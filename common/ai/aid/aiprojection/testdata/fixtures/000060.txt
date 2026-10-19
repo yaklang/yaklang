@@ -175,8 +175,8 @@ section_hash_count:
 如果你想要使用工具，请严格遵循以下流程：
 
 1. **申请工具：** 使用以下格式提交工具申请，确保清晰指定你需要的工具名称。申请内容为：
-   {"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "..."}
-   请确保 `tool_require_payload` 中填写的工具名称准确无误，并在 `human_readable_thought` 中简要说明调用该工具的目的和预期结果。
+   {"@action": "require_tool", "require_tool_payload": "..[your-toolname]..", "human_readable_thought": "..."}
+   请确保 `require_tool_payload` 中填写的工具名称准确无误，并在 `human_readable_thought` 中简要说明调用该工具的目的和预期结果。
 2. **查看参数：** 在工具申请通过后，系统会返回该工具所需的参数列表。请仔细阅读每个参数的说明，确保理解其用途和格式要求。根据任务需求填写参数，确保输入信息完整且正确。
 3. **执行工具：** 提交参数后，系统将执行工具并返回结果。请关注工具的输出内容，并在后续步骤中根据结果决定下一步行动。
 
@@ -207,26 +207,9 @@ section_hash_count:
 
 
 
- ## 知识增强引导
+ ## 知识库工具
 
-当回答问题时，若遇到知识盲区、信息过时或需实时数据，应主动使用知识增强技术，确保答案准确全面。包括：
-
-- **技术文档查询**：API文档、框架更新、工具使用方法
-- **实时信息需求**：当前时间敏感的数据、最新版本信息
-- **安全威胁情报**：最新漏洞、攻击手段、防护措施
-- **具体错误排查**：特定报错信息、故障诊断、解决方案
-- **行业标准更新**：最新规范、合规要求、最佳实践
-- **工具版本特性**：新功能、兼容性、配置方法
-- **学术研究引用**：需要具体出处、数据支撑的知识点
-
-### 准确度要求
-
-- 高准确性需求（技术实现、安全、法律） 必须增强
-- 中等准确性需求（一般知识、概念）建议增强
-- 低准确性需求（创意、观点）可直接回答
-
-**Action**：knowledge_enhance_answer
-**使用时机**: 静态知识不足或需验证信息准确性时，**记住**：宁可多查证一次，也不要提供可能错误或过时的信息。用户的信任建立在答案的可靠性上。
+根据 yaklang-system Skill，require manage_knowledge_base 后使用 op=list 查看知识库，再 require query_knowledge_base，显式选择 name/names 或 all=true，并指定 token_limit、limit 和 per_entry_token_limit。
 
 <|PERSISTENT_END|>
 
@@ -244,9 +227,9 @@ section_hash_count:
 <|FINAL_ANSWER_END_CURRENT_NONCE|>
 
 *. 如果你想要使用工具：
-    * `{"@action": "require_tool", "tool_require_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
-*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
-    * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}
+    * `{"@action": "require_tool", "require_tool_payload": "..[your-toolname]..", "human_readable_thought": "先读取配置"}`
+*. 需要知识库资料时，根据 yaklang-system Skill 先加载管理工具选择库：
+    * `{"@action":"require_tool","require_tool_payload":"manage_knowledge_base"}`
 
 
 
@@ -330,7 +313,6 @@ Available Skills (use loading_skills action to load):
         "directly_call_tool",
         "tool_compose",
         "load_capability",
-        "knowledge_enhance_answer",
         "loading_skills",
         "load_skill_resources"
       ],
@@ -343,7 +325,6 @@ Available Skills (use loading_skills action to load):
         "directly_call_tool: directly call a recently used tool (skip require \u0026 param-generation phases). Only tools listed in the CACHE_TOOL_CALL block are eligible. Provide directly_call_tool_name AND directly_call_tool_params together.",
         "tool_compose: Compose multiple KNOWN tool calls into a workflow DAG with explicit dependencies or parallelism. ONLY use this when you already know exactly which tools to call and their dependency/parallel relationships. Do NOT use tool_compose as a planning mechanism — for complex/uncertain tasks use request_plan_and_execution instead. Do NOT use tool_compose to invoke AI Blueprints (use require_ai_blueprint). Minimum requirement: at least 2 tool nodes with meaningful dependency or parallel structure.",
         "load_capability: 自动加载一些外部能力，这个外部能力可以被自动检测类型，并且加载。可以出现工具调用(tool)，专注模式(focus_mode)，技能(skill)或者模版/蓝图（forge/blueprint）",
-        "knowledge_enhance_answer: Enhance the answer with additional knowledge",
         "loading_skills: Load one or more skills into the context window. Use this when you need specialized knowledge or instructions from available skills. Provide either 'skill_name' for a single skill, or 'skill_names' (comma-separated) for batch loading. The skill's SKILL.md content and file tree will be displayed in the context.",
         "load_skill_resources: Load a specific file or search content across skill files. Two modes (mutually exclusive): (1) resource_path: load a file using \"@skill_name/path/to/file.md\". Fuzzy matching is applied if exact path not found. Set resource_type to \"document\" (default) for content or \"script\" for executable file path resolution. (2) pattern: grep/search across all files in skills using a regex or string pattern. Returns matching lines with surrounding context. Use optional skill_name to limit grep scope."
       ]
@@ -364,7 +345,7 @@ Available Skills (use loading_skills action to load):
       "description": "新增的 evidence Markdown。系统会自动与历史 EVIDENCE 合并并执行 token 裁剪。建议优先写关键新增发现，可使用 `## 新增待测试列表`、`## 某一个事实发现` 等小节；每条至少写清楚主体是谁、发现了什么。",
       "type": "string"
     },
-    "tool_require_payload": {
+    "require_tool_payload": {
       "description": "MUST set in {\"@action\": \"require_tool\", ... }. 根据上下文信息，提供你想要申请的工具名，只说明工具名即可，严禁包含参数.",
       "type": "string"
     },
@@ -390,10 +371,6 @@ Available Skills (use loading_skills action to load):
     },
     "capability_identifier": {
       "description": "只对 {\"@action\":\"load_capability\" ...} 时生效，这个标识符会被自动检测是 skill/tool/forge/focus_mode/filename, 然后自动加载",
-      "type": "string"
-    },
-    "rewrite_user_query_for_knowledge_enhance": {
-      "description": "MUST be set if 'knowledge_enhance_answer' @action is set. The user query to enhance the knowledge answer. If not provided, the system will use the original user input as the query.",
       "type": "string"
     },
     "skill_name": {

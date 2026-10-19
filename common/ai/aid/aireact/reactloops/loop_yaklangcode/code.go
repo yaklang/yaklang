@@ -263,7 +263,6 @@ func init() {
 
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(wrapInitTaskBindLoopBox(loopBox, buildInitTask(r, holder, installCfg))),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),

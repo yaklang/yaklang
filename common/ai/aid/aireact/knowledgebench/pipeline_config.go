@@ -42,7 +42,7 @@ type KnowledgePipelineConfig struct {
 	CompressTargetTokens int64   // target token budget (default 10K)
 	CompressScoreThresh  float64 // minimum score to keep (default 0.3)
 
-	// --- Loop (knowledge_enhance) ---
+	// --- Benchmark iteration settings ---
 	MaxIterations        int  // search loop iterations (default 3)
 	MaxSearchesPerLoop   int  // max searches before forced stop (default 5)
 	UseSpeedModelForEval bool // use SpeedPriority for evaluateNextSearch

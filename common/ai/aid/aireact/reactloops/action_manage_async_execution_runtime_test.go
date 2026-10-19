@@ -48,7 +48,7 @@ func TestManageAsyncExecutionRuntime(t *testing.T) {
 			invoker := mock.NewMockInvoker(ctx)
 			invoker.SetConfig(cfg)
 			loop, err := NewReActLoop("async-management-test", invoker, WithFunctionCallMode(native),
-				WithAllowToolCall(false), WithAllowAIForge(false), WithAllowRAG(false), WithAllowPlanAndExec(false),
+				WithAllowToolCall(false), WithAllowAIForge(false), WithAllowPlanAndExec(false),
 				WithAllowUserInteract(false), WithRegisterLoopAction("require_tool", "unused routing", nil, nil, nil))
 			require.NoError(t, err)
 			defer loop.Release()

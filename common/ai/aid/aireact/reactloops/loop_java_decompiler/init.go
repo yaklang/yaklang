@@ -22,7 +22,6 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_JAVA_DECOMPILER,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowToolCall(false),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),

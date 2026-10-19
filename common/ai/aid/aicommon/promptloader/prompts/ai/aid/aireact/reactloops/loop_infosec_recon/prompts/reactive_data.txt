@@ -20,9 +20,6 @@
 - **Unverified**: {{ .PoolUnverified }}
 - **By source**: {{ .PoolBySource }}
 
-### Knowledge / RAG snippet
-{{ .EnhanceData }}
-
 ### Recent tool recon log (truncated)
 ```
 {{ .ReconLogTail }}

@@ -31,7 +31,7 @@ func detachTestRuntime(t *testing.T, native bool, tool *aitool.Tool, opts ...aic
 	cfg := aicommon.NewConfig(ctx, append(base, opts...)...)
 	r := &ReAct{config: cfg, Emitter: cfg.Emitter}
 	r.promptManager = NewPromptManager(r, t.TempDir())
-	loop, err := reactloops.NewReActLoop("detach-test", r, reactloops.WithFunctionCallMode(native), reactloops.WithFunctionCallActionVariants(), reactloops.WithAllowAIForge(false), reactloops.WithAllowRAG(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false), reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true))
+	loop, err := reactloops.NewReActLoop("detach-test", r, reactloops.WithFunctionCallMode(native), reactloops.WithFunctionCallActionVariants(), reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false), reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true))
 	require.NoError(t, err)
 	t.Cleanup(loop.Release)
 	task := aicommon.NewStatefulTaskBase("detach-owner", "original owner", ctx, cfg.Emitter, true)

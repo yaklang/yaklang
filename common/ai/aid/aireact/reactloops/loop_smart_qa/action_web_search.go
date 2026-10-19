@@ -50,7 +50,7 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 					"Web search FAILED for '%s': %v. "+
 						"Internet search encountered an error. "+
 						"You may try web_search again with a different query, "+
-						"or use search_knowledge / search_persistent_memory as alternatives.", query, err)
+						"or require query_knowledge_base via yaklang-system / use search_persistent_memory as alternatives.", query, err)
 				invoker.AddToTimeline("web_search_failed", failMsg)
 				op.Feedback(failMsg)
 				op.Continue()

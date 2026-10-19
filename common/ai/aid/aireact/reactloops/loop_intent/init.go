@@ -21,7 +21,6 @@ func init() {
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithDisableTodoSnapshot(true),
 				reactloops.WithDisableLoopPerception(true),
-				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(false),

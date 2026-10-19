@@ -144,7 +144,7 @@ func TestBuildSubAgentInvoker_InheritsNativeProtocolAndAuto(t *testing.T) {
 	require.True(t, childCfg.EnableFunctionCallMode)
 	require.True(t, childCfg.GetConfigBool("EnableFunctionCallMode"))
 	loop, err := NewReActLoop("child-native", child, WithDisableLoopPerception(true),
-		WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false),
+		WithAllowToolCall(false), WithAllowAIForge(false), WithAllowPlanAndExec(false),
 		WithAllowUserInteract(false),
 		WithRegisterLoopAction("require_tool", "unused routing fixture", nil, nil, nil))
 	require.NoError(t, err)

@@ -356,11 +356,8 @@ type AIInvokeRuntime interface {
 	CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error)
 	// QuickKnowledgeSearch performs a fast local knowledge-base search using LIKE + BM25.
 	QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error)
-	// EnhanceKnowledgeGetterEx 支持多种 EnhancePlan 的知识增强获取器
-	// enhancePlans 参数可选，支持：
-	//   - nil 或空切片：使用默认完整增强流程
-	//   - []string{"exact_keyword_search"}: 仅使用精准关键词搜索
-	//   - []string{"hypothetical_answer", "generalize_query"}: 指定增强策略组合
+	// Deprecated: automatic knowledge enhancement is unavailable. Use the
+	// yaklang-system Skill and explicit knowledge tools with bounded queries.
 	EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error)
 	// VerifyUserSatisfaction verifies if the user is satisfied with the result
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*VerifySatisfactionResult, error)

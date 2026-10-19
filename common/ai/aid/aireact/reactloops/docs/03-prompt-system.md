@@ -74,7 +74,7 @@ flowchart TD
 | `Tools` | 工具列表 | `r.toolsGetter()` |
 | `TopTools` | 摘要后的工具 | 同上但省略详情 |
 | `AllowPlan` | 是否允许 plan | `r.allowPlanAndExec()` |
-| `AllowKnowledgeEnhanceAnswer` | 是否允许 RAG | `r.allowRAG()` |
+| `AllowKnowledgeEnhanceAnswer` | 知识工具能力标记，默认可用；实际检索由 Skill 引导 | `true` |
 | `AllowAIForge` | 是否允许蓝图 | `r.allowAIForge()` |
 | `AllowToolCall` | 是否允许工具 | `r.allowToolCall()` |
 | `AllowUserInteract` | 是否允许问用户 | `r.allowUserInteract()` |

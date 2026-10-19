@@ -78,7 +78,7 @@
 1. 先使用查资料工具收集信息：
    - `read_reference_file` 阅读参考文件
    - `grep_reference` 搜索关键词
-   - `search_knowledge` 知识库搜索
+   - `require_tool` / `directly_call_tool` 按 yaklang-system Skill 查询知识库，显式指定库范围和 token_limit
 2. 收集足够资料后使用 `write_section` 创建初稿
 
 ### 如果报告已有内容

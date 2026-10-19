@@ -50,7 +50,7 @@ func TestMUSTPASS_GreetingAnswersOnceWithoutMemoryRecall(t *testing.T) {
 			memory := &greetingRecallMemory{MemoryTriage: aicommon.NewNoOpMemoryTriage()}
 			loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_DEFAULT, inv,
 				reactloops.WithFunctionCallMode(false), // This fixture emits text actions.
-				reactloops.WithAllowRAG(false), reactloops.WithAllowToolCall(false),
+				reactloops.WithAllowToolCall(false),
 				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowUserInteract(false), reactloops.WithMemoryTriage(memory),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),

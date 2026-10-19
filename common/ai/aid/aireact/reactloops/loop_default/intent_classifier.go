@@ -489,7 +489,7 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 				"[CRITICAL] User's input explicitly contains internet search keywords. "+
 					"You MUST use web_search tool or switch to internet_research focus mode to satisfy this request. "+
 					"Do NOT use do_http_request with placeholder URLs. "+
-					"Do NOT rely solely on knowledge_enhance_answer. "+
+					"Use the yaklang-system knowledge tools for knowledge base queries. "+
 					"The user is requesting real-time internet search results.")
 		}
 
@@ -497,9 +497,9 @@ func applyFastMatchResult(r aicommon.AIInvokeRuntime, loop *reactloops.ReActLoop
 			if schTool.Name == "web_search" {
 				r.AddToTimeline("web_search_recommended",
 					"web_search tool was identified as relevant for this query. "+
-						"If knowledge_enhance_answer or knowledge base search cannot provide sufficient results, "+
+						"If knowledge base tools cannot provide sufficient results, "+
 						"you MUST call web_search to find the answer from the internet. "+
-						"Do NOT repeatedly retry knowledge_enhance_answer if it already failed.")
+						"Do NOT repeat an unsuccessful knowledge query without changing its scope or query.")
 				break
 			}
 		}

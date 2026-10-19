@@ -276,7 +276,6 @@ func buildPhase2StaticAnalysisLoop(r aicommon.AIInvokeRuntime, state *SkillAudit
 
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(math.MaxInt32),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

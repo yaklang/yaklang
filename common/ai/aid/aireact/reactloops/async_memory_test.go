@@ -67,7 +67,6 @@ func TestAsyncMemoryDoesNotBlockIterationsAndReachesLaterPrompt(t *testing.T) {
 	loop, err := NewReActLoop("async-memory-test", invoker,
 		WithFunctionCallMode(false),
 		WithAllowToolCall(false),
-		WithAllowRAG(false),
 		WithAllowAIForge(false),
 		WithAllowPlanAndExec(false),
 		WithAllowUserInteract(false),

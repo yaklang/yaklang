@@ -1,7 +1,6 @@
 package loop_default
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -14,7 +13,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		config := r.GetConfig()
 
 		attachedDatas := aicommon.NonEmptyAttachedResources(task.GetAttachedDatas())
-		attachedResources := reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
+		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		// Local greeting classification must remain available when expensive
 		// synchronous enrichment is disabled. It enables one-answer completion
 		// without restoring model-backed intent or knowledge initialization.
@@ -27,26 +26,6 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		// Attachments remain available to the main loop. Expensive enrichment is
 		// opt-in so the first response can start before intent/knowledge calls.
 		if !config.GetConfigBool("AllowSyncInitContext") {
-			return
-		}
-
-		// Original logic: process attached data (knowledge bases, files, etc.)
-		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
-		if mustProcessMentionedInfo && hasAttachedKnowledgeBaseResource(attachedResources) {
-			loop.UserStatus("开始处理用户提及的数据（@ Mentionup）", "Start to process user-mentioned data (@ Mentionup)")
-			err := ProcessAttachedData(r, loop, task, operator, attachedResources)
-			if err != nil {
-				log.Errorf("failed to process attached data: %v", err)
-				loop.GetInvoker().AddToTimeline("error", fmt.Sprintf("failed to process attached data: %v", err))
-			}
-		}
-
-		// exit early
-		if failed, reason := operator.IsFailed(); operator.IsDone() || failed {
-			if reason != nil && reason.Error() != "" {
-				r.AddToTimeline("attached_materials_handler", reason.Error())
-			}
-			r.AddToTimeline("end", "Attached Materials Handler Decide to exit.")
 			return
 		}
 

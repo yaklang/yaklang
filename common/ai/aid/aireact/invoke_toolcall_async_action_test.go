@@ -68,7 +68,7 @@ func TestDirectToolAsyncActionIntegration(t *testing.T) {
 			runtime := &ReAct{config: cfg, Emitter: cfg.Emitter}
 			loop, err := reactloops.NewReActLoop("async-action-test", runtime,
 				reactloops.WithFunctionCallMode(protocol == "native"), reactloops.WithFunctionCallActionVariants(), reactloops.WithAllowAIForge(false),
-				reactloops.WithAllowRAG(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
+				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithToolInvokeGuard(func(_ string, params aitool.InvokeParams) (bool, string) {
 					return params.GetString("mode") != "blocked", "owner rejected this call"

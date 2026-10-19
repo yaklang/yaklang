@@ -383,7 +383,7 @@ func (r *ReAct) ExecuteLoopTask(taskTypeName string, task aicommon.AIStatefulTas
 		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
 			// Defer the emit decision to after ALL callbacks have completed.
 			// This ensures that IgnoreError() calls from loop-specific callbacks
-			// (e.g. loop_intent, loop_knowledge_enhance) are respected regardless
+			// (e.g. loop_intent) are respected regardless
 			// of callback registration order. Without deferral, this callback might
 			// check ShouldIgnoreError() before a later callback has called IgnoreError().
 			operator.DeferAfterCallbacks(func() {

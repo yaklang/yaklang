@@ -39,7 +39,6 @@ func init() {
 			}
 
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(true),

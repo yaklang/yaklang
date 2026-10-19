@@ -91,7 +91,6 @@ func init() {
     reactloops.RegisterAction(loopAction_toolRequireAndCall)        // require_tool
     reactloops.RegisterAction(loopAction_directlyCallTool)          // directly_call_tool
     reactloops.RegisterAction(loopAction_AskForClarification)       // ask_for_clarification
-    reactloops.RegisterAction(loopAction_EnhanceKnowledgeAnswer)    // knowledge_enhance
     reactloops.RegisterAction(loopAction_RequestPlanAndExecution)   // request_plan_execution
     reactloops.RegisterAction(loopAction_RequireAIBlueprintForge)   // require_ai_blueprint
     reactloops.RegisterAction(loopAction_LoadingSkills)             // loading_skills
@@ -109,7 +108,6 @@ func init() {
 | `require_tool` | 否 | `action_tool_require_and_call.go` | `allowToolCall=true` | `require_tool_payload` 接收一个工具名或名称数组；只加载 Schema，不生成参数、不执行工具 |
 | `directly_call_tool` | 否 | `action_directly_call_tool.go` | `allowToolCall=true` 且 `aiToolManager != nil` | 单个工具走旧标量字段；2–8 个独立、完整参数已知的调用可走 `directly_call_tool_params_group`；recent-cache miss 仅告警 |
 | `ask_for_clarification` | 否 | `action_ask_for_clarification.go` | `allowUserInteract=true` | 信息不足问用户 |
-| `knowledge_enhance` | 否 | `action_enhance_knowledge_answer.go` | `allowRAG=true` | RAG 检索回答 |
 | `save_evidence` | 是 | `reactloops/action_save_evidence.go` | 总是 | 幂等写入共享 Session Evidence Store 后继续任务 |
 | `request_plan_execution` | 是 | `action_request_plan_execution.go` | `allowPlanAndExec=true` | 切到任务规划模式 |
 | `require_ai_blueprint` | 是 | `action_require_ai_blueprint_forge.go` | `allowAIForge=true` | 启动一个 forge 蓝图 |

@@ -30,7 +30,6 @@ func init() {
 			}
 
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
@@ -71,7 +70,6 @@ func init() {
 						"PoolVerified":            ver,
 						"PoolUnverified":          unver,
 						"PoolBySource":            strings.Join(srcParts, ", "),
-						"EnhanceData":             utils.ShrinkString(loop.Get(keyInfosecEnhanceData), 4000),
 						"ReconLogTail":            reconLog,
 						"FeedbackMessages":        strings.TrimSpace(feedbacker.String()),
 					}
@@ -82,7 +80,6 @@ func init() {
 				crawlJsCollectorAction(r),
 				runJsStaticAnalysisAction(r),
 				probeAPICandidatesAction(r),
-				searchKnowledgeInfosec(r),
 				webSearchAction(r),
 				readFileAction(r),
 				findFilesAction(r),

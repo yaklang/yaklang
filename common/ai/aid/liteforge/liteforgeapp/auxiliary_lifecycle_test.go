@@ -296,7 +296,7 @@ func TestPR5128_SpeedLoop_LifecycleAcrossRounds(t *testing.T) {
 	label := "speed-rounds"
 	baseEvents, baseHotpatches, _ := pr5128LabeledLoops(t, label)
 	loop, err := reactloops.NewReActLoop("pr5128-two-rounds", invoker,
-		reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 		reactloops.WithUseSpeedPriorityAICallback(true),
 		reactloops.WithDisablePeriodicVerification(true),

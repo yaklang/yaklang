@@ -21,7 +21,6 @@ func newHTTPFuzztestLoopForDecryptTest(t *testing.T) *reactloops.ReActLoop {
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),
@@ -322,7 +321,6 @@ func TestDecryptDataAction_EmitsMarkdownResult(t *testing.T) {
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),

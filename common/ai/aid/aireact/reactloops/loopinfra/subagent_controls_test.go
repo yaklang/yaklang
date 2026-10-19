@@ -186,7 +186,7 @@ func TestBackgroundDispatchActions_ActualLoop(t *testing.T) {
 				reactloops.WithReactiveDataBuilder(func(_ *reactloops.ReActLoop, feedback *bytes.Buffer, _ string) (string, error) {
 					return feedback.String(), nil
 				}),
-				reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+				reactloops.WithAllowToolCall(false), reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true),
 				reactloops.WithRegisterLoopAction("read_deployment", "read independent deployment config", nil, nil,

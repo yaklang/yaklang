@@ -99,7 +99,7 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 			invoker := &speedLoopProjectedInvoker{MockInvoker: mock.NewMockInvoker(ctx)}
 			invoker.SetConfig(cfg)
 			loop, err := reactloops.NewReActLoop("auxiliary-integration", invoker,
-				reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 				reactloops.WithRegisterLoopAction("require_tool", "unused tool route", nil, nil, nil),
 				reactloops.WithUseSpeedPriorityAICallback(true),

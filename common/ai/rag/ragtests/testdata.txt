@@ -620,7 +620,6 @@ type ReActLoop struct {
     // Capability gates (dynamic feature toggles)
     allowAIForge      func() bool  // AI Blueprint invocation
     allowPlanAndExec  func() bool  // Recursive planning
-    allowRAG          func() bool  // Retrieval-augmented generation
     allowToolCall     func() bool  // External tool calls
     allowUserInteract func() bool  // User interaction requests
 

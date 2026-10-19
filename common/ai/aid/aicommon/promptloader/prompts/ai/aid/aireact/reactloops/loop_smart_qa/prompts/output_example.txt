@@ -1,8 +1,12 @@
 * When you can answer the question directly:
   {"@action": "final_answer", "human_readable_thought": "I have enough knowledge to answer this question directly", "answer": "Your comprehensive answer here..."}
 
-* When you need to search the knowledge base first:
-  {"@action": "search_knowledge", "human_readable_thought": "The user's question is about a specific topic that might be covered in the attached knowledge base", "search_query": "relevant search query", "mode": "semantic"}
+* When you need knowledge, load the management tool and inspect bases with op=list:
+  {"@action": "require_tool", "require_tool_payload": "manage_knowledge_base"}
+  {"@action": "directly_call_tool", "directly_call_tool_name": "manage_knowledge_base", "directly_call_tool_params": {"op":"list","limit":20}}
+* After choosing an exact base from the list, load and query it:
+  {"@action": "require_tool", "require_tool_payload": "query_knowledge_base"}
+  {"@action": "directly_call_tool", "directly_call_tool_name": "query_knowledge_base", "directly_call_tool_params": {"name":"project-docs","mode":"semantic","query":"relevant search query","token_limit":1024,"limit":3,"per_entry_token_limit":256}}
 
 * When you need to search the internet:
   {"@action": "web_search", "human_readable_thought": "I need up-to-date information about this topic from the internet", "search_query": "specific search query"}

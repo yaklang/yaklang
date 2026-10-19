@@ -320,7 +320,6 @@ WithAllowXxxGetter(f func() bool) // 完整形式（运行时可变）
 
 | 选项 | 作用 |
 |------|------|
-| `WithAllowRAG` | 是否启用 RAG（决定是否注册 `knowledge_enhance` action） |
 | `WithAllowAIForge` | 是否允许 AI 蓝图（`require_ai_blueprint`） |
 | `WithAllowPlanAndExec` | 是否允许任务规划与执行（`request_plan_execution`） |
 | `WithAllowToolCall` | 是否允许工具调用（`require_tool` / `directly_call_tool`） |

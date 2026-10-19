@@ -17,7 +17,7 @@ import (
 // CollectFocusModeDynamicOptions 读取 caller 中已注册的 focusXxx 钩子函数，
 // 转换为对应的 ReActLoopOption 列表。caller 应在整个 loop 生命周期内存活。
 //
-// 注意：动态钩子的优先级高于同名静态 dunder（例如 focusAllowRAG > __ALLOW_RAG__）。
+// 注意：动态钩子的优先级高于同名静态 dunder（例如 focusAllowToolCall > __ALLOW_TOOL_CALL__）。
 // 调用方可以先 append 静态选项再 append 动态选项以覆盖。
 //
 // 关键词: dynamic hook bridging, focusXxx to With*Option
@@ -112,9 +112,6 @@ func CollectFocusModeDynamicOptions(caller *FocusModeYakHookCaller) []ReActLoopO
 	}
 
 	// ---- 动态权限 getter，覆盖静态同名 dunder ----
-	if caller.HasHook(FocusHook_AllowRAG) {
-		opts = append(opts, WithAllowRAGGetter(makeBoolGetter(caller, FocusHook_AllowRAG)))
-	}
 	if caller.HasHook(FocusHook_AllowAIForge) {
 		opts = append(opts, WithAllowAIForgeGetter(makeBoolGetter(caller, FocusHook_AllowAIForge)))
 	}

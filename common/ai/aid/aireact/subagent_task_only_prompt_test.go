@@ -101,7 +101,7 @@ func TestSubAgentContextMode_RealRuntimeAndGoalElaboration(t *testing.T) {
 				childConfig = p.Invoker.GetConfig().(*aicommon.Config)
 				options := reactloops.BasicAICommonConfigOption(childConfig)
 				options = append(options,
-					reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+					reactloops.WithAllowToolCall(false), reactloops.WithAllowAIForge(false),
 					reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 					reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true))
 				return reactloops.NewReActLoop("context-mode-child", p.Invoker, options...)

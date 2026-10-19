@@ -82,7 +82,7 @@ func TestToolBatchUserAnswerCancelsChildrenAndExitsParent(t *testing.T) {
 	}
 	var err error
 	loop, err = reactloops.NewReActLoop("tool-batch-user-exit", inv,
-		reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowToolCall(false), reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 		reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true), reactloops.WithDisableIncreaseIteration(true),
 		reactloops.WithRegisterLoopAction("start_child", "start background work", nil, nil,

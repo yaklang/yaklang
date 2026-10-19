@@ -23,7 +23,7 @@ func TestKnowledgeQueryExplicitScopeAndGlobalBounds(t *testing.T) {
 		t.Helper()
 		params["token_limit"] = 1024
 		params["per_entry_token_limit"] = 256
-		r, err := Query(params, opts...)
+		r, err := queryRequestForTest(params, opts...)
 		require.NoError(t, err)
 		raw, err := json.Marshal(r)
 		require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestKnowledgeQueryExplicitScopeAndGlobalBounds(t *testing.T) {
 		return r
 	}
 	for _, params := range []map[string]any{{}, {"all": false}, {"name": " "}, {"names": []string{}}} {
-		_, err := Query(params, opts...)
+		_, err := queryRequestForTest(params, opts...)
 		require.ErrorContains(t, err, "manage_knowledge_base")
 		require.ErrorContains(t, err, `"op":"list"`)
 		require.ErrorContains(t, err, "names")
@@ -69,7 +69,7 @@ func TestKnowledgeQueryExplicitScopeAndGlobalBounds(t *testing.T) {
 	require.True(t, r.BudgetExhausted)
 	require.Less(t, len(r.Results), 9)
 	require.Equal(t, len(r.Results), r.NextOffset, "budget exhaustion must not skip unreturned entries")
-	_, err := Query(map[string]any{"all": true, "token_limit": 1024}, append(opts, WithContext(cancelledQueryContext()))...)
+	_, err := queryRequestForTest(map[string]any{"all": true, "token_limit": 1024}, append(opts, WithContext(cancelledQueryContext()))...)
 	require.ErrorIs(t, err, context.Canceled)
 }
 
@@ -99,13 +99,13 @@ func TestKnowledgeQueryRejectsUnsafeOrAmbiguousParameters(t *testing.T) {
 		for key, value := range fields {
 			params[key] = value
 		}
-		_, err := Query(params, opts...)
+		_, err := queryRequestForTest(params, opts...)
 		require.Error(t, err, "%v", params)
 	}
 	for i := 1; i <= maxQueryBases; i++ {
 		create(t, opts, fmt.Sprintf("base-%d", i))
 	}
-	_, err := Query(map[string]any{"all": true, "token_limit": 1024}, opts...)
+	_, err := queryRequestForTest(map[string]any{"all": true, "token_limit": 1024}, opts...)
 	require.ErrorContains(t, err, "safety limit")
 	require.ErrorContains(t, err, "op=list")
 }

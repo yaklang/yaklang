@@ -107,7 +107,7 @@ func TestReportOutputFilterPreservesAITagEdits(t *testing.T) {
 				inv := mock.NewMockInvoker(ctx)
 				inv.SetConfig(cfg)
 				opts := []reactloops.ReActLoopOption{
-					reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+					reactloops.WithAllowToolCall(false), reactloops.WithAllowAIForge(false),
 					reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 					reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
 					reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(len(steps) + 1),
@@ -221,8 +221,7 @@ func TestReportGeneratingOutputLifecycle(t *testing.T) {
 			inv := mock.NewMockInvoker(ctx)
 			inv.SetConfig(cfg)
 			opts := []reactloops.ReActLoopOption{
-				reactloops.WithAllowToolCall(false), reactloops.WithAllowRAG(false),
-				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
+				reactloops.WithAllowToolCall(false), reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 				reactloops.WithDisableLoopPerception(true), reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithDisableIncreaseIteration(true), reactloops.WithMaxIterations(5),
 				reactloops.WithInitTask(func(l *reactloops.ReActLoop, _ aicommon.AIStatefulTask, op *reactloops.InitTaskOperator) {

@@ -67,7 +67,7 @@ func TestDirectToolBatchAsyncIntegration(t *testing.T) {
 			runtime := &ReAct{config: cfg, Emitter: cfg.Emitter}
 			loop, err := reactloops.NewReActLoop("mixed-batch-test", runtime,
 				reactloops.WithFunctionCallMode(protocol == "native"), reactloops.WithFunctionCallActionVariants(),
-				reactloops.WithAllowAIForge(false), reactloops.WithAllowRAG(false), reactloops.WithAllowPlanAndExec(false),
+				reactloops.WithAllowAIForge(false), reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowUserInteract(false), reactloops.WithDisableLoopPerception(true),
 				reactloops.WithDisablePeriodicVerification(true),
 				reactloops.WithToolInvokeGuard(func(_ string, params aitool.InvokeParams) (bool, string) {

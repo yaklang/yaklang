@@ -95,7 +95,6 @@ func TestDefaultLoop_ReproducesReasoningReplayPromptExampleEcho(t *testing.T) {
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		reactIns,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
@@ -196,7 +195,6 @@ func TestDefaultLoop_PromptExampleEchoDoesNotRequireReasoningReplay(t *testing.T
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		reactIns,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
@@ -269,7 +267,6 @@ func TestDefaultLoop_ReasonStreamProtocolTextIsNotParsedAsAnswer(t *testing.T) {
 	loop, err := reactloops.CreateLoopByName(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		reactIns,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),

@@ -407,7 +407,6 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(maxIter),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
@@ -935,7 +934,6 @@ var planPromptTemplate = promptloader.MustLoad("inline/ai/aid/aireact/reactloops
 func BuildAllCategoriesLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, overrideCategories []model.VulnCategory, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(math.MaxInt32),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

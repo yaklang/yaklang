@@ -101,7 +101,6 @@ func BuildDirExploreLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoo
 
 	preset := []reactloops.ReActLoopOption{
 		withExploreOutput(),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

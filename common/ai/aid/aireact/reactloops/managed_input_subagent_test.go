@@ -39,7 +39,7 @@ func TestManagedInputSubAgentInheritsResourceBoundary(t *testing.T) {
 	require.True(t, cfg.DisallowMCPServers)
 	require.True(t, cfg.IsReActActionAllowed("plan", "read_file"))
 	require.True(t, cfg.IsReActActionAllowed("default", "request_plan"))
-	require.False(t, cfg.IsReActActionAllowed("plan", "search_knowledge"))
+	require.False(t, cfg.IsReActActionAllowed("plan", "query_knowledge_base"))
 	require.Same(t, manager, cfg.GetAiToolManager())
 	inherited, err := cfg.GetAiToolManager().GetToolByName("read_file")
 	require.NoError(t, err)

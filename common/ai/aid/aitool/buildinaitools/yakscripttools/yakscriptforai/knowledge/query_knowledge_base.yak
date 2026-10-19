@@ -41,7 +41,11 @@ perEntryTokenLimit = cli.Int("per_entry_token_limit", cli.setDefault(512), cli.s
 contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setJsonSchema(`{"type":"integer","minimum":0}`), cli.setHelp("get 正文 Unicode 字符偏移，使用 next_content_offset 续读"))
 minScore = cli.Float("min_score", cli.setDefault(-1), cli.setJsonSchema(`{"type":"number","minimum":-1,"maximum":1}`), cli.setHelp("semantic 最低余弦相似度，-1..1，默认-1（不过滤）"))
 cli.check()
-params = {"name":name,"names":json.loads(namesJSON),"all":all,"query":query,"mode":mode,"entry_id":entryID,"limit":limit,"offset":offset,"token_limit":tokenLimit,"per_entry_token_limit":perEntryTokenLimit,"content_offset":contentOffset}
-if mode=="semantic" || minScore != -1 { params.min_score=minScore }
-result = aiknowledge.Query(params)~
+names = json.loads(namesJSON)
+if name!="" && len(names)>0 { die("choose exactly one scope: name, names or all=true") }
+scope = name
+if len(names)>0 { scope=names }
+opts = [aiknowledge.all(all),aiknowledge.mode(mode),aiknowledge.entryID(entryID),aiknowledge.limit(limit),aiknowledge.offset(offset),aiknowledge.perEntryTokenLimit(perEntryTokenLimit),aiknowledge.contentOffset(contentOffset)]
+if mode=="semantic" || minScore != -1 { opts=append(opts,aiknowledge.minScore(minScore)) }
+result = aiknowledge.Query(scope,query,tokenLimit,opts...)~
 println(json.dumps(result,json.withIndent("")))

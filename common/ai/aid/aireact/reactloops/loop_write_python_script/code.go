@@ -35,7 +35,6 @@ func init() {
 			)
 
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),

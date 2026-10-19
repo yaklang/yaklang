@@ -63,7 +63,6 @@ func newHTTPFuzztestLoopForDirectAnswerTest(t *testing.T) *reactloops.ReActLoop 
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),
@@ -184,7 +183,6 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerEmptyPayloadRetryWithAITAGHint(t 
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),
@@ -275,7 +273,6 @@ func TestLoopHTTPFuzztestExecute_DirectlyAnswerWithFinalAnswerAITag(t *testing.T
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),

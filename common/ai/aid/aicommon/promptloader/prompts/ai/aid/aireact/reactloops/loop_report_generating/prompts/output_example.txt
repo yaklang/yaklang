@@ -31,14 +31,16 @@
 ```
 
 ### 示例3：知识库搜索
-当需要从知识库获取信息时：
+先根据 yaklang-system Skill 加载管理工具，使用 op=list 查看库并选择名称。随后加载查询工具：
 ```json
 {
-  "@action": "search_knowledge",
-  "human_readable_thought": "从知识库中搜索关于SQL注入的防护方案",
-  "knowledge_bases": ["security_kb"],
-  "search_query": "SQL注入攻击的防护方法有哪些？"
+  "@action": "require_tool",
+  "require_tool_payload": "query_knowledge_base"
 }
+```
+读取返回的 schema 后调用，必须指定范围和预算：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_knowledge_base","directly_call_tool_params":{"name":"security_kb","mode":"semantic","query":"SQL注入攻击的防护方法有哪些？","token_limit":1024,"limit":3,"per_entry_token_limit":256}}
 ```
 
 ### 示例4：创建报告初稿（必须包含 <|GEN_REPORT_CURRENT_NONCE|> 标签！）
@@ -144,7 +146,7 @@
 - `delete_section` - 删除内容（无需生成内容）
 - `read_reference_file` - 读取参考文件（查询类操作）
 - `grep_reference` - 搜索参考资料（查询类操作）
-- `search_knowledge` - 知识库搜索（查询类操作）
+- `require_tool` / `directly_call_tool` - 按 Skill 加载管理和查询知识库工具（查询类操作）
 - `finish` - 完成报告
 
 **记忆口诀**: 只有需要你"生成或提供报告内容片段"的 actions 才需要 `<|GEN_REPORT_...|>` 标签对！

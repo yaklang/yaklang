@@ -29,7 +29,6 @@ func registerStubRequireToolAction(t *testing.T) {
 // 使 NewReActLoop 能在测试进程内（无生产 loop init）完成构建。
 func minimalNewReActLoopOptions() []ReActLoopOption {
 	return []ReActLoopOption{
-		WithAllowRAG(false),
 		WithAllowAIForge(false),
 		WithAllowPlanAndExec(false),
 		WithAllowUserInteract(false),

@@ -24,7 +24,6 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_INTERNET_RESEARCH,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
 				reactloops.WithAllowToolCall(false),

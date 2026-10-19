@@ -75,7 +75,6 @@ func (i *postIterationTestInvoker) timelineValues(entry string) []string {
 func newPostIterationTestLoop(t *testing.T, invoker *postIterationTestInvoker, extraOpts ...reactloops.ReActLoopOption) *reactloops.ReActLoop {
 	t.Helper()
 	opts := []reactloops.ReActLoopOption{
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),

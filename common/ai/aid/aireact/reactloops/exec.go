@@ -254,9 +254,6 @@ func inferActionTypeFromPayload(action *aicommon.Action, finalAnswer string) str
 	if hasField("capability_identifier") {
 		return "load_capability"
 	}
-	if hasField("rewrite_user_query_for_knowledge_enhance") {
-		return "knowledge_enhance_answer"
-	}
 	if hasField("blueprint_payload") {
 		return "require_ai_blueprint"
 	}

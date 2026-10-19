@@ -145,7 +145,7 @@ func TestNewReActLoopRegistersSearchCapabilities(t *testing.T) {
 				aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true)))
 			options := []ReActLoopOption{
 				WithFunctionCallMode(test.native), WithDisableLoopPerception(true),
-				WithAllowRAG(false), WithAllowAIForge(false),
+				WithAllowAIForge(false),
 				WithAllowPlanAndExec(false), WithAllowUserInteract(false),
 				WithRegisterLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL, "tool routing", nil, nil, nil),
 			}

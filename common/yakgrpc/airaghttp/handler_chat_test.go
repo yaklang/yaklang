@@ -1,6 +1,7 @@
 package airaghttp
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -8,9 +9,40 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aiknowledge"
+	"github.com/yaklang/yaklang/common/aiengine"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	_ "github.com/yaklang/yaklang/common/yak"
 )
+
+func TestChatUsesScopedReadOnlyKnowledgeTool(t *testing.T) {
+	db, err := consts.CreateProfileDatabase(filepath.Join(t.TempDir(), "profile.db"))
+	require.NoError(t, err)
+	defer db.Close()
+	_, err = aiknowledge.Add("allowed", aiknowledge.WithDatabase(db))
+	require.NoError(t, err)
+	_, err = aiknowledge.AddEntry("allowed", "API", "CHAT_MARKER", aiknowledge.WithDatabase(db), aiknowledge.WithIndex(false))
+	require.NoError(t, err)
+	server := &RAGHTTPServer{db: db, config: &RAGServerConfig{MaxIteration: 1}, readyCollections: []string{"allowed"}}
+	tools := server.chatKnowledgeTools()
+	require.Len(t, tools, 1)
+	require.Equal(t, "query_knowledge_base", tools[0].Name)
+	result, err := tools[0].InvokeWithParams(aitool.InvokeParams{"name": "allowed", "query": "CHAT_MARKER", "token_limit": 512})
+	require.NoError(t, err)
+	require.True(t, result.Success)
+	require.Contains(t, result.Data.(*aitool.ToolExecutionResult).Stdout, "CHAT_MARKER")
+	for _, params := range []aitool.InvokeParams{{"name": "foreign", "token_limit": 512}, {"names": []string{"allowed", "foreign"}, "token_limit": 512}, {"all": true, "token_limit": 512}} {
+		_, err := tools[0].InvokeWithParams(params)
+		require.Error(t, err)
+	}
+	engine := aiengine.NewAIEngineConfig(server.buildAIEngineOptions(context.Background(), "chat-test", nil)...)
+	require.Equal(t, "default", engine.Focus)
+	require.False(t, engine.DisableToolUse)
+	require.GreaterOrEqual(t, engine.MaxIteration, 8)
+}
 
 // TestCleanupSessionData 验证会话结束后 session 及关联数据被彻底删除 (防数据爆炸)
 // 关键词: cleanup session, DeleteAISession, avoid data explosion
@@ -79,7 +111,7 @@ func TestSanitizeTraceMessage(t *testing.T) {
 
 // TestCleanProgressMessage 验证 loading status 双语技术串被裁剪为简洁短语
 func TestCleanProgressMessage(t *testing.T) {
-	require.Equal(t, "执行搜索中", cleanProgressMessage("执行搜索中 - search_knowledge:semantic / executing search - mode:semantic"))
+	require.Equal(t, "执行搜索中", cleanProgressMessage("执行搜索中 - query_knowledge_base / executing search - mode:semantic"))
 	require.Equal(t, "初始化", cleanProgressMessage("初始化 / initializing..."))
 	require.Equal(t, "压缩搜索结果中", cleanProgressMessage("压缩搜索结果中 - compressing search result"))
 }

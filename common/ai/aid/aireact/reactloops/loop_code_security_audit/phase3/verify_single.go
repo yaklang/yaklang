@@ -67,7 +67,6 @@ func buildSingleFindingVerifyLoop(
 
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(maxIter),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(true),

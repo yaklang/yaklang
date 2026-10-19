@@ -267,10 +267,6 @@ var nodeIdMapper = map[string]*I18n{
 		Zh: "选择相关知识库",
 		En: "Search Relative Knowledge Base",
 	},
-	"rewrite_user_query_for_knowledge_enhance": {
-		Zh: "知识增强：重写用户查询",
-		En: "Knowledge Enhance: Rewrite User Query",
-	},
 	"interval-review": {
 		Zh: "进度检查",
 		En: "Progress Check",
@@ -1023,10 +1019,6 @@ var nodeIdMapper = map[string]*I18n{
 	"re_act_success": {
 		Zh: "ReAct 任务执行成功",
 		En: "ReAct Task Execution Success",
-	},
-	"knowledge_enhance": {
-		Zh: "知识增强",
-		En: "Knowledge Enhancement",
 	},
 	"knowledge-single-relevance": {
 		Zh: "知识相关性分析",

@@ -111,7 +111,7 @@ func TestIntentMemoryThirtyRoundLoop(t *testing.T) {
 			invoker.SetConfig(cfg)
 			steps := 0
 			var err error
-			loop, err = NewReActLoop("intent-memory-30", invoker, WithFunctionCallMode(false), WithAllowToolCall(false), WithAllowRAG(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false), WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true), WithMemoryTriage(memory),
+			loop, err = NewReActLoop("intent-memory-30", invoker, WithFunctionCallMode(false), WithAllowToolCall(false), WithAllowAIForge(false), WithAllowPlanAndExec(false), WithAllowUserInteract(false), WithDisableLoopPerception(true), WithDisablePeriodicVerification(true), WithDisableIncreaseIteration(true), WithMemoryTriage(memory),
 				WithInitTask(func(l *ReActLoop, task aicommon.AIStatefulTask, _ *InitTaskOperator) {
 					if recognized {
 						l.RecallMemoryForIntent(task, "one recognized intent")

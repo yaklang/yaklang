@@ -113,7 +113,7 @@ Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.Delete
 
 ## 知识库管理与知识查询
 
-知识库使用本次运行的 profile 数据库，与 Yakit 共用。`manage_knowledge_base` 与 MCP 管理工具同属内置 Yak 工具，可由 `require_tool` 加载；库列表是管理操作 `op=list`。`query_knowledge_base` 只读，必须显式选择 `name`（一个库）、`names`（多个库）或 `all=true`，三者互斥，并提供 `token_limit`。未指定范围报错，提示先 manage list 再选择一个或多个库；省略 all 或 all=false 不会默认全库，字面库名 all 也不会被解释为全库。旧 `knowledge_enhance_answer` action 已停用，`WithAllowRAG` / `WithAllowRAGGetter` 保留为空操作，不再触发自动选库或检索。
+知识库使用本次运行的 profile 数据库，与 Yakit 共用。`manage_knowledge_base` 与 MCP 管理工具同属内置 Yak 工具，可由 `require_tool` 加载；库列表是管理操作 `op=list`。`query_knowledge_base` 只读，必须显式选择 `name`（一个库）、`names`（多个库）或 `all=true`，三者互斥，并提供 `token_limit`。未指定范围报错，提示先 manage list 再选择一个或多个库；省略 all 或 all=false 不会默认全库，字面库名 all 也不会被解释为全库。知识操作统一通过本 Skill 引导调用工具。
 
 ```json
 {"op":"list","keyword":"project","limit":20,"offset":0}
@@ -144,15 +144,24 @@ Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.Delete
 {"all":true,"query":"启动","limit":5,"token_limit":1024}
 ```
 
-直接 Yak 调用示例：
+直接 Yak API 与 mitm、servicescan、synscan 一样，每个操作都有独立函数，必填参数放在前面，可选设置使用可变 options。`List(options...)` 列库；`Add(name, options...)` 新建；`Get(name, options...)`、`Update(name, options...)`、`Delete(name, options...)` 管理精确库名；`Build(name, content, options...)` 或 `BuildFromFile(name, path, options...)` 构建知识。查询入口为 `Query(scope, query, tokenLimit, options...)`，scope 为单个库名或库名数组，全库必须显式使用 `all(true)`。
 
 ```yak
-bases = aiknowledge.Manage({"op":"list","limit":20,"offset":0})~
+bases = aiknowledge.List(aiknowledge.limit(20), aiknowledge.offset(0))~
 println(json.dumps(bases))
-aiknowledge.Manage({"op":"create","name":"project-docs","metadata":{"description":"项目文档"}})~
-added = aiknowledge.Manage({"op":"add_entry","name":"project-docs","entry":{"title":"启动方法","content":"使用 yak 启动项目"},"index":false})~
-result = aiknowledge.Query({"name":"project-docs","mode":"get","entry_id":added.entry_id,"token_limit":1024})~
+aiknowledge.Add("project-docs", aiknowledge.description("项目文档"), aiknowledge.tags("project"))~
+added = aiknowledge.AddEntry("project-docs", "启动方法", "使用 yak 启动项目", aiknowledge.index(false))~
+result = aiknowledge.Query("project-docs", "", 1024, aiknowledge.mode("get"), aiknowledge.entryID(added.entry_id))~
 println(json.dumps(result))
+aiknowledge.BuildFromFile("project-docs", "/tmp/readme.txt", aiknowledge.buildMode("chunks"), aiknowledge.chunkSize(8192), aiknowledge.concurrency(2))~
+aiknowledge.UpdateEntry("project-docs", added.entry_id, "启动方法", "使用新版 yak 启动项目")~
+aiknowledge.Update("project-docs", aiknowledge.description("更新后的说明"), aiknowledge.isDefault(false))~
+aiknowledge.Query(["project-docs", "api-docs"], "启动", 1024, aiknowledge.limit(3), aiknowledge.perEntryTokenLimit(256))~
+aiknowledge.Query(nil, "启动", 1024, aiknowledge.all(true), aiknowledge.limit(3))~
 ```
 
-可选 `aiknowledge.db(db)` / `aiknowledge.ctx(ctx)` 指定数据库和取消上下文，构建可用 `aiknowledge.aiService(callback)` 指定 AI。AI 工具和运行时内的 Yak 脚本自动绑定本次调用的 profile 与 context；失败会返回实际错误，不能将失败或截断当作完成。
+条目操作分别为 `AddEntry(name, title, content, options...)`、`UpdateEntry(name, entryID, title, content, options...)`、`DeleteEntry(name, entryID, options...)`，`RebuildIndex(name, options...)` 重建该库索引。
+
+查询 options：`mode`、`all`、`limit`、`offset`、`entryID`、`perEntryTokenLimit`、`contentOffset`、`minScore`；范围、模式和预算限制与上述工具参数相同。管理 options：列表 `keyword`、`limit`、`offset`，元信息 `description`、`type`、`tags`、`isDefault`，索引配置 `embeddingModel`、`dimension`、`hnswM`、`hnswML`、`hnswEFSearch`、`hnswEFConstruct`，条目 `entrySummary`、`entryType`、`entryKeywords`、`potentialQuestions`、`index`，构建 `buildMode`、`chunkSize`、`concurrency`、`extraPrompt`。同一 option 多次设置时以最后一次为准；空值和 false 可用于明确清除元信息。
+
+可选 `aiknowledge.db(db)` / `aiknowledge.context(ctx)` 指定数据库和取消上下文，构建可用 `aiknowledge.aiService(callback)` 指定 AI。AI 工具和运行时内的 Yak 脚本自动绑定本次调用的 profile 与 context；失败会返回实际错误，不能将失败或截断当作完成。

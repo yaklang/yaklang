@@ -16,7 +16,6 @@ func TestBindAttachedHTTPFuzzRequestToLoop(t *testing.T) {
 	loop, err := reactloops.NewReActLoop(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

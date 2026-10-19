@@ -10,8 +10,7 @@
 |--------|--------|-----------|------------------|----------------------|---------------|-----------|------------------|------|
 | [loop_default](../loop_default) | 低 | InitTask 处理 attached data + 意图识别 | 0（共享通用 actions） | 否 | DeepIntent 调用 | 0 | persistent_instruction | 通用 ReAct 入口 |
 | [loop_intent](../loop_intent) | 中 | InitTask + OnPostIteraction | 2（query_capabilities, finalize_enrichment） | 否（用 finalize_enrichment 替代） | DeepIntent 实现 | 多 | persistent_instruction + reactive_data | 内部意图识别 |
-| [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 7（search_knowledge, web_search 等） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
-| [loop_knowledge_enhance](../loop_knowledge_enhance) | 中 | OnPostIteraction（finalize fallback） | 1（search） | 否 | finalize fallback | 1 | persistent_instruction | 知识库增强 |
+| [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 6（web_search 等，知识库使用通用工具） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
 | [coordinator / pe_task](../../../coordinator/README.md) | 高 | Session + 自动 DAG 调度 | 计划编辑、审核、报告与显式工具调用 | 由运行时验收 | 辅助结构化请求 | 按动作声明 | 计划 / 执行角色与状态 | 规划和任务执行 |
 | [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + output_example | HTTP 安全模糊测试 |
 | [loop_http_flow_analyze](../loop_http_flow_analyze) | 高 | OnPostIteraction（强制 fallback） | 4（filter, match, get_detail, output_findings） | 是 | finalize fallback | 多 | persistent + reactive_data | HTTP 流量分析 |
@@ -38,11 +37,10 @@
 
 1. **[loop_default](../loop_default)**：理解最简形态
 2. **[loop_smart_qa](../loop_smart_qa)**：理解 ActionFilter + 自定义 actions
-3. **[loop_knowledge_enhance](../loop_knowledge_enhance)**：理解 finalize fallback 模式
-4. **[loop_intent](../loop_intent)**：理解内部 loop + meta 行为
-5. **[loop_http_flow_analyze](../loop_http_flow_analyze)**：理解多 action + finalize fallback
-6. **[coordinator / pe_task](../../../coordinator/README.md)**：理解计划审批、调度及实际结果验收
-7. **[loop_http_fuzztest](../loop_http_fuzztest)**：理解极端定制化（终极目标）
+3. **[loop_intent](../loop_intent)**：理解内部 loop + meta 行为
+4. **[loop_http_flow_analyze](../loop_http_flow_analyze)**：理解多 action + finalize fallback
+5. **[coordinator / pe_task](../../../coordinator/README.md)**：理解计划审批、调度及实际结果验收
+6. **[loop_http_fuzztest](../loop_http_fuzztest)**：理解极端定制化（终极目标）
 
 下面给 5 个最值得细看的 loop 做深度拆解。
 
@@ -64,12 +62,8 @@
 
 ```mermaid
 flowchart TD
-    A["进入 InitTask"] --> B{"MustProcessAttachedData?<br/>有 attached datas?"}
-    B -->|是| C["ProcessAttachedData<br/>处理 @ 提及的知识库 / 文件"]
-    B -->|否| D{"DisableIntentRecognition?"}
-    C --> E{"early exit?"}
-    E -->|是| End[返回]
-    E -->|否| D
+    A["进入 InitTask"] --> C["保留附件元信息，不自动查询知识"]
+    C --> D{"DisableIntentRecognition?"}
     D -->|是| End
     D -->|否| F["MatchCapabilitiesByText<br/>BM25 + 子串匹配"]
     F --> G{"输入规模"}
@@ -102,7 +96,6 @@ flowchart TD
 
 ```go
 reactloops.WithDisableLoopPerception(true)        // 不需要感知层
-reactloops.WithAllowRAG(false)
 reactloops.WithAllowAIForge(false)
 reactloops.WithAllowPlanAndExec(false)
 reactloops.WithAllowToolCall(false)               // 不允许调真工具
@@ -133,14 +126,12 @@ reactloops.WithActionFilter(...)                  // 只允许 query_capabilitie
 源码 [loop_smart_qa/init.go:35-95](../loop_smart_qa/init.go)：
 
 ```go
-reactloops.WithAllowRAG(false)              // 通过自己的 search_knowledge action 控制
 reactloops.WithAllowAIForge(false)
 reactloops.WithAllowPlanAndExec(false)
-reactloops.WithAllowToolCall(false)         // 关掉通用工具，只用自己注册的
-reactloops.WithMaxIterations(5)              // 限制 5 轮
-reactloops.WithActionFilter(...)            // 白名单：search_knowledge, web_search, read_file, find_files, grep_text, search_persistent_memory, final_answer
-// 注册 7 个自定义 action
-knowledgeSearchAction(r),
+reactloops.WithAllowToolCall(true)          // 按 Skill 加载知识工具
+reactloops.WithMaxIterations(8)              // 容纳 Skill 加载、选库与查询
+reactloops.WithActionFilter(...)            // 白名单：require_tool, directly_call_tool, loading_skills, load_skill_resources, web_search, read_file, find_files, grep_text, search_persistent_memory, final_answer
+// 注册 6 个自定义 action，知识库按 Skill 加载工具
 webSearchAction(r),
 readFileAction(r),
 findFilesAction(r),
@@ -152,9 +143,9 @@ finalAnswerAction(r),
 ### 学到什么
 
 - **白名单胜过黑名单**：明确允许哪些 actions，拒绝其他所有
-- **不用通用工具**：`WithAllowToolCall(false)` 然后自己注册定制版（更可控、更易测试）
+- **通用工具与领域动作组合**：知识库使用 Skill 引导的两个工具，其他信息来源保留专用动作
 - **`final_answer` 替代 `directly_answer`**：自定义命名让 prompt 更直观
-- **5 轮迭代**：限制成本，逼 LLM 聚焦
+- **8 轮迭代**：容纳 Skill 加载、管理工具 list、选择范围和预算查询，再输出答案
 
 ---
 
@@ -200,7 +191,6 @@ loop_http_fuzztest/
 
 ```go
 preset := []reactloops.ReActLoopOption{
-    reactloops.WithAllowRAG(false),
     reactloops.WithAllowToolCall(true),
     
     // 两种 AITag：生成的包 / 修改后的包
@@ -316,10 +306,6 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 
 ## 11.8 其他 loop 速览
 
-### loop_knowledge_enhance
-
-知识库增强。简单的 single-action loop（`search`）+ 强 finalize fallback。**学习 finalize 模式的最佳示例**。
-
 ### loop_internet_research
 
 互联网调研。多个 web_search action 组合 + finalize 生成 markdown 报告。
@@ -372,7 +358,7 @@ AI 技能审计。检查已有 skill 库的覆盖率。
 
 ### 模式 B：Finalize Fallback
 
-`loop_knowledge_enhance` / `loop_http_fuzztest` / `loop_http_flow_analyze` / `loop_internet_research` 都有 `OnPostIteraction(isDone=true)` 强制兜底。
+`loop_http_fuzztest` / `loop_http_flow_analyze` / `loop_internet_research` 都有 `OnPostIteraction(isDone=true)` 强制兜底。
 
 ```go
 if hasDelivered { return }

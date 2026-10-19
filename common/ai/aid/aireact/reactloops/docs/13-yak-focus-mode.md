@@ -88,7 +88,6 @@ Boot 与 Run 双相执行：
 
 | Yak 常量 | Go 选项 |
 |---|---|
-| `__ALLOW_RAG__` | `WithAllowRAG` |
 | `__ALLOW_AI_FORGE__` | `WithAllowAIForge` |
 | `__ALLOW_PLAN_AND_EXEC__` | `WithAllowPlanAndExec` |
 | `__ALLOW_TOOL_CALL__` | `WithAllowToolCall` |
@@ -117,7 +116,6 @@ Boot 与 Run 双相执行：
 | `focusOutputExample` | `WithOutputExampleContextProvider` | 高于 `__OUTPUT_EXAMPLE__` |
 | `focusReactiveData` | `WithReactiveDataBuilder` | — |
 | `focusActionFilter` | `WithActionFilter` | — |
-| `focusAllowRAG` | `WithAllowRAGGetter` | 高于 `__ALLOW_RAG__` |
 | `focusAllowAIForge` | `WithAllowAIForgeGetter` | 高于 `__ALLOW_AI_FORGE__` |
 | `focusAllowPlanAndExec` | `WithAllowPlanAndExecGetter` | 高于 `__ALLOW_PLAN_AND_EXEC__` |
 | `focusAllowToolCall` | `WithAllowToolCallGetter` | 高于 `__ALLOW_TOOL_CALL__` |
@@ -325,7 +323,7 @@ sidekicks：
 | 元数据 dunder | `__VERBOSE_NAME__` / `__VERBOSE_NAME_ZH__` / `__DESCRIPTION__` / `__USAGE_PROMPT__` / `__OUTPUT_EXAMPLE__` |
 | Prompt 文本 | `__PERSISTENT_INSTRUCTION__` / `__OUTPUT_EXAMPLE__` |
 | 阈值 | `__MAX_ITERATIONS__` / `__PERIODIC_VERIFICATION_INTERVAL__` / `__MEMORY_SIZE_LIMIT__` |
-| 能力开关 | `__ALLOW_RAG__` / `__ALLOW_TOOL_CALL__` / `__ALLOW_USER_INTERACT__` |
+| 能力开关 | `__ALLOW_TOOL_CALL__` / `__ALLOW_USER_INTERACT__` |
 | 初始变量 / 流字段 | `__VARS__` / `__AI_TAG_FIELDS__` |
 | 钩子 | `focusInitTask` / `focusOnLoopInstanceCreated` / `focusPostIteration` / `focusReactiveData` / `focusPersistentContext` |
 | Action | `__ACTIONS__`（`showcase_step` / `summarize_findings`） |

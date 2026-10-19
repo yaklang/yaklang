@@ -12,7 +12,7 @@ import (
 // script runners and command wrappers) do not acquire coordinator privileges.
 func AllowedTool(name string, params aitool.InvokeParams, workdir string) bool {
 	switch name {
-	case "read_file", "read_file_lines", "list_dir", "list_files", "find_file", "find_files", "tree", "grep", "grep_files", "search_files", "search_knowledge", "query_knowledge_base", "yakdoc":
+	case "read_file", "read_file_lines", "list_dir", "list_files", "find_file", "find_files", "tree", "grep", "grep_files", "search_files", "query_knowledge_base", "yakdoc":
 		return true
 	case "write_file":
 		path := params.GetString("file")

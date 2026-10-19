@@ -19,7 +19,6 @@ var actionStatusNames = map[string]actionStatusName{
 	schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:        {"执行工具", "running tools"},
 	schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES:       {"查找可用能力", "finding available capabilities"},
 	schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION:     {"确认需求", "clarifying the request"},
-	schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE:         {"检索知识", "searching knowledge"},
 	schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT:      {"申请 AI 工作流", "requesting an AI blueprint"},
 	schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN:              {"制定计划", "drafting a plan"},
 	schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION:    {"执行计划", "executing the plan"},

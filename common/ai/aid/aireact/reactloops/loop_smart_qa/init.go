@@ -20,7 +20,10 @@ var outputExample = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_smart_
 var reactiveData = promptloader.MustLoad("ai/aid/aireact/reactloops/loop_smart_qa/prompts/reactive_data.txt")
 
 var allowedActions = []string{
-	"search_knowledge",
+	"require_tool",
+	"directly_call_tool",
+	"loading_skills",
+	"load_skill_resources",
 	"web_search",
 	"read_file",
 	"find_files",
@@ -34,16 +37,14 @@ func init() {
 		schema.AI_REACT_LOOP_NAME_SMART_QA,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 			preset := []reactloops.ReActLoopOption{
-				reactloops.WithAllowRAG(false),
 				reactloops.WithAllowAIForge(false),
 				reactloops.WithAllowPlanAndExec(false),
-				reactloops.WithAllowToolCall(false),
+				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
 				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
 				reactloops.WithPersistentInstruction(instruction),
 				reactloops.WithOutputExample(outputExample),
-				reactloops.WithMaxIterations(5),
+				reactloops.WithMaxIterations(8),
 				reactloops.WithActionFilter(func(action *reactloops.LoopAction) bool {
 					for _, name := range allowedActions {
 						if action.ActionType == name {
@@ -63,7 +64,6 @@ func init() {
 					}
 					return utils.RenderTemplate(reactiveData, renderMap)
 				}),
-				knowledgeSearchAction(r),
 				webSearchAction(r),
 				readFileAction(r),
 				findFilesAction(r),

@@ -20,7 +20,7 @@
 │        ▼                   ▼                   ▼           │
 │  • read_reference    • write_section     • modify_section   │
 │  • grep_reference    • insert_section   • delete_section   │
-│  • search_knowledge  • modify_section                      │
+│  • require_tool      • modify_section                      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -33,7 +33,7 @@
 |--------|------|----------|
 | `read_reference_file` | 读取参考文件内容 | 阅读文档、代码文件等 |
 | `grep_reference` | 正则搜索参考资料 | 在大文件中搜索关键信息 |
-| `search_knowledge` | 语义搜索知识库 | 从知识库获取相关知识 |
+| `require_tool` / `directly_call_tool` | 按 yaklang-system Skill 加载知识工具 | 先 manage list 选库，再以明确范围和 token_limit 查询 |
 
 ### 第二阶段：撰写报告
 
@@ -99,7 +99,6 @@ loop_report_generating/
 ├── code.go                      # 模式注册和初始化
 ├── action_read_reference.go     # 读取参考文件
 ├── action_grep_reference.go     # 搜索参考资料
-├── action_search_knowledge.go   # 知识库搜索
 ├── action_change_offset.go      # 切换视图偏移（分页导航）
 ├── init_task.go                 # 初始化任务（意图分析、文件准备）
 │   # write_section, modify_section, insert_section, delete_section

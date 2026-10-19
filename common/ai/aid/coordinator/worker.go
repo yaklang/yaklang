@@ -28,7 +28,7 @@ func NewWorkerLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOptio
 		reactloops.WithDisableLoopPerception(true),
 		reactloops.WithActionFilter(func(a *reactloops.LoopAction) bool {
 			switch a.ActionType {
-			case "submit_task_result", "finish", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities":
+			case "submit_task_result", "finish", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities":
 				return true
 			}
 			return false

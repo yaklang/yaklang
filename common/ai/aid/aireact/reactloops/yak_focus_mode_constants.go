@@ -66,10 +66,12 @@ const (
 	// 对应 WithPeriodicVerificationInterval。
 	FocusDunder_PeriodicVerificationInterval = "__PERIODIC_VERIFICATION_INTERVAL__"
 
-	// FocusDunder_AllowRAG / AIForge / PlanAndExec / ToolCall / UserInteract 静态开关。
-	// 对应 WithAllowRAG / WithAllowAIForge / WithAllowPlanAndExec /
+	// Deprecated: retained only for source compatibility; RAG settings are ignored.
+	FocusDunder_AllowRAG = "__ALLOW_RAG__"
+
+	// AIForge / PlanAndExec / ToolCall / UserInteract 静态开关。
+	// 对应 WithAllowAIForge / WithAllowPlanAndExec /
 	// WithAllowToolCall / WithAllowUserInteract。
-	FocusDunder_AllowRAG          = "__ALLOW_RAG__"
 	FocusDunder_AllowAIForge      = "__ALLOW_AI_FORGE__"
 	FocusDunder_AllowPlanAndExec  = "__ALLOW_PLAN_AND_EXEC__"
 	FocusDunder_AllowToolCall     = "__ALLOW_TOOL_CALL__"

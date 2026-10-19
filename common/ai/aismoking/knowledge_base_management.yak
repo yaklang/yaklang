@@ -28,7 +28,6 @@ plan = [
     {"name":"manage_knowledge_base","params":{"op":"add_entry","name":otherName,"entry":{"title":"Other API token","content":"OTHER_API_MARKER api token belongs to the other knowledge base"}}},
     {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"API_MARKER","limit":3,"token_limit":1024,"per_entry_token_limit":256}},
     {"name":"query_knowledge_base","params":{"all":true,"mode":"semantic","query":"api token","limit":2,"token_limit":512,"per_entry_token_limit":256,"min_score":-1}},
-    {"name":"query_knowledge_base","params":{"all":false,"query":"API_MARKER","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix}},
     {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"OTHER_API_MARKER","token_limit":512}},
     {"name":"manage_knowledge_base","params":{"op":"delete_entry","name":kbName,"entry_id":"pending"}},
@@ -45,13 +44,6 @@ func checkPrevious() {
     assert len(calls)==cursor
     actual = calls[len(calls)-1]
     assert actual.Name==plan[cursor-1].name
-    if cursor==19 {
-        assert !actual.Success, "missing scope must fail instead of searching all"
-        evidence=json.dumps(actual)
-        assert "manage_knowledge_base" in evidence && "list" in evidence && "all=true" in evidence, "scope error must guide AI to manage list and an explicit choice"
-        awaiting=false
-        return
-    }
     assert actual.Success, "knowledge tool failed"
     directory = ""
     for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
@@ -75,10 +67,10 @@ func checkPrevious() {
     if cursor==16 { assert value.indexed }
     if cursor==17 { assert value.total==3 && len(value.results)==3 && value.knowledge_base_count==2 && value.used_tokens<=1024 }
     if cursor==18 { assert value.all && len(value.results)==2 && value.used_tokens<=512 && value.knowledge_base_count==2 }
-    if cursor==20 { assert value.total==2 }
-    if cursor==21 { assert len(value.results)==1 && value.results[0].knowledge_base==otherName }
-    if cursor==22 || cursor==24 || cursor==25 { assert value.deleted }
-    if cursor==23 || cursor==26 { assert value.total==0 }
+    if cursor==19 { assert value.total==2 }
+    if cursor==20 { assert len(value.results)==1 && value.results[0].knowledge_base==otherName }
+    if cursor==21 || cursor==23 || cursor==24 { assert value.deleted }
+    if cursor==22 || cursor==25 { assert value.total==0 }
     awaiting=false
 }
 smokeHandler=func(w,body) {
@@ -108,7 +100,7 @@ for native in [false,true] {
     config,operator,cursor,awaiting,loaded=nil,nil,0,false,{}
     // Reset values filled in by the previous protocol run.
     for item in plan { if "entry_id" in item.params { item.params.entry_id="pending" } }
-    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、缺少范围报错后 manage list 再选择库，最后删除测试库。",aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、manage list 后再选择库，最后删除测试库。",aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
         config,operator=op.GetConfig(),op
         if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
     }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){

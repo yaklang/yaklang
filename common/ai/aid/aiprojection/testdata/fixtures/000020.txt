@@ -144,7 +144,6 @@ hostscan
 [focus_mode:infosec_recon]: infosec_recon - Focused information gathering and API endpoint discovery for...s_collector and js_static_extract_ai; optional HTTP probing.
 [focus_mode:internet_research]: internet_research - Internet research mode: collect, read, analyze, and synthesi...et search engines to produce comprehensive research reports.
 [focus_mode:java_decompiler]: java_decompiler - Enter Java decompiler expert mode: automatically decompile J...tal fixes for JAR binary analysis and source reconstruction.
-[focus_mode:knowledge_enhance]: knowledge_enhance - Supplementary resource collection mode: gather relevant info...orges based on the user's question for subsequent answering.
 [focus_mode:plan]: plan - Loop for generating and refining plans based on user require...ctured thinking frameworks (SMART, Six Thinking Hats, SWOT).
 [focus_mode:report_generating]: report_generating - Report generation mode: the AI researches while writing inve... articles, with support for iterative drafting and revision.
 [focus_mode:write_python_script]: write_python_script - Enter focused mode for Python script generation. Creates pro... entry points, dependency management, and syntax validation.
@@ -249,7 +248,6 @@ hostscan
 [focus_mode:infosec_recon]: infosec_recon - Focused information gathering and API endpoint discovery for...s_collector and js_static_extract_ai; optional HTTP probing.
 [focus_mode:internet_research]: internet_research - Internet research mode: collect, read, analyze, and synthesi...et search engines to produce comprehensive research reports.
 [focus_mode:java_decompiler]: java_decompiler - Enter Java decompiler expert mode: automatically decompile J...tal fixes for JAR binary analysis and source reconstruction.
-[focus_mode:knowledge_enhance]: knowledge_enhance - Supplementary resource collection mode: gather relevant info...orges based on the user's question for subsequent answering.
 [focus_mode:plan]: plan - Loop for generating and refining plans based on user require...ctured thinking frameworks (SMART, Six Thinking Hats, SWOT).
 [focus_mode:report_generating]: report_generating - Report generation mode: the AI researches while writing inve... articles, with support for iterative drafting and revision.
 [focus_mode:write_python_script]: write_python_script - Enter focused mode for Python script generation. Creates pro... entry points, dependency management, and syntax validation.

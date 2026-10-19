@@ -112,7 +112,6 @@ func newFinalizeTestLoop(t *testing.T, invoker *finalizeTestInvoker, opts ...rea
 	t.Helper()
 
 	baseOpts := []reactloops.ReActLoopOption{
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

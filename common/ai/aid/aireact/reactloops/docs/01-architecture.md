@@ -42,14 +42,13 @@
 ```go
 allowAIForge      func() bool
 allowPlanAndExec  func() bool
-allowRAG          func() bool
 allowToolCall     func() bool
 allowUserInteract func() bool
 allowSkillLoading func() bool
 allowSkillViewOffset func() bool
 ```
 
-这些 getter 在 `NewReActLoop` 末尾决定是否把 `require_ai_blueprint` / `request_plan_execution` / `knowledge_enhance` / `require_tool` / `ask_for_clarification` / 技能相关 action 加进 `r.actions`。详见 [04-actions.md](04-actions.md)。
+这些 getter 在 `NewReActLoop` 末尾决定是否把 `require_ai_blueprint` / `request_plan_execution` / `require_tool` / `ask_for_clarification` / 技能相关 action 加进 `r.actions`。详见 [04-actions.md](04-actions.md)。
 
 ### D. Action 注册表
 

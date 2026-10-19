@@ -128,7 +128,6 @@ func init() {
 
 			preset := []reactloops.ReActLoopOption{
 				reactloops.WithOverrideLoopAction(loopAction_DirectlyAnswerSyntaxFlow),
-				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithScenarioToolWhitelist([]string{"check-syntaxflow-syntax"}),
 				reactloops.WithInitTask(buildInitTask(r, docSearcher, docSearcherByRag)),

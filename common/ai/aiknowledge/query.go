@@ -16,6 +16,44 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+// Query reads one exact name (string), multiple exact names ([]string), or nil
+// with the explicit all(true) option. query and tokenLimit are positional; an
+// empty query is allowed for keyword browsing or mode=get. Missing scope fails.
+//
+// Example (Yak):
+// aiknowledge.Query("docs", "startup", 1024, aiknowledge.limit(3))~
+// aiknowledge.Query(["docs","api"], "startup", 1024, aiknowledge.mode("semantic"))~
+// aiknowledge.Query(nil, "startup", 1024, aiknowledge.all(true))~
+func Query(scope any, query string, tokenLimit int, opts ...Option) (*QueryResult, error) {
+	c := configure(opts)
+	req := c.query
+	req.Query, req.TokenLimit = query, tokenLimit
+	switch names := scope.(type) {
+	case nil:
+	case string:
+		req.Name = names
+	case []string:
+		req.Names = append([]string{}, names...)
+	case []any:
+		for _, value := range names {
+			name, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("scope must contain exact knowledge base names as strings")
+			}
+			req.Names = append(req.Names, name)
+		}
+	default:
+		return nil, fmt.Errorf("scope must be one exact name or an array of exact names; use nil with all(true) for all bases")
+	}
+	if err := req.validate(); err != nil {
+		return nil, err
+	}
+	if err := c.initialize(); err != nil {
+		return nil, err
+	}
+	return c.queryKnowledge(req)
+}
+
 const maxQueryBases = 20
 const queryScopeHelp = `knowledge base scope is required: first call manage_knowledge_base with {"op":"list","limit":20,"offset":0}, then choose one exact name, multiple exact names via names, or explicitly set all=true to search every knowledge base`
 
@@ -107,7 +145,7 @@ func (r *queryRequest) validate() error {
 	if r.Mode != "semantic" && r.MinScore != nil {
 		return fmt.Errorf("min_score requires mode=semantic")
 	}
-	if r.MinScore != nil && (*r.MinScore < -1 || *r.MinScore > 1) {
+	if r.MinScore != nil && (math.IsNaN(*r.MinScore) || math.IsInf(*r.MinScore, 0) || *r.MinScore < -1 || *r.MinScore > 1) {
 		return fmt.Errorf("min_score must be -1..1 (cosine similarity, higher is better)")
 	}
 	switch r.Mode {
@@ -158,18 +196,7 @@ type queryCandidate struct {
 // Query requires an explicit scope, never creates a missing base, and applies
 // one limit and one token budget across the complete scope. Even the response
 // envelope, JSON escaping and continuation metadata count towards token_limit.
-func Query(input map[string]any, opts ...Option) (*QueryResult, error) {
-	var req queryRequest
-	if err := decode(input, &req); err != nil {
-		return nil, err
-	}
-	if err := req.validate(); err != nil {
-		return nil, err
-	}
-	c, err := newConfig(opts)
-	if err != nil {
-		return nil, err
-	}
+func (c *config) queryKnowledge(req queryRequest) (*QueryResult, error) {
 	bases, err := c.queryBases(req)
 	if err != nil {
 		return nil, err

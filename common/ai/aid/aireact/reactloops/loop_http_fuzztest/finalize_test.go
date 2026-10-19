@@ -116,7 +116,6 @@ func newFuzzFinalizeTestLoop(t *testing.T, invoker *fuzzFinalizeTestInvoker) *re
 	loop, err := reactloops.NewReActLoop(
 		"http-fuzztest-finalize-test",
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),
@@ -326,7 +325,6 @@ func TestLoopHTTPFuzztestFinalize_PostIterationHookDeliversSummary(t *testing.T)
 	loop, err := reactloops.CreateLoopByName(
 		LoopHTTPFuzztestName,
 		invoker,
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowUserInteract(false),

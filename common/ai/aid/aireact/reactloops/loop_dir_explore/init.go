@@ -47,7 +47,6 @@ func generateExploreReport(
 		r,
 		reactloops.WithMaxIterations(math.MaxInt32),
 		reactloops.WithAllowUserInteract(false),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowToolCall(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),

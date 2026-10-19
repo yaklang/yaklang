@@ -14,7 +14,7 @@ import (
 func TestReadFileActionUsesRealToolFields(t *testing.T) {
 	invoker := mock.NewMockInvoker(context.Background())
 	loop, err := reactloops.NewReActLoop("read-file-fields", invoker,
-		reactloops.WithAllowRAG(false), reactloops.WithAllowAIForge(false),
+		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false), reactloops.WithAllowUserInteract(false),
 		reactloops.WithAllowToolCall(false), readFileAction(invoker))
 	require.NoError(t, err)

@@ -23,7 +23,6 @@ import (
 func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
 	preset := []reactloops.ReActLoopOption{
 		reactloops.WithMaxIterations(math.MaxInt32),
-		reactloops.WithAllowRAG(false),
 		reactloops.WithAllowAIForge(false),
 		reactloops.WithAllowPlanAndExec(false),
 		reactloops.WithAllowToolCall(false),

@@ -613,7 +613,6 @@ func (r *reActSessionRuntime) createRuntime(
 		log.Errorf("create re-act failed: %v", err)
 		return nil, utils.Errorf("create re-act instance failed: %v", err)
 	}
-	reAct.GetConfig().SetConfig("MustProcessAttachedData", true)
 	owner := &ownedReActRuntime{
 		sessionID: sessionID,
 		react:     reAct,

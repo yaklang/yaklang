@@ -16,7 +16,7 @@ func TestFocusModeCaller_ExtractAndCall(t *testing.T) {
 	code := `
 __VERBOSE_NAME__ = "TestCaller"
 __MAX_ITERATIONS__ = 7
-__ALLOW_RAG__ = true
+__ALLOW_TOOL_CALL__ = true
 __VARS__ = {"counter": 1}
 
 focusInitTask = func(loop, task, op) {
@@ -34,9 +34,9 @@ focusInitTask = func(loop, task, op) {
 	require.True(t, ok)
 	require.Equal(t, 7, maxIter)
 
-	allowRAG, ok := caller.GetBool(FocusDunder_AllowRAG)
+	allowTool, ok := caller.GetBool(FocusDunder_AllowToolCall)
 	require.True(t, ok)
-	require.True(t, allowRAG)
+	require.True(t, allowTool)
 
 	vars := caller.GetMap(FocusDunder_Vars)
 	require.NotNil(t, vars)
