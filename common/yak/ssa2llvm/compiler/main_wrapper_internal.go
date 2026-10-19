@@ -96,11 +96,9 @@ func (c *Compiler) addMainWrapperToModule(entryFunc string, printEntryResult boo
 		c.Builder.CreateCall(printType, printFn, []llvm.Value{ret}, "")
 	}
 
-	// Wait for `go` goroutines the script spawned before exiting. The wait
-	// group only tracks goroutines launched through `go` statements; a server
-	// started inside one returns when its context is cancelled, so the wait
-	// finishes. Dropping this wait lets the process exit before a finite `go`
-	// body (go println(1)) runs, losing its output.
+	// Drain `go` goroutines that can still finish. The runtime bounds this
+	// wait, so a body parked in a server loop does not hang the process, but a
+	// finite body (go println) runs before exit instead of losing its output.
 	c.Builder.CreateCall(waitAsyncFn.GlobalValueType(), waitAsyncFn, nil, "")
 	c.Builder.CreateCall(gcFn.GlobalValueType(), gcFn, nil, "")
 
