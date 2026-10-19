@@ -265,12 +265,11 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 	requireIRContainsInOrder(t, ir,
 		"define i32 @main()",
 		"call void @"+abi.InvokeSymbol,
+		"call void @"+abi.RuntimeWaitAsyncSymbol,
 		"call void @"+abi.RuntimeGCSymbol,
 	)
-	// The wrapper must NOT wait for outstanding `go func` goroutines: the VM
-	// returns as soon as the main flow ends, and an unconditional wait hangs
-	// every script that leaves a serve loop running.
-	require.NotContains(t, ir, "call void @"+abi.RuntimeWaitAsyncSymbol)
+	// The wait symbol is a bounded drain (see yak_runtime_wait_async). It lets
+	// a finite `go` body run, and it returns without joining a parked server.
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
