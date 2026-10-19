@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -37,6 +38,12 @@ var builtinSkillReleaseDB = func() *gorm.DB {
 // each with a SKILL.md defining the skill metadata and content.
 func GetBuiltinSkillsFS() fi.FileSystem {
 	return builtinSkillsFS
+}
+
+// GetBuiltinSkillLoader makes embedded Skills available to an explicitly selected
+// focus without enabling automatic discovery or extracting files to disk.
+func (r *ReAct) GetBuiltinSkillLoader() (aiskillloader.SkillLoader, error) {
+	return aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem

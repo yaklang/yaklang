@@ -292,7 +292,7 @@ func (s *RAGHTTPServer) chatKnowledgeTools() []*aitool.Tool {
 func (s *RAGHTTPServer) buildAIEngineOptions(ctx context.Context, sessionID string, emitter *sseEmitter) []aiengine.AIEngineConfigOption {
 	opts := []aiengine.AIEngineConfigOption{
 		aiengine.WithContext(ctx),
-		aiengine.WithFocus("default"),
+		aiengine.WithFocus(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE),
 		aiengine.WithYOLOMode(),
 		aiengine.WithAllowUserInteract(false),
 		aiengine.WithMaxIteration(max(s.config.MaxIteration, 8)),

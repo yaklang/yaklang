@@ -27,6 +27,7 @@ metadata:
 
 ## 使用顺序与边界
 
+- `knowledge_enhance`（知识增强检索）专注模式基于通用 loop，进入时默认加载本 Skill 和当前允许的知识库工具 Schema；已有上下文直接复用，无需重复 loading_skills / require_tool。保留用户 attach 的库名、选择标志和附加说明，以此决定查询偏好；未选择库先 list 再指定 name/names，auto-select 不代表 all=true。显式选择全库才使用 all=true；仅检索不执行构建或写入，管理操作依据用户请求。
 - 接续旧任务：先 `read_memory` 回顾稳定偏好，再 `grep_timeline_history` 找原始证据。当前用户指令优先于旧记忆；历史搜索覆盖已归档的压缩前 item，无法恢复未归档的旧原文。
 - 管理记忆：delete/change 使用精确 memory_id；add/change 提供 content。修改后回读确认，只保存明确且可复用的事实与偏好。
 - 查询流量：省略 database_id 读取当前数据库。跨项目先列项目，选择 available=true 且 supports_http=true 的 database_id，查询和取包使用同一 database_id；操作只读，不切换当前项目。

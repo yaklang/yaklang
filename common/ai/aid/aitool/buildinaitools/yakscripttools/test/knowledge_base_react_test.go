@@ -33,8 +33,17 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 	oldMock := vectorstore.IsMockMode
 	vectorstore.IsMockMode = true
 	t.Cleanup(func() { vectorstore.IsMockMode = oldMock })
-	for _, native := range []bool{false, true} {
-		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
+	for _, scenario := range []struct {
+		focus  string
+		native bool
+	}{
+		{schema.AI_REACT_LOOP_NAME_DEFAULT, false},
+		{schema.AI_REACT_LOOP_NAME_DEFAULT, true},
+		{schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, false},
+		{schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, true},
+	} {
+		focus, native := scenario.focus, scenario.native
+		t.Run(fmt.Sprintf("%s/native=%t", focus, native), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			workdir := t.TempDir()
@@ -136,6 +145,16 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 					return nil, fmt.Errorf("unexpected AI request: %s", req.GetCallerLabel())
 				}
 				prompt := req.GetPrompt()
+				if focus == schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE {
+					skillLoaded = true
+					for _, name := range []string{"manage_knowledge_base", "query_knowledge_base"} {
+						require.True(t, runtime.GetConfig().GetAiToolManager().IsRecentlyUsedTool(name), "focus must preload schemas before the first model decision")
+						loaded[name] = true
+					}
+					for _, key := range []string{"attached_knowledge_base", "docs", "PREFERENCE_MARKER", "优先使用项目资料", "Raw Value"} {
+						require.Contains(t, prompt, key, "user attachment preferences must reach the actual AI prompt")
+					}
+				}
 				if !skillLoaded {
 					require.Contains(t, prompt, "yaklang-system", "the actual Skill must appear in the catalog")
 					skillLoaded = true
@@ -235,20 +254,37 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				cursor++
 				return respond(c, req, "directly_call_tool", map[string]any{"directly_call_tool_name": next.tool, "directly_call_tool_params": next.params, "directly_call_reason": "Verify the knowledge tool integration"})
 			}
-			runtime, err = aireact.NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(native),
-				aicommon.WithSingleAIModelMode(true), aicommon.WithDisableAutoSkills(true), aicommon.WithSkillsFS(aireact.GetBuiltinSkillsFS()), aicommon.WithNoOpMemoryTriage(),
+			var skillOptions []aicommon.ConfigOption
+			if focus == schema.AI_REACT_LOOP_NAME_DEFAULT {
+				skillOptions = append(skillOptions, aicommon.WithSkillsFS(aireact.GetBuiltinSkillsFS()))
+			}
+			runtime, err = aireact.NewTestReAct(append(skillOptions, aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(native),
+				aicommon.WithSingleAIModelMode(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage(),
 				aicommon.WithAiToolManagerOptions(buildinaitools.WithExtendTools(tools, false)),
 				aicommon.WithWorkdir(workdir), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithAgreeYOLO(),
-				aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(callback))
+				aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(callback))...)
 			require.NoError(t, err)
 			task = aicommon.NewStatefulTaskBase("knowledge-integration", "Use the system Skill to manage and query knowledge bases.", ctx, runtime.GetConfig().GetEmitter(), true)
+			attachments := []*aicommon.AttachedResource{
+				aicommon.NewAttachedResource(aicommon.AttachedResourceTypeKnowledgeBase, aicommon.CONTEXT_PROVIDER_KEY_NAME, "docs"),
+				aicommon.NewAttachedResource(aicommon.AttachedResourceTypeFile, aicommon.CONTEXT_PROVIDER_KEY_FILE_CONTENT, "PREFERENCE_MARKER 优先使用项目资料；保留这段用户附加说明。"),
+			}
+			if focus == schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE {
+				task.SetAttachedDatas(attachments)
+			}
 			runtime.SetCurrentTask(task)
-			loop, err := reactloops.CreateLoopByName("default", runtime, reactloops.WithMaxIterations(32))
+			loop, err := reactloops.CreateLoopByName(focus, runtime, reactloops.WithMaxIterations(32))
 			require.NoError(t, err)
+			require.Equal(t, focus, loop.GetLoopName())
 			defer loop.Release()
 			require.NoError(t, loop.ExecuteWithExistedTask(task))
 			require.Equal(t, len(steps), checked)
-			require.Equal(t, 2, requires)
+			if focus == schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE {
+				require.Zero(t, requires, "the focus must not spend model turns on Skill or schema loading")
+				require.Equal(t, attachments, task.GetAttachedDatas(), "initialization must preserve original attachments")
+			} else {
+				require.Equal(t, 2, requires)
+			}
 			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
 			var count int
 			require.NoError(t, profile.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)

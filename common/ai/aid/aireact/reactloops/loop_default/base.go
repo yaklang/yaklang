@@ -74,57 +74,63 @@ func buildDefaultReactiveDataBuilder() reactloops.ReActLoopOption {
 	})
 }
 
+// NewLoop creates a named specialization of the general-purpose loop.
+// It retains the default actions, initialization, prompts and completion hooks.
+func NewLoop(name string, r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
+	preset := []reactloops.ReActLoopOption{
+		reactloops.WithFunctionCallActionVariants(),
+		reactloops.WithAllowToolCall(true),
+		reactloops.WithAllowAIForge(true),
+		reactloops.WithAllowPlanAndExec(true),
+		reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
+		reactloops.WithInitTask(InitTask(r)),
+		reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
+		reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
+		reactloops.WithPersistentInstruction(instruction),
+		reactloops.WithOutputExample(outputExample),
+		buildDefaultReactiveDataBuilder(),
+		reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
+			if !isDone {
+				return
+			}
+			lastAction := loop.GetLastValidAction()
+			if lastAction == nil {
+				log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
+				return
+			}
+			if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
+				log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
+				return
+			}
+			if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
+				// Coordinator owns the review panel and final report. Another
+				// model summary here delays the root task's terminal event.
+				return
+			}
+			if strings.TrimSpace(loop.Get("intent_hint")) == "simple_query" {
+				log.Infof("iteration %d: simple query task, skip post-iteration summary", iteration)
+				return
+			}
+
+			directlySummary, _ := loop.GetInvoker().DirectlyAnswer(
+				task.GetContext(), buildPostSummaryPrompt(task.GetUserInput()), nil, nil,
+			)
+			if directlySummary != "" {
+				loop.GetInvoker().AddToTimeline("final_summary", directlySummary)
+			}
+		}),
+	}
+
+	preset = append(preset, opts...)
+	loop, err := reactloops.NewReActLoop(name, r, preset...)
+	return loop, err
+}
+
 func init() {
 	err := reactloops.RegisterLoopFactory(
 		schema.AI_REACT_LOOP_NAME_DEFAULT,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			preset := []reactloops.ReActLoopOption{
-				reactloops.WithFunctionCallActionVariants(),
-				reactloops.WithAllowToolCall(true),
-				reactloops.WithAllowAIForge(true),
-				reactloops.WithAllowPlanAndExec(true),
-				reactloops.WithPlanExecActionType(schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION),
-				reactloops.WithInitTask(buildInitTask(r)),
-				reactloops.WithAllowUserInteract(r.GetConfig().GetAllowUserInteraction()),
-				reactloops.WithMaxIterations(resolveMaxIterations(r.GetConfig())),
-				reactloops.WithPersistentInstruction(instruction),
-				reactloops.WithOutputExample(outputExample),
-				buildDefaultReactiveDataBuilder(),
-				reactloops.WithOnPostIteraction(func(loop *reactloops.ReActLoop, iteration int, task aicommon.AIStatefulTask, isDone bool, reason any, operator *reactloops.OnPostIterationOperator) {
-					if !isDone {
-						return
-					}
-					lastAction := loop.GetLastValidAction()
-					if lastAction == nil {
-						log.Warnf("iteration %d: skip final summary because last action is empty", iteration)
-						return
-					}
-					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_DIRECTLY_ANSWER {
-						log.Infof("iteration %d: action is directly answer, exiting loop and returning final answer", iteration)
-						return
-					}
-					if lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN || lastAction.ActionType == schema.AI_REACT_LOOP_ACTION_REQUEST_PLAN_EXECUTION {
-						// Coordinator owns the review panel and final report. Another
-						// model summary here delays the root task's terminal event.
-						return
-					}
-					if strings.TrimSpace(loop.Get("intent_hint")) == "simple_query" {
-						log.Infof("iteration %d: simple query task, skip post-iteration summary", iteration)
-						return
-					}
-
-					directlySummary, _ := loop.GetInvoker().DirectlyAnswer(
-						task.GetContext(), buildPostSummaryPrompt(task.GetUserInput()), nil, nil,
-					)
-					if directlySummary != "" {
-						loop.GetInvoker().AddToTimeline("final_summary", directlySummary)
-					}
-				}),
-			}
-
-			preset = append(preset, opts...)
-			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
-			return loop, err
+			return NewLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, opts...)
 		},
 		reactloops.WithLoopDescription("General-purpose assistant mode for mixed tasks, combining reasoning, skill-guided tools, and AI forges."),
 		reactloops.WithLoopDescriptionZh("通用助手模式：适合处理混合型任务，综合使用推理、Skill 引导的工具与 AI 蓝图完成工作。"),

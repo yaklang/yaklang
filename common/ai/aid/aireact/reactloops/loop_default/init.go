@@ -8,6 +8,11 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 )
 
+// InitTask supplies the general-purpose attachment and intent initialization.
+func InitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return buildInitTask(r)
+}
+
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 		config := r.GetConfig()

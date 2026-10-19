@@ -260,7 +260,9 @@ func truncateAttachedFilePreview(content string) string {
 }
 
 type AttachedKnowledgeBaseResourceData struct {
-	Value string
+	Key     string
+	Value   string
+	content AttachedFileContentResourceData
 }
 
 func (d *AttachedKnowledgeBaseResourceData) Type() string {
@@ -272,8 +274,8 @@ func (d *AttachedKnowledgeBaseResourceData) Unmarshal(raw string) error {
 	if value == "" {
 		return utils.Error("attached knowledge base value is empty")
 	}
-	d.Value = value
-	return nil
+	d.Value = raw
+	return d.content.Unmarshal(raw)
 }
 
 func (d *AttachedKnowledgeBaseResourceData) BindLoopData(reactloop ReActLoopIF) error {
@@ -281,5 +283,20 @@ func (d *AttachedKnowledgeBaseResourceData) BindLoopData(reactloop ReActLoopIF) 
 }
 
 func (d *AttachedKnowledgeBaseResourceData) ToAttachData(reactloop ReActLoopIF) string {
-	return ""
+	raw := "```\n" + d.Value + "\n```"
+	if len(d.Value) > AttachedDefaultResourceInlineLimit {
+		// Reuse the literal attachment renderer to preserve the full byte stream
+		// once, with a bounded Unicode-safe preview and a readable file reference.
+		raw = d.content.ToAttachData(reactloop)
+	}
+	preference := "Prefer the user's attached knowledge base name or selection notes when choosing explicit query names. This attachment does not execute a search."
+	if d.Key == CONTEXT_PROVIDER_KEY_SYSTEM_FLAG {
+		switch {
+		case strings.TrimSpace(d.Value) == CONTEXT_PROVIDER_VALUE_ALL_KNOWLEDGE_BASE:
+			preference = "The user explicitly selected all knowledge bases; use all=true if querying all bases is needed."
+		case strings.HasPrefix(strings.TrimSpace(d.Value), CONTEXT_PROVIDER_VALUE_AUTO_SELECT_KNOWLEDGE_BASE):
+			preference = "The user requested automatic selection: call manage_knowledge_base op=list, then choose explicit name or names using the question and attached notes. Do not substitute all=true."
+		}
+	}
+	return fmt.Sprintf("## User-attached Knowledge Base Preference\n\n- Resource Key: %s\n- Selection: %s\n\n### Raw Value\n%s", d.Key, preference, raw)
 }

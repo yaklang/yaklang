@@ -115,6 +115,8 @@ Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.Delete
 
 知识库使用本次运行的 profile 数据库，与 Yakit 共用。`manage_knowledge_base` 与 MCP 管理工具同属内置 Yak 工具，可由 `require_tool` 加载；库列表是管理操作 `op=list`。`query_knowledge_base` 只读，必须显式选择 `name`（一个库）、`names`（多个库）或 `all=true`，三者互斥，并提供 `token_limit`。未指定范围报错，提示先 manage list 再选择一个或多个库；省略 all 或 all=false 不会默认全库，字面库名 all 也不会被解释为全库。知识操作统一通过本 Skill 引导调用工具。
 
+`knowledge_enhance` 专注模式保留原有名称与前端入口，复用普通通用 loop 的动作和完成流程，在首次模型决策前加载本 Skill 和已启用的管理、查询工具 Schema。用户附加的知识库选择与原文留在任务及上下文中；指定库优先，auto-select 先 list 再明确选择，不会隐式全库检索。只读服务可限制为查询工具，预加载不会绕过工具白名单。缓存中已存在的 Skill 正文和工具定义直接复用。
+
 ```json
 {"op":"list","keyword":"project","limit":20,"offset":0}
 ```

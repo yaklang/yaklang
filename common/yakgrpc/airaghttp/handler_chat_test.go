@@ -39,7 +39,7 @@ func TestChatUsesScopedReadOnlyKnowledgeTool(t *testing.T) {
 		require.Error(t, err)
 	}
 	engine := aiengine.NewAIEngineConfig(server.buildAIEngineOptions(context.Background(), "chat-test", nil)...)
-	require.Equal(t, "default", engine.Focus)
+	require.Equal(t, schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, engine.Focus)
 	require.False(t, engine.DisableToolUse)
 	require.GreaterOrEqual(t, engine.MaxIteration, 8)
 }
