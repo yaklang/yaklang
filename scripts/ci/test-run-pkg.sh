@@ -55,7 +55,10 @@ needs_race() {
     normalized="${pattern#./}"; normalized="${normalized%/...}"; normalized="${normalized%/.}"
     pnorm="${pkg#./}"
     if [[ "$pattern" == *"/..." ]]; then
-      [[ "$pnorm" == "$normalized"* ]] && return 0
+      # Same boundary as pkg_matches_pattern: ssa must not match ssaapi.
+      if [[ "$pnorm" == "$normalized" || "$pnorm" == "$normalized"/* ]]; then
+        return 0
+      fi
     elif [[ "$pnorm" == "$normalized" ]]; then
       return 0
     fi
