@@ -53,6 +53,11 @@ func goFixtureVirtualPath(filename string) string {
 	if trimmed == "" {
 		trimmed = "fixture"
 	}
+	// Default compile excludes drop *_test.go. These files are syntax
+	// fixtures, so build them under a name the project compiler accepts.
+	if strings.HasSuffix(trimmed, "_test.go") {
+		trimmed = strings.TrimSuffix(trimmed, "_test.go") + "_syntax.go"
+	}
 	return path.Join("fixture", trimmed)
 }
 
