@@ -492,9 +492,9 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
-		if scope.FindVariableByName(variable.GetName(), true, func(find VersionedIF[T]) bool {
-			return find.GetLocal() && variable.GetCaptured().GetGlobalIndex() == find.GetGlobalIndex()
-		}) != nil {
+		// skip capture only when the captured target is itself a local
+		// version of this name in the current scope
+		if scope.linkValues.HasLocalWithIndex(variable.GetName(), variable.GetCaptured().GetGlobalIndex()) {
 			return
 		}
 		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
