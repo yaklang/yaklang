@@ -24,6 +24,10 @@ func NewSafeMapWithKey[K comparable, V any]() *SafeMapWithKey[K, V] {
 }
 
 func (sm *SafeMapWithKey[K, V]) Get(key K) (V, bool) {
+	if sm == nil {
+		var zero V
+		return zero, false
+	}
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	val, ok := sm.m[key]
@@ -121,6 +125,9 @@ func (sm *SafeMapWithKey[K, V]) Delete(key K) {
 }
 
 func (sm *SafeMapWithKey[K, V]) ForEach(f func(key K, value V) bool) {
+	if sm == nil || f == nil {
+		return
+	}
 	sm.mu.RLock()
 	keys := make([]K, 0, len(sm.m))
 	values := make([]V, 0, len(sm.m))
@@ -157,6 +164,9 @@ func (sm *SafeMapWithKey[K, V]) ValuesMatching(match func(K) bool) []V {
 }
 
 func (sm *SafeMapWithKey[K, V]) GetAll() map[K]V {
+	if sm == nil {
+		return nil
+	}
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 	ret := make(map[K]V, len(sm.m))

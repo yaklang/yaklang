@@ -83,12 +83,8 @@ func (v *Variable) internRange(r *memedit.Range) *memedit.Range {
 		return r
 	}
 	key := variableRangePosition{r.GetStartOffset(), r.GetEndOffset(), r.GetStart().GetLine(), r.GetStart().GetColumn(), r.GetEnd().GetLine(), r.GetEnd().GetColumn()}
-	prog.variableRangeMu.Lock()
-	if prog.variableRanges == nil {
-		prog.variableRanges = utils.NewSafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]()
-	}
+	prog.initConcurrentMaps()
 	registry := prog.variableRanges
-	prog.variableRangeMu.Unlock()
 	ranges, _ := registry.GetOrLoad(editor, func() (*utils.SafeMapWithKey[variableRangePosition, *memedit.Range], error) {
 		return utils.NewSafeMapWithKey[variableRangePosition, *memedit.Range](), nil
 	})
