@@ -19,6 +19,7 @@ func todoSnapshotTestConfig(t *testing.T, sessionID string) *Config {
 	require.NoError(t, consts.SetGormProjectDatabase(filepath.Join(t.TempDir(), "snapshot-todo.db")))
 	t.Cleanup(func() { require.NoError(t, consts.SetGormProjectDatabase(previous)) })
 	db := consts.GetGormProjectDatabase()
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
 	require.NoError(t, yakit.RegisterAIAgentSession(db, sessionID))
 	return NewConfig(context.Background(), WithPersistentSessionId(sessionID), WithDisableAutoSkills(true))
