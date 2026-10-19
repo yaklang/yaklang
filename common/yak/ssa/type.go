@@ -490,9 +490,8 @@ type baseType struct {
 	// id is read by every IR marshal of a shared type and assigned lazily by
 	// typeStore.remember, so it must never be a plain field: persist workers run
 	// concurrently over the same *FunctionType and friends.
-	id         atomic.Int64
-	methods    atomic.Pointer[typeMethodState]
-	typeNameMu sync.Mutex
+	id      atomic.Int64
+	methods atomic.Pointer[typeMethodState]
 }
 
 func NewBaseType() *baseType {
@@ -650,12 +649,12 @@ func (b *baseType) RangeMethod(f func(string, *Function)) {
 type BasicType struct {
 	// Basic types are numerous and own their base state. Keep it in the same
 	// allocation, avoiding a separate GC object and pointer per type. BasicType
-	// must not be copied after use (baseType contains atomics and locks).
+	// must not be copied after use (baseType contains atomics).
 	baseType
 	Kind        TypeKind
 	description *basicTypeDescription
 
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 type basicTypeDescription struct{ name string }
@@ -700,27 +699,21 @@ func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
 	}
-	b.typeNameMu.Lock()
-	defer b.typeNameMu.Unlock()
-	fullTypeNameAdd(&b.fullTypeName, name, b)
+	b.fullTypeName.add(name)
 }
 
 func (b *BasicType) GetFullTypeNames() []string {
 	if b == nil {
 		return nil
 	}
-	b.typeNameMu.Lock()
-	defer b.typeNameMu.Unlock()
-	return b.fullTypeName
+	return b.fullTypeName.list()
 }
 
 func (b *BasicType) SetFullTypeNames(names []string) {
 	if b == nil {
 		return
 	}
-	b.typeNameMu.Lock()
-	defer b.typeNameMu.Unlock()
-	fullTypeNameSet(&b.fullTypeName, names, b)
+	b.fullTypeName.set(names)
 }
 
 func (b *BasicType) IsAny() bool {
@@ -834,7 +827,7 @@ type AliasType struct {
 	elem         Type
 	Name         string
 	pkgPath      string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ Type = (*AliasType)(nil)
@@ -852,27 +845,21 @@ func (a *AliasType) AddFullTypeName(name string) {
 	if a == nil {
 		return
 	}
-	a.typeNameMu.Lock()
-	defer a.typeNameMu.Unlock()
-	fullTypeNameAdd(&a.fullTypeName, name, a)
+	a.fullTypeName.add(name)
 }
 
 func (a *AliasType) GetFullTypeNames() []string {
 	if a == nil {
 		return nil
 	}
-	a.typeNameMu.Lock()
-	defer a.typeNameMu.Unlock()
-	return a.fullTypeName
+	return a.fullTypeName.list()
 }
 
 func (a *AliasType) SetFullTypeNames(names []string) {
 	if a == nil {
 		return
 	}
-	a.typeNameMu.Lock()
-	defer a.typeNameMu.Unlock()
-	fullTypeNameSet(&a.fullTypeName, names, a)
+	a.fullTypeName.set(names)
 }
 
 // func (b *AliasType) GetAllKey() []string {
@@ -912,8 +899,9 @@ type InterfaceType struct {
 	*baseType
 	object       map[string]*ObjectType
 	name         string
+	nameMu       sync.Mutex
 	pkgPath      string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 	parents      []*InterfaceType
 	childs       []*InterfaceType
 }
@@ -948,8 +936,8 @@ func (i *InterfaceType) GetTypeKind() TypeKind {
 }
 
 func (i *InterfaceType) String() string {
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
+	i.nameMu.Lock()
+	defer i.nameMu.Unlock()
 	if i.name != "" {
 		return i.name
 	}
@@ -965,8 +953,8 @@ func (i *InterfaceType) PkgPathString() string {
 }
 
 func (i *InterfaceType) RawString() string {
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
+	i.nameMu.Lock()
+	defer i.nameMu.Unlock()
 	return fmt.Sprintf("type %s interface{}", i.name)
 }
 
@@ -983,35 +971,31 @@ func (i *InterfaceType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
+	i.nameMu.Lock()
 	i.name = name
-	fullTypeNameAdd(&i.fullTypeName, name, i)
+	i.nameMu.Unlock()
+	i.fullTypeName.add(name)
 }
 
 func (i *InterfaceType) GetFullTypeNames() []string {
 	if i == nil {
 		return nil
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
-	return i.fullTypeName
+	return i.fullTypeName.list()
 }
 
 func (i *InterfaceType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
-	fullTypeNameSet(&i.fullTypeName, names, i)
+	i.fullTypeName.set(names)
 }
 
 // ====================== chan type
 type ChanType struct {
 	*baseType
 	Elem         Type
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*ChanType)(nil)
@@ -1020,27 +1004,21 @@ func (c *ChanType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *ChanType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *ChanType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 // func (b *ChanType) GetAllKey() []string {
@@ -1091,7 +1069,7 @@ type ObjectType struct {
 	KeyTyp    Type
 	FieldType Type
 
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*ObjectType)(nil)
@@ -1108,27 +1086,21 @@ func (i *ObjectType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
-	fullTypeNameAdd(&i.fullTypeName, name, i)
+	i.fullTypeName.add(name)
 }
 
 func (i *ObjectType) GetFullTypeNames() []string {
 	if i == nil {
 		return nil
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
-	return i.fullTypeName
+	return i.fullTypeName.list()
 }
 
 func (i *ObjectType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	i.typeNameMu.Lock()
-	defer i.typeNameMu.Unlock()
-	fullTypeNameSet(&i.fullTypeName, names, i)
+	i.fullTypeName.set(names)
 }
 
 func (i *ObjectType) SetName(name string) {
@@ -1155,7 +1127,6 @@ func NewObjectType() *ObjectType {
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
 
-		fullTypeName:   []string{},
 		AnonymousField: map[string]*ObjectType{},
 	}
 }
@@ -1413,7 +1384,7 @@ type FunctionType struct {
 	IsModifySelf    bool // if this is method function
 
 	AnnotationFunc    []func(Value)
-	fullTypeName      []string
+	fullTypeName      orderedTypeNames
 	isAnyFunctionType bool
 
 	// stringCache caches the RawString result so repeated String() calls
@@ -1439,27 +1410,21 @@ func (f *FunctionType) AddFullTypeName(name string) {
 	if f == nil {
 		return
 	}
-	f.typeNameMu.Lock()
-	defer f.typeNameMu.Unlock()
-	fullTypeNameAdd(&f.fullTypeName, name, f)
+	f.fullTypeName.add(name)
 }
 
 func (f *FunctionType) GetFullTypeNames() []string {
 	if f == nil {
 		return nil
 	}
-	f.typeNameMu.Lock()
-	defer f.typeNameMu.Unlock()
-	return f.fullTypeName
+	return f.fullTypeName.list()
 }
 
 func (f *FunctionType) SetFullTypeNames(names []string) {
 	if f == nil {
 		return
 	}
-	f.typeNameMu.Lock()
-	defer f.typeNameMu.Unlock()
-	fullTypeNameSet(&f.fullTypeName, names, f)
+	f.fullTypeName.set(names)
 }
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
@@ -1619,7 +1584,7 @@ func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
 type GenericType struct {
 	*baseType
 	symbol       string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*GenericType)(nil)
@@ -1628,27 +1593,21 @@ func (c *GenericType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *GenericType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *GenericType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 func (c *GenericType) GetTypeKind() TypeKind {
@@ -1811,7 +1770,7 @@ func CloneType(t Type) (Type, bool) {
 type OrType struct {
 	*baseType
 	types        Types
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*OrType)(nil)
@@ -1820,27 +1779,21 @@ func (c *OrType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *OrType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 func (c *OrType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	c.typeNameMu.Lock()
-	defer c.typeNameMu.Unlock()
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *OrType) GetTypeKind() TypeKind {

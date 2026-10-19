@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"sync"
-
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -95,9 +93,8 @@ type Blueprint struct {
 
 	ParentBlueprints    []*Blueprint
 	InterfaceBlueprints []*Blueprint
-	// full Type Name
-	fullTypeName []string
-	typeNameMu   sync.Mutex
+	// full Type Name, insertion order, capped.
+	fullTypeName orderedTypeNames
 
 	// lazy
 	*LazyBuilder
@@ -123,8 +120,7 @@ func NewBlueprint(name string) *Blueprint {
 		StaticMethod: make(map[string]*Function),
 		MagicMethod:  utils.NewSafeMapWithKey[BlueprintMagicMethodKind, Value](),
 
-		fullTypeName: make([]string, 0),
-		LazyBuilder:  NewLazyBuilder("Blueprint:" + name),
+		LazyBuilder: NewLazyBuilder("Blueprint:" + name),
 	}
 	return class
 }
