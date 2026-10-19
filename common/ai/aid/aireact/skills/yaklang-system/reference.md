@@ -67,3 +67,46 @@ for packetFile in files { println(packetFile.Dump()) }
 SQL 中原有 quoted 存储由 API 解码；直接使用 dump 文本和导出文件核验证据。超限时遵循文件路径提示，避免将整个大报文搬入对话。
 
 已有 `db.QueryHTTPFlowByID(id)` 保留原 HTTPFlow 类型和完整存储字段，可以继续传给 `db.SaveHTTPFlowInstance`；有限展示与文件导出使用上述历史条目 API。
+## MCP 服务器与客户端
+
+MCP 配置保存于 profile 系统表 `mcp_servers`，与 Yakit 的 MCP 管理共用。AI 先 require `manage_mcp_server`，再用 `op=add/delete/list` 操作。add 不覆盖同名配置，也不连接网络或启动进程；delete 使用精确名称，清理对应工具与桥接缓存。list 包含禁用服务器；按 `has_more` 和 `next_offset` 续查，列表只展示环境变量和请求头的键。
+
+```json
+{"op":"add","name":"demo","type":"streamable_http","endpoint":"http://127.0.0.1:8080/mcp","headers":{"Authorization":"Bearer token"}}
+```
+
+`type` 支持 `stdio/sse/streamable_http`。stdio 的 endpoint 为完整命令行，支持引号和空格路径，按 argv 执行，不经过 shell；`env` 为字符串值对象。`disabled` 默认 false；true 只保存禁用配置。HTTP 的 endpoint 必须为绝对 HTTP(S) URL。
+
+添加后，当前会话 require `query_mcp_tools`，传 `server_name`。其输出是实时的远端工具清单和完整 inputSchema；`nextCursor` 非空时传给下次的 `cursor`。再 require `call_mcp_tool`，传 `server_name`、远端裸 `remote_tool`、符合 schema 的 `arguments` 对象。两工具均支持单次请求 `timeout`（秒），调用后关闭连接；远端 `isError=true` 会输出错误内容并使工具调用失败。
+
+```json
+{"server_name":"demo","remote_tool":"echo","arguments":{"message":"hello"}}
+```
+
+Yak 的 `mcp` 标准库也能直接编写客户端：
+
+```yak
+client = mcp.Connect("demo", mcp.timeout(10))~
+defer client.Close()
+page = client.ListTools()~
+dump(page.Tools)
+// page.NextCursor 非空时，继续 client.ListTools(string(page.NextCursor))。
+result = client.CallTool("echo", {"message":"hello"})~
+dump(result.Content)
+```
+
+不保存配置时直接创建连接：
+
+```yak
+client = mcp.NewClient("sse", "http://127.0.0.1:8080/sse", mcp.headers({"Authorization":"Bearer token"}))~
+defer client.Close()
+// stdio 示例：
+local = mcp.NewClient("stdio", `python3 "/tmp/my server.py"`, mcp.env({"TOKEN":"value"}))~
+defer local.Close()
+```
+
+客户端还提供 `Ping()`、`ListResources(cursor?)`、`ReadResource(uri)`、`ListPrompts(cursor?)` 和 `GetPrompt(name, arguments)`。每次请求单独计时，连接不因初始化超时上下文结束而关闭。用 `mcp.context(ctx)` 绑定连接生命周期，结束时 `Close()`；重复 Close 安全。AI 工具自动绑定本次调用的上下文和 profile 库。
+
+Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.DeleteServer(name,options...)`、`mcp.ListServers(keyword,mcp.limit(20),mcp.offset(0))`。列表不回显命令参数和凭据值。已有会话桥接连接和在途调用不会因删除配置被强行撤销；后续的脚本连接会按最新配置检查存在性和启用状态。
+
+`DeleteServer` 和 `Ping` 仅返回 error，在 Yak 中使用 `die(mcp.DeleteServer("demo"))`、`die(client.Ping())` 检查错误；有 `(result,error)` 返回值的接口可使用 `~`。

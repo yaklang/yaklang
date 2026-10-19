@@ -25,6 +25,12 @@ func IsMCPToolName(name string) bool {
 	return strings.HasPrefix(name, "mcp_")
 }
 
+// IsMCPRelatedToolName also covers the Yak tools that manage and connect to
+// servers, so disabling MCP hides all of its first-party entry points.
+func IsMCPRelatedToolName(name string) bool {
+	return IsMCPToolName(name) || name == "manage_mcp_server" || name == "query_mcp_tools" || name == "call_mcp_tool"
+}
+
 // IsMCPPendingStub reports whether the tool is still a DB-cache stub awaiting live connection.
 func IsMCPPendingStub(tool *aitool.Tool) bool {
 	return tool != nil && tool.MCPPendingStub

@@ -97,7 +97,7 @@ func (r *ReAct) executeToolCallInternal(ctx context.Context, toolName string, pa
 // resolveToolForCall looks up a tool by name and, for MCP tools, waits for the
 // background loader to replace the DB stub with a live tool (or timeout).
 func (r *ReAct) resolveToolForCall(ctx context.Context, toolName string) (*aitool.Tool, error) {
-	if buildinaitools.IsMCPToolName(toolName) && !aicommon.IsMCPServersAllowedConfig(r.config) {
+	if buildinaitools.IsMCPRelatedToolName(toolName) && !aicommon.IsMCPServersAllowedConfig(r.config) {
 		return nil, utils.Errorf("MCP tools are disabled for this runtime")
 	}
 

@@ -17,8 +17,6 @@ func init() {
 	reactloops.RegisterAction(loopAction_LoadSkillResources)
 	reactloops.RegisterAction(loopAction_SearchCapabilities)
 	reactloops.RegisterAction(loopAction_LoadCapability)
-	reactloops.RegisterAction(loopAction_QueryMCPServers)
-	reactloops.RegisterAction(loopAction_QueryMCPTools)
 	reactloops.RegisterAction(loopAction_ListAsyncTasks)
 	reactloops.RegisterAction(loopAction_DispatchSubReactAgents)
 	reactloops.RegisterAction(loopAction_InspectSubAgents)
