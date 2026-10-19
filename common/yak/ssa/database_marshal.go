@@ -221,8 +221,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		params["errorcatch_exception"] = ret.Exception
 		params["errorcatch_catch"] = ret.CatchBody
 	case *ExternLib:
-		log.Warnf("TBD: marshal ExternLib: %v", ret)
-		// return nil, utils.Errorf("BUG: ConstInst should not be marshaled")
+		// Name, opcode, and member relations use the generic instruction
+		// record. This branch intentionally adds no extra fields and must
+		// not warn: every persisted import otherwise repeats the same TBD.
 	case *If:
 		if ret.Cond > 0 {
 			params["if_cond"] = ret.Cond
