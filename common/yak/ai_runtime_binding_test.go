@@ -33,6 +33,7 @@ func TestAIToolRuntimeBindingsPreserveExports(t *testing.T) {
 		{"aimemory", "memoryLimit", bindMemorySearchToEngine},
 		{"aihistory", "limit", bindAIHistoryToEngine},
 		{"mcp", "timeout", bindMCPToEngine},
+		{"aiknowledge", "db", bindAIKnowledgeToEngine},
 	} {
 		t.Run(tc.module, func(t *testing.T) {
 			engine := yaklang.New()

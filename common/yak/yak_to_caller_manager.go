@@ -1281,6 +1281,7 @@ func (y *YakToCallerManager) fetchFunctionFromSourceCode(pluginContext *YakitPlu
 			bindAIToolSleep(engine, pluginContext.Ctx)
 			bindDBHistoryToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
 			bindMCPToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
+			bindAIKnowledgeToEngine(engine, pluginContext.Ctx, y.aiRuntimeConfig)
 		}
 		return nil
 	})

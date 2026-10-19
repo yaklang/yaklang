@@ -1,0 +1,71 @@
+// Explicit local test against configured real AI and embedding services.
+// Run: yak common/ai/aismoking/live/knowledge_base_management.yak
+// Creates only a fresh named fixture base and deletes it on exit. No AI or
+// embedding mocks; requests, tool logs and results are saved without headers.
+root = os.Getenv("AISMOKING_OUTPUT")
+if root=="" { root=file.Join(os.TempDir(),"knowledge-live-"+randstr(12)) }
+file.MkdirAll(root)~
+name = "knowledge-live-"+randstr(12)
+marker = "KB_LIVE_"+randstr(16)
+source = file.Join(root,"source.txt")
+file.Save(source,"项目服务名为 knowledge-smoke。\nAPI 请求必须使用 X-Knowledge-Token 请求头。\n本次验证标记是 "+marker+"。\n该标记只能从本次文件构建的知识库中查询得到。")~
+defer func(){
+    _,err=aiknowledge.Manage({"op":"delete","name":name})
+    if err!=nil { println("fixture cleanup: ",err) }
+}()
+ctx=context.WithTimeoutSeconds(360)
+events,calls,errors=[],[],[]
+restricted=false
+mu=sync.NewMutex()
+prompt=sprintf(`直接完成一个知识库验证任务，使用 yaklang-system 索引的内置知识库工具：
+1. 列出知识库，创建精确名称 %s 的新库，描述为 live smoke，tags 为 smoke。
+2. 将本地文件 %s 构建到该库，使用 question_index 模式、chunk_size=1024、concurrency=1；等待实际构建成功。
+3. 在该库内用 semantic 查询 knowledge-smoke API 请求头和验证标记，显式设置 token_limit=1024。再用 keyword 查询同一知识原文核对。不要通过 read_file 直接回答问题。
+4. 将库描述更新为 live smoke verified，再 get 核对。保留测试库，测试程序会在退出时负责删除。
+成功时简短回答请求头和验证标记；出错时如实说明实际错误。无需生成报告或计划。`,name,source)
+started=time.Now().UnixMilli()
+runError=aim.InvokeReAct(prompt,aim.context(ctx),aim.sessionID("knowledge-live-"+randstr(12)),aim.workdir(root),aim.reviewPolicy("yolo"),aim.maxIteration(24),aim.timeout(300),aim.disableAIForge(true),aim.onEvent(func(op,e){
+    if !restricted {
+        manager=op.GetConfig().GetAiToolManager()
+        if manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base");restricted=true }
+    }
+    item={"type":string(e.Type),"node":string(e.NodeId),"content":string(e.Content)}
+    mu.Lock();events=append(events,item);mu.Unlock()
+    if string(e.Type)=="tool_call_log_dir" { mu.Lock();calls=append(calls,json.loads(string(e.Content)));mu.Unlock() }
+}),aim.configOptions(aiagent.functionCallMode(os.Getenv("AISMOKING_FUNCTION_CALL")!="0"),func(c){
+    c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+    return nil
+}))
+file.SaveJson(file.Join(root,"events.json"),events)~
+file.SaveJson(file.Join(root,"tool-call-directories.json"),calls)~
+if runError!=nil { errors=append(errors,string(runError)) }
+base,baseError=aiknowledge.Manage({"op":"get","name":name})
+query,queryError=aiknowledge.Query({"name":name,"query":marker,"token_limit":2048})
+if baseError!=nil { errors=append(errors,string(baseError)) }
+if queryError!=nil { errors=append(errors,string(queryError)) }
+if baseError==nil && base.knowledge_base.Description!="live smoke verified" { errors=append(errors,"metadata update did not persist") }
+if queryError==nil && len(query.Results)==0 { errors=append(errors,"file marker was not persisted in the requested knowledge base") }
+seenManage,seenQuery,seenSemantic,seenKeyword,seenBuild=false,false,false,false,false
+for call in calls {
+    manifestPath=file.Join(call.dir_path,"..","manifest.json")
+    manifest=json.loads(string(file.ReadFile(manifestPath)~))
+    if manifest.success && manifest.tool=="manage_knowledge_base" {
+        seenManage=true
+        if manifest.params.op=="build" && manifest.params.build_options.mode=="question_index" { seenBuild=true }
+    }
+    if manifest.success && manifest.tool=="query_knowledge_base" {
+        seenQuery=true
+        output=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
+        if len(output.results)>0 && output.used_tokens<=output.token_limit {
+            if output.mode=="semantic" { seenSemantic=true }
+            if output.mode=="keyword" { seenKeyword=true }
+        }
+    }
+}
+if !seenManage || !seenQuery { errors=append(errors,"real AI did not invoke both built-in knowledge tools") }
+if !seenBuild || !seenSemantic || !seenKeyword { errors=append(errors,"real AI must complete question-index build and both semantic and keyword retrieval") }
+summary={"passed":len(errors)==0,"knowledge_base":name,"duration_ms":time.Now().UnixMilli()-started,"real_provider":true,"real_embedding":true,"tool_scope":"two built-in knowledge tools","function_call":os.Getenv("AISMOKING_FUNCTION_CALL")!="0","tool_calls":len(calls),"errors":errors}
+file.SaveJson(file.Join(root,"summary.json"),summary)~
+println(json.dumps(summary))
+assert len(errors)==0,json.dumps(errors)
+println("AISMOKING_LIVE_PASS ",root)

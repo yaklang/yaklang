@@ -110,3 +110,40 @@ defer local.Close()
 Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.DeleteServer(name,options...)`、`mcp.ListServers(keyword,mcp.limit(20),mcp.offset(0))`。列表不回显命令参数和凭据值。已有会话桥接连接和在途调用不会因删除配置被强行撤销；后续的脚本连接会按最新配置检查存在性和启用状态。
 
 `DeleteServer` 和 `Ping` 仅返回 error，在 Yak 中使用 `die(mcp.DeleteServer("demo"))`、`die(client.Ping())` 检查错误；有 `(result,error)` 返回值的接口可使用 `~`。
+
+## 知识库管理与知识查询
+
+知识库使用本次运行的 profile 数据库，与 Yakit 共用。`manage_knowledge_base` 与 MCP 管理工具同属内置 Yak 工具，可由 `require_tool` 加载；库列表是管理操作 `op=list`。`query_knowledge_base` 只读取指定库的正文，必须显式提供 `name`、`token_limit`。旧 `knowledge_enhance_answer` action 已停用，`WithAllowRAG` / `WithAllowRAGGetter` 保留为空操作，不再触发自动选库或检索。
+
+```json
+{"op":"list","keyword":"project","limit":20,"offset":0}
+```
+```json
+{"op":"create","name":"project-docs","metadata":{"description":"项目文档","type":"documentation","tags":["project"]},"index_options":{"embedding_model":"Qwen3-Embedding-0.6B-Q4_K_M","dimension":1024,"m":16,"ml":0.25,"ef_search":64,"ef_construct":64}}
+```
+```json
+{"op":"build","name":"project-docs","source_file":"/tmp/readme.txt","build_options":{"mode":"question_index","chunk_size":8192,"concurrency":2,"extra_prompt":"保留启动命令和配置项"}}
+```
+```json
+{"name":"project-docs","mode":"semantic","query":"如何启动项目？","limit":5,"token_limit":2048}
+```
+
+- 管理操作：list 分页返回 `knowledge_bases/total/has_more/next_offset`；get 返回元信息、条目数和集合参数；create 只接受新名称，不请求 embedding；update 的 metadata 按字段更新，支持空字符串、空 tags、is_default=false；delete 完整删除指定库及关联数据。名称保持稳定，避免破坏索引和实体关联。
+- `index_options` 只用于 create，模型和维度必须匹配实际 embedding 服务。省略参数使用引擎默认值，后续构建/检索使用保存的集合参数；rebuild_index 重建全部条目索引，不能更换模型。
+- build 只接受 source_file/content 之一，并且库必须已存在。`mode=question_index` 默认通过 AI 提取知识和问题索引；`mode=chunks` 直接分块入库。chunk_size 单位为字节（256..1048576，默认8192），concurrency=1..16（默认2），extra_prompt 提供额外构建要求。构建失败可能留下部分条目，先读取实际库内容再决定重试。
+- add_entry/update_entry 使用完整 `entry={title,content,summary?,type?,keywords?,potential_questions?}`；update_entry/delete_entry 需要同一库的精确 entry_id。默认立即索引；工具参数 skip_index=true 仅存知识、移除旧语义索引，之后可显式 rebuild_index（直接 Yak API 使用 index=false）。正文由查询工具读取，管理结果返回条目 ID。
+- keyword 默认按字面子串匹配标题/正文/摘要/关键词，query 为空则分页浏览；semantic 必须给 query，offset=0，limit 控制去重后知识条目数，score 是向量检索得分；get 必须 entry_id，content_offset 为 Unicode 字符偏移。所有模式限定同一个精确库名。
+- token_limit=128..32768 必填，约束各结果 JSON（含转义、条目元信息）的 token 累计，used_tokens 返回实际值，外层信封不计入。结果 truncated=true 时用 `mode=get`、entry_id 和 next_content_offset 续读；分页按 next_offset 继续，budget_exhausted 时增加预算或减少条数。
+
+直接 Yak 调用示例：
+
+```yak
+bases = aiknowledge.Manage({"op":"list","limit":20,"offset":0})~
+println(json.dumps(bases))
+aiknowledge.Manage({"op":"create","name":"project-docs","metadata":{"description":"项目文档"}})~
+added = aiknowledge.Manage({"op":"add_entry","name":"project-docs","entry":{"title":"启动方法","content":"使用 yak 启动项目"},"index":false})~
+result = aiknowledge.Query({"name":"project-docs","mode":"get","entry_id":added.entry_id,"token_limit":1024})~
+println(json.dumps(result))
+```
+
+可选 `aiknowledge.db(db)` / `aiknowledge.ctx(ctx)` 指定数据库和取消上下文，构建可用 `aiknowledge.aiService(callback)` 指定 AI。AI 工具和运行时内的 Yak 脚本自动绑定本次调用的 profile 与 context；失败会返回实际错误，不能将失败或截断当作完成。

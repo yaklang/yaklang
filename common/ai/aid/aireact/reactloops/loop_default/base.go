@@ -127,8 +127,8 @@ func init() {
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r, preset...)
 			return loop, err
 		},
-		reactloops.WithLoopDescription("General-purpose assistant mode for mixed tasks, combining reasoning, tools, RAG, and AI forges."),
-		reactloops.WithLoopDescriptionZh("通用助手模式：适合处理混合型任务，综合使用推理、工具、RAG 与 AI 蓝图完成工作。"),
+		reactloops.WithLoopDescription("General-purpose assistant mode for mixed tasks, combining reasoning, skill-guided tools, and AI forges."),
+		reactloops.WithLoopDescriptionZh("通用助手模式：适合处理混合型任务，综合使用推理、Skill 引导的工具与 AI 蓝图完成工作。"),
 		reactloops.WithLoopUsagePrompt("Use as the primary fallback mode when the request does not require a specialized focused mode. Suitable for broad problem solving, multi-step coordination, and direct responses."),
 		reactloops.WithLoopOutputExample(`
 * When the task is general and no specialized focused mode is needed:

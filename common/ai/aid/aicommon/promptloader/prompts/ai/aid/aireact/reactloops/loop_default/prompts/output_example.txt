@@ -41,9 +41,6 @@
     * 排除一条路径时，写明实验条件和对照，而不是单次未命中就下结论：
       `{"@action": "save_evidence", "evidence_id": "admin-anonymous-access", "evidence_content": "排除 /admin/ 路径存在未授权访问：对比携带有效 session 与清空 Cookie 两种请求，未登录时返回 302 跳转至登录页，与预期基线一致，字段和状态码均无差异"}`
 
-{{ if .AllowKnowledgeEnhanceAnswer }}*. 如果你觉得问题是事实密集型、需要精确数据、或涉及特定专业领域的概念解释，可以通过外部知识检索来增强回答的准确性和深度:
-    * `{"@action": "knowledge_enhance_answer", "rewrite_user_query_for_knowledge_enhance": "..[rewrite-user-query]..", "human_readable_thought": "先补充资料"}
-{{end}}
 {{ if .AllowPlan }}如果这个任务本身比较复杂：
     * 如果你发现有对应的 AI Blueprint(Forge) 可以使用，请你输出: `{"@action": "require_ai_blueprint", "blueprint_payload": "[your-blueprint-name]", ...}` 可以启动一个已经存在 AI 预设应用执行这个任务。
     * 如果你觉得任务复杂，且没有现有任务模版（Blueprint）需要使用任务规划能力，可使用 `request_plan`（规划+审查后再执行），需提供 `plan_request_payload`

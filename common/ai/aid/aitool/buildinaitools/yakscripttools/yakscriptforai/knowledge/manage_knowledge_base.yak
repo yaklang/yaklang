@@ -1,0 +1,52 @@
+__DESC__ = "Manage the Yakit profile knowledge base: list, get, create, update, delete, build from a file/text, add/update/delete entries, or rebuild the semantic index. Listing knowledge bases belongs to this tool."
+__VERBOSE_NAME__ = "Manage Knowledge Bases"
+__VERBOSE_NAME_ZH__ = "管理知识库"
+__KEYWORDS__ = "knowledge base,knowledge,rag,create,build,list,update,delete,知识库,知识,管理,构建,索引"
+__USAGE__ = <<<USAGE
+知识库管理的唯一入口；先 require_tool 加载 manage_knowledge_base，再传参数。与 Yakit 共用本次运行的 profile 数据库。
+op=list：keyword 匹配库名/描述，limit 1..100，offset 非负；has_more=true 时用 next_offset 续查。这里列的是知识库，不是长期记忆空间或单独的向量集合。
+其他 op 必须传精确 name；不存在报错，只有 create 能新建库。create 重复名称报错；先创建再 build，build 追加，不覆盖既有知识。
+op=create：metadata 可含 description/type/tags(字符串数组)/is_default；index_options 可含 embedding_model/dimension/m/ml/ef_search/ef_construct（省略用引擎默认值，余弦距离）。只创建元信息，不请求 embedding。模型和维度必须与配置的 embedding 服务一致；后续操作使用保存的参数。
+op=get：库元信息、知识条目数和保存的向量集合参数。
+op=update：metadata 仅更新给出的字段；空字符串、空 tags、is_default=false 可以清空。库名保持稳定。
+op=delete：删除指定库及关联知识、向量和实体关系；删除后 list 确认。
+op=add_entry/update_entry：entry 是完整条目 {title,content,summary?,type?,keywords?,potential_questions?}；update_entry 还需 entry_id，只操作该库中的条目。默认调用 embedding 更新向量；skip_index=true 仅存知识并移除旧索引，之后用 rebuild_index。entry_id 从写入结果或 query_knowledge_base 获取。
+op=delete_entry：entry_id 必填，只删该库的指定条目及其索引。
+op=build：source_file（引擎本地文件绝对路径）和 content 必须且只能给一个。build_options.mode=question_index（默认，AI 分析并生成问题索引）或 chunks（直接按块入库，文本不调用 AI）；chunk_size=256..1048576 字节，默认8192；concurrency=1..16，默认2；extra_prompt 是 AI 构建的额外要求。多媒体/文档提取依赖引擎对应能力。构建等待实际落库；出错时如实报告，部分成功写入可能保留，检查库内容后再重试。
+op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重建索引，不用于更换模型；可能耗时且需要 embedding 服务。index_options 只允许在 create 使用。
+查询知识正文另行 require query_knowledge_base，必须传 name 和 token_limit；不要把列表当成知识内容，也不要声称失败的操作成功。
+
+[[- if .FunctionCallMode -]]
+```json
+{"op":"create","name":"project-docs","metadata":{"description":"项目文档","tags":["project"]}}
+```
+```json
+{"op":"build","name":"project-docs","source_file":"/tmp/readme.txt","build_options":{"mode":"question_index","chunk_size":8192,"concurrency":2}}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"list","limit":20,"offset":0}}
+```
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_knowledge_base","directly_call_tool_params":{"op":"build","name":"project-docs","content":"项目启动说明","build_options":{"mode":"chunks"}}}
+```
+[[- end -]]
+USAGE
+op = cli.String("op", cli.setRequired(true), cli.setJsonSchema(`{"type":"string","enum":["list","get","create","update","delete","build","add_entry","update_entry","delete_entry","rebuild_index"]}`), cli.setHelp("知识库管理操作"))
+name = cli.String("name", cli.setHelp("除 list 外必填：精确知识库名称"))
+keyword = cli.String("keyword", cli.setHelp("list 的库名/描述关键词"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("list 每页条数，1..100"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("list 偏移，使用 next_offset 续查"))
+metadata = cli.Json("metadata", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"description":{"type":"string"},"type":{"type":"string"},"tags":{"type":"array","items":{"type":"string"}},"is_default":{"type":"boolean"}},"additionalProperties":false}`), cli.setHelp("create/update 元信息，只更新给出的字段"))
+indexOptions = cli.Json("index_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"embedding_model":{"type":"string"},"dimension":{"type":"integer","minimum":1,"maximum":65536},"m":{"type":"integer","minimum":1,"maximum":256},"ml":{"type":"number","exclusiveMinimum":0,"maximum":1},"ef_search":{"type":"integer","minimum":1,"maximum":100000},"ef_construct":{"type":"integer","minimum":1,"maximum":100000}},"additionalProperties":false}`), cli.setHelp("仅 create：embedding 模型、维度和 HNSW 参数"))
+entryID = cli.String("entry_id", cli.setHelp("update_entry/delete_entry 的精确条目 ID"))
+entry = cli.Json("entry", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"title":{"type":"string"},"content":{"type":"string"},"summary":{"type":"string"},"type":{"type":"string"},"keywords":{"type":"array","items":{"type":"string"}},"potential_questions":{"type":"array","items":{"type":"string"}}},"additionalProperties":false}`), cli.setHelp("仅 add_entry/update_entry 必填：title/content 不能为空；update 替换完整内容"))
+skipIndex = cli.Bool("skip_index", cli.setDefault(false), cli.setHelp("true 仅存知识并移除旧索引；默认立即索引"))
+sourceFile = cli.String("source_file", cli.setHelp("build 输入文件路径，与 content 二选一"))
+content = cli.String("content", cli.setHelp("build 输入文本，与 source_file 二选一"))
+buildOptions = cli.Json("build_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"mode":{"type":"string","enum":["chunks","question_index"]},"chunk_size":{"type":"integer","minimum":256,"maximum":1048576},"concurrency":{"type":"integer","minimum":1,"maximum":16},"extra_prompt":{"type":"string"}},"additionalProperties":false}`), cli.setHelp("build 模式、分块字节数、并发和额外提示词"))
+cli.check()
+if op == "" { die("op is required") }
+if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" { die("metadata, index_options and build_options must be JSON objects") }
+result = aiknowledge.Manage({"op":op,"name":name,"keyword":keyword,"limit":limit,"offset":offset,"metadata":metadata,"index_options":indexOptions,"entry_id":entryID,"entry":entry,"index":!skipIndex,"source_file":sourceFile,"content":content,"build_options":buildOptions})~
+println(json.dumps(result))

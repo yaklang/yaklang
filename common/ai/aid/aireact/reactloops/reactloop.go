@@ -474,11 +474,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		}
 	}
 
-	if r.allowRAG != nil && r.allowRAG() {
-		info["AllowKnowledgeEnhanceAnswer"] = true
-	} else {
-		info["AllowKnowledgeEnhanceAnswer"] = false
-	}
+	info["AllowKnowledgeEnhanceAnswer"] = false // legacy template key
 
 	if r.allowToolCall != nil && !r.allowToolCall() { // default allow tool call
 		info["AllowToolCall"] = false
@@ -845,15 +841,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if loadCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY, "optional capability discovery"); loadCap != nil {
 			r.actions.Set(loadCap.ActionType, loadCap)
 		}
-	}
-
-	if r.allowRAG == nil || r.allowRAG() {
-		// allow tool call, must have tools
-		ins, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE, "knowledge enhancement enabled")
-		if err != nil {
-			return nil, err
-		}
-		r.actions.Set(ins.ActionType, ins)
 	}
 
 	if r.allowAIForge == nil || r.allowAIForge() {

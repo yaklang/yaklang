@@ -15,10 +15,10 @@ func WithLoopPromptGenerator(generator ReActLoopCoreGenerateCode) ReActLoopOptio
 	return func(*ReActLoop) {}
 }
 
+// Deprecated: retained as a no-op. Knowledge base operations are discovered
+// through yaklang-system and executed by the built-in Yak tools.
 func WithAllowRAGGetter(allowRAG func() bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.allowRAG = allowRAG
-	}
+	return func(*ReActLoop) {}
 }
 
 func WithAllowAIForgeGetter(allowAIForge func() bool) ReActLoopOption {
@@ -67,16 +67,8 @@ func WithAllowAIForge(b ...bool) ReActLoopOption {
 	})
 }
 
-func WithAllowRAG(b ...bool) ReActLoopOption {
-	if len(b) > 0 {
-		return WithAllowRAGGetter(func() bool {
-			return b[0]
-		})
-	}
-	return WithAllowRAGGetter(func() bool {
-		return true
-	})
-}
+// Deprecated: retained as a no-op; use the knowledge base Yak tools.
+func WithAllowRAG(b ...bool) ReActLoopOption { return func(*ReActLoop) {} }
 
 func WithAllowToolCallGetter(allowToolCall func() bool) ReActLoopOption {
 	return func(r *ReActLoop) {
