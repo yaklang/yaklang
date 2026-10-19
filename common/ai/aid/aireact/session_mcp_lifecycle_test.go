@@ -66,7 +66,7 @@ func newSessionMCPLifecycleFixture(t *testing.T, transport string) (*schema.MCPS
 		}
 		closedPath := filepath.Join(t.TempDir(), "stdio-closed")
 		t.Setenv(sessionMCPStdioClosedEnv, closedPath)
-		config.Command = executable + " -test.run=^TestSessionMCPStdioHelper$"
+		config.Command = filepath.ToSlash(executable) + " -test.run=^TestSessionMCPStdioHelper$"
 		return config, func() {
 			t.Helper()
 			require.Eventually(t, func() bool {
