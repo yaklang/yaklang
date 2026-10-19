@@ -1682,8 +1682,8 @@
   {
     "rule_id": "a258e671-339e-4d8f-af91-e2493a4e91dd",
     "rule_name": "审计Java Servlet用户输入",
-    "hash": "fd409489295fe22f8342c7656c9798e398b217ea87f6fc5562e871bfcc4827a9",
-    "version": "20260901.0002"
+    "hash": "0e8cee892145dcea96e134c209f85d77c9d55ca55e1732214f8249344327d772",
+    "version": "20261019.0001"
   },
   {
     "rule_id": "1314089e-e030-4436-89d2-2aabe2758683",
