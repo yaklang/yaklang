@@ -52,10 +52,14 @@ type FunctionBuilder struct {
 	Included bool
 	IsReturn bool
 
-	RefParameter map[string]struct {
+	// RefParameter records pointer/reference parameters while one compile
+	// worker assigns values and another records a member reference. It uses
+	// the existing concurrent map; Get, Set, and Delete hold its lock only
+	// for that map operation and do not cross AssignVariable or Emit.
+	RefParameter *utils.SafeMapWithKey[string, struct {
 		Index int
 		Kind  SideEffectKind
-	}
+	}]
 
 	target *target // for break and continue
 	labels map[string]*BasicBlock
@@ -109,10 +113,10 @@ func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder)
 		CurrentBlock:  nil,
 		CurrentRange:  nil,
 		parentBuilder: parent,
-		RefParameter: make(map[string]struct {
+		RefParameter: utils.NewSafeMapWithKey[string, struct {
 			Index int
 			Kind  SideEffectKind
-		}),
+		}](),
 		SyntaxIncludingStack: utils.NewStack[string](),
 		includeStack:         utils.NewStack[*Program](),
 		captureFreeValue:     make(map[string]struct{}),
@@ -310,13 +314,56 @@ func (b *FunctionBuilder) GetMarkedFunction() *FunctionType {
 }
 
 func (b *FunctionBuilder) ReferenceParameter(name string, index int, kind SideEffectKind) {
-	b.RefParameter[name] = struct {
+	if b == nil || b.RefParameter == nil {
+		return
+	}
+	b.RefParameter.Set(name, struct {
 		Index int
 		Kind  SideEffectKind
 	}{
 		Index: index,
 		Kind:  kind,
+	})
+}
+
+func (b *FunctionBuilder) lookupRefParameter(name string) (struct {
+	Index int
+	Kind  SideEffectKind
+}, bool) {
+	if b == nil || b.RefParameter == nil {
+		var zero struct {
+			Index int
+			Kind  SideEffectKind
+		}
+		return zero, false
 	}
+	return b.RefParameter.Get(name)
+}
+
+func (b *FunctionBuilder) TakeRefParameter(name string) (struct {
+	Index int
+	Kind  SideEffectKind
+}, bool) {
+	if b == nil || b.RefParameter == nil {
+		var zero struct {
+			Index int
+			Kind  SideEffectKind
+		}
+		return zero, false
+	}
+	prev, loaded, _ := b.RefParameter.UpdateAction(name, func(old struct {
+		Index int
+		Kind  SideEffectKind
+	}, loaded bool) (struct {
+		Index int
+		Kind  SideEffectKind
+	}, utils.SafeMapAction) {
+		if !loaded {
+			return old, utils.SafeMapKeep
+		}
+		return old, utils.SafeMapDelete
+	})
+	return prev, loaded
 }
 
 func (b *FunctionBuilder) ClassConstructor(bluePrint *Blueprint, args []Value) Value {

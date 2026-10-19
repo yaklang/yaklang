@@ -61,9 +61,8 @@ func (b *astbuilder) memberRefParameterChecker(member *ssa.Value) func(target st
 		} else if p, ok := ssa.ToParameterMember(*member); ok {
 			refParameterIndex = p.FormalParameterIndex
 		}
-		if ref, ok := b.RefParameter[(*member).GetName()]; ok {
+		if ref, ok := b.TakeRefParameter((*member).GetName()); ok {
 			refParameterIndex = ref.Index
-			delete(b.RefParameter, (*member).GetName())
 		}
 		if refParameterIndex != -1 {
 			b.ReferenceParameter(target, refParameterIndex, ssa.PointerSideEffect)

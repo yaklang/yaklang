@@ -89,6 +89,37 @@ func (sm *SafeMapWithKey[K, V]) Update(key K, fn func(old V, loaded bool) (next 
 	return prev, loaded
 }
 
+type SafeMapAction int
+
+const (
+	SafeMapKeep SafeMapAction = iota
+	SafeMapStore
+	SafeMapDelete
+)
+
+// UpdateAction runs fn while holding the write lock. Store replaces the key,
+// Delete removes it, and Keep leaves it unchanged. The returned value is the
+// value present before fn runs.
+func (sm *SafeMapWithKey[K, V]) UpdateAction(key K, fn func(old V, loaded bool) (next V, action SafeMapAction)) (prev V, loaded bool, action SafeMapAction) {
+	if sm == nil || fn == nil {
+		var zero V
+		return zero, false, SafeMapKeep
+	}
+	sm.mu.Lock()
+	defer sm.mu.Unlock()
+	prev, loaded = sm.m[key]
+	next, action := fn(prev, loaded)
+	switch action {
+	case SafeMapStore:
+		sm.m[key] = next
+	case SafeMapDelete:
+		delete(sm.m, key)
+	default:
+		action = SafeMapKeep
+	}
+	return prev, loaded, action
+}
+
 func (sm *SafeMapWithKey[K, V]) Keys() []K {
 	if sm == nil {
 		return nil
