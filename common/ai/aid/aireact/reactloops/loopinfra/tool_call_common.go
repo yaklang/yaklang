@@ -20,7 +20,7 @@ func directToolRetryFeedback(loop *reactloops.ReActLoop, name, reason string, ma
 	if config := loop.GetConfig(); config != nil && config.GetAiToolManager() != nil {
 		tool, err := config.GetAiToolManager().GetToolByName(name)
 		if err == nil && tool != nil && !buildinaitools.IsMCPPendingStub(tool) &&
-			(!buildinaitools.IsMCPToolName(name) || aicommon.IsMCPServersAllowedConfig(config)) {
+			(!buildinaitools.IsMCPRelatedToolName(name) || aicommon.IsMCPServersAllowedConfig(config)) {
 			mutation := loop.RecordRecentlyUsedTool(tool)
 			if mutation.Upsert != nil || mutation.Reuse != nil {
 				schemaState = "完整 Schema 已放入 CACHE_TOOL_CALL；按定义修正完整参数，不要重复加载或委托其他模型生成参数。"

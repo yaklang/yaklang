@@ -26,6 +26,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit/yakdiff"
 
 	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/mcp/mcpclient"
 	"github.com/yaklang/yaklang/common/mediautils"
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/minirehs"
@@ -358,6 +359,7 @@ func initYaklangLib() {
 	yaklang.Import("aiagent", AIAgentExport)
 
 	yaklang.Import("aim", aiengine.Exports)
+	yaklang.Import("mcp", mcpclient.Exports)
 	yaklang.Import("aimemory", aimemory.Exports)
 	yaklang.Import("aihistory", aihistory.Exports)
 

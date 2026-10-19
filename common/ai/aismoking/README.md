@@ -21,6 +21,7 @@ yak common/ai/aismoking/run.yak
 | 脚本 | 覆盖内容 |
 | --- | --- |
 | [mainloop.yak](mainloop.yak) | 默认 `aim.InvokeReAct` × 两种协议 × require/load_capability；只加载 Schema、错误参数 reason/retry、修正后显式执行、实际读文件、session Evidence、冻结提升和纯动态区不重复展示用户输入 |
+| [mcp_management.yak](mcp_management.yak) | 默认 `aim.InvokeReAct` × 文本流/function-call；自动 system skill、require 三个 MCP 脚本工具、真实 profile 配置增删/启用状态/分页/凭据隐藏、远端 MCP 游标分页与调用；`AISMOKING_CASE=mcp_management` 隔离执行 |
 | [tool_params_group.yak](tool_params_group.yak) | 双协议；名称数组只加载 Schema、无效分组零执行、修正后真实文件读取、结果隔离、Evidence 及六轮主请求静态前缀稳定 |
 | [tool_review.yak](tool_review.yak) | `aim.InvokeReAct` × 双协议；wrong_tool/wrong_params 返回所属循环、零辅助构参、显式修正、人工改参再次审核、直接回答；真实只读来源 |
 | [recon.yak](recon.yak) | 内置侦察模式双协议；预加载零执行、移除六类隐式动作、显式读取本地来源、静态缓存前缀稳定；不发起扫描 |
