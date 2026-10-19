@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
+	"github.com/yaklang/yaklang/common/fp/imagecache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minirehs"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
@@ -193,7 +194,8 @@ func compileWebPrefilter(rules []*rule.FingerPrintRule) *webPrefilter {
 	if len(patterns) == 0 {
 		return filter
 	}
-	db, err := minirehs.Compile(patterns,
+	// 同一批首页正则的自动机写入本机镜像。进程重启后加载，不再重新编译。
+	db, err := imagecache.Open("web", patterns,
 		minirehs.WithBackend(minirehs.BackendMVS),
 		minirehs.WithReportLocation(false),
 		minirehs.WithLogger(webPrefilterLog{}),

@@ -11,6 +11,7 @@ import (
 	regexp "github.com/VillanCh/go-pcre2-lite/regexp2"
 	"golang.org/x/sync/singleflight"
 
+	"github.com/yaklang/yaklang/common/fp/imagecache"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minirehs"
 	utils2 "github.com/yaklang/yaklang/common/utils"
@@ -112,7 +113,8 @@ func compileNmapPrefilter(rules []*NmapMatch) *nmapPrefilter {
 	if len(patterns) == 0 {
 		return filter
 	}
-	db, err := minirehs.Compile(patterns,
+	// 规则顺序和选项不变时，镜像放在本机缓存里。下次进程直接加载，不再解析这批正则。
+	db, err := imagecache.Open("service", patterns,
 		minirehs.WithBackend(minirehs.BackendMVS),
 		minirehs.WithReportLocation(false),
 		minirehs.WithLogger(nmapPrefilterLog{}),
