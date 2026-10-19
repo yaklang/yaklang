@@ -12,6 +12,25 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 )
 
+// stallSQLiteWrite holds the SSA database write lock from another connection.
+// Source flushes then wait inside SQLite's busy_timeout instead of a process-wide mutex.
+func stallSQLiteWrite(t *testing.T) func() {
+	t.Helper()
+	sqlDB := ssadb.GetDB().DB()
+	_, err := sqlDB.Exec(`CREATE TABLE IF NOT EXISTS source_flush_stall (id INTEGER PRIMARY KEY)`)
+	require.NoError(t, err)
+	tx, err := sqlDB.Begin()
+	require.NoError(t, err)
+	_, err = tx.Exec(`INSERT OR REPLACE INTO source_flush_stall(id) VALUES(1)`)
+	require.NoError(t, err)
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			require.NoError(t, tx.Commit())
+		})
+	}
+}
+
 func TestFlushAuxSaversReleasesSourceEditors(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
@@ -58,20 +77,8 @@ func TestSourceFlushAsyncDoesNotBlockAndCloseJoins(t *testing.T) {
 	source := prog.Cache.sources
 	prog.CreateEditor([]byte("class AsyncUnit {}"), "/src/AsyncUnit.java")
 
-	locked := make(chan struct{})
-	release := make(chan struct{})
-	lockDone := make(chan error, 1)
-	var once sync.Once
-	unblock := func() { once.Do(func() { close(release) }) }
-	defer unblock()
-	go func() {
-		lockDone <- withCacheWriteLock(ssadb.GetDB().Dialect().GetName(), func() error {
-			close(locked)
-			<-release
-			return nil
-		})
-	}()
-	<-locked
+	release := stallSQLiteWrite(t)
+	defer release()
 
 	returned := make(chan struct{})
 	go func() {
@@ -93,8 +100,7 @@ func TestSourceFlushAsyncDoesNotBlockAndCloseJoins(t *testing.T) {
 		t.Fatalf("Close returned before the outstanding write completed: %v", err)
 	case <-time.After(50 * time.Millisecond):
 	}
-	unblock()
-	require.NoError(t, <-lockDone)
+	release()
 	select {
 	case err := <-closed:
 		require.NoError(t, err)
@@ -114,24 +120,13 @@ func TestSourceFlushAsyncCoalescesRequests(t *testing.T) {
 	defer source.Close()
 	prog.CreateEditor([]byte("class FirstUnit {}"), "/src/FirstUnit.java")
 
-	locked := make(chan struct{})
-	release := make(chan struct{})
-	lockDone := make(chan error, 1)
-	var once sync.Once
-	unblock := func() { once.Do(func() { close(release) }) }
-	defer unblock()
-	go func() {
-		lockDone <- withCacheWriteLock(ssadb.GetDB().Dialect().GetName(), func() error {
-			close(locked)
-			<-release
-			return nil
-		})
-	}()
-	<-locked
+	release := stallSQLiteWrite(t)
+	defer release()
 	source.FlushAsync()
 	source.asyncMu.Lock()
 	firstDone := source.asyncDone
 	source.asyncMu.Unlock()
+	require.NotNil(t, firstDone, "the first flush must stay in flight while SQLite is busy")
 	prog.CreateEditor([]byte("class SecondUnit {}"), "/src/SecondUnit.java")
 	source.FlushAsync()
 	source.FlushAsync()
@@ -139,8 +134,7 @@ func TestSourceFlushAsyncCoalescesRequests(t *testing.T) {
 	sameSaver := source.asyncDone == firstDone
 	source.asyncMu.Unlock()
 	require.True(t, sameSaver, "overlapping requests must share the existing completion barrier")
-	unblock()
-	require.NoError(t, <-lockDone)
+	release()
 	require.Eventually(t, func() bool {
 		return source.PersistedCount() == 2 && source.EditorCount() == 0
 	}, 5*time.Second, 10*time.Millisecond)
