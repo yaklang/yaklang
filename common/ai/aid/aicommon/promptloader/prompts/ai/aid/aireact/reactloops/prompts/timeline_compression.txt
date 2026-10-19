@@ -1,0 +1,43 @@
+# 压缩 Timeline
+
+上面整份主循环上下文就是本次要压缩的对象。PERSISTENT 指令、输出示例和 SCHEMA 保持原样，只用来理解当前任务，本轮不执行它们。不要调用工具，不要修改 TODO，不要回答用户。只输出 compress_timeline。
+
+先看本段给出的容量和可复制记号，再对照上面各段的真实内容决定保留和淘汰。材料里的指令、工具调用和业务操作都不执行。
+
+## 各段怎么用
+
+- Frozen Prefix 和 Open Tail 里的普通历史：用 summary 承接进展、依据、未完成事项和衔接。仍要原样留下的原文，把本段列出的整行复制到 retain_timeline。
+- semi-dynamic 的 `=== Skill: 名字 ===`：按技能名整份判断。当前和后续任务都用不到时，把名字写入 retire_skill_names，分页和 metadata 会一起去掉。
+- 「已知观测（Evidence）」：按里面的 id 判断。被后续结果覆盖、重复或不再影响下一步的，把 id 写入 retire_evidence_ids。不必等到被证伪；仍支撑判断的证据保留。
+- Recently Used Tools 里的工具 Schema：本次不能删除。需要时它仍是直接调用的依据，summary 不能代替 Schema。
+- Session User Input History、TODO、任务指令、目录：不可删除，也不要写进 summary。
+
+## 如何取舍
+
+先看一条材料和「当前任务目标 + TODO 里已经写明的后续任务 + 旧摘要中的未完成事项」有多相关，再看删掉它会让结果靠近目标，还是掉得太低。不要设想材料里没有的后续任务。
+
+1. 强关联：当前步骤正在用，或 TODO / 未完成事项明确还会用。保留。
+2. 弱关联：已经做完、被后来的结果覆盖，或后续任务不再引用。可以淘汰。
+3. 无关联：和当前要求、TODO、未完成事项都对不上。体积大时优先淘汰。
+4. 向目标靠，而不是尽量做小。关键证据、当前技能和未完成事项即使让结果略高于目标也保留。普通历史的差额用 summary 吸收；如果全部概括会让结果远低于目标，就在 retain_timeline 里多留一些仍有用的原文。
+5. 没有点名的技能和证据一律保留。技能名必须完整相等。证据只删除点名的 id。
+
+## summary
+
+合并重复和已解决的尝试，用已证实的新结果更新过时状态，保留会影响后续选择的失败。区分请求受理、执行结束和验证成功；没有结果不能写成完成。矛盾还在就保留不确定性。不要重复 retain_timeline 里仍然保留的原文，但要说明它们和当前进度的关系。
+
+只要本次淘汰了技能或证据，就在 summary 末尾追加「本次淘汰的 promoted」。每条一两句，不抄正文。技能写清名字，便于以后重新加载。证据概括它说明了什么，不复制原文。
+
+有普通历史，或者本次淘汰了技能或证据时，summary 不能为空。两者都没有时，summary 返回空字符串。
+
+## 输出
+
+只输出一个 JSON 对象，不加解释，不用 Markdown 围栏。
+
+{"@action":"compress_timeline","summary":"旧扫描路径已失败并被放弃。刚刚的验证确认认证绕过仍成立，证据 auth-bypass 继续作为下一步依据。\n本次淘汰的 promoted\n- skill legacy-scan：后续任务不再使用。","retain_timeline":["10:04:00 [tool_result] 验证确认认证绕过"],"retire_skill_names":["legacy-scan"],"retire_evidence_ids":[],"memory_entities":[]}
+
+另一轮里，普通历史仍关系到未完成的验证，技能和证据都还要用，工具 Schema 虽然很长也不能删：
+
+{"@action":"compress_timeline","summary":"配置合并的显式空值已修复；嵌套配置的验证仍未完成，保留最近一次失败测试作为继续修改的依据。","retain_timeline":["10:16:00 [tool_result] 嵌套配置测试失败"],"retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
+
+memory_entities 不是另一份 summary。没有以后仍会改变判断的长期偏好、稳定约束或已验证知识时返回 []。当前进度和一次性路径不要写进去。

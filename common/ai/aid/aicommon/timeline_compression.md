@@ -13,19 +13,19 @@ sequenceDiagram
     participant W as Actions / Timeline 写入
     participant L as 下一轮主循环
     participant T as Timeline
-    participant A as 辅助 AI（mock 可替换）
+    participant A as 主模型
     participant P as Prompt 组装
     W->>T: 追加普通历史和 evidence/toolcache delta
     Note over T: 全部留在 Open；不自动冻结，不请求 AI
-    L->>T: CompressBeforePrompt（Prompt 组装前）
+    L->>L: 阈值检查，直接进入 compress_timeline
     alt 未达阈值 / 没有新内容 / 失败退避
         T-->>L: 无变更
     else 达到阈值
         T->>T: 完整快照与覆盖 ID，预占唯一事务
         Note over T: 锁内取快照，锁外算 token 和请求 AI
-        T->>A: 旧摘要 + 全部普通 Frozen/Open + 实际保留上下文
+        L->>L: 代码触发 compress_timeline
         W->>T: 并发追加更大 ID 的下一段 Open
-        A-->>T: 一份 timeline-summary
+        A-->>L: summary、可见历史记号、技能名、证据 id
         T->>T: 校验取消状态、来源、head、冻结版本
         alt 来源未改变且输出有效
             T->>T: 同一个写锁内提交全部状态
@@ -43,7 +43,9 @@ sequenceDiagram
 
 ## 请求和输出
 
-模板：`prompts/timeline/compression.txt` 只放固定指令。请求再附上计算出的容量和渲染后的 Timeline。输出协议：`prompts/timeline/compression.json`。
+达到阈值时，主循环直接执行 `compress_timeline`，不把它放进普通回合的可选动作。action 内先做无 AI 折叠；仍高于目标时，用主循环 prompt 调用主模型。高静态段说明 Timeline 如何进入 semi-dynamic。PERSISTENT 指令给出压缩方法和例子。动态区只列可复制的记号：普通历史用可见行，技能用名字，证据用观测 id。工具 Schema、用户输入、TODO 和目录不可删除。输出不合法时，AI transaction 用校验错误重试。
+
+没有这条 action 的调用仍使用 `prompts/timeline/compression.txt` 和 `prompts/timeline/compression.json`。
 
 一次请求包含 `previous_summary`、`history_to_summarize` 和调用方传入的 `retained_context`。主循环传实际用户输入、冻结用户上下文、TODO、任务指令，避免摘要重复这些未被压缩的字段。evidence/tool schema 不进入待替换文本。历史中的 assistant + N tools 作为完整历史记录输入；只在请求副本去掉 projection nonce 并 JSON 编码，原 Timeline 不改写。
 

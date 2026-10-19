@@ -39,6 +39,10 @@ const (
 	TimelineCompressionMemory     TimelineCompressionStage = "memory"
 )
 
+// TimelineCompressionAction is the only action on a main-loop compression turn.
+// timeline-summary remains an accepted alias for older responses.
+const TimelineCompressionAction = "compress_timeline"
+
 // TimelineCompressionOptions describes one explicit compression, not automatic
 // scheduling policy. Safety limits reject oversized helper input/output;
 // TargetTokens is the separate desired size of the main Timeline prompt.

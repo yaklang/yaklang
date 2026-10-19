@@ -178,6 +178,9 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 		if v.ActionType == nativeAdjustTodolistActionName && !r.functionCallMode {
 			continue
 		}
+		if v.ActionType == compressTimelineActionName {
+			continue
+		}
 		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
 			filteredValues = append(filteredValues, v)
 		} else {
@@ -353,7 +356,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	if input == nil {
 		return "", utils.Error("loop prompt build input is nil")
 	}
-	nonce, userInput, frozenUserContext := input.nonce, input.userInput, input.frozenUserContext
+	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
 	subAgentInput, subAgentRevision := input.subAgentInput, input.subAgentRevision
 	var tools []*aitool.Tool
@@ -447,14 +450,13 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	}
 	r.lastLoopSchema = schema
 	r.syncPromptOverflowTimelineLimit()
-	if err := r.compressTimelineBeforePrompt(userInput, frozenUserContext, todoSnapshot); err != nil {
-		return "", err
-	}
 	var planStatus string
 	if r.planStatusProvider != nil {
 		planStatus = r.planStatusProvider()
-	} else if provider, ok := r.GetCurrentTask().(aicommon.PlanStatusProvider); ok {
-		planStatus = provider.GetPlanStatusForPrompt()
+	} else if task := r.GetCurrentTask(); task != nil {
+		if provider, ok := task.(aicommon.PlanStatusProvider); ok {
+			planStatus = provider.GetPlanStatusForPrompt()
+		}
 	}
 
 	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{

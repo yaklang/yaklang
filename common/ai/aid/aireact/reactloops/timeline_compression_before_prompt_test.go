@@ -23,27 +23,31 @@ type compressionBeforePromptInvoker struct {
 	timeline *aicommon.Timeline
 }
 
-func (i *compressionBeforePromptInvoker) AssembleLoopPrompt(_ []*aitool.Tool, _ *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
+func (i *compressionBeforePromptInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
 	view := aicommon.RenderTimelineFrozenOpen(i.timeline)
-	return &aicommon.LoopPromptAssemblyResult{Prompt: view.Frozen + view.Open}, nil
-}
-
-func (c *compressionBeforePromptConfig) ScheduleAuxiliaryTask(ctx context.Context, name string,
-	builder func() string, result func(*aicommon.Action), opts ...aicommon.AuxiliaryTaskOption) {
-	c.calls++
-	c.prompt = builder()
-	if c.beforeCompress != nil {
-		c.beforeCompress()
+	prompt := view.Frozen + view.Open
+	if input != nil {
+		prompt += input.TaskInstruction + input.FrozenUserContext + input.TodoSnapshot + input.Schema + input.OutputExample + input.ReactiveData
 	}
-	action, err := aicommon.ExtractValidActionFromStream(ctx, strings.NewReader(`{"@action":"timeline-summary","summary":"COMPACTED_BEFORE_ASSEMBLY","ratain_timeline_item_range":"","memory_entities":[]}`), "timeline-summary")
-	if err == nil {
-		result(action)
-	}
+	return &aicommon.LoopPromptAssemblyResult{Prompt: prompt}, nil
 }
 
 func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	ctx := context.Background()
-	cfg := &compressionBeforePromptConfig{Config: aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(1200))}
+	cfg := &compressionBeforePromptConfig{}
+	cfg.Config = aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(1200),
+		aicommon.WithAICallback(func(_ aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			cfg.calls++
+			cfg.prompt = req.GetPrompt()
+			require.Equal(t, aicommon.CallerLabelTimelineCompress, req.GetCallerLabel())
+			if cfg.beforeCompress != nil {
+				cfg.beforeCompress()
+			}
+			response := aicommon.NewUnboundAIResponse()
+			response.EmitOutputStream(strings.NewReader(`{"@action":"compress_timeline","summary":"COMPACTED_BEFORE_ASSEMBLY","retain_timeline":[],"retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}`))
+			response.Close()
+			return response, nil
+		}))
 	cfg.Timeline.SoftBindConfig(cfg, nil)
 	loop := makeSchemaStabilityTestLoop(cfg)
 	capture := captureActivityStatus(loop)
@@ -56,7 +60,13 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	loop.invoker = &compressionBeforePromptInvoker{MockInvoker: mock.NewMockInvoker(ctx), timeline: cfg.Timeline}
 	cfg.Timeline.PushText(1, strings.Repeat("ORIGINAL_HISTORY ", 2000))
 	loop.persistentInstructionProvider = func(*ReActLoop, string) (string, error) { return "CURRENT_INSTRUCTION", nil }
-	prompt, err := loop.generateLoopPrompt("compression-before-prompt", "CURRENT_QUERY", "FROZEN_USER_CONTEXT", nil, "", &LoopActionHandlerOperator{})
+	build := loop.captureLoopPromptBuildInput("compression-before-prompt", "CURRENT_QUERY", "FROZEN_USER_CONTEXT", nil, "", &LoopActionHandlerOperator{})
+	prompt, err := loop.generateLoopPromptFromInput(build)
+	require.NoError(t, err)
+	require.Contains(t, prompt, "ORIGINAL_HISTORY")
+	require.Greater(t, int64(aicommon.MeasureTokens(prompt)), loop.wholePromptTokenLimit())
+	require.NoError(t, loop.compressMainPrompt(build, loop.wholePromptTokenLimit()))
+	prompt, err = loop.generateLoopPromptFromInput(build)
 	require.NoError(t, err)
 	require.Contains(t, prompt, "COMPACTED_BEFORE_ASSEMBLY")
 	require.NotContains(t, prompt, "ORIGINAL_HISTORY")
@@ -64,9 +74,13 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	require.Equal(t, 1, cfg.calls)
 	require.Contains(t, cfg.prompt, "ORIGINAL_HISTORY")
 	require.Contains(t, cfg.prompt, "CURRENT_QUERY")
-	require.NotContains(t, cfg.prompt, "CURRENT_INSTRUCTION")
-	require.NotContains(t, cfg.prompt, "TASK_INSTRUCTION")
 	require.Contains(t, cfg.prompt, "FROZEN_USER_CONTEXT")
+	require.Contains(t, cfg.prompt, "# 压缩 Timeline")
+	require.Contains(t, cfg.prompt, "retain_timeline")
+	require.Contains(t, cfg.prompt, "retire_skill_names")
+	require.Contains(t, cfg.prompt, "retire_evidence_ids")
+	require.NotContains(t, cfg.prompt, "ITEM_ID=")
+	require.NotContains(t, cfg.prompt, "ratain_timeline_item_range")
 	view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
 	require.Contains(t, view.Frozen, "COMPACTED_BEFORE_ASSEMBLY")
 	require.Empty(t, view.Open)
@@ -80,7 +94,8 @@ func TestTimelineCompressionBeforeLoopPrompt(t *testing.T) {
 	labels := map[string]bool{statuses[0].Value: true}
 	for i := 1; i < len(contextOptimizationStatusNames); i++ {
 		cfg.Timeline.PushText(int64(i+1), strings.Repeat("NEW_HISTORY ", 2000))
-		require.NoError(t, loop.compressTimelineBeforePrompt("CURRENT_QUERY", "", ""))
+		rebuild := loop.captureLoopPromptBuildInput("compression-before-prompt", "CURRENT_QUERY", "", nil, "", &LoopActionHandlerOperator{})
+		require.NoError(t, loop.compressMainPrompt(rebuild, loop.wholePromptTokenLimit()))
 		statuses = capture.snapshot()
 		label := statuses[len(statuses)-2]
 		require.Equal(t, "context.optimizing", label.Code)

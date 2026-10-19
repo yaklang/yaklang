@@ -21,7 +21,7 @@
 
 promoted 压缩项逐条来自 timeline item。`retire_promoted_entries` 只删点名 ID；缺失、空值和非法值默认保留。解析后直接执行合法 ID 名单，不按同 key 的操作扩大或取消删除，之后从剩余 item 重建 state。水位后的新 item 不在本次候选中，用户输入不可删除。已移除 `planCompressionPromotedRetirementLocked` 和辅助重放函数；事务来源校验继续保留。
 
-辅助请求由三部分组成：固定核心指令、计算出的容量、渲染后的 Timeline。容量只按两类给出占用：普通历史一共多少，promoted 内容一共多少。不给每条单独标 token。promoted item 和普通历史放在同一历史条目区，用 RETIRE_ID 标识可选择的条目；提示词要求逐项判断，不把该标识解释为必须删除。用户输入不可删除。解析和提交语义不变：没点名的 ID 仍保留。
+达到阈值时，主循环直接执行 `compress_timeline`。action 内先无 AI 折叠，再用主循环 prompt 调用主模型：PERSISTENT 是压缩方法和例子，动态区给出容量以及可复制的历史记号、技能名和证据 id。不要求模型输出纯 Timeline ID。工具 Schema 不可删除。输出不合法时由 AI transaction 按校验错误重试。没有这条 action 的调用继续使用原来的辅助模板。
 
 辅助请求的默认输入安全上限是 512K，不截断输入。摘要与保留材料仍受 16K 输出安全检查。
 
