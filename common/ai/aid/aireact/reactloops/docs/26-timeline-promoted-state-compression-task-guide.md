@@ -33,7 +33,7 @@ Timeline 的占用是它实际提供给主模型 prompt 的材料，不是原始
 2. 未到上限则结束；达到上限后进入本次优化；
 3. 调用一次 `foldTimelineWithoutAI`，独立提交不需要 AI 的确定性折叠；
 4. 重新渲染，满足低水位目标即可结束，否则构建原始 item 压缩快照；
-5. 折叠后仍高于目标时，最多一次模型调用完成本轮的普通历史筛选、摘要及 promoted 黑名单；
+5. 达到阈值时由主循环代码执行 `compress_timeline`。action 内先无 AI 折叠；仍高于目标时，用主循环 prompt 引导主模型完成摘要、保留和淘汰，失败则交给 AI transaction 重试；
 6. 原子提交后返回。一次检查不再继续调用模型；仍高于上限时，下一次检查再处理。
 
 触发后由 `foldThenCompressTimelineToTarget` 按“无 AI 折叠一次 → 复测 → 必要时一次 AI 压缩”的顺序推进。整个检查有独立等待通道，多个检查者共享同一进程中的优化进展；AI 事务走 `compressTimelineOnceWithAI`。写入和渲染不会自行启动压缩。

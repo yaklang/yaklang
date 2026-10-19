@@ -732,7 +732,24 @@ LOOP:
 			// 推送给前端 "上下文成分" 面板, 不再落盘 ASCII 副本以避免污染 task 目录.
 			// 关键词: prompt observation 不再落盘, EmitPromptProfile 现役路径
 			promptTokens := aicommon.MeasureTokens(prompt)
-			if attempt > 0 && promptTokens >= lastPromptTokens*99/100 {
+			// The whole prompt is the budget boundary. Compression only starts
+			// after normal assembly proves it is over the configured limit.
+			if promptLimit := r.wholePromptTokenLimit(); promptLimit > 0 && int64(promptTokens) > promptLimit {
+				if attempt >= retryMax {
+					log.Warnf("main prompt still exceeds %d tokens after compression (%d tokens)", promptLimit, promptTokens)
+				} else {
+					if err := r.compressMainPrompt(buildInput, promptLimit); err != nil {
+						r.finishIterationLoopWithError(iterationCount, task, err)
+						return err
+					}
+					continue
+				}
+			}
+			// Only a provider overflow retry cares whether the rebuilt prompt shrank.
+			// A local compression continue has not called the model yet, so a nil
+			// transaction error must not be treated as a failed retry.
+			if transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) &&
+				promptTokens >= lastPromptTokens*99/100 {
 				log.Warnf(
 					"prompt overflow retry made no progress (%d -> %d tokens), giving up: %v",
 					lastPromptTokens, promptTokens, transactionErr,

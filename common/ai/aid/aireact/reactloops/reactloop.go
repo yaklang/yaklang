@@ -148,6 +148,9 @@ type ReActLoop struct {
 
 	// use speed priority AI callback for main AI calls in the loop
 	useSpeedPriorityAI bool
+	// compressionTurn is the prompt context captured when the loop triggers
+	// compress_timeline. It is empty for ordinary actions.
+	compressionTurn timelineCompressionTurnContext
 
 	// 记录历史 satisfaction 状态
 	historySatisfactionReasons []*SatisfactionRecord
@@ -706,6 +709,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 		loopAction_SaveEvidence,
+		loopAction_CompressTimeline,
 		loopAction_ManageAsyncExecutionRuntime,
 	} {
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))

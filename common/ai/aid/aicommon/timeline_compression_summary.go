@@ -20,12 +20,9 @@ type compressionPromptData struct {
 	Schema   string
 }
 
-// renderCompressionSummaryPrompt builds one reduction request from three parts:
-// the fixed instruction, a computed capacity section, and rendered Timeline
-// content. It never freezes, deletes, or commits anything.
-func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (string, error) {
+func compressionSnapshotNeedsModel(snapshot *timelineCompressionSnapshot) error {
 	if snapshot == nil {
-		return "", fmt.Errorf("invalid timeline compression snapshot")
+		return fmt.Errorf("invalid timeline compression snapshot")
 	}
 	previous := ""
 	if snapshot.Head != nil {
@@ -34,7 +31,17 @@ func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (stri
 	if strings.TrimSpace(previous) == "" && strings.TrimSpace(renderCompressionSnapshotItems(snapshot.Items)) == "" &&
 		!snapshot.hasPromotedItems() &&
 		(!snapshot.FinalizingMemory || (len(snapshot.UserContexts) == 0 && strings.TrimSpace(snapshot.Evidence) == "")) {
-		return "", fmt.Errorf("timeline compression has no history to summarize")
+		return fmt.Errorf("timeline compression has no history to summarize")
+	}
+	return nil
+}
+
+// renderCompressionSummaryPrompt builds one reduction request from three parts:
+// the fixed instruction, a computed capacity section, and rendered Timeline
+// content. It never freezes, deletes, or commits anything.
+func renderCompressionSummaryPrompt(snapshot *timelineCompressionSnapshot) (string, error) {
+	if err := compressionSnapshotNeedsModel(snapshot); err != nil {
+		return "", err
 	}
 	var buf bytes.Buffer
 	if err := compressionPromptTemplate.Execute(&buf, compressionPromptData{
@@ -159,6 +166,41 @@ func compressionExtraContext(snapshot *timelineCompressionSnapshot) string {
 	return b.String()
 }
 
+func compressionIndexLocator(text string) string {
+	line := ""
+	for _, candidate := range strings.Split(text, "\n") {
+		candidate = strings.Join(strings.Fields(candidate), " ")
+		// Snapshot bodies prefix the original with an ITEM_ID header that the
+		// main-loop timeline does not render. Locate the visible text instead.
+		if candidate == "" || strings.HasPrefix(candidate, "ITEM_ID=") {
+			continue
+		}
+		line = candidate
+		break
+	}
+	runes := []rune(line)
+	if len(runes) > 80 {
+		line = string(runes[:80]) + "…"
+	}
+	return line
+}
+
+func publishCompressionModelOutput(snapshot *timelineCompressionSnapshot, output *timelineCompressionOutput) {
+	completion := &timelineCompressionCompletion{
+		done:     make(chan struct{}),
+		notified: make(chan struct{}),
+		output:   output,
+	}
+	close(completion.done)
+	snapshot.MemoryCompletion = completion
+	snapshot.Output = &timelineCompressionOutput{
+		Summary:                output.Summary,
+		RetainedRange:          output.RetainedRange,
+		RetainedIDs:            append([]int64(nil), output.RetainedIDs...),
+		RetiredPromotedEntries: append([]int64(nil), output.RetiredPromotedEntries...),
+	}
+}
+
 // summarizeCompressionSnapshot schedules one complete reduction for the
 // transaction before prompt assembly, without chunks, refinement or
 // truncation. Transport/parser retries still follow the existing Config policy.
@@ -171,6 +213,10 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	if config == nil {
 		return "", fmt.Errorf("timeline compression requires an auxiliary scheduler")
 	}
+	var limit TimelineCompressionOptions
+	if len(limits) > 0 {
+		limit = limits[0]
+	}
 	prompt, err := renderCompressionSummaryPrompt(snapshot)
 	if err != nil {
 		return "", err
@@ -178,10 +224,6 @@ func (m *Timeline) summarizeCompressionSnapshot(snapshot *timelineCompressionSna
 	snapshot.SummaryPrompt = prompt
 	// Capture the safety limits before invoking callbacks; don't reread mutable state
 	// or the caller's snapshot after the request has started.
-	var limit TimelineCompressionOptions
-	if len(limits) > 0 {
-		limit = limits[0]
-	}
 	snapshot.MemoryInputLimit, snapshot.MemoryOutputLimit = limit.MaxInputTokens, limit.MaxSummaryTokens
 	ctx := limit.Context
 	if ctx == nil {
