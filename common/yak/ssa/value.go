@@ -440,7 +440,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 		}
 	}
 
-	if val, ok := b.RefParameter[variable.GetName()]; ok {
+	if val, ok := b.lookupRefParameter(variable.GetName()); ok {
 		b.AddForceSideEffect(variable, value, val.Index, val.Kind)
 	}
 	if value.GetName() == variable.GetName() {
@@ -482,7 +482,7 @@ func (b *FunctionBuilder) AssignVariable(variable *Variable, value Value) {
 			scope.RegisterCapturedVariable(variable)
 		}
 	}
-	if _, ok := b.RefParameter[variable.GetName()]; !ok {
+	if _, ok := b.lookupRefParameter(variable.GetName()); !ok {
 		b.CheckMemberSideEffect(variable, value)
 	}
 

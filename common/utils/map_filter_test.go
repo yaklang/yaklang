@@ -35,6 +35,50 @@ func TestSafeMapValuesMatching(t *testing.T) {
 	}), "misses must not allocate a whole-map snapshot")
 }
 
+func TestSafeMapUpdateActionStoreKeepAndDelete(t *testing.T) {
+	m := NewSafeMapWithKey[string, int]()
+	m.Set("name", 1)
+
+	prev, loaded, action := m.UpdateAction("name", func(old int, loaded bool) (int, SafeMapAction) {
+		require.True(t, loaded)
+		require.Equal(t, 1, old)
+		return 2, SafeMapStore
+	})
+	require.Equal(t, 1, prev)
+	require.True(t, loaded)
+	require.Equal(t, SafeMapStore, action)
+	got, ok := m.Get("name")
+	require.True(t, ok)
+	require.Equal(t, 2, got)
+
+	prev, loaded, action = m.UpdateAction("name", func(old int, loaded bool) (int, SafeMapAction) {
+		return old + 10, SafeMapKeep
+	})
+	require.Equal(t, 2, prev)
+	require.True(t, loaded)
+	require.Equal(t, SafeMapKeep, action)
+	got, ok = m.Get("name")
+	require.True(t, ok)
+	require.Equal(t, 2, got)
+
+	prev, loaded, action = m.UpdateAction("name", func(old int, loaded bool) (int, SafeMapAction) {
+		return old, SafeMapDelete
+	})
+	require.Equal(t, 2, prev)
+	require.True(t, loaded)
+	require.Equal(t, SafeMapDelete, action)
+	_, ok = m.Get("name")
+	require.False(t, ok)
+
+	prev, loaded, action = m.UpdateAction("missing", func(old int, loaded bool) (int, SafeMapAction) {
+		require.False(t, loaded)
+		return 9, SafeMapKeep
+	})
+	require.Zero(t, prev)
+	require.False(t, loaded)
+	require.Equal(t, SafeMapKeep, action)
+}
+
 func BenchmarkSafeMapSelectiveSnapshot(b *testing.B) {
 	m := NewSafeMapWithKey[string, []int64]()
 	for i := 0; i < 100000; i++ {
