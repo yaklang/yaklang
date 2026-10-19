@@ -18,6 +18,9 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		// string while other workers read it in libraryNameForCompileUnit.
 		application.Language = c.LanguageBuilder.GetLanguage()
 	}
+	if language, ok := c.LanguageBuilder.(ssa.MethodLookupBuilder); ok {
+		application.SetDeferMethodBuildOnLookup(language.DeferMethodBuildOnLookup())
+	}
 	application.ProjectID = c.GetProjectID()
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)

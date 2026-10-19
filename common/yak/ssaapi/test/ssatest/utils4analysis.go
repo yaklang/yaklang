@@ -14,7 +14,6 @@ import (
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
 
@@ -40,29 +39,14 @@ const (
 )
 
 func CheckWithFS(fs fi.FileSystem, t require.TestingT, handler func(ssaapi.Programs) error, opt ...ssaconfig.Option) {
-	// only in memory
+	// only in memory. File completion order is not a compile input.
 	{
-		var astSequence ssareducer.ASTSequenceType
-		for i := 0; i < 3; i++ {
-			switch i {
-			case 0:
-				log.Infof("current: ssareducer.Order")
-				astSequence = ssareducer.Order
-			case 1:
-				log.Infof("current: ssareducer.ReverseOrder")
-				astSequence = ssareducer.ReverseOrder
-			case 2:
-				log.Infof("current: ssareducer.OutOfOrder")
-				astSequence = ssareducer.OutOfOrder
-			}
+		prog, err := ssaapi.ParseProjectWithFS(fs, opt...)
+		require.Nil(t, err)
 
-			prog, err := ssaapi.ParseProjectWithFS(fs, append(opt, ssaapi.WithASTOrder(astSequence))...)
-			require.Nil(t, err)
-
-			log.Infof("only in memory")
-			err = handler(prog)
-			require.Nil(t, err)
-		}
+		log.Infof("only in memory")
+		err = handler(prog)
+		require.Nil(t, err)
 	}
 
 	programID := uuid.NewString()

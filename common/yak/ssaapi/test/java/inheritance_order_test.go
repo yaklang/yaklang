@@ -9,7 +9,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 )
 
 // Class fields can instantiate an implementation before its lazy inheritance
@@ -41,7 +40,7 @@ class Consumer {
 			}
 			programs, err := ssaapi.ParseProjectWithFS(vf,
 				ssaapi.WithLanguage(ssaconfig.JAVA), ssaapi.WithMemory(),
-				ssaapi.WithASTOrder(ssareducer.Order), ssaconfig.WithCompileConcurrency(1))
+				ssaconfig.WithCompileConcurrency(4))
 			require.NoError(t, err)
 			result, err := programs.SyntaxFlowWithError(`
 IA as $instances

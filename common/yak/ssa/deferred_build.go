@@ -12,10 +12,18 @@ const (
 	DeferredBuildKindBlueprint DeferredBuildKind = "blueprint"
 	DeferredBuildKindFile      DeferredBuildKind = "file"
 	DeferredBuildKindHelper    DeferredBuildKind = "helper"
+	// Binding runs after every skeleton and before hierarchy and bodies.
+	// Frontends use it for import and name links that cannot be resolved
+	// while another worker still owns a package.
+	DeferredBuildKindBinding DeferredBuildKind = "binding"
+	// Hierarchy runs after binding and before bodies, so type relations exist
+	// no matter which library is built first.
+	DeferredBuildKindHierarchy DeferredBuildKind = "hierarchy"
 )
 
 type deferredBuildTask struct {
 	id      string
+	kind    DeferredBuildKind
 	unitKey string
 	*LazyBuilder
 }
@@ -23,6 +31,7 @@ type deferredBuildTask struct {
 func newDeferredBuildTask(kind DeferredBuildKind, name string, unitKey string, work func()) *deferredBuildTask {
 	task := &deferredBuildTask{
 		id:          string(kind) + ":" + name,
+		kind:        kind,
 		unitKey:     unitKey,
 		LazyBuilder: NewLazyBuilder("deferred:" + string(kind) + ":" + name),
 	}
@@ -191,22 +200,24 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, nil)
 }
 
-// RunDeferredBuildsForUnitsMatching is RunDeferredBuildsForUnitsWithUnitCallback
-// restricted to task ids accepted by matchID. A nil matchID accepts every id.
-func (prog *Program) RunDeferredBuildsForUnitsMatching(
+// RunDeferredBuildsForUnitsOfKind runs the tasks of one kind that belong to
+// unitKeys. The kind is the frontend's phase, not a language name.
+func (prog *Program) RunDeferredBuildsForUnitsOfKind(
 	unitKeys []string,
+	kind DeferredBuildKind,
 	afterEach func(index int, total int) bool,
 	afterUnit func(unitKey string) bool,
-	matchID func(id string) bool,
 ) bool {
-	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, matchID)
+	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, func(task *deferredBuildTask) bool {
+		return task != nil && task.kind == kind
+	})
 }
 
 func (prog *Program) runDeferredBuildsForUnits(
 	unitKeys []string,
 	afterEach func(index int, total int) bool,
 	afterUnit func(unitKey string) bool,
-	matchID func(id string) bool,
+	match func(*deferredBuildTask) bool,
 ) bool {
 	if prog == nil || len(unitKeys) == 0 {
 		return true
@@ -245,7 +256,7 @@ func (prog *Program) runDeferredBuildsForUnits(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
-		if matchID != nil && !matchID(id) {
+		if match != nil && !match(task) {
 			continue
 		}
 		total++
@@ -294,7 +305,7 @@ func (prog *Program) runDeferredBuildsForUnits(
 			if _, match := units[ntask.unitKey]; !match {
 				continue
 			}
-			if matchID != nil && !matchID(nid) {
+			if match != nil && !match(ntask) {
 				continue
 			}
 			queued[nid] = struct{}{}

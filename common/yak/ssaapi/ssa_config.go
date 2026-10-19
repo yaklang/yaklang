@@ -108,10 +108,6 @@ func (c *Config) Processf(process float64, format string, arg ...any) {
 	}
 }
 
-func WithASTOrder(sequence ssaconfig.ASTSequenceType) ssaconfig.Option {
-	return ssaconfig.WithCompileASTSequence(sequence)
-}
-
 var WithLogLevel = ssaconfig.SetOption("ssa_compile/log_level", func(c *Config, v string) {
 	c.logLevel = v
 	log.SetLevel(v)

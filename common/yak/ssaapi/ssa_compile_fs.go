@@ -7,8 +7,6 @@ import (
 	"math"
 	"os"
 	"runtime"
-	"slices"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -342,6 +340,9 @@ func (c *Config) parseProjectWithFSUnits(
 	if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok {
 		prog.SetConcurrentUnitBuild(language.SupportsConcurrentUnitBuild())
 	}
+	if language, ok := c.LanguageBuilder.(ssa.MethodLookupBuilder); ok {
+		prog.SetDeferMethodBuildOnLookup(language.DeferMethodBuildOnLookup())
+	}
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := s
 		if len(v) > 0 {
@@ -425,25 +426,18 @@ func (c *Config) parseProjectWithFSUnits(
 			if unit == nil {
 				continue
 			}
-			// batch.units is in dependency order, and a unit's pre-handler must
-			// see the packages it imports already registered. Only reorder files
-			// inside a unit: a batch-wide sort lets a later unit's file land
-			// ahead of the dependency it imports.
-			files := append([]string(nil), unit.Files...)
-			sort.Strings(files)
-			if c.GetCompileASTSequence() == ssareducer.ReverseOrder {
-				slices.Reverse(files)
-			}
-			batchFiles = append(batchFiles, files...)
-			for _, path := range files {
+			// Unit order is the dependency batch. File completion order inside
+			// the batch is not part of that contract: a pre-handler that only
+			// works when its imports were visited first is a frontend bug.
+			batchFiles = append(batchFiles, unit.Files...)
+			for _, path := range unit.Files {
 				fileUnits[path] = unit.Key
 			}
 		}
-		// One bounded parser pool for the entire batch lets small packages use
-		// the available workers too, without multiplying the AST window by
-		// the number of units. Delivery stays in the dependency order built
-		// above; each file still registers declarations on its own unit.
-		prefetchedFiles := c.getFileHandlerWithOrder(filesystem, batchFiles, preHandlerFileSet, ssareducer.BoundedOrder)
+		// One parser pool for the entire batch lets small packages use the
+		// available workers too, without multiplying the AST window by the
+		// number of units. Files are delivered as their AST is ready.
+		prefetchedFiles := c.GetFileHandler(filesystem, batchFiles, preHandlerFileSet)
 		prog.SetPreHandler(true)
 		compilePhase = "f1_units"
 		if holdSCCIR && prog.Cache != nil {
@@ -457,14 +451,8 @@ func (c *Config) parseProjectWithFSUnits(
 			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s",
 				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
 		}
-		concurrentPrehandle := prog.ConcurrentUnitBuildEnabled()
-		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitPreHandler); ok {
-			// Declaration registration and deferred body building have distinct
-			// safety boundaries. A frontend may safely prehandle independent
-			// owners even when its body drain must remain serial.
-			concurrentPrehandle = language.SupportsConcurrentUnitPreHandler()
-		}
-		if concurrentPrehandle {
+		prehandleWorkers, buildWorkers, drainUnscheduled := unitWorkerCounts(c, prog)
+		if prehandleWorkers > 1 {
 			for _, key := range unitKeys {
 				prog.EnsureLibraryForCompileUnit(key)
 			}
@@ -480,8 +468,7 @@ func (c *Config) parseProjectWithFSUnits(
 			handlerFileSet:        handlerFileSet,
 			preHandlerBuildsFiles: preHandlerBuildsFiles,
 			preHandlerProcess:     preHandlerProcess,
-			concurrentUnits:       concurrentPrehandle,
-			concurrency:           c.GetCompileConcurrency(),
+			concurrency:           prehandleWorkers,
 			astErr:                astErr,
 			astParseErrLogged:     astParseErrLogged,
 			astParseErrSuppressed: astParseErrSuppressed,
@@ -504,18 +491,11 @@ func (c *Config) parseProjectWithFSUnits(
 			language.AfterPreHandlerProject(builder)
 			language.Clearup()
 		}
-		// Java import links skipped while another worker owned the package
-		// run here, after every skeleton has released its builder and before
-		// prehandler mode is cleared. Directory compiles in that window still
-		// visit class bodies, and they no longer share a builder with a live
-		// prehandle worker. Hierarchy is the other half of that window:
-		// extends/implements must be recorded before any library body, so a
-		// cyclic compile unit does not depend on which library is built first.
-		// Other deferred work stays on the later pass.
-		for _, marker := range []string{"java-static-import:", "java-type-hierarchy:"} {
-			if !prog.RunDeferredBuildsForUnitsMatching(unitKeys, nil, nil, func(id string) bool {
-				return strings.Contains(id, marker)
-			}) {
+		// Binding then hierarchy run after every skeleton has released its
+		// builder and before prehandler mode is cleared. Frontends register
+		// those phases by kind. Other deferred work stays on the later pass.
+		for _, kind := range []ssa.DeferredBuildKind{ssa.DeferredBuildKindBinding, ssa.DeferredBuildKindHierarchy} {
+			if !prog.RunDeferredBuildsForUnitsOfKind(unitKeys, kind, nil, nil) {
 				return nil, ErrContextCancel
 			}
 		}
@@ -561,23 +541,8 @@ func (c *Config) parseProjectWithFSUnits(
 			return nil, ErrContextCancel
 		}
 		// Second phase of this batch: expand method-body LazyBuilders that
-		// belong to these units. PreHandler already built the skeleton;
-		// without this drain, bodies wait for Application.Finish and the
-		// unit cannot scan or recycle AST/IR on its own. The same DAG
-		// scheduler serves every frontend; concurrency 1 is its serial mode,
-		// not a second implementation.
-		batchConcurrency := c.GetCompileConcurrency()
-		drainUnscheduled := true
-		if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok && language.SupportsConcurrentUnitBuild() {
-			// A dependency-aware frontend already schedules its upstream
-			// libraries, so only the scheduler's own plan is built here.
-			drainUnscheduled = false
-		} else {
-			// Frontends sharing one application scope have no per-unit
-			// dependency DAG; keep batch builds serial and let the
-			// post-build drain cover upstream libraries.
-			batchConcurrency = 1
-		}
+		// belong to these units. The same DAG scheduler serves every frontend;
+		// buildWorkers 1 is its serial mode, not a second implementation.
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
@@ -601,7 +566,7 @@ func (c *Config) parseProjectWithFSUnits(
 		// starting the next batch; compilation parallelism is inside the DAG
 		// scheduler above, not in an unowned cleanup goroutine.
 		buildCost, err := executeCompileUnitBatch(
-			c.GetContext(), prog, plan, batch, batchConcurrency, batchIndex, cleanup, drainUnscheduled,
+			c.GetContext(), prog, plan, batch, buildWorkers, batchIndex, cleanup, drainUnscheduled,
 		)
 		parseTime += buildCost
 		if err != nil {
