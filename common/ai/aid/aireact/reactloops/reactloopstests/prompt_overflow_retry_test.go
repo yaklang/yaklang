@@ -12,13 +12,18 @@ import (
 )
 
 // A confirmed prompt overflow must not replay the same prompt. The loop records
-// a tighter timeline limit and stops with the original typed error, so the
-// caller can decide what to compress.
+// a tighter limit and may retry after folding actually shrinks the prompt.
+// Compression requests are not replays of the main decision request.
 func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
-	callCount := 0
+	var mainPromptTokens []int
+	compressionCalls := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			callCount++
+			if req.GetCallerLabel() == aicommon.CallerLabelTimelineCompress {
+				compressionCalls++
+			} else {
+				mainPromptTokens = append(mainPromptTokens, aicommon.MeasureTokens(req.GetPrompt()))
+			}
 			rsp := i.NewAIResponse()
 			rsp.SetRawHTTPResponseData(
 				[]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: application/json\r\n\r\n"),
@@ -40,7 +45,12 @@ func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 
 	require.Error(t, err)
 	require.True(t, aicommon.IsPromptTooLong(err), "the typed overflow must reach the caller: %v", err)
-	require.Equal(t, 1, callCount, "the same prompt must not be replayed")
+	require.NotEmpty(t, mainPromptTokens)
+	require.LessOrEqual(t, len(mainPromptTokens), cfg.GetPromptOverflowRetryMax()+1, "main-loop retries must remain bounded")
+	require.Equal(t, 1, compressionCalls, "the lower limit triggers one compression action")
+	for i := 1; i < len(mainPromptTokens); i++ {
+		require.Less(t, mainPromptTokens[i], mainPromptTokens[i-1]*99/100, "a main-loop retry requires measurable progress, not replay of the same prompt")
+	}
 	require.EqualValues(t, 8192*8/10, cfg.GetTimeline().GetTimelineContentLimit(),
 		"the loop records a tighter limit for the model that rejected the prompt")
 	require.Less(t, cfg.GetTimeline().GetTimelineContentLimit(), base)
