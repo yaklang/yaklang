@@ -35,6 +35,39 @@ func CallReturned() { d := db.New(); d.SetBool("returned", true) }
 	return vf
 }
 
+func TestGoNamedNonStructMethodResolves(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("go.mod", "module fixture\n\ngo 1.20\n")
+	vf.AddFile("status.go", `package status
+
+type Status string
+
+func (s Status) Terminal() bool { return s == "done" }
+func Use(s Status) bool { return s.Terminal() }
+`)
+	programs, err := ssaapi.ParseProjectWithFS(vf, ssaapi.WithLanguage(ssaconfig.GO), ssaapi.WithMemory(), ssaconfig.WithCompileConcurrency(1))
+	require.NoError(t, err)
+	require.Len(t, programs, 1)
+	lib, _ := programs[0].Program.GetLibrary("status")
+	require.NotNil(t, lib)
+	method, ok := lib.Funcs.Get("Status$Terminal")
+	require.True(t, ok)
+	typ, ok := lib.GetExportType("Status")
+	require.True(t, ok)
+	resolved := ssa.GetMethod(typ, "Terminal")
+	require.NotNil(t, resolved)
+	require.Equal(t, method.GetId(), resolved.GetId())
+	fn, ok := lib.Funcs.Get("Use")
+	require.True(t, ok)
+	calls := callsInGoFunction(t, fn)
+	require.NotEmpty(t, calls)
+	callee, ok := calls[len(calls)-1].GetValueById(calls[len(calls)-1].Method)
+	require.True(t, ok)
+	receiver := ssa.GetLatestObject(callee)
+	require.NotNil(t, receiver)
+	require.Equal(t, method.GetId(), ssa.GetMethod(receiver.GetType(), "Terminal").GetId())
+}
+
 func callsInGoFunction(t *testing.T, fn *ssa.Function) []*ssa.Call {
 	t.Helper()
 	var calls []*ssa.Call

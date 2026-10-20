@@ -1028,15 +1028,17 @@ func (b *astbuilder) bindGoMethod(typeName, methodName string, fun *ssa.Function
 		if !ok || typ == nil {
 			return false
 		}
-		// Both receiver kinds are recorded on the named struct type, which is
-		// the type every use of the name resolves to. A pointer receiver is
-		// marked so value-addressability can be checked by the caller; it is not
-		// given a second function.
-		if obj, ok := typ.(*ssa.ObjectType); ok {
-			if pointerReceiver {
+		// Both receiver kinds are recorded on the named type every use of the
+		// name resolves to. A struct gets the pointer-receiver marker; a defined
+		// non-struct type (named string, slice, and so on) still owns a method
+		// set, so the method is attached there too instead of being dropped.
+		if pointerReceiver {
+			if _, ok := typ.(*ssa.ObjectType); ok {
 				fun.SetVerboseName("*" + typeName + "." + methodName)
 			}
-			obj.AddMethod(methodName, fun)
+		}
+		if adder, ok := typ.(interface{ AddMethod(string, *ssa.Function) }); ok {
+			adder.AddMethod(methodName, fun)
 		}
 		if lib.Blueprint != nil {
 			if bp, ok := lib.Blueprint.Get(typeName); ok && bp != nil {
