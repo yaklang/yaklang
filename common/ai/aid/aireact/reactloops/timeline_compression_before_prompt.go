@@ -110,12 +110,12 @@ func (r *ReActLoop) compressMainPrompt(input *loopPromptBuildInput, limit int64)
 	if err != nil {
 		return err
 	}
-	promptTokens := int64(aicommon.MeasureTokens(rebuilt))
+	promptTokens := int64(aicommon.MeasureTokens(rebuilt.Prompt))
 	if limit > 0 && promptTokens <= limit/2 {
 		return nil
 	}
 	return r.runTimelineCompressionAction(timelineCompressionTurnContext{
-		Prompt:       rebuilt,
+		Prompt:       rebuilt.Prompt,
 		PromptTokens: promptTokens,
 		TargetTokens: limit / 2,
 	})

@@ -365,7 +365,7 @@ func (r *ReActLoop) Release() {
 
 // WaitForInflightObservation 等待所有异步 prompt observation 构建 goroutine
 // 完成. 主循环不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在
-// generateLoopPrompt 返回后断言 observation 字段.
+// publishPromptObservation 提交后断言 observation 字段.
 // 关键词: 异步 observation join, 测试可观测
 func (r *ReActLoop) WaitForInflightObservation() {
 	if r == nil {

@@ -718,16 +718,15 @@ LOOP:
 		)
 		retryMax := r.promptOverflowRetryMax()
 		for attempt := 0; ; attempt++ {
-			prompt, finalError = r.generateLoopPromptFromInput(buildInput)
+			var assembled *LoopPromptAssemblyResult
+			assembled, finalError = r.generateLoopPromptFromInput(buildInput)
 			if finalError != nil {
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				log.Errorf("Failed to generate prompt: %v", finalError)
 				needSummary.SetTo(true)
 				return finalError
 			}
-			// observation 已通过 emitter.EmitPromptProfile 走 prompt_profile 结构化事件
-			// 推送给前端 "上下文成分" 面板, 不再落盘 ASCII 副本以避免污染 task 目录.
-			// 关键词: prompt observation 不再落盘, EmitPromptProfile 现役路径
+			prompt = assembled.Prompt
 			promptTokens := aicommon.MeasureTokens(prompt)
 			// The whole prompt is the budget boundary. Compression only starts
 			// after normal assembly proves it is over the configured limit.
@@ -759,6 +758,9 @@ LOOP:
 				r.savePromptToFile(task, iterationCount, prompt)
 			}
 
+			// Only a prompt accepted for an actual decision request is observed.
+			// Compression probes and discarded overflow rebuilds stay invisible.
+			r.publishPromptObservation(nonce, assembled, promptTokens)
 			streamWg := new(sync.WaitGroup)
 			/* Generate AI Action */
 			loopCalls, stopReason, resultDescriptor, transactionErr = r.callAILoopTransaction(

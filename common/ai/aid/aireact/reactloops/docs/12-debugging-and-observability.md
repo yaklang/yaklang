@@ -143,7 +143,7 @@ Query: sql injection login
 
 ### 数据结构
 
-每轮 prompt 渲染后，`prompt_observation.go` 把 prompt 拆段统计：
+主循环确定实际请求模型后，`prompt_observation.go` 按该请求的成分快照异步统计。仅渲染 prompt、压缩容量检查和无进展的重建不会触发上报：
 
 | 段落 | 来源 |
 |------|------|
@@ -163,12 +163,14 @@ Query: sql injection login
 ### 事件发出
 
 ```go
-status := observation.BuildStatus(1 * 1024)
-r.SetLastPromptObservationStatus(status)
-r.emitPromptObservationStatus(status)
+r.publishPromptObservation(nonce, assembled, promptTokens)
+// → 异步 BuildPromptObservation + BuildStatus(0)
+// → 更新 LastObservation / LastObservationStatus
 // → emitter.EmitPromptProfile(status)
 // → emit EVENT_TYPE_PROMPT_PROFILE 到前端
 ```
+
+同步的 LastPromptToken 复用主循环已测得的 token 数，只记录已接受的主模型请求；观测直接异步发布，不阻塞主循环，也不添加额外的排序锁或等待链。
 
 ### 前端用途
 
