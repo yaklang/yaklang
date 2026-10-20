@@ -93,7 +93,7 @@ yak common/ai/aismoking/forge.yak
 
 ## 收集与清理范围
 
-`live/knowledge_base_management.yak` 使用真实配置模型和 embedding，在保留的 `knowledge_enhance` 模式中复用固定 Skill 和工具，附加选库偏好，执行创建、AI 问题索引构建、显式 names 数组/单库名的预算语义和关键词查询、元信息更新，并用直接 API 核验实际入库。测试将工具范围限定为这两个内置工具；只创建随机命名测试库，退出时清理。设置 `AISMOKING_OUTPUT` 为新目录；`AISMOKING_FUNCTION_CALL=0` 可切换文本协议。保存事件、工具 artifacts 路径与 summary，不保存认证头；真实服务失败不会计为通过。仅供本地开发，不进入 CI。确定性用例 `knowledge_base_management.yak` 设置 `AISMOKING_KNOWLEDGE_FOCUS=1` 可覆盖同一模式，断言两种协议首轮已有完整 schema，且无需 require。
+`live/knowledge_base_management.yak` 使用真实配置模型和 embedding，在普通通用 loop 中通过 Skill 引导的两个工具执行创建、AI 问题索引构建、显式 names 数组/单库名的预算语义和关键词查询、元信息更新，并用直接 API 核验实际入库。测试将工具范围限定为这两个内置工具；只创建随机命名测试库，退出时清理。设置 `AISMOKING_OUTPUT` 为新目录；`AISMOKING_FUNCTION_CALL=0` 可切换文本协议。保存事件、工具 artifacts 路径与 summary，不保存认证头；真实服务失败不会计为通过。仅供本地开发，不进入 CI。
 
 已收集原 Coordinator 的 6 个 Yak 入口、Go `live_runner` 的综合实验、LiteForge 的注入式及直接入口、liteforgeapp 的应用案例、Forge 全流程案例、缓存脚本、17 个循环示例、2 个视频案例和 3 个 AI engine benchmark。注入式 `.yak` 和 Go live runner 已删除；原内部断言保留为普通 Go 回归，公共调用矩阵由此套件承接。VM 配置绑定仍有窄范围 Go 单元测试，不再用外部注入式业务脚本执行计划。
 

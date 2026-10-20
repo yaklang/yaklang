@@ -94,7 +94,7 @@ smokeHandler=func(w,body) {
         schemaContext = prompt + json.dumps(body.tools)
         for key in ["content_offset", "index_options", "build_options", "per_entry_token_limit"] { assert key in schemaContext, "both complete schemas must be present before the first decision" }
         for name in ["manage_knowledge_base", "query_knowledge_base"] {
-            assert operator.GetCurrentLoop().HasToolSchema(name), "focus must pin enabled knowledge schemas"
+            assert config.GetAiToolManager().IsRecentlyUsedTool(name), "focus must load enabled knowledge schemas into the ordinary cache"
             loaded[name] = true
         }
     }

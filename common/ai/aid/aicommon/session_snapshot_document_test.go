@@ -22,7 +22,6 @@ func TestSessionSnapshotDocument_PersistsCumulativeAndTaskViews(t *testing.T) {
 	})
 
 	db := consts.GetGormProjectDatabase()
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	require.NoError(t, db.AutoMigrate(&schema.AISession{}).Error)
 	const sessionID = "snapshot-document-session"
 	require.NoError(t, yakit.RegisterAIAgentSession(db, sessionID))

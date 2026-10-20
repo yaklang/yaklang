@@ -40,76 +40,52 @@ func GetBuiltinSkillsFS() fi.FileSystem {
 	return builtinSkillsFS
 }
 
-// GetBuiltinSkillLoader supplies only missing required built-ins. The configured
-// loader (including arbitrary custom implementations) remains authoritative.
-// Focus overlays need no automatic discovery, disk extraction or shared mutation.
-func (r *ReAct) GetBuiltinSkillLoader(configured aiskillloader.SkillLoader, names ...string) (aiskillloader.SkillLoader, error) {
-	builtin, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
-	if err != nil {
-		return nil, err
-	}
-	loader := &focusSkillLoader{primary: configured, fallback: make(map[string]*aiskillloader.LoadedSkill)}
-	present := make(map[string]bool)
+// GetKnowledgeSkillLoader adds the embedded system Skill only when it is missing.
+// Keep the caller's loader authoritative for all other Skills.
+func (r *ReAct) GetKnowledgeSkillLoader(configured aiskillloader.SkillLoader) (aiskillloader.SkillLoader, error) {
 	if configured != nil {
 		for _, meta := range configured.AllSkillMetas() {
-			if meta != nil {
-				present[meta.Name] = true
+			if meta != nil && meta.Name == "yaklang-system" {
+				return configured, nil
 			}
 		}
 	}
-	for _, name := range names {
-		if present[name] || loader.fallback[name] != nil {
-			continue
-		}
-		skill, err := builtin.LoadSkill(name)
-		if err != nil {
-			return nil, err
-		}
-		loader.fallback[name] = skill
-		loader.names = append(loader.names, name)
+	builtin, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil || configured == nil {
+		return builtin, err
 	}
-	return loader, nil
+	system, err := builtin.LoadSkill("yaklang-system")
+	if err != nil {
+		return nil, err
+	}
+	return &knowledgeSkillLoader{SkillLoader: configured, system: system}, nil
 }
 
-type focusSkillLoader struct {
-	primary  aiskillloader.SkillLoader
-	fallback map[string]*aiskillloader.LoadedSkill
-	names    []string
+type knowledgeSkillLoader struct {
+	aiskillloader.SkillLoader
+	system *aiskillloader.LoadedSkill
 }
 
-func (l *focusSkillLoader) LoadSkill(name string) (*aiskillloader.LoadedSkill, error) {
-	if skill := l.fallback[name]; skill != nil {
-		return skill, nil
+func (l *knowledgeSkillLoader) LoadSkill(name string) (*aiskillloader.LoadedSkill, error) {
+	if name == "yaklang-system" {
+		return l.system, nil
 	}
-	if l.primary == nil {
-		return nil, os.ErrNotExist
-	}
-	return l.primary.LoadSkill(name)
+	return l.SkillLoader.LoadSkill(name)
 }
 
-func (l *focusSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
-	if skill := l.fallback[name]; skill != nil {
-		return skill.FileSystem, nil
+func (l *knowledgeSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
+	if name == "yaklang-system" {
+		return l.system.FileSystem, nil
 	}
-	if l.primary == nil {
-		return nil, os.ErrNotExist
-	}
-	return l.primary.GetFileSystem(name)
+	return l.SkillLoader.GetFileSystem(name)
 }
 
-func (l *focusSkillLoader) HasSkills() bool {
-	return len(l.names) > 0 || (l.primary != nil && l.primary.HasSkills())
+func (l *knowledgeSkillLoader) HasSkills() bool {
+	return true
 }
 
-func (l *focusSkillLoader) AllSkillMetas() []*aiskillloader.SkillMeta {
-	var metas []*aiskillloader.SkillMeta
-	if l.primary != nil {
-		metas = append(metas, l.primary.AllSkillMetas()...)
-	}
-	for _, name := range l.names {
-		metas = append(metas, l.fallback[name].Meta)
-	}
-	return metas
+func (l *knowledgeSkillLoader) AllSkillMetas() []*aiskillloader.SkillMeta {
+	return append(append([]*aiskillloader.SkillMeta(nil), l.SkillLoader.AllSkillMetas()...), l.system.Meta)
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem

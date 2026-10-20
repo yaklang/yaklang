@@ -182,8 +182,6 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	// helpers keep their existing history projection through the default path.
 	base, err := pm.getLoopPromptBaseMaterials(tools, input.Nonce, pm.react.GetCurrentLoop(), aicommon.TimelinePromptOptions{
 		IncludeLatestModelReplay: input.IncludeLatestModelReplay,
-		PinnedSkillNames:         input.PinnedSkillNames,
-		PinnedToolNames:          input.PinnedToolNames,
 		PromoteUserInput:         true,
 		UserInputOnly:            input.Lightweight,
 	})
@@ -350,10 +348,6 @@ func (pm *PromptManager) NewPromptMaterials(base *reactloops.LoopPromptBaseMater
 	if input != nil {
 		materials.FunctionCallMode = input.FunctionCallMode
 		materials.TaskInstruction = input.TaskInstruction
-		materials.StaticInstruction = input.StaticInstruction
-		if input.PinnedContext != "" {
-			materials.SkillsContext = input.PinnedContext + "\n\n" + materials.SkillsContext
-		}
 		materials.OutputExample = input.OutputExample
 		materials.Schema = input.Schema
 		materials.FunctionCallSchemas = input.FunctionCallSchemas
@@ -544,11 +538,6 @@ func (pm *PromptManager) buildHighStaticObservation(
 			false,
 			pm.renderHighStaticPreamble(materials),
 		),
-	}
-	if materials != nil && materials.StaticInstruction != "" {
-		children = append(children, reactloops.NewPromptSectionObservation(
-			"section.high_static.focus_instruction", "Focus Instructions",
-			reactloops.PromptSectionRoleHighStatic, false, materials.StaticInstruction))
 	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
