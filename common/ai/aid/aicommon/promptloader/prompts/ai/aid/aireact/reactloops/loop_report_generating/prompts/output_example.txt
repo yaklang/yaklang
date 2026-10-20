@@ -36,7 +36,7 @@
 {"@action":"loading_skills","skill_name":"yaklang-system"}
 ```
 ```json
-{"@action":"require_tool","tool_require_payload":"query_knowledge_base"}
+{"@action":"require_tool","require_tool_payload":"query_knowledge_base"}
 ```
 确定用户附加的精确库名后，执行实际查询：
 ```json
