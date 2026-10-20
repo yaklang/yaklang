@@ -460,13 +460,8 @@ func (r *ReActLoop) clearPerceptionKnowledgeSearchResult() {
 }
 
 func (r *ReActLoop) allowPerceptionKnowledgeRefresh() bool {
-	if r == nil {
-		return false
-	}
-	if r.allowRAG == nil {
-		return false
-	}
-	return r.allowRAG()
+	// Legacy helpers remain until their tests are retired; automatic retrieval is disabled.
+	return false
 }
 
 func (r *ReActLoop) buildPerceptionKnowledgeSearchQuery(state *PerceptionState) string {
@@ -884,7 +879,6 @@ func (r *ReActLoop) TriggerPerception(reason string, force bool) *PerceptionStat
 			//
 			if currentState.shouldRefreshDownstreamForState(updated) {
 				r.refreshCapabilitiesFromPerception(currentState)
-				r.refreshKnowledgeFromPerception(currentState)
 			}
 
 			if cfg := r.config; cfg != nil && currentState != nil {
@@ -980,13 +974,6 @@ func (r *ReActLoop) RegisterPerceptionContextProvider() {
 			return "", nil
 		}
 		return state.FormatForContext(), nil
-	})
-	mgr.RegisterTracedContent("perception_knowledge", func(
-		config aicommon.AICallerConfigIf,
-		emitter *aicommon.Emitter,
-		key string,
-	) (string, error) {
-		return strings.TrimSpace(r.Get("perception_knowledge_context")), nil
 	})
 	log.Infof("perception context provider registered for loop %s", r.loopName)
 }
