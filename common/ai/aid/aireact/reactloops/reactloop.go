@@ -88,7 +88,6 @@ type ReActLoop struct {
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
 	planExecActionType string
-	allowRAG           func() bool
 	allowToolCall      func() bool
 	allowUserInteract  func() bool
 
