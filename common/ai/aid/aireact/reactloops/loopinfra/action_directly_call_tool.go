@@ -313,8 +313,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 			toolName = action.GetInvokeParams("next_action").GetString("directly_call_tool_name")
 		}
 		if toolName != "" {
-			mgr := loop.GetConfig().GetAiToolManager()
-			if mgr == nil || !mgr.IsRecentlyUsedTool(toolName) {
+			if !loop.HasToolSchema(toolName) {
 				// 工具不在 recently-used cache 中时只记录警告，不报错触发重试。
 				// 后续 ActionHandler 会通过 GetToolByName 自行决定：工具存在则继续
 				// 直接调用，工具不存在则报告错误，由主循环决定下一步。

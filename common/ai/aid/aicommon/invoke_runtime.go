@@ -239,7 +239,12 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 }
 
 type LoopPromptAssemblyInput struct {
-	Nonce string
+	// Focus-owned snapshots are never reduced with Timeline or speed-mode history.
+	StaticInstruction string
+	PinnedContext     string
+	PinnedSkillNames  []string
+	PinnedToolNames   []string
+	Nonce             string
 	// FunctionCallMode describes this request's output protocol, not the loop's
 	// global preference. Auxiliary parameter-generation requests remain textual.
 	FunctionCallMode bool

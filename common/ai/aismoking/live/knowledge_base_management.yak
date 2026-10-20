@@ -24,7 +24,7 @@ prompt=sprintf(`直接完成一个知识库验证任务，使用 yaklang-system 
 4. 将库描述更新为 live smoke verified，再 get 核对。保留测试库，测试程序会在退出时负责删除。
 成功时简短回答请求头和验证标记；出错时如实说明实际错误。无需生成报告或计划。`,name,source)
 started=time.Now().UnixMilli()
-runError=aim.InvokeReAct(prompt,aim.focus("default"),aim.context(ctx),aim.sessionID("knowledge-live-"+randstr(12)),aim.workdir(root),aim.reviewPolicy("yolo"),aim.maxIteration(24),aim.timeout(300),aim.disableAIForge(true),aim.onEvent(func(op,e){
+runError=aim.InvokeReAct(prompt,aim.focus("knowledge_enhance"),aim.attachedKnowledgeBase(name),aim.attachedFileContent("优先使用本次附加的测试知识库和中文资料；只操作任务指定的精确库名。"),aim.context(ctx),aim.sessionID("knowledge-live-"+randstr(12)),aim.workdir(root),aim.reviewPolicy("yolo"),aim.maxIteration(24),aim.timeout(300),aim.disableAIForge(true),aim.onEvent(func(op,e){
     if !restricted {
         manager=op.GetConfig().GetAiToolManager()
         if manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base");restricted=true }

@@ -113,6 +113,8 @@ Yak 管理接口为 `mcp.AddServer(name,type,endpoint,options...)`、`mcp.Delete
 
 ## 知识库管理与知识查询
 
+`knowledge_enhance` 仍是可通过 `aim.focus("knowledge_enhance")` 或前端 focus 字段选择的知识增强模式。它复用普通助手 loop，固定本 Skill、静态选库指引及调用方允许的两个知识库工具 schema；进入时不执行查询，无需再 require。固定定义不参与历史压缩、工具 LRU 或快速模式裁剪。附加名称和原始说明保留为选库偏好，长说明保存完整文件并展示有界预览；只有明确全库请求才允许 all=true。其他轻量专注模式可复用 [固定上下文机制](../../reactloops/docs/19-lightweight-focus.md)。
+
 知识库使用本次运行的 profile 数据库，与 Yakit 共用。`manage_knowledge_base` 与 MCP 管理工具同属内置 Yak 工具，可由 `require_tool` 加载；库列表是管理操作 `op=list`。`query_knowledge_base` 只读，必须显式选择 `name`（一个库）、`names`（多个库）或 `all=true`，三者互斥，并提供 `token_limit`。未指定范围报错，提示先 manage list 再选择一个或多个库；省略 all 或 all=false 不会默认全库，字面库名 all 也不会被解释为全库。知识操作统一通过本 Skill 引导调用工具。
 
 ```json

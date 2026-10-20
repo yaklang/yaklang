@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -37,6 +38,78 @@ var builtinSkillReleaseDB = func() *gorm.DB {
 // each with a SKILL.md defining the skill metadata and content.
 func GetBuiltinSkillsFS() fi.FileSystem {
 	return builtinSkillsFS
+}
+
+// GetBuiltinSkillLoader supplies only missing required built-ins. The configured
+// loader (including arbitrary custom implementations) remains authoritative.
+// Focus overlays need no automatic discovery, disk extraction or shared mutation.
+func (r *ReAct) GetBuiltinSkillLoader(configured aiskillloader.SkillLoader, names ...string) (aiskillloader.SkillLoader, error) {
+	builtin, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil {
+		return nil, err
+	}
+	loader := &focusSkillLoader{primary: configured, fallback: make(map[string]*aiskillloader.LoadedSkill)}
+	present := make(map[string]bool)
+	if configured != nil {
+		for _, meta := range configured.AllSkillMetas() {
+			if meta != nil {
+				present[meta.Name] = true
+			}
+		}
+	}
+	for _, name := range names {
+		if present[name] || loader.fallback[name] != nil {
+			continue
+		}
+		skill, err := builtin.LoadSkill(name)
+		if err != nil {
+			return nil, err
+		}
+		loader.fallback[name] = skill
+		loader.names = append(loader.names, name)
+	}
+	return loader, nil
+}
+
+type focusSkillLoader struct {
+	primary  aiskillloader.SkillLoader
+	fallback map[string]*aiskillloader.LoadedSkill
+	names    []string
+}
+
+func (l *focusSkillLoader) LoadSkill(name string) (*aiskillloader.LoadedSkill, error) {
+	if skill := l.fallback[name]; skill != nil {
+		return skill, nil
+	}
+	if l.primary == nil {
+		return nil, os.ErrNotExist
+	}
+	return l.primary.LoadSkill(name)
+}
+
+func (l *focusSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
+	if skill := l.fallback[name]; skill != nil {
+		return skill.FileSystem, nil
+	}
+	if l.primary == nil {
+		return nil, os.ErrNotExist
+	}
+	return l.primary.GetFileSystem(name)
+}
+
+func (l *focusSkillLoader) HasSkills() bool {
+	return len(l.names) > 0 || (l.primary != nil && l.primary.HasSkills())
+}
+
+func (l *focusSkillLoader) AllSkillMetas() []*aiskillloader.SkillMeta {
+	var metas []*aiskillloader.SkillMeta
+	if l.primary != nil {
+		metas = append(metas, l.primary.AllSkillMetas()...)
+	}
+	for _, name := range l.names {
+		metas = append(metas, l.fallback[name].Meta)
+	}
+	return metas
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem

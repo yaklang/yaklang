@@ -117,6 +117,9 @@ func (b *PromptPrefixBuilder) AssemblePromptPrefix(materials *PromptMaterials) (
 	if err != nil {
 		return nil, err
 	}
+	if materials.StaticInstruction != "" {
+		highStatic += "\n\n# Focus Instructions\n" + materials.StaticInstruction
+	}
 	frozenBlock, err := RenderPromptTemplate(b.FrozenBlockTemplateName, frozenBlockTemplate, materials.FrozenBlockData())
 	if err != nil {
 		return nil, err
