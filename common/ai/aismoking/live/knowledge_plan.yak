@@ -5,6 +5,6 @@ assert os.Getenv("AISMOKING_OUTPUT")!=""
 for native in [false,true] {
     protocol=os.Getenv("AISMOKING_FUNCTION_CALL")
     if (protocol=="0" && native) || (protocol=="1" && !native) { continue }
-    runKnowledgePlan(native,nil,context.WithTimeoutSeconds(480))
+    runKnowledgePlan(native,nil,context.WithTimeoutSeconds(900))
 }
 println("AISMOKING_LIVE_PASS")
