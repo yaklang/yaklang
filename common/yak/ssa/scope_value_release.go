@@ -121,6 +121,11 @@ func releaseScopeOrdinaryValues(prog *Program, scope ScopeIF, visited map[*Scope
 				case prog.Cache.instructions.residentCache != nil:
 					prog.Cache.instructions.residentCache.DeleteClean(id)
 				}
+				// The head stays in linkValues. Older ordinary versions are not a
+				// lexical lookup key once their saved id is on the variable itself.
+				if versioned != latest {
+					current.TrimSettledVersion(versioned)
+				}
 				released++
 			}
 		}

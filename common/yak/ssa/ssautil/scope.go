@@ -510,6 +510,26 @@ func (scope *ScopedVersionedTable[T]) UnlinkValue(value T) {
 	scope.linkMu.Unlock()
 }
 
+// TrimSettledVersion unlinks one persisted ordinary version. The lexical head
+// stays, so ReadVariable order does not change; callers that already hold the
+// removed version keep its id and reload path.
+func (scope *ScopedVersionedTable[T]) TrimSettledVersion(variable VersionedIF[T]) bool {
+	if scope == nil || variable == nil {
+		return false
+	}
+	name := variable.GetName()
+	scope.linkMu.Lock()
+	defer scope.linkMu.Unlock()
+	if head := scope.linkValues.Get(name); head == variable {
+		return false
+	}
+	ln, ok := scope.linkValues.val.Get(name)
+	if !ok || ln == nil {
+		return false
+	}
+	return ln.Remove(variable)
+}
+
 func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
 	scope.linkMu.RLock()
 	defer scope.linkMu.RUnlock()
