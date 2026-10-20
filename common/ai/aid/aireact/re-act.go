@@ -569,6 +569,9 @@ func (r *ReAct) SendInputEventAndWaitAccepted(event *ypb.AIInputEvent) (ret erro
 	}
 	if r.config.InputEventManager != nil {
 		r.config.InputEventManager.CallMirrorOfAIInputEvent(event)
+		if event.GetUserInteraction() != "" {
+			defer r.config.InputEventManager.CallAfterInputEvent(event)
+		}
 	}
 	return r.handleFreeValue(event)
 }

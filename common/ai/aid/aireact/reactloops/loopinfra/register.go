@@ -5,6 +5,7 @@ import (
 )
 
 func init() {
+	reactloops.RegisterAction(renderUIAction)
 	reactloops.RegisterAction(userQuestionsAction(false))
 	reactloops.RegisterAction(userQuestionsAction(true))
 	reactloops.RegisterAction(loopAction_toolRequireAndCall)

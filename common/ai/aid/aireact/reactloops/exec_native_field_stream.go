@@ -218,6 +218,9 @@ func (r *ReActLoop) emitNativeActionStreamFields(resp *aicommon.AIResponse, call
 
 func emitNativeActionField(emitter *aicommon.Emitter, taskIndex string, field *LoopStreamField, raw io.Reader, onData ...func()) (bool, error) {
 	var reader io.Reader = utils.JSONStringReader(raw)
+	if field.RawJSON {
+		reader = utils.UTF8Reader(raw)
+	}
 	if len(onData) > 0 {
 		reader = &displayFieldReader{Reader: reader, onData: onData[0]}
 	}

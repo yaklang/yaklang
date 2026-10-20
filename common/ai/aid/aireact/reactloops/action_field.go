@@ -11,6 +11,7 @@ type LoopStreamField struct {
 	ContentType   string
 	StreamHandler LoopStreamFieldHandler
 	IsSystem      bool
+	RawJSON       bool // Structured UI fields stream JSON bytes, not a decoded JSON string.
 }
 
 // LoopAITagField 描述一个被注册到 ActionMaker 的 AITAG 字段.

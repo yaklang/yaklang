@@ -502,7 +502,8 @@ type ActionMaker struct {
 	tagToExtraNonces map[string][]string
 	nonce            string
 
-	fieldStreamHandler []*FieldStreamItem
+	fieldStreamHandler    []*FieldStreamItem
+	canonicalStreamFields map[string]bool
 }
 type FieldStreamItem struct {
 	FieldName []string
@@ -617,6 +618,20 @@ func WithActionFieldStreamHandler(fieldNames []string, handler func(key string, 
 			FieldName: fieldNames,
 			Handler:   handler,
 		})
+	}
+}
+
+// Structured fields may contain objects with identically named properties.
+// Only the action's own argument (including the legacy next_action envelope)
+// may open a stream for such a field.
+func WithActionCanonicalStreamFields(names ...string) ActionMakerOption {
+	return func(maker *ActionMaker) {
+		if maker.canonicalStreamFields == nil {
+			maker.canonicalStreamFields = map[string]bool{}
+		}
+		for _, name := range names {
+			maker.canonicalStreamFields[name] = true
+		}
 	}
 }
 
@@ -849,6 +864,10 @@ func (m *ActionMaker) ReadFromReader(ctx context.Context, reader io.Reader) *Act
 
 		for name, _ := range fieldHandlerMap { // register field stream handlers for json field type
 			opts = append(opts, jsonextractor.WithRegisterFieldStreamHandlerAndStartCallback(name, nil, func(key string, reader io.Reader, parents []string) { // sync create writer
+				if m.canonicalStreamFields[key] && len(parents) > 0 && !(len(parents) == 1 && parents[0] == "next_action") {
+					go func() { _, _ = io.Copy(io.Discard, reader) }()
+					return
+				}
 				w := mirrorPipe(key)
 				go func() {
 					defer w.Close()
