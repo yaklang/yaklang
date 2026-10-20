@@ -49,7 +49,7 @@ func runKnowledgeCaller(focus, native, model) {
         c.SetConfig("MustProcessAttachedData",false)
         c.SetConfig("AllowSyncInitContext",false)
         c.SetConfig("output_file",file.Join(root,"report.md"))
-        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        if model!=nil { c.AiAutoRetry,c.AiTransactionAutoRetry=1,1 }
         return nil
     })]
     if model!=nil { options=append(options,aim.aiCallback(model),aim.configOptions(aiagent.aiCallback(model))) }
@@ -106,6 +106,7 @@ func runKnowledgePlan(native,model,ctx) {
     header,marker="X-Plan-"+randstr(12),"PLAN_FILE_"+randstr(16)
     oldNote,newNote="PLAN_OLD_"+randstr(16),"PLAN_UPDATED_"+randstr(16)
     source=file.Join(root,"项目鉴权资料.txt")
+    workerReport=file.Join(root,"knowledge-report.md")
     file.Save(source,"本项目 API 鉴权请求头是 "+header+"，验证标记是 "+marker+"。")~
     planCase={"root":root,"prefix":prefix,"name":name,"decoy":decoy,"source":source,"header":header,"marker":marker,"old":oldNote,"updated":newNote,"calls":[]}
     file.SaveJson(file.Join(root,"fixtures.json"),{"name":name,"decoy":decoy})~
@@ -120,15 +121,18 @@ func runKnowledgePlan(native,model,ctx) {
     aiknowledge.Add(decoy)~
     aiknowledge.AddEntry(decoy,"对照资料","DECOY_PLAN_MUST_SURVIVE")~
     question=sprintf("请进入 Plan 模式，分三个有依赖关系的任务执行并交付报告。第一步：创建知识库「%s」，将文件「%s」按直接切块方式入库（每块512、并发1），再新增标题「临时维护说明」、正文「%s」的条目。第二步：查询这个库的 API 鉴权请求头及验证标记，读出临时维护条目的 ID，以该 ID 更新正文为「%s」，将库描述更新为「PLAN 验证已更新」，再查询核对更新结果。第三步：删除临时维护条目，查询确认文件中的 API 鉴权资料仍在，然后删除本次创建的库，按名称前缀「%s」列库（最多五个）核对仅余对照库「%s」。最终报告必须包含查到的请求头、验证标记、完整来源库名及实际修改和删除结果。只允许修改「%s」，不修改其他库。每次知识查询必须明确选这个库，最多三条、总预算1024 tokens、每条256 tokens。",name,source,oldNote,newNote,prefix,decoy,name)
+    if model==nil { question+="请保持三个可执行任务，不再细拆。第三个任务包含收尾报告，报告保持简短并保存到「"+workerReport+"」，不要额外创建仅负责报告的任务。" }
     planCase.question=question
     mu=sync.NewMutex()
     events,cards,errors,operations=[],[],[],[]
     approvals,pushes,pops,ends=0,0,0,0
     restricted=false
     started=time.Now().UnixMilli()
-    opts=[aim.focus("coordinator"),aim.sessionID(prefix),aim.workdir(root),aim.attachedKnowledgeBase(name),aim.attachedFileContent("只操作本次指定库，保留对照库。查询必须显式选库并限制结果和 token。"),aim.context(ctx),aim.timeout(450),aim.maxIteration(60),aim.reviewPolicy("yolo"),aim.disableMCPServers(true),aim.onEvent(func(op,e){
+    timeout=450
+    if model==nil { timeout=840 }
+    opts=[aim.focus("coordinator"),aim.sessionID(prefix),aim.workdir(root),aim.attachedKnowledgeBase(name),aim.attachedFileContent("只操作本次指定库，保留对照库。查询必须显式选库并限制结果和 token。"),aim.context(ctx),aim.timeout(timeout),aim.maxIteration(60),aim.reviewPolicy("yolo"),aim.disableMCPServers(true),aim.onEvent(func(op,e){
         manager=op.GetConfig().GetAiToolManager()
-        if !restricted && manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base");restricted=true }
+        if !restricted && manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base","read_file","write_file");restricted=true }
         typ,data=string(e.Type),{}
         if e.IsJson { data=json.loads(string(e.Content)) }
         mu.Lock()
@@ -146,18 +150,24 @@ func runKnowledgePlan(native,model,ctx) {
     }),aim.configOptions(aiagent.functionCallMode(native),func(c){
         c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
         c.ForceManualPlanReview,c.PlanExecTaskConcurrency=true,1
-        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        if model!=nil { c.AiAutoRetry,c.AiTransactionAutoRetry=1,1 }
         c.GetTimeline().SetTimelineBucketByteSize(-1)
         return nil
     })]
     if model!=nil { opts=append(opts,aim.aiCallback(model),aim.speedPriorityAICallback(model),aim.configOptions(aiagent.aiCallback(model))) }
     err=aim.InvokeReAct(question,opts...)
     if err!=nil { errors=append(errors,string(err)) }
-    seen,queries,entryID,hiddenRead,lastListTotal={},0,"",false,-1
+    seen,queries,entryID,hiddenRead,survivedDelete,updatedRead,lastListTotal={},0,"",false,false,false,-1
     for call in planCase.calls {
         manifest=json.loads(string(file.ReadFile(file.Join(call.dir_path,"..","manifest.json"))~))
         params=manifest.params
         if !manifest.success { errors=append(errors,"PLAN tool call failed: "+manifest.tool);continue }
+        if manifest.tool in ["read_file","write_file"] {
+            if manifest.tool=="read_file" && params.file!=source && params.file!=workerReport { errors=append(errors,"PLAN read escaped the owned files") }
+            if manifest.tool=="write_file" && params.file!=workerReport { errors=append(errors,"PLAN write escaped the owned report") }
+            operations=append(operations,{"tool":manifest.tool,"params":params})
+            continue
+        }
         value=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
         operations=append(operations,{"tool":manifest.tool,"params":params,"result":value})
         if manifest.tool=="manage_knowledge_base" {
@@ -177,13 +187,17 @@ func runKnowledgePlan(native,model,ctx) {
             if params.token_limit<256 || params.token_limit>1024 || params.limit<1 || (params.mode!="get" && params.limit>3) || params.per_entry_token_limit<128 || params.per_entry_token_limit>256 || value.used_tokens>value.token_limit || len(value.results)>3 || len(value.results)>params.limit { errors=append(errors,"PLAN query violated budgets") }
             for hit in value.results {
                 if hit.knowledge_base!=name { errors=append(errors,"PLAN query returned decoy knowledge") }
-                if header in hit.content && marker in hit.content { hiddenRead=true }
+                if header in hit.content && marker in hit.content {
+                    hiddenRead=true
+                    if seen["delete_entry"]==true && seen["delete"]!=true { survivedDelete=true }
+                }
+                if hit.entry_id==entryID && hit.content==newNote { updatedRead=true }
             }
         } else { errors=append(errors,"unexpected PLAN tool: "+manifest.tool) }
     }
     for op in ["create","build","add_entry","update","update_entry","delete_entry","delete","list"] { if seen[op]!=true { errors=append(errors,"PLAN did not execute "+op) } }
-    if queries<3 || !hiddenRead || entryID=="" { errors=append(errors,"PLAN did not query actual hidden facts/entries") }
-    if approvals!=1 || pushes!=3 || pops!=3 || ends!=1 || len(cards)!=1 { errors=append(errors,"PLAN approval/worker/completion events mismatch") }
+    if queries<3 || !hiddenRead || !survivedDelete || !updatedRead || entryID=="" { errors=append(errors,"PLAN did not query actual hidden facts/updated entries/surviving file") }
+    if approvals!=1 || pushes<3 || pops!=pushes || (model!=nil && pushes!=3) || ends!=1 || len(cards)!=1 { errors=append(errors,"PLAN approval/worker/completion events mismatch") }
     report=""
     if len(cards)==1 {
         report=string(file.ReadFile(cards[0].report_path)~)
