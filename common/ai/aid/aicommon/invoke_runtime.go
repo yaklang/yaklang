@@ -319,7 +319,7 @@ type LoopPromptAssemblyInput struct {
 
 type LoopPromptAssemblyResult struct {
 	Prompt   string
-	Sections any
+	Sections []*PromptSectionObservation
 }
 
 // ExecutePlanInput carries an approved plan generated outside Coordinator plan loop.

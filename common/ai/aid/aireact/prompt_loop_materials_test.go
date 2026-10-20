@@ -21,13 +21,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 )
 
-func mustLoopPromptSections(t *testing.T, raw any) []*reactloops.PromptSectionObservation {
-	t.Helper()
-	sections, ok := raw.([]*reactloops.PromptSectionObservation)
-	require.True(t, ok, "loop prompt sections should be []*reactloops.PromptSectionObservation")
-	return sections
-}
-
 func freezePromptTestSkill(t *testing.T, react *ReAct, body string) {
 	t.Helper()
 	require.True(t, react.config.GetTimeline().PushSkillFileContent(react.config.AcquireId(), "prompt-test-skill", "SKILL.md", body, aicommon.SkillContentSourceManual, 1, 1, 1))
@@ -287,7 +280,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.NotNil(t, result)
-	sections := mustLoopPromptSections(t, result.Sections)
+	sections := result.Sections
 	require.Len(t, sections, 6)
 
 	require.Equal(t, "section.high_static", sections[0].Key)
@@ -296,15 +289,15 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "section.semi_dynamic_2", sections[3].Key)
 	require.Equal(t, "section.timeline_open", sections[4].Key)
 	require.Equal(t, "section.dynamic", sections[5].Key)
-	require.Equal(t, reactloops.PromptSectionRoleHighStatic, sections[0].Role)
-	require.Equal(t, reactloops.PromptSectionRoleZHHighStatic, sections[0].RoleZh)
-	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Role)
-	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic1, sections[2].Role)
-	require.Equal(t, reactloops.PromptSectionRoleZHSemiDynamic1, sections[2].RoleZh)
-	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Role)
-	require.Equal(t, reactloops.PromptSectionRoleZHSemiDynamic2, sections[3].RoleZh)
-	require.Equal(t, reactloops.PromptSectionRoleTimelineOpen, sections[4].Role)
-	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[5].Role)
+	require.Equal(t, aicommon.PromptSectionRoleHighStatic, sections[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleZHHighStatic, sections[0].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleFrozenBlock, sections[1].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic1, sections[2].Role)
+	require.Equal(t, aicommon.PromptSectionRoleZHSemiDynamic1, sections[2].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic2, sections[3].Role)
+	require.Equal(t, aicommon.PromptSectionRoleZHSemiDynamic2, sections[3].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleTimelineOpen, sections[4].Role)
+	require.Equal(t, aicommon.PromptSectionRoleDynamic, sections[5].Role)
 
 	prompt := result.Prompt
 	traitsIdx := strings.Index(prompt, "<|TRAITS|>")
@@ -401,14 +394,14 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.NotEmpty(t, sections[1].Children)
 	require.Equal(t, "section.frozen_block.tool_inventory", sections[1].Children[0].Key)
 	require.Equal(t, "Tool Inventory", sections[1].Children[0].Label)
-	require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleFrozenBlock, sections[1].Children[0].Role)
 
 	// semi_dynamic_1 段子结构: skills_context。
 	// 关键词: semi_dynamic_1 children, skills_context, Name 去前缀
 	require.Len(t, sections[2].Children, 2)
 	require.Equal(t, "section.semi_dynamic_1.workspace", sections[2].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic_1.skills_context", sections[2].Children[1].Key)
-	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic1, sections[2].Children[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic1, sections[2].Children[0].Role)
 
 	// semi_dynamic_2 段子结构: execution_policy(inline) + task_instruction + schema + output_example
 	// (ExecutionPolicy / TaskInstruction / OutputExample 从 high_static 迁入 semi-dynamic-2,
@@ -421,8 +414,8 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Equal(t, "Schema", sections[3].Children[1].Label)
 	require.Equal(t, "section.semi_dynamic_2.output_example", sections[3].Children[2].Key)
 	require.Equal(t, "Output Example", sections[3].Children[2].Label)
-	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[0].Role)
-	require.Equal(t, reactloops.PromptSectionRoleSemiDynamic2, sections[3].Children[2].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic2, sections[3].Children[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic2, sections[3].Children[2].Role)
 
 	// timeline_open 段子结构 (P1-C3 段内重排后):
 	// User history is part of the Open journal until promotion; there is no
@@ -441,7 +434,7 @@ func TestPromptManager_AssembleLoopPrompt_SectionOrder(t *testing.T) {
 	require.Contains(t, sections[5].Children[1].Content, "loop-owned async execution snapshot")
 	require.Contains(t, prompt[currentTimeIdx:dynamicEndIdx], "loop-owned async execution snapshot")
 	require.NotContains(t, sections[5].Content, "current user query")
-	require.Equal(t, reactloops.PromptSectionRoleDynamic, sections[5].Children[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleDynamic, sections[5].Children[0].Role)
 
 }
 
@@ -491,7 +484,7 @@ func TestPromptManager_RenderLoopSemiDynamic1Section_Order(t *testing.T) {
 	require.Greater(t, userInputIdx, promotedIdx)
 	require.Greater(t, evidenceIdx, userInputIdx)
 	observation := react.promptManager.buildSemiDynamic1Observation(materials, rendered)
-	children := map[string]*reactloops.PromptSectionObservation{}
+	children := map[string]*aicommon.PromptSectionObservation{}
 	for _, child := range observation.Children {
 		children[child.Key] = child
 	}
@@ -618,7 +611,7 @@ func TestPromptManagerSkillInventorySnapshot(t *testing.T) {
 			require.NotContains(t, before.Prompt, "SKILL_BODY_ONLY_AFTER_LOAD")
 			require.NotContains(t, before.SemiDynamic1, "SKILLS_CONTEXT")
 
-			var observation *reactloops.PromptSectionObservation
+			var observation *aicommon.PromptSectionObservation
 			for _, child := range before.Sections[1].Children {
 				if child.Key == "section.frozen_block.skill_inventory" {
 					observation = child
@@ -626,7 +619,7 @@ func TestPromptManagerSkillInventorySnapshot(t *testing.T) {
 			}
 			require.NotNil(t, observation)
 			require.Equal(t, mgr.SkillInventory(), observation.Content)
-			require.Equal(t, reactloops.PromptSectionRoleFrozenBlock, observation.Role)
+			require.Equal(t, aicommon.PromptSectionRoleFrozenBlock, observation.Role)
 
 			added, err := mgr.LoadForcedSkill("inventory-skill")
 			require.NoError(t, err)

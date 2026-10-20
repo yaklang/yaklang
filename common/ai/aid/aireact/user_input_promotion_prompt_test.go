@@ -101,12 +101,12 @@ func TestUserInputHistoryPromptPromotionAcrossModes(t *testing.T) {
 				require.NotContains(t, sealed.Prompt, "USER_QUERY")
 				require.NotContains(t, sealed.Prompt, "UNJOURNALED_HELPER_QUERY")
 				require.NotContains(t, aicommon_testutil.MustExtractAITagBlock(t, sealed.Prompt, "PROMPT_SECTION_dynamic").Body, "CURRENT_QUERY")
-				sections := mustLoopPromptSections(t, sealed.Sections)
+				sections := sealed.Sections
 				found := false
 				for _, child := range sections[2].Children {
 					if child.Key == "section.semi_dynamic_1.user_history" {
 						found = true
-						require.Equal(t, reactloops.PromptSectionRoleSemiDynamic1, child.Role)
+						require.Equal(t, aicommon.PromptSectionRoleSemiDynamic1, child.Role)
 						require.Contains(t, child.Content, original)
 					}
 				}

@@ -347,14 +347,20 @@ func (r *ReActLoop) generateLoopPrompt(
 	memory string,
 	operator *LoopActionHandlerOperator,
 ) (string, error) {
-	return r.generateLoopPromptFromInput(r.captureLoopPromptBuildInput(
+	result, err := r.generateLoopPromptFromInput(r.captureLoopPromptBuildInput(
 		nonce, userInput, frozenUserContext, frozenPartitions, memory, operator,
 	))
+	if err != nil {
+		return "", err
+	}
+	return result.Prompt, nil
 }
 
-func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (string, error) {
+// Assembly returns both the prompt and its section snapshot. It never publishes
+// observations: compression can rebuild and discard this result without a call.
+func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*LoopPromptAssemblyResult, error) {
 	if input == nil {
-		return "", utils.Error("loop prompt build input is nil")
+		return nil, utils.Error("loop prompt build input is nil")
 	}
 	nonce, frozenUserContext := input.nonce, input.frozenUserContext
 	frozenPartitions, memory, operator := input.frozenPartitions, input.memory, input.operator
@@ -375,7 +381,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	if persistentProvider != nil {
 		persistent, err = persistentProvider(r, "") // persistent context not use nonce
 		if err != nil {
-			return "", utils.Wrap(err, "build persistent context failed")
+			return nil, utils.Wrap(err, "build persistent context failed")
 		}
 	}
 
@@ -383,7 +389,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	if !r.functionCallMode && r.outputExampleProvider != nil {
 		outputExample, err = r.outputExampleProvider(r, "") // persistent context not use nonce
 		if err != nil {
-			return "", utils.Wrap(err, "build output example failed")
+			return nil, utils.Wrap(err, "build output example failed")
 		}
 	}
 
@@ -391,7 +397,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	if r.reactiveDataBuilder != nil {
 		reactiveData, err = r.reactiveDataBuilder(r, operator.GetFeedback(), nonce)
 		if err != nil {
-			return "", utils.Wrap(err, "build reactive data failed")
+			return nil, utils.Wrap(err, "build reactive data failed")
 		}
 		if reactiveData != "" {
 			utils.Debug(func() {
@@ -438,7 +444,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	}
 
 	if r.invoker == nil {
-		return "", utils.Error("invoker is nil in ReActLoop.generateLoopPrompt")
+		return nil, utils.Error("invoker is nil in ReActLoop.generateLoopPrompt")
 	}
 
 	// Providers may change the available actions (for example, the last planning
@@ -446,7 +452,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 	// transitions so the emitted schema matches the handlers for this iteration.
 	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	r.lastLoopSchema = schema
 	r.syncPromptOverflowTimelineLimit()
@@ -479,57 +485,14 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (st
 		TodoCheckpoint:           todoCheckpoint,
 	})
 	if err != nil {
-		return "", utils.Wrap(err, "assemble loop prompt failed")
+		return nil, utils.Wrap(err, "assemble loop prompt failed")
 	}
 	if result == nil {
-		return "", utils.Error("assemble loop prompt returned nil result")
+		return nil, utils.Error("assemble loop prompt returned nil result")
 	}
 	r.commitSubAgentPrompt(subAgentRevision)
 	r.subAgentModelSeen = subAgentRevision
-	// observation（UI 上下文成分面板）是旁路需求，不参与 AI call 主流程。
-	// 同步只写入 PromptTokens 供 verification gate 使用，完整 observation
-	// 构建 + BuildStatus + emit 全部异步执行，不阻塞主循环。
-	// verification gate 的 token 门阈值为 10K/20K 量级，粗估 len/4 即可。
-	_promptTokens := len(result.Prompt) / 4
-	r.SetLastPromptToken(_promptTokens)
-
-	// 异步旁路：构建完整 observation + BuildStatus + emit + debug report
-	_asyncSections := getLoopPromptObservationSections(result)
-	_promptCopy := result.Prompt
-	_loopName := r.loopName
-	_nonce := nonce
-	_debugMode := r.isDebugModeEnabled()
-	_emitter := r.emitter
-	r.observationInflight.Add(1)
-	go func() {
-		defer r.observationInflight.Done()
-		defer func() {
-			if rec := recover(); rec != nil {
-				log.Warnf("async observation build panic recovered: %v", rec)
-			}
-		}()
-		observation := BuildPromptObservation(_loopName, _nonce, _promptCopy, _asyncSections)
-		status := observation.BuildStatus(0)
-		r.SetLastPromptObservation(observation)
-		r.SetLastPromptObservationStatus(status)
-		if _emitter != nil {
-			_emitter.EmitPromptProfile(status)
-		}
-		if _debugMode {
-			log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
-		}
-	}()
-	return result.Prompt, nil
-}
-
-func getLoopPromptObservationSections(result *LoopPromptAssemblyResult) []*PromptSectionObservation {
-	if result == nil {
-		return nil
-	}
-	if sections, ok := result.Sections.([]*PromptSectionObservation); ok {
-		return sections
-	}
-	return nil
+	return result, nil
 }
 
 // syncRecentToolParamAITagFields 给当前 react loop 的 aiTagFields 注册
