@@ -15,7 +15,8 @@ func runKnowledgeCaller(focus, native, model) {
     aiknowledge.AddEntry(decoy,"API 鉴权说明","另一个项目使用 X-Decoy-Invalid 和 DECOY_MARKER。")~
     callerCase.focus,callerCase.name,callerCase.header,callerCase.marker,callerCase.root=focus,name,header,marker,root
     callerCase.stage,callerCase.operator=0,nil
-    calls,events,answerParts,actions,loops,cards=[],[],[],[],{},[]
+    calls,events,answerParts,actions,loops,cards=[],[],{},[],{},[]
+    answerOrder=[]
     restricted,skillSeen,schemaSeen=false,false,false
     mu=sync.NewMutex()
     question="请根据附加项目资料，查询本项目 API 的鉴权请求头和验证标记，并给出完整来源库名。只读查询，资料总预算不超过 1024 tokens，最多三条，每条不超过 256 tokens。"
@@ -39,10 +40,14 @@ func runKnowledgeCaller(focus, native, model) {
             last=loop.GetLastValidAction()
             if last!=nil && (len(actions)==0 || actions[len(actions)-1]!=last.ActionType) { actions=append(actions,last.ActionType) }
         }
-        events=append(events,{"type":string(e.Type),"node":string(e.NodeId),"content":string(e.Content),"delta":string(e.StreamDelta)})
+        events=append(events,{"type":string(e.Type),"node":string(e.NodeId),"stream_id":string(e.EventUUID),"content_type":string(e.ContentType),"content":string(e.Content),"delta":string(e.StreamDelta)})
         if string(e.Type)=="tool_call_log_dir" { calls=append(calls,json.loads(string(e.Content))) }
         if string(e.Type)=="report_finish" { cards=append(cards,json.loads(string(e.Content))) }
-        if string(e.Type)=="stream" && string(e.NodeId)=="re-act-loop-answer-payload" { answerParts=append(answerParts,string(e.StreamDelta)) }
+        if string(e.Type)=="stream" && string(e.NodeId)=="re-act-loop-answer-payload" {
+            streamID=string(e.EventUUID)
+            if answerParts[streamID]==nil { answerParts[streamID]=[];answerOrder=append(answerOrder,streamID) }
+            answerParts[streamID]=append(answerParts[streamID],string(e.StreamDelta))
+        }
     }),aim.configOptions(aiagent.functionCallMode(native),func(c){
         c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
         // Keep the selected ordinary/focused caller; do not auto-route attached KBs.
@@ -76,7 +81,9 @@ func runKnowledgeCaller(focus, native, model) {
         for hit in result.results { if hit.knowledge_base!=name { errors=append(errors,"query returned another project") } }
         queries=append(queries,{"mode":params.mode,"token_limit":params.token_limit,"limit":params.limit,"per_entry_token_limit":params.per_entry_token_limit,"used_tokens":result.used_tokens})
     }
-    answer=str.Join(answerParts,"")
+    answers=[]
+    for streamID in answerOrder { answers=append(answers,str.Join(answerParts[streamID],"")) }
+    answer=str.Join(answers,"\n\n")
     reportPath=""
     if focus=="report_generating" {
         if len(cards)!=1 { errors=append(errors,"report finish card missing") } else {
