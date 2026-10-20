@@ -9,6 +9,8 @@ metadata:
 
 适用于用户给出本地 PCAP/PCAPNG 文件，或此前导入得到的 pcapdb DatasetID。Yakit 项目的 HTTP 历史使用 yaklang-system；这里查询的是独立捕获库。
 
+PCAP/PCAPNG 的应用层问题默认走本 Skill 的结构化链路。`read_file` 的二进制提示和本地 shell 中没有 tshark 都不构成手工解析 pcapng 或拼接 TCP 载荷的理由。包级摘要不能替代协议字段、会话、流和证据分析；这些问题应使用 `load_pcapfile + query_pcapdb`。
+
 ## 三个核心工具
 
 先通过 require_tool 加载需要的工具说明，再调用：
@@ -29,6 +31,7 @@ metadata:
 
 - 总包数、消息数及能力：query_type=metadata。protocol_count 是协议消息数，不是协议种类数。
 - 协议、请求路径、响应状态：先 query_type=protocols 取摘要，按实际 protocol 名筛选。协议消息可跨多个包。
+- HTTP 请求响应关联：protocols 摘要中的 response_to 直接指向请求消息 ID，transaction_id 表示同一事务。先配对消息，再用 details 获取字段；不要自行根据相邻行或时间猜测配对。
 - 查具体字段：query_type=fields 发现真实 Path、Types 和 ExampleMessageID；再 details 核对示例值，最后 query_type=protocols 配合 field_path / field_op / field_type / field_value 返回命中的消息。fields 返回字段目录，不能代替消息命中列表。不要猜协议字段名；integer 值用十进制字符串，null 与 missing 分开。
 - IP、端口、捕获时间：query_type=packets。source/destination 有方向；不支持 CIDR 或任意文本 SQL。
 - 连接与重组：query_type=sessions 读取完整性标记；streams 配合 session_id 找方向流。Direction=0 是会话 Source→Destination，1 为反向，不能仅据此认定应用 client/server。
