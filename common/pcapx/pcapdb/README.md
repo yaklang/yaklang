@@ -181,6 +181,8 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | `fieldExists(path)`、`fieldMissing(path)` | 无 | 区分存在、显式 null 和缺失 |
 | `withFields(true)` | false | 仅原生 QueryProtocols 投影完整 Fields/Session；摘要 Page 不接受 |
 
+协议摘要还包含 `TransactionID` 和 `ResponseTo`。对 HTTP 等已建立请求响应关联的协议，响应记录的 `ResponseTo` 是请求消息 ID，可直接用于配对；不要根据相邻行、时间接近或 TCP 流顺序猜测配对。
+
 各选项不是通用 SQL 语言。以下矩阵列出工具可以承诺的筛选语义；对于没有支持的组合，工具应拒绝输入或先做关联查询，不能静默丢弃。
 
 | 操作 | transport / IP / port | protocol / flow / field | session / stream | timeRange | after 含义 |

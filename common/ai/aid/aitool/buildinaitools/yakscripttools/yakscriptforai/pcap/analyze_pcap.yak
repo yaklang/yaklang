@@ -1,13 +1,19 @@
-__DESC__ = "一个强大的PCAP数据包分析工具，支持解析网络数据包、提取流量信息、分析协议内容。适用于网络流量分析、协议逆向、数据包调试等场景。"
-__VERBOSE_NAME__ = "PCAP Analyzer"
-__VERBOSE_NAME_ZH__ = "PCAP分析"
-__KEYWORDS__ = "pcap,packet analysis,网络分析,数据包,流量分析,协议解析,网络调试,packet capture,网络流量,数据包分析"
+__DESC__ = "Legacy packet-level PCAP/PCAPNG summary tool. It reports per-packet gopacket output and coarse packet counters; it does not reliably parse HTTP requests/responses, DNS transactions or application fields. Use load_pcapfile and query_pcapdb for protocol, field, session, stream and evidence questions."
+__VERBOSE_NAME__ = "Legacy PCAP Packet Summary"
+__VERBOSE_NAME_ZH__ = "旧版 PCAP 包级摘要"
+__KEYWORDS__ = "pcap,pcapng,packet summary,tcpdump-like,legacy,兼容,数据包摘要"
 
 __USAGE__ = <<<USAGE_BLOCK
 PCAP Analyzer Tool - Parameter Description for JSON Tool Calls
 
 Required Parameters:
-  file            (string)  PCAP file path to analyze (.pcap or .pcapng).
+  file            (string)  PCAP/PCAPNG path for packet-level summary.
+
+Compatibility tool:
+  This tool emits per-packet gopacket strings and coarse counters. Its HTTP/DNS
+  counters only inspect packet bytes/strings and are not protocol dissectors.
+  For HTTP Host/Method/Path/status, DNS transactions, sessions, streams, field
+  search or evidence IDs, use load_pcapfile followed by query_pcapdb.
 
 Optional Parameters:
   filter          (string)  Optional BPF filter expression used to limit packets.
@@ -39,43 +45,37 @@ arguments 示例：
 USAGE_BLOCK
 
 /*
-PCAP数据包分析工具
+旧版 PCAP 包级摘要工具
 
 功能特点：
-1. 支持多种PCAP文件格式分析
-   - 解析TCP/IP协议栈
-   - 提取HTTP/HTTPS流量
-   - 分析DNS查询和响应
-   - 识别常见网络协议
-
-2. 智能流量分析：
-   - 自动重组TCP流
-   - 提取应用层数据
-   - 统计流量信息
-   - 识别可疑流量模式
+1. 支持 .pcap 和 .pcapng 文件
+2. 输出每个包的 gopacket 字符串，用于包级排障
+3. 统计 TCP/UDP/ICMP 和粗略的 HTTP/DNS 字符串命中
+4. 不提供可靠的 HTTP 请求/响应、DNS 事务或结构化应用字段
+5. 应用层分析使用 load_pcapfile + query_pcapdb
 
 3. 参数说明：
    --file: PCAP文件路径 (必需)
-   --filter: BPF过滤器表达式，用于过滤特定流量 (可选)
+   --filter: BPF 过滤器表达式，用于过滤特定流量 (可选)
    --max-packets: 最大处理数据包数量，默认50000 (可选)
 
 使用示例：
-1. 分析整个PCAP文件：
+1. 输出整个捕获的包级摘要：
    yak analyze_pcap.yak --file capture.pcap
 
-2. 使用BPF过滤器分析特定流量：
+2. 使用 BPF 过滤器查看特定流量：
    yak analyze_pcap.yak --file capture.pcap --filter "tcp port 80"
 
-3. 限制分析包数量：
+3. 限制输出包数量：
    yak analyze_pcap.yak --file capture.pcap --max-packets 1000
 
 注意事项：
-- 支持.pcap和.pcapng格式文件
-- BPF过滤器语法与Wireshark相同
-- 大文件分析可能需要较长时间
-- 统计信息输出到控制台，完整的gopacket信息保存到临时文件
+- 支持 .pcap 和 .pcapng 格式文件
+- BPF 过滤器语法与 Wireshark 相同
+- 大文件分析可能耗时
+- 统计信息输出到控制台，gopacket 详情保存到临时文件
 - 临时文件路径会在分析完成后显示
-- 自动检测TCP、UDP、ICMP等协议类型
+- HTTP/DNS 计数不是 dissector，不能用于字段级结论
 */
 
 yakit.AutoInitYakit()

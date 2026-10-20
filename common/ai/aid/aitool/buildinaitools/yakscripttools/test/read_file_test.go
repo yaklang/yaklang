@@ -229,6 +229,33 @@ func TestReadFile_BinaryFileDetection(t *testing.T) {
 		"binary file should be detected and rejected with a helpful message")
 }
 
+// TestReadFile_PCAPRoutesToStructuredWorkflow ensures a raw PCAP read directs
+// the caller to the protocol-aware workflow instead of the legacy packet tool.
+// The previous hint caused HTTP questions to stop at Layer 4.
+func TestReadFile_PCAPRoutesToStructuredWorkflow(t *testing.T) {
+	tool := getReadFileTool(t)
+	path, err := filepath.Abs(filepath.Join("..", "..", "..", "..", "..", "..", "..", "testdata", "enterprise-traffic-analysis", "http-dga-c2", "capture.pcapng"))
+	assert.NilError(t, err)
+	_, err = os.Stat(path)
+	assert.NilError(t, err, "shared HTTP DGA capture should exist")
+
+	stdout, _ := execReadFileTool(t, tool, aitool.InvokeParams{"file": path})
+	t.Logf("stdout:\n%s", stdout)
+
+	assert.Assert(t, strings.Contains(stdout, "load_pcapfile"),
+		"PCAP guidance must start with load_pcapfile")
+	assert.Assert(t, strings.Contains(stdout, "query_pcapdb"),
+		"PCAP guidance must include query_pcapdb")
+	assert.Assert(t, strings.Contains(stdout, "[Compatibility only]"),
+		"legacy tool must be visibly downgraded")
+	assert.Assert(t, strings.Contains(stdout, "does not provide reliable HTTP"),
+		"legacy tool must disclose its HTTP limitation")
+	workflow := strings.Index(stdout, "load_pcapfile")
+	compatibility := strings.Index(stdout, "[Compatibility only]")
+	assert.Assert(t, workflow >= 0 && compatibility > workflow,
+		"structured workflow must be presented before the legacy tool")
+}
+
 // TestReadFile_SourceFile_NumberedOutput verifies reading a real source file with lines mode
 // returns properly numbered output (regression test against the log observations).
 func TestReadFile_SourceFile_NumberedOutput(t *testing.T) {
