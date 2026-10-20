@@ -463,6 +463,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
 		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
+		info["UserInteractionDisabled"] = !cfg.GetAllowUserInteraction()
 		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
 			info["UICatalog"] = string(utils.Jsonify(catalog))
 		}

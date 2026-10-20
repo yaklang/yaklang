@@ -7,9 +7,38 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/ai/aid/interaction"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestUIQuestionActionRegistrationHonorsSessionPolicy(t *testing.T) {
+	for _, allow := range []bool{true, false} {
+		t.Run(map[bool]string{true: "enabled", false: "disabled"}[allow], func(t *testing.T) {
+			ctx, cancel := context.WithCancel(context.Background())
+			t.Cleanup(cancel)
+			react, err := NewTestReAct(aicommon.WithContext(ctx),
+				aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`),
+				aicommon.WithAllowRequireForUserInteract(allow),
+				aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					t.Error("registering actions must not call a model")
+					return nil, nil
+				}))
+			require.NoError(t, err)
+			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, react)
+			require.NoError(t, err)
+			for _, name := range []string{"request_user_input_async", "request_user_input"} {
+				_, err := loop.GetActionHandler(name)
+				if allow {
+					require.NoError(t, err, name)
+				} else {
+					require.Error(t, err, name)
+				}
+			}
+		})
+	}
+}
 
 func TestUIAnswersSteerRunningTaskAndQueueLateReplies(t *testing.T) {
 	for _, active := range []bool{true, false} {

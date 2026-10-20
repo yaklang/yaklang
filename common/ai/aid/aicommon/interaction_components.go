@@ -10,12 +10,13 @@ import (
 )
 
 type UIArtifact struct {
-	Document    interaction.ComponentDocument `json:"document"`
-	TaskID      string                        `json:"taskId"`
-	Revision    int                           `json:"revision"`
-	Diagnostics []interaction.Diagnostic      `json:"diagnostics,omitempty"`
-	Reported    bool                          `json:"reported,omitempty"`
-	Catalog     interaction.Catalog           `json:"catalog"`
+	Document    interaction.ComponentDocument     `json:"document"`
+	TaskID      string                            `json:"taskId"`
+	Revision    int                               `json:"revision"`
+	Diagnostics []interaction.Diagnostic          `json:"diagnostics,omitempty"`
+	Reported    bool                              `json:"reported,omitempty"`
+	Catalog     interaction.Catalog               `json:"catalog"`
+	Submissions map[string]interaction.Submission `json:"submissions,omitempty"`
 	origin      *Config
 	ctx         context.Context
 }
@@ -26,6 +27,15 @@ func (c *Config) UICatalog() interaction.Catalog {
 	defer s.mu.Unlock()
 	var catalog interaction.Catalog
 	_ = json.Unmarshal(s.client.Catalog, &catalog)
+	if !c.GetAllowUserInteraction() {
+		display := catalog.Components[:0]
+		for _, entry := range catalog.Components {
+			if entry.Name != "ParameterForm" && len(entry.Actions) == 0 && len(entry.Bindings) == 0 {
+				display = append(display, entry)
+			}
+		}
+		catalog.Components = display
+	}
 	return catalog
 }
 
@@ -36,6 +46,13 @@ func (c *Config) RenderUI(ctx context.Context, taskID string, doc interaction.Co
 	catalog := c.UICatalog()
 	if len(catalog.Components) == 0 {
 		return nil, fmt.Errorf("client does not support generated UI; answer in plain text")
+	}
+	if !c.GetAllowUserInteraction() {
+		for _, node := range doc.Nodes {
+			if node.Component == "ParameterForm" || node.Action != nil || len(node.Bindings) > 0 {
+				return nil, fmt.Errorf("user interaction is disabled by session settings; do not substitute render_ui forms for questions")
+			}
+		}
 	}
 	s := c.UISession()
 	s.mu.Lock()
@@ -53,6 +70,9 @@ func (c *Config) RenderUI(ctx context.Context, taskID string, doc interaction.Co
 	}
 	artifact := &UIArtifact{Document: normalized, TaskID: taskID, Revision: revision,
 		Diagnostics: diagnostics, Reported: len(diagnostics) > 0, Catalog: catalog, origin: c, ctx: ctx}
+	if previous := s.artifacts[doc.ID]; previous != nil {
+		artifact.Submissions = previous.Submissions
+	}
 	s.artifacts[doc.ID] = artifact
 	if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
 		return nil, err
@@ -101,6 +121,23 @@ func (c *Config) acceptComponentAnswerLocked(s *UISession, event *ypb.AIInputEve
 	if artifact == nil {
 		return fmt.Errorf("component block does not belong to this session")
 	}
+	if previous, exists := artifact.Submissions[receipt.NodeID]; exists {
+		// A different transport ID must not turn the same form into another user
+		// message. Publish authoritative state even when rejecting edited values.
+		if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
+			return err
+		}
+		before, _ := json.Marshal(previous.Values)
+		after, _ := json.Marshal(receipt.Values)
+		if string(before) != string(after) {
+			return fmt.Errorf("form already submitted; use a new form to provide different values")
+		}
+		c.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": true}, event.SyncID)
+		return nil
+	}
+	if !c.GetAllowUserInteraction() {
+		return fmt.Errorf("user interaction is disabled by session settings")
+	}
 	text, err := artifact.Document.SubmissionText(receipt, artifact.Catalog)
 	if err != nil {
 		return err
@@ -115,7 +152,14 @@ func (c *Config) acceptComponentAnswerLocked(s *UISession, event *ypb.AIInputEve
 	}
 	message := UIUserMessage{ID: receipt.ID, TaskID: taskID, Text: text, Metadata: receipt}
 	s.receipts[receipt.ID] = message
+	if artifact.Submissions == nil {
+		artifact.Submissions = make(map[string]interaction.Submission)
+	}
+	artifact.Submissions[receipt.NodeID] = receipt
 	if _, err := c.EmitJSON("user_message", "user_message", message); err != nil {
+		return err
+	}
+	if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
 		return err
 	}
 	c.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": true}, event.SyncID)
