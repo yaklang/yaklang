@@ -100,7 +100,7 @@ func (c *Config) UIQuestionsEnabled() bool {
 	s := c.UISession()
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.client.Protocol == interaction.Protocol && s.client.Questions
+	return c.GetAllowUserInteraction() && s.client.Protocol == interaction.Protocol && s.client.Questions
 }
 
 func (c *Config) RestoreUIInteractions() error {
@@ -110,6 +110,7 @@ func (c *Config) RestoreUIInteractions() error {
 	if s.restored {
 		return nil
 	}
+	var componentReceipts []interaction.Submission
 	if c.PersistentSessionId != "" && c.GetDB() != nil {
 		events, err := yakit.QueryAIEvent(c.GetDB(), &ypb.AIEventFilter{
 			SessionID: c.PersistentSessionId, EventType: []string{"ui_question", "user_message", "ui_component"},
@@ -133,11 +134,35 @@ func (c *Config) RestoreUIInteractions() error {
 				var message UIUserMessage
 				if json.Unmarshal(e.Content, &message) == nil && message.ID != "" {
 					s.receipts[message.ID] = message
+					if message.Metadata.Source == "component" {
+						componentReceipts = append(componentReceipts, message.Metadata)
+					}
 				}
 			}
 		}
 	}
 	s.restored = true
+	// Receipts from older engines may have no terminal component snapshot.
+	// Replay in journal order so the first accepted answer owns the form.
+	repairedComponents := make(map[string]*UIArtifact)
+	for _, receipt := range componentReceipts {
+		artifact := s.artifacts[receipt.RequestID]
+		if artifact == nil {
+			continue
+		}
+		if artifact.Submissions == nil {
+			artifact.Submissions = make(map[string]interaction.Submission)
+		}
+		if _, exists := artifact.Submissions[receipt.NodeID]; !exists {
+			artifact.Submissions[receipt.NodeID] = receipt
+			repairedComponents[receipt.RequestID] = artifact
+		}
+	}
+	for _, artifact := range repairedComponents {
+		if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
+			return err
+		}
+	}
 	// A durable user message can precede its terminal question snapshot if the
 	// process stops between the two writes. Recover from the accepted receipt.
 	for _, receipt := range s.receipts {
@@ -337,6 +362,13 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 		after, _ := json.Marshal(receipt)
 		if string(before) != string(after) {
 			return fmt.Errorf("submission id was reused with different answers")
+		}
+		if receipt.Source == "component" {
+			if artifact := s.artifacts[receipt.RequestID]; artifact != nil {
+				if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
+					return err
+				}
+			}
 		}
 		c.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": true}, event.SyncID)
 		return nil
