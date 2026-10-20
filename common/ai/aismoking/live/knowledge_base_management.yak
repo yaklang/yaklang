@@ -1,3 +1,84 @@
+// Attachment-only read test with an unrelated decoy base and hidden random facts.
+// AISMOKING_KNOWLEDGE_SELECTION=1 selects this case; AISMOKING_FUNCTION_CALL=0 uses text mode.
+func runAttachedKnowledgeSelectionSmoke() {
+    // Real aim provider and embeddings; fixture data is never included in the question.
+    root = os.Getenv("AISMOKING_OUTPUT")
+    assert root != ""
+    file.MkdirAll(root)~
+    name = "knowledge-selection-项目资料-" + randstr(12)
+    decoy = "knowledge-decoy-另一个项目-" + randstr(12)
+    header = "X-Project-" + randstr(12)
+    marker = "KB_SELECTION_" + randstr(16)
+    file.SaveJson(file.Join(root,"fixtures.json"),{"knowledge_base":name,"decoy_base":decoy})~
+    defer func(){
+        aiknowledge.Delete(name)
+        aiknowledge.Delete(decoy)
+    }()
+    aiknowledge.Add(name)~
+    aiknowledge.Add(decoy)~
+    aiknowledge.AddEntry(name,"API 鉴权说明","本项目 API 的鉴权请求头为 " + header + "。验证标记为 " + marker + "。")~
+    aiknowledge.AddEntry(decoy,"API 鉴权说明","另一个项目的鉴权请求头是 X-Decoy-Invalid，验证标记是 DECOY_MARKER。不得用于当前项目。")~
+    mu=sync.NewMutex()
+    calls,events,answerParts,actions=[],[],[],[]
+    lastActionKey=""
+    restricted,preloaded,reloaded=false,false,false
+    native=os.Getenv("AISMOKING_FUNCTION_CALL")!="0"
+    started=time.Now().UnixMilli()
+    runError=aim.InvokeReAct("请根据我附加的项目资料，查询本项目 API 的鉴权请求头和验证标记。只读查询。请输出三行：鉴权头、验证标记、来源库名。",aim.focus("knowledge_enhance"),aim.attachedKnowledgeBase(name),aim.attachedFileContent("选库偏好：严格使用我附加的项目知识库，不要扩展到其他库或其他项目资料。"),aim.context(context.WithTimeoutSeconds(240)),aim.sessionID("selection-recheck-"+randstr(12)),aim.workdir(root),aim.reviewPolicy("yolo"),aim.maxIteration(12),aim.timeout(210),aim.disableAIForge(true),aim.disableMCPServers(true),aim.onEvent(func(op,e){
+        manager=op.GetConfig().GetAiToolManager()
+        if !restricted && manager!=nil { manager.RestrictToTools("query_knowledge_base");restricted=true }
+        loop=op.GetCurrentLoop()
+        if loop!=nil {
+            skills=loop.GetSkillsContextManager()
+            if skills!=nil && skills.IsSkillLoaded("yaklang-system") && manager!=nil && manager.IsRecentlyUsedTool("query_knowledge_base") { preloaded=true }
+            last=loop.GetLastValidAction()
+            if last!=nil && (last.ActionType=="require_tool" || last.ActionType=="loading_skills") { reloaded=true }
+            if last!=nil {
+                key=string(last.ActionType)
+                if key!=lastActionKey { actions=append(actions,key);lastActionKey=key }
+            }
+        }
+        mu.Lock()
+        events=append(events,{"type":string(e.Type),"node":string(e.NodeId),"content":string(e.Content),"delta":string(e.StreamDelta)})
+        if string(e.Type)=="tool_call_log_dir" { calls=append(calls,json.loads(string(e.Content))) }
+        if string(e.Type)=="stream" && string(e.NodeId)=="re-act-loop-answer-payload" { answerParts=append(answerParts,string(e.StreamDelta)) }
+        mu.Unlock()
+    }),aim.configOptions(aiagent.functionCallMode(native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        return nil
+    }))
+    errors,queries=[],[]
+    if runError!=nil { errors=append(errors,string(runError)) }
+    if !preloaded { errors=append(errors,"system Skill and query schema were not automatically cached") }
+    if reloaded { errors=append(errors,"AI redundantly reloaded an already visible definition") }
+    for call in calls {
+        manifest=json.loads(string(file.ReadFile(file.Join(call.dir_path,"..","manifest.json"))~))
+        params=manifest.params
+        if !manifest.success || manifest.tool!="query_knowledge_base" { errors=append(errors,"unexpected or failed tool call");continue }
+        if params.all { errors=append(errors,"query silently expanded to all knowledge bases") }
+        if params.name!=name && (len(params.names)!=1 || params.names[0]!=name) { errors=append(errors,"query ignored the attachment's exact knowledge base selection") }
+        if params.token_limit<256 || params.token_limit>8192 || params.limit<1 || params.limit>50 || params.per_entry_token_limit>8192 { errors=append(errors,"query budget is outside the public API limits") }
+        result=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
+        if result.used_tokens>result.token_limit { errors=append(errors,"query exceeded the shared token budget") }
+        for hit in result.results { if hit.knowledge_base!=name { errors=append(errors,"query returned another project's content") } }
+        queries=append(queries,{"mode":params.mode,"token_limit":params.token_limit,"limit":params.limit,"per_entry_token_limit":params.per_entry_token_limit,"used_tokens":result.used_tokens})
+    }
+    answer=str.Join(answerParts,"")
+    if len(queries)==0 { errors=append(errors,"AI answered without querying the attached knowledge base") }
+    if !(header in answer) || !(marker in answer) || !(name in answer) || "DECOY_MARKER" in answer { errors=append(errors,"final answer does not reproduce the selected source's header, random marker and library name") }
+    summary={"passed":len(errors)==0,"real_provider":true,"real_embedding":true,"function_call":native,"duration_ms":time.Now().UnixMilli()-started,"knowledge_base":name,"decoy_base":decoy,"tool_calls":len(calls),"preloaded":preloaded,"redundant_load":reloaded,"actions":actions,"queries":queries,"answer":answer,"errors":errors}
+    file.SaveJson(file.Join(root,"summary.json"),summary)~
+    file.SaveJson(file.Join(root,"events.json"),events)~
+    file.SaveJson(file.Join(root,"tool-call-directories.json"),calls)~
+    println(json.dumps(summary))
+    assert len(errors)==0,json.dumps(errors)
+    println("NATURAL_KNOWLEDGE_SELECTION_PASS")
+}
+if os.Getenv("AISMOKING_KNOWLEDGE_SELECTION")=="1" {
+    runAttachedKnowledgeSelectionSmoke()
+    os.Exit(0)
+}
+
 // Explicit local test against configured real AI and embedding services.
 // Run: yak common/ai/aismoking/live/knowledge_base_management.yak
 // Creates only a fresh named fixture base and deletes it on exit. No AI or

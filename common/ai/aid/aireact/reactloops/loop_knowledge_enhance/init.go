@@ -89,13 +89,19 @@ func initKnowledgeTask(r aicommon.AIInvokeRuntime) func(*reactloops.ReActLoop, a
 				}
 			}
 		}
+		var loaded []string
 		for _, result := range loop.LoadToolSchemas(task.GetContext(), names) {
 			if result["status"] == "error" {
 				op.Failed(fmt.Errorf("load knowledge tool %s: %s", result["tool_name"], result["detail"]))
 				return
 			}
+			if result["status"] == "schema_loaded" {
+				loaded = append(loaded, result["tool_name"])
+			}
 		}
-		r.AddToTimeline("knowledge_focus", "The system Skill and enabled knowledge tool definitions were automatically loaded using the ordinary context cache. Reuse visible definitions; reload evicted definitions with loading_skills or require_tool. Loading definitions does not execute a query. Preserve attached knowledge base preferences.")
+		r.AddToTimeline("knowledge_focus", fmt.Sprintf(`知识增强初始化已完成：yaklang-system Skill 和以下工具的完整参数 Schema 已加载并可见：%v。直接按可见 Schema 调用工具，不要重复 loading_skills 或 require_tool；仅在定义已被普通缓存淘汰、上下文确实缺失时重新加载。
+附加资源中的库名必须原样使用完整值，不得截取名称片段或自行替换。按用户附加资源和选库偏好限定范围，不得静默扩大为 all=true。
+用户未指定查询预算时，优先使用 token_limit=1024、limit=3、per_entry_token_limit=256，再按实际结果分页或续读。加载定义尚未执行查询，只读任务不执行写入。`, loaded))
 		loop_default.InitTask(r)(loop, task, op)
 	}
 }
