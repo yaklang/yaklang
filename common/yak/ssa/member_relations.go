@@ -163,3 +163,19 @@ func memberKeySignature(key Value) string {
 	}
 	return fmt.Sprintf("id:%d", key.GetId())
 }
+
+// BindMemberRelation records one object/member relation in both directions
+// using a single key identity. The forward and reverse relations describe the
+// same relationship, so they must not be built from separately emitted keys
+// that merely share a string. Repeating the bind for a relation that already
+// exists is a no-op, so a binding phase can be re-run without duplicating it.
+func BindMemberRelation(object, member Value, key Value) {
+	if utils.IsNil(object) || utils.IsNil(member) || utils.IsNil(key) {
+		return
+	}
+	if bound, ok := GetLatestMemberByKeyString(object, GetKeyString(key)); ok && !utils.IsNil(bound) && bound.GetId() == member.GetId() {
+		return
+	}
+	object.AddMember(key, member)
+	member.AddObjectKeyPair(object, key)
+}
