@@ -2,8 +2,10 @@ package aireact
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/segmentio/ksuid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -51,6 +53,30 @@ func installTaskInlineAttachmentProvider(manager *aicommon.ContextProviderManage
 }
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
+	if event.GetUserInteraction() != "" {
+		err := r.config.AcceptQuestionAnswer(event, func(text, taskID string, origin *aicommon.Config) error {
+			if origin != nil && r.getProcessingRuntimeTask() != nil {
+				if _, err := origin.AppendUserInputHistory(text, time.Now()); err != nil {
+					return err
+				}
+				r.SaveTimeline()
+				// Existing coordinator wakeup hooks consume this after admission.
+				event.SyncType = aicommon.SYNC_TYPE_USER_INTERVENTION
+				payload, _ := json.Marshal(map[string]string{"content": text})
+				event.SyncJsonInput = string(payload)
+				return nil
+			}
+			return r.enqueueReTask(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: text})
+		})
+		if err != nil {
+			var receipt struct {
+				ID string `json:"id"`
+			}
+			_ = json.Unmarshal([]byte(event.UserInteraction), &receipt)
+			r.config.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": false, "error": err.Error()}, event.SyncID)
+		}
+		return err
+	}
 	if r.pureInvokerMode {
 		return utils.Errorf("use in prue invoker mode, cannot handle free input")
 	}

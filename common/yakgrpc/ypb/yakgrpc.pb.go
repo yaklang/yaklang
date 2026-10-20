@@ -10529,9 +10529,11 @@ type AIInputEvent struct {
 	FocusModeLoop string `protobuf:"bytes,16,opt,name=FocusModeLoop,proto3" json:"FocusModeLoop,omitempty"`
 	// 配置热补丁目标任务的逻辑 ID (AIStatefulTask.GetId)。
 	// 非空时，仅当前正在执行且 ID 匹配的任务会应用该热补丁（主要用于能力热更新）。
-	TaskId        string `protobuf:"bytes,17,opt,name=TaskId,proto3" json:"TaskId,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	TaskId string `protobuf:"bytes,17,opt,name=TaskId,proto3" json:"TaskId,omitempty"`
+	// JSON metadata for a question/form submission. FreeInput remains human-readable.
+	UserInteraction string `protobuf:"bytes,18,opt,name=UserInteraction,proto3" json:"UserInteraction,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *AIInputEvent) Reset() {
@@ -10679,6 +10681,13 @@ func (x *AIInputEvent) GetFocusModeLoop() string {
 func (x *AIInputEvent) GetTaskId() string {
 	if x != nil {
 		return x.TaskId
+	}
+	return ""
+}
+
+func (x *AIInputEvent) GetUserInteraction() string {
+	if x != nil {
+		return x.UserInteraction
 	}
 	return ""
 }
@@ -11056,7 +11065,9 @@ type AIStartParams struct {
 	// Session-local opt-in; a globally enabled single-model mode still wins.
 	SingleModelMode bool `protobuf:"varint,50,opt,name=SingleModelMode,proto3" json:"SingleModelMode,omitempty"`
 	// Opt-in complete model HTTP diagnostics. Includes credentials/prompts, stored locally and exported with AI logs.
-	NetworkDebug  *bool `protobuf:"varint,52,opt,name=NetworkDebug,proto3,oneof" json:"NetworkDebug,omitempty"`
+	NetworkDebug *bool `protobuf:"varint,52,opt,name=NetworkDebug,proto3,oneof" json:"NetworkDebug,omitempty"`
+	// Connection-local, build-generated component catalog and interaction capabilities.
+	ClientUI      string `protobuf:"bytes,53,opt,name=ClientUI,proto3" json:"ClientUI,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -11432,6 +11443,13 @@ func (x *AIStartParams) GetNetworkDebug() bool {
 		return *x.NetworkDebug
 	}
 	return false
+}
+
+func (x *AIStartParams) GetClientUI() string {
+	if x != nil {
+		return x.ClientUI
+	}
+	return ""
 }
 
 type AIExecutionStrategy struct {
@@ -80002,7 +80020,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\tSessionId\x18\x1a \x01(\tR\tSessionId\"&\n" +
 	"\x04I18n\x12\x0e\n" +
 	"\x02Zh\x18\x01 \x01(\tR\x02Zh\x12\x0e\n" +
-	"\x02En\x18\x02 \x01(\tR\x02En\"\xab\x05\n" +
+	"\x02En\x18\x02 \x01(\tR\x02En\"\xd5\x05\n" +
 	"\fAIInputEvent\x12\x18\n" +
 	"\aIsStart\x18\x01 \x01(\bR\aIsStart\x12*\n" +
 	"\x10IsConfigHotpatch\x18\b \x01(\bR\x10IsConfigHotpatch\x12\"\n" +
@@ -80021,7 +80039,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x10AttachedFilePath\x18\x0e \x03(\tR\x10AttachedFilePath\x12M\n" +
 	"\x14AttachedResourceInfo\x18\x0f \x03(\v2\x19.ypb.AttachedResourceInfoR\x14AttachedResourceInfo\x12$\n" +
 	"\rFocusModeLoop\x18\x10 \x01(\tR\rFocusModeLoop\x12\x16\n" +
-	"\x06TaskId\x18\x11 \x01(\tR\x06TaskId\"R\n" +
+	"\x06TaskId\x18\x11 \x01(\tR\x06TaskId\x12(\n" +
+	"\x0fUserInteraction\x18\x12 \x01(\tR\x0fUserInteraction\"R\n" +
 	"\x14AttachedResourceInfo\x12\x10\n" +
 	"\x03Key\x18\x01 \x01(\tR\x03Key\x12\x12\n" +
 	"\x04Type\x18\x02 \x01(\tR\x04Type\x12\x14\n" +
@@ -80040,7 +80059,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x03Url\x18\x03 \x01(\tR\x03Url\"=\n" +
 	"\x13AIEnabledCapability\x12\x12\n" +
 	"\x04Name\x18\x01 \x01(\tR\x04Name\x12\x12\n" +
-	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xdb\x12\n" +
+	"\x04Type\x18\x02 \x01(\tR\x04Type\"\xf7\x12\n" +
 	"\rAIStartParams\x12$\n" +
 	"\rCoordinatorId\x18\x11 \x01(\tR\rCoordinatorId\x12\x1a\n" +
 	"\bSequence\x18\x12 \x01(\x03R\bSequence\x12.\n" +
@@ -80095,7 +80114,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\bStrategy\x180 \x01(\v2\x18.ypb.AIExecutionStrategyR\bStrategy\x120\n" +
 	"\x13DisableMemoryTriage\x181 \x01(\bR\x13DisableMemoryTriage\x12(\n" +
 	"\x0fSingleModelMode\x182 \x01(\bR\x0fSingleModelMode\x12'\n" +
-	"\fNetworkDebug\x184 \x01(\bH\x00R\fNetworkDebug\x88\x01\x01B\x0f\n" +
+	"\fNetworkDebug\x184 \x01(\bH\x00R\fNetworkDebug\x88\x01\x01\x12\x1a\n" +
+	"\bClientUI\x185 \x01(\tR\bClientUIB\x0f\n" +
 	"\r_NetworkDebug\"\xa5\x02\n" +
 	"\x13AIExecutionStrategy\x12*\n" +
 	"\x10EnableMultiAgent\x18\x01 \x01(\bR\x10EnableMultiAgent\x12&\n" +
