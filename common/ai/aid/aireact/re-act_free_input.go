@@ -12,6 +12,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -54,19 +55,31 @@ func installTaskInlineAttachmentProvider(manager *aicommon.ContextProviderManage
 
 func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 	if event.GetUserInteraction() != "" {
-		err := r.config.AcceptQuestionAnswer(event, func(text, taskID string, origin *aicommon.Config) error {
-			if origin != nil && r.getProcessingRuntimeTask() != nil {
-				if _, err := origin.AppendUserInputHistory(text, time.Now()); err != nil {
-					return err
+		err := r.config.AcceptQuestionAnswer(event, func(text, taskID string, origin *aicommon.Config) (string, error) {
+			if origin != nil {
+				stamp := time.Now()
+				history, err := r.config.AppendUserInputHistory(text, stamp)
+				if err != nil {
+					return "", err
+				}
+				if origin.GetSessionPromptState() != r.config.GetSessionPromptState() {
+					if _, err := origin.AppendUserInputHistory(text, stamp); err != nil {
+						return "", err
+					}
+				}
+				if r.config.PersistentSessionId != "" && r.config.GetDB() != nil {
+					if err := yakit.UpdateAIAgentRuntimeUserInput(r.config.GetDB(), r.config.GetRuntimeId(), history); err != nil {
+						log.Warnf("persist UI reply history failed: %v", err)
+					}
 				}
 				r.SaveTimeline()
 				// Existing coordinator wakeup hooks consume this after admission.
 				event.SyncType = aicommon.SYNC_TYPE_USER_INTERVENTION
 				payload, _ := json.Marshal(map[string]string{"content": text})
 				event.SyncJsonInput = string(payload)
-				return nil
+				return "", nil
 			}
-			return r.enqueueReTask(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: text})
+			return r.enqueueReTaskWithID(&ypb.AIInputEvent{IsFreeInput: true, FreeInput: text})
 		})
 		if err != nil {
 			var receipt struct {
@@ -245,9 +258,14 @@ func sanitizeForTaskId(input string) string {
 
 // enqueueReTask 将输入事件转换为任务并添加到队列
 func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
+	_, err := r.enqueueReTaskWithID(event)
+	return err
+}
+
+func (r *ReAct) enqueueReTaskWithID(event *ypb.AIInputEvent) (string, error) {
 	task := r.buildReTaskFromEvent(event)
 	if task == nil {
-		return fmt.Errorf("failed to build task from event")
+		return "", fmt.Errorf("failed to build task from event")
 	}
 	log.Infof("Task enqueue started processing: %s", task.GetId())
 	// 任务不相关，进入排队状态
@@ -256,12 +274,12 @@ func (r *ReAct) enqueueReTask(event *ypb.AIInputEvent) error {
 	err := r.taskQueue.Append(task)
 	if err != nil {
 		log.Errorf("Failed to add task to queue: %v", err)
-		return fmt.Errorf("failed to enqueue task: %v", err)
+		return "", fmt.Errorf("failed to enqueue task: %v", err)
 	}
 	if r.config.DebugEvent {
 		log.Infof("Task enqueued: %s with input: %s", task.GetId(), event.FreeInput)
 	}
-	return nil
+	return task.GetId(), nil
 }
 
 func (r *ReAct) buildReTaskFromEvent(event *ypb.AIInputEvent) aicommon.AIStatefulTask {

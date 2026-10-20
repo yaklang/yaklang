@@ -463,6 +463,9 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
 		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
+		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
+			info["UICatalog"] = string(utils.Jsonify(catalog))
+		}
 	}
 
 	allowPlanRaw, ok := info["AllowPlan"]
@@ -898,6 +901,14 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	}
 
 	// Register skills actions conditionally
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok && len(cfg.UICatalog().Components) > 0 {
+		action, err := requireRegisteredLoopAction("render_ui", "client UI catalog available")
+		if err != nil {
+			return nil, err
+		}
+		r.actions.Set(action.ActionType, action)
+	}
+
 	if r.skillsContextManager != nil {
 		if r.allowSkillLoading == nil || r.allowSkillLoading() {
 			loadSkill, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, "registered skills are available")

@@ -39,12 +39,12 @@ func TestUIQuestionLifecycle(t *testing.T) {
 		Answers: []interaction.Answer{{QuestionID: "scope", Selected: []string{"b"}, Text: "只读"}}}
 	raw, _ := json.Marshal(receipt)
 	event := &ypb.AIInputEvent{UserInteraction: string(raw)}
-	deliver := func(text, taskID string, origin *Config) error {
+	deliver := func(text, taskID string, origin *Config) (string, error) {
 		deliveries.Add(1)
 		require.Contains(t, text, "前后端；只读")
 		require.Equal(t, "task", taskID)
 		require.Same(t, c, origin)
-		return nil
+		return "", nil
 	}
 	require.NoError(t, c.AcceptQuestionAnswer(event, deliver))
 	require.NoError(t, c.AcceptQuestionAnswer(event, deliver))
@@ -70,7 +70,7 @@ func TestUIBlockingQuestionCancellationAndAnswer(t *testing.T) {
 			} else {
 				raw, _ := json.Marshal(interaction.Submission{ID: "answer", Source: "questionnaire", RequestID: q.ID,
 					Answers: []interaction.Answer{{QuestionID: "scope", Text: "自述答案"}}})
-				require.NoError(t, c.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(raw)}, func(string, string, *Config) error { return nil }))
+				require.NoError(t, c.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(raw)}, func(string, string, *Config) (string, error) { return "", nil }))
 			}
 			select {
 			case err := <-done:
@@ -94,5 +94,5 @@ func TestUIExpiredQuestionCanBeAnswered(t *testing.T) {
 	require.NoError(t, c.UpdateQuestion(id, "expire"))
 	raw, _ := json.Marshal(interaction.Submission{ID: "late", Source: "questionnaire", RequestID: id,
 		Answers: []interaction.Answer{{QuestionID: "scope", Selected: []string{"a"}}}})
-	require.NoError(t, c.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(raw)}, func(string, string, *Config) error { return nil }))
+	require.NoError(t, c.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(raw)}, func(string, string, *Config) (string, error) { return "", nil }))
 }

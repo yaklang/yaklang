@@ -34,23 +34,25 @@ type uiQuestion struct {
 
 type UIUserMessage struct {
 	ID       string                 `json:"id"`
+	TaskID   string                 `json:"taskId,omitempty"` // Set only when the reply starts a new queue task.
 	Text     string                 `json:"text"`
 	Metadata interaction.Submission `json:"metadata"`
 }
 
 // UISession is shared by the parent and its workers, but never across sessions.
 // Durable snapshots use the existing event journal and are replayable by old
-// clients through the ordinary text fallback emitted beside each UI artifact.
+// clients through the ordinary text fallback projected at the delivery boundary.
 type UISession struct {
 	mu        sync.Mutex
 	client    UIClientCapabilities
 	questions map[string]*uiQuestion
 	receipts  map[string]UIUserMessage
 	restored  bool
+	artifacts map[string]*UIArtifact
 }
 
 func newUISession() *UISession {
-	return &UISession{questions: map[string]*uiQuestion{}, receipts: map[string]UIUserMessage{}}
+	return &UISession{questions: map[string]*uiQuestion{}, receipts: map[string]UIUserMessage{}, artifacts: map[string]*UIArtifact{}}
 }
 
 func (c *Config) UISession() *UISession {
@@ -74,7 +76,16 @@ func WithClientUI(raw string) ConfigOption {
 				return fmt.Errorf("invalid client UI capabilities: %w", err)
 			}
 			if client.Protocol != interaction.Protocol {
-				return fmt.Errorf("unsupported client UI protocol %q", client.Protocol)
+				client = UIClientCapabilities{} // Unknown protocol negotiates plain text.
+			}
+			if len(client.Catalog) > 0 && string(client.Catalog) != "null" {
+				var catalog interaction.Catalog
+				if err := json.Unmarshal(client.Catalog, &catalog); err != nil {
+					return err
+				}
+				if err := catalog.Validate(); err != nil {
+					return err
+				}
 			}
 		}
 		s := c.UISession()
@@ -101,7 +112,7 @@ func (c *Config) RestoreUIInteractions() error {
 	}
 	if c.PersistentSessionId != "" && c.GetDB() != nil {
 		events, err := yakit.QueryAIEvent(c.GetDB(), &ypb.AIEventFilter{
-			SessionID: c.PersistentSessionId, EventType: []string{"ui_question", "user_message"},
+			SessionID: c.PersistentSessionId, EventType: []string{"ui_question", "user_message", "ui_component"},
 		})
 		if err != nil {
 			return err
@@ -113,6 +124,11 @@ func (c *Config) RestoreUIInteractions() error {
 				if json.Unmarshal(e.Content, &q) == nil && q.ID != "" {
 					s.questions[q.ID] = &uiQuestion{Request: q}
 				}
+			} else if e.Type == "ui_component" {
+				var artifact UIArtifact
+				if json.Unmarshal(e.Content, &artifact) == nil && artifact.Document.ID != "" {
+					s.artifacts[artifact.Document.ID] = &artifact
+				}
 			} else {
 				var message UIUserMessage
 				if json.Unmarshal(e.Content, &message) == nil && message.ID != "" {
@@ -122,6 +138,20 @@ func (c *Config) RestoreUIInteractions() error {
 		}
 	}
 	s.restored = true
+	// A durable user message can precede its terminal question snapshot if the
+	// process stops between the two writes. Recover from the accepted receipt.
+	for _, receipt := range s.receipts {
+		if receipt.Metadata.Source != "questionnaire" {
+			continue
+		}
+		if q := s.questions[receipt.Metadata.RequestID]; q != nil && q.Request.State != "submitted" {
+			q.Request.State, q.Request.Touched, q.Request.Deadline = "submitted", true, 0
+			q.answer = receipt.Text
+			if err := c.emitQuestion(q); err != nil {
+				return err
+			}
+		}
+	}
 	for _, q := range s.questions {
 		if q.Request.State == "pending" && q.Request.Deadline > 0 && !q.Request.Touched {
 			id := q.Request.ID
@@ -224,6 +254,9 @@ func (c *Config) UpdateQuestion(id, operation string) error {
 	case "touch":
 		q.Request.Touched = true
 		q.Request.Deadline = 0
+		if q.Request.State == "expired" {
+			q.Request.State = "pending"
+		}
 		if q.timer != nil {
 			q.timer.Stop()
 		}
@@ -253,13 +286,21 @@ func (c *Config) UpdateQuestion(id, operation string) error {
 }
 
 func (c *Config) HandleUIControl(event *ypb.AIInputEvent) error {
+	if len(event.SyncJsonInput) > 16*1024 {
+		return fmt.Errorf("UI control exceeds 16 KiB")
+	}
 	var control struct {
-		RequestID string `json:"requestId"`
-		Operation string `json:"operation"`
+		RequestID   string                   `json:"requestId"`
+		Operation   string                   `json:"operation"`
+		Diagnostics []interaction.Diagnostic `json:"diagnostics"`
 	}
 	err := json.Unmarshal([]byte(event.SyncJsonInput), &control)
 	if err == nil {
-		err = c.UpdateQuestion(control.RequestID, control.Operation)
+		if control.Operation == "diagnostics" {
+			err = c.ReportUIDiagnostics(control.RequestID, control.Diagnostics)
+		} else {
+			err = c.UpdateQuestion(control.RequestID, control.Operation)
+		}
 	}
 	payload := map[string]any{"requestId": control.RequestID, "operation": control.Operation, "ok": err == nil}
 	if err != nil {
@@ -271,7 +312,7 @@ func (c *Config) HandleUIControl(event *ypb.AIInputEvent) error {
 
 // AcceptQuestionAnswer owns deduplication, validation, journaling and wakeup.
 // deliver chooses current-task steering or new-task admission at the server.
-func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(string, string, *Config) error) error {
+func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(string, string, *Config) (string, error)) error {
 	if err := c.RestoreUIInteractions(); err != nil {
 		return err
 	}
@@ -282,18 +323,26 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 	if err := json.Unmarshal([]byte(event.UserInteraction), &receipt); err != nil {
 		return err
 	}
-	if strings.TrimSpace(receipt.ID) == "" || len(receipt.ID) > 128 || receipt.Source != "questionnaire" {
+	if strings.TrimSpace(receipt.ID) == "" || len(receipt.ID) > 128 || (receipt.Source != "questionnaire" && receipt.Source != "component") {
 		return fmt.Errorf("invalid submission id or source")
 	}
 	s := c.UISession()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if previous, exists := s.receipts[receipt.ID]; exists {
-		if previous.Metadata.RequestID != receipt.RequestID {
+		if previous.Metadata.RequestID != receipt.RequestID || previous.Metadata.Source != receipt.Source || previous.Metadata.NodeID != receipt.NodeID {
 			return fmt.Errorf("submission id already belongs to another request")
+		}
+		before, _ := json.Marshal(previous.Metadata)
+		after, _ := json.Marshal(receipt)
+		if string(before) != string(after) {
+			return fmt.Errorf("submission id was reused with different answers")
 		}
 		c.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": true}, event.SyncID)
 		return nil
+	}
+	if receipt.Source == "component" {
+		return c.acceptComponentAnswerLocked(s, event, receipt, deliver)
 	}
 	q := s.questions[receipt.RequestID]
 	if q == nil {
@@ -311,10 +360,11 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 		if q.ctx == nil || q.ctx.Err() != nil {
 			origin = nil
 		}
-		if err := deliver(text, q.Request.TaskID, origin); err != nil {
+		taskID, err := deliver(text, q.Request.TaskID, origin)
+		if err != nil {
 			return err
 		}
-		message := UIUserMessage{ID: receipt.ID, Text: text, Metadata: receipt}
+		message := UIUserMessage{ID: receipt.ID, TaskID: taskID, Text: text, Metadata: receipt}
 		// Admission succeeded: retries in this runtime must never deliver twice,
 		// even if the transport disconnects while publishing the receipt.
 		s.receipts[receipt.ID] = message
