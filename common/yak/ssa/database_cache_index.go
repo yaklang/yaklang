@@ -3,8 +3,10 @@ package ssa
 import (
 	"github.com/yaklang/gorm"
 
-	"github.com/yaklang/yaklang/common/utils"
 	"sync"
+	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/utils"
 
 	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/utils/memedit"
@@ -28,6 +30,11 @@ type indexStore struct {
 	residentKeys *utils.SafeMapWithKey[residentIndexKey, struct{}]
 	residentMu   sync.Mutex
 	indexSaved   *utils.SafeMapWithKey[indexRelationshipKey, struct{}]
+	// maxFlushedValueID is the largest instruction id successfully written by
+	// the index or offset saver. settledBefore never moves past that id:
+	// an allocated id that has not reached the saver must stay writable.
+	maxFlushedValueID atomic.Int64
+	settledBefore     atomic.Int64
 
 	indexSaver  *dbcache.Save[*ssadb.IrIndex]
 	offsetSaver *dbcache.Save[*ssadb.IrOffset]
@@ -65,7 +72,15 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 				return ssadb.SaveIrIndexBatch(tx, indices)
 			})
 		}
-		return store.diagnosticsTrackErr("ssa.Database.SaveIrIndexBatch", saveStep)
+		err := store.diagnosticsTrackErr("ssa.Database.SaveIrIndexBatch", saveStep)
+		if err == nil {
+			for _, row := range indices {
+				if row != nil {
+					store.noteFlushedValueID(row.ValueID)
+				}
+			}
+		}
+		return err
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
@@ -77,7 +92,15 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 				return ssadb.SaveIrOffsetBatch(tx, offsets)
 			})
 		}
-		return store.diagnosticsTrackErr("ssa.Database.SaveIrOffsetBatch", saveStep)
+		err := store.diagnosticsTrackErr("ssa.Database.SaveIrOffsetBatch", saveStep)
+		if err == nil {
+			for _, row := range offsets {
+				if row != nil {
+					store.noteFlushedValueID(row.ValueID)
+				}
+			}
+		}
+		return err
 	},
 		dbcache.WithSaveSize(saveSize),
 		dbcache.WithSaveTimeout(saveTime),
@@ -104,9 +127,9 @@ func (s *indexStore) Close() error {
 	return utils.JoinErrors(errs...)
 }
 
-func (s *indexStore) Flush() error {
+func (s *indexStore) Flush() (int64, error) {
 	if s == nil {
-		return nil
+		return 0, nil
 	}
 	var errs []error
 	if s.indexSaver != nil {
@@ -119,7 +142,32 @@ func (s *indexStore) Flush() error {
 			errs = append(errs, err)
 		}
 	}
-	return utils.JoinErrors(errs...)
+	return s.maxFlushedValueID.Load(), utils.JoinErrors(errs...)
+}
+
+func (s *indexStore) noteFlushedValueID(id int64) {
+	if s == nil || id <= 0 {
+		return
+	}
+	for {
+		old := s.maxFlushedValueID.Load()
+		if id <= old || s.maxFlushedValueID.CompareAndSwap(old, id) {
+			return
+		}
+	}
+}
+
+// flushedWatermark is exclusive. IDs below it were included in a successful
+// saver batch; IDs at or above it were not.
+func (s *indexStore) flushedWatermark() int64 {
+	if s == nil {
+		return 0
+	}
+	maxID := s.maxFlushedValueID.Load()
+	if maxID <= 0 {
+		return 0
+	}
+	return maxID + 1
 }
 
 func (s *indexStore) AddInstructionOffsets(inst Instruction) {
@@ -184,16 +232,114 @@ func (s *indexStore) AddClassInstance(name string, inst Instruction) {
 }
 
 func (s *indexStore) saveIndexDedup(index *ssadb.IrIndex) {
-	if s != nil && s.indexSaver != nil && index != nil {
-		fresh := false
-		s.indexSaved.Update(indexRelationship(index), func(_ struct{}, exists bool) (struct{}, bool) {
-			fresh = !exists
-			return struct{}{}, true
-		})
-		if fresh {
-			s.indexSaver.Save(index)
+	if s == nil || s.indexSaver == nil || index == nil || s.instructionSettled(index.ProgramName, index.ValueID) {
+		return
+	}
+	fresh := false
+	s.indexSaved.Update(indexRelationship(index), func(_ struct{}, exists bool) (struct{}, bool) {
+		fresh = !exists
+		return struct{}{}, true
+	})
+	if fresh {
+		s.indexSaver.Save(index)
+	}
+}
+
+func (s *indexStore) programLabel() string {
+	if s == nil || s.program == nil {
+		return ""
+	}
+	if app := s.program.GetApplication(); app != nil && app.Name != "" {
+		return app.Name
+	}
+	return s.program.Name
+}
+
+func (s *indexStore) instructionSettled(programName string, id int64) bool {
+	if s == nil || id <= 0 || programName == "" || programName != s.programLabel() {
+		return false
+	}
+	return id < s.settledBefore.Load()
+}
+
+// ReleaseSettled drops dedup state for instruction IDs below beforeID.
+// The three sets are index relationships, offset locations, and resident
+// name/id membership. Lookup slices stay in place. A later enqueue of a
+// released instruction is ignored, so the unique indexes are not asked to
+// reject a row that was already flushed.
+func (s *indexStore) ReleaseSettled(programName string, beforeID int64) int {
+	if s == nil || programName == "" || beforeID <= 0 || programName != s.programLabel() {
+		return 0
+	}
+	// Callers may pass the next allocated id. Only a successful saver batch
+	// moves the watermark, so a higher allocated id can still be indexed.
+	if flushed := s.flushedWatermark(); flushed == 0 {
+		return 0
+	} else if beforeID > flushed {
+		beforeID = flushed
+	}
+	for {
+		old := s.settledBefore.Load()
+		if beforeID <= old || s.settledBefore.CompareAndSwap(old, beforeID) {
+			break
 		}
 	}
+	watermark := s.settledBefore.Load()
+	released := 0
+	if s.indexSaved != nil {
+		var keys []indexRelationshipKey
+		s.indexSaved.ForEach(func(key indexRelationshipKey, _ struct{}) bool {
+			if key.program == programName && key.value > 0 && key.value < watermark {
+				keys = append(keys, key)
+			}
+			return true
+		})
+		for _, key := range keys {
+			s.indexSaved.Delete(key)
+		}
+		released += len(keys)
+	}
+	if s.offsetSaved != nil {
+		var keys []offsetLocationKey
+		s.offsetSaved.ForEach(func(key offsetLocationKey, _ struct{}) bool {
+			if key.value > 0 && key.value < watermark {
+				keys = append(keys, key)
+			}
+			return true
+		})
+		for _, key := range keys {
+			s.offsetSaved.Delete(key)
+		}
+		released += len(keys)
+	}
+	if s.residentKeys != nil {
+		var keys []residentIndexKey
+		s.residentKeys.ForEach(func(key residentIndexKey, _ struct{}) bool {
+			if key.id > 0 && key.id < watermark {
+				keys = append(keys, key)
+			}
+			return true
+		})
+		for _, key := range keys {
+			s.residentKeys.Delete(key)
+		}
+		released += len(keys)
+	}
+	return released
+}
+
+// ReleaseSettledIndexes is the batch barrier hook. The watermark is the
+// highest value id actually written by the index and offset savers, not the
+// next instruction id.
+func (prog *Program) ReleaseSettledIndexes() int {
+	if batchReleaseDisabledForTest.Load() || prog == nil || prog.Cache == nil || prog.Cache.indexes == nil {
+		return 0
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	return prog.Cache.indexes.ReleaseSettled(app.GetProgramName(), prog.Cache.indexes.flushedWatermark())
 }
 
 // A key owns scalar IDs, never pointers into the GORM row that the saver edits.
@@ -231,7 +377,7 @@ type residentIndexKey struct {
 }
 
 func (s *indexStore) appendIndex(index *utils.SafeMapWithKey[string, []int64], name string, id int64) {
-	if id <= 0 {
+	if s == nil || id <= 0 || s.instructionSettled(s.programLabel(), id) {
 		return
 	}
 	s.residentMu.Lock()
@@ -337,9 +483,9 @@ func (s *indexStore) SaveVariableOffset(variable *Variable, rng *memedit.Range) 
 // been saved. This prevents truly duplicate offset rows from compile-unit
 // split cross-unit resolution visiting the same instruction from the same
 // file editor multiple times. Different ranges for the same value_id are
-// legitimate and are NOT deduped.
+// legitimate until that value is below the settled-batch watermark.
 func (s *indexStore) saveOffsetDedup(offset *ssadb.IrOffset) {
-	if offset == nil {
+	if s == nil || offset == nil || (offset.ValueID > 0 && offset.ValueID < s.settledBefore.Load()) {
 		return
 	}
 	if s.program != nil && s.program.NameCache != nil {

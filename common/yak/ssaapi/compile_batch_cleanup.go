@@ -54,7 +54,9 @@ func (task compileBatchCleanup) run() error {
 		task.program.Cache.FlushAuxSavers()
 		// Workers for this batch have joined, and both saver barriers have
 		// returned. Only then may ordinary persisted values leave the scopes.
+		// The index dedup release is the same barrier: one call, no extra goroutine.
 		task.program.ReleasePersistedOrdinaryValues()
+		task.program.ReleaseSettledIndexes()
 		task.program.CheckMemoryPressure(task.batchIndex+1, task.batchCount)
 	}
 	if compileUnitLogEnabled() {

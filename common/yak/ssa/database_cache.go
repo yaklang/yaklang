@@ -452,7 +452,7 @@ func (c *ProgramCache) FlushAuxSavers() {
 		return
 	}
 	if c.indexes != nil {
-		if err := c.indexes.Flush(); err != nil {
+		if _, err := c.indexes.Flush(); err != nil {
 			log.Errorf("FlushAuxSavers: index store flush failed: %v", err)
 		}
 	}
