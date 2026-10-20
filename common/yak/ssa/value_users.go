@@ -27,14 +27,33 @@ func (n *anValue) snapshotUserIDs() []int64 {
 	return n.userList
 }
 
+// addUserSetThreshold is the userList length at which AddUser switches from
+// a linear duplicate scan to the userSet map.
+const addUserSetThreshold = 16
+
 // for Value
 func (n *anValue) AddUser(u User) {
 	id := u.GetId()
 	n.relationsMu.Lock()
 	defer n.relationsMu.Unlock()
+	if n.userSet != nil {
+		if _, ok := n.userSet[id]; ok {
+			return
+		}
+		n.userSet[id] = struct{}{}
+		n.userList = append(n.userList, id)
+		n.markPersistenceDirty()
+		return
+	}
 	if index := slices.Index(n.userList, id); index == -1 {
 		n.userList = append(n.userList, id)
 		n.markPersistenceDirty()
+		if len(n.userList) >= addUserSetThreshold {
+			n.userSet = make(map[int64]struct{}, len(n.userList))
+			for _, uid := range n.userList {
+				n.userSet[uid] = struct{}{}
+			}
+		}
 	}
 }
 
@@ -46,5 +65,8 @@ func (n *anValue) RemoveUser(u User) {
 		return
 	}
 	n.userList = utils.RemoveSliceItem(append([]int64(nil), n.userList...), id)
+	if n.userSet != nil {
+		delete(n.userSet, id)
+	}
 	n.markPersistenceDirty()
 }

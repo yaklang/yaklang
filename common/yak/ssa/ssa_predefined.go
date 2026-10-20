@@ -380,6 +380,11 @@ type anValue struct {
 	typId       int64
 	relationsMu sync.Mutex
 	userList    []int64
+	// userSet indexes userList for O(1) duplicate checks once a value
+	// accumulates many users; it stays nil while the list is short enough
+	// for a linear scan. AddUser on hot values (one user added per member,
+	// e.g. struct default construction) was quadratic in the user count.
+	userSet map[int64]struct{}
 
 	memberPairs []memberPairRecord
 	ownerPairs  []ownerPairRecord
