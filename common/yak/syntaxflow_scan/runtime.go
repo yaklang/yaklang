@@ -134,6 +134,7 @@ func queryTargetName(target ssaapi.SyntaxFlowQueryInstance) string {
 
 func (m *scanManager) skipRule(program, rule, reason string) {
 	m.markRuleSkipped()
+	log.Infof("[code-scan-rule] program=%q rule=%q status=skipped duration=0s duration_ms=0 reason=%q", program, rule, reason)
 	if m.processMonitor == nil {
 		return
 	}
@@ -251,6 +252,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	}
 
 	// 将查询逻辑包装到函数中
+	ruleStartedAt := time.Now()
 	f := func() error {
 		var ruleRecorder *diagnostics.Recorder
 		option := []ssaapi.QueryOption{}
@@ -335,6 +337,33 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			m.errorCallback("program %s exc rule %s failed: %s",
 				targetName, rule.RuleName, err)
 		}
+
+		resultStatus := "success"
+		switch {
+		case bailedByBudget:
+			resultStatus = "partial"
+		case err != nil:
+			resultStatus = "failed"
+		}
+		var riskCount int64
+		if res != nil {
+			riskCount = int64(res.RiskCount())
+		}
+		var workLimitValue, workVisited int64
+		if workBudget != nil {
+			workLimitValue = int64(workBudget.Limit())
+			workVisited = int64(workBudget.Visited())
+		}
+		errorMessage := ""
+		if err != nil {
+			errorMessage = err.Error()
+		} else if bailedByBudget {
+			errorMessage = bailReason
+		}
+		ruleDuration := time.Since(ruleStartedAt)
+		log.Infof("[code-scan-rule] program=%q rule=%q status=%s duration=%s duration_ms=%d risks=%d work_limit=%d work_visited=%d error=%q",
+			targetName, rule.RuleName, resultStatus, ruleDuration, ruleDuration.Milliseconds(), riskCount,
+			workLimitValue, workVisited, errorMessage)
 
 		if enableRulePerf && ruleRecorder != nil {
 			snapshots := ruleRecorder.Snapshot()

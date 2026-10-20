@@ -313,7 +313,8 @@ func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.
 		if s.workLimit > 0 {
 			budget = sfvm.NewRuleWorkBudget(s.workLimit, cancel)
 		}
-		start := time.Now().Unix()
+		ruleStartedAt := time.Now()
+		start := ruleStartedAt.Unix()
 		res, err := QuerySyntaxflow(
 			QueryWithValue(target),
 			QueryWithResultProgram(progAPI),
@@ -327,7 +328,9 @@ func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.
 			QueryWithWorkBudget(budget),
 		)
 		cancel()
-		end := time.Now().Unix()
+		finishedAt := time.Now()
+		end := finishedAt.Unix()
+		ruleDuration := finishedAt.Sub(ruleStartedAt)
 		programName := ""
 		if progAPI != nil {
 			programName = strings.TrimSpace(progAPI.GetProgramName())
@@ -335,15 +338,22 @@ func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.
 		if err != nil {
 			s.noteRule(rule, programName, start, end, 0, err)
 			s.addErr(utils.Wrapf(err, "struct scan %s rule %s", unit.Key, rule.RuleName))
-			log.Warnf("[struct_scan] unit=%s rule=%s err=%v", unit.Key, rule.RuleName, err)
+			log.Warnf("[struct_scan-rule] unit=%q program=%q rule=%q status=failed duration=%s duration_ms=%d alerts=0 risks=0 error=%q",
+				unit.Key, programName, rule.RuleName, ruleDuration, ruleDuration.Milliseconds(), err.Error())
 			continue
 		}
 		if res != nil {
 			s.publish(res)
 			found = append(found, res)
 			s.ranHashes = append(s.ranHashes, ruleContentHash(rule))
-			s.noteRule(rule, programName, start, end, int64(res.RiskCount()), nil)
-			log.Infof("[struct_scan] package=%s rule=%s alerts=%d", unit.Key, rule.RuleName, len(res.GetAlertVariables()))
+			riskCount := int64(res.RiskCount())
+			s.noteRule(rule, programName, start, end, riskCount, nil)
+			alerts := len(res.GetAlertVariables())
+			log.Infof("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=%d risks=%d",
+				unit.Key, programName, rule.RuleName, ruleDuration, ruleDuration.Milliseconds(), alerts, riskCount)
+		} else {
+			log.Infof("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=0 risks=0",
+				unit.Key, programName, rule.RuleName, ruleDuration, ruleDuration.Milliseconds())
 		}
 		progAPI.ResetInterRuleState()
 	}
