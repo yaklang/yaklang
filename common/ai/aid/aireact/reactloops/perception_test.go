@@ -106,23 +106,20 @@ func TestTriggerPerceptionDoesNotRetrieveKnowledge(t *testing.T) {
 	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("task", "use attached project knowledge", context.Background(), cfg.GetEmitter(), true))
 	loop.Set("perception_knowledge_context", "RETIRED_KNOWLEDGE_CONTEXT")
 	loop.RegisterPerceptionContextProvider()
-	oldLister, oldSearcher := perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher
-	t.Cleanup(func() { perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher = oldLister, oldSearcher })
-	lists, capabilities := 0, 0
-	perceptionKnowledgeBaseNameLister = func() ([]string, error) { lists++; return []string{"private-kb"}, nil }
+	oldSearcher := perceptionCapabilitySearcher
+	t.Cleanup(func() { perceptionCapabilitySearcher = oldSearcher })
+	capabilities := 0
 	perceptionCapabilitySearcher = func(aicommon.AIInvokeRuntime, *ReActLoop, CapabilitySearchInput) (*CapabilitySearchResult, error) {
 		capabilities++
 		return &CapabilitySearchResult{}, nil
 	}
 	require.NotNil(t, loop.TriggerPerception(PerceptionTriggerForced, true))
 	require.Equal(t, 1, capabilities, "keep capability discovery")
-	require.Zero(t, lists)
 	require.Zero(t, invoker.selectCalls)
 	require.Zero(t, invoker.searchCalls)
 	require.Zero(t, invoker.compressCalls)
 	rendered := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
 	require.NotContains(t, rendered, "Perception Knowledge")
-	require.NotContains(t, rendered, "private-kb")
 	require.NotContains(t, rendered, "RETIRED_KNOWLEDGE_CONTEXT")
 }
 

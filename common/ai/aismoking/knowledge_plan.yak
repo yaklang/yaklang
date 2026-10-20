@@ -1,0 +1,108 @@
+// AISMOKING_CASE=knowledge_plan yak common/ai/aismoking/run.yak
+// Mock decisions only; real PLAN, workers, Skill, schemas, tools and persistence.
+if os.Getenv("AISMOKING_TIMEOUT_SECONDS")=="" { os.Setenv("AISMOKING_TIMEOUT_SECONDS","450") }
+include "common/ai/aismoking/mock.inc"
+include "common/ai/aismoking/knowledge_callers.inc"
+assert os.Getenv("YAKIT_HOME")!="","Use the isolated smoke runner"
+rag.EnableMockMode()
+cursor,awaiting,reportStep,mainCalls=0,false,0,0
+loaded,stages,checked,mockOperations={}, {}, [], []
+skillRequests={}
+
+func planQuery(text) { return {"name":planCase.name,"token_limit":1024,"limit":3,"per_entry_token_limit":256,"query":text} }
+func planOperations() {
+    return [
+        {"task":"准备","tool":"manage_knowledge_base","params":{"op":"create","name":planCase.name}},
+        {"task":"准备","tool":"manage_knowledge_base","params":{"op":"build","name":planCase.name,"source_file":planCase.source,"build_options":{"mode":"chunks","chunk_size":512,"concurrency":1}}},
+        {"task":"准备","tool":"manage_knowledge_base","params":{"op":"add_entry","name":planCase.name,"entry":{"title":"临时维护说明","content":planCase.old}}},
+        {"task":"核对更新","tool":"query_knowledge_base","params":planQuery("API 鉴权")},
+        {"task":"核对更新","tool":"query_knowledge_base","params":planQuery(planCase.old)},
+        {"task":"核对更新","tool":"manage_knowledge_base","params":{"op":"update_entry","name":planCase.name,"entry_id":"pending","entry":{"title":"临时维护说明","content":planCase.updated}}},
+        {"task":"核对更新","tool":"manage_knowledge_base","params":{"op":"update","name":planCase.name,"metadata":{"description":"PLAN 验证已更新"}}},
+        {"task":"核对更新","tool":"query_knowledge_base","params":planQuery(planCase.updated)},
+        {"task":"清理","tool":"manage_knowledge_base","params":{"op":"delete_entry","name":planCase.name,"entry_id":"pending"}},
+        {"task":"清理","tool":"query_knowledge_base","params":planQuery("API 鉴权")},
+        {"task":"清理","tool":"manage_knowledge_base","params":{"op":"delete","name":planCase.name}},
+        {"task":"清理","tool":"manage_knowledge_base","params":{"op":"list","keyword":planCase.prefix,"limit":5}},
+    ]
+}
+
+smokeHandler=func(w,body) {
+    prompt,native=smokePrompt(body),len(body.tools)>0
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"PLAN知识库验证"});return }
+    brief=re.FindSubmatch(prompt,`\[CURRENT_EXECUTION\]\n([^\n]+)`)
+    if len(brief)>0 {
+        task=json.loads(brief[1])
+        if awaiting {
+            for i=0;i<100 && len(planCase.calls)<cursor;i++ { time.Sleep(0.01) }
+            assert len(planCase.calls)==cursor,"worker lost actual tool-call events"
+            manifest=json.loads(string(file.ReadFile(file.Join(planCase.calls[cursor-1].dir_path,"..","manifest.json"))~))
+            assert manifest.success && manifest.tool==mockOperations[cursor-1].tool
+            value=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
+            checked=append(checked,{"tool":manifest.tool,"value":value})
+            if cursor==3 { planCase.entryID=value.entry_id;assert planCase.entryID!="" }
+            if cursor in [4,10] {
+                assert planCase.header in json.dumps(value) && planCase.marker in json.dumps(value),"file facts must come from the actual query"
+                planCase.facts=value.results[0].content
+            }
+            if cursor==5 { assert value.results[0].entry_id==planCase.entryID }
+            if cursor==8 { assert value.results[0].content==planCase.updated && value.results[0].entry_id==planCase.entryID }
+            if cursor==12 { assert value.total==1 && value.knowledge_bases[0].name==planCase.decoy }
+            awaiting=false
+        }
+        assert planCase.name in prompt && planCase.source in prompt && planCase.old in prompt && planCase.updated in prompt,"worker lost frozen user requirements"
+        for legacy in ["\"knowledge_enhance_answer\"","\"search_knowledge\"","\"search_knowledge_infosec\""] { assert !(legacy in prompt+json.dumps(body.tools)),"legacy action leaked into PLAN worker" }
+        if skillRequests[task.task_id]!=true { skillRequests[task.task_id]=true;smokeAnswer(w,native,"loading_skills",{"skill_name":"yaklang-system"});return }
+        if !("本 Skill 统一描述 Yaklang 引擎" in prompt) { smokeAnswer(w,native,"loading_skills",{"skill_name":"yaklang-system"});return }
+        for key in ["manage_knowledge_base","query_knowledge_base","all=true","token_limit"] { assert key in prompt,"PLAN worker lost system Skill knowledge guidance" }
+        if cursor<len(mockOperations) && mockOperations[cursor].task==task.name {
+            item=mockOperations[cursor]
+            key=task.task_id+":"+item.tool
+            if loaded[key]!=true { loaded[key]=true;smokeAnswer(w,native,"require_tool",{"require_tool_payload":item.tool});return }
+            schema=prompt+json.dumps(body.tools)
+            keys=["build_options","entry_id","metadata"]
+            if item.tool=="query_knowledge_base" { keys=["names","token_limit","per_entry_token_limit","content_offset","min_score"] }
+            for key in keys { assert key in schema,"PLAN worker did not receive the required schema" }
+            if "entry_id" in item.params && item.params.entry_id=="pending" { item.params.entry_id=planCase.entryID }
+            cursor++;awaiting=true
+            smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":item.tool,"directly_call_tool_params":item.params,"directly_call_reason":"按批准计划操作隔离测试库"});return
+        }
+        step=stages[task.task_id]
+        if step==nil { step=0 }
+        stages[task.task_id]=step+1
+        evidence="已核对真实工具输出，来源库："+planCase.name
+        if task.name!="准备" { assert planCase.facts in prompt || planCase.header in prompt;evidence+="\n"+planCase.facts }
+        if step==0 { smokeAnswer(w,native,"save_evidence",{"evidence_id":"knowledge."+task.task_id,"evidence_content":evidence});return }
+        if step==1 { smokeAnswer(w,native,"submit_task_result",{"summary":evidence,"evidence_ids":["knowledge."+task.task_id]});return }
+        smokeAnswer(w,native,"finish",{});return
+    }
+    mainCalls++
+    assert mainCalls<40,"PLAN coordinator did not converge"
+    if skillRequests["coordinator"]!=true { skillRequests["coordinator"]=true;smokeAnswer(w,native,"loading_skills",{"skill_name":"yaklang-system"});return }
+    if "已有计划：false" in prompt {
+        mockOperations=planOperations()
+        tasks=[{"name":"准备","goal":"创建指定库，将指定文件直接切块入库，并新增临时维护条目。","identifier":"prepare","depends_on":[]},{"name":"核对更新","goal":"查询真实鉴权事实和条目 ID，以稳定 ID 更新条目和库描述，再查询核对。","identifier":"update","depends_on":["prepare"]},{"name":"清理","goal":"删除临时条目，查询确认文件事实仍在，删除本次库并限量列库，保留对照库。","identifier":"cleanup","depends_on":["update"]}]
+        smokeAnswer(w,native,"create_plan",{"plan":{"name":"知识库操作验证","goal":"完成用户指定的隔离知识库管理并报告真实结果","tasks":tasks},"plan_document":"# 知识库操作验证\n准备 → 核对更新 → 清理。\n"+planCase.question});return
+    }
+    if !("阶段：EXEC" in prompt) && !("当前任务图和关键消息已经收尾" in prompt) { smokeAnswer(w,native,"submit_plan",{});return }
+    status=str.Split(prompt,"# PLAN STATUS")
+    states=re.FindSubmatchAll(status[len(status)-1],`\[([^\]]+)\]: ([a-z_]+); attempt=(\d+)`)
+    accepted=0
+    for state in states {
+        assert !(state[2] in ["failed","rejected"]),"knowledge worker failed"
+        if state[2]=="accepted" { accepted++ }
+        if state[2]=="awaiting_review" { assert "knowledge." in prompt;smokeAnswer(w,native,"review_task",{"task_id":state[1],"attempt_id":parseInt(state[3]),"decision":"accept","reason":"真实知识库操作与已发布证据一致"});return }
+    }
+    if accepted<3 || !("当前任务图和关键消息已经收尾" in prompt) { smokeAnswer(w,native,"directly_answer",{"answer_payload":"等待已批准任务结算。"});return }
+    assert cursor==len(mockOperations) && len(checked)==cursor && planCase.header in prompt && planCase.marker in prompt,"shared evidence must reach coordinator delivery"
+    reportStep++
+    if reportStep==1 { smokeAnswer(w,native,"create_report",{"title":"PLAN知识库验证","document":"# PLAN知识库验证\n来源："+planCase.name+"\n"+planCase.facts+"\n条目已按稳定 ID 更新，测试库已删除，对照库保留。"});return }
+    smokeAnswer(w,native,"submit_report",{"summary":"知识库真实操作、证据和清理已核验。"})
+}
+for native in [false,true] {
+    cursor,awaiting,reportStep,mainCalls=0,false,0,0
+    loaded,stages,checked,mockOperations={}, {}, [], []
+    skillRequests={}
+    runKnowledgePlan(native,smokeModel,smokeCtx)
+}
+smokeCheck()

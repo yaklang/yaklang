@@ -1,0 +1,10 @@
+// Real AI/embeddings, public aim.InvokeReAct PLAN and three dependent workers.
+// Natural-language instructions; only disposable named fixtures are modified.
+include "common/ai/aismoking/knowledge_callers.inc"
+assert os.Getenv("AISMOKING_OUTPUT")!=""
+for native in [false,true] {
+    protocol=os.Getenv("AISMOKING_FUNCTION_CALL")
+    if (protocol=="0" && native) || (protocol=="1" && !native) { continue }
+    runKnowledgePlan(native,nil,context.WithTimeoutSeconds(480))
+}
+println("AISMOKING_LIVE_PASS")
