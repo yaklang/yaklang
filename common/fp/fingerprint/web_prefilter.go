@@ -228,6 +228,7 @@ func (p *webPrefilter) allows(page []byte, rules []*rule.FingerPrintRule) []*rul
 		if err != nil {
 			return rules
 		}
+		defer scratch.Close()
 		if err := p.db.Scan(page, scratch, func(m minirehs.Match) bool {
 			id := int(m.ID)
 			if id >= 0 && id < len(p.compiled) {

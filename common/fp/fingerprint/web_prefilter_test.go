@@ -1,7 +1,9 @@
 package fingerprint
 
 import (
+	"bytes"
 	"context"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,6 +13,28 @@ import (
 	"github.com/yaklang/yaklang/common/fp/webfingerprint"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+func TestWebPrefilterClosesScanWorkers(t *testing.T) {
+	if runtime.GOMAXPROCS(0) < 2 {
+		t.Skip("native parallel scans require multiple processors")
+	}
+	rules := []*rule.FingerPrintRule{
+		webRegexpRule("merged", `[a-z]{3}`, ""),
+		webRegexpRule("assertion", `\b[a-z]{2}\b`, ""),
+	}
+	filter := compileWebPrefilter(rules)
+	require.NotNil(t, filter.db)
+	t.Cleanup(func() { _ = filter.db.Close() })
+	page := bytes.Repeat([]byte("abc "), 256)
+	filter.allows(page, rules)
+	before := runtime.NumGoroutine()
+	for i := 0; i < 20; i++ {
+		require.NotEmpty(t, filter.allows(page, rules))
+	}
+	runtime.GC()
+	runtime.Gosched()
+	require.LessOrEqual(t, runtime.NumGoroutine()-before, 8, "scan workers must not outlive their scratch")
+}
 
 func webRegexpRule(product, pattern, path string) *rule.FingerPrintRule {
 	r := rule.NewEmptyFingerPrintRule()

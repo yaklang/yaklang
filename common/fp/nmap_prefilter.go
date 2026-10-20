@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"regexp/syntax"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -40,25 +41,29 @@ func (nmapPrefilterLog) Errorf(format string, args ...interface{}) {
 	log.Errorf(format, args...)
 }
 
-// scanBanner 把横幅变成和 pcre2 相同的“一字节一个码点”视图。
-// minirehs 按 UTF-8 解码: 0x80 会变成 RuneError, 而 nmap 的 \x80 要匹配码点 U+0080。
-// ASCII 原样扫描。出现高位字节时, 把每个字节展开成对应码点的 UTF-8, 只用于存在性判断。
-func scanBanner(banner []byte) []byte {
+// PCRE's Unicode classes and word boundaries differ from RE2, and its \s
+// includes vertical tab. These inputs retain the full byte-oriented matcher.
+func needsPCREBanner(banner []byte) bool {
 	for _, b := range banner {
-		if b < 0x80 {
-			continue
+		if b >= 0x80 || b == '\v' {
+			return true
 		}
-		out := make([]byte, 0, len(banner)+len(banner)/4)
-		for _, item := range banner {
-			if item < 0x80 {
-				out = append(out, item)
-				continue
-			}
-			out = append(out, 0xC0|item>>6, 0x80|item&0x3F)
-		}
-		return out
 	}
-	return banner
+	return false
+}
+
+func relaxNmapEndAnchors(re *syntax.Regexp) bool {
+	if re.Op == syntax.OpEndText || re.Op == syntax.OpEndLine {
+		*re = syntax.Regexp{Op: syntax.OpEmptyMatch}
+		return true
+	}
+	changed := false
+	for _, child := range re.Sub {
+		if relaxNmapEndAnchors(child) {
+			changed = true
+		}
+	}
+	return changed
 }
 
 func nmapPattern(rule *NmapMatch) (string, minirehs.Flag, bool) {
@@ -86,6 +91,15 @@ func nmapPattern(rule *NmapMatch) (string, minirehs.Flag, bool) {
 			prefix += "s"
 		}
 		expr = prefix + ")" + lazy.raw
+	}
+	if parsed, err := syntax.Parse(expr, syntax.Perl); err == nil {
+		// PCRE's $ can assert before a final newline. Removing end assertions
+		// gives a conservative candidate superset, including assertions inside
+		// a concatenation. Captures and exact anchors stay in the PCRE check.
+		if relaxNmapEndAnchors(parsed) {
+			return parsed.String(), 0, true
+		}
+		return lazy.raw, flags, true
 	}
 	if !regexp_utils.NewYakRegexpUtils(expr).CanUse() {
 		return "", 0, false
@@ -142,7 +156,7 @@ const maxServicePrefilterDB = 2048
 
 type nmapPrefilterGlobalKey struct {
 	probe *NmapProbe
-	rules int
+	rules uint64
 }
 
 func prefilterForBlock(block *RuleBlock) *nmapPrefilter {
@@ -152,9 +166,9 @@ func prefilterForBlock(block *RuleBlock) *nmapPrefilter {
 	if block.Probe == nil {
 		return compileNmapPrefilter(block.Matched)
 	}
-	key := fmt.Sprintf("%p/%d", block.Probe, len(block.Matched))
+	mapKey := nmapPrefilterGlobalKey{probe: block.Probe, rules: nmapMatchesStamp(block.Matched)}
+	key := fmt.Sprintf("%p/%016x", mapKey.probe, mapKey.rules)
 	v, _, _ := nmapPrefilterFlight.Do(key, func() (interface{}, error) {
-		mapKey := nmapPrefilterGlobalKey{probe: block.Probe, rules: len(block.Matched)}
 		if cached, ok := nmapPrefilterGlobal.Load(mapKey); ok {
 			return cached.(*nmapPrefilter), nil
 		}
@@ -209,7 +223,7 @@ func (b *RuleBlock) candidateMatches(banner []byte) []*NmapMatch {
 }
 
 func (p *nmapPrefilter) selectMatches(rules []*NmapMatch, banner []byte) []*NmapMatch {
-	if p == nil || p.fallbackAll || p.db == nil {
+	if p == nil || p.fallbackAll || p.db == nil || needsPCREBanner(banner) {
 		return rules
 	}
 	hit := make([]bool, len(rules))
@@ -222,7 +236,8 @@ func (p *nmapPrefilter) selectMatches(rules []*NmapMatch, banner []byte) []*Nmap
 	if err != nil {
 		return rules
 	}
-	if err := p.db.Scan(scanBanner(banner), scratch, func(m minirehs.Match) bool {
+	defer scratch.Close()
+	if err := p.db.Scan(banner, scratch, func(m minirehs.Match) bool {
 		id := int(m.ID)
 		if id >= 0 && id < len(p.compiled) {
 			idx := p.compiled[id]
