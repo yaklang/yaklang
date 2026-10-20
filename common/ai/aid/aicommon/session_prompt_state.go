@@ -49,6 +49,7 @@ type SessionPromptState struct {
 	//
 	// 关键词: reportedRiskStore, ReportedRiskStore, 已报告漏洞清单, 去重, 共享
 	reportedRiskStore *ReportedRiskStore
+	uiSession         *UISession
 }
 
 func NewSessionPromptState() *SessionPromptState {
@@ -85,6 +86,10 @@ func (s *SessionPromptState) forkForSubAgent(inheritConversation bool) *SessionP
 	// Share the thread-safe reporting ledger even before the first report.
 	// A copied nil pointer would allow parent/children to create separate stores.
 	forked.reportedRiskStore = s.getOrCreateReportedRiskStore()
+	if s.uiSession == nil {
+		s.uiSession = newUISession()
+	}
+	forked.uiSession = s.uiSession
 	if !inheritConversation {
 		return forked
 	}
