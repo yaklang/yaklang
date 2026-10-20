@@ -346,25 +346,36 @@ func constLookupSQL(operator, indexName string) string {
 
 var constLookupHintCache sync.Map
 
-func constLookupIndexHint(db *gorm.DB) string {
+func constLookupIndexHint(ctx context.Context, db *gorm.DB) (string, error) {
 	if db == nil || db.Dialect() == nil || db.CommonDB() == nil {
-		return ""
+		return "", nil
 	}
 	switch db.Dialect().GetName() {
 	case "sqlite3", "sqlite":
 	default:
-		return ""
+		return "", nil
 	}
 	key := db.CommonDB()
 	if v, ok := constLookupHintCache.Load(key); ok {
-		return v.(string)
+		return v.(string), nil
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var indexName string
+	err := db.DB().QueryRowContext(ctx,
+		`SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=? LIMIT 1`,
+		TableIrCodes, irCodeConstLookupIndex,
+	).Scan(&indexName)
+	if err != nil && err != sql.ErrNoRows {
+		return "", err
 	}
 	hint := ""
-	if hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex) {
-		hint = irCodeConstLookupIndex
+	if err == nil {
+		hint = indexName
 	}
 	constLookupHintCache.Store(key, hint)
-	return hint
+	return hint, nil
 }
 
 // nativeGetIrCodeIDsByConstType returns the code_ids matching the ConstType
@@ -381,9 +392,21 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 		return nil, nil
 	}
 	nativeConstTypeIDQueries.Add(1)
+	started := time.Now()
+	if parent == nil {
+		parent = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(parent, nativeQueryTimeout())
+	defer cancel()
+	hint, err := constLookupIndexHint(ctx, db)
+	if err != nil {
+		query := bindSQLPlaceholdersDB(db, `SELECT name FROM sqlite_master WHERE type='index' AND tbl_name=? AND name=? LIMIT 1`)
+		RecordDBRead(time.Since(started), true)
+		logNativeSQL(query, time.Since(started), err)
+		return nil, err
+	}
 	var q string
 	var args []interface{}
-	hint := constLookupIndexHint(db)
 	if compareMode == ExactCompare {
 		q = bindSQLPlaceholdersDB(db, constLookupSQL("=", hint))
 		args = []interface{}{progName, value}
@@ -396,12 +419,6 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 		q = bindSQLPlaceholdersDB(db, constLookupSQL(operator, hint))
 		args = []interface{}{progName, value}
 	}
-	started := time.Now()
-	if parent == nil {
-		parent = context.Background()
-	}
-	ctx, cancel := context.WithTimeout(parent, nativeQueryTimeout())
-	defer cancel()
 	rows, err := nativeQueryContextDB(db, ctx, q, args...)
 	if err != nil {
 		RecordDBRead(time.Since(started), true)
