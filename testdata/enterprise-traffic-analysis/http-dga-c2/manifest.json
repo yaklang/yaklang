@@ -1,0 +1,19 @@
+{
+  "id": "http-dga-c2",
+  "title": "HTTP DGA host, victim metadata and POST exfiltration candidate",
+  "capture": "capture.pcapng",
+  "format": "pcapng",
+  "size_bytes": 9896,
+  "sha256": "08cc76efbbeeb1eed155964622dcdf512dff166bb0a9fe55ddbc8e18434a2138",
+  "packet_count": 28,
+  "start_time": "2020-10-24 22:28:20.185377",
+  "end_time": "2020-10-24 22:30:08.336155",
+  "source": {
+    "publisher": "sbousseaden/PCAP-ATTACK",
+    "page": "https://github.com/sbousseaden/PCAP-ATTACK",
+    "download": "https://raw.githubusercontent.com/sbousseaden/PCAP-ATTACK/master/Command%20and%20Control/C2_Foudre_Backdoor_DGA.pcapng"
+  },
+  "capabilities": ["http", "http-redirect", "http-post", "dga-candidate", "victim-metadata-in-url", "exfiltration-candidate"],
+  "tasks": "TASKS.md",
+  "safety": "Malicious infrastructure in training capture. Do not contact it."
+}

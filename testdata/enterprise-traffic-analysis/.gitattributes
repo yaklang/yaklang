@@ -1,0 +1,4 @@
+# Preserve exact capture bytes and test key logs across platforms.
+*.pcap binary
+*.pcapng binary
+*.keys -text whitespace=-blank-at-eof,-trailing-space
