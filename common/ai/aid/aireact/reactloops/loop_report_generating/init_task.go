@@ -34,14 +34,19 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 		var knowledgeBases []string
 
 		// 获取附加的数据（文件、知识库等）
-		attachedDatas := task.GetAttachedDatas()
+		attachedDatas := aicommon.NonEmptyAttachedResources(task.GetAttachedDatas())
+		reactloops.RunAttachedExtraResourcesInit(r, loop, attachedDatas)
 		for _, data := range attachedDatas {
 			log.Infof("report_generating attached data: type=%s, value=%s", data.Type, data.Value)
 			switch data.Type {
 			case aicommon.CONTEXT_PROVIDER_TYPE_FILE:
-				referenceFiles = append(referenceFiles, data.Value)
+				if data.HasKey(aicommon.CONTEXT_PROVIDER_KEY_FILE_PATH) {
+					referenceFiles = append(referenceFiles, data.Value)
+				}
 			case aicommon.CONTEXT_PROVIDER_TYPE_KNOWLEDGE_BASE:
-				knowledgeBases = append(knowledgeBases, data.Value)
+				if data.HasKey(aicommon.CONTEXT_PROVIDER_KEY_NAME) {
+					knowledgeBases = append(knowledgeBases, data.Value)
+				}
 			}
 		}
 
