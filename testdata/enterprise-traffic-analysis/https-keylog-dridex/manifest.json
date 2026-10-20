@@ -1,0 +1,22 @@
+{
+  "id": "https-keylog-dridex",
+  "title": "HTTPS visibility with and without an authorized NSS key log",
+  "capture": "capture.pcap",
+  "keylog": "capture.keys",
+  "format": "pcap",
+  "size_bytes": 632950,
+  "sha256": "32bd460f240646b9d62549725412f176a5fdaf2ab803bafcc1ee6bf322b3439f",
+  "keylog_sha256": "cb5cbc6802964483fc639be179c37ec1fd27073c3acb76cbae9b9c8ef81e6958",
+  "packet_count": 1465,
+  "start_time": "2020-04-02 05:02:19.297730",
+  "end_time": "2020-04-02 05:17:22.689791",
+  "source": {
+    "publisher": "Palo Alto Networks Unit 42",
+    "page": "https://unit42.paloaltonetworks.com/wireshark-tutorial-decrypting-https-traffic/",
+    "download": "https://raw.githubusercontent.com/pan-unit42/wireshark-tutorial-decrypting-HTTPS-traffic/master/Wireshark-tutorial-on-decrypting-HTTPS-SSL-TLS-traffic.zip",
+    "archive_password": "infected"
+  },
+  "capabilities": ["tls12-aes128-gcm", "nss-keylog", "https-http1", "file-download", "http-post-c2-candidate"],
+  "tasks": "TASKS.md",
+  "safety": "Key log is test-only. Never ingest production key logs without explicit authorization and access controls."
+}
