@@ -22,7 +22,10 @@ func runKnowledgeCaller(focus, native, model) {
     options=[aim.focus(focus),aim.attachedKnowledgeBase(name),aim.attachedFileContent("CALLER_SELECTION_PREFERENCE：仅使用附加项目库的完整名称，不要扩展到别的库。"),aim.context(context.WithTimeoutSeconds(240)),aim.sessionID("knowledge-callers-"+randstr(12)),aim.workdir(root),aim.reviewPolicy("yolo"),aim.maxIteration(16),aim.timeout(210),aim.disableAIForge(true),aim.disableMCPServers(true),aim.onEvent(func(op,e){
         callerCase.operator=op
         manager=op.GetConfig().GetAiToolManager()
-        if !restricted && manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base");restricted=true }
+        if !restricted && manager!=nil {
+            if os.Getenv("AISMOKING_UNRESTRICTED_KNOWLEDGE")!="1" { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base") }
+            restricted=true
+        }
         loop=op.GetCurrentLoop()
         mu.Lock()
         defer mu.Unlock()
@@ -82,7 +85,7 @@ func runKnowledgeCaller(focus, native, model) {
     }
     if len(queries)==0 || !matched { errors=append(errors,"AI answered without retrieving knowledge") }
     if !(header in answer) || !(marker in answer) || !(name in answer) || "DECOY_MARKER" in answer { errors=append(errors,"answer did not reproduce the hidden source facts and exact source name") }
-    summary={"passed":len(errors)==0,"focus":focus,"requested_function_call":native,"effective_function_call":native && focus!="report_generating","real_provider":model==nil,"real_embedding":model==nil,"duration_ms":time.Now().UnixMilli()-started,"knowledge_base":name,"decoy_base":decoy,"actions":actions,"loops":loops,"queries":queries,"answer":answer,"report_path":reportPath,"errors":errors}
+    summary={"passed":len(errors)==0,"focus":focus,"requested_function_call":native,"effective_function_call":native && focus!="report_generating","unrestricted_tools":os.Getenv("AISMOKING_UNRESTRICTED_KNOWLEDGE")=="1","real_provider":model==nil,"real_embedding":model==nil,"duration_ms":time.Now().UnixMilli()-started,"knowledge_base":name,"decoy_base":decoy,"actions":actions,"loops":loops,"queries":queries,"answer":answer,"report_path":reportPath,"errors":errors}
     file.SaveJson(file.Join(root,"summary.json"),summary)~
     file.SaveJson(file.Join(root,"events.json"),events)~
     callerResults=append(callerResults,summary)

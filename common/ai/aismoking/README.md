@@ -94,6 +94,10 @@ yak common/ai/aismoking/forge.yak
 
 ## 收集与清理范围
 
+设置 `AISMOKING_UNRESTRICTED_KNOWLEDGE=1` 运行 `live/knowledge_callers.yak`，可在保留其他内置工具目录的情况下复测三种 loop 的自然语言问答，验证实际工具选择。MCP 与蓝图使用脚本既有的关闭设置；查询范围、预算、隐藏事实、报告文件和完成卡片断言仍执行。
+
+`live/knowledge_natural.yak` 仅用自然语言提出管理任务，提示中不提供工具名或 JSON 参数。真实 AI 在普通/知识增强模式、文本/原生协议下分别完成建库与限量列库、增添知识与文件构建、隐蔽随机事实问答、更新元信息和稳定 ID 条目、双库查询、删条目、删库七个步骤，共四条完整流程。逐步核对实际工具 artifacts、SDK 数据状态、显式范围和 token 预算，并保留对照库；只操作随机命名夹具，退出时核对已清理。设置新的 `AISMOKING_OUTPUT` 后运行；可用 `NATURAL_KNOWLEDGE_FOCUS=default/knowledge_enhance`、`AISMOKING_FUNCTION_CALL=0/1` 单独诊断。文本流程测试直接切块，原生流程测试真实 AI 问题索引构建。
+
 `live/knowledge_callers.yak` 使用真实 AI 和 embedding 运行普通、报告、侦察三种模式的同一组 `aim.InvokeReAct` 任务。设置新的 `AISMOKING_OUTPUT` 后直接执行脚本；逐一核验两种请求协议、精确附加库名、只读约束、实际查询预算、隐藏随机事实和报告文件/卡片。报告模式沿用现有文本 AITag 协议。测试只创建随机命名的自有夹具库并在退出时删除，保存逐例 summary 与事件，真实服务失败不会计为通过。
 
 `live/knowledge_base_management.yak` 使用真实配置模型和 embedding，在普通通用 loop 中通过 Skill 引导的两个工具执行创建、AI 问题索引构建、显式 names 数组/单库名的预算语义和关键词查询、元信息更新，并用直接 API 核验实际入库。测试将工具范围限定为这两个内置工具；只创建随机命名测试库，退出时清理。设置 `AISMOKING_OUTPUT` 为新目录；`AISMOKING_FUNCTION_CALL=0` 可切换文本协议。保存事件、工具 artifacts 路径与 summary，不保存认证头；真实服务失败不会计为通过。仅供本地开发，不进入 CI。
