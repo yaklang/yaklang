@@ -32,7 +32,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
-		if mustProcessMentionedInfo && hasAttachedKnowledgeBaseResource(attachedResources) {
+		if mustProcessMentionedInfo && !loop.HasPinnedContext() && hasAttachedKnowledgeBaseResource(attachedResources) {
 			loop.UserStatus("开始处理用户提及的数据（@ Mentionup）", "Start to process user-mentioned data (@ Mentionup)")
 			err := ProcessAttachedData(r, loop, task, operator, attachedResources)
 			if err != nil {

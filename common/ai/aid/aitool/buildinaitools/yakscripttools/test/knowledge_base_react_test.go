@@ -33,8 +33,9 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 	oldMock := vectorstore.IsMockMode
 	vectorstore.IsMockMode = true
 	t.Cleanup(func() { vectorstore.IsMockMode = oldMock })
-	for _, native := range []bool{false, true} {
-		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
+	for _, scenario := range []struct{ native, focus bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		native, focused := scenario.native, scenario.focus
+		t.Run(fmt.Sprintf("native=%t/focus=%t", native, focused), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			workdir := t.TempDir()
@@ -88,7 +89,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				manage("list", "", map[string]any{"limit": 1}),
 				manage("get", "docs", nil),
 				manage("update", "docs", map[string]any{"metadata": map[string]any{"description": "", "tags": []string{}, "is_default": false}}),
-				manage("add_entry", "docs", map[string]any{"entry": map[string]any{"title": "API token", "content": "ORIGINAL_MARKER " + strings.Repeat("原文\"\\😀\n", 100)}}),
+				manage("add_entry", "docs", map[string]any{"entry": map[string]any{"title": "API token", "content": "ORIGINAL_MARKER " + strings.Repeat("鍘熸枃\"\\馃榾\n", 100)}}),
 				query(map[string]any{"name": "docs", "query": "ORIGINAL_MARKER", "per_entry_token_limit": 256}),
 				query(map[string]any{"name": "docs", "mode": "get", "entry_id": "pending", "content_offset": -1}),
 				manage("update_entry", "docs", map[string]any{"entry_id": "pending", "entry": map[string]any{"title": "updated", "content": "NEW_MARKER API token"}}),
@@ -103,6 +104,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				manage("delete", "docs", nil), manage("delete", "other", nil), manage("list", "", nil),
 			}
 			var runtime *aireact.ReAct
+			var loop *reactloops.ReActLoop
 			var task aicommon.AIStatefulTask
 			cursor, checked, requires := 0, 0, 0
 			loaded := map[string]bool{}
@@ -136,7 +138,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 					return nil, fmt.Errorf("unexpected AI request: %s", req.GetCallerLabel())
 				}
 				prompt := req.GetPrompt()
-				if !skillLoaded {
+				if !skillLoaded && !focused {
 					require.Contains(t, prompt, "yaklang-system", "the actual Skill must appear in the catalog")
 					skillLoaded = true
 					return respond(c, req, "loading_skills", map[string]any{"skill_name": "yaklang-system"})
@@ -203,13 +205,18 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				}
 				next := steps[cursor]
 				manager := runtime.GetConfig().GetAiToolManager()
-				if !loaded[next.tool] {
+				if !loaded[next.tool] && !focused {
 					require.False(t, manager.IsRecentlyUsedTool(next.tool), "require must cause schema promotion")
 					loaded[next.tool] = true
 					requires++
 					return respond(c, req, "require_tool", map[string]any{"require_tool_payload": next.tool})
 				}
-				require.True(t, manager.IsRecentlyUsedTool(next.tool))
+				if focused {
+					require.True(t, loop.HasToolSchema(next.tool))
+					require.Contains(t, prompt, "ATTACHED_SELECTION_NOTE")
+				} else {
+					require.True(t, manager.IsRecentlyUsedTool(next.tool))
+				}
 				contextSchema := prompt
 				if native {
 					raw, _ := json.Marshal(wire.Tools)
@@ -239,13 +246,25 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 			require.NoError(t, err)
 			task = aicommon.NewStatefulTaskBase("knowledge-integration", "Use the system Skill to manage and query knowledge bases.", ctx, runtime.GetConfig().GetEmitter(), true)
 			runtime.SetCurrentTask(task)
-			loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_DEFAULT, runtime, reactloops.WithMaxIterations(32))
+			loopName := schema.AI_REACT_LOOP_NAME_DEFAULT
+			if focused {
+				loopName = schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE
+				task.SetAttachedDatas([]*aicommon.AttachedResource{aicommon.NewAttachedResource(aicommon.AttachedResourceTypeKnowledgeBase, aicommon.CONTEXT_PROVIDER_KEY_NAME, "ATTACHED_SELECTION_NOTE: prefer the newly created integration fixture")})
+				runtime.GetConfig().SetConfig("AllowSyncInitContext", true)
+				runtime.GetConfig().SetConfig("MustProcessAttachedData", true)
+				runtime.GetConfig().SetConfig("DisableIntentRecognition", true)
+			}
+			loop, err = reactloops.CreateLoopByName(loopName, runtime, reactloops.WithMaxIterations(32))
 			require.NoError(t, err)
-			require.Equal(t, schema.AI_REACT_LOOP_NAME_DEFAULT, loop.GetLoopName())
+			require.Equal(t, loopName, loop.GetLoopName())
 			defer loop.Release()
 			require.NoError(t, loop.ExecuteWithExistedTask(task))
 			require.Equal(t, len(steps), checked)
-			require.Equal(t, 2, requires, "both schemas must be explicitly required")
+			if focused {
+				require.Zero(t, requires, "both schemas must be pinned before the first AI decision")
+			} else {
+				require.Equal(t, 2, requires, "both schemas must be explicitly required")
+			}
 			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
 			var count int
 			require.NoError(t, profile.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)

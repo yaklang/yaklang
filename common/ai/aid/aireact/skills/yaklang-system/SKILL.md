@@ -27,6 +27,7 @@ metadata:
 
 ## 使用顺序与边界
 
+- `knowledge_enhance` 知识增强模式沿用普通助手流程，固定加载本 Skill 和调用方允许的知识库工具完整 schema；这些固定内容不随历史压缩或工具缓存淘汰。上下文已有完整 schema 时直接调用，不重复 loading_skills / require_tool。附加的知识库名称与原始说明是选库偏好；自动选库先 list 再决定 name/names，不能替换成 all=true。
 - 接续旧任务：先 `read_memory` 回顾稳定偏好，再 `grep_timeline_history` 找原始证据。当前用户指令优先于旧记忆；历史搜索覆盖已归档的压缩前 item，无法恢复未归档的旧原文。
 - 管理记忆：delete/change 使用精确 memory_id；add/change 提供 content。修改后回读确认，只保存明确且可复用的事实与偏好。
 - 查询流量：省略 database_id 读取当前数据库。跨项目先列项目，选择 available=true 且 supports_http=true 的 database_id，查询和取包使用同一 database_id；操作只读，不切换当前项目。

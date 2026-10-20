@@ -64,6 +64,9 @@ func ParseAttachedResourceData(data *AttachedResource) (AttachedResourceData, er
 	if resource == nil {
 		return nil, utils.Errorf("attached resource factory returned nil for type: %s", strings.TrimSpace(data.Type))
 	}
+	if knowledge, ok := resource.(*AttachedKnowledgeBaseResourceData); ok {
+		knowledge.Key = data.Key
+	}
 	if err := resource.Unmarshal(data.Value); err != nil {
 		return nil, err
 	}

@@ -971,3 +971,9 @@ func newRecentToolEntry(tool *aitool.Tool, native bool) *RecentToolEntry {
 
 	return &RecentToolEntry{Name: name, Description: desc, SchemaSnippet: schemaStr, Usage: renderedUsage, Size: size}
 }
+
+// NewRecentToolEntry renders a detached schema snapshot without LRU admission.
+// Focus overlays use it to retain required definitions for their own lifetime.
+func NewRecentToolEntry(tool *aitool.Tool, native bool) *RecentToolEntry {
+	return newRecentToolEntry(tool, native)
+}

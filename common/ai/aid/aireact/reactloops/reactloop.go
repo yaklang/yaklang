@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/asyncexecmanager"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -233,6 +234,11 @@ type ReActLoop struct {
 
 	// Skills context manager for on-demand skill loading
 	skillsContextManager *aiskillloader.SkillsContextManager
+	pinnedSkillNames     []string
+	pinnedToolNames      []string
+	pinnedToolEntries    map[string]*buildinaitools.RecentToolEntry
+	pinnedContext        string
+	staticInstruction    string
 
 	// Extra capabilities discovered via intent recognition
 	// Rendered as a dedicated prompt section, separate from core tools
@@ -728,6 +734,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 
 	for _, opt := range options {
 		opt(r)
+	}
+	if err := r.preparePinnedContext(); err != nil {
+		return nil, err
 	}
 	if r.functionCallMode {
 		if r.actions.Have(nativeAdjustTodolistActionName) || r.loopActions.Have(nativeAdjustTodolistActionName) {

@@ -4,6 +4,9 @@
 include "common/ai/aismoking/mock.inc"
 assert os.Getenv("YAKIT_HOME") != "", "Use a disposable home"
 rag.EnableMockMode()
+knowledgeFocus = os.Getenv("AISMOKING_KNOWLEDGE_FOCUS") == "1"
+focusName = "default"
+if knowledgeFocus { focusName = "knowledge_enhance" }
 prefix = "kb-smoke-" + randstr(8)
 kbName, otherName = prefix + "-docs", prefix + "-other"
 sourceFile = file.Join(smokeRoot,"source.txt")
@@ -84,8 +87,17 @@ smokeHandler=func(w,body) {
         smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"知识库实际操作已核验。","evidence":[]}`},"stop")
         w.Write("data: [DONE]\n\n")~;return
     }
-    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    assert ("SMOKE_CALLER:react-loop:" + focusName) in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     assert "管理知识库" in prompt && "manage_knowledge_base" in prompt && "query_knowledge_base" in prompt && "token_limit" in prompt && "all=true" in prompt, "system skill must index both knowledge tools and explicit all scope"
+    if knowledgeFocus {
+        assert "PREFERENCE_FOCUS_MARKER" in prompt && kbName in prompt && "attached_knowledge_base" in prompt, "attached preferences must reach the focused loop"
+        schemaContext = prompt + json.dumps(body.tools)
+        for key in ["content_offset", "index_options", "build_options", "per_entry_token_limit"] { assert key in schemaContext, "both complete schemas must be present before the first decision" }
+        for name in ["manage_knowledge_base", "query_knowledge_base"] {
+            assert operator.GetCurrentLoop().HasToolSchema(name), "focus must pin enabled knowledge schemas"
+            loaded[name] = true
+        }
+    }
     if awaiting { checkPrevious() }
     if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
     item=plan[cursor]
@@ -99,7 +111,7 @@ for native in [false,true] {
     config,operator,cursor,awaiting,loaded,requiredTools=nil,nil,0,false,{},0
     // Reset values filled in by the previous protocol run.
     for item in plan { if "entry_id" in item.params { item.params.entry_id="pending" } }
-    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、manage list 后再选择库，最后删除测试库。",aim.focus("default"),aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、manage list 后再选择库，最后删除测试库。",aim.focus(focusName),aim.attachedKnowledgeBase(kbName),aim.attachedFileContent("PREFERENCE_FOCUS_MARKER 优先使用用户附加的项目知识库；本次显式验证全库查询。"),aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
         config,operator=op.GetConfig(),op
         if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
     }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
@@ -108,8 +120,8 @@ for native in [false,true] {
         return nil
     })))
     assert cursor==len(plan) && !awaiting && len(loaded)==2
-    assert requiredTools==2, "both knowledge schemas must be required"
-    results=append(results,{"focus":"default","function_call":native,"tool_calls":cursor,"required_tools":requiredTools,"passed":true})
+    if knowledgeFocus { assert requiredTools==0, "focus must not spend model turns loading schemas" } else { assert requiredTools==2 }
+    results=append(results,{"focus":focusName,"function_call":native,"tool_calls":cursor,"required_tools":requiredTools,"passed":true})
     file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
 }
 smokeCheck()

@@ -62,7 +62,8 @@ func TestParseAttachedResourceDataByType(t *testing.T) {
 	require.NoError(t, err)
 	require.IsType(t, &AttachedKnowledgeBaseResourceData{}, resource)
 	require.Equal(t, AttachedResourceTypeKnowledgeBase, resource.Type())
-	require.Empty(t, resource.ToAttachData(nil))
+	require.Equal(t, CONTEXT_PROVIDER_KEY_NAME, resource.(*AttachedKnowledgeBaseResourceData).Key)
+	require.Contains(t, resource.ToAttachData(nil), "```\nkb\n```", "knowledge selections must remain visible as user context")
 
 	resource, err = ParseAttachedResourceData(NewAttachedResource("unknown_type", "custom_key", "hello"))
 	require.NoError(t, err)

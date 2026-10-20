@@ -89,7 +89,7 @@ func (r *ReActLoop) loadToolSchemas(ctx context.Context, names []string, preload
 	// Loading later entries can evict earlier ones. Do not report those entries
 	// as available in the final cache state of this load batch.
 	for _, entry := range results {
-		if entry["status"] == "schema_loaded" && !manager.IsRecentlyUsedTool(entry["tool_name"]) {
+		if entry["status"] == "schema_loaded" && !r.HasToolSchema(entry["tool_name"]) {
 			entry["status"], entry["detail"] = "evicted", "Schema was evicted by the tool-cache budget; load a smaller set."
 		}
 	}

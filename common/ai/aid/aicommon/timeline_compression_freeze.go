@@ -206,7 +206,7 @@ func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 // rendered in place; frozen controls appear only in semi-dynamic snapshots.
 // Filtering occurs after bucket selection, so helper prompts share the same
 // freeze boundaries without receiving unrelated tool-cache schemas.
-func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput bool, promoteUserInput bool) TimelineRenderableBlocks {
+func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput bool, promoteUserInput bool, hide func(*PromotableTimelineItem) bool) TimelineRenderableBlocks {
 	var blocks TimelineRenderableBlocks
 	if !onlyUserInput && m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
 		blocks = append(blocks, &TimelineCompressedHeadBlock{
@@ -233,6 +233,10 @@ func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput
 				continue
 			}
 			if op != nil {
+				if hide != nil && hide(op) {
+					filteredToolCache = true
+					continue
+				}
 				if !open {
 					continue
 				}
