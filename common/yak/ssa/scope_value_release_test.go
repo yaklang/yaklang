@@ -104,6 +104,40 @@ func TestReleasePersistedOrdinaryValueVersions(t *testing.T) {
 	require.Same(t, variables[len(variables)-1], current, "release must not change lexical version order")
 }
 
+func TestReleaseTrimsSettledOrdinaryVersionChain(t *testing.T) {
+	prog := newSplitWriteProgram(t)
+	fn := prog.NewFunction("helper")
+	builder := fn.GetOrCreateBuilder()
+	var variables []*Variable
+	var ids []int64
+	for i := 0; i < 3; i++ {
+		value := builder.EmitConstInst(i)
+		variable := builder.CreateVariableForce("local")
+		builder.AssignVariable(variable, value)
+		variables = append(variables, variable)
+		ids = append(ids, value.GetId())
+	}
+	capturedValue := builder.EmitConstInst("captured")
+	captured := builder.CreateVariableForce("captured")
+	builder.AssignVariable(captured, capturedValue)
+	noteCapturedByClosure(capturedValue, "captured")
+	persistFinished(t, fn)
+
+	require.Equal(t, len(variables), prog.ReleasePersistedOrdinaryValues())
+	remaining := builder.CurrentBlock.ScopeTable.GetAllVariablesByName("local", true)
+	require.Len(t, remaining, 1, "persisted ordinary history must leave the scope chain")
+	require.Same(t, variables[len(variables)-1], remaining[0], "the lexical head stays reachable")
+	for i, variable := range variables {
+		reloaded := variable.GetValue()
+		require.NotNil(t, reloaded)
+		require.Equal(t, ids[i], reloaded.GetId(), "a caller holding an older version still reloads that saved instruction")
+	}
+	capturedVersions := builder.CurrentBlock.ScopeTable.GetAllVariablesByName("captured", true)
+	require.Len(t, capturedVersions, 1)
+	require.Same(t, captured, capturedVersions[0], "a captured version stays in the scope chain")
+	require.Same(t, capturedValue, captured.GetValue())
+}
+
 func TestReleaseKeepsCapturedHistoricalVersion(t *testing.T) {
 	prog := newSplitWriteProgram(t)
 	fn := prog.NewFunction("Helper")

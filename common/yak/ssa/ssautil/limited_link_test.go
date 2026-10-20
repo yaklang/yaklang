@@ -69,3 +69,26 @@ func TestLinkNodeFindShortCircuitAndDetachedSnapshots(t *testing.T) {
 		t.Fatal("older matches must be visited newest first")
 	}
 }
+
+func TestLinkNodeRemoveDropsOnlyTheTarget(t *testing.T) {
+	var ln LinkNode[*dummySSAValue]
+	a := NewVersioned[*dummySSAValue](0, "x", true, nil)
+	b := NewVersioned[*dummySSAValue](1, "x", true, nil)
+	c := NewVersioned[*dummySSAValue](2, "x", true, nil)
+	ln.Append(a)
+	ln.Append(b)
+	ln.Append(c)
+
+	if !ln.Remove(b) || len(ln.All()) != 2 || ln.Last() != c || ln.First() != a {
+		t.Fatal("removing the middle version must keep newest and oldest")
+	}
+	if !ln.Remove(a) || len(ln.All()) != 1 || ln.Last() != c || ln.First() != c {
+		t.Fatal("removing the oldest version must move the head forward")
+	}
+	if ln.Remove(b) {
+		t.Fatal("a version already removed must not match again")
+	}
+	if !ln.Remove(c) || ln.All() != nil || ln.Last() != nil || ln.First() != nil {
+		t.Fatal("removing the only version must clear the chain")
+	}
+}

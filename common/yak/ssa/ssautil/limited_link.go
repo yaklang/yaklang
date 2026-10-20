@@ -39,10 +39,16 @@ func (n *LinkNode[T]) Append(val VersionedIF[T]) {
 }
 
 func (n *LinkNode[T]) Last() VersionedIF[T] {
+	if n == nil || n.last == nil {
+		return nil
+	}
 	return n.last.value
 }
 
 func (n *LinkNode[T]) First() VersionedIF[T] {
+	if n == nil || n.header == nil {
+		return nil
+	}
 	return n.header.value
 }
 
@@ -64,10 +70,40 @@ func (n *LinkNode[T]) All() []VersionedIF[T] {
 	ret := make([]VersionedIF[T], length)
 	i := 0
 	for current := n.last; current != nil; current = current.previous {
-		ret[i] = current.value
+		if i < len(ret) {
+			ret[i] = current.value
+		} else {
+			ret = append(ret, current.value)
+		}
 		i++
 	}
-	return ret
+	// Removals leave last.ID above the live node count. Drop that tail
+	// instead of reporting nil holes as versions.
+	return ret[:i]
+}
+
+func (n *LinkNode[T]) Remove(target VersionedIF[T]) bool {
+	if n == nil || n.last == nil || target == nil {
+		return false
+	}
+	var newer *node[T]
+	for current := n.last; current != nil; current = current.previous {
+		if current.value == target {
+			if newer == nil {
+				n.last = current.previous
+			} else {
+				newer.previous = current.previous
+			}
+			if n.header == current {
+				n.header = newer
+			}
+			current.previous = nil
+			current.value = nil
+			return true
+		}
+		newer = current
+	}
+	return false
 }
 
 func (n *LinkNode[T]) Find(match func(VersionedIF[T]) bool) VersionedIF[T] {
