@@ -69,9 +69,9 @@ func runKnowledgeCaller(focus, native, model) {
         if manifest.tool!="query_knowledge_base" { errors=append(errors,"unexpected tool");continue }
         params=manifest.params
         if params.all || (params.name!=name && (len(params.names)!=1 || params.names[0]!=name)) { errors=append(errors,"query broadened the attached scope") }
-        if params.token_limit<256 || params.token_limit>1024 || params.limit<1 || params.limit>3 || params.per_entry_token_limit<128 || params.per_entry_token_limit>256 { errors=append(errors,"query violated the requested budget") }
+        if params.token_limit<256 || params.token_limit>1024 || params.limit<1 || (params.mode!="get" && params.limit>3) || params.per_entry_token_limit<128 || params.per_entry_token_limit>256 { errors=append(errors,"query violated the requested budget") }
         result=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
-        if result.used_tokens>result.token_limit { errors=append(errors,"query exceeded token budget") }
+        if result.used_tokens>result.token_limit || len(result.results)>3 { errors=append(errors,"query exceeded token/result budget") }
         if len(result.results)>0 { matched=true }
         for hit in result.results { if hit.knowledge_base!=name { errors=append(errors,"query returned another project") } }
         queries=append(queries,{"mode":params.mode,"token_limit":params.token_limit,"limit":params.limit,"per_entry_token_limit":params.per_entry_token_limit,"used_tokens":result.used_tokens})
@@ -174,7 +174,7 @@ func runKnowledgePlan(native,model,ctx) {
         } else if manifest.tool=="query_knowledge_base" {
             queries++
             if params.all || (params.name!=name && (len(params.names)!=1 || params.names[0]!=name)) { errors=append(errors,"PLAN query escaped explicit scope") }
-            if params.token_limit<256 || params.token_limit>1024 || params.limit<1 || params.limit>3 || params.per_entry_token_limit<128 || params.per_entry_token_limit>256 || value.used_tokens>value.token_limit || len(value.results)>params.limit { errors=append(errors,"PLAN query violated budgets") }
+            if params.token_limit<256 || params.token_limit>1024 || params.limit<1 || (params.mode!="get" && params.limit>3) || params.per_entry_token_limit<128 || params.per_entry_token_limit>256 || value.used_tokens>value.token_limit || len(value.results)>3 || len(value.results)>params.limit { errors=append(errors,"PLAN query violated budgets") }
             for hit in value.results {
                 if hit.knowledge_base!=name { errors=append(errors,"PLAN query returned decoy knowledge") }
                 if header in hit.content && marker in hit.content { hiddenRead=true }

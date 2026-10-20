@@ -44,12 +44,12 @@ func naturalTask(test,phase,question) {
             if params.name!="" { names=[params.name] }
             if params.all || len(names)==0 { failures=append(failures,"query implicitly broadened its scope") }
             for name in names { if !(name in [test.name,test.other]) { failures=append(failures,"query escaped the fixture scope") } }
-            if manifest.success && (params.token_limit<256 || params.token_limit>1024 || params.limit<1 || params.limit>3 || params.per_entry_token_limit<128 || params.per_entry_token_limit>256) { failures=append(failures,"query ignored the natural-language token/result budget") }
+            if manifest.success && (params.token_limit<256 || params.token_limit>1024 || params.limit<1 || (params.mode!="get" && params.limit>3) || params.per_entry_token_limit<128 || params.per_entry_token_limit>256) { failures=append(failures,"query ignored the natural-language token/result budget") }
         } else { failures=append(failures,"unexpected business tool") }
         if !manifest.success { recovered=append(recovered,{"tool":manifest.tool,"error":manifest.error});continue }
         value=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
         if manifest.tool=="query_knowledge_base" {
-            if value.used_tokens>value.token_limit || len(value.results)>params.limit { failures=append(failures,"query exceeded its shared token/result budget") }
+            if value.used_tokens>value.token_limit || len(value.results)>3 || len(value.results)>params.limit { failures=append(failures,"query exceeded its shared token/result budget") }
             for hit in value.results { if !(hit.knowledge_base in names) { failures=append(failures,"query returned content outside its explicit scope") } }
         }
         actual=append(actual,{"tool":manifest.tool,"params":params,"result":value})
