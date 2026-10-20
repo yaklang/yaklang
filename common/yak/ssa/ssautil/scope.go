@@ -332,14 +332,31 @@ func isZeroValue(i any) bool {
 // ---------------- read
 
 func (v *ScopedVersionedTable[T]) getLatestVersionInCurrentLexicalScope(name string) VersionedIF[T] {
+	if v == nil {
+		return nil
+	}
+	// linkMu covers the chain pointers. The ordered-map lock only covers
+	// lookup of the *LinkNode and is released before Last walks it.
+	v.linkMu.RLock()
+	defer v.linkMu.RUnlock()
 	return v.linkValues.Get(name)
 }
 
 func (v *ScopedVersionedTable[T]) getHeadVersionInCurrentLexicalScope(name string) VersionedIF[T] {
+	if v == nil {
+		return nil
+	}
+	v.linkMu.RLock()
+	defer v.linkMu.RUnlock()
 	return v.linkValues.GetHead(name)
 }
 
 func (v *ScopedVersionedTable[T]) getAllVersionInCurrentLexicalScope(name string) []VersionedIF[T] {
+	if v == nil {
+		return nil
+	}
+	v.linkMu.RLock()
+	defer v.linkMu.RUnlock()
 	return v.linkValues.GetAll(name)
 }
 
@@ -390,13 +407,17 @@ func (scope *ScopedVersionedTable[T]) ReadVariable(name string, current ...bool)
 
 func (scope *ScopedVersionedTable[T]) GetAllVariables() []VersionedIF[T] {
 	var ret []VersionedIF[T]
-
+	if scope == nil {
+		return ret
+	}
+	scope.linkMu.RLock()
 	scope.linkValues.ForEach(func(s string, vi VersionedIF[T]) {
 		if s == "" || s == "_" {
 			return
 		}
 		ret = append(ret, vi)
 	})
+	scope.linkMu.RUnlock()
 
 	return ret
 }
@@ -746,17 +767,19 @@ func (s *ScopedVersionedTable[T]) Compare(other ScopedVersionedTableIF[T]) bool 
 func (s *ScopedVersionedTable[T]) GetAllVariableNames() map[string]struct{} {
 	var names map[string]struct{} = make(map[string]struct{})
 
-	s.linkValues.ForEach(func(s string, vi VersionedIF[T]) {
-		if s == "" || s == "_" {
+	s.linkMu.RLock()
+	s.linkValues.ForEach(func(name string, vi VersionedIF[T]) {
+		if name == "" || name == "_" {
 			return
 		}
 
 		// TODO: 多值返回时生成的member导致phi值重复，这里暂时先跳过
-		if s[0] == '#' {
+		if name[0] == '#' {
 			return
 		}
-		names[s] = struct{}{}
+		names[name] = struct{}{}
 	})
+	s.linkMu.RUnlock()
 
 	parent := s.GetParent()
 	if parent != nil {
