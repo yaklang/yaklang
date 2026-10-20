@@ -31,14 +31,15 @@ const nativeOffsetBatchChunk = 500
 // call does not cache misses. Read-mode preload may cache non-empty value
 // snapshots separately; callers still receive their own row copies.
 func nativeGetOffsetsByVariable(db *gorm.DB, name string, valueID int64, programName string) ([]*IrOffset, error) {
-	query := nativeOffsetSelect + ` WHERE deleted_at IS NULL AND variable_name = ? AND value_id = ?`
-	args := []any{name, valueID}
-	if program := strings.TrimSpace(programName); program != "" {
-		query += ` AND program_name = ?`
-		args = append(args, program)
+	query, args := offsetVariableQuery(name, valueID, programName)
+	rows, err := queryOffsetRows(db, query, args...)
+	if err != nil {
+		return nil, err
 	}
-	query += ` ORDER BY id`
-	return queryOffsetRows(db, query, args...)
+	// Keep id order in memory. The composite index is not ordered by id, and
+	// putting ORDER BY id in the SQL changes the plan when sqlite_stat1 is absent.
+	sort.Slice(rows, func(i, j int) bool { return rows[i].ID < rows[j].ID })
+	return rows, nil
 }
 
 // nativeGetOffsetsByValueIDs reads every non-deleted binding for the requested
@@ -68,6 +69,19 @@ func nativeGetOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int6
 	}
 	sort.Slice(all, func(i, j int) bool { return all[i].ID < all[j].ID })
 	return all, nil
+}
+
+// offsetVariableQuery is the single-variable lookup. It has no ORDER BY.
+// Callers sort by id. Whether SQLite uses the value_id index for ORDER BY id
+// depends on statistics; this statement does not try to force an index.
+func offsetVariableQuery(name string, valueID int64, programName string) (string, []any) {
+	query := nativeOffsetSelect + ` WHERE deleted_at IS NULL AND variable_name = ? AND value_id = ?`
+	args := []any{name, valueID}
+	if program := strings.TrimSpace(programName); program != "" {
+		query += ` AND program_name = ?`
+		args = append(args, program)
+	}
+	return query, args
 }
 
 // offsetBatchQuery builds one read-mode batch statement. program_name must be
