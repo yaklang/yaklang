@@ -1,0 +1,157 @@
+// Real AI/embeddings. Prompts contain user requests, never tool/schema names.
+// AISMOKING_OUTPUT is required. Optional NATURAL_KNOWLEDGE_FOCUS=default|knowledge_enhance
+// and AISMOKING_FUNCTION_CALL=0|1 select a single workflow for diagnosis.
+root=os.Getenv("AISMOKING_OUTPUT")
+assert root!=""
+file.MkdirAll(root)~
+results=[]
+
+func naturalTask(test,phase,question) {
+    directory=file.Join(test.root,phase)
+    file.MkdirAll(directory)~
+    calls,events,parts=[],[],[]
+    restricted=false
+    mu=sync.NewMutex()
+    question+=sprintf("\n只允许修改本次测试库「%s」，不修改其他库；库名必须完整使用。查询知识正文最多取三条，总返回不超过1024 tokens，每条不超过256 tokens。请直接完成操作并如实说明实际结果，不需要计划或报告。",test.name)
+    err=aim.InvokeReAct(question,aim.focus(test.focus),aim.attachedKnowledgeBase(test.name),aim.attachedFileContent("测试范围：只写入本次指定库；查询范围由本轮问题指定，不可擅自扩大到全库。"),aim.sessionID("natural-"+randstr(16)),aim.workdir(directory),aim.context(context.WithTimeoutSeconds(240)),aim.timeout(210),aim.maxIteration(18),aim.reviewPolicy("yolo"),aim.disableAIForge(true),aim.disableMCPServers(true),aim.onEvent(func(op,e){
+        manager=op.GetConfig().GetAiToolManager()
+        if !restricted && manager!=nil { manager.RestrictToTools("manage_knowledge_base","query_knowledge_base");restricted=true }
+        mu.Lock()
+        defer mu.Unlock()
+        events=append(events,{"type":string(e.Type),"node":string(e.NodeId),"content":string(e.Content),"delta":string(e.StreamDelta)})
+        if string(e.Type)=="tool_call_log_dir" { calls=append(calls,json.loads(string(e.Content))) }
+        if string(e.Type)=="stream" && string(e.NodeId)=="re-act-loop-answer-payload" { parts=append(parts,string(e.StreamDelta)) }
+    }),aim.configOptions(aiagent.functionCallMode(test.native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        c.SetConfig("MustProcessAttachedData",false)
+        c.SetConfig("AllowSyncInitContext",false)
+        return nil
+    }))
+    failures,actual,recovered=[],[],[]
+    if err!=nil { failures=append(failures,string(err)) }
+    for call in calls {
+        manifest=json.loads(string(file.ReadFile(file.Join(call.dir_path,"..","manifest.json"))~))
+        params=manifest.params
+        names=[]
+        if manifest.tool=="manage_knowledge_base" {
+            if params.op=="list" {
+                if !(test.prefix in params.keyword) || params.limit<1 || params.limit>5 { failures=append(failures,"list ignored the requested fixture prefix/page limit") }
+            } else if params.op=="get" {
+                if !(params.name in [test.name,test.other]) { failures=append(failures,"metadata read escaped the fixture scope") }
+            } else if params.name!=test.name { failures=append(failures,"write escaped the owned test base") }
+        } else if manifest.tool=="query_knowledge_base" {
+            names=params.names
+            if params.name!="" { names=[params.name] }
+            if params.all || len(names)==0 { failures=append(failures,"query implicitly broadened its scope") }
+            for name in names { if !(name in [test.name,test.other]) { failures=append(failures,"query escaped the fixture scope") } }
+            if manifest.success && (params.token_limit<256 || params.token_limit>1024 || params.limit<1 || params.limit>3 || params.per_entry_token_limit<128 || params.per_entry_token_limit>256) { failures=append(failures,"query ignored the natural-language token/result budget") }
+        } else { failures=append(failures,"unexpected business tool") }
+        if !manifest.success { recovered=append(recovered,{"tool":manifest.tool,"error":manifest.error});continue }
+        value=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
+        if manifest.tool=="query_knowledge_base" {
+            if value.used_tokens>value.token_limit || len(value.results)>params.limit { failures=append(failures,"query exceeded its shared token/result budget") }
+            for hit in value.results { if !(hit.knowledge_base in names) { failures=append(failures,"query returned content outside its explicit scope") } }
+        }
+        actual=append(actual,{"tool":manifest.tool,"params":params,"result":value})
+    }
+    if len(actual)==0 { failures=append(failures,"AI did not execute any successful operation") }
+    outcome={"phase":phase,"passed":len(failures)==0,"question":question,"answer":str.Join(parts,""),"operations":actual,"recovered_tool_errors":recovered,"errors":failures}
+    file.SaveJson(file.Join(directory,"summary.json"),outcome)~
+    file.SaveJson(file.Join(directory,"events.json"),events)~
+    assert len(failures)==0,json.dumps(failures)
+    return outcome
+}
+
+func saw(outcome,tool,op) {
+    for call in outcome.operations { if call.tool==tool && (op=="" || call.params.op==op) { return true } }
+    return false
+}
+
+func runNaturalWorkflow(focus,native) {
+    directory=file.Join(root,focus+"-"+string(native))
+    file.MkdirAll(directory)~
+    prefix="knowledge-natural-"+string(time.Now().UnixNano())+"-"+randstr(8)
+    name,other=prefix+"-项目资料",prefix+"-对照项目"
+    header,marker="X-Natural-"+randstr(12),"NATURAL_FILE_"+randstr(16)
+    otherHeader,otherMarker="X-Other-"+randstr(12),"NATURAL_OTHER_"+randstr(16)
+    noteTitle,oldNote,newNote="临时维护说明", "NOTE_OLD_"+randstr(16), "NOTE_UPDATED_"+randstr(16)
+    test={"root":directory,"focus":focus,"native":native,"prefix":prefix,"name":name,"other":other}
+    file.SaveJson(file.Join(directory,"fixtures.json"),test)~
+    defer func(){
+        for owned in [name,other] {
+            _,err=aiknowledge.Get(owned)
+            if err==nil { aiknowledge.Delete(owned)~ }
+            page=aiknowledge.List(aiknowledge.keyword(owned),aiknowledge.limit(1))~
+            assert page.total==0,"owned natural-language fixture was not cleaned up"
+        }
+    }()
+    aiknowledge.Add(other)~
+    aiknowledge.AddEntry(other,"对照项目 API 鉴权说明","对照项目 API 的鉴权请求头是 "+otherHeader+"，校验标记是 "+otherMarker+"。")~
+    source=file.Join(directory,"项目接口说明.txt")
+    file.Save(source,"本项目 API 的鉴权请求头为 "+header+"。验证标记是 "+marker+"。这两个值只保存在本次文件资料中。")~
+    outcomes=[]
+    started=time.Now().UnixMilli()
+    create=naturalTask(test,"create",sprintf("请先列出库名包含「%s」的知识库，一页最多五个，只看元信息。然后新建精确名称「%s」的知识库，说明为「自然语言验证资料」，标签为「冒烟」和「临时」。最后查看这个库的详情确认创建结果。不要改动同前缀下的对照项目库。",prefix,name))
+    assert saw(create,"manage_knowledge_base","list") && saw(create,"manage_knowledge_base","create") && saw(create,"manage_knowledge_base","get")
+    base=aiknowledge.Get(name)~
+    assert base.knowledge_base.Description=="自然语言验证资料" && len(base.knowledge_base.Tags)==2 && "冒烟" in base.knowledge_base.Tags && "临时" in base.knowledge_base.Tags
+    outcomes=append(outcomes,create)
+    build="直接按文本切块入库，不生成问题索引；每块512字节，并发一。"
+    expectedBuild="chunks"
+    if native { build="根据内容生成可提问的问题索引后入库，避免只做文本切块；每块512字节，并发一。";expectedBuild="question_index" }
+    importResult=naturalTask(test,"import",sprintf("往「%s」新增一条标题为「%s」的知识，正文原样为「维护验证值是 %s」。再将引擎本地文件「%s」导入这个库，%s请等待实际落库完成，最后查看库详情确认已有资料。",name,noteTitle,oldNote,source,build))
+    assert saw(importResult,"manage_knowledge_base","add_entry") && saw(importResult,"manage_knowledge_base","build")
+    entryID=""
+    built=false
+    for call in importResult.operations {
+        if call.tool=="manage_knowledge_base" && call.params.op=="add_entry" { entryID=call.result.entry_id }
+        if call.tool=="manage_knowledge_base" && call.params.op=="build" {
+            assert call.params.source_file==source && call.params.build_options.mode==expectedBuild && call.params.build_options.chunk_size==512 && call.params.build_options.concurrency==1 && call.result.entries_added>0
+            built=true
+        }
+    }
+    assert built && entryID!=""
+    outcomes=append(outcomes,importResult)
+    read=naturalTask(test,"read",sprintf("请依据「%s」的文件资料回答：本项目 API 的鉴权请求头和验证标记分别是什么？附上完整来源库名。不要使用对照项目资料。",name))
+    assert saw(read,"query_knowledge_base","") && header in read.answer && marker in read.answer && name in read.answer && !(otherMarker in read.answer)
+    outcomes=append(outcomes,read)
+    update=naturalTask(test,"update",sprintf("把「%s」的说明改成「自然语言验证完成」，清空标签。同时找到标题「%s」的那条知识，将正文改为「维护验证值是 %s」，保留原条目，不要删除重建。修改后查看库详情，并按原文检索核对新正文。",name,noteTitle,newNote))
+    assert saw(update,"manage_knowledge_base","update") && saw(update,"manage_knowledge_base","update_entry") && saw(update,"query_knowledge_base","")
+    base=aiknowledge.Get(name)~
+    assert base.knowledge_base.Description=="自然语言验证完成" && len(base.knowledge_base.Tags)==0
+    updated=aiknowledge.Query(name,newNote,1024)~
+    old=aiknowledge.Query(name,oldNote,1024)~
+    assert len(updated.Results)==1 && updated.Results[0].EntryID==entryID && len(old.Results)==0
+    outcomes=append(outcomes,update)
+    multi=naturalTask(test,"multiple-bases",sprintf("这次请在「%s」和「%s」这两个精确名称的库中一起查询，分别回答本项目和对照项目的 API 鉴权请求头、校验标记，并逐项写明完整来源库名。查询范围仅这两个库，不要扩展到所有库。",name,other))
+    assert saw(multi,"query_knowledge_base","") && header in multi.answer && marker in multi.answer && otherHeader in multi.answer && otherMarker in multi.answer && name in multi.answer && other in multi.answer
+    outcomes=append(outcomes,multi)
+    remove=naturalTask(test,"delete-entry",sprintf("请从「%s」删除标题为「%s」的临时维护知识。只删那一条，保留从文件导入的鉴权资料。删除后按原文标题检索核对它已消失，并确认文件中的鉴权资料还在。",name,noteTitle))
+    assert saw(remove,"manage_knowledge_base","delete_entry") && saw(remove,"query_knowledge_base","")
+    remaining=aiknowledge.Query(name,marker,1024)~
+    removed=aiknowledge.Query(name,newNote,1024)~
+    assert len(remaining.Results)>0 && len(removed.Results)==0
+    outcomes=append(outcomes,remove)
+    deletion=naturalTask(test,"delete-base",sprintf("现在删除本次测试知识库，精确名称是「%s」。然后列出库名包含「%s」的库，每页至多五个，核对它已消失且对照项目库「%s」仍保留。严禁删除其他库。",name,prefix,other))
+    assert saw(deletion,"manage_knowledge_base","delete") && saw(deletion,"manage_knowledge_base","list")
+    page=aiknowledge.List(aiknowledge.keyword(name),aiknowledge.limit(1))~
+    untouched=aiknowledge.Get(other)~
+    assert page.total==0 && untouched.entry_count==1
+    outcomes=append(outcomes,deletion)
+    summary={"passed":true,"focus":focus,"function_call":native,"build_mode":expectedBuild,"real_provider":true,"real_embedding":true,"duration_ms":time.Now().UnixMilli()-started,"phases":outcomes}
+    file.SaveJson(file.Join(directory,"summary.json"),summary)~
+    results=append(results,summary)
+    file.SaveJson(file.Join(root,"results.json"),results)~
+    println("NATURAL_KNOWLEDGE_PASS ",focus," native=",native," phases=",len(outcomes))
+}
+
+for focus in ["default","knowledge_enhance"] {
+    if os.Getenv("NATURAL_KNOWLEDGE_FOCUS")!="" && os.Getenv("NATURAL_KNOWLEDGE_FOCUS")!=focus { continue }
+    for native in [false,true] {
+        protocol=os.Getenv("AISMOKING_FUNCTION_CALL")
+        if (protocol=="0" && native) || (protocol=="1" && !native) { continue }
+        runNaturalWorkflow(focus,native)
+    }
+}
+assert len(results)>0
+println("AISMOKING_LIVE_PASS")
