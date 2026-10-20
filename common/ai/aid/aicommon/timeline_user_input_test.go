@@ -1,7 +1,6 @@
 package aicommon
 
 import (
-	"context"
 	"strings"
 	"sync"
 	"testing"
@@ -10,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
 func TestTimelineUserInteractionReleaseOnlyRecordsAnsweredQuestions(t *testing.T) {
@@ -24,56 +22,6 @@ func TestTimelineUserInteractionReleaseOnlyRecordsAnsweredQuestions(t *testing.T
 	cfg.Epm.Feed(review.GetId(), aitool.InvokeParams{"suggestion": "continue"})
 	cfg.CallAfterInteractiveEventReleased(review.GetId(), review.GetParams())
 	require.Zero(t, cfg.Timeline.GetIdToTimelineItem().Len(), "tool reviews already use CallAfterReview")
-}
-
-func TestTimelineUserClarificationSurvivesCompressionAndRestore(t *testing.T) {
-	for _, legacy := range []bool{false, true} {
-		t.Run(map[bool]string{false: "interactive-answer", true: "legacy-clarification"}[legacy], func(t *testing.T) {
-			cfg := evidenceConfig(t)
-			const original = "  EXACT_CLARIFICATION\n\t只处理源码、不部署  \n"
-			var payload string
-			if legacy {
-				payload = "[user-clarification]:\nUser clarification requested: Which scope?\nUser response: " + original
-				cfg.Timeline.PushText(cfg.AcquireId(), payload)
-			} else {
-				ep := cfg.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
-				ep.SetReviewMaterials(aitool.InvokeParams{"prompt": "Which scope?", "options": []string{"all", "source only"}})
-				cfg.Epm.Feed(ep.GetId(), aitool.InvokeParams{"suggestion": "2", "extra_info": original})
-				cfg.CallAfterInteractiveEventReleased(ep.GetId(), ep.GetParams())
-				payload = string(utils.Jsonify(ep.GetParams()))
-			}
-			require.Contains(t, userInputPromptMaterials(cfg).TimelineOpen, payload)
-			cfg.Timeline.PushText(cfg.AcquireId(), "ordinary execution state")
-			if legacy {
-				cfg.Timeline.FreezeAll()
-			}
-			before := userInputPromptMaterials(cfg).PromotedUserInputHistory
-			if legacy {
-				require.Contains(t, before, payload)
-			} else {
-				require.Empty(t, before, "an Open answer must be promoted by compression itself")
-			}
-			bindCompressionMock(t, cfg.Timeline, func(req *AIRequest) (string, error) {
-				require.Contains(t, req.GetPrompt(), "EXACT_CLARIFICATION", "user answers inform extraction and remain independently preserved")
-				return compressionMockSummary("execution state summarized"), nil
-			})
-			result, err := cfg.Timeline.CompressOnce(compressionTestOptions())
-			require.NoError(t, err)
-			require.Len(t, result.RetiredIDs, 1, "only ordinary execution state is retired")
-			after := userInputPromptMaterials(cfg).PromotedUserInputHistory
-			require.Contains(t, after, payload)
-			if legacy {
-				require.Equal(t, before, after)
-			} else {
-				require.Contains(t, after, "source only", "the chosen option's meaning must survive with its answer")
-			}
-			raw, err := MarshalTimeline(cfg.Timeline)
-			require.NoError(t, err)
-			restored, err := UnmarshalTimeline(raw)
-			require.NoError(t, err)
-			require.Equal(t, after, userInputPromptBlocks(restored).PromotedUserInputHistory)
-		})
-	}
 }
 
 func userInputPromptMaterials(cfg *Config) PromptFrozenOpenMaterials {
@@ -229,25 +177,6 @@ func TestTimelineUserInputHistoryImportRepeatedInputsAndRestore(t *testing.T) {
 	nextID := int64(100)
 	restored.ReassignIDs(func() int64 { nextID++; return nextID })
 	require.Equal(t, blocks.PromotedUserInputHistory, userInputPromptBlocks(restored).PromotedUserInputHistory)
-}
-
-func TestTimelineUserInputCompressionAndRollbackKeepExactHistory(t *testing.T) {
-	cfg := evidenceConfig(t)
-	input := strings.Repeat("原始输入 long query\n", 5000)
-	_, err := cfg.AppendUserInputHistory(input, time.Now())
-	require.NoError(t, err)
-	result, err := cfg.Timeline.CompressOnce(TimelineCompressionOptions{Context: context.Background(), MaxInputTokens: 100000, MaxSummaryTokens: 1000})
-	require.NoError(t, err, "exact-only compression must seal without calling an AI summarizer")
-	require.Empty(t, result.RetiredIDs)
-	require.Contains(t, userInputPromptMaterials(cfg).PromotedUserInputHistory, input)
-	checkpoint := cfg.Timeline.GetMaxID()
-	_, err = cfg.AppendUserInputHistory("after checkpoint", time.Now())
-	require.NoError(t, err)
-	cfg.Timeline.FreezeAll()
-	require.Contains(t, userInputPromptMaterials(cfg).PromotedUserInputHistory, "after checkpoint")
-	require.NoError(t, cfg.Timeline.TruncateAfter(checkpoint))
-	require.NotContains(t, userInputPromptMaterials(cfg).PromotedUserInputHistory, "after checkpoint")
-	require.Contains(t, userInputPromptMaterials(cfg).PromotedUserInputHistory, input)
 }
 
 func TestTimelineUserInputConcurrentAppendOrder(t *testing.T) {

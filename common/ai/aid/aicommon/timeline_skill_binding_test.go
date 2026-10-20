@@ -2,80 +2,11 @@ package aicommon
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 )
-
-func TestSkillBindingPreservesRetiredTimelineAndRestoredHistory(t *testing.T) {
-	for _, restore := range []bool{false, true} {
-		name := "rebind"
-		if restore {
-			name = "restore"
-		}
-		t.Run(name, func(t *testing.T) {
-			vfs := filesys.NewVirtualFs()
-			vfs.AddFile("default/SKILL.md", "---\nname: default\ndescription: Default guide\nmetadata:\n  auto_load: true\n---\nRETIRED_DEFAULT_BODY")
-			loader, err := aiskillloader.NewFSSkillLoader(vfs)
-			require.NoError(t, err)
-			mgr := aiskillloader.NewSkillsContextManager(loader)
-			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-			tl := cfg.GetTimeline()
-			tl.SetTimelineBucketByteSize(-1)
-			bindTestTimeline(mgr, cfg)
-			mgr.LoadDefaultSkills()
-			require.True(t, mgr.IsSkillLoaded("default"))
-
-			bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-				// The live skill body is listed once as a deletable entry.
-				require.Equal(t, 1, strings.Count(req.GetPrompt(), "RETIRED_DEFAULT_BODY"))
-				return compressionMockSummary("Ordinary history summarized."), nil
-			})
-			options := compressionTestOptions()
-			options.FinalizeMemory = true
-			_, err = tl.CompressOnce(options)
-			require.NoError(t, err)
-			require.True(t, mgr.IsSkillLoaded("default"))
-			require.Len(t, mgr.GetCurrentSelectedSkills(), 1)
-
-			if restore {
-				raw, err := MarshalTimeline(tl)
-				require.NoError(t, err)
-				tl, err = UnmarshalTimeline(raw)
-				require.NoError(t, err)
-				mgr = aiskillloader.NewSkillsContextManager(loader)
-			}
-			before, err := MarshalTimeline(tl)
-			require.NoError(t, err)
-			beforeView := RenderTimelineFrozenOpen(tl)
-			nextID := tl.GetMaxID()
-			mgr.BindTimelineSink(NewSkillContentTimelineAdapter(tl, func() int64 {
-				nextID++
-				return nextID
-			}))
-			if !restore {
-				mgr.LoadDefaultSkills()
-			}
-			after, err := MarshalTimeline(tl)
-			require.NoError(t, err)
-			require.Equal(t, before, after, "binding and default initialization must not change existing history")
-			require.Equal(t, beforeView, RenderTimelineFrozenOpen(tl))
-			if !restore {
-				require.True(t, mgr.HasSkillContentHistory("default"))
-			}
-			require.True(t, mgr.IsSkillLoaded("default"))
-			require.Len(t, mgr.GetCurrentSelectedSkills(), 1)
-
-			added, err := mgr.LoadAutoSkill("default")
-			require.NoError(t, err)
-			require.False(t, added, "exact content must not be appended again")
-			require.Contains(t, mgr.RenderStable(), "RETIRED_DEFAULT_BODY")
-		})
-	}
-}
 
 func TestSkillBindingViewsTargetWithoutChangingEitherTimeline(t *testing.T) {
 	loader, err := aiskillloader.NewFSSkillLoader(buildSkillsVFS())

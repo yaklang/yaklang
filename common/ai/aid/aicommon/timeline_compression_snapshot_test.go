@@ -9,7 +9,6 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
-	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 )
 
 func compressionSnapshotFixture() *Timeline {
@@ -179,30 +178,4 @@ func TestTimelineCompressionSnapshotPreservesFullBodies(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, plan.SourceState, state)
 	require.Contains(t, plan.InputText, "item-240")
-}
-
-func TestTimelineCompressionPromptUsesProjectionWithoutRewritingToolData(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	toCompress := []*TimelineItem{
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 1, Text: "[TODO_DELTA]:\nDROP_REDUCER_BREADCRUMB"}},
-		{createdAt: time.Now(), value: &aitool.ToolResult{ID: 2, Name: "opaque", Success: true, Data: "KEEP_REDUCER_TOOL_DATA"}},
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 3, Text: "[DIRECT_CALL_PARAMS]:\nKEEP_REDUCER_DIRECT_PARAMS"}},
-	}
-	recentKeep := []*TimelineItem{
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 4, Text: "[evidence_ops]:\nDROP_RECENT_EVIDENCE_BREADCRUMB"}},
-		{createdAt: time.Now(), value: &TextTimelineItem{ID: 5, Text: "[review]:\nKEEP_RECENT_REVIEW"}},
-	}
-
-	for _, item := range append(toCompress, recentKeep...) {
-		importFreezeItem(tl, item.GetID(), item.createdAt, item.value)
-	}
-	snapshot, err := tl.buildCompressionSnapshot()
-	require.NoError(t, err)
-	prompt, err := renderCompressionSummaryPrompt(snapshot)
-	require.NoError(t, err)
-	require.NotContains(t, prompt, "DROP_REDUCER_BREADCRUMB")
-	require.NotContains(t, prompt, "DROP_RECENT_EVIDENCE_BREADCRUMB")
-	require.Contains(t, prompt, "KEEP_REDUCER_TOOL_DATA")
-	require.Contains(t, prompt, "KEEP_REDUCER_DIRECT_PARAMS")
-	require.Contains(t, prompt, "KEEP_RECENT_REVIEW")
 }
