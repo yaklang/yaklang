@@ -37,31 +37,18 @@ err = aim.InvokeReAct(
     aim.onEvent(func(react, event) {
         eventType = string(event.Type)
         
-        // 捕获 filesystem_pin_filename 事件
-        if eventType == "filesystem_pin_filename" {
+        // 捕获 report_finish 事件
+        if eventType == "report_finish" {
             contentStr = string(event.Content)
             if len(contentStr) > 0 {
                 try {
                     jsonData = json.loads(contentStr)
-                    if jsonData != nil && jsonData["path"] != nil {
-                        reportFilename = jsonData["path"]
+                    if jsonData != nil && jsonData["report_path"] != nil {
+                        reportFilename = jsonData["report_path"]
                     }
                 } catch e {
                     // ignore
                 }
-            }
-        }
-    }),
-    aim.onData(func(react, event, nodeId, data) {
-        // 备用：从 data 中捕获文件名
-        if event.Type == "filesystem_pin_filename" && len(data) > 0 && reportFilename == "" {
-            try {
-                jsonData = json.loads(string(data))
-                if jsonData != nil && jsonData["path"] != nil {
-                    reportFilename = jsonData["path"]
-                }
-            } catch e {
-                // ignore
             }
         }
     }),
