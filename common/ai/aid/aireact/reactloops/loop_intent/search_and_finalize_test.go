@@ -243,7 +243,7 @@ func TestMatchExplicitIdentifiersFromCatalogDoesNotUseSemanticSubstring(t *testi
 	catalog := strings.Join([]string{
 		"[tool:hostscan]: Host Scan - inspect a host",
 		"[tool:syn_scan_tcp_port]: SYN Scanner - scan TCP ports",
-		"[focus_mode:smart_qa]: Smart QA - answer questions",
+		"[focus_mode:report_generating]: Report Generating - write reports",
 	}, "\n")
 
 	matched := MatchExplicitIdentifiersFromCatalog(
