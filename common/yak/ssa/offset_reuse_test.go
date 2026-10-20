@@ -33,7 +33,8 @@ func TestOffsetDedupPreservesVariableAliases(t *testing.T) {
 			p.Cache.indexes.saveOffsetDedup(row)
 		}
 	}
-	require.NoError(t, p.Cache.indexes.Flush())
+	_, err := p.Cache.indexes.Flush()
+	require.NoError(t, err)
 	var rows []ssadb.IrOffset
 	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND value_id = ?", p.Name, 10).Find(&rows).Error)
 	require.Equal(t, 2, len(rows), "the same value and position may be referenced by different variable names")
