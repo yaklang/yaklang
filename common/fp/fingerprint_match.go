@@ -38,6 +38,7 @@ func (m *Matcher) reportFinished(port *MatchResult) {
 func (m *Matcher) reportOpen(port *MatchResult) {
 	reportOpenMutex.Lock()
 	defer reportOpenMutex.Unlock()
+	port.mergeProtocolFields(nil)
 
 	if m.Config.OpenPortSyncMap == nil {
 		m.Config.OpenPortSyncMap = new(sync.Map)
@@ -114,9 +115,10 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 
 	// 设置初始化匹配结果
 	result = &MatchResult{
-		Target: host,
-		Port:   port,
-		State:  CLOSED,
+		Target:         host,
+		Port:           port,
+		State:          CLOSED,
+		ProtocolFields: make(map[string]any),
 		Fingerprint: &FingerprintInfo{
 			IP:   host,
 			Port: port,

@@ -154,6 +154,9 @@ type MatchResult struct {
 	State       PortState        `json:"state"`
 	Reason      string           `json:"reason"`
 	Fingerprint *FingerprintInfo `json:"fingerprint"`
+	// ProtocolFields groups owned response message observations by protocol.
+	// See ParseProtocolFields for the message map layout.
+	ProtocolFields map[string]any `json:"protocol_fields"`
 }
 
 func (m *MatchResult) Identifier() string {
@@ -164,6 +167,7 @@ func (m *MatchResult) Tidy() {
 	if m == nil {
 		return
 	}
+	m.mergeProtocolFields(nil)
 	if m.Fingerprint == nil {
 		return
 	}
@@ -193,6 +197,7 @@ func (m *MatchResult) Merge(f *MatchResult) {
 	if !(m.Target == f.Target && m.Port == f.Port) {
 		return
 	}
+	m.mergeProtocolFields(f.ProtocolFields)
 
 	if m.Fingerprint == nil {
 		m.Fingerprint = f.Fingerprint

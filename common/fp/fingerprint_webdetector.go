@@ -44,10 +44,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		if !isOpen {
 			f.log("port is closed: %v", err)
 			return &MatchResult{
-				Target: host,
-				Port:   port,
-				State:  result.State,
-				Reason: err.Error(),
+				Target:         host,
+				Port:           port,
+				State:          result.State,
+				Reason:         err.Error(),
+				ProtocolFields: result.ProtocolFields,
 				Fingerprint: &FingerprintInfo{
 					IP:                ip.String(),
 					Port:              port,
@@ -58,10 +59,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		}
 		f.log("error occurred but port is open: %v", err)
 		fastResult := &MatchResult{
-			Target: host,
-			Port:   port,
-			State:  OPEN,
-			Reason: "",
+			Target:         host,
+			Port:           port,
+			State:          OPEN,
+			Reason:         "",
+			ProtocolFields: result.ProtocolFields,
 			Fingerprint: &FingerprintInfo{
 				IP:                ip.String(),
 				Port:              port,
@@ -76,9 +78,10 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 		f.log("no redirect info found")
 		// 设置初始化匹配结果
 		fastResult := &MatchResult{
-			Target: host,
-			Port:   port,
-			State:  OPEN,
+			Target:         host,
+			Port:           port,
+			State:          OPEN,
+			ProtocolFields: result.ProtocolFields,
 			Fingerprint: &FingerprintInfo{
 				IP:                ip.String(),
 				Port:              port,
@@ -111,6 +114,9 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 
 	f.log("finished to check iotdevfp: %v fetch response[%v]", utils2.HostPort(ip.String(), port), len(redirectInfos))
 	result.State = OPEN
+	for _, info := range redirectInfos {
+		result.mergeProtocolFields(parseProtocolFields(ctx, info.Request, [][]byte{info.Response}, TCP, port, false))
+	}
 	// notify via callback
 	f.reportOpen(result)
 
