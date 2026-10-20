@@ -52,7 +52,7 @@ func (m *Timeline) foldTimelineWithoutAI(ctx context.Context) (*timelineCompress
 		}
 	}
 	m.mu.Unlock()
-	return &timelineCompressionCommit{Result: result, Notify: notify, FreezeVersion: version + 1},
+	return &timelineCompressionCommit{Result: result, Notify: notify},
 		m.sessionMemory.saveOwner()
 }
 

@@ -1,29 +1,18 @@
 package reactloops
 
 import (
-	"strings"
 	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/log"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-// timelineCompressionTurnContext carries the same turn material the next
-// main-loop prompt would show. The compression request reuses that assembly
-// and only replaces the dynamic task with a compression decision.
+// timelineCompressionTurnContext reuses the assembled main-loop prompt.
+// Only the appended compression guide differs from the normal request.
 type timelineCompressionTurnContext struct {
-	Nonce             string
-	UserInput         string
-	FrozenUserContext string
-	Todo              string
-	TaskInstruction   string
-	ReactiveData      string
-	Memory            string
-	ExtraCapabilities string
-	PlanStatus        string
-	AutoContext       string
-	Prompt            string
+	Prompt       string
+	PromptTokens int64
+	TargetTokens int64
 }
 
 var contextOptimizationStatusIndex atomic.Uint64
@@ -54,66 +43,14 @@ func (r *ReActLoop) runTimelineCompressionAction(turn timelineCompressionTurnCon
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	r.compressionTurn = r.prepareCompressionTurn(turn)
+	r.compressionTurn = turn
+	defer func() { r.compressionTurn = timelineCompressionTurnContext{} }()
 	operator := newLoopActionHandlerOperator(r.GetCurrentTask())
 	handleCompressTimeline(r, nil, operator)
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	return nil
-}
-
-func (r *ReActLoop) mainTimelinePromptOptions() aicommon.TimelinePromptOptions {
-	if r == nil {
-		return aicommon.TimelinePromptOptions{}
-	}
-	return aicommon.TimelinePromptOptions{
-		IncludeLatestModelReplay: true,
-		PromoteUserInput:         true,
-		UserInputOnly:            r.useSpeedPriorityAI,
-	}
-}
-
-func (r *ReActLoop) prepareCompressionTurn(turn timelineCompressionTurnContext) timelineCompressionTurnContext {
-	if strings.TrimSpace(turn.Nonce) == "" {
-		turn.Nonce = "compress-timeline"
-	}
-	if strings.TrimSpace(turn.TaskInstruction) == "" {
-		provider := r.persistentInstructionProvider
-		if r.functionCallMode && r.functionCallInstructionProvider != nil {
-			provider = r.functionCallInstructionProvider
-		}
-		if provider != nil {
-			if built, err := provider(r, ""); err == nil {
-				turn.TaskInstruction = built
-			}
-		}
-	}
-	if turn.AutoContext == "" {
-		turn.AutoContext = r.renderAsyncExecutionContext(turn.Nonce)
-	}
-	if turn.PlanStatus == "" && r.planStatusProvider != nil {
-		turn.PlanStatus = r.planStatusProvider()
-	}
-	if turn.Todo == "" {
-		turn.Todo = r.currentTodoSnapshot(turn.Nonce)
-	}
-	return turn
-}
-
-func (r *ReActLoop) currentTodoSnapshot(nonce string) string {
-	if r == nil || r.config == nil || !r.shouldRenderTodoSnapshot() {
-		return ""
-	}
-	content := r.config.GetVerificationTodoRendered(aicommon.BuildVerificationTodoScope(r.GetCurrentTask()))
-	if content == "" {
-		return ""
-	}
-	rendered, err := utils.RenderTemplate(todoListTemplate, map[string]any{"Nonce": nonce, "Todo": content})
-	if err != nil {
-		return ""
-	}
-	return rendered
 }
 
 const defaultWholePromptTokenLimit int64 = 300 * 1024
@@ -173,13 +110,13 @@ func (r *ReActLoop) compressMainPrompt(input *loopPromptBuildInput, limit int64)
 	if err != nil {
 		return err
 	}
-	if limit > 0 && int64(aicommon.MeasureTokens(rebuilt)) <= limit/2 {
+	promptTokens := int64(aicommon.MeasureTokens(rebuilt))
+	if limit > 0 && promptTokens <= limit/2 {
 		return nil
 	}
 	return r.runTimelineCompressionAction(timelineCompressionTurnContext{
-		Nonce:             input.nonce,
-		UserInput:         input.userInput,
-		FrozenUserContext: input.frozenUserContext,
-		Prompt:            rebuilt,
+		Prompt:       rebuilt,
+		PromptTokens: promptTokens,
+		TargetTokens: limit / 2,
 	})
 }

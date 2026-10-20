@@ -5,31 +5,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 )
-
-// TimelineCompressionAnchor is one ordinary history entry the model can keep
-// by copying Token. Token is taken from the visible timeline text, not a bare ID.
-type TimelineCompressionAnchor struct {
-	Token string
-	ID    int64
-}
-
-// TimelineCompressionChoice is one promoted item the model can retire by the
-// name or evidence id already shown in the main-loop prompt.
-type TimelineCompressionChoice struct {
-	Name string
-	Kind string
-	IDs  []int64
-}
-
-// TimelineCompressionView is the dynamic-section brief for one compression action.
-type TimelineCompressionView struct {
-	DynamicGuide string
-	Anchors      []TimelineCompressionAnchor
-	Skills       []TimelineCompressionChoice
-	Evidence     []TimelineCompressionChoice
-}
 
 // CompressionDecision is one code-triggered compression after the lossless fold.
 // The reservation stays held until Commit or Abort.
@@ -37,21 +13,18 @@ type CompressionDecision struct {
 	timeline *Timeline
 	snapshot *timelineCompressionSnapshot
 	options  TimelineCompressionOptions
-	usage    timelinePromptUsage
-	view     TimelineCompressionView
-	anchors  map[string]int64
+	guide    string
 	skills   map[string][]int64
 	evidence map[string][]int64
 	output   *timelineCompressionOutput
-	commits  []*timelineCompressionCommit
 	finished bool
 }
 
-func (d *CompressionDecision) View() TimelineCompressionView {
+func (d *CompressionDecision) DynamicGuide() string {
 	if d == nil {
-		return TimelineCompressionView{}
+		return ""
 	}
-	return d.view
+	return d.guide
 }
 
 // BeginCompressionDecision opens one model compression after the caller has
@@ -61,9 +34,6 @@ func (m *Timeline) BeginCompressionDecision(options TimelineCompressionOptions) 
 		return nil, nil
 	}
 	options = m.prepareCompressionOptions(options)
-	if options.MaxInputTokens == 0 {
-		options.MaxInputTokens = TimelineCompressionMaxInputTokens
-	}
 	if options.MaxSummaryTokens == 0 {
 		options.MaxSummaryTokens = TimelineCompressionMaxSummaryTokens
 	}
@@ -71,50 +41,34 @@ func (m *Timeline) BeginCompressionDecision(options TimelineCompressionOptions) 
 		return nil, err
 	}
 	decision := &CompressionDecision{timeline: m, options: options}
-	usage := timelinePromptUsage{Limit: m.GetTimelineContentLimit()}
-	if usage.Limit <= 0 {
-		usage.Limit = 300 * 1024
-	}
-	decision.usage = usage
 	options.reportProgress(TimelineCompressionOptimizing)
 	m.mu.Lock()
 	snapshot, err := m.captureCompressionSnapshotLocked()
 	if err != nil {
 		m.mu.Unlock()
-		decision.Abort(err)
+		decision.Abort()
 		return nil, err
 	}
 	m.compressionSnapshot = snapshot
-	snapshot.TargetTokens = max(int64(1), usage.Limit/timelineCompressionTargetDivisor)
 	snapshot.Context = options.Context
-	blocks, _, budgetErr := m.captureCompressionBudgetBlocksLocked(options.PromptOptions)
 	m.mu.Unlock()
-	if budgetErr != nil {
-		decision.Abort(budgetErr)
-		return nil, budgetErr
-	}
-	snapshot.PromptBudget = newCompressionPromptBudget(blocks, usage.Limit, snapshot.TargetTokens)
-	snapshot.RetainedContext = make(map[string]string, len(options.RetainedContext))
-	for key, value := range options.RetainedContext {
-		snapshot.RetainedContext[key] = value
-	}
 	if err := prepareCompressionSnapshot(snapshot); err != nil && len(snapshot.ExactItemIDs) == 0 {
-		decision.Abort(err)
+		decision.Abort()
 		return nil, err
 	}
 	if err := options.Context.Err(); err != nil {
-		decision.Abort(err)
+		decision.Abort()
 		return nil, err
 	}
 	if err := m.sessionMemory.waitForModelTail(options.Context, func() {
 		options.reportProgress(TimelineCompressionMemory)
 	}); err != nil {
-		decision.Abort(err)
+		decision.Abort()
 		return nil, err
 	}
 	snapshot.SessionMemoryCandidates = m.sessionMemory.snapshot()
 	decision.snapshot = snapshot
-	decision.view = decision.buildView()
+	decision.buildGuide()
 	return decision, nil
 }
 
@@ -128,21 +82,14 @@ func (m *Timeline) FoldRedundantForCompression(ctx context.Context) error {
 	if err := m.awaitCompression(options); err != nil {
 		return err
 	}
-	decision := &CompressionDecision{timeline: m, options: options}
 	folded, err := m.foldTimelineWithoutAI(ctx)
-	if folded != nil {
-		decision.commits = append(decision.commits, folded)
-	}
-	decision.finish(nil)
+	m.finishCompression([]*timelineCompressionCommit{folded})
 	return err
 }
 
-func (d *CompressionDecision) Abort(err error) {
+func (d *CompressionDecision) Abort() {
 	if d == nil || d.finished {
 		return
-	}
-	if err != nil && d.timeline != nil {
-		d.timeline.recordCompressionOutcome(d.options, d.usage, err)
 	}
 	d.finish(nil)
 }
@@ -152,20 +99,18 @@ func (d *CompressionDecision) finish(extra *timelineCompressionCommit) {
 		return
 	}
 	d.finished = true
-	if extra != nil {
-		d.commits = append(d.commits, extra)
-	}
-	d.timeline.finishCompression(d.commits)
+	d.timeline.finishCompression([]*timelineCompressionCommit{extra})
 }
 
 // Validate checks one model action against the catalog shown in this decision.
-// It does not commit. Unknown anchors, skill names, or evidence ids are errors
+// It does not commit. Unknown timeline IDs, skill names, or evidence ids are errors
 // so the action can retry with guidance instead of deleting the wrong item.
 func (d *CompressionDecision) Validate(action *Action) error {
 	if d == nil || d.snapshot == nil || d.finished {
 		return fmt.Errorf("compression decision is not open")
 	}
-	if action == nil || (action.Name() != TimelineCompressionAction && action.Name() != "timeline-summary") {
+	d.output = nil
+	if action == nil || action.Name() != TimelineCompressionAction {
 		return fmt.Errorf("必须输出 compress_timeline")
 	}
 	rawSummary, _ := action.LookupCanonicalParam("summary")
@@ -174,7 +119,12 @@ func (d *CompressionDecision) Validate(action *Action) error {
 		return fmt.Errorf("summary 必须是字符串")
 	}
 	summary = strings.TrimSpace(summary)
-	retained, err := d.lookupAnchors(action)
+	rawRange, _ := action.LookupCanonicalParam("retain_timeline")
+	retainedRange, ok := rawRange.(string)
+	if !ok {
+		return fmt.Errorf("retain_timeline 必须是 ID/范围字符串，例如 12,18-23；全部概括时返回空字符串")
+	}
+	retained, err := parseCompressionRetainedRange(retainedRange, d.snapshot.Items)
 	if err != nil {
 		return err
 	}
@@ -185,10 +135,10 @@ func (d *CompressionDecision) Validate(action *Action) error {
 	if summary == "" && (d.snapshot.hasSummarySource() || len(retired) > 0) {
 		return fmt.Errorf("summary 不能为空；淘汰了技能或证据时，要在末尾写明本次淘汰了什么")
 	}
-	output := parseTimelineCompressionOutput(action, d.snapshot, summary)
-	output.RetainedIDs = retained
-	output.RetainedRange = strings.Join(d.anchorTokens(retained), "\n")
-	output.RetiredPromotedEntries = retired
+	output := &timelineCompressionOutput{
+		Summary: summary, RetainedIDs: retained, RetainedRange: strings.TrimSpace(retainedRange),
+		RetiredPromotedEntries: retired, MemoryEntities: parseTimelineCompressionMemories(action),
+	}
 	if err := validateCompressionSelection(output, d.snapshot, d.options); err != nil {
 		return err
 	}
@@ -209,7 +159,6 @@ func (d *CompressionDecision) Commit() (*TimelineCompressionResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	d.timeline.recordCompressionOutcome(d.options, d.usage, nil)
 	d.finish(commit)
 	if commit == nil {
 		return nil, nil
@@ -217,24 +166,9 @@ func (d *CompressionDecision) Commit() (*TimelineCompressionResult, error) {
 	return commit.Result, nil
 }
 
-func (d *CompressionDecision) buildView() TimelineCompressionView {
-	view := TimelineCompressionView{}
-	d.anchors = map[string]int64{}
+func (d *CompressionDecision) buildGuide() {
 	d.skills = map[string][]int64{}
 	d.evidence = map[string][]int64{}
-	seenAnchor := map[string]int{}
-	for _, item := range d.snapshot.Items {
-		token := compressionAnchorToken(item)
-		if token == "" {
-			continue
-		}
-		seenAnchor[token]++
-		if seenAnchor[token] > 1 {
-			token = fmt.Sprintf("%s ·%d", token, seenAnchor[token])
-		}
-		d.anchors[token] = item.ID
-		view.Anchors = append(view.Anchors, TimelineCompressionAnchor{Token: token, ID: item.ID})
-	}
 	skillOrder := []string{}
 	evidenceOrder := []string{}
 	for _, item := range d.snapshot.PromotedItems {
@@ -261,102 +195,53 @@ func (d *CompressionDecision) buildView() TimelineCompressionView {
 	}
 	sort.Strings(skillOrder)
 	sort.Strings(evidenceOrder)
-	for _, name := range skillOrder {
-		ids := append([]int64(nil), d.skills[name]...)
-		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-		d.skills[name] = ids
-		view.Skills = append(view.Skills, TimelineCompressionChoice{Name: name, Kind: TimelinePromotedKindSkillContent, IDs: ids})
-	}
-	for _, name := range evidenceOrder {
-		ids := append([]int64(nil), d.evidence[name]...)
-		sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-		d.evidence[name] = ids
-		view.Evidence = append(view.Evidence, TimelineCompressionChoice{Name: name, Kind: TimelinePromotedKindEvidence, IDs: ids})
-	}
-	view.DynamicGuide = renderCompressionDecisionGuide(d.snapshot, view)
-	d.view = view
-	return view
+	d.guide = renderCompressionDecisionGuide(d.snapshot, d.options, skillOrder, evidenceOrder)
 }
 
-func renderCompressionDecisionGuide(snapshot *timelineCompressionSnapshot, view TimelineCompressionView) string {
+func renderCompressionDecisionGuide(snapshot *timelineCompressionSnapshot, options TimelineCompressionOptions, skills, evidence []string) string {
 	var b strings.Builder
 	b.WriteString("# 本轮只压缩上下文\n")
 	b.WriteString("本轮不是执行任务。上面各段就是主循环下一轮会看到的真实上下文。不要调用工具，不要修改 TODO，不要回答用户。只输出 compress_timeline。\n")
-	b.WriteString("压缩方法在 PERSISTENT 指令里。这里只给出容量和允许点名的记号；记号必须从下面原样复制，不要发明，也不要改写。\n\n")
-	if snapshot != nil {
-		budget := snapshot.PromptBudget
-		target := snapshot.TargetTokens
-		if target == 0 {
-			target = budget.Target
-		}
-		ordinary, promoted := compressionCapacityParts(budget)
-		if budget.Current > 0 {
-			fmt.Fprintf(&b, "当前 Timeline：%d tokens。\n", budget.Current)
-		}
-		if target > 0 {
-			fmt.Fprintf(&b, "压缩目标：接近 %d tokens。目标不是越低越好；关键信息保留良好优先于继续压低。\n", target)
-		}
-		if budget.Current > 0 && target > 0 && budget.Current > target {
-			fmt.Fprintf(&b, "目前高出目标：%d tokens。只处理能补上这个差额的弱关联材料。\n", budget.Current-target)
-		}
-		if ordinary > 0 || promoted > 0 {
-			fmt.Fprintf(&b, "可优化部分：普通历史 %d tokens，技能与证据 %d tokens。工具 Schema 和用户输入不在可删除范围内。\n", ordinary, promoted)
-		}
-		if query := strings.TrimSpace(compressionRetainedText(snapshot, "user_query")); query != "" {
-			b.WriteString("\n当前任务目标只用于判断关联，不要写进 summary：\n")
-			b.WriteString(query)
-			b.WriteString("\n")
+	b.WriteString("压缩方法见前面的「压缩 Timeline」指引。以下列出整份主循环 prompt 的容量和允许选择的 ID、技能名、证据 id。\n\n")
+	if options.PromptTokens > 0 {
+		fmt.Fprintf(&b, "当前整份主循环 prompt：%d tokens。\n", options.PromptTokens)
+	}
+	if options.TargetTokens > 0 {
+		fmt.Fprintf(&b, "整份 prompt 压缩目标：接近 %d tokens（限制值的一半）。关键信息保留良好优先于继续压低。\n", options.TargetTokens)
+		if options.PromptTokens > options.TargetTokens {
+			fmt.Fprintf(&b, "目前高出目标：%d tokens。\n", options.PromptTokens-options.TargetTokens)
 		}
 	}
 	b.WriteString("\n# 可保留的普通历史\n")
-	b.WriteString("每一行都是 Frozen Prefix 或 Open Tail 里能对上的一条原文。retain_timeline 原样复制需要留下的整行；空数组表示这些普通历史都由 summary 概括。\n")
-	if len(view.Anchors) == 0 {
+	b.WriteString("retain_timeline 支持多个散落的 ID 段和单个 ID，用逗号组合，例如 \"3-8,12,20-26,37,41-45\"；空字符串表示全部由 summary 概括。范围只选择下列普通历史，不影响夹在其中的技能、证据或用户输入。条目按整条保留，不拆分工具调用及其结果。正文片段仅用于定位，无需复制。\n")
+	if len(snapshot.Items) == 0 {
 		b.WriteString("（没有可概括的普通历史）\n")
 	}
-	for _, anchor := range view.Anchors {
-		b.WriteString(anchor.Token)
-		b.WriteByte('\n')
+	for _, item := range snapshot.Items {
+		if item.PromptText != "" {
+			fmt.Fprintf(&b, "ID=%d %s\n", item.ID, compressionIndexLocator(item.PromptText))
+		}
 	}
 	b.WriteString("\n# 可淘汰的技能\n")
 	b.WriteString("名字与 semi-dynamic 里 `=== Skill: 名字 ===` 一致。retire_skill_names 写要整份去掉的名字；同一名字下的分页和 metadata 会一起去掉。空数组表示全部保留。\n")
-	if len(view.Skills) == 0 {
+	if len(skills) == 0 {
 		b.WriteString("（没有可淘汰的技能）\n")
 	}
-	for _, skill := range view.Skills {
-		b.WriteString(skill.Name)
+	for _, skill := range skills {
+		b.WriteString(skill)
 		b.WriteByte('\n')
 	}
 	b.WriteString("\n# 可淘汰的证据\n")
 	b.WriteString("id 与「已知观测（Evidence）」里的 id 一致。retire_evidence_ids 只写确认不再影响下一步的 id。空数组表示全部保留。\n")
-	if len(view.Evidence) == 0 {
+	if len(evidence) == 0 {
 		b.WriteString("（没有可淘汰的证据）\n")
 	}
-	for _, evidence := range view.Evidence {
-		b.WriteString(evidence.Name)
+	for _, id := range evidence {
+		b.WriteString(id)
 		b.WriteByte('\n')
 	}
 	b.WriteString("\nRecently Used Tools、Session User Input History、TODO、任务指令和目录都不能删除。\n")
 	return strings.TrimRight(b.String(), "\n")
-}
-
-func compressionAnchorToken(item timelineCompressionSnapshotItem) string {
-	body := item.PromptText
-	header := body
-	if index := strings.IndexByte(body, '\n'); index >= 0 {
-		header, body = body[:index], body[index+1:]
-	}
-	kind := "entry"
-	if start := strings.LastIndex(header, "["); start >= 0 {
-		if end := strings.Index(header[start:], "]"); end > 1 {
-			kind = strings.TrimSpace(header[start+1 : start+end])
-		}
-	}
-	locator := compressionIndexLocator(body)
-	if locator == "" {
-		return ""
-	}
-	clock := time.UnixMilli(item.Timestamp).Format("15:04:05")
-	return clock + " [" + kind + "] " + locator
 }
 
 func compressionSkillChoiceName(item timelineCompressionPromotedItem) string {
@@ -371,30 +256,6 @@ func compressionSkillChoiceName(item timelineCompressionPromotedItem) string {
 		name = name[:index]
 	}
 	return strings.TrimSpace(name)
-}
-
-func (d *CompressionDecision) lookupAnchors(action *Action) ([]int64, error) {
-	tokens, err := compressionStringList(action, "retain_timeline")
-	if err != nil {
-		return nil, err
-	}
-	if len(tokens) == 0 {
-		return nil, nil
-	}
-	selected := make([]int64, 0, len(tokens))
-	seen := map[int64]bool{}
-	for _, token := range tokens {
-		id, ok := d.anchors[token]
-		if !ok {
-			return nil, fmt.Errorf("retain_timeline 有无法对应的记号 %q，必须原样复制动态区列出的整行", token)
-		}
-		if !seen[id] {
-			seen[id] = true
-			selected = append(selected, id)
-		}
-	}
-	sort.Slice(selected, func(i, j int) bool { return selected[i] < selected[j] })
-	return selected, nil
 }
 
 func (d *CompressionDecision) lookupRetirements(action *Action) ([]int64, error) {
@@ -432,20 +293,6 @@ func (d *CompressionDecision) lookupRetirements(action *Action) ([]int64, error)
 	}
 	sort.Slice(retired, func(i, j int) bool { return retired[i] < retired[j] })
 	return retired, nil
-}
-
-func (d *CompressionDecision) anchorTokens(ids []int64) []string {
-	wanted := map[int64]bool{}
-	for _, id := range ids {
-		wanted[id] = true
-	}
-	var tokens []string
-	for _, anchor := range d.view.Anchors {
-		if wanted[anchor.ID] {
-			tokens = append(tokens, anchor.Token)
-		}
-	}
-	return tokens
 }
 
 func compressionStringList(action *Action, key string) ([]string, error) {

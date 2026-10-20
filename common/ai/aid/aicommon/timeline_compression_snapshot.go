@@ -20,7 +20,6 @@ type timelineCompressionSnapshot struct {
 	MemoryInputLimit        int
 	MemoryOutputLimit       int
 	Context                 context.Context `json:"-"`
-	TargetTokens            int64           // desired main-model Timeline size, not helper-output size
 	Head                    *TimelineCompressedHead
 	ThroughID               int64 // captured watermark, including exact state and tombstones
 	FrozenThroughID         int64
@@ -35,13 +34,12 @@ type timelineCompressionSnapshot struct {
 	FreezeVersion           int64
 	Evidence                string // detached effective session evidence, including pending mutations
 	UserContexts            []timelineCompressionUserContext
-	SessionMemoryCandidates []any                           // completed session extractions, detached from listeners and storage
-	MemoryCompletion        *timelineCompressionCompletion  `json:"-"`
-	Output                  *timelineCompressionOutput      `json:"-"`
-	SummaryPrompt           string                          `json:"-"` // actual rendered request source, runtime-only
-	CommittedFreeze         TimelineFreezeResult            `json:"-"` // detached receipt, populated only after validation
-	NotifyCommitted         func()                          `json:"-"` // observers captured at commit, called after unlock
-	PromptBudget            timelineCompressionPromptBudget `json:"-"` // main-model occupancy captured with this snapshot
+	SessionMemoryCandidates []any                          // completed session extractions, detached from listeners and storage
+	MemoryCompletion        *timelineCompressionCompletion `json:"-"`
+	Output                  *timelineCompressionOutput     `json:"-"`
+	SummaryPrompt           string                         `json:"-"` // actual rendered request source, runtime-only
+	CommittedFreeze         TimelineFreezeResult           `json:"-"` // detached receipt, populated only after validation
+	NotifyCommitted         func()                         `json:"-"` // observers captured at commit, called after unlock
 }
 
 type timelineCompressionUserContext struct {
@@ -65,37 +63,6 @@ type timelineCompressionPromotedItem struct {
 	Kind      string
 	Key       string
 	Operation string
-}
-
-// timelineCompressionPromptBudget is the main-model Timeline occupancy, using
-// the same projection that decides whether compression runs. Section token
-// counts are for the helper prompt; they are not a second budget enforcer.
-type timelineCompressionPromptBudget struct {
-	Current  int64
-	Target   int64
-	Limit    int64
-	Sections []timelineCompressionSectionUsage
-}
-
-type timelineCompressionSectionUsage struct {
-	Name   string
-	Tokens int64
-}
-
-// buildCompressionSnapshot includes the old summary and the original Frozen/Open
-// items. There is no retained suffix or fixed compression ratio.
-func (m *Timeline) buildCompressionSnapshot() (*timelineCompressionSnapshot, error) {
-	if m == nil {
-		return nil, fmt.Errorf("compression snapshot requires a timeline")
-	}
-	snapshot, err := m.captureCompressionSnapshot()
-	if err != nil {
-		return nil, err
-	}
-	if err := prepareCompressionSnapshot(snapshot); err != nil {
-		return nil, err
-	}
-	return snapshot, nil
 }
 
 func prepareCompressionSnapshot(snapshot *timelineCompressionSnapshot) error {
