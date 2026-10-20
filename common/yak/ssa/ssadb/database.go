@@ -175,6 +175,15 @@ func ensureConstLookupIndex(db *gorm.DB) {
 	}
 }
 
+// hasNamedIndex asks the dialect whether an index exists. db.New() clears a
+// program_name row scope while keeping the current connection.
+func hasNamedIndex(db *gorm.DB, table, index string) bool {
+	if db == nil || db.Dialect() == nil {
+		return false
+	}
+	return db.New().Dialect().HasIndex(table, index)
+}
+
 // deleteDuplicateIrCodes removes every row except the oldest (MIN id) per
 // (program_name, code_id) using a single window query, and returns the number
 // of removed rows. The oldest row is exactly what normal single-read paths
