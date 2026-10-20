@@ -173,35 +173,6 @@ func (b *FunctionBuilder) EmitFirst(i Instruction, blocks ...*BasicBlock) {
 	}
 }
 
-// emitBeforeLastInst inserts i right before the last instruction of the
-// current block in O(1). Inserting before the last instruction only shifts
-// that one element, while EmitFirst memmoves the whole instruction slice;
-// emitting N placeholders into one block via EmitFirst is therefore
-// quadratic in the block size. The position within the block is free to
-// choose here because the callers emit side-effect-free placeholders whose
-// users are all created after the insert: no existing instruction of the
-// block can reference them.
-func (f *FunctionBuilder) emitBeforeLastInst(i Instruction) {
-	block := f.CurrentBlock
-	if len(block.Insts) == 0 {
-		f.emit(i)
-		return
-	}
-	last, ok := f.GetInstructionById(block.Insts[len(block.Insts)-1])
-	if !ok || last == nil {
-		f.emit(i)
-		return
-	}
-	recoverBuilder := f.SetCurrent(last, true)
-	defer recoverBuilder()
-	f.emitEx(i, func(i Instruction) {
-		insts := block.Insts
-		insts = append(insts, 0)
-		insts[len(insts)-1] = i.GetId()
-		block.Insts = insts
-	})
-}
-
 func (f *FunctionBuilder) EmitInstructionBefore(i, before Instruction) {
 	f.emitAroundInstruction(i, before, func(i Instruction) {
 		insts := f.CurrentBlock.Insts
@@ -277,7 +248,7 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 // NOTE: the object/membercall will create vars in finished blocks
 func (f *FunctionBuilder) EmitUndefined(name string) *Undefined {
 	u := NewUndefined(name)
-	f.emitBeforeLastInst(u)
+	f.EmitFirst(u)
 	return u
 }
 
