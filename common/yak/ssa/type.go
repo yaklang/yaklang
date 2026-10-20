@@ -1224,6 +1224,85 @@ func (itype *ObjectType) rawString(format func(Type) string) string {
 	return ret
 }
 
+// typeStringLimitedBudget bounds TypeStringLimited output. Field-type graphs
+// shared diamond-style expand multiplicatively at every nesting level, so
+// building the full String() of such a type can grow exponentially; error
+// messages must not attempt it.
+const typeStringLimitedBudget = 4096
+
+// TypeStringLimited returns the same text as t.String() while the expansion
+// stays within typeStringLimitedBudget; once the budget or the depth cap is
+// exhausted the remaining part is abbreviated to "...". Only object and alias
+// types recurse structurally — every other kind is bounded by construction.
+func TypeStringLimited(t Type) string {
+	budget := typeStringLimitedBudget
+	return typeStringLimited(t, &budget, 0)
+}
+
+func typeStringLimited(t Type, budget *int, depth int) string {
+	if utils.IsNil(t) {
+		return "<nil>"
+	}
+	if *budget <= 0 || depth > 16 {
+		return "..."
+	}
+	switch typ := t.(type) {
+	case *AliasType:
+		if typ.Name != "" {
+			return typ.Name
+		}
+		return typeStringLimited(typ.GetType(), budget, depth+1)
+	case *ObjectType:
+		if typ.Combination {
+			return typeStringLimitedJoin(typ.FieldTypes, ", ", budget, depth)
+		}
+		if typ.Name != "" {
+			return typ.Name
+		}
+		switch typ.Kind {
+		case StructTypeKind:
+			s := typeStringLimitedJoin(typ.FieldTypes, ",", budget, depth)
+			*budget -= len(s) + 9
+			return "struct {" + s + "}"
+		case SliceTypeKind:
+			if typ.FieldType == nil {
+				return ""
+			}
+			elem := typeStringLimited(typ.FieldType, budget, depth+1)
+			if typ.Len == 0 {
+				return "[]" + elem
+			}
+			return fmt.Sprintf("[%d]%s", typ.Len, elem)
+		case MapTypeKind:
+			keyTyp := typ.KeyTyp
+			if utils.IsNil(keyTyp) {
+				keyTyp = CreateAnyType()
+			}
+			fieldType := typ.FieldType
+			if utils.IsNil(fieldType) {
+				fieldType = CreateAnyType()
+			}
+			return "map[" + typeStringLimited(keyTyp, budget, depth+1) + "]" + typeStringLimited(fieldType, budget, depth+1)
+		case TupleTypeKind:
+			return "[" + typeStringLimitedJoin(typ.FieldTypes, ",", budget, depth) + "]"
+		default:
+			return typ.String()
+		}
+	default:
+		return t.String()
+	}
+}
+
+func typeStringLimitedJoin(ts []Type, sep string, budget *int, depth int) string {
+	parts := make([]string, 0, len(ts))
+	for _, ft := range ts {
+		parts = append(parts, typeStringLimited(ft, budget, depth+1))
+	}
+	s := strings.Join(parts, sep)
+	*budget -= len(s)
+	return s
+}
+
 // for struct build
 func (s *ObjectType) AddField(key Value, field Type) {
 	if s == nil || utils.IsNil(key) {
