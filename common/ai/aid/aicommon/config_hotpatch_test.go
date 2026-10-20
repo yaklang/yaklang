@@ -410,29 +410,17 @@ func requireRuntimeContextLimit(t *testing.T, c *Config, limit int) {
 	require.EqualValues(t, limit, c.SimpleInfoMap()["TimelineContentSizeLimit"])
 }
 
-func stallTimelineCompression(t *testing.T, timeline *Timeline) {
-	t.Helper()
-	timeline.mu.Lock()
-	timeline.compressionLastFailure = "stale-limit"
-	timeline.compressionRetryAfter = time.Now().Add(time.Minute)
-	timeline.mu.Unlock()
-	require.True(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
-}
-
 func TestWithTimelineContentLimitUpdatesBoundTimeline(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	c := NewTestConfig(ctx)
 	timeline := c.GetTimeline()
 	timeline.SetTimelineContentLimit(111)
-	stallTimelineCompression(t, timeline)
 
 	require.NoError(t, WithTimelineContentLimit(64*1024)(c))
 
 	require.Same(t, timeline, c.GetTimeline())
 	requireRuntimeContextLimit(t, c, 64*1024)
-	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}),
-		"an explicit limit change must be measured immediately")
 }
 
 func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
@@ -444,7 +432,6 @@ func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
 	timeline := c.GetTimeline()
 	require.Same(t, timeline, c.GetTimeline())
 	timeline.SetTimelineContentLimit(111)
-	stallTimelineCompression(t, timeline)
 	require.Equal(t, DefaultTimelineContentSizeLimit, c.TimelineContentSizeLimit,
 		"precondition: only the timeline object is stale")
 
@@ -459,10 +446,8 @@ func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
 
 	require.Same(t, timeline, c.GetTimeline())
 	requireRuntimeContextLimit(t, c, 128*1024)
-	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
 
 	timeline.SetTimelineContentLimit(222)
-	stallTimelineCompression(t, timeline)
 	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
 		HotpatchType:     HotPatchType_RuntimeContextSizeLimit,
@@ -473,7 +458,6 @@ func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
 
 	require.Same(t, timeline, c.GetTimeline())
 	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
-	require.False(t, timeline.compressionCoolingDown(timelinePromptUsage{Fingerprint: "stale-limit"}))
 
 	feed(&ypb.AIInputEvent{
 		IsConfigHotpatch: true,
@@ -483,6 +467,17 @@ func TestHotPatch_RuntimeContextSizeLimit_UpdatesTimeline(t *testing.T) {
 		},
 	}, 1)
 	requireRuntimeContextLimit(t, c, DefaultTimelineContentSizeLimit)
+}
+
+func TestRuntimeContextLimitSurvivesSharedTimelineRebind(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	parent := NewTestConfig(ctx)
+	require.NoError(t, WithTimelineContentLimit(96*1024)(parent))
+
+	child := NewConfig(ctx, ConvertConfigToOptions(parent)...)
+	require.Same(t, parent.GetTimeline(), child.GetTimeline())
+	requireRuntimeContextLimit(t, child, 96*1024)
 }
 
 func TestHotPatch_RuntimeContextSizeLimit_PersistSessionStartParams(t *testing.T) {

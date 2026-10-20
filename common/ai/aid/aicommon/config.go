@@ -3374,8 +3374,7 @@ func WithTimelineLimit(limit int) ConfigOption {
 }
 
 // applyTimelineContentSizeLimit stores the base threshold and pushes it onto the live timeline.
-// Prompt overflow may later lower the timeline threshold for one model; an explicit limit change
-// must clear that backoff so the new threshold is measured immediately.
+// The main-loop compressor also reads the config field, so both views must move together.
 func (c *Config) applyTimelineContentSizeLimit(limit int) {
 	if c == nil {
 		return
@@ -3391,7 +3390,6 @@ func (c *Config) applyTimelineContentSizeLimit(limit int) {
 		return
 	}
 	timeline.SetTimelineContentLimit(int64(limit))
-	timeline.ClearCompressionBackoff()
 }
 
 func WithTimeline(t *Timeline) ConfigOption {
