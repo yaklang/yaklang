@@ -47,44 +47,31 @@ func (i *perceptionCapabilitySearchTestInvoker) GetConfig() aicommon.AICallerCon
 	return i.cfg
 }
 
-type perceptionKnowledgeSearchTestInvoker struct {
+type perceptionKnowledgeRetrievalSpy struct {
 	*mockcfg.MockInvoker
-	cfg                        aicommon.AICallerConfigIf
-	selectedKnowledgeBase      []string
-	quickSearchResult          string
-	compressedResult           string
-	lastQuickSearchQuery       string
-	lastQuickSearchKeywords    []string
-	lastQuickSearchCollections []string
-	lastCompressTarget         int64
-	selectCalls                int
+	cfg           aicommon.AICallerConfigIf
+	selectCalls   int
+	searchCalls   int
+	compressCalls int
 }
 
-func (i *perceptionKnowledgeSearchTestInvoker) GetConfig() aicommon.AICallerConfigIf {
+func (i *perceptionKnowledgeRetrievalSpy) GetConfig() aicommon.AICallerConfigIf {
 	return i.cfg
 }
 
-func (i *perceptionKnowledgeSearchTestInvoker) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
-	_ = ctx
-	_ = originQuery
+func (i *perceptionKnowledgeRetrievalSpy) SelectKnowledgeBase(ctx context.Context, originQuery string) (*aicommon.SelectedKnowledgeBaseResult, error) {
 	i.selectCalls++
-	return aicommon.NewSelectedKnowledgeBaseResult("test selection", append([]string{}, i.selectedKnowledgeBase...)), nil
+	return aicommon.NewSelectedKnowledgeBaseResult("unexpected legacy selection", nil), nil
 }
 
-func (i *perceptionKnowledgeSearchTestInvoker) QuickKnowledgeSearch(ctx context.Context, userQuery string, keywords []string, collections ...string) (string, error) {
-	_ = ctx
-	i.lastQuickSearchQuery = userQuery
-	i.lastQuickSearchKeywords = append([]string{}, keywords...)
-	i.lastQuickSearchCollections = append([]string{}, collections...)
-	return i.quickSearchResult, nil
+func (i *perceptionKnowledgeRetrievalSpy) QuickKnowledgeSearch(ctx context.Context, userQuery string, keywords []string, collections ...string) (string, error) {
+	i.searchCalls++
+	return "", nil
 }
 
-func (i *perceptionKnowledgeSearchTestInvoker) CompressLongTextWithDestination(ctx context.Context, input any, destination string, targetByteSize int64) (string, error) {
-	_ = ctx
-	_ = input
-	_ = destination
-	i.lastCompressTarget = targetByteSize
-	return i.compressedResult, nil
+func (i *perceptionKnowledgeRetrievalSpy) CompressLongTextWithDestination(ctx context.Context, input any, destination string, targetByteSize int64) (string, error) {
+	i.compressCalls++
+	return "", nil
 }
 
 func TestTriggerPerceptionUpdatesSummaryAndTopics(t *testing.T) {
@@ -107,7 +94,7 @@ func TestTriggerPerceptionUpdatesSummaryAndTopics(t *testing.T) {
 
 func TestTriggerPerceptionDoesNotRetrieveKnowledge(t *testing.T) {
 	cfg := &aicommon.Config{Ctx: context.Background(), ContextProviderManager: aicommon.NewContextProviderManager()}
-	invoker := &perceptionKnowledgeSearchTestInvoker{
+	invoker := &perceptionKnowledgeRetrievalSpy{
 		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
 		cfg:         &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
 	}
@@ -117,6 +104,7 @@ func TestTriggerPerceptionDoesNotRetrieveKnowledge(t *testing.T) {
 	loop.maxIterations = 100
 	loop.actionHistoryMutex = new(sync.Mutex)
 	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("task", "use attached project knowledge", context.Background(), cfg.GetEmitter(), true))
+	loop.Set("perception_knowledge_context", "RETIRED_KNOWLEDGE_CONTEXT")
 	loop.RegisterPerceptionContextProvider()
 	oldLister, oldSearcher := perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher
 	t.Cleanup(func() { perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher = oldLister, oldSearcher })
@@ -130,11 +118,12 @@ func TestTriggerPerceptionDoesNotRetrieveKnowledge(t *testing.T) {
 	require.Equal(t, 1, capabilities, "keep capability discovery")
 	require.Zero(t, lists)
 	require.Zero(t, invoker.selectCalls)
-	require.Empty(t, invoker.lastQuickSearchQuery)
-	require.Zero(t, invoker.lastCompressTarget)
+	require.Zero(t, invoker.searchCalls)
+	require.Zero(t, invoker.compressCalls)
 	rendered := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
 	require.NotContains(t, rendered, "Perception Knowledge")
 	require.NotContains(t, rendered, "private-kb")
+	require.NotContains(t, rendered, "RETIRED_KNOWLEDGE_CONTEXT")
 }
 
 func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
@@ -196,95 +185,6 @@ func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
 
 	rendered := loop.extraCapabilities.Render("nonce")
 	require.Contains(t, rendered, "`perception_tool`")
-}
-
-func TestTriggerPerception_AppliesKnowledgeSearchResultsToLoop(t *testing.T) {
-	cfg := &aicommon.Config{
-		Ctx:                    context.Background(),
-		ContextProviderManager: aicommon.NewContextProviderManager(),
-	}
-	invoker := &perceptionKnowledgeSearchTestInvoker{
-		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
-		cfg:                   &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
-		selectedKnowledgeBase: []string{"security_kb"},
-		quickSearchResult:     "raw knowledge result",
-		compressedResult:      "compressed knowledge result",
-	}
-
-	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.loopName = "perception-knowledge-search-test"
-	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
-	loop.allowRAG = func() bool { return true }
-	loop.maxIterations = 100
-	loop.actionHistory = make([]*ActionRecord, 0)
-	loop.actionHistoryMutex = new(sync.Mutex)
-	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("perception-knowledge-task", "help me fuzz this endpoint", context.Background(), cfg.GetEmitter(), true))
-	loop.RegisterPerceptionContextProvider()
-
-	originalKBLister := perceptionKnowledgeBaseNameLister
-	perceptionKnowledgeBaseNameLister = func() ([]string, error) {
-		return []string{"security_kb", "yaklang_docs"}, nil
-	}
-	defer func() {
-		perceptionKnowledgeBaseNameLister = originalKBLister
-	}()
-
-	state := loop.TriggerPerception(PerceptionTriggerForced, true)
-	require.NotNil(t, state)
-	require.Equal(t, "security_kb,yaklang_docs", loop.Get("perception_selected_knowledge_bases"))
-	require.Equal(t, "header malformed http fuzzing", loop.Get("perception_knowledge_query"))
-	require.Contains(t, loop.Get("perception_knowledge_context"), "compressed knowledge result")
-	require.Equal(t, int64(perceptionKnowledgeMaxContextTokens), invoker.lastCompressTarget)
-	require.Contains(t, invoker.lastQuickSearchQuery, "focused summary from perception")
-	require.Equal(t, []string{"header", "malformed", "http fuzzing"}, invoker.lastQuickSearchKeywords)
-	require.Equal(t, []string{"security_kb", "yaklang_docs"}, invoker.lastQuickSearchCollections)
-	require.Equal(t, 0, invoker.selectCalls)
-
-	renderedDynamicContext := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
-	require.Contains(t, renderedDynamicContext, "## Perception Knowledge")
-	require.Contains(t, renderedDynamicContext, "security_kb")
-	require.Contains(t, renderedDynamicContext, "yaklang_docs")
-	require.Contains(t, renderedDynamicContext, "compressed knowledge result")
-}
-
-func TestTriggerPerception_LimitsKnowledgeContextTo15K(t *testing.T) {
-	oversizedKnowledge := strings.Repeat("knowledge ", perceptionKnowledgeMaxContextTokens+2048)
-
-	cfg := &aicommon.Config{
-		Ctx:                    context.Background(),
-		ContextProviderManager: aicommon.NewContextProviderManager(),
-	}
-	invoker := &perceptionKnowledgeSearchTestInvoker{
-		MockInvoker:           mockcfg.NewMockInvoker(context.Background()),
-		cfg:                   &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
-		selectedKnowledgeBase: []string{"security_kb"},
-		quickSearchResult:     "raw knowledge result",
-		compressedResult:      oversizedKnowledge,
-	}
-
-	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
-	loop.loopName = "perception-knowledge-size-limit-test"
-	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
-	loop.allowRAG = func() bool { return true }
-	loop.maxIterations = 100
-	loop.actionHistory = make([]*ActionRecord, 0)
-	loop.actionHistoryMutex = new(sync.Mutex)
-	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("perception-knowledge-limit-task", "help me fuzz this endpoint", context.Background(), cfg.GetEmitter(), true))
-
-	originalKBLister := perceptionKnowledgeBaseNameLister
-	perceptionKnowledgeBaseNameLister = func() ([]string, error) {
-		return []string{"security_kb", "yaklang_docs"}, nil
-	}
-	defer func() {
-		perceptionKnowledgeBaseNameLister = originalKBLister
-	}()
-
-	state := loop.TriggerPerception(PerceptionTriggerForced, true)
-	require.NotNil(t, state)
-
-	knowledgeContext := loop.Get("perception_knowledge_context")
-	require.NotEmpty(t, knowledgeContext)
-	require.LessOrEqual(t, aicommon.MeasureTokens(knowledgeContext), perceptionKnowledgeMaxContextTokens)
 }
 
 func TestHashTopics_DeterministicAndOrderIndependent(t *testing.T) {
