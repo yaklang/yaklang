@@ -80,3 +80,24 @@ func TestUIRejectExternalReferences(t *testing.T) {
 	require.Error(t, CheckSchema(map[string]any{"$ref": "https://example.com/schema"}, 0))
 	require.Error(t, CheckSchema(map[string]any{"properties": map[string]any{"__proto__": true}}, 0))
 }
+
+func TestUIFormEnumArrayRejectsEmptyAndDuplicateChoices(t *testing.T) {
+	catalog := testCatalog(t)
+	doc := ComponentDocument{ID: "form", CatalogVersion: catalog.Version, Fallback: "选择关注方面", Root: "form",
+		Nodes: []ComponentNode{{ID: "form", Component: "ParameterForm", Action: &ComponentAction{Name: "submit_to_chat", Args: map[string]any{}},
+			Props: map[string]any{"schema": map[string]any{
+				"type": "object", "properties": map[string]any{"focus": map[string]any{
+					"type": "array", "minItems": float64(1),
+					"items": map[string]any{"type": "string", "enum": []any{"模块职责", "数据流"}},
+				}}, "required": []any{"focus"},
+			}}}}}
+	normalized, diagnostics := catalog.Normalize(doc)
+	require.Empty(t, diagnostics)
+	for _, values := range [][]any{nil, {}, {"数据流", "数据流"}, {"无效"}} {
+		_, err := normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"focus": values}}, catalog)
+		require.Error(t, err)
+	}
+	text, err := normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"focus": []any{"数据流"}}}, catalog)
+	require.NoError(t, err)
+	require.Contains(t, text, "数据流")
+}

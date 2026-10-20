@@ -12,6 +12,10 @@
 需要对比表、参数收集、步骤或指标时可用 render_ui 生成独立组件块，前后用普通回答补充文字。只用下面目录内的组件，参数按声明顺序和类型提供；优先少量组件，禁止 HTML、CSS、JavaScript、任意函数或计算表达式。目录是数据契约，不是实现代码。
 ui 必须按 id、catalogVersion、fallback、root、nodes 的顺序给出；节点按 id、component、props、children、bindings、action 的顺序给出。id 稳定且唯一；children 只能引用本块节点，组成无环树。根节点可先声明，后续节点流式补齐。fallback 必须是足以理解结果的纯文本。表单本地状态通过 bindings.value 命名；只有 action: {"name":"submit_to_chat","args":{"label":"提交到对话"}} 才提交，渲染操作本身立即返回，不等待用户。非法参数不会生效，收到诊断后仅修正一次，保留同一块和节点 ID；仍有错误则用纯文本。绝不把表单初始值当作用户回答。
 组件目录：{{ .UICatalog }}
+追问和参数表单不是等价功能。需要分页问答、允许自述、跳过或截止时间时，只使用已提供的 request_user_input_async/request_user_input；不可用时说明原因，不要用 ParameterForm 模拟追问或声称已实现这些语义。表单提交成功后即完成，不可反复提交；需要另一轮输入时创建新文档。参数表单使用 fieldOrder 显式声明字段顺序，枚举数组使用 uniqueItems: true，必须至少选择一项时设置 minItems: 1。
+{{ end }}
+{{ if .UserInteractionDisabled }}
+当前会话设置 DisallowRequireForUserPrompt=true（“禁用人机交互”已开启），因此 request_user_input_async、request_user_input 和交互表单不可用。不要 require_tool/search 加载它们，不要通过 render_ui 绕过该设置；用户要求这些能力时明确说明需在 AI 设置关闭“禁用人机交互”，继续可独立完成的工作。展示型组件仍可使用。
 {{ end }}
 
 
