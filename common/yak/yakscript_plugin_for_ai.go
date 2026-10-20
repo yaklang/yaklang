@@ -224,6 +224,7 @@ func executeNativeYakPlugin(ctx context.Context, script *schema.YakScript, param
 		bindAIToolSleep(ae, ctx)
 		bindDBHistoryToEngine(ae, ctx, runtimeConfig)
 		bindMCPToEngine(ae, ctx, runtimeConfig)
+		bindAIKnowledgeToEngine(ae, ctx, runtimeConfig)
 		return nil
 	})
 
