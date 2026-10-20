@@ -940,6 +940,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"ScanFromSynResult":   _scanFromTargetStream,
 	"ScanFromSpaceEngine": _scanFromTargetStream,
 	"ScanFromPing":        _scanFromPingUtils,
+	"ParseProtocolFields": fp.ParseProtocolFields,
 
 	"proto": _protoOption,
 

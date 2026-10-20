@@ -198,6 +198,7 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 				return CLOSED, nil, utils2.Errorf("%s: %v", block.Probe.Name, err)
 			}
 			defer conn.Close()
+			var request []byte
 
 			// Send Payload
 			if block.Probe.Payload != "" {
@@ -206,10 +207,13 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 					host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(block.Probe.Payload),
 				)
 				_ = conn.SetWriteDeadline(getDeadlineFromContext(ctx, 3*time.Second))
-				_, _ = conn.Write([]byte(block.Probe.Payload))
+				payload := []byte(block.Probe.Payload)
+				n, _ := conn.Write(payload)
+				request = payload[:n]
 			}
 
-			banner := readBanner(ctx, conn, config.ProbeTimeout, config.FingerprintDataSize)
+			responseConn := &protocolResponseConn{Conn: conn}
+			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
 			log.Debugf(
 				"active probe for %s:%v recv(%v)-%v: %v",
 				host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(string(banner)),
@@ -237,6 +241,7 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			if info := applyMatchRules(rootCtx, block, banner, port, host, resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
 				resultFingerprintInfo = info
 			}
+			resultFingerprintInfo.protocolFields = responseConn.parse(rootCtx, request, banner, TCP, port)
 			return OPEN, resultFingerprintInfo, nil
 		}
 
@@ -262,14 +267,20 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			}
 			defer udpConn.Close()
 
-			_, _ = udpConn.Write([]byte(block.Probe.Payload))
-			banner := readBanner(ctx, udpConn, config.ProbeTimeout, config.FingerprintDataSize)
+			payload := []byte(block.Probe.Payload)
+			var request []byte
+			if n, err := udpConn.Write(payload); err == nil && n == len(payload) {
+				request = payload
+			}
+			responseConn := &protocolResponseConn{Conn: udpConn, udp: true}
+			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
 			if banner != nil {
 				resultFingerprintInfo.Banner = bannerToString(banner)
 				log.Infof("%s udp banner: %v", block.Probe.Name, resultFingerprintInfo.Banner)
 				if info := applyMatchRules(rootCtx, block, banner, port, host, resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
 					resultFingerprintInfo = info
 				}
+				resultFingerprintInfo.protocolFields = responseConn.parse(rootCtx, request, banner, UDP, port)
 			} else {
 				return UNKNOWN, resultFingerprintInfo, nil
 			}
