@@ -38,6 +38,7 @@ func TestJobEventPublisherFencesSessionAndHonorsCancellation(t *testing.T) {
 	waitForNodeSession(t, base)
 	fakeJS := &fakeJetStreamContext{}
 	publisher := newJobEventPublisher(base)
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.js, publisher.natsURL = fakeJS, session.NATSURL
 	ref := jobExecutionRef{CommandID: "cmd-a", JobID: "job-a", SubtaskID: "sub-a", AttemptID: "attempt-a", NodeSessionID: "session-retired"}
 	if err := publisher.PublishSucceeded(context.Background(), ref, "done"); err == nil {

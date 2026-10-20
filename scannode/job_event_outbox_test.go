@@ -182,6 +182,7 @@ func TestJobOutboxReplaysOriginalEnvelopeAfterNewSession(t *testing.T) {
 	fake := &fakeJetStreamContext{}
 	publisher := newJobEventPublisher(base)
 	publisher.outbox = box
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.js = fake
 	publisher.natsURL = session.NATSURL
 	require.Error(t, publisher.deliverPending(context.Background(), entries), "terminal replay needs a recovery grant")
@@ -263,6 +264,7 @@ func TestJobOutboxInterruptedStateCannotReopenOldExecution(t *testing.T) {
 	fake := &fakeJetStreamContext{}
 	publisher := newJobEventPublisher(base)
 	publisher.outbox = box
+	publisher.conn = newReconnectingEventTestConn(t)
 	publisher.js = fake
 	publisher.natsURL = session.NATSURL
 	require.NoError(t, box.acceptRecovery(session))

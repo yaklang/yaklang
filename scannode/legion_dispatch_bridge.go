@@ -414,10 +414,9 @@ func (b *legionJobBridge) finishDispatch(
 		return
 	}
 
-	// Execution has ended, but the platform cannot retire this Attempt until
-	// JetStream acknowledges the terminal event. Keep its HTTP heartbeat while
-	// NATS is unavailable so lease reclamation cannot repeat completed work.
-	// This is in-memory delivery: node death still relies on platform recovery.
+	// Keep this Attempt active until its terminal event is durably queued or
+	// acknowledged by a direct publisher. The ordinary Scan outbox then keeps
+	// its heartbeat active until the platform confirms terminal projection.
 	ctx := b.rootContext()
 	retryDelay := time.Second
 	if interval := b.heartbeatInterval(); interval > 0 && interval < retryDelay {
