@@ -63,8 +63,5 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 		return false
 	}
 	timeline.SetTimelineContentLimit(limit)
-	// A confirmed overflow is new evidence that compression is required; do not
-	// let an earlier compression failure suppress this attempt for a minute.
-	timeline.ClearCompressionBackoff()
 	return true
 }

@@ -238,7 +238,7 @@ func (m *Timeline) ArchiveMemoryBranch(branch *Timeline, afterID int64) error {
 // once. The caller supplies a bounded lifecycle and persists candidates before
 // FinishMemoryFinalization. Runtime-only locks and durable receipts are never
 // used by prompt rendering.
-func (m *Timeline) FinalizeMemory(ctx context.Context, _ ...TimelineCompressionOptions) error {
+func (m *Timeline) FinalizeMemory(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}

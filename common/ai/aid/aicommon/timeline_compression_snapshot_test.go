@@ -11,6 +11,20 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
+func (m *Timeline) buildCompressionSnapshot() (*timelineCompressionSnapshot, error) {
+	if m == nil {
+		return nil, fmt.Errorf("compression snapshot requires a timeline")
+	}
+	snapshot, err := m.captureCompressionSnapshot()
+	if err != nil {
+		return nil, err
+	}
+	if err := prepareCompressionSnapshot(snapshot); err != nil {
+		return nil, err
+	}
+	return snapshot, nil
+}
+
 func compressionSnapshotFixture() *Timeline {
 	tl := NewTimeline(nil, nil)
 	tl.compressedHead = &TimelineCompressedHead{Text: "OLD_SUMMARY " + strings.Repeat("previous finding ", 80), CoveredEndItemID: 1, Version: 2}

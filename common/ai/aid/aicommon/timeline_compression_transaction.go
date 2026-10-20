@@ -7,7 +7,6 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -40,20 +39,21 @@ const (
 )
 
 // TimelineCompressionAction is the only action on a main-loop compression turn.
-// timeline-summary remains an accepted alias for older responses.
 const TimelineCompressionAction = "compress_timeline"
 
+const (
+	TimelineCompressionMaxInputTokens   = 512 * 1024
+	TimelineCompressionMaxSummaryTokens = 16 * 1024
+)
+
 // TimelineCompressionOptions describes one explicit compression, not automatic
-// scheduling policy. Safety limits reject oversized helper input/output;
-// TargetTokens is the separate desired size of the main Timeline prompt.
+// scheduling policy. PromptTokens and TargetTokens refer to the entire
+// assembled main-loop prompt, not a separately measured Timeline budget.
 type TimelineCompressionOptions struct {
 	Context          context.Context
-	MaxInputTokens   int
 	MaxSummaryTokens int
-	RetainedContext  map[string]string     // actual independent prompt fields, not inferred from their names
-	FinalizeMemory   bool                  // include exact-only business context and wait for the full memory tail before commit
-	PromptOptions    TimelinePromptOptions // same projection used to assemble the main-model prompt
-	TargetTokens     int64                 // runtime target, zero for an explicit one-shot reduction
+	PromptTokens     int64
+	TargetTokens     int64
 	// OnProgress runs synchronously outside Timeline locks, only when work or
 	// waiting actually occurs. It must not schedule another compression.
 	OnProgress func(TimelineCompressionStage)
@@ -64,9 +64,6 @@ func (o TimelineCompressionOptions) reportProgress(stage TimelineCompressionStag
 		o.OnProgress(stage)
 	}
 }
-
-var errTimelineCompressionBusy = errors.New("timeline compression is already running")
-var errTimelineCompressionLimitChanged = errors.New("timeline content limit changed during compression")
 
 type TimelineCompressionResult struct {
 	ThroughID     int64
@@ -115,8 +112,7 @@ func (m *Timeline) commitCompressionRound(snapshot *timelineCompressionSnapshot,
 	if err != nil {
 		return nil, err
 	}
-	return &timelineCompressionCommit{Result: result, Notify: snapshot.NotifyCommitted,
-		FreezeVersion: snapshot.FreezeVersion + 1}, nil
+	return &timelineCompressionCommit{Result: result, Notify: snapshot.NotifyCommitted}, nil
 }
 
 func (m *Timeline) commitCompressionSnapshot(snapshot *timelineCompressionSnapshot, summary string) (*TimelineCompressionResult, error) {

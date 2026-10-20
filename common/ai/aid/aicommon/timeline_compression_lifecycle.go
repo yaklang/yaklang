@@ -2,15 +2,13 @@ package aicommon
 
 import (
 	"context"
-	"sort"
 )
 
 // A committed transaction and its detached observer receipt. The owner of the
 // compression lifecycle dispatches receipts only after releasing execution.
 type timelineCompressionCommit struct {
-	Result        *TimelineCompressionResult
-	Notify        func()
-	FreezeVersion int64
+	Result *TimelineCompressionResult
+	Notify func()
 }
 
 func (m *Timeline) prepareCompressionOptions(options TimelineCompressionOptions) TimelineCompressionOptions {
@@ -71,50 +69,10 @@ func (m *Timeline) finishCompression(commits []*timelineCompressionCommit) {
 	close(m.compressionDone)
 	m.compressionDone = nil
 	m.mu.Unlock()
-	// Callbacks can reenter CompressBeforePrompt without waiting on themselves.
+	// Release the reservation before invoking callbacks so they may reenter.
 	for _, commit := range commits {
 		if commit != nil && commit.Notify != nil {
 			commit.Notify()
 		}
 	}
-}
-
-// Return the latest reduction's summary/selection and all actual retirements.
-// A later lossless compaction must not replace the summary or input statistics
-// with its empty bookkeeping result.
-func collectCompressionResults(commits []*timelineCompressionCommit) *TimelineCompressionResult {
-	var result *TimelineCompressionResult
-	for _, commit := range commits {
-		if commit == nil || commit.Result == nil {
-			continue
-		}
-		if result == nil {
-			result = &TimelineCompressionResult{}
-		}
-		next := commit.Result
-		result.ThroughID = max(result.ThroughID, next.ThroughID)
-		result.RetiredIDs = append(result.RetiredIDs, next.RetiredIDs...)
-		result.RetiredPromotedEntryIDs = append(result.RetiredPromotedEntryIDs, next.RetiredPromotedEntryIDs...)
-		if next.InputTokens > 0 || next.Summary != "" {
-			result.Summary, result.InputTokens, result.SummaryTokens = next.Summary, next.InputTokens, next.SummaryTokens
-			result.RetainedRange = next.RetainedRange
-			result.RetainedIDs = append([]int64(nil), next.RetainedIDs...)
-		}
-	}
-	if result != nil {
-		result.RetiredIDs = sortedCompressionIDs(result.RetiredIDs)
-		result.RetiredPromotedEntryIDs = sortedCompressionIDs(result.RetiredPromotedEntryIDs)
-	}
-	return result
-}
-
-func sortedCompressionIDs(ids []int64) []int64 {
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	unique := ids[:0]
-	for _, id := range ids {
-		if len(unique) == 0 || unique[len(unique)-1] != id {
-			unique = append(unique, id)
-		}
-	}
-	return unique
 }
