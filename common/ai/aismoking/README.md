@@ -21,6 +21,7 @@ yak common/ai/aismoking/run.yak
 | 脚本 | 覆盖内容 |
 | --- | --- |
 | [knowledge_base_management.yak](knowledge_base_management.yak) | 两种协议的真实 ReAct → SKILL 索引 → require 两个内置 Yak 工具 → 库列表/增删改查、条目修改、文件构建、稳定 ID 索引重建、语义查询、全 JSON token 预算与续读、names 多库/显式 all；模型与 embedding 为确定性夹具 |
+| [knowledge_callers.yak](knowledge_callers.yak) | `aim.InvokeReAct` 验证普通、报告、侦察三个 loop：加载 SKILL、require 完整 schema、执行受库名和 token 预算约束的查询；保留附件偏好，核验隐藏随机事实、隔离干扰库、报告文件和完成卡片。模型和 embedding 为 mock；不自动切换到知识专注模式 |
 | [mainloop.yak](mainloop.yak) | 默认 `aim.InvokeReAct` × 两种协议 × require/load_capability；只加载 Schema、错误参数 reason/retry、修正后显式执行、实际读文件、session Evidence、冻结提升和纯动态区不重复展示用户输入 |
 | [mcp_management.yak](mcp_management.yak) | 默认 `aim.InvokeReAct` × 文本流/function-call；自动 system skill、require 三个 MCP 脚本工具、真实 profile 配置增删/启用状态/分页/凭据隐藏、远端 MCP 游标分页与调用；`AISMOKING_CASE=mcp_management` 隔离执行 |
 | [tool_params_group.yak](tool_params_group.yak) | 双协议；名称数组只加载 Schema、无效分组零执行、修正后真实文件读取、结果隔离、Evidence 及六轮主请求静态前缀稳定 |
@@ -92,6 +93,8 @@ yak common/ai/aismoking/forge.yak
 - [http_packet_history.yak](http_packet_history.yak)：`aim.InvokeReAct` 的文本流和 function-call 两种协议依次调用项目列表、HTTP 历史查询、精确 ID 获取及文件 grep，核对默认工具展示、Skill 自动加载、原始请求和完整大响应导出。使用 `AISMOKING_CASE=http_packet_history` 从总入口运行，仅供本地开发。
 
 ## 收集与清理范围
+
+`live/knowledge_callers.yak` 使用真实 AI 和 embedding 运行普通、报告、侦察三种模式的同一组 `aim.InvokeReAct` 任务。设置新的 `AISMOKING_OUTPUT` 后直接执行脚本；逐一核验两种请求协议、精确附加库名、只读约束、实际查询预算、隐藏随机事实和报告文件/卡片。报告模式沿用现有文本 AITag 协议。测试只创建随机命名的自有夹具库并在退出时删除，保存逐例 summary 与事件，真实服务失败不会计为通过。
 
 `live/knowledge_base_management.yak` 使用真实配置模型和 embedding，在普通通用 loop 中通过 Skill 引导的两个工具执行创建、AI 问题索引构建、显式 names 数组/单库名的预算语义和关键词查询、元信息更新，并用直接 API 核验实际入库。测试将工具范围限定为这两个内置工具；只创建随机命名测试库，退出时清理。设置 `AISMOKING_OUTPUT` 为新目录；`AISMOKING_FUNCTION_CALL=0` 可切换文本协议。保存事件、工具 artifacts 路径与 summary，不保存认证头；真实服务失败不会计为通过。仅供本地开发，不进入 CI。
 
