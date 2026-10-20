@@ -623,7 +623,7 @@ func TestBuiltinSystemSkillsDefaultContext(t *testing.T) {
 	if strings.Contains(rendered, "[source: user-forced]") {
 		t.Fatal("default skills must not carry user-forced source markers")
 	}
-	for _, text := range []string{"FuzzTag 文本生成", "grep_timeline_history", "read_memory", "amend_memory", "list_yak_projects", "query_http_packet_history", "fetch_http_packet_by_id", "@yaklang-system/reference.md"} {
+	for _, text := range []string{"FuzzTag 文本生成", "grep_timeline_history", "read_memory", "amend_memory", "list_yak_projects", "query_http_packet_history", "fetch_http_packet_by_id", "manage_knowledge_base", "query_knowledge_base", "token_limit", "all=true", "per_entry_token_limit", "@yaklang-system/reference.md"} {
 		if !strings.Contains(rendered, text) {
 			t.Errorf("default prompt missing %q", text)
 		}

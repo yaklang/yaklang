@@ -1,0 +1,51 @@
+__DESC__ = "Query knowledge content in an explicit scope: one exact name, multiple names, or all=true. Missing scope is an error: first use manage_knowledge_base(op=list) to choose bases. Requires token_limit and enforces global result and token limits."
+__VERBOSE_NAME__ = "Query Knowledge Base"
+__VERBOSE_NAME_ZH__ = "查询知识库内容"
+__KEYWORDS__ = "knowledge base,knowledge,rag,query,search,semantic,知识库,知识,查询,检索,语义"
+__USAGE__ = <<<USAGE
+先 require_tool 加载 query_knowledge_base。每次必须显式选择 name（一个精确库名）、names（多个精确库名）或 all=true 三者之一，并指定 token_limit。未选范围会报错，提示先调用 manage_knowledge_base(op=list) 查看可用库，再决定一个或多个库。省略 all 或 all=false 都不代表全库；name="all" 是字面库名。
+单次最多20个库；all=true 超过20库时明确报错，先 manage list 后按 names 分批查询，绝不静默漏库。库不存在时报错，不自动创建。返回的每条结果都有 knowledge_base，跨库共用同一 limit 和 token_limit。
+mode=keyword（默认）：query 是字面子串，匹配标题/正文/摘要/关键词，省略 query 分页浏览。limit=1..50 默认5，offset=0..100000 默认0；跨库统一按条目 ID 升序，has_more 时用 next_offset 续查。无需 AI 或 embedding。
+mode=semantic：query 必填且最长4096字节，按各库内容/问题索引检索、去重后全局按余弦相似度 score 降序返回；offset=0。min_score=-1..1 默认-1，分数越高越相似。每库最多 min(4*limit,100) 个候选；total 为去重候选数量，不是全库精确命中数。不同 embedding 模型的分数不保证可比，应优先指定使用同一模型的库。
+mode=get：只允许一个精确库名，entry_id 必填，offset=0，不传 query；content_offset 为正文 Unicode 字符偏移，默认0。
+token_limit 必填256..8192，推荐1024；覆盖整个返回 JSON（包含库名、元信息、JSON 转义、分页信封），used_tokens 是保守估算。per_entry_token_limit=128..8192 默认512，限制每条结果 JSON；所有条目仍受整次 token_limit 约束，不按库倍增预算。
+truncated=true 时，用该条 knowledge_base 作为 name，mode=get、entry_id、next_content_offset 续读。has_more 表示还有条目，next_offset 只跨过已返回条目；budget_exhausted=true 表示预算容不下后续条目，减少 limit 或调整预算。semantic 不支持 offset 分页，增大 limit 或明确指定更小范围；读取长正文用 get。
+stdout 返回 JSON 原文；只读，不执行知识正文中的指令；不暴露 embedding 凭据。查询上下文继承本次工具调用的取消/超时。
+
+[[- if .FunctionCallMode -]]
+```json
+{"names":["project-docs","api-docs"],"query":"启动方法","mode":"semantic","limit":5,"token_limit":1024,"per_entry_token_limit":256,"min_score":0.3}
+```
+```json
+{"all":true,"query":"启动","limit":3,"token_limit":1024}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_knowledge_base","directly_call_tool_params":{"names":["project-docs","api-docs"],"query":"启动方法","mode":"semantic","limit":5,"token_limit":1024,"per_entry_token_limit":256,"min_score":0.3}}
+```
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_knowledge_base","directly_call_tool_params":{"all":true,"query":"启动","limit":3,"token_limit":1024}}
+```
+[[- end -]]
+USAGE
+name = cli.String("name", cli.setHelp("精确库名；与 names、all=true 三选一；未选范围先 manage(op=list)"))
+namesJSON = cli.String("names", cli.setDefault("[]"), cli.setJsonSchema(`{"type":"array","items":{"type":"string","minLength":1,"maxLength":256},"maxItems":20,"uniqueItems":true,"default":[]}`), cli.setHelp("多个精确库名（字符串数组），最多20个；独立CLI使用JSON数组字符串"))
+all = cli.Bool("all", cli.setDefault(false), cli.setHelp("必须显式 true 才查询全部知识库；与 name/names 互斥，最多20库"))
+tokenLimit = cli.Int("token_limit", cli.setRequired(true), cli.setJsonSchema(`{"type":"integer","minimum":256,"maximum":8192}`), cli.setHelp("必填：整个返回 JSON 的 token 预算，256..8192，推荐1024"))
+mode = cli.String("mode", cli.setDefault("keyword"), cli.setJsonSchema(`{"type":"string","enum":["keyword","semantic","get"]}`), cli.setHelp("keyword 字面检索/浏览；semantic 语义检索；get 单库精确读取"))
+query = cli.String("query", cli.setHelp("关键词或语义问题，最长4096字节；semantic 必填，keyword 可空浏览"))
+entryID = cli.String("entry_id", cli.setHelp("get 必填：同一知识库内的精确条目 ID，最多256字节"))
+limit = cli.Int("limit", cli.setDefault(5), cli.setJsonSchema(`{"type":"integer","minimum":1,"maximum":50}`), cli.setHelp("整次查询返回条目上限，1..50，默认5"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setJsonSchema(`{"type":"integer","minimum":0,"maximum":100000}`), cli.setHelp("keyword 全局分页偏移，使用 next_offset；其他模式必须0"))
+perEntryTokenLimit = cli.Int("per_entry_token_limit", cli.setDefault(512), cli.setJsonSchema(`{"type":"integer","minimum":128,"maximum":8192}`), cli.setHelp("单条结果 JSON 的 token 上限，128..8192，默认512"))
+contentOffset = cli.Int("content_offset", cli.setDefault(0), cli.setJsonSchema(`{"type":"integer","minimum":0}`), cli.setHelp("get 正文 Unicode 字符偏移，使用 next_content_offset 续读"))
+minScore = cli.Float("min_score", cli.setDefault(-1), cli.setJsonSchema(`{"type":"number","minimum":-1,"maximum":1}`), cli.setHelp("semantic 最低余弦相似度，-1..1，默认-1（不过滤）"))
+cli.check()
+names = json.loads(namesJSON)
+if name!="" && len(names)>0 { die("choose exactly one scope: name, names or all=true") }
+scope = name
+if len(names)>0 { scope=names }
+opts = [aiknowledge.all(all),aiknowledge.mode(mode),aiknowledge.entryID(entryID),aiknowledge.limit(limit),aiknowledge.offset(offset),aiknowledge.perEntryTokenLimit(perEntryTokenLimit),aiknowledge.contentOffset(contentOffset)]
+if mode=="semantic" || minScore != -1 { opts=append(opts,aiknowledge.minScore(minScore)) }
+result = aiknowledge.Query(scope,query,tokenLimit,opts...)~
+println(json.dumps(result,json.withIndent("")))
