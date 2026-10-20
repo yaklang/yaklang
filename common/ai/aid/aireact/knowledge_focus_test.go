@@ -36,6 +36,27 @@ func TestKnowledgeFocusPreservesCustomSkillLoader(t *testing.T) {
 	require.Len(t, loader.AllSkillMetas(), 1, "the caller's loader is not mutated")
 }
 
+func TestKnowledgeFocusKeepsConfiguredSkillStartup(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("project-guide/SKILL.md", "---\nname: project-guide\ndescription: Custom guide\n---\nUSER_SELECTED_PROJECT_GUIDE")
+	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()), aiskillloader.WithAutoLoad_FileSystem(vfs))
+	require.NoError(t, err)
+	runtime, err := NewTestReAct(aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithSkillLoader(loader), aicommon.WithEnabledCapabilities(aicommon.EnabledCapability{Name: "project-guide", Type: aicommon.EnabledCapabilityTypeSkill}))
+	require.NoError(t, err)
+	loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, runtime)
+	require.NoError(t, err)
+	defer loop.Release()
+	require.Same(t, loader, loop.GetSkillsContextManager().GetLoader())
+	require.True(t, loop.GetSkillsContextManager().IsSkillLoaded("project-guide"), "keep ordinary startup loading for user-selected Skills")
+
+	manager := aiskillloader.NewSkillsContextManager(loader)
+	other, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE, runtime, reactloops.WithSkillsContextManager(manager))
+	require.NoError(t, err)
+	defer other.Release()
+	require.Same(t, manager, other.GetSkillsContextManager(), "reuse an explicitly configured context manager")
+}
+
 func TestKnowledgeFocusRoutingAndReadOnlyPolicy(t *testing.T) {
 	for _, readOnly := range []bool{false, true} {
 		t.Run(fmt.Sprintf("read-only=%t", readOnly), func(t *testing.T) {

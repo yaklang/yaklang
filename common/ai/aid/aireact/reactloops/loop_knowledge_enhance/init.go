@@ -14,12 +14,6 @@ import (
 func init() {
 	err := reactloops.RegisterLoopFactory(schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE,
 		func(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*reactloops.ReActLoop, error) {
-			provider, ok := r.(interface {
-				GetKnowledgeSkillLoader(aiskillloader.SkillLoader) (aiskillloader.SkillLoader, error)
-			})
-			if !ok {
-				return nil, fmt.Errorf("knowledge_enhance requires the system Skill loader")
-			}
 			var loadErr error
 			prepareSkill := func(loop *reactloops.ReActLoop) {
 				var loader aiskillloader.SkillLoader
@@ -28,6 +22,20 @@ func init() {
 				}
 				if mgr := loop.GetSkillsContextManager(); mgr != nil {
 					loader = mgr.GetLoader()
+				}
+				if loader != nil {
+					for _, meta := range loader.AllSkillMetas() {
+						if meta != nil && meta.Name == "yaklang-system" {
+							return // Preserve normal startup loading and the caller's manager options.
+						}
+					}
+				}
+				provider, ok := r.(interface {
+					GetKnowledgeSkillLoader(aiskillloader.SkillLoader) (aiskillloader.SkillLoader, error)
+				})
+				if !ok {
+					loadErr = fmt.Errorf("knowledge_enhance requires the system Skill loader")
+					return
 				}
 				loader, loadErr = provider.GetKnowledgeSkillLoader(loader)
 				if loadErr == nil {
