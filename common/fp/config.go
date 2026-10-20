@@ -709,6 +709,7 @@ func WithOnlyEnableWebFingerprint(b bool) ConfigOption {
 func WithFingerprintRule(rules map[*NmapProbe][]*NmapMatch) ConfigOption {
 	return func(config *Config) {
 		config.FingerprintRules = rules
+		config.resetServiceRuleStamp()
 	}
 }
 
@@ -888,7 +889,6 @@ func WithNmapRule(i interface{}) ConfigOption {
 		if len(nmapRules) <= 0 {
 			return
 		}
-		config.FingerprintRules = nmapRules
-		config.resetServiceRuleStamp()
+		WithFingerprintRule(nmapRules)(config)
 	}
 }

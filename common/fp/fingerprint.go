@@ -72,26 +72,6 @@ func transportCacheKey(config *Config) string {
 	return b.String()
 }
 
-func rulesCacheStamp(rules map[*NmapProbe][]*NmapMatch) uint64 {
-	// 每条探针先折成独立哈希，再用异或合并。异或对顺序不敏感，
-	// map 的遍历顺序不会让同一个规则集得到不同的缓存键。
-	var sum uint64
-	for probe, matches := range rules {
-		if probe == nil {
-			continue
-		}
-		hash := uint64(14695981039346656037)
-		for i := 0; i < len(probe.Name); i++ {
-			hash ^= uint64(probe.Name[i])
-			hash *= 1099511628211
-		}
-		hash ^= uint64(probe.Index)*0x9E3779B185EBCA87 + uint64(len(probe.Payload))<<8
-		hash ^= uint64(probe.Rarity)<<17 + uint64(len(probe.Proto))<<9 + uint64(len(matches))
-		sum ^= hash
-	}
-	return sum ^ uint64(len(rules))
-}
-
 func (c *Config) serviceRuleStamp(rules map[*NmapProbe][]*NmapMatch) uint64 {
 	if c == nil {
 		return rulesCacheStamp(rules)
