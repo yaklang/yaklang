@@ -7,7 +7,13 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
 )
+
+// InitTask initializes the ordinary assistant, including user attachments.
+func InitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+	return buildInitTask(r)
+}
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
@@ -32,7 +38,7 @@ func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, 
 
 		// Original logic: process attached data (knowledge bases, files, etc.)
 		mustProcessMentionedInfo := config.GetConfigBool("MustProcessAttachedData")
-		if mustProcessMentionedInfo && !loop.HasPinnedContext() && hasAttachedKnowledgeBaseResource(attachedResources) {
+		if mustProcessMentionedInfo && loop.GetLoopName() != schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE && hasAttachedKnowledgeBaseResource(attachedResources) {
 			loop.UserStatus("开始处理用户提及的数据（@ Mentionup）", "Start to process user-mentioned data (@ Mentionup)")
 			err := ProcessAttachedData(r, loop, task, operator, attachedResources)
 			if err != nil {

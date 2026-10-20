@@ -22,7 +22,6 @@ type PromptMaterials struct {
 	HasLoadCapability bool
 
 	TaskInstruction     string
-	StaticInstruction   string
 	ExecutionPolicy     string
 	Schema              string
 	FunctionCallSchemas string
@@ -220,10 +219,6 @@ func RenderTimelineFrozenOpenWithLatestModelReplay(timeline *Timeline) TimelineF
 // ExcludeToolCache omits structured cache events and their semi snapshot, not
 // ordinary history mentioning tools or containing tool execution results.
 type TimelinePromptOptions struct {
-	// Omit duplicate root definitions already supplied by a loop-owned focus.
-	// Referenced Skill resource windows and ordinary tool results remain visible.
-	PinnedSkillNames         []string
-	PinnedToolNames          []string
 	IncludeLatestModelReplay bool
 	ExcludeToolCache         bool
 	// PromoteUserInput is opt-in for main context construction. Helper and
@@ -248,11 +243,10 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 // one lock, so Open and promoted content cannot be omitted or counted twice
 // while moving across a freeze boundary.
 func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptions) TimelineFrozenOpenBlocks {
-	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly, options.hidesPinnedDefinition)
-	promoted := options.withoutPinnedDefinitions(timeline.promotedState)
+	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly)
 	var recentTools string
 	if !options.ExcludeToolCache && !options.UserInputOnly {
-		recentTools = renderPromotedRecentTools(promoted)
+		recentTools = renderPromotedRecentTools(timeline.promotedState)
 	}
 	evidenceSemi := timeline.projectEvidenceLocked()
 	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
@@ -278,7 +272,7 @@ func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptio
 	return TimelineFrozenOpenBlocks{
 		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		SkillsContext:            renderPromotedSkillContent(promoted),
+		SkillsContext:            renderPromotedSkillContent(timeline.promotedState),
 		PromotedRecentTools:      recentTools,
 		PromotedUserInputHistory: userInputHistory,
 		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rb),
