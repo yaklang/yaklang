@@ -1,6 +1,18 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
+
+// batchReleaseDisabledForTest is set only from tests that compare persisted
+// IR with the post-batch release turned off. Production leaves it false.
+var batchReleaseDisabledForTest atomic.Bool
+
+func SetBatchReleaseDisabledForTest(disabled bool) {
+	batchReleaseDisabledForTest.Store(disabled)
+}
 
 // ReleasePersistedOrdinaryValues drops strong scope references to ordinary
 // instructions that have already been saved. The variable keeps the id and
@@ -14,7 +26,7 @@ import "github.com/yaklang/yaklang/common/utils"
 // instruction saver barrier has returned. It does not guess compile-unit
 // names and does not clear fn.Blocks.
 func (prog *Program) ReleasePersistedOrdinaryValues() int {
-	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+	if batchReleaseDisabledForTest.Load() || prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return 0
 	}
 	if prog.Cache.instructions.mode != ProgramCacheDBWrite {
