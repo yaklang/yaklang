@@ -190,8 +190,7 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 	}
 	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt()
 	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
-	result["AllowKnowledgeEnhanceAnswer"] = pm.react.config.GetEnhanceKnowledgeManager() == nil ||
-		!pm.react.config.GetDisableEnhanceDirectlyAnswer()
+	result["AllowKnowledgeEnhanceAnswer"] = true // Legacy template key; retrieval uses Skill-guided tools.
 	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
 	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
 

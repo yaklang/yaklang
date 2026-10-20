@@ -20,8 +20,8 @@
 - **Unverified**: {{ .PoolUnverified }}
 - **By source**: {{ .PoolBySource }}
 
-### Knowledge / RAG snippet
-{{ .EnhanceData }}
+### Knowledge references
+For knowledge-base answers, follow `yaklang-system`: load the Skill and tool schema only when missing, then call `query_knowledge_base`. Use the exact attached names and selection preferences. Without a scope, call `manage_knowledge_base(op=list)` and select explicit name/names; never silently expand to all bases. Specify token_limit; prefer 1024, limit=3, per_entry_token_limit=256. Results remain in the ordinary tool Timeline. Respect existing tool permissions.
 
 ### Recent tool recon log (truncated)
 ```

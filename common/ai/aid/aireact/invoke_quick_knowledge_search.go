@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/yaklang/gorm"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -240,62 +239,7 @@ func quickKnowledgeBM25Search(db *gorm.DB, collections []string, query string, k
 	return items, nil
 }
 
+// Deprecated: use query_knowledge_base with explicit scope and token limits.
 func (r *ReAct) QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error) {
-	if utils.IsNil(ctx) {
-		ctx = r.config.GetContext()
-	}
-	_ = ctx
-
-	query = strings.TrimSpace(query)
-	collections = utils.StringArrayFilterEmpty(collections)
-	keywords = normalizeQuickKnowledgeKeywords(query, keywords)
-	if len(collections) == 0 || (query == "" && len(keywords) == 0) {
-		return "", nil
-	}
-
-	db := consts.GetGormProfileDatabase()
-	if db == nil {
-		return "", nil
-	}
-
-	kbInfos, err := loadQuickKnowledgeBaseInfos(db, collections)
-	if err != nil {
-		return "", utils.Errorf("load knowledge base infos failed: %v", err)
-	}
-	if len(kbInfos) == 0 {
-		return "", nil
-	}
-
-	kbNameByID := make(map[int64]string, len(kbInfos))
-	var kbIDs []int64
-	for _, kb := range kbInfos {
-		if kb == nil {
-			continue
-		}
-		kbIDs = append(kbIDs, int64(kb.ID))
-		kbNameByID[int64(kb.ID)] = kb.KnowledgeBaseName
-	}
-	if len(kbIDs) == 0 {
-		return "", nil
-	}
-
-	likeItems, err := quickKnowledgeLikeSearch(db, kbIDs, kbNameByID, keywords)
-	if err != nil {
-		return "", utils.Errorf("knowledge LIKE search failed: %v", err)
-	}
-	bm25Items, err := quickKnowledgeBM25Search(db, collections, query, keywords)
-	if err != nil {
-		return "", utils.Errorf("knowledge BM25 search failed: %v", err)
-	}
-
-	var merged []quickKnowledgeSearchItem
-	seen := make(map[string]struct{}, len(likeItems)+len(bm25Items))
-	for _, item := range likeItems {
-		merged = appendQuickKnowledgeItem(merged, seen, item)
-	}
-	for _, item := range bm25Items {
-		merged = appendQuickKnowledgeItem(merged, seen, item)
-	}
-
-	return formatQuickKnowledgeSearchItems(merged), nil
+	return "", errLegacyRAGRetrieval
 }
