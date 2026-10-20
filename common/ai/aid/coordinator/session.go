@@ -170,6 +170,10 @@ func fromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 	key := "coordinator-input-" + id
 	if !forge {
 		parent.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
+			// The outer runtime validates and routes UI replies to their origin.
+			if e.GetUserInteraction() != "" || e.SyncType == aicommon.SyncUIInteraction {
+				return
+			}
 			switch e.SyncType {
 			case aicommon.SYNC_TYPE_USER_INTERVENTION, "queue_info", "react_cancel_task", "react_cancel_current_task":
 				// The outer runtime owns queue cancellation. Its context already

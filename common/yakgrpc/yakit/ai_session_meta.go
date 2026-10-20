@@ -239,6 +239,8 @@ func MergeCachedAISessionStartParams(cached, request *ypb.AIStartParams) *ypb.AI
 	}
 
 	merged := proto.Clone(cached).(*ypb.AIStartParams)
+	// Capabilities describe this connection, never the client that saved the session.
+	merged.ClientUI = request.GetClientUI()
 	merged.SingleModelMode = cached.GetSingleModelMode() || request.GetSingleModelMode()
 	merged.CoordinatorId = request.GetCoordinatorId()
 	merged.Sequence = request.GetSequence()

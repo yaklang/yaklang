@@ -35,23 +35,23 @@ func recordDecision(loop *reactloops.ReActLoop, name string, err error) {
 	}
 	d.considered = true
 	switch name {
-	case "modify_plan", "retry_task", "cancel_tasks", "directly_answer", "ask_for_clarification":
+	case "modify_plan", "retry_task", "cancel_tasks", "directly_answer", "ask_for_clarification", "request_user_input_async", "request_user_input":
 		d.handledUser = true
 	}
 	switch name {
-	case "directly_call_tool", "require_tool", "inspect_task", "save_evidence", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities", "modify_plan", "create_report", "modify_report", "ask_for_clarification":
+	case "directly_call_tool", "require_tool", "inspect_task", "save_evidence", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities", "modify_plan", "create_report", "modify_report", "ask_for_clarification", "request_user_input_async", "request_user_input":
 		// Tool results and intermediate edits require a next local decision even
 		// while workers are running. A TODO title is never parsed as a dependency.
 		d.continuation = true
 	}
 	switch name {
-	case "directly_call_tool", "require_tool", "inspect_task", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities", "ask_for_clarification":
+	case "directly_call_tool", "require_tool", "inspect_task", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities", "ask_for_clarification", "request_user_input_async", "request_user_input":
 		d.toolResult = true
 	}
 }
 
 func configureDecisionBoundary(loop *reactloops.ReActLoop) {
-	for _, name := range []string{"save_evidence", "directly_call_tool", "require_tool", "adjust_todolist", "ask_for_clarification", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities"} {
+	for _, name := range []string{"save_evidence", "directly_call_tool", "require_tool", "adjust_todolist", "ask_for_clarification", "request_user_input_async", "request_user_input", "knowledge_enhance_answer", "load_skills", "change_skill_view_offset", "load_skill_resources", "search_capabilities"} {
 		action, err := loop.GetActionHandler(name)
 		if err != nil {
 			continue

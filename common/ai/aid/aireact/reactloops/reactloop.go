@@ -461,6 +461,9 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		info["AllowAskForClarification"] = false
 	}
 	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
+		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
+	}
 
 	allowPlanRaw, ok := info["AllowPlan"]
 	if ok && utils.InterfaceToBoolean(allowPlanRaw) {
@@ -882,6 +885,16 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 			return nil, err
 		}
 		r.actions.Set(ac.ActionType, ac)
+		if cfg, ok := r.GetConfig().(*aicommon.Config); ok && cfg.UIQuestionsEnabled() {
+			r.actions.Delete(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
+			for _, name := range []string{"request_user_input_async", "request_user_input"} {
+				action, err := requireRegisteredLoopAction(name, "structured user interaction enabled")
+				if err != nil {
+					return nil, err
+				}
+				r.actions.Set(action.ActionType, action)
+			}
+		}
 	}
 
 	// Register skills actions conditionally

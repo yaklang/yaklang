@@ -689,6 +689,10 @@ func (r *reActSessionRuntime) attachConnection(
 	reservation *sessionReservation,
 ) (ReActConnection, error) {
 	log.Infof("attach connection to running aireact session: %s", sessionID)
+	if err := aicommon.WithClientUI(startParams.GetClientUI())(reAct.GetConfig().(*aicommon.Config)); err != nil {
+		delivery.cancel()
+		return nil, err
+	}
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, startParams, time.Now()); err != nil {
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
 	}
