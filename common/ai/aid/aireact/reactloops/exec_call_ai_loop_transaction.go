@@ -988,6 +988,11 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			}
 		}
 		var actionErr error
+		for _, field := range streamFields.Values() {
+			if field.RawJSON {
+				tagOptions = append(tagOptions, aicommon.WithActionCanonicalStreamFields(field.FieldName))
+			}
+		}
 		options := append(tagOptions, aicommon.WithActionAlias(actionNames...),
 			aicommon.WithActionFieldCallback(func(key string, value any, parents []string) {
 				activity.field("text", key, value, parents)
@@ -1022,6 +1027,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 						log.Warnf("stream field [%s] not found in streamFields, skipping", key)
 						done()
 						return
+					}
+					if fieldIns.RawJSON {
+						jsonReader.Reader = utils.UTF8Reader(reader)
 					}
 
 					pr, pw := utils.NewPipe()

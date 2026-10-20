@@ -37,6 +37,10 @@ func userQuestionsAction(blocking bool) *reactloops.LoopAction {
 			if !params.Has("questions") {
 				params = action.GetInvokeParams("next_action")
 			}
+			if err := interaction.ValidateSchema(interaction.QuestionSchema(), params["questions"]); err != nil {
+				operator.Feedback(err.Error())
+				return
+			}
 			raw, _ := json.Marshal(params["questions"])
 			var questions []interaction.Question
 			if err := json.Unmarshal(raw, &questions); err != nil {
