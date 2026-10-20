@@ -105,6 +105,38 @@ func TestTriggerPerceptionUpdatesSummaryAndTopics(t *testing.T) {
 	require.Equal(t, []string{"header", "malformed"}, state.Keywords)
 }
 
+func TestTriggerPerceptionDoesNotRetrieveKnowledge(t *testing.T) {
+	cfg := &aicommon.Config{Ctx: context.Background(), ContextProviderManager: aicommon.NewContextProviderManager()}
+	invoker := &perceptionKnowledgeSearchTestInvoker{
+		MockInvoker: mockcfg.NewMockInvoker(context.Background()),
+		cfg:         &perceptionSchedulerTestConfig{AICallerConfigIf: cfg, t: t},
+	}
+	loop := NewMinimalReActLoop(invoker.GetConfig(), invoker)
+	loop.loopName = "perception-without-legacy-rag"
+	loop.perception = newPerceptionController(perceptionDefaultIterationInterval)
+	loop.maxIterations = 100
+	loop.actionHistoryMutex = new(sync.Mutex)
+	loop.SetCurrentTask(aicommon.NewStatefulTaskBase("task", "use attached project knowledge", context.Background(), cfg.GetEmitter(), true))
+	loop.RegisterPerceptionContextProvider()
+	oldLister, oldSearcher := perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher
+	t.Cleanup(func() { perceptionKnowledgeBaseNameLister, perceptionCapabilitySearcher = oldLister, oldSearcher })
+	lists, capabilities := 0, 0
+	perceptionKnowledgeBaseNameLister = func() ([]string, error) { lists++; return []string{"private-kb"}, nil }
+	perceptionCapabilitySearcher = func(aicommon.AIInvokeRuntime, *ReActLoop, CapabilitySearchInput) (*CapabilitySearchResult, error) {
+		capabilities++
+		return &CapabilitySearchResult{}, nil
+	}
+	require.NotNil(t, loop.TriggerPerception(PerceptionTriggerForced, true))
+	require.Equal(t, 1, capabilities, "keep capability discovery")
+	require.Zero(t, lists)
+	require.Zero(t, invoker.selectCalls)
+	require.Empty(t, invoker.lastQuickSearchQuery)
+	require.Zero(t, invoker.lastCompressTarget)
+	rendered := cfg.ContextProviderManager.Execute(cfg, cfg.GetEmitter())
+	require.NotContains(t, rendered, "Perception Knowledge")
+	require.NotContains(t, rendered, "private-kb")
+}
+
 func TestTriggerPerception_AppliesCapabilitySearchResultsToLoop(t *testing.T) {
 	tool, err := aitool.New(
 		"perception_tool",
