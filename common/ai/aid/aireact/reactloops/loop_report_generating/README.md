@@ -143,13 +143,13 @@ err = aim.InvokeReAct(
     aim.onEvent(func(react, event) {
         // 注意：event.Type 需要转换为字符串进行比较
         eventType = string(event.Type)
-        if eventType == "filesystem_pin_filename" {
+        if eventType == "report_finish" {
             // event.Content 是 []byte 类型
             contentStr = string(event.Content)
             try {
                 jsonData = json.loads(contentStr)
-                if jsonData != nil && jsonData["path"] != nil {
-                    reportFilename = jsonData["path"]
+                if jsonData != nil && jsonData["report_path"] != nil {
+                    reportFilename = jsonData["report_path"]
                     log.Info("Report file: %s", reportFilename)
                 }
             } catch e {
