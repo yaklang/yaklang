@@ -2,12 +2,14 @@ package test
 
 import (
 	"embed"
-	"github.com/stretchr/testify/require"
-	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 	"io/fs"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/java/freemarker"
+	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 )
 
 //go:embed all:testdata
@@ -110,6 +112,11 @@ func validateSavedFreeMarkerFixture(t *testing.T, filePath string, content strin
 	}
 }
 
+func TestAllSyntaxForFreeMarkerTemplate_G4(t *testing.T) {
+	TestAllSavedFreeMarkerTemplates(t)
+	TestFreeMarkerFailureSamplesParseGenerateAndParseJava(t)
+}
+
 func TestAllSavedFreeMarkerTemplates(t *testing.T) {
 	found := false
 	err := fs.WalkDir(testdataFS, "testdata", func(filePath string, d fs.DirEntry, walkErr error) error {
@@ -128,4 +135,35 @@ func TestAllSavedFreeMarkerTemplates(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, found, "no saved freemarker templates found")
+}
+
+func TestFreeMarkerFailureSamplesParseGenerateAndParseJava(t *testing.T) {
+	cases := []struct {
+		name string
+		ftl  string
+	}{
+		{
+			name: "html escape expression",
+			ftl:  `<h1>${name?html}</h1>`,
+		},
+		{
+			name: "if elseif else",
+			ftl:  `<#if status == "active">A<#elseif status == "inactive">B<#else>C</#if>`,
+		},
+		{
+			name: "list and quoted expression",
+			ftl:  `<#list users as user><p>${user.name}</p></#list><#if prop.name != 'createdBy'>${r"#{item}"}</#if>`,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := freemarker.GetAST(tt.ftl)
+			require.NoError(t, err, "freemarker grammar did not parse")
+			info, err := tj.ConvertTemplateToJava(tj.Freemarker, tt.ftl, tt.name+".ftl")
+			require.NoError(t, err)
+			require.NotNil(t, info)
+			require.Contains(t, info.GetContent(), "void _JavaTemplateService(")
+			checkJavaFront(t, info.GetContent(), tt.name+".ftl")
+		})
+	}
 }

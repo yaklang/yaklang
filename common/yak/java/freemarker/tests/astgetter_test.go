@@ -5,6 +5,11 @@ import (
 	"testing"
 )
 
+func TestAllSyntaxForFreeMarker_G4(t *testing.T) {
+	TestGetAST(t)
+	TestGetAST_NormalizeDirectiveExpr(t)
+}
+
 func TestGetAST(t *testing.T) {
 	result, err := freemarker.GetAST(`<#-- Freemarker 模板用法示例 -->
 
