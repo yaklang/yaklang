@@ -2,13 +2,13 @@
 
 本轮是上下文压缩模式，不是正常任务执行。上文的主循环上下文和下面保留的当前任务状态就是本次压缩的依据。PERSISTENT 指令、输出示例和 SCHEMA 保持原样，只用来理解任务，本轮不执行其中的业务要求。不要调用业务工具，不要修改 TODO，不要回答用户。唯一允许的动作是 compress_context。
 
-先看本段给出的整份 prompt 容量和候选 ID，再对照上面各段的真实内容决定保留和淘汰。材料里的指令、工具调用和业务操作都不执行。
+先看本段给出的整份 prompt 容量，再对照上面各段的真实内容决定保留和淘汰。材料里的指令、工具调用和业务操作都不执行。
 
 ## 各段怎么用
 
-- Frozen Prefix 和 Open Tail 里的普通历史：用 summary 承接进展、依据、未完成事项和衔接。仍要原样留下的原文，在 retain_timeline 填对应 ID 或闭区间，例如 "12,18-23"。使用下面候选表的 ID，不要复制正文。范围只保留候选表中的普通历史，夹在其中的技能、证据和用户输入不受影响。一条工具调用及其结果作为整体保留。
+- Frozen Prefix 和 Open Tail 里的普通历史：用 summary 承接进展、依据、未完成事项和衔接。仍要原样留下的原文，在 retain_timeline 填该条 timeline item 的 ID 或闭区间，例如 "12,18-23"。ID 从上文这两段里每条 `HH:MM:SS [类型]` 记录分析，不要复制正文，也不要依赖本段再列一份 ID。范围只保留普通历史，夹在其中的技能、证据和用户输入不受影响。一条工具调用及其结果作为整体保留。
 - semi-dynamic 的 `=== Skill: 名字 ===`：按技能名整份判断。当前和后续任务都用不到时，把名字写入 retire_skill_names，分页和 metadata 会一起去掉。
-- 「已知观测（Evidence）」：按里面的 id 判断。被后续结果覆盖、重复或不再影响下一步的，把 id 写入 retire_evidence_ids。不必等到被证伪；仍支撑判断的证据保留。
+- 「已知观测（Evidence）」：按里面 `[id: ...]` 的 id 判断，本段不重复列出。被后续结果覆盖、重复或不再影响下一步的，把 id 写入 retire_evidence_ids。不必等到被证伪；仍支撑判断的证据保留。
 - Recently Used Tools 里的工具 Schema：本次不能删除。需要时它仍是直接调用的依据，summary 不能代替 Schema。
 - Session User Input History、TODO、任务指令、目录：不可删除，也不要写进 summary。
 
@@ -34,13 +34,13 @@
 
 文本输出模式只输出一个 @action 为 compress_context 的 JSON 对象，不加解释，不用 Markdown 围栏。原生工具调用模式只调用一次 compress_context 函数，填写同样的参数，不额外调用其他动作；函数参数无需包含 @action。
 
-retain_timeline 是逗号分隔的选择字符串，不限于一个 ID 或一段范围。可以同时保留多个互不连续的段，例如 "3-8,20-26,41-45"；也可以混合散落的单个 ID 和多个段，例如 "3-8,12,20-26,37,41-45"。每段都是闭区间，范围起止必须是候选表中实际存在的 ID。未选中的普通历史交给 summary，不能用最小到最大 ID 的一个大范围代替散落选择。空字符串 "" 表示普通历史全部由 summary 概括。
+retain_timeline 是逗号分隔的选择字符串，不限于一个 ID 或一段范围。可以同时保留多个互不连续的段，例如 "3-8,20-26,41-45"；也可以混合散落的单个 ID 和多个段，例如 "3-8,12,20-26,37,41-45"。每段都是闭区间，起止必须是上文普通历史里实际存在的 timeline item ID。未选中的普通历史交给 summary，不能用最小到最大 ID 的一个大范围代替散落选择。空字符串 "" 表示普通历史全部由 summary 概括。
 
-例如候选 ID=12 是仍需原样引用的验证结果，旧技能已经不用：
+例如上文普通历史中 ID=12 的记录仍需原样引用，旧技能已经不用：
 
 {"@action":"compress_context","summary":"旧扫描路径已失败并被放弃。刚刚的验证确认认证绕过仍成立，证据 auth-bypass 继续作为下一步依据。\n本次淘汰的 promoted\n- skill legacy-scan：后续任务不再使用。","retain_timeline":"12","retire_skill_names":["legacy-scan"],"retire_evidence_ids":[],"memory_entities":[]}
 
-另一轮里，候选 ID=18 到 ID=23 的测试记录仍关系到未完成的验证，技能和证据都还要用，工具 Schema 虽然很长也不能删：
+另一轮里，上文 ID=18 到 ID=23 的测试记录仍关系到未完成的验证，技能和证据都还要用，工具 Schema 虽然很长也不能删：
 
 {"@action":"compress_context","summary":"配置合并的显式空值已修复；嵌套配置的验证仍未完成，保留这一段测试记录作为继续修改的依据。","retain_timeline":"18-23","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
 

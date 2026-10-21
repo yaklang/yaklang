@@ -100,7 +100,7 @@ func (m *Timeline) ApplyCompressionSelection(selection *TimelineCompressionSelec
 
 func renderCompressionGuide(snapshot *timelineCompressionSnapshot, options TimelineCompressionOptions) string {
 	skills := map[string]struct{}{}
-	evidence := map[string]struct{}{}
+	hasEvidence := false
 	for _, item := range snapshot.PromotedItems {
 		switch item.Kind {
 		case TimelinePromotedKindSkillContent:
@@ -108,15 +108,15 @@ func renderCompressionGuide(snapshot *timelineCompressionSnapshot, options Timel
 				skills[name] = struct{}{}
 			}
 		case TimelinePromotedKindEvidence:
-			if name := strings.TrimSpace(item.Key); name != "" {
-				evidence[name] = struct{}{}
+			if strings.TrimSpace(item.Key) != "" {
+				hasEvidence = true
 			}
 		}
 	}
 	var b strings.Builder
 	b.WriteString("# 本轮只压缩上下文\n")
 	b.WriteString("本轮不是执行任务。上文各段及本轮只读状态就是主循环的真实上下文。不要调用业务工具，不要修改 TODO，不要回答用户。只能选择 compress_context，且只选择一次。\n")
-	b.WriteString("压缩方法见前面的「压缩 Timeline」指引。以下列出整份主循环 prompt 的容量和允许选择的 ID、技能名、证据 id。\n\n")
+	b.WriteString("压缩方法见前面的「压缩 Timeline」指引。timeline 正文已经在前缀里，这里只补充整份 prompt 的容量，以及可以整份淘汰的技能名。\n\n")
 	if options.PromptTokens > 0 {
 		fmt.Fprintf(&b, "当前整份主循环 prompt：%d tokens。\n", options.PromptTokens)
 	}
@@ -126,15 +126,11 @@ func renderCompressionGuide(snapshot *timelineCompressionSnapshot, options Timel
 			fmt.Fprintf(&b, "目前高出目标：%d tokens。\n", options.PromptTokens-options.TargetTokens)
 		}
 	}
-	b.WriteString("\n# 可保留的普通历史\n")
-	b.WriteString("retain_timeline 支持多个散落的 ID 段和单个 ID，用逗号组合，例如 \"3-8,12,20-26,37,41-45\"；空字符串表示全部由 summary 概括。范围只选择下列普通历史，不影响夹在其中的技能、证据或用户输入。条目按整条保留，不拆分工具调用及其结果。正文片段仅用于定位，无需复制。\n")
+	b.WriteString("\n# 普通历史 ID 从哪里看\n")
+	b.WriteString("不要在这里重复列出普通历史。retain_timeline 的数字 ID 从上文 Timeline Memory 的 Frozen Prefix 和 Open Tail 分析：每条普通历史以 `HH:MM:SS [类型]` 开头，后面是已经给出的正文，这条记录的 timeline item ID 就是要填写的 ID。\n")
+	b.WriteString("可以写单个 ID 或闭区间，多个散落段用逗号组合，例如 \"3-8,12,20-26,37,41-45\"。空字符串表示全部由 summary 概括。范围只选择普通历史，不影响夹在其中的技能、证据或用户输入。一条工具调用及其结果按整条保留，不拆开。\n")
 	if len(snapshot.Items) == 0 {
 		b.WriteString("（没有可概括的普通历史）\n")
-	}
-	for _, item := range snapshot.Items {
-		if item.PromptText != "" {
-			fmt.Fprintf(&b, "ID=%d %s\n", item.ID, compressionIndexLocator(item.PromptText))
-		}
 	}
 	b.WriteString("\n# 可淘汰的技能\n")
 	b.WriteString("名字与 semi-dynamic 里 `=== Skill: 名字 ===` 一致。retire_skill_names 写要整份去掉的名字；同一名字下的分页和 metadata 会一起去掉。空数组表示全部保留。\n")
@@ -145,14 +141,10 @@ func renderCompressionGuide(snapshot *timelineCompressionSnapshot, options Timel
 		b.WriteString(skill)
 		b.WriteByte('\n')
 	}
-	b.WriteString("\n# 可淘汰的证据\n")
-	b.WriteString("id 与「已知观测（Evidence）」里的 id 一致。retire_evidence_ids 只写确认不再影响下一步的 id。空数组表示全部保留。\n")
-	if len(evidence) == 0 {
+	b.WriteString("\n# 证据 id 从哪里看\n")
+	b.WriteString("不要在这里重复列出证据。retire_evidence_ids 使用上文「已知观测（Evidence）」里 `[id: ...]` 的 id。只写确认不再影响下一步的 id。空数组表示全部保留。\n")
+	if !hasEvidence {
 		b.WriteString("（没有可淘汰的证据）\n")
-	}
-	for _, id := range sortedCompressionChoices(evidence) {
-		b.WriteString(id)
-		b.WriteByte('\n')
 	}
 	b.WriteString("\nRecently Used Tools、Session User Input History、TODO、任务指令和目录都不能删除。\n")
 	return strings.TrimRight(b.String(), "\n")
