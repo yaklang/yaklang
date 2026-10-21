@@ -105,6 +105,10 @@ func TestReplaceMemberCallKeepsUndefinedMembers(t *testing.T) {
 	updated := result[name]
 	_, ok := ToUndefined(updated)
 	require.True(t, ok, "undefined member should remain undefined after replacement")
+	require.Equal(t, undefinedMember.GetId(), updated.GetId(), "unresolved member replacement should reuse the existing undefined")
+	latest, ok := GetLatestMemberByKey(replacement, key)
+	require.True(t, ok, "replacement should expose the reused undefined")
+	require.Equal(t, undefinedMember.GetId(), latest.GetId())
 }
 
 func TestReplaceMemberCallMergesMemberWithoutResolvedOwner(t *testing.T) {

@@ -139,7 +139,17 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				}
 			}
 			if utils.IsNil(toMember) {
-				toMember = builder.ReadMemberCallValue(replacement, key)
+				// An undefined member has no payload to merge. Reuse it on the
+				// replacement instead of synthesizing a fresh undefined and deleting
+				// the old one: that create/delete pair indexes both instructions, and
+				// on a decompiled loop it ran once per historical pair until the
+				// process was tens of gigabytes into one file.
+				if member.GetOpcode() == SSAOpcodeUndefined {
+					setMemberCallRelationship(replacement, key, member)
+					toMember = member
+				} else {
+					toMember = builder.ReadMemberCallValue(replacement, key)
+				}
 			}
 
 			if toMemberObj := GetLatestObject(toMember); utils.IsNil(toMemberObj) || toMemberObj.GetId() == target.GetId() || toMemberObj.GetId() == holder.GetId() {
