@@ -85,7 +85,7 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 		// Names are already recorded. The deferred task links after the owner
 		// releases the slot. A package nobody is compiling is still compiled
 		// now, including a dependency that belongs to a later batch.
-		deferForeignPackage := !resolveStaticTypes && y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled()
+		deferForeignPackage := y.GetProgram() != nil && y.GetProgram().ConcurrentUnitBuildEnabled()
 		ownerBusy := false
 
 		var prog *ssa.Program
@@ -124,14 +124,12 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 				// The post-skeleton link runs after the owner finished. The unit
 				// library already exists; compiling the directory again duplicates
 				// the class. hasFile is not existence.
-				if resolveStaticTypes {
-					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
-						unitLibrary = true
-						if tryLibrary(lib, candidateClassName, false) {
-							break
-						}
-						continue
+				if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
+					unitLibrary = true
+					if tryLibrary(lib, candidateClassName, false) {
+						break
 					}
+					continue
 				}
 				if lib, ok := y.GetProgram().GetLibrary(pkgName); ok && tryLibrary(lib, candidateClassName, false) {
 					break
@@ -164,7 +162,7 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			if prog == nil && lastErr != nil {
 				log.Infof("Dependencies Missed: Import package not found(%v)", lastErr)
 			}
-			if prog != nil && resolveStaticTypes {
+			if prog != nil {
 				if all {
 					_ = y.GetProgram().ImportTypeStaticAll(prog, className)
 				} else {
@@ -177,23 +175,20 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			for idx := len(pkgNames) - 1; idx > 0; idx-- {
 				className = strings.Join(pkgNames[idx:], ".")
 				pkgName := strings.Join(pkgNames[:idx], ".")
-				// Post-skeleton: do not compile a package the unit scheduler
-				// already owns. A second build shows up as an extra typeName.
-				if resolveStaticTypes {
-					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
-						unitLibrary = true
-						if hasImportType(lib, className) {
-							prog = lib
-							break
-						}
-						continue
+				// A library that already exists is owned by the unit scheduler or by
+				// an earlier file of the same compile unit. While another worker can
+				// still be declaring that package, link it only when the imported type
+				// is already there. Otherwise fakeImportType plants an empty blueprint
+				// in the owner's map and the real declaration diverges from it.
+				// Serial compilation has no such owner, so a missing external type
+				// still gets its virtual blueprint here.
+				if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
+					unitLibrary = true
+					if hasImportType(lib, className) || !deferForeignPackage {
+						prog = lib
+						break
 					}
-				}
-				// hasFile, not mere existence. An empty unit library must not
-				// hide the directory compile that actually builds the class.
-				if lib, ok := y.GetProgram().GetLibrary(pkgName); ok && lib != nil {
-					prog = lib
-					break
+					continue
 				}
 				if deferForeignPackage && y.directoryPackageBusy(pkgName) {
 					ownerBusy = true
