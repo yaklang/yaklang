@@ -56,8 +56,8 @@ func TestIR_LocalFunctionCallUsesUnifiedInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, strings.Count(ir, "call void @"+abi.InvokeSymbol), 2)
-	require.Contains(t, ir, "@add")
-	require.NotContains(t, ir, "call void @add")
+	require.Contains(t, ir, "@"+abi.UserSymbolPrefix+"add")
+	require.NotContains(t, ir, "call void @"+abi.UserSymbolPrefix+"add")
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
 }
 
@@ -198,7 +198,7 @@ func TestIR_GoStmtCallableUsesAsyncInvoke(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"@f",
+		"@"+abi.UserSymbolPrefix+"f",
 		"store i64 1",
 		"call void @"+abi.InvokeSymbol,
 	)
@@ -226,7 +226,7 @@ func TestIR_AsyncSideEffectMemberReadAfterWait(t *testing.T) {
 	_, _, ir, err := compileToIRFromCodeWithExternBindings(code, "yak", nil)
 	require.NoError(t, err)
 	requireIRContainsInOrder(t, ir,
-		"ptr @yak_method_name_33",
+		"ptr @yak_method_name_",
 		"call void @"+abi.InvokeSymbol,
 		"call i64 @"+abi.RuntimeGetFieldSymbol,
 	)
@@ -268,7 +268,31 @@ func TestIR_MainWrapperUsesUnifiedInvoke(t *testing.T) {
 		"call void @"+abi.RuntimeWaitAsyncSymbol,
 		"call void @"+abi.RuntimeGCSymbol,
 	)
+	// The wait symbol is a bounded drain (see yak_runtime_wait_async). It lets
+	// a finite `go` body run, and it returns without joining a parked server.
 	requireIRAvoidsLegacyCallEntrypoints(t, ir)
+}
+
+func TestIR_ContainerScriptDoesNotOpenYakitDatabase(t *testing.T) {
+	_, comp, _, err := compileInput("", `check = () => { s = container.NewSet("1"); return 1 }`, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+
+	require.NoError(t, comp.addMainWrapperToModule("check", false))
+	ir := comp.Mod.String()
+	require.NotContains(t, ir, "call void @"+abi.RuntimeUseYakitDatabaseSymbol)
+}
+
+func TestIR_PocScriptOpensYakitDatabase(t *testing.T) {
+	_, comp, _, err := compileInput("", `check = () => { poc.Get("http://127.0.0.1")~; return 1 }`, "yak", nil, "", nil)
+	require.NoError(t, err)
+	require.NotNil(t, comp)
+	defer comp.Dispose()
+
+	require.NoError(t, comp.addMainWrapperToModule("check", false))
+	ir := comp.Mod.String()
+	require.Contains(t, ir, "call void @"+abi.RuntimeUseYakitDatabaseSymbol)
 }
 
 func TestIR_SyncWaitGroupUsesDispatch(t *testing.T) {

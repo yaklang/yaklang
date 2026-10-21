@@ -6,6 +6,10 @@ import (
 
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/callframe"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
+	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/tiers"
+	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 func (c *Compiler) compileInstruction(inst ssa.Instruction) error {
@@ -72,6 +76,16 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	// These values can be referenced in multiple blocks, so do not cache the load.
 	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
 		if _, ok := c.function.exceptionValueIDs[id]; ok {
+			// The catch binding tracks the live panic word. recover() clears
+			// it, so neither the value cache nor a slot materialized before the
+			// recover call may satisfy a later read.
+			delete(c.Values, id)
+			if c.function.valueSlots != nil {
+				delete(c.function.valueSlots, id)
+			}
+			if c.function.storedValues != nil {
+				delete(c.function.storedValues, id)
+			}
 			return c.loadContextPanic(fmt.Sprintf("yak_exc_%d", id))
 		}
 	}
@@ -94,6 +108,39 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if !ok {
 		return llvm.Value{}, fmt.Errorf("getValue: value %d not found in function", id)
 	}
+	c.ensureOwnerValueIDs(fn)
+	if _, owned := c.function.ownerValueIDs[id]; !owned {
+		// Cross-function reference (front-end artifact): never compile a value
+		// owned by another function from this function's context. The front end
+		// can misplace loop-body values (e.g. "#<next>.field") into the entry
+		// function while the referenced Next belongs to the callee; allow those
+		// only when their object/key chain points back into the current
+		// function so the callee can compile them correctly.
+		// Extern value placeholders (e.g. VULINBOX injected from the compile
+		// environment) belong to no function, so keep them flowing into the
+		// extern-value lowering below instead of folding to zero here.
+		isExternUndef := false
+		if undef, ok := valObj.(*ssa.Undefined); ok && undef != nil && undef.IsExtern() {
+			isExternUndef = true
+		}
+		_, isExternLib := ssa.ToExternLib(valObj)
+		if !isExternUndef && !isExternLib && !c.valueHasLocalDependency(fn, valObj) {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+		}
+	}
+	// A variable captured by a closure lives in one heap cell. A later read,
+	// including a side effect the front end attached to an async go, loads
+	// that cell. A loop that does not assign the variable still builds a phi
+	// of the pre-loop word; that phi is not the cell, so the read loads the
+	// cell too. Shared loop variables have no remembered cell and keep the
+	// phi slot.
+	if phi, isPhi := valObj.(*ssa.Phi); isPhi {
+		if ptr := c.capturedCellForPhi(phi); !ptr.IsNil() {
+			return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_cell_%d", id)), nil
+		}
+	} else if ptr := c.capturedCellPointer(valObj); !ptr.IsNil() {
+		return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_cell_%d", id)), nil
+	}
 	if se, ok := valObj.(*ssa.SideEffect); ok {
 		err := c.withLazyCompileInsertPoint(contextInst, se, func() error {
 			return c.compileSideEffectValue(se)
@@ -103,6 +150,16 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 		if val, ok := c.getCachedValue(contextInst, id); ok {
 			return val, nil
+		}
+		// A by-ref side effect does not snapshot the word. The closure slot
+		// is resolved at this use, so a callback that ran after the call
+		// (and before this read) is visible.
+		if c.function != nil && c.function.redirectedSlots != nil {
+			if src, ok := c.function.redirectedSlots[id]; ok {
+				if ptr, ok := c.redirectedSlotPtr(id, src); ok && !ptr.IsNil() {
+					return c.Builder.CreateLoad(c.LLVMCtx.Int64Type(), ptr, fmt.Sprintf("yak_redir_load_%d", id)), nil
+				}
+			}
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileSideEffect succeeded but value %d not cached", id)
 	}
@@ -129,9 +186,23 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		return val, nil
 	}
 
-	// ExternLib values are compile-time module handles; they are not runtime objects.
+	// ExternLib values are compile-time module handles. Materialize an
+	// immutable runtime export map so an imported module can be aliased and
+	// called through a variable (for example `tools = pcapdb`).
 	if extern, ok := ssa.ToExternLib(valObj); ok && extern != nil {
-		val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+		moduleName := extern.LibraryName
+		if moduleName == "" {
+			moduleName = extern.GetName()
+		}
+		if moduleName == "" {
+			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.cacheValue(id, val)
+			return c.finishGetValue(contextInst, id)
+		}
+		c.recordYaklibDependency(moduleName, "")
+		fn, fnType := c.getOrInsertRuntimeGetModule()
+		namePtr := c.Builder.CreateGlobalStringPtr(moduleName, fmt.Sprintf("yak_module_name_%d", id))
+		val := c.Builder.CreateCall(fnType, fn, []llvm.Value{namePtr}, "yak_module")
 		c.cacheValue(id, val)
 		return c.finishGetValue(contextInst, id)
 	}
@@ -161,6 +232,9 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
+		if param.GetFunc() != nil && c.currentFunction() != nil && param.GetFunc() != c.currentFunction() {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+		}
 		var loadedOK bool
 		err := c.withEntryInsertPoint(fn, func() error {
 			val, ok := c.loadBoundParameterValue(fn, param)
@@ -205,6 +279,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			isMember = true
 		}
 		if undef.IsExtern() {
+			if !isMember && isKnownYaklibModule(undef.GetName()) {
+				fn, fnType := c.getOrInsertRuntimeGetModule()
+				namePtr := c.Builder.CreateGlobalStringPtr(undef.GetName(), fmt.Sprintf("yak_module_name_%d", id))
+				val := c.Builder.CreateCall(fnType, fn, []llvm.Value{namePtr}, "yak_module")
+				c.recordYaklibDependency(undef.GetName(), "module")
+				c.cacheValue(id, val)
+				return val, nil
+			}
 			if isMember {
 				// fall through to MemberCall lowering
 			} else if pkg, key, ok := splitExternValueName(undef.GetName()); ok {
@@ -213,6 +295,8 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 						return val, nil
 					}
 				}
+			} else if val, ok := c.compileExternInstanceValue(contextInst, undef, id); ok {
+				return val, nil
 			} else {
 				switch undef.Kind {
 				case ssa.UndefinedValueValid, ssa.UndefinedValueInValid, ssa.UndefinedMemberInValid:
@@ -328,34 +412,63 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 
 	// 14. Lazy compile if Next
 	if next, ok := valObj.(*ssa.Next); ok {
-		err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
-			return c.compileNext(next)
-		})
-		if err != nil {
-			return llvm.Value{}, err
+		if next.GetFunc() != nil && c.currentFunction() != nil && next.GetFunc() != c.currentFunction() {
+			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
-		if val, ok := c.getCachedValue(contextInst, id); ok {
-			return val, nil
+		if !c.isSSAValueStored(id) {
+			err := c.withLazyCompileInsertPoint(contextInst, next, func() error {
+				return c.compileNext(next)
+			})
+			if err != nil {
+				return llvm.Value{}, err
+			}
+			if val, ok := c.getCachedValue(contextInst, id); ok {
+				return val, nil
+			}
+			return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
 		}
-		return llvm.Value{}, fmt.Errorf("getValue: compileNext succeeded but value %d not cached", id)
+		return c.loadSSAValue(id), nil
 	}
 
 	// 15. Generic MemberCall
 	if mc, ok := valObj.(ssa.MemberCall); ok && mc.IsMember() {
-		if err := c.compileMemberCall(contextInst, valObj, mc); err != nil {
-			return llvm.Value{}, err
+		if _, isFn := ssa.ToFunction(valObj); isFn {
+			// A function value stored as an object member is a closure/function
+			// pointer, not a member read: fall through to case 16 so it is
+			// materialized directly instead of being read back through the object.
+		} else {
+			if err := c.compileMemberCall(contextInst, valObj, mc); err != nil {
+				return llvm.Value{}, err
+			}
+			if val, ok := c.getCachedValue(contextInst, id); ok {
+				return val, nil
+			}
+			return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 		}
-		if val, ok := c.getCachedValue(contextInst, id); ok {
-			return val, nil
-		}
-		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
 	}
 
 	// 16. Function values are materialized as i64 function pointers in the
-	// unified InvokeContext representation.
+	// unified InvokeContext representation. A yaklib export used as a value is
+	// materialized as a dispatch closure instead of an undefined symbol.
 	if ssaFn, ok := ssa.ToFunction(valObj); ok && ssaFn != nil {
+		if ssaFn.IsExtern() {
+			if pkg, method, ok := splitQualifiedName(ssaFn.GetName()); ok {
+				if _, ok := yaklang.LookupExport(pkg, method); ok {
+					c.recordYaklibDependency(pkg, method)
+					val := c.materializeYaklibExportCallable(valObj, pkg, method)
+					c.cacheValue(id, val)
+					return val, nil
+				}
+				// Modules registered only in the AOT runtime table (e.g. poc,
+				// http via runtimeRegisterYaklibModule) are still yaklib
+				// dependencies for tier selection and per-module DCE.
+				c.recordYaklibDependency(pkg, method)
+			}
+		}
 		llvmFn, _ := c.getOrDeclareLLVMFunction(ssaFn)
-		return c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64"), nil
+		val := c.Builder.CreatePtrToInt(llvmFn, c.LLVMCtx.Int64Type(), "yak_fn_i64")
+		c.cacheValue(id, val)
+		return val, nil
 	}
 
 	// 17. Return error if not found and not a constant
@@ -380,25 +493,69 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 	var val llvm.Value
 	name := fmt.Sprintf("val_%d", resultID)
 
+	// Float operands (float constants carry their bit pattern in the i64
+	// word) must not go through integer arithmetic: 1.0 * 2 would multiply
+	// the bit pattern. Route add/sub/mul/div through the runtime when either
+	// operand is a float constant.
+	floatOp := c.binOpIsFloat(inst)
+
 	switch inst.Op {
 	case ssa.OpAdd:
-		val = c.Builder.CreateAdd(lhs, rhs, name)
+		if inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.StringTypeKind {
+			val = c.emitRuntimeConcat(lhs, rhs, name)
+		} else if floatOp {
+			val = c.emitRuntimeFloatBinop(inst, 0, lhs, rhs, name)
+		} else {
+			val = c.Builder.CreateAdd(lhs, rhs, name)
+		}
 	case ssa.OpSub:
-		val = c.Builder.CreateSub(lhs, rhs, name)
+		if floatOp {
+			val = c.emitRuntimeFloatBinop(inst, 1, lhs, rhs, name)
+		} else {
+			val = c.Builder.CreateSub(lhs, rhs, name)
+		}
 	case ssa.OpMul:
-		val = c.Builder.CreateMul(lhs, rhs, name)
+		if floatOp {
+			val = c.emitRuntimeFloatBinop(inst, 2, lhs, rhs, name)
+		} else {
+			val = c.Builder.CreateMul(lhs, rhs, name)
+		}
 	case ssa.OpDiv:
-		val = c.Builder.CreateSDiv(lhs, rhs, name)
+		if floatOp {
+			val = c.emitRuntimeFloatBinop(inst, 3, lhs, rhs, name)
+		} else {
+			checked, err := c.emitCheckedIntDiv(inst, lhs, rhs, name, false)
+			if err != nil {
+				return err
+			}
+			val = checked
+		}
 	case ssa.OpMod:
-		val = c.Builder.CreateSRem(lhs, rhs, name)
-	case ssa.OpGt:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpLt:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLT, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpGtEq:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSGE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
-	case ssa.OpLtEq:
-		val = c.Builder.CreateZExt(c.Builder.CreateICmp(llvm.IntSLE, lhs, rhs, name), c.LLVMCtx.Int64Type(), name)
+		// `"fmt" % args` is sprintf, not integer remainder. A string left
+		// operand (or a []byte) takes that path; numbers stay on checked mod.
+		if c.binOpLeftIsString(inst) {
+			val = c.emitRuntimeSprintf(lhs, rhs, name)
+			break
+		}
+		checked, err := c.emitCheckedIntDiv(inst, lhs, rhs, name, true)
+		if err != nil {
+			return err
+		}
+		val = checked
+	case ssa.OpGt, ssa.OpLt, ssa.OpGtEq, ssa.OpLtEq:
+		// Ordered compares go through the runtime so a float bit pattern
+		// (0.2, or Duration.Seconds()) is not ordered as a signed integer.
+		// Opcodes match yak_runtime_float_binop: 4 >, 5 <, 6 >=, 7 <=.
+		opID := int64(4)
+		switch inst.Op {
+		case ssa.OpLt:
+			opID = 5
+		case ssa.OpGtEq:
+			opID = 6
+		case ssa.OpLtEq:
+			opID = 7
+		}
+		val = c.emitRuntimeFloatBinop(inst, opID, lhs, rhs, name)
 	case ssa.OpEq:
 		spec, err := c.newRuntimeEqDispatchSpec(inst, false)
 		if err != nil {
@@ -417,6 +574,20 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 			return err
 		}
 		return c.lowerResolvedContextCall(spec)
+	case ssa.OpShl:
+		val = c.Builder.CreateShl(lhs, rhs, name)
+	case ssa.OpShr:
+		val = c.Builder.CreateAShr(lhs, rhs, name)
+	case ssa.OpAnd:
+		val = c.Builder.CreateAnd(lhs, rhs, name)
+	case ssa.OpLogicAnd:
+		val = c.Builder.CreateAnd(lhs, rhs, name)
+	case ssa.OpOr:
+		val = c.Builder.CreateOr(lhs, rhs, name)
+	case ssa.OpLogicOr:
+		val = c.Builder.CreateOr(lhs, rhs, name)
+	case ssa.OpXor:
+		val = c.Builder.CreateXor(lhs, rhs, name)
 	default:
 		return fmt.Errorf("unknown BinOp opcode: %v", inst.Op)
 	}
@@ -426,6 +597,17 @@ func (c *Compiler) compileBinOp(inst *ssa.BinOp, resultID int64) error {
 		return err
 	}
 	return nil
+}
+
+func isKnownYaklibModule(name string) bool {
+	for _, tier := range tiers.All {
+		for _, module := range tier.Modules {
+			if module == name {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
@@ -466,13 +648,38 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
-	} else if inst.IsString() {
+	} else if inst.IsString() || (inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.BytesTypeKind) {
+		// x`...` fuzztag templates expand at runtime into a string slice
+		// (like yakvm's FuzzTagExec): the first element is the expanded
+		// value. Non-x strings keep the C-string representation.
+		if inst.Unary == 'x' {
+			// x`...` templates need the fuzz/mutate engine at runtime; record
+			// the dependency so tier selection keeps the module and elfsplit
+			// does not prune its shared groups (e.g. sharednet).
+			c.recordYaklibDependency("fuzz", "fuzztag")
+			ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
+			fn, fnType := c.getOrInsertRuntimeFuzztag()
+			val := c.Builder.CreateCall(fnType, fn, []llvm.Value{llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())}, fmt.Sprintf("fuzztag_%d", id))
+			c.cacheValue(id, c.coerceToInt64(val))
+			return c.finishConstValue(inst, id)
+		}
 		ptr := c.Builder.CreateGlobalStringPtr(inst.VarString(), fmt.Sprintf("str_%d", id))
 		// Represent pointers as i64 (uintptr) in LLVM IR.
 		// NOTE: Do not tag here. Tagging is applied selectively at stdlib
 		// call sites (e.g. print/println) so non-print stdlib calls can receive
-		// raw C-string pointers.
+		// raw C-string pointers. Bytes constants use the same C-string
+		// representation; the runtime converts them to []byte on demand.
 		llvmVal := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
+		c.cacheValue(id, llvmVal)
+		return c.finishConstValue(inst, id)
+	} else if rawBool, ok := inst.GetRawValue().(bool); ok {
+		// A boolean whose SSA type is Any (e.g. true written through a
+		// dynamic map key) still must compile to 0/1.
+		iVal := uint64(0)
+		if rawBool {
+			iVal = 1
+		}
+		llvmVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), iVal, false)
 		c.cacheValue(id, llvmVal)
 		return c.finishConstValue(inst, id)
 	}
@@ -486,14 +693,68 @@ func (c *Compiler) compileConst(inst *ssa.ConstInst) error {
 	return c.finishConstValue(inst, id)
 }
 
+// returnedValueNeedsCStringTag reports a returned word that is a raw C string.
+// Shadow strings (concat, sprintf, yaklib) already compare through their
+// handle and must stay untagged so callers can use the address directly.
+func returnedValueNeedsCStringTag(val ssa.Value) bool {
+	ci, ok := val.(*ssa.ConstInst)
+	if !ok || ci == nil || ci.Unary == 'x' {
+		return false
+	}
+	if ci.IsString() {
+		return true
+	}
+	if t := ci.GetType(); t != nil && t.GetTypeKind() == ssa.BytesTypeKind {
+		return true
+	}
+	return false
+}
+
 func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	retVal := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
-	if len(inst.Results) > 0 {
+	if len(inst.Results) > 1 {
+		// Callers unpack `a, b = f()` by reading member keys "0" and "1".
+		// A single ABI word cannot carry both results.
+		packed, err := c.emitReturnTuple(inst)
+		if err != nil {
+			return err
+		}
+		retVal = packed
+	} else if len(inst.Results) > 0 {
 		val, err := c.getValue(inst, inst.Results[0])
 		if err != nil {
 			return err
 		}
 		retVal = c.coerceToInt64(val)
+		// A returned closure must be materialized in the function that owns its
+		// free values (e.g. a counter factory returning func() { n++; return n }).
+		// Materializing at the caller's call site would resolve the captured
+		// variable from the caller's scope, where it does not exist.
+		if fn := inst.GetFunc(); fn != nil {
+			if ssaFn, ok := c.functionValueForArg(fn, inst.Results[0]); ok && ssaFn != nil && !ssaFn.IsExtern() && c.closureNeedsFreeValues(ssaFn) {
+				closure, err := c.materializeCallableClosure(inst, ssaFn)
+				if err != nil {
+					return fmt.Errorf("compileReturn: materialize returned closure: %w", err)
+				}
+				retVal = c.coerceToInt64(closure)
+			} else if ssaVal, ok := fn.GetValueById(inst.Results[0]); ok && returnedValueNeedsCStringTag(ssaVal) {
+				// String constants are raw C strings. Equality only GoStrings a
+				// word when bit 62 is set; an untagged return compares as an
+				// address against a tagged literal. OR is idempotent, and bit
+				// 62 sits above the i32 exit code.
+				retVal = c.Builder.CreateOr(retVal, llvm.ConstInt(c.LLVMCtx.Int64Type(), yakTaggedPointerMask, false), "yak_ret_cstr_tag")
+			}
+		}
+	}
+	// Apply the closure's return side effects: writes to captured variables
+	// must go through the by-reference free-value slots so mutable state
+	// persists across calls (counter factories, i++ in per-iteration loop
+	// closures). This must also run for implicit exits (functions without an
+	// explicit ret), so closures like `func() { count += 1 }` still write back.
+	if fn := inst.GetFunc(); fn != nil {
+		if err := c.applyClosureSideEffectWriteback(fn, inst); err != nil {
+			return err
+		}
 	}
 	if err := c.storeContextReturn(retVal); err != nil {
 		return err
@@ -502,7 +763,7 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	// If this function has a DeferBlock, route all returns through it.
 	currentFunction := c.currentFunction()
 	if currentFunction != nil && currentFunction.DeferBlock > 0 && c.function != nil && !c.function.returnBlock.IsNil() {
-		deferBB, ok := c.Blocks[currentFunction.DeferBlock]
+		deferBB, ok := c.ssaBlockEntry(currentFunction.DeferBlock)
 		if !ok {
 			return fmt.Errorf("compileReturn: defer block %d not found", currentFunction.DeferBlock)
 		}
@@ -514,23 +775,433 @@ func (c *Compiler) compileReturn(inst *ssa.Return) error {
 	return nil
 }
 
+// storeClosureCaptureAtDefinition writes a by-ref capture in the block that
+// produces the new value. Exit writeback only stores a modification that
+// dominates the exit, so a branch-local assignment such as
+// `if recover() != nil { ok = false }` never reaches the shared slot.
+// Side-effect instructions are the caller's view of a write the callee
+// already performed; reading one here does not yield a cached word.
+func (c *Compiler) storeClosureCaptureAtDefinition(fn *ssa.Function, inst ssa.Instruction) error {
+	if fn == nil || inst == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 {
+		return nil
+	}
+	if _, ok := inst.(*ssa.SideEffect); ok {
+		return nil
+	}
+	id := inst.GetId()
+	if id <= 0 {
+		return nil
+	}
+	for _, ser := range fn.SideEffectsReturn {
+		for _, se := range ser {
+			if se == nil || se.Modify != id {
+				continue
+			}
+			if err := c.storeFreeValueSideEffect(fn, se, inst); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (c *Compiler) storeFreeValueSideEffect(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction) error {
+	return c.storeFreeValueSideEffectWord(fn, se, contextInst, llvm.Value{})
+}
+
+func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction, preset llvm.Value) error {
+	if fn == nil || se == nil || se.Modify <= 0 || c == nil || c.function == nil {
+		return nil
+	}
+	for _, binding := range callframe.OrderedFreeValueBindings(fn) {
+		if se.Variable != nil && binding.Variable != nil {
+			if se.Variable.GetName() != binding.Variable.GetName() {
+				continue
+			}
+		} else if se.Name != binding.Name {
+			continue
+		}
+		if c.freeValueCaptureMode(fn, binding) == freeValueCaptureByValue {
+			continue
+		}
+		ptr, ok := c.function.freeValuePointers[binding.ValueID]
+		if !ok || ptr.IsNil() {
+			continue
+		}
+		// The modify value may be the instruction currently being compiled
+		// (a parameter member materialized from its own read). Re-entering
+		// getValue would recurse; the word is already cached.
+		var modifyVal llvm.Value
+		if !preset.IsNil() {
+			modifyVal = preset
+		} else if contextInst != nil && contextInst.GetId() == se.Modify {
+			cached, ok := c.getCachedValue(contextInst, se.Modify)
+			if !ok || cached.IsNil() {
+				return nil
+			}
+			modifyVal = cached
+		} else {
+			var err error
+			modifyVal, err = c.getValue(contextInst, se.Modify)
+			if err != nil {
+				return err
+			}
+		}
+		c.Builder.CreateStore(c.coerceToInt64(modifyVal), ptr)
+		return nil
+	}
+	return nil
+}
+
+// publishPhiClosureCapture writes a by-ref capture at the phi that merges it.
+// Exit writeback only stores a modify whose block dominates the exit. With
+// several `if { checkN = true }` in one closure, only the last phi shares the
+// exit block, so the earlier cells stay at the value captured on entry. The
+// merged word is stored here, after both incoming edges have filled the phi
+// slot. A path that returns before this block does not reach the store.
+func (c *Compiler) publishPhiClosureCapture(fn *ssa.Function, phi *ssa.Phi) error {
+	if fn == nil || phi == nil || c == nil || c.function == nil || len(c.function.freeValuePointers) == 0 || len(fn.SideEffectsReturn) == 0 {
+		return nil
+	}
+	phiID := phi.GetId()
+	if phiID <= 0 {
+		return nil
+	}
+	matched := make([]*ssa.FunctionSideEffect, 0, 1)
+	seen := make(map[*ssa.FunctionSideEffect]struct{})
+	for _, ser := range fn.SideEffectsReturn {
+		for _, se := range ser {
+			if se == nil || se.Modify <= 0 {
+				continue
+			}
+			if _, ok := seen[se]; ok {
+				continue
+			}
+			if !phiCarriesSideEffect(phi, se.Modify) {
+				continue
+			}
+			seen[se] = struct{}{}
+			matched = append(matched, se)
+		}
+	}
+	if len(matched) == 0 {
+		return nil
+	}
+	block := phi.GetBlock()
+	if block == nil {
+		return nil
+	}
+	phiBB, ok := c.Blocks[block.GetId()]
+	if !ok || phiBB.IsNil() {
+		return nil
+	}
+	// Publishing loads the merged phi at the block start. Restore the builder
+	// afterwards so a later side-effect compile does not emit into this block.
+	savedBB := c.currentInsertBlock()
+	prevActive := int64(0)
+	if c.function != nil {
+		prevActive = c.function.activeBlockID
+	}
+	defer func() {
+		if c.function != nil {
+			c.function.activeBlockID = prevActive
+		}
+		if !savedBB.IsNil() {
+			c.restoreInsertPoint(savedBB)
+		}
+	}()
+	if first := phiBB.FirstInstruction(); first.IsNil() {
+		c.Builder.SetInsertPointAtEnd(phiBB)
+	} else {
+		c.Builder.SetInsertPointBefore(first)
+	}
+	if c.function != nil {
+		c.function.activeBlockID = block.GetId()
+	}
+	word := c.loadSSAValue(phiID)
+	if word.IsNil() {
+		return nil
+	}
+	for _, se := range matched {
+		if err := c.storeFreeValueSideEffectWord(fn, se, nil, word); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// phiCarriesSideEffect reports that the phi is the captured variable's merged
+// value, or that one incoming edge is the branch assignment recorded as the
+// side effect. The edge id is the const or instruction inside the branch; its
+// block does not dominate the function exit.
+func phiCarriesSideEffect(phi *ssa.Phi, modifyID int64) bool {
+	if phi == nil || modifyID <= 0 {
+		return false
+	}
+	if phi.GetId() == modifyID {
+		return true
+	}
+	for _, edge := range phi.Edge {
+		if edge == modifyID {
+			return true
+		}
+	}
+	return false
+}
+
+// applyClosureSideEffectWriteback stores the closure's modified captured
+// variables back into their by-reference free-value slots. It is shared by
+// explicit returns and implicit function exits so mutable captures persist
+// across calls even when the closure body has no ret statement.
+func (c *Compiler) applyClosureSideEffectWriteback(fn *ssa.Function, contextInst ssa.Instruction) error {
+	if fn == nil || c.function == nil || c.function.freeValuePointers == nil {
+		return nil
+	}
+	var retBlock *ssa.BasicBlock
+	if contextInst != nil {
+		retBlock = contextInst.GetBlock()
+	}
+	if retBlock == nil && c.function != nil && c.function.activeBlockID > 0 {
+		if blockInst, ok := fn.GetInstructionById(c.function.activeBlockID); ok {
+			if blk, ok := ssa.ToBasicBlock(blockInst); ok {
+				retBlock = blk
+			}
+		}
+	}
+	for _, ser := range fn.SideEffectsReturn {
+		for variable, se := range ser {
+			if variable == nil || se == nil || se.Modify <= 0 {
+				continue
+			}
+			// Only write back on return paths where the modification actually
+			// executed: an early-return branch that skips the assignment (e.g.
+			// `if dir { return }` before `files = append(files, x)`) must not
+			// clobber the free-value slot with an uninitialized value. The
+			// modified value's defining block dominates the return iff every
+			// path to the return executed the side effect.
+			if !c.sideEffectModifyDominates(fn, se, retBlock) {
+				continue
+			}
+			// The assignment already stored this word into the capture cell
+			// (at the instruction, or at a phi). Storing the same register
+			// again at the exit replays a snapshot from this call. Under a
+			// user lock that only covers the assignment, that replay lands
+			// after Unlock and races with other goroutines.
+			if sideEffectStoredBeforeExit(fn, se) {
+				continue
+			}
+			if err := c.storeFreeValueSideEffect(fn, se, contextInst); err != nil {
+				continue
+			}
+		}
+	}
+	return nil
+}
+
+// sideEffectStoredBeforeExit reports that the capture cell is updated where
+// the value is produced, so the exit replay must not run. Block instructions
+// go through storeClosureCaptureAtDefinition. Phis go through
+// publishPhiClosureCapture. A modify that is only materialized later (a
+// parameter member, a constant) still needs the exit store.
+func sideEffectStoredBeforeExit(fn *ssa.Function, se *ssa.FunctionSideEffect) bool {
+	if fn == nil || se == nil || se.Modify <= 0 {
+		return false
+	}
+	modifyVal, ok := fn.GetValueById(se.Modify)
+	if !ok || modifyVal == nil {
+		return false
+	}
+	if _, isPhi := modifyVal.(*ssa.Phi); isPhi {
+		return true
+	}
+	inst, ok := modifyVal.(ssa.Instruction)
+	if !ok || inst == nil {
+		return false
+	}
+	block := inst.GetBlock()
+	if block == nil {
+		return false
+	}
+	id := inst.GetId()
+	for _, listed := range block.Insts {
+		if listed == id {
+			return true
+		}
+	}
+	return false
+}
+
+// sideEffectModifyDominates reports whether the block defining the side
+// effect's modified value dominates the return instruction's block, i.e. the
+// modification is guaranteed to have executed on every path reaching the
+// return. A nil defining block (e.g. a constant) is treated as dominating so
+// constant assignments keep their previous writeback behavior.
+func (c *Compiler) sideEffectModifyDominates(fn *ssa.Function, se *ssa.FunctionSideEffect, retBlock *ssa.BasicBlock) bool {
+	if fn == nil || se == nil || se.Modify <= 0 || retBlock == nil {
+		return false
+	}
+	modifyVal, ok := fn.GetValueById(se.Modify)
+	if !ok || modifyVal == nil {
+		return false
+	}
+	modifyBlock := modifyVal.GetBlock()
+	if modifyBlock == nil {
+		return true
+	}
+	return blockDominatesInFunction(fn, modifyBlock, retBlock)
+}
+
+// blockDominatesInFunction reports whether block a dominates block b in fn's
+// CFG: every path from the function entry to b passes through a.
+//
+// Non-entry blocks start as the full block set. A loop back-edge is still
+// the universal set on the first pass; seeding those blocks empty makes the
+// intersection collapse, so the entry stops dominating everything after the
+// loop and a capture cell allocated there is ignored.
+func blockDominatesInFunction(fn *ssa.Function, a, b *ssa.BasicBlock) bool {
+	if fn == nil || a == nil || b == nil {
+		return false
+	}
+	if a.GetId() == b.GetId() {
+		return true
+	}
+	entryID := fn.EnterBlock
+	blockIDs := fn.Blocks
+	universe := make(map[int64]struct{}, len(blockIDs))
+	for _, id := range blockIDs {
+		universe[id] = struct{}{}
+	}
+	dom := make(map[int64]map[int64]struct{}, len(blockIDs))
+	for _, id := range blockIDs {
+		if id == entryID {
+			dom[id] = map[int64]struct{}{entryID: {}}
+			continue
+		}
+		dom[id] = cloneIDSet(universe)
+	}
+	changed := true
+	for changed {
+		changed = false
+		for _, id := range blockIDs {
+			if id == entryID {
+				continue
+			}
+			blockInst, ok := fn.GetInstructionById(id)
+			block, isBlock := ssa.ToBasicBlock(blockInst)
+			if !ok || blockInst == nil || !isBlock || block == nil || len(block.Preds) == 0 {
+				only := map[int64]struct{}{id: {}}
+				if !domSetEqual(dom[id], only) {
+					dom[id] = only
+					changed = true
+				}
+				continue
+			}
+			var inter map[int64]struct{}
+			seenPred := false
+			unknownPred := false
+			for _, pred := range block.Preds {
+				predDom, ok := dom[pred]
+				if !ok {
+					unknownPred = true
+					break
+				}
+				if !seenPred {
+					inter = cloneIDSet(predDom)
+					seenPred = true
+					continue
+				}
+				for k := range inter {
+					if _, ok := predDom[k]; !ok {
+						delete(inter, k)
+					}
+				}
+			}
+			if !seenPred || unknownPred {
+				inter = map[int64]struct{}{}
+			}
+			inter[id] = struct{}{}
+			if !domSetEqual(dom[id], inter) {
+				dom[id] = inter
+				changed = true
+			}
+		}
+	}
+	domB, ok := dom[b.GetId()]
+	if !ok {
+		return false
+	}
+	_, dominates := domB[a.GetId()]
+	return dominates
+}
+
+func domSetEqual(a, b map[int64]struct{}) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k := range a {
+		if _, ok := b[k]; !ok {
+			return false
+		}
+	}
+	return true
+}
+
 func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 	val, err := c.getValue(inst, inst.Value)
 	if err != nil {
 		return err
 	}
 
-	if inst.GetType() != nil && inst.GetType().GetTypeKind() == ssa.StringTypeKind {
+	if inst.GetType() != nil {
 		sourceKind := ssa.AnyTypeKind
 		if fn := inst.GetFunc(); fn != nil {
 			if sourceVal, ok := fn.GetValueById(inst.Value); ok && sourceVal != nil && sourceVal.GetType() != nil {
 				sourceKind = sourceVal.GetType().GetTypeKind()
 			}
 		}
-		if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
-			fn, fnType := c.getOrInsertRuntimeToCString()
-			argPtr := c.coerceToI8Ptr(val)
-			val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argPtr}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+		switch inst.GetType().GetTypeKind() {
+		case ssa.StringTypeKind:
+			if sourceKind == ssa.BytesTypeKind || sourceKind == ssa.StringTypeKind {
+				fn, fnType := c.getOrInsertRuntimeToCString()
+				argWord := c.coerceToInt64(val)
+				val = c.Builder.CreateCall(fnType, fn, []llvm.Value{argWord}, fmt.Sprintf("to_cstring_%d", inst.GetId()))
+			} else if sourceKind == ssa.BooleanTypeKind {
+				castFn, castType := c.getOrInsertRuntimeBoolToString()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("bool_to_str_%d", inst.GetId()))
+			} else {
+				// Number/null/any source: format through the runtime, which
+				// recognizes float bit patterns and keeps nil as "".
+				castFn, castType := c.getOrInsertRuntimeToString()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_string_%d", inst.GetId()))
+			}
+		case ssa.NumberTypeKind:
+			// int()/float() casts share the NumberTypeKind; the float() target
+			// carries the float-cast marker so the conversion direction is
+			// distinguishable at compile time. String sources are parsed.
+			if sourceKind == ssa.StringTypeKind {
+				if isFloatCastTarget(inst.GetType()) {
+					castFn, castType := c.getOrInsertRuntimeParseFloat()
+					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_float_%d", inst.GetId()))
+				} else {
+					castFn, castType := c.getOrInsertRuntimeParseInt()
+					val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("parse_int_%d", inst.GetId()))
+				}
+			} else if isFloatCastTarget(inst.GetType()) {
+				castFn, castType := c.getOrInsertRuntimeToFloat()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_float_%d", inst.GetId()))
+			} else {
+				castFn, castType := c.getOrInsertRuntimeToInt()
+				val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_int_%d", inst.GetId()))
+			}
+		case ssa.BytesTypeKind:
+			// []byte(x) has to become a real byte slice. A no-op cast leaves a
+			// string word in place, and len() then counts runes.
+			castFn, castType := c.getOrInsertRuntimeStringToBytes()
+			val = c.Builder.CreateCall(castType, castFn, []llvm.Value{c.coerceToInt64(val)}, fmt.Sprintf("to_bytes_%d", inst.GetId()))
+		case ssa.BooleanTypeKind:
+			// bool(x): any non-zero word is true (float bit patterns included).
+			cond := c.coerceToI1(c.coerceToInt64(val), "bool_cast_cond")
+			val = c.Builder.CreateZExt(cond, c.LLVMCtx.Int64Type(), "bool_cast")
 		}
 	}
 
@@ -540,4 +1211,238 @@ func (c *Compiler) compileTypeCast(inst *ssa.TypeCast) error {
 		return err
 	}
 	return nil
+}
+
+func (c *Compiler) getOrInsertRuntimeToInt() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToIntSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeToFloat() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToFloatSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeToString() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeToStringSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeStringToBytes() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeStringToBytesSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeBoolToString() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeBoolToStringSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeIsTrue() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeIsTrueSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeParseInt() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeParseIntSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeParseFloat() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeParseFloatSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) getOrInsertRuntimeFuzztag() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeFuzztagSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+// compileExternInstanceValue lowers a plain extern value placeholder (e.g.
+// VULINBOX injected from the compile environment via WithExternValue) to its
+// constant runtime representation. String values become C-string pointers;
+// other kinds fall back to zero so callers keep the previous behavior.
+func (c *Compiler) compileExternInstanceValue(contextInst ssa.Instruction, undef *ssa.Undefined, id int64) (llvm.Value, bool) {
+	if undef == nil {
+		return llvm.Value{}, false
+	}
+	fn := c.currentFunction()
+	if fn == nil && contextInst != nil {
+		fn = contextInst.GetFunc()
+	}
+	if fn == nil {
+		return llvm.Value{}, false
+	}
+	prog := fn.GetProgram()
+	if prog == nil || prog.ExternInstance == nil {
+		return llvm.Value{}, false
+	}
+	v, ok := prog.ExternInstance[undef.GetName()]
+	if !ok {
+		return llvm.Value{}, false
+	}
+	s, ok := v.(string)
+	if !ok {
+		return llvm.Value{}, false
+	}
+	ptr := c.Builder.CreateGlobalStringPtr(s, fmt.Sprintf("extern_str_%d", id))
+	val := llvm.ConstPtrToInt(ptr, c.LLVMCtx.Int64Type())
+	c.cacheValue(id, val)
+	return val, true
+}
+
+// binOpIsFloat reports whether a binary operation involves a float constant
+// operand (float constants carry their bit pattern in the i64 word and must
+// not go through integer arithmetic).
+func (c *Compiler) binOpLeftIsString(inst *ssa.BinOp) bool {
+	if inst == nil || inst.GetFunc() == nil {
+		return false
+	}
+	v, ok := inst.GetFunc().GetValueById(inst.X)
+	if !ok || v == nil {
+		return false
+	}
+	if cst, ok := v.(*ssa.ConstInst); ok && cst != nil && cst.IsString() {
+		return true
+	}
+	if t := v.GetType(); t != nil {
+		switch t.GetTypeKind() {
+		case ssa.StringTypeKind, ssa.BytesTypeKind:
+			return true
+		}
+	}
+	return false
+}
+
+func (c *Compiler) emitRuntimeSprintf(lhs, rhs llvm.Value, name string) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeSprintf()
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{c.coerceToInt64(lhs), c.coerceToInt64(rhs)}, name)
+}
+
+func (c *Compiler) getOrInsertRuntimeSprintf() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeSprintfSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) binOpIsFloat(inst *ssa.BinOp) bool {
+	if inst == nil || inst.GetFunc() == nil {
+		return false
+	}
+	fn := inst.GetFunc()
+	for _, id := range []int64{inst.X, inst.Y} {
+		if v, ok := fn.GetValueById(id); ok && v != nil {
+			if c, ok := v.(*ssa.ConstInst); ok && c != nil && c.IsFloat() {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// emitRuntimeFloatBinop lowers a float add/sub/mul/div through the runtime,
+// which decodes float bit patterns and returns the result as a bit pattern.
+func (c *Compiler) emitRuntimeFloatBinop(inst *ssa.BinOp, opID int64, lhs, rhs llvm.Value, name string) llvm.Value {
+	fn, fnType := c.getOrInsertRuntimeFloatBinop()
+	op := llvm.ConstInt(c.LLVMCtx.Int64Type(), uint64(opID), false)
+	return c.Builder.CreateCall(fnType, fn, []llvm.Value{op, c.coerceToInt64(lhs), c.coerceToInt64(rhs)}, name)
+}
+
+func (c *Compiler) getOrInsertRuntimeFloatBinop() (llvm.Value, llvm.Type) {
+	name := c.runtimeSymName(abi.RuntimeFloatBinopSymbol)
+	fn := c.Mod.NamedFunction(name)
+	i64 := c.LLVMCtx.Int64Type()
+	fnType := llvm.FunctionType(i64, []llvm.Type{i64, i64, i64}, false)
+	if fn.IsNil() {
+		fn = llvm.AddFunction(c.Mod, name, fnType)
+	}
+	return fn, fnType
+}
+
+func (c *Compiler) valueHasLocalDependency(fn *ssa.Function, val ssa.Value) bool {
+	if c == nil || c.function == nil || c.function.ownerValueIDs == nil || val == nil {
+		return false
+	}
+	for _, pair := range val.GetObjectKeyPairs() {
+		if pair.Object != nil {
+			if _, ok := c.function.ownerValueIDs[pair.Object.GetId()]; ok {
+				return true
+			}
+		}
+		if pair.Key != nil {
+			if _, ok := c.function.ownerValueIDs[pair.Key.GetId()]; ok {
+				return true
+			}
+		}
+	}
+	for _, variable := range val.GetAllVariables() {
+		if variable == nil {
+			continue
+		}
+		if value := variable.GetValue(); value != nil {
+			if _, ok := c.function.ownerValueIDs[value.GetId()]; ok {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -31,7 +31,9 @@ packetBytes = library.ReadPacket(4)~
 assert len(packetBytes) > 0
 
 sessions = library.QuerySessions(libraryTools.transport("tcp"), libraryTools.limit(2))~
-assert len(sessions) == 1 && sessions[0].Complete
+session = sessions[0]
+assert session.Complete
+assert len(sessions) == 1
 assert len(library.QueryPackets(libraryTools.session(sessions[0].ID))~) == 8
 assert library.PacketSessions(4)~[0].ID == sessions[0].ID
 streams = library.QueryStreams(libraryTools.session(sessions[0].ID))~
@@ -68,8 +70,10 @@ preview = library.ReadPacketPage(4, libraryTools.previewBytes(4))~
 assert len(preview.Items[0].Data) == 4 && preview.Items[0].Truncated
 assert preview.Items[0].Encoding == "base64"
 streamPreview = library.ReadStreamPage(requestStream.ID, libraryTools.limit(1), libraryTools.previewBytes(4))~
-assert streamPreview.HasMore && streamPreview.Items[0].Truncated
-assert streamPreview.Items[0].StreamID == requestStream.ID
+assert streamPreview.HasMore
+streamPreviewItem = streamPreview.Items[0]
+assert streamPreviewItem.Truncated
+assert streamPreviewItem.StreamID == requestStream.ID
 references = library.ProtocolPacketIDsPage(messages[0].ID, libraryTools.limit(1))~
 assert len(references.Items) == 1 && references.HasMore
 assert len(library.PacketSessionsPage(4)~.Items) == 1

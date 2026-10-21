@@ -64,7 +64,7 @@ func TestSelectPicksSmallestCoveringTier(t *testing.T) {
 // "use the embedded archive", which either has the module or reports it by
 // name before the linker runs.
 func TestSelectRejectsUnknownModule(t *testing.T) {
-	if _, err := Select([]string{"codec", "mitm"}); err == nil {
+	if _, err := Select([]string{"codec", "definitely_not_a_yaklib_module"}); err == nil {
 		t.Fatal("Select accepted a module no tier provides")
 	}
 }

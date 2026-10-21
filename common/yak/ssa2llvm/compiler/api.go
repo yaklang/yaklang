@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/go-llvm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/obfuscation"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/profile"
 	"github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/abi"
@@ -337,6 +338,12 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 	if err != nil {
 		return nil, nil, "", utils.Errorf("SSA parse failed: %v", err)
 	}
+	capturedFunctionIDs := map[int64]struct{}{}
+	progBundle.Program.EachFunction(func(fn *ssa.Function) {
+		if fn != nil && len(fn.FreeValues) > 0 {
+			capturedFunctionIDs[fn.GetId()] = struct{}{}
+		}
+	})
 	obfCtx := &obfuscation.Context{
 		SSA:           progBundle.Program,
 		EntryFunction: cfg.EntryFunctionName,
@@ -377,6 +384,7 @@ func compileInputWithConfig(cfg *CompileConfig) (*ssaapi.Program, *Compiler, str
 		WithExternBindings(cfg.ExternBindings),
 		WithInstructionTags(obfCtx.InstrTags),
 		WithRuntimeSymManifest(cfg.RuntimeSymManifest),
+		WithCapturedFunctionIDs(capturedFunctionIDs),
 	)
 	if len(obfCtx.FunctionWrappers) > 0 {
 		compilerOpts = append(compilerOpts, WithFunctionWrappers(obfCtx.FunctionWrappers))
@@ -468,14 +476,24 @@ func entryFunctionCandidates(requested string) []string {
 		*out = append(*out, name)
 	}
 
-	out := make([]string, 0, 4)
+	out := make([]string, 0, 6)
 	add(requested, &out)
+	// User functions are namespaced with the yak_user_ prefix by
+	// llvmFunctionName, so the real entry lives there. Resolve it before the
+	// synthetic "@" container: for a requested "main" the module also holds an
+	// empty "@main" container, and picking that runs nothing.
+	userName := abi.UserSymbolPrefix + strings.TrimPrefix(requested, "@")
+	add(userName, &out)
+	add("@"+userName, &out)
 	if strings.HasPrefix(requested, "@") {
 		add(strings.TrimPrefix(requested, "@"), &out)
 	} else {
 		add("@"+requested, &out)
 	}
 	if requested == "check" {
+		// A user-defined main is namespaced to yak_user_main; prefer it over the
+		// empty synthetic @main container.
+		add(abi.UserSymbolPrefix+"main", &out)
 		add("main", &out)
 		add("@main", &out)
 	}

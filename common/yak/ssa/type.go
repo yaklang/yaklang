@@ -561,6 +561,19 @@ type BasicType struct {
 	pkgPath string
 
 	fullTypeName []string
+
+	// floatCast marks the target type of a float() cast. It keeps the
+	// "number" name so every user-visible type report (hover, static
+	// analysis, declared types) reads exactly as before; only the ssa2llvm
+	// lowering needs to tell a float() target from an int() one.
+	floatCast bool
+}
+
+// IsFloatCastType reports whether this type is the target of a float() cast.
+// Every other basic type answers false, so a plain number type keeps behaving
+// as an int target.
+func (t *BasicType) IsFloatCastType() bool {
+	return t != nil && t.floatCast
 }
 
 func NewBasicType(kind TypeKind, name string) *BasicType {
@@ -649,6 +662,18 @@ func CreateNumberType() Type {
 	return NewBasicType(NumberTypeKind, "number")
 }
 
+// CreateFloatType is the target type of a float() cast. It shares the
+// NumberTypeKind (so type compatibility and every printed type name are
+// unchanged: float() still reports "number") and is told apart from an int()
+// cast only through IsFloatCastType, which the ssa2llvm compiler uses to pick
+// the conversion direction. A distinct printed name would leak into hover and
+// static-analysis output.
+func CreateFloatType() Type {
+	typ := NewBasicType(NumberTypeKind, "number")
+	typ.floatCast = true
+	return typ
+}
+
 func CreateStringType() Type {
 	return NewBasicType(StringTypeKind, "string")
 }
@@ -704,7 +729,7 @@ func GetTypeByStr(typ string) Type {
 	case "uint", "uint8", "byte", "uint16", "uint32", "uint64", "int", "int8", "int16", "int32", "int64", "uintptr":
 		return CreateNumberType()
 	case "float", "float32", "float64", "double", "complex128", "complex64":
-		return CreateNumberType()
+		return CreateFloatType()
 	case "string":
 		return CreateStringType()
 	case "bool":

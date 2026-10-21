@@ -168,11 +168,20 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ImportAlias:  "yakit",
 		ExportExpr:   "yakit.ReportExports",
 	},
+	"pcapdb": {
+		ModuleName:   "pcapdb",
+		GoImportPath: "github.com/yaklang/yaklang/common/pcapx/pcapdb",
+		ImportAlias:  "pcapdb",
+		ExportExpr:   "pcapdb.AOTExports",
+	},
 	"json": {
-		ModuleName:   "json",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.JsonExports",
+		ModuleName: "json",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.JsonExports",
+		},
 	},
 	"xml": {
 		ModuleName:   "xml",
@@ -193,10 +202,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.RegexpExport",
 	},
 	"str": {
-		ModuleName:   "str",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.StringsExport",
+		ModuleName: "str",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.StringsExports",
+		},
 	},
 	"math": {
 		ModuleName:   "math",
@@ -217,10 +229,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		},
 	},
 	"file": {
-		ModuleName:   "file",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.FileExport",
+		ModuleName: "file",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.FileExports",
+		},
 	},
 	"io": {
 		ModuleName:   "io",
@@ -229,10 +244,13 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.IoExports",
 	},
 	"sync": {
-		ModuleName:   "sync",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.SyncExport",
+		ModuleName: "sync",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.SyncExports",
+		},
 	},
 	"context": {
 		ModuleName:   "context",
@@ -241,16 +259,25 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ExportExpr:   "yaklib.ContextExports",
 	},
 	"time": {
-		ModuleName:   "time",
-		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
-		ImportAlias:  "yaklib",
-		ExportExpr:   "yaklib.TimeExports",
+		ModuleName: "time",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.TimeExports",
+		},
 	},
 	"log": {
 		ModuleName:   "log",
 		GoImportPath: "github.com/yaklang/yaklang/common/yak/yaklib",
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.LogExports",
+		// AOT build only: stdlib-backed subset, keeps the monolithic yaklib out.
+		PrunedShim: &ExportSource{
+			GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+			ImportAlias:  "aotlib",
+			ExportExpr:   "aotlib.LogExports",
+		},
 	},
 	"env": {
 		ModuleName:   "env",
@@ -582,6 +609,66 @@ var moduleRegistry = map[string]ModuleImportSpec{
 		ImportAlias:  "yaklib",
 		ExportExpr:   "yaklib.DictUtilExports",
 	},
+	"bin": {
+		ModuleName:   "bin",
+		GoImportPath: "github.com/yaklang/yaklang/common/binx",
+		ImportAlias:  "binx",
+		ExportExpr:   "binx.Exports",
+	},
+	"crawlerx": {
+		ModuleName:   "crawlerx",
+		GoImportPath: "github.com/yaklang/yaklang/common/crawlerx",
+		ImportAlias:  "crawlerx",
+		ExportExpr:   "crawlerx.CrawlerXExports",
+	},
+	"diff": {
+		ModuleName:   "diff",
+		GoImportPath: "github.com/yaklang/yaklang/common/utils/yakgit/yakdiff",
+		ImportAlias:  "yakdiff",
+		ExportExpr:   "yakdiff.Exports",
+	},
+	"git": {
+		ModuleName:   "git",
+		GoImportPath: "github.com/yaklang/yaklang/common/utils/yakgit",
+		ImportAlias:  "yakgit",
+		ExportExpr:   "yakgit.Exports",
+	},
+	"omnisearch": {
+		ModuleName:   "omnisearch",
+		GoImportPath: "github.com/yaklang/yaklang/common/omnisearch",
+		ImportAlias:  "omnisearch",
+		ExportExpr:   "omnisearch.Exports",
+	},
+	"openapi": {
+		ModuleName:   "openapi",
+		GoImportPath: "github.com/yaklang/yaklang/common/openapi",
+		ImportAlias:  "openapi",
+		ExportExpr:   "openapi.Exports",
+	},
+	"sandbox": {
+		ModuleName:   "sandbox",
+		GoImportPath: "github.com/yaklang/yaklang/common/yak",
+		ImportAlias:  "yak",
+		ExportExpr:   "yak.SandboxExports",
+	},
+	"sca": {
+		ModuleName:   "sca",
+		GoImportPath: "github.com/yaklang/yaklang/common/sca",
+		ImportAlias:  "sca",
+		ExportExpr:   "sca.Exports",
+	},
+	"simulator": {
+		ModuleName:   "simulator",
+		GoImportPath: "github.com/yaklang/yaklang/common/simulator",
+		ImportAlias:  "simulator",
+		ExportExpr:   "simulator.Exports",
+	},
+	"suricata": {
+		ModuleName:   "suricata",
+		GoImportPath: "github.com/yaklang/yaklang/common/chaosmaker",
+		ImportAlias:  "chaosmaker",
+		ExportExpr:   "chaosmaker.ChaosMakerExports",
+	},
 	"webforest": {
 		ModuleName:   "webforest",
 		GoImportPath: "github.com/yaklang/yaklang/common/utils/webforest",
@@ -760,4 +847,28 @@ func AllModuleNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// aotCorePluginStubModules is intentionally empty. It used to replace the
+// real yaklib export tables of these modules with a compile-only stub for the
+// coreplugin sweep, but the mustpass suite executes the produced binaries:
+// a stub table makes every real call fail with "yaklib export not found".
+// The monolithic yaklib is already retained in the archive through the
+// ssafront group, so registering the real tables costs nothing extra.
+var aotCorePluginStubModules = []string{}
+
+func init() {
+	stub := &ExportSource{
+		GoImportPath: "github.com/yaklang/yaklang/common/yak/ssa2llvm/runtime/aotlib",
+		ImportAlias:  "aotlib",
+		ExportExpr:   "aotlib.CorePluginStubExports",
+	}
+	for _, name := range aotCorePluginStubModules {
+		spec, ok := moduleRegistry[name]
+		if !ok || spec.PrunedShim != nil {
+			continue
+		}
+		spec.PrunedShim = stub
+		moduleRegistry[name] = spec
+	}
 }

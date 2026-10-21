@@ -1,6 +1,7 @@
 package main
 
 /*
+#cgo linux CFLAGS: -D_GNU_SOURCE
 #cgo linux LDFLAGS: -ldl
 #include <stdint.h>
 #include <stdlib.h>
@@ -72,7 +73,7 @@ func yak_runtime_invoke_vm(ctx unsafe.Pointer, blobHex *C.char, seedHex *C.char,
 		C.GoString(hostBindingSpec),
 		args,
 		func(id abi.FuncID, rawArgs []uint64) int64 {
-			return dispatchRuntimeCall(id, rawArgs)
+			return dispatchRuntimeCall(id, rawArgs, false)
 		},
 		invokeVMBoundSymbol,
 	)

@@ -680,13 +680,34 @@ func startBridge(
 	for _, opt := range opts {
 		opt(config)
 	}
+	// Bind before certificate and callback setup. Those steps take longer
+	// than the one second a caller typically sleeps, and dialing in that
+	// window is connection refused. The kernel queues the handshake until
+	// accept starts.
+	if config.host == "" {
+		config.host = "127.0.0.1"
+	}
+	if config.ctx == nil {
+		config.ctx = context.Background()
+	}
+	lis, err := net.Listen("tcp", utils.HostPort(config.host, port))
+	if err != nil {
+		return err
+	}
 	downstreamProxys := strings.Split(downstreamProxy, ",")
 	server, err := initMitmServer(downstreamProxys, config)
 	if err != nil {
+		lis.Close()
 		return utils.Errorf("create mitm server failed: %s", err)
 	}
-	err = server.Serve(config.ctx, utils.HostPort(config.host, port))
+	go func() {
+		<-config.ctx.Done()
+		_ = lis.Close()
+	}()
+	log.Info("mitm server started")
+	err = server.ServerListener(config.ctx, lis)
 	if err != nil {
+		lis.Close()
 		log.Errorf("server mitm failed: %s", err)
 		return err
 	}

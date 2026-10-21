@@ -111,6 +111,45 @@ func IsFunctionLikeValue(value ssa.Value) bool {
 	return false
 }
 
+// foreignCapturedClosure reports a parameter whose default is a closure
+// defined in an ancestor and that closure has free values. The call has to
+// use the object the ancestor materialized.
+func foreignCapturedClosure(current *ssa.Function, calleeVal ssa.Value) bool {
+	if current == nil || calleeVal == nil {
+		return false
+	}
+	param, ok := ssa.ToParameter(calleeVal)
+	if !ok || param == nil {
+		return false
+	}
+	nested := directNonExternFunction(param.GetDefault())
+	if nested == nil {
+		nested = directNonExternFunction(param)
+	}
+	if nested == nil || len(nested.FreeValues) == 0 {
+		return false
+	}
+	parent := nested.GetParent()
+	if parent == nil {
+		return false
+	}
+	return parent.GetId() != current.GetId()
+}
+
+func directNonExternFunction(value ssa.Value) *ssa.Function {
+	if value == nil {
+		return nil
+	}
+	if fn, ok := ssa.ToFunction(value); ok && fn != nil && !fn.IsExtern() {
+		return fn
+	}
+	ft, ok := value.GetType().(*ssa.FunctionType)
+	if !ok || ft == nil || ft.This == nil || ft.This.IsExtern() {
+		return nil
+	}
+	return ft.This
+}
+
 func ResolveDirectCallee(program *ssa.Program, fn *ssa.Function, call *ssa.Call) (*ssa.Function, bool) {
 	if fn == nil || call == nil {
 		return nil, false
@@ -120,8 +159,26 @@ func ResolveDirectCallee(program *ssa.Program, fn *ssa.Function, call *ssa.Call)
 	if !ok || calleeVal == nil {
 		return nil, false
 	}
+	// A call result is a runtime value (possibly a materialized closure object
+	// returned by a factory function), not a statically known callee.
+	if _, isCall := calleeVal.(*ssa.Call); isCall {
+		return nil, false
+	}
+	// A member read (e.g. fns[0] or obj.method) yields a runtime value: the
+	// closure object stored in the collection, or a method bound to the object.
+	if mc, ok := calleeVal.(ssa.MemberCall); ok && mc.IsMember() {
+		return nil, false
+	}
 	if ssaFn, ok := ssa.ToFunction(calleeVal); ok && ssaFn != nil && !ssaFn.IsExtern() {
 		return ssaFn, true
+	}
+	// A parameter whose default is a closure defined in an ancestor must stay
+	// indirect. The ancestor stored the closure object (with its free values)
+	// into this parameter. Rebuilding the function here initializes those
+	// captures to zero. The FunctionType.This shortcut below would otherwise
+	// devirtualize the parameter before this check.
+	if foreignCapturedClosure(fn, calleeVal) {
+		return nil, false
 	}
 	if ft, ok := calleeVal.GetType().(*ssa.FunctionType); ok && ft != nil && ft.This != nil && !ft.This.IsExtern() {
 		return ft.This, true
@@ -168,6 +225,9 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 			}
 		case FrameInputParamMember:
 			actualID := resolveCallArgMemberID(call, calleeFn, input)
+			if actualID <= 0 && call != nil && input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
+				actualID = call.ArgMember[input.Index]
+			}
 			if actualID > 0 {
 				if shouldDeferParameterMemberArg(call, calleeFn, input, actualID) {
 					argIDs = append(argIDs, zero)
@@ -183,25 +243,9 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 			if input.Variable != nil {
 				name = input.Variable.GetName()
 			}
-			callerFn := call.GetFunc()
-			if name != "" && callerFn != nil {
-				if !resolved {
-					for variable, valueID := range callerFn.FreeValues {
-						if variable != nil && variable.GetName() == name && valueID > 0 {
-							argIDs = append(argIDs, valueID)
-							resolved = true
-							break
-						}
-					}
-				}
-				if !resolved {
-					if actualID, ok := call.Binding[name]; ok && actualID > 0 {
-						if valueBelongsToFunctionOrParent(callerFn, actualID) {
-							argIDs = append(argIDs, actualID)
-							resolved = true
-						}
-					}
-				}
+			if actualID := resolveCapturedValueID(call, calleeFn, name, input.Value); actualID > 0 {
+				argIDs = append(argIDs, actualID)
+				resolved = true
 			}
 			if !resolved {
 				argIDs = append(argIDs, zero)
@@ -211,6 +255,57 @@ func BuildCallFrameArgIDs(program *ssa.Program, call *ssa.Call, calleeFn *ssa.Fu
 		}
 	}
 	return argIDs
+}
+
+func formalMemberKeyString(input FrameInput) string {
+	if input.Value == nil {
+		return ""
+	}
+	pm, ok := ssa.ToParameterMember(input.Value)
+	if !ok || pm == nil || pm.GetKey() == nil {
+		return ""
+	}
+	return memberKeyString(pm.GetKey())
+}
+
+func resolveCapturedValueID(call *ssa.Call, calleeFn *ssa.Function, name string, fallback ssa.Value) int64 {
+	if call == nil || name == "" {
+		return 0
+	}
+	callerFn := call.GetFunc()
+	if callerFn != nil {
+		for variable, valueID := range callerFn.FreeValues {
+			if variable != nil && variable.GetName() == name && valueID > 0 {
+				return valueID
+			}
+		}
+	}
+	if callerFn != nil {
+		if actualID, ok := call.Binding[name]; ok && actualID > 0 && valueBelongsToFunctionOrParent(callerFn, actualID) {
+			return actualID
+		}
+	}
+	// The binding id may belong to the callee's free-value parameter; its
+	// default is the captured caller-side value.
+	if calleeFn != nil {
+		for variable, valueID := range calleeFn.FreeValues {
+			if variable != nil && variable.GetName() == name && valueID > 0 {
+				if param, ok := calleeFn.GetValueById(valueID); ok {
+					if p, ok := ssa.ToParameter(param); ok && p != nil && p.GetDefault() != nil {
+						return p.GetDefault().GetId()
+					}
+				}
+			}
+		}
+	}
+	if fallback != nil {
+		if param, ok := ssa.ToParameter(fallback); ok && param != nil && param.GetDefault() != nil {
+			if def := param.GetDefault(); callerFn == nil || def.GetFunc() == callerFn {
+				return def.GetId()
+			}
+		}
+	}
+	return 0
 }
 
 func valueBelongsToFunctionOrParent(fn *ssa.Function, valueID int64) bool {
@@ -223,16 +318,16 @@ func valueBelongsToFunctionOrParent(fn *ssa.Function, valueID int64) bool {
 }
 
 func resolveCallArgMemberID(call *ssa.Call, calleeFn *ssa.Function, input FrameInput) int64 {
-	if call == nil || input.Kind != FrameInputParamMember {
+	if call == nil || input.Kind != FrameInputParamMember || input.Index < 0 {
 		return 0
 	}
-
 	if formal, ok := ssa.ToParameterMember(input.Value); ok && formal != nil {
-		if actualID := findMatchingCallArgMember(call, calleeFn, formal); actualID > 0 {
-			return actualID
+		if formal.MemberCallKind == ssa.FreeValueMemberCall {
+			if id := resolveCapturedValueID(call, calleeFn, formal.ObjectName, nil); id > 0 {
+				return id
+			}
 		}
 	}
-
 	if input.Index < len(call.ArgMember) && call.ArgMember[input.Index] > 0 {
 		return call.ArgMember[input.Index]
 	}
@@ -328,6 +423,9 @@ func shouldDeferParameterMemberArg(call *ssa.Call, calleeFn *ssa.Function, input
 
 	formalMember, ok := ssa.ToParameterMember(input.Value)
 	if !ok || formalMember == nil || !formalParameterMemberUsedOnlyAsCallTarget(formalMember) {
+		return false
+	}
+	if formalMember.MemberCallKind == ssa.FreeValueMemberCall {
 		return false
 	}
 

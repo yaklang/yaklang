@@ -26,6 +26,14 @@ func (c *Compiler) shouldUseYaklibDispatch(calleeName string) bool {
 	if _, ok := c.getExternBinding(calleeName); ok {
 		return false
 	}
+	// AOT runtime globals that are not part of yaklang's callable table
+	// still dispatch through the empty-package yaklib path. The interpreter
+	// injects getParam, getParams, and param as the same params reader;
+	// AOT serves that reader from the environment under the name param.
+	switch calleeName {
+	case "param", "getParam", "getParams":
+		return true
+	}
 	if _, ok := yaklang.LookupGlobalCallable(calleeName); ok {
 		return true
 	}
@@ -100,8 +108,8 @@ func (c *Compiler) newRuntimeEqDispatchSpec(inst *ssa.BinOp, negate bool) (conte
 		negateValue = 1
 	}
 	args := []contextCallArg{
-		{ssaID: inst.X, tagPointerArg: true},
-		{ssaID: inst.Y, tagPointerArg: true},
+		{ssaID: inst.X, tagPointerArg: true, tagBytes: true},
+		{ssaID: inst.Y, tagPointerArg: true, tagBytes: true},
 		{value: llvm.ConstInt(c.LLVMCtx.Int64Type(), negateValue, false)},
 	}
 	return contextCallSpec{

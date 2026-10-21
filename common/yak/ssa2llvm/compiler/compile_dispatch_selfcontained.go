@@ -79,13 +79,33 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 	if len(usedModules) > 0 {
 		usedModules = append(usedModules, "shared")
 	}
-	for _, dep := range moduleGroupDeps {
-		if !containsModule(usedModules, dep.module) {
-			continue
+	// Close over the dependency table until it stops growing: entries can
+	// depend on each other (ssa <-> ai), so a single pass would miss groups
+	// added by an entry that was already visited.
+	for changed := true; changed; {
+		changed = false
+		for _, dep := range moduleGroupDeps {
+			if !containsModule(usedModules, dep.module) {
+				continue
+			}
+			for _, need := range dep.needs {
+				if !containsModule(usedModules, need) {
+					usedModules = append(usedModules, need)
+					changed = true
+				}
+			}
 		}
-		for _, need := range dep.needs {
-			if !containsModule(usedModules, need) {
-				usedModules = append(usedModules, need)
+	}
+	// The staticanalyze tier's modules share the monolithic yaklib and the
+	// network/SSA closures so pervasively that pruning the shared groups
+	// inside it is not sound: yaklib-backed modules call sharednet at runtime,
+	// sca/omnisearch reach ssafront, and the ai/liteforge/sandbox modules
+	// cross-register init callbacks. Keep the whole shared closure for this
+	// tier; the core and net tiers still prune per script.
+	if tier == "staticanalyze" {
+		for _, g := range []string{"sharednet", "ssafront", "ssa", "cli", "poc", "ai", "tools", "httptpl"} {
+			if !containsModule(usedModules, g) {
+				usedModules = append(usedModules, g)
 			}
 		}
 	}
@@ -100,10 +120,18 @@ func prepareAndLinkBinary(comp *Compiler, finalLL, outputFile string, cfg *Compi
 // embedded archive may still carry it (SSA2LLVM_EMBED_MODULES takes any list),
 // and if it does not, checkModulesAvailable says so by name before lld runs.
 func selectRuntimeTier(scriptModules []string) string {
-	if len(scriptModules) == 0 {
+	// Global callables (die, sprintf, ...) are recorded with an empty module;
+	// they are runtime globals, not tier modules, so drop them before lookup.
+	filtered := make([]string, 0, len(scriptModules))
+	for _, mod := range scriptModules {
+		if mod != "" {
+			filtered = append(filtered, mod)
+		}
+	}
+	if len(filtered) == 0 {
 		return tiers.All[0].Name
 	}
-	t, err := tiers.Select(scriptModules)
+	t, err := tiers.Select(filtered)
 	if err != nil {
 		return ""
 	}
@@ -130,7 +158,88 @@ var moduleGroupDeps = []struct {
 	{"poc", []string{"cli", "sharednet"}},
 	{"http", []string{"cli", "poc", "sharednet"}},
 	{"cli", []string{"sharednet"}},
-	{"ssa", []string{"cli", "poc", "ssafront", "sharednet"}},
+	{"ssa", []string{"cli", "poc", "ssafront", "sharednet", "ai"}},
+	// The ai/liteforge/sandbox/rag/dyn/hook modules share the common/yak
+	// monolith and the common/ai subtree, whose package init functions
+	// register callbacks across those packages (aiconfig -> yakit, aiforge ->
+	// aitool, common/yak -> aicommon). The groups must therefore stay
+	// together: ai drags ssa (yakit), and the yak-monolith-backed modules
+	// drag ai (common/yak lives in the ai group).
+	{"ai", []string{"ssa"}},
+	{"liteforge", []string{"ai"}},
+	{"sandbox", []string{"ai"}},
+	{"rag", []string{"ai", "liteforge"}},
+	{"ai", []string{"ssa", "liteforge"}},
+	{"dyn", []string{"ai"}},
+	// hook executes plugin source on the in-process interpreter. That source
+	// is not an SSA call of the outer script, but it does call http.*.
+	// yaklib.HttpExports aliases yakhttp.HttpExports; skipping yakhttp's init
+	// leaves the alias nil, and httpex.go then installs an empty map. The
+	// interpreter panics with "no such key" on http.Get. Keeping the http
+	// group runs the real export-table initializer.
+	{"hook", []string{"ai", "http"}},
+	// Modules whose export tables live in the ssa group (their own packages
+	// are placed there by elfsplit) must keep it, or the module registration
+	// function calls a pruned stub at start-up.
+	{"simulator", []string{"ssa"}},
+	{"suricata", []string{"ssa"}},
+	{"pprof", []string{"ssa"}},
+	// The nuclei module is backed by the same httptpl package as the httptpl
+	// module, so using it must keep the httptpl group.
+	{"nuclei", []string{"httptpl"}},
+	// Monolithic-yaklib-backed modules: their export tables live in
+	// common/yak/yaklib, which elfsplit places in the ssafront group.
+	{"atoi", []string{"ssafront"}},
+	{"bot", []string{"ssafront"}},
+	{"bufio", []string{"ssafront"}},
+	{"context", []string{"ssafront"}},
+	{"csrf", []string{"ssafront"}},
+	{"db", []string{"ssafront"}},
+	{"dictutil", []string{"ssafront"}},
+	{"dns", []string{"ssafront"}},
+	{"dnslog", []string{"ssafront"}},
+	{"env", []string{"ssafront"}},
+	{"exec", []string{"ssafront"}},
+	{"filemonitor", []string{"ssafront"}},
+	{"filescanner", []string{"ssafront"}},
+	{"fuzz", []string{"ssafront"}},
+	{"fuzzx", []string{"ssafront"}},
+	{"gzip", []string{"ssafront"}},
+	{"httpool", []string{"ssafront"}},
+	{"httpserver", []string{"ssafront"}},
+	{"io", []string{"ssafront"}},
+	{"js", []string{"ssafront"}},
+	{"jsonstream", []string{"ssafront"}},
+	{"ldap", []string{"ssafront"}},
+	{"math", []string{"ssafront"}},
+	{"mitm", []string{"ssafront"}},
+	{"mmdb", []string{"ssafront"}},
+	{"rdp", []string{"ssafront"}},
+	{"re", []string{"ssafront"}},
+	{"re2", []string{"ssafront"}},
+	{"redis", []string{"ssafront"}},
+	{"regen", []string{"ssafront"}},
+	{"risk", []string{"ssafront"}},
+	{"smb", []string{"ssafront"}},
+	{"spacengine", []string{"ssafront"}},
+	{"ssh", []string{"ssafront"}},
+	{"tcp", []string{"ssafront"}},
+	{"timezone", []string{"ssafront"}},
+	{"tls", []string{"ssafront"}},
+	{"traceroute", []string{"ssafront"}},
+	{"udp", []string{"ssafront"}},
+	{"x", []string{"ssafront"}},
+	{"xml", []string{"ssafront"}},
+	{"yaml", []string{"ssafront"}},
+	{"zip", []string{"ssafront"}},
+	// Tools-backed modules: their export tables live in
+	// common/yak/yaklib/tools, which elfsplit places in the tools group.
+	{"brute", []string{"tools"}},
+	{"finscan", []string{"tools"}},
+	{"ping", []string{"tools"}},
+	{"servicescan", []string{"tools"}},
+	{"subdomain", []string{"tools"}},
+	{"synscan", []string{"tools"}},
 }
 
 // moduleClosureKey identifies the rules above for the build cache. A cached
