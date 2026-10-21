@@ -177,12 +177,13 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			for idx := len(pkgNames) - 1; idx > 0; idx-- {
 				className = strings.Join(pkgNames[idx:], ".")
 				pkgName := strings.Join(pkgNames[:idx], ".")
-				// Pass1, and only when this class is not declared yet. The scheduler
-				// creates the library before hasFile is set, so a missing name would
-				// make fakeImportType plant an empty blueprint that the real
-				// declaration reuses. An already declared class, a package with no
-				// library yet, and the binding pass all keep the old path.
-				if deferForeignPackage {
+				// Pass1, and only for a package this project is still compiling.
+				// The scheduler creates that library before its classes exist, and
+				// fakeImportType would plant an empty blueprint the real declaration
+				// then reuses. A virtual library created for an earlier external
+				// import is not one of those packages: later classes from the same
+				// import list still have to be recorded.
+				if deferForeignPackage && y.packageIsCompileUnit(pkgName) {
 					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil && !hasImportType(lib, className) {
 						unitLibrary = true
 						ownerBusy = true
@@ -256,6 +257,23 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 		}
 		prog.PopEditor(false)
 	}
+}
+
+func (y *singleFileBuilder) packageIsCompileUnit(pkgName string) bool {
+	if y == nil || pkgName == "" || y.GetProgram() == nil {
+		return false
+	}
+	app := y.GetProgram().GetApplication()
+	if app == nil {
+		app = y.GetProgram()
+	}
+	want := "java:" + pkgName
+	for _, unit := range app.CompileUnits {
+		if unit != nil && unit.Key == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (y *singleFileBuilder) directoryPackageBusy(pkgName string) bool {
