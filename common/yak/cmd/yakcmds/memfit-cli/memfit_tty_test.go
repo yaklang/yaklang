@@ -284,29 +284,28 @@ func TestMemfitTTYComposerCompletionPasteAndHistorySnapshot(t *testing.T) {
 
 	h.WaitFor("❯")
 	h.Write("/mo")
-	h.WaitForScreen("Commands · ↑↓ choose · Tab insert")
-	h.WaitForScreen("/mode yolo")
+	// Completion rows are written before the editor and footer. Wait for the
+	// entire requested frame, even when PTY reads split it across chunks.
+	h.WaitForScreen("Commands · ↑↓ choose · Tab insert", "/mode yolo", "│ ❯ /mo", "click/Ctrl+O details · /help")
 	h.AssertSnapshot("composer-slash-completion")
 	h.Write("\t")
 	h.WaitForScreen("│ ❯ /mode yolo")
 
 	h.Write("\x15@REA")
-	h.WaitForScreen("Files · ↑↓ choose · Tab insert")
-	h.WaitForScreen("@README.md")
+	h.WaitForScreen("Files · ↑↓ choose · Tab insert", "@README.md", "│ ❯ @REA", "click/Ctrl+O details · /help")
 	h.AssertSnapshot("composer-file-completion")
 	h.Write("\t")
 	h.WaitForScreen("│ ❯ @README.md")
 
 	h.Write("\x15\x1b[200~first line\n第二行 🌏\x1b[201~")
-	h.WaitForScreen("│ ❯ first line\n│   第二行 🌏")
+	h.WaitForScreen("│ ❯ first line\n│   第二行 🌏", "click/Ctrl+O details · /help")
 	h.AssertSnapshot("composer-multiline-paste")
 	h.Write("\r")
 	h.WaitFor("Completed")
 	h.WaitForScreen("○ Ready")
 
 	h.Write("\x1b[5~")
-	h.WaitForScreen("╭─ History")
-	h.WaitForScreen("PgDn latest")
+	h.WaitForScreen("╭─ History", "PgDn latest · YOLO")
 	h.AssertSnapshot("conversation-history")
 	h.Write("\x1b[6~")
 	time.Sleep(50 * time.Millisecond)
@@ -734,7 +733,7 @@ func (h *memfitTTYHarness) WaitFor(want string) string {
 	return ""
 }
 
-func (h *memfitTTYHarness) WaitForScreen(want string) string {
+func (h *memfitTTYHarness) WaitForScreen(wants ...string) string {
 	h.t.Helper()
 	deadline := time.Now().Add(4 * time.Second)
 	for time.Now().Before(deadline) {
@@ -742,12 +741,19 @@ func (h *memfitTTYHarness) WaitForScreen(want string) string {
 		snapshot := h.screen.Snapshot()
 		raw := h.raw.String()
 		h.mu.Unlock()
-		if strings.Contains(snapshot, want) {
+		matches := true
+		for _, want := range wants {
+			if !strings.Contains(snapshot, want) {
+				matches = false
+				break
+			}
+		}
+		if matches {
 			return snapshot
 		}
 		select {
 		case err := <-h.done:
-			h.t.Fatalf("TTY helper exited while waiting for %q on screen: %v\nraw output:\n%s", want, err, visibleMemfitControlBytes(raw))
+			h.t.Fatalf("TTY helper exited while waiting for %q on screen: %v\nraw output:\n%s", wants, err, visibleMemfitControlBytes(raw))
 		default:
 		}
 		time.Sleep(10 * time.Millisecond)
@@ -756,7 +762,7 @@ func (h *memfitTTYHarness) WaitForScreen(want string) string {
 	snapshot := h.screen.Snapshot()
 	raw := h.raw.String()
 	h.mu.Unlock()
-	h.t.Fatalf("timed out waiting for %q on screen\nscreen:\n%s\nraw output:\n%s", want, snapshot, visibleMemfitControlBytes(raw))
+	h.t.Fatalf("timed out waiting for %q on screen\nscreen:\n%s\nraw output:\n%s", wants, snapshot, visibleMemfitControlBytes(raw))
 	return ""
 }
 
