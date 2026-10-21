@@ -528,13 +528,29 @@ func appendResidentIndex(index *utils.SafeMapWithKey[string, []int64], key strin
 }
 
 func removeResidentIndex(index *utils.SafeMapWithKey[string, []int64], key string, id int64) {
-	if index == nil || id <= 0 || !index.Have(key) {
+	if index == nil || id <= 0 {
 		return
 	}
-	index.Update(key, func(data []int64, _ bool) ([]int64, bool) {
+	index.Update(key, func(data []int64, loaded bool) ([]int64, bool) {
 		// Readers can retain the previous slice after releasing the map lock.
-		// Removal must not shift elements in that shared backing array.
-		var result []int64
+		// A real removal therefore publishes a new backing array. A miss keeps
+		// the existing slice: copying it would only create allocation traffic.
+		if !loaded || len(data) == 0 {
+			return data, false
+		}
+		matches := 0
+		for _, item := range data {
+			if item == id {
+				matches++
+			}
+		}
+		if matches == 0 {
+			return data, false
+		}
+		if matches == len(data) {
+			return nil, true
+		}
+		result := make([]int64, 0, len(data)-matches)
 		for _, item := range data {
 			if item != id {
 				result = append(result, item)

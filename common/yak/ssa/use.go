@@ -24,18 +24,28 @@ func replaceBlueprintFieldReference(fields *utils.SafeMapWithKey[string, []Value
 			if !loaded || len(values) == 0 {
 				return values, false
 			}
+			// Most fields do not contain the replaced value. Find one hit before
+			// copying so a miss does not allocate a same-sized slice.
+			hit := -1
+			fromID := from.GetId()
+			for index, current := range values {
+				if utils.IsNil(current) || current.GetId() != fromID {
+					continue
+				}
+				hit = index
+				break
+			}
+			if hit < 0 {
+				return values, false
+			}
 			next := make([]Value, len(values))
 			copy(next, values)
-			replaced := false
-			for index, current := range next {
-				if utils.IsNil(current) || current.GetId() != from.GetId() {
+			for index := hit; index < len(next); index++ {
+				current := next[index]
+				if utils.IsNil(current) || current.GetId() != fromID {
 					continue
 				}
 				next[index] = to
-				replaced = true
-			}
-			if !replaced {
-				return values, false
 			}
 			return next, true
 		})
