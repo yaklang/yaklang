@@ -4,7 +4,7 @@ desc(
 	title: "源码扫描：Python 响应头写入外部值"
 	title_zh: "源码扫描：Python 响应头写入外部值"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-python-response-header"
 	risk: "crlf-injection"
 	cwe: "CWE-113"
@@ -48,7 +48,7 @@ NEG
 )
 ${*.py}.pattern_regex(/headers\s*\[/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Python 响应头写入外部值",
 	title_zh: "源码扫描：Python 响应头写入外部值",
 	message: "源码扫描：Python 响应头写入外部值",

@@ -4,7 +4,7 @@ desc(
 	title: "源码扫描：Python 模型批量接收请求体"
 	title_zh: "源码扫描：Python 模型批量接收请求体"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-python-model-create-request"
 	risk: "mass-assignment"
 	cwe: "CWE-915"
@@ -48,7 +48,7 @@ NEG
 )
 ${*.py}.pattern_regex(/objects\.create\s*\(\s*\*\*|objects\.update\s*\(\s*\*\*/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "源码扫描：Python 模型批量接收请求体",
 	title_zh: "源码扫描：Python 模型批量接收请求体",
 	message: "源码扫描：Python 模型批量接收请求体",

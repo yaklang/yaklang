@@ -1,7 +1,7 @@
 desc(
 	title_zh: "检测Java java.sql 数据库Statement资源未释放"
 	title: "Check Java java.sql Statement Unreleased Resource"
-	level:high
+	level:low
 	risk:"resource-leak"
 	reference: <<<REFERENCE
 [CWE-772: Missing Release of Resource after Effective Lifetime](https://cwe.mitre.org/data/definitions/772.html)

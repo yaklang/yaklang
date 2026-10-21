@@ -4,7 +4,7 @@ desc(
 	title: "Struct scan: Java RC4 Cipher"
 	title_zh: "结构扫描：Java RC4/ARCFOUR 加密"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-java-rc4-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -45,7 +45,7 @@ NEG
 Cipher.getInstance(*?{have: "RC4"}) as $call
 Cipher.getInstance(*?{have: "ARCFOUR"}) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Weak RC4 Cipher",
 	title_zh: "弱加密 RC4",
 	message: "结构扫描：Java RC4/ARCFOUR 加密",

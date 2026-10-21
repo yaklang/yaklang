@@ -4,7 +4,7 @@ desc(
 	title: "Struct scan: Java RSA PKCS1Padding"
 	title_zh: "结构扫描：Java RSA PKCS1Padding"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-java-rsa-pkcs1"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 Cipher.getInstance(*?{have: "PKCS1Padding"}) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Java RSA PKCS1Padding",
 	title_zh: "结构扫描：Java RSA PKCS1Padding",
 	message: "结构扫描：Java RSA PKCS1Padding",

@@ -4,7 +4,7 @@ desc(
 	title: "Struct scan: Python compile call"
 	title_zh: "结构扫描：Python compile 调用"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-python-compile"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 compile(* as $c) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Python compile call",
 	title_zh: "结构扫描：Python compile 调用",
 	message: "结构扫描：Python compile 调用",

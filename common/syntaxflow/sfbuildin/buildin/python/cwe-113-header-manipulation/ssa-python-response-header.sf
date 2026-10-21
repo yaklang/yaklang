@@ -4,7 +4,7 @@ desc(
 	title: "数据流：Python 响应头写入外部值"
 	title_zh: "数据流：Python 响应头写入外部值"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "ssa-python-response-header"
 	risk: "crlf-injection"
 	cwe: "CWE-113"
@@ -48,7 +48,7 @@ NEG
 )
 set_header(*?{!opcode: const && !opcode: param} as $dyn) as $call
 alert $dyn for {
-	level: "high",
+	level: "middle",
 	title: "数据流：Python 响应头写入外部值",
 	title_zh: "数据流：Python 响应头写入外部值",
 	message: "数据流：Python 响应头写入外部值",
