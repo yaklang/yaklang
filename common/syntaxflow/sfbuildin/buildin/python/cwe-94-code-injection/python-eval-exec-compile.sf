@@ -18,7 +18,6 @@ REFERENCE
 
 eval() as $sink
 exec() as $sink
-compile() as $sink
 
 alert $sink for {
 	title: "eval exec compile",

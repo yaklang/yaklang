@@ -4,7 +4,7 @@ desc(
 	title: "检测 JavaScript document.write"
 	title_zh: "检测 JavaScript document.write"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-js-document-write"
 	risk: "xss"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 ${*.js}.pattern_regex(/document\.write(ln)?\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript document.write",
 	title_zh: "检测 JavaScript document.write",
 	message: "检测 JavaScript document.write",

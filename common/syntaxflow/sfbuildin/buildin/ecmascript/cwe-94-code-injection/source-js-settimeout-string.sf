@@ -4,7 +4,7 @@ desc(
 	title: "检测 JavaScript setTimeout 字符串参数"
 	title_zh: "检测 JavaScript setTimeout 字符串参数"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-js-settimeout-string"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 ${*.js}.pattern_regex(/set(Timeout|Interval)\s*\(\s*['"]/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript setTimeout 字符串参数",
 	title_zh: "检测 JavaScript setTimeout 字符串参数",
 	message: "检测 JavaScript setTimeout 字符串参数",

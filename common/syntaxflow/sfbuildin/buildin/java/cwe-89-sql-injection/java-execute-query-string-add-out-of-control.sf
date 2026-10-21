@@ -102,7 +102,7 @@ $prepAdd + $prepAppendDirect as $prepIndirect
 $directly + $indirectly + $prepIndirect as $vuln
 
 alert $vuln for {
-	level: "high",
+	level: "middle",
 	title: "Java SQL Injection Vulnerability Was Detected",
 	title_zh: "检测到Java SQL注入漏洞",
 	name: "vuln",

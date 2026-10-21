@@ -4,7 +4,7 @@ desc(
 	title: "源码扫描：Java XML 字符串拼接"
 	title_zh: "源码扫描：Java XML 字符串拼接"
 	type: vuln
-	level: high
+	level: low
 	rule_id: "source-java-xml-string-concat"
 	risk: "xml-injection"
 	cwe: "CWE-91"
@@ -45,7 +45,7 @@ NEG
 )
 ${*.java}.pattern_regex(/<\w+[^>]*>\"\s*\+|\"\s*<\w+[^>]*>\"\s*\+/) as $hit
 alert $hit for {
-	level: "high",
+	level: "low",
 	title: "源码扫描：Java XML 字符串拼接",
 	title_zh: "源码扫描：Java XML 字符串拼接",
 	message: "源码扫描：Java XML 字符串拼接",
