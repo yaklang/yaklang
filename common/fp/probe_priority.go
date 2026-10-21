@@ -3,13 +3,13 @@ package fp
 import "sort"
 
 const (
-	// defaultProbesMax is the configured generic active-probe budget. Port-matched
-	// probes are not charged against it.
+	// defaultProbesMax is the Config.ProbesMax default: the generic
+	// active-probe budget. Port-matched probes are not charged against it.
 	defaultProbesMax = 10
-	// defaultGenericProbeBudget is the generic sweep used when ProbesMax is left
-	// at its default. It fits the lowered common protocols, the rarity-1
-	// foundation and the rarity-0 RDP probe. An explicit smaller ProbesMax is
-	// still honored.
+	// defaultGenericProbeBudget is the generic-sweep floor for the default and
+	// any raised ProbesMax. It fits the lowered common protocols, the rarity-1
+	// foundation and the rarity-0 RDP probe. An explicitly smaller ProbesMax
+	// is still honored.
 	defaultGenericProbeBudget = 14
 	// defaultPortProbeBudget is how many default-port probes one target may
 	// receive even when their embedded rarity is above RarityMax.
@@ -81,7 +81,10 @@ func selectionLimits(config *Config) (portLimit, genericLimit int, limited bool)
 		return 0, 0, false
 	}
 	if config.ProbesMax > defaultProbesMax {
-		return config.ProbesMax, config.ProbesMax, true
+		// Raising the budget must never send fewer probes than the default
+		// sweep, so both default floors stay in effect as minimums.
+		return max(config.ProbesMax, defaultPortProbeBudget),
+			max(config.ProbesMax, defaultGenericProbeBudget), true
 	}
 	portLimit = defaultPortProbeBudget
 	genericLimit = config.ProbesMax

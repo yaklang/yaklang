@@ -989,7 +989,8 @@ var FingerprintScanExports = map[string]interface{}{
 	// 主动发包模式打开
 	"active": fp.WithActiveMode,
 
-	// 每个服务最多主动发几个包？
+	// 每个服务最多主动发几个通用探测包？端口命中的探针另有预算，
+	// 实际发包上限见 fp.Config.ProbesMax 的注释。
 	"maxProbes": fp.WithProbesMax,
 
 	// 主动发包模式下，并发量？
