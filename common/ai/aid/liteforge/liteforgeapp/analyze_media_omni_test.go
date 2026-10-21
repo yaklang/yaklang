@@ -9,6 +9,7 @@ import (
 	"image"
 	"image/color"
 	"image/png"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -321,4 +322,73 @@ func TestOmniMediaCancelledProbeDoesNotFallback(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.Nil(t, ch)
 	require.Zero(t, legacy.Load())
+}
+
+func TestOmniMediaTransientRetryBudget(t *testing.T) {
+	for _, firstErr := range []error{io.ErrUnexpectedEOF, fmt.Errorf("401 invalid api key"), context.Canceled} {
+		t.Run(firstErr.Error(), func(t *testing.T) {
+			calls := 0
+			var deadline time.Time
+			s := &omniMediaSession{config: NewAnalysisConfig(), video: NewDefaultVideoOmniConfig(), info: OmniModelInfo{Model: "fixture"}}
+			s.video.Timeout = time.Second
+			s.chat = func(_ string, options ...aispec.AIConfigOption) (string, error) {
+				cfg := aispec.NewDefaultAIConfig(options...)
+				require.EqualValues(t, 4096, *cfg.MaxTokens)
+				current, ok := cfg.Context.Deadline()
+				require.True(t, ok)
+				calls++
+				if calls == 1 {
+					deadline = current
+					return "discard partial output", firstErr
+				}
+				require.Equal(t, deadline, current, "retry must not reset the timeout budget")
+				cfg.StreamHandler(strings.NewReader("ORBIT-731"))
+				return "ORBIT-731", nil
+			}
+			text, err := s.call("video range=20s~40s", "extract", aispec.WithVideoUrl("fixture"))
+			if firstErr == io.ErrUnexpectedEOF {
+				require.NoError(t, err)
+				require.Equal(t, "ORBIT-731", text)
+				require.Equal(t, 2, calls)
+			} else {
+				require.Error(t, err)
+				require.Equal(t, 1, calls)
+			}
+		})
+	}
+}
+
+func TestOmniMediaVideoFallbackFrameExtraction(t *testing.T) {
+	ffmpeg := consts.GetFfmpegPath()
+	if ffmpeg == "" {
+		ffmpeg = os.Getenv("YAK_OMNI_TEST_FFMPEG")
+	}
+	if ffmpeg == "" {
+		ffmpeg, _ = exec.LookPath("ffmpeg")
+	}
+	if ffmpeg == "" {
+		t.Skip("ffmpeg is required")
+	}
+	t.Setenv("PATH", filepath.Dir(ffmpeg)+string(os.PathListSeparator)+os.Getenv("PATH"))
+	path := filepath.Join(t.TempDir(), "fallback.mp4")
+	data, err := exec.Command(ffmpeg, "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=5", "-t", "4", "-c:v", "libx264", path).CombinedOutput()
+	require.NoError(t, err, string(data))
+	provider, _ := omniTestProvider(t, func(n int32) int {
+		if n == 1 {
+			return 200
+		}
+		return 503
+	}, nil)
+	var legacyCalls atomic.Int32
+	var failures []error
+	ch, err := AnalyzeFile(path, provider, omniTestLegacy(&legacyCalls), aicommon.WithDisableCreateDBRuntime(true), WithAnalyzeErrorHandler(func(err error) { failures = append(failures, err) }))
+	require.NoError(t, err)
+	count := 0
+	for item := range ch {
+		count++
+		require.True(t, item.(*OmniMediaAnalysisResult).Fallback)
+	}
+	require.Empty(t, failures)
+	require.Positive(t, count, "fallback must produce frames even when Windows timestamp filters crash")
+	require.Positive(t, legacyCalls.Load(), "original vision callback must be preserved by the video fallback")
 }

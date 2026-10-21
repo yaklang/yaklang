@@ -18,7 +18,9 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
+	"github.com/yaklang/yaklang/common/ai/aiknowledge"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/coreplugin"
@@ -49,6 +51,11 @@ func TestGRPCMUSTPASS_KnowledgeBaseOmniPlugin(t *testing.T) {
 			answer = "OMNI_READY"
 		case bytes.Contains(messages, []byte("image_url")):
 			media.Add(1)
+			select {
+			case <-time.After(5200 * time.Millisecond):
+			case <-req.Context().Done():
+				return
+			}
 			answer = "# Redhaze recovery\nThe Redhaze recovery code is ORBIT-731.\nUse the recovery code to restore the training system."
 		default:
 			indexes.Add(1)
@@ -89,6 +96,7 @@ func TestGRPCMUSTPASS_KnowledgeBaseOmniPlugin(t *testing.T) {
 		}
 	}
 	require.NotContains(t, output.String(), "YakVM Panic")
+	require.Contains(t, output.String(), "waiting elapsed=", "gRPC must stream progress before a slow media request completes")
 	require.EqualValues(t, 1, probes.Load(), output.String())
 	require.EqualValues(t, 1, media.Load(), output.String())
 	require.GreaterOrEqual(t, indexes.Load(), int32(1), output.String())
@@ -104,4 +112,31 @@ func TestGRPCMUSTPASS_KnowledgeBaseOmniPlugin(t *testing.T) {
 	var vectors int64
 	require.NoError(t, db.Model(&schema.VectorStoreDocument{}).Where("collection_id IN (?)", db.Model(&schema.VectorStoreCollection{}).Select("id").Where("name = ?", kbName).SubQuery()).Count(&vectors).Error)
 	require.Greater(t, vectors, int64(0), "the plugin must persist vectors before reporting entries")
+
+	// Run the actual native management tool over gRPC as well. Its progress
+	// must reach captured stdout, where asynchronous AI inspect/wait can see it.
+	toolName := kbName + "-managed"
+	_, err = aiknowledge.Add(toolName)
+	require.NoError(t, err)
+	toolCode, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/knowledge/manage_knowledge_base.yak")
+	require.NoError(t, err)
+	stream, err = client.DebugPlugin(ctx, &ypb.DebugPluginRequest{Code: string(toolCode), PluginType: "yak", ExecParams: []*ypb.KVPair{
+		{Key: "op", Value: "build"}, {Key: "name", Value: toolName}, {Key: "source_file", Value: path}, {Key: "build_options", Value: `{"mode":"chunks","omni_mode":"required"}`},
+	}})
+	require.NoError(t, err)
+	output.Reset()
+	for {
+		result, recvErr := stream.Recv()
+		if recvErr == io.EOF {
+			break
+		}
+		require.NoError(t, recvErr)
+		if result.GetIsMessage() {
+			output.Write(result.GetMessage())
+		}
+	}
+	require.NotContains(t, output.String(), "YakVM Panic")
+	require.Contains(t, output.String(), "persisted_entries=0")
+	require.Contains(t, output.String(), "persisted_entries=1")
+	require.Contains(t, output.String(), "completed; all reported entries persisted")
 }

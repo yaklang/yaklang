@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
@@ -179,7 +180,7 @@ type buildOptions struct {
 
 // Build deliberately waits for persistence after AI analysis. The legacy
 // channel builders can publish entries before writes and only log write errors.
-func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[string]any, error) {
+func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (result map[string]any, buildErr error) {
 	if (req.SourceFile == "") == (strings.TrimSpace(req.Content) == "") {
 		return nil, fmt.Errorf("build requires exactly one of source_file or content")
 	}
@@ -228,9 +229,21 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 	}
 	ctx, cancel := context.WithCancel(c.ctx)
 	defer cancel()
+	progress := newBuildProgress(ctx, req.Name, c.progress, 5*time.Second)
+	defer func() { progress.finish(buildErr) }()
+	progress.event("initializing embedding; mode=%s omni_mode=%s segment_seconds=%g", b.Mode, b.OmniMode, b.OmniSegmentSeconds)
+	kb, err := c.load(req.Name)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireEmbedding(kb.GetVectorStore()); err != nil {
+		return nil, err
+	}
+	progress.event("embedding ready; starting source analysis")
 	var mu sync.Mutex
 	var firstErr error
 	opts := []any{liteforgeapp.WithAnalyzeContext(ctx), liteforgeapp.WithAnalyzeConcurrency(b.Concurrency), chunkmaker.WithChunkSize(int64(b.ChunkSize)), liteforgeapp.WithExtraPrompt(b.ExtraPrompt),
+		liteforgeapp.AnalysisOption(func(cfg *liteforgeapp.AnalysisConfig) { cfg.AnalyzeLog = progress.event }),
 		liteforgeapp.WithOmniMediaMode(b.OmniMode), liteforgeapp.WithVideoOmniSegmentSeconds(b.OmniSegmentSeconds), liteforgeapp.WithVideoOmniMaxBase64Bytes(b.OmniPayloadBytes),
 		liteforgeapp.WithAnalyzeErrorHandler(func(err error) {
 			mu.Lock()
@@ -248,20 +261,12 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 		opts = append(opts, rag.WithAIService(c.ai))
 	}
 	var input <-chan liteforgeapp.AnalysisResult
-	var err error
 	if req.SourceFile != "" {
 		input, err = liteforgeapp.AnalyzeFile(req.SourceFile, opts...)
 	} else {
 		input, err = liteforgeapp.AnalyzeReader(strings.NewReader(req.Content), opts...)
 	}
 	if err != nil {
-		return nil, err
-	}
-	kb, err := c.load(req.Name)
-	if err != nil {
-		return nil, err
-	}
-	if err := requireEmbedding(kb.GetVectorStore()); err != nil {
 		return nil, err
 	}
 	var wg sync.WaitGroup
@@ -278,14 +283,22 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 					if !ok {
 						return
 					}
+					chunkID := progress.analyzed.Add(1)
+					progress.event("source chunk %d extracted", chunkID)
 					entries := []*schema.KnowledgeBaseEntry{{KnowledgeTitle: req.Name, KnowledgeDetails: analyzed.Dump()}}
 					var err error
 					if b.Mode == "question_index" {
+						progress.indexing.Add(1)
+						progress.event("generating question index for chunk %d", chunkID)
 						entries, err = liteforgeapp.BuildIndexFormAnalyzeResult(analyzed, opts...)
+						progress.indexing.Add(-1)
+						progress.event("question index finished for chunk %d; entries=%d error=%v", chunkID, len(entries), err)
 					}
 					if err == nil && len(entries) == 0 {
 						err = fmt.Errorf("AI build produced no knowledge entries")
 					}
+					progress.writing.Add(1)
+					progress.event("embedding and persisting chunk %d; entries=%d", chunkID, len(entries))
 					for _, entry := range entries {
 						if err != nil {
 							break
@@ -305,8 +318,11 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (map[s
 							mu.Lock()
 							count++
 							mu.Unlock()
+							progress.persisted.Add(1)
+							progress.event("entry persisted for chunk %d", chunkID)
 						}
 					}
+					progress.writing.Add(-1)
 					if err != nil {
 						mu.Lock()
 						if firstErr == nil {

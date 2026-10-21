@@ -98,4 +98,5 @@ var Exports = map[string]any{
 	"chunkSize": WithChunkSize, "concurrency": WithConcurrency, "extraPrompt": WithExtraPrompt,
 	"omniMode": WithOmniMode, "omniModel": WithOmniModel,
 	"omniSegmentSeconds": WithOmniSegmentSeconds, "omniPayloadBytes": WithOmniPayloadBytes,
+	"onProgress": WithProgress,
 }
