@@ -240,7 +240,7 @@ for _, blk := range result.GetTaggedBlocks() {
 
 ## 5. 压缩、冻结与记忆
 
-渲染不会调用 AI。主循环先构建整份 prompt 再检查长度，超限后通过 `compressMainPrompt` 折叠冗余操作；重建后仍高于限制的一半才代码触发 `compress_timeline` action。压缩快照包含已有摘要、投影后的 Frozen/Open 条目、用户信息、Evidence 和本会话已有记忆候选。
+渲染不会调用 AI。`generateLoopPromptFromInput` 正常组装后检查整份 prompt，超限则折叠并重建；仍高于限制的六分之一时只替换动态段，返回压缩模式。主循环强制解析单一 `compress_context` 并交给统一 action 流程执行，action 内不调用 AI。压缩快照包含已有摘要、投影后的 Frozen/Open 条目、用户信息、Evidence 和本会话已有记忆候选。
 
 当前没有“保留最新 1/4”的固定比例。模型输出摘要和原文 ID/范围组合（如 `3-8,12,20-26,37,41-45`），事务校验来源指纹后一起提交摘要、保留条目与冻结状态；请求期间新增的条目仍属于 Open 段。来源被修改、解析失败或提交失败时，不丢弃原始 Timeline。
 
