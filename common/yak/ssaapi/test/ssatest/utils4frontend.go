@@ -2,7 +2,6 @@ package ssatest
 
 import (
 	"fmt"
-	"os"
 	"regexp"
 	"sort"
 	"strings"
@@ -60,13 +59,7 @@ func CheckTestCase(t *testing.T, tc TestCase) {
 	prog, err := ssaapi.Parse(tc.Code, opt...)
 	require.Nil(t, err, "parse error")
 
-	// DisAsm of a full program is quadratic in the instruction count and
-	// guard tests (e.g. struct default expansion) legitimately build
-	// programs with thousands of zero-value instructions; keep the asm dump
-	// opt-in.
-	if os.Getenv("YAKSSA_TEST_SHOW") != "" {
-		prog.Show()
-	}
+	prog.Show()
 	fmt.Println(prog.GetErrors().String())
 
 	if tc.Want == nil {

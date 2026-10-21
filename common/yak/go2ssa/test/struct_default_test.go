@@ -34,42 +34,45 @@ func TestStructDefaultExpansionPruned(t *testing.T) {
 		`, []string{"0", "0"}, t)
 	})
 
-	t.Run("exponential tree keeps real zero values on the bounded prefix", func(t *testing.T) {
+	t.Run("deep linear nesting degrades past the depth limit", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("package main\n")
-		b.WriteString("type L0 struct{ A int; B int }\n")
-		for i := 1; i <= 20; i++ {
-			fmt.Fprintf(&b, "type L%d struct{ X L%d; Y L%d }\n", i, i-1, i-1)
+		b.WriteString("type L0 struct{ A int }\n")
+		for i := 1; i <= 80; i++ {
+			fmt.Fprintf(&b, "type L%d struct{ F L%d; A int }\n", i, i-1)
 		}
-		chain := "v" + strings.Repeat(".X", 20) + ".A"
-		b.WriteString("func main() { var v L20; println(" + chain + ") }")
-		// the leftmost chain is built first and stays within the node limit,
-		// so it keeps the real zero value instead of a placeholder
-		test.CheckPrintlnValueContain(b.String(), []string{"0"}, t)
+		shallow := "v" + strings.Repeat(".F", 63) + ".A"
+		deep := "v" + strings.Repeat(".F", 75) + ".A"
+		b.WriteString("func main() { var v L80; println(" + shallow + "); println(" + deep + ") }")
+		// 63 nesting levels stay within defaultValueDepthLimit and keep the
+		// real zero; 75 levels degrade to a placeholder
+		test.CheckPrintlnValueContain(b.String(), []string{"0", "Undefined"}, t)
 	})
 
 	t.Run("exponential tree degrades past the node limit", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("package main\n")
 		b.WriteString("type L0 struct{ A int; B int }\n")
-		for i := 1; i <= 20; i++ {
+		for i := 1; i <= 10; i++ {
 			fmt.Fprintf(&b, "type L%d struct{ X L%d; Y L%d }\n", i, i-1, i-1)
 		}
-		chain := "v" + strings.Repeat(".Y", 20) + ".A"
-		b.WriteString("func main() { var v L20; println(" + chain + ") }")
-		// the all-Y path is built after the left subtree has exhausted the
-		// node limit, so it degrades to a placeholder instead of a zero value
-		test.CheckPrintlnValueContain(b.String(), []string{"Undefined"}, t)
+		left := "v" + strings.Repeat(".X", 10) + ".A"
+		right := "v" + strings.Repeat(".Y", 10) + ".A"
+		b.WriteString("func main() { var v L10; println(" + left + "); println(" + right + ") }")
+		// the raw field tree holds 2^11-1 = 2047 struct nodes, past the
+		// 1024-node budget: the leftmost chain is built first and keeps the
+		// real zero value, the all-Y path degrades to a placeholder
+		test.CheckPrintlnValueContain(b.String(), []string{"0", "Undefined"}, t)
 	})
 
 	t.Run("invalid member access on exponential type reports a bounded error", func(t *testing.T) {
 		var b strings.Builder
 		b.WriteString("package main\n")
 		b.WriteString("type L0 struct{ A int; B int }\n")
-		for i := 1; i <= 20; i++ {
+		for i := 1; i <= 10; i++ {
 			fmt.Fprintf(&b, "type L%d struct{ X L%d; Y L%d }\n", i, i-1, i-1)
 		}
-		b.WriteString("func main() { var v L20; println(v.NoSuchField) }")
+		b.WriteString("func main() { var v L10; println(v.NoSuchField) }")
 		test.CheckPrintlnValueContain(b.String(), []string{"Undefined"}, t)
 	})
 }
