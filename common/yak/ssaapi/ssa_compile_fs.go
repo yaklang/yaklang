@@ -268,6 +268,8 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 
 	sourceFilesystem := filesystem
+	// The builder must exist before the wrap: it is what expands jar/zip members.
+	c.resolveLanguageBuilder(filesystem)
 	filesystem = c.swapLanguageFs(filesystem)
 	// Jar/zip members, class files and JSP are transformed into source before the
 	// source scan. ScanProjectFiles then only classifies an already-prepared tree.
@@ -522,16 +524,20 @@ func (c *Config) parseProjectWithFSUnits(
 			return nil, ErrContextCancel
 		}
 		if language := c.LanguageBuilder; language != nil {
+			phaseStart := time.Now()
 			language.AfterPreHandlerProject(builder)
 			language.Clearup()
+			log.Infof("[ssa-compile] batch=%d after-prehandler cost=%v", batchIndex+1, time.Since(phaseStart))
 		}
 		// Binding then hierarchy run after every skeleton has released its
 		// builder and before prehandler mode is cleared. Frontends register
 		// those phases by kind. Other deferred work stays on the later pass.
 		for _, kind := range []ssa.DeferredBuildKind{ssa.DeferredBuildKindBinding, ssa.DeferredBuildKindHierarchy} {
+			phaseStart := time.Now()
 			if !prog.RunDeferredBuildsForUnitsOfKind(unitKeys, kind, nil, nil) {
 				return nil, ErrContextCancel
 			}
+			log.Infof("[ssa-compile] batch=%d deferred-kind=%v cost=%v", batchIndex+1, kind, time.Since(phaseStart))
 		}
 		prog.SetPreHandler(false)
 		if holdSCCIR && !structScanOn && prog.Cache != nil {
@@ -548,6 +554,7 @@ func (c *Config) parseProjectWithFSUnits(
 				// Spread that band across all batches so batch 1/N cannot claim ~87%.
 				p := deferredBuildProcessFraction(batchIndex, len(batches), index, total)
 				storeProcess(p)
+				log.Infof("[ssa-compile] batch=%d body build progress %d/%d elapsed=%v", batchIndex+1, index, total, time.Since(unitBuildStart))
 				reportProcess(p, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
@@ -566,6 +573,7 @@ func (c *Config) parseProjectWithFSUnits(
 		) {
 			return nil, ErrContextCancel
 		}
+		log.Infof("[ssa-compile] batch=%d body build done units=%d cost=%v", batchIndex+1, len(unitKeys), time.Since(unitBuildStart))
 		// Unit-end and batch-boundary instruction flushes enqueue ordinary
 		// instructions for asynchronous persistence. Boundary instructions stay
 		// resident for cross-unit resolution, while the completion callback logs
