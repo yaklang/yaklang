@@ -57,11 +57,19 @@ func TestLoweredProtocolsEnterDefaultSweep(t *testing.T) {
 	for _, want := range []string{"mqtt", "mongodb", "ms-sql-s", "Memcache", "redis-server", "oracle-tns", "LDAPBindReq", "LDAPSearchReq"} {
 		require.Truef(t, names[want], "default sweep for an unlisted port missed %s", want)
 	}
-	for _, demoted := range []string{"RdpStandard", "RdpSSLHybridAndHybridEx", "ORACLE", "SMBProgNeg"} {
+	for _, demoted := range []string{"RdpSSLHybridAndHybridEx", "ORACLE", "SMBProgNeg"} {
 		require.Falsef(t, names[demoted], "demoted probe %s still occupies the generic sweep", demoted)
 	}
+	require.Contains(t, probeNames(blocks), "RdpStandard")
 	require.LessOrEqual(t, len(blocks), selectionCap(config))
 	require.Contains(t, probeNames(blocks), "GetRequest")
+}
+
+func TestSmallProbeBudgetStillSendsRDP(t *testing.T) {
+	config := NewConfig(WithActiveMode(true), WithProbesMax(5))
+	_, blocks, _ := GetRuleBlockByConfig(59999, config)
+	require.Contains(t, probeNames(blocks), "RdpStandard")
+	require.LessOrEqual(t, len(blocks), 5)
 }
 
 func TestDemotedProbesStayOnTheirPorts(t *testing.T) {

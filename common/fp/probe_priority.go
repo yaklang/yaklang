@@ -7,16 +7,17 @@ const (
 	// probes are not charged against it.
 	defaultProbesMax = 10
 	// defaultGenericProbeBudget is the generic sweep used when ProbesMax is left
-	// at its default. It is wide enough for the lowered common protocols plus
-	// the rarity-1 foundation, and an explicit smaller ProbesMax is still honored.
-	defaultGenericProbeBudget = 12
+	// at its default. It fits the lowered common protocols, the rarity-1
+	// foundation and the rarity-0 RDP probe. An explicit smaller ProbesMax is
+	// still honored.
+	defaultGenericProbeBudget = 14
 	// defaultPortProbeBudget is how many default-port probes one target may
 	// receive even when their embedded rarity is above RarityMax.
 	defaultPortProbeBudget = 12
 	// defaultProbeTotalBudget stops a silent port from turning into an
-	// unbounded sweep. 24 probes is about three rounds at the default
+	// unbounded sweep. 26 probes is still about three rounds at the default
 	// concurrency of 10.
-	defaultProbeTotalBudget = 24
+	defaultProbeTotalBudget = 26
 )
 
 // probeRarityOverride replaces embedded nmap rarity without editing the
@@ -36,7 +37,10 @@ var probeRarityOverride = map[string]int{
 	"LDAPSearchReq": 3,
 	"memcached":     3,
 
-	"RdpStandard":             7,
+	// RdpStandard stays at its embedded rarity. A five-probe scan is expected
+	// to identify RDP, and that probe is the one that elicits the banner.
+	// The TLS hybrid variant, the legacy ORACLE probe and SMB1 negotiate are
+	// not useful on unrelated ports.
 	"RdpSSLHybridAndHybridEx": 7,
 	"ORACLE":                  7,
 	"SMBProgNeg":              7,
@@ -167,7 +171,7 @@ func preferLoweredProbes(candidates, kept, portMatched []*RuleBlock, limit, rari
 			seen[probe.Name] = true
 			continue
 		}
-		idx := evictableGeneric(kept)
+		idx := evictableGeneric(kept, effectiveProbeRarity(probe))
 		if idx < 0 {
 			continue
 		}
@@ -181,7 +185,7 @@ func preferLoweredProbes(candidates, kept, portMatched []*RuleBlock, limit, rari
 	return kept
 }
 
-func evictableGeneric(blocks []*RuleBlock) int {
+func evictableGeneric(blocks []*RuleBlock, incoming int) int {
 	chosen := -1
 	rarity := -1
 	index := -1
@@ -193,6 +197,12 @@ func evictableGeneric(blocks []*RuleBlock) int {
 			continue
 		}
 		got := effectiveProbeRarity(block.Probe)
+		// A lowered protocol may replace a less common generic probe. It must
+		// not displace a probe the fingerprint file already ranks first, such
+		// as the RDP negotiate that a small scan is expected to send.
+		if got < incoming {
+			continue
+		}
 		if chosen < 0 || got > rarity || (got == rarity && block.Probe.Index > index) {
 			chosen = i
 			rarity = got
