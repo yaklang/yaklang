@@ -69,7 +69,7 @@ log "building ${target_os}/${target_arch} HIDS node from $source_sha with the pi
 musl_recipe="$(jq -ce --arg arch "$target_arch" '
   select(.c_library == "musl" and .cgo_enabled == true and
     .link_mode == "external-static" and .goarch == $arch and
-    .build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension")
+    .build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng")
 ' "$build_dir/recipe.json")" || die 'musl Node build recipe is invalid'
 build_tags="$(jq -er .build_tags <<<"$musl_recipe")"
 go_version="$(jq -er .go_version <<<"$musl_recipe")"

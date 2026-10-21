@@ -17,6 +17,25 @@ schema must already have been initialized by a writer. Node-local profile
 databases retain their existing SQLite configuration. PostgreSQL and SQLite
 remain available through their existing DSNs.
 
+## Optional native driver
+
+Build with `-tags dameng` to include the pinned native DM protocol driver. The
+ordinary engine build includes only our `database/sql` adapter and GORM dialect;
+it does not import the DM SDK or its Go `plugin` cipher loader. Opening a DM URL
+without the tag returns `ErrNativeUnavailable` before connecting, with rebuild
+instructions. It never falls back to a local SQLite IR database.
+
+Only `native_dm.go` imports the SDK. Its driver identity and custom-dialer APIs
+are registered through package-private hooks; SSA and the rest of the adapter
+use standard database interfaces. This isolates the dependency at compile time;
+the upstream optional cipher loader remains in DM-enabled Linux/macOS binaries.
+The native authentication and transport implementations are retained unchanged.
+
+The shared Linux product, portable and runtime musl build profiles include the
+`dameng` tag, so their binaries support DM, PostgreSQL and SQLite together. The
+driver module path and version are unchanged; no driver fork, local module
+replacement or extra runtime library is required for those static binaries.
+
 ## Storage behavior
 
 - DM identifiers are quoted in uppercase; returned column labels are adapted
@@ -34,12 +53,30 @@ remain available through their existing DSNs.
   shared connection-negotiation state. Cancellation closes the underlying socket
   rather than concurrently mutating the driver's active statements.
 
+## Linux glibc builds
+
+The DM driver's Linux cipher extension imports Go's `plugin` package. The Go
+linker consequently disallows copy relocations, which the legacy bundled glibc
+libpcap archive requires. Install the system `libpcap-dev` and `pkg-config`
+packages and prefer its shared PIC library when building on glibc Linux:
+
+```sh
+export CGO_LDFLAGS="-L$(pkg-config --variable=libdir libpcap) ${CGO_LDFLAGS:-}"
+```
+
+This setup is needed only for DM-enabled glibc builds and their binary consumers.
+The dedicated DM CI job selects it; ordinary engine CI keeps its existing link
+configuration. Race support remains enabled. The static musl release recipe uses
+its pinned compiler and PIC archives, explicitly selecting BFD because Go 1.22
+otherwise requests the unavailable gold linker for ARM64 plugin imports.
+
 ## Verification
 
 Unit and SQLite regression checks:
 
 ```sh
 GOWORK=off go test -mod=readonly -race ./common/utils/damenggorm
+GOWORK=off go test -mod=readonly -race -tags dameng ./common/utils/damenggorm
 GOWORK=off go test -mod=readonly ./common/schema ./common/yak/ssa/ssadb \
   -run 'Test(SQLTextBytes|LargeBatchChunks|UniqueConstraint|SaveIrTypeBatch|RetryProgramDelete|DeleteProgramChecked|DeleteProgramIrCode)' \
   -count=1
@@ -57,7 +94,7 @@ YAK_SSA_DM_ALLOW_FIXTURE=1 \
 YAK_SSA_DM_URL_FILE=/private/dm-ir.url \
 YAK_SSA_PG_URL_FILE=/private/pg-ir.url \
 YAKIT_HOME=/private/isolated-engine-state \
-GOWORK=off go test -mod=readonly ./common/yak/ssaapi \
+GOWORK=off go test -mod=readonly -tags dameng ./common/yak/ssaapi \
   -run '^Test((DM|Postgres)IRCompileAndCrossProcessReload|DMIRBatchFailurePreservesPreviousRows)$' \
   -count=1 -timeout=6m
 ```
@@ -65,10 +102,8 @@ GOWORK=off go test -mod=readonly ./common/yak/ssaapi \
 Both backends compile Java with a long Chinese string, reload it in a fresh
 process, execute SyntaxFlow, persist/reload an incremental layer, and delete the
 programs. The DM failure case checks rollback after a uniqueness conflict.
-On Linux hosts where the bundled libpcap archive rejects PIE linking, the local
-test executable can be built with
-`-ldflags '-linkmode=external -extldflags=-static'`; this test-only option is not a
-release build recipe.
+DM-enabled Linux glibc tests require the PIC libpcap setup above. Use the shared
+musl build script when validating static product binaries.
 
 These checks passed on the tested DM8 instance. Production-scale performance,
 concurrent compiler workloads, existing PostgreSQL IR conversion, schema

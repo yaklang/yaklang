@@ -122,7 +122,7 @@ jobs:
               .source.dirty == false and
               .recipe.goos == "linux" and
               .recipe.goarch == $goarch and
-              .recipe.build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension" and
+              .recipe.build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng" and
               .recipe.c_library == "musl" and
               .recipe.c_library_version == "1.2.5" and
               .recipe.link_mode == "external-static" and

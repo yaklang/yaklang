@@ -39,8 +39,8 @@ install_toolchain() {
 
 tags_for_profile() {
   case "$1" in
-    product) printf 'hids,musl,netgo,osusergo,sqlite_omit_load_extension' ;;
-    portable|runtime) printf 'musl,netgo,osusergo,sqlite_omit_load_extension' ;;
+    product) printf 'hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng' ;;
+    portable|runtime) printf 'musl,netgo,osusergo,sqlite_omit_load_extension,dameng' ;;
     *) die "unsupported Node build profile: $1" ;;
   esac
 }
@@ -178,10 +178,13 @@ C
   staged_binary="$binary_stage_dir/node"
   staged_metadata="$metadata_stage_dir/musl-build.json"
   log "building Linux $target_arch $profile node with musl $actual_musl_version, GCC $compiler_version"
+  # Go 1.22 selects gold for ARM64 programs importing plugin, including the DM
+  # driver's optional cipher loader. Alpine ships the pinned modern BFD linker;
+  # select it explicitly for this static build instead of requiring ld.gold.
   (
     cd "$build_source_dir"
     go build -mod=readonly -trimpath -buildvcs="$buildvcs" -tags "$build_tags" \
-      -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static"' \
+      -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static -fuse-ld=bfd"' \
       -o "$staged_binary" ./cmd/legion-smoke-node
   )
   verify_binary "$staged_binary" "$target_arch" "$build_tags"

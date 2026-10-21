@@ -27,8 +27,8 @@ case "$(basename "$0")" in
       version)
         if [ "${2:-}" = -m ]; then
           case "$NODE_BUILD_PROFILE" in
-            product) tags=hids,musl,netgo,osusergo,sqlite_omit_load_extension ;;
-            *) tags=musl,netgo,osusergo,sqlite_omit_load_extension ;;
+            product) tags=hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng ;;
+            *) tags=musl,netgo,osusergo,sqlite_omit_load_extension,dameng ;;
           esac
           printf '\tbuild\t-tags=%s\n\tbuild\tCGO_ENABLED=1\n\tbuild\tGOARCH=%s\n' "$tags" "$NODE_GOARCH"
         else

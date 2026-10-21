@@ -38,7 +38,7 @@ import "fmt"
 func main() { fmt.Println(C.GoString(C.version())) }
 GO
 CGO_ENABLED=1 GOOS=linux GOARCH="$target_arch" CC=musl-gcc GOTOOLCHAIN=local \
-  go build -trimpath -buildvcs=false -tags musl,netgo,osusergo,sqlite_omit_load_extension \
+  go build -trimpath -buildvcs=false -tags musl,netgo,osusergo,sqlite_omit_load_extension,dameng \
     -ldflags '-s -w -buildid= -linkmode external -extldflags "-static"' \
     -o "$runtime_binary" "$test_root/main.go"
 fixture_libc_version="$("$runtime_binary")"
@@ -48,7 +48,7 @@ jq -n --arg arch "$target_arch" --arg builder "$builder_image" \
   '{goos:"linux",goarch:$arch,builder_image:$builder,go_version:$go_version,
     c_library:"musl",c_library_version:$version,c_compiler:"fixture musl-gcc",
     cgo_enabled:true,link_mode:"external-static",builder_execution:"native",
-    build_tags:"musl,netgo,osusergo,sqlite_omit_load_extension"}' >"$runtime_recipe"
+    build_tags:"musl,netgo,osusergo,sqlite_omit_load_extension,dameng"}' >"$runtime_recipe"
 mkdir -p "$runtime_archive_root/blobs/sha256"
 printf '{"architecture":"%s","fixture":true}\n' "$target_arch" \
   >"$runtime_archive_root/runtime-config.json"
@@ -129,7 +129,7 @@ jq -e \
     .recipe.cgo_enabled == true and
     .recipe.link_mode == "external-static" and
     .recipe.c_library == "musl" and
-    .recipe.build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension" and
+    .recipe.build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension,dameng" and
     .recipe.module_go_version == "1.22.12" and
     (.capabilities | index("ai.input.managed_attachment.v1")) != null and
     (.capabilities | index("ai.session.bind_epoch.v1")) != null and

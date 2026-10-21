@@ -13,8 +13,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	dm "gitee.com/chunanyong/dm"
 )
 
 const cancellationDialName = "yaklang-ssa-context-socket-"
@@ -51,7 +49,7 @@ func registerSocketDial(request *dialRequest) (string, func()) {
 	}
 	socketDials.Unlock()
 	request.connecting.Store(true)
-	dm.RegisterDialContext(name, func(_ context.Context, addr string) (net.Conn, error) {
+	nativeDriver.registerDial(name, func(_ context.Context, addr string) (net.Conn, error) {
 		if !request.connecting.Load() {
 			request.socket.abort()
 			return nil, driver.ErrBadConn
@@ -79,7 +77,7 @@ func registerSocketDial(request *dialRequest) (string, func()) {
 	var once sync.Once
 	return name, func() {
 		once.Do(func() {
-			dm.RegisterDialContext(name, func(context.Context, string) (net.Conn, error) { return nil, driver.ErrBadConn })
+			nativeDriver.registerDial(name, func(context.Context, string) (net.Conn, error) { return nil, driver.ErrBadConn })
 			socketDials.Lock()
 			socketDials.free = append(socketDials.free, name)
 			socketDials.Unlock()

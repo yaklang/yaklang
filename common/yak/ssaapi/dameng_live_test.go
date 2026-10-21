@@ -83,7 +83,7 @@ func checkIRCompileAndCrossProcessReload(t *testing.T, backend string) {
 	row, err := ssadb.GetProgram(name, ssadb.Application)
 	require.NoError(t, err)
 	require.NotEmpty(t, row.FileList, "JSON map must survive CLOB storage without hex conversion")
-	ctx, cancel := context.WithTimeout(t.Context(), 2*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	child := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestIRBackendReloadProcess$", "-test.v")
 	child.Env = append(os.Environ(), "YAK_SSA_IR_RELOAD_PROGRAM="+name, "YAK_SSA_IR_RELOAD_BACKEND="+backend)

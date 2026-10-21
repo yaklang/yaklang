@@ -1,0 +1,61 @@
+name: Check optional DM IR driver
+
+on:
+  pull_request:
+    paths:
+      - 'common/utils/damenggorm/**'
+      - 'common/consts/**'
+      - 'common/yak/ssa/ssadb/**'
+      - 'common/yak/ssaapi/dameng_live_test.go'
+      - '.github/workflows/check-dameng-ir.yml'
+      - '.github/actions/linux-pcap/**'
+      - 'scripts/ci/configure-linux-pcap.sh'
+      - 'scripts/ci/tests/test_linux_pcap.py'
+      - 'go.mod'
+      - 'go.sum'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-dameng-ir-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  default-driver-boundary:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Verify ordinary engine builds omit the DM SDK and Go plugin loader
+        shell: bash
+        run: |
+          set -euo pipefail
+          go list -mod=readonly -deps ./common/consts ./common/yak/ssaapi > "$RUNNER_TEMP/ssa-default-deps.txt"
+          if grep -E '^(plugin|gitee.com/chunanyong/dm(/.*)?)$' "$RUNNER_TEMP/ssa-default-deps.txt"; then
+            echo 'Default engine build unexpectedly includes the optional DM driver' >&2
+            exit 1
+          fi
+          go test -mod=readonly -race ./common/utils/damenggorm -count=1
+
+  native-driver:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - uses: ./.github/actions/linux-pcap
+      - name: Verify native connection cancellation and adapter races
+        run: go test -mod=readonly -race -tags dameng ./common/utils/damenggorm -count=1 -timeout=2m
+      - name: Compile native SSA tests with the supported Go version
+        run: go test -mod=readonly -tags dameng ./common/yak/ssaapi -run '^$' -count=1
+      - name: Check isolated glibc linker setup
+        run: python3 -m unittest discover -s scripts/ci/tests -p test_linux_pcap.py -v

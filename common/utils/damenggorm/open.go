@@ -8,11 +8,16 @@ import (
 	"net/url"
 	"regexp"
 	"strings"
-
-	dm "gitee.com/chunanyong/dm"
 )
 
 var connectionGate = make(chan struct{}, 1)
+
+// Keep connection details out of the public message while retaining context
+// cancellation and driver causes for errors.Is/errors.As.
+type schemaValidationError struct{ cause error }
+
+func (*schemaValidationError) Error() string   { return "DM SSA schema validation failed" }
+func (e *schemaValidationError) Unwrap() error { return e.cause }
 
 func enterConnectionGate(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
@@ -45,6 +50,9 @@ func OpenDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	if parseErr != nil || u.Scheme != Dialect || !regexp.MustCompile(`^[A-Z][A-Z0-9_]{0,127}$`).MatchString(u.Query().Get("schema")) {
 		return nil, errors.New("DM SSA requires an explicit uppercase schema")
 	}
+	if !NativeEnabled() {
+		return nil, ErrNativeUnavailable
+	}
 	if err := enterConnectionGate(ctx); err != nil {
 		return nil, err
 	}
@@ -71,7 +79,7 @@ func OpenDBContext(ctx context.Context, dsn string) (*sql.DB, error) {
 	var actual string
 	if err := db.QueryRowContext(ctx, `SELECT SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM DUAL`).Scan(&actual); err != nil {
 		_ = db.Close()
-		return nil, errors.New("DM SSA schema validation failed")
+		return nil, &schemaValidationError{cause: err}
 	}
 	if !strings.EqualFold(actual, u.Query().Get("schema")) {
 		_ = db.Close()
@@ -98,7 +106,7 @@ func (c *privateConnector) Connect(ctx context.Context) (driver.Conn, error) {
 	var releaseDial func()
 	keepDial := false
 	connectContext := ctx
-	if _, ok := c.base.(*dm.DmDriver); ok {
+	if nativeDriver.matches(c.base) {
 		socket = &connectionSocket{}
 		request = &dialRequest{context: ctx, socket: socket}
 		name, release := registerSocketDial(request)
