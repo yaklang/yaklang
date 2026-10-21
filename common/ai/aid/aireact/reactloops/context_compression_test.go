@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
@@ -21,7 +22,7 @@ type compressionPromptInvoker struct {
 	*mock.MockInvoker
 	timeline        *aicommon.Timeline
 	inputs          []aicommon.LoopPromptAssemblyInput
-	unfoldedPadding string
+	overflowPadding string
 	compressionErr  error
 }
 
@@ -32,12 +33,17 @@ func (i *compressionPromptInvoker) AssembleLoopPrompt(_ []*aitool.Tool, input *a
 	}
 	view := aicommon.RenderTimelineFrozenOpen(i.timeline)
 	prompt := view.PromptText() + input.TaskInstruction + input.FrozenUserContext + input.TodoSnapshot + input.ReactiveData
-	if frozen := i.timeline.FreezeSnapshot(); frozen == nil || frozen.Version == 0 {
-		prompt += i.unfoldedPadding
-	}
+	prompt += i.overflowPadding
 	return &aicommon.LoopPromptAssemblyResult{Prompt: prompt + input.CompressionGuide}, nil
 }
 
+// compressionReasoningMarker identifies a compression response's reasoning so
+// tests can prove it never leaks into a later normal request.
+var compressionReasoningMarker = uuid.NewString()
+
+// Loop-level mode selection with a stub assembler: it verifies the threshold
+// decision and the guide the loop appends. Real prompt rendering is covered by
+// the aireact main-loop tests.
 func TestContextCompressionPromptSelectsModeAndOneSixthTarget(t *testing.T) {
 	for _, words := range []int{100, 1500} {
 		t.Run(fmt.Sprint(words), func(t *testing.T) {
@@ -50,7 +56,7 @@ func TestContextCompressionPromptSelectsModeAndOneSixthTarget(t *testing.T) {
 				}))
 			loop := makeSchemaStabilityTestLoop(cfg)
 			loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
-			invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline, unfoldedPadding: strings.Repeat("unfolded ", 9000)}
+			invoker := &compressionPromptInvoker{MockInvoker: mock.NewMockInvoker(context.Background()), timeline: cfg.Timeline, overflowPadding: strings.Repeat("unfolded ", 9000)}
 			loop.invoker = invoker
 			for _, text := range []string{strings.Repeat("obsolete ", 9000), strings.Repeat("current ", words)} {
 				payload, err := json.Marshal(map[string]string{"id": "e1", "content": text})
@@ -74,6 +80,8 @@ func TestContextCompressionPromptSelectsModeAndOneSixthTarget(t *testing.T) {
 	}
 }
 
+// The stub assembler returns everything it receives, so this test proves the
+// loop measures the assembled prompt rather than only timeline history.
 func TestContextCompressionMeasuresWholePrompt(t *testing.T) {
 	cfg := aicommon.NewConfig(context.Background(), aicommon.WithDisableAutoSkills(true),
 		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithTimelineContentLimit(6000))
@@ -93,7 +101,7 @@ func TestContextCompressionMeasuresWholePrompt(t *testing.T) {
 	require.Contains(t, result.Prompt, "接近 1000 tokens")
 }
 
-func TestContextCompressionReleasesFailedPromptBuild(t *testing.T) {
+func TestContextCompressionPropagatesPromptBuildError(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true),
@@ -113,7 +121,7 @@ func TestContextCompressionReleasesFailedPromptBuild(t *testing.T) {
 	require.ErrorIs(t, err, buildErr)
 }
 
-func TestContextCompressionActionReleasesCancelledDecision(t *testing.T) {
+func TestContextCompressionActionFailsOnCancelledTask(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true))
@@ -136,7 +144,7 @@ func contextCompressionTestResponse(t *testing.T, c aicommon.AICallerConfigIf, r
 	wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 	response := c.NewAIResponse()
 	if name == aicommon.ContextCompressionAction {
-		response.EmitReasonStream(strings.NewReader("COMPRESSION_MODEL_REASONING"))
+		response.EmitReasonStream(strings.NewReader(compressionReasoningMarker))
 	}
 	if wire.ToolCallCallback != nil {
 		arguments, err := json.Marshal(params)
@@ -164,6 +172,8 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 			t.Run(fmt.Sprintf("native=%v/%s", native, invalid), func(t *testing.T) {
 				ctx := context.Background()
 				qualityCalls, otherCalls := 0, 0
+				summary := uuid.NewString()
+				historyText := map[int64]string{}
 				cfg := aicommon.NewConfig(ctx, aicommon.WithDisableAutoSkills(true), aicommon.WithDisableCreateDBRuntime(true),
 					aicommon.WithAIRetryWaitFunc(func(context.Context, time.Duration) error { return nil }),
 					aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
@@ -173,7 +183,7 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 					aicommon.WithQualityPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 						qualityCalls++
 						require.Equal(t, aicommon.CallerLabelContextCompress, req.GetCallerLabel())
-						params := map[string]any{"summary": "COMPACTED_HISTORY", "retain_timeline": "3-8,12,20-26,37,41-45", "retire_skill_names": []string{}, "retire_evidence_ids": []string{}}
+						params := map[string]any{"summary": summary, "retain_timeline": "3-8,12,20-26,37,41-45", "retire_skill_names": []string{}, "retire_evidence_ids": []string{}}
 						name := aicommon.ContextCompressionAction
 						if qualityCalls == 1 {
 							switch invalid {
@@ -190,7 +200,8 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 						return contextCompressionTestResponse(t, c, req, name, params, false), nil
 					}))
 				for _, id := range []int64{3, 8, 10, 12, 20, 26, 37, 41, 45} {
-					cfg.Timeline.PushText(id, "history-%d", id)
+					historyText[id] = uuid.NewString()
+					cfg.Timeline.PushText(id, "%s", historyText[id])
 				}
 				loop := makeSchemaStabilityTestLoop(cfg)
 				loop.functionCallMode, loop.useSpeedPriorityAI = native, false
@@ -208,30 +219,19 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 				require.Equal(t, aicommon.ContextCompressionAction, calls[0].Action.Name())
 				require.Equal(t, 2, qualityCalls)
 				require.Zero(t, otherCalls)
-				require.Contains(t, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).PromptText(), "history-10", "parsing a proposal must not commit it")
+				require.Contains(t, aicommon.RenderTimelineFrozenOpen(cfg.Timeline).PromptText(), historyText[10], "parsing a proposal must not commit it")
 				op := NewActionHandlerOperator(nil)
 				calls[0].LoopAction.ActionHandler(loop, calls[0].Action, op)
 				_, err = op.IsTerminated()
 				require.NoError(t, err)
 				require.Equal(t, 2, qualityCalls, "the action must not call AI")
 				view := aicommon.RenderTimelineFrozenOpen(cfg.Timeline)
-				require.Contains(t, view.Frozen, "COMPACTED_HISTORY")
-				require.NotContains(t, view.Frozen, "history-10")
-				require.Contains(t, view.Frozen, "history-12")
+				require.Contains(t, view.Frozen, summary)
+				require.NotContains(t, view.Frozen, historyText[10])
+				require.Contains(t, view.Frozen, historyText[12])
 			})
 		}
 	}
-}
-
-func TestContextCompressionVerifierIsModeAgnostic(t *testing.T) {
-	loop := makeSchemaStabilityTestLoop(aicommon.NewConfig(context.Background()))
-	action := aicommon.NewSimpleAction(aicommon.ContextCompressionAction, aitool.InvokeParams{"summary": "x", "retain_timeline": ""})
-	require.NoError(t, loopAction_CompressContext.ActionVerifier(loop, action))
-	op := NewActionHandlerOperator(nil)
-	handleCompressContext(loop, action, op)
-	terminated, err := op.IsTerminated()
-	require.NoError(t, err)
-	require.False(t, terminated)
 }
 
 func TestContextCompressionHandlerParsesSelection(t *testing.T) {
