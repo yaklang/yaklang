@@ -107,12 +107,8 @@ func GetLocalEmbeddingService() (*LocalModelEmbedding, error) {
 		return nil, embeddingServiceError
 	}
 
-	if embeddingServiceInstance != nil {
-		err := utils.WaitConnect(embeddingServiceInstance.address, 30)
-		if err != nil {
-			return nil, err
-		}
-	}
+	// Initialization already checked the service once. Actual embedding requests
+	// report transport errors; fetching the cached client must never probe again.
 	return embeddingServiceInstance, nil
 }
 
@@ -122,7 +118,7 @@ func startEmbeddingServiceInternal() (*LocalModelEmbedding, error) {
 
 	// 首先检查服务是否已经在运行
 	log.Infof("checking if embedding service is already running on %s", address)
-	if testEmbeddingService(address, 3) {
+	if _, err := ProbeLocalEmbedding("test"); err == nil {
 		log.Infof("embedding service is already running and responding on %s, reusing existing service", address)
 
 		// 获取默认模型配置
@@ -262,6 +258,8 @@ func ResetService() {
 	embeddingServiceInstance = nil
 	embeddingServiceError = nil
 	embeddingServiceOnce = sync.Once{}
+	localEmbeddingProbe.Once = sync.Once{}
+	localEmbeddingProbe.vector, localEmbeddingProbe.err = nil, nil
 }
 
 // isPortAvailable 检查端口是否可用
@@ -307,13 +305,18 @@ func CleanupRedundantServices() error {
 	return nil
 }
 
-// Embedding 全局嵌入函数，使用单例服务生成文本的嵌入向量
-// 如果服务未启动，会自动启动；如果无法启动，则报错
+// Embedding uses the cached AIBalance online service first. Only an unavailable
+// online service selects the local singleton; explicit LocalEmbedding callers
+// can still request the local provider directly.
 func Embedding(text string) ([]float32, error) {
+	online, onlineErr := GetAIBalanceFreeEmbeddingService()
+	if onlineErr == nil && online != nil {
+		return online.Embedding(text)
+	}
 	service, err := GetLocalEmbeddingService()
 	if err != nil {
 		log.Errorf("failed to get embedding service: %v", err)
-		return nil, fmt.Errorf("failed to get embedding service: %v", err)
+		return nil, fmt.Errorf("AIBalance embedding unavailable: %v; local embedding unavailable: %w", onlineErr, err)
 	}
 
 	return service.Embedding(text)

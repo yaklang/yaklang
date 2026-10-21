@@ -292,7 +292,7 @@ func isOmniTransientError(err error) bool {
 		return false
 	}
 	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "unexpected eof") || strings.Contains(message, "connection reset") || strings.Contains(message, "i/o timeout")
+	return strings.Contains(message, "unexpected eof") || strings.Contains(message, "connection reset") || strings.Contains(message, "i/o timeout") || strings.Contains(message, "context deadline exceeded")
 }
 
 func (s *omniMediaSession) emit(r *OmniMediaAnalysisResult, out chan<- AnalysisResult) {
@@ -315,7 +315,8 @@ func (s *omniMediaSession) analyzeImage(source string, page int, raw []byte, out
 			s.config.reportError(fmt.Errorf("Omni image source=%q page=%d failed: %w", source, page, err))
 			return
 		}
-		s.failed = true
+		// A broken stream does not make Omni unavailable for subsequent pages.
+		s.failed = !isOmniTransientError(err)
 		s.config.AnalyzeLog("Omni image extraction failed; using original vision extraction: %v", err)
 		legacy, legacyErr := AnalyzeImage(raw, s.options...)
 		if legacyErr != nil {
@@ -415,7 +416,8 @@ func (s *omniMediaSession) analyzeClip(source string, clip *ffmpegutils.VideoSli
 			s.config.reportError(fmt.Errorf("Omni video range=%s~%s failed: %w", r.StartTime, r.EndTime, err))
 			return
 		}
-		s.failed = true
+		// Prefer Omni again for the next clip after a transient transport failure.
+		s.failed = !isOmniTransientError(err)
 		s.config.AnalyzeLog("Omni video extraction failed; using original extraction for clip %s~%s: %v", r.StartTime, r.EndTime, err)
 		omniErr := err
 		legacyOptions := append(append([]any(nil), s.options...), WithAnalyzeErrorHandler(func(cause error) {

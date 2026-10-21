@@ -47,7 +47,8 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 	if _, err := os.Stat(inputFile); os.IsNotExist(err) {
 		return nil, fmt.Errorf("input file does not exist: %s", inputFile)
 	}
-	if ffmpegBinaryPath == "" {
+	ffmpegPath := resolveFFmpegBinary()
+	if ffmpegPath == "" {
 		return nil, fmt.Errorf("ffmpeg binary path is not configured")
 	}
 
@@ -176,7 +177,7 @@ func ExtractImageFramesFromVideo(inputFile string, opts ...Option) (<-chan *Ffmp
 	args = append(args, "-q:v", strconv.Itoa(o.frameQuality), outputPattern)
 
 	// 4. Execute and stream results
-	cmd := exec.CommandContext(o.ctx, ffmpegBinaryPath, args...)
+	cmd := exec.CommandContext(o.ctx, ffmpegPath, args...)
 	resultsChan := make(chan *FfmpegStreamResult)
 
 	go func() {
