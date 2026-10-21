@@ -204,7 +204,7 @@ func (t *T) List() int {
     		T_List as $b
 	`,
 			map[string][]string{
-				"a": {"Function-T.T"},
+				"a": {"Function-*T.List"},
 			},
 			ssaapi.WithLanguage(ssaconfig.GO),
 		)
