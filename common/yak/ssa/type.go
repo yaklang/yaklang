@@ -1063,12 +1063,6 @@ type ObjectType struct {
 
 	AnonymousField map[string]*ObjectType
 
-	// expansionMemo caches this type's struct-default expansion size for
-	// StructDefaultExpansionExceedsBudget: 0 not computed, -1 exceeds the
-	// budget (or the graph is cyclic/over-deep), n>0 the exact struct-node
-	// count. AddField resets it.
-	expansionMemo atomic.Int32
-
 	Combination bool // function multiple return will combined to struct
 	// VariadicPara bool // function last variadic parameter will become slice
 
@@ -1255,26 +1249,26 @@ func TypeStringLimited(t Type) string {
 // nested fields are guarded as well.
 const StructDefaultExpansionBudget = 1024
 
-// structExpansionDepthLimit bounds alias chains and struct nesting inside the
-// expansion probe; raw field graphs may be cyclic (built programmatically),
-// and the limit plus the visiting set keep the walk finite.
+// structExpansionDepthLimit bounds alias chains and struct nesting inside
+// the expansion probe; raw field graphs may be cyclic (built
+// programmatically), and the limit keeps the walk finite — a depth-tripped
+// graph counts as exceeding, which is safe since it can only be that deep by
+// nesting more nodes than the budget allows.
 const structExpansionDepthLimit = 64
 
 // StructDefaultExpansionExceedsBudget reports whether expanding ityp as a raw
 // field tree (no dedup of shared field types — the exact expansion per-field
 // default construction performs) would exceed StructDefaultExpansionBudget
-// nodes. Counting stops as soon as the budget is exhausted, so a cold probe
-// costs at most the budget; the answer is memoized per ObjectType (reset by
-// AddField), so repeated default constructions of the same type are a single
-// load. Only struct and alias types recurse in that expansion, and only they
-// are counted.
+// nodes. Counting stops as soon as the budget is exhausted, so the probe
+// costs at most the budget. Only struct and alias types recurse in that
+// expansion, and only they are counted.
 func StructDefaultExpansionExceedsBudget(ityp Type) bool {
-	return structExpansionNodeCount(ityp, 0, nil) > StructDefaultExpansionBudget
+	return structExpansionNodeCount(ityp, 0) > StructDefaultExpansionBudget
 }
 
 // structExpansionNodeCount returns the number of struct nodes in ityp's raw
 // field tree, saturated at StructDefaultExpansionBudget+1.
-func structExpansionNodeCount(ityp Type, depth int, visiting map[*ObjectType]struct{}) int {
+func structExpansionNodeCount(ityp Type, depth int) int {
 	if depth > structExpansionDepthLimit {
 		return StructDefaultExpansionBudget + 1
 	}
@@ -1284,7 +1278,7 @@ func structExpansionNodeCount(ityp Type, depth int, visiting map[*ObjectType]str
 	switch ityp.GetTypeKind() {
 	case AliasTypeKind:
 		if alias, ok := ToAliasType(ityp); ok {
-			return structExpansionNodeCount(alias.GetType(), depth+1, visiting)
+			return structExpansionNodeCount(alias.GetType(), depth+1)
 		}
 		return 0
 	case StructTypeKind:
@@ -1292,50 +1286,17 @@ func structExpansionNodeCount(ityp Type, depth int, visiting map[*ObjectType]str
 		if typ == nil {
 			return 0
 		}
-		return typ.expansionNodeCount(depth, visiting)
+		n := 1
+		for _, fieldTyp := range typ.FieldTypes {
+			n += structExpansionNodeCount(fieldTyp, depth+1)
+			if n > StructDefaultExpansionBudget {
+				return StructDefaultExpansionBudget + 1
+			}
+		}
+		return n
 	default:
 		return 0
 	}
-}
-
-// expansionNodeCount is the memoized core of structExpansionNodeCount.
-// visiting breaks struct cycles: a type already on the active walk saturates
-// and stays marked as exceeding. Depth-tripped nodes are not memoized so an
-// entry-level probe of the same type can still compute its exact count.
-func (o *ObjectType) expansionNodeCount(depth int, visiting map[*ObjectType]struct{}) int {
-	if v := o.expansionMemo.Load(); v != 0 {
-		if v > 0 {
-			return int(v)
-		}
-		return StructDefaultExpansionBudget + 1
-	}
-	if depth > structExpansionDepthLimit {
-		return StructDefaultExpansionBudget + 1
-	}
-	if _, cyclic := visiting[o]; cyclic {
-		o.expansionMemo.Store(-1)
-		return StructDefaultExpansionBudget + 1
-	}
-	if visiting == nil {
-		visiting = make(map[*ObjectType]struct{})
-	}
-	visiting[o] = struct{}{}
-	defer delete(visiting, o)
-
-	n := 1
-	for _, fieldTyp := range o.FieldTypes {
-		n += structExpansionNodeCount(fieldTyp, depth+1, visiting)
-		if n > StructDefaultExpansionBudget {
-			n = StructDefaultExpansionBudget + 1
-			break
-		}
-	}
-	if n > StructDefaultExpansionBudget {
-		o.expansionMemo.Store(-1)
-	} else {
-		o.expansionMemo.Store(int32(n))
-	}
-	return n
 }
 
 func typeStringLimited(t Type, budget *int, depth int) string {
@@ -1429,14 +1390,12 @@ func (s *ObjectType) AddField(key Value, field Type) {
 		s.keyTypes[index] = keyTyp
 		s.Keys[index] = key
 		s.FieldTypes[index] = field
-		s.expansionMemo.Store(0)
 		return
 	}
 
 	s.Keys = append(s.Keys, key)
 	s.keyTypes = append(s.keyTypes, keyTyp)
 	s.FieldTypes = append(s.FieldTypes, field)
-	s.expansionMemo.Store(0)
 
 	s.keymap[keyText] = len(s.Keys) - 1
 }
