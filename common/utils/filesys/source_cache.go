@@ -204,6 +204,16 @@ func (m *SourceMaterializer) store(name string, data []byte) {
 		return
 	}
 	m.overlayMu.Lock()
+	// VirtualFS.AddFile keeps the first content it sees and silently ignores a
+	// later write of the same path. That breaks the JSP flow, which reads the raw
+	// page first (caching it) and then Puts the generated Java under the same
+	// path. Remove the stale entry so the replacement is what later reads see.
+	existed, _ := m.overlay.Stat(name)
+	if existed != nil {
+		_ = m.overlay.RemoveFileOrDir(name)
+		m.loadedB.Add(-existed.Size())
+		m.pathCount.Add(-1)
+	}
 	m.overlay.AddFile(name, string(data))
 	m.overlayMu.Unlock()
 	m.loadedB.Add(int64(len(data)))
