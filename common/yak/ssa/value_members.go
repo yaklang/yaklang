@@ -145,6 +145,13 @@ func (n *anValue) resolveLinkedValue(id int64) (Value, bool) {
 	if prog.DatabaseKind == ProgramCacheMemory {
 		return nil, false
 	}
+	// Pre-handler and other spill-disabled phases keep every live instruction
+	// in memory. A miss is a deleted id still sitting in a member-pair slice,
+	// not a row in the database. Looking it up anyway was about half of all
+	// queries during member replacement, and every one of them missed.
+	if cache := n.getProgramCache(); cache != nil && cache.IsInstructionSpillDisabled() {
+		return nil, false
+	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
@@ -208,6 +215,46 @@ func (n *anValue) GetMembersByExactKey(key Value) []Value {
 		}
 	}
 	return ret
+}
+
+// latestMemberByKey is GetMembersByExactKey then GetMembersByKeyString, but it
+// stops at the newest live member instead of resolving the whole history.
+func (n *anValue) latestMemberByKey(key Value) (Value, bool) {
+	if n == nil || key == nil {
+		return nil, false
+	}
+	pairs := n.snapshotMemberPairs()
+	for index := len(pairs) - 1; index >= 0; index-- {
+		pair := pairs[index]
+		if pair.member <= 0 || !n.memberPairMatchesKey(pair, key) {
+			continue
+		}
+		if member, ok := n.resolveLinkedValue(pair.member); ok {
+			return member, true
+		}
+	}
+	want := GetKeyString(key)
+	if want == "" {
+		return nil, false
+	}
+	for index := len(pairs) - 1; index >= 0; index-- {
+		pair := pairs[index]
+		if pair.key <= 0 || pair.member <= 0 {
+			continue
+		}
+		keyVal, ok := n.resolveLinkedValue(pair.key)
+		if !ok {
+			continue
+		}
+		lit, ok := ToConstInst(keyVal)
+		if !ok || fmt.Sprint(lit.value) != want {
+			continue
+		}
+		if member, ok := n.resolveLinkedValue(pair.member); ok {
+			return member, true
+		}
+	}
+	return nil, false
 }
 
 func (n *anValue) GetMembersByKeyString(key string) []Value {

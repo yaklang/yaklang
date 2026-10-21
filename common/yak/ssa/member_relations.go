@@ -149,6 +149,18 @@ func GetMembersByKey(object, key Value) []Value {
 }
 
 func GetLatestMemberByKey(object, key Value) (Value, bool) {
+	if utils.IsNil(object) || utils.IsNil(key) {
+		return nil, false
+	}
+	// Newest match only. GetMembersByKey resolves every historical pair and
+	// allocates the full list; replacement looks this up several times per pair,
+	// so the scan was quadratic in how many members a value had ever had.
+	if value := object.getAnValue(); value != nil {
+		if member, ok := value.latestMemberByKey(key); ok {
+			return member, true
+		}
+		return nil, false
+	}
 	members := GetMembersByKey(object, key)
 	if len(members) == 0 {
 		return nil, false
