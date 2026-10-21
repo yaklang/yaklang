@@ -101,12 +101,12 @@ func diamondStructType(levels int) *ssa.ObjectType {
 	return typ
 }
 
-// Test_StructDefaultExpansionMemo pins the memoization behind
-// StructDefaultExpansionExceedsBudget: a cached "fits" answer must reset when
-// the type grows through AddField, and cyclic field graphs must terminate as
-// "exceeds" instead of hanging.
-func Test_StructDefaultExpansionMemo(t *testing.T) {
-	t.Run("AddField growth invalidates the cached answer", func(t *testing.T) {
+// Test_StructDefaultExpansionBudget pins StructDefaultExpansionExceedsBudget:
+// the probe stays exact below the budget, saturates above it, resolves through
+// aliases, and terminates on cyclic field graphs (as exceeding, since a cyclic
+// expansion is unbounded).
+func Test_StructDefaultExpansionBudget(t *testing.T) {
+	t.Run("AddField growth flips the answer", func(t *testing.T) {
 		outer := ssa.NewStructType()
 		outer.AddField(ssa.NewConst("f"), diamondStructType(8)) // 511 nodes, fits
 		require.False(t, ssa.StructDefaultExpansionExceedsBudget(outer))
