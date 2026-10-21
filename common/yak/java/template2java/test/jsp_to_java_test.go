@@ -3,11 +3,14 @@ package test
 import (
 	"embed"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
 )
 
@@ -120,7 +123,7 @@ func TestJSP2Java_Content(t *testing.T) {
 			"test jstl-core set tag",
 			"<c:set var='name' value='John'/>",
 			[]string{
-				`request.setAttribute("name", John);`,
+				`request.setAttribute("name", "John");`,
 			},
 		},
 		// core if tag
@@ -186,6 +189,13 @@ func TestJSP2Java_Content(t *testing.T) {
 				"out.print(elExpr.parse(\"now\"));",
 			},
 		},
+		{
+			"test el function call with parentheses",
+			`<input value="${fn:escapeXml(!empty param.password ? param.password : param.pass)}">`,
+			[]string{
+				`out.print(elExpr.parse("fn:escapeXml(!empty param.password ? param.password : param.pass)"));`,
+			},
+		},
 	}
 	check := func(jspCode string, wants []string) {
 		codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, jspCode, "test.jsp")
@@ -213,6 +223,72 @@ func validateSavedJSPTemplateFixture(t *testing.T, filePath string, content stri
 	require.NotNil(t, codeInfo)
 	require.LessOrEqual(t, convertDur, generatedJavaFixtureMaxParseDuration, "template to java took too long for %s", filePath)
 	checkJavaFront(t, codeInfo.GetContent(), filePath)
+}
+
+// TestJSPCorpusGeneratesParsableJava converts every .jsp under YAK_JSP_CORPUS
+// and parses the generated Java. It is the regression for the 2026-10-21 coremail
+// scan, where fn:escapeXml(...) and GBK bytes produced Java the frontend rejected.
+// The corpus is a local tree, so the test skips when the variable is unset.
+func TestJSPCorpusGeneratesParsableJava(t *testing.T) {
+	root := strings.TrimSpace(os.Getenv("YAK_JSP_CORPUS"))
+	if root == "" {
+		t.Skip("YAK_JSP_CORPUS is not set")
+	}
+	var paths []string
+	if list := strings.TrimSpace(os.Getenv("YAK_JSP_LIST")); list != "" {
+		raw, rerr := os.ReadFile(list)
+		require.NoError(t, rerr)
+		for _, line := range strings.Split(string(raw), "\n") {
+			line = strings.TrimSpace(line)
+			if line != "" {
+				paths = append(paths, filepath.Join(root, line))
+			}
+		}
+	} else {
+		err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+			if err != nil || d.IsDir() || !strings.HasSuffix(strings.ToLower(d.Name()), ".jsp") {
+				return nil
+			}
+			paths = append(paths, path)
+			return nil
+		})
+		require.NoError(t, err)
+	}
+	var failed []string
+	checked := 0
+	for _, path := range paths {
+		checked++
+		raw, rerr := os.ReadFile(path)
+		if rerr != nil {
+			failed = append(failed, path+": read: "+rerr.Error())
+			continue
+		}
+		rel := path
+		if r, rerr := filepath.Rel(root, path); rerr == nil {
+			rel = r
+		}
+		info, cerr := tj.ConvertTemplateToJava(tj.JSP, string(raw), rel)
+		if cerr != nil {
+			failed = append(failed, rel+": convert: "+cerr.Error())
+			continue
+		}
+		if _, perr := java2ssa.Frontend(info.GetContent()); perr != nil {
+			msg := perr.Error()
+			if len(msg) > 180 {
+				msg = msg[:180]
+			}
+			failed = append(failed, rel+": java: "+msg)
+		}
+	}
+	require.Greater(t, checked, 0)
+	if len(failed) > 0 {
+		limit := failed
+		if len(limit) > 20 {
+			limit = limit[:20]
+		}
+		t.Fatalf("%d/%d jsp files did not produce parsable java:\n%s", len(failed), checked, strings.Join(limit, "\n"))
+	}
+	t.Logf("parsed %d jsp files from %s", checked, root)
 }
 
 func TestAllSavedJSPTemplates(t *testing.T) {
