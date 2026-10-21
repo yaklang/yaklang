@@ -18,15 +18,20 @@ const (
 	compileUnitBatchMinFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_FILES"
 	compileUnitBatchMinBytesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_BYTES"
 	compileUnitBatchMaxFilesEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MAX_FILES"
+	compileUnitBatchMinUnitsEnv = "YAK_SSA_COMPILE_UNIT_BATCH_MIN_UNITS"
 )
 
 const (
 	// Compile-unit split thresholds. We can't fully clear memory between
 	// batches (Instruction objects hold references to Function/Block/Program),
 	// so each batch is kept small enough that accumulation stays bounded.
+	// minUnits keeps a batch from flushing after a handful of packages: the
+	// DAG scheduler can only run the units inside the current batch, and a
+	// 256KB byte target was leaving 2-6 workers busy on a 32-core machine.
 	defaultCompileUnitBatchMinFiles = 32
 	defaultCompileUnitBatchMinBytes = 256 * 1024
-	defaultCompileUnitBatchMaxFiles = 100
+	defaultCompileUnitBatchMaxFiles = 400
+	defaultCompileUnitBatchMinUnits = 32
 )
 
 // compileUnitExecutionBatch is a contiguous run of SCCs from the unit plan that
@@ -85,6 +90,22 @@ func compileUnitBatchMaxFiles() int {
 	return maxFiles
 }
 
+func compileUnitBatchMinUnits() int {
+	raw := strings.TrimSpace(os.Getenv(compileUnitBatchMinUnitsEnv))
+	if raw == "" {
+		return defaultCompileUnitBatchMinUnits
+	}
+	switch strings.ToLower(raw) {
+	case "0", "false", "no", "off", "disable", "disabled":
+		return 0
+	default:
+		if v, err := strconv.Atoi(raw); err == nil && v >= 0 {
+			return v
+		}
+	}
+	return defaultCompileUnitBatchMinUnits
+}
+
 func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minBytes int64) []compileUnitExecutionBatch {
 	if len(order) == 0 {
 		return nil
@@ -96,6 +117,7 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 		minBytes = 0
 	}
 	maxFiles := compileUnitBatchMaxFiles()
+	minUnits := compileUnitBatchMinUnits()
 
 	// Calculate total project size
 	totalFiles := 0
@@ -182,6 +204,16 @@ func buildCompileUnitExecutionBatches(order [][]*CompileUnit, minFiles int, minB
 		} else if compileUnitBatchReadyAdaptive(current, softMinFiles, softMinBytes) {
 			// Reached soft threshold - flush
 			shouldFlush = true
+		}
+
+		// A byte/file soft target alone flushes after a few small packages and
+		// leaves the rest of the worker pool idle. Hold the batch until it has
+		// enough units for the scheduler, unless the file cap or the last SCC
+		// says it must close.
+		if shouldFlush && remainingSCCs != 0 && minUnits > 1 && len(current.units) < minUnits {
+			if maxFiles <= 0 || current.files < maxFiles {
+				shouldFlush = false
+			}
 		}
 
 		if shouldFlush {
