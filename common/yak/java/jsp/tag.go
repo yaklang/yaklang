@@ -166,8 +166,11 @@ func (y *JSPVisitor) ParseSingleTag() {
 			log.Errorf("JSTL set tag must have var attribute")
 			return
 		}
-		value, ok := tagInfo.attrs["value"]
-		y.EmitPureCode("request.setAttribute(\"" + variable + "\", " + value + ");")
+		value := ""
+		if v, ok := tagInfo.attrs["value"]; ok {
+			value = v
+		}
+		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + javaValueArg(value) + ");")
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 		y.EmitAttrFunc()
@@ -192,24 +195,40 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 			log.Errorf("JSTL if tag must have test attribute")
 			return
 		}
-		y.EmitPureCode("if (" + condition + ") {")
+		y.EmitPureCode("if (" + y.asJavaCondition(condition) + ") {")
 		visitContent()
 		y.EmitPureCode("}")
 	case JSP_TAG_CORE_CHOOSE:
+		y.switchDepth++
 		y.EmitPureCode("switch (true) {")
 		visitContent()
 		y.EmitPureCode("}")
+		y.switchDepth--
 	case JSP_TAG_CORE_WHEN:
 		condition, ok := tagInfo.attrs["test"]
 		if !ok {
 			log.Errorf("JSTL when tag must have test attribute")
 			return
 		}
-		y.EmitPureCode("case " + condition + ":")
+		if y.switchDepth > 0 {
+			y.EmitPureCode("case " + y.asJavaCondition(condition) + ":")
+			visitContent()
+			break
+		}
+		// The choose was not a Java switch (the tag was split or nested the
+		// wrong way out). An if is still a branch java2ssa can parse.
+		y.EmitPureCode("if (" + y.asJavaCondition(condition) + ") {")
 		visitContent()
+		y.EmitPureCode("}")
 	case JSP_TAG_CORE_OTHERWISE:
-		y.EmitPureCode("default:")
+		if y.switchDepth > 0 {
+			y.EmitPureCode("default:")
+			visitContent()
+			break
+		}
+		y.EmitPureCode("if (true) {")
 		visitContent()
+		y.EmitPureCode("}")
 	case JSP_TAG_CORE_FOREACH:
 		variable, ok := tagInfo.attrs["var"]
 		if !ok {
@@ -230,28 +249,81 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 	}
 }
 
+var (
+	// elBraceRe matches one ${...} expression. It is compiled once: coremail-sized
+	// pages call this on every text node and every attribute.
+	elBraceRe = regexp.MustCompile(`\$\{(.+?)\}`)
+	// elParseCallRe matches a finished elExpr.parse("...") call, including
+	// escaped quotes. The previous ([^)]*) form stopped at the first ')' inside
+	// the expression, so fn:escapeXml(...) became an unclosed Java string
+	// ("token recognition error at: '"fn:escapeXml(...)').
+	elParseCallRe = regexp.MustCompile(`elExpr\.parse\("(?:\\.|[^"\\])*"\)`)
+)
+
 func (y *JSPVisitor) appendElParseMethod(expr string) string {
 	expr = strings.TrimSpace(expr)
-	re := regexp.MustCompile(`\$\{(.+?)\}`)
 	expr = yakunquote.TryUnquote(expr)
-	return re.ReplaceAllString(expr, fmt.Sprintf("%s(\"$1\")", JSP_EL_PARSE_METHOD))
+	return elBraceRe.ReplaceAllStringFunc(expr, func(match string) string {
+		inner := elBraceRe.FindStringSubmatch(match)
+		if len(inner) < 2 {
+			return match
+		}
+		return fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, javaLiteralBody(inner[1]))
+	})
+}
+
+// javaLiteralBody escapes text placed between double quotes in generated Java.
+// A raw quote, backslash or line break inside an EL argument otherwise terminates
+// the literal and the next token is the rest of the expression plus the CRLF.
+// javaValueArg turns a JSTL attribute into a Java expression. EL is already
+// elExpr.parse(...); a bare literal such as |uid|user| must be a string or the
+// generated statement does not parse.
+func javaValueArg(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return `""`
+	}
+	if strings.HasPrefix(value, "elExpr.parse(") {
+		return value
+	}
+	if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+		return value
+	}
+	return `"` + javaLiteralBody(value) + `"`
+}
+
+// asJavaCondition makes a tag test usable as a Java expression. EL becomes
+// elExpr.parse; a raw test such as ajc.result.code == 'FA_SECRITY' is quoted
+// the same way, because a multi-character single-quoted literal is not Java.
+func (y *JSPVisitor) asJavaCondition(condition string) string {
+	condition = strings.TrimSpace(condition)
+	if condition == "" {
+		return "false"
+	}
+	converted := y.appendElParseMethod(condition)
+	if strings.Contains(converted, "elExpr.parse(") {
+		return converted
+	}
+	return fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, javaLiteralBody(converted))
+}
+
+func javaLiteralBody(s string) string {
+	return strings.NewReplacer(
+		`\`, `\\`,
+		`"`, `\"`,
+		"\r", `\r`,
+		"\n", `\n`,
+	).Replace(s)
 }
 
 func (y *JSPVisitor) replaceElExprInText(text string) string {
-	re := regexp.MustCompile(`\$\{(.+?)\}`)
-	expr := re.FindString(text)
-	if expr != "" {
-		expr = y.appendElParseMethod(expr)
-		y.EmitOutput(expr)
-	}
-	output := re.ReplaceAllString(text, "")
-
-	methodRe := regexp.MustCompile(`elExpr\.parse\(([^)]*)\)`)
-	expr = methodRe.FindString(output)
-	if expr != "" {
-		expr = y.appendElParseMethod(expr)
-		y.EmitOutput(expr)
-	}
-	output = methodRe.ReplaceAllString(output, "")
-	return output
+	text = elBraceRe.ReplaceAllStringFunc(text, func(match string) string {
+		y.EmitOutput(y.appendElParseMethod(match))
+		return ""
+	})
+	text = elParseCallRe.ReplaceAllStringFunc(text, func(match string) string {
+		y.EmitOutput(match)
+		return ""
+	})
+	return text
 }

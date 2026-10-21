@@ -24,9 +24,27 @@ var transparentChoosePattern = regexp.MustCompile(`(?is)</?\s*c:choose\b[^>]*>`)
 var directiveImportPattern = regexp.MustCompile(`(?i)\bimport\s*=\s*(?:"([^"]*)"|'([^']*)')`)
 var directiveOnlyJSPPattern = regexp.MustCompile(`(?s)<%@.*?%>|<%--.*?--%>`)
 
+// xmlDeclPattern / doctypePattern match markup that the JSP lexer only accepts
+// at the start of a document. Coremail WAP pages emit <?xml ...?> and a WML
+// doctype after tags, and the lexer then rejects the '=' inside the declaration.
+var xmlDeclPattern = regexp.MustCompile(`(?is)<\?xml\b.*?\?>`)
+var doctypePattern = regexp.MustCompile(`(?is)<!DOCTYPE\b[^>]*>`)
+
 const staticJSPFrontPlaceholder = "<yak:fragment></yak:fragment>"
 
 type VisitorCreator struct {
+}
+
+// CreateLinearJSPVisitor turns a page into Java without the JSP grammar:
+// scriptlets stay code, everything else is text. Used when the structured
+// translation does not parse as Java.
+func CreateLinearJSPVisitor(editor *memedit.MemEditor) (tl.TemplateVisitor, error) {
+	if editor == nil {
+		return nil, utils.Errorf("jsp editor is nil")
+	}
+	visitor := NewJSPVisitor()
+	visitor.Editor = editor
+	return buildLinearScriptletJSPVisitor(visitor, editor.GetSourceCode())
 }
 
 func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, error) {
@@ -46,7 +64,9 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 	}
 	ast, err := Front(src)
 	if err != nil {
-		return nil, utils.Errorf("failed to get jsp.AST: %v", err)
+		// A page the grammar cannot structure still has to become Java that
+		// java2ssa can parse: keep scriptlets as code and the rest as text.
+		return buildLinearScriptletJSPVisitor(visitor, src)
 	}
 	visitor.VisitJspDocuments(ast)
 	appendTrailingScriptletIfNeeded(visitor, src)
@@ -82,6 +102,12 @@ func Front(code string) (jspparser.IJspDocumentsContext, error) {
 }
 
 func preprocessMalformedJSPHTML(src string) string {
+	if strings.Contains(src, "<?xml") || strings.Contains(src, "<?XML") {
+		src = xmlDeclPattern.ReplaceAllString(src, "")
+	}
+	if strings.Contains(src, "<!DOCTYPE") || strings.Contains(src, "<!doctype") {
+		src = doctypePattern.ReplaceAllString(src, "")
+	}
 	if strings.Contains(src, "<%=") {
 		src = unclosedTagExpressionLinePattern.ReplaceAllString(src, `$1>$2$3`)
 	}

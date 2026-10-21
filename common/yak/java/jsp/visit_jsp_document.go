@@ -15,12 +15,15 @@ var jspIfBlockTestAttrPattern = regexp.MustCompile(`(?i)\btest\s*=\s*(?:"([^"]*)
 type JSPVisitor struct {
 	*tl.Visitor
 	tagStack *utils.Stack[*TagInfo]
+	// switchDepth is how many c:choose bodies are currently being emitted.
+	// A c:when/c:otherwise seen outside one cannot be a Java case/default label.
+	switchDepth int
 }
 
 func NewJSPVisitor() *JSPVisitor {
 	return &JSPVisitor{
-		tl.NewVisitor(),
-		utils.NewStack[*TagInfo](),
+		Visitor:  tl.NewVisitor(),
+		tagStack: utils.NewStack[*TagInfo](),
 	}
 }
 
@@ -499,7 +502,7 @@ func (y *JSPVisitor) VisitJspIfBlock(raw jspparser.IJspIfBlockContext) {
 	if condition == "" {
 		condition = attrMatches[2]
 	}
-	condition = y.appendElParseMethod(condition)
+	condition = y.asJavaCondition(condition)
 	y.EmitPureCode("if (" + condition + ") {")
 	if strings.TrimSpace(body) != "" {
 		trimmedBody := strings.TrimSpace(body)

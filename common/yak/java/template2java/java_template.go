@@ -1,9 +1,10 @@
 package template2java
 
 import (
-	"fmt"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/text/encoding"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
@@ -21,6 +22,11 @@ var _ tl.TemplateRender = (*JavaTemplate)(nil)
 type JavaTemplate struct {
 	pkgName   string
 	className string
+
+	// sourceEncoding is the charset declared by the template header (nil = UTF-8).
+	// Text written into the generated Java is decoded with it first, so a GBK JSP
+	// page does not leak raw bytes into a Java string literal.
+	sourceEncoding encoding.Encoding
 
 	classDeclLine int
 	builder       strings.Builder
@@ -67,9 +73,21 @@ func (t *JavaTemplate) String() string {
 
 func (t *JavaTemplate) WritePureText(texts string) {
 	texts = tryUnquote(texts)
+	// Decode with the template's declared charset, then emit a Java-legal literal:
+	// Go's %q would produce \xNN escapes for legacy-encoded bytes, which Java cannot parse.
+	texts = decodeTemplateText(texts, t.sourceEncoding)
 	for _, text := range strings.Split(texts, "\n") {
-		t.append(fmt.Sprintf("	out.write(%q);\n", text))
+		t.append("\tout.write(\"" + javaStringLiteral(text) + "\");\n")
 	}
+}
+
+// SetSourceEncoding records the charset declared by the template header. It must be called
+// before the template is generated; a nil encoding keeps UTF-8 passthrough.
+func (t *JavaTemplate) SetSourceEncoding(enc encoding.Encoding) {
+	if t == nil {
+		return
+	}
+	t.sourceEncoding = enc
 }
 
 func (t *JavaTemplate) WriteGetAttribute(variable string) {
