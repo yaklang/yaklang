@@ -615,6 +615,10 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
+	if compressionMode {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithThinkingLevel("none")))
+	}
+
 	postHandler := func(resp *aicommon.AIResponse) error {
 		r.clearCallsExecutionValues(acceptedCalls)
 		acceptedCalls = nil
@@ -890,6 +894,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 					}
 				})(req)
 		},
+	}
+	if compressionMode {
+		requestOpts = append(requestOpts, aicommon.WithAIRequest_ExtraSpecOpts(aispec.WithThinkingLevel("none")))
 	}
 	var acceptedResp *aicommon.AIResponse
 
