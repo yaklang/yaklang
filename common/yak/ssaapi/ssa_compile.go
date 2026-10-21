@@ -1,10 +1,14 @@
 package ssaapi
 
 import (
+	"io/fs"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 
 	//js2ssa "github.com/yaklang/yaklang/common/yak/JS2ssa"
@@ -246,4 +250,112 @@ func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 	// Archive-backed sources decompile on every read. Wrap them so the decompiled tree is
 	// materialized once and reused by planning, dependency scan and AST build.
 	return c.wrapMaterializedSources(fs)
+}
+
+// resolveLanguageBuilder picks the language builder before the filesystem is
+// wrapped. WrapWithPreprocessedFS is language-specific — Java is what expands
+// jar/zip members into .java sources — and ScanProjectFiles, the caller that
+// used to be first to resolve the builder, runs after the wrap. A target
+// compiled without an explicit language therefore kept every archive member
+// invisible: coremail's 8 war files never contributed a single class.
+//
+// Resolution order:
+//  1. the configured language (BaseInfo.Language);
+//  2. otherwise probe the tree for the first file a builder claims, in a fixed
+//     order so one tree always resolves to the same builder.
+//
+// A tree with no recognizable file keeps the builder nil; the per-file fallback
+// in checkLanguage then applies as before.
+func (c *Config) resolveLanguageBuilder(filesystem fi.FileSystem) {
+	if c == nil || c.LanguageBuilder != nil || filesystem == nil {
+		return
+	}
+	if lang := c.GetLanguage(); lang != "" {
+		if create, ok := LanguageBuilderCreater[lang]; ok && create != nil {
+			c.LanguageBuilder = create()
+		}
+		return
+	}
+	c.LanguageBuilder = probeLanguageBuilder(filesystem, c.programPath)
+}
+
+// probeLanguageOrder is the deterministic probe order: when a tree holds
+// evidence for more than one language, the earlier one wins. Java is first
+// because it is the language whose wrapper expands archives, and a Java webapp
+// routinely carries a lot of JavaScript that must not outvote it.
+var probeLanguageOrder = []ssaconfig.Language{
+	ssaconfig.JAVA,
+	ssaconfig.GO,
+	ssaconfig.PHP,
+	ssaconfig.PYTHON,
+	ssaconfig.CSHARP,
+	ssaconfig.C,
+	ssaconfig.TS,
+	ssaconfig.JS,
+	ssaconfig.Yak,
+}
+
+// probeLanguageByExtension maps the extensions that identify a project's
+// language. Deliberately narrow: it holds markers a human would accept as
+// "this tree is written in X", not every extension a builder accepts. Notably
+// absent are .txt/.xml/.json, which several pre-handlers claim.
+var probeLanguageByExtension = map[string]ssaconfig.Language{
+	".java":  ssaconfig.JAVA,
+	".jsp":   ssaconfig.JAVA,
+	".jspx":  ssaconfig.JAVA,
+	".class": ssaconfig.JAVA,
+	".war":   ssaconfig.JAVA,
+	".jar":   ssaconfig.JAVA,
+	".go":    ssaconfig.GO,
+	".php":   ssaconfig.PHP,
+	".py":    ssaconfig.PYTHON,
+	".cs":    ssaconfig.CSHARP,
+	".c":     ssaconfig.C,
+	".h":     ssaconfig.C,
+	".cpp":   ssaconfig.C,
+	".cc":    ssaconfig.C,
+	".ts":    ssaconfig.TS,
+	".tsx":   ssaconfig.TS,
+	".js":    ssaconfig.JS,
+	".jsx":   ssaconfig.JS,
+	".yak":   ssaconfig.Yak,
+}
+
+// languageProbeFileLimit caps the probe walk. A project declares its language
+// long before the two-hundredth file; the cap keeps a tree with no recognizable
+// source at all from costing a full traversal.
+const languageProbeFileLimit = 200
+
+// probeLanguageBuilder collects language evidence from the first files of the
+// tree and returns the builder for the highest-priority language seen. Looking
+// at a sample instead of the first matching file keeps a webapp's bundled
+// JavaScript from deciding that a Java project is a JavaScript project.
+func probeLanguageBuilder(filesystem fi.FileSystem, root string) ssa.Builder {
+	seen := make(map[ssaconfig.Language]bool)
+	files := 0
+	_ = filesys.Recursive(root,
+		filesys.WithFileSystem(filesystem),
+		filesys.WithFileStat(func(path string, info fs.FileInfo) error {
+			if info == nil || info.IsDir() {
+				return nil
+			}
+			files++
+			if lang, ok := probeLanguageByExtension[strings.ToLower(filepath.Ext(path))]; ok {
+				seen[lang] = true
+			}
+			if files >= languageProbeFileLimit {
+				return filesys.SkipAll
+			}
+			return nil
+		}),
+	)
+	for _, lang := range probeLanguageOrder {
+		if !seen[lang] {
+			continue
+		}
+		if create, ok := LanguageBuilderCreater[lang]; ok && create != nil {
+			return create()
+		}
+	}
+	return nil
 }
