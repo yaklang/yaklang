@@ -1240,66 +1240,6 @@ func TypeStringLimited(t Type) string {
 	return typeStringLimited(t, 0)
 }
 
-// StructDefaultExpansionBudget bounds how many nodes a struct type's
-// default-value expansion may cover. Legal value-type graphs can make the raw
-// field tree exponential (each nesting level may multiply the node count, so
-// N levels of two same-typed fields expand to 2^N nodes), and per-field
-// default construction has no deduplication, so such types never finished
-// compiling. Callers degrade oversized types to a typed Make placeholder at
-// the GetDefaultValue entry point, where every recursive call re-enters and
-// nested fields are guarded as well.
-const StructDefaultExpansionBudget = 1024
-
-// structExpansionDepthLimit bounds alias chains and struct nesting inside
-// the expansion probe; raw field graphs may be cyclic (built
-// programmatically), and the limit keeps the walk finite — a depth-tripped
-// graph counts as exceeding, which is safe since it can only be that deep by
-// nesting more nodes than the budget allows.
-const structExpansionDepthLimit = 64
-
-// StructDefaultExpansionExceedsBudget reports whether expanding ityp as a raw
-// field tree (no dedup of shared field types — the exact expansion per-field
-// default construction performs) would exceed StructDefaultExpansionBudget
-// nodes. Counting stops as soon as the budget is exhausted, so the probe
-// costs at most the budget. Only struct and alias types recurse in that
-// expansion, and only they are counted.
-func StructDefaultExpansionExceedsBudget(ityp Type) bool {
-	return structExpansionNodeCount(ityp, 0) > StructDefaultExpansionBudget
-}
-
-// structExpansionNodeCount returns the number of struct nodes in ityp's raw
-// field tree, saturated at StructDefaultExpansionBudget+1.
-func structExpansionNodeCount(ityp Type, depth int) int {
-	if depth > structExpansionDepthLimit {
-		return StructDefaultExpansionBudget + 1
-	}
-	if utils.IsNil(ityp) {
-		return 0
-	}
-	switch ityp.GetTypeKind() {
-	case AliasTypeKind:
-		if alias, ok := ToAliasType(ityp); ok {
-			return structExpansionNodeCount(alias.GetType(), depth+1)
-		}
-		return 0
-	case StructTypeKind:
-		typ, _ := ToObjectType(ityp)
-		if typ == nil {
-			return 0
-		}
-		n := 1
-		for _, fieldTyp := range typ.FieldTypes {
-			n += structExpansionNodeCount(fieldTyp, depth+1)
-			if n > StructDefaultExpansionBudget {
-				return StructDefaultExpansionBudget + 1
-			}
-		}
-		return n
-	default:
-		return 0
-	}
-}
-
 func typeStringLimited(t Type, depth int) string {
 	if utils.IsNil(t) {
 		return "<nil>"

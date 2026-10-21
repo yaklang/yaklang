@@ -939,22 +939,30 @@ func coverType(ityp, iwantTyp ssa.Type) {
 	ityp.SetFullTypeNames(iwantTyp.GetFullTypeNames())
 }
 
+// Struct default construction expands fields recursively without dedup of
+// shared field types: a legal value-type graph can make the raw field tree
+// exponential (N levels of two same-typed fields -> 2^N nodes) or cyclic, and
+// such types used to never finish compiling. The recursion is bounded inline:
+// nesting past defaultValueDepthLimit, more than defaultValueNodeLimit struct
+// nodes within one construction, or a type re-entering itself (path table)
+// degrades that node to a typed Make placeholder, whose deep members are
+// created lazily on member access.
+const (
+	defaultValueDepthLimit = 64
+	defaultValueNodeLimit  = 1024
+)
+
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
+	nodes := 0
+	return b.getDefaultValue(ityp, 0, &nodes, nil)
+}
+
+func (b *astbuilder) getDefaultValue(ityp ssa.Type, depth int, nodes *int, path map[ssa.Type]struct{}) ssa.Value {
 	if utils.IsNil(ityp) {
 		return b.EmitUndefined("default")
 	}
-	// Default construction expands struct fields recursively, without
-	// deduplication of shared field types: a legal value-type graph can make
-	// the raw field tree exponential (N levels of two same-typed fields ->
-	// 2^N nodes), and such types used to never finish compiling. Types whose
-	// expansion exceeds the budget degrade to a typed Make placeholder at this
-	// entry point; since every recursive call re-enters here, the check also
-	// guards each nested field, and deep members are created lazily on member
-	// access.
-	if ityp.GetTypeKind() == ssa.StructTypeKind {
-		if ssa.StructDefaultExpansionExceedsBudget(ityp) {
-			return b.EmitMakeBuildWithType(ityp, nil, nil)
-		}
+	if depth > defaultValueDepthLimit || *nodes > defaultValueNodeLimit {
+		return b.EmitMakeBuildWithType(ityp, nil, nil)
 	}
 	switch ityp.GetTypeKind() {
 	case ssa.NumberTypeKind:
@@ -967,14 +975,23 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		return b.EmitUndefined("func")
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
-		return b.GetDefaultValue(alias.GetType())
-		case ssa.StructTypeKind:
-			typ := goSelectorObjectType(ityp)
-			obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
-				return typ.Keys[i]
-			}, func(i int) ssa.Value {
-				return b.GetDefaultValue(typ.FieldTypes[i])
-			})
+		return b.getDefaultValue(alias.GetType(), depth+1, nodes, path)
+	case ssa.StructTypeKind:
+		if _, cyclic := path[ityp]; cyclic {
+			return b.EmitMakeBuildWithType(ityp, nil, nil)
+		}
+		if path == nil {
+			path = make(map[ssa.Type]struct{})
+		}
+		path[ityp] = struct{}{}
+		defer delete(path, ityp)
+		*nodes++
+		typ := goSelectorObjectType(ityp)
+		obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
+			return typ.Keys[i]
+		}, func(i int) ssa.Value {
+			return b.getDefaultValue(typ.FieldTypes[i], depth+1, nodes, path)
+		})
 		obj.SetType(ityp)
 		return obj
 	case ssa.PointerKind:
