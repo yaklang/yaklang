@@ -122,7 +122,16 @@ jobs:
                 git rebase --abort
                 exit 1
               fi
-              GIT_EDITOR=true git rebase --continue || break
+              # Continuing can stop at another commit's generated-file
+              # conflicts. Let the loop resolve those too; only an unrelated
+              # continuation failure should abort this cleanup.
+              if ! GIT_EDITOR=true git rebase --continue; then
+                if [ -z "$(git diff --name-only --diff-filter=U)" ]; then
+                  echo "::error::rebase continuation failed without conflicts; aborting"
+                  git rebase --abort
+                  exit 1
+                fi
+              fi
             done
             if [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; then
               echo "::error::bot commit removal rebase still in progress"
