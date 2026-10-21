@@ -674,6 +674,11 @@ func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
 	return info
 }
 
+type templateIndexEntry struct {
+	path string
+	info tl.TemplateGeneratedInfo
+}
+
 func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
 	owner := p.templateOwner()
 	if owner == nil {
@@ -685,6 +690,16 @@ func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
 	fileName := filepath.Base(path)
 	owner.templateMu.Lock()
 	defer owner.templateMu.Unlock()
+	if _, miss := owner.templateMiss[fileName]; miss {
+		return nil
+	}
+	if entries := owner.templateByBase[fileName]; len(entries) > 0 {
+		if len(entries) == 1 {
+			return entries[0].info
+		}
+		owner.noteTemplateMissLocked(fileName)
+		return nil
+	}
 	var rets []tl.TemplateGeneratedInfo
 	for tp, t := range owner.Template {
 		if strings.Contains(tp, fileName) {
@@ -694,6 +709,7 @@ func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
 	if len(rets) == 1 {
 		return rets[0]
 	}
+	owner.noteTemplateMissLocked(fileName)
 	return nil
 }
 
@@ -707,7 +723,29 @@ func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
 		owner.Template = make(map[string]tl.TemplateGeneratedInfo)
 	}
 	owner.Template[path] = info
+	base := filepath.Base(path)
+	if owner.templateByBase == nil {
+		owner.templateByBase = make(map[string][]templateIndexEntry)
+	}
+	previous := owner.templateByBase[base]
+	slot := make([]templateIndexEntry, 0, len(previous)+1)
+	for _, entry := range previous {
+		if entry.path != path {
+			slot = append(slot, entry)
+		}
+	}
+	owner.templateByBase[base] = append(slot, templateIndexEntry{path: path, info: info})
+	// A newly registered template can satisfy a lookup that previously missed,
+	// including a substring match that is not this basename.
+	owner.templateMiss = nil
 	owner.templateMu.Unlock()
+}
+
+func (p *Program) noteTemplateMissLocked(name string) {
+	if p.templateMiss == nil {
+		p.templateMiss = make(map[string]struct{})
+	}
+	p.templateMiss[name] = struct{}{}
 }
 
 func (prog *Program) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {
