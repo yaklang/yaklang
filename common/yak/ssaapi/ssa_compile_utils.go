@@ -360,11 +360,16 @@ func newAntlrASTParseWorker(c *Config) *antlrASTParseWorker {
 	resetEveryFiles := antlrCacheResetEveryFiles()
 	resetEveryBytes := antlrCacheResetEveryBytes()
 	if c.GetCompileProjectBytes() >= largeProjectByteCap {
+		// One worker cache per compile batch. GetFileHandler is called once
+		// per batch and drops the worker, so the DFA is rebuilt at the batch
+		// boundary instead of after every file. Per-file reset serialized
+		// ANTLR prediction behind a shared lock and threw away the DFA.
+		// YAK_ANTLR_CACHE_RESET_FILES / _BYTES still override this.
 		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_FILES"); !ok {
-			resetEveryFiles = 1
+			resetEveryFiles = 0
 		}
 		if _, ok := os.LookupEnv("YAK_ANTLR_CACHE_RESET_BYTES"); !ok {
-			resetEveryBytes = 2 * 1024 * 1024
+			resetEveryBytes = 0
 		}
 	}
 	return &antlrASTParseWorker{
