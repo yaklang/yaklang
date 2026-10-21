@@ -479,6 +479,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	prompt, nonce string, generalOutputCallback LoopGeneralOutputCallback,
 	functionCallOutputCallback LoopFunctionCallOutputCallback,
 ) ([]LoopCall, LoopStopReason, *LoopResultDescriptor, error) {
+	callLabel := fmt.Sprintf(fmt.Sprintf("react-loop:%s", r.loopName))
 	descriptor := newLoopResultDescriptor("functioncall")
 	// Capture once for all retries. Registered handlers are not necessarily
 	// advertised tools (planning handoff, init constraints, disabled actions).
@@ -488,6 +489,12 @@ func (r *ReActLoop) callAIFunctionTransaction(
 	if advertisedActions == nil {
 		// Compatibility for callers using a supplied prompt without loop assembly.
 		availableActions = r.GetAllActionNames()
+	}
+	compressionMode := r.promptMode == aicommon.LoopPromptModeCompressContext
+	if compressionMode {
+		advertisedActions = []string{aicommon.ContextCompressionAction}
+		availableActions = advertisedActions
+		callLabel = aicommon.CallerLabelContextCompress
 	}
 	activeTaskCtx := r.config.GetContext()
 	if task := r.GetCurrentTask(); task != nil && !utils.IsNil(task.GetContext()) {
@@ -604,7 +611,7 @@ func (r *ReActLoop) callAIFunctionTransaction(
 		)(req)
 	})
 	requestOpts := []aicommon.AIRequestOption{
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
+		aicommon.WithAIRequest_CallerLabel(callLabel),
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		captureOption,
 	}
@@ -802,6 +809,12 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		}
 	}()
 	var actionNames = r.GetAllActionNames()
+	var callLabel = fmt.Sprintf("react-loop:%s", r.loopName)
+	compressionMode := r.promptMode == aicommon.LoopPromptModeCompressContext
+	if compressionMode {
+		actionNames = []string{aicommon.ContextCompressionAction}
+		callLabel = aicommon.CallerLabelContextCompress
+	}
 	// Bind the provider request to the immutable task that owns this
 	// transaction. ReAct.currentTask may temporarily point at a nested loop,
 	// while Stop cancels the queue-owned task context. If the request only uses
@@ -811,10 +824,6 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 	activeTaskCtx := r.config.GetContext()
 	if activeTask != nil && !utils.IsNil(activeTask.GetContext()) {
 		activeTaskCtx = activeTask.GetContext()
-	}
-
-	getNextActionType := func(a *aicommon.Action) string { //legacy support
-		return inferActionTypeFromPayload(a, r.Get("tag_final_answer"))
 	}
 
 	ctxCanceled := utils.NewBool(false)
@@ -864,7 +873,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		}
 	}()
 	requestOpts := []aicommon.AIRequestOption{
-		aicommon.WithAIRequest_CallerLabel(fmt.Sprintf("react-loop:%s", r.loopName)),
+		aicommon.WithAIRequest_CallerLabel(callLabel),
 		aicommon.WithAIRequest_Context(activeTaskCtx),
 		func(req *aicommon.AIRequest) {
 			resetActivity(false)
@@ -1066,7 +1075,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			admittedActionType = strings.TrimSpace(action.ActionType())
 			observedActionType = strings.TrimSpace(action.ObservedActionType())
 		}
-		actionType := getNextActionType(action)
+		actionType := inferActionTypeFromPayload(action, r.Get("tag_final_answer"))
 		if observedActionType != "" && admittedActionType == "" {
 			r.UserStatus(
 				"当前思路还不够合适，正在重新整理",
@@ -1151,7 +1160,9 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		return nil
 	}
 	var transactionErr error
-	if r.useSpeedPriorityAI {
+	if compressionMode {
+		transactionErr = aicommon.CallAITransaction(r.config, prompt, r.config.CallQualityPriorityAI, postHandler, requestOpts...)
+	} else if r.useSpeedPriorityAI {
 		// Config owns execution, not just policy lookup. LiteForge runs each
 		// response through the existing streaming parser and verifier within its
 		// retry transaction; the loop never supplies an AI caller override.
@@ -1204,7 +1215,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 		return nil, nil, utils.Error("action is nil in ReActLoop")
 	}
 
-	handler, err := r.GetActionHandler(getNextActionType(action))
+	handler, err := r.GetActionHandler(inferActionTypeFromPayload(action, r.Get("tag_final_answer")))
 	if err != nil {
 		return nil, nil, utils.Wrap(err, "GetActionHandler failed")
 	}

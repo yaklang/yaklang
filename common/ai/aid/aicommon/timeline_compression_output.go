@@ -2,28 +2,16 @@ package aicommon
 
 import (
 	"encoding/json"
-	"fmt"
 	"math"
-	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
-// Selection references whole original items. Memory candidates are delivered
-// with the committed summary; compression does not write a memory database.
-type timelineCompressionOutput struct {
-	Summary       string
-	RetainedRange string
-	RetainedIDs   []int64
-	// Original promoted item IDs explicitly blacklisted by the model. Missing,
-	// malformed or unknown IDs keep content by default.
-	RetiredPromotedEntries []int64
-	MemoryEntities         []any
-}
-
-func parseTimelineCompressionMemories(action *Action) []any {
+// ParseTimelineCompressionMemoryEntities normalizes optional memory candidates
+// from a compression action. Parsing and validation belong to the action layer;
+// Timeline only stores the accepted candidates.
+func ParseTimelineCompressionMemoryEntities(action *Action) []any {
 	// Optional extensions must not reject a usable summary. Normalize detached
 	// JSON data and admit valid candidates independently; never invent scores.
 	rawMemory, _ := action.LookupCanonicalParam("memory_entities")
@@ -74,64 +62,6 @@ func validCompressionMemoryEntity(value any) bool {
 		}
 	}
 	return true
-}
-
-// Select from the snapshot instead of expanding numeric ranges. Sparse IDs
-// and arbitrarily large ranges cannot select protected entries or allocate
-// memory proportional to the range's width.
-func parseCompressionRetainedRange(text string, items []timelineCompressionSnapshotItem) ([]int64, error) {
-	if strings.TrimSpace(text) == "" {
-		return nil, nil
-	}
-	eligible := make(map[int64]bool, len(items))
-	for _, item := range items {
-		if item.PromptText != "" {
-			eligible[item.ID] = true
-		}
-	}
-	selected := make(map[int64]bool)
-	for _, part := range strings.Split(text, ",") {
-		part = strings.TrimSpace(part)
-		first, last, ranged := strings.Cut(part, "-")
-		if !ranged {
-			last = first
-		}
-		start, startErr := strconv.ParseInt(first, 10, 64)
-		end, endErr := strconv.ParseInt(last, 10, 64)
-		if startErr != nil || endErr != nil || start <= 0 || end < start ||
-			strings.HasPrefix(first, "+") || strings.HasPrefix(last, "+") || !eligible[start] || !eligible[end] {
-			return nil, fmt.Errorf("retain_timeline 范围 %q 无效；使用动态区列出的普通历史 ID，例如 12,18-23，起止 ID 都必须存在且递增", part)
-		}
-		for id := range eligible {
-			if id >= start && id <= end {
-				selected[id] = true
-			}
-		}
-	}
-	ids := make([]int64, 0, len(selected))
-	for id := range selected {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
-	return ids, nil
-}
-
-func (o *timelineCompressionOutput) budgetText(snapshot *timelineCompressionSnapshot) string {
-	var text strings.Builder
-	text.WriteString(o.Summary)
-	selected := make(map[int64]bool, len(o.RetainedIDs))
-	for _, id := range o.RetainedIDs {
-		selected[id] = true
-	}
-	for _, item := range snapshot.Items {
-		if selected[item.ID] {
-			text.WriteByte('\n')
-			text.WriteString(item.PromptText)
-		}
-	}
-	raw, _ := json.Marshal(o.MemoryEntities)
-	text.Write(raw)
-	return text.String()
 }
 
 func cloneCompressionMemoryEntities(entities []any) []any {

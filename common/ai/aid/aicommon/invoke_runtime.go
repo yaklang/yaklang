@@ -238,8 +238,19 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 	}
 }
 
+type LoopPromptMode uint8
+
+const (
+	LoopPromptModeNormal LoopPromptMode = iota
+	LoopPromptModeCompressContext
+)
+
 type LoopPromptAssemblyInput struct {
 	Nonce string
+	// Both modes share the same cacheable prefix. Only the dynamic section
+	// changes; compression carries instructions and the snapshot's candidates.
+	PromptMode       LoopPromptMode
+	CompressionGuide string
 	// FunctionCallMode describes this request's output protocol, not the loop's
 	// global preference. Auxiliary parameter-generation requests remain textual.
 	FunctionCallMode bool
@@ -319,6 +330,7 @@ type LoopPromptAssemblyInput struct {
 
 type LoopPromptAssemblyResult struct {
 	Prompt   string
+	Mode     LoopPromptMode
 	Sections []*PromptSectionObservation
 }
 

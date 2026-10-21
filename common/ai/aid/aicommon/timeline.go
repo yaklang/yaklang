@@ -64,9 +64,6 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	compressing           bool                         // guarded by mu; reserved before freezing or starting a reducer
-	compressionSnapshot   *timelineCompressionSnapshot // explicit one-shot transaction; never persisted or forked
-	compressionDone       chan struct{}
 	branchTimeline        bool
 	memoryCoveredState    string // internal extraction watermark; never rendered into prompts
 	memoryFinalizePending bool   // normal completion or interruption still requires memory processing

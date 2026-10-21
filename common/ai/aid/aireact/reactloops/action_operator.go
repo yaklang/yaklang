@@ -30,6 +30,9 @@ type LoopActionHandlerOperator struct {
 
 	task aicommon.AIStatefulTask
 
+	// requestPrompt is the prompt of this call, used by compression callbacks.
+	requestPrompt string
+
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
 

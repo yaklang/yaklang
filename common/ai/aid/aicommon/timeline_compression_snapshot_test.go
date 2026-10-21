@@ -54,7 +54,6 @@ func TestTimelineCompressionSnapshotRange(t *testing.T) {
 	after, err := MarshalTimeline(tl)
 	require.NoError(t, err)
 	require.Equal(t, before, after, "planning must not freeze, promote, delete or update history")
-	require.False(t, tl.compressing)
 	require.EqualValues(t, 245, snapshot.ThroughID)
 	require.EqualValues(t, 120, snapshot.FrozenThroughID)
 	require.Len(t, snapshot.Items, 24)

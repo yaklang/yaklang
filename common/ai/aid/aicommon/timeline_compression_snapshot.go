@@ -11,10 +11,9 @@ import (
 	"strings"
 )
 
-// timelineCompressionSnapshot is a detached plan, not a running compression.
-// It contains no references to mutable TimelineItem values and never freezes,
-// deletes, promotes or calls AI. Compression before prompt assembly reserves
-// and commits this snapshot atomically.
+// timelineCompressionSnapshot is a detached read of the current timeline.
+// Guide rendering and action application capture it locally and drop it.
+// It is not stored on Timeline and never freezes, deletes, or calls AI.
 type timelineCompressionSnapshot struct {
 	FinalizingMemory        bool
 	MemoryInputLimit        int
@@ -36,10 +35,7 @@ type timelineCompressionSnapshot struct {
 	UserContexts            []timelineCompressionUserContext
 	SessionMemoryCandidates []any                          // completed session extractions, detached from listeners and storage
 	MemoryCompletion        *timelineCompressionCompletion `json:"-"`
-	Output                  *timelineCompressionOutput     `json:"-"`
 	SummaryPrompt           string                         `json:"-"` // actual rendered request source, runtime-only
-	CommittedFreeze         TimelineFreezeResult           `json:"-"` // detached receipt, populated only after validation
-	NotifyCommitted         func()                         `json:"-"` // observers captured at commit, called after unlock
 }
 
 type timelineCompressionUserContext struct {

@@ -170,6 +170,7 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 
 	var filteredValues []*LoopAction
 	var asyncManagement *LoopAction
+	var contextCompression *LoopAction
 	for _, v := range values {
 		if v.ActionType == schema.AI_REACT_LOOP_ACTION_MANAGE_ASYNC_EXECUTION_RUNTIME {
 			asyncManagement = v
@@ -178,7 +179,8 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 		if v.ActionType == nativeAdjustTodolistActionName && !r.functionCallMode {
 			continue
 		}
-		if v.ActionType == compressTimelineActionName {
+		if v.ActionType == aicommon.ContextCompressionAction {
+			contextCompression = v
 			continue
 		}
 		if !slices.Contains(disableActionList, v.ActionType) && filterFunc(v) {
@@ -231,6 +233,11 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 	// already applied the host's runtime action policy.
 	if asyncManagement != nil {
 		filteredValues = append(filteredValues, asyncManagement)
+	}
+	// Maintenance admission is controlled by the loop's prompt mode, not the
+	// business action filters. Keep its contract stable across both modes.
+	if contextCompression != nil {
+		filteredValues = append(filteredValues, contextCompression)
 	}
 	return filteredValues
 }
@@ -356,8 +363,9 @@ func (r *ReActLoop) generateLoopPrompt(
 	return result.Prompt, nil
 }
 
-// Assembly returns both the prompt and its section snapshot. It never publishes
-// observations: compression can rebuild and discard this result without a call.
+// Assembly returns the prompt, mode and section snapshot. Once the normal
+// prompt exceeds the limit, it folds redundant history and rebuilds directly in
+// compression mode. Observations are published only for real decision requests.
 func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*LoopPromptAssemblyResult, error) {
 	if input == nil {
 		return nil, utils.Error("loop prompt build input is nil")
@@ -465,7 +473,7 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 	}
 
-	result, err := r.invoker.AssembleLoopPrompt(tools, &LoopPromptAssemblyInput{
+	assembly := &LoopPromptAssemblyInput{
 		Nonce:                    nonce,
 		FunctionCallMode:         r.functionCallMode,
 		IncludeLatestModelReplay: true,
@@ -483,12 +491,45 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		ReactiveData:             reactiveData,
 		InjectedMemory:           memory,
 		TodoCheckpoint:           todoCheckpoint,
-	})
-	if err != nil {
-		return nil, utils.Wrap(err, "assemble loop prompt failed")
 	}
-	if result == nil {
-		return nil, utils.Error("assemble loop prompt returned nil result")
+	assemble := func() (*LoopPromptAssemblyResult, error) {
+		result, err := r.invoker.AssembleLoopPrompt(tools, assembly)
+		if err != nil {
+			return nil, utils.Wrap(err, "assemble loop prompt failed")
+		}
+		if result == nil {
+			return nil, utils.Error("assemble loop prompt returned nil result")
+		}
+		result.Mode = assembly.PromptMode
+		return result, nil
+	}
+	result, err := assemble()
+	if err != nil {
+		return nil, err
+	}
+	limit := r.wholePromptTokenLimit()
+	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
+	if timeline := timelineFromConfig(r.config); timeline != nil && promptTokens > limit {
+		ctx := r.config.GetContext()
+		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
+			ctx = task.GetContext()
+		}
+		target := max(int64(1), limit/6)
+		guide, err := timeline.RenderCompressionGuide(aicommon.TimelineCompressionOptions{
+			Context: ctx, PromptTokens: promptTokens, TargetTokens: target,
+		})
+		if err != nil {
+			return nil, err
+		}
+		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
+		assembly.CompressionGuide = strings.TrimSpace(compressContextDynamicText) + "\n\n" + guide
+		result, err = assemble()
+		if err != nil {
+			return nil, err
+		}
+		if aicommon.TokenCountExceeds(result.Prompt, aicommon.TimelineCompressionMaxInputTokens) {
+			return nil, utils.Error("context-compression prompt exceeds the input safety limit")
+		}
 	}
 	r.commitSubAgentPrompt(subAgentRevision)
 	r.subAgentModelSeen = subAgentRevision

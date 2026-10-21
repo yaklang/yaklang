@@ -20,7 +20,7 @@ type timelineMemoryRetry struct {
 
 func newTimelineMemoryRetry(snapshot *timelineCompressionSnapshot) timelineMemoryRetry {
 	copy := *snapshot
-	copy.Context, copy.MemoryCompletion, copy.Output, copy.NotifyCommitted = nil, nil, nil, nil
+	copy.Context, copy.MemoryCompletion = nil, nil
 	copy.Head = cloneTimelineCompressedHead(snapshot.Head)
 	copy.Items = append([]timelineCompressionSnapshotItem(nil), snapshot.Items...)
 	copy.PromotedItems = append([]timelineCompressionPromotedItem(nil), snapshot.PromotedItems...)
@@ -258,28 +258,16 @@ func (m *Timeline) FinalizeMemory(ctx context.Context) error {
 	if err := m.replayMemorySources(ctx); err != nil {
 		return err
 	}
-	for {
-		m.mu.Lock()
-		if m.compressing {
-			done := m.compressionDone
-			m.mu.Unlock()
-			select {
-			case <-done:
-				continue
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-		state := m.memoryFingerprintLocked()
-		covered := m.memoryCoveredState
-		m.mu.Unlock()
-		if state == "" || state == covered {
-			return h.saveOwner()
-		}
-		// Timeline compression belongs to the main loop. This boundary no longer
-		// calls the old auxiliary compressor just to extract memory.
+	m.mu.Lock()
+	state := m.memoryFingerprintLocked()
+	covered := m.memoryCoveredState
+	m.mu.Unlock()
+	if state == "" || state == covered {
 		return h.saveOwner()
 	}
+	// Timeline compression belongs to the main loop. This boundary no longer
+	// calls the old auxiliary compressor just to extract memory.
+	return h.saveOwner()
 }
 
 // PrepareMemoryRecovery captures only the restored pending source. Later user

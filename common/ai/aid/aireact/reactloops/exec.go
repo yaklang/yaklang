@@ -629,6 +629,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 	defer stopStallHeartbeat()
 
 	needSummary := utils.NewBool(false)
+	lastCompressionTokens := 0
 LOOP:
 	for {
 		if r.asyncReviewRequiresAnswer() {
@@ -705,11 +706,8 @@ LOOP:
 			r.GetCurrentMemoriesContent(),
 			operator,
 		)
-		// A confirmed prompt overflow is retried with a lower timeline content
-		// limit: rebuilding the prompt compresses the history against that limit,
-		// then the model is called again. The retry is bounded and stops as soon
-		// as one rebuild fails to shrink the prompt.
 		var (
+			assembled        *LoopPromptAssemblyResult
 			loopCalls        []LoopCall
 			stopReason       LoopStopReason
 			resultDescriptor *LoopResultDescriptor
@@ -718,7 +716,6 @@ LOOP:
 		)
 		retryMax := r.promptOverflowRetryMax()
 		for attempt := 0; ; attempt++ {
-			var assembled *LoopPromptAssemblyResult
 			assembled, finalError = r.generateLoopPromptFromInput(buildInput)
 			if finalError != nil {
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
@@ -727,45 +724,29 @@ LOOP:
 				return finalError
 			}
 			prompt = assembled.Prompt
-			promptTokens := aicommon.MeasureTokens(prompt)
-			// The whole prompt is the budget boundary. Compression only starts
-			// after normal assembly proves it is over the configured limit.
-			if promptLimit := r.wholePromptTokenLimit(); promptLimit > 0 && int64(promptTokens) > promptLimit {
-				if attempt >= retryMax {
-					log.Warnf("main prompt still exceeds %d tokens after compression (%d tokens)", promptLimit, promptTokens)
-				} else {
-					if err := r.compressMainPrompt(buildInput, promptLimit); err != nil {
-						r.finishIterationLoopWithError(iterationCount, task, err)
-						return err
-					}
-					continue
-				}
+			r.promptMode = assembled.Mode
+			tokens := aicommon.MeasureTokens(prompt)
+			if r.promptMode == aicommon.LoopPromptModeCompressContext {
+				r.noteCompressionStatus()
 			}
-			// Only a provider overflow retry cares whether the rebuilt prompt shrank.
-			// A local compression continue has not called the model yet, so a nil
-			// transaction error must not be treated as a failed retry.
-			if transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) &&
-				promptTokens >= lastPromptTokens*99/100 {
-				log.Warnf(
-					"prompt overflow retry made no progress (%d -> %d tokens), giving up: %v",
-					lastPromptTokens, promptTokens, transactionErr,
-				)
+			if r.promptMode == aicommon.LoopPromptModeCompressContext && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
+				finalError = utils.Errorf("context compression made no progress (%d -> %d tokens)", lastCompressionTokens, tokens)
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				return finalError
+			}
+			if r.promptMode == aicommon.LoopPromptModeNormal && transactionErr != nil && aicommon.IsPromptTooLong(transactionErr) && tokens >= lastPromptTokens*99/100 {
 				break
 			}
-			lastPromptTokens = promptTokens
-			// Save prompt to file in debug mode
+			lastPromptTokens = tokens
 			if r.isDebugModeEnabled() {
 				r.savePromptToFile(task, iterationCount, prompt)
 			}
-
-			// Only a prompt accepted for an actual decision request is observed.
-			// Compression probes and discarded overflow rebuilds stay invisible.
-			r.publishPromptObservation(nonce, assembled, promptTokens)
+			if r.promptMode == aicommon.LoopPromptModeNormal {
+				r.publishPromptObservation(nonce, assembled, tokens)
+			}
 			streamWg := new(sync.WaitGroup)
-			/* Generate AI Action */
 			loopCalls, stopReason, resultDescriptor, transactionErr = r.callAILoopTransaction(
-				streamWg, prompt, nonce, operator,
-				r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput,
+				streamWg, prompt, nonce, operator, r.emitLoopGeneralOutput, r.emitLoopFunctionCallOutput,
 			)
 			if resultDescriptor != nil {
 				log.Debugf("AI loop transaction stop=%s provider_finish=%q", stopReason, resultDescriptor.Snapshot().ProviderFinishReason)
@@ -780,13 +761,10 @@ LOOP:
 			if transactionErr == nil {
 				break
 			}
-			if attempt >= retryMax || !aicommon.IsPromptTooLong(transactionErr) {
+			if attempt >= retryMax || !aicommon.IsPromptTooLong(transactionErr) || !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
 				break
 			}
-			if !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
-				break
-			}
-			log.Warnf("prompt overflow detected; compressing the context and retrying (retry %d/%d)", attempt+1, retryMax)
+			log.Warnf("prompt overflow detected; rebuilding the context (retry %d/%d)", attempt+1, retryMax)
 		}
 		iterationModelThinking := strings.TrimSpace(r.takeModelThinkingForTimeline())
 		if transactionErr != nil {
@@ -795,6 +773,16 @@ LOOP:
 			log.Errorf("Failed to execute loop: %v", transactionErr)
 			needSummary.SetTo(true)
 			return transactionErr
+		}
+		if r.promptMode == aicommon.LoopPromptModeCompressContext {
+			if len(loopCalls) != 1 || loopCalls[0].Action == nil || loopCalls[0].Action.Name() != aicommon.ContextCompressionAction {
+				finalError = utils.Error("context-compression mode requires exactly one compress_context action")
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				return finalError
+			}
+			lastCompressionTokens = aicommon.MeasureTokens(prompt)
+		} else {
+			lastCompressionTokens = 0
 		}
 		if len(loopCalls) == 0 {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
@@ -808,7 +796,9 @@ LOOP:
 		// acknowledgement before any action writes to the timeline. Execution below
 		// is the same for both response formats.
 		var eventSink loopActionEventSink
-		if stopReason == LoopStopToolCalls {
+		// The committed compressed head already contains this maintenance
+		// response. Replaying its arguments would duplicate the summary.
+		if r.promptMode == aicommon.LoopPromptModeNormal && stopReason == LoopStopToolCalls {
 			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
 				r.clearCallsExecutionValues(loopCalls)
 				r.finishIterationLoopWithError(iterationCount, task, err)
@@ -816,7 +806,7 @@ LOOP:
 				return err
 			}
 			eventSink = r.appendFunctionCallActionEvent
-		} else {
+		} else if r.promptMode == aicommon.LoopPromptModeNormal {
 			decision := r.Get("last_ai_decision_response")
 			if loopCalls[0].Action == nil {
 				decision = ""
@@ -843,7 +833,7 @@ LOOP:
 			r.finishIterationLoopWithError(iterationCount, task, nil)
 			return nil
 		}
-		if batch.skipPostIteration {
+		if batch.skipPostIteration || r.promptMode == aicommon.LoopPromptModeCompressContext {
 			continue LOOP
 		}
 		postOp := r.doneCurrentIteration(iterationCount, task)

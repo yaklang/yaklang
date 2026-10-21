@@ -273,6 +273,7 @@ func (r *ReActLoop) execOneCall(
 	prompt string, done *utils.Once, position, callCount int, eventSink loopActionEventSink,
 ) loopActionsResult {
 	op := newLoopActionHandlerOperator(task)
+	op.requestPrompt = prompt
 	result := loopActionsResult{operator: op, result: loopActionsContinue}
 	action, handler := call.Action, call.LoopAction
 	if action == nil || handler == nil {
