@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"sort"
 	"sync"
 
 	"github.com/google/uuid"
@@ -98,7 +99,9 @@ func (p *Program) drainLazyBuilders() {
 	for {
 		progressed := false
 		if p.Blueprint != nil {
-			for _, key := range p.Blueprint.Keys() {
+			keys := p.Blueprint.Keys()
+			sort.Strings(keys)
+			for _, key := range keys {
 				bp, ok := p.Blueprint.Get(key)
 				if !ok || bp == nil || !bp.hasPending() {
 					continue
@@ -119,7 +122,9 @@ func (p *Program) drainLazyBuilders() {
 		}
 	}
 	if p.Blueprint != nil {
-		for _, key := range p.Blueprint.Keys() {
+		keys := p.Blueprint.Keys()
+		sort.Strings(keys)
+		for _, key := range keys {
 			bp, ok := p.Blueprint.Get(key)
 			if !ok || bp == nil {
 				continue
@@ -293,6 +298,9 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 			}
 		}
 	}
+	// Maps above only collect candidates. Drain by source declaration order,
+	// not by their map iteration order; the stack pops the smallest key first.
+	sortLazyFunctionStack(stack)
 	for len(stack) > 0 {
 		fun := stack[len(stack)-1]
 		stack = stack[:len(stack)-1]
@@ -304,31 +312,78 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 		}
 		visited[fun] = struct{}{}
 		fn(fun)
+		var children []*Function
 		for _, childID := range fun.ChildFuncs {
 			childValue, ok := fun.GetValueById(childID)
 			if !ok || childValue == nil {
 				continue
 			}
 			if childFunc, ok := ToFunction(childValue); ok && childFunc != nil {
-				stack = append(stack, childFunc)
+				children = append(children, childFunc)
 			}
 		}
+		sortLazyFunctionStack(children)
+		stack = append(stack, children...)
 	}
+}
+
+// Source ranges distinguish anonymous functions without using their allocation
+// counters. Names order synthetic/range-less declarations; IDs are never keys.
+func sortLazyFunctionStack(functions []*Function) {
+	key := func(f *Function) (path string, start, end int, name string) {
+		if f == nil {
+			return
+		}
+		name = f.GetName()
+		if r := f.GetRange(); r != nil {
+			start, end = r.GetStartOffset(), r.GetEndOffset()
+			if editor := r.GetEditor(); editor != nil {
+				path = editor.GetUrl()
+			}
+		}
+		return
+	}
+	sort.SliceStable(functions, func(i, j int) bool {
+		ap, as, ae, an := key(functions[i])
+		bp, bs, be, bn := key(functions[j])
+		if ap != bp {
+			return ap > bp
+		}
+		if as != bs {
+			return as > bs
+		}
+		if ae != be {
+			return ae > be
+		}
+		return an > bn
+	})
+}
+
+func lazyMethodNames(methods map[string]*Function) []string {
+	names := make([]string, 0, len(methods))
+	for name := range methods {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {
 	if c.MagicMethod != nil {
-		c.MagicMethod.ForEach(func(_ BlueprintMagicMethodKind, value Value) bool {
-			if function, b := ToFunction(value); b {
-				function.Build()
+		keys := c.MagicMethod.Keys()
+		sort.Slice(keys, func(i, j int) bool { return string(keys[i]) < string(keys[j]) })
+		for _, key := range keys {
+			if value, ok := c.MagicMethod.Get(key); ok {
+				if function, ok := ToFunction(value); ok {
+					function.Build()
+				}
 			}
-			return true
-		})
+		}
 	}
-	for _, m := range c.NormalMethod {
-		m.Build()
+	for _, name := range lazyMethodNames(c.NormalMethod) {
+		c.NormalMethod[name].Build()
 	}
-	for _, function := range c.StaticMethod {
-		function.Build()
+	for _, name := range lazyMethodNames(c.StaticMethod) {
+		c.StaticMethod[name].Build()
 	}
 }
