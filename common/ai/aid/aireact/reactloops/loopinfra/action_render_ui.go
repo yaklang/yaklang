@@ -17,6 +17,7 @@ var renderUIAction = &reactloops.LoopAction{
 		"properties": map[string]any{
 			"id": map[string]any{"type": "string"}, "catalogVersion": map[string]any{"type": "string"},
 			"fallback": map[string]any{"type": "string"}, "root": map[string]any{"type": "string"},
+			"requiredComponents": map[string]any{"type": "array", "maxItems": 32, "items": map[string]any{"type": "string"}},
 			"nodes": map[string]any{"type": "array", "maxItems": 64, "items": map[string]any{
 				"type": "object", "required": []string{"id", "component", "props"}, "properties": map[string]any{
 					"id": map[string]any{"type": "string"}, "component": map[string]any{"type": "string"},

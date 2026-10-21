@@ -30,7 +30,9 @@ func (c *Config) UICatalog() interaction.Catalog {
 	if !c.GetAllowUserInteraction() {
 		display := catalog.Components[:0]
 		for _, entry := range catalog.Components {
-			if entry.Name != "ParameterForm" && len(entry.Actions) == 0 && len(entry.Bindings) == 0 {
+			if entry.Name == "DataTable" {
+				display = append(display, entry.DisplayOnly())
+			} else if entry.Name != "ParameterForm" && len(entry.Actions) == 0 && len(entry.Bindings) == 0 {
 				display = append(display, entry)
 			}
 		}
@@ -80,7 +82,7 @@ func (c *Config) RenderUI(ctx context.Context, taskID string, doc interaction.Co
 	return map[string]any{
 		"status": "rendered", "id": doc.ID, "diagnostics": diagnostics,
 		"correctionAllowed": revision == 0 && len(diagnostics) > 0,
-		"instruction":       "If diagnostics exist, correct ONCE using the SAME document and node IDs. Otherwise continue the task. Rendering does not wait for input. Only a later ordinary user message conveys submitted form values.",
+		"instruction":       "If diagnostics exist, correct ONCE using the SAME document and node IDs. Otherwise continue the task. Rendering does not wait for input. Only a later ordinary user message conveys submitted form values or selected table rows.",
 	}, nil
 }
 
@@ -120,6 +122,11 @@ func (c *Config) acceptComponentAnswerLocked(s *UISession, event *ypb.AIInputEve
 	artifact := s.artifacts[receipt.RequestID]
 	if artifact == nil {
 		return fmt.Errorf("component block does not belong to this session")
+	}
+	var err error
+	receipt, err = artifact.Document.NormalizeSubmission(receipt)
+	if err != nil {
+		return err
 	}
 	if previous, exists := artifact.Submissions[receipt.NodeID]; exists {
 		// A different transport ID must not turn the same form into another user

@@ -22,7 +22,7 @@ func TestUIComponentCorrectionBudgetAndFallback(t *testing.T) {
 	caps, _ := json.Marshal(client)
 	events := make(chan *schema.AiOutputEvent, 16)
 	c := NewTestConfig(context.Background(), WithClientUI(string(caps)), WithEventHandler(func(e *schema.AiOutputEvent) { events <- e }))
-	doc := interaction.ComponentDocument{ID: "block", CatalogVersion: "1.0", Fallback: "有用的文本", Root: "text",
+	doc := interaction.ComponentDocument{ID: "block", CatalogVersion: c.UICatalog().Version, Fallback: "有用的文本", Root: "text",
 		Nodes: []interaction.ComponentNode{{ID: "text", Component: "Text", Props: map[string]any{}}}}
 	result, err := c.RenderUI(c.GetContext(), "task", doc)
 	require.NoError(t, err)
@@ -49,7 +49,7 @@ func uiFormFixture(t *testing.T, options ...ConfigOption) (*Config, interaction.
 	require.NoError(t, err)
 	caps, _ := json.Marshal(UIClientCapabilities{Protocol: interaction.Protocol, Questions: true, Catalog: raw})
 	cfg := NewTestConfig(context.Background(), append([]ConfigOption{WithClientUI(string(caps))}, options...)...)
-	doc := interaction.ComponentDocument{ID: "arch_questions", CatalogVersion: "1.0", Fallback: "填写姓名", Root: "form",
+	doc := interaction.ComponentDocument{ID: "arch_questions", CatalogVersion: cfg.UICatalog().Version, Fallback: "填写姓名", Root: "form",
 		Nodes: []interaction.ComponentNode{{ID: "form", Component: "ParameterForm",
 			Props: map[string]any{"schema": map[string]any{"type": "object", "properties": map[string]any{
 				"name": map[string]any{"type": "string"},
@@ -146,4 +146,88 @@ func TestUIInteractionPolicyCoversQuestionsFormsAndDisplayCatalog(t *testing.T) 
 	require.NoError(t, WithAllowRequireForUserInteract(true)(cfg))
 	require.True(t, cfg.UIQuestionsEnabled())
 	require.NotNil(t, cfg.UICatalog().Definition("ParameterForm"))
+}
+
+func uiDataTableFixture(t *testing.T, options ...ConfigOption) (*Config, interaction.ComponentDocument) {
+	t.Helper()
+	cfg, _ := uiFormFixture(t, options...)
+	raw, err := os.ReadFile("../interaction/testdata/visualizations.json")
+	require.NoError(t, err)
+	var doc interaction.ComponentDocument
+	require.NoError(t, json.Unmarshal(raw, &doc))
+	return cfg, doc
+}
+
+func TestUIDataTablePolicyAndVersionFallback(t *testing.T) {
+	cfg, doc := uiDataTableFixture(t, WithAllowRequireForUserInteract(false))
+	catalog := cfg.UICatalog()
+	entry := catalog.Definition("DataTable")
+	require.NotNil(t, entry)
+	require.Empty(t, entry.Actions)
+	require.Empty(t, entry.Bindings)
+	require.NotNil(t, catalog.Definition("BarChart"))
+	require.NotNil(t, catalog.Definition("LineChart"))
+	_, err := cfg.RenderUI(cfg.GetContext(), "task", doc)
+	require.ErrorContains(t, err, "interaction is disabled")
+	doc.Nodes[4].Action, doc.Nodes[4].Bindings = nil, nil
+	doc.Nodes[4].Props["selection"] = "none"
+	_, err = cfg.RenderUI(cfg.GetContext(), "task", doc)
+	require.NoError(t, err)
+	require.NoError(t, WithAllowRequireForUserInteract(true)(cfg))
+	require.NotEmpty(t, cfg.UICatalog().Definition("DataTable").Actions, "capability filtering must not mutate the original client catalog")
+	event := &schema.AiOutputEvent{Type: "ui_component", Content: utils.Jsonify(UIArtifact{Document: doc})}
+	legacy := cfg.UICatalog()
+	legacy.Version = "1.0"
+	raw, _ := json.Marshal(legacy)
+	projected := ProjectUIEvent(event, UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw})
+	require.Equal(t, schema.EVENT_TYPE_RESULT, projected.Type)
+	require.Contains(t, string(projected.Content), doc.Fallback)
+	legacy.Version = doc.CatalogVersion
+	legacy.Components = legacy.Components[1:]
+	raw, _ = json.Marshal(legacy)
+	require.Equal(t, schema.EVENT_TYPE_RESULT, ProjectUIEvent(event, UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw}).Type)
+}
+
+func TestUIDataTableSubmissionIsCanonicalOnceAndRecoverable(t *testing.T) {
+	var accepted UIUserMessage
+	cfg, doc := uiDataTableFixture(t, WithPersistentSessionId("table-session"), WithEventHandler(func(event *schema.AiOutputEvent) {
+		if event.Type == "user_message" {
+			require.NoError(t, json.Unmarshal(event.Content, &accepted))
+		}
+	}))
+	_, err := cfg.RenderUI(cfg.GetContext(), "task", doc)
+	require.NoError(t, err)
+	deliveries := 0
+	deliver := func(text, task string, origin *Config) (string, error) {
+		deliveries++
+		require.Contains(t, text, "API 网关")
+		require.NotContains(t, text, "forged")
+		return "task", nil
+	}
+	answer := func(id string) *ypb.AIInputEvent {
+		return &ypb.AIInputEvent{UserInteraction: string(utils.Jsonify(interaction.Submission{
+			ID: id, Source: "component", RequestID: doc.ID, NodeID: "details", Values: map[string]any{"selectedRowIds": []any{"gateway"}, "rows": []any{"forged"}},
+		}))}
+	}
+	for i := 0; i < 12; i++ {
+		require.NoError(t, cfg.AcceptQuestionAnswer(answer(fmt.Sprint(i)), deliver))
+	}
+	require.Equal(t, 1, deliveries)
+	require.Equal(t, "0", accepted.ID)
+	require.Equal(t, float64(12), accepted.Metadata.Values["rows"].([]any)[0].(map[string]any)["values"].(map[string]any)["count"])
+	db, err := utils.CreateTempTestDatabaseInMemory()
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	require.NoError(t, db.AutoMigrate(&schema.AiOutputEvent{}).Error)
+	require.NoError(t, db.Create(&schema.AiOutputEvent{SessionId: "table-session", Type: "ui_component", Content: utils.Jsonify(cfg.UISession().artifacts[doc.ID])}).Error)
+	require.NoError(t, db.Create(&schema.AiOutputEvent{SessionId: "table-session", Type: "user_message", Content: utils.Jsonify(accepted)}).Error)
+	recovered, _ := uiDataTableFixture(t, WithPersistentSessionId("table-session"))
+	recovered.BaseCheckpointableStorage = NewCheckpointableStorageWithDB("table-runtime", db)
+	require.NoError(t, recovered.RestoreUIInteractions())
+	require.NoError(t, recovered.AcceptQuestionAnswer(answer("after-restart"), deliver))
+	require.Equal(t, 1, deliveries)
+	require.Equal(t, "0", recovered.UISession().artifacts[doc.ID].Submissions["details"].ID)
+	require.NoError(t, WithAllowRequireForUserInteract(false)(recovered))
+	changed := interaction.Submission{ID: "changed", Source: "component", RequestID: doc.ID, NodeID: "details", Values: map[string]any{"selectedRowIds": []any{"admin"}}}
+	require.Error(t, recovered.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(utils.Jsonify(changed))}, deliver))
 }
