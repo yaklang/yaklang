@@ -177,6 +177,18 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			for idx := len(pkgNames) - 1; idx > 0; idx-- {
 				className = strings.Join(pkgNames[idx:], ".")
 				pkgName := strings.Join(pkgNames[:idx], ".")
+				// Pass1, and only when this class is not declared yet. The scheduler
+				// creates the library before hasFile is set, so a missing name would
+				// make fakeImportType plant an empty blueprint that the real
+				// declaration reuses. An already declared class, a package with no
+				// library yet, and the binding pass all keep the old path.
+				if deferForeignPackage {
+					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil && !hasImportType(lib, className) {
+						unitLibrary = true
+						ownerBusy = true
+						break
+					}
+				}
 				// Post-skeleton: do not compile a package the unit scheduler
 				// already owns. A second build shows up as an extra typeName.
 				if resolveStaticTypes {
