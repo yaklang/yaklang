@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -150,7 +151,20 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 	default:
 	}
 
-	db, err := gorm.Open(driver, path)
+	var db *gorm.DB
+	var err error
+	if driver == damenggorm.Dialect {
+		sqlDB, openErr := damenggorm.OpenDB(path)
+		if openErr != nil {
+			return nil, openErr
+		}
+		db, err = gorm.Open(driver, sqlDB)
+		if err != nil {
+			_ = sqlDB.Close()
+		}
+	} else {
+		db, err = gorm.Open(driver, path)
+	}
 	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
 		log.Warnf("open database[%s] with driver[%s] failed: %s, try to check and fix it", purePath, driver, err)
 		err = checkAndTryFixDatabase(purePath)

@@ -57,7 +57,7 @@ type SyntaxFlowScanTask struct {
 	TotalQuery int64
 
 	// config
-	Config []byte `gorm:"type:text"` // new data
+	Config SQLTextBytes `gorm:"type:text"` // new data
 }
 
 func (*SyntaxFlowScanTask) TableName() string {

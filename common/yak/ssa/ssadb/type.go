@@ -74,6 +74,9 @@ func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
+	if needsDMIRTransaction(db) {
+		return inIRTransaction(db, func(tx *gorm.DB) error { return SaveIrTypeBatch(tx, items) })
+	}
 	clean := make([]*IrType, 0, len(items))
 	for _, it := range items {
 		if it != nil {
@@ -126,8 +129,8 @@ func bulkUpsertIrType(db *gorm.DB, items []*IrType) error {
 		}
 	}
 
-	if r := db.CreateInBatches(items, irTypeBatchChunk); r.Error != nil {
-		return r.Error
+	if err := createIRBatch(db, items, irTypeBatchChunk); err != nil {
+		return err
 	}
 	return nil
 }

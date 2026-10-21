@@ -66,8 +66,8 @@ func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
 	}
 
 	err := diagnostics.TrackLow("Database.SaveIRIndexBatch", func() error {
-		if r := db.CreateInBatches(clean, irIndexBatchChunk); r.Error != nil {
-			return r.Error
+		if err := createIRBatch(db, clean, irIndexBatchChunk); err != nil {
+			return err
 		}
 		return nil
 	})

@@ -172,6 +172,9 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
+	if needsDMIRTransaction(db) {
+		return inIRTransaction(db, func(tx *gorm.DB) error { return SaveIrCodeBatch(tx, items) })
+	}
 	clean := make([]*IrCode, 0, len(items))
 	for _, it := range items {
 		if it != nil {
@@ -216,8 +219,8 @@ func bulkUpsertIrCode(db *gorm.DB, items []*IrCode) error {
 			}
 		}
 	}
-	if r := db.CreateInBatches(items, irCodeBatchChunk); r.Error != nil {
-		return r.Error
+	if err := createIRBatch(db, items, irCodeBatchChunk); err != nil {
+		return err
 	}
 	return nil
 }

@@ -139,6 +139,7 @@ require (
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
+	gitee.com/chunanyong/dm v1.8.23
 	github.com/ProtonMail/go-crypto v1.1.3 // indirect
 	github.com/VillanCh/go-pcre2-lite v0.1.6
 	github.com/andybalholm/cascadia v1.1.0 // indirect
