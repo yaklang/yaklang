@@ -34,7 +34,7 @@ flowchart TD
     E --> F
     F --> G["返回 Prompt + Sections"]
     G --> H{"主循环长度 / 重试检查"}
-    H -->|需要压缩| I["折叠 / 压缩后重建；不发布观测"]
+    H -->|需要压缩| I["压缩后重建；不发布观测"]
     I --> B
     H -->|确定请求主模型| J["publishPromptObservation()<br/>异步 emit prompt_profile"]
     J --> K["callAILoopTransaction()"]
@@ -259,7 +259,7 @@ flowchart TD
 r.publishPromptObservation(nonce, assembled, promptTokens)
 ```
 
-该方法同步记录已测得的 token 数，直接异步构建观测、更新 LastObservation 并通过 `Emitter.EmitPromptProfile` 发出事件，不添加额外的排序锁或等待链。压缩中的容量检查、折叠后重建以及因重试无进展而丢弃的 prompt 都不发布观测；真实的溢出重试会为新请求发布一份观测。默认成分内容完整透传，不截断。
+该方法同步记录已测得的 token 数，直接异步构建观测、更新 LastObservation 并通过 `Emitter.EmitPromptProfile` 发出事件，不添加额外的排序锁或等待链。压缩中的容量检查、压缩重建以及因重试无进展而丢弃的 prompt 都不发布观测；真实的溢出重试会为新请求发布一份观测。默认成分内容完整透传，不截断。
 
 debug 模式（`YAKIT_AI_WORKSPACE_DEBUG=1`）下还会落盘 markdown：`debug/<loop_name>/prompts/<iteration>.md`。
 
