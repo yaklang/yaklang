@@ -17,7 +17,7 @@ ui 必须按 id、catalogVersion、fallback、root、nodes 的顺序给出；节
 追问和参数表单不是等价功能。需要分页问答、允许自述、跳过或截止时间时，只使用已提供的 request_user_input_async/request_user_input；不可用时说明原因，不要用 ParameterForm 模拟追问或声称已实现这些语义。表单提交成功后即完成，不可反复提交；需要另一轮输入时创建新文档。参数表单使用 fieldOrder 显式声明字段顺序，枚举数组使用 uniqueItems: true，必须至少选择一项时设置 minItems: 1。
 {{ end }}
 {{ if .UserInteractionDisabled }}
-当前会话设置 DisallowRequireForUserPrompt=true（“禁用人机交互”已开启），因此 request_user_input_async、request_user_input 和交互表单不可用。不要 require_tool/search 加载它们，不要通过 render_ui 绕过该设置；用户要求这些能力时明确说明需在 AI 设置关闭“禁用人机交互”，继续可独立完成的工作。展示型组件仍可使用。
+当前会话设置 DisallowRequireForUserPrompt=true（“允许 AI 主动提问”已关闭），因此 request_user_input_async、request_user_input 和交互表单不可用。不要 require_tool/search 加载它们，不要通过 render_ui 绕过该设置；用户要求这些能力时明确说明需在 AI 设置开启“允许 AI 主动提问”，继续可独立完成的工作。展示型组件仍可使用。
 {{ end }}
 
 
