@@ -1,6 +1,7 @@
 package vectorstore
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"sync"
@@ -275,23 +276,9 @@ func isPortAvailable(address string) bool {
 
 // testEmbeddingService 测试嵌入服务是否正常工作
 func testEmbeddingService(address string, timeoutSeconds float64) bool {
-	// 首先使用 WaitConnect 等待端口可用
-	manager := localmodel.GetManager()
-	err := manager.WaitForEmbeddingService(address, timeoutSeconds) // 等待15秒
-	if err != nil {
-		log.Infof("embedding service not available on %s: %v", address, err)
-		return false
-	}
-
-	// 创建临时客户端测试服务
-	testClient := embedding.NewOpenaiEmbeddingClient(
-		aispec.WithDomain(address),
-		aispec.WithNoHTTPS(true),
-		aispec.WithModel("embedding"),
-	)
-
-	// 测试服务是否能正常生成嵌入
-	_, err = testClient.Embedding("test")
+	ctx, cancel := context.WithTimeout(context.Background(), utils.FloatSecondDuration(timeoutSeconds))
+	defer cancel()
+	_, err := probeLocalEmbedding(ctx, address, "test")
 	if err != nil {
 		log.Infof("embedding service test failed on %s: %v", address, err)
 		return false

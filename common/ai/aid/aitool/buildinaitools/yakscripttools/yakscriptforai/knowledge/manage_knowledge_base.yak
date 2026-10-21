@@ -15,6 +15,7 @@ op=delete_entry：entry_id 必填，只删该库的指定条目及其索引。
 op=build：source_file（引擎本地文件绝对路径）和 content 必须且只能给一个。build_options.mode=question_index（默认，AI 分析并生成问题索引）或 chunks（直接按块入库，文本不调用 AI）；chunk_size=256..1048576 字节，默认8192；concurrency=1..16，默认2；extra_prompt 是 AI 构建的额外要求。视频、PDF、图片先探测本地 Omni，默认 AIBalance qwen3.8-omni-flash；omni_mode=auto（默认，失败回退原路径）/required（必须使用 Omni）/disabled（原路径）；omni_model 指定模型，凭据来自本地配置；omni_segment_seconds=(0,600]，默认20；omni_payload_bytes=1024..10485760，默认7340032，限制完整 base64 data URI，超限视频继续细分。构建等待实际落库；出错时如实报告，部分成功写入可能保留，检查库内容后再重试。
 op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重建索引，不用于更换模型；可能耗时且需要 embedding 服务。index_options 只允许在 create 使用。
 查询知识正文另行 require query_knowledge_base，必须显式选择 name、names 或 all=true，并指定 token_limit；库名未知先用本工具 op=list。不要把列表当成知识内容，也不要声称失败的操作成功。
+build 会即时输出阶段变化，并每 5 秒输出耗时、已抽取块、正在索引/写入块和实际落库条数。以这些日志判断进度；遇到错误须同时报告原始模型/ffmpeg 原因及部分落库数量，不能把没有输出解释为没有讲解内容。
 
 [[- if .FunctionCallMode -]]
 ```json
@@ -49,6 +50,7 @@ cli.check()
 if op == "" { die("op is required") }
 if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" { die("metadata, index_options and build_options must be JSON objects") }
 opts = [aiknowledge.keyword(keyword),aiknowledge.limit(limit),aiknowledge.offset(offset),aiknowledge.index(!skipIndex)]
+opts = append(opts, aiknowledge.onProgress(message => { println(message) }))
 if "description" in metadata { opts=append(opts,aiknowledge.description(metadata.description)) }
 if "type" in metadata { opts=append(opts,aiknowledge.type(metadata.type)) }
 if "tags" in metadata { opts=append(opts,aiknowledge.tags(metadata.tags...)) }

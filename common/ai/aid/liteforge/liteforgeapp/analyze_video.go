@@ -50,11 +50,13 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 	go func() {
 		defer ffmpegChan.Close()
 		var ffmpegOptions = make([]ffmpegutils.Option, 0)
+		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithContext(analyzeConfig.Ctx))
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithTimestampOverlay(true))
 		ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithIgnoreBottomPaddingInSceneDetection(true)) // 默认启用智能场景检测
 
 		analyzeConfig.AnalyzeStatusCard("Analysis", "ffmpeg extract image")
 		totalCount := 0
+		var extractionErrors []error
 
 		if audioAnalysisFailed {
 			// Fallback strategy: scene change detection + every 3 seconds frame extraction
@@ -66,10 +68,14 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 			sceneResult, err := ffmpegutils.ExtractImageFramesFromVideo(video, sceneOptions...)
 			if err != nil {
 				log.Errorf("Failed to extract frames using scene change detection: %v", err)
+				extractionErrors = append(extractionErrors, err)
+				analyzeConfig.AnalyzeLog("scene frame extraction failed: %v", err)
 			} else {
 				for fResult := range sceneResult {
 					if fResult.Error != nil {
 						log.Warnf("Error extracting scene change frame: %v", fResult.Error)
+						extractionErrors = append(extractionErrors, fResult.Error)
+						analyzeConfig.AnalyzeLog("scene frame extraction failed: %v", fResult.Error)
 						continue
 					}
 					ffmpegChan.SafeFeed(&InterimData{
@@ -86,11 +92,15 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 			intervalResult, err := ffmpegutils.ExtractImageFramesFromVideo(video, intervalOptions...)
 			if err != nil {
 				log.Errorf("Failed to extract frames using fixed interval: %v", err)
+				extractionErrors = append(extractionErrors, err)
+				analyzeConfig.AnalyzeLog("interval frame extraction failed: %v", err)
 			} else {
 				intervalCount := 0
 				for fResult := range intervalResult {
 					if fResult.Error != nil {
 						log.Warnf("Error extracting interval frame: %v", fResult.Error)
+						extractionErrors = append(extractionErrors, fResult.Error)
+						analyzeConfig.AnalyzeLog("interval frame extraction failed: %v", fResult.Error)
 						continue
 					}
 					ffmpegChan.SafeFeed(&InterimData{
@@ -103,7 +113,29 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 				analyzeConfig.AnalyzeLog("Extracted %d frames using 3-second interval", intervalCount)
 			}
 
+			// Some Windows ffmpeg builds crash inside drawtext/font discovery.
+			// Retry without timestamp or scene overlays before declaring failure.
+			if totalCount == 0 && analyzeConfig.Ctx.Err() == nil {
+				analyzeConfig.AnalyzeLog("zero fallback frames; retrying plain interval extraction without timestamp/scene overlays")
+				plain, plainErr := ffmpegutils.ExtractImageFramesFromVideo(video, ffmpegutils.WithContext(analyzeConfig.Ctx), ffmpegutils.WithFramesPerSecond(1.0/3.0))
+				if plainErr != nil {
+					extractionErrors = append(extractionErrors, plainErr)
+				} else {
+					for frame := range plain {
+						if frame.Error != nil {
+							extractionErrors = append(extractionErrors, frame.Error)
+							continue
+						}
+						ffmpegChan.SafeFeed(&InterimData{ImageData: frame})
+						totalCount++
+					}
+				}
+			}
+
 			analyzeConfig.AnalyzeLog("Fallback strategy completed: total %d frames extracted", totalCount)
+			if totalCount == 0 && len(extractionErrors) > 0 && analyzeConfig.Ctx.Err() == nil {
+				analyzeConfig.reportError(fmt.Errorf("video frame extraction failed; zero frames is not evidence of empty content: %v", extractionErrors))
+			}
 		} else {
 			// Normal audio-guided frame extraction
 			ffmpegOptions = append(ffmpegOptions, ffmpegutils.WithSceneThreshold(0.05))
@@ -168,8 +200,10 @@ func AnalyzeVideo(video string, options ...any) (<-chan AnalysisResult, error) {
 		}
 
 		analyzeConfig.AnalyzeLog("Start to analyze video frame %d, Supplementary Information: %s", frameCount, supplementaryInfo)
-		imageResult, err := AnalyzeImage(data.ImageData.RawData, WithExtraPrompt(fmt.Sprintf(extraPromptFormat, supplementaryInfo, cumulativeSummary, analyzeConfig.ExtraPrompt)))
+		imageOptions := append(append([]any(nil), options...), WithExtraPrompt(fmt.Sprintf(extraPromptFormat, supplementaryInfo, cumulativeSummary, analyzeConfig.ExtraPrompt)))
+		imageResult, err := AnalyzeImage(data.ImageData.RawData, imageOptions...)
 		if err != nil {
+			analyzeConfig.AnalyzeLog("video frame analysis failed: %v", err)
 			return nil, err
 		}
 

@@ -84,36 +84,29 @@ if onlineOK {
     status(f`online embedding failed: ${onlineErr}`)
 }
 
-// Step 3: Check Local Embedding service with retry
+// Step 3: Probe the running local service once, with a total 3s budget.
+// Do not auto-start a model or retry a known failure during diagnostics.
 yakit.SetProgress(0.7)
-status("checking local embedding service")
+status("checking local embedding service (total budget: 3s, no auto-start)")
 
 localOK := false
 localErr := ""
 localDim := 0
-maxRetry := 5
-
-for i := 0; i < maxRetry; i++ {
-    try {
-        localResult, err := rag.LocalEmbedding("你好")
-        if err == nil && localResult != nil && len(localResult) > 0 {
-            localOK = true
-            localDim = len(localResult)
-            break
-        } else if err != nil {
-            localErr = sprintf("%v", err)
-        } else {
-            localErr = "empty result"
-        }
-    } catch err {
+localStarted := time.Now()
+try {
+    localResult, err := rag.ProbeLocalEmbedding("你好")
+    if err == nil && localResult != nil && len(localResult) > 0 {
+        localOK = true
+        localDim = len(localResult)
+    } else if err != nil {
         localErr = sprintf("%v", err)
+    } else {
+        localErr = "empty result"
     }
-    
-    if i < maxRetry - 1 {
-        status(f`local embedding loading, retry ${i+1}/${maxRetry}...`)
-        sleep(3)
-    }
+} catch err {
+    localErr = sprintf("%v", err)
 }
+yakit.Info("local embedding probe completed in %s (budget 3s)", time.Since(localStarted))
 
 if localOK {
     status(f`local embedding OK (dim: ${localDim})`)

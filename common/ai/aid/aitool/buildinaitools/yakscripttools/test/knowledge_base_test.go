@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
 	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yak"
@@ -99,6 +100,14 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		_, err := execute(tc.name, tc.params)
 		require.Error(t, err)
 	}
+	oldMock := vectorstore.IsMockMode
+	vectorstore.IsMockMode = true
+	t.Cleanup(func() { vectorstore.IsMockMode = oldMock })
+	built, err := execute("manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "ORBIT-731 fixture recovery", "build_options": map[string]any{"mode": "chunks"}})
+	require.NoError(t, err)
+	require.Contains(t, built.Stdout, "embedding ready")
+	require.Contains(t, built.Stdout, "persisted_entries=1")
+	require.Contains(t, built.Stdout, "completed; all reported entries persisted")
 	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-fixture"})
 	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-other"})
 	require.Equal(t, float64(0), invoke("manage_knowledge_base", map[string]any{"op": "list"})["total"])

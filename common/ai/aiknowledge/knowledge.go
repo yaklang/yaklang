@@ -22,6 +22,7 @@ type config struct {
 	ctx       context.Context
 	embedding aispec.EmbeddingCaller
 	ai        aicommon.AICallbackType
+	progress  func(string)
 	manage    manageRequest
 	query     queryRequest
 }
@@ -34,6 +35,10 @@ func WithEmbeddingClient(client aispec.EmbeddingCaller) Option {
 	return func(c *config) { c.embedding = client }
 }
 func WithAIService(ai aicommon.AICallbackType) Option { return func(c *config) { c.ai = ai } }
+
+// WithProgress receives stage changes and a heartbeat every five seconds during
+// a build, including counts of successfully persisted entries.
+func WithProgress(handler func(string)) Option { return func(c *config) { c.progress = handler } }
 
 func configure(opts []Option) *config {
 	c := &config{ctx: context.Background()}

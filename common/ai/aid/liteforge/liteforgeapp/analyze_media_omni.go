@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai"
@@ -171,12 +172,14 @@ func newOmniMediaSession(cfg *AnalysisConfig, options []any) (*omniMediaSession,
 	if err := png.Encode(&probe, image.NewRGBA(image.Rect(0, 0, 32, 32))); err != nil {
 		return nil, err
 	}
+	finishProbe := cfg.trackProgress(probeCtx, "Omni availability probe "+s.info.Provider+"/"+s.info.Model, nil)
 	response, err := s.chat("Check image input support. Reply with OMNI_READY.", aispec.WithContext(probeCtx), aispec.WithTimeout(15), aispec.WithImageRaw(probe.Bytes()), aispec.WithMaxTokens(32), aispec.WithEnableThinking(false))
+	if err == nil && !strings.Contains(response, "OMNI_READY") {
+		err = fmt.Errorf("Omni availability probe returned no confirmation")
+	}
+	finishProbe(err)
 	if err != nil {
 		return nil, fmt.Errorf("Omni availability probe failed for %s/%s: %w", s.info.Provider, s.info.Model, err)
-	}
-	if !strings.Contains(response, "OMNI_READY") {
-		return nil, fmt.Errorf("Omni availability probe returned no confirmation for %s/%s", s.info.Provider, s.info.Model)
 	}
 	return s, nil
 }
@@ -257,14 +260,39 @@ func tryAnalyzeOmniMedia(path string, mime *mimetype.MIME, cfg *AnalysisConfig, 
 
 const omniKnowledgePrompt = `Extract knowledge from this media faithfully for a searchable knowledge base. Preserve visible text, names, numbers, code, diagrams, causal relations and procedures. For video integrate speech, sound and visuals in temporal order. Describe uncertainty explicitly. Return detailed Markdown suitable for retrieval; do not invent missing information.`
 
-func (s *omniMediaSession) call(prompt string, media aispec.AIConfigOption) (string, error) {
+type omniResponseCounter struct{ bytes atomic.Int64 }
+
+func (c *omniResponseCounter) Write(p []byte) (int, error) {
+	c.bytes.Add(int64(len(p)))
+	return len(p), nil
+}
+
+func (s *omniMediaSession) call(label, prompt string, media aispec.AIConfigOption) (text string, err error) {
 	ctx, cancel := context.WithTimeout(s.config.Ctx, s.video.Timeout)
 	defer cancel()
-	text, err := s.chat(prompt+"\n"+s.config.ExtraPrompt, aispec.WithContext(ctx), aispec.WithTimeout(s.video.Timeout.Seconds()), media, aispec.WithEnableThinking(false))
-	if err == nil && strings.TrimSpace(text) == "" {
-		err = fmt.Errorf("Omni returned empty media knowledge")
+	for attempt := 1; attempt <= 2; attempt++ {
+		counter := new(omniResponseCounter)
+		finish := s.config.trackProgress(ctx, fmt.Sprintf("Omni %s model=%s attempt=%d/2 timeout=%s", label, s.info.Model, attempt, s.video.Timeout), func() string { return fmt.Sprintf("response_bytes=%d", counter.bytes.Load()) })
+		text, err = s.chat(prompt+"\n"+s.config.ExtraPrompt, aispec.WithContext(ctx), aispec.WithTimeout(s.video.Timeout.Seconds()), media, aispec.WithEnableThinking(false), aispec.WithMaxTokens(4096),
+			aispec.WithStreamHandler(func(r io.Reader) { io.Copy(counter, r) }))
+		if err == nil && strings.TrimSpace(text) == "" {
+			err = fmt.Errorf("Omni returned empty media knowledge")
+		}
+		finish(err)
+		if err == nil || ctx.Err() != nil || !isOmniTransientError(err) || attempt == 2 {
+			return text, err
+		}
+		s.config.AnalyzeLog("Omni %s transient transport failure; retrying once within the same %s budget: %v", label, s.video.Timeout, err)
 	}
 	return text, err
+}
+
+func isOmniTransientError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "unexpected eof") || strings.Contains(message, "connection reset") || strings.Contains(message, "i/o timeout")
 }
 
 func (s *omniMediaSession) emit(r *OmniMediaAnalysisResult, out chan<- AnalysisResult) {
@@ -278,13 +306,13 @@ func (s *omniMediaSession) analyzeImage(source string, page int, raw []byte, out
 	r := &OmniMediaAnalysisResult{OmniModelInfo: s.info, Source: source, Page: page}
 	compressed, err := boundedOmniImage(raw, s.video.MaxBase64Bytes)
 	if err == nil && !s.failed {
-		r.Content, err = s.call(omniKnowledgePrompt, aispec.WithImageRaw(compressed))
+		r.Content, err = s.call(fmt.Sprintf("image source=%q page=%d bytes=%d", source, page, len(compressed)), omniKnowledgePrompt, aispec.WithImageRaw(compressed))
 	} else if s.failed {
 		err = fmt.Errorf("Omni unavailable after a previous media request")
 	}
 	if err != nil {
 		if s.config.Ctx.Err() != nil || s.config.OmniMediaMode == "required" {
-			s.config.reportError(err)
+			s.config.reportError(fmt.Errorf("Omni image source=%q page=%d failed: %w", source, page, err))
 			return
 		}
 		s.failed = true
@@ -305,8 +333,10 @@ func (s *omniMediaSession) analyzeVideo(path string) (<-chan AnalysisResult, err
 		return nil, err
 	}
 	ctx, cancel := context.WithCancel(s.config.Ctx)
+	finish := s.config.trackProgress(ctx, fmt.Sprintf("video extraction (ffmpeg + Omni) source=%q segment_seconds=%g", path, s.video.SegmentSeconds), nil)
 	clips, err := s.sliceVideo(ctx, path, tempDir, s.video.SegmentSeconds)
 	if err != nil {
+		finish(err)
 		cancel()
 		os.RemoveAll(tempDir)
 		return nil, err
@@ -314,6 +344,7 @@ func (s *omniMediaSession) analyzeVideo(path string) (<-chan AnalysisResult, err
 	out := make(chan AnalysisResult, 1)
 	go func() {
 		defer close(out)
+		defer func() { finish(s.config.Ctx.Err()) }()
 		defer os.RemoveAll(tempDir)
 		defer cancel()
 		count := 0
@@ -326,6 +357,7 @@ func (s *omniMediaSession) analyzeVideo(path string) (<-chan AnalysisResult, err
 				continue
 			}
 			count++
+			s.config.AnalyzeLog("video segment %d ready range=%s~%s bytes=%d", count, clip.StartTime, clip.EndTime, clip.SizeBytes)
 			if s.video.MaxSegments > 0 && count > s.video.MaxSegments {
 				cancel()
 				continue
@@ -355,6 +387,7 @@ func (s *omniMediaSession) analyzeClip(source string, clip *ffmpegutils.VideoSli
 		if err == nil {
 			defer os.RemoveAll(dir)
 			seconds := (clip.EndTime - clip.StartTime).Seconds() / 2
+			s.config.AnalyzeLog("video segment range=%s~%s exceeds encoded payload limit=%d; subdividing to %gs", offset+clip.StartTime, offset+clip.EndTime, s.video.MaxBase64Bytes, seconds)
 			subclips, splitErr := s.sliceVideo(s.config.Ctx, clip.FilePath, dir, seconds)
 			if splitErr == nil {
 				for sub := range subclips {
@@ -373,20 +406,24 @@ func (s *omniMediaSession) analyzeClip(source string, clip *ffmpegutils.VideoSli
 	raw, err := readOmniMediaFile(clip.FilePath, rawLimit)
 	if err == nil && !s.failed {
 		dataURI := "data:;base64," + base64.StdEncoding.EncodeToString(raw)
-		r.Content, err = s.call(omniKnowledgePrompt, aispec.WithVideoUrl(dataURI))
+		r.Content, err = s.call(fmt.Sprintf("video range=%s~%s payload_bytes=%d", r.StartTime, r.EndTime, len(dataURI)), omniKnowledgePrompt, aispec.WithVideoUrl(dataURI))
 	} else if s.failed {
 		err = fmt.Errorf("Omni unavailable after a previous media request")
 	}
 	if err != nil {
 		if s.config.Ctx.Err() != nil || s.config.OmniMediaMode == "required" {
-			s.config.reportError(err)
+			s.config.reportError(fmt.Errorf("Omni video range=%s~%s failed: %w", r.StartTime, r.EndTime, err))
 			return
 		}
 		s.failed = true
 		s.config.AnalyzeLog("Omni video extraction failed; using original extraction for clip %s~%s: %v", r.StartTime, r.EndTime, err)
-		legacy, legacyErr := AnalyzeVideo(clip.FilePath, s.options...)
+		omniErr := err
+		legacyOptions := append(append([]any(nil), s.options...), WithAnalyzeErrorHandler(func(cause error) {
+			s.config.reportError(fmt.Errorf("video range=%s~%s: Omni failed: %v; original extraction failed: %w", r.StartTime, r.EndTime, omniErr, cause))
+		}))
+		legacy, legacyErr := AnalyzeVideo(clip.FilePath, legacyOptions...)
 		if legacyErr != nil {
-			s.config.reportError(legacyErr)
+			s.config.reportError(fmt.Errorf("video range=%s~%s: Omni failed: %v; original extraction failed: %w", r.StartTime, r.EndTime, err, legacyErr))
 			return
 		}
 		count := 0
@@ -397,7 +434,7 @@ func (s *omniMediaSession) analyzeClip(source string, clip *ffmpegutils.VideoSli
 			s.emit(&copy, out)
 		}
 		if count == 0 && s.config.Ctx.Err() == nil {
-			s.config.reportError(fmt.Errorf("original video extraction produced no knowledge for %s~%s", r.StartTime, r.EndTime))
+			s.config.reportError(fmt.Errorf("original video extraction produced no knowledge for %s~%s after Omni failed: %w; see original extraction logs for ffmpeg/audio errors", r.StartTime, r.EndTime, err))
 		}
 		return
 	}
