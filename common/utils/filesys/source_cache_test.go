@@ -229,3 +229,33 @@ func TestSourceMaterializerPrefetchHonorsContext(t *testing.T) {
 	require.ErrorIs(t, err, context.Canceled)
 	require.Less(t, base.totalReads(), len(list))
 }
+
+// TestSourceMaterializerPutReplacesCachedContent is the JSP case: the raw page
+// is read first, which caches it, and the generated Java is then Put under the
+// same path. Later reads must return the replacement, not the raw page.
+func TestSourceMaterializerPutReplacesCachedContent(t *testing.T) {
+	base := seedSourceFS(t, "webapp/index.jsp")
+	m := NewSourceMaterializer()
+
+	first, err := m.ReadFile(base, "webapp/index.jsp")
+	require.NoError(t, err)
+	require.Equal(t, "source-of:webapp/index.jsp", string(first))
+
+	generated := "public class Index { void _JavaTemplateService() {} }"
+	m.Put("webapp/index.jsp", []byte(generated))
+
+	got, err := m.ReadFile(base, "webapp/index.jsp")
+	require.NoError(t, err)
+	require.Equal(t, generated, string(got))
+
+	// The replacement must also be what the overlay exposes, and the counters
+	// must not double-count the replaced entry.
+	overlay, err := m.VirtualFS().ReadFile("webapp/index.jsp")
+	require.NoError(t, err)
+	require.Equal(t, generated, string(overlay))
+	stats := m.Stats()
+	require.EqualValues(t, 1, stats.Paths)
+	require.EqualValues(t, len(generated), stats.Loaded)
+	// The replacement is served from memory, so the base is not read again.
+	require.Equal(t, 1, base.readCount("webapp/index.jsp"))
+}
