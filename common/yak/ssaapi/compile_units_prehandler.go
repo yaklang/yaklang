@@ -3,7 +3,6 @@ package ssaapi
 import (
 	"errors"
 	"fmt"
-	"hash/fnv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +29,11 @@ type prehandleBatchEnv struct {
 	astParseErrLogged     int
 	astParseErrSuppressed bool
 	maxAstParseErrLogs    int
+	// unitAssign sticks one library to one worker. workerLoad counts files
+	// so the next library lands on the least busy worker instead of a hash
+	// bucket. Worker 0 stays reserved for units that share the application.
+	unitAssign map[string]int
+	workerLoad []int
 }
 
 // unitWorkerCounts is the only serial-versus-parallel decision for one batch.
@@ -125,13 +129,27 @@ func (env *prehandleBatchEnv) unitWorker(key string, workers int) int {
 	if workers == 2 {
 		return 1
 	}
-	h := fnv.New32a()
 	ownerKey := owner.Name
 	if ownerKey == "" {
 		ownerKey = key
 	}
-	_, _ = h.Write([]byte(ownerKey))
-	return int(h.Sum32()%uint32(workers-1)) + 1
+	if env.unitAssign == nil {
+		env.unitAssign = make(map[string]int)
+		env.workerLoad = make([]int, workers)
+	}
+	if worker, ok := env.unitAssign[ownerKey]; ok {
+		env.workerLoad[worker]++
+		return worker
+	}
+	best := 1
+	for i := 2; i < workers; i++ {
+		if env.workerLoad[i] < env.workerLoad[best] {
+			best = i
+		}
+	}
+	env.unitAssign[ownerKey] = best
+	env.workerLoad[best]++
+	return best
 }
 
 func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent) {

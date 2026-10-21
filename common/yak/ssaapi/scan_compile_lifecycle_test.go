@@ -72,6 +72,7 @@ func TestStructScanLanguageSelection(t *testing.T) {
 func TestStructScanReleasesPersistedBatchResults(t *testing.T) {
 	t.Setenv(compileUnitBatchMinFilesEnv, "1")
 	t.Setenv(compileUnitBatchMinBytesEnv, "1")
+	t.Setenv(compileUnitBatchMinUnitsEnv, "1")
 	t.Setenv("YAK_SSA_COMPILE_UNIT_LOG", "1")
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("a/A.java", `package a; class A { void f(String s) throws Exception { Runtime.getRuntime().exec(s); } }`)
