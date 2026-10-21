@@ -231,6 +231,12 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 		doc.Nodes = nil
 		return doc, []Diagnostic{{Path: "document", Message: "require stable id, matching catalogVersion, fallback text and at most 64 nodes"}}
 	}
+	for _, name := range doc.RequiredComponents {
+		if c.Definition(name) == nil {
+			doc.Nodes = nil
+			return doc, []Diagnostic{{Path: "requiredComponents", Message: "required component is unavailable; use fallback"}}
+		}
+	}
 	var nodes []ComponentNode
 	ids, components := map[string]bool{}, map[string]bool{}
 	for _, node := range doc.Nodes {
@@ -268,6 +274,9 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 				node.Action = nil
 				diagnose("action", "invalid action disabled")
 			}
+		}
+		if !NormalizeVisualization(&node, diagnose) {
+			continue
 		}
 		components[node.Component] = true
 		nodes = append(nodes, node)
@@ -315,6 +324,11 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 }
 
 func (doc ComponentDocument) SubmissionText(receipt Submission, catalog Catalog) (string, error) {
+	var err error
+	receipt, err = doc.NormalizeSubmission(receipt)
+	if err != nil {
+		return "", err
+	}
 	for _, node := range doc.Nodes {
 		if node.ID != receipt.NodeID {
 			continue
@@ -322,6 +336,13 @@ func (doc ComponentDocument) SubmissionText(receipt Submission, catalog Catalog)
 		entry := catalog.Definition(node.Component)
 		if entry == nil || node.Action == nil || node.Action.Name != "submit_to_chat" {
 			return "", fmt.Errorf("node has no authorized submit action")
+		}
+		actionSchema, exists := entry.Actions[node.Action.Name]
+		if !exists || ValidateSchema(actionSchema, node.Action.Args) != nil {
+			return "", fmt.Errorf("action is not allowed by the catalog")
+		}
+		if node.Component == "DataTable" {
+			return tableSubmissionText(node, receipt)
 		}
 		schema, ok := node.Props["schema"].(map[string]any)
 		if !ok || ValidateSchema(schema, receipt.Values) != nil {
