@@ -109,6 +109,35 @@ func TestScanProtocolBudgetStopsFurtherDecoding(t *testing.T) {
 	require.Contains(t, fresh, "ssh")
 }
 
+func TestProbeBudgetsGrowMonotonically(t *testing.T) {
+	previousPort, previousGeneric, previousCap := 0, 0, 0
+	for probesMax := 1; probesMax <= 30; probesMax++ {
+		config := NewConfig(WithActiveMode(true), WithProbesMax(probesMax))
+		portLimit, genericLimit, limited := selectionLimits(config)
+		require.Truef(t, limited, "ProbesMax=%d", probesMax)
+		require.GreaterOrEqualf(t, portLimit, previousPort, "port budget shrank at ProbesMax=%d", probesMax)
+		require.GreaterOrEqualf(t, genericLimit, previousGeneric, "generic budget shrank at ProbesMax=%d", probesMax)
+		total := selectionCap(config)
+		require.GreaterOrEqualf(t, total, previousCap, "total budget shrank at ProbesMax=%d", probesMax)
+		previousPort, previousGeneric, previousCap = portLimit, genericLimit, total
+	}
+}
+
+func TestRaisedProbesMaxKeepsDefaultSweep(t *testing.T) {
+	base := NewConfig(WithActiveMode(true))
+	_, baseBlocks, _ := GetRuleBlockByConfig(59999, base)
+	baseNames := probeNames(baseBlocks)
+	for _, probesMax := range []int{11, 12, 13, 14} {
+		config := NewConfig(WithActiveMode(true), WithProbesMax(probesMax))
+		_, blocks, _ := GetRuleBlockByConfig(59999, config)
+		require.GreaterOrEqualf(t, len(blocks), len(baseBlocks),
+			"maxProbes(%d) shrank the generic sweep below the default", probesMax)
+		for _, name := range baseNames {
+			require.Containsf(t, probeNames(blocks), name, "maxProbes(%d) dropped %s", probesMax, name)
+		}
+	}
+}
+
 func probeNames(blocks []*RuleBlock) []string {
 	names := make([]string, 0, len(blocks))
 	for _, block := range blocks {
