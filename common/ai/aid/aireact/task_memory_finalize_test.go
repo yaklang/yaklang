@@ -106,7 +106,7 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 				var loopCalls, compressionCalls atomic.Int32
 				model := func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					name, params := "finish", map[string]any{}
-					if req.GetCallerLabel() == aicommon.CallerLabelTimelineCompress {
+					if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
 						compressionCalls.Add(1)
 						return nil, fmt.Errorf("task finalization must not request timeline compression")
 					} else if strings.HasPrefix(req.GetCallerLabel(), "react-loop:") {

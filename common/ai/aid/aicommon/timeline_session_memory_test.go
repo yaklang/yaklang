@@ -35,7 +35,7 @@ func TestTimelineSessionMemoryRestoreForkAndIsolation(t *testing.T) {
 	require.NoError(t, err)
 	correction := compressionMemoryFixture()
 	correction["content"] = "用户更正先前要求；仅在当前项目使用英文报告。"
-	completion := &timelineCompressionCompletion{done: make(chan struct{}), output: &timelineCompressionOutput{MemoryEntities: []any{correction}}}
+	completion := &timelineCompressionCompletion{done: make(chan struct{}), output: &TimelineCompressionSelection{MemoryEntities: []any{correction}}}
 	fork.Branch.sessionMemory.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
 	close(completion.done)
 	require.Len(t, tl.GetSessionMemoryCandidates(), 2)
@@ -61,7 +61,7 @@ func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	waits := 0
 	require.ErrorIs(t, h.waitWithProgress(ctx, func() { waits++ }), context.DeadlineExceeded)
 	require.Equal(t, 1, waits)
-	completion.output = &timelineCompressionOutput{MemoryEntities: []any{compressionMemoryFixture()}}
+	completion.output = &TimelineCompressionSelection{MemoryEntities: []any{compressionMemoryFixture()}}
 	close(completion.done)
 	require.NoError(t, h.waitWithProgress(context.Background(), func() { waits++ }))
 	require.Equal(t, 1, waits, "completed memory must not flash a waiting status")

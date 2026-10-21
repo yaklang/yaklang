@@ -19,7 +19,7 @@ func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 	compressionCalls := 0
 	reactIns, err := aireact.NewTestReAct(
 		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-			if req.GetCallerLabel() == aicommon.CallerLabelTimelineCompress {
+			if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
 				compressionCalls++
 			} else {
 				mainPromptTokens = append(mainPromptTokens, aicommon.MeasureTokens(req.GetPrompt()))

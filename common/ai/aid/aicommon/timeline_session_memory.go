@@ -8,9 +8,30 @@ import (
 	"sync"
 )
 
+// timelineCompressionCompletion is one compression commit's memory receipt.
+// done is closed when the parsed memory entities are available. notified is
+// closed after memory observers have been invoked.
+type timelineCompressionCompletion struct {
+	done     chan struct{}
+	notified chan struct{}
+	retryKey string
+	output   *TimelineCompressionSelection
+	err      error
+}
+
+func newTimelineCompressionCompletion(selection *TimelineCompressionSelection) *timelineCompressionCompletion {
+	completion := &timelineCompressionCompletion{
+		done:     make(chan struct{}),
+		notified: make(chan struct{}),
+		output:   selection,
+	}
+	close(completion.done)
+	return completion
+}
+
 // Session candidates are extraction history, not verified or persisted memory
 // entities. Forks share this append-only ledger without sharing ordinary history.
-// Only successful, committed compression responses enter it. Pending streams are
+// Only successful, committed compression responses enter it. Pending receipts are
 // runtime-only; snapshots persist completed candidates and tolerate older dumps.
 type timelineSessionMemory struct {
 	mu                sync.Mutex

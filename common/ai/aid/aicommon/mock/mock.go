@@ -344,9 +344,15 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 		renderMockInjectedMemoryBlock(input.Nonce, input.InjectedMemory),
 		input.TodoCheckpoint,
 	), input.Nonce)
+	if input.PromptMode == aicommon.LoopPromptModeCompressContext {
+		dynamic = wrapMockPromptSectionWithNonce("dynamic", joinMockPromptParts(
+			input.CompressionGuide, input.AutoContext, input.ReactiveData, input.InjectedMemory, input.TodoCheckpoint,
+		), input.Nonce)
+	}
 
 	return &aicommon.LoopPromptAssemblyResult{
 		Prompt:   joinMockPromptParts(highStatic, semiDynamic, timelineOpen, dynamic),
+		Mode:     input.PromptMode,
 		Sections: nil,
 	}, nil
 }

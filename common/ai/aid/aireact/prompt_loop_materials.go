@@ -38,6 +38,7 @@ const (
 )
 
 var loopDynamicSectionTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/loop/dynamic_section.txt")
+var loopCompressionDynamicSectionTemplate = promptloader.MustLoad("ai/aid/aireact/prompts/loop/context_compression_dynamic_section.txt")
 
 func (r *ReAct) GetLoopPromptBaseMaterials(tools []*aitool.Tool, nonce string) (*reactloops.LoopPromptBaseMaterials, error) {
 	if r == nil || r.promptManager == nil {
@@ -175,6 +176,12 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	if input == nil {
 		return nil, fmt.Errorf("loop prompt assembly input is nil")
 	}
+	if input.PromptMode != aicommon.LoopPromptModeNormal && input.PromptMode != aicommon.LoopPromptModeCompressContext {
+		return nil, fmt.Errorf("unsupported loop prompt mode %d", input.PromptMode)
+	}
+	if input.PromptMode == aicommon.LoopPromptModeCompressContext && strings.TrimSpace(input.CompressionGuide) == "" {
+		return nil, fmt.Errorf("context-compression prompt requires its snapshot guide")
+	}
 	if pm.react == nil || pm.react.config == nil || pm.react.config.GetTimeline() == nil {
 		return nil, fmt.Errorf("main-loop timeline is not initialized")
 	}
@@ -252,6 +259,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 	)
 	return &reactloops.LoopPromptAssemblyResult{
 		Prompt:   prompt,
+		Mode:     input.PromptMode,
 		Sections: sections,
 	}, nil
 }
@@ -493,6 +501,8 @@ func (pm *PromptManager) buildLoopPromptSectionData(base *reactloops.LoopPromptB
 	}
 	if input != nil {
 		data["Nonce"] = input.Nonce
+		data["CompressContext"] = input.PromptMode == aicommon.LoopPromptModeCompressContext
+		data["CompressionGuide"] = input.CompressionGuide
 		data["FunctionCallMode"] = input.FunctionCallMode
 		data["UserQuery"] = input.UserQuery
 		data["TaskInstruction"] = input.TaskInstruction
@@ -924,6 +934,18 @@ func (pm *PromptManager) buildDynamicObservation(
 			input.TodoCheckpoint,
 		),
 	}
+	if input.PromptMode == aicommon.LoopPromptModeCompressContext {
+		state := []*aicommon.PromptSectionObservation{
+			aicommon.NewPromptSectionObservation("section.dynamic.context_compression", "Context Compression",
+				aicommon.PromptSectionRoleDynamic, false, input.CompressionGuide),
+		}
+		for _, child := range children {
+			if child.Key != "section.dynamic.extra_capabilities" {
+				state = append(state, child)
+			}
+		}
+		children = state
+	}
 	section.Children = filterIncludedPromptSections(children)
 	if strings.TrimSpace(rendered) != "" {
 		section.Content = ""
@@ -1128,6 +1150,9 @@ func (pm *PromptManager) renderLoopFrozenBlockSection(materials *reactloops.Prom
 }
 
 func (pm *PromptManager) renderLoopDynamicSection(data map[string]any) (string, error) {
+	if data["CompressContext"] == true {
+		return pm.executeTemplate("loop-context-compression-dynamic", loopCompressionDynamicSectionTemplate, data)
+	}
 	return pm.executeTemplate("loop-dynamic", loopDynamicSectionTemplate, data)
 }
 

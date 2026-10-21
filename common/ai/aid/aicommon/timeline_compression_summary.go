@@ -22,19 +22,3 @@ func compressionIndexLocator(text string) string {
 	}
 	return line
 }
-
-func publishCompressionModelOutput(snapshot *timelineCompressionSnapshot, output *timelineCompressionOutput) {
-	completion := &timelineCompressionCompletion{
-		done:     make(chan struct{}),
-		notified: make(chan struct{}),
-		output:   output,
-	}
-	close(completion.done)
-	snapshot.MemoryCompletion = completion
-	snapshot.Output = &timelineCompressionOutput{
-		Summary:                output.Summary,
-		RetainedRange:          output.RetainedRange,
-		RetainedIDs:            append([]int64(nil), output.RetainedIDs...),
-		RetiredPromotedEntries: append([]int64(nil), output.RetiredPromotedEntries...),
-	}
-}

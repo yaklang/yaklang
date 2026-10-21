@@ -112,6 +112,9 @@ type ReActLoop struct {
 	// execution state
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
+	// promptMode is the prompt mode of the current iteration. It is set when the
+	// prompt is built and stays until the next prompt replaces it.
+	promptMode aicommon.LoopPromptMode
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.
@@ -148,9 +151,6 @@ type ReActLoop struct {
 
 	// use speed priority AI callback for main AI calls in the loop
 	useSpeedPriorityAI bool
-	// compressionTurn is the prompt context captured when the loop triggers
-	// compress_timeline. It is empty for ordinary actions.
-	compressionTurn timelineCompressionTurnContext
 
 	// 记录历史 satisfaction 状态
 	historySatisfactionReasons []*SatisfactionRecord
@@ -709,7 +709,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 		loopAction_SaveEvidence,
-		loopAction_CompressTimeline,
+		loopAction_CompressContext,
 		loopAction_ManageAsyncExecutionRuntime,
 	} {
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))
