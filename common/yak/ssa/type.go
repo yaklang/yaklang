@@ -1239,6 +1239,54 @@ func TypeStringLimited(t Type) string {
 	return typeStringLimited(t, &budget, 0)
 }
 
+// StructDefaultExpansionBudget bounds how many nodes a nested struct field's
+// default-value expansion may cover. Legal value-type graphs can make the raw
+// field tree exponential (each nesting level may multiply the node count, so
+// N levels of two same-typed fields expand to 2^N nodes), and per-field
+// construction has no deduplication, so such types never finished compiling.
+// Callers degrade oversized fields to a typed Make placeholder.
+const StructDefaultExpansionBudget = 1024
+
+// StructFieldExpansionExceedsBudget reports whether expanding ityp as a raw
+// field tree (no dedup of shared field types — the exact expansion per-field
+// default construction performs) would exceed budget nodes. Counting stops
+// as soon as the budget is exhausted, so its cost is bounded by the budget
+// itself. Only struct and alias types recurse in that expansion, and only
+// they are counted here. The budget is consumed but the caller decides what
+// to do with the answer, so each field gets a fresh budget via the value.
+func StructFieldExpansionExceedsBudget(ityp Type, budget *int, depth int) bool {
+	if depth > 64 {
+		return true
+	}
+	if utils.IsNil(ityp) {
+		return false
+	}
+	switch ityp.GetTypeKind() {
+	case AliasTypeKind:
+		if alias, ok := ToAliasType(ityp); ok {
+			return StructFieldExpansionExceedsBudget(alias.GetType(), budget, depth+1)
+		}
+		return false
+	case StructTypeKind:
+		if *budget <= 0 {
+			return true
+		}
+		*budget--
+		typ, _ := ToObjectType(ityp)
+		if typ == nil {
+			return false
+		}
+		for _, fieldTyp := range typ.FieldTypes {
+			if StructFieldExpansionExceedsBudget(fieldTyp, budget, depth+1) {
+				return true
+			}
+		}
+		return false
+	default:
+		return false
+	}
+}
+
 func typeStringLimited(t Type, budget *int, depth int) string {
 	if utils.IsNil(t) {
 		return "<nil>"

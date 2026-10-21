@@ -249,7 +249,13 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 			obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
 				return typ.Keys[i]
 			}, func(i int) ssa.Value {
-				return b.GetDefaultValue(typ.FieldTypes[i])
+				fieldTyp := typ.FieldTypes[i]
+				if !utils.IsNil(fieldTyp) && fieldTyp.GetTypeKind() == ssa.StructTypeKind {
+					if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(fieldTyp, &budget, 0) {
+						return b.EmitMakeBuildWithType(fieldTyp, nil, nil)
+					}
+				}
+				return b.GetDefaultValue(fieldTyp)
 			})
 			if !utils.IsNil(obj) {
 				obj.SetType(ityp)
