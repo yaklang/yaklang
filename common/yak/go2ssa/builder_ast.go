@@ -890,8 +890,21 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 
 	store := b.StoreFunctionBuilder()
 	capturedFun := ssa.DetachAST(fun)
+	prepareSignature := b.registerGoDeclarationSignature(newFunc, func() {
+		restore := b.SwitchFunctionBuilder(store)
+		defer restore()
+		b.FunctionBuilder = b.PushFunction(newFunc)
+		b.SupportClosure = false
+		defer func() { b.FunctionBuilder = b.PopFunction() }()
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
+			params, result = b.buildSignature(para)
+		}
+		handleFunctionType(newFunc)
+		newFunc.Type.This = newFunc
+	})
 	log.Debugf("add function funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
+		prepareSignature()
 		log.Debugf("build function funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
@@ -904,15 +917,9 @@ func (b *astbuilder) buildFunctionDeclFront(fun *gol.FunctionDeclContext) {
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
 
-		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
-			params, result = b.buildSignature(para)
-		}
-
 		if typeps := capturedFun.TypeParameters(); typeps != nil {
 			b.tpHandler[funcName] = b.buildTypeParameters(typeps.(*gol.TypeParametersContext))
 		}
-
-		handleFunctionType(b.Function)
 
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
@@ -1122,25 +1129,33 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		b.AssignVariable(variable, newFunc)
 	}
 
-	{
+	store := b.StoreFunctionBuilder()
+	capturedFun := ssa.DetachAST(fun)
+	prepareSignature := b.registerGoDeclarationSignature(newFunc, func() {
+		restore := b.SwitchFunctionBuilder(store)
+		defer restore()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
-
-		if recove := fun.Receiver(); recove != nil {
-			ssatyp := b.buildReceiver(recove.(*gol.ReceiverContext))
-			for _, t := range ssatyp {
-				if it, ok := ssa.ToObjectType(t); ok {
-					it.AddMethod(methodName, newFunc)
+		defer func() { b.FunctionBuilder = b.PopFunction() }()
+		var receiverType ssa.Type
+		if receiver := capturedFun.Receiver(); receiver != nil {
+			for _, typ := range b.buildReceiver(receiver.(*gol.ReceiverContext)) {
+				receiverType = typ
+				if object, ok := ssa.ToObjectType(typ); ok {
+					object.AddMethod(methodName, newFunc)
 				}
 			}
 		}
-		b.FunctionBuilder = b.PopFunction()
-	}
-
-	store := b.StoreFunctionBuilder()
-	capturedFun := ssa.DetachAST(fun)
+		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
+			params, result = b.buildSignature(para)
+		}
+		handleFunctionType(newFunc)
+		newFunc.Type.This = newFunc
+		newFunc.SetMethod(true, receiverType)
+	})
 	log.Debugf("add method funcName = %s", funcName)
 	newFunc.AddLazyBuilder(func() {
+		prepareSignature()
 		log.Debugf("build method funcName = %s", funcName)
 		switchHandler := b.SwitchFunctionBuilder(store)
 		defer func() {
@@ -1152,12 +1167,6 @@ func (b *astbuilder) buildMethodDeclFront(fun *gol.MethodDeclContext) {
 		}()
 		b.FunctionBuilder = b.PushFunction(newFunc)
 		b.SupportClosure = false
-
-		if para, ok := capturedFun.Signature().(*gol.SignatureContext); ok {
-			params, result = b.buildSignature(para)
-		}
-
-		handleFunctionType(b.Function)
 
 		if hitDefinedFunction {
 			b.MarkedFunctions = append(b.MarkedFunctions, newFunc)
@@ -1347,11 +1356,14 @@ func (b *astbuilder) buildResult(rety *gol.ResultContext) ssa.Type {
 	}
 
 	if paras := rety.Parameters(); paras != nil {
-		key, field := b.buildResultParameters(paras.(*gol.ParametersContext))
+		_, field := b.buildResultParameters(paras.(*gol.ParametersContext))
 		obj := ssa.NewStructType()
 		obj.SetTypeKind(ssa.TupleTypeKind)
 		for i := range field {
-			obj.AddField(key[i], field[i])
+			// Result declarations can each have a zero-valued default, but the
+			// tuple slots are positional. Reusing every default as key 0 let a
+			// later error result overwrite the factory's receiver result type.
+			obj.AddField(b.EmitConstInst(i), field[i])
 		}
 		return obj
 	}
