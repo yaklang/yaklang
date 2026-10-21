@@ -238,7 +238,7 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	// point; every recursive call re-enters here, so nested fields are
 	// guarded as well, and deep members are created lazily on member access.
 	if !utils.IsNil(ityp) && ityp.GetTypeKind() == ssa.StructTypeKind {
-		if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(ityp, &budget, 0) {
+		if ssa.StructDefaultExpansionExceedsBudget(ityp) {
 			return b.EmitMakeBuildWithType(ityp, nil, nil)
 		}
 	}

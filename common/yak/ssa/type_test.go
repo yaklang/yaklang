@@ -87,3 +87,60 @@ func TestFunctionTypeString_CachesRawStringResult(t *testing.T) {
 	raw := ft.RawString()
 	require.NotEmpty(t, raw)
 }
+
+// diamondStructType returns a struct whose raw field tree holds 2^(levels+1)-1
+// nodes: each level embeds the previous one twice by value.
+func diamondStructType(levels int) *ssa.ObjectType {
+	typ := ssa.NewStructType()
+	for i := 0; i < levels; i++ {
+		next := ssa.NewStructType()
+		next.AddField(ssa.NewConst("l"), typ)
+		next.AddField(ssa.NewConst("r"), typ)
+		typ = next
+	}
+	return typ
+}
+
+// Test_StructDefaultExpansionMemo pins the memoization behind
+// StructDefaultExpansionExceedsBudget: a cached "fits" answer must reset when
+// the type grows through AddField, and cyclic field graphs must terminate as
+// "exceeds" instead of hanging.
+func Test_StructDefaultExpansionMemo(t *testing.T) {
+	t.Run("AddField growth invalidates the cached answer", func(t *testing.T) {
+		outer := ssa.NewStructType()
+		outer.AddField(ssa.NewConst("f"), diamondStructType(8)) // 511 nodes, fits
+		require.False(t, ssa.StructDefaultExpansionExceedsBudget(outer))
+
+		outer.AddField(ssa.NewConst("g"), diamondStructType(10)) // subtree alone > budget
+		require.True(t, ssa.StructDefaultExpansionExceedsBudget(outer))
+	})
+
+	t.Run("cyclic field graph terminates as exceeding", func(t *testing.T) {
+		a := ssa.NewStructType()
+		b := ssa.NewStructType()
+		a.AddField(ssa.NewConst("b"), b)
+		b.AddField(ssa.NewConst("a"), a)
+		require.True(t, ssa.StructDefaultExpansionExceedsBudget(a))
+	})
+
+	t.Run("plain and alias-wrapped structs stay within budget", func(t *testing.T) {
+		require.False(t, ssa.StructDefaultExpansionExceedsBudget(diamondStructType(8)))
+		alias := ssa.NewAliasType("T", "", diamondStructType(10))
+		require.True(t, ssa.StructDefaultExpansionExceedsBudget(alias))
+	})
+}
+
+// Test_TypeStringLimited_BoundedOutput pins TypeStringLimited: small types
+// render fully, exponential field graphs abbreviate with "..." and stay far
+// below the raw expansion size.
+func Test_TypeStringLimited_BoundedOutput(t *testing.T) {
+	small := ssa.NewStructType()
+	small.AddField(ssa.NewConst("a"), ssa.CreateStringType())
+	s := ssa.TypeStringLimited(small)
+	require.Contains(t, s, "struct {")
+	require.NotContains(t, s, "...")
+
+	big := ssa.TypeStringLimited(diamondStructType(16)) // raw tree > 100k nodes
+	require.Contains(t, big, "...")
+	require.Less(t, len(big), 2*4096+64)
+}

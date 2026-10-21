@@ -952,7 +952,7 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	// guards each nested field, and deep members are created lazily on member
 	// access.
 	if ityp.GetTypeKind() == ssa.StructTypeKind {
-		if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(ityp, &budget, 0) {
+		if ssa.StructDefaultExpansionExceedsBudget(ityp) {
 			return b.EmitMakeBuildWithType(ityp, nil, nil)
 		}
 	}
