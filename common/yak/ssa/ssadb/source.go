@@ -125,7 +125,6 @@ func GetEditorByHash(hash string) (*memedit.MemEditor, error) {
 	db := GetDB()
 	result, ok := irSourceCache.Get(hash)
 	if ok {
-		log.Debugf("GetEditorByHash: found in cache, hash=%s", hash)
 		return result, nil
 	}
 
