@@ -943,6 +943,19 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	if utils.IsNil(ityp) {
 		return b.EmitUndefined("default")
 	}
+	// Default construction expands struct fields recursively, without
+	// deduplication of shared field types: a legal value-type graph can make
+	// the raw field tree exponential (N levels of two same-typed fields ->
+	// 2^N nodes), and such types used to never finish compiling. Types whose
+	// expansion exceeds the budget degrade to a typed Make placeholder at this
+	// entry point; since every recursive call re-enters here, the check also
+	// guards each nested field, and deep members are created lazily on member
+	// access.
+	if ityp.GetTypeKind() == ssa.StructTypeKind {
+		if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(ityp, &budget, 0) {
+			return b.EmitMakeBuildWithType(ityp, nil, nil)
+		}
+	}
 	switch ityp.GetTypeKind() {
 	case ssa.NumberTypeKind:
 		return b.EmitConstInst(0)
@@ -955,19 +968,13 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	case ssa.AliasTypeKind:
 		alias, _ := ssa.ToAliasType(ityp)
 		return b.GetDefaultValue(alias.GetType())
-	case ssa.StructTypeKind:
-		typ := goSelectorObjectType(ityp)
-		obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
-			return typ.Keys[i]
-		}, func(i int) ssa.Value {
-			fieldTyp := typ.FieldTypes[i]
-			if !utils.IsNil(fieldTyp) && fieldTyp.GetTypeKind() == ssa.StructTypeKind {
-				if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(fieldTyp, &budget, 0) {
-					return b.EmitMakeBuildWithType(fieldTyp, nil, nil)
-				}
-			}
-			return b.GetDefaultValue(fieldTyp)
-		})
+		case ssa.StructTypeKind:
+			typ := goSelectorObjectType(ityp)
+			obj := b.InterfaceAddFieldBuild(len(typ.Keys), func(i int) ssa.Value {
+				return typ.Keys[i]
+			}, func(i int) ssa.Value {
+				return b.GetDefaultValue(typ.FieldTypes[i])
+			})
 		obj.SetType(ityp)
 		return obj
 	case ssa.PointerKind:
