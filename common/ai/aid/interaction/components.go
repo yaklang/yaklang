@@ -21,8 +21,26 @@ type ComponentDefinition struct {
 }
 
 type Catalog struct {
-	Version    string                `json:"version"`
-	Components []ComponentDefinition `json:"components"`
+	Version            string                `json:"version"`
+	CompatibleVersions []string              `json:"compatibleVersions,omitempty"`
+	Components         []ComponentDefinition `json:"components"`
+}
+
+// SupportsVersion permits explicitly declared additive upgrades when replaying
+// older documents. Unknown required components still force a text fallback.
+func (c Catalog) SupportsVersion(version string) bool {
+	if version == "" {
+		return false
+	}
+	if version == c.Version {
+		return true
+	}
+	for _, supported := range c.CompatibleVersions {
+		if version == supported {
+			return true
+		}
+	}
+	return false
 }
 
 type ComponentAction struct {
@@ -227,7 +245,7 @@ func normalize(s map[string]any, value any, path string, diagnose func(string, s
 
 func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnostic) {
 	var diagnostics []Diagnostic
-	if doc.ID == "" || len(doc.ID) > 128 || doc.CatalogVersion != c.Version || strings.TrimSpace(doc.Fallback) == "" || len(doc.Nodes) > 64 {
+	if doc.ID == "" || len(doc.ID) > 128 || !c.SupportsVersion(doc.CatalogVersion) || strings.TrimSpace(doc.Fallback) == "" || len(doc.Nodes) > 64 {
 		doc.Nodes = nil
 		return doc, []Diagnostic{{Path: "document", Message: "require stable id, matching catalogVersion, fallback text and at most 64 nodes"}}
 	}
@@ -275,7 +293,7 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 				diagnose("action", "invalid action disabled")
 			}
 		}
-		if !NormalizeVisualization(&node, diagnose) {
+		if !NormalizeVisualization(&node, diagnose) || !NormalizeNavigation(&node, diagnose) {
 			continue
 		}
 		components[node.Component] = true
