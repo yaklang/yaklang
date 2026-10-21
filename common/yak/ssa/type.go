@@ -1224,19 +1224,20 @@ func (itype *ObjectType) rawString(format func(Type) string) string {
 	return ret
 }
 
-// typeStringLimitedBudget bounds TypeStringLimited output. Field-type graphs
-// shared diamond-style expand multiplicatively at every nesting level, so
-// building the full String() of such a type can grow exponentially; error
-// messages must not attempt it.
-const typeStringLimitedBudget = 4096
+// typeStringWidthLimit bounds how much text a single field-join may assemble:
+// every join truncates past it, and each nesting level's output is emitted by
+// its parent's join, so the final string is bounded by the depth cap times
+// this limit. Field-type graphs shared diamond-style expand multiplicatively
+// at every nesting level, so building the full String() of such a type can
+// grow exponentially; error messages must not attempt it.
+const typeStringWidthLimit = 4096
 
-// TypeStringLimited returns the same text as t.String() while the expansion
-// stays within typeStringLimitedBudget; once the budget or the depth cap is
-// exhausted the remaining part is abbreviated to "...". Only object and alias
-// types recurse structurally — every other kind is bounded by construction.
+// TypeStringLimited returns the same text as t.String() while every join
+// stays within typeStringWidthLimit; the part past the limit is abbreviated
+// to "...". Only object and alias types recurse structurally — every other
+// kind is bounded by construction.
 func TypeStringLimited(t Type) string {
-	budget := typeStringLimitedBudget
-	return typeStringLimited(t, &budget, 0)
+	return typeStringLimited(t, 0)
 }
 
 // StructDefaultExpansionBudget bounds how many nodes a struct type's
@@ -1299,11 +1300,11 @@ func structExpansionNodeCount(ityp Type, depth int) int {
 	}
 }
 
-func typeStringLimited(t Type, budget *int, depth int) string {
+func typeStringLimited(t Type, depth int) string {
 	if utils.IsNil(t) {
 		return "<nil>"
 	}
-	if *budget <= 0 || depth > 16 {
+	if depth > 16 {
 		return "..."
 	}
 	switch typ := t.(type) {
@@ -1311,26 +1312,22 @@ func typeStringLimited(t Type, budget *int, depth int) string {
 		if typ.Name != "" {
 			return typ.Name
 		}
-		return typeStringLimited(typ.GetType(), budget, depth+1)
+		return typeStringLimited(typ.GetType(), depth+1)
 	case *ObjectType:
 		if typ.Combination {
-			return typeStringLimitedJoin(typ.FieldTypes, ", ", budget, depth)
+			return typeStringLimitedJoin(typ.FieldTypes, ", ", depth)
 		}
 		if typ.Name != "" {
 			return typ.Name
 		}
 		switch typ.Kind {
 		case StructTypeKind:
-			s := typeStringLimitedJoin(typ.FieldTypes, ",", budget, depth)
-			// the join already charged len(s); account only for the
-			// "struct {}" wrapper
-			*budget -= 9
-			return "struct {" + s + "}"
+			return "struct {" + typeStringLimitedJoin(typ.FieldTypes, ",", depth) + "}"
 		case SliceTypeKind:
 			if typ.FieldType == nil {
 				return ""
 			}
-			elem := typeStringLimited(typ.FieldType, budget, depth+1)
+			elem := typeStringLimited(typ.FieldType, depth+1)
 			if typ.Len == 0 {
 				return "[]" + elem
 			}
@@ -1344,9 +1341,9 @@ func typeStringLimited(t Type, budget *int, depth int) string {
 			if utils.IsNil(fieldType) {
 				fieldType = CreateAnyType()
 			}
-			return "map[" + typeStringLimited(keyTyp, budget, depth+1) + "]" + typeStringLimited(fieldType, budget, depth+1)
+			return "map[" + typeStringLimited(keyTyp, depth+1) + "]" + typeStringLimited(fieldType, depth+1)
 		case TupleTypeKind:
-			return "[" + typeStringLimitedJoin(typ.FieldTypes, ",", budget, depth) + "]"
+			return "[" + typeStringLimitedJoin(typ.FieldTypes, ",", depth) + "]"
 		default:
 			return typ.String()
 		}
@@ -1355,21 +1352,27 @@ func typeStringLimited(t Type, budget *int, depth int) string {
 	}
 }
 
-func typeStringLimitedJoin(ts []Type, sep string, budget *int, depth int) string {
-	parts := make([]string, 0, len(ts))
+// typeStringLimitedJoin renders field types until the assembled text reaches
+// typeStringWidthLimit, then marks the rest with one "..." per join instead
+// of one per elided field, which thousand-field types would stretch back
+// into an unbounded dot string.
+func typeStringLimitedJoin(ts []Type, sep string, depth int) string {
+	capHint := len(ts)
+	if capHint > 64 {
+		capHint = 64
+	}
+	parts := make([]string, 0, capHint)
+	n := 0
 	for _, ft := range ts {
-		if *budget <= 0 {
-			// one visible marker per join beats one "..." per elided
-			// field, which thousand-field types would turn into a dot
-			// string as long as the expansion it guards against
+		part := typeStringLimited(ft, depth+1)
+		parts = append(parts, part)
+		n += len(part) + len(sep)
+		if n >= typeStringWidthLimit {
 			parts = append(parts, "...")
 			break
 		}
-		parts = append(parts, typeStringLimited(ft, budget, depth+1))
 	}
-	s := strings.Join(parts, sep)
-	*budget -= len(s)
-	return s
+	return strings.Join(parts, sep)
 }
 
 // for struct build

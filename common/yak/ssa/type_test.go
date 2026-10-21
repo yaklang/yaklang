@@ -132,15 +132,31 @@ func Test_StructDefaultExpansionBudget(t *testing.T) {
 
 // Test_TypeStringLimited_BoundedOutput pins TypeStringLimited: small types
 // render fully, exponential field graphs abbreviate with "..." and stay far
-// below the raw expansion size.
+// below the raw expansion size. Each nesting level assembles at most
+// typeStringWidthLimit characters, so the output is bounded by the depth cap
+// times the width limit.
 func Test_TypeStringLimited_BoundedOutput(t *testing.T) {
-	small := ssa.NewStructType()
-	small.AddField(ssa.NewConst("a"), ssa.CreateStringType())
-	s := ssa.TypeStringLimited(small)
-	require.Contains(t, s, "struct {")
-	require.NotContains(t, s, "...")
+	t.Run("small type renders fully", func(t *testing.T) {
+		small := ssa.NewStructType()
+		small.AddField(ssa.NewConst("a"), ssa.CreateStringType())
+		s := ssa.TypeStringLimited(small)
+		require.Contains(t, s, "struct {")
+		require.NotContains(t, s, "...")
+	})
 
-	big := ssa.TypeStringLimited(diamondStructType(16)) // raw tree > 100k nodes
-	require.Contains(t, big, "...")
-	require.Less(t, len(big), 2*4096+64)
+	t.Run("exponential nesting abbreviates", func(t *testing.T) {
+		big := ssa.TypeStringLimited(diamondStructType(16)) // raw tree > 100k nodes
+		require.Contains(t, big, "...")
+		require.Less(t, len(big), 2*4096+64)
+	})
+
+	t.Run("wide flat struct truncates at the width limit", func(t *testing.T) {
+		wide := ssa.NewStructType()
+		for i := 0; i < 4000; i++ {
+			wide.AddField(ssa.NewConst(int64(i)), ssa.CreateNumberType())
+		}
+		s := ssa.TypeStringLimited(wide)
+		require.Contains(t, s, "...")
+		require.Less(t, len(s), 2*4096+64)
+	})
 }
