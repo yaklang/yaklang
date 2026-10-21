@@ -40,6 +40,10 @@ type Config struct {
 	ProbeTimeout time.Duration
 
 	// 发送 Probe 的数量限制，默认值为 10。
+	// 这只限制没有命中目标端口的通用探针。默认配置会把通用预算放到
+	// defaultGenericProbeBudget，给被调低稀有度的常见协议留位置。
+	// 端口命中的探针另有预算，两者加起来不超过 defaultProbeTotalBudget，
+	// 避免静默端口把扫描拖死。显式调小 ProbesMax 时仍按该值截断通用探针。
 	// 服务匹配正则由 minirehs 预编译后一次筛选，再用 pcre2-lite 确认捕获组，
 	// 因此可以提高参与指纹的数量，同时用同样的并发把这些探测一次发出。
 	ProbesMax int

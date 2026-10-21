@@ -15,7 +15,78 @@ import (
 const (
 	maxProtocolResponseBytes = 1 << 20
 	maxProtocolMessages      = 256
+
+	// Scan-wide ceilings. A single target can run about twenty probes; without
+	// a shared budget each one may buffer a megabyte and walk a deep grammar.
+	scanProtocolByteBudget         = 256 << 10
+	scanProtocolMessageBudget      = 32
+	scanProtocolMessagesPerProbe   = 8
+	scanProtocolMaxFrameBytes      = 64 << 10
+	scanProtocolMaxBufferedBytes   = 256 << 10
+	scanProtocolMaxRecursionDepth  = 16
+	scanProtocolMaxCollectionItems = 256
 )
+
+type protocolScanBudget struct {
+	bytes    atomic.Int64
+	messages atomic.Int64
+}
+
+type protocolScanBudgetKey struct{}
+
+func withScanProtocolBudget(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if ctx.Value(protocolScanBudgetKey{}) != nil {
+		return ctx
+	}
+	return context.WithValue(ctx, protocolScanBudgetKey{}, &protocolScanBudget{})
+}
+
+func scanProtocolBudgetFrom(ctx context.Context) *protocolScanBudget {
+	if ctx == nil {
+		return nil
+	}
+	budget, _ := ctx.Value(protocolScanBudgetKey{}).(*protocolScanBudget)
+	return budget
+}
+
+func (b *protocolScanBudget) allowBytes(n int) bool {
+	if b == nil || n < 0 {
+		return true
+	}
+	for {
+		current := b.bytes.Load()
+		if current >= scanProtocolByteBudget || int64(n) > scanProtocolByteBudget-current {
+			return false
+		}
+		if b.bytes.CompareAndSwap(current, current+int64(n)) {
+			return true
+		}
+	}
+}
+
+func (b *protocolScanBudget) allowMessage() bool {
+	if b == nil {
+		return true
+	}
+	return b.messages.Add(1) <= scanProtocolMessageBudget
+}
+
+func protocolParserBudget(scanning bool) pcaputil.ParserBudget {
+	if !scanning {
+		return pcaputil.ParserBudget{
+			MaxFrameBytes: maxProtocolResponseBytes, MaxMessageBytes: maxProtocolResponseBytes,
+			MaxBufferedBytes: 4 << 20, MaxRecursionDepth: 32, MaxCollectionElements: 1024,
+		}
+	}
+	return pcaputil.ParserBudget{
+		MaxFrameBytes: scanProtocolMaxFrameBytes, MaxMessageBytes: scanProtocolMaxFrameBytes,
+		MaxBufferedBytes: scanProtocolMaxBufferedBytes, MaxRecursionDepth: scanProtocolMaxRecursionDepth,
+		MaxCollectionElements: scanProtocolMaxCollectionItems,
+	}
+}
 
 // ParseProtocolFields inspects application response bytes, without Ethernet,
 // IP or TCP headers. A UDP input must be exactly one datagram. Port is only a
@@ -51,6 +122,15 @@ func parseProtocolFields(ctx context.Context, request []byte, responses [][]byte
 	if total <= len(request) || total > maxProtocolResponseBytes {
 		return fields
 	}
+	budget := scanProtocolBudgetFrom(ctx)
+	if budget != nil && !budget.allowBytes(total) {
+		log.Debugf("service response protocol parser: target byte budget exhausted")
+		return fields
+	}
+	if budget != nil && budget.messages.Load() >= scanProtocolMessageBudget {
+		log.Debugf("service response protocol parser: target message budget exhausted")
+		return fields
+	}
 	options := []pcaputil.ProtocolSessionOption{
 		pcaputil.WithSessionTransport(string(transport)),
 		pcaputil.WithSessionPorts(0, uint16(port)),
@@ -58,10 +138,7 @@ func parseProtocolFields(ctx context.Context, request []byte, responses [][]byte
 	if transport == TCP {
 		options = append(options, pcaputil.WithSessionClientDirection(0))
 	}
-	session, err := pcaputil.NewProtocolSessionWithOptions(pcaputil.ParserBudget{
-		MaxFrameBytes: maxProtocolResponseBytes, MaxMessageBytes: maxProtocolResponseBytes,
-		MaxBufferedBytes: 4 << 20, MaxRecursionDepth: 32, MaxCollectionElements: 1024,
-	}, options...)
+	session, err := pcaputil.NewProtocolSessionWithOptions(protocolParserBudget(budget != nil), options...)
 	if err != nil {
 		return fields
 	}
@@ -77,9 +154,13 @@ func parseProtocolFields(ctx context.Context, request []byte, responses [][]byte
 		remaining = remaining[n:]
 	}
 	count := 0
+	messageLimit := maxProtocolMessages
+	if budget != nil {
+		messageLimit = scanProtocolMessagesPerProbe
+	}
 	collect := func(events []*pcaputil.ProtocolEvent) {
 		for _, event := range events {
-			if count >= maxProtocolMessages || ctx.Err() != nil {
+			if count >= messageLimit || ctx.Err() != nil {
 				return
 			}
 			if event.Direction != 1 || event.Protocol == "" {
@@ -96,13 +177,17 @@ func parseProtocolFields(ctx context.Context, request []byte, responses [][]byte
 			if event.Metadata != nil {
 				message["metadata"] = event.Metadata
 			}
+			if budget != nil && !budget.allowMessage() {
+				log.Debugf("service response protocol parser: target message budget exhausted")
+				return
+			}
 			messages, _ := fields[event.Protocol].([]any)
 			fields[event.Protocol] = append(messages, message)
 			count++
 		}
 	}
 	for _, response := range responses {
-		for len(response) > 0 && count < maxProtocolMessages && ctx.Err() == nil {
+		for len(response) > 0 && count < messageLimit && ctx.Err() == nil {
 			n := len(response)
 			if transport == TCP {
 				n = min(n, 4096)
@@ -119,6 +204,10 @@ func parseProtocolFields(ctx context.Context, request []byte, responses [][]byte
 	if len(fields) == 0 && len(request) > 0 && ctx.Err() == nil {
 		// A scan probe can be insufficient to establish a negotiated session.
 		// Independently recognizable replies can still expose bounded fields.
+		// Give the byte budget back so the fallback is not charged twice.
+		if budget != nil {
+			budget.bytes.Add(-int64(total))
+		}
 		return parseProtocolFields(ctx, nil, responses, transport, port, eof)
 	}
 	return fields
