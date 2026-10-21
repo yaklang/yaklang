@@ -26,6 +26,10 @@ func validateJSPFrontFixture(t *testing.T, filePath string, src string) {
 	require.LessOrEqual(t, parseDur, savedJSPFrontFixtureMaxParseDuration, "parse took too long for %s", filePath)
 }
 
+func TestAllSyntaxForJSP_G4(t *testing.T) {
+	TestAllJSPFrontFixtures(t)
+}
+
 func TestAllJSPFrontFixtures(t *testing.T) {
 	found := false
 	err := fs.WalkDir(jspFs, "code", func(filePath string, d fs.DirEntry, walkErr error) error {

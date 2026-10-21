@@ -1,9 +1,12 @@
 package jsp
 
 import (
+	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -77,6 +80,8 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 // later shows JSP mixed static-content/template parsing has the same kind of
 // ANTLR decision explosion as PHP, consider adding a JSP-specific token-source
 // coalescing optimization here instead of treating it as test-only code.
+const maxJSPStructuredParseBytes = 64 * 1024
+
 func Front(code string) (jspparser.IJspDocumentsContext, error) {
 	if canBypassFullJSPFront(code) || canBypassDirectiveOnlyJSP(code) || canUseLinearScriptletJSPFastPath(code) {
 		code = staticJSPFrontPlaceholder
@@ -85,18 +90,81 @@ func Front(code string) (jspparser.IJspDocumentsContext, error) {
 		code = preprocessJavascriptHrefQuotes(code)
 		code = wrapStandaloneJSPFragment(code)
 	}
-	ast, err := antlr4util.ParseASTWithSLLFirst(
-		code,
-		jspparser.NewJSPLexer,
-		jspparser.NewJSPParser,
-		newMixedContentCoalescingTokenSource,
-		nil,
-		func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
-			return parser.JspDocuments()
-		},
-	)
+	ast, err := parseJSPDocuments(code)
 	if err != nil {
 		return nil, utils.Errorf("parse AST FrontEnd error: %v", err)
+	}
+	return ast, nil
+}
+
+func parseJSPDocuments(code string) (ast jspparser.IJspDocumentsContext, err error) {
+	if len(code) <= maxJSPStructuredParseBytes {
+		return antlr4util.ParseASTWithSLLFirst(
+			code,
+			jspparser.NewJSPLexer,
+			jspparser.NewJSPParser,
+			newMixedContentCoalescingTokenSource,
+			nil,
+			func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
+				return parser.JspDocuments()
+			},
+		)
+	}
+	// Large mixed HTML/JSP pages can spend minutes and gigabytes in LL
+	// full-context recovery. Their Java translation does not need an HTML AST;
+	// let the caller use the grammar-free scriptlet-preserving translator.
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		ast, err = parseJSPDocumentsSLL(code)
+	}()
+	select {
+	case <-done:
+		return ast, err
+	case <-time.After(2 * time.Second):
+		return nil, fmt.Errorf("large JSP SLL parse exceeded 2s")
+	}
+}
+
+// parseJSPDocumentsSLL avoids LL full-context recovery for large mixed
+// HTML/JSP pages. Those pages use the grammar-free translator in
+// VisitorCreator.Create when their syntax needs recovery.
+func parseJSPDocumentsSLL(code string) (ast jspparser.IJspDocumentsContext, parseErr error) {
+	var messages []string
+	listener := antlr4util.NewErrorListener(antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, _ *memedit.Position) {
+		if len(messages) < 8 {
+			messages = append(messages, fmt.Sprintf("line %d:%d %s", start.GetLine(), start.GetColumn(), msg))
+		}
+	}))
+	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(code))
+	lexer.RemoveErrorListeners()
+	lexer.AddErrorListener(listener)
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	tokens.SetTokenSource(newMixedContentCoalescingTokenSource(lexer))
+	parser := jspparser.NewJSPParser(tokens)
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	defer antlr4util.DetachLexerTokenSource(lexer)
+	parser.RemoveErrorListeners()
+	parser.AddErrorListener(listener)
+	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+	parser.SetErrorHandler(antlr4util.NewBailErrorStrategy())
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			switch recovered.(type) {
+			case *antlr.ParseCancellationException:
+				parseErr = fmt.Errorf("SLL parse cancelled: %s", strings.Join(messages, "; "))
+			default:
+				if s, ok := recovered.(string); ok && s == "implement me" {
+					parseErr = fmt.Errorf("SLL parse cancelled: %s", strings.Join(messages, "; "))
+					return
+				}
+				panic(recovered)
+			}
+		}
+	}()
+	ast = parser.JspDocuments()
+	if len(messages) > 0 {
+		return nil, fmt.Errorf("SLL syntax errors: %s", strings.Join(messages, "; "))
 	}
 	return ast, nil
 }

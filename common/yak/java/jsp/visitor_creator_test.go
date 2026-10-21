@@ -56,3 +56,21 @@ func TestPreprocessJavascriptHrefQuotes_replacesEmbeddedQuotesInBody(t *testing.
 	got := preprocessJavascriptHrefQuotes(src)
 	require.Equal(t, `<jsp:page/><a href="javascript:foo('bar')">click</a>`, got)
 }
+
+func TestFront_largeMalformedPageAvoidsFullContextRecovery(t *testing.T) {
+	var page strings.Builder
+	page.WriteString("<%@ page contentType=\"text/html\" %>\n<html><body>\n<c:out value=\"${title}\"/>\n")
+	for page.Len() < 96*1024 {
+		page.WriteString(`<div id="row"><span class="x"><input type="text" value="`)
+		page.WriteString(strings.Repeat("a", 40))
+		page.WriteString(`" name="n"><ul><li><a href="/x?q=`)
+		page.WriteString(strings.Repeat("b", 20))
+	}
+	page.WriteString("<div class=unterminated")
+
+	start := time.Now()
+	_, err := Front(page.String())
+	elapsed := time.Since(start)
+	require.Error(t, err)
+	require.Less(t, elapsed, 3*time.Second, "large malformed JSP entered full-context recovery, got %s", elapsed)
+}

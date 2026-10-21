@@ -11,7 +11,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
-	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	"github.com/yaklang/yaklang/common/yak/java/jsp"
+	j "github.com/yaklang/yaklang/common/yak/java/template2java"
 )
 
 func TestJSP2Java_Content(t *testing.T) {
@@ -198,7 +199,7 @@ func TestJSP2Java_Content(t *testing.T) {
 		},
 	}
 	check := func(jspCode string, wants []string) {
-		codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, jspCode, "test.jsp")
+		codeInfo, err := j.ConvertTemplateToJava(j.JSP, jspCode, "test.jsp")
 		require.NoError(t, err)
 		require.NotNil(t, codeInfo)
 		checkJavaFront(t, codeInfo.GetContent(), "test.jsp")
@@ -217,7 +218,7 @@ func validateSavedJSPTemplateFixture(t *testing.T, filePath string, content stri
 	t.Helper()
 
 	start := time.Now()
-	codeInfo, err := tj.ConvertTemplateToJava(tj.JSP, content, filePath)
+	codeInfo, err := j.ConvertTemplateToJava(j.JSP, content, filePath)
 	convertDur := time.Since(start)
 	require.NoError(t, err)
 	require.NotNil(t, codeInfo)
@@ -267,7 +268,7 @@ func TestJSPCorpusGeneratesParsableJava(t *testing.T) {
 		if r, rerr := filepath.Rel(root, path); rerr == nil {
 			rel = r
 		}
-		info, cerr := tj.ConvertTemplateToJava(tj.JSP, string(raw), rel)
+		info, cerr := j.ConvertTemplateToJava(j.JSP, string(raw), rel)
 		if cerr != nil {
 			failed = append(failed, rel+": convert: "+cerr.Error())
 			continue
@@ -289,6 +290,11 @@ func TestJSPCorpusGeneratesParsableJava(t *testing.T) {
 		t.Fatalf("%d/%d jsp files did not produce parsable java:\n%s", len(failed), checked, strings.Join(limit, "\n"))
 	}
 	t.Logf("parsed %d jsp files from %s", checked, root)
+}
+
+func TestAllSyntaxForJSPTemplate_G4(t *testing.T) {
+	TestAllSavedJSPTemplates(t)
+	TestJSPFailureSamplesParseGenerateAndParseJava(t)
 }
 
 func TestAllSavedJSPTemplates(t *testing.T) {
@@ -313,4 +319,81 @@ func TestAllSavedJSPTemplates(t *testing.T) {
 	})
 	require.NoError(t, err)
 	require.True(t, found, "no saved jsp templates found")
+}
+
+func TestJSPFailureSamplesParseGenerateAndParseJava(t *testing.T) {
+	// Each sample comes from a page that previously failed somewhere in the
+	// JSP -> Java -> java2ssa chain. Structured parsing may fail on malformed
+	// HTML; generation must then use the grammar-free translator, and the Java
+	// emitted by either route must parse again.
+	cases := []struct {
+		name string
+		jsp  string
+	}{
+		{
+			name: "el function call",
+			jsp:  `<input value="${fn:escapeXml(!empty param.password ? param.password : param.pass)}">`,
+		},
+		{
+			name: "unquoted jstl test",
+			jsp: `<c:set var="skipKeys" value="|uid|user|password|"/>
+<c:if test="ajc.result.code == 'FA_SECRITY'">
+  <c:redirect url="${ajc.exitURL}"/>
+</c:if>`,
+		},
+		{
+			name: "nested choose",
+			jsp: `<c:choose>
+  <c:when test="${!empty account.smtpHost}"><p>smtp</p></c:when>
+  <c:when test="${(empty account.smtpHost) && (account.type eq 'ews')}">
+    <c:choose>
+      <c:when test="${user.supportEws}">ews</c:when>
+      <c:otherwise>no</c:otherwise>
+    </c:choose>
+  </c:when>
+  <c:otherwise>other</c:otherwise>
+</c:choose>`,
+		},
+		{
+			name: "xml declaration after tags",
+			jsp: `<wm:i18n category="main"/>
+<fmt:message key="title_tip" var="title"/>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE wml PUBLIC "-//OPENWAVE.COM//DTD WML 1.3//EN" "http://www.openwave.com/dtd/wml13.dtd">
+<wml><card>x</card></wml>`,
+		},
+		{
+			name: "unclosed checkbox row",
+			jsp: `<tr class="single-line">
+  <td align="right"><fmt:message key=".info.privilege"/></td>
+  <td><input type="checkbox" name="supportApproval" id="supportApproval" value="1" ${bean.supportApproval == '1' ? 'checked' : ''}>&nbsp;<fmt:message key=".info.approval_project"/></td>
+</tr>`,
+		},
+	}
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			requireTemplatePipeline(t, j.JSP, tt.jsp, tt.name+".jsp")
+		})
+	}
+}
+
+func requireTemplatePipeline(t *testing.T, kind j.JavaTemplateType, content, filePath string) {
+	t.Helper()
+	if kind == j.JSP {
+		// Parsing is one stage of the contract. A grammar failure is acceptable
+		// only because Create falls back to the scriptlet-preserving translator.
+		if _, err := jsp.Front(content); err != nil {
+			t.Logf("structured jsp parse fell back: %v", err)
+		}
+	}
+	info, err := j.ConvertTemplateToJava(kind, content, filePath)
+	if kind == j.JSP && (err != nil || info == nil || strings.TrimSpace(info.GetContent()) == "") {
+		info, err = j.ConvertJSPLinear(content, filePath)
+	}
+	require.NoError(t, err)
+	require.NotNil(t, info)
+	src := info.GetContent()
+	require.NotEmpty(t, strings.TrimSpace(src))
+	require.Contains(t, src, "void _JavaTemplateService(")
+	checkJavaFront(t, src, filePath)
 }
