@@ -33,21 +33,29 @@ type enipPending struct {
 	service byte
 	tag     string
 	value   int32
+	id      uint64
+	wire    []byte
 }
 
 type enipPendingKey struct {
 	dir     int
 	service byte
-	tag     string
+	context [8]byte
 }
 
 type binENIP struct {
-	clientDir           int
-	registerRequestSeen bool
-	registered          bool
-	session             uint32
-	pending             map[enipPendingKey]enipPending
-	maxPending          int
+	clientDir                          int
+	registerRequestSeen                bool
+	registered                         bool
+	session                            uint32
+	pending                            map[enipPendingKey]enipPending
+	maxPending                         int
+	registerContext                    [8]byte
+	registerID                         uint64
+	eventID, transactionID, responseTo uint64
+	seen                               map[enipPendingKey]bool
+	reserveMemory                      func(int64) error
+	pendingCapacity                    int
 }
 
 func parseENIPHeader(w []byte) (enipHeader, bool) {
@@ -94,12 +102,33 @@ func (f *binFlow) frameENIP(w []byte) (int, *binSpec, error) {
 	if len(w) < n {
 		return 0, nil, nil
 	}
-	if h.command == enipCommandRegister && h.length != 4 {
+	if h.command == enipCommandRegister && h.status == 0 && h.length != 4 {
 		return 0, nil, protocolError(ErrMalformedMessage, "EtherNet/IP RegisterSession must carry exactly four bytes")
 	}
 	return n, &binSpec{}, nil
 }
 
+// Context bytes are opaque echoes, scoped by this TCP flow and CIP service.
+func (p *binENIP) consumeEvent(dir int, wire []byte, id uint64, limit int) (map[string]any, uint64, uint64, error) {
+	p.eventID, p.transactionID, p.responseTo = id, 0, 0
+	fields, err := p.consume(dir, wire, limit)
+	if err != nil {
+		return nil, 0, 0, err
+	}
+	return fields, p.responseTo, p.transactionID, nil
+}
+
+// Size-class rounding is conservative for these bounded symbol/frame copies.
+func enipContextBytes(tag string, wire []byte) int64 {
+	return int64((len(tag)+63)&^63) + int64((len(wire)+63)&^63)
+}
+func (p *binENIP) storage() int64 {
+	n := int64(1024 + 64*len(p.seen) + 96*p.pendingCapacity)
+	for _, q := range p.pending {
+		n += enipContextBytes(q.tag, q.wire)
+	}
+	return n
+}
 func (p *binENIP) consume(dir int, wire []byte, collectionLimit int) (map[string]any, error) {
 	h, ok := parseENIPHeader(wire)
 	if !ok || enipHeaderSize+int(h.length) != len(wire) {
@@ -107,6 +136,12 @@ func (p *binENIP) consume(dir int, wire []byte, collectionLimit int) (map[string
 	}
 	if h.options != 0 {
 		return nil, protocolError(ErrMalformedMessage, "EtherNet/IP encapsulation options must be zero")
+	}
+	if p.reserveMemory != nil {
+		if err := p.reserveMemory(p.storage()); err != nil {
+			return nil, err
+		}
+		// Reservations use the established high-water contract until Close.
 	}
 	fields := map[string]any{
 		"Command Code":   h.command,
@@ -124,13 +159,16 @@ func (p *binENIP) consume(dir int, wire []byte, collectionLimit int) (map[string
 		return p.consumeRegister(dir, h, body, fields)
 	case enipCommandSendRRData:
 		if !p.registered {
-			return nil, sessionContext("SendRRData preceded a successful RegisterSession response")
+			return nil, protocolError(ErrContextRequired, "SendRRData preceded a successful RegisterSession response")
 		}
 		if h.status != 0 {
-			return nil, protocolError(ErrMalformedMessage, "EtherNet/IP SendRRData status is 0x%08x", h.status)
+			if dir != p.clientDir {
+				return nil, protocolError(ErrUnsupportedFeature, "EtherNet/IP peer encapsulation error0x%08x is outside selected success profile", h.status)
+			}
+			return nil, protocolError(ErrMalformedMessage, "EtherNet/IP request status must be zero")
 		}
 		if h.session != p.session {
-			return nil, protocolError(ErrMalformedMessage, "EtherNet/IP session handle does not match the registered session")
+			return nil, protocolError(ErrContextRequired, "EtherNet/IP session handle does not match the observed registration")
 		}
 		if p.pending == nil {
 			p.pending = make(map[enipPendingKey]enipPending)
@@ -146,7 +184,7 @@ func (p *binENIP) consume(dir int, wire []byte, collectionLimit int) (map[string
 			return nil, err
 		}
 		fields["Interface Handle"], fields["Timeout"] = cpf.interfaceHandle, cpf.timeout
-		cipFields, err := p.consumeCIP(dir, cpf.cip, collectionLimit)
+		cipFields, err := p.consumeCIP(dir, cpf.cip, collectionLimit, h.context, wire)
 		if err != nil {
 			return nil, err
 		}
@@ -161,7 +199,10 @@ func (p *binENIP) consume(dir int, wire []byte, collectionLimit int) (map[string
 
 func (p *binENIP) consumeRegister(dir int, h enipHeader, body []byte, fields map[string]any) (map[string]any, error) {
 	if h.status != 0 {
-		return nil, protocolError(ErrMalformedMessage, "EtherNet/IP RegisterSession status is 0x%08x", h.status)
+		if dir != p.clientDir {
+			return nil, protocolError(ErrUnsupportedFeature, "EtherNet/IP peer registration error0x%08x is outside selected success profile", h.status)
+		}
+		return nil, protocolError(ErrMalformedMessage, "EtherNet/IP registration request status must be zero")
 	}
 	if h.length != 4 || len(body) != 4 || binary.LittleEndian.Uint16(body) != 1 || binary.LittleEndian.Uint16(body[2:]) != 0 {
 		return nil, protocolError(ErrMalformedMessage, "EtherNet/IP RegisterSession version/options are invalid")
@@ -171,21 +212,24 @@ func (p *binENIP) consumeRegister(dir int, h enipHeader, body []byte, fields map
 	if !p.registered {
 		if dir == p.clientDir {
 			if h.session != 0 || p.registerRequestSeen {
-				return nil, sessionContext("RegisterSession request has an unexpected session handle or is duplicated")
+				return nil, protocolError(ErrContextRequired, "RegisterSession request has an unexpected session handle or is duplicated")
 			}
 			p.registerRequestSeen = true
+			p.registerContext, p.registerID = h.context, p.eventID
+			p.transactionID = p.eventID
 			fields["Role"] = "RegisterSession Request"
 			return fields, nil
 		}
-		if !p.registerRequestSeen || h.session == 0 {
-			return nil, sessionContext("RegisterSession response has no matching request or valid session handle")
+		if !p.registerRequestSeen || h.session == 0 || h.context != p.registerContext {
+			return nil, protocolError(ErrContextRequired, "RegisterSession response has no matching request or valid session handle")
 		}
 		p.session, p.registered = h.session, true
+		p.responseTo, p.transactionID = p.registerID, p.registerID
 		fields["Role"] = "RegisterSession Response"
 		fields["Session Handle"] = p.session
 		return fields, nil
 	}
-	return nil, sessionContext("duplicate RegisterSession exchange")
+	return nil, protocolError(ErrContextRequired, "duplicate RegisterSession exchange")
 }
 
 type enipCPF struct {
@@ -229,7 +273,7 @@ func parseENIPSendRRData(body []byte) (enipCPF, error) {
 	return enipCPF{interfaceHandle: interfaceHandle, timeout: timeout, cip: data}, nil
 }
 
-func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[string]any, error) {
+func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int, context [8]byte, wire []byte) (map[string]any, error) {
 	if len(cip) < 2 {
 		return nil, protocolError(ErrMalformedMessage, "CIP service/path header is truncated")
 	}
@@ -237,7 +281,7 @@ func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[stri
 	switch service {
 	case enipCIPReadTag, enipCIPWriteTag:
 		if dir != p.clientDir {
-			return nil, sessionContext("CIP request was observed in the registered originator's peer direction")
+			return nil, protocolError(ErrContextRequired, "CIP request was observed in the registered originator's peer direction")
 		}
 		if len(cip) < 2 {
 			return nil, protocolError(ErrMalformedMessage, "CIP request path size is missing")
@@ -257,7 +301,7 @@ func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[stri
 				return nil, protocolError(ErrUnsupportedFeature, "CIP Read Tag supports exactly one explicitly requested element")
 			}
 			fields["Element Count"] = uint16(1)
-			if err := p.addPending(enipPending{service: service, tag: tag}, collectionLimit); err != nil {
+			if err := p.addPending(enipPending{service: service, tag: tag}, collectionLimit, context, wire); err != nil {
 				return nil, err
 			}
 			return fields, nil
@@ -267,13 +311,13 @@ func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[stri
 		}
 		value := int32(binary.LittleEndian.Uint32(data[4:8]))
 		fields["Data Type"], fields["Data Type Code"], fields["Element Count"], fields["Write Value"] = "DINT", uint16(enipCIPTypeDINT), uint16(1), value
-		if err := p.addPending(enipPending{service: service, tag: tag, value: value}, collectionLimit); err != nil {
+		if err := p.addPending(enipPending{service: service, tag: tag, value: value}, collectionLimit, context, wire); err != nil {
 			return nil, err
 		}
 		return fields, nil
 	case enipCIPReadTagReply, enipCIPWriteTagReply:
 		if dir == p.clientDir {
-			return nil, sessionContext("CIP response was observed in the registered originator's direction")
+			return nil, protocolError(ErrContextRequired, "CIP response was observed in the registered originator's direction")
 		}
 		if len(cip) < 4 || cip[1] != 0 {
 			return nil, protocolError(ErrMalformedMessage, "CIP response reserved byte is invalid")
@@ -289,7 +333,7 @@ func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[stri
 			if len(cip) != 10 || binary.LittleEndian.Uint16(cip[4:6]) != enipCIPTypeDINT {
 				return nil, protocolError(ErrUnsupportedFeature, "CIP Read Tag response must contain one DINT")
 			}
-			pending, err := p.takePending(enipCIPReadTag)
+			pending, err := p.takePending(enipCIPReadTag, context)
 			if err != nil {
 				return nil, err
 			}
@@ -299,7 +343,7 @@ func (p *binENIP) consumeCIP(dir int, cip []byte, collectionLimit int) (map[stri
 		if len(cip) != 4 {
 			return nil, protocolError(ErrMalformedMessage, "CIP Write Tag response must not contain service data")
 		}
-		pending, err := p.takePending(enipCIPWriteTag)
+		pending, err := p.takePending(enipCIPWriteTag, context)
 		if err != nil {
 			return nil, err
 		}
@@ -340,39 +384,48 @@ func isENIPTagSymbol(symbol []byte) bool {
 	return true
 }
 
-func (p *binENIP) addPending(request enipPending, limit int) error {
-	key := enipPendingKey{dir: p.clientDir, service: request.service, tag: request.tag}
-	for candidate := range p.pending {
-		if candidate.service == request.service {
-			return sessionContext("CIP response correlation is ambiguous while another request of the same service is outstanding")
+func (p *binENIP) addPending(request enipPending, limit int, context [8]byte, wire []byte) error {
+	key := enipPendingKey{dir: p.clientDir, service: request.service, context: context}
+	if old, ok := p.pending[key]; ok {
+		if bytes.Equal(old.wire, wire) {
+			p.transactionID = old.id
+			return nil
 		}
+		return protocolError(ErrContextRequired, "CIP sender context conflicts with an active request")
+	}
+	if p.seen[key] {
+		return protocolError(ErrContextRequired, "reused CIP sender context cannot distinguish a late reply")
 	}
 	if p.maxPending <= 0 {
 		p.maxPending = limit
 	}
-	if len(p.pending) >= p.maxPending {
-		return protocolError(ErrResourceExceeded, "EtherNet/IP pending CIP request budget exceeded")
+	limit = min(limit, p.maxPending)
+	if len(p.pending) >= limit || len(p.seen) >= limit {
+		return protocolError(ErrResourceExceeded, "EtherNet/IP pending/history context budget exceeded")
 	}
-	p.pending[key] = request
-	return nil
-}
-
-func (p *binENIP) takePending(service byte) (enipPending, error) {
-	var match enipPendingKey
-	found := false
-	for candidate, request := range p.pending {
-		if candidate.dir == p.clientDir && candidate.service == service && request.service == service {
-			if found {
-				return enipPending{}, sessionContext("CIP response matches multiple outstanding requests")
-			}
-			match, found = candidate, true
+	if p.reserveMemory != nil {
+		if err := p.reserveMemory(p.storage() + int64(64+96*(max(p.pendingCapacity, len(p.pending)+1)-p.pendingCapacity)) + enipContextBytes(request.tag, wire)); err != nil {
+			return err
 		}
 	}
-	if !found {
-		return enipPending{}, sessionContext("CIP response has no matching outstanding request")
+	if p.seen == nil {
+		p.seen = make(map[enipPendingKey]bool)
 	}
-	request := p.pending[match]
-	delete(p.pending, match)
+	request.id, request.wire = p.eventID, bytes.Clone(wire)
+	p.pendingCapacity = max(p.pendingCapacity, len(p.pending)+1)
+	p.pending[key] = request
+	p.seen[key] = true
+	p.transactionID = request.id
+	return nil
+}
+func (p *binENIP) takePending(service byte, context [8]byte) (enipPending, error) {
+	key := enipPendingKey{dir: p.clientDir, service: service, context: context}
+	request, ok := p.pending[key]
+	if !ok {
+		return enipPending{}, protocolError(ErrContextRequired, "CIP response has no matching sender context and service")
+	}
+	delete(p.pending, key)
+	p.responseTo, p.transactionID = request.id, request.id
 	return request, nil
 }
 

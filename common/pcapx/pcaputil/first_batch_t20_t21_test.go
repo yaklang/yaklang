@@ -34,6 +34,16 @@ const t20CaptureSHA256 = "1e59eebe6462dbf469fa3145597bd9251c4b0447b756845efc10ef
 const t20OracleSHA256 = "3b4862ccea0b25f62ec26515b4ae1d80b8698f49639d2dc2f1daebba6e542c6f"
 
 func TestFirstBatchT20(t *testing.T) {
+	t.Run("stun-identity", func(t *testing.T) {
+		t.Run("retired-identity-existing-api", testSTUNRetiredIdentityExistingAPI)
+		t.Run("refusal-and-ownership-existing-api", testSTUNMoreExistingAPI)
+		t.Run("initial-refusal-existing-api", testSTUNInitialRefusalExistingAPI)
+		t.Run("sealed-identity-matrix", testSTUNIdentityMatrix)
+		t.Run("identity-bounds-and-domains", testSTUNIdentityBoundsAndDomains)
+		t.Run("identity-tcp-chunks", testSTUNIdentityTCPChunks)
+		t.Run("malformed-context-retirement", testSTUNMalformedContextRetirement)
+		t.Run("untracked-refusal-memory-bound", testSTUNUntrackedRefusalMemoryBound)
+	})
 	t.Run("native-duplex-capture-and-independent-oracle", testT20NativeCapture)
 	t.Run("upstream-stun-turn-udp-and-channel-context-oracle", testT20STUNTurnCapture)
 	t.Run("nonstandard-udp-and-decode-as-context-boundary", testT20UDPAdmission)

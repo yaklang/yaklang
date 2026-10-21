@@ -354,13 +354,9 @@ type AIInvokeRuntime interface {
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error)
-	// QuickKnowledgeSearch performs a fast local knowledge-base search using LIKE + BM25.
+	// Deprecated: use query_knowledge_base with explicit scope and token limits.
 	QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error)
-	// EnhanceKnowledgeGetterEx 支持多种 EnhancePlan 的知识增强获取器
-	// enhancePlans 参数可选，支持：
-	//   - nil 或空切片：使用默认完整增强流程
-	//   - []string{"exact_keyword_search"}: 仅使用精准关键词搜索
-	//   - []string{"hypothetical_answer", "generalize_query"}: 指定增强策略组合
+	// Deprecated: legacy AI RAG retrieval is disabled; use the Skill-guided knowledge tools.
 	EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error)
 	// VerifyUserSatisfaction verifies if the user is satisfied with the result
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*VerifySatisfactionResult, error)
@@ -381,8 +377,7 @@ type AIInvokeRuntime interface {
 	// so they participate in the auxiliary-task registry.
 	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
-	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query
-	// It uses AI to analyze the query and match it with available knowledge bases
+	// Deprecated: select explicit names using manage_knowledge_base(op=list).
 	SelectKnowledgeBase(ctx context.Context, originQuery string) (*SelectedKnowledgeBaseResult, error)
 
 	ExecuteLoopTaskIF(taskTypeName string, task AIStatefulTask, options ...any) (bool, error)

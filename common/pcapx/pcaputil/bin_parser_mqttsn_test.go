@@ -42,6 +42,7 @@ func TestMQTTSNMessageStructure(t *testing.T) {
 }
 
 func TestWinlab5013MQTTSNAllDatagrams(t *testing.T) {
+	t.Run("owned-queries", testMQTTSNOwnedQueries)
 	events := replayWinlab5013Protocols(t, "08-mqttsn.pcapng")
 	require.Len(t, events, 9)
 	kinds := []string{"SEARCHGW", "GWINFO", "CONNECT", "CONNACK", "REGISTER", "REGACK", "PUBLISH", "PUBACK", "DISCONNECT"}

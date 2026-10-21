@@ -52,6 +52,12 @@ func TestDoIPScapyDiagnosticSessionControl(t *testing.T) {
 			require.Equal(t, ProbeAccept, probeDoIP(w, 1024).Verdict)
 		}
 		fields, err = s.consume(dirs[i], w)
+		if i == 6 { // no previous DSC descriptor: ambiguous after the first generation
+			rocTypedError(t, "ContextRequired", err)
+			require.Nil(t, fields)
+			require.Equal(t, 1, s.outstanding())
+			continue
+		}
 		require.NoError(t, err, "frame %d", i)
 		switch i {
 		case 1:
@@ -67,7 +73,7 @@ func TestDoIPScapyDiagnosticSessionControl(t *testing.T) {
 			require.Equal(t, 3, fields["Session Type"])
 			require.Equal(t, 50, fields["P2 Server Max Milliseconds"])
 			require.Equal(t, 5000, fields["P2 Star Server Max Milliseconds"])
-			require.Equal(t, true, fields["Diagnostic Acknowledged"])
+			require.Equal(t, false, fields["Diagnostic Acknowledged"])
 			require.Zero(t, s.outstanding())
 		}
 	}
@@ -147,7 +153,7 @@ func TestDoIPBudgetsOwnershipAndRoutingConfirmation(t *testing.T) {
 	require.Error(t, err)
 	_, err = doipFrameSize(doipTestWire(5, 0x0e, 0x80, 0, 0, 0, 0, 0), 14)
 	require.Error(t, err)
-	require.Equal(t, int64(256), s.sessionBytes())
+	require.Equal(t, int64(256+128), s.sessionBytes(), "one bounded diagnostic target history")
 }
 
 func TestDoIPUnsupportedAndMalformedControls(t *testing.T) {
@@ -213,6 +219,8 @@ func TestDoIPDuplicateAcknowledgementAndNACK(t *testing.T) {
 	_, err = s.consume(0, doipTestWire(0x8001, 0x0e, 0x80, 0x40, 0x10, 0x10, 3))
 	require.NoError(t, err)
 	require.Equal(t, true, first["Diagnostic Acknowledged"], "previous event is an owned snapshot")
-	_, err = s.consume(1, doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, 3, 0, 50, 1, 0xf4))
-	require.NoError(t, err)
+	fields, err = s.consume(1, doipTestWire(0x8001, 0x40, 0x10, 0x0e, 0x80, 0x50, 3, 0, 50, 1, 0xf4))
+	rocTypedError(t, "ContextRequired", err)
+	require.Nil(t, fields)
+	require.Equal(t, 1, s.outstanding())
 }

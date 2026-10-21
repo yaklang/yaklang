@@ -426,22 +426,42 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 		return
 	}
 	end := seq + uint32(len(tcp.Payload))
-	if tcp.FIN && !seqBefore(end, t.nextSeq) {
-		if t.finSeen && end != t.finSeq {
+	finEnd := end
+	finForBytes := tcp.FIN
+	if tcp.FIN && t.evidence.tcpMissingTail > 0 {
+		finEnd += t.evidence.tcpMissingTail
+		finForBytes = false
+		distance := uint32(finEnd - t.nextSeq)
+		if distance == 1<<31 || distance < 1<<31 && uint64(distance) > uint64(t.Flow.pool.options.MaxSequenceGap) {
+			t.Flow.reassemblyIncomplete = true
+			t.Flow.pool.invalidSegment("captured TCP FIN exceeds the sequence window")
+			return
+		}
+	}
+	if tcp.FIN && !seqBefore(finEnd, t.nextSeq) {
+		if t.finSeen && finEnd != t.finSeq {
 			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("TCP FIN changes an established stream end")
 			return
 		}
-		t.finSeen, t.finSeq = true, end
+		t.finSeen, t.finSeq = true, finEnd
+	}
+	if tcp.FIN && !finForBytes && seqBefore(t.nextSeq, finEnd) {
+		// One bounded zero-payload control entry retains the observed FIN at
+		// its declared end, while only captured bytes enter the data stream.
+		t.queueFuture(finEnd, nil, true, ts)
+		if t.IsClosed() {
+			return
+		}
 	}
 	if t.finSeen && seqBefore(t.finSeq, seq) {
 		return
 	}
 	if seqBefore(t.nextSeq, seq) {
-		t.queueFuture(seq, tcp.Payload, tcp.FIN, ts)
+		t.queueFuture(seq, tcp.Payload, finForBytes, ts)
 		return
 	}
-	t.consume(seq, tcp.Payload, tcp.FIN, ts)
+	t.consume(seq, tcp.Payload, finForBytes, ts)
 	for !t.IsClosed() && len(t.waitGroup) > 0 && !seqBefore(t.nextSeq, t.waitGroup[0].Seq) {
 		f := t.popFuture()
 		t.evidence = f.evidence

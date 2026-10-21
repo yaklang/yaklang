@@ -15,10 +15,9 @@ func WithLoopPromptGenerator(generator ReActLoopCoreGenerateCode) ReActLoopOptio
 	return func(*ReActLoop) {}
 }
 
+// Deprecated: retained as a no-op. Knowledge retrieval uses Skill-guided tools.
 func WithAllowRAGGetter(allowRAG func() bool) ReActLoopOption {
-	return func(r *ReActLoop) {
-		r.allowRAG = allowRAG
-	}
+	return func(*ReActLoop) {}
 }
 
 func WithAllowAIForgeGetter(allowAIForge func() bool) ReActLoopOption {

@@ -21,6 +21,11 @@ import (
 // actual sockets/veth, endpoint success oracles and a separate TShark oracle.
 // The generator configures public APIs; it does not construct protocol packets.
 func TestIndustrialNativeGOOSEOPCUACaptures(t *testing.T) {
+	// Keep owned history and byte-budget invariants under the current required root.
+	gooseHistoryBooleanOwnership(t)
+	gooseBooleanHistoryBudget(t)
+	gooseHistoryBitsOwnership(t)
+	gooseBitsHistoryBudget(t)
 	root := "../../bin-parser/testdata/protocol-native/industrial"
 	raw, err := trafficfixture.ReadFile(filepath.Join(root, "manifest.json"))
 	require.NoError(t, err)

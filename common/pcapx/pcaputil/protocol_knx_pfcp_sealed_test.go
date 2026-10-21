@@ -276,15 +276,68 @@ func TestPFCPSealedAssociationMatrix(t *testing.T) {
 					extra = append(extra, WithBinParserConfig(BinParserConfig{MaxMessageBytes: c.Budgets.Message, MaxBufferedBytes: c.Budgets.Buffered}))
 				}
 				events, stats := discoveryReplay(t, discoveryCapture(t, c), workers, deferred, observe, extra...)
+				legacyBudget := c.Name == "pfcp-expired-state-before-transient-reservation"
+				if legacyBudget {
+					u, err := trafficfixture.ReadFile("pfcp-idle-legacy-budget/overlay.json")
+					require.NoError(t, err)
+					var overlay struct {
+						CaptureSHA  string `json:"capture_sha256"`
+						AnswerAlias string `json:"original_answer_alias"`
+						AnswerSHA   string `json:"original_answer_sha256"`
+						Retained    int    `json:"retained_bytes"`
+						Transient   int    `json:"transient_bytes"`
+						Budget      int    `json:"original_budget_bytes"`
+						Peak        int    `json:"necessary_peak_bytes"`
+					}
+					require.NoError(t, json.Unmarshal(u, &overlay))
+					require.Equal(t, c.SHA256, overlay.CaptureSHA)
+					original, err := trafficfixture.ReadFile("../../../" + overlay.AnswerAlias)
+					require.NoError(t, err)
+					require.Equal(t, overlay.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(original)))
+					require.Equal(t, 4352, overlay.Retained)
+					require.Equal(t, 3072, overlay.Transient)
+					require.Equal(t, overlay.Budget, c.Budgets.Buffered)
+					require.Equal(t, overlay.Retained+overlay.Transient, overlay.Peak)
+					require.Greater(t, overlay.Peak, overlay.Budget)
+					// Original budget and bytes stay unchanged. An adjacent replay
+					// at the exact charged peak proves valid complete field decoding
+					// and preserves the retired identity diagnostic (never a match).
+					adjacent, adjacentStats := discoveryReplay(t, discoveryCapture(t, c), workers, deferred, observe, WithBinParserConfig(BinParserConfig{MaxMessageBytes: c.Budgets.Message, MaxBufferedBytes: overlay.Peak}))
+					require.Len(t, adjacent, 2)
+					for i, e := range adjacent {
+						f, err := e.GetFields()
+						require.NoError(t, err)
+						rocEqualFields(t, c.ExpectedDecodedFields[i].Fields, f)
+						require.Equal(t, doipDiscoveryWire(t, c.Steps[i].Hex), e.Raw)
+					}
+					require.Equal(t, "ambiguous-sequence", adjacent[1].Session["Association"])
+					require.Zero(t, adjacent[1].ResponseTo)
+					require.Zero(t, adjacent[1].TransactionID)
+					require.EqualValues(t, overlay.Peak, adjacentStats.PeakBufferedBytes)
+					require.Zero(t, adjacentStats.BufferedBytes)
+					require.LessOrEqual(t, stats.PeakBufferedBytes, int64(overlay.Budget))
+				}
 				require.Len(t, events, c.Packets)
 				require.EqualValues(t, c.Packets, stats.Messages)
 				ids := map[int]uint64{}
 				matched := map[int]int{}
 				for i, e := range events {
 					require.Equal(t, "pfcp", e.Protocol)
-					require.Empty(t, e.Error)
 					require.Len(t, e.SourceBytes.PacketRefs, 1)
 					require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
+					if legacyBudget && i == 1 {
+						_, err := e.GetFields()
+						rocTypedError(t, "ResourceExceeded", err)
+						require.Nil(t, e.Session)
+						require.Empty(t, e.Raw)
+						require.Equal(t, "limited", e.Status)
+						require.Equal(t, "limited", e.Completeness)
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						require.Equal(t, events[0].FlowID, e.FlowID)
+						continue
+					}
+					require.Empty(t, e.Error)
 					wire, err := hex.DecodeString(c.Steps[i].Hex)
 					require.NoError(t, err)
 					require.Equal(t, wire, e.Raw)
@@ -311,10 +364,16 @@ func TestPFCPSealedAssociationMatrix(t *testing.T) {
 				}
 				for _, n := range c.Association.Unmatched {
 					require.Zero(t, events[n-1].ResponseTo)
+					if legacyBudget {
+						require.Nil(t, events[n-1].Session)
+						continue
+					}
 					require.Equal(t, "unmatched-response", events[n-1].Session["Association"])
 				}
 				if c.Association.Outstanding != nil {
-					require.EqualValues(t, *c.Association.Outstanding, events[len(events)-1].Session["Outstanding"])
+					if !legacyBudget {
+						require.EqualValues(t, *c.Association.Outstanding, events[len(events)-1].Session["Outstanding"])
+					}
 				}
 				if c.Association.Ambiguous != nil {
 					for _, e := range events[1:] {
@@ -389,6 +448,7 @@ func TestKNXPFCPDatagramBoundariesAndAdmission(t *testing.T) {
 	}
 }
 func TestKNXPFCPResourceBoundariesAndOwnership(t *testing.T) {
+	t.Run("knx-private-session-queries", knxSessionQueriesOwnAcceptedObservation)
 	q, r := discoveryPayload(t, "pfcp-heartbeat-request"), discoveryPayload(t, "pfcp-heartbeat-response")
 	for _, delta := range []int{-1, 0} {
 		t.Run(fmt.Sprintf("shared%d", delta), func(t *testing.T) {
@@ -499,10 +559,13 @@ func TestPFCPIsolationReuseDenialAndIdle(t *testing.T) {
 	expired := event("b:8805", "a:40000", d0, ts.Add(pfcpIdleTTL))
 	require.True(t, a.decodeDiscoveryDatagram(expired, r, 8805, 40000, "pfcp"))
 	require.Zero(t, expired.ResponseTo)
-	require.Zero(t, s.Stats().BufferedBytes)
+	require.Equal(t, "ambiguous-sequence", expired.Session["Association"])
+	require.EqualValues(t, 4352, s.Stats().BufferedBytes, "retained sequence marker is charged, request body released")
 	fresh := event("a:40000", "b:8805", d0, ts.Add(pfcpIdleTTL))
 	require.True(t, a.decodeDiscoveryDatagram(fresh, q, 40000, 8805, "pfcp"))
-	require.NotEqual(t, first.FlowID, fresh.FlowID)
+	require.Equal(t, first.FlowID, fresh.FlowID, "idle alone cannot prove a new peer generation")
+	require.Equal(t, "ambiguous-sequence", fresh.Session["Association"])
+	require.Zero(t, fresh.TransactionID)
 	s.Close("scope")
 	require.Zero(t, s.Stats().BufferedBytes)
 	require.Nil(t, a.udpSessions)

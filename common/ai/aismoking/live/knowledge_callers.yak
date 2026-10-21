@@ -1,0 +1,6 @@
+// Explicit live run against configured AI/embeddings; owned random fixtures are cleaned up.
+// AISMOKING_OUTPUT must be a fresh directory. Never run with the mock runner's home.
+include "common/ai/aismoking/knowledge_callers.inc"
+assert os.Getenv("AISMOKING_OUTPUT")!=""
+for focus in ["default","report_generating","infosec_recon"] { for native in [false,true] { runKnowledgeCaller(focus,native,nil) } }
+println("AISMOKING_LIVE_PASS")

@@ -88,7 +88,6 @@ type ReActLoop struct {
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
 	planExecActionType string
-	allowRAG           func() bool
 	allowToolCall      func() bool
 	allowUserInteract  func() bool
 
@@ -481,11 +480,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		}
 	}
 
-	if r.allowRAG != nil && r.allowRAG() {
-		info["AllowKnowledgeEnhanceAnswer"] = true
-	} else {
-		info["AllowKnowledgeEnhanceAnswer"] = false
-	}
+	info["AllowKnowledgeEnhanceAnswer"] = true // Legacy template key; retrieval uses Skill-guided tools.
 
 	if r.allowToolCall != nil && !r.allowToolCall() { // default allow tool call
 		info["AllowToolCall"] = false
@@ -852,15 +847,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if loadCap := optionalRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOAD_CAPABILITY, "optional capability discovery"); loadCap != nil {
 			r.actions.Set(loadCap.ActionType, loadCap)
 		}
-	}
-
-	if r.allowRAG == nil || r.allowRAG() {
-		// allow tool call, must have tools
-		ins, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE, "knowledge enhancement enabled")
-		if err != nil {
-			return nil, err
-		}
-		r.actions.Set(ins.ActionType, ins)
 	}
 
 	if r.allowAIForge == nil || r.allowAIForge() {

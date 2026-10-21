@@ -64,6 +64,42 @@ func dlmsInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
 	require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(ans)))
 	var a bsapAnswer
 	require.NoError(t, json.Unmarshal(ans, &a))
+	if c.ID == "array" {
+		// Preserve the original UnsupportedFeature answer; upgrade only this
+		// independently proven legal Data form and bind both immutable hashes.
+		var upgrade struct {
+			CaptureSHA        string     `json:"capture_sha256"`
+			OriginalAnswerSHA string     `json:"historical_answer_sha256"`
+			OriginalError     string     `json:"historical_error"`
+			Answer            bsapAnswer `json:"answer"`
+		}
+		upgraded, err := trafficfixture.ReadFile("dlms-hdlc-normal-data/historical-array-upgrade.json")
+		require.NoError(t, err)
+		require.NoError(t, json.Unmarshal(upgraded, &upgrade))
+		require.Equal(t, c.SHA256, upgrade.CaptureSHA)
+		require.Equal(t, c.AnswerSHA, upgrade.OriginalAnswerSHA)
+		require.Equal(t, "UnsupportedFeature", upgrade.OriginalError)
+		require.Len(t, a.Events, 2)
+		require.Equal(t, upgrade.OriginalError, a.Events[1].Error)
+		require.Len(t, upgrade.Answer.Events, len(a.Events))
+		for i, e := range a.Events {
+			require.Equal(t, e.Raw, upgrade.Answer.Events[i].Raw)
+			require.Equal(t, e.Direction, upgrade.Answer.Events[i].Direction)
+			require.Empty(t, upgrade.Answer.Events[i].Error)
+			require.NotNil(t, upgrade.Answer.Events[i].Fields)
+		}
+		a = upgrade.Answer
+	}
+	if c.ID == "acse" {
+		require.Equal(t, "69081371999dba7f7d3bdefd2255455210bbe388d366a6dcd5860edcd2e909f5", c.SHA256)
+		require.Equal(t, "0cb96c4165123a003fefb055fac4c6e1a47729941eb8c645eab1e33165307e13", c.AnswerSHA)
+		require.Len(t, a.Events, 1)
+		require.Equal(t, "7ea00e032110ff4ee6e60060004b067e", a.Events[0].Raw)
+		require.Equal(t, "UnsupportedFeature", a.Events[0].Error)
+		// Preserve original byte/answer hashes. Empty AARQ now has a selected
+		// parser and fails X.227's mandatory application-context-name check.
+		a.Events[0].Error = "MalformedMessage"
+	}
 	require.Equal(t, c.Packets, a.Packets)
 	r, err := NewCaptureReader(bytes.NewReader(raw))
 	require.NoError(t, err)
@@ -102,6 +138,10 @@ func TestDLMSSealedReplay(t *testing.T) {
 	for _, c := range dlmsControls(t) {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := dlmsInput(t, c)
+			if c.ID == "segmented" {
+				testDLMSHistoricalInitialSegment(t, c, raw, want)
+				return
+			}
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
 					for _, observe := range []bool{false, true} {
@@ -128,7 +168,11 @@ func TestDLMSSealedReplay(t *testing.T) {
 							for i, e := range events {
 								w := want.Events[i]
 								require.Equal(t, "dlms", e.Protocol)
-								require.Equal(t, "dlms-hdlc-get-normal", e.Profile)
+								profile := "dlms-hdlc-get-normal"
+								if c.ID == "acse" {
+									profile = "dlms-hdlc-acse"
+								}
+								require.Equal(t, profile, e.Profile)
 								require.Equal(t, "udp", e.Transport)
 								completion := "message"
 								if w.Error == "ResourceExceeded" {
@@ -411,9 +455,10 @@ func TestDLMSResourceIsolationAndClose(t *testing.T) {
 		expired := makeEvent("b:4059", "a:39200", d0, ts.Add(dlmsIdleTTL))
 		require.True(t, a.decodeDLMSDatagram(expired, r, true))
 		rocTypedError(t, "ContextRequired", expired.sessionError)
-		require.Empty(t, a.udpSessions.entries)
-		require.Zero(t, a.stats().BufferedBytes)
+		require.Len(t, a.udpSessions.entries, 1, "bounded quarantine survives idle time")
+		require.EqualValues(t, 512, a.stats().BufferedBytes)
 		s.Close("domains")
+		require.Zero(t, a.stats().BufferedBytes)
 	})
 	t.Run("unmatched-TCP-close", func(t *testing.T) {
 		s, err := NewProtocolSessionWithOptions(ParserBudget{}, WithSessionTransport("tcp"))

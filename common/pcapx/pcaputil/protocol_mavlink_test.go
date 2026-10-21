@@ -59,6 +59,8 @@ func mavlinkTestPayload(id uint32) []byte {
 }
 
 func TestMAVLinkCompleteFields(t *testing.T) {
+	t.Run("attitude", testMAVLinkAttitudeMatrix)
+	t.Run("gps-raw-int", testMAVLinkGPSMatrix)
 	for _, version := range []int{1, 2} {
 		for _, id := range []uint32{0, 1, 33} {
 			def, _ := mavlinkDefinitionFor(id)
@@ -119,6 +121,7 @@ func TestMAVLinkCompleteFields(t *testing.T) {
 }
 
 func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
+	t.Run("signing", testMAVLinkSigning)
 	for _, id := range []uint32{1, 33} {
 		def, _ := mavlinkDefinitionFor(id)
 		messages, err := decodeMAVLinkDatagram(mavlinkTestFrame(2, id, []byte{42}, 0, def.extra), 280, 1)
@@ -155,6 +158,9 @@ func TestMAVLinkV2ZeroTailAndOpaqueSignature(t *testing.T) {
 }
 
 func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
+	t.Run("common-depth", testMAVLinkCommonDepthBudget)
+	t.Run("attitude-budgets", testMAVLinkAttitudeBudgets)
+	t.Run("gps-budgets", testMAVLinkGPSBudgets)
 	valid := mavlinkTestFrame(2, 0, mavlinkTestPayload(0), 0, 50)
 	controls := map[string][]byte{
 		"bad-crc":                    append(bytes.Clone(valid[:len(valid)-1]), valid[len(valid)-1]^1),
@@ -202,6 +208,7 @@ func TestMAVLinkFailsClosedAndDatagramBoundaries(t *testing.T) {
 }
 
 func TestMAVLinkCopackedEvidenceOwnership(t *testing.T) {
+	t.Run("existing-field-queries", testMAVLinkExistingQueries)
 	wire, err := trafficfixture.ReadFile("incremental-mvp/mavlink/captures/copacked-heartbeat-position.pcap")
 	require.NoError(t, err)
 	for _, deferred := range []bool{false, true} {
@@ -224,5 +231,78 @@ func TestMAVLinkCopackedEvidenceOwnership(t *testing.T) {
 		after, err := second.GetFields()
 		require.NoError(t, err)
 		require.Equal(t, before, after)
+		assertMAVLinkOwnedSession(t, first)
+		assertMAVLinkOwnedSession(t, second)
 	}
+}
+
+// The enclosing tests validate these fields against independent complete
+// answers first. This helper checks ownership without deriving a wire oracle
+// from the implementation, including nested numeric and opaque signature data.
+func assertMAVLinkOwnedSession(t *testing.T, e *ProtocolEvent) {
+	t.Helper()
+	want, err := e.GetFields()
+	require.NoError(t, err)
+	public := e.Session
+	defer func() { e.Session = public }()
+	for _, session := range []map[string]any{e.Session, {"forged": true}, nil} {
+		e.Session = session
+		if session != nil {
+			session["Message ID"] = uint32(999)
+			if fields, ok := session["Message Fields"].(map[string]any); ok {
+				clear(fields)
+			}
+		}
+		d, err := e.Decode()
+		require.NoError(t, err)
+		require.Equal(t, want, protocolFields(d))
+		got := d["session"].(map[string]any)
+		require.Equal(t, want, got)
+		got["Message ID"] = uint32(998)
+		clear(got["Message Fields"].(map[string]any))
+		if signature, ok := got["Signature"].([]byte); ok {
+			clear(signature)
+		}
+		d, err = e.Decode()
+		require.NoError(t, err)
+		require.Equal(t, want, protocolFields(d))
+		require.Equal(t, want, d["session"])
+		require.Zero(t, e.ResponseTo)
+		require.Zero(t, e.TransactionID)
+	}
+}
+
+// Unlike the generic *-native helper, this must execute for every MAVLink
+// profile. Compare the independent complete answer before ownership probes;
+// query equality with itself is not a semantic golden.
+func assertMAVLinkGoldenSession(t *testing.T, e *ProtocolEvent, want map[string]any) {
+	t.Helper()
+	require.Equal(t, "mavlink", e.Protocol)
+	require.Contains(t, []string{"mavlink-common-three-messages", "mavlink-common-gps-raw-int", "mavlink-common-attitude"}, e.Profile)
+	saved := cloneSession(e.Session)
+	defer func() { e.Session = saved }()
+	mavlinkGPSEqual(t, want, e.Session)
+	query := func() {
+		fields, err := e.GetFields()
+		require.NoError(t, err)
+		mavlinkGPSEqual(t, want, fields)
+		tree, err := e.Decode()
+		require.NoError(t, err)
+		mavlinkGPSEqual(t, want, protocolFields(tree))
+		session, ok := tree["session"].(map[string]any)
+		require.True(t, ok)
+		mavlinkGPSEqual(t, want, session)
+		mutateRTPSQuery(fields)
+		mutateRTPSQuery(protocolFields(tree))
+		mutateRTPSQuery(session)
+	}
+	query()
+	mutateRTPSQuery(e.Session)
+	query()
+	e.Session = map[string]any{"caller": "replacement"}
+	query()
+	e.Session = nil
+	query()
+	require.Zero(t, e.ResponseTo)
+	require.Zero(t, e.TransactionID)
 }

@@ -79,6 +79,7 @@ func m2bPreparedSteps(deprecated, cursor bool) []sessionStep {
 	return steps
 }
 func TestM2MySQLPreparedState(t *testing.T) {
+	t.Run("live-column-ownership", testMySQLPreparedLiveOwnership)
 	for _, mode := range []struct{ deprecated, cursor bool }{{false, false}, {true, false}, {false, true}} {
 		t.Run(fmt.Sprint(mode), func(t *testing.T) {
 			steps := m2bPreparedSteps(mode.deprecated, mode.cursor)
@@ -104,6 +105,18 @@ func TestM2MySQLPreparedState(t *testing.T) {
 			steps = append(steps, sessionStep{0, mysqlTestPacket(0, []byte{0x1a, 1, 0, 0, 0})})
 			ev, _ := sessionTestFlow(t, "mysql", steps, 0, false)
 			require.Equal(t, "context-required", ev[len(ev)-1].Status)
+			refused := ev[len(ev)-1]
+			id, flow, response, transaction := refused.ID, refused.FlowID, refused.ResponseTo, refused.TransactionID
+			refused.Status, refused.Error = "decoded", ""
+			refused.Session = map[string]any{"Statement ID": uint32(1), "Session State Validated": true}
+			refused.Fields, refused.Structured = refused.Session, map[string]any{"fields": refused.Session}
+			fields, err := refused.GetFields()
+			require.Nil(t, fields)
+			assertOwnedProtocolRefusal(t, refused, string(ErrContextRequired), err)
+			require.Equal(t, id, refused.ID)
+			require.Equal(t, flow, refused.FlowID)
+			require.Equal(t, response, refused.ResponseTo)
+			require.Equal(t, transaction, refused.TransactionID)
 		})
 	}
 	t.Run("error-mid-result", func(t *testing.T) {
@@ -137,6 +150,41 @@ func TestM2MySQLPreparedState(t *testing.T) {
 			}
 		}
 	})
+}
+
+// Reuse the established complete handshake/prepare/execute/reset/close steps.
+// Column names and binary integers have literal independent expected values;
+// editing an earlier event must not change later statement metadata or rows.
+func testMySQLPreparedLiveOwnership(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		s, err := NewProtocolSession(DefaultParserBudget())
+		require.NoError(t, err)
+		s.(*captureSession).f.a.config.Deferred = deferred
+		rows := 0
+		for i, step := range m2bPreparedSteps(false, false) {
+			r := s.Feed(step.dir, time.Unix(1, int64(i)*int64(time.Millisecond)), step.wire)
+			require.Nil(t, r.Err)
+			for _, e := range r.Events {
+				if e.Entry != "MySQLPreparedFields" {
+					continue
+				}
+				if values, ok := e.Session["Values"].([]map[string]any); ok {
+					require.Len(t, values, 1)
+					require.Equal(t, []byte("x"), values[0]["Name"])
+					require.Equal(t, int64(42+rows), values[0]["Value"])
+					rows++
+				}
+				// Both the column projection and raw column packet used to
+				// expose the live retained statement dictionary.
+				mutateRTPSQuery(e.Session)
+				clear(e.Raw)
+			}
+		}
+		require.Equal(t, 2, rows)
+		s.Close("done")
+		s.Close("again")
+		require.Zero(t, s.Stats().BufferedBytes)
+	}
 }
 func TestM2PostgresPipelinedPortal(t *testing.T) {
 	startup := pgSessionUntyped(196608, []byte("user\x00m2\x00\x00"))

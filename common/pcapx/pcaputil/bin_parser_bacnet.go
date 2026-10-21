@@ -42,7 +42,10 @@ func inspectBACnetIP(wire []byte) (bacnetIPEnvelope, bool) {
 	// This profile uses the rule's fixed two-byte NPDU header. Routed packets
 	// and network-layer messages need a different NPDU layout and stay outside
 	// this recognition slice rather than being mislabeled as APDU bytes.
-	if control&(0x80|0x20|0x01) != 0 {
+	// Bits7/5/3 change the NPDU layout (network/destination/source).
+	// Reserved bits6/4 must be zero. Bits1/0 are legal network priority;
+	// bit2 reports expecting-reply and does not extend this header.
+	if control&0xf8 != 0 {
 		return out, false
 	}
 	at := 6
@@ -155,6 +158,8 @@ func (a *binParser) decodeBACnetDatagram(e *ProtocolEvent, wire []byte) bool {
 		e.Summary = fmt.Sprintf("BACnet/IP %s", envelope.serviceName)
 	}
 
+	// Accepted observations own query context independently of public projections.
+	e.semanticSession = cloneSession(e.Session)
 	a.messages.Add(1)
 	a.messageBytes.Add(uint64(len(wire)))
 	result, err := e.Decode()
@@ -173,7 +178,7 @@ func (a *binParser) decodeBACnetDatagram(e *ProtocolEvent, wire []byte) bool {
 		fields["Complete BVLC PDU"] = bytes.Clone(wire)
 		// These envelope observations are part of the decoded field contract.
 		// A deferred retry of the YAML rule alone cannot reconstruct them.
-		e.semanticFields = cloneSession(fields)
+		e.retainRuleEnvelope(result)
 	}
 	if a.config.Deferred {
 		e.Structured = nil

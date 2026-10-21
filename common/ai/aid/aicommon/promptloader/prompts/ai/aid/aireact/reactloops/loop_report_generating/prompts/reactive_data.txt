@@ -62,7 +62,7 @@
 {{ if .AvailableKnowledgeBases }}
 {{ .AvailableKnowledgeBases }}
 {{ else }}
-暂无可用的知识库。
+尚未附加精确库名；如需知识库依据，先通过 manage_knowledge_base(op=list) 查看并选择。
 {{ end }}
 
 {{ if .FeedbackMessages }}
@@ -78,7 +78,7 @@
 1. 先使用查资料工具收集信息：
    - `read_reference_file` 阅读参考文件
    - `grep_reference` 搜索关键词
-   - `search_knowledge` 知识库搜索
+   - 按 `yaklang-system` Skill 调用 `query_knowledge_base`；缺少范围先 manage list，查询指定完整库名与 token_limit
 2. 收集足够资料后使用 `write_section` 创建初稿
 
 ### 如果报告已有内容

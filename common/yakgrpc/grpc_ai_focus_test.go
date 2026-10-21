@@ -25,6 +25,10 @@ func TestYak_GetAIReActLoopMetadata(t *testing.T) {
 		names = append(names, meta.GetName())
 	}
 
+	require.NotContains(t, names, "smart_qa", "retired focus mode must not be offered to clients")
+	require.Contains(t, names, schema.AI_REACT_LOOP_NAME_REPORT_GENERATING,
+		"report generation is used by code audit, Skill audit and directory exploration")
+
 	var yaklangMeta *ypb.AIFocus
 	for _, meta := range resp.GetData() {
 		if meta.GetName() == schema.AI_REACT_LOOP_NAME_WRITE_YAKLANG {

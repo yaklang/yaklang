@@ -120,14 +120,14 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 	sort.Sort(byName(blocks))
 	sort.Sort(byIndex(blocks))
 	sort.Sort(byRarity(blocks))
-	blocks = funk.Filter(blocks, func(block *RuleBlock) bool {
-		if block.Probe == nil {
-			if block.Probe.Rarity > config.RarityMax {
-				return false
-			}
+	kept := blocks[:0]
+	for _, block := range blocks {
+		if block == nil || block.Probe == nil {
+			continue
 		}
-		return true
-	}).([]*RuleBlock)
+		kept = append(kept, block)
+	}
+	blocks = kept
 	if config.ProbesMax > 0 && config.ProbesMax < len(blocks) {
 		log.Debugf("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(blocks))
 		return emptyBlock, blocks[:config.ProbesMax], false

@@ -33,8 +33,9 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 	oldMock := vectorstore.IsMockMode
 	vectorstore.IsMockMode = true
 	t.Cleanup(func() { vectorstore.IsMockMode = oldMock })
-	for _, native := range []bool{false, true} {
-		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
+	for _, scenario := range []struct{ native, focus bool }{{false, false}, {true, false}, {false, true}, {true, true}} {
+		native, focused := scenario.native, scenario.focus
+		t.Run(fmt.Sprintf("native=%t/focus=%t", native, focused), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 			defer cancel()
 			workdir := t.TempDir()
@@ -43,6 +44,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 			defer profile.Close()
 			var outputs []string
 			var tools []*aitool.Tool
+			var afterTool func()
 			for _, name := range []string{"manage_knowledge_base", "query_knowledge_base"} {
 				source, err := yakscripttools.GetEmbedFS().ReadFile("yakscriptforai/knowledge/" + name + ".yak")
 				require.NoError(t, err)
@@ -61,10 +63,24 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 					var output bytes.Buffer
 					result, err := callback(ctx, params, bound, io.MultiWriter(stdout, &output), stderr)
 					outputs = append(outputs, output.String())
+					if afterTool != nil {
+						afterTool()
+					}
 					return result, err
 				}
 				tools = append(tools, tool)
 			}
+			// Budget both knowledge schemas exactly, then create real LRU pressure.
+			probe := buildinaitools.NewToolManagerByToolGetter(func() []*aitool.Tool { return tools })
+			cacheBudget := 64
+			for _, tool := range tools {
+				cacheBudget += probe.AddRecentlyUsedToolForMode(tool, native).Upsert.Size
+			}
+			pressure, err := aitool.New("context_cache_pressure", aitool.WithDescription(strings.Repeat("cache pressure ", cacheBudget)),
+				aitool.WithSimpleCallback(func(aitool.InvokeParams, io.Writer, io.Writer) (any, error) {
+					return nil, fmt.Errorf("cache pressure tool must never execute")
+				}))
+			require.NoError(t, err)
 			file := filepath.Join(workdir, "knowledge.txt")
 			require.NoError(t, os.WriteFile(file, []byte("FILE_MARKER\nAPI requests require X-Knowledge-Token."), 0600))
 			type step struct {
@@ -88,7 +104,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				manage("list", "", map[string]any{"limit": 1}),
 				manage("get", "docs", nil),
 				manage("update", "docs", map[string]any{"metadata": map[string]any{"description": "", "tags": []string{}, "is_default": false}}),
-				manage("add_entry", "docs", map[string]any{"entry": map[string]any{"title": "API token", "content": "ORIGINAL_MARKER " + strings.Repeat("原文\"\\😀\n", 100)}}),
+				manage("add_entry", "docs", map[string]any{"entry": map[string]any{"title": "API token", "content": "ORIGINAL_MARKER " + strings.Repeat("鍘熸枃\"\\馃榾\n", 100)}}),
 				query(map[string]any{"name": "docs", "query": "ORIGINAL_MARKER", "per_entry_token_limit": 256}),
 				query(map[string]any{"name": "docs", "mode": "get", "entry_id": "pending", "content_offset": -1}),
 				manage("update_entry", "docs", map[string]any{"entry_id": "pending", "entry": map[string]any{"title": "updated", "content": "NEW_MARKER API token"}}),
@@ -103,10 +119,12 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				manage("delete", "docs", nil), manage("delete", "other", nil), manage("list", "", nil),
 			}
 			var runtime *aireact.ReAct
+			var loop *reactloops.ReActLoop
 			var task aicommon.AIStatefulTask
 			cursor, checked, requires := 0, 0, 0
 			loaded := map[string]bool{}
 			skillLoaded := false
+			evicted, skillReloaded := false, false
 			entryID, continuation := "", 0
 			respond := func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest, name string, args map[string]any) (*aicommon.AIResponse, error) {
 				response := c.NewAIResponse()
@@ -136,8 +154,13 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 					return nil, fmt.Errorf("unexpected AI request: %s", req.GetCallerLabel())
 				}
 				prompt := req.GetPrompt()
-				if !skillLoaded {
+				if (!skillLoaded && !focused) || (evicted && !skillReloaded) {
 					require.Contains(t, prompt, "yaklang-system", "the actual Skill must appear in the catalog")
+					if evicted {
+						require.NotContains(t, prompt, "本 Skill 统一描述 Yaklang 引擎", "automatically loaded content must remain evictable")
+						require.False(t, loop.GetSkillsContextManager().IsSkillLoaded("yaklang-system"))
+						skillReloaded = true
+					}
 					skillLoaded = true
 					return respond(c, req, "loading_skills", map[string]any{"skill_name": "yaklang-system"})
 				}
@@ -203,11 +226,17 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				}
 				next := steps[cursor]
 				manager := runtime.GetConfig().GetAiToolManager()
-				if !loaded[next.tool] {
+				if (!loaded[next.tool] && !focused) || (focused && !manager.IsRecentlyUsedTool(next.tool)) {
 					require.False(t, manager.IsRecentlyUsedTool(next.tool), "require must cause schema promotion")
+					if focused {
+						require.True(t, evicted, "both definitions must be available before cache pressure")
+					}
 					loaded[next.tool] = true
 					requires++
 					return respond(c, req, "require_tool", map[string]any{"require_tool_payload": next.tool})
+				}
+				if focused {
+					require.Contains(t, prompt, "ATTACHED_SELECTION_NOTE")
 				}
 				require.True(t, manager.IsRecentlyUsedTool(next.tool))
 				contextSchema := prompt
@@ -233,19 +262,47 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 			}
 			runtime, err = aireact.NewTestReAct(aicommon.WithSkillsFS(aireact.GetBuiltinSkillsFS()), aicommon.WithContext(ctx), aicommon.WithEnableFunctionCallMode(native),
 				aicommon.WithSingleAIModelMode(true), aicommon.WithDisableAutoSkills(true), aicommon.WithNoOpMemoryTriage(),
-				aicommon.WithAiToolManagerOptions(buildinaitools.WithExtendTools(tools, false)),
+				aicommon.WithAiToolManagerOptions(buildinaitools.WithExtendTools(append(tools, pressure), false), buildinaitools.WithRecentToolCacheMaxTokens(cacheBudget)),
 				aicommon.WithWorkdir(workdir), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithAgreeYOLO(),
 				aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithAICallback(callback))
 			require.NoError(t, err)
 			task = aicommon.NewStatefulTaskBase("knowledge-integration", "Use the system Skill to manage and query knowledge bases.", ctx, runtime.GetConfig().GetEmitter(), true)
 			runtime.SetCurrentTask(task)
-			loop, err := reactloops.CreateLoopByName(schema.AI_REACT_LOOP_NAME_DEFAULT, runtime, reactloops.WithMaxIterations(32))
+			loopName := schema.AI_REACT_LOOP_NAME_DEFAULT
+			if focused {
+				loopName = schema.AI_REACT_LOOP_NAME_KNOWLEDGE_ENHANCE
+				task.SetAttachedDatas([]*aicommon.AttachedResource{aicommon.NewAttachedResource(aicommon.AttachedResourceTypeKnowledgeBase, aicommon.CONTEXT_PROVIDER_KEY_NAME, "ATTACHED_SELECTION_NOTE: prefer the newly created integration fixture")})
+				runtime.GetConfig().SetConfig("AllowSyncInitContext", true)
+				runtime.GetConfig().SetConfig("MustProcessAttachedData", true)
+				runtime.GetConfig().SetConfig("DisableIntentRecognition", true)
+			}
+			loop, err = reactloops.CreateLoopByName(loopName, runtime, reactloops.WithMaxIterations(32))
 			require.NoError(t, err)
-			require.Equal(t, schema.AI_REACT_LOOP_NAME_DEFAULT, loop.GetLoopName())
+			require.Equal(t, loopName, loop.GetLoopName())
 			defer loop.Release()
+			if focused {
+				afterTool = func() {
+					if len(outputs) != 2 {
+						return
+					}
+					require.Zero(t, requires, "initial automatic loading must save require_tool turns")
+					mutation := loop.RecordRecentlyUsedTool(pressure)
+					require.Len(t, mutation.Deleted, 2, "both focus schemas follow normal LRU eviction")
+					require.True(t, loop.GetSkillsContextManager().UnloadSkill("yaklang-system"))
+					runtime.GetConfig().(*aicommon.Config).GetTimeline().FreezeAll()
+					evicted = true
+				}
+			}
 			require.NoError(t, loop.ExecuteWithExistedTask(task))
 			require.Equal(t, len(steps), checked)
-			require.Equal(t, 2, requires, "both schemas must be explicitly required")
+			if focused {
+				// The completed manage call recaches its own schema normally;
+				// the evicted query schema needs a real require_tool action.
+				require.Equal(t, 1, requires)
+				require.True(t, evicted && skillReloaded && loop.GetSkillsContextManager().IsSkillLoaded("yaklang-system"))
+			} else {
+				require.Equal(t, 2, requires, "both schemas must be explicitly required")
+			}
 			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
 			var count int
 			require.NoError(t, profile.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)

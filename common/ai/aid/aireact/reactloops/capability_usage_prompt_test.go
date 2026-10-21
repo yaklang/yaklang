@@ -10,7 +10,7 @@ func TestCapabilityUsageGuidesMatchExecutionEntries(t *testing.T) {
 	markdown := BuildCapabilityEnrichmentMarkdown([]CapabilityDetail{
 		{CapabilityName: "read_file", CapabilityType: "tool"},
 		{CapabilityName: "mcp_server_read", CapabilityType: "mcp-tool"},
-		{CapabilityName: "smart_qa", CapabilityType: "focus_mode"},
+		{CapabilityName: "report_generating", CapabilityType: "focus_mode"},
 	}, nil)
 	require.Contains(t, markdown, "已广告工具专用 action")
 	require.Contains(t, markdown, "`require_tool` 仅加载定义")

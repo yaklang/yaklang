@@ -24,7 +24,7 @@ type fragmentKey struct {
 type ipFragment struct {
 	start int
 	data  []byte
-	ref   PacketReference
+	refs  []PacketReference
 }
 type fragmentSet struct {
 	parts    []ipFragment
@@ -60,7 +60,16 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			payload = payload[4:]
 		}
 		if etherType == layers.EthernetType(0x8892) {
-			a.decodeDCPEthernet(p.Data(), e, ci)
+			frame := p.Data()
+			// The DCP wire codec takes the observed Ethernet frame, not its PPI
+			// metadata prefix. Select only a validated, declared PPI layer; never
+			// guess/strip a prefix from ordinary Ethernet or change packet identity.
+			if decoded := p.Layers(); len(decoded) > 0 {
+				if ppi, ok := decoded[0].(*capturePPILayer); ok {
+					frame = ppi.payload
+				}
+			}
+			a.decodeDCPEthernet(frame, e, ci)
 			return nil, true
 		}
 		if etherType == layers.EthernetType(0x88cc) {
@@ -102,17 +111,27 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				unsupportedTunnel = true
 			}
 		case *layers.IPv4:
-			if v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6 {
+			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
 				tunnels++
 			}
 		}
 	}
 	if networks > 1 {
-		if unsupportedTunnel || tunnels == 0 || tunnels > 4 || networks != tunnels+1 {
+		// The inner carrier can become visible only after outer reassembly.
+		// Every contributing fragment belongs to that same reconstructed domain.
+		e.refs = append([]PacketReference(nil), e.refs...)
+		for i := range e.refs {
+			e.refs[i].Domain = e.Ref.Domain
+		}
+		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
 			a.networkDiagnostic(e, ci, "limited", "EncapsulationDepthOrProfile")
 			return nil, true
 		}
+		e.normalizedTunnels += tunnels
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
+		// Fragmentation of an outer carrier does not mean that the inner
+		// IPv6 ND message itself contained a Fragment header.
+		e.ipv6Fragment = false
 		ci.CaptureLength, ci.Length = len(raw), len(raw)
 		ci = withEvidence(ci, e)
 		p = gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
@@ -145,8 +164,46 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if off >= 0 {
-		return a.fragment(p, e, key, off, more, payload)
+		q, consumed := a.fragment(p, e, key, off, more, payload)
+		// fragment() releases its store mutex before this dispatch. A complete
+		// datagram must pass through tunnel normalization and native observation
+		// before transport dispatch; the decoded outer IP is not the inner peer.
+		if !consumed && q != nil {
+			return a.networkPacket(q)
+		}
+		return q, consumed
 	}
+
+	// Check native observation admission before constructing or cloning field trees,
+	// quoted packets, ND options or the captured Raw projection. Capture buffers
+	// retained by the driver/caller are outside this parser's resource contract.
+	nativeProtocol := ""
+	if p.Layer(layers.LayerTypeARP) != nil {
+		nativeProtocol = "arp"
+	} else if p.Layer(layers.LayerTypeICMPv4) != nil {
+		nativeProtocol = "icmp"
+	} else if p.Layer(layers.LayerTypeICMPv6) != nil {
+		nativeProtocol = "icmpv6"
+	}
+	if nativeProtocol != "" && len(p.Data()) > min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes) {
+		err := protocolError(ErrResourceExceeded, "native network frame exceeds parser message limit")
+		status, typed := classifySessionError(err)
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: nativeProtocol, Domain: e.Ref.Domain, Length: len(p.Data()), Status: status, Completeness: status, ExpertCode: string(typed.Kind), Error: err.Error(), sessionError: typed, SourceBytes: networkObservationSource(e)}
+		if n := p.NetworkLayer(); n != nil {
+			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
+		}
+		if arp, ok := p.Layer(layers.LayerTypeARP).(*layers.ARP); ok {
+			if arp.Protocol == layers.EthernetTypeIPv4 && arp.ProtAddressSize == 4 {
+				event.Source, event.Destination = net.IP(arp.SourceProtAddress).String(), net.IP(arp.DstProtAddress).String()
+			} else {
+				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
+			}
+		}
+		a.limited.Add(uint64(len(p.Data())))
+		a.emit(event)
+		return nil, true
+	}
+
 	var protocol string
 	var fields map[string]any
 	if arp, ok := p.Layer(layers.LayerTypeARP).(*layers.ARP); ok {
@@ -154,6 +211,14 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		fields = map[string]any{"Operation": arp.Operation, "Sender MAC": net.HardwareAddr(arp.SourceHwAddress).String(), "Sender IP": net.IP(arp.SourceProtAddress).String(), "Target IP": net.IP(arp.DstProtAddress).String(), "Observation": "unverified-neighbor"}
 	} else if icmp, ok := p.Layer(layers.LayerTypeICMPv6).(*layers.ICMPv6); ok {
 		protocol = "icmpv6"
+		// RFC 6980 section 5 forbids a Fragment header on ND types133..137,
+		// including atomic fragments. Keep a diagnostic, never a valid ND
+		// projection. SEND CPA/message types outside this range are distinct.
+		if e.ipv6Fragment && icmp.TypeCode.Type() >= 133 && icmp.TypeCode.Type() <= 137 {
+			a.malformed.Add(1)
+			a.networkDiagnostic(e, ci, "malformed", "NDFragmentForbidden")
+			return nil, true
+		}
 		fields = map[string]any{"Type": icmp.TypeCode.Type(), "Code": icmp.TypeCode.Code()}
 		typ := icmp.TypeCode.Type()
 		b := icmp.Payload
@@ -212,7 +277,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if protocol != "" {
-		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: fields, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}, semanticFields: fields}
+		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -224,7 +289,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
 			}
 		}
-		event.Structured = map[string]any{"fields": fields}
+		event.Structured = map[string]any{"fields": cloneSession(fields)}
 		a.messages.Add(1)
 		a.decoded.Add(1)
 		a.emit(event)
@@ -294,6 +359,7 @@ func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, ev
 	} else {
 		e.Status, e.Completeness = "decoded", "message"
 		e.Structured = result
+		e.retainRuleEnvelope(result)
 		e.Summary = fmt.Sprintf("GOOSE state %v sequence %v", e.Session["State Number"], e.Session["Sequence Number"])
 		a.messages.Add(1)
 		a.messageBytes.Add(uint64(length))
@@ -302,8 +368,15 @@ func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, ev
 	a.emit(e)
 }
 
+func networkObservationSource(e captureEvidence) ByteSource {
+	if len(e.refs) != 0 {
+		return ByteSource{Kind: "reassembled", PacketRefs: append([]PacketReference(nil), e.refs...)}
+	}
+	return ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}
+}
+
 func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo, status, code string) {
-	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}})
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: status, Completeness: status, ExpertCode: code, Error: code, SourceBytes: networkObservationSource(e)})
 }
 func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentKey, off int, more bool, payload []byte) (gopacket.Packet, bool) {
 	ci := p.Metadata().CaptureInfo
@@ -403,7 +476,20 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		}
 		v.end = off + len(payload)
 	}
-	cost := int64(len(payload) + 128)
+	refs := e.refs
+	if len(refs) == 0 {
+		refs = []PacketReference{e.Ref}
+	}
+	contributors := len(refs)
+	for _, part := range v.parts {
+		contributors += len(part.refs)
+	}
+	if contributors > min(128, a.budget.MaxCollectionElements) {
+		return invalid("FragmentRangeBudget")
+	}
+	// Reconstructed fragments can themselves contain reconstructed carriers.
+	// Retain and charge every physical contributor, not only the final arrival.
+	cost := int64(len(payload) + 128*len(refs))
 	var header []byte
 	if off == 0 {
 		var err error
@@ -424,7 +510,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if header != nil {
 		v.header = header
 	}
-	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), e.Ref})
+	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), append([]PacketReference(nil), refs...)})
 	sort.Slice(v.parts, func(i, j int) bool { return v.parts[i].start < v.parts[j].start })
 	cursor := 0
 	for _, part := range v.parts {
@@ -437,10 +523,10 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		return nil, true
 	}
 	raw := make([]byte, 0, cursor)
-	refs := make([]PacketReference, 0, len(v.parts))
+	refs = make([]PacketReference, 0, contributors)
 	for _, part := range v.parts {
 		raw = append(raw, part.data...)
-		refs = append(refs, part.ref)
+		refs = append(refs, part.refs...)
 	}
 	length := len(v.header) + len(raw)
 	if key.v6 {
@@ -555,6 +641,10 @@ func (a *binParser) reassembledPacket(header, payload []byte, e captureEvidence,
 		binary.BigEndian.PutUint16(raw[10:12], ^uint16(sum))
 	}
 	q := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+	e.ipv6Fragment = v6
+	if len(e.refs) == 0 {
+		e.refs = []PacketReference{e.Ref}
+	}
 	ci.CaptureLength, ci.Length = len(raw), len(raw)
 	ci = withEvidence(ci, e)
 	q.Metadata().CaptureInfo = ci
@@ -577,7 +667,7 @@ func (a *binParser) fragmentDiagnostic(v *fragmentSet, code string) {
 	}
 	refs := make([]PacketReference, 0, len(v.parts))
 	for _, p := range v.parts {
-		refs = append(refs, p.ref)
+		refs = append(refs, p.refs...)
 	}
 	a.emit(&ProtocolEvent{Timestamp: v.last, Transport: "network", Protocol: "ip", Domain: refs[0].Domain, Status: "incomplete", Completeness: "incomplete", ExpertCode: code, Error: code, SourceBytes: ByteSource{Kind: "reassembled", PacketRefs: refs}})
 }
@@ -607,6 +697,7 @@ func dhcp6Options(w []byte, depth, limit int) ([]map[string]any, error) {
 		return nil, protocolError(ErrResourceExceeded, "DHCPv6 option depth")
 	}
 	var out []map[string]any
+	var clientSeen, serverSeen bool
 	for len(w) > 0 {
 		if len(w) < 4 {
 			return nil, fmt.Errorf("DHCPv6 option header")
@@ -622,6 +713,24 @@ func dhcp6Options(w []byte, depth, limit int) ([]map[string]any, error) {
 			return nil, protocolError(ErrResourceExceeded, "DHCPv6 option count")
 		}
 		o := map[string]any{"Code": code, "Raw": bytes.Clone(b)}
+		if code == 1 {
+			if clientSeen {
+				return nil, fmt.Errorf("DHCPv6 duplicate client identifier")
+			}
+			clientSeen = true
+		}
+		if code == 2 {
+			if serverSeen {
+				return nil, fmt.Errorf("DHCPv6 duplicate server identifier")
+			}
+			serverSeen = true
+		}
+		if code == 8 && n != 2 {
+			return nil, fmt.Errorf("DHCPv6 elapsed time width")
+		}
+		if code == 14 && n != 0 {
+			return nil, fmt.Errorf("DHCPv6 Rapid Commit width")
+		}
 		prefix := -1
 		switch code {
 		case 1, 2:
