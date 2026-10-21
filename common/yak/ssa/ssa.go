@@ -400,6 +400,11 @@ type Program struct {
 	// Template Language
 	templateMu sync.Mutex
 	Template   map[string]tl.TemplateGeneratedInfo
+	// templateByBase indexes Template by filepath.Base so TryGetTemplate does
+	// not scan every template. templateMiss remembers basename lookups that
+	// are absent or ambiguous until the next SetTemplate.
+	templateByBase map[string][]templateIndexEntry
+	templateMiss   map[string]struct{}
 
 	config *LanguageConfig
 	ctx    context.Context
