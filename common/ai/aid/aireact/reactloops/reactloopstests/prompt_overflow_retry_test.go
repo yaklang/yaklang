@@ -12,7 +12,7 @@ import (
 )
 
 // A confirmed prompt overflow must not replay the same prompt. The loop records
-// a tighter limit and may retry after folding actually shrinks the prompt.
+// a tighter limit and may retry after the compression action shrinks the prompt.
 // Compression requests are not replays of the main decision request.
 func TestReActLoop_PromptOverflowStopsReplayAndRecordsLimit(t *testing.T) {
 	var mainPromptTokens []int

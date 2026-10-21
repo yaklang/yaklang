@@ -88,8 +88,9 @@ func MockAICallback(t *testing.T, initFlag, persistentFlag, planFlag string) aic
 		case "liteforge[session-title-generator]":
 			return rag.MockAIService(func(string) string { return `{"@action":"session-title-generator","session_title":"Forge builder"}` })(i, req)
 		case aicommon.CallerLabelContextCompress:
-			return forgeBuilderResponse(i, req, "timeline-summary", map[string]any{
-				"summary": "计算已完成，结果为 2。", "ratain_timeline_item_range": "", "memory_entities": []any{},
+			return forgeBuilderResponse(i, req, aicommon.ContextCompressionAction, map[string]any{
+				"summary": "计算已完成，结果为 2。", "retain_timeline": "",
+				"retire_skill_names": []any{}, "retire_evidence_ids": []any{}, "memory_entities": []any{},
 			})
 		case "liteforge[memory-triage]":
 			return rag.MockAIService(func(string) string { return `{"@action":"memory-triage","memory_entities":[]}` })(i, req)

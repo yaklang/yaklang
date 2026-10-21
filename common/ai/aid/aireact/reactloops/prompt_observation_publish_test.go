@@ -78,6 +78,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				var requests []string
 				compressionCalls := 0
 				var historyID int64
+				compactedSummary, originalHistory := uuid.NewString(), uuid.NewString()
 				limit := 3000
 				if mode == "provider_overflow" || mode == "overflow_no_progress" {
 					limit = 10000
@@ -98,12 +99,14 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 								retain = fmt.Sprint(historyID)
 							}
 							return contextCompressionTestResponse(t, c, req, aicommon.ContextCompressionAction, map[string]any{
-								"summary": "COMPACTED_HISTORY", "retain_timeline": retain, "retire_skill_names": []string{}, "retire_evidence_ids": []string{},
+								"summary": compactedSummary, "retain_timeline": retain, "retire_skill_names": []string{}, "retire_evidence_ids": []string{},
 							}, false), nil
 						}
 						requests = append(requests, req.GetPrompt())
-						require.NotContains(t, req.GetPrompt(), "COMPRESSION_MODEL_REASONING")
-						require.NotContains(t, req.GetPrompt(), "compress_context")
+						require.NotContains(t, req.GetPrompt(), compressionReasoningMarker,
+							"compression reasoning must not replay into a normal request")
+						require.NotContains(t, req.GetPrompt(), "# 本轮只压缩上下文",
+							"a normal request must not carry the compression dynamic section")
 						require.Equal(t, aicommon.MeasureTokens(req.GetPrompt()), loop.GetLastPromptToken())
 						if (mode == "provider_overflow" || mode == "overflow_no_progress") && len(requests) == 1 {
 							return nil, promptOverflowErrorFor("openai", "gpt-4o", 5000)
@@ -124,7 +127,7 @@ func TestMainLoopPublishesOnlyRequestedPromptObservations(t *testing.T) {
 				require.NoError(t, err)
 				if mode != "normal" && mode != "overflow_no_progress" {
 					historyID = cfg.AcquireId()
-					cfg.Timeline.PushText(historyID, strings.Repeat("ORIGINAL_HISTORY ", 2000))
+					cfg.Timeline.PushText(historyID, "%s %s", originalHistory, strings.Repeat("history-filler ", 2000))
 				}
 				executeErr := loop.Execute("observation-task", ctx, "continue the task")
 				if mode == "overflow_no_progress" {

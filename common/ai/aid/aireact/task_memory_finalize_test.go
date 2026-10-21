@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
@@ -82,7 +83,8 @@ func TestUserTaskMemoryCompletionWithoutCandidatesDoesNotExtract(t *testing.T) {
 			return nil, fmt.Errorf("completion must not create a memory extraction request")
 		}))
 	require.NoError(t, err)
-	task := aicommon.NewStatefulTaskBase("no-candidates", "UNEXTRACTED_TASK_SOURCE", ctx, r.Emitter, true)
+	source := uuid.NewString()
+	task := aicommon.NewStatefulTaskBase("no-candidates", source, ctx, r.Emitter, true)
 	r.persistTaskUserInput(task)
 	r.completeUserTaskMemory(task)
 	require.Zero(t, calls.Load())
@@ -92,7 +94,7 @@ func TestUserTaskMemoryCompletionWithoutCandidatesDoesNotExtract(t *testing.T) {
 	require.True(t, r.config.Timeline.HasPendingMemoryFinalization())
 	archive, err := aicommon.MarshalTimeline(r.config.Timeline)
 	require.NoError(t, err)
-	require.Contains(t, archive, "UNEXTRACTED_TASK_SOURCE")
+	require.Contains(t, archive, source)
 }
 
 func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
@@ -136,7 +138,8 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 					aicommon.WithAICallback(model), aicommon.WithSpeedPriorityAICallback(model))
 				require.NoError(t, err)
 				restoreFinalizationCandidates(t, r)
-				task := aicommon.NewStatefulTaskBase("full-user", "FULL_USER_TASK: preserve explicit report requirements", ctx, r.Emitter, true)
+				taskSource := uuid.NewString()
+				task := aicommon.NewStatefulTaskBase("full-user", taskSource+": preserve explicit report requirements", ctx, r.Emitter, true)
 				r.setCurrentTask(task)
 				r.persistTaskUserInput(task)
 				task.SetStatus(aicommon.AITaskState_Processing)
@@ -165,7 +168,7 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 				if failure {
 					archive, err := aicommon.MarshalTimeline(r.config.Timeline)
 					require.NoError(t, err)
-					require.Contains(t, archive, "FULL_USER_TASK", "failed save must retain its source")
+					require.Contains(t, archive, taskSource, "failed save must retain its source")
 					require.Zero(t, memory.saved.Load())
 					memory.failed.Store(false)
 					require.NoError(t, aimem.CompleteTimelineMemory(r.config, ctx, task.GetOriginUserInput()))
@@ -215,15 +218,16 @@ func TestUserTaskMemoryAsyncIncludesFinalHostRecords(t *testing.T) {
 				aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(model), aicommon.WithSpeedPriorityAICallback(model), aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1))
 			require.NoError(t, err)
 			restoreFinalizationCandidates(t, r)
-			task := aicommon.NewStatefulTaskBase("async-memory", "ASYNC_MEMORY_TASK", ctx, r.Emitter, true)
+			taskName, taskSource, artifact := uuid.NewString(), uuid.NewString(), uuid.NewString()
+			task := aicommon.NewStatefulTaskBase(taskName, taskSource, ctx, r.Emitter, true)
 			task.SetAsyncMode(true)
 			task.SetStatus(aicommon.AITaskState_Processing)
 			task.SetAsyncDeferCallback(func(err error) { require.NoError(t, err); task.SetStatus(aicommon.AITaskState_Completed) })
 			r.setCurrentTask(task)
 			r.persistTaskUserInput(task)
-			r.config.HijackPERequest = func(context.Context, string) error { r.AddToTimeline("artifact", "FINAL_HOST_ARTIFACT"); return nil }
+			r.config.HijackPERequest = func(context.Context, string) error { r.AddToTimeline("artifact", artifact); return nil }
 			done := make(chan struct{})
-			r.AsyncPlanAndExecute(ctx, "ASYNC_MEMORY_TASK", func(err error) { require.NoError(t, err); close(done) })
+			r.AsyncPlanAndExecute(ctx, taskName, func(err error) { require.NoError(t, err); close(done) })
 			select {
 			case <-memory.started:
 			case <-ctx.Done():
@@ -232,8 +236,8 @@ func TestUserTaskMemoryAsyncIncludesFinalHostRecords(t *testing.T) {
 			require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus())
 			archive, err := aicommon.MarshalTimeline(r.config.Timeline)
 			require.NoError(t, err)
-			require.Contains(t, archive, "plan: ASYNC_MEMORY_TASK is finished")
-			require.Contains(t, archive, "FINAL_HOST_ARTIFACT", "host records must be present before final persistence")
+			require.Contains(t, archive, "plan: "+taskName+" is finished")
+			require.Contains(t, archive, artifact, "host records must be present before final persistence")
 			close(memory.release)
 			select {
 			case <-done:
