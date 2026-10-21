@@ -241,7 +241,9 @@ func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 		// （基础全量 + 差量）禁止展开（disableArchiveExpansion），普通
 		// 全量编译遵循用户的 jar_recursive_parse 设置。
 		jarRecursiveParse := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
-		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
+		fs = c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
 	}
-	return fs
+	// Archive-backed sources decompile on every read. Wrap them so the decompiled tree is
+	// materialized once and reused by planning, dependency scan and AST build.
+	return c.wrapMaterializedSources(fs)
 }

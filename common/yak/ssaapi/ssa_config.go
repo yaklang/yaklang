@@ -8,6 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -83,6 +84,10 @@ type Config struct {
 	// back into a full recompile. Non-incremental compiles keep the user's
 	// jar_recursive_parse setting.
 	disableArchiveExpansion bool
+	// materializedSources holds the decompiled source tree for archive-backed code
+	// sources (jar/war/class). It is created lazily per compile and keeps every
+	// source in memory so planning and AST build read each class exactly once.
+	materializedSources *filesys.SourceMaterializer
 }
 
 func (c *Config) CalcHash() string {

@@ -70,7 +70,20 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 		if err := prog.ParseProjectConfig([]byte(editor.GetSourceCode()), path, ssa.PROJECT_CONFIG_YAML); err != nil {
 			return err
 		}
-	case ".jsp":
+	case ".jsp", ".jspx":
+		src := editor.GetSourceCode()
+		// The prepare stage already turned this page into Java and stored it
+		// back under the same path. Parsing it again as JSP would reject the
+		// generated compilation unit.
+		if strings.Contains(src, "void _JavaTemplateService(") {
+			ast, err := s.ParseAST(src, s.GetAntlrCache())
+			if err != nil {
+				log.Debugf("parse prepared jsp %s error: %v", path, err)
+				return err
+			}
+			defer ssa.ReleaseASTRoot(ast)
+			return prog.Build(ast, editor, fb)
+		}
 		info, err := tj.ConvertTemplateToJavaWithEditor(tj.JSP, editor)
 		if err != nil {
 			return utils.Errorf("convert jsp to java error: %v", err)
