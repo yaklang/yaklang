@@ -20,7 +20,7 @@ func ProjectUIEvent(event *schema.AiOutputEvent, client UIClientCapabilities) *s
 		}
 		var catalog interaction.Catalog
 		_ = json.Unmarshal(client.Catalog, &catalog)
-		compatible := supported && catalog.Version == artifact.Document.CatalogVersion
+		compatible := supported && catalog.SupportsVersion(artifact.Document.CatalogVersion)
 		for _, component := range artifact.Document.RequiredComponents {
 			compatible = compatible && catalog.Definition(component) != nil
 		}

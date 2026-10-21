@@ -231,3 +231,47 @@ func TestUIDataTableSubmissionIsCanonicalOnceAndRecoverable(t *testing.T) {
 	changed := interaction.Submission{ID: "changed", Source: "component", RequestID: doc.ID, NodeID: "details", Values: map[string]any{"selectedRowIds": []any{"admin"}}}
 	require.Error(t, recovered.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(utils.Jsonify(changed))}, deliver))
 }
+
+func TestUIInformationDisplayWithQuestionsDisabledAndLegacyFallback(t *testing.T) {
+	cfg, _ := uiFormFixture(t, WithAllowRequireForUserInteract(false))
+	raw, err := os.ReadFile("../interaction/testdata/information.json")
+	require.NoError(t, err)
+	var doc interaction.ComponentDocument
+	require.NoError(t, json.Unmarshal(raw, &doc))
+	// Remove the parameter view; local browsing is still allowed without questions.
+	doc.Nodes[4].Props["items"] = doc.Nodes[4].Props["items"].([]any)[:1]
+	doc.Nodes = append(doc.Nodes[:6], doc.Nodes[7:]...)
+	for _, name := range []string{"Alert", "Tabs", "Tooltip", "Popover"} {
+		require.NotNil(t, cfg.UICatalog().Definition(name))
+	}
+	doc.RequiredComponents = nil
+	_, err = cfg.RenderUI(cfg.GetContext(), "task", doc)
+	require.NoError(t, err)
+	artifact := cfg.UISession().artifacts[doc.ID]
+	require.Empty(t, artifact.Diagnostics)
+	event := &schema.AiOutputEvent{Type: "ui_component", Content: utils.Jsonify(artifact)}
+	legacy := cfg.UICatalog()
+	legacy.Version = "1.1"
+	raw, _ = json.Marshal(legacy)
+	require.Equal(t, schema.EVENT_TYPE_RESULT, ProjectUIEvent(event, UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw}).Type)
+}
+
+func TestUIInformationUpgradePreservesOlderDocuments(t *testing.T) {
+	cfg, doc := uiDataTableFixture(t)
+	doc.CatalogVersion = "1.1"
+	catalog := cfg.UICatalog()
+	normalized, diagnostics := catalog.Normalize(doc)
+	require.Empty(t, diagnostics)
+	require.NotEmpty(t, normalized.Nodes)
+	event := &schema.AiOutputEvent{Type: "ui_component", Content: utils.Jsonify(UIArtifact{Document: normalized})}
+	raw, _ := json.Marshal(catalog)
+	require.Same(t, event, ProjectUIEvent(event, UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw}))
+	// No compatibility declaration means an exact version match remains required.
+	catalog.CompatibleVersions = nil
+	raw, _ = json.Marshal(catalog)
+	require.Equal(t, schema.EVENT_TYPE_RESULT, ProjectUIEvent(event, UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw}).Type)
+	doc.RequiredComponents = append(doc.RequiredComponents, "FutureWidget")
+	normalized, diagnostics = cfg.UICatalog().Normalize(doc)
+	require.Empty(t, normalized.Nodes)
+	require.NotEmpty(t, diagnostics)
+}
