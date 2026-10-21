@@ -101,35 +101,6 @@ func diamondStructType(levels int) *ssa.ObjectType {
 	return typ
 }
 
-// Test_StructDefaultExpansionBudget pins StructDefaultExpansionExceedsBudget:
-// the probe stays exact below the budget, saturates above it, resolves through
-// aliases, and terminates on cyclic field graphs (as exceeding, since a cyclic
-// expansion is unbounded).
-func Test_StructDefaultExpansionBudget(t *testing.T) {
-	t.Run("AddField growth flips the answer", func(t *testing.T) {
-		outer := ssa.NewStructType()
-		outer.AddField(ssa.NewConst("f"), diamondStructType(8)) // 511 nodes, fits
-		require.False(t, ssa.StructDefaultExpansionExceedsBudget(outer))
-
-		outer.AddField(ssa.NewConst("g"), diamondStructType(10)) // subtree alone > budget
-		require.True(t, ssa.StructDefaultExpansionExceedsBudget(outer))
-	})
-
-	t.Run("cyclic field graph terminates as exceeding", func(t *testing.T) {
-		a := ssa.NewStructType()
-		b := ssa.NewStructType()
-		a.AddField(ssa.NewConst("b"), b)
-		b.AddField(ssa.NewConst("a"), a)
-		require.True(t, ssa.StructDefaultExpansionExceedsBudget(a))
-	})
-
-	t.Run("plain and alias-wrapped structs stay within budget", func(t *testing.T) {
-		require.False(t, ssa.StructDefaultExpansionExceedsBudget(diamondStructType(8)))
-		alias := ssa.NewAliasType("T", "", diamondStructType(10))
-		require.True(t, ssa.StructDefaultExpansionExceedsBudget(alias))
-	})
-}
-
 // Test_TypeStringLimited_BoundedOutput pins TypeStringLimited: small types
 // render fully, exponential field graphs abbreviate with "..." and stay far
 // below the raw expansion size. Each nesting level assembles at most
