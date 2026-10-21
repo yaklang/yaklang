@@ -110,6 +110,17 @@ func (b *FunctionBuilder) externLibFieldWithLazyExports(extern *ExternLib, membe
 		}
 		return g
 	}
+	// An unexported package function is not part of the import namespace's
+	// published member set, but a call that names it still has to reach the
+	// function declared in this compilation. Methods stay on the receiver.
+	if lib.Funcs != nil {
+		if fun, ok := lib.Funcs.Get(memberName); ok && fun != nil && !fun.IsMethod() {
+			if _, exists := GetLatestMemberByKeyString(extern, memberName); !exists {
+				setMemberCallRelationship(extern, b.EmitConstInstPlaceholder(memberName), fun)
+			}
+			return fun
+		}
+	}
 	if g, ok := lib.GetGlobalVariable(memberName); ok {
 		return g
 	}
