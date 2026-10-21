@@ -16,13 +16,9 @@ const (
 	envAIWorkspaceDebugPrimary   = "YAKIT_AI_WORKSPACE_DEBUG"
 	envAIWorkspaceDebugSecondary = "AI_WORKSPACE_DEBUG"
 
-	perceptionDebugTotalDurationKey             = "debug_perception_total_duration"
-	perceptionDebugAIDurationKey                = "debug_perception_ai_duration"
-	perceptionDebugCapabilityDurationKey        = "debug_perception_capability_duration"
-	perceptionDebugKnowledgeDurationKey         = "debug_perception_knowledge_duration"
-	perceptionDebugKnowledgeResolveDurationKey  = "debug_perception_knowledge_resolve_duration"
-	perceptionDebugKnowledgeSearchDurationKey   = "debug_perception_knowledge_search_duration"
-	perceptionDebugKnowledgeCompressDurationKey = "debug_perception_knowledge_compress_duration"
+	perceptionDebugTotalDurationKey      = "debug_perception_total_duration"
+	perceptionDebugAIDurationKey         = "debug_perception_ai_duration"
+	perceptionDebugCapabilityDurationKey = "debug_perception_capability_duration"
 
 	intentDebugTotalDurationKey           = "debug_intent_total_duration"
 	intentDebugExecuteLoopDurationKey     = "debug_intent_execute_loop_duration"
@@ -259,10 +255,6 @@ func writePerceptionDebugMarkdown(loop *ReActLoop, state *PerceptionState, input
 		{"Total", perceptionDebugTotalDurationKey},
 		{"Perception AI", perceptionDebugAIDurationKey},
 		{"Capability Search", perceptionDebugCapabilityDurationKey},
-		{"Knowledge Refresh", perceptionDebugKnowledgeDurationKey},
-		{"Knowledge Base Resolve", perceptionDebugKnowledgeResolveDurationKey},
-		{"Knowledge Search", perceptionDebugKnowledgeSearchDurationKey},
-		{"Knowledge Compress", perceptionDebugKnowledgeCompressDurationKey},
 	}))
 
 	appendWorkspaceDebugSection(&buf, "Summary", state.OneLinerSummary)

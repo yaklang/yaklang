@@ -99,10 +99,12 @@ type ProtocolSession interface {
 }
 
 type captureSession struct {
-	f         *binFlow
-	events    []*ProtocolEvent
-	closed    bool
-	transport string
+	f                *binFlow
+	events           []*ProtocolEvent
+	closed           bool
+	transport        string
+	bacnetRead       bool
+	bacnetRoutedRead bool
 }
 
 // NewProtocolSession builds an isolated capture flow on the same binFlow
@@ -156,6 +158,12 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		ports:             [2]uint16{40000, 40001},
 		syslogStreamProbe: true,
 	}
+	optionsComplete := false
+	defer func() {
+		if !optionsComplete {
+			s.f.a.closeMAVLinkSigning()
+		}
+	}()
 	for _, option := range options {
 		if option == nil {
 			return nil, fmt.Errorf("nil session option")
@@ -163,6 +171,56 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 		if err := option(s); err != nil {
 			return nil, err
 		}
+	}
+	for _, profile := range s.f.a.datagramDecodeAs {
+		if profile == "hart-ip" && s.transport != "udp" {
+			return nil, fmt.Errorf("HART-IP DecodeAs requires UDP")
+		}
+		if profile == "fins" && s.transport != "udp" {
+			return nil, fmt.Errorf("FINS DecodeAs requires UDP")
+		}
+		if (profile == "someip-tp" || profile == "someip-sd") && s.transport != "udp" {
+			return nil, fmt.Errorf("SOME/IP-TP observation requires UDP")
+		}
+		if (profile == "bacnet-read-property" || profile == "bacnet-routed-read-property") && s.transport != "udp" {
+			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
+		}
+		if (profile == "rtps-control" || profile == "rtps-wire" || profile == "rtps13-wire" || profile == "rtps13-parameters" || profile == "rtps20-rti-filter") && s.transport != "udp" {
+			return nil, fmt.Errorf("RTPS control observation requires a UDP session")
+		}
+		if (profile == "rtps-spdp-fragments" || profile == "rtps-shape-fragments") && s.transport != "udp" {
+			return nil, fmt.Errorf("RTPS fragment observation requires a UDP session")
+		}
+	}
+	if s.bacnetRead {
+		if s.transport != "udp" {
+			return nil, fmt.Errorf("BACnet ReadProperty observations require UDP")
+		}
+		if s.f.a.datagramDecodeAs == nil {
+			s.f.a.datagramDecodeAs = map[uint16]string{}
+		}
+		profile := "bacnet-read-property"
+		if s.bacnetRoutedRead {
+			profile = "bacnet-routed-read-property"
+		}
+		for _, port := range s.f.ports {
+			if old := s.f.a.datagramDecodeAs[port]; old != "" && old != profile {
+				return nil, fmt.Errorf("conflicting BACnet ReadProperty session profile")
+			}
+			s.f.a.datagramDecodeAs[port] = profile
+		}
+	}
+	if s.transport == "udp" && (s.f.a.config.DecodeDNP3ReadPoints || s.f.a.config.DecodeDNP3DirectStaticReads || s.f.a.config.DecodeDNP3TypedStaticReads || s.f.a.config.DecodeDNP3CounterPoints || s.f.a.config.DecodeDNP3CounterEvents || s.f.a.config.DecodeDNP3EventCountReads || s.f.a.config.DecodeDNP3StaticStatusPoints || s.f.a.config.DecodeDNP3BinaryEvents || s.f.a.config.DecodeDNP3AnalogEvents) {
+		return nil, fmt.Errorf("DNP3 selected READ points require TCP")
+	}
+	if s.transport == "udp" && s.f.a.config.DecodeDNP3TransportFragments {
+		return nil, fmt.Errorf("DNP3 transport assembly requires TCP")
+	}
+	if s.transport == "udp" && (s.f.a.config.DecodeOPCUARead || s.f.a.config.DecodeOPCUABrowse || s.f.a.config.DecodeOPCUAWrite || s.f.a.config.DecodeOPCUABrowseNext || s.f.a.config.DecodeOPCUACall) {
+		return nil, fmt.Errorf("OPC UA observations require a TCP session")
+	}
+	if s.f.a.mavlinkSigning != nil && s.transport != "udp" {
+		return nil, fmt.Errorf("MAVLink signing requires a UDP session")
 	}
 	if b := s.f.a.pfcpSessionIdentity; b != nil {
 		if s.transport != "udp" {
@@ -173,6 +231,10 @@ func NewProtocolSessionWithOptions(budget ParserBudget, options ...ProtocolSessi
 	if s.transport == "udp" && s.f.tcpClientKnown {
 		return nil, fmt.Errorf("TCP initiator direction cannot be set on a UDP session")
 	}
+	if s.f.mms != nil && s.transport == "udp" {
+		return nil, fmt.Errorf("MMS ISO requires TCP")
+	}
+	optionsComplete = true
 	return s, nil
 }
 
@@ -194,7 +256,71 @@ func NewDecryptedQUICSession(budget ParserBudget, source string) (ProtocolSessio
 }
 
 func (s *captureSession) Probe(data []byte) ProbeResult {
+	if s.transport == "udp" && s.f.a.hartSelected(s.f.ports[0], s.f.ports[1], &ProtocolEvent{Source: s.f.endpoints[0], Destination: s.f.endpoints[1], Domain: s.f.domain}, data) || s.transport != "udp" && (s.f.protocol == "hart-ip" || s.f.port(5094) && len(data) > 0 && data[0] == 1) {
+		if s.closed {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "hart-ip", Reason: "closed observation"}
+		}
+		if len(data) < 8 {
+			return probeNeed("hart-ip", "v1", len(data), 8)
+		}
+		n := int(binary.BigEndian.Uint16(data[6:8]))
+		if s.transport != "udp" && n >= 8 && len(data) < n {
+			return probeNeed("hart-ip", "v1", len(data), n)
+		}
+		return probeHARTIP(data)
+	}
+	if s.f.mms != nil && s.transport != "udp" {
+		n, err := mmsFrameSize(data, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes))
+		if err != nil {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: err.Error()}
+		}
+		if n == 0 || n > len(data) {
+			return ProbeResult{Verdict: ProbeNeedMore, Protocol: "mms", NeedBytes: max(n, 4) - len(data)}
+		}
+		if s.closed || s.f.mms.poison {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "closed or refused observed context"}
+		}
+		target := s.f.mms.storage() + 32768 + s.f.mms.projectionFactor(s.f.a.budget)*int64(n)
+		if s.f.a.buffered.Load()+max(int64(0), target-s.f.sessionBytes) > int64(s.f.a.config.MaxBufferedBytes) {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: "MMS shared projection budget"}
+		}
+		if _, err = parseMMSCOTP(data[:n], s.f.a.budget); err != nil {
+			return ProbeResult{Verdict: ProbeReject, Protocol: "mms", Reason: err.Error()}
+		}
+		return probeAccept("mms", s.f.mms.profile(), 95)
+	}
+
 	if s.transport == "udp" {
+		if p, ok := s.probeSomeIPSD(data); ok {
+			return p
+		}
+		if p, ok := s.probeSomeIPTP(data); ok {
+			return p
+		}
+		if s.bacnetRead {
+			return s.probeBACnetRead(data)
+		}
+		if p, ok := s.probeRTPS20RTIFilter(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPS13Wire(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPSShapeFragments(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPSWire(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPSControl(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPS20(data); ok {
+			return p
+		}
+		if p, ok := s.probeRTPSFragments(data); ok {
+			return p
+		}
 		if p, ok := s.probeSemtechDownlink(data); ok {
 			return p
 		}
@@ -234,7 +360,7 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if p := s.f.a.probeWrapper(input); p.Verdict != ProbeReject {
 		return p
 	}
-	if p := probeDLMS(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+	if p := probeDLMSStream(input, s.f.a.budget.MaxFrameBytes, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeGenisys(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
@@ -286,7 +412,11 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if probe := probeOpenWire(input, s.f.a.budget.MaxFrameBytes); probe.Verdict != ProbeReject {
 		return probe
 	}
-	return probeWireTransport(data, limit, s.f.captureTCP)
+	p := probeWireTransport(data, limit, s.f.captureTCP)
+	if p.Verdict == ProbeReject && !s.f.captureTCP {
+		return probeRADIUSAccountingByte(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes))
+	}
+	return p
 }
 
 func (s *captureSession) Feed(direction int, ts time.Time, data []byte) FeedResult {
@@ -339,6 +469,21 @@ func (s *captureSession) Close(reason string) []*ProtocolEvent {
 	s.f.a.flows.Store(0)
 	events := s.events
 	s.events = nil
+	if s.transport == "udp" {
+		for _, e := range events {
+			if e.Protocol != "dlms" && e.Protocol != "dlms-wrapper" && e.Protocol != "fins" && !e.nativeHARTIPObservation {
+				continue
+			}
+			// Feed uses caller-relative directions; retained UDP conversations
+			// use their own first-observed endpoint orientation. Close must map
+			// the same physical endpoints back without inferring a client role.
+			if e.Source == s.f.endpoints[0] && e.Destination == s.f.endpoints[1] {
+				e.Direction = 0
+			} else if e.Source == s.f.endpoints[1] && e.Destination == s.f.endpoints[0] {
+				e.Direction = 1
+			}
+		}
+	}
 	return events
 }
 
@@ -371,10 +516,13 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
+	if f.mms != nil {
+		return true
+	}
 	if f.protocol == "nats" {
 		return true // NATS allocates its budgeted negotiation state at consumption.
 	}
-	return f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil || f.iso8583 != nil
+	return f.hart != nil || f.fins != nil || f.slmpTCP != nil || f.wrapper != nil || f.tls != nil || f.dnp3 != nil || f.c37118 != nil || f.goose != nil || f.syslog != nil || f.rfb != nil || f.diameter != nil || f.iec104 != nil || f.s7 != nil || f.opcua != nil || f.ipp != nil || f.rtsp != nil || f.stun != nil || f.h2 != nil || f.mysql != nil || f.pg != nil || f.ws != nil || f.ldap != nil || f.redis != nil || f.mqtt != nil || f.nats != nil || f.mongo != nil || f.kafka != nil || f.tds != nil || f.amqp != nil || f.smb2 != nil || f.dcerpc != nil || f.ssh != nil || f.nfs != nil || f.snmp != nil || f.rdp != nil || f.dot != nil || f.doh != nil || f.sip != nil || f.rtp != nil || f.quic != nil || f.smtp != nil || f.imap != nil || f.pop3 != nil || f.ftp != nil || f.tns != nil || f.socks5 != nil || f.scgi != nil || f.msgpackRPC != nil || f.textInternet != nil || f.radius != nil || f.dhcp != nil || f.ntp != nil || f.coap != nil || f.modbus != nil || f.memcached != nil || f.enip != nil || f.doip != nil || f.genisys != nil || f.dlms != nil || f.rocplus != nil || f.atg != nil || f.stratum != nil || f.gearman != nil || f.beanstalk != nil || f.zookeeper != nil || f.clickhouse != nil || f.stomp != nil || f.iso8583 != nil
 }
 
 func (f *binFlow) mailLike() bool {

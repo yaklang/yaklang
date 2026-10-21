@@ -60,7 +60,6 @@ flowchart TD
 |------|------|--------|-----------|
 | [loop_default](loop_default) | 通用 ReAct 入口，没有领域定制 | 低 | 几乎只用了默认 actions，是入门示例 |
 | [loop_intent](loop_intent) | 深度意图识别 + 推荐能力 | 低 | `WithDisableLoopPerception`、`WithReactiveDataBuilder`、自定义意图 action |
-| [loop_smart_qa](loop_smart_qa) | 智能问答（带知识增强） | 中 | 启用 RAG、自定义 finalize |
 | [loop_knowledge_enhance](loop_knowledge_enhance) | 知识库检索增强答案 | 中 | 多步 LiteForge 评估 |
 | [loop_internet_research](loop_internet_research) | 联网研究 | 中 | 自定义 web_search action + finalize 总结 |
 | [loop_dir_explore](loop_dir_explore) | 目录探索 | 中 | LiteForge 抽路径、限定 actions |

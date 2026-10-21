@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"errors"
 	"fmt"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"sort"
@@ -67,8 +68,7 @@ func retainedStreamEvents(history *pcaputil.ProtocolInspector, stream *streamSna
 		if len(out) >= 128 {
 			break
 		}
-		d, err := history.Details(e.ID)
-		if err == nil {
+		if d := retainedProtocolDetail(history, e.ID); d != nil {
 			out = append(out, boundedEvent(d, &remaining))
 		}
 	}
@@ -113,7 +113,7 @@ func (p *capturedPacket) protocolEvents() []*pcaputil.ProtocolEvent {
 		}
 	}
 	for _, id := range ids {
-		if e, err := p.history.Details(id); err == nil {
+		if e := retainedProtocolDetail(p.history, id); e != nil {
 			events = append(events, boundedEvent(e, &remaining))
 		}
 	}
@@ -127,4 +127,23 @@ func boundedEvent(e *pcaputil.ProtocolEvent, remaining *int) *pcaputil.ProtocolE
 		return e
 	}
 	return &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, Protocol: e.Protocol, Status: "limited", Completeness: "limited", Summary: "Detail unavailable: snapshot byte budget", Domain: e.Domain, Source: e.Source, Destination: e.Destination, ResponseTo: e.ResponseTo}
+}
+
+// Details returns an owned observation alongside its decode error. Only a nil
+// observation denotes absence/eviction; a retained diagnostic remains visible.
+func retainedProtocolDetail(history *pcaputil.ProtocolInspector, id uint64) *pcaputil.ProtocolEvent {
+	e, err := history.Details(id)
+	if e != nil && err != nil {
+		if e.Error == "" {
+			e.Error = err.Error()
+			e.Completeness = "detail-unavailable"
+		}
+		if e.ExpertCode == "" {
+			var typed *pcaputil.ProtocolError
+			if errors.As(err, &typed) {
+				e.ExpertCode = string(typed.Kind)
+			}
+		}
+	}
+	return e
 }

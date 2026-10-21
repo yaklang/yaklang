@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -37,6 +38,54 @@ var builtinSkillReleaseDB = func() *gorm.DB {
 // each with a SKILL.md defining the skill metadata and content.
 func GetBuiltinSkillsFS() fi.FileSystem {
 	return builtinSkillsFS
+}
+
+// GetKnowledgeSkillLoader adds the embedded system Skill only when it is missing.
+// Keep the caller's loader authoritative for all other Skills.
+func (r *ReAct) GetKnowledgeSkillLoader(configured aiskillloader.SkillLoader) (aiskillloader.SkillLoader, error) {
+	if configured != nil {
+		for _, meta := range configured.AllSkillMetas() {
+			if meta != nil && meta.Name == "yaklang-system" {
+				return configured, nil
+			}
+		}
+	}
+	builtin, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(GetBuiltinSkillsFS()))
+	if err != nil || configured == nil {
+		return builtin, err
+	}
+	system, err := builtin.LoadSkill("yaklang-system")
+	if err != nil {
+		return nil, err
+	}
+	return &knowledgeSkillLoader{SkillLoader: configured, system: system}, nil
+}
+
+type knowledgeSkillLoader struct {
+	aiskillloader.SkillLoader
+	system *aiskillloader.LoadedSkill
+}
+
+func (l *knowledgeSkillLoader) LoadSkill(name string) (*aiskillloader.LoadedSkill, error) {
+	if name == "yaklang-system" {
+		return l.system, nil
+	}
+	return l.SkillLoader.LoadSkill(name)
+}
+
+func (l *knowledgeSkillLoader) GetFileSystem(name string) (fi.FileSystem, error) {
+	if name == "yaklang-system" {
+		return l.system.FileSystem, nil
+	}
+	return l.SkillLoader.GetFileSystem(name)
+}
+
+func (l *knowledgeSkillLoader) HasSkills() bool {
+	return true
+}
+
+func (l *knowledgeSkillLoader) AllSkillMetas() []*aiskillloader.SkillMeta {
+	return append(append([]*aiskillloader.SkillMeta(nil), l.SkillLoader.AllSkillMetas()...), l.system.Meta)
 }
 
 // ExtractBuiltinSkillsToDir extracts built-in skills from the embedded filesystem

@@ -589,6 +589,9 @@ func (c *Config) parseProjectWithFSUnits(
 			}
 			prog.Cache.FlushInstructionSaver()
 			prog.Cache.FlushAuxSavers()
+			// Type/index serialization can reload instructions and enqueue their
+			// eviction again; settle those writes before declaring the batch done.
+			prog.Cache.FlushInstructionSaver()
 			prog.CheckMemoryPressure(batchIndex+1, len(batches))
 		}
 		if compileUnitLogEnabled() {

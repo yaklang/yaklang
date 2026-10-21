@@ -389,6 +389,30 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			require.Len(t, events, len(sample.steps), sample.name)
 			session.Close("fixture-end")
 			require.Zero(t, session.Stats().BufferedBytes)
+		} else if sample.protocol == "radius" {
+			// Preserve the original archived request and answer bytes. RFC2865
+			// 4.1 requires NAS identity; an invalid request cannot own its reply.
+			require.EqualValues(t, 1, stats.Malformed)
+			require.Zero(t, stats.BufferedBytes)
+			require.Len(t, events, 2)
+			for i, e := range events {
+				require.Equal(t, sample.steps[i].wire, e.Raw)
+				require.Equal(t, i, e.Direction)
+				require.Equal(t, time.Unix(1700000000, int64(i)*1234), e.Timestamp)
+				require.Zero(t, e.TransactionID)
+				require.Zero(t, e.ResponseTo)
+				require.Equal(t, "radius-access-observed", e.Profile)
+			}
+			require.Nil(t, events[0].Session)
+			require.Equal(t, "malformed", events[0].Completeness)
+			f, queryErr := events[0].GetFields()
+			require.Nil(t, f)
+			rocTypedError(t, "MalformedMessage", queryErr)
+			require.Equal(t, "message", events[1].Completeness)
+			require.Equal(t, radiusM1ReplyFields("ambiguous-identifier", false), events[1].Session)
+			f, queryErr = events[1].GetFields()
+			require.NoError(t, queryErr)
+			require.Equal(t, radiusM1ReplyFields("ambiguous-identifier", false), f)
 		} else if !negativeWS && sample.protocol == "dcerpc" {
 			// The original M1 BindAck contains only fixed fields and omits the
 			// required result list. Preserve its bytes as a negative legacy sample.
@@ -443,4 +467,15 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 	stored, err := trafficfixture.ReadFile(manifestPath)
 	require.NoError(t, err)
 	require.Contains(t, string(stored), doc.Samples[0].SHA256)
+}
+
+func radiusM1ReplyFields(association string, matched bool) map[string]any {
+	out := map[string]any{"Packet Name": "Access-Accept", "Code": 2, "Identifier": 7, "Packet Length": 20, "Padding Bytes": 0, "Authenticator": []byte("0123456789abcdef"), "Authentication": "not-verified", "Role": "response", "Observation Scope": "conversation", "Attributes": []map[string]any{}, "Attribute Count": 0}
+	if association != "" {
+		out["Association"] = association
+	}
+	if matched {
+		out["In Reply To"] = "Access-Request"
+	}
+	return out
 }

@@ -639,5 +639,5 @@ yak test ./common/ai/aid/aireact/reactloops/loop_log_analyze/...
 - [11-case-studies.md](11-case-studies.md)：参考真实 loop 实现
 - 参考项目：
   - 简单：[loop_default](../loop_default)
-  - 中等：[loop_smart_qa](../loop_smart_qa)、[loop_knowledge_enhance](../loop_knowledge_enhance)
+  - 中等：[loop_report_generating](../loop_report_generating)、[loop_knowledge_enhance](../loop_knowledge_enhance)
   - 复杂：[loop_http_fuzztest](../loop_http_fuzztest)、[coordinator](../../../coordinator/README.md)

@@ -40,15 +40,6 @@ smokeHandler = func(w,body) {
         smokeFrame(w,{"content":"记忆搜索验证通过；报告应简洁，保留来源。"},"stop")
         w.Write("data: [DONE]\n\n")~; return
     }
-    if "SMOKE_CALLER:react-loop:smart_qa" in prompt {
-        step++
-        if step == 1 {
-            seedMemoryFixtures()
-            smokeAnswer(w,native,"search_persistent_memory",{"query":"memory-smoke-sentinel-report","search_mode":"bm25","limit":5,"bytes_limit":1000}); return
-        }
-        assert sentinel in prompt && fixtureID in prompt, "smart_qa action did not execute the shared Yak tool"
-        smokeAnswer(w,native,"final_answer",{"answer":"历史偏好已查明：报告应简洁，保留来源。"}); return
-    }
     assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
     step++
     if step == 1 {
@@ -91,17 +82,6 @@ for native in [true,false] {
         assert step == expectedSteps && config != nil
         printf("PASS memory search: function_call=%v mode=%s namespace=1 expired=0 auto_injection=0 frozen_timeline=1\n",native,mode)
     }
-}
-for native in [true,false] {
-    step,config,seeded = 0,nil,false
-    namespace,fixtureID = "smoke-memory-" + randstr(12), "memory-smoke-" + randstr(12)
-    die(aim.InvokeReAct(query,aim.focus("smart_qa"),aim.sessionID(namespace),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(4),aim.timeout(45),aim.disableMCPServers(true),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e) { config = op.GetConfig() }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c) {
-        c.DisableCreateDBRuntime,c.DisablePerception,c.DisableMemoryTriage = true,true,true
-        c.AiAutoRetry,c.AiTransactionAutoRetry = 1,1
-        return nil
-    })))
-    assert step == 2
-    printf("PASS smart_qa shared Yak search: function_call=%v calls=1 namespace=1\n",native)
 }
 for searchMode in ["bm25","vector","hybrid"] {
     missing = aimemory.Search("report",aimemory.memoryNamespace(namespace+"-missing"),aimemory.memorySearchMode(searchMode))~

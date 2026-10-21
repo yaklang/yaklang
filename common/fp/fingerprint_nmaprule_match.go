@@ -26,8 +26,14 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		Port:   port,
 		State:  UNKNOWN,
 	}
+	deliver := func() (*MatchResult, error) {
+		if result.State == OPEN {
+			f.reportOpen(result)
+		}
+		return specialCase(result, config), nil
+	}
 
-	// 获取需要匹配的指纹. 同一 Matcher、同一端口的规则块可以复用.
+	// 获取需要匹配的指纹. 缓存按端口和传输协议复用, 追加前先复制, 避免改到缓存切片.
 	firstBlock, blocks, bestMode := f.ruleBlocks(port, config)
 	if len(blocks) <= 0 && firstBlock == nil {
 		return nil, errors.New("empty rules is not allowed")
@@ -35,28 +41,27 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 	_ = bestMode
 	if firstBlock != nil {
 		if config.CanScanUDP() {
-			blocks = append(blocks, firstBlock)
+			copied := make([]*RuleBlock, len(blocks), len(blocks)+1)
+			copy(copied, blocks)
+			blocks = append(copied, firstBlock)
 		} else if config.CanScanTCP() {
 			log.Debugf("%s - %v ", firstBlock.Probe.Name, firstBlock.Probe.Proto)
 
 			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
 			result.State = state
-			if result.State == OPEN {
-				f.reportOpen(result)
-			}
 			result.Fingerprint = info
 			if err != nil {
 				result.Reason = err.Error()
 			}
 			if (result.Fingerprint != nil && result.Fingerprint.Banner != "") || result.State == CLOSED {
-				return specialCase(result, config), nil
+				return deliver()
 			}
 		}
 	}
 
 	// active mode is allowed to send packet
 	if !config.ActiveMode {
-		return specialCase(result, config), nil
+		return deliver()
 	}
 
 	var collectResultLock = new(sync.Mutex)
@@ -76,7 +81,7 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 
 		select {
 		case <-ctx.Done():
-			return specialCase(result, config), nil
+			return deliver()
 		default:
 		}
 
@@ -98,9 +103,6 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			}
 			log.Debugf("try %s probe[%v] rarity[%v] %#v", utils2.HostPort(host, port), block.Probe.Index, block.Probe.Rarity, block.Probe.Payload)
 			state, info, err := f.matchBlock(ctx, ip, port, block, config)
-			if result.State == OPEN {
-				f.reportOpen(result)
-			}
 			collectResultLock.Lock()
 			defer collectResultLock.Unlock()
 			states = append(states, state)
@@ -121,12 +123,8 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		result.Reason = mergeError(errs...).Error()
 	}
 
-	if result.State == CLOSED {
-		return specialCase(result, config), nil
-	}
-
-	if result.Fingerprint != nil && result.Fingerprint.ServiceName != "tcp" && result.Fingerprint.ServiceName != "udp" {
-		return specialCase(result, config), nil
+	if result.State == OPEN {
+		f.reportOpen(result)
 	}
 	return specialCase(result, config), nil
 }

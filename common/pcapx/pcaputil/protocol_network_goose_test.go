@@ -13,6 +13,7 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func replayGOOSECapture(t *testing.T, capture []byte, options ...CaptureOption) []*ProtocolEvent {
@@ -218,4 +219,149 @@ func TestReplayPcapGOOSEOptionalAndDefaultFields(t *testing.T) {
 	require.Equal(t, "decoded", events[0].Status, events[0].Error)
 	require.Equal(t, true, events[0].Session["Simulation"])
 	require.Equal(t, true, events[0].Session["Needs Commissioning"])
+}
+
+// Whole selected session answer from power-02-goose.pcapng's literal BER,
+// independently cross-checked with Wireshark4.2.5 PDML. This checks history
+// ownership; it does not infer publisher identity or GOOSE retransmit state.
+func gooseHistoryBooleanOwnership(t *testing.T) {
+	t.Helper()
+	raw, err := trafficfixture.ReadFile("../../bin-parser/testdata/winlab5013/captures/power-02-goose.pcapng")
+	require.NoError(t, err)
+	discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+		events, _ := discoveryReplay(t, raw, workers, deferred, observe)
+		require.Len(t, events, 2)
+		history, err := NewBinParserInspector(2, 1<<20)
+		require.NoError(t, err)
+		for i, e := range events {
+			expected := map[string]any{"Packet Name": "GOOSE", "APPID": 0x3000, "Length": 96, "Simulation": false, "Needs Commissioning": false, "Control Block Reference": "LABP1/LLN0$GO$gcb1", "Dataset": "LABP1/LLN0$ds1", "GOOSE ID": "LAB-GOOSE-1", "State Number": 5 + i, "Sequence Number": 0, "Dataset Entry Count": 1, "Boolean": []bool{i == 1}}
+			require.Equal(t, "goose", e.Protocol)
+			require.Equal(t, "decoded", e.Status, e.Error)
+			require.Equal(t, expected, e.Session)
+			testLegacyRuleQueryOwnership(t, e)
+			require.Zero(t, e.ResponseTo)
+			require.Zero(t, e.TransactionID)
+			require.Len(t, e.SourceBytes.PacketRefs, 1)
+			require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
+			history.OnEvent(e)
+			e.Session["Boolean"].([]bool)[0] = i != 1
+			testOwnedSessionQueries(t, e, expected)
+			detail, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, detail.Session)
+			require.Equal(t, e.Raw, detail.Raw)
+			require.Equal(t, e.SourceBytes, detail.SourceBytes)
+			detail.Session["Boolean"].([]bool)[0] = i != 1
+			decoded, err := detail.Decode()
+			require.NoError(t, err)
+			decoded["session"].(map[string]any)["Boolean"].([]bool)[0] = i != 1
+			again, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, again.Session)
+		}
+		require.Len(t, history.Rows("goose", 0), 2)
+		require.Zero(t, history.Evicted())
+	})
+}
+
+// Retained logical charge: one map64 + key7 + slot32 + slice24 + three
+// boolean values3 =130. A129-byte inspector must refuse before cloning.
+func gooseBooleanHistoryBudget(t *testing.T) {
+	t.Helper()
+	e := &ProtocolEvent{ID: 1, Protocol: "goose", Session: map[string]any{"Boolean": []bool{false, true, false}}}
+	for _, limit := range []int{129, 130} {
+		history, err := NewBinParserInspector(1, limit)
+		require.NoError(t, err)
+		history.OnEvent(e)
+		if limit == 129 {
+			require.Empty(t, history.Rows("goose", 0))
+			require.EqualValues(t, 1, history.Evicted())
+		} else {
+			require.Len(t, history.Rows("goose", 0), 1)
+			detail, err := history.Details(1)
+			require.NoError(t, err)
+			require.Equal(t, e.Session, detail.Session)
+			require.Zero(t, history.Evicted())
+		}
+	}
+}
+func TestProtocolInspectorBooleanVectorBudget(t *testing.T) {
+	gooseBooleanHistoryBudget(t)
+}
+
+// The pinned ITI capture's eight complete selected session projections were
+// independently decoded by Wireshark 4.2.5. The bit payloads are four 0000
+// values per message; this does not infer publisher identity or pad-bit semantics.
+func gooseHistoryBitsOwnership(t *testing.T) {
+	t.Helper()
+	raw, err := trafficfixture.ReadFile("../../bin-parser/testdata/protocol-corpus/captures/iti-ics/iti-goose.pcap")
+	require.NoError(t, err)
+	discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
+		events, _ := discoveryReplay(t, raw, workers, deferred, observe)
+		require.Len(t, events, 8)
+		history, err := NewBinParserInspector(8, 1<<20)
+		require.NoError(t, err)
+		lengths := []int{145, 145, 145, 144, 144, 144, 144, 145}
+		sequences := []int{10, 11, 12, 1, 2, 3, 4, 5}
+		for i, e := range events {
+			expected := map[string]any{"Packet Name": "GOOSE", "APPID": 1, "Length": lengths[i], "Simulation": false, "Needs Commissioning": false, "Control Block Reference": "GEDeviceF650/LLN0$GO$gcb01", "Dataset": "GEDeviceF650/LLN0$GOOSE1", "GOOSE ID": "F650_GOOSE1", "State Number": 1, "Sequence Number": sequences[i], "Dataset Entry Count": 8, "Boolean": []bool{false, false, false, false}, "Bits": [][]byte{{0, 0}, {0, 0}, {0, 0}, {0, 0}}}
+			require.Equal(t, "goose", e.Protocol)
+			require.Equal(t, "decoded", e.Status, e.Error)
+			require.Equal(t, expected, e.Session)
+			require.Zero(t, e.TransactionID)
+			require.Zero(t, e.ResponseTo)
+			require.Len(t, e.SourceBytes.PacketRefs, 1)
+			require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
+			history.OnEvent(e)
+			bits := e.Session["Bits"].([][]byte)
+			bits[0] = []byte{0xff}
+			bits[1][0] = 0xff
+			testOwnedSessionQueries(t, e, expected)
+			detail, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, detail.Session)
+			require.Equal(t, e.Raw, detail.Raw)
+			require.Equal(t, e.SourceBytes, detail.SourceBytes)
+			detail.Session["Bits"].([][]byte)[2][0] = 0xff
+			decoded, err := detail.Decode()
+			require.NoError(t, err)
+			decoded["session"].(map[string]any)["Bits"].([][]byte)[3][0] = 0xff
+			again, err := history.Details(e.ID)
+			require.NoError(t, err)
+			require.Equal(t, expected, again.Session)
+		}
+		require.Len(t, history.Rows("goose", 0), 8)
+		require.Zero(t, history.Evicted())
+	})
+}
+
+func gooseBitsHistoryBudget(t *testing.T) {
+	t.Helper()
+	// Map64 + key4 + slot32 + outer slice24 + three inner headers72 +
+	// two owned payload bytes2 =198; spare caller capacity is not retained.
+	large := make([]byte, 2, 4096)
+	copy(large, []byte{0xa0, 0x00})
+	e := &ProtocolEvent{ID: 1, Protocol: "goose", Session: map[string]any{"Bits": [][]byte{nil, {}, large}}}
+	for _, limit := range []int{197, 198} {
+		history, err := NewBinParserInspector(1, limit)
+		require.NoError(t, err)
+		history.OnEvent(e)
+		if limit == 197 {
+			require.Empty(t, history.Rows("goose", 0))
+			require.EqualValues(t, 1, history.Evicted())
+		} else {
+			detail, err := history.Details(1)
+			require.NoError(t, err)
+			require.Equal(t, e.Session, detail.Session)
+			bits := detail.Session["Bits"].([][]byte)
+			require.Nil(t, bits[0])
+			require.NotNil(t, bits[1])
+			require.Equal(t, len(bits[2]), cap(bits[2]))
+			require.Zero(t, history.Evicted())
+		}
+	}
+}
+
+func TestProtocolInspectorBitStringVectorBudget(t *testing.T) {
+	gooseBitsHistoryBudget(t)
 }

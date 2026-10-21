@@ -80,6 +80,7 @@ func TestTunnelWorkerRoutingUsesInnerTuple(t *testing.T) {
 }
 
 func TestTunnelHTTPResponseWorkerParity(t *testing.T) {
+	testFragmentedTunnelHTTP(t)
 	request := "GET /worker HTTP/1.1\r\nHost: tunnel.test\r\n\r\n"
 	response := "HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nhello"
 	for _, profile := range []string{"ipip", "6in4", "gre", "vxlan", "geneve"} {

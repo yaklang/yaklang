@@ -41,7 +41,13 @@ func NewStdioMCPClient(
 	env []string,
 	args ...string,
 ) (*StdioMCPClient, error) {
-	cmd := exec.Command(command, args...)
+	return NewStdioMCPClientWithContext(context.Background(), command, env, args...)
+}
+
+// NewStdioMCPClientWithContext binds the subprocess lifetime to ctx. It uses
+// argv directly, without a shell, and inherits the host environment.
+func NewStdioMCPClientWithContext(ctx context.Context, command string, env []string, args ...string) (*StdioMCPClient, error) {
+	cmd := exec.CommandContext(ctx, command, args...)
 
 	mergedEnv := os.Environ()
 	mergedEnv = append(mergedEnv, env...)

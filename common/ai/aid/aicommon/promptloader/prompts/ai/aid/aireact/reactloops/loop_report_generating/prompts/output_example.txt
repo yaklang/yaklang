@@ -30,16 +30,19 @@
 }
 ```
 
-### 示例3：知识库搜索
-当需要从知识库获取信息时：
+### 示例3：知识库查询
+按 `yaklang-system` Skill 使用标准知识库工具。只有定义未在上下文中时才加载：
 ```json
-{
-  "@action": "search_knowledge",
-  "human_readable_thought": "从知识库中搜索关于SQL注入的防护方案",
-  "knowledge_bases": ["security_kb"],
-  "search_query": "SQL注入攻击的防护方法有哪些？"
-}
+{"@action":"loading_skills","skill_name":"yaklang-system"}
 ```
+```json
+{"@action":"require_tool","require_tool_payload":"query_knowledge_base"}
+```
+确定用户附加的精确库名后，执行实际查询：
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_knowledge_base","directly_call_tool_params":{"name":"security_kb","query":"SQL注入的防护方法","token_limit":1024,"limit":3,"per_entry_token_limit":256}}
+```
+未选库时先加载并调用 `manage_knowledge_base(op=list)`；例子中的库名必须替换为真实选择，不得从示例猜测库名。
 
 ### 示例4：创建报告初稿（必须包含 <|GEN_REPORT_CURRENT_NONCE|> 标签！）
 当资料收集完成，报告为空时：
@@ -144,7 +147,7 @@
 - `delete_section` - 删除内容（无需生成内容）
 - `read_reference_file` - 读取参考文件（查询类操作）
 - `grep_reference` - 搜索参考资料（查询类操作）
-- `search_knowledge` - 知识库搜索（查询类操作）
+- 标准知识库工具：按 Skill 加载 Schema 后调用，查询带明确库范围与 token 预算
 - `finish` - 完成报告
 
 **记忆口诀**: 只有需要你"生成或提供报告内容片段"的 actions 才需要 `<|GEN_REPORT_...|>` 标签对！

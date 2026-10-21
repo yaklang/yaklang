@@ -312,7 +312,7 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 	allTools := m.toolsGetter()
 	if m.disallowMCPServers.Load() {
 		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
-			return !IsMCPToolName(tool.Name)
+			return !IsMCPRelatedToolName(tool.Name)
 		})
 	}
 	if len(m.disableTools) > 0 {
@@ -405,6 +405,9 @@ func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
 			return tool, nil
 		}
 		return nil, fmt.Errorf("tool %q is outside the runtime capability set", name)
+	}
+	if m.disallowMCPServers.Load() && IsMCPRelatedToolName(name) {
+		return nil, fmt.Errorf("MCP servers are disabled for this runtime")
 	}
 	tools, err := m.GetEnableTools()
 	if err != nil {

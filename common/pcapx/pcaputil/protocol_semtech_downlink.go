@@ -660,6 +660,9 @@ func (a *binParser) refuseSemtechDownlinkOversize(e *ProtocolEvent, w []byte, sr
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
 	}
+	if explicit == "semtech-downlink-session" {
+		return a.decodeSemtechCorrelatedDatagram(e, w)
+	}
 	if explicit != "" && explicit != "semtech-udp" {
 		return false
 	}

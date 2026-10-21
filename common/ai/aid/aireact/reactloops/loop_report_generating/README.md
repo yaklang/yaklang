@@ -20,7 +20,7 @@
 │        ▼                   ▼                   ▼           │
 │  • read_reference    • write_section     • modify_section   │
 │  • grep_reference    • insert_section   • delete_section   │
-│  • search_knowledge  • modify_section                      │
+│  • query_knowledge_base（标准工具） • modify_section         │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -33,7 +33,7 @@
 |--------|------|----------|
 | `read_reference_file` | 读取参考文件内容 | 阅读文档、代码文件等 |
 | `grep_reference` | 正则搜索参考资料 | 在大文件中搜索关键信息 |
-| `search_knowledge` | 语义搜索知识库 | 从知识库获取相关知识 |
+| `query_knowledge_base`（标准工具） | 经 `yaklang-system` Skill / `require_tool` 加载后查询 | 指定完整库名或显式 `all=true`，并设置 token 预算 |
 
 ### 第二阶段：撰写报告
 
@@ -99,7 +99,6 @@ loop_report_generating/
 ├── code.go                      # 模式注册和初始化
 ├── action_read_reference.go     # 读取参考文件
 ├── action_grep_reference.go     # 搜索参考资料
-├── action_search_knowledge.go   # 知识库搜索
 ├── action_change_offset.go      # 切换视图偏移（分页导航）
 ├── init_task.go                 # 初始化任务（意图分析、文件准备）
 │   # write_section, modify_section, insert_section, delete_section
@@ -144,13 +143,13 @@ err = aim.InvokeReAct(
     aim.onEvent(func(react, event) {
         // 注意：event.Type 需要转换为字符串进行比较
         eventType = string(event.Type)
-        if eventType == "filesystem_pin_filename" {
+        if eventType == "report_finish" {
             // event.Content 是 []byte 类型
             contentStr = string(event.Content)
             try {
                 jsonData = json.loads(contentStr)
-                if jsonData != nil && jsonData["path"] != nil {
-                    reportFilename = jsonData["path"]
+                if jsonData != nil && jsonData["report_path"] != nil {
+                    reportFilename = jsonData["report_path"]
                     log.Info("Report file: %s", reportFilename)
                 }
             } catch e {

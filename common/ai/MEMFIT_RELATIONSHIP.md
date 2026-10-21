@@ -73,7 +73,7 @@ flowchart TB
 | `aireact/` | ReAct 引擎主体：主循环、prompt 渲染、内置 actions、感知 / 反思 / 自旋检测 | `NewReAct`、`ReAct.SendInputEvent`、`WithBuiltinTools` | 通过 `init()` 把自己注册成 `aicommon.AIEngineOperator` 工厂 |
 | `aireact/reactloops/` | Focus mode 体系：Loop 工厂注册、`LoopAction`、`LoopActionHandlerOperator`、所有 `loop_xxx/` 实现 | `RegisterLoopFactory`、`GetAllLoopMetadata`、`GetLoopMetadata`、`CreateLoopByName` | gRPC `QueryAIFocus` 直接读 |
 | `aireact/reactloops/reactloops_yak/` | Yak 专注模式基础设施：embed 内置 + 用户目录懒扫 | `LoadAllFromEmbed`、`LoadSingleFile`、`EnsureUserFocusModesLoaded` | gRPC `QueryAIFocus` / `StartAIReAct` 入口调 `EnsureUserFocusModesLoaded` |
-| `aireact/reactloops/loop_xxx/` | 17+ 个领域专注模式（`loop_default` / `loop_intent` / `loop_http_fuzztest` / `loop_smart_qa` / ...） | 每个 `init()` 调 `RegisterLoopFactory` | 由 `reactinit/init.go` 空白 import 触发注册 |
+| `aireact/reactloops/loop_xxx/` | 领域专注模式（`loop_default` / `loop_intent` / `loop_http_fuzztest` / ...） | 每个 `init()` 调 `RegisterLoopFactory` | 由 `reactinit/init.go` 空白 import 触发注册 |
 | `aitool/` | 工具抽象（`aitool.Tool`、`aitool.ToolOption`） | `WithStringParam`、`NewObjectSchema` | 所有 action / tool 用它来声明参数 schema |
 | `aitool/buildinaitools/yakscripttools/yakscriptforai/` | 内置 yak 脚本工具（含 `do_http_request.yak` 等） | embed FS | 由 `WithBuiltinTools` 注入 ReAct |
 | `aimem/` | AI 中长期记忆（关键词 + HNSW 索引） | `MemoryStore` 等 | ReAct 在多轮间用 |

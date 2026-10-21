@@ -93,6 +93,7 @@ func workDirFromInvoker(r aicommon.AIInvokeRuntime) string {
 
 func buildInitTask(r aicommon.AIInvokeRuntime) func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
 	return func(loop *reactloops.ReActLoop, task aicommon.AIStatefulTask, operator *reactloops.InitTaskOperator) {
+		reactloops.RunAttachedExtraResourcesInit(r, loop, task.GetAttachedDatas())
 		reactloops.EmitStatusI18n(loop, "正在准备收集相关信息", "Preparing to gather relevant information")
 
 		wd := workDirFromInvoker(r)

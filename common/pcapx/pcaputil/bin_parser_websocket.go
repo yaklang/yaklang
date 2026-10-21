@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 	"unicode/utf8"
 )
 
@@ -16,6 +17,63 @@ type binWebSocket struct {
 	buf                   [2][]byte
 	opcode                [2]byte
 	closed                [2]bool
+	ocpp                  *binOCPP
+}
+
+// RFC6455 4.2.2: a selected token must have been offered, and there is at
+// most one selected token. Absence of selection is ordinary WebSocket.
+func websocketSubprotocol(offer string, selected []string) (string, error) {
+	if len(selected) == 0 {
+		return "", nil
+	}
+	if len(selected) != 1 {
+		return "", fmt.Errorf("WebSocket multiple subprotocol selections")
+	}
+	token := strings.TrimSpace(selected[0])
+	if !websocketProtocolToken(token) {
+		return "", fmt.Errorf("WebSocket invalid selected subprotocol")
+	}
+	for _, offered := range strings.Split(offer, ",") {
+		if strings.TrimSpace(offered) == token {
+			return token, nil
+		}
+	}
+	return "", fmt.Errorf("WebSocket subprotocol was not offered")
+}
+
+func websocketProtocolToken(s string) bool {
+	if s == "" {
+		return false
+	}
+	for _, c := range []byte(s) {
+		if c < 0x21 || c > 0x7e || strings.ContainsRune("()<>@,;:\\\"/[]?={}", rune(c)) {
+			return false
+		}
+	}
+	return true
+}
+
+func websocketProtocolOffer(s string) bool {
+	if s == "" {
+		return true
+	}
+	seen := map[string]bool{}
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if !websocketProtocolToken(p) || seen[p] {
+			return false
+		}
+		seen[p] = true
+	}
+	return true
+}
+
+func (ws *binWebSocket) retainedBytes() int64 {
+	n := int64(256 + cap(ws.buf[0]) + cap(ws.buf[1]) + cap(ws.dictionary[0]) + cap(ws.dictionary[1]))
+	if ws.deflate {
+		n += int64(2*ws.limit + 65536)
+	}
+	return n + ws.ocpp.retainedBytes()
 }
 
 func probeWebSocket(w []byte, limit int) ProbeResult {
@@ -120,10 +178,7 @@ func (f *binFlow) frameWebSocket(dir int, w []byte) (int, *binSpec, error) {
 		return 0, nil, fmt.Errorf("websocket: new data frame interrupts fragmented message")
 	}
 	ws.limit = f.a.config.MaxMessageBytes
-	target := int64(256 + cap(ws.buf[0]) + cap(ws.buf[1]) + cap(ws.dictionary[0]) + cap(ws.dictionary[1]))
-	if ws.deflate {
-		target += int64(2*f.a.config.MaxMessageBytes + 65536)
-	}
+	target := ws.retainedBytes()
 	if op <= 2 && (op == 0 || w[0]&128 == 0) {
 		header := 2
 		if w[1]&127 == 126 {

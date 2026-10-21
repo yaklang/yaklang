@@ -8,6 +8,15 @@ import (
 )
 
 func TestTFTPTransferPortsAndOptions(t *testing.T) {
+	t.Run("oack-existing-api", testTFTPObservedOACKExistingAPI)
+	t.Run("fields-existing-api", testTFTPFieldsOwnedExistingAPI)
+	t.Run("refusal-query-existing-api", testTFTPRejectedQueryExistingAPI)
+	t.Run("byte-refusal-existing-api", testTFTPByteRefusalExistingAPI)
+	t.Run("sealed-budget-context", testTFTPSealedBudgetContext)
+	t.Run("sealed-negotiation-matrix", testTFTPNegotiationMatrix)
+	t.Run("sealed-generation-matrix", testTFTPGenerationMatrix)
+	t.Run("generation-resources-domains", testTFTPGenerationResourcesAndDomains)
+	t.Run("retired-byte-refusal", testTFTPRetiredByteRefusal)
 	c := NewDefaultConfig()
 	require.NoError(t, WithBinParserConfig(BinParserConfig{OnEvent: func(*ProtocolEvent) {}})(c))
 	require.NoError(t, c.prepareBinParser())

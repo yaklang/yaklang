@@ -10,7 +10,6 @@
 |--------|--------|-----------|------------------|----------------------|---------------|-----------|------------------|------|
 | [loop_default](../loop_default) | 低 | InitTask 处理 attached data + 意图识别 | 0（共享通用 actions） | 否 | DeepIntent 调用 | 0 | persistent_instruction | 通用 ReAct 入口 |
 | [loop_intent](../loop_intent) | 中 | InitTask + OnPostIteraction | 2（query_capabilities, finalize_enrichment） | 否（用 finalize_enrichment 替代） | DeepIntent 实现 | 多 | persistent_instruction + reactive_data | 内部意图识别 |
-| [loop_smart_qa](../loop_smart_qa) | 中 | InitTask | 7（search_knowledge, web_search 等） | 否（用 final_answer） | 否 | 多 | persistent_instruction | 智能问答 |
 | [loop_knowledge_enhance](../loop_knowledge_enhance) | 中 | OnPostIteraction（finalize fallback） | 1（search） | 否 | finalize fallback | 1 | persistent_instruction | 知识库增强 |
 | [coordinator / pe_task](../../../coordinator/README.md) | 高 | Session + 自动 DAG 调度 | 计划编辑、审核、报告与显式工具调用 | 由运行时验收 | 辅助结构化请求 | 按动作声明 | 计划 / 执行角色与状态 | 规划和任务执行 |
 | [loop_http_fuzztest](../loop_http_fuzztest) | 极高 | InitTask + OnPostIteraction | 9（set_http_request, fuzz_method, fuzz_path 等） | 是 | 初始化 + finalize 多次 | 多（AITag + Stream） | persistent + reactive_data + output_example | HTTP 安全模糊测试 |
@@ -37,14 +36,13 @@
 按递增复杂度：
 
 1. **[loop_default](../loop_default)**：理解最简形态
-2. **[loop_smart_qa](../loop_smart_qa)**：理解 ActionFilter + 自定义 actions
-3. **[loop_knowledge_enhance](../loop_knowledge_enhance)**：理解 finalize fallback 模式
-4. **[loop_intent](../loop_intent)**：理解内部 loop + meta 行为
-5. **[loop_http_flow_analyze](../loop_http_flow_analyze)**：理解多 action + finalize fallback
-6. **[coordinator / pe_task](../../../coordinator/README.md)**：理解计划审批、调度及实际结果验收
-7. **[loop_http_fuzztest](../loop_http_fuzztest)**：理解极端定制化（终极目标）
+2. **[loop_knowledge_enhance](../loop_knowledge_enhance)**：理解 finalize fallback 模式
+3. **[loop_intent](../loop_intent)**：理解内部 loop + meta 行为
+4. **[loop_http_flow_analyze](../loop_http_flow_analyze)**：理解多 action + finalize fallback
+5. **[coordinator / pe_task](../../../coordinator/README.md)**：理解计划审批、调度及实际结果验收
+6. **[loop_http_fuzztest](../loop_http_fuzztest)**：理解极端定制化（终极目标）
 
-下面给 5 个最值得细看的 loop 做深度拆解。
+下面给 4 个最值得细看的 loop 做深度拆解。
 
 ---
 
@@ -122,43 +120,7 @@ reactloops.WithActionFilter(...)                  // 只允许 query_capabilitie
 
 ---
 
-## 11.5 深度拆解 3：loop_smart_qa
-
-### 角色
-
-智能问答。用户提问，系统结合知识库 / 网络 / 文件 / 持久记忆 给答案。
-
-### 关键配置
-
-源码 [loop_smart_qa/init.go:35-95](../loop_smart_qa/init.go)：
-
-```go
-reactloops.WithAllowRAG(false)              // 通过自己的 search_knowledge action 控制
-reactloops.WithAllowAIForge(false)
-reactloops.WithAllowPlanAndExec(false)
-reactloops.WithAllowToolCall(false)         // 关掉通用工具，只用自己注册的
-reactloops.WithMaxIterations(5)              // 限制 5 轮
-reactloops.WithActionFilter(...)            // 白名单：search_knowledge, web_search, read_file, find_files, grep_text, search_persistent_memory, final_answer
-// 注册 7 个自定义 action
-knowledgeSearchAction(r),
-webSearchAction(r),
-readFileAction(r),
-findFilesAction(r),
-grepTextAction(r),
-memorySearchAction(r),
-finalAnswerAction(r),
-```
-
-### 学到什么
-
-- **白名单胜过黑名单**：明确允许哪些 actions，拒绝其他所有
-- **不用通用工具**：`WithAllowToolCall(false)` 然后自己注册定制版（更可控、更易测试）
-- **`final_answer` 替代 `directly_answer`**：自定义命名让 prompt 更直观
-- **5 轮迭代**：限制成本，逼 LLM 聚焦
-
----
-
-## 11.6 深度拆解 4：coordinator / pe_task
+## 11.5 深度拆解 3：coordinator / pe_task
 
 PLAN 使用 [coordinator](../../../coordinator/README.md) 协调计划、审批和任务 DAG；`pe_task` 执行已批准任务。计划由主循环生成，工具采用显式参数调用，schema 加载不执行工具、不请求辅助模型构参。
 
@@ -166,7 +128,7 @@ PLAN 使用 [coordinator](../../../coordinator/README.md) 协调计划、审批�
 
 ---
 
-## 11.7 深度拆解 5：loop_http_fuzztest（终极复杂度）
+## 11.6 深度拆解 4：loop_http_fuzztest（终极复杂度）
 
 ### 角色
 
@@ -314,7 +276,7 @@ func BuildOnPostIterationHook(invoker aicommon.AIInvokeRuntime) reactloops.ReAct
 
 ---
 
-## 11.8 其他 loop 速览
+## 11.7 其他 loop 速览
 
 ### loop_knowledge_enhance
 
@@ -362,13 +324,13 @@ AI 技能审计。检查已有 skill 库的覆盖率。
 
 ---
 
-## 11.9 模式总结
+## 11.8 模式总结
 
 从横向对比中提取的几个**通用模式**：
 
 ### 模式 A：白名单 ActionFilter
 
-`loop_smart_qa` / `loop_intent` 用 `WithActionFilter` 限定 actions。通用框架仍提供显式工具执行等公共能力，应按具体循环需求配置。
+`loop_intent` 用 `WithActionFilter` 限定 actions。通用框架仍提供显式工具执行等公共能力，应按具体循环需求配置。
 
 ### 模式 B：Finalize Fallback
 
@@ -401,7 +363,7 @@ IgnoreError on max iterations
 
 `loop_http_fuzztest` 把 20+ 状态字段都注入到每轮 prompt。**适合状态密集的工程化任务**。
 
-## 11.10 进一步阅读
+## 11.9 进一步阅读
 
 - [10-build-your-own-loop.md](10-build-your-own-loop.md)：自己造一个
 - [05-hooks-and-lifecycle.md](05-hooks-and-lifecycle.md)：InitTask / OnPostIteraction 详解

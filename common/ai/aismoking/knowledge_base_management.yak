@@ -1,0 +1,127 @@
+// AISMOKING_CASE=knowledge_base_management yak common/ai/aismoking/run.yak
+// Real ReAct, embedded scripts, CLI conversion, profile persistence, indexing,
+// retrieval and artifacts. Provider decisions and embeddings are deterministic.
+include "common/ai/aismoking/mock.inc"
+assert os.Getenv("YAKIT_HOME") != "", "Use a disposable home"
+rag.EnableMockMode()
+knowledgeFocus = os.Getenv("AISMOKING_KNOWLEDGE_FOCUS") == "1"
+focusName = "default"
+if knowledgeFocus { focusName = "knowledge_enhance" }
+prefix = "kb-smoke-" + randstr(8)
+kbName, otherName = prefix + "-docs", prefix + "-other"
+sourceFile = file.Join(smokeRoot,"source.txt")
+file.Save(sourceFile,"FILE_API_MARKER\nThe database API uses a token to authenticate requests.")~
+original = "ORIGINAL_MARKER\n" + str.Repeat("api token 原始知识\"\\😀\n",150)
+plan = [
+    {"name":"manage_knowledge_base","params":{"op":"create","name":kbName,"metadata":{"description":"知识库冒烟","tags":["smoke"]},"index_options":{"m":8,"ef_search":40,"ef_construct":50}}},
+    {"name":"manage_knowledge_base","params":{"op":"create","name":otherName}},
+    {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix,"limit":1}},
+    {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix,"limit":1,"offset":1}},
+    {"name":"manage_knowledge_base","params":{"op":"get","name":kbName}},
+    {"name":"manage_knowledge_base","params":{"op":"update","name":kbName,"metadata":{"description":"","tags":[],"is_default":false}}},
+    {"name":"manage_knowledge_base","params":{"op":"add_entry","name":kbName,"entry":{"title":"API token","content":original}}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"query":"ORIGINAL_MARKER","token_limit":256}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"mode":"get","entry_id":"pending","content_offset":0,"token_limit":256}},
+    {"name":"manage_knowledge_base","params":{"op":"update_entry","name":kbName,"entry_id":"pending","entry":{"title":"API token updated","content":"NEW_API_MARKER\napi token 新内容\"\\😀"}}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"mode":"semantic","query":"api token","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"build","name":kbName,"source_file":sourceFile,"build_options":{"mode":"chunks","chunk_size":512,"concurrency":1}}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"query":"FILE_API_MARKER","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"rebuild_index","name":kbName}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"mode":"semantic","query":"api token database","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"add_entry","name":otherName,"entry":{"title":"Other API token","content":"OTHER_API_MARKER api token belongs to the other knowledge base"}}},
+    {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"API_MARKER","limit":3,"token_limit":1024,"per_entry_token_limit":256}},
+    {"name":"query_knowledge_base","params":{"all":true,"mode":"semantic","query":"api token","limit":2,"token_limit":512,"per_entry_token_limit":256,"min_score":-1}},
+    {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix}},
+    {"name":"query_knowledge_base","params":{"names":[kbName,otherName],"query":"OTHER_API_MARKER","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"delete_entry","name":kbName,"entry_id":"pending"}},
+    {"name":"query_knowledge_base","params":{"name":kbName,"query":"NEW_API_MARKER","token_limit":512}},
+    {"name":"manage_knowledge_base","params":{"op":"delete","name":kbName}},
+    {"name":"manage_knowledge_base","params":{"op":"delete","name":otherName}},
+    {"name":"manage_knowledge_base","params":{"op":"list","keyword":prefix}},
+]
+config,operator,cursor,awaiting = nil,nil,0,false
+requiredTools = 0
+artifactDirs,results,loaded = {},[],{}
+entryID,continuation = "",0
+func checkPrevious() {
+    calls = operator.GetCurrentTask().GetAllToolCallResults()
+    assert len(calls)==cursor
+    actual = calls[len(calls)-1]
+    assert actual.Name==plan[cursor-1].name
+    assert actual.Success, "knowledge tool failed"
+    directory = ""
+    for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
+    assert directory!=nil && directory!=""
+    manifest=json.loads(string(file.ReadFile(file.Join(directory,"manifest.json"))~))
+    assert manifest.success && manifest.files.result.bytes==0, "knowledge tools return stdout directly"
+    value=json.loads(string(file.ReadFile(manifest.files.stdout.path)~))
+    if cursor==1 { assert value.knowledge_base.name==kbName }
+    if cursor==3 { assert value.total==2 && value.has_more && value.next_offset==1 }
+    if cursor==4 { assert value.total==2 && !value.has_more }
+    if cursor==5 { assert value.entry_count==0 && value.collection.M==8 && value.collection.EfSearch==40 }
+    if cursor==6 { assert value.knowledge_base.description=="" && len(value.knowledge_base.tags)==0 && !value.knowledge_base.is_default }
+    if cursor==7 { entryID=value.entry_id; assert entryID!="" && value.indexed }
+    if cursor==8 { assert len(value.results)==1 && value.used_tokens<=256 && value.results[0].truncated;continuation=value.results[0].next_content_offset;assert continuation>0 }
+    if cursor==9 { assert value.results[0].entry_id==entryID && value.results[0].content_offset==continuation && value.results[0].next_content_offset>continuation }
+    if cursor==11 { assert len(value.results)==1 && value.results[0].entry_id==entryID && value.results[0].content=="NEW_API_MARKER\napi token 新内容\"\\😀" }
+    if cursor==12 { assert value.entries_added>0 && value.mode=="chunks" }
+    if cursor==13 { assert len(value.results)==1 && "FILE_API_MARKER" in value.results[0].content }
+    if cursor==14 { assert value.indexed && value.entries_indexed==2 }
+    if cursor==15 { assert len(value.results)>0 && value.used_tokens<=512 }
+    if cursor==16 { assert value.indexed }
+    if cursor==17 { assert value.total==3 && len(value.results)==3 && value.knowledge_base_count==2 && value.used_tokens<=1024 }
+    if cursor==18 { assert value.all && len(value.results)==2 && value.used_tokens<=512 && value.knowledge_base_count==2 }
+    if cursor==19 { assert value.total==2 }
+    if cursor==20 { assert len(value.results)==1 && value.results[0].knowledge_base==otherName }
+    if cursor==21 || cursor==23 || cursor==24 { assert value.deleted }
+    if cursor==22 || cursor==25 { assert value.total==0 }
+    awaiting=false
+}
+smokeHandler=func(w,body) {
+    native,prompt=len(body.tools)>0,smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"知识库管理验证"});return }
+    if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":"知识库管理、文件构建、预算查询和清理均已核验。"});return }
+    if "SMOKE_CALLER:liteforge[perception]" in prompt { smokeAnswer(w,false,"perception",{"summary":"知识库验证完成。","topics":["知识库"],"keywords":["knowledge"],"changed":true,"confidence":1});return }
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"知识库实际操作已核验。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    assert ("SMOKE_CALLER:react-loop:" + focusName) in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    assert "管理知识库" in prompt && "manage_knowledge_base" in prompt && "query_knowledge_base" in prompt && "token_limit" in prompt && "all=true" in prompt, "system skill must index both knowledge tools and explicit all scope"
+    if knowledgeFocus {
+        assert "PREFERENCE_FOCUS_MARKER" in prompt && kbName in prompt && "attached_knowledge_base" in prompt, "attached preferences must reach the focused loop"
+        schemaContext = prompt + json.dumps(body.tools)
+        for key in ["content_offset", "index_options", "build_options", "per_entry_token_limit"] { assert key in schemaContext, "both complete schemas must be present before the first decision" }
+        for name in ["manage_knowledge_base", "query_knowledge_base"] {
+            assert config.GetAiToolManager().IsRecentlyUsedTool(name), "focus must load enabled knowledge schemas into the ordinary cache"
+            loaded[name] = true
+        }
+    }
+    if awaiting { checkPrevious() }
+    if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
+    item=plan[cursor]
+    if loaded[item.name]==nil { loaded[item.name]=true;requiredTools++;smokeAnswer(w,native,"require_tool",{"require_tool_payload":item.name});return }
+    if "entry_id" in item.params && item.params.entry_id=="pending" { item.params.entry_id=entryID }
+    if cursor==8 { item.params.content_offset=continuation }
+    cursor++;awaiting=true
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":item.name,"directly_call_tool_params":item.params,"directly_call_reason":"核验真实知识库管理与查询"})
+}
+for native in [false,true] {
+    config,operator,cursor,awaiting,loaded,requiredTools=nil,nil,0,false,{},0
+    // Reset values filled in by the previous protocol run.
+    for item in plan { if "entry_id" in item.params { item.params.entry_id="pending" } }
+    die(aim.InvokeReAct("通过 yaklang-system 的两个知识库工具创建和管理测试库、写入并修改知识、按 token 预算查询和续读、构建文件和索引、语义检索；验证 names、显式 all、manage list 后再选择库，最后删除测试库。",aim.focus(focusName),aim.attachedKnowledgeBase(kbName),aim.attachedFileContent("PREFERENCE_FOCUS_MARKER 优先使用用户附加的项目知识库；本次显式验证全库查询。"),aim.sessionID("knowledge-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(40),aim.timeout(240),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+        config,operator=op.GetConfig(),op
+        if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
+    }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        return nil
+    })))
+    assert cursor==len(plan) && !awaiting && len(loaded)==2
+    if knowledgeFocus { assert requiredTools==0, "focus must not spend model turns loading schemas" } else { assert requiredTools==2 }
+    results=append(results,{"focus":focusName,"function_call":native,"tool_calls":cursor,"required_tools":requiredTools,"passed":true})
+    file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
+}
+smokeCheck()

@@ -297,11 +297,16 @@ func (s *binPFCP) retainAmbiguous(f *binFlow, k pfcpSequence, w []byte, id uint6
 // Called with udpMu held.
 func (a *binParser) blockPFCPConversation(e *ProtocolEvent, w []byte) {
 	if a.udpSessions == nil {
+		if pfcpRequestHeader(w) {
+			a.pfcpUntrackedRefusal = true
+		}
 		return
 	}
+	tracked := false
 	for _, el := range a.udpSessions.entries {
 		f := el.Value.(*binUDPEntry).flow
 		if f.pfcp != nil && f.domain == e.Domain && ((f.endpoints[0] == e.Source && f.endpoints[1] == e.Destination) || (f.endpoints[1] == e.Source && f.endpoints[0] == e.Destination)) {
+			tracked = true
 			if pfcpRequestHeader(w) && !f.pfcp.hasDeniedSequence {
 				dir := 0
 				if e.Source != f.endpoints[0] {
@@ -315,4 +320,35 @@ func (a *binParser) blockPFCPConversation(e *ProtocolEvent, w []byte) {
 			f.blockPFCPSetup()
 		}
 	}
+	if !tracked && pfcpRequestHeader(w) {
+		// A bounded capture-owned marker avoids an unbudgeted rejected-key map.
+		// Existing retained peers stay usable. Newly admitted keys can still
+		// expose literal fields but cannot prove an unseen identity is fresh.
+		a.pfcpUntrackedRefusal = true
+	}
+}
+
+// A node profile is only a parsing key, not a fresh wire endpoint generation.
+// Inherit terminal peer refusal before creating a different profile's entry.
+// udpMu is held; scan only the already bounded/charged store, no new key map.
+func (a *binParser) newPFCPState(e *ProtocolEvent) *binPFCP {
+	s := &binPFCP{blocked: a.pfcpUntrackedRefusal, untracked: a.pfcpUntrackedRefusal}
+	if a.udpSessions == nil {
+		return s
+	}
+	for _, el := range a.udpSessions.entries {
+		f := el.Value.(*binUDPEntry).flow
+		if f.pfcp == nil || !f.pfcp.blocked || f.domain != e.Domain || !((f.endpoints[0] == e.Source && f.endpoints[1] == e.Destination) || (f.endpoints[1] == e.Source && f.endpoints[0] == e.Destination)) {
+			continue
+		}
+		s.blocked = true
+		s.untracked = s.untracked || f.pfcp.untracked
+		if f.pfcp.hasDeniedSequence && !s.hasDeniedSequence {
+			s.deniedSequence, s.hasDeniedSequence = f.pfcp.deniedSequence, true
+			if e.Source != f.endpoints[0] {
+				s.deniedSequence.dir = 1 - s.deniedSequence.dir
+			}
+		}
+	}
+	return s
 }

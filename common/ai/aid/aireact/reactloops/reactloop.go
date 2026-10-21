@@ -88,7 +88,6 @@ type ReActLoop struct {
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
 	planExecActionType string
-	allowRAG           func() bool
 	allowToolCall      func() bool
 	allowUserInteract  func() bool
 
@@ -474,11 +473,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		}
 	}
 
-	if r.allowRAG != nil && r.allowRAG() {
-		info["AllowKnowledgeEnhanceAnswer"] = true
-	} else {
-		info["AllowKnowledgeEnhanceAnswer"] = false
-	}
+	info["AllowKnowledgeEnhanceAnswer"] = true // Legacy template key; retrieval uses Skill-guided tools.
 
 	if r.allowToolCall != nil && !r.allowToolCall() { // default allow tool call
 		info["AllowToolCall"] = false
@@ -847,15 +842,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if r.allowRAG == nil || r.allowRAG() {
-		// allow tool call, must have tools
-		ins, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE, "knowledge enhancement enabled")
-		if err != nil {
-			return nil, err
-		}
-		r.actions.Set(ins.ActionType, ins)
-	}
-
 	if r.allowAIForge == nil || r.allowAIForge() {
 		aiforge, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, "AI Forge enabled")
 		if err != nil {
@@ -907,22 +893,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if IsMCPServersAllowed(invoker) {
-		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); !ok {
-			queryMCPServers, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS, "MCP servers enabled")
-			if err != nil {
-				return nil, err
-			}
-			r.actions.Set(queryMCPServers.ActionType, queryMCPServers)
-		}
-		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); !ok {
-			queryMCPTools, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS, "MCP servers enabled")
-			if err != nil {
-				return nil, err
-			}
-			r.actions.Set(queryMCPTools.ActionType, queryMCPTools)
-		}
-	}
+	// MCP discovery and management use require_tool and embedded Yak tools.
 
 	if r.emitter == nil {
 		return nil, utils.Error("loop's emitter is nil in ReActLoop")

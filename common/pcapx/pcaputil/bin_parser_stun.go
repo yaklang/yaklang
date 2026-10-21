@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash/crc32"
 	"net/netip"
@@ -40,6 +41,8 @@ type turnChannel struct {
 }
 type binSTUN struct {
 	pending     map[stunKey]stunRequest
+	history     map[stunKey]bool
+	blocked     bool
 	channels    map[turnChannelKey]turnChannel
 	permissions map[turnPeerKey]time.Time
 	allocations [2]time.Time
@@ -95,9 +98,13 @@ func stunFrameLength(w []byte, stream bool) (int, error) {
 func (f *binFlow) frameSTUN(w []byte) (int, *binSpec, error) {
 	s := f.stun
 	if err := f.reserveSession(s.bytes() + int64(len(w))*8 + 256); err != nil {
+		s.invalidate()
 		return 0, nil, err
 	}
 	n, err := stunFrameLength(w, true)
+	if err != nil {
+		s.invalidate()
+	}
 	entry := "STUN"
 	if len(w) > 0 && w[0]&0xc0 == 0x40 {
 		entry = "ChannelData"
@@ -105,7 +112,7 @@ func (f *binFlow) frameSTUN(w []byte) (int, *binSpec, error) {
 	return n, f.a.specs["stun_session/"+entry], err
 }
 func (s *binSTUN) bytes() int64 {
-	n := int64(512 + len(s.pending)*256 + len(s.channels)*96 + len(s.permissions)*80)
+	n := int64(512 + len(s.pending)*256 + len(s.history)*128 + len(s.channels)*96 + len(s.permissions)*80)
 	for _, p := range s.pending {
 		n += int64(cap(p.peers)) * 32
 	}
@@ -138,7 +145,7 @@ func (s *binSTUN) expire(ts time.Time) {
 	ts = s.clock
 	for k, v := range s.pending {
 		if !ts.Before(v.expires) {
-			delete(s.pending, k)
+			s.retire(k)
 		}
 	}
 	for k, v := range s.channels {
@@ -156,6 +163,23 @@ func (s *binSTUN) expire(ts time.Time) {
 			s.clearAllocation(dir)
 		}
 	}
+}
+
+// Wire IDs are not new generations when a local timer fires. Retain only
+// bounded hashes/tombstones; ambiguous observations never grant TURN state.
+func (s *binSTUN) retire(k stunKey) {
+	if _, ok := s.history[k]; ok {
+		s.history[k] = true
+	}
+	delete(s.pending, k)
+}
+func (s *binSTUN) invalidate() {
+	for k := range s.pending {
+		s.retire(k)
+	}
+	s.blocked = true
+	s.clearAllocation(0)
+	s.clearAllocation(1)
 }
 func (s *binSTUN) clearAllocation(dir int) {
 	s.allocations[dir] = time.Time{}
@@ -194,11 +218,24 @@ func stunAddress(v, w []byte, xor bool) (netip.AddrPort, error) {
 	ip, _ := netip.AddrFromSlice(b)
 	return netip.AddrPortFrom(ip, port), nil
 }
-func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool) (map[string]any, error) {
+func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool) (_ map[string]any, consumeErr error) {
+	keepContext := false
+	defer func() {
+		var typed *ProtocolError
+		if consumeErr != nil && !errors.As(consumeErr, &typed) {
+			// Keep a semantic refusal typed through event queries; an unchecked
+			// structural rule must not turn a failed fingerprint into success.
+			consumeErr = protocolError(ErrMalformedMessage, "%s", consumeErr)
+		}
+		if consumeErr != nil && !keepContext {
+			s.invalidate()
+		}
+	}()
 	max = sessionCollectionLimit(max)
 	s.expire(ts)
 	if s.pending == nil {
 		s.pending = map[stunKey]stunRequest{}
+		s.history = map[stunKey]bool{}
 		s.channels = map[turnChannelKey]turnChannel{}
 		s.permissions = map[turnPeerKey]time.Time{}
 	}
@@ -239,7 +276,7 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 	class := (t>>4)&1 | (t>>7)&2
 	var id [12]byte
 	copy(id[:], w[8:20])
-	req := stunRequest{method: method, hash: sha256.Sum256(w), expires: s.clock.Add(40 * time.Second)}
+	req := stunRequest{method: method, hash: sha256.Sum256(w), expires: ts.Add(40 * time.Second)}
 	out := map[string]any{"Packet Name": stunName(method), "Class": class, "Transaction ID": hex.EncodeToString(id[:]), "TURN": stunTURNMethod(method), "Integrity": "absent"}
 	attrs := []any{}
 	fingerprint := false
@@ -328,14 +365,30 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 		at = next
 	}
 	out["Attributes"] = attrs
+	// Required response grammar does not depend on owning its request.
+	if class == 2 && (method == 3 || method == 4) && !req.hasLifetime {
+		return nil, fmt.Errorf("turn: successful allocation/refresh lacks lifetime")
+	}
 	key := stunKey{dir, id}
 	if class == 0 {
 		old, ok := s.pending[key]
-		if ok && old.hash != req.hash {
-			return nil, protocolError(ErrDesynchronized, "STUN transaction ID reused for another method")
+		h, seen := s.history[key]
+		if s.blocked || seen && h {
+			out["Retransmission"] = false
+			out["Association Status"] = "ambiguous-transaction-id"
+			out["Pending Transactions"] = len(s.pending)
+			return out, nil
 		}
-		if !ok && len(s.pending) >= max {
-			return nil, protocolError(ErrResourceExceeded, "STUN transaction budget")
+		if ok && old.hash != req.hash {
+			s.retire(key)
+			keepContext = true
+			return nil, protocolError(ErrDesynchronized, "STUN transaction ID reused for different request bytes")
+		}
+		if !seen && len(s.history) >= max {
+			// Fully decoded unseen identity cannot be retained, but unrelated
+			// already tracked transactions and exact retries remain usable.
+			keepContext = true
+			return nil, protocolError(ErrResourceExceeded, "STUN identity history budget")
 		}
 		if (method == 8 || method == 9) && !req.peer.IsValid() {
 			return nil, fmt.Errorf("turn: request lacks peer address")
@@ -343,23 +396,27 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 		if method == 9 && (req.channel == 0 || len(req.peers) != 1) {
 			return nil, fmt.Errorf("turn: ChannelBind lacks channel")
 		}
+		if ok && req.expires.Before(old.expires) {
+			req.expires = old.expires
+		}
+		s.history[key] = false
 		s.pending[key] = req
 		out["Retransmission"] = ok
 	} else if class >= 2 {
 		key.dir = 1 - dir
 		old, ok := s.pending[key]
-		out["Matched"] = ok && old.method == method
-		if ok && old.method == method {
+		out["Matched"] = !s.blocked && ok && old.method == method
+		if s.blocked {
+			out["Association Status"] = "unverified-after-refusal"
+		}
+		if !s.blocked && ok && old.method == method {
 			if class == 2 {
 				switch method {
 				case 3, 4:
-					if !req.hasLifetime {
-						return nil, fmt.Errorf("turn: successful allocation/refresh lacks lifetime")
-					}
 					if req.lifetime == 0 {
 						s.clearAllocation(key.dir)
 					} else {
-						s.allocations[key.dir] = s.clock.Add(time.Duration(req.lifetime) * time.Second)
+						s.allocations[key.dir] = ts.Add(time.Duration(req.lifetime) * time.Second)
 					}
 					out["Lifetime"] = req.lifetime
 				case 8, 9:
@@ -371,11 +428,13 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 						}
 					}
 					if len(s.permissions)+len(added) > max {
+						keepContext = true // Fully parsed matching response; no relay mutation occurred.
 						return nil, protocolError(ErrResourceExceeded, "TURN permission budget")
 					}
 					ck := turnChannelKey{key.dir, old.channel}
 					if method == 9 {
 						if _, exists := s.channels[ck]; !exists && len(s.channels) >= max {
+							keepContext = true
 							return nil, protocolError(ErrResourceExceeded, "TURN channel budget")
 						}
 						if current, exists := s.channels[ck]; exists && current.peer != old.peer {
@@ -386,15 +445,32 @@ func (s *binSTUN) consume(dir int, ts time.Time, w []byte, max int, stream bool)
 								return nil, protocolError(ErrDesynchronized, "TURN peer bound to another channel")
 							}
 						}
-						s.channels[ck] = turnChannel{old.peer, s.clock.Add(600 * time.Second)}
+						expiry := ts.Add(600 * time.Second)
+						if prior, ok := s.channels[ck]; ok && prior.expires.After(expiry) {
+							expiry = prior.expires
+						}
+						s.channels[ck] = turnChannel{old.peer, expiry}
 					}
 					for _, peer := range old.peers {
-						s.permissions[turnPeerKey{key.dir, peer.Addr()}] = s.clock.Add(300 * time.Second)
+						pk := turnPeerKey{key.dir, peer.Addr()}
+						expiry := ts.Add(300 * time.Second)
+						if prior := s.permissions[pk]; prior.After(expiry) {
+							expiry = prior
+						}
+						s.permissions[pk] = expiry
 					}
 				}
 			}
-			delete(s.pending, key)
+			s.retire(key)
 			out["In Reply To"] = stunName(old.method)
+		} else if !ok {
+			if _, seen := s.history[key]; !seen {
+				if len(s.history) < max {
+					s.history[key] = true
+				} else {
+					s.invalidate()
+				}
+			}
 		}
 	}
 	out["Pending Transactions"] = len(s.pending)

@@ -10,7 +10,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
-	"github.com/yaklang/yaklang/common/ai/rag"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
@@ -577,9 +576,6 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 
 		// AI 服务配置
 		aicommon.WithTieredAICallback(),
-
-		// 知识库配置
-		aicommon.WithEnhanceKnowledgeManager(rag.NewRagEnhanceKnowledgeManager()),
 
 		// 会话配置
 		// S3c: PersistentSessionId/MemoryTriageId 移到字面量后 append,以便

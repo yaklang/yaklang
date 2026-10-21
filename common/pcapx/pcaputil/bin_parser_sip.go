@@ -2,35 +2,43 @@ package pcaputil
 
 import (
 	"bytes"
+	"container/list"
+	"crypto/sha256"
 	"fmt"
 	"net"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
-// binSIP is the M0 session state for RFC 3261. Ports 5060/5061 are never
-// consulted. ACK and CANCEL are first-class methods. UDP retransmission is
-// the same Call-ID/CSeq/Via-branch seen again before a final response.
+// binSIP retains bounded passive RFC3261 transaction/dialog observations.
+// Ports5060/5061 are never consulted. Exact retries retain their owner;
+// expired/conflicting identities remain bounded tombstones until Close.
 type binSIP struct {
-	pending        map[sipTxnKey]string
-	pendingAt      map[sipTxnKey]time.Time
-	inviteStatus   map[sipTxnKey]int
-	inviteComplete map[sipTxnKey]int
-	completedAt    map[sipTxnKey]time.Time
-	seen           map[sipTxnKey]int
-	seenAt         map[sipTxnKey]time.Time
-	finalResponses map[sipFinalResponseKey]int
-	responseAt     map[sipFinalResponseKey]time.Time
-	responseDir    map[sipFinalResponseKey]int
-	dialogs        map[sipDialogKey]string
-	dialogAt       map[sipDialogKey]time.Time
-	dialogTxns     map[sipDialogKey]sipTxnKey
-	reserveMemory  func(int64) error
+	unverified      bool
+	clock           time.Time
+	requestDigests  map[sipTxnKey][32]byte
+	pending         map[sipTxnKey]string
+	pendingAt       map[sipTxnKey]time.Time
+	inviteStatus    map[sipTxnKey]int
+	inviteComplete  map[sipTxnKey]int
+	completedAt     map[sipTxnKey]time.Time
+	seen            map[sipTxnKey]int
+	seenAt          map[sipTxnKey]time.Time
+	responseDigests map[sipFinalResponseKey][32]byte
+	finalResponses  map[sipFinalResponseKey]int
+	responseAt      map[sipFinalResponseKey]time.Time
+	responseDir     map[sipFinalResponseKey]int
+	dialogs         map[sipDialogKey]string
+	dialogAt        map[sipDialogKey]time.Time
+	dialogTxns      map[sipDialogKey]sipTxnKey
+	reserveMemory   func(int64) error
 }
 
 const (
+	// These are local observation budgets, not asserted peer timer values.
 	sipTransactionStateTTL = 32 * time.Second
 	sipDialogStateTTL      = 30 * time.Minute
 	sipMaxHeaderBytes      = 32 << 10
@@ -246,8 +254,14 @@ func (s *binSIP) retainedBytes() int64 {
 	for key := range s.seenAt {
 		n += sipTxnRetainedBytes(key)
 	}
+	for key := range s.requestDigests {
+		n += sipTxnRetainedBytes(key) + 32
+	}
 	for key := range s.finalResponses {
 		n += sipFinalRetainedBytes(key)
+	}
+	for key := range s.responseDigests {
+		n += sipFinalRetainedBytes(key) + 32
 	}
 	for key := range s.responseAt {
 		n += sipFinalRetainedBytes(key)
@@ -312,7 +326,7 @@ func (s *binSIP) projectedStateBytes(raw []byte, dir, max int) int64 {
 		if status >= 200 && len(s.finalResponses) < max {
 			finalKey := sipFinalResponseKey{txn: requestKey, toTag: strings.Clone(sipParam(header["to"], "tag")), status: status}
 			if _, exists := s.finalResponses[finalKey]; !exists {
-				delta += sipFinalRetainedBytes(finalKey)
+				delta += 2*sipFinalRetainedBytes(finalKey) + 32 // final identity and exact response digest
 				if _, exists := s.responseDir[finalKey]; !exists {
 					delta += sipFinalRetainedBytes(finalKey)
 				}
@@ -349,7 +363,7 @@ func (s *binSIP) projectedStateBytes(raw []byte, dir, max int) int64 {
 	if !sipRequestLine(line) || s.seen[key] > 0 || len(s.seen) >= max {
 		return 0
 	}
-	delta := sipTxnRetainedBytes(key) // seen
+	delta := 2*sipTxnRetainedBytes(key) + 32 // seen plus owned request digest
 	if _, exists := s.seenAt[key]; !exists {
 		delta += sipTxnRetainedBytes(key)
 	}
@@ -414,7 +428,9 @@ func sipParseHeaders(header []byte) (map[string]string, error) {
 			return nil, fmt.Errorf("sip: header missing colon")
 		}
 		key := sipHeaderName(string(name))
-		valueText := strings.TrimSpace(string(value))
+		// Trim before copying: a short retained identity must not pin a large
+		// whitespace-padded header allocation outside its charged byte length.
+		valueText := string(bytes.TrimSpace(value))
 		if key == "content-length" {
 			if previous, exists := out[key]; exists && previous != valueText {
 				return nil, protocolError(ErrMalformedMessage, "SIP conflicting Content-Length values")
@@ -474,6 +490,9 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 	if len(directions) > 0 && (directions[0] == 0 || directions[0] == 1) {
 		dir = directions[0]
 	}
+	if s.requestDigests == nil {
+		s.requestDigests = map[sipTxnKey][32]byte{}
+	}
 	if s.pending == nil {
 		s.pending = map[sipTxnKey]string{}
 	}
@@ -494,6 +513,9 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 	}
 	if s.seenAt == nil {
 		s.seenAt = map[sipTxnKey]time.Time{}
+	}
+	if s.responseDigests == nil {
+		s.responseDigests = map[sipFinalResponseKey][32]byte{}
 	}
 	if s.finalResponses == nil {
 		s.finalResponses = map[sipFinalResponseKey]int{}
@@ -534,6 +556,9 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 	if err != nil {
 		return nil, err
 	}
+	if sipRequestLine(line) && strings.SplitN(line, " ", 2)[0] != cseqM {
+		return nil, protocolError(ErrMalformedMessage, "SIP CSeq method differs from request method")
+	}
 	from := hs["from"]
 	to := hs["to"]
 	via := hs["via"]
@@ -550,7 +575,7 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 		"Content Type":  hs["content-type"],
 		"Context Level": "observed",
 	}
-	key := sipTxnKey{callID: callID, branch: strings.Clone(sipParam(via, "branch")), method: strings.Clone(strings.ToUpper(cseqM)), cseq: cseqN, direction: dir}
+	key := sipTxnKey{callID: callID, branch: strings.Clone(sipParam(via, "branch")), method: strings.Clone(cseqM), cseq: cseqN, direction: dir}
 	fromTag := strings.Clone(sipParam(from, "tag"))
 	toTag := strings.Clone(sipParam(to, "tag"))
 	dialog, hasDialog := makeSIPDialogKey(key.callID, fromTag, toTag)
@@ -561,6 +586,17 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 		} else if sdp != nil {
 			info["SDP"] = sdp
 		}
+	}
+	if s.unverified {
+		info["Association Status"], info["Context Level"] = "unverified-after-refusal", "partial"
+		if sipResponseLine(line) {
+			status, _ := strconv.Atoi(line[8:11])
+			info["Packet Name"], info["Status"], info["Reason"] = "Response", status, strings.TrimSpace(line[11:])
+		} else {
+			parts := strings.SplitN(line, " ", 3)
+			info["Packet Name"], info["Method"], info["URI"] = parts[0], parts[0], parts[1]
+		}
+		return info, nil
 	}
 	if sipResponseLine(line) {
 		status, _ := strconv.Atoi(line[8:11])
@@ -595,6 +631,11 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 		}
 		responseKey := sipFinalResponseKey{txn: requestKey, toTag: strings.Clone(sipParam(to, "tag")), status: status}
 		if count := s.finalResponses[responseKey]; count > 0 {
+			if s.responseDigests[responseKey] != sha256.Sum256(raw) {
+				s.retireTransaction(requestKey)
+				info["Unmatched"], info["Association Status"], info["Context Level"] = true, "conflicting-response", "partial"
+				return info, nil
+			}
 			if dir >= 0 {
 				if previousDir, known := s.responseDir[responseKey]; known && previousDir >= 0 && previousDir != dir {
 					markSIPDirectionMismatch(info)
@@ -619,6 +660,7 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 			}
 			if status >= 200 {
 				s.finalResponses[responseKey] = 1
+				s.responseDigests[responseKey] = sha256.Sum256(raw)
 				s.responseDir[responseKey] = dir
 				if !now.IsZero() {
 					s.responseAt[responseKey] = now
@@ -673,7 +715,8 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 	if !sipRequestLine(line) {
 		return nil, fmt.Errorf("sip: invalid start line")
 	}
-	method := strings.SplitN(line, " ", 3)[0]
+	// The retained pending method must not pin an otherwise long URI line.
+	method := strings.Clone(strings.SplitN(line, " ", 3)[0])
 	uri := strings.SplitN(line, " ", 3)[1]
 	info["Packet Name"] = method
 	info["Method"] = method
@@ -682,6 +725,14 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 		info["Dialog Identity"] = sipDialogIdentity(callID, dialog)
 		if state, ok := s.dialogs[dialog]; ok {
 			info["Dialog State"] = state
+		}
+	}
+	if s.seen[key] > 0 {
+		if digest, live := s.requestDigests[key]; !live || digest != sha256.Sum256(raw) {
+			s.retireTransaction(key)
+			info["Association Status"] = "retired-or-conflicting-identity"
+			info["Context Level"] = "partial"
+			return info, nil
 		}
 	}
 	if method == "ACK" {
@@ -739,6 +790,7 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 		}
 	}
 	s.seen[key] = 1
+	s.requestDigests[key] = sha256.Sum256(raw)
 	if !now.IsZero() {
 		s.seenAt[key] = now
 	}
@@ -769,6 +821,32 @@ func (s *binSIP) consumeAt(raw []byte, max int, now time.Time, directions ...int
 	return info, nil
 }
 
+// A conflict or lost generation must not contaminate another active key.
+func (s *binSIP) retireTransaction(key sipTxnKey) {
+	delete(s.pending, key)
+	delete(s.pendingAt, key)
+	delete(s.requestDigests, key)
+	delete(s.seenAt, key)
+	delete(s.inviteStatus, key)
+	delete(s.inviteComplete, key)
+	delete(s.completedAt, key)
+	for k := range s.finalResponses {
+		if k.txn == key {
+			delete(s.finalResponses, k)
+			delete(s.responseDigests, k)
+			delete(s.responseAt, k)
+			delete(s.responseDir, k)
+		}
+	}
+	for k, v := range s.dialogTxns {
+		if v == key {
+			delete(s.dialogTxns, k)
+			delete(s.dialogs, k)
+			delete(s.dialogAt, k)
+		}
+	}
+}
+
 func markSIPDirectionMismatch(info map[string]any) {
 	info["Unmatched"] = true
 	info["Association Status"] = "direction-mismatch"
@@ -793,6 +871,12 @@ func (s *binSIP) prune(now time.Time) {
 	if now.IsZero() {
 		return
 	}
+	// Only this endpoint/domain conversation contributes to its monotonic
+	// observation clock; capture order can move backwards in timestamp.
+	if now.After(s.clock) {
+		s.clock = now
+	}
+	now = s.clock
 	expired := func(created time.Time) bool {
 		return !created.IsZero() && !now.Before(created) && now.Sub(created) >= sipTransactionStateTTL
 	}
@@ -813,13 +897,15 @@ func (s *binSIP) prune(now time.Time) {
 	for key, created := range s.seenAt {
 		if expired(created) {
 			delete(s.seenAt, key)
-			delete(s.seen, key)
+			// The bounded seen key is a lifetime tombstone, not a fresh generation.
+			delete(s.requestDigests, key)
 		}
 	}
 	for key, created := range s.responseAt {
 		if expired(created) {
 			delete(s.responseAt, key)
 			delete(s.finalResponses, key)
+			delete(s.responseDigests, key)
 			delete(s.responseDir, key)
 		}
 	}
@@ -845,15 +931,24 @@ func sipParseCSeq(v string) (uint32, string, error) {
 	if v == "" {
 		return 0, "", protocolError(ErrMalformedMessage, "SIP CSeq is required")
 	}
-	num, meth, ok := strings.Cut(v, " ")
-	if !ok {
+	i := strings.IndexAny(v, " \t")
+	if i < 1 {
 		return 0, "", protocolError(ErrMalformedMessage, "SIP CSeq must be number and method")
 	}
-	n, err := strconv.ParseUint(strings.TrimSpace(num), 10, 32)
+	num, meth := v[:i], strings.Trim(v[i:], " \t")
+	if meth == "" || strings.ContainsAny(meth, " \t\r\n") {
+		return 0, "", protocolError(ErrMalformedMessage, "SIP CSeq method is invalid")
+	}
+	for _, c := range []byte(num) {
+		if c < '0' || c > '9' {
+			return 0, "", protocolError(ErrMalformedMessage, "SIP CSeq number is invalid")
+		}
+	}
+	n, err := strconv.ParseUint(num, 10, 31)
 	if err != nil {
 		return 0, "", protocolError(ErrMalformedMessage, "SIP CSeq number is invalid")
 	}
-	return uint32(n), strings.ToUpper(strings.TrimSpace(meth)), nil
+	return uint32(n), meth, nil
 }
 
 func sipParam(v, name string) string {
@@ -1120,4 +1215,58 @@ func sipSDPFieldsBounded(value string, max int) ([]string, error) {
 		inField = !space
 	}
 	return strings.Fields(value), nil
+}
+
+// A rejected datagram has unknown effect. Retain a charged exact-key tombstone,
+// or conservatively quarantine future unseen keys if that identity cannot fit.
+// Neither its timestamp nor its refusal can retire another retained owner.
+func (a *binParser) recordSIPGap(e *ProtocolEvent) {
+	a.udpMu.Lock()
+	defer a.udpMu.Unlock()
+	key := binUDPKey{"sip/" + e.Source, "sip/" + e.Destination, e.Domain}
+	if key.a > key.b {
+		key.a, key.b = key.b, key.a
+	}
+	store := a.udpSessions
+	if store == nil {
+		store = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
+		a.udpSessions = store
+	}
+	el := store.entries[key]
+	if el == nil {
+		if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			a.sipUntrackedRefusal = true
+			return
+		}
+		endpoints := []string{e.Source, e.Destination}
+		sort.Strings(endpoints)
+		flow := &binFlow{a: a, id: a.flows.Add(1), protocol: "sip", endpoints: [2]string{endpoints[0], endpoints[1]}, sip: &binSIP{unverified: true}}
+		if flow.reserveSession(512) != nil {
+			a.sipUntrackedRefusal = true
+			return
+		}
+		el = store.lru.PushBack(&binUDPEntry{key: key, flow: flow, touched: e.Timestamp})
+		store.entries[key] = el
+	} else {
+		flow := el.Value.(*binUDPEntry).flow
+		flow.sip = &binSIP{unverified: true}
+		_ = flow.reserveSession(512)
+	}
+	flow := el.Value.(*binUDPEntry).flow
+	e.FlowID = flow.id
+	if e.Source != flow.endpoints[0] {
+		e.Direction = 1
+	}
+}
+
+func (a *binParser) refuseSIPOversizeAssociation(e *ProtocolEvent, w []byte) bool {
+	if probeSIP(w, min(len(w), a.config.ProbeBytes)).Verdict != ProbeAccept {
+		return false
+	}
+	e.nativeSIPObservation = true
+	a.recordSIPGap(e)
+	e.Protocol, e.Profile, e.Admission, e.Completeness = "sip", "sip-udp-observed", "wire-signature", "message"
+	a.finishProtocolDatagram(e, nil, nil, protocolError(ErrResourceExceeded, "SIP UDP datagram exceeds message byte budget"))
+	a.limited.Add(uint64(len(w)))
+	return true
 }

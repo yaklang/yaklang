@@ -151,7 +151,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 			break
 		}
 		// Initial protection authenticates packet bytes, not peer identity.
-		m, err := q.tls.handshakeMessage(dir, b[:n], space != quicSpaceInitial)
+		m, err := q.tls.handshakeMessage(dir, b[:n], space != quicSpaceInitial, max)
 		if err != nil {
 			return err
 		}

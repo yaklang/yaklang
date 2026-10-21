@@ -69,6 +69,62 @@ func udpBudgetControls(t *testing.T) []udpBudgetControl {
 			}
 		}
 		require.Equal(t, 1, bound, c.Name)
+		if c.Name == "slmp-expiry-before-refusal" || c.Name == "slmp-denial-other-interface" {
+			upgrade, err := trafficfixture.ReadFile("slmp-idle-history/historical-ingress-upgrade.json")
+			require.NoError(t, err)
+			type change struct{ Old, New string }
+			var docUpgrade struct {
+				Cases []struct {
+					Name       string
+					CaptureSHA string `json:"capture_sha256"`
+					AnswerSHA  string `json:"original_answer_sha256"`
+					Changes    map[int]change
+				}
+			}
+			require.NoError(t, json.Unmarshal(upgrade, &docUpgrade))
+			matched := 0
+			for _, u := range docUpgrade.Cases {
+				if u.Name != c.Name {
+					continue
+				}
+				matched++
+				require.Equal(t, c.SHA256, u.CaptureSHA)
+				require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(raw)), u.AnswerSHA)
+				count := 1
+				if c.Name == "slmp-expiry-before-refusal" {
+					count = 2
+				}
+				require.Len(t, u.Changes, count)
+				for at, change := range u.Changes {
+					require.True(t, at == 1 || count == 2 && at == 2)
+					require.Equal(t, change.Old, doc.Cases[i].Steps[at].Expected)
+					require.Equal(t, map[int]string{1: "ResourceExceeded", 2: "ContextRequired"}[at], change.New)
+					doc.Cases[i].Steps[at].Expected = change.New
+				}
+			}
+			require.Equal(t, 1, matched)
+		}
+		if c.Name == "wrapper-expiry-before-refusal" {
+			// Preserve the original capture and answer; the corrected idle
+			// association expectation is explicitly bound to both hashes.
+			upgrade, err := trafficfixture.ReadFile("dlms-udp-idle/historical-expiry-upgrade.json")
+			require.NoError(t, err)
+			var u struct {
+				CaptureSHA string `json:"capture_sha256"`
+				AnswerSHA  string `json:"original_answer_sha256"`
+				Changes    map[int]struct{ Old, New string }
+			}
+			require.NoError(t, json.Unmarshal(upgrade, &u))
+			require.Equal(t, c.SHA256, u.CaptureSHA)
+			require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(raw)), u.AnswerSHA)
+			require.Len(t, u.Changes, 1)
+			for at, change := range u.Changes {
+				require.Equal(t, "unmatched-response", change.Old)
+				require.Equal(t, "ambiguous-conversation", change.New)
+				require.Equal(t, change.Old, doc.Cases[i].Steps[at].Association)
+				doc.Cases[i].Steps[at].Association = change.New
+			}
+		}
 	}
 	return doc.Cases
 }

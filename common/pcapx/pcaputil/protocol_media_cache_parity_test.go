@@ -39,6 +39,10 @@ func TestSDPMediaEquivalentSpellingIsDeterministic(t *testing.T) {
 }
 
 func TestRTSPMediaFinalSemanticCacheParity(t *testing.T) {
+	rtcpBYEHistorySourcesOwnership(t)
+	rtcpNativeQueryOwnership(t)
+	rtcpNativeRefusalQueries(t)
+	mediaPacketReferenceHistoryOwnership(t)
 	now := time.Unix(1790000000, 0)
 	association := &rtspMediaAssociation{session: "mvp-camera", profile: "RTP/AVP/UDP", clientRTP: "192.0.2.1:5000", clientRTCP: "192.0.2.1:5001", serverRTP: "192.0.2.2:6000", serverRTCP: "192.0.2.2:6001", eventIDs: []uint64{41, 42}, packetRefs: []PacketReference{{Number: 1}, {Number: 2}}}
 	for _, rtcp := range []bool{false, true} {
@@ -69,6 +73,23 @@ func TestRTSPMediaFinalSemanticCacheParity(t *testing.T) {
 					require.Equal(t, reference, fields)
 				}
 			}
+			wantRefs := []PacketReference{{Number: 1}, {Number: 2}}
+			e.Session["RTSP SETUP Packet References"].([]PacketReference)[0].Number = 999999
+			for i := 0; i < 2; i++ {
+				decoded, err := e.Decode()
+				require.NoError(t, err)
+				fields := protocolFields(decoded)
+				require.Equal(t, wantRefs, fields["RTSP SETUP Packet References"])
+				require.Equal(t, wantRefs, decoded["session"].(map[string]any)["RTSP SETUP Packet References"])
+				fields["RTSP SETUP Packet References"].([]PacketReference)[1].Domain.Encapsulation = "caller-forged"
+				decoded["session"].(map[string]any)["RTSP SETUP Packet References"].([]PacketReference)[1].Number = 999999
+				again, err := e.GetFields()
+				require.NoError(t, err)
+				require.Equal(t, wantRefs, again["RTSP SETUP Packet References"])
+				require.Equal(t, []uint64{41, 42}, again["RTSP SETUP Event IDs"])
+				require.Equal(t, "mvp-camera", again["Associated RTSP Session ID"])
+			}
+			require.Equal(t, wantRefs, association.packetRefs)
 			parser.closeUDPSessions()
 			require.Zero(t, parser.buffered.Load())
 		}
@@ -217,4 +238,40 @@ func assertMediaMVPEvents(t testing.TB, raw json.RawMessage, events []*ProtocolE
 		require.NoError(t, err)
 		require.JSONEq(t, string(expectedJSON), string(actualJSON), "all observed semantic fields from independent wire facts")
 	}
+}
+
+// Inspector history owns packet references including capture-domain context.
+// The logical charge is 64(map)+4(key)+32(slot)+24(slice)+2*64(ref)+7(tunnel)=259.
+func mediaPacketReferenceHistoryOwnership(t *testing.T) {
+	t.Helper()
+	want := []PacketReference{{Number: 1, Domain: CaptureDomain{Encapsulation: "/vlan:7"}}, {Number: 2}}
+	for _, limit := range []int{258, 259} {
+		t.Run(fmt.Sprintf("limit%d", limit), func(t *testing.T) {
+			history, err := NewBinParserInspector(1, limit)
+			require.NoError(t, err)
+			input := append(make([]PacketReference, 0, 100), want...)
+			e := &ProtocolEvent{ID: 1, Protocol: "rtp", Session: map[string]any{"Refs": input}}
+			history.OnEvent(e)
+			input[0].Number = 999999
+			if limit == 258 {
+				require.Empty(t, history.Rows("rtp", 0))
+				require.EqualValues(t, 1, history.Evicted())
+				return
+			}
+			require.Len(t, history.Rows("rtp", 0), 1)
+			require.Zero(t, history.Evicted())
+			for repeat := 0; repeat < 2; repeat++ {
+				detail, err := history.Details(1)
+				require.NoError(t, err)
+				refs := detail.Session["Refs"].([]PacketReference)
+				require.Equal(t, want, refs)
+				require.Equal(t, len(refs), cap(refs), "spare input capacity must not be retained")
+				refs[1].Domain.Encapsulation = "caller-forged"
+			}
+		})
+	}
+}
+
+func TestProtocolInspectorMediaPacketReferenceBudget(t *testing.T) {
+	mediaPacketReferenceHistoryOwnership(t)
 }

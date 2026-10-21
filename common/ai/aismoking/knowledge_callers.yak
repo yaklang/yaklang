@@ -1,0 +1,45 @@
+// AISMOKING_CASE=knowledge_callers yak common/ai/aismoking/run.yak
+include "common/ai/aismoking/mock.inc"
+include "common/ai/aismoking/knowledge_callers.inc"
+assert os.Getenv("YAKIT_HOME")!="", "Use the isolated smoke runner"
+rag.EnableMockMode()
+smokeHandler=func(w,body){
+    prompt,native=smokePrompt(body),len(body.tools)>0
+    facts="鉴权头："+callerCase.header+"\n验证标记："+callerCase.marker+"\n来源库名："+callerCase.name
+    if "SMOKE_CALLER:timeline-compress" in prompt { smokeAnswer(w,false,"timeline-summary",{"summary":"已按附加库名完成预算内查询。","ratain_timeline_item_range":"","memory_entities":[]});return }
+    if "SMOKE_CALLER:liteforge[analyze-report-intent]" in prompt { smokeAnswer(w,native,"analyze-report-intent",{"is_modify":false,"target_file":file.Join(callerCase.root,"report.md"),"analysis_reason":"创建本次隔离验证报告。"});return }
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"知识调用方验证"});return }
+    if "SMOKE_CALLER:verification" in prompt { smokeAnswer(w,false,"verify-satisfaction",{"user_satisfied":true,"reasoning":"已执行真实知识查询。","evidence":[]});return }
+    if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":facts});return }
+    assert ("SMOKE_CALLER:react-loop:"+callerCase.focus) in prompt, "unexpected caller or silent routing"
+    for legacy in ["\"knowledge_enhance_answer\"","\"search_knowledge\"","\"search_knowledge_infosec\""] { assert !(legacy in prompt+json.dumps(body.tools)), "legacy action schema remains visible" }
+    assert callerCase.name in prompt && "CALLER_SELECTION_PREFERENCE" in prompt && "attached_knowledge_base" in prompt, "attachments and raw preferences must survive migration"
+    if callerCase.stage==0 {
+        assert "yaklang-system" in prompt
+        callerCase.stage=1
+        smokeAnswer(w,native,"loading_skills",{"skill_name":"yaklang-system"});return
+    }
+    for key in ["本 Skill 统一描述 Yaklang 引擎","manage_knowledge_base","query_knowledge_base","all=true","token_limit"] { assert key in prompt, "loaded Skill/index missing" }
+    if callerCase.stage==1 {
+        callerCase.stage=2
+        smokeAnswer(w,native,"require_tool",{"require_tool_payload":"query_knowledge_base"});return
+    }
+    for key in ["names","token_limit","per_entry_token_limit","content_offset","min_score"] { assert key in prompt+json.dumps(body.tools), "required query schema missing from model context" }
+    if callerCase.stage==2 {
+        callerCase.stage=3
+        smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":"query_knowledge_base","directly_call_tool_params":{"name":callerCase.name,"query":"API 鉴权","mode":"semantic","token_limit":1024,"limit":3,"per_entry_token_limit":256},"directly_call_reason":"按用户附加的精确库名与预算检索"});return
+    }
+    assert callerCase.header in prompt && callerCase.marker in prompt, "real query results must reach the model before answering"
+    actual=callerCase.operator.GetCurrentTask().GetAllToolCallResults()
+    assert len(actual)==1 && actual[0].Name=="query_knowledge_base" && actual[0].Success
+    if callerCase.focus=="report_generating" && callerCase.stage==3 {
+        callerCase.stage=4
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"write_section","identifier":"write_report"}`+"\n<|GEN_REPORT_CURRENT_NONCE|>\n# 项目鉴权报告\n\n"+facts+"\n<|GEN_REPORT_END_CURRENT_NONCE|>"},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    if callerCase.focus!="report_generating" && callerCase.stage==3 { callerCase.stage=4;smokeAnswer(w,native,"directly_answer",{"answer_payload":facts});return }
+    smokeAnswer(w,native,"finish",{})
+}
+for focus in ["default","report_generating","infosec_recon"] { for native in [false,true] { runKnowledgeCaller(focus,native,smokeModel) } }
+smokeCheck()

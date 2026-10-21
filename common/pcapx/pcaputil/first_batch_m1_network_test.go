@@ -88,6 +88,7 @@ func TestFirstBatchT02(t *testing.T) {
 	})
 }
 func TestFirstBatchT07Native(t *testing.T) {
+	t.Run("owned-DHCP-queries", testDHCPOwnedQueries)
 	for _, file := range []string{"ndpi/ndpi-dns.pcap", "wireshark-tests/wireshark-mdns.pcap"} {
 		t.Run(file, func(t *testing.T) {
 			b, err := trafficfixture.ReadFile("../../bin-parser/testdata/protocol-corpus/captures/" + file)
@@ -140,6 +141,7 @@ func TestFirstBatchT08(t *testing.T) {
 }
 
 func TestFirstBatchT08DHCP6Native(t *testing.T) {
+	t.Run("owned-queries", testDHCP6OwnedQueries)
 	b, err := trafficfixture.ReadFile("testdata/protocol-sessions/first-batch-m1/dhcpv6-native.pcap")
 	require.NoError(t, err)
 	for _, deferred := range []bool{false, true} {

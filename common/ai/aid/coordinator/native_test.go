@@ -12,13 +12,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/mock"
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	_ "github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/reactinit"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 )
 
@@ -160,6 +163,53 @@ func TestCoordinatorLoopWorkerNativeResultGate(t *testing.T) {
 	require.Equal(t, "the exact result", result.Summary)
 	for _, name := range []string{"request_plan", "request_plan_and_execution", "report_generating", "dispatch_sub_react_agents"} {
 		require.NotContains(t, strings.Join(loop.GetAllActionNames(), ","), name)
+	}
+}
+
+func TestCoordinatorKnowledgeSkillLoading(t *testing.T) {
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(aireact.GetBuiltinSkillsFS()))
+			require.NoError(t, err)
+			require.True(t, loader.HasSkills())
+			var worker *reactloops.ReActLoop
+			var calls atomic.Int64
+			cfg := aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true),
+				aicommon.WithDisablePerception(true), aicommon.WithDisallowMCPServers(true), aicommon.WithWorkdir(t.TempDir()),
+				aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+					switch calls.Add(1) {
+					case 1:
+						return protocolResponse(c, req, native, schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, map[string]any{"skill_name": "yaklang-system"})
+					case 2:
+						require.True(t, worker.GetSkillsContextManager().IsSkillLoaded("yaklang-system"))
+						require.Contains(t, req.GetPrompt(), "manage_knowledge_base")
+						require.Contains(t, req.GetPrompt(), "query_knowledge_base")
+						return protocolResponse(c, req, native, "submit_task_result", map[string]any{"summary": "system Skill loaded through the actual worker action", "evidence_ids": []string{}})
+					default:
+						return protocolResponse(c, req, native, "finish", map[string]any{})
+					}
+				}))
+			inv := mock.NewMockInvoker(ctx)
+			inv.SetConfig(cfg)
+			owner := coordinator.New(ctx, &nativeHost{}, 1)
+			defer owner.Close()
+			root, err := coordinator.NewLoop(&projectedInvoker{inv}, coordinator.WithController(owner), reactloops.WithSkillLoader(loader))
+			require.NoError(t, err)
+			defer root.Release()
+			require.Contains(t, root.GetAllActionNames(), schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS)
+			require.NotContains(t, root.GetAllActionNames(), schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
+			worker, err = coordinator.NewWorkerLoop(&projectedInvoker{inv}, reactloops.WithSkillLoader(loader), reactloops.WithFunctionCallMode(native))
+			require.NoError(t, err)
+			defer worker.Release()
+			require.NotContains(t, worker.GetAllActionNames(), schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE)
+			worker.GetSkillsContextManager().UnloadSkill("yaklang-system")
+			require.False(t, worker.GetSkillsContextManager().IsSkillLoaded("yaklang-system"))
+			task := aicommon.NewStatefulTaskBase("knowledge-worker", "load the system Skill before managing knowledge", ctx, cfg.GetEmitter(), true)
+			require.NoError(t, worker.ExecuteWithExistedTask(task))
+			require.Equal(t, int64(3), calls.Load())
+		})
 	}
 }
 

@@ -8,7 +8,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"sort"
-	"strings"
 	"time"
 )
 
@@ -131,23 +130,15 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 	store := a.udpSessions
 	var el *list.Element
 	if store != nil {
-		if e.Timestamp.After(store.clock) {
-			store.clock = e.Timestamp
-		}
-		for cur := store.lru.Front(); cur != nil; {
-			next := cur.Next()
-			entry := cur.Value.(*binUDPEntry)
-			if store.clock.Sub(entry.touched) < dtlsIdleTTL {
-				break
-			}
-			if strings.HasPrefix(entry.key.a, "dtls/") {
-				entry.flow.closeSession()
-				delete(store.entries, entry.key)
-				store.lru.Remove(cur)
-			}
-			cur = next
-		}
 		el = store.entries[key]
+		if el != nil && e.Timestamp.Sub(el.Value.(*binUDPEntry).touched) >= dtlsIdleTTL {
+			// Expiry belongs to this endpoint pair and capture domain. A future
+			// timestamp on another conversation cannot retire or prolong it.
+			el.Value.(*binUDPEntry).flow.closeSession()
+			delete(store.entries, key)
+			store.lru.Remove(el)
+			el = nil
+		}
 	}
 	if !explicit && !dtlsWireCandidate(w) {
 		// A negotiated DTLS conversation can report unsupported modern/CID
@@ -156,6 +147,7 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			return false
 		}
 	}
+	e.nativeDTLSObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "dtls", "dtls-legacy-udp", "wire-signature", "datagram"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -178,14 +170,16 @@ func (a *binParser) decodeDTLSDatagram(e *ProtocolEvent, w []byte, explicit bool
 			state := &binDTLS{client: -1, fragments: map[dtlsMessageKey]*dtlsAssembly{}, completed: map[dtlsMessageKey]dtlsCompleted{}, records: map[dtlsRecordKey][32]byte{}}
 			flow := &binFlow{a: a, id: a.flows.Add(1), protocol: "dtls", dtls: state, endpoints: [2]string{endpoints[0], endpoints[1]}}
 			if err = flow.reserveSession(state.storage()); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, flow, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, flow, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
 	}
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		f := entry.flow
 		e.FlowID = f.id
@@ -439,18 +433,28 @@ func (s *binDTLS) message(f *binFlow, dir int, typ byte, b []byte) (map[string]a
 			out["Cookie Bytes"] = n
 			wire = append(bytes.Clone(b[:p]), b[p+1+n:]...)
 		}
-		hello, err := tlsHello(wire, client)
+		hello, err := tlsHello(wire, client, f.a.budget.MaxCollectionElements)
 		if err != nil {
+			if typed, ok := err.(*ProtocolError); ok && typed.Kind == ErrResourceExceeded {
+				// Keep the existing carrier-specific collection diagnostic.
+				return nil, protocolError(ErrResourceExceeded, "DTLS hello collection")
+			}
 			return nil, err
 		}
 		if len(hello.order) > f.a.budget.MaxCollectionElements || len(hello.suites)/2 > f.a.budget.MaxCollectionElements {
 			return nil, protocolError(ErrResourceExceeded, "DTLS hello collection")
 		}
+		if err := tlsHelloExtensionStructure(hello, client); err != nil {
+			return nil, err
+		}
 		out["Hello Version"], out["Random"], out["Session ID"] = version, hex.EncodeToString(b[2:34]), hex.EncodeToString(hello.session)
 		// Extension vectors reuse the TLS syntax, not its handshake state machine.
 		t := &binTLS{}
 		if len(wire) > len(hello.prefix) {
-			if err := t.extensions(wire[len(hello.prefix):], client); err != nil {
+			if err := t.extensions(wire[len(hello.prefix):], client, f.a.budget.MaxCollectionElements); err != nil {
+				if typed, ok := err.(*ProtocolError); client && ok && typed.Kind == ErrResourceExceeded {
+					return nil, protocolError(ErrResourceExceeded, "DTLS offered ALPN")
+				}
 				return nil, err
 			}
 		}
@@ -528,7 +532,7 @@ func (s *binDTLS) message(f *binFlow, dir int, typ byte, b []byte) (map[string]a
 		}
 		out["Hello Version"], out["Cookie Bytes"] = version, len(b)-3
 	case 11:
-		certificates, err := tlsCertificates(b, false)
+		certificates, err := tlsCertificates(b, false, f.a.budget.MaxCollectionElements)
 		if err != nil {
 			return nil, err
 		}

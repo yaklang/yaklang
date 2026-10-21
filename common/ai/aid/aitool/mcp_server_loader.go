@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 )
 
 // defaultMCPClientInfo is the implementation identity yaklang advertises during
@@ -316,13 +317,17 @@ func createMCPClientWithContext(ctx context.Context, server *schema.MCPServer) (
 	switch server.Type {
 	case "stdio":
 		// 解析命令和参数
-		commandParts := utils.PrettifyListFromStringSplited(server.Command, " ")
-		if len(commandParts) == 0 {
-			return nil, utils.Errorf("invalid command: %s", server.Command)
+		commandParts, err := shlex.Split(server.Command)
+		if err != nil || len(commandParts) == 0 {
+			return nil, utils.Error("invalid MCP stdio command")
 		}
 		command := commandParts[0]
 		args := commandParts[1:]
-		return client.NewStdioMCPClient(command, []string{}, args...)
+		env := make([]string, 0, len(server.Envs))
+		for k, v := range server.Envs {
+			env = append(env, fmt.Sprintf("%s=%v", k, v))
+		}
+		return client.NewStdioMCPClient(command, env, args...)
 
 	case "sse":
 		sseMcpClient, err := client.NewSSEMCPClient(server.URL, mapStringAnyToStringMap(server.Headers))

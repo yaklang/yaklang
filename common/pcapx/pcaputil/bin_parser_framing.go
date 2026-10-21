@@ -564,14 +564,100 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
+			a.decodeHARTIPDatagram(e, wire, protocolError(ErrNeedMore, "HART-IP truncated or invalid UDP carrier"))
+			a.emit(e)
+			return
+		}
+		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeFINSDatagram(e, wire, protocolError(ErrNeedMore, "FINS truncated or invalid UDP carrier"))
+			a.emit(e)
+			return
+		}
+		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrNeedMore, "SD carrier truncated or invalid UDP length"))
+			a.emit(e)
+			return
+		}
+		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrNeedMore, "SOME/IP carrier truncated or invalid UDP length"))
+			a.emit(e)
+			return
+		}
+		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrNeedMore, "RTI filter carrier is truncated or has invalid UDP length"))
+			a.emit(e)
+			return
+		}
+		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrNeedMore, "legacy RTPS carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.emit(e)
+			return
+		}
+		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.emit(e)
+			return
+		}
+		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrNeedMore, "AIS fragment carrier is truncated or has invalid UDP length"))
+			a.emit(e)
+			return
+		}
+		if a.refuseBACnetReadTruncated(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.emit(e)
+			return
+		}
 		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
 		a.incomplete.Add(1)
 	} else if len(wire) > a.config.MaxMessageBytes {
-		if a.refuseUDPOversizeAssociation(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refusePFCPOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseSemtechDownlinkOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
+			a.decodeHARTIPDatagram(e, wire, protocolError(ErrResourceExceeded, "HART-IP UDP byte budget"))
+			a.emit(e)
+			return
+		}
+		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeFINSDatagram(e, wire, protocolError(ErrResourceExceeded, "FINS UDP byte budget"))
+			a.emit(e)
+			return
+		}
+		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrResourceExceeded, "SD carrier byte budget"))
+			a.emit(e)
+			return
+		}
+		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrResourceExceeded, "SOME/IP carrier exceeds byte budget"))
+			a.emit(e)
+			return
+		}
+		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrResourceExceeded, "RTI filter exceeds UDP message budget"))
+			a.emit(e)
+			return
+		}
+		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrResourceExceeded, "legacy RTPS exceeds UDP message budget"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.emit(e)
+			return
+		}
+		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrResourceExceeded, "RTPS fragment exceeds UDP message budget"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.emit(e)
+			return
+		}
+		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrResourceExceeded, "AIS fragment exceeds UDP message byte budget"))
+			a.emit(e)
+			return
+		}
+		if a.refuseBACnetReadOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseUDPOversizeAssociation(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refusePFCPOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) || a.refuseSemtechDownlinkOversize(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
 			a.emit(e)
 			return
 		}
 		e.Status, e.Summary = "limited", "UDP datagram exceeds message limit"
+		e.sessionError = &ProtocolError{Kind: ErrResourceExceeded, Message: e.Summary}
+		e.Error = e.sessionError.Message
 		a.limited.Add(uint64(len(wire)))
 	} else {
 		if events, ok := a.decodeMAVLinkDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)); ok {

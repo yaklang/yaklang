@@ -53,12 +53,12 @@ err = aim.InvokeReAct(
     aim.maxIteration(25),
     aim.onEvent(func(react, event) {
         eventType = string(event.Type)
-        if eventType == "filesystem_pin_filename" {
+        if eventType == "report_finish" {
             contentStr = string(event.Content)
             try {
                 jsonData = json.loads(contentStr)
-                if jsonData != nil && jsonData["path"] != nil {
-                    reportFilename = jsonData["path"]
+                if jsonData != nil && jsonData["report_path"] != nil {
+                    reportFilename = jsonData["report_path"]
                 }
             } catch e {
                 // ignore

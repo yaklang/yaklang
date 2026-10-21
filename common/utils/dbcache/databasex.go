@@ -1029,7 +1029,10 @@ func (c *Cache[T, D]) Barrier() error {
 		return firstErr
 	}
 	if c.saver != nil {
-		return c.saver.recordedErr()
+		// FinishPersist releases resident.Wait before the saver callback returns.
+		// Join that final callback too, so its error and pending accounting are
+		// settled even when pendingCount reached zero before this Barrier began.
+		return c.saver.Flush()
 	}
 	return nil
 }

@@ -1,0 +1,28 @@
+__DESC__ = "Call a remote MCP tool on an enabled server saved in the shared registry. Works immediately after manage_mcp_server add, using the bare tool name and JSON arguments from query_mcp_tools."
+__VERBOSE_NAME__ = "Call MCP Tool"
+__VERBOSE_NAME_ZH__ = "调用 MCP 工具"
+__KEYWORDS__ = "mcp,call,remote,tool,调用,远程,工具"
+__USAGE__ = <<<USAGE
+先用 query_mcp_tools 获取工具名和 inputSchema。server_name 是注册表精确名称，remote_tool 是远端裸名称，arguments 是符合 inputSchema 的 JSON 对象。stdout 保留 MCP content 数组。isError=true 会使本次调用失败，同时输出远端错误内容；不要把远端工具失败当作成功。每次连接执行后关闭，添加后无需重启。timeout 控制单次请求秒数，默认 30。
+[[- if .FunctionCallMode -]]
+```json
+{"server_name":"local-demo","remote_tool":"echo","arguments":{"message":"hello"}}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"call_mcp_tool","directly_call_tool_params":{"server_name":"local-demo","remote_tool":"echo","arguments":{"message":"hello"}}}
+```
+[[- end -]]
+USAGE
+serverName = cli.String("server_name", cli.setRequired(true), cli.setHelp("注册表中的精确服务器名称"))
+toolName = cli.String("remote_tool", cli.setRequired(true), cli.setHelp("query_mcp_tools 返回的远端裸工具名"))
+params = cli.Json("arguments", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object"}`), cli.setHelp("符合 inputSchema 的 JSON 参数对象"))
+timeout = cli.Float("timeout", cli.setDefault(30), cli.setHelp("单次请求超时秒数，>0 且 <=3600"))
+if str.TrimSpace(serverName) == "" || str.TrimSpace(toolName) == "" { die("server_name and remote_tool are required") }
+if json.dumps(params) == "null" { die("arguments must be a JSON object") }
+cli.check()
+client = mcp.Connect(serverName, mcp.timeout(timeout))~
+defer client.Close()
+result, err = client.CallTool(toolName, params)
+if result != nil { println(json.dumps(result)) }
+if err != nil { die(err) }
