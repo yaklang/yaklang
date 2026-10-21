@@ -100,8 +100,8 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			}()
 
 			if block.Probe != nil {
-				if block.Probe.Rarity > config.RarityMax && !utils2.IntArrayContains(block.Probe.DefaultPorts, port) {
-					log.Debugf("filter probe[%v] for raritymax: %v current: %v", block.Probe.Name, config.RarityMax, block.Probe.Rarity)
+				if effectiveProbeRarity(block.Probe) > config.RarityMax && !utils2.IntArrayContains(block.Probe.DefaultPorts, port) {
+					log.Debugf("filter probe[%v] for raritymax: %v current: %v", block.Probe.Name, config.RarityMax, effectiveProbeRarity(block.Probe))
 					return
 				}
 			}

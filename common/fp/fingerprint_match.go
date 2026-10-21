@@ -61,6 +61,12 @@ func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result 
 }
 
 func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, options ...ConfigOption) (result *MatchResult, err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// One target shares a parse budget across every probe so protocol fields
+	// cannot accumulate unbounded CPU or memory.
+	ctx = withScanProtocolBudget(ctx)
 	host = utils2.ExtractHost(host)
 	proto, port := utils2.ParsePortToProtoPort(port)
 	addr := utils2.HostPort(host, port)
