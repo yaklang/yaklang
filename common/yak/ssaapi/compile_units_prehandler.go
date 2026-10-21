@@ -157,6 +157,11 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		return
 	}
 	defer fileContent.Release()
+	// Progress counts finished files: the heavy work (pre-handler + inline file build) is
+	// below, and a file picked up by a worker must not advance the bar before it is done.
+	if env.preHandlerProcess != nil {
+		defer env.preHandlerProcess()
+	}
 	unitKey := env.fileUnits[fileContent.Path]
 	owner := env.prog.EnsureLibraryForCompileUnit(unitKey)
 	if owner == nil {
@@ -205,7 +210,6 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		env.astErr = utils.JoinErrors(env.astErr, utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err))
 		env.astErrMu.Unlock()
 	}
-	env.preHandlerProcess()
 	unitBuilder := env.prog.GetOrCreateUnitBuilder(unitKey, env.builder)
 	if unitBuilder == nil {
 		unitBuilder = env.builder

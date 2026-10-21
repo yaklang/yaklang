@@ -26,6 +26,21 @@ import (
 // at ~70-170K on Hadoop (12,581 Java files).
 const defaultFlushCompileUnitThreshold = 100000
 
+// In-stage progress bands for the unit compile. They are contiguous so the
+// reported fraction only moves forward:
+//
+//	[0.00, 0.06)  prepare sources (jar/zip/class/jsp, full compile concurrency)
+//	[0.06, 0.08)  source scan + compile-unit planning
+//	[0.08, 0.40)  pre-handler + inline file build, one tick per finished file
+//	[0.40, 0.88)  deferred unit build (see deferredBuildProcessFraction)
+//	[0.88, 1.00)  finish + IR persist
+const (
+	sourcePrefetchProcessEnd   = 0.06
+	compilePlanProcessEnd      = 0.08
+	preHandlerProcessBandStart = 0.08
+	preHandlerProcessEnd       = 0.40
+)
+
 // flushCompileUnitThreshold returns the configured threshold for mid-batch
 // flush. Reads YAK_SSA_FLUSH_COMPILE_UNIT_THRESHOLD; non-positive or
 // unparseable values fall back to defaultFlushCompileUnitThreshold.
@@ -246,7 +261,6 @@ func (c *Config) parseProjectWithFSUnits(
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	processCallback(0.0, fmt.Sprintf("[%s] parse project in fs: %v, path: %v", compilePhase, filesystem, c.GetCodeSource().ToJSONString()))
-	processCallback(0.0, fmt.Sprintf("[%s] calculate total size of project", compilePhase))
 
 	folder2Save := make([][]string, 0)
 	if programName != "" {
@@ -255,6 +269,10 @@ func (c *Config) parseProjectWithFSUnits(
 
 	sourceFilesystem := filesystem
 	filesystem = c.swapLanguageFs(filesystem)
+	// Jar/zip members, class files and JSP are transformed into source before the
+	// source scan. ScanProjectFiles then only classifies an already-prepared tree.
+	c.prepareProjectSources(filesystem, reportProcess, storeProcess)
+	reportProcess(sourcePrefetchProcessEnd, "[%s] calculate total size of project", compilePhase)
 	scanResult, err := ScanProjectFiles(ScanConfig{
 		ProgramName:     programName,
 		ProgramPath:     programPath,
@@ -292,6 +310,12 @@ func (c *Config) parseProjectWithFSUnits(
 	if restoreGC := c.applyCompileProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
+
+	// Sources were prepared before this scan. Planning and AST build read the
+	// materializer; this second pass only fills files the prepare walk missed.
+	c.prefetchCompileSources(filesystem, preHandlerFiles, reportProcess, storeProcess)
+	storeProcess(compilePlanProcessEnd)
+	reportProcess(compilePlanProcessEnd, "[%s] compile unit planning start files=%d", "f0_plan", len(preHandlerFiles))
 
 	plan := buildCompileUnitPlan(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles)
 	if len(plan.Order) == 0 {
@@ -407,9 +431,14 @@ func (c *Config) parseProjectWithFSUnits(
 	var preHandlerNum atomic.Int32
 	preHandlerProcess := func() {
 		n := preHandlerNum.Add(1)
-		p := (float64(n) / float64(preHandlerTotal)) * 0.4
-		if p > 0.4 {
-			p = 0.4
+		// Count finished files (the callback runs from a defer in prehandleFile), so the bar
+		// tracks completed work instead of files merely picked up by a worker.
+		p := preHandlerProcessBandStart
+		if preHandlerTotal > 0 {
+			p += (float64(n) / float64(preHandlerTotal)) * (preHandlerProcessEnd - preHandlerProcessBandStart)
+		}
+		if p > preHandlerProcessEnd {
+			p = preHandlerProcessEnd
 		}
 		storeProcess(p)
 		reportProcess(p, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, n, preHandlerTotal))
