@@ -939,51 +939,6 @@ func coverType(ityp, iwantTyp ssa.Type) {
 	ityp.SetFullTypeNames(iwantTyp.GetFullTypeNames())
 }
 
-// structDefaultExpansionBudget bounds how many nodes one nested struct field
-// may expand to while building default values. A legal Go value-type graph can
-// make the raw field tree exponential (each nesting level may double the field
-// count, e.g. N levels of two same-typed fields -> 2^N nodes), and GetDefaultValue
-// expands that tree without deduplication, so types like these never finished
-// compiling. Fields whose tree exceeds the budget degrade to a typed Make
-// placeholder; deeper members are then created lazily on member access.
-const structDefaultExpansionBudget = 1024
-
-// structDefaultTreeExceedsBudget reports whether expanding default values for
-// ityp as a raw field tree (no dedup of shared field types — the exact
-// expansion GetDefaultValue performs) would exceed budget nodes. Counting
-// stops as soon as the budget is exhausted, so its cost is bounded by the
-// budget itself. Only struct and alias types recurse in GetDefaultValue, and
-// only they are counted here.
-func structDefaultTreeExceedsBudget(ityp ssa.Type, budget *int, depth int) bool {
-	if depth > 64 {
-		return true
-	}
-	if utils.IsNil(ityp) {
-		return false
-	}
-	switch ityp.GetTypeKind() {
-	case ssa.AliasTypeKind:
-		if alias, ok := ssa.ToAliasType(ityp); ok {
-			return structDefaultTreeExceedsBudget(alias.GetType(), budget, depth+1)
-		}
-		return false
-	case ssa.StructTypeKind:
-		if *budget <= 0 {
-			return true
-		}
-		*budget--
-		typ := goSelectorObjectType(ityp)
-		for _, fieldTyp := range typ.FieldTypes {
-			if structDefaultTreeExceedsBudget(fieldTyp, budget, depth+1) {
-				return true
-			}
-		}
-		return false
-	default:
-		return false
-	}
-}
-
 func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 	if utils.IsNil(ityp) {
 		return b.EmitUndefined("default")
@@ -1007,7 +962,7 @@ func (b *astbuilder) GetDefaultValue(ityp ssa.Type) ssa.Value {
 		}, func(i int) ssa.Value {
 			fieldTyp := typ.FieldTypes[i]
 			if !utils.IsNil(fieldTyp) && fieldTyp.GetTypeKind() == ssa.StructTypeKind {
-				if budget := structDefaultExpansionBudget; structDefaultTreeExceedsBudget(fieldTyp, &budget, 0) {
+				if budget := ssa.StructDefaultExpansionBudget; ssa.StructFieldExpansionExceedsBudget(fieldTyp, &budget, 0) {
 					return b.EmitMakeBuildWithType(fieldTyp, nil, nil)
 				}
 			}
