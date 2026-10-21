@@ -46,11 +46,12 @@ skipIndex = cli.Bool("skip_index", cli.setDefault(false), cli.setHelp("true 仅�
 sourceFile = cli.String("source_file", cli.setHelp("build 输入文件路径，与 content 二选一"))
 content = cli.String("content", cli.setHelp("build 输入文本，与 source_file 二选一"))
 buildOptions = cli.Json("build_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"mode":{"type":"string","enum":["chunks","question_index"]},"chunk_size":{"type":"integer","minimum":256,"maximum":1048576},"concurrency":{"type":"integer","minimum":1,"maximum":16},"extra_prompt":{"type":"string"},"omni_mode":{"type":"string","enum":["auto","required","disabled"]},"omni_model":{"type":"string"},"omni_segment_seconds":{"type":"number","exclusiveMinimum":0,"maximum":600},"omni_payload_bytes":{"type":"integer","minimum":1024,"maximum":10485760}},"additionalProperties":false}`), cli.setHelp("build 模式、分块、并发、Omni 路径/模型和视频编码大小"))
+yakit.AutoInitYakit()
 cli.check()
 if op == "" { die("op is required") }
 if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" { die("metadata, index_options and build_options must be JSON objects") }
 opts = [aiknowledge.keyword(keyword),aiknowledge.limit(limit),aiknowledge.offset(offset),aiknowledge.index(!skipIndex)]
-opts = append(opts, aiknowledge.onProgress(message => { println(message) }))
+opts = append(opts, aiknowledge.onProgress(message => { yakit.Info("%s", message) }))
 if "description" in metadata { opts=append(opts,aiknowledge.description(metadata.description)) }
 if "type" in metadata { opts=append(opts,aiknowledge.type(metadata.type)) }
 if "tags" in metadata { opts=append(opts,aiknowledge.tags(metadata.tags...)) }

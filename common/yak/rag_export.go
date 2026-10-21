@@ -129,10 +129,11 @@ var RagExports = map[string]interface{}{
 	"noKnowledgeBase":    _noKnowledgeBase,
 	"ragImportFile":      rag.WithImportFile,
 
-	"Embedding":           _embedding,
-	"LocalEmbedding":      _localEmbedding,
-	"ProbeLocalEmbedding": vectorstore.ProbeLocalEmbedding,
-	"OnlineEmbedding":     _onlineEmbedding,
+	"Embedding":            _embedding,
+	"LocalEmbedding":       _localEmbedding,
+	"ProbeLocalEmbedding":  vectorstore.ProbeLocalEmbedding,
+	"CheckOnlineEmbedding": vectorstore.CheckOnlineEmbedding,
+	"OnlineEmbedding":      _onlineEmbedding,
 
 	// Collection2DPoints - 集合向量二维化（PCA），供绘图侧使用
 	"Collection2DPoints": _collection2DPoints,

@@ -182,6 +182,12 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 						require.True(t, actual.Success, "step %d: %+v", cursor, actual)
 						require.Len(t, outputs, cursor)
 						output := outputs[cursor-1]
+						if steps[cursor-1].params["op"] == "build" {
+							require.Contains(t, output, "persisted_entries=", "AI must observe build progress alongside its final result")
+							resultStart := strings.LastIndex(output, "\n{")
+							require.GreaterOrEqual(t, resultStart, 0, "build must end with its JSON result")
+							output = output[resultStart+1:]
+						}
 						var value map[string]any
 						require.NoError(t, json.Unmarshal([]byte(output), &value), output)
 						if actual.Name == "query_knowledge_base" {

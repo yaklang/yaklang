@@ -3,19 +3,30 @@ package vectorstore
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
 )
 
-// ProbeLocalEmbedding checks the running local service within one three-second
+var localEmbeddingProbe struct {
+	sync.Once
+	vector []float32
+	err    error
+}
+
+// ProbeLocalEmbedding checks the running local service once within one three-second
 // budget, including HTTP retries and response reads. Diagnostics must not start
-// a model process or wait for model installation/loading.
+// a model process or wait for model installation/loading. Subsequent calls reuse
+// the cached probe result; use LocalEmbedding to embed actual new input.
 func ProbeLocalEmbedding(text string) ([]float32, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	return probeLocalEmbedding(ctx, "127.0.0.1:11435", text)
+	localEmbeddingProbe.Do(func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+		localEmbeddingProbe.vector, localEmbeddingProbe.err = probeLocalEmbedding(ctx, "127.0.0.1:11435", text)
+	})
+	return append([]float32(nil), localEmbeddingProbe.vector...), localEmbeddingProbe.err
 }
 
 func probeLocalEmbedding(ctx context.Context, address, text string) ([]float32, error) {

@@ -80,8 +80,22 @@ example, after creating a knowledge base:
 ```yak
 aiknowledge.BuildFromFile("training-media", "/path/lecture.mp4",
     aiknowledge.buildMode("chunks"), aiknowledge.omniMode("required"),
-    aiknowledge.omniSegmentSeconds(20))~
+    aiknowledge.omniSegmentSeconds(20),
+    aiknowledge.onProgress(message => { println(message) }))~
 ```
+
+The management tool forwards stage changes and a heartbeat every five seconds
+to stdout. Progress includes the video time range, request attempt, elapsed
+time, received response bytes, active indexing/writing chunks and successfully
+persisted entry count. Transport failures retry once within the original request
+budget; later clips still prefer Omni after a transient failure. Errors preserve
+both the Omni failure and any original extraction failure.
+
+Embedding is initialized only on demand. AIBalance is preferred and its
+availability result is cached with `sync.Once`; subsequent diagnostics reuse
+that result and skip local checks when online embedding is available. Any local
+probe is also cached and has a total three-second budget. Fetching an initialized
+local client never waits for another TCP readiness check.
 
 `manage-media-knowledge-omni.yak` creates a new knowledge base through that API,
 builds its media content, then verifies both keyword and semantic retrieval with
