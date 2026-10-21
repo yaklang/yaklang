@@ -156,15 +156,22 @@ func (m *linkNodeMap[T]) Append(key string, val VersionedIF[T]) {
 	}
 	ln.Append(val)
 	if val.GetLocal() {
-		if m.locals == nil {
-			m.locals = make(map[string]map[int]struct{})
-		}
-		set, ok := m.locals[key]
-		if !ok {
-			set = make(map[int]struct{})
-			m.locals[key] = set
-		}
-		set[val.GetGlobalIndex()] = struct{}{}
+		m.registerLocalIndex(key, val.GetGlobalIndex())
 	}
 	m.callBack(val)
+}
+
+// registerLocalIndex records a local version's global index for
+// HasLocalWithIndex. A name may hold several local versions, hence the
+// per-name set.
+func (m *linkNodeMap[T]) registerLocalIndex(key string, index int) {
+	if m.locals == nil {
+		m.locals = make(map[string]map[int]struct{})
+	}
+	set, ok := m.locals[key]
+	if !ok {
+		set = make(map[int]struct{})
+		m.locals[key] = set
+	}
+	set[index] = struct{}{}
 }
