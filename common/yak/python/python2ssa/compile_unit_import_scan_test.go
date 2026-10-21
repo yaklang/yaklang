@@ -137,6 +137,14 @@ func TestScanPyImportEdgesDynamicGuards(t *testing.T) {
 	requireScan(t, "mod = compat.__import__(\"db.engine\")\n")
 	requireScan(t, "value = 1\nimport_moduleX(\"db.engine\")\n")
 	requireScan(t, "mod = import_module(\"db.engine\")  # import_module(\"other\")\n", "dynamic||db.engine|")
+	// A quote followed by an operator is an expression, not a module literal.
+	// Hue hits this as import_module(".".join(...)) and __import__(".".join(...)).
+	requireScan(t, "mod = import_module(\".\".join(parts))\n")
+	requireScan(t, "c = getattr(__import__(\".\".join(modules[0:-1])), m)\n")
+	requireScan(t, "mod = import_module(\"a\" + \"b\")\n")
+	// A pure-dot literal is a real relative import and must be kept.
+	requireScan(t, "mod = importlib.import_module(\".\", package=\"pkg\")\n", "dynamic||.|pkg")
+	requireScan(t, "mod = import_module(\"..\")\n", "dynamic||..|")
 }
 
 // TestScanPyImportEdgesStatementForms covers statement shapes the scanner walks

@@ -121,6 +121,28 @@ mod = importlib.import_module(".base", package="pkg")
 	require.Contains(t, got, "dir:pkg2->dir:pkg", "edges: %v", edges)
 }
 
+func TestPythonCompileUnit_PureDotDynamicImportDoesNotPanic(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("pkg/__init__.py", "")
+	vf.AddFile("pkg/base.py", "def f():\n    return 1\n")
+	vf.AddFile("nested/__init__.py", "")
+	vf.AddFile("nested/expr.py", `
+import importlib
+mod = importlib.import_module(".".join(["pkg", "base"]))
+c = getattr(__import__("..".join(["pkg"])), "base")
+`)
+	vf.AddFile("app.py", `
+import importlib
+mod = importlib.import_module(".", package="pkg")
+`)
+
+	edges := requirePyUnitEdges(t, vf)
+	require.Contains(t, pyEdgeKeys(edges), "dir:.->dir:pkg", "edges: %v", edges)
+	for _, edge := range edges {
+		require.NotEqual(t, "dir:nested", edge.From, "a join expression must not create an import edge: %v", edges)
+	}
+}
+
 func TestPythonProjectCompile_ImaginaryNumberLiteral(t *testing.T) {
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("main.py", `
@@ -159,6 +181,7 @@ func TestPythonCompileUnit_EdgeStability(t *testing.T) {
 		require.Equal(t, sorted[i].To, edges[i].To)
 	}
 }
+
 // pyEdgeKeys renders the edge set as "from->to" keys.
 func pyEdgeKeys(edges []ssa.UnitRef) map[string]bool {
 	keys := map[string]bool{}
