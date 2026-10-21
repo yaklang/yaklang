@@ -24,6 +24,9 @@ type typeStore struct {
 	resident    *utils.SafeMapWithKey[int64, Type]
 	flushMu     sync.Mutex
 	persisted   typeFingerprints
+	// identity remembers the last persisted map-cache key. A matching key
+	// whose fingerprint is already stored skips snapshot and hashing.
+	identity map[int64]typePersistIdentity
 }
 
 func newTypeStore(
@@ -126,14 +129,17 @@ func (s *typeStore) flush() error {
 	}
 	started := time.Now()
 	changed := 0
+	identitySkipped := 0
 	defer func() {
-		log.Debugf("[ssa-type-flush] checked=%d changed=%d skipped=%d duration=%s", len(types), changed, len(types)-changed, time.Since(started))
+		log.Debugf("[ssa-type-flush] checked=%d changed=%d skipped=%d identity=%d duration=%s", len(types), changed, len(types)-changed, identitySkipped, time.Since(started))
 	}()
 
 	saveBatch := saveIrType(s.program, s.db)
 	batchSize := max(1, s.saveSize)
 	batch := make([]typePersistenceSnapshot, 0, batchSize)
 	fingerprints := make([][sha256.Size]byte, 0, batchSize)
+	batchIdentity := make([]typePersistIdentity, 0, batchSize)
+	batchStable := make([]bool, 0, batchSize)
 	var firstErr error
 	flush := func() {
 		if len(batch) == 0 {
@@ -151,34 +157,70 @@ func (s *typeStore) flush() error {
 		} else {
 			for i, typ := range batch {
 				s.persisted.set(typ.id, fingerprints[i])
+				if batchStable[i] && typ.id > 0 {
+					s.rememberIdentity(typ.id, batchIdentity[i])
+				}
 			}
 		}
 		clear(batch)
 		batch = batch[:0]
 		fingerprints = fingerprints[:0]
+		batchIdentity = batchIdentity[:0]
+		batchStable = batchStable[:0]
 	}
 
 	for _, typ := range types {
-		snapshot := snapshotTypePersistence(typ)
-		if s.program != nil && s.program.NameCache != nil {
-			snapshot.text = s.program.NameCache.Intern(snapshot.text)
-			snapshot.name = s.program.NameCache.Intern(snapshot.name)
+		id := typ.GetId()
+		key, stable := typePersistIdentityOf(typ)
+		if stable && id > 0 && s.identity != nil {
+			if previous, seen := s.identity[id]; seen && previous == key {
+				if _, persisted := s.persisted.get(id); persisted {
+					identitySkipped++
+					continue
+				}
+			}
 		}
+		snapshot := snapshotTypePersistence(typ)
+		s.internSnapshot(&snapshot)
 		fingerprint := snapshot.fingerprint()
 		// Check ALL persisted fields before JSON encoding. ID/pointer-only
 		// checks would lose cross-unit updates, including in-place slice edits.
 		if previous, ok := s.persisted.get(snapshot.id); ok && previous == fingerprint {
+			if stable && id > 0 {
+				s.rememberIdentity(id, key)
+			}
 			continue
 		}
 		changed++
 		batch = append(batch, snapshot)
 		fingerprints = append(fingerprints, fingerprint)
+		batchIdentity = append(batchIdentity, key)
+		batchStable = append(batchStable, stable)
 		if len(batch) >= batchSize {
 			flush()
 		}
 	}
 	flush()
 	return firstErr
+}
+
+func (s *typeStore) rememberIdentity(id int64, key typePersistIdentity) {
+	if s.identity == nil {
+		s.identity = make(map[int64]typePersistIdentity)
+	}
+	s.identity[id] = key
+}
+
+func (s *typeStore) internSnapshot(snapshot *typePersistenceSnapshot) {
+	if s == nil || snapshot == nil || s.program == nil || s.program.NameCache == nil {
+		return
+	}
+	pool := s.program.NameCache
+	snapshot.text = pool.Intern(snapshot.text)
+	snapshot.name = pool.Intern(snapshot.name)
+	for i, name := range snapshot.fullNames {
+		snapshot.fullNames[i] = pool.Intern(name)
+	}
 }
 
 func saveTypeWithValue(value Value, typ Type) {

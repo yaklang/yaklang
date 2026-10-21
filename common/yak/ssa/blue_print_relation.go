@@ -39,6 +39,7 @@ func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRe
 			}
 		}
 		c.ParentBlueprints = append(c.ParentBlueprints, parent)
+		c.relationGen.Add(1)
 	case BlueprintRelationInterface:
 		for _, existed := range c.InterfaceBlueprints {
 			if existed == parent {
@@ -46,6 +47,7 @@ func (c *Blueprint) setBlueprintRelation(parent *Blueprint, relation BlueprintRe
 			}
 		}
 		c.InterfaceBlueprints = append(c.InterfaceBlueprints, parent)
+		c.relationGen.Add(1)
 	default:
 		log.Errorf("BUG!: add parent blueprint error: unknown relation %v", relation)
 		return false

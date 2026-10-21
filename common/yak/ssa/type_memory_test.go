@@ -32,6 +32,36 @@ func BenchmarkBasicTypeAllocation(b *testing.B) {
 	basicTypeAllocationSink = nil
 }
 
+func TestTypePersistIdentitySkipsUntilMutation(t *testing.T) {
+	basic := NewBasicType(StringTypeKind, "string")
+	basic.SetId(1)
+	first, ok := typePersistIdentityOf(basic)
+	require.True(t, ok)
+	again, ok := typePersistIdentityOf(basic)
+	require.True(t, ok)
+	require.Equal(t, first, again)
+	basic.AddFullTypeName("java.lang.String")
+	changed, ok := typePersistIdentityOf(basic)
+	require.True(t, ok)
+	require.NotEqual(t, first, changed)
+
+	unnamed := NewObjectType()
+	unnamed.SetId(2)
+	_, ok = typePersistIdentityOf(unnamed)
+	require.False(t, ok, "structural object types must keep the snapshot path")
+
+	class := NewBlueprint("Widget")
+	class.SetId(3)
+	before, ok := typePersistIdentityOf(class)
+	require.True(t, ok)
+	parent := NewBlueprint("Parent")
+	parent.SetId(4)
+	require.True(t, class.setBlueprintRelation(parent, BlueprintRelationParents))
+	after, ok := typePersistIdentityOf(class)
+	require.True(t, ok)
+	require.NotEqual(t, before, after)
+}
+
 func TestTypeFingerprintsPages(t *testing.T) {
 	p := make(typeFingerprints)
 	ids := []int64{1, 31, 32, 63, 64, math.MaxInt64}

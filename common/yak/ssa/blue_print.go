@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 )
@@ -98,6 +100,9 @@ type Blueprint struct {
 	InterfaceBlueprints []*Blueprint
 	// full Type Name, insertion order, capped.
 	fullTypeName orderedTypeNames
+	// relationGen bumps when persisted blueprint links change. Type flush
+	// treats it as part of the map-cache identity.
+	relationGen atomic.Uint64
 
 	// lazy
 	*LazyBuilder
@@ -498,6 +503,7 @@ func (b *Blueprint) InitializeWithContainer(con Value) error {
 		return utils.Errorf("the container is already initialized id:(%v)", b._container.GetId())
 	}
 	b._container = con
+	b.relationGen.Add(1)
 	return nil
 }
 
@@ -509,5 +515,9 @@ func (c *Blueprint) SetKind(kind BlueprintKind) {
 	if c == nil {
 		return
 	}
+	if c.Kind == kind {
+		return
+	}
 	c.Kind = kind
+	c.relationGen.Add(1)
 }
