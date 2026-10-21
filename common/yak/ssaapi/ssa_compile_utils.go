@@ -463,7 +463,13 @@ func (c *Config) GetFileHandler(
 	parse := func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error) {
 		start := time.Now()
 		defer func() {
-			log.Debugf("pre-handler cost:%v parse ast: %s; size(%s)", time.Since(start), path, formatFileSize(len(content)))
+			elapsed := time.Since(start)
+			if elapsed > slowPreHandlerFileThreshold {
+				// The batch log prints only after every file in it is parsed, so one
+				// pathologically slow parse leaves the run looking hung with no clue.
+				log.Warnf("[ssa-compile] slow ast parse %s took %v size(%s)", path, elapsed, formatFileSize(len(content)))
+			}
+			log.Debugf("pre-handler cost:%v parse ast: %s; size(%s)", elapsed, path, formatFileSize(len(content)))
 		}()
 
 		defer func() {
