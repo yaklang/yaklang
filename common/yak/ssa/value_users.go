@@ -37,22 +37,28 @@ func (n *anValue) AddUser(u User) {
 	n.relationsMu.Lock()
 	defer n.relationsMu.Unlock()
 	if n.userSet != nil {
-		if _, ok := n.userSet[id]; ok {
-			return
+		if _, ok := n.userSet[id]; !ok {
+			n.userSet[id] = struct{}{}
+			n.userList = append(n.userList, id)
+			n.markPersistenceDirty()
 		}
-		n.userSet[id] = struct{}{}
-		n.userList = append(n.userList, id)
-		n.markPersistenceDirty()
 		return
 	}
-	if index := slices.Index(n.userList, id); index == -1 {
-		n.userList = append(n.userList, id)
-		n.markPersistenceDirty()
-		if len(n.userList) >= addUserSetThreshold {
-			n.userSet = make(map[int64]struct{}, len(n.userList))
-			for _, uid := range n.userList {
-				n.userSet[uid] = struct{}{}
-			}
+	if slices.Index(n.userList, id) == -1 {
+		n.appendUser(id)
+	}
+}
+
+// appendUser appends a fresh user id and upgrades to the userSet map once
+// the list reaches addUserSetThreshold. Callers must have checked the id is
+// not present yet. Caller holds relationsMu.
+func (n *anValue) appendUser(id int64) {
+	n.userList = append(n.userList, id)
+	n.markPersistenceDirty()
+	if len(n.userList) >= addUserSetThreshold {
+		n.userSet = make(map[int64]struct{}, len(n.userList))
+		for _, uid := range n.userList {
+			n.userSet[uid] = struct{}{}
 		}
 	}
 }
