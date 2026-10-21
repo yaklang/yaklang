@@ -39,6 +39,54 @@ type typePersistenceSnapshot struct {
 	container       int64
 }
 
+// typePersistIdentity is the map-cache key for one type. Fields are the
+// persisted inputs that can change without a full snapshot: name-pool
+// identity, full-name generation, and blueprint links. Types whose String()
+// walks a structural graph stay uncached and take the snapshot path.
+type typePersistIdentity struct {
+	namesGen, relationGen uint64
+	container             int64
+	kind, extraKind       int
+	name, extra           string
+}
+
+func typePersistIdentityOf(typ Type) (typePersistIdentity, bool) {
+	if utils.IsNil(typ) {
+		return typePersistIdentity{}, false
+	}
+	switch t := typ.(type) {
+	case *BasicType:
+		name := ""
+		if t.description != nil {
+			name = t.description.name
+		}
+		return typePersistIdentity{
+			namesGen: t.fullTypeName.generation(), kind: int(t.GetTypeKind()), extraKind: int(t.Kind), name: name,
+		}, true
+	case *ObjectType:
+		if t.Name == "" || t.Combination {
+			return typePersistIdentity{}, false
+		}
+		return typePersistIdentity{namesGen: t.fullTypeName.generation(), kind: int(t.GetTypeKind()), name: t.Name}, true
+	case *FunctionType:
+		if t.Name == "" {
+			return typePersistIdentity{}, false
+		}
+		return typePersistIdentity{namesGen: t.fullTypeName.generation(), kind: int(t.GetTypeKind()), name: t.Name}, true
+	case *Blueprint:
+		container := int64(-1)
+		if c := t.Container(); !utils.IsNil(c) {
+			container = c.GetId()
+		}
+		return typePersistIdentity{
+			namesGen: t.fullTypeName.generation(), relationGen: t.relationGen.Load(), container: container,
+			kind: int(t.GetTypeKind()), name: t.Name, extra: string(t.Kind),
+		}, true
+	default:
+		return typePersistIdentity{}, false
+	}
+}
+
 func snapshotTypePersistence(typ Type) typePersistenceSnapshot {
 	s := typePersistenceSnapshot{id: typ.GetId(), kind: int(typ.GetTypeKind()), text: typ.String(), fullNames: typ.GetFullTypeNames()}
 	switch t := typ.(type) {

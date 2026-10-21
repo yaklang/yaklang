@@ -1,6 +1,10 @@
 package ssa
 
-import "github.com/yaklang/yaklang/common/utils"
+import (
+	"sync/atomic"
+
+	"github.com/yaklang/yaklang/common/utils"
+)
 
 // maxFullTypeNameEntries caps the number of fullTypeNames stored per type.
 // On large Java projects (e.g. Hadoop), types can accumulate hundreds of
@@ -16,6 +20,9 @@ const maxFullTypeNameEntries = 200
 // []string. SafeSlice is the lock; omap would invent keys this list does not have.
 type orderedTypeNames struct {
 	items utils.SafeSlice[string]
+	// gen changes only when the stored names change. Type flush uses it as the
+	// map-cache key so an unchanged type is not snapshotted again.
+	gen atomic.Uint64
 }
 
 func (n *orderedTypeNames) add(name string) bool {
@@ -31,8 +38,22 @@ func (n *orderedTypeNames) add(name string) bool {
 				return nil, false
 			}
 		}
+		n.bump()
 		return append(cur, name), true
 	})
+}
+
+func (n *orderedTypeNames) generation() uint64 {
+	if n == nil {
+		return 0
+	}
+	return n.gen.Load()
+}
+
+func (n *orderedTypeNames) bump() {
+	if n != nil {
+		n.gen.Add(1)
+	}
 }
 
 func (n *orderedTypeNames) addList(names []string) bool {
@@ -66,6 +87,7 @@ func (n *orderedTypeNames) set(names []string) bool {
 				return nil, false
 			}
 		}
+		n.bump()
 		return cleaned, true
 	})
 }
@@ -88,6 +110,7 @@ func (n *orderedTypeNames) rewrite(fn func([]string) []string) {
 		if next == nil {
 			return nil, false
 		}
+		n.bump()
 		return next, true
 	})
 }
