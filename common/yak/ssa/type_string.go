@@ -22,11 +22,7 @@ func (s *typeStringer) format(t Type) string {
 	switch t := t.(type) {
 	case *ObjectType:
 		if t.Combination {
-			parts := make([]string, len(t.FieldTypes))
-			for i, field := range t.FieldTypes {
-				parts[i] = s.format(field)
-			}
-			return strings.Join(parts, ", ")
+			return joinTypesBounded(t.FieldTypes, ", ", s.format)
 		}
 		if t.Name != "" {
 			return t.Name

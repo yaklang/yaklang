@@ -1203,100 +1203,31 @@ func (itype *ObjectType) rawString(format func(Type) string) string {
 		ret += fmt.Sprintf("map[%s]%s", format(keyTyp), format(fieldType))
 	case StructTypeKind:
 		// map[string](T/U/xx)
-		ret += fmt.Sprintf(
-			"struct {%s}",
-			strings.Join(
-				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return format(field) }),
-				",",
-			),
-		)
+		ret += fmt.Sprintf("struct {%s}", joinTypesBounded(itype.FieldTypes, ",", format))
 	case ObjectTypeKind:
 		ret += "object{}"
 	case TupleTypeKind:
 		// [T,U,V]
-		ret += fmt.Sprintf(
-			"[%s]", strings.Join(
-				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return format(field) }),
-				",",
-			),
-		)
+		ret += fmt.Sprintf("[%s]", joinTypesBounded(itype.FieldTypes, ",", format))
 	}
 	return ret
 }
 
 // typeStringWidthLimit bounds how much text a single field-join may assemble:
-// every join truncates past it, and each nesting level's output is emitted by
-// its parent's join, so the final string is bounded by the depth cap times
-// this limit. Field-type graphs shared diamond-style expand multiplicatively
-// at every nesting level, so building the full String() of such a type can
-// grow exponentially; error messages must not attempt it.
+// field-type graphs shared diamond-style expand multiplicatively per nesting
+// level, so an unbounded join turns String() of such a type into 2^N text.
+// The bound lives inside String()/RawString() themselves — every consumer
+// (error messages, debug dumps, PkgPathString type comparison) flows through
+// it. Each nesting level's output is emitted by its parent's join, so the
+// total stays bounded by the graph depth times this limit.
 const typeStringWidthLimit = 4096
 
-// TypeStringLimited returns the same text as t.String() while every join
-// stays within typeStringWidthLimit; the part past the limit is abbreviated
-// to "...". Only object and alias types recurse structurally — every other
-// kind is bounded by construction.
-func TypeStringLimited(t Type) string {
-	return typeStringLimited(t, 0)
-}
-
-func typeStringLimited(t Type, depth int) string {
-	if utils.IsNil(t) {
-		return "<nil>"
-	}
-	if depth > 16 {
-		return "..."
-	}
-	switch typ := t.(type) {
-	case *AliasType:
-		if typ.Name != "" {
-			return typ.Name
-		}
-		return typeStringLimited(typ.GetType(), depth+1)
-	case *ObjectType:
-		if typ.Combination {
-			return typeStringLimitedJoin(typ.FieldTypes, ", ", depth)
-		}
-		if typ.Name != "" {
-			return typ.Name
-		}
-		switch typ.Kind {
-		case StructTypeKind:
-			return "struct {" + typeStringLimitedJoin(typ.FieldTypes, ",", depth) + "}"
-		case SliceTypeKind:
-			if typ.FieldType == nil {
-				return ""
-			}
-			elem := typeStringLimited(typ.FieldType, depth+1)
-			if typ.Len == 0 {
-				return "[]" + elem
-			}
-			return fmt.Sprintf("[%d]%s", typ.Len, elem)
-		case MapTypeKind:
-			keyTyp := typ.KeyTyp
-			if utils.IsNil(keyTyp) {
-				keyTyp = CreateAnyType()
-			}
-			fieldType := typ.FieldType
-			if utils.IsNil(fieldType) {
-				fieldType = CreateAnyType()
-			}
-			return "map[" + typeStringLimited(keyTyp, depth+1) + "]" + typeStringLimited(fieldType, depth+1)
-		case TupleTypeKind:
-			return "[" + typeStringLimitedJoin(typ.FieldTypes, ",", depth) + "]"
-		default:
-			return typ.String()
-		}
-	default:
-		return t.String()
-	}
-}
-
-// typeStringLimitedJoin renders field types until the assembled text reaches
-// typeStringWidthLimit, then marks the rest with one "..." per join instead
-// of one per elided field, which thousand-field types would stretch back
-// into an unbounded dot string.
-func typeStringLimitedJoin(ts []Type, sep string, depth int) string {
+// joinTypesBounded renders field types via format until the assembled text
+// reaches typeStringWidthLimit, then marks the rest with one "..." per join
+// instead of one per elided field. Callers must pass the same format used by
+// the surrounding typeStringer so cyclic graphs still terminate through the
+// active-path check.
+func joinTypesBounded(ts []Type, sep string, format func(Type) string) string {
 	capHint := len(ts)
 	if capHint > 64 {
 		capHint = 64
@@ -1304,7 +1235,7 @@ func typeStringLimitedJoin(ts []Type, sep string, depth int) string {
 	parts := make([]string, 0, capHint)
 	n := 0
 	for _, ft := range ts {
-		part := typeStringLimited(ft, depth+1)
+		part := format(ft)
 		parts = append(parts, part)
 		n += len(part) + len(sep)
 		if n >= typeStringWidthLimit {
