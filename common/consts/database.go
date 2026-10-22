@@ -51,6 +51,14 @@ type databaseOpenOptions struct {
 	// (PRAGMA journal_size_limit). Zero keeps SQLite's default of no limit,
 	// which lets the WAL file grow to its high-water mark and stay there.
 	sqliteJournalSizeLimitBytes int64
+	// sqliteCacheKiB is PRAGMA cache_size in KiB (applied as a negative value).
+	// Zero keeps the generic 8000-page cache.
+	sqliteCacheKiB int64
+	// sqliteMmapBytes is PRAGMA mmap_size. Zero leaves SQLite's default.
+	sqliteMmapBytes int64
+	// sqliteWALAutocheckpoint is PRAGMA wal_autocheckpoint in pages.
+	// Zero leaves SQLite's default of 1000.
+	sqliteWALAutocheckpoint int
 }
 
 func defaultDatabaseOpenOptions() databaseOpenOptions {
@@ -74,6 +82,24 @@ func sqliteBusyTimeout(options databaseOpenOptions) int {
 func applySQLiteConnectionPragmas(conn *sqlite3.SQLiteConn, options databaseOpenOptions) error {
 	if options.sqliteJournalSizeLimitBytes > 0 {
 		_, err := conn.Exec(fmt.Sprintf("PRAGMA journal_size_limit = %d;", options.sqliteJournalSizeLimitBytes), nil)
+		if err != nil {
+			return err
+		}
+	}
+	if options.sqliteCacheKiB > 0 {
+		_, err := conn.Exec(fmt.Sprintf("PRAGMA cache_size = %d;", -options.sqliteCacheKiB), nil)
+		if err != nil {
+			return err
+		}
+	}
+	if options.sqliteMmapBytes > 0 {
+		_, err := conn.Exec(fmt.Sprintf("PRAGMA mmap_size = %d;", options.sqliteMmapBytes), nil)
+		if err != nil {
+			return err
+		}
+	}
+	if options.sqliteWALAutocheckpoint > 0 {
+		_, err := conn.Exec(fmt.Sprintf("PRAGMA wal_autocheckpoint = %d;", options.sqliteWALAutocheckpoint), nil)
 		if err != nil {
 			return err
 		}
@@ -307,7 +333,11 @@ func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databa
 		// set journal_mode for write speed
 		db.Exec("PRAGMA journal_mode = WAL;")
 		db.Exec("PRAGMA temp_store = MEMORY;")
-		db.Exec("PRAGMA cache_size = 8000;")
+		if options.sqliteCacheKiB > 0 {
+			db.Exec(fmt.Sprintf("PRAGMA cache_size = %d;", -options.sqliteCacheKiB))
+		} else {
+			db.Exec("PRAGMA cache_size = 8000;")
+		}
 		db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d;", sqliteBusyTimeout(options)))
 	}
 }
