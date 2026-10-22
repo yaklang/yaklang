@@ -331,7 +331,7 @@ func GenerateCA(opts ...CertOption) ([]byte, []byte, error) {
 	}
 
 	// 自签名，所以父证书就是模板本身
-	return createCertificate(template, template, config.PrivateKey.Public(), config.PrivateKey)
+	return createCertificate(template, template, config.PrivateKey, config.PrivateKey)
 }
 
 // GenerateServerCert 使用给定的 CA 签发一个服务器证书
@@ -442,7 +442,7 @@ func generateSignedCert(caCertPEM, caKeyPEM []byte, isCA bool, opts ...CertOptio
 		return nil, nil, err
 	}
 
-	return createCertificate(template, caCert, config.PrivateKey.Public(), caKey)
+	return createCertificate(template, caCert, config.PrivateKey, caKey)
 }
 
 func getDefaultedValue(inputValue, defaultValue string) string {
@@ -488,9 +488,9 @@ func createTemplate(config *CertConfig, isCA bool) (*x509.Certificate, error) {
 }
 
 // createCertificate 执行实际的证书创建和编码。
-func createCertificate(template, parent *x509.Certificate, pub interface{}, priv crypto.Signer) ([]byte, []byte, error) {
+func createCertificate(template, parent *x509.Certificate, priv, signingKey crypto.Signer) ([]byte, []byte, error) {
 	// 创建证书的 DER 编码
-	derBytes, err := x509.CreateCertificate(cryptorand.Reader, template, parent, pub, priv)
+	derBytes, err := x509.CreateCertificate(cryptorand.Reader, template, parent, priv.Public(), signingKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create certificate: %w", err)
 	}
