@@ -26,6 +26,9 @@ func (d *stdlibDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 	sc.clearVerifierText()
 	defer sc.clearVerifierText()
 	for _, cp := range d.patterns {
+		if !patternAllowed(sc, cp.id) {
+			continue
+		}
 		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
 		if err != nil {
 			return false, verifierScanError(cp, err)

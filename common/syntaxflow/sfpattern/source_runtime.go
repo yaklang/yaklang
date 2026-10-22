@@ -397,6 +397,9 @@ func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scrat
 	fileHits := make([][]storedSpan, len(r.plan.patterns))
 	located := make([]bool, len(r.plan.patterns))
 	var locateErr error
+	// Skip patterns whose path glob cannot match this file. The engine would
+	// otherwise rescan the whole record for every triggered pattern.
+	minirehs.RestrictScratch(scratch, allowed)
 	err := r.plan.db.Scan([]byte(content), scratch, func(m minirehs.Match) bool {
 		if ctx.Err() != nil || stop() {
 			return false

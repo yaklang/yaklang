@@ -108,13 +108,13 @@ func simpleValueToSSAValue(sv *sfvm.SimpleValue) *Value {
 	path := sv.Path()
 	if ed := sv.FileEditor(); ed != nil {
 		start, end := sv.Start(), sv.End()
-		if offsetMap := ed.GetRuneOffsetMap(); offsetMap != nil {
-			if rs, ok := offsetMap.ByteOffsetToRuneIndex(start); ok {
-				start = rs
-			}
-			if re, ok := offsetMap.ByteOffsetToRuneIndex(end); ok {
-				end = re
-			}
+		// Byte offsets from the file scan. ASCII files are already rune
+		// offsets, so this does not build a per-rune table.
+		if rs, ok := ed.ByteOffsetToRuneIndex(start); ok {
+			start = rs
+		}
+		if re, ok := ed.ByteOffsetToRuneIndex(end); ok {
+			end = re
 		}
 		return prog.NewConstValue(text, ed.GetRangeOffset(start, end))
 	}
