@@ -93,11 +93,12 @@ class A{
 }
 `)
 	ssatest.CheckSyntaxFlowWithFS(t, vf,
-		`off #-> * as $param`,
+		// Import linking must not compile the interface a second time. One
+		// formal declaration resolves to the actual argument at its sole call.
+		`off as $formal; off #-> * as $param`,
 		map[string][]string{
-			// The called declaration resolves to its actual argument. A second,
-			// uncalled copy of the interface must not add a ghost Parameter-off.
-			"param": {"1"},
+			"formal": {"Parameter-off"},
+			"param":  {"1"},
 		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
 

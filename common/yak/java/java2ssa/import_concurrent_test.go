@@ -10,24 +10,33 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
-// A package nobody is compiling, including a dependency in a later batch, is
-// still loaded on demand. A package occupied by another prehandle worker is
-// not: that compile would enter the owner's library builder. Serial prehandling
-// has no owner and keeps the directory fallback.
+// Planned packages remain owned by the unit scheduler before their library or
+// file is published. Other directories are loaded on demand unless occupied by
+// another worker. Serial prehandling keeps the directory fallback.
 func TestConcurrentJavaSkeletonDefersDirectoryImports(t *testing.T) {
 	for _, tc := range []struct {
 		name       string
 		concurrent bool
 		occupied   bool
+		planned    bool
+		static     bool
+		declared   bool
 		builds     int
 	}{
 		{name: "serial", builds: 1},
 		{name: "concurrent-free", concurrent: true, builds: 1},
 		{name: "concurrent-owned", concurrent: true, occupied: true, builds: 0},
+		{name: "concurrent-planned-before-library", concurrent: true, planned: true, builds: 0},
+		{name: "concurrent-planned-static-before-library", concurrent: true, planned: true, static: true, builds: 0},
+		{name: "concurrent-planned-type-before-file", concurrent: true, planned: true, declared: true, builds: 0},
+		{name: "concurrent-planned-static-type-before-file", concurrent: true, planned: true, static: true, declared: true, builds: 0},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			vf := filesys.NewVirtualFs()
-			const source = `package a; import b.B; class A { B value; }`
+			source := `package a; import b.B; class A { B value; }`
+			if tc.static {
+				source = `package a; import static b.B.value; class A { int field = value; }`
+			}
 			vf.AddFile("a/A.java", source)
 			vf.AddFile("b/B.java", `package b; class B {}`)
 			cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile)
@@ -35,8 +44,18 @@ func TestConcurrentJavaSkeletonDefersDirectoryImports(t *testing.T) {
 			app := ssa.NewProgram(cfg, ssa.ProgramCacheMemory, ssa.Application, vf, ".", 2)
 			app.ProcessInfof = func(string, ...any) {}
 			app.SetConcurrentUnitBuild(tc.concurrent)
+			if tc.planned {
+				app.CompileUnits = []*ssa.CompileUnit{{Key: "java:b", LibraryName: "b"}}
+			}
 			app.SetPreHandler(true)
 			fb := app.GetAndCreateFunctionBuilder("", string(ssa.MainFunctionName))
+			if tc.declared {
+				lib := app.NewLibrary("b", []string{"b"})
+				libBuilder := lib.GetAndCreateFunctionBuilder("b", string(ssa.MainFunctionName))
+				lib.SetExportType("B", libBuilder.CreateBlueprint("B"))
+				_, hasFile := app.GetLibrary("b")
+				require.False(t, hasFile, "the declared type must precede file registration")
+			}
 			editor := app.CreateEditor([]byte(source), "a/A.java")
 			fb.SetEditor(editor)
 			frontend := CreateBuilder()
