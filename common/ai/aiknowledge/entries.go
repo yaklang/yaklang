@@ -28,14 +28,14 @@ type entryInput struct {
 
 func (e *entryInput) entry(baseID int64) (*schema.KnowledgeBaseEntry, error) {
 	if e == nil || strings.TrimSpace(e.Title) == "" || strings.TrimSpace(e.Content) == "" {
-		return nil, fmt.Errorf("entry requires non-empty title and content")
+		return nil, invalidArgumentf("entry requires non-empty title and content")
 	}
 	return &schema.KnowledgeBaseEntry{KnowledgeBaseID: baseID, KnowledgeTitle: e.Title, KnowledgeDetails: e.Content, Summary: e.Summary, KnowledgeType: e.Type, Keywords: e.Keywords, PotentialQuestions: e.PotentialQuestions}, nil
 }
 
 func (c *config) manageEntry(req manageRequest, base *schema.KnowledgeBaseInfo) (map[string]any, error) {
 	if req.Op != "add_entry" && req.EntryID == "" {
-		return nil, fmt.Errorf("entry_id is required")
+		return nil, invalidArgumentf("entry_id is required")
 	}
 	var old schema.KnowledgeBaseEntry
 	if req.Op != "add_entry" {
@@ -107,7 +107,7 @@ func requireEmbedding(store *vectorstore.SQLiteVectorStoreHNSW) error {
 		return fmt.Errorf("embedding service is unavailable")
 	}
 	if model, ok := client.(interface{ GetModelDimension() int }); ok && model.GetModelDimension() > 0 && model.GetModelDimension() != store.GetCollectionInfo().Dimension {
-		return fmt.Errorf("collection dimension %d does not match embedding service dimension %d", store.GetCollectionInfo().Dimension, model.GetModelDimension())
+		return invalidArgumentf("collection dimension %d does not match embedding service dimension %d", store.GetCollectionInfo().Dimension, model.GetModelDimension())
 	}
 	return nil
 }
@@ -182,17 +182,17 @@ type buildOptions struct {
 // channel builders can publish entries before writes and only log write errors.
 func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (result map[string]any, buildErr error) {
 	if (req.SourceFile == "") == (strings.TrimSpace(req.Content) == "") {
-		return nil, fmt.Errorf("build requires exactly one of source_file or content")
+		return nil, invalidArgumentf("build requires exactly one of source_file or content")
 	}
 	if req.IndexOptions != (indexOptions{}) {
-		return nil, fmt.Errorf("index_options apply only to create")
+		return nil, invalidArgumentf("index_options apply only to create")
 	}
 	b := req.BuildOptions
 	if b.Mode == "" {
 		b.Mode = "question_index"
 	}
 	if b.Mode != "chunks" && b.Mode != "question_index" {
-		return nil, fmt.Errorf("build mode must be chunks or question_index")
+		return nil, invalidArgumentf("build mode must be chunks or question_index")
 	}
 	if b.ChunkSize == 0 {
 		b.ChunkSize = 8192
@@ -201,13 +201,13 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (resul
 		b.Concurrency = 2
 	}
 	if b.ChunkSize < 256 || b.ChunkSize > 1048576 || b.Concurrency < 1 || b.Concurrency > 16 {
-		return nil, fmt.Errorf("chunk_size must be 256..1048576 bytes and concurrency 1..16")
+		return nil, invalidArgumentf("chunk_size must be 256..1048576 bytes and concurrency 1..16")
 	}
 	if b.OmniMode == "" {
 		b.OmniMode = "auto"
 	}
 	if b.OmniMode != "auto" && b.OmniMode != "required" && b.OmniMode != "disabled" {
-		return nil, fmt.Errorf("omni_mode must be auto, required or disabled")
+		return nil, invalidArgumentf("omni_mode must be auto, required or disabled")
 	}
 	if b.OmniSegmentSeconds == 0 {
 		b.OmniSegmentSeconds = 20
@@ -216,7 +216,7 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (resul
 		b.OmniPayloadBytes = 7 * 1024 * 1024
 	}
 	if b.OmniSegmentSeconds <= 0 || b.OmniSegmentSeconds > 600 || b.OmniPayloadBytes < 1024 || b.OmniPayloadBytes > 10*1024*1024 {
-		return nil, fmt.Errorf("omni_segment_seconds must be (0,600] and omni_payload_bytes 1024..10485760")
+		return nil, invalidArgumentf("omni_segment_seconds must be (0,600] and omni_payload_bytes 1024..10485760")
 	}
 	if req.SourceFile != "" {
 		stat, err := os.Stat(req.SourceFile)
@@ -224,7 +224,7 @@ func (c *config) build(req manageRequest, base *schema.KnowledgeBaseInfo) (resul
 			return nil, err
 		}
 		if !stat.Mode().IsRegular() {
-			return nil, fmt.Errorf("source_file must be a regular file")
+			return nil, invalidArgumentf("source_file must be a regular file")
 		}
 	}
 	ctx, cancel := context.WithCancel(c.ctx)

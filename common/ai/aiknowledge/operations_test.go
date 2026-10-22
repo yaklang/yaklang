@@ -5,7 +5,32 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
+	"github.com/yaklang/yaklang/common/schema"
 )
+
+func TestKnowledgeDescriptionUpdatesAreAtomic(t *testing.T) {
+	db, opts, _, _ := fixture(t)
+	_, err := Add("docs", append(opts, WithDescription("original"))...)
+	require.NoError(t, err)
+	for _, description := range []string{"updated 描述", ""} {
+		_, err = Update("docs", append(opts, WithDescription(description))...)
+		require.NoError(t, err)
+		result, err := Get("docs", opts...)
+		require.NoError(t, err)
+		require.Equal(t, description, result["knowledge_base"].(baseInfo).Description)
+		require.Equal(t, description, result["collection"].(*vectorstore.CollectionInfo).Description)
+	}
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_description BEFORE UPDATE OF description ON `+(&schema.VectorStoreCollection{}).TableName()+` BEGIN SELECT RAISE(ABORT, 'COLLECTION_UPDATE_REFUSED'); END`).Error)
+	_, err = Update("docs", append(opts, WithDescription("must roll back"), WithTags("must roll back"))...)
+	require.ErrorContains(t, err, "COLLECTION_UPDATE_REFUSED")
+	result, err := Get("docs", opts...)
+	require.NoError(t, err)
+	base := result["knowledge_base"].(baseInfo)
+	require.Empty(t, base.Description)
+	require.Empty(t, base.Tags)
+	require.Empty(t, result["collection"].(*vectorstore.CollectionInfo).Description)
+}
 
 func TestKnowledgeNamedOperationsAndOptions(t *testing.T) {
 	_, defaults, _, _ := fixture(t)

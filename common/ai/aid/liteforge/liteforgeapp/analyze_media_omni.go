@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/mimetype"
 	"github.com/yaklang/yaklang/common/utils/ffmpegutils"
 	"github.com/yaklang/yaklang/common/utils/imageutils"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 	"golang.org/x/image/draw"
 )
@@ -77,6 +78,15 @@ func CheckOmniAvailable(options ...any) (*OmniModelInfo, error) {
 	return &s.info, nil
 }
 
+func isOmniFreeCredentialMismatch(providerType, apiKey, model string) bool {
+	builtin := yakit.DefaultAIBalanceProviderConfig()
+	if !strings.EqualFold(providerType, builtin.GetType()) || strings.TrimSpace(apiKey) != builtin.GetAPIKey() {
+		return false
+	}
+	name := strings.ToLower(strings.TrimSpace(model))
+	return !(strings.HasPrefix(name, "memfit-") && strings.HasSuffix(name, "-free"))
+}
+
 func newOmniMediaSession(cfg *AnalysisConfig, options []any) (*omniMediaSession, error) {
 	v := NewDefaultVideoOmniConfig()
 	v.AIType, v.Model = "aibalance", DefaultKnowledgeOmniModel
@@ -130,6 +140,22 @@ func newOmniMediaSession(cfg *AnalysisConfig, options []any) (*omniMediaSession,
 			case model.GetProvider().GetType() == v.AIType || model.GetProvider().GetType() == requestedType:
 				score = 1
 			}
+			candidateModel := v.Model
+			if score >= 2 && v.Model == DefaultKnowledgeOmniModel && explicit.Model == "" {
+				candidateModel = model.GetModelName()
+			}
+			apiKey := model.GetProvider().GetAPIKey()
+			if v.APIKey != "" {
+				apiKey = v.APIKey
+			}
+			if explicit.APIKey != "" {
+				apiKey = explicit.APIKey
+			}
+			// The public free identity only authorizes memfit free routes. A
+			// default vision entry must not hide a user's configured Omni key.
+			if isOmniFreeCredentialMismatch(model.GetProvider().GetType(), apiKey, candidateModel) {
+				continue
+			}
 			if score > bestScore {
 				bestScore = score
 				selected = model
@@ -161,6 +187,9 @@ func newOmniMediaSession(cfg *AnalysisConfig, options []any) (*omniMediaSession,
 	aiOptions = append(aiOptions, aispec.WithStreamHandler(func(r io.Reader) { io.Copy(io.Discard, r) }))
 	aiOptions = append(aiOptions, cfg.OmniAIOptions...)
 	resolved := aispec.NewDefaultAIConfig(aiOptions...)
+	if isOmniFreeCredentialMismatch(resolved.Type, resolved.APIKey, resolved.Model) {
+		return nil, fmt.Errorf("Omni model %q requires a configured AIBalance API key; built-in free credentials cannot access this model", resolved.Model)
+	}
 	chatter, err := ai.LoadChater(resolved.Type, aiOptions...)
 	if err != nil {
 		return nil, err

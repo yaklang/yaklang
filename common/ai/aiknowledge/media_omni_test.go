@@ -51,6 +51,20 @@ func TestKnowledgeOmniBuildAndAsyncFailure(t *testing.T) {
 	var raw bytes.Buffer
 	require.NoError(t, png.Encode(&raw, image.NewRGBA(image.Rect(0, 0, 32, 32))))
 	require.NoError(t, os.WriteFile(path, raw.Bytes(), 0600))
+	// Omitting every Omni option must still use the configured Omni provider
+	// and persist its extraction; the default must not regress to legacy vision.
+	create(t, options, "default-media")
+	defaults := append(append([]Option{}, options...), WithBuildMode("chunks"))
+	defaultResult, err := BuildFromFile("default-media", path, defaults...)
+	require.NoError(t, err)
+	require.Equal(t, "auto", defaultResult["omni_mode"])
+	require.Equal(t, 1, defaultResult["entries_added"])
+	queried, err := Query("default-media", "ORBIT-731", 512, options...)
+	require.NoError(t, err)
+	require.Len(t, queried.Results, 1)
+	require.Contains(t, queried.Results[0].Content, "ORBIT-731")
+	_, err = Delete("default-media", options...)
+	require.NoError(t, err)
 	create(t, options, "media")
 	buildOptions := append(append([]Option{}, options...), WithBuildMode("chunks"), WithOmniMode("required"), WithOmniModel("qwen-test-omni"), WithOmniSegmentSeconds(3), WithOmniPayloadBytes(4096))
 	result, err := BuildFromFile("media", path, buildOptions...)

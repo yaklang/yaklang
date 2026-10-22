@@ -22,8 +22,11 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
 func omniTestImage(t *testing.T) string {
@@ -86,6 +89,76 @@ func omniTestLegacy(calls *atomic.Int32) AnalysisOption {
 		rsp.Close()
 		return rsp, nil
 	})
+}
+
+func TestOmniMediaLocalProviderCredentials(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	aiconfig.EnsureConfigLoaded()
+	previous := consts.GetTieredAIConfig()
+	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
+
+	for _, modelName := range []string{DefaultKnowledgeOmniModel, "custom-omni"} {
+		t.Run(modelName, func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				calls.Add(1)
+				require.Equal(t, "/v1/chat/completions", r.URL.Path)
+				if r.Header.Get("Authorization") != "Bearer configured-user-key" {
+					w.WriteHeader(http.StatusUnauthorized)
+					fmt.Fprint(w, `{"error":{"message":"invalid api key"}}`)
+					return
+				}
+				require.Equal(t, "local-provider", r.Header.Get("X-Omni-Test"))
+				var body map[string]any
+				require.NoError(t, json.NewDecoder(r.Body).Decode(&body))
+				require.Equal(t, modelName, body["model"])
+				w.Header().Set("Content-Type", "application/json")
+				fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"OMNI_READY"}}]}`)
+			}))
+			t.Cleanup(server.Close)
+			builtin := yakit.DefaultAIBalanceProviderConfig()
+			builtin.Domain, builtin.BaseURL = "", server.URL+"/v1"
+			consts.SetTieredAIConfig(&consts.TieredAIConfig{
+				VisionConfigs:      []*ypb.AIModelConfig{{Provider: builtin, ModelName: "memfit-vision-free"}},
+				LightweightConfigs: []*ypb.AIModelConfig{{Provider: builtin, ModelName: "memfit-light-free"}},
+				IntelligentConfigs: []*ypb.AIModelConfig{{ModelName: "deepseek-v4.1-flash", Provider: &ypb.ThirdPartyApplicationConfig{
+					Type: "aibalance", APIKey: "configured-user-key", BaseURL: server.URL + "/v1",
+					Headers: []*ypb.KVPair{{Key: "X-Omni-Test", Value: "local-provider"}},
+				}}},
+			})
+			info, err := CheckOmniAvailable(WithVideoOmniModel(modelName))
+			require.NoError(t, err)
+			require.Equal(t, &OmniModelInfo{Provider: "aibalance", Model: modelName}, info)
+			require.EqualValues(t, 1, calls.Load())
+		})
+	}
+}
+
+func TestOmniMediaBuiltinFreeCredentials(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	aiconfig.EnsureConfigLoaded()
+	previous := consts.GetTieredAIConfig()
+	t.Cleanup(func() { consts.SetTieredAIConfig(previous) })
+	var calls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		require.Equal(t, "Bearer explicit-user-key", r.Header.Get("Authorization"))
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprint(w, `{"choices":[{"message":{"role":"assistant","content":"OMNI_READY"}}]}`)
+	}))
+	t.Cleanup(server.Close)
+	builtin := yakit.DefaultAIBalanceProviderConfig()
+	builtin.Domain, builtin.BaseURL = "", server.URL+"/v1"
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{
+		VisionConfigs: []*ypb.AIModelConfig{{Provider: builtin, ModelName: "memfit-vision-free"}},
+	})
+	_, err := CheckOmniAvailable()
+	require.ErrorContains(t, err, "requires a configured AIBalance API key")
+	require.Zero(t, calls.Load(), "do not send known incompatible free credentials to Omni")
+	info, err := CheckOmniAvailable(WithOmniMediaAIOptions(aispec.WithAPIKey("explicit-user-key")))
+	require.NoError(t, err)
+	require.Equal(t, DefaultKnowledgeOmniModel, info.Model)
+	require.EqualValues(t, 1, calls.Load(), "explicit credentials must retain the configured endpoint")
 }
 
 func TestOmniMediaImageAndTextRouting(t *testing.T) {

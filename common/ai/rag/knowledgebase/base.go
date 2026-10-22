@@ -1,6 +1,7 @@
 package knowledgebase
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 	"strings"
@@ -12,6 +13,9 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+// ErrAlreadyExists identifies an existing knowledge base or collection.
+var ErrAlreadyExists = errors.New("knowledge base or RAG collection already exists")
 
 // KnowledgeBase 知识库结构体，提供对知识库的操作接口
 type KnowledgeBase struct {
@@ -119,7 +123,7 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 	var existingInfo schema.KnowledgeBaseInfo
 	err := db.Model(&schema.KnowledgeBaseInfo{}).Where("knowledge_base_name = ?", name).First(&existingInfo).Error
 	if err == nil {
-		return nil, utils.Errorf("知识库 %s 已存在", name)
+		return nil, fmt.Errorf("知识库 %s 已存在: %w", name, ErrAlreadyExists)
 	}
 	if err != gorm.ErrRecordNotFound {
 		return nil, utils.Errorf("检查知识库是否存在失败: %v", err)
@@ -127,7 +131,7 @@ func CreateKnowledgeBase(db *gorm.DB, name, description, kbType string, opts ...
 
 	// 检查 RAG Collection 是否存在
 	if vectorstore.HasCollection(db, name) {
-		return nil, utils.Errorf("RAG集合 %s 已存在", name)
+		return nil, fmt.Errorf("RAG集合 %s 已存在: %w", name, ErrAlreadyExists)
 	}
 
 	// 使用事务创建 KnowledgeBaseInfo

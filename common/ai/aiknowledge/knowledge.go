@@ -182,6 +182,17 @@ func (c *config) updateMetadata(id int64, meta metadata) error {
 		if len(changes) == 0 {
 			return nil
 		}
-		return tx.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", id).Updates(changes).Error
+		if err := tx.Model(&schema.KnowledgeBaseInfo{}).Where("id = ?", id).Updates(changes).Error; err != nil {
+			return err
+		}
+		if meta.Description != nil {
+			var base schema.KnowledgeBaseInfo
+			if err := tx.Select("knowledge_base_name").Where("id = ?", id).First(&base).Error; err != nil {
+				return err
+			}
+			return tx.Model(&schema.VectorStoreCollection{}).Where("name = ?", base.KnowledgeBaseName).
+				Update("description", *meta.Description).Error
+		}
+		return nil
 	})
 }

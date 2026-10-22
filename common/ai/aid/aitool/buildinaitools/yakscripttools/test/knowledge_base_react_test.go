@@ -109,7 +109,7 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 				query(map[string]any{"name": "docs", "mode": "get", "entry_id": "pending", "content_offset": -1}),
 				manage("update_entry", "docs", map[string]any{"entry_id": "pending", "entry": map[string]any{"title": "updated", "content": "NEW_MARKER API token"}}),
 				manage("build", "docs", map[string]any{"source_file": file, "build_options": map[string]any{"mode": "chunks", "chunk_size": 512, "concurrency": 1}}),
-				query(map[string]any{"names": []string{"docs", "other"}, "mode": "semantic", "query": "API token", "limit": 2}),
+				query(map[string]any{"names": []string{"docs", "other"}, "mode": "semantic", "query": "API token", "limit": 2, "min_score": 0.56}),
 				query(map[string]any{"all": true, "query": "MARKER", "limit": 1}),
 				query(map[string]any{"query": "MARKER"}), // Must fail, then the AI follows its guidance.
 				manage("list", "", nil),
@@ -174,9 +174,15 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 					actual := results[cursor-1]
 					require.Equal(t, steps[cursor-1].tool, actual.Name)
 					if cursor == 13 {
-						require.False(t, actual.Success)
+						require.True(t, actual.Success, "a business error must complete the tool protocol")
+						require.Empty(t, actual.Error)
+						require.Contains(t, actual.Data, `"error_code": "INVALID_ARGUMENT"`, "the canonical tool result must retain the business error")
+						var failure map[string]any
+						require.NoError(t, json.Unmarshal([]byte(outputs[cursor-1]), &failure))
+						require.Equal(t, false, failure["success"])
+						require.Equal(t, "INVALID_ARGUMENT", failure["error_code"])
 						for _, key := range []string{"manage_knowledge_base", `"op":"list"`, "names", "all=true"} {
-							require.Contains(t, actual.Error, key)
+							require.Contains(t, failure["message"], key)
 						}
 					} else {
 						require.True(t, actual.Success, "step %d: %+v", cursor, actual)
@@ -190,6 +196,16 @@ func TestKnowledgeBaseReActSkillToolsIntegration(t *testing.T) {
 						}
 						var value map[string]any
 						require.NoError(t, json.Unmarshal([]byte(output), &value), output)
+						if cursor == 11 {
+							rawParams, err := json.Marshal(actual.Param)
+							require.NoError(t, err)
+							var params map[string]any
+							require.NoError(t, json.Unmarshal(rawParams, &params))
+							require.Equal(t, 0.56, params["min_score"], "explicit floats must survive model/action/tool conversion")
+							for _, rawHit := range value["results"].([]any) {
+								require.GreaterOrEqual(t, rawHit.(map[string]any)["score"].(float64), 0.56)
+							}
+						}
 						if actual.Name == "query_knowledge_base" {
 							require.LessOrEqual(t, ytoken.CalcTokenCount(output), 512)
 						}
