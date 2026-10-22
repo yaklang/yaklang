@@ -750,15 +750,17 @@ func debugMockHTTPServerWithTLSConfig(ctx context.Context, addr string, https, h
 }
 
 func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
-	addr := GetRandomLocalAddr()
-	time.Sleep(time.Millisecond * 300)
-	host, port, _ := ParseStringToHostPort(addr)
+	// Bind before returning the port. Closing a :0 listener and rebinding after
+	// a delay lets a concurrent test claim the same ephemeral port.
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		panic(err)
+	}
+	host, port, _ := ParseStringToHostPort(lis.Addr().String())
+	addr := HostPort(host, port)
 
 	go func() {
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			panic(err)
-		}
+		defer lis.Close()
 		go func() {
 			time.Sleep(du)
 			lis.Close()
@@ -781,8 +783,8 @@ func DebugMockHTTPWithTimeout(du time.Duration, rsp []byte) (string, int) {
 		lis.Close()
 	}()
 
-	err := WaitConnect(addr, 3)
-	if err != nil {
+	if err = WaitConnect(addr, 3); err != nil {
+		lis.Close()
 		panic(err)
 	}
 	return host, port
