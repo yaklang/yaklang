@@ -21,7 +21,8 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 	require.Equal(t, int64(64*1024*1024), opt.sqliteJournalSizeLimitBytes)
 	require.Equal(t, int64(256*1024), opt.sqliteCacheKiB, "SSA compile writes need a 256MB page cache, not the 32MB default")
 	require.Equal(t, int64(512*1024*1024), opt.sqliteMmapBytes)
-	require.Equal(t, 20000, opt.sqliteWALAutocheckpoint)
+	require.True(t, opt.sqliteWALAutocheckpointSet)
+	require.Equal(t, 0, opt.sqliteWALAutocheckpoint, "automatic checkpoints rewrite the growing database; SSA folds the WAL once at the end")
 
 	projectOpt := defaultDatabaseOpenOptions()
 	require.Equal(t, 1, projectOpt.sqliteMaxOpenConns)
@@ -65,7 +66,7 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 		err = conn.QueryRowContext(ctx, "PRAGMA wal_autocheckpoint").Scan(&checkpoint)
 		conn.Close()
 		require.NoError(t, err)
-		require.Equal(t, 20000, checkpoint, "connection %d checkpoint", i)
+		require.Equal(t, 0, checkpoint, "connection %d checkpoint", i)
 	}
 }
 

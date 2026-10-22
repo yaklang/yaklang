@@ -44,9 +44,12 @@ const (
 	// is already 2GB, and SSA never called that tuner. Hue's insert working
 	// set does not fit in the 8000-page (32MB) default, so every connection
 	// starts at the large-database tier.
-	ssaSQLiteCacheKiB          int64 = 256 * 1024
-	ssaSQLiteMmapBytes         int64 = 512 * 1024 * 1024
-	ssaSQLiteWALAutocheckpoint       = 20000
+	ssaSQLiteCacheKiB  int64 = 256 * 1024
+	ssaSQLiteMmapBytes int64 = 512 * 1024 * 1024
+	// 0 disables automatic checkpoints (sqlite.org: zero or negative turns
+	// wal_autocheckpoint off). Repeated checkpoints were copying the growing
+	// database back onto the slow disk; the compile folds the WAL once at the end.
+	ssaSQLiteWALAutocheckpoint = 0
 )
 
 var (
@@ -181,6 +184,7 @@ func ssaDatabaseOpenOptions() databaseOpenOptions {
 		sqliteCacheKiB:              ssaSQLiteCacheKiB,
 		sqliteMmapBytes:             ssaSQLiteMmapBytes,
 		sqliteWALAutocheckpoint:     ssaSQLiteWALAutocheckpoint,
+		sqliteWALAutocheckpointSet:  true,
 	}
 }
 

@@ -276,6 +276,12 @@ func (c *Config) parseProject() (progs Programs, err error) {
 				err = restoreErr
 			}
 		}
+		if checkpointErr := ssadb.CheckpointSQLiteWAL(ssadb.GetDB()); checkpointErr != nil {
+			log.Errorf("checkpoint sqlite wal: %v", checkpointErr)
+			if err == nil {
+				err = checkpointErr
+			}
+		}
 	}()
 
 	// Old IR rows must go before a full compile re-inserts under the same
