@@ -122,6 +122,21 @@ func (p *programSource) Paths() []string {
 	return p.paths
 }
 
+func (p *programSource) SharedBody(path string) (*memedit.SafeString, bool) {
+	if p == nil || p.prog == nil {
+		return nil, false
+	}
+	raw, ok := p.raw[path]
+	if !ok {
+		return nil, false
+	}
+	editor, err := p.prog.getEditor(raw, p.hash[path])
+	if err != nil || editor == nil || editor.SourceBody() == nil {
+		return nil, false
+	}
+	return editor.SourceBody(), true
+}
+
 func (p *programSource) Read(path string) (string, func(), error) {
 	if p == nil || p.prog == nil {
 		return "", nil, utils.Error("nil program source")

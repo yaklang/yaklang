@@ -16,7 +16,7 @@ import (
 // (including resume indices), and each query receives its own SFVM/root.
 func (m *scanManager) prepareSourceRuntimes() (map[ssaapi.SyntaxFlowQueryInstance]*sfpattern.SourceScanRuntime, func()) {
 	noop := func() {}
-	if m.Config.disableSourceScanRuntime || m.IsStop() {
+	if m.IsStop() {
 		return nil, noop
 	}
 	targets := m.Config.QueryTargets

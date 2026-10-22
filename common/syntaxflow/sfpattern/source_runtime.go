@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/minirehs"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
@@ -181,10 +182,18 @@ type storedSpan struct {
 	Text       string
 }
 
+// SharedBodySource is optional. A store that already owns an immutable body
+// (a compiled program editor, for example) lets the runtime reuse it.
+type SharedBodySource interface {
+	SharedBody(path string) (*memedit.SafeString, bool)
+}
+
 // SourceScanRuntime precomputes raw offsets for one immutable files snapshot.
 // It publishes only complete results by closing done. SFVM roots, values,
 // editors and batch cursors remain query-local, never shared between rules.
-// File bodies are borrowed from store and dropped after each file is scanned.
+// The first read of a path, including an empty body or a read error, is kept
+// for this scan only. Direct search, fallback, chained search and editors all
+// use that snapshot.
 type SourceScanRuntime struct {
 	plan    *SourceScanPlan
 	store   SourceStore
@@ -196,6 +205,18 @@ type SourceScanRuntime struct {
 	lookups atomic.Int64
 	mu      sync.Mutex
 	close   sync.Once
+
+	bodyMu sync.Mutex
+	bodies map[string]*sourceBody
+}
+
+// sourceBody is the one snapshot of a path. once publishes text, raw and err
+// together; later readers wait for that publication.
+type sourceBody struct {
+	once sync.Once
+	text string
+	raw  *memedit.SafeString
+	err  error
 }
 
 // Start begins the shared scan independently of any individual rule's context.
@@ -348,10 +369,7 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 					continue
 				}
 				func() {
-					content, release, err := r.store.Read(job.path)
-					if release != nil {
-						defer release()
-					}
+					content, _, err := r.body(job.path)
 					if err != nil {
 						log.Warnf("source pre-scan: skip %s: %v", job.path, err)
 						return
@@ -508,16 +526,77 @@ func locateContent(locator *regexp_utils.YakRegexpUtils, content string, capture
 	return hits, nil
 }
 
+// body returns the scan's one snapshot of path. The first caller reads the
+// store; everyone else, including a later rule, waits for that result.
+func (r *SourceScanRuntime) body(path string) (string, *memedit.SafeString, error) {
+	if r == nil || r.store == nil {
+		return "", nil, fmt.Errorf("source body %q is not available", path)
+	}
+	r.bodyMu.Lock()
+	if r.bodies == nil {
+		r.bodies = make(map[string]*sourceBody)
+	}
+	cached := r.bodies[path]
+	if cached == nil {
+		cached = &sourceBody{}
+		r.bodies[path] = cached
+	}
+	r.bodyMu.Unlock()
+	cached.once.Do(func() {
+		if shared, ok := r.store.(SharedBodySource); ok {
+			if raw, ok := shared.SharedBody(path); ok && raw != nil {
+				cached.raw = raw
+				cached.text = raw.String()
+				return
+			}
+		}
+		content, release, err := r.store.Read(path)
+		if release != nil {
+			defer release()
+		}
+		if err != nil {
+			cached.err = err
+			return
+		}
+		cached.raw = memedit.NewSafeString(content)
+		cached.text = cached.raw.String()
+	})
+	return cached.text, cached.raw, cached.err
+}
+
+func sharedScanFiles(root *sfvm.PatternRoot, files map[string]string) map[string]string {
+	if root != nil && root.UsesSharedBody() {
+		return nil
+	}
+	return files
+}
+
+func (r *SourceScanRuntime) bind(root *sfvm.PatternRoot) {
+	if r == nil || root == nil {
+		return
+	}
+	root.SetFileReader(func(path string) (string, error) {
+		text, _, err := r.body(path)
+		return text, err
+	})
+	root.SetSharedSource(func(path string) (*memedit.SafeString, error) {
+		_, raw, err := r.body(path)
+		return raw, err
+	})
+}
+
 // Matcher decorates only PatternRoot's direct searches. Unknown requests still
-// use the existing matcher. A completed empty result is handled, not a miss.
-// Cancellation stops this caller's wait, not the shared scan.
+// use the existing matcher, reading the same cached body. A completed empty
+// result is handled, not a miss. Cancellation stops this caller's wait, not
+// the shared scan.
 func (r *SourceScanRuntime) Matcher(ctx context.Context) sfvm.FileFilterFunc {
 	return func(root *sfvm.PatternRoot, files map[string]string, path, matchType string, params map[string]string, patterns []string) (sfvm.Values, error) {
+		r.bind(root)
 		key := directSearchKey(path, params, patterns)
 		search, ok := r.plan.searches[key]
 		matchType = strings.ToLower(matchType)
 		if !ok || (matchType != "regexp" && matchType != "re" && matchType != "pattern_regex" && matchType != "pattern-regex" && matchType != "") {
-			return MatchFileFilter(root, files, path, matchType, params, patterns)
+			return MatchFileFilter(root, sharedScanFiles(root, files), path, matchType, params, patterns)
 		}
 		if err := r.Wait(ctx); err != nil {
 			return nil, err

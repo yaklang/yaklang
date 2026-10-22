@@ -29,7 +29,6 @@ var Exports = map[string]any{
 	"withCompiledSource":           WithCompiledSource,
 	"withScanSourceFiles":          WithSourceFiles,
 	"withScanSourceDir":            WithSourceDir,
-	"withSourceScanRuntime":        WithSourceScanRuntime,
 	"withScanQueryTargets":         WithQueryTargets,
 	"withScanConcurrency":          ssaconfig.WithScanConcurrency,
 	"withScanRuleTimeout":          ssaconfig.WithScanRuleTimeout,

@@ -104,6 +104,36 @@ func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
 	return editor
 }
 
+// NewMemEditorFromSafeString builds an editor over an existing immutable body.
+// The SafeString is not copied, so each rule can keep its own editor and line
+// map while every editor of one file reads the same bytes.
+func NewMemEditorFromSafeString(source *SafeString, fileUrl string) *MemEditor {
+	if source == nil {
+		source = NewSafeString("")
+	}
+	editor := &MemEditor{safeSourceCode: source}
+	if fileUrl != "" {
+		editor.SetUrl(fileUrl)
+	}
+	return editor
+}
+
+// SourceBody returns the immutable text this editor reads.
+func (ve *MemEditor) SourceBody() *SafeString {
+	if ve == nil {
+		return nil
+	}
+	return ve.safeSourceCode
+}
+
+// SameSource reports whether both editors reference one immutable body.
+func (ve *MemEditor) SameSource(other *MemEditor) bool {
+	if ve == nil || other == nil || ve.safeSourceCode == nil {
+		return false
+	}
+	return ve.safeSourceCode == other.safeSourceCode
+}
+
 func (ve *MemEditor) ensureLineMappings() {
 	ve.getLineMappings()
 }

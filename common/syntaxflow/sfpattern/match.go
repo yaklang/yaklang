@@ -212,8 +212,12 @@ func sourceHitsToValues(root *sfvm.PatternRoot, hits []Hit) (sfvm.Values, error)
 			h.End,
 			root.SourceHitEditor(h.Path),
 		)
-		sv.SetFiles(root.Files())
-		sv.SetFileReader(root.FileReader())
+		if root != nil && root.UsesSharedBody() {
+			sv.SetFileReader(root.FileReader())
+		} else {
+			sv.SetFiles(root.Files())
+			sv.SetFileReader(root.FileReader())
+		}
 		vals = append(vals, sv)
 	}
 	return sfvm.NewValues(vals), nil

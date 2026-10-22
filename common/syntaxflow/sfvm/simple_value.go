@@ -370,6 +370,7 @@ type PatternRoot struct {
 	files            map[string]string
 	paths            []string
 	readFile         func(string) (string, error)
+	sharedSource     func(string) (*memedit.SafeString, error)
 	matcher          FileFilterFunc
 	programName      string
 	sourceMu         sync.RWMutex
@@ -489,11 +490,20 @@ func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
 	}
 	r.sourceMu.Unlock()
 	// Read outside the lock. The reader may block on the in-flight cap.
-	content, err := r.FileContent(path)
-	if err != nil {
-		return nil
+	var editor *memedit.MemEditor
+	if r.sharedSource != nil {
+		raw, err := r.sharedSource(path)
+		if err != nil || raw == nil {
+			return nil
+		}
+		editor = memedit.NewMemEditorFromSafeString(raw, path)
+	} else {
+		content, err := r.FileContent(path)
+		if err != nil {
+			return nil
+		}
+		editor = memedit.NewMemEditorWithFileUrl(content, path)
 	}
-	editor := memedit.NewMemEditorWithFileUrl(content, path)
 	r.sourceMu.Lock()
 	defer r.sourceMu.Unlock()
 	if r.sourceHitEditors == nil {
@@ -524,6 +534,25 @@ func (r *PatternRoot) SetFileSource(paths []string, read func(string) (string, e
 	r.readFile = read
 }
 
+// SetFileReader replaces only the body reader. The path list stays put.
+func (r *PatternRoot) SetFileReader(read func(string) (string, error)) {
+	if r != nil {
+		r.readFile = read
+	}
+}
+
+// SetSharedSource supplies the one immutable body editors of this root share.
+func (r *PatternRoot) SetSharedSource(get func(string) (*memedit.SafeString, error)) {
+	if r != nil {
+		r.sharedSource = get
+	}
+}
+
+// UsesSharedBody reports whether file reads and editors go through one body.
+func (r *PatternRoot) UsesSharedBody() bool {
+	return r != nil && r.sharedSource != nil
+}
+
 // FileReader returns the on-demand reader, or nil when the root only has a map.
 func (r *PatternRoot) FileReader() func(string) (string, error) {
 	if r == nil {
@@ -552,6 +581,9 @@ func (r *PatternRoot) FilePaths() []string {
 func (r *PatternRoot) FileContent(path string) (string, error) {
 	if r == nil {
 		return "", utils.Error("nil pattern root")
+	}
+	if r.sharedSource != nil && r.readFile != nil {
+		return r.readFile(path)
 	}
 	if content, ok := r.files[path]; ok {
 		return content, nil
