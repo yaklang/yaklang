@@ -13,3 +13,5 @@
 {{ if .FunctionCallMode }}使用原生 function call，通过函数名选择 action，参数放在 arguments；adjust_todolist 仅维护协调员微观事项。
 {{ else }}使用文本流 JSON @action，参数遵循 SCHEMA，流式字段遵循主循环 AITAG/Nonce；todo_delta 仅维护微观事项。
 {{ end }}不要把完整任务树、报告正文或大结果重复写到微观 TODO、feedback 和消息。
+
+用户澄清仅使用当前可用的 ask_for_clarification / ask_for_clarification_async。优先异步：立即返回，回答稍后作为普通用户消息到达，继续独立工作，不要等待、轮询或重复提问。同步、异步共用调用额度（每批最多三题计一次）；PLAN 阶段受 AllowPlanUserInteract 和规划次数限制，执行阶段禁止阻塞。没有暴露的提问入口不可绕过。跳过、超时、取消均不是同意。
