@@ -101,3 +101,27 @@ func TestUIFormEnumArrayRejectsEmptyAndDuplicateChoices(t *testing.T) {
 	require.NoError(t, err)
 	require.Contains(t, text, "数据流")
 }
+
+func TestUIUnusableFormsPreserveValidSiblings(t *testing.T) {
+	for _, fields := range []string{
+		`{"properties":{"name":{"type":"array"}},"required":["name"]}`,
+		`{"properties":{"name":{"type":"string"}},"required":["missing"]}`,
+		`{"properties":{"name":{"type":"number","minimum":10,"maximum":1}},"required":["name"]}`,
+	} {
+		t.Run(fields, func(t *testing.T) {
+			catalog := testCatalog(t)
+			var form map[string]any
+			require.NoError(t, json.Unmarshal([]byte(fields), &form))
+			form["type"], form["additionalProperties"] = "object", false
+			doc := ComponentDocument{ID: "invalid-form", CatalogVersion: catalog.Version, Fallback: "继续阅读", Root: "root", Nodes: []ComponentNode{
+				{ID: "root", Component: "Stack", Props: map[string]any{}, Children: []string{"form", "note"}},
+				{ID: "form", Component: "ParameterForm", Props: map[string]any{"schema": form}},
+				{ID: "note", Component: "Text", Props: map[string]any{"text": "仍然可读"}},
+			}}
+			normalized, diagnostics := catalog.Normalize(doc)
+			require.NotEmpty(t, diagnostics)
+			require.Len(t, normalized.Nodes, 2)
+			require.Equal(t, []string{"note"}, normalized.Nodes[0].Children)
+		})
+	}
+}
