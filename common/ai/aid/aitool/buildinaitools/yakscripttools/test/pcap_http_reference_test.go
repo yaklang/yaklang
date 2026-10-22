@@ -83,4 +83,33 @@ func TestPCAPHTTPDGAFixtureUsesStructuredWorkflow(t *testing.T) {
 		require.NoError(t, err)
 		require.Contains(t, string(encoded), "db54a845.top")
 	}
+	bodyPage := invoke("query_pcapdb", map[string]any{
+		"id": page.DatasetID, "query_type": "body_summary", "record_id": 7, "result_bytes": 65536,
+	}).(*pcapdb.ResultPage[pcapdb.ProtocolBodySummary])
+	require.Nil(t, bodyPage.Error)
+	require.Len(t, bodyPage.Items, 1)
+	body := bodyPage.Items[0]
+	require.Equal(t, "POST", body.Method)
+	require.Equal(t, "application/x-www-form-urlencoded", body.ContentType)
+	require.NotNil(t, body.DeclaredBodyBytes)
+	require.EqualValues(t, 4464, *body.DeclaredBodyBytes)
+	require.Equal(t, 4464, body.WireBodyBytes)
+	require.Equal(t, 4464, body.DecodedBodyBytes)
+	require.True(t, body.TransferComplete)
+	require.True(t, body.DecodedComplete)
+	require.Equal(t, "eb563e11423ebbc793348c40a7bd6204682ef023912118be47dc4411b9f8ceb6", body.MessageSHA256)
+	require.Equal(t, "3fa31e8d261fafbf21a297c2492c852fce2b9de6879a6965f204b99451d17179", body.WireBodySHA256)
+	require.Equal(t, body.WireBodySHA256, body.DecodedBodySHA256)
+	require.True(t, body.EncodedForm)
+	require.True(t, body.PercentEncoded)
+	require.False(t, body.Compressed)
+	require.False(t, body.Binary)
+	require.True(t, body.TextLike)
+	require.True(t, body.Sensitive)
+	require.Contains(t, body.SensitiveIndicators, "user-identifier")
+	require.Contains(t, body.SensitiveIndicators, "encoded-payload")
+	encoded, err := json.Marshal(bodyPage)
+	require.NoError(t, err)
+	require.NotContains(t, string(encoded), "IEUser")
+	require.NotContains(t, string(encoded), "IAAAAE")
 }
