@@ -2,9 +2,10 @@ package damenggorm
 
 import "strings"
 
-// SSA owns uppercase DM object names, including raw SQL paths whose quoted
-// identifiers were written for PostgreSQL. Values and comments are untouched.
-func normalizeIdentifiers(query string) string {
+// NormalizeQuery applies SSA's uppercase object policy to its owned native SQL
+// templates. It is not a driver hook: values, comments and bound data are not
+// rewritten by the connection layer.
+func NormalizeQuery(query string) string {
 	var out strings.Builder
 	for i := 0; i < len(query); {
 		start := i

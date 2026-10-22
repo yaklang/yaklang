@@ -88,6 +88,50 @@ func TestSaveIrCodeBatch_UpsertFailurePreservesExisting(t *testing.T) {
 	require.Equal(t, "old", got.Name)
 }
 
+func TestSaveIrCodeBatch_LateFailureRollsBackEveryChunk(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{CodeID: 1, ProgramName: "prog", Name: "original"}}))
+	var before IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 1).First(&before).Error)
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_late_ir_code BEFORE INSERT ON ir_codes
+		WHEN NEW.name = 'reject' BEGIN SELECT RAISE(ABORT, 'rejected late IR code'); END`).Error)
+
+	items := make([]*IrCode, 0, irCodeBatchChunk+2)
+	for id := 1; id <= irCodeBatchChunk+1; id++ {
+		items = append(items, &IrCode{CodeID: int64(id), ProgramName: "prog", Name: "replacement"})
+	}
+	items = append(items, &IrCode{CodeID: int64(irCodeBatchChunk + 2), ProgramName: "prog", Name: "reject"})
+	require.ErrorContains(t, SaveIrCodeBatch(db, items), "rejected late IR code")
+
+	var after IrCode
+	require.NoError(t, db.Where("program_name = ? AND code_id = ?", "prog", 1).First(&after).Error)
+	require.Equal(t, before.ID, after.ID)
+	require.True(t, before.CreatedAt.Equal(after.CreatedAt))
+	require.Equal(t, "original", after.Name)
+	var count int
+	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", "prog").Count(&count).Error)
+	require.Equal(t, 1, count, "successful earlier chunks must be rolled back with the rejected final row")
+}
+
+func TestSaveIrCodeBatch_CallerOwnsTransaction(t *testing.T) {
+	db := setupIrCodeTestDB(t)
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, SaveIrCodeBatch(tx, []*IrCode{{CodeID: 1, ProgramName: "prog", Name: "rolled back"}}))
+	require.NoError(t, tx.Rollback().Error, "the batch must leave a caller-owned transaction open")
+	var count int
+	require.NoError(t, db.Model(&IrCode{}).Count(&count).Error)
+	require.Zero(t, count)
+
+	tx = db.Begin()
+	require.NoError(t, tx.Error)
+	require.NoError(t, SaveIrCodeBatch(tx, []*IrCode{{CodeID: 1, ProgramName: "prog", Name: "committed first"}}))
+	require.NoError(t, SaveIrCodeBatch(tx, []*IrCode{{CodeID: 2, ProgramName: "prog", Name: "committed second"}}))
+	require.NoError(t, tx.Commit().Error)
+	require.NoError(t, db.Model(&IrCode{}).Count(&count).Error)
+	require.Equal(t, 2, count)
+}
+
 func TestSaveIrCodeBatch_UpsertRestoresDeletedRowInPlace(t *testing.T) {
 	db := setupIrCodeTestDB(t)
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{

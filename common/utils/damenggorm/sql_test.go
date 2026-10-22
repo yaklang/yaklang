@@ -13,7 +13,7 @@ func TestIdentifierNormalizationDoesNotChangePayloads(t *testing.T) {
 		{`SELECT '"source"', 'it''s "quoted"' FROM "ir_codes"`, `SELECT '"source"', 'it''s "quoted"' FROM "IR_CODES"`},
 		{"SELECT \"id\" -- \"keep\"\nFROM \"ir_codes\" /* \"keep\" */", "SELECT \"ID\" -- \"keep\"\nFROM \"IR_CODES\" /* \"keep\" */"},
 	} {
-		require.Equal(t, test.want, normalizeIdentifiers(test.query))
+		require.Equal(t, test.want, NormalizeQuery(test.query))
 	}
 }
 

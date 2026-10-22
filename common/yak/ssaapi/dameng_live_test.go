@@ -12,7 +12,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -48,7 +50,11 @@ func openLiveIR(t *testing.T, backend string) {
 	}
 	db, err := consts.CreateSSAProjectDatabaseRaw(strings.TrimSpace(string(raw)))
 	require.NoError(t, err)
-	require.Equal(t, backend, db.Dialect().GetName())
+	if backend == "dm" {
+		require.True(t, damenggorm.IsDM(db), "SSA DM URLs must use the registered SSA dialect policy")
+	} else {
+		require.Equal(t, backend, db.Dialect().GetName())
+	}
 	ssadb.SetDB(db)
 	t.Cleanup(func() { require.NoError(t, db.Close()) })
 }
@@ -125,53 +131,135 @@ func TestDMIRBatchFailurePreservesPreviousRows(t *testing.T) {
 	db := ssadb.GetDB()
 	t.Cleanup(func() { require.NoError(t, ssadb.DeleteProgramChecked(db, name)) })
 	require.NoError(t, ssadb.SaveIrCodeBatch(db, []*ssadb.IrCode{{ProgramName: name, CodeID: 1, Name: "original"}}))
+	var before ssadb.IrCode
+	require.NoError(t, db.Where("program_name=? AND code_id=?", name, 1).First(&before).Error)
+	require.NotZero(t, before.ID)
+	changed := before
+	changed.ID += 1000000 // Natural-key MERGE must ignore stale caller identities.
+	changed.CreatedAt = before.CreatedAt.Add(-24 * time.Hour)
+	changed.Name = "updated"
+	require.NoError(t, ssadb.SaveIrCodeBatch(db, []*ssadb.IrCode{&changed}))
+	var committed ssadb.IrCode
+	require.NoError(t, db.Where("program_name=? AND code_id=?", name, 1).First(&committed).Error)
+	require.Equal(t, before.ID, committed.ID)
+	require.True(t, before.CreatedAt.Equal(committed.CreatedAt), "MERGE must preserve stored creation time")
+	require.Equal(t, "updated", committed.Name)
+	constraint := addDMIRFailureCheck(t, db, ssadb.TableIrCodes, "opcode", name)
 	items := make([]*ssadb.IrCode, 0, 502)
 	for id := int64(1); id <= 501; id++ {
 		items = append(items, &ssadb.IrCode{ProgramName: name, CodeID: id, Name: "replacement"})
 	}
-	items = append(items, &ssadb.IrCode{ProgramName: name, CodeID: 501, Name: "duplicate"})
+	items = append(items, &ssadb.IrCode{ProgramName: name, CodeID: 502, Name: "rejected", Opcode: -1})
 	err := ssadb.SaveIrCodeBatch(db, items)
-	require.Error(t, err, "the unique invariant must reject the second row")
+	require.Error(t, err)
+	require.Contains(t, strings.ToUpper(err.Error()), strings.ToUpper(constraint), "the final distinct row must fail at the named CHECK")
 	var row ssadb.IrCode
 	require.NoError(t, db.Where("program_name=? AND code_id=?", name, 1).First(&row).Error)
-	require.Equal(t, "original", row.Name, "failed upsert must roll back its delete and inserts across all chunks")
+	require.Equal(t, "updated", row.Name, "failed MERGE must roll back updates and inserts across all chunks")
+	require.Equal(t, committed.ID, row.ID)
+	require.True(t, committed.CreatedAt.Equal(row.CreatedAt))
+	var count int64
+	require.NoError(t, db.Model(&ssadb.IrCode{}).Where("program_name=?", name).Count(&count).Error)
+	require.EqualValues(t, 1, count)
 }
 
-// A second flush carries the identity assigned by the previous write. DM must
-// generate a fresh identity for its replacement without attempting IDENTITY_INSERT.
+// A stale identity carried by a re-flushed struct must not replace the stored
+// identity or alter another natural key. Failed writes must leave the cache alone.
 func TestDMIRTypeBatchReuseAndRollback(t *testing.T) {
 	openLiveDMIR(t)
 	name := "dm-live-types-" + uuid.NewString()
 	db := ssadb.GetDB()
 	t.Cleanup(func() { require.NoError(t, ssadb.DeleteProgramChecked(db, name)) })
 	row := &ssadb.IrType{ProgramName: name, TypeId: 1, Kind: 1, String: "original"}
-	require.NoError(t, ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{nil, row}))
-	require.NotZero(t, row.ID)
+	other := &ssadb.IrType{ProgramName: name, TypeId: 2, Kind: 1, String: "untouched"}
+	require.NoError(t, ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{nil, row, other}))
+	require.Zero(t, row.ID, "natural-key SaveInBatches does not write generated identities back to caller structs")
+	var before, beforeOther ssadb.IrType
+	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 1).First(&before).Error)
+	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 2).First(&beforeOther).Error)
+	require.NotZero(t, before.ID)
+	row.ID = beforeOther.ID
+	row.CreatedAt = before.CreatedAt.Add(-24 * time.Hour)
 	row.Kind = 2
 	row.String = "updated"
 	require.NoError(t, ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{row, nil}))
+	require.Equal(t, beforeOther.ID, row.ID, "the caller struct remains caller-owned")
 	var count int64
 	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name=?", name).Count(&count).Error)
-	require.EqualValues(t, 1, count)
-	var stored ssadb.IrType
+	require.EqualValues(t, 2, count)
+	var stored, untouched ssadb.IrType
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 1).First(&stored).Error)
 	require.Equal(t, "updated", stored.String)
-	err := ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{
-		{ProgramName: name, TypeId: 1, String: "replacement"},
-		{ProgramName: name, TypeId: 1, String: "duplicate"},
-	})
+	require.Equal(t, before.ID, stored.ID)
+	require.True(t, before.CreatedAt.Equal(stored.CreatedAt))
+	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 2).First(&untouched).Error)
+	require.Equal(t, "untouched", untouched.String)
+	require.Equal(t, beforeOther.ID, untouched.ID)
+	constraint := addDMIRFailureCheck(t, db, ssadb.TableIrTypes, "kind", name)
+	items := make([]*ssadb.IrType, 0, 1002)
+	for id := uint64(1); id <= 1001; id++ {
+		items = append(items, &ssadb.IrType{ProgramName: name, TypeId: id, Kind: 1, String: "replacement"})
+	}
+	items = append(items, &ssadb.IrType{ProgramName: name, TypeId: 1002, Kind: -1, String: "rejected"})
+	err := ssadb.SaveIrTypeBatch(db, items)
 	require.Error(t, err)
+	require.Contains(t, strings.ToUpper(err.Error()), strings.ToUpper(constraint), "the final distinct row must fail at the named CHECK")
 	stored = ssadb.IrType{}
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 1).First(&stored).Error)
 	require.Equal(t, "updated", stored.String, "failed type batch must preserve the previous snapshot")
+	require.Equal(t, before.ID, stored.ID)
+	require.True(t, before.CreatedAt.Equal(stored.CreatedAt))
+	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name=?", name).Count(&count).Error)
+	require.EqualValues(t, 2, count, "earlier successful insert chunks must be rolled back")
 	cached, ok := ssadb.GetIrTypeCache(name).Get(1)
 	require.True(t, ok)
 	require.Equal(t, "updated", cached.String, "failed batch must not warm the type cache")
+	_, ok = ssadb.GetIrTypeCache(name).Get(3)
+	require.False(t, ok, "rolled-back new types must not enter the cache")
 	// Main now propagates index errors to the persistence barrier. Check the DM
 	// adapter returns an actual database error rather than silently swallowing it.
 	badIndex := &ssadb.IrIndex{ProgramName: name, ValueID: 1}
 	require.NoError(t, db.Create(badIndex).Error)
 	require.Error(t, ssadb.SaveIrIndexBatch(db, []*ssadb.IrIndex{nil, badIndex}), "reusing a primary key must propagate the insert conflict")
+}
+
+// This fixture-local CHECK creates a real database error after preceding MERGE
+// statements have succeeded; duplicate input keys can legitimately merge twice.
+func addDMIRFailureCheck(t *testing.T, db *gorm.DB, table, column, program string) string {
+	t.Helper()
+	require.NotContains(t, program, "'") // The generated fixture name is the only SQL literal below.
+	constraint := "ck_ssa_" + strings.ReplaceAll(uuid.NewString(), "-", "")[:20]
+	quote := db.Dialect().Quote
+	statement := "ALTER TABLE " + quote(table) + " ADD CONSTRAINT " + quote(constraint) +
+		" CHECK (" + quote("program_name") + " <> '" + program + "' OR " + quote(column) + " >= 0)"
+	require.NoError(t, db.Exec(statement).Error)
+	t.Cleanup(func() {
+		require.NoError(t, db.Exec("ALTER TABLE "+quote(table)+" DROP CONSTRAINT "+quote(constraint)).Error)
+	})
+	return constraint
+}
+
+func TestDMIRBatchRespectsCallerTransaction(t *testing.T) {
+	openLiveDMIR(t)
+	name := "dm-live-transaction-" + uuid.NewString()
+	db := ssadb.GetDB()
+	t.Cleanup(func() { require.NoError(t, ssadb.DeleteProgramChecked(db, name)) })
+	tx := db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	require.NoError(t, ssadb.SaveIrCodeBatch(tx, []*ssadb.IrCode{{ProgramName: name, CodeID: 1, Name: "rolled back"}}))
+	require.NoError(t, tx.Rollback().Error, "a successful batch must leave the caller transaction open")
+	var count int64
+	require.NoError(t, db.Model(&ssadb.IrCode{}).Where("program_name=?", name).Count(&count).Error)
+	require.Zero(t, count)
+	tx = db.Begin()
+	require.NoError(t, tx.Error)
+	defer tx.Rollback()
+	require.NoError(t, ssadb.SaveIrCodeBatch(tx, []*ssadb.IrCode{{ProgramName: name, CodeID: 1, Name: "first"}}))
+	require.NoError(t, ssadb.SaveIrCodeBatch(tx, []*ssadb.IrCode{{ProgramName: name, CodeID: 2, Name: "second"}}))
+	require.NoError(t, tx.Commit().Error)
+	require.NoError(t, db.Model(&ssadb.IrCode{}).Where("program_name=?", name).Count(&count).Error)
+	require.EqualValues(t, 2, count)
 }
 
 func TestDMIRTypeIndexUpgradePreservesRows(t *testing.T) {

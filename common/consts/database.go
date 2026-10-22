@@ -158,7 +158,7 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		if openErr != nil {
 			return nil, openErr
 		}
-		db, err = gorm.Open(driver, sqlDB)
+		db, err = gorm.Open(damenggorm.ORMName, sqlDB)
 		if err != nil {
 			_ = sqlDB.Close()
 		}

@@ -20,16 +20,21 @@ remain available through their existing DSNs.
 ## Optional native driver
 
 Build with `-tags dameng` to include the pinned native DM protocol driver. The
-ordinary engine build includes only our `database/sql` adapter and GORM dialect;
+ordinary engine build includes the GORM DM dialect and SSA policy;
 it does not import the DM SDK or its Go `plugin` cipher loader. Opening a DM URL
 without the tag returns `ErrNativeUnavailable` before connecting, with rebuild
 instructions. It never falls back to a local SQLite IR database.
 
-Only `native_dm.go` imports the SDK. Its driver identity and custom-dialer APIs
-are registered through package-private hooks; SSA and the rest of the adapter
-use standard database interfaces. This isolates the dependency at compile time;
-the upstream optional cipher loader remains in DM-enabled Linux/macOS binaries.
-The native authentication and transport implementations are retained unchanged.
+The published `github.com/yaklang/gorm/dialects/dameng` package owns the generic
+dialect, batches, native SDK registration and cancellation-safe connection pool.
+This integration uses [GORM v1.9.17](https://github.com/yaklang/gorm/releases/tag/v1.9.17),
+whose source commit is `8899a0c8da16583343d1f73f4e83a18038056be9`;
+`go.sum` records the public module and module-metadata checksums.
+Yaklang keeps only SSA policy here: the `dm_ssa` GORM alias preserves uppercase
+objects and payload sizes while URL and driver names remain `dm`. No second
+`dm` dialect or driver is registered. The optional cipher loader remains in
+DM-enabled Linux/macOS binaries; native authentication and transport stay in the
+upstream driver.
 
 The shared Linux product, portable and runtime musl build profiles include the
 `dameng` tag, so their binaries support DM, PostgreSQL and SQLite together. The
@@ -38,14 +43,16 @@ replacement or extra runtime library is required for those static binaries.
 
 ## Storage behavior
 
-- DM identifiers are quoted in uppercase; returned column labels are adapted
-  for GORM's field mapping. SQL literals, comments, and bound values are preserved.
+- DM identifiers are quoted in uppercase. The native SDK's
+  `columnNameCase=lower` option supplies labels for GORM's field mapping. SSA's
+  owned native read templates normalize quoted identifiers before execution;
+  connection and row wrappers do not rewrite SQL or values.
 - Unbounded text and JSON payloads use CLOBs bound as text. Indexed names use
   bounded VARCHAR columns, defaulting to `VARCHAR(1024)` when no size is declared.
   Identity columns are read back after each insert. Bulk IR writes use a
   transaction without assuming consecutive generated IDs.
-- Code/type replacement includes deletion and insertion in the same DM
-  transaction. A failed code batch preserves the previously stored rows.
+- Code/type batches use GORM's in-place DM MERGE inside the owning transaction.
+  Existing identities are retained, and a failed batch preserves previous rows.
 - Equivalent ordered-column indexes are reused. Existing duplicate data causes
   uniqueness installation to fail; it is not silently deleted. Migration errors
   fail initialization. This is not a general historical-schema conversion tool.

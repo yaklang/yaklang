@@ -10,12 +10,14 @@ import (
 )
 
 func setupIrTypeTestDB(t *testing.T) *gorm.DB {
+	t.Helper()
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
 	require.NoError(t, db.Exec(
 		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
 	).Error)
+	t.Cleanup(func() { require.NoError(t, db.Close()) })
 	return db
 }
 
@@ -117,6 +119,38 @@ func TestSaveIrTypeBatch_ReflushingTheSameStructKeepsRow(t *testing.T) {
 	assert.Equal(t, first.ID, second.ID)
 	assert.Equal(t, "v2", second.String)
 	assert.Equal(t, "other", untouched.String)
+}
+
+func TestSaveIrTypeBatch_LateFailurePreservesRowsAndCache(t *testing.T) {
+	db := setupIrTypeTestDB(t)
+	program := t.Name()
+	t.Cleanup(func() { deleteCache(program) })
+	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{TypeId: 1, ProgramName: program, String: "original"}}))
+	var before IrType
+	require.NoError(t, db.Where("program_name = ? AND type_id = ?", program, 1).First(&before).Error)
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_late_ir_type BEFORE INSERT ON ir_types
+		WHEN NEW.string = 'reject' BEGIN SELECT RAISE(ABORT, 'rejected late IR type'); END`).Error)
+
+	items := make([]*IrType, 0, irTypeBatchChunk+2)
+	for id := 1; id <= irTypeBatchChunk+1; id++ {
+		items = append(items, &IrType{TypeId: uint64(id), ProgramName: program, String: "replacement"})
+	}
+	items = append(items, &IrType{TypeId: uint64(irTypeBatchChunk + 2), ProgramName: program, String: "reject"})
+	require.ErrorContains(t, SaveIrTypeBatch(db, items), "rejected late IR type")
+
+	var after IrType
+	require.NoError(t, db.Where("program_name = ? AND type_id = ?", program, 1).First(&after).Error)
+	require.Equal(t, before.ID, after.ID)
+	require.True(t, before.CreatedAt.Equal(after.CreatedAt))
+	require.Equal(t, "original", after.String)
+	var count int
+	require.NoError(t, db.Model(&IrType{}).Where("program_name = ?", program).Count(&count).Error)
+	require.Equal(t, 1, count)
+	cached, ok := GetIrTypeCache(program).Get(1)
+	require.True(t, ok)
+	require.Equal(t, "original", cached.String, "a failed batch must preserve the previous cached snapshot")
+	_, ok = GetIrTypeCache(program).Get(2)
+	require.False(t, ok, "rolled-back rows must not enter the type cache")
 }
 
 func TestEnsureUniqueIrTypesIndex_RemovesDuplicatesKeepingOldest(t *testing.T) {

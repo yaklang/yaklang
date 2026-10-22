@@ -41,7 +41,19 @@ jobs:
             echo 'Default engine build unexpectedly includes the optional DM driver' >&2
             exit 1
           fi
-          go test -mod=readonly -race ./common/utils/damenggorm -count=1
+      - name: Verify SSA policy without the native driver
+        run: go test -mod=readonly -race ./common/utils/damenggorm -count=1 -timeout=2m
+      - name: Verify the public DM dialect without adding its test dependencies to the engine
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(go list -mod=readonly -m -f '{{.Version}}' github.com/yaklang/gorm)
+          work=$(mktemp -d "$RUNNER_TEMP/dm-gorm-tests.XXXXXX")
+          trap 'rm -rf "$work"' EXIT
+          cd "$work"
+          go mod init example.com/yaklang-dm-dialect-check
+          go mod edit -go=1.22 -require="github.com/yaklang/gorm@$version"
+          go test -mod=mod -race github.com/yaklang/gorm/dialects/dameng -count=1 -timeout=2m
 
   native-driver:
     runs-on: ubuntu-22.04
@@ -53,8 +65,19 @@ jobs:
           go-version-file: go.mod
           cache: true
       - uses: ./.github/actions/linux-pcap
-      - name: Verify native connection cancellation and adapter races
+      - name: Verify SSA policy with the native driver
         run: go test -mod=readonly -race -tags dameng ./common/utils/damenggorm -count=1 -timeout=2m
+      - name: Verify the public native driver's races in an isolated module
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(go list -mod=readonly -m -f '{{.Version}}' github.com/yaklang/gorm)
+          work=$(mktemp -d "$RUNNER_TEMP/dm-gorm-tests.XXXXXX")
+          trap 'rm -rf "$work"' EXIT
+          cd "$work"
+          go mod init example.com/yaklang-dm-native-check
+          go mod edit -go=1.22 -require="github.com/yaklang/gorm@$version"
+          go test -mod=mod -race -tags dameng github.com/yaklang/gorm/dialects/dameng -count=1 -timeout=2m
       - name: Compile native SSA tests with the supported Go version
         run: go test -mod=readonly -tags dameng ./common/yak/ssaapi -run '^$' -count=1
       - name: Check isolated glibc linker setup

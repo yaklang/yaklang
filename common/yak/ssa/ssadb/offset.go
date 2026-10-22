@@ -61,7 +61,7 @@ func SaveIrOffsetBatch(db *gorm.DB, items []*IrOffset) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	if err := createIRBatch(db, items, irOffsetBatchChunk); err != nil {
+	if err := db.CreateInBatches(items, irOffsetBatchChunk).Error; err != nil {
 		return err
 	}
 	return nil

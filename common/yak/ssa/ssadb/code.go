@@ -158,25 +158,22 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 	return SaveIrCodeBatch(db, []*IrCode{ir})
 }
 
-// irCodeBatchChunk bounds rows per CreateInBatches call. IrCode is a wide
+// irCodeBatchChunk bounds rows per SaveInBatches chunk. IrCode is a wide
 // model; 500 matches saveIrCodeInsertBatchSize and stays under SQLite's
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
 // SaveIrCodeBatch writes IR snapshots as batched in-place upserts on
-// (program_name, code_id) via gorm SaveInBatches (INSERT ... ON CONFLICT DO
-// UPDATE). Updating in place keeps row ids and their secondary-index entries
+// (program_name, code_id) via gorm SaveInBatches (native upsert or DM MERGE).
+// Updating in place keeps row ids and their secondary-index entries
 // stable across the resident-cache flush, and a rejected statement cannot first
 // remove the previous snapshot. The batch still inserts rows that do not exist
 // yet, so one call both publishes new IR and refreshes changed IR.
 // ux_ir_codes_program_code is created with the schema; SaveInBatches skips nil
-// elements itself. DM retains an atomic delete/insert fallback instead.
+// elements itself and owns one transaction unless a caller supplied one.
 func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
-	}
-	if db.Dialect().GetName() == "dm" {
-		return saveDMIRCodeBatch(db, items)
 	}
 	if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
