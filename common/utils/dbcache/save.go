@@ -264,18 +264,10 @@ func (s *Save[T]) processBuffer() {
 			bytes += n
 			if len(items) >= currentSaveSize || (byteBudget > 0 && bytes >= byteBudget) {
 				save(items)
-				if byteBudget <= 0 {
-					bufferSize := s.buffer.Len()
-					if bufferSize > currentSaveSize*2 {
-						currentSaveSize *= 10
-					} else if bufferSize > currentSaveSize {
-						currentSaveSize *= 5
-					} else if bufferSize <= saveSize {
-						currentSaveSize = saveSize
-					}
-				} else {
-					currentSaveSize = saveSize
-				}
+				// Stay at the configured size. Growing the batch (x5/x10) turned one
+				// SQLite transaction into 1e5 rows and held the write lock longer than
+				// busy_timeout, so the index flush failed with "database is locked".
+				currentSaveSize = saveSize
 				clearBatch()
 				resetTimer(timer, saveTime)
 			}

@@ -31,6 +31,10 @@ const (
 	ssaSQLiteMaxOpenConns = 8
 	ssaSQLiteSynchronous  = "NORMAL"
 	ssaSQLiteTxLock       = "immediate"
+	// Instruction batches can hold the write lock for well over the generic
+	// 10s busy_timeout. SSA waits 60s so the other store retries inside SQLite
+	// instead of failing with "database is locked".
+	ssaSQLiteBusyTimeoutMS = 60000
 )
 
 var (
@@ -151,10 +155,11 @@ func ssaDatabaseOpenOptions() databaseOpenOptions {
 	// defaultDatabaseOpenOptions() (single connection, synchronous=OFF,
 	// no _txlock). Injected via databaseOpenOptions so database.go stays generic.
 	return databaseOpenOptions{
-		sqliteMaxOpenConns: ssaSQLiteMaxOpenConns,
-		sqlitePrivateCache: true,
-		sqliteSynchronous:  ssaSQLiteSynchronous,
-		sqliteTxLock:       ssaSQLiteTxLock,
+		sqliteMaxOpenConns:  ssaSQLiteMaxOpenConns,
+		sqlitePrivateCache:  true,
+		sqliteSynchronous:   ssaSQLiteSynchronous,
+		sqliteTxLock:        ssaSQLiteTxLock,
+		sqliteBusyTimeoutMS: ssaSQLiteBusyTimeoutMS,
 	}
 }
 

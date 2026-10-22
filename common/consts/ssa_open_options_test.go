@@ -16,6 +16,7 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 	require.True(t, opt.sqlitePrivateCache)
 	require.Equal(t, ssaSQLiteSynchronous, opt.sqliteSynchronous)
 	require.Equal(t, ssaSQLiteTxLock, opt.sqliteTxLock)
+	require.Equal(t, 60000, opt.sqliteBusyTimeoutMS)
 
 	projectOpt := defaultDatabaseOpenOptions()
 	require.Equal(t, 1, projectOpt.sqliteMaxOpenConns)
@@ -36,6 +37,10 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 	var journalMode string
 	require.NoError(t, db.Raw("PRAGMA journal_mode").Row().Scan(&journalMode))
 	require.Equal(t, "wal", journalMode)
+
+	var busyTimeout int
+	require.NoError(t, db.Raw("PRAGMA busy_timeout").Row().Scan(&busyTimeout))
+	require.Equal(t, 60000, busyTimeout)
 }
 
 func TestSSADatabaseSynchronousNotOff(t *testing.T) {

@@ -45,10 +45,19 @@ type databaseOpenOptions struct {
 	// sqliteTxLock is the SQLite DSN _txlock value.
 	// Empty omits _txlock from the DSN.
 	sqliteTxLock string
+	// sqliteBusyTimeoutMS is PRAGMA busy_timeout. Zero keeps the 10s default.
+	sqliteBusyTimeoutMS int
 }
 
 func defaultDatabaseOpenOptions() databaseOpenOptions {
 	return databaseOpenOptions{sqliteMaxOpenConns: 1}
+}
+
+func sqliteBusyTimeout(options databaseOpenOptions) int {
+	if options.sqliteBusyTimeoutMS > 0 {
+		return options.sqliteBusyTimeoutMS
+	}
+	return 10000
 }
 
 func DeleteDatabaseFile(path string) error {
@@ -138,7 +147,7 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 		params := url.Values{
 			"mode":          []string{"rwc"},
 			"cache":         []string{cacheMode},
-			"_busy_timeout": []string{"10000"},
+			"_busy_timeout": []string{strconv.Itoa(sqliteBusyTimeout(options))},
 			"_synchronous":  []string{syncMode},
 			"_cache_size":   []string{"8000"},
 		}
@@ -262,7 +271,7 @@ func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databa
 		db.Exec("PRAGMA journal_mode = WAL;")
 		db.Exec("PRAGMA temp_store = MEMORY;")
 		db.Exec("PRAGMA cache_size = 8000;")
-		db.Exec("PRAGMA busy_timeout = 10000;")
+		db.Exec(fmt.Sprintf("PRAGMA busy_timeout = %d;", sqliteBusyTimeout(options)))
 	}
 }
 
