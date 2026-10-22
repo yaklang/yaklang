@@ -5,8 +5,10 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -67,4 +69,15 @@ func TestGenerateSignedCertReturnsLeafKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEMudhraEmbeddedMaterial(t *testing.T) {
+	chain, key := GetEMudhraCAAndKey()
+	require.Equal(t, "c83e14e82261ebb52ae8c0ed9bb306a3c2bc7543a6079443bab38200f89df585", fmt.Sprintf("%x", sha256.Sum256(chain)))
+	require.Equal(t, "5ca823f143cf31ac1d43f78c1d65d355f316243b0b7ac524d220df414194ef54", fmt.Sprintf("%x", sha256.Sum256(key)))
+	originalChain, originalKey := bytes.Clone(chain), bytes.Clone(key)
+	chain[0], key[0] = 0, 0
+	nextChain, nextKey := GetEMudhraCAAndKey()
+	require.Equal(t, originalChain, nextChain, "callers must not mutate the cached CA chain")
+	require.Equal(t, originalKey, nextKey, "callers must not mutate the cached signing key")
 }

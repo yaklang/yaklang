@@ -313,6 +313,8 @@ type MITMServer struct {
 	mitmConfig            *mitm.Config
 	caCert                []byte
 	caKey                 []byte
+	gmCACert              []byte
+	gmCAKey               []byte
 	dnsCache              *sync.Map
 	lowerHeaders          []string
 	http2                 bool

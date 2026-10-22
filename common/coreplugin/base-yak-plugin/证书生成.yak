@@ -145,18 +145,40 @@ if notAfter != "" {
 }
 // --- Group: 证书用途与名称 ---
 
-if dnslist != "" {
-    options = append(options, tls.alternativeDNS(str.Split(dnslist, ",")...))
+dnsNames := []
+for name in str.Split(dnslist, ",") {
+    name = str.TrimSpace(name)
+    if name != "" {
+        dnsNames = append(dnsNames, name)
+    }
 }
-if iplist != "" {
-    options = append(options, tls.alternativeIP(str.Split(iplist, ",")...))
+ipAddresses := []
+for ip in str.Split(iplist, ",") {
+    ip = str.TrimSpace(ip)
+    if ip == "" {
+        continue
+    }
+    if !str.IsIPv4(ip) && !str.IsIPv6(ip) {
+        die(sprintf("无效的 IP 地址：%s", ip))
+    }
+    // IPv6 可使用方括号输入，传给证书生成器时使用纯地址。
+    if str.HasPrefix(ip, "[") && str.HasSuffix(ip, "]") {
+        ip = str.TrimSuffix(str.TrimPrefix(ip, "["), "]")
+    }
+    ipAddresses = append(ipAddresses, ip)
+}
+if len(dnsNames) > 0 {
+    options = append(options, tls.alternativeDNS(dnsNames...))
+}
+if len(ipAddresses) > 0 {
+    options = append(options, tls.alternativeIP(ipAddresses...))
 }
 
 
 certType := certTypeInfo["kind"]
 var ca,key
 if certType == "EMudhraServer" {
-    if str.TrimSpace(dnslist) == "" && str.TrimSpace(iplist) == "" {
+    if len(dnsNames) == 0 && len(ipAddresses) == 0 {
         die("生成服务器证书需要填写 DNS 名称或 IP 地址（SAN）")
     }
     ca,key = tls.GenerateEMudhraServerCert(options...)~

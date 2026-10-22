@@ -17,6 +17,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	gmx509 "github.com/yaklang/yaklang/common/gmsm/x509"
 	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
 
@@ -134,5 +135,28 @@ func TestEMudhraHTTPSProxy(t *testing.T) {
 			require.Equal(t, "EM OV TLS CA - G3C", resp.TLS.PeerCertificates[0].Issuer.CommonName)
 			require.NotEmpty(t, resp.TLS.VerifiedChains)
 		})
+	}
+}
+
+func TestEMudhraPreservesCustomGMCA(t *testing.T) {
+	ca, key, err := tlsutils.GenerateGMSelfSignedCertKey("Custom GM CA")
+	require.NoError(t, err)
+	block, _ := pem.Decode(ca)
+	require.NotNil(t, block)
+	issuer, err := gmx509.ParseCertificate(block.Bytes)
+	require.NoError(t, err)
+	for _, enabled := range []bool{false, true} {
+		server, err := NewMITMServer(MITM_SetCaCertAndPrivKey(nil, nil, ca, key), MITM_UseEMudhra(enabled))
+		require.NoError(t, err)
+		config := server.mitmConfig.ObsoleteTLS("example.test", false)
+		hello := &gmtls.ClientHelloInfo{ServerName: "example.test", SupportedVersions: []uint16{gmtls.VersionGMSSL}}
+		for _, getCertificate := range []func(*gmtls.ClientHelloInfo) (*gmtls.Certificate, error){config.GetCertificate, config.GetKECertificate} {
+			cert, err := getCertificate(hello)
+			require.NoError(t, err)
+			leaf, err := gmx509.ParseCertificate(cert.Certificate[0])
+			require.NoError(t, err)
+			require.Equal(t, issuer.Subject.CommonName, leaf.Issuer.CommonName)
+			require.NoError(t, leaf.CheckSignatureFrom(issuer))
+		}
 	}
 }

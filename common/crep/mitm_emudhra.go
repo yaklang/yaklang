@@ -14,7 +14,7 @@ func MITM_UseEMudhra(enabled bool) MITMConfig {
 			return nil
 		}
 		ca, key := tlsutils.GetEMudhraCAAndKey()
-		if err := MITM_SetCaCertAndPrivKey(ca, key, nil, nil)(server); err != nil {
+		if err := MITM_SetCaCertAndPrivKey(ca, key, server.gmCACert, server.gmCAKey)(server); err != nil {
 			return err
 		}
 		log.Warn("MITM is using the compromised eMudhra CA for TLS trust testing; patched clients will reject it")
