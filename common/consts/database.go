@@ -154,7 +154,7 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 	var db *gorm.DB
 	var err error
 	if driver == damenggorm.Dialect {
-		sqlDB, openErr := damenggorm.OpenDB(path)
+		sqlDB, openErr := openDMSQLDatabase(path, damenggorm.OpenDB)
 		if openErr != nil {
 			return nil, openErr
 		}
@@ -226,6 +226,14 @@ func configureAndOptimizeDB(drive string, db *gorm.DB) {
 }
 
 func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databaseOpenOptions) {
+	if damenggorm.IsDialect(drive) {
+		// The DM factory configures its pool before handing it to GORM. SSA
+		// configures again after migration; preserve that caller-selected pool.
+		if db.DB().Stats().MaxOpenConnections == 0 {
+			defaultDMDatabasePool().apply(db.DB())
+		}
+		return
+	}
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
 	db.DB().SetConnMaxLifetime(time.Hour)
 	// SQLite must keep a single writer connection to avoid "database is locked" under concurrent writes.
