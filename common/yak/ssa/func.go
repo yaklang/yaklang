@@ -291,12 +291,19 @@ func (f *Function) SetMethod(is bool, objType Type) {
 		f.Type = NewFunctionType("", nil, nil, false)
 		f.Type.This = f
 	}
-	ft := f.Type
+	old := f.Type
 	f.typeMu.Unlock()
-	ft.receiverMu.Lock()
-	ft.IsMethod = is
-	ft.ObjectType = objType
-	ft.receiverMu.Unlock()
+	// The function's type value can be replaced after this (Go rebuilds it
+	// when the signature is parsed). Copy a binding made on the previous
+	// type forward, so the declaring receiver is not lost in the replacement.
+	if prev := old.boundReceiver(); prev != nil && objType == nil {
+		objType = prev
+	}
+	cur := f.functionType()
+	if cur == nil {
+		cur = old
+	}
+	cur.setMethodBinding(is, objType)
 }
 
 func (f *Function) SetVerboseName(name string) {

@@ -76,8 +76,8 @@ func TestAntlrCacheResetDefaults(t *testing.T) {
 	t.Cleanup(resetAntlrCacheResetConfigForTest)
 	resetAntlrCacheResetConfigForTest()
 
-	require.Equal(t, 25, antlrCacheResetEveryFiles())
-	require.Equal(t, int64(8*1024*1024), antlrCacheResetEveryBytes())
+	require.Equal(t, 0, antlrCacheResetEveryFiles())
+	require.Equal(t, int64(64*1024*1024), antlrCacheResetEveryBytes())
 }
 
 func TestAntlrCacheResetEnvParsing(t *testing.T) {

@@ -1419,13 +1419,33 @@ type FunctionType struct {
 var _ Type = (*FunctionType)(nil)
 
 func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
+	f.setMethodBinding(isMethod, obj)
+}
+
+// setMethodBinding records whether the function is a method and, once, the
+// type that declares it. Lookup resolves one function through every type that
+// embeds or aliases it and reports that lookup type here, so a later caller in
+// a parallel compile would otherwise overwrite the declaring type. A call site
+// learns its own receiver from the member it called, not from this field.
+func (f *FunctionType) setMethodBinding(isMethod bool, obj Type) {
 	if f == nil {
 		return
 	}
 	f.receiverMu.Lock()
+	defer f.receiverMu.Unlock()
 	f.IsMethod = isMethod
-	f.ObjectType = obj
-	f.receiverMu.Unlock()
+	if f.ObjectType == nil {
+		f.ObjectType = obj
+	}
+}
+
+func (f *FunctionType) boundReceiver() Type {
+	if f == nil {
+		return nil
+	}
+	f.receiverMu.RLock()
+	defer f.receiverMu.RUnlock()
+	return f.ObjectType
 }
 
 func (f *FunctionType) AddFullTypeName(name string) {

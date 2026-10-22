@@ -7,6 +7,23 @@ import (
 	"testing"
 )
 
+// TestSetMethodKeepsTheDeclaringReceiver pins the receiver a method
+// reports. Lookup calls SetMethod with the type it searched through, which
+// for an embedded or aliased field is not the type that declared the
+// method. The last such call must not replace the declaring type: call
+// sites take their own receiver from the member they called.
+func TestSetMethodKeepsTheDeclaringReceiver(t *testing.T) {
+	declaring := NewObjectType()
+	lookedUp := NewObjectType()
+	fn := NewFunctionWithType("Get", NewFunctionType("Get", nil, nil, false))
+
+	fn.SetMethod(true, declaring)
+	fn.SetMethod(true, lookedUp)
+
+	require.True(t, fn.IsMethod())
+	require.Equal(t, declaring, fn.Type.boundReceiver())
+}
+
 func TestTypeMethodsPublishStableSnapshots(t *testing.T) {
 	typ := NewBaseType()
 	const count = 32

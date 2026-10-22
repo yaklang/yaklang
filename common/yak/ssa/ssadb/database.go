@@ -50,6 +50,10 @@ func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
+	// gorm.Open copies gorm.DefaultCallback exactly once and never re-reads
+	// it, so the timing callbacks have to be on the default before the SSA
+	// database opens. Importing ssadb is what triggers the open.
+	EnsureDBOpCallbacks(nil)
 }
 
 // patchIrSourceQuotedCode patches the QuotedCode column type based on database dialect

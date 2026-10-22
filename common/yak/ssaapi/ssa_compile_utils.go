@@ -100,7 +100,14 @@ func beginCompileGCPercent(percent int) (int, func()) {
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
-		antlrCacheResetEveryFilesCached = 25
+		// Resetting on a fixed file count throws away a DFA the worker just
+		// paid to learn, and the next files rebuild it from scratch. That
+		// dominated allocation on projects below the large-project threshold
+		// (37GB of ATN prediction objects on a 13MB tree). The cache is now
+		// kept for the worker's lifetime and only dropped when it grows past
+		// the byte budget below. YAK_ANTLR_CACHE_RESET_FILES still forces the
+		// old periodic reset.
+		antlrCacheResetEveryFilesCached = 0
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_FILES")); raw != "" {
 			if v, err := strconv.Atoi(raw); err == nil {
 				antlrCacheResetEveryFilesCached = v
@@ -115,7 +122,10 @@ func antlrCacheResetEveryFiles() int {
 
 func antlrCacheResetEveryBytes() int64 {
 	antlrCacheResetEveryBytesOnce.Do(func() {
-		antlrCacheResetEveryBytesCached = 8 * 1024 * 1024
+		// Upper bound on how much source one worker parses before its DFA and
+		// prediction-context cache are dropped. This caps cache memory without
+		// the periodic rebuild the old 8MB default caused.
+		antlrCacheResetEveryBytesCached = 64 * 1024 * 1024
 		if raw := strings.TrimSpace(os.Getenv("YAK_ANTLR_CACHE_RESET_BYTES")); raw != "" {
 			switch strings.ToLower(raw) {
 			case "0", "false", "no", "off", "disable", "disabled":
