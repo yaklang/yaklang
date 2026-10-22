@@ -127,7 +127,7 @@ func renderCompressionGuide(snapshot *timelineCompressionSnapshot, options Timel
 		}
 	}
 	b.WriteString("\n# 普通历史 ID 从哪里看\n")
-	b.WriteString("不要在这里重复列出普通历史。retain_timeline 的数字 ID 从上文 Timeline Memory 的 Frozen Prefix 和 Open Tail 分析：每条普通历史以 `HH:MM:SS [类型]` 开头，后面是已经给出的正文，这条记录的 timeline item ID 就是要填写的 ID。\n")
+	b.WriteString("不要在这里重复列出普通历史。retain_timeline 使用上文 Timeline Memory 的 Frozen Prefix 和 Open Tail 中每条普通历史标题里的 `[item_id:N]` 数字 N；标题格式是 `HH:MM:SS [类型] [item_id:N]`，不要把时间、工具调用 id 或块标签当作历史 ID。\n")
 	b.WriteString("可以写单个 ID 或闭区间，多个散落段用逗号组合，例如 \"3-8,12,20-26,37,41-45\"。空字符串表示全部由 summary 概括。范围只选择普通历史，不影响夹在其中的技能、证据或用户输入。一条工具调用及其结果按整条保留，不拆开。\n")
 	if len(snapshot.Items) == 0 {
 		b.WriteString("（没有可概括的普通历史）\n")

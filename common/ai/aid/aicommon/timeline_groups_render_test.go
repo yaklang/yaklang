@@ -37,6 +37,26 @@ func makeToolResult(id int64, name string, success bool, data string) *aitool.To
 	}
 }
 
+func TestTimelineCompressionRetentionIDsVisibleInPrompt(t *testing.T) {
+	tl := NewTimeline(nil, nil)
+	ids := []int64{90731007, 90731031, 90731069}
+	for _, id := range ids[:2] {
+		tl.PushText(id, "record-%x", id)
+	}
+	tl.FreezeAll()
+	frozen := RenderTimelineFrozenOpen(tl).Frozen
+	tl.PushText(ids[2], "record-%x", ids[2])
+	view := RenderTimelineFrozenOpen(tl)
+	require.Equal(t, frozen, view.Frozen, "appending a record must preserve the frozen prefix")
+	for i, id := range ids {
+		body := view.Frozen
+		if i == 2 {
+			body = view.Open
+		}
+		require.Contains(t, body, fmt.Sprintf("[item_id:%d]\nrecord-%x", id, id))
+	}
+}
+
 // TestGroupByMinutes_EmptyTimeline 空 timeline 不应产生任何 block
 // 关键词: GroupByMinutes 空 timeline 边界
 func TestGroupByMinutes_EmptyTimeline(t *testing.T) {

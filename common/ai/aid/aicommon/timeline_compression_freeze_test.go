@@ -126,7 +126,8 @@ func TestTimelineFreezeRestoreForkRollbackAndRemap(t *testing.T) {
 	next := int64(100)
 	restored.ReassignIDs(func() int64 { next++; return next })
 	require.Equal(t, int64(102), restored.Freeze().ThroughID)
-	require.Equal(t, frozen.Frozen, RenderTimelineFrozenOpen(restored).Frozen)
+	require.Equal(t, strings.ReplaceAll(frozen.Frozen, "[item_id:1]", "[item_id:101]"), RenderTimelineFrozenOpen(restored).Frozen,
+		"restored records must expose their reassigned IDs while retaining the block boundary")
 	require.Equal(t, frozen.PromotedRecentTools, RenderTimelineFrozenOpen(restored).PromotedRecentTools)
 	require.Contains(t, RenderTimelineFrozenOpen(restored).Open, "tail")
 	fork, err := tl.ForkForTask("child", "test", nil, nil)
