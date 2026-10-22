@@ -389,6 +389,9 @@ func (r *PatternRoot) SetSourceHitBatch(offset, limit int) {
 	defer r.sourceMu.Unlock()
 	r.sourceHitOffset = max(0, offset)
 	r.sourceHitLimit = max(0, limit)
+	// Each feed may access multiple independent direct searches. Recompute
+	// their maximum for this window instead of letting the last one win.
+	r.sourceHitTotal = 0
 }
 
 // SourceHitBatch returns the current raw-hit window and its total.
@@ -418,9 +421,8 @@ func (r *PatternRoot) SetSourceHits(key string, hits []SourceHit) {
 	if _, ok := r.sourceHitCaches[key]; !ok {
 		r.sourceHitCaches[key] = append([]SourceHit(nil), hits...)
 	}
-	// sourceHitTotal tracks the size of the most recently accessed cache entry,
-	// which is what the batch window slices in sourceHitsToValues.
-	r.sourceHitTotal = len(r.sourceHitCaches[key])
+	// A smaller later search must not truncate the other searches' windows.
+	r.sourceHitTotal = max(r.sourceHitTotal, len(r.sourceHitCaches[key]))
 }
 
 // SourceHits returns cached raw hits when the filter key matches.
@@ -428,13 +430,13 @@ func (r *PatternRoot) SourceHits(key string) ([]SourceHit, bool) {
 	if r == nil {
 		return nil, false
 	}
-	r.sourceMu.RLock()
-	defer r.sourceMu.RUnlock()
+	r.sourceMu.Lock()
+	defer r.sourceMu.Unlock()
 	hits, ok := r.sourceHitCaches[key]
 	if !ok {
 		return nil, false
 	}
-	r.sourceHitTotal = len(hits)
+	r.sourceHitTotal = max(r.sourceHitTotal, len(hits))
 	return hits, true
 }
 

@@ -71,6 +71,9 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
 
+	sourceRuntimes, closeSourceRuntimes := m.prepareSourceRuntimes()
+	defer closeSourceRuntimes()
+
 	var errs error
 	var taskIndex atomic.Int64
 	var concurrency int
@@ -110,11 +113,20 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 					log.Errorf("SyntaxFlow Scan Failed:the query target is nil")
 					return
 				}
-				m.Query(rule, target)
+				var options []ssaapi.QueryOption
+				if rule.IsSourceMode() && sourceRuntimes[target] != nil {
+					options = append(options, ssaapi.QueryWithSourceScanRuntime(sourceRuntimes[target]))
+				}
+				m.Query(rule, target, options...)
 			}(rule, target)
 		}
 	}
 	swg.Wait()
+	for _, runtime := range sourceRuntimes {
+		if err := runtime.Wait(m.ctx); err != nil {
+			errs = errors.Join(errs, err)
+		}
+	}
 	return errs
 }
 
@@ -163,7 +175,7 @@ func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	}
 }
 
-func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
+func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance, queryOptions ...ssaapi.QueryOption) {
 	targetName := queryTargetName(target)
 	if !ruleMatchesQueryTarget(rule, target) {
 		m.skipRule(targetName, rule.RuleName, "skipped: target-mode mismatch")
@@ -248,6 +260,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			}),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
+		option = append(option, queryOptions...)
 		if m.Config != nil && m.Config.scanRuntime != nil {
 			rt := m.Config.scanRuntime
 			option = append(option, ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk, audits ...func(*gorm.DB) error) {

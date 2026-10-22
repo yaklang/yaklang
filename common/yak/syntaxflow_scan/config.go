@@ -64,6 +64,10 @@ type ScanTaskCallback struct {
 	// snapshot so product scans also run source rules on compiled programs.
 	CompiledSource bool `json:"-"`
 
+	// Direct source searches use a shared pre-scan by default. The opt-out is
+	// useful for result/performance comparisons and emergency rollback.
+	disableSourceScanRuntime bool
+
 	// scanModes is the product-stage filter (source/struct/ssa). Empty means all.
 	scanModes []string `json:"-"`
 
@@ -88,6 +92,14 @@ const (
 var WithReporter = ssaconfig.SetOption(reporterKey, func(c *Config, reporter sfreport.IReport) {
 	c.Reporter = reporter
 })
+
+// WithSourceScanRuntime enables or disables the shared direct-regexp pre-scan.
+// Enabled by default; SFVM execution and secondary searches are unchanged.
+func WithSourceScanRuntime(enabled bool) ssaconfig.Option {
+	return ssaconfig.SetOption("syntaxflow-scan/sourceScanRuntime", func(c *Config, v bool) {
+		c.disableSourceScanRuntime = !v
+	})(enabled)
+}
 
 // WithScanRuntime shares one scan runtime across every stage of a scan.
 func WithScanRuntime(rt *ssaapi.ScanRuntime) ssaconfig.Option {
