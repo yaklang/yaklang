@@ -275,6 +275,8 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) 
 
 		server.caCert = ca
 		server.caKey = key
+		server.gmCACert = gmCA
+		server.gmCAKey = gmKey
 		server.mitmConfig = mc
 
 		return nil

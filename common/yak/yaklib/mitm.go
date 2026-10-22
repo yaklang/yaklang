@@ -734,9 +734,6 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 	}
 
 	caOption := crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey)
-	if config.useEMudhra {
-		caOption = crep.MITM_UseEMudhra(true)
-	}
 
 	var mitmOpts []crep.MITMConfig
 	mitmOpts = append(mitmOpts,
@@ -862,6 +859,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		}),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
 		caOption,
+		crep.MITM_UseEMudhra(config.useEMudhra),
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
 			if reqIns.Method == "CONNECT" {
 				return req

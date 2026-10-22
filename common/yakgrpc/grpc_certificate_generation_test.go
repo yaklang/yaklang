@@ -49,8 +49,8 @@ func TestGRPCMUSTPASS_CertificateGenerationEMudhra(t *testing.T) {
 			{Key: "type_info", Value: `{"kind":"EMudhraServer"}`},
 			{Key: "commonName", Value: "example.test"},
 			{Key: "org", Value: "TLS Test"},
-			{Key: "dns", Value: "example.test"},
-			{Key: "ip", Value: "127.0.0.1,::1"},
+			{Key: "dns", Value: " example.test , "},
+			{Key: "ip", Value: " 127.0.0.1, [::1] , "},
 			{Key: "notBefore", Value: before.Format(time.RFC3339)},
 			{Key: "notAfter", Value: after.Format(time.RFC3339)},
 		},
@@ -111,4 +111,43 @@ func TestGRPCMUSTPASS_CertificateGenerationEMudhra(t *testing.T) {
 	currentCA, err := os.ReadFile(crep.GetDefaultCaFilePath())
 	require.NoError(t, err)
 	require.Equal(t, defaultCA, currentCA)
+}
+
+func TestGRPCMUSTPASS_CertificateGenerationRejectsInvalidSAN(t *testing.T) {
+	client, err := NewLocalClient()
+	require.NoError(t, err)
+	code := coreplugin.GetCorePluginData("证书生成")
+	for _, tc := range []struct{ name, dns, ip, want string }{
+		{"invalid-ip", "", "127.0.0.999", "无效的 IP 地址"},
+		{"invalid-ip-with-dns", "example.test", "127.0.0.1, invalid", "无效的 IP 地址"},
+		{"empty-lists", " , ", " , ", "生成服务器证书需要填写"},
+		{"missing-san", "", "", "生成服务器证书需要填写"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			stream, err := client.DebugPlugin(ctx, &ypb.DebugPluginRequest{
+				Code: string(code), PluginType: "yak",
+				ExecParams: []*ypb.KVPair{
+					{Key: "type_info", Value: `{"kind":"EMudhraServer"}`},
+					{Key: "dns", Value: tc.dns}, {Key: "ip", Value: tc.ip},
+				},
+			})
+			require.NoError(t, err)
+			output := ""
+			for {
+				result, err := stream.Recv()
+				if err != nil {
+					if err != io.EOF {
+						output += err.Error()
+					}
+					break
+				}
+				output += string(result.Message)
+			}
+			require.Contains(t, output, tc.want)
+			require.NotContains(t, output, "CA 文件地址", "invalid input must not produce certificate files")
+			require.NotContains(t, output, "私钥 文件地址", "invalid input must not produce key files")
+		})
+	}
 }
