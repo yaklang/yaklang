@@ -274,6 +274,8 @@ func (r *ReActLoop) execOneCall(
 ) loopActionsResult {
 	op := newLoopActionHandlerOperator(task)
 	op.requestPrompt = prompt
+	op.requestTimelineThroughID = r.requestTimelineThroughID
+	op.requestTimelineItemIDs = r.requestTimelineItemIDs
 	result := loopActionsResult{operator: op, result: loopActionsContinue}
 	action, handler := call.Action, call.LoopAction
 	if action == nil || handler == nil {

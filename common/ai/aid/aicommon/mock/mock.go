@@ -351,9 +351,11 @@ func (m *MockInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.L
 	}
 
 	return &aicommon.LoopPromptAssemblyResult{
-		Prompt:   joinMockPromptParts(highStatic, semiDynamic, timelineOpen, dynamic),
-		Mode:     input.PromptMode,
-		Sections: nil,
+		Prompt:            joinMockPromptParts(highStatic, semiDynamic, timelineOpen, dynamic),
+		Mode:              input.PromptMode,
+		Sections:          nil,
+		TimelineThroughID: &timeline.TimelineThroughID,
+		TimelineItemIDs:   timeline.TimelineItemIDs,
 	}, nil
 }
 

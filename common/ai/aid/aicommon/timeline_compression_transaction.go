@@ -114,10 +114,28 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 	if selection == nil {
 		return nil, nil, fmt.Errorf("compression selection is nil")
 	}
-	// 删除前读取当前 timeline。这份来源要交给记忆重放，也用来知道哪些普通历史还在。
-	source, err := m.captureCompressionSnapshotLocked()
+	// The model can summarize only the history rendered in its request.
+	// Appends after that boundary remain Open, including new promoted versions.
+	throughID := m.getMaxIDLocked()
+	if selection.ThroughID != nil {
+		throughID = *selection.ThroughID
+	}
+	source, err := m.captureCompressionSnapshotThroughLocked(throughID)
 	if err != nil {
 		return nil, nil, err
+	}
+	observed := compressionObservedIDs(selection.ObservedIDs)
+	for _, ids := range [][]int64{selection.RetainedIDs, selection.RetiredPromotedEntries} {
+		for _, id := range ids {
+			if id > source.ThroughID {
+				return nil, nil, fmt.Errorf("compression item %d is outside the request history boundary %d", id, source.ThroughID)
+			}
+		}
+	}
+	for _, id := range selection.RetiredPromotedEntries {
+		if observed != nil && !observed[id] {
+			return nil, nil, fmt.Errorf("compression item %d was not present in the request", id)
+		}
 	}
 	_ = prepareCompressionSnapshot(source)
 	summary := strings.TrimSpace(selection.Summary)
@@ -127,6 +145,7 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 
 	// 选择直接来自 action：保留的普通历史、点名淘汰的技能和证据。
 	result, head := compressionSelectionResult(source, selection, summary)
+	memorySource := m.compressionObservedSourceLocked(source, selection.ObservedIDs)
 
 	// 观察者要在删除前拿到冻结回执，回调本身等锁释放后再执行。
 	completion := newTimelineCompressionCompletion(selection)
@@ -139,13 +158,13 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 	m.noteCompressionPendingBytes(notify, freeze)
 
 	// 记忆登记用的是删除前的来源，不是已经淘汰过的 timeline。
-	source.SummaryPrompt = requestPrompt
-	source.MemoryCompletion = completion
+	memorySource.SummaryPrompt = requestPrompt
+	memorySource.MemoryCompletion = completion
 	if m.sessionMemory == nil {
 		m.sessionMemory = newTimelineSessionMemory(m, nil)
 	}
-	m.sessionMemory.record(source)
-	m.markCompressionMemoryCoveredLocked(source)
+	m.sessionMemory.record(memorySource)
+	m.markCompressionMemoryCoveredLocked(memorySource)
 	return result, notify, nil
 }
 
@@ -163,11 +182,18 @@ func compressionSelectionResult(source *timelineCompressionSnapshot, selection *
 	for _, id := range result.RetainedIDs {
 		selected[id] = true
 	}
+	observed := compressionObservedIDs(selection.ObservedIDs)
 	head := &TimelineCompressedHead{Text: summary}
 	if source.Head != nil {
 		head.CoveredEndItemID, head.CoveredEndAtMs = source.Head.CoveredEndItemID, source.Head.CoveredEndAtMs
 	}
 	for _, item := range source.Items {
+		if observed != nil && !observed[item.ID] && !selected[item.ID] {
+			// Late inserts below the watermark must be included in freeze
+			// membership, otherwise they would fall behind the new boundary.
+			result.RetainedIDs = append(result.RetainedIDs, item.ID)
+			selected[item.ID] = true
+		}
 		if !selected[item.ID] {
 			result.RetiredIDs = append(result.RetiredIDs, item.ID)
 		}
@@ -176,8 +202,63 @@ func compressionSelectionResult(source *timelineCompressionSnapshot, selection *
 		}
 	}
 	result.RetiredIDs = append(result.RetiredIDs, result.RetiredPromotedEntryIDs...)
+	sort.Slice(result.RetainedIDs, func(i, j int) bool { return result.RetainedIDs[i] < result.RetainedIDs[j] })
 	sort.Slice(result.RetiredIDs, func(i, j int) bool { return result.RetiredIDs[i] < result.RetiredIDs[j] })
 	return result, head
+}
+
+func compressionObservedIDs(ids []int64) map[int64]bool {
+	if ids == nil {
+		return nil
+	}
+	observed := make(map[int64]bool, len(ids))
+	for _, id := range ids {
+		observed[id] = true
+	}
+	return observed
+}
+
+// Memory receipts cover only model-visible source identities. Preserve the
+// complete apply-time source separately for freeze membership and late results.
+func (m *Timeline) compressionObservedSourceLocked(source *timelineCompressionSnapshot, ids []int64) *timelineCompressionSnapshot {
+	observed := compressionObservedIDs(ids)
+	if observed == nil {
+		return source
+	}
+	copy := *source
+	copy.ObservedIDs = append([]int64{}, ids...)
+	copy.Items, copy.PromotedItems, copy.ExactItemIDs, copy.UserContexts = nil, nil, nil, nil
+	copy.ExactText = ""
+	for _, item := range source.Items {
+		if observed[item.ID] {
+			copy.Items = append(copy.Items, item)
+		}
+	}
+	for _, item := range source.PromotedItems {
+		if observed[item.ID] {
+			copy.PromotedItems = append(copy.PromotedItems, item)
+		}
+	}
+	for _, id := range source.ExactItemIDs {
+		if !observed[id] {
+			continue
+		}
+		copy.ExactItemIDs = append(copy.ExactItemIDs, id)
+		if item, ok := m.idToTimelineItem.Get(id); ok {
+			if op := timelinePromotionForItem(item); op != nil && op.Kind != TimelinePromotedKindUserInput {
+				copy.ExactText += "\n" + op.OpenPromptText()
+			}
+		}
+	}
+	for _, entry := range source.UserContexts {
+		if observed[entry.ID] {
+			copy.UserContexts = append(copy.UserContexts, entry)
+		}
+	}
+	evidence, _ := m.evidenceStoreMatchingLocked(func(id int64) bool { return observed[id] })
+	copy.Evidence = renderEvidenceItems(evidence.Items)
+	_ = prepareCompressionSnapshot(&copy)
+	return &copy
 }
 
 // publishCompressionLocked installs the freeze set, retires the chosen items,

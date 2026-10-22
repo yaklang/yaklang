@@ -25,6 +25,9 @@ func newTimelineMemoryRetry(snapshot *timelineCompressionSnapshot) timelineMemor
 	copy.Items = append([]timelineCompressionSnapshotItem(nil), snapshot.Items...)
 	copy.PromotedItems = append([]timelineCompressionPromotedItem(nil), snapshot.PromotedItems...)
 	copy.ExactItemIDs = append([]int64(nil), snapshot.ExactItemIDs...)
+	if snapshot.ObservedIDs != nil {
+		copy.ObservedIDs = append([]int64{}, snapshot.ObservedIDs...)
+	}
 	copy.UserContexts = append([]timelineCompressionUserContext(nil), snapshot.UserContexts...)
 	copy.SessionMemoryCandidates = cloneCompressionMemoryEntities(snapshot.SessionMemoryCandidates)
 	copy.RetainedContext = make(map[string]string, len(snapshot.RetainedContext))
@@ -368,8 +371,9 @@ func (m *Timeline) markCompressionMemoryCoveredLocked(source *timelineCompressio
 		return
 	}
 	items := current.Items[:0]
+	observed := compressionObservedIDs(source.ObservedIDs)
 	for _, item := range current.Items {
-		if item.ID <= source.ThroughID {
+		if item.ID <= source.ThroughID && (observed == nil || observed[item.ID]) {
 			items = append(items, item)
 		}
 	}

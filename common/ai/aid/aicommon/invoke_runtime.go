@@ -332,6 +332,9 @@ type LoopPromptAssemblyResult struct {
 	Prompt   string
 	Mode     LoopPromptMode
 	Sections []*PromptSectionObservation
+	// Captured with the rendered Timeline; compression must not consume later writes.
+	TimelineThroughID *int64
+	TimelineItemIDs   []int64
 }
 
 // ExecutePlanInput carries an approved plan generated outside Coordinator plan loop.

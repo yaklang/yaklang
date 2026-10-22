@@ -725,6 +725,8 @@ LOOP:
 			}
 			prompt = assembled.Prompt
 			r.promptMode = assembled.Mode
+			r.requestTimelineThroughID = assembled.TimelineThroughID
+			r.requestTimelineItemIDs = assembled.TimelineItemIDs
 			tokens := aicommon.MeasureTokens(prompt)
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
@@ -796,9 +798,10 @@ LOOP:
 		// acknowledgement before any action writes to the timeline. Execution below
 		// is the same for both response formats.
 		var eventSink loopActionEventSink
+		compressionOnly := len(loopCalls) == 1 && loopCalls[0].Action != nil && loopCalls[0].Action.Name() == aicommon.ContextCompressionAction
 		// The committed compressed head already contains this maintenance
 		// response. Replaying its arguments would duplicate the summary.
-		if r.promptMode == aicommon.LoopPromptModeNormal && stopReason == LoopStopToolCalls {
+		if r.promptMode == aicommon.LoopPromptModeNormal && !compressionOnly && stopReason == LoopStopToolCalls {
 			if err := r.appendFunctionCallActionResponse(loopCalls, resultDescriptor); err != nil {
 				r.clearCallsExecutionValues(loopCalls)
 				r.finishIterationLoopWithError(iterationCount, task, err)
@@ -806,7 +809,7 @@ LOOP:
 				return err
 			}
 			eventSink = r.appendFunctionCallActionEvent
-		} else if r.promptMode == aicommon.LoopPromptModeNormal {
+		} else if r.promptMode == aicommon.LoopPromptModeNormal && !compressionOnly {
 			decision := r.Get("last_ai_decision_response")
 			if loopCalls[0].Action == nil {
 				decision = ""

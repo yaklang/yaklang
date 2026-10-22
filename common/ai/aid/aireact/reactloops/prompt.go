@@ -493,6 +493,13 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		TodoCheckpoint:           todoCheckpoint,
 	}
 	assemble := func() (*LoopPromptAssemblyResult, error) {
+		// Custom assemblers may not report a watermark. Capture a conservative
+		// boundary before rendering so their in-flight writes are still protected.
+		var throughID int64
+		var itemIDs []int64
+		if timeline := timelineFromConfig(r.config); timeline != nil {
+			throughID, itemIDs = timeline.CompressionBoundary()
+		}
 		result, err := r.invoker.AssembleLoopPrompt(tools, assembly)
 		if err != nil {
 			return nil, utils.Wrap(err, "assemble loop prompt failed")
@@ -501,6 +508,12 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 			return nil, utils.Error("assemble loop prompt returned nil result")
 		}
 		result.Mode = assembly.PromptMode
+		if result.TimelineThroughID == nil {
+			result.TimelineThroughID = &throughID
+		}
+		if result.TimelineItemIDs == nil {
+			result.TimelineItemIDs = itemIDs
+		}
 		return result, nil
 	}
 	result, err := assemble()

@@ -21,6 +21,7 @@ type timelineCompressionSnapshot struct {
 	Context                 context.Context `json:"-"`
 	Head                    *TimelineCompressedHead
 	ThroughID               int64 // captured watermark, including exact state and tombstones
+	ObservedIDs             []int64
 	FrozenThroughID         int64
 	Items                   []timelineCompressionSnapshotItem // ordinary items, retained by whitelist
 	PromotedItems           []timelineCompressionPromotedItem // original promoted items, retired by blacklist
@@ -143,15 +144,26 @@ func (m *Timeline) captureCompressionSnapshot() (*timelineCompressionSnapshot, e
 	return m.captureCompressionSnapshotLocked()
 }
 
-func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompressionSnapshot, err error) {
+func (m *Timeline) captureCompressionSnapshotLocked() (*timelineCompressionSnapshot, error) {
+	return m.captureCompressionSnapshotThroughLocked(m.getMaxIDLocked())
+}
+
+func (m *Timeline) captureCompressionSnapshotThroughLocked(throughID int64) (snapshot *timelineCompressionSnapshot, err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			snapshot, err = nil, fmt.Errorf("capture timeline compression source: %v", recovered)
 		}
 	}()
+	if throughID < 0 {
+		return nil, fmt.Errorf("invalid compression history boundary %d", throughID)
+	}
+	if m.compressedHead != nil && m.compressedHead.CoveredEndItemID > throughID {
+		return nil, fmt.Errorf("timeline summary advanced beyond the compression request")
+	}
+	throughID = min(throughID, m.getMaxIDLocked())
 	snapshot = &timelineCompressionSnapshot{
 		Head:      cloneTimelineCompressedHead(m.compressedHead),
-		ThroughID: m.getMaxIDLocked(), FrozenThroughID: m.frozenThroughLocked(),
+		ThroughID: throughID, FrozenThroughID: min(throughID, m.frozenThroughLocked()),
 		SessionMemoryCandidates: m.sessionMemory.snapshot(),
 	}
 	if m.freezeState != nil {
@@ -161,12 +173,15 @@ func (m *Timeline) captureCompressionSnapshotLocked() (snapshot *timelineCompres
 	if err != nil {
 		return nil, err
 	}
-	if evidence, found := m.evidenceStoreLocked(); found {
+	if evidence, found := m.evidenceStoreLocked(throughID); found {
 		snapshot.Evidence = renderEvidenceItems(evidence.Items)
 	}
 	ids := append([]int64(nil), m.idToTimelineItem.Keys()...)
 	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
 	for _, id := range ids {
+		if id > throughID {
+			break
+		}
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil || item.deleted {
 			continue

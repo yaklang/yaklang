@@ -76,7 +76,9 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 		operator.Fail(fmt.Errorf("context compression requires a timeline"))
 		return
 	}
-	selection, err := loop.prepareContextCompression(action)
+	selection, err := loop.prepareContextCompression(action, contextCompressionRequest{
+		throughID: operator.requestTimelineThroughID, itemIDs: operator.requestTimelineItemIDs,
+	})
 	if err != nil {
 		operator.Fail(err)
 		return
