@@ -411,6 +411,9 @@ func (r *ReActLoop) execOneCall(
 	invoker := r.GetInvoker()
 	previousTask := invoker.GetCurrentTask()
 	invoker.SetCurrentTask(task)
+	if actionName != aicommon.ContextCompressionAction {
+		r.initActionApplied = true
+	}
 	func() {
 		defer invoker.SetCurrentTask(previousTask)
 		handler.ActionHandler(r, action, op)

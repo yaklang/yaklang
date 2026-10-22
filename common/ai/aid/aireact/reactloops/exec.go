@@ -819,6 +819,15 @@ LOOP:
 		}
 
 		batch := r.execCalls(loopCalls, iterationCount, task, prompt, done, eventSink)
+		// A maintenance action does not consume the preceding business action's
+		// next-action constraints, including while a rejected selection is retried.
+		if len(loopCalls) == 1 && loopCalls[0].Action != nil && loopCalls[0].Action.Name() == aicommon.ContextCompressionAction {
+			batch.operator.nextActionMustUse = append(batch.operator.nextActionMustUse, operator.GetNextActionMustUse()...)
+			batch.operator.nextActionDisabled = append(batch.operator.nextActionDisabled, operator.GetNextActionDisabled()...)
+			if operator.GetDisallowLoopExit() {
+				batch.operator.DisallowNextLoopExit()
+			}
+		}
 		operator = batch.operator
 		if batch.err != nil || batch.result == loopActionsError {
 			finalError = batch.err

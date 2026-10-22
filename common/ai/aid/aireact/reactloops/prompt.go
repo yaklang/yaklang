@@ -29,11 +29,6 @@ var todoListTemplate = promptloader.MustLoad("ai/aid/aireact/reactloops/prompts/
 func (r *ReActLoop) generateSchemaString(disallowExit bool, actionOperators ...*LoopActionHandlerOperator) (string, error) {
 	filteredValues := r.getFilteredActions(disallowExit, actionOperators...)
 
-	// Mark init constraints as applied after first schema generation
-	if !r.functionCallMode && !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
-		r.initActionApplied = true
-	}
-
 	schemaText := buildSchema(filteredValues...)
 	return applyToolBatchSchemaMaxItems(schemaText, r.toolBatchMaxCalls())
 }
@@ -67,13 +62,10 @@ func (r *ReActLoop) prepareLoopActionSchemas(operator *LoopActionHandlerOperator
 			return "", "", err
 		}
 	}
-	// Preserve this turn's exact tool set before consuming one-shot constraints.
-	// Recomputing filters during a retry could expose actions absent from its prompt.
+	// Rendering never consumes one-shot constraints. The first dispatched
+	// business action owns that transition; maintenance and retries keep them.
 	r.lastNativeActionNames = nativeActionNames
 	r.lastNativeTools = nativeTools
-	if !r.initActionApplied && (len(r.initActionMustUse) > 0 || len(r.initActionDisabled) > 0) {
-		r.initActionApplied = true
-	}
 	return schema, functionCallSchemas, nil
 }
 
@@ -320,6 +312,13 @@ type loopPromptBuildInput struct {
 	subAgentInput    string
 	subAgentRevision uint64
 	todoCheckpoint   string
+	actionSchemas    *loopPromptActionSchemas
+}
+
+type loopPromptActionSchemas struct {
+	text, native      string
+	nativeActionNames []string
+	nativeTools       []aispec.Tool
 }
 
 // captureLoopPromptBuildInput fixes the iteration inputs. The returned value is
@@ -458,10 +457,20 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	// Providers may change the available actions (for example, the last planning
 	// iteration removes exploration tools). Build both protocols only after those
 	// transitions so the emitted schema matches the handlers for this iteration.
-	schema, functionCallSchemas, err := r.prepareLoopActionSchemas(operator)
-	if err != nil {
-		return nil, err
+	if input.actionSchemas == nil {
+		text, native, err := r.prepareLoopActionSchemas(operator)
+		if err != nil {
+			return nil, err
+		}
+		input.actionSchemas = &loopPromptActionSchemas{
+			text: text, native: native,
+			nativeActionNames: slices.Clone(r.lastNativeActionNames),
+			nativeTools:       slices.Clone(r.lastNativeTools),
+		}
 	}
+	schema, functionCallSchemas := input.actionSchemas.text, input.actionSchemas.native
+	r.lastNativeActionNames = slices.Clone(input.actionSchemas.nativeActionNames)
+	r.lastNativeTools = slices.Clone(input.actionSchemas.nativeTools)
 	r.lastLoopSchema = schema
 	r.syncPromptOverflowTimelineLimit()
 	var planStatus string
