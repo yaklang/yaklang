@@ -5,6 +5,8 @@ import (
 )
 
 func init() {
+	reactloops.RegisterAction(loadUIComponentsAction)
+	reactloops.RegisterAction(searchUIComponentsAction)
 	reactloops.RegisterAction(renderUIAction)
 	reactloops.RegisterAction(userQuestionsAction(false))
 	reactloops.RegisterAction(userQuestionsAction(true))

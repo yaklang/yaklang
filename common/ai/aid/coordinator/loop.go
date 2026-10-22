@@ -120,7 +120,7 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			switch a.ActionType {
 			case "finish":
 				return owningController.Snapshot().Phase == PhasePlan || planningOnlyForOwner
-			case "directly_answer", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "request_user_input_async", "request_user_input", "render_ui", schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, "change_skill_view_offset", "load_skill_resources", "search_capabilities":
+			case "directly_answer", "save_evidence", "adjust_todolist", "require_tool", "directly_call_tool", "ask_for_clarification", "request_user_input_async", "request_user_input", "render_ui", "load_ui_components", "search_ui_components", schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, "change_skill_view_offset", "load_skill_resources", "search_capabilities":
 				return true
 			}
 			return false

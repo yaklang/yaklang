@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
@@ -14,6 +15,27 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
+
+func TestUIClientCatalogGrowthHasSeparateTransportLimit(t *testing.T) {
+	catalog := interaction.Catalog{Version: "large"}
+	for i := 0; i < interaction.MaxCatalogComponents; i++ {
+		catalog.Components = append(catalog.Components, interaction.ComponentDefinition{
+			Name: fmt.Sprintf("Component%d", i), Description: strings.Repeat("description ", 16),
+			Schema: map[string]any{"type": "object"},
+		})
+	}
+	raw, err := json.Marshal(catalog)
+	require.NoError(t, err)
+	caps, err := json.Marshal(UIClientCapabilities{Protocol: interaction.Protocol, Catalog: raw})
+	require.NoError(t, err)
+	require.Greater(t, len(caps), 64*1024)
+	cfg := NewTestConfig(context.Background())
+	require.NoError(t, WithClientUI(string(caps))(cfg))
+	require.Len(t, cfg.UICatalog().Components, interaction.MaxCatalogComponents)
+	require.ErrorContains(t, WithClientUI(strings.Repeat(" ", 1024*1024+1))(cfg), "1 MiB")
+	require.NoError(t, WithClientUI(`{"protocol":"unsupported","catalog":{}}`)(cfg))
+	require.Empty(t, cfg.UICatalog().Components)
+}
 
 func TestUIComponentCorrectionBudgetAndFallback(t *testing.T) {
 	raw, err := os.ReadFile("../interaction/testdata/catalog.json")
