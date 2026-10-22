@@ -112,7 +112,12 @@ func (r *ReActLoop) parseContextCompressionSelection(action *aicommon.Action, ca
 	return selection, nil
 }
 
-func (r *ReActLoop) prepareContextCompression(action *aicommon.Action) (*aicommon.TimelineCompressionSelection, error) {
+type contextCompressionRequest struct {
+	throughID *int64
+	itemIDs   []int64
+}
+
+func (r *ReActLoop) prepareContextCompression(action *aicommon.Action, request ...contextCompressionRequest) (*aicommon.TimelineCompressionSelection, error) {
 	if r == nil {
 		return nil, fmt.Errorf("context compression requires a loop")
 	}
@@ -120,11 +125,39 @@ func (r *ReActLoop) prepareContextCompression(action *aicommon.Action) (*aicommo
 	if timeline == nil {
 		return nil, fmt.Errorf("context compression requires a timeline")
 	}
-	candidates, err := timeline.CompressionCandidates()
+	var through []int64
+	var observedIDs []int64
+	if len(request) > 0 {
+		observedIDs = request[0].itemIDs
+		if request[0].throughID != nil {
+			through = []int64{*request[0].throughID}
+		}
+	}
+	candidates, err := timeline.CompressionCandidates(through...)
 	if err != nil {
 		return nil, err
 	}
-	return r.parseContextCompressionSelection(action, candidates, aicommon.TimelineCompressionMaxSummaryTokens)
+	if observedIDs != nil {
+		observed := make(map[int64]bool, len(observedIDs))
+		for _, id := range observedIDs {
+			observed[id] = true
+		}
+		visible := candidates[:0]
+		for _, candidate := range candidates {
+			if observed[candidate.ID] {
+				visible = append(visible, candidate)
+			}
+		}
+		candidates = visible
+	}
+	selection, err := r.parseContextCompressionSelection(action, candidates, aicommon.TimelineCompressionMaxSummaryTokens)
+	if err == nil && len(through) > 0 {
+		selection.ThroughID = &through[0]
+	}
+	if err == nil {
+		selection.ObservedIDs = observedIDs
+	}
+	return selection, err
 }
 
 func parseContextCompressionRetainedIDs(text string, candidates []aicommon.TimelineCompressionCandidate) ([]int64, error) {

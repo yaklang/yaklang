@@ -16,13 +16,34 @@ type TimelineCompressionCandidate struct {
 }
 
 // TimelineCompressionSelection is the fully parsed action result. Timeline
-// applies these IDs to the timeline as it exists at apply time.
+// applies these IDs only through the request's rendered history boundary.
 type TimelineCompressionSelection struct {
+	// Nil is the compatibility path for direct callers applying to current history.
+	ThroughID              *int64
+	ObservedIDs            []int64
 	Summary                string
 	RetainedRange          string
 	RetainedIDs            []int64
 	RetiredPromotedEntries []int64
 	MemoryEntities         []any
+}
+
+// CompressionBoundary captures identities, not bodies. A result may reserve a
+// low ID before execution and arrive after newer entries have already rendered.
+func (m *Timeline) CompressionBoundary() (int64, []int64) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.getMaxIDLocked(), m.compressionItemIDsLocked()
+}
+
+func (m *Timeline) compressionItemIDsLocked() []int64 {
+	ids := make([]int64, 0, m.idToTimelineItem.Len())
+	for _, id := range m.idToTimelineItem.Keys() {
+		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
+			ids = append(ids, id)
+		}
+	}
+	return ids
 }
 
 // RenderCompressionGuide reads the current timeline and returns the dynamic
@@ -47,15 +68,19 @@ func (m *Timeline) RenderCompressionGuide(options TimelineCompressionOptions) (s
 	return renderCompressionGuide(snapshot, options), nil
 }
 
-// CompressionCandidates reads the current timeline for action translation.
+// CompressionCandidates reads the request's history range for action translation.
 // The returned slice is detached and is not retained by Timeline.
-func (m *Timeline) CompressionCandidates() ([]TimelineCompressionCandidate, error) {
+func (m *Timeline) CompressionCandidates(throughID ...int64) ([]TimelineCompressionCandidate, error) {
 	if m == nil {
 		return nil, fmt.Errorf("timeline is nil")
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	snapshot, err := m.captureCompressionSnapshotLocked()
+	through := m.getMaxIDLocked()
+	if len(throughID) > 0 {
+		through = throughID[0]
+	}
+	snapshot, err := m.captureCompressionSnapshotThroughLocked(through)
 	if err != nil {
 		return nil, err
 	}
@@ -73,8 +98,8 @@ func (m *Timeline) CompressionCandidates() ([]TimelineCompressionCandidate, erro
 	return candidates, nil
 }
 
-// ApplyCompressionSelection applies an already parsed action to the timeline
-// as it exists now. It does not compare the timeline with an earlier read.
+// ApplyCompressionSelection applies a parsed action through its request boundary.
+// It captures a local memory source without retaining a cross-request snapshot.
 func (m *Timeline) ApplyCompressionSelection(selection *TimelineCompressionSelection, requestPrompt string) (*TimelineCompressionResult, error) {
 	if m == nil {
 		return nil, fmt.Errorf("timeline is nil")

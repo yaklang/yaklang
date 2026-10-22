@@ -258,9 +258,11 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		base.Nonce,
 	)
 	return &reactloops.LoopPromptAssemblyResult{
-		Prompt:   prompt,
-		Mode:     input.PromptMode,
-		Sections: sections,
+		Prompt:            prompt,
+		Mode:              input.PromptMode,
+		Sections:          sections,
+		TimelineThroughID: &base.TimelineThroughID,
+		TimelineItemIDs:   base.TimelineItemIDs,
 	}, nil
 }
 

@@ -114,7 +114,9 @@ type ReActLoop struct {
 	currentTask aicommon.AIStatefulTask
 	// promptMode is the prompt mode of the current iteration. It is set when the
 	// prompt is built and stays until the next prompt replaces it.
-	promptMode aicommon.LoopPromptMode
+	promptMode               aicommon.LoopPromptMode
+	requestTimelineThroughID *int64
+	requestTimelineItemIDs   []int64
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.

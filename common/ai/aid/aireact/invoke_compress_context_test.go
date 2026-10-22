@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
@@ -35,7 +36,12 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 			var decisions atomic.Int32
 			var secondPrompt atomic.Value
 			oldHistory, keptHistory, summary := uuid.NewString(), uuid.NewString(), uuid.NewString()
-			react, err := NewTestReAct(
+			lateHistory := uuid.NewString()
+			reservedHistory := uuid.NewString()
+			var reservedID int64
+			var react *ReAct
+			var err error
+			react, err = NewTestReAct(
 				aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableCreateDBRuntime(true),
 				aicommon.WithEnableFunctionCallMode(native),
 				aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
@@ -76,6 +82,9 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 							"retire_evidence_ids": []string{},
 						})
 						args = string(params)
+						require.NotContains(t, req.GetPrompt(), lateHistory)
+						react.config.Timeline.PushText(react.config.AcquireId(), "%s", lateHistory)
+						react.config.Timeline.PushToolResult(&aitool.ToolResult{ID: reservedID, Name: "delayed-tool", Success: true, Data: reservedHistory})
 					case 2:
 						secondPrompt.Store(req.GetPrompt())
 					default:
@@ -104,6 +113,7 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 			require.NoError(t, err)
 			tl := react.config.Timeline
 			tl.PushText(react.config.AcquireId(), "%s", oldHistory)
+			reservedID = react.config.AcquireId()
 			tl.PushText(react.config.AcquireId(), "%s", keptHistory)
 
 			loop, err := reactloops.NewReActLoop("compress-context", react,
@@ -122,6 +132,9 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 			prompt, _ := secondPrompt.Load().(string)
 			require.Contains(t, prompt, summary)
 			require.Contains(t, prompt, keptHistory)
+			require.Contains(t, prompt, lateHistory, "an ordinary compression action must preserve unseen results")
+			require.Contains(t, prompt, reservedHistory, "reserved IDs below the request watermark must also survive")
+			require.Equal(t, 1, strings.Count(prompt, summary), "maintenance arguments must not replay a duplicate summary")
 			require.NotContains(t, prompt, oldHistory)
 		})
 	}
@@ -137,6 +150,9 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 			var compressionPrompt, normalPrompt atomic.Value
 			var history []string
 			summary := uuid.NewString()
+			lateHistory := uuid.NewString()
+			reservedHistory := uuid.NewString()
+			var reservedID int64
 			var react *ReAct
 			respond := func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest, name, args string) (*aicommon.AIResponse, error) {
 				response := cfg.NewAIResponse()
@@ -185,6 +201,9 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 						if err != nil {
 							return nil, err
 						}
+						require.NotContains(t, req.GetPrompt(), lateHistory)
+						react.config.Timeline.PushText(react.config.AcquireId(), "%s", lateHistory)
+						react.config.Timeline.PushToolResult(&aitool.ToolResult{ID: reservedID, Name: "delayed-tool", Success: true, Data: reservedHistory})
 						return respond(cfg, req, aicommon.ContextCompressionAction, string(params))
 					}
 					if aicommon.IsVerifySatisfactionPrompt(req.GetPrompt()) {
@@ -203,6 +222,7 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 				}),
 			)
 			require.NoError(t, err)
+			reservedID = react.config.AcquireId()
 			for i := 0; i < 4; i++ {
 				marker := uuid.NewString()
 				id := react.config.AcquireId()
@@ -229,6 +249,8 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 			require.Less(t, aicommon.MeasureTokens(normal), 60*1024)
 			require.NotContains(t, normal, "# 本轮只压缩上下文")
 			require.Contains(t, normal, summary)
+			require.Contains(t, normal, lateHistory, "a forced compression turn must preserve unseen results")
+			require.Contains(t, normal, reservedHistory, "a forced compression turn must preserve late reserved IDs")
 			require.Contains(t, normal, history[len(history)-1])
 			for _, marker := range history[:len(history)-1] {
 				require.NotContains(t, normal, marker)
