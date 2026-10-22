@@ -67,6 +67,13 @@ func newIndexStore(cfg *ssaconfig.Config, prog *Program, mode ProgramCacheKind, 
 	}
 
 	store.indexSaver = dbcache.NewSave(func(indices []*ssadb.IrIndex) error {
+		// Async index batches can commit before the compile barrier. The name
+		// rows have to land first or the saved variable ids point at nothing.
+		if store.program != nil && store.program.NameCache != nil {
+			if err := store.program.NameCache.Flush(); err != nil {
+				return err
+			}
+		}
 		saveStep := func() error {
 			return utils.GormTransaction(db, func(tx *gorm.DB) error {
 				return ssadb.SaveIrIndexBatch(tx, indices)

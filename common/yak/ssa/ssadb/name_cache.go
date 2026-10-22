@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/gobwas/glob"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -21,10 +22,11 @@ type NameCache struct {
 	// GetDB and assigns ids from an in-memory counter — so building the SSA
 	// program does not open/migrate the YakIT/SSA database. When true
 	// (DB-backed programs, e.g. the interpreter's incremental compile), the
-	// cache preloads existing name<->id mappings from the DB and persists new
-	// ids via FirstOrCreate, as before.
-	useDB  bool
-	nextID int64
+	// cache preloads existing name<->id mappings from the DB. New ids are
+	// assigned in memory and persisted by Flush, not by a transaction per name.
+	useDB   bool
+	nextID  int64
+	pending []IrNamePool
 }
 
 // NewNameCache creates a name cache for program. useDB selects DB-backed mode;
@@ -121,23 +123,17 @@ func (c *NameCache) GetID(name string) int64 {
 		c.Unlock()
 		return 0
 	}
-
-	c.RLock()
-	if id, ok := c.nameToId[name]; ok {
-		c.RUnlock()
-		return id
-	}
-	c.RUnlock()
-
-	c.Lock()
-	defer c.Unlock()
-
-	if id, ok := c.nameToId[name]; ok {
+	if id, ok := c.cachedID(name); ok {
 		return id
 	}
 
 	if !c.useDB {
 		// In-memory: assign a fresh local id. 0 is reserved for "".
+		c.Lock()
+		defer c.Unlock()
+		if id, ok := c.nameToId[name]; ok {
+			return id
+		}
 		c.nextID++
 		id := c.nextID
 		c.nameToId[name] = id
@@ -145,24 +141,96 @@ func (c *NameCache) GetID(name string) int64 {
 		return id
 	}
 
+	// Allocate outside the cache lock. Holding that lock across SQLite made
+	// every new variable name wait on the instruction writer's transaction.
 	db := GetDB()
 	if db == nil {
 		return 0
 	}
-
-	entry := IrNamePool{
-		ProgramName: c.program,
-		Name:        name,
-	}
-
-	if err := db.Where(IrNamePool{ProgramName: c.program, Name: name}).FirstOrCreate(&entry).Error; err != nil {
+	id, err := reserveNamePoolID(db)
+	if err != nil || id == 0 {
 		return 0
 	}
+	c.Lock()
+	defer c.Unlock()
+	if existing, ok := c.nameToId[name]; ok {
+		return existing
+	}
+	c.nameToId[name] = id
+	c.idToName[id] = name
+	c.pending = append(c.pending, IrNamePool{ProgramName: c.program, NameID: id, Name: name})
+	return id
+}
 
-	c.nameToId[name] = entry.NameID
-	c.idToName[entry.NameID] = name
+func (c *NameCache) cachedID(name string) (int64, bool) {
+	c.RLock()
+	defer c.RUnlock()
+	id, ok := c.nameToId[name]
+	return id, ok
+}
 
-	return entry.NameID
+// namePoolSeq hands out name_id values for one open database. NameID is the
+// table primary key, shared by every program, so two caches must not both
+// start from the same MAX.
+var namePoolSeq = struct {
+	sync.Mutex
+	db    interface{}
+	next  int64
+	ready bool
+}{}
+
+func reserveNamePoolID(db *gorm.DB) (int64, error) {
+	if db == nil || db.DB() == nil {
+		return 0, nil
+	}
+	namePoolSeq.Lock()
+	defer namePoolSeq.Unlock()
+	sqlDB := db.DB()
+	if namePoolSeq.db != sqlDB {
+		namePoolSeq.db = sqlDB
+		namePoolSeq.ready = false
+		namePoolSeq.next = 0
+	}
+	if !namePoolSeq.ready {
+		var maxID int64
+		query := "SELECT COALESCE(MAX(name_id), 0) FROM \"" + TableIrNamePool + "\""
+		if err := db.Raw(query).Row().Scan(&maxID); err != nil {
+			return 0, err
+		}
+		namePoolSeq.next = maxID
+		namePoolSeq.ready = true
+	}
+	namePoolSeq.next++
+	return namePoolSeq.next, nil
+}
+
+// Flush writes names assigned since the previous flush. GetID itself does not
+// start a transaction.
+func (c *NameCache) Flush() error {
+	if c == nil || !c.useDB {
+		return nil
+	}
+	c.Lock()
+	pending := c.pending
+	c.pending = nil
+	c.Unlock()
+	if len(pending) == 0 {
+		return nil
+	}
+	db := GetDB()
+	if db == nil {
+		c.Lock()
+		c.pending = append(pending, c.pending...)
+		c.Unlock()
+		return nil
+	}
+	if err := db.CreateInBatches(pending, 500).Error; err != nil {
+		c.Lock()
+		c.pending = append(pending, c.pending...)
+		c.Unlock()
+		return err
+	}
+	return nil
 }
 
 func (c *NameCache) GetName(id int64) string {
