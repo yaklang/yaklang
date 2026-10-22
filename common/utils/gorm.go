@@ -2,12 +2,36 @@ package utils
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/yaklang/gorm"
 )
 
-func GormTransaction(db *gorm.DB, callback func(tx *gorm.DB) error) (err error) {
+func sqliteBusy(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "database is locked") || strings.Contains(msg, "sqlite_busy") || strings.Contains(msg, "database is busy")
+}
+
+func GormTransaction(db *gorm.DB, callback func(tx *gorm.DB) error) error {
+	// A writer can still be inside one batch when the next store begins.
+	// SQLite then returns SQLITE_BUSY after busy_timeout. Retry the whole
+	// transaction; the previous attempt was rolled back.
+	const attempts = 8
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		err = gormTransactionOnce(db, callback)
+		if err == nil || !sqliteBusy(err) {
+			return err
+		}
+	}
+	return err
+}
+
+func gormTransactionOnce(db *gorm.DB, callback func(tx *gorm.DB) error) (err error) {
 	tx := db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
@@ -22,6 +46,10 @@ func GormTransaction(db *gorm.DB, callback func(tx *gorm.DB) error) (err error) 
 			}
 		}
 	}()
+	if tx.Error != nil {
+		err = tx.Error
+		return
+	}
 
 	err = callback(tx)
 	return
