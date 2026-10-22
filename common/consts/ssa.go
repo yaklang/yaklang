@@ -40,6 +40,13 @@ const (
 	// which is what pinned scans when the disk was already busy. 64MiB matches
 	// the cap the project-database tuner uses.
 	ssaSQLiteJournalSizeLimitBytes int64 = 64 * 1024 * 1024
+	// The project-database tuner only reaches a 256MB cache after the file
+	// is already 2GB, and SSA never called that tuner. Hue's insert working
+	// set does not fit in the 8000-page (32MB) default, so every connection
+	// starts at the large-database tier.
+	ssaSQLiteCacheKiB          int64 = 256 * 1024
+	ssaSQLiteMmapBytes         int64 = 512 * 1024 * 1024
+	ssaSQLiteWALAutocheckpoint       = 20000
 )
 
 var (
@@ -171,6 +178,9 @@ func ssaDatabaseOpenOptions() databaseOpenOptions {
 		sqliteTxLock:                ssaSQLiteTxLock,
 		sqliteBusyTimeoutMS:         ssaSQLiteBusyTimeoutMS,
 		sqliteJournalSizeLimitBytes: ssaSQLiteJournalSizeLimitBytes,
+		sqliteCacheKiB:              ssaSQLiteCacheKiB,
+		sqliteMmapBytes:             ssaSQLiteMmapBytes,
+		sqliteWALAutocheckpoint:     ssaSQLiteWALAutocheckpoint,
 	}
 }
 
