@@ -84,7 +84,11 @@ func releaseProgramOrdinaryValues(prog *Program) int {
 			released += releaseScopeOrdinaryValues(prog, fn.builder.CurrentBlock.ScopeTable, visitedScopes, reload)
 		}
 		for _, id := range fn.Blocks {
-			block, ok := fn.GetBasicBlockByID(id)
+			inst, ok := prog.Cache.instructions.residentInstruction(id)
+			if !ok || utils.IsNil(inst) {
+				continue
+			}
+			block, ok := ToBasicBlock(inst)
 			if !ok || block == nil || block.ScopeTable == nil {
 				continue
 			}
