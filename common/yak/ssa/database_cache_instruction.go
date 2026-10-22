@@ -267,6 +267,28 @@ func (s *instructionStore) Set(inst Instruction) {
 	}
 }
 
+// residentInstruction returns an instruction only when it is already in
+// memory. A miss must not read the database: reloading a spilled BasicBlock
+// builds a fresh scope and does not recover the compile-time ScopeTable.
+func (s *instructionStore) residentInstruction(id int64) (Instruction, bool) {
+	if s == nil || id <= 0 {
+		return nil, false
+	}
+	switch {
+	case s.writer != nil:
+		inst, ok := s.writer.GetResident(id)
+		return inst, ok && !utils.IsNil(inst)
+	case s.reader != nil:
+		inst, ok := s.reader.GetResident(id)
+		return inst, ok && !utils.IsNil(inst)
+	case s.resident != nil:
+		inst, ok := s.resident.Get(id)
+		return inst, ok && !utils.IsNil(inst)
+	default:
+		return nil, false
+	}
+}
+
 func (s *instructionStore) Get(id int64) Instruction {
 	if s == nil || id <= 0 {
 		return nil

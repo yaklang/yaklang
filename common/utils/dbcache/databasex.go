@@ -215,14 +215,26 @@ func NewCache[T MemoryItem, D any](
 			}, nil
 		})
 
-		cache.saver = NewSave(func(tasks []*saveTask[D]) error {
-			return cache.handleSaveBatch(tasks, save)
-		},
+		// Save stores *saveTask[D], so the caller's func(D) int has to
+		// measure task.data. Dropping it here makes the row-count limit the
+		// only batch boundary.
+		saveOpts := []Option{
 			WithContext(ctx),
 			WithSaveSize(cfg.saveSize),
 			WithSaveTimeout(cfg.saveTimeout),
 			WithName(cfg.name),
-		)
+		}
+		if sizeOf, ok := cfg.saveByteSize.(func(D) int); ok && cfg.saveByteBudget > 0 && sizeOf != nil {
+			saveOpts = append(saveOpts, WithSaveByteBudget(cfg.saveByteBudget, func(task *saveTask[D]) int {
+				if task == nil {
+					return 1
+				}
+				return sizeOf(task.data)
+			}))
+		}
+		cache.saver = NewSave(func(tasks []*saveTask[D]) error {
+			return cache.handleSaveBatch(tasks, save)
+		}, saveOpts...)
 
 		cache.wg.Add(1)
 		go func() {
