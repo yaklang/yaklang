@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"runtime"
 	"time"
 )
 
@@ -132,20 +131,6 @@ func defaultCodeSourceConfig() *CodeSourceInfo {
 		Auth:  &AuthConfigInfo{},
 		Proxy: &ProxyConfigInfo{},
 	}
-}
-
-// DefaultCPUConcurrency returns the unified CPU concurrency budget:
-// max(1, GOMAXPROCS-1). Both compile and scan concurrency default to this.
-func DefaultCPUConcurrency() int {
-	c := runtime.GOMAXPROCS(0)
-	if c <= 1 {
-		return 1
-	}
-	return c - 1
-}
-
-func defaultCompileConcurrency() int {
-	return DefaultCPUConcurrency()
 }
 
 func defaultSSACompileConfig() *SSACompileConfig {

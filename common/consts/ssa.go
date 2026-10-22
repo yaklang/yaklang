@@ -36,7 +36,10 @@ const (
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
-	ssaDatabase            *gorm.DB
+	// Plain pointer, same as profileDatabase. initYakitDatabaseOnce is the
+	// only guard: the handle is published when it is still unset, and later
+	// SetGormSSAProjectDatabase calls are explicit rebinds.
+	ssaDatabase *gorm.DB
 )
 
 const (
@@ -107,9 +110,7 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	if err != nil {
 		return err
 	}
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
-	schema.SetDefaultSSADatabase(db)
+	SetGormSSAProjectDatabase(db)
 	return nil
 }
 
@@ -163,9 +164,9 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 }
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
+	// schema 里的句柄只是这里的镜像，一起赋值。
 	schema.SetDefaultSSADatabase(db)
+	ssaDatabase = db
 }
 
 func GetGormSSAProjectDataBase() *gorm.DB {

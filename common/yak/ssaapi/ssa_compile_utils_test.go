@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"runtime/debug"
 	"sync"
 	"testing"
 
@@ -223,8 +224,9 @@ func TestResolveLargeProjectGCPercent_AutoForLargePreHandlerProject(t *testing.T
 	t.Setenv("GOGC", "")
 	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
 
-	decision := cfg.resolveLargeProjectGCPercent()
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
 
+	require.True(t, decision.eligible)
 	require.True(t, decision.largeProject)
 	require.False(t, decision.manualOverride)
 	require.Equal(t, defaultLargeProjectGC, decision.percent)
@@ -235,8 +237,9 @@ func TestResolveLargeProjectGCPercent_RespectsGOGC(t *testing.T) {
 	t.Setenv("GOGC", "50")
 	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
 
-	decision := cfg.resolveLargeProjectGCPercent()
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
 
+	require.True(t, decision.eligible)
 	require.True(t, decision.largeProject)
 	require.True(t, decision.manualOverride)
 	require.Zero(t, decision.percent)
@@ -248,8 +251,9 @@ func TestResolveLargeProjectGCPercent_EnvOverride(t *testing.T) {
 	t.Setenv("YAK_SSA_GC_PERCENT", "150")
 	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
 
-	decision := cfg.resolveLargeProjectGCPercent()
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
 
+	require.True(t, decision.eligible)
 	require.True(t, decision.largeProject)
 	require.False(t, decision.manualOverride)
 	require.Equal(t, 150, decision.percent)
@@ -261,20 +265,72 @@ func TestResolveLargeProjectGCPercent_DisabledByEnv(t *testing.T) {
 	t.Setenv("YAK_SSA_GC_PERCENT", "off")
 	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 60*1024*1024, true)
 
-	decision := cfg.resolveLargeProjectGCPercent()
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
 
+	require.True(t, decision.eligible)
 	require.True(t, decision.largeProject)
 	require.True(t, decision.manualOverride)
 	require.Zero(t, decision.percent)
 	require.Equal(t, "env:YAK_SSA_GC_PERCENT", decision.source)
 }
 
-func TestResolveLargeProjectGCPercent_SkipsSmallProjects(t *testing.T) {
+func TestResolveCompileProjectGCPercent_TunesMediumProjectWithMemoryHeadroom(t *testing.T) {
 	t.Setenv("GOGC", "")
-	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 4*1024*1024, true)
+	t.Setenv(ssaCompileAdaptiveGCEnv, "")
+	t.Setenv(ssaCompileGOGCEnv, "")
+	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 339173, true)
 
-	decision := cfg.resolveLargeProjectGCPercent()
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
 
 	require.False(t, decision.largeProject)
-	require.Zero(t, decision.percent)
+	require.True(t, decision.eligible)
+	require.Equal(t, 100, decision.percent)
+	require.Equal(t, "auto:ssa-compile", decision.source)
+}
+
+func TestResolveCompileProjectGCPercent_KeepsLowMemoryAndTinyProjects(t *testing.T) {
+	t.Setenv("GOGC", "")
+	medium := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 4*1024*1024, true)
+	require.False(t, medium.resolveCompileProjectGCPercent(4<<30).eligible)
+	tiny := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 128*1024, true)
+	require.False(t, tiny.resolveCompileProjectGCPercent(32<<30).eligible)
+}
+
+func TestResolveCompileProjectGCPercent_RespectsAdaptiveGC(t *testing.T) {
+	t.Setenv("GOGC", "")
+	t.Setenv(ssaCompileAdaptiveGCEnv, "1")
+	cfg := newASTWindowTestConfig(t, ssaconfig.JAVA, 12, 931225, true)
+	decision := cfg.resolveCompileProjectGCPercent(32 << 30)
+	require.True(t, decision.manualOverride)
+	require.Equal(t, "env:YAK_SSA_COMPILE_ADAPTIVE_GC", decision.source)
+}
+
+func TestCompileGCPercentScopesRestoreActiveTarget(t *testing.T) {
+	original := debug.SetGCPercent(200)
+	t.Cleanup(func() { debug.SetGCPercent(original) })
+
+	previous, restoreLow := beginCompileGCPercent(100)
+	require.Equal(t, 200, previous)
+	previous, restoreHigh := beginCompileGCPercent(150)
+	require.Equal(t, 100, previous)
+	require.Equal(t, 150, debug.SetGCPercent(150))
+
+	// The original process setting must not override a still-active scope.
+	restoreHigh()
+	require.Equal(t, 100, debug.SetGCPercent(100))
+	restoreHigh() // Restoring twice is harmless.
+	restoreLow()
+	require.Equal(t, 200, debug.SetGCPercent(200))
+}
+
+func TestCompileGCPercentScopesRestoreOutOfOrder(t *testing.T) {
+	original := debug.SetGCPercent(8)
+	t.Cleanup(func() { debug.SetGCPercent(original) })
+
+	_, restoreFirst := beginCompileGCPercent(100)
+	_, restoreSecond := beginCompileGCPercent(150)
+	restoreFirst()
+	require.Equal(t, 150, debug.SetGCPercent(150))
+	restoreSecond()
+	require.Equal(t, 8, debug.SetGCPercent(8))
 }

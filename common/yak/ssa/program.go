@@ -19,6 +19,28 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+// initConcurrentMaps publishes the program maps that several compile workers
+// read and write. SafeMap owns the locking; callers must not add another mutex.
+func (p *Program) initConcurrentMaps() {
+	if p == nil {
+		return
+	}
+	p.mapsOnce.Do(func() {
+		if p.variableRanges == nil {
+			p.variableRanges = utils.NewSafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]()
+		}
+		if p.ExportType == nil {
+			p.ExportType = utils.NewSafeMapWithKey[string, Type]()
+		}
+		if p.ExportValue == nil {
+			p.ExportValue = utils.NewSafeMapWithKey[string, Value]()
+		}
+		if p.ReExportTable == nil {
+			p.ReExportTable = utils.NewSafeMapWithKey[string, *ReExportInfo]()
+		}
+	})
+}
+
 func NewProgram(
 	cfg *ssaconfig.Config,
 	databaseKind ProgramCacheKind,
@@ -138,26 +160,45 @@ func (prog *Program) createSubProgram(name string, kind ssadb.ProgramKind, path 
 	subProg.Language = prog.Language
 
 	subProg.LibraryFile = prog.LibraryFile
-	subProg.FileList = prog.FileList
-	subProg.LineCount = prog.LineCount
+	fileOwner := prog.GetApplication()
+	if fileOwner == nil {
+		fileOwner = prog
+	}
+	fileOwner.fileListMu.Lock()
+	subProg.FileList = fileOwner.FileList
+	subProg.LineCount = fileOwner.LineCount
+	fileOwner.fileListMu.Unlock()
+	prog.editorStackMu.RLock()
 	subProg.editorStack = prog.editorStack.Copy()
+	prog.editorStackMu.RUnlock()
 	// subProg.editorStack = prog.editorStack
 	subProg.externType = prog.externType
 	subProg.externMethodBuilder = prog.externMethodBuilder
 	subProg.externBuildValueHandler = prog.externBuildValueHandler
 	subProg.ExternInstance = prog.ExternInstance
 	subProg.ExternLib = prog.ExternLib
-	subProg.ExportType = make(map[string]Type)
-	subProg.ExportValue = make(map[string]Value)
-	subProg.ReExportTable = make(map[string]*ReExportInfo)
-
-	// up-down stream and application
-	prog.AddUpStream(subProg)
-	prog.Application.AddUpStream(subProg)
+	subProg.ExportType = utils.NewSafeMapWithKey[string, Type]()
+	subProg.ExportValue = utils.NewSafeMapWithKey[string, Value]()
+	subProg.ReExportTable = utils.NewSafeMapWithKey[string, *ReExportInfo]()
 	subProg.Application = prog.Application
+	if prog.Application != nil && prog.Application.Build != nil {
+		subProg.Build = prog.Application.Build
+	} else {
+		subProg.Build = prog.Build
+	}
 	subProg.Cache = prog.Cache
 	subProg.NameCache = prog.NameCache
 	subProg.fixImportCallback = make([]func(), 0)
+	if subProg.PkgName == "" {
+		subProg.PkgName = name
+	}
+
+	// Publish only after the fields above are set. Concurrent importers
+	// observe this library through UpStream.
+	prog.AddUpStream(subProg)
+	if prog.Application != nil {
+		prog.Application.AddUpStream(subProg)
+	}
 	return subProg
 }
 
@@ -198,14 +239,19 @@ func (prog *Program) IsVirtualImport() bool {
 }
 
 func (prog *Program) GetSubProgram(name string, path ...string) *Program {
-	child, ok := prog.UpStream.Get(name)
-	if !ok {
-		child = prog.createSubProgram(name, Library, path...)
-	}
-	return child
+	return prog.NewLibrary(name, path)
 }
 
 func (prog *Program) NewLibrary(name string, path []string) *Program {
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.libraryCreateMu.Lock()
+	defer app.libraryCreateMu.Unlock()
+	if existing, ok := app.UpStream.Get(name); ok && existing != nil {
+		return existing
+	}
 	return prog.createSubProgram(name, Library, path...)
 }
 
@@ -230,15 +276,17 @@ func (prog *Program) GetLibrary(name string) (*Program, bool) {
 	currentEditor := prog.GetCurrentEditor()
 	// this program has current file
 	hasFile := func(p *Program) bool {
-		if currentEditor == nil {
+		if currentEditor == nil || p == nil {
 			return false
 		}
-		if hash, ok := p.FileList[currentEditor.GetUrl()]; ok {
-			if hash == currentEditor.GetIrSourceHash() {
-				return true
-			}
+		owner := app
+		if owner == nil {
+			owner = p
 		}
-		return false
+		owner.fileListMu.Lock()
+		hash, ok := p.FileList[currentEditor.GetUrl()]
+		owner.fileListMu.Unlock()
+		return ok && hash == currentEditor.GetIrSourceHash()
 	}
 
 	// contain in memory
@@ -303,16 +351,34 @@ func (prog *Program) SetCacheExternInstance(name string, v Value) {
 
 // create or get main function builder
 func (prog *Program) GetAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
+	if prog == nil {
+		return nil
+	}
+	// Publish the builder only. NewBuilder does not Emit, and this must
+	// not call fake import. The virtual function is also built under
+	// virtualEmitMu; take that one first (same order as withVirtualBuilder).
+	if funcName == string(VirtualFunctionName) {
+		prog.virtualEmitMu.Lock()
+		defer prog.virtualEmitMu.Unlock()
+	}
+	prog.builderMu.Lock()
+	defer prog.builderMu.Unlock()
+	return prog.getAndCreateFunctionBuilder(pkgName, funcName)
+}
+
+func (prog *Program) getAndCreateFunctionBuilder(pkgName string, funcName string) *FunctionBuilder {
 	prog.SetPackageName(pkgName)
 	fun := prog.GetAndCreateFunction(pkgName, funcName)
 	builder := fun.builder
 	if builder == nil {
 		builder = NewBuilder(prog.GetCurrentEditor(), fun, nil)
 	}
-
 	return builder
 }
 func (prog *Program) SetPackageName(name string) {
+	if prog == nil || prog.PkgName == name {
+		return
+	}
 	prog.PkgName = name
 }
 
@@ -485,12 +551,16 @@ func (p *Program) GetIncludeFileNum() int {
 }
 
 func (p *Program) PushEditor(e *memedit.MemEditor) {
+	p.editorStackMu.Lock()
 	p.editorStack.Push(e)
+	p.editorStackMu.Unlock()
 	if !p.PreHandler() {
 		p.SetEditor(e.GetUrl(), e)
 	}
 }
 func (p *Program) GetCurrentEditor() *memedit.MemEditor {
+	p.editorStackMu.RLock()
+	defer p.editorStackMu.RUnlock()
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
 		return nil
 	}
@@ -502,21 +572,73 @@ func (p *Program) GetCurrentEditor() *memedit.MemEditor {
 }
 
 func (p *Program) PopEditor(save bool) {
+	p.editorStackMu.Lock()
 	if p.editorStack == nil || p.editorStack.Len() <= 0 {
+		p.editorStackMu.Unlock()
 		return
 	}
 	e := p.editorStack.Pop()
+	p.editorStackMu.Unlock()
 	if save && e != nil {
-		p.FileList[e.GetUrl()] = e.GetIrSourceHash()
-		p.LineCount += e.GetLineCount()
+		owner := p
+		if app := p.GetApplication(); app != nil {
+			owner = app
+		}
+		owner.fileListMu.Lock()
+		if owner.FileList == nil {
+			owner.FileList = make(map[string]string)
+		}
+		if owner.fileLineCounts == nil {
+			owner.fileLineCounts = utils.NewSafeMapWithKey[string, int]()
+		}
+		previous, _ := owner.fileLineCounts.Get(e.GetUrl())
+		owner.FileList[e.GetUrl()] = e.GetIrSourceHash()
+		owner.LineCount += e.GetLineCount() - previous
+		owner.fileLineCounts.Set(e.GetUrl(), e.GetLineCount())
+		owner.fileListMu.Unlock()
 	}
+}
+
+func (p *Program) SetExtraFile(path, hash string) {
+	if p == nil || path == "" {
+		return
+	}
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	if owner.ExtraFile == nil {
+		owner.ExtraFile = make(map[string]string)
+	}
+	owner.ExtraFile[path] = hash
+	owner.metaMu.Unlock()
+}
+
+func (p *Program) AppendSCAPackages(pkgs ...*dxtypes.Package) {
+	if p == nil || len(pkgs) == 0 {
+		return
+	}
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	owner.SCAPackages = append(owner.SCAPackages, pkgs...)
+	owner.metaMu.Unlock()
 }
 
 func (p *Program) GetSCAPackageByName(name string) *dxtypes.Package {
 	if p == nil {
 		return nil
 	}
-	for _, pkg := range p.SCAPackages {
+	owner := p
+	if app := p.GetApplication(); app != nil {
+		owner = app
+	}
+	owner.metaMu.Lock()
+	defer owner.metaMu.Unlock()
+	for _, pkg := range owner.SCAPackages {
 		if strings.Contains(pkg.Name, name) {
 			return pkg
 		}
@@ -531,23 +653,40 @@ func (p *Program) GetApplication() *Program {
 	return p.Application
 }
 
-func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
+func (p *Program) templateOwner() *Program {
 	if p == nil {
 		return nil
 	}
-	return p.Template[path]
+	if app := p.GetApplication(); app != nil {
+		return app
+	}
+	return p
+}
+
+func (p *Program) GetTemplate(path string) tl.TemplateGeneratedInfo {
+	owner := p.templateOwner()
+	if owner == nil {
+		return nil
+	}
+	owner.templateMu.Lock()
+	info := owner.Template[path]
+	owner.templateMu.Unlock()
+	return info
 }
 
 func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
-	if p == nil {
+	owner := p.templateOwner()
+	if owner == nil {
 		return nil
 	}
-	if t := p.GetTemplate(path); t != nil {
+	if t := owner.GetTemplate(path); t != nil {
 		return t
 	}
 	fileName := filepath.Base(path)
+	owner.templateMu.Lock()
+	defer owner.templateMu.Unlock()
 	var rets []tl.TemplateGeneratedInfo
-	for tp, t := range p.Template {
+	for tp, t := range owner.Template {
 		if strings.Contains(tp, fileName) {
 			rets = append(rets, t)
 		}
@@ -559,10 +698,16 @@ func (p *Program) TryGetTemplate(path string) tl.TemplateGeneratedInfo {
 }
 
 func (p *Program) SetTemplate(path string, info tl.TemplateGeneratedInfo) {
-	if p == nil {
+	owner := p.templateOwner()
+	if owner == nil {
 		return
 	}
-	p.Template[path] = info
+	owner.templateMu.Lock()
+	if owner.Template == nil {
+		owner.Template = make(map[string]tl.TemplateGeneratedInfo)
+	}
+	owner.Template[path] = info
+	owner.templateMu.Unlock()
 }
 
 func (prog *Program) SetDiagnosticsRecorder(rec *diagnostics.Recorder) {

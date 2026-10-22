@@ -145,6 +145,7 @@ type ScopedVersionedTable[T versionedValue] struct {
 	newVersioned VersionedBuilder[T]
 
 	callback        func(VersionedIF[T])
+	linkMu          sync.RWMutex
 	linkValues      linkNodeMap[T]
 	linkVariable    map[T]VersionedIF[T]
 	linkCaptured    *omap.OrderedMap[string, VersionedIF[T]]
@@ -434,6 +435,35 @@ func (v *ScopedVersionedTable[T]) ReadValue(name string) (t T) {
 	return
 }
 
+// FindVariableByName visits newest first, then parents if current is false.
+// Existing scope implementations can keep the snapshot API; built-in scopes
+// supply the allocation-free traversal. Predicates must not mutate version links.
+func FindVariableByName[T versionedValue](scope ScopedVersionedTableIF[T], name string, current bool, match func(VersionedIF[T]) bool) VersionedIF[T] {
+	if finder, ok := scope.(interface {
+		FindVariableByName(string, bool, func(VersionedIF[T]) bool) VersionedIF[T]
+	}); ok {
+		return finder.FindVariableByName(name, current, match)
+	}
+	for _, variable := range scope.GetAllVariablesByName(name, current) {
+		if match(variable) {
+			return variable
+		}
+	}
+	return nil
+}
+
+func (scope *ScopedVersionedTable[T]) FindVariableByName(name string, current bool, match func(VersionedIF[T]) bool) VersionedIF[T] {
+	scope.linkMu.RLock()
+	ret := scope.linkValues.Find(name, match)
+	scope.linkMu.RUnlock()
+	if ret == nil && !current {
+		if parent := scope.GetParent(); parent != nil {
+			return FindVariableByName(parent, name, false, match)
+		}
+	}
+	return ret
+}
+
 // ---------------- create
 func (v *ScopedVersionedTable[T]) CreateVariable(name string, isLocal bool) VersionedIF[T] {
 	return v.newVar(name, isLocal)
@@ -454,24 +484,26 @@ func (scope *ScopedVersionedTable[T]) AssignVariable(variable VersionedIF[T], va
 	}
 
 	if updata {
-		// variable to value
+		scope.linkMu.Lock()
 		scope.linkValues.Append(variable.GetName(), variable)
-		// value to variable
 		scope.linkVariable[value] = variable
+		scope.linkMu.Unlock()
 	}
 
 	// capture variable
 	if !variable.GetLocal() && !scope.IsRoot() {
-		for _, find := range scope.GetCurrentVariables(variable.GetName()) {
-			if find.GetLocal() && variable.GetCaptured().GetGlobalIndex() == find.GetGlobalIndex() {
-				return
-			}
+		if scope.FindVariableByName(variable.GetName(), true, func(find VersionedIF[T]) bool {
+			return find.GetLocal() && variable.GetCaptured().GetGlobalIndex() == find.GetGlobalIndex()
+		}) != nil {
+			return
 		}
 		scope.tryRegisterCapturedVariable(variable.GetName(), variable)
 	}
 }
 
 func (scope *ScopedVersionedTable[T]) GetVariableFromValue(value T) VersionedIF[T] {
+	scope.linkMu.RLock()
+	defer scope.linkMu.RUnlock()
 	if res, ok := scope.linkVariable[value]; ok {
 		return res
 	}

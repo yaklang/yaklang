@@ -66,28 +66,34 @@ func SetObjectKeyPairs(member Value, pairs []ObjectKeyPair) {
 	if utils.IsNil(member) {
 		return
 	}
-	anValue := member.getAnValue()
-	anValue.ownerPairs = anValue.ownerPairs[:0]
+	var replacement anValue
 	for _, pair := range pairs {
 		if utils.IsNil(pair.Object) || utils.IsNil(pair.Key) {
 			continue
 		}
-		anValue.appendOwnerPairIDs(pair.Object.GetId(), pair.Key.GetId())
+		replacement.appendOwnerPairIDs(pair.Object.GetId(), pair.Key.GetId())
 	}
+	value := member.getAnValue()
+	value.relationsMu.Lock()
+	value.ownerPairs = replacement.ownerPairs
+	value.relationsMu.Unlock()
 }
 
 func SetMemberPairs(object Value, pairs []MemberPair) {
 	if utils.IsNil(object) {
 		return
 	}
-	anValue := object.getAnValue()
-	anValue.memberPairs = anValue.memberPairs[:0]
+	var replacement anValue
 	for _, pair := range pairs {
 		if utils.IsNil(pair.Key) || utils.IsNil(pair.Member) {
 			continue
 		}
-		anValue.appendMemberPairIDs(pair.Key.GetId(), pair.Member.GetId())
+		replacement.appendMemberPairIDs(pair.Key.GetId(), pair.Member.GetId())
 	}
+	value := object.getAnValue()
+	value.relationsMu.Lock()
+	value.memberPairs = replacement.memberPairs
+	value.relationsMu.Unlock()
 }
 
 func GetMemberPairs(object Value) []MemberPair {

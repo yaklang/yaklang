@@ -216,3 +216,154 @@ hanging/OOM-killing.
 `refactor/ssa/compile_step_shrink_ast`. The TODO(scan-log) comments it carries
 trace where split-compile flush + lazy reload surface nil/missing data; the
 OffsetMap mutex guards the scan-time race that the deeper dataflow exposed.
+
+## Compile-unit persistence boundaries (2026-09-30)
+
+The writer-mode unit flush now releases settled, already-persisted instruction
+copies reloaded by later units, rather than skipping them until final close.
+It also spills finished function blocks under the existing conservative
+function-retention policy; unfinished/protected block scopes and callable
+boundary instructions remain resident. That policy's uppercase/extern check
+is not language-specific export metadata.
+
+`resident` and `remaining_dirty` are separate sets: resident includes clean
+reloaded IDs. Final-save accounting counts resident IDs not yet persisted;
+subtracting the total persisted count from residency can hide new unsaved IR.
+This is first-persistence accounting, not complete version tracking of later
+in-place IR mutations. Evicting a cache entry alone also does not prove heap
+reclamation: live function builders, scopes and type/index maps may still
+reference it.
+
+Batch cleanup schedules immutable source payloads on a single coalescing
+background saver. Only successful writes release source-store editor
+references; URL/hash and visited markers remain, and reads use the bounded
+DB source cache. A final source close joins all outstanding requests and
+retains the source payload on failure for retry. Memory-mode editors without
+file/hash metadata and URL aliases preserve their existing lookup semantics.
+
+Index/type maps still retain mutable cross-unit identities. Their batch
+flushes and the instruction-saver barrier are currently synchronous; this
+change does not claim that all batch I/O has moved off the compile path.
+Removing those barriers or releasing mutable type/index entries requires
+stable snapshots and cross-unit update/reload regression tests first.
+
+Current run evidence belongs under `/mnt/data/scan-outputs/`, not the historical
+`build/pprof/` paths above. Distinguish `ssa-compile` runtime from complete
+`code-scan` runtime, and do not attribute GC/CPU improvements to a resident
+count reduction without comparing heap profiles and controlled measurements.
+
+## SQLite final IR updates (2026-09-30)
+
+The resident-cache final flush checks a fresh snapshot: instructions can
+change in place after an incremental flush, so a persisted ID alone is not a
+safe reason to skip that write. With the production `(program_name, code_id)`
+unique index, `SaveIrCodeBatch` now uses SQLite `ON CONFLICT DO UPDATE` in bounded
+batches, retaining the row identity and updating zero-valued fields and
+soft-delete state. This removes the delete-and-reinsert operation and protects
+the previous snapshot if an insert fails. Schemas lacking that index and other
+database dialects use the existing replacement path.
+
+The interrupted GoBlog run under
+`/mnt/data/scan-outputs/dirty-ir-20260930-small/goblog` had 497,503 unique IR IDs
+already persisted before final close. Its 11:56 and 12:01 goroutine snapshots
+both showed the final flush in `bulkUpsertIrCode`'s SQLite delete. That run exited
+137 and is incomplete performance evidence. The failure-preservation and
+row-identity regressions fail with the old implementation and pass with native
+UPSERT. Completed runs for that source snapshot are recorded under
+`/mnt/data/scan-outputs/ir-upsert-20260930-1438/summary.md`.
+
+## Resident IR change detection (2026-10-08)
+
+The resident fast path now remembers a fingerprint of each successfully saved
+IR payload. Final flush still checks the resident instructions, but skips
+unchanged payloads before issuing any database write. New IDs use INSERT;
+changed saved IDs use UPSERT. The fingerprint covers the entire serialized
+`IrCode` columns, including zero values and in-place relation slice/map edits.
+Custom fields use their SQL `driver.Valuer` representation: `Int64Map` has
+private key/value fields that ordinary JSON cannot preserve, and nil/empty
+slices that write the same SQL string must compare equally.
+Strings use the database write hook's normalization; GORM row identity and
+timestamps are excluded. The fingerprint is updated only after a
+successful database transaction, so a failed change remains eligible for retry.
+
+The original GoBlog final close rewrote all 504000 resident instructions,
+bringing write operations to 1008000. That full rewrite is no longer the
+resident fast path's policy. `unchanged_skipped` in the writer summary counts
+snapshots omitted from persistence; `write_ops` continues to count actual
+successful row writes. Instructions remain resident for compile/query reuse.
+
+This reduces database modification work; it does not remove the final
+snapshot/hash pass or claim version tracking for the separate writer cache.
+SQL-trigger regressions reject updates to unchanged rows, while additional
+regressions cover new rows, in-place changes, zero values and failed-save retry.
+
+Completed GoBlog evidence is in
+`/mnt/data/scan-outputs/ir-delta-20261008-1057/goblog-final/`: exit 0,
+497029 unique IR rows, 1457 final updates, 495572 unchanged snapshots skipped,
+and 498486 total row writes. Final cache flush took 10.882s; process wall time
+was 4m54.65s with the existing GC/memory settings. This omits 99.7% of the
+updates that a full resident rewrite would issue in this run. Different host
+conditions and IR counts from earlier runs prevent a controlled speedup or
+exact structural-equivalence claim.
+
+## Dirty IR flush and cache ownership (2026-10-08)
+
+The resident fast path now queues dirty IDs when instructions are registered
+or mutated. Both unit and final flushes visit this queue; an empty queue returns
+without enumerating resident instructions or computing their fingerprints.
+Fingerprints remain useful for dirty setters that leave the serialized payload
+unchanged. Successful saves clear only the observed dirty generation, while
+failed saves and newer generations remain queued. Deletion removes the dirty
+ID as well as the resident object.
+
+Value setters, use-def/member relations, operand replacement, CFG updates,
+function metadata, parameter defaults, closures and lazy-instruction setters
+publish mutations. Callers that directly change exported instruction fields
+must call `ProgramCache.MarkInstructionDirty(inst)`. Clean database reloads
+publish no dirty work.
+
+Successful persistence releases clean, unnamed ordinary body instructions
+whose owning function has finished. Hot opcodes, cross-unit boundaries,
+unfinished functions and values still bound to lexical variables retain their
+canonical objects. Late mutations through a held concrete instruction can
+queue that object again. Database reloads use a bounded 1024-entry, one-minute
+cache and bypass the additional global raw-IR row cache. Releasing a resident
+entry does not prove that every other owner has released the same object.
+
+Values now contain their instruction base in the same allocation. Their
+construction-only pending type occupies a slot later reused for the concrete
+dirty-publication owner; it no longer allocates a deferred-type closure for
+every value. Explicit one-time type-saving callbacks clear their closure after
+execution. Empty dirty maps and completed persistence batches release their
+backing references, and instruction fingerprints use paged storage. A parent
+database row-cache eviction closes its child cache and workers; recreating the
+same program cache cannot resurrect a closed child from a retained loader
+result.
+
+Mutable types, named values and function scopes still carry cross-unit
+identity. This change does not clear those graphs or change the GC frequency
+or memory limit. Focused regression coverage includes late changes after
+save/eviction, new function metadata after save, direct-field dirty publication,
+failed-save retry, dirty-generation settlement, clean reloads, one-allocation
+value construction and child-cache lifetime.
+
+Run artifacts and the measured limitations are recorded in
+`/mnt/data/scan-outputs/ir-dirty-release-20261008-1213/summary.md`.
+
+The delivery GoBlog run (`goblog-delivery`) completed with exit 0 in 4m03.23s.
+Read-only SQL confirmed 498100 rows and 498100 unique instruction IDs, matching
+the writer's unique-persisted counter. Actual row writes were 498777; 1099
+unchanged dirty candidates were skipped, 30115 clean-residency releases were
+recorded, and 467986 instructions remained protected/resident. Final dirty and
+pending counts were zero. With no dirty IR at final close, instruction close
+took 51.509us; the entire final cache-save phase took 422.379ms.
+
+The process peak RSS was 2493200KiB (about 2.38GiB), and final sampled live heap
+was 1068.92MB. CPU windows attributed 73.53%, 88.65% and 89.36% cumulatively to
+`runtime.gcDrain`; removing clean IR traversal has not removed the GC bottleneck.
+The run ended before five minutes, so its initial/early/final profiles cover the
+whole run. Longer intermediate runs retain their five-minute profiles. Two
+pre-existing `method call, but object is nil` diagnostics remain; persistence
+errors were zero. Host conditions and instruction counts varied between runs,
+so these measurements do not establish an overall speedup, a lower peak RSS,
+or exact structural equivalence with the prior revision.

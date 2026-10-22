@@ -262,6 +262,13 @@ func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
 }
 
 func (s *structScanState) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {
+	if progAPI == nil {
+		return
+	}
+	s.scanStructWithOpcodeIndex(progAPI, unit, &structResidentOpcodeIndex{prog: progAPI.Program})
+}
+
+func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.CompileUnit, index *structResidentOpcodeIndex) {
 	if s == nil || !s.enabled() || progAPI == nil || unit == nil {
 		return
 	}
@@ -279,6 +286,16 @@ func (s *structScanState) ScanStruct(progAPI *Program, unit *ssa.CompileUnit) {
 	}
 	target := NewStructQueryTarget(progAPI, unit, nil)
 	var found []*SyntaxFlowResult
+	defer func() {
+		// A result frame may retain its feed root. Do not let that keep the
+		// batch-wide snapshot or this unit's opcode buckets alive afterwards.
+		target.residentIndex = nil
+		target.opcodeIndex = nil
+	}()
+	if !structScanUseDatabase(progAPI.Program) {
+		target.opcodeIndex = make(map[ssa.Opcode][]ssa.Instruction)
+		target.residentIndex = index
+	}
 	for _, rule := range s.rules {
 		if rule == nil {
 			continue
@@ -658,8 +675,8 @@ func programStructUnits(prog *Program) []*ssa.CompileUnit {
 }
 
 func libraryUnitFiles(app *ssa.Program, name string, lib *ssa.Program) []string {
-	if app != nil && app.LibraryFile != nil {
-		if files := append([]string(nil), app.LibraryFile[name]...); len(files) > 0 {
+	if app != nil {
+		if files := app.LibraryFiles(name); len(files) > 0 {
 			sort.Strings(files)
 			return files
 		}

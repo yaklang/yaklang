@@ -1,13 +1,16 @@
 package ssaapi
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"math"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils"
@@ -207,7 +210,7 @@ func (c *Config) parseProjectWithFSUnits(
 	}()
 	defer func() {
 		if r := recover(); r != nil {
-			err = utils.Errorf("parse project panic: %v", r)
+			err = utils.JoinErrors(err, utils.Errorf("parse project panic: %v", r))
 			log.Errorf("parse project error: %s", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
 		}
@@ -217,7 +220,28 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase := "f0_scan"
 	programName := c.GetProgramName()
 	programPath := c.programPath
-	process := 0.0
+	var processBits atomic.Uint64
+	var progressMu sync.Mutex
+	var lastReportedProcess float64
+	loadProcess := func() float64 { return math.Float64frombits(processBits.Load()) }
+	storeProcess := func(p float64) {
+		for {
+			old := processBits.Load()
+			if p <= math.Float64frombits(old) || processBits.CompareAndSwap(old, math.Float64bits(p)) {
+				return
+			}
+		}
+	}
+	reportProcess := func(p float64, msg string, args ...any) {
+		progressMu.Lock()
+		defer progressMu.Unlock()
+		if p < lastReportedProcess {
+			p = lastReportedProcess
+		} else {
+			lastReportedProcess = p
+		}
+		processCallback(p, msg, args...)
+	}
 	start := time.Now()
 
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
@@ -259,8 +283,8 @@ func (c *Config) parseProjectWithFSUnits(
 	}
 	calculateTime = time.Since(start)
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
-	emitCompileScale(processCallback, process, scanResult)
-	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+	emitCompileScale(processCallback, loadProcess(), scanResult)
+	if restoreGC := c.applyCompileProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
 
@@ -313,6 +337,12 @@ func (c *Config) parseProjectWithFSUnits(
 	if err != nil {
 		return nil, err
 	}
+	if language, ok := c.LanguageBuilder.(ssa.ConcurrentUnitBuilder); ok {
+		prog.SetConcurrentUnitBuild(language.SupportsConcurrentUnitBuild())
+	}
+	if language, ok := c.LanguageBuilder.(ssa.MethodLookupBuilder); ok {
+		prog.SetDeferMethodBuildOnLookup(language.DeferMethodBuildOnLookup())
+	}
 	prog.ProcessInfof = func(s string, v ...any) {
 		msg := s
 		if len(v) > 0 {
@@ -321,7 +351,7 @@ func (c *Config) parseProjectWithFSUnits(
 		if compilePhase != "" {
 			msg = fmt.Sprintf("[%s] %s", compilePhase, msg)
 		}
-		processCallback(process, msg)
+		reportProcess(loadProcess(), msg)
 	}
 	if stopAdaptiveGC := startSSACompileAdaptiveGC(prog.ProcessInfof); stopAdaptiveGC != nil {
 		defer stopAdaptiveGC()
@@ -360,8 +390,8 @@ func (c *Config) parseProjectWithFSUnits(
 	if prog.Cache != nil {
 		cacheMode = prog.Cache.InstructionCacheMode()
 	}
-	prog.ProcessInfof("compile unit execution batches built batches=%d min_files=%d min_bytes=%d writer_requested=%v writer_enabled=%v cache=%s",
-		len(batches), batchMinFiles, batchMinBytes, writerCacheRequested, writerCacheEnabled, cacheMode)
+	prog.ProcessInfof("compile unit execution batches built batches=%d min_files=%d min_bytes=%d writer_requested=%v writer_enabled=%v cache=%s concurrency=%d memory_limit=%d",
+		len(batches), batchMinFiles, batchMinBytes, writerCacheRequested, writerCacheEnabled, cacheMode, c.GetCompileConcurrency(), c.GetCompileMemoryLimit())
 	logCompileUnitPlan(prog, fmt.Sprintf("%v", c.GetLanguage()), plan, batches, batchMinFiles, batchMinBytes, spillMode, cacheMode, writerCacheRequested, writerCacheEnabled)
 
 	var astErr error
@@ -369,14 +399,15 @@ func (c *Config) parseProjectWithFSUnits(
 	astParseErrSuppressed := false
 	const maxAstParseErrLogs = 20
 	preHandlerBuildsFiles := c.LanguageBuilder != nil && c.LanguageBuilder.UsesDeferredFileBuild()
-	preHandlerNum := 0
+	var preHandlerNum atomic.Int32
 	preHandlerProcess := func() {
-		preHandlerNum++
-		process = (float64(preHandlerNum) / float64(preHandlerTotal)) * 0.4
-		if process > 0.4 {
-			process = 0.4
+		n := preHandlerNum.Add(1)
+		p := (float64(n) / float64(preHandlerTotal)) * 0.4
+		if p > 0.4 {
+			p = 0.4
 		}
-		processCallback(process, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, preHandlerNum, preHandlerTotal))
+		storeProcess(p)
+		reportProcess(p, fmt.Sprintf("[%s] pre-handler progress(%d/%d)", compilePhase, n, preHandlerTotal))
 	}
 
 	compilePhase = "f1_units"
@@ -389,6 +420,26 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		var batchFiles []string
+		fileUnits := make(map[string]string, batch.files)
+		for _, unit := range batch.units {
+			if unit == nil {
+				continue
+			}
+			// Unit order is the dependency batch. File completion order inside
+			// the batch is not part of that contract: a pre-handler that only
+			// works when its imports were visited first is a frontend bug.
+			batchFiles = append(batchFiles, unit.Files...)
+			for _, path := range unit.Files {
+				fileUnits[path] = unit.Key
+			}
+		}
+		// One parser pool for the entire batch lets small packages use the
+		// available workers too, without multiplying the AST window by the
+		// number of units. Files are delivered as their AST is ready.
+		prefetchedFiles := c.GetFileHandler(filesystem, batchFiles, preHandlerFileSet)
+		prog.SetPreHandler(true)
+		compilePhase = "f1_units"
 		if holdSCCIR && prog.Cache != nil {
 			prog.Cache.DisableInstructionSpill()
 		}
@@ -400,107 +451,38 @@ func (c *Config) parseProjectWithFSUnits(
 			prog.ProcessInfof("compile unit batch(%d/%d) scc=%d-%d units=%d files=%d bytes=%d spill=%s",
 				batchIndex+1, len(batches), batch.startSCC+1, batch.endSCC+1, len(batch.units), batch.files, batch.bytes, spillMode)
 		}
-		for _, unit := range batch.units {
-			if unit == nil {
-				continue
+		prehandleWorkers, buildWorkers, drainUnscheduled := unitWorkerCounts(c, prog)
+		if prehandleWorkers > 1 {
+			for _, key := range unitKeys {
+				prog.EnsureLibraryForCompileUnit(key)
 			}
-			prog.BeginCompileUnit(unit.Key)
-			unitCanceled := false
-			ch := c.GetFileHandler(filesystem, unit.Files, preHandlerFileSet)
-			for fileContent := range ch {
-				if fileContent == nil {
-					continue
-				}
-				func(fileContent *ssareducer.FileContent) {
-					defer fileContent.Release()
-					if fileContent.Status == ssareducer.FileStatusFsError {
-						prog.RecordCompileDiagnostic("file", fileContent.Path, fmt.Sprint(fileContent.Err))
-						log.Errorf("skip file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-						prog.ProcessInfof("skip  file: %s with fs error: %v", fileContent.Path, fileContent.Err)
-						return
-					}
-					if fileContent.Status == ssareducer.FileParseASTError {
-						prog.RecordCompileDiagnostic("ast", fileContent.Path, fmt.Sprint(fileContent.Err))
-						if astParseErrLogged < maxAstParseErrLogs {
-							log.Warnf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-							astParseErrLogged++
-						} else if !astParseErrSuppressed {
-							astParseErrSuppressed = true
-							log.Warnf("too many AST parse errors; suppressing further per-file logs (limit=%d)", maxAstParseErrLogs)
-						}
-						astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
-					}
-					editor := prog.CreateEditor(fileContent.Content, fileContent.Path)
-					fileContent.Editor = editor
-					fileContent.Content = nil
-					if fileContent.Err != nil {
-						prog.ProcessInfof("file %s parse ast error: %v", fileContent.Path, fileContent.Err)
-						astErr = utils.JoinErrors(astErr,
-							utils.Errorf("pre-handler parse file %s error: %v", fileContent.Path, fileContent.Err),
-						)
-					}
-					preHandlerProcess()
-					if language := c.LanguageBuilder; language != nil {
-						func() {
-							defer func() {
-								if r := recover(); r != nil {
-									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, fmt.Sprint(r))
-									log.Errorf("pre-handler parse [%s] error %v  ", fileContent.Path, r)
-									utils.PrintCurrentGoroutineRuntimeStack()
-								}
-							}()
-							language.InitHandler(builder)
-							err = language.PreHandlerProject(filesystem, fileContent.AST, builder, editor)
-							if err != nil {
-								var configError *ssa.ProjectConfigError
-								if errors.As(err, &configError) {
-									log.Warnf("%v", err)
-								} else {
-									prog.RecordCompileDiagnostic("prehandler", fileContent.Path, err.Error())
-									log.Errorf("pre-handler parse [%s] error %v", fileContent.Path, err)
-								}
-							}
-						}()
-					}
-					if preHandlerBuildsFiles {
-						ssa.ReleaseASTRoot(fileContent.AST)
-					}
-					if _, needBuild := preHandlerFileSet[fileContent.Path]; needBuild {
-						_, needsCompile := handlerFileSet[fileContent.Path]
-						switch {
-						case needsCompile && fileContent.AST != nil && !preHandlerBuildsFiles:
-							ast := fileContent.AST
-							path := fileContent.Path
-							prog.RegisterFileBuild(path, editor, builder, func(fileBuilder *ssa.FunctionBuilder) {
-								fileBuildStart := time.Now()
-								defer func() {
-									if d := time.Since(fileBuildStart); d > 100*time.Millisecond {
-										log.Debugf("[file build] %s cost %v", path, d)
-									}
-								}()
-								if err := c.LanguageBuilder.BuildFromAST(ast, fileBuilder); err != nil {
-									log.Errorf("file build [%s] failed: %v", path, err)
-								}
-							})
-						case !needsCompile && fileContent.Editor != nil:
-							rootEditor := fileContent.Editor
-							prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
-								prog.PushEditor(rootEditor)
-								prog.PopEditor(true)
-							})
-						}
-					}
-					fileContent.AST = nil
-				}(fileContent)
-				if c.isStop() {
-					unitCanceled = true
-					break
-				}
-			}
+		}
+		prehandleStart := time.Now()
+		prehandle := &prehandleBatchEnv{
+			c:                     c,
+			prog:                  prog,
+			builder:               builder,
+			filesystem:            filesystem,
+			fileUnits:             fileUnits,
+			preHandlerFileSet:     preHandlerFileSet,
+			handlerFileSet:        handlerFileSet,
+			preHandlerBuildsFiles: preHandlerBuildsFiles,
+			preHandlerProcess:     preHandlerProcess,
+			concurrency:           prehandleWorkers,
+			astErr:                astErr,
+			astParseErrLogged:     astParseErrLogged,
+			astParseErrSuppressed: astParseErrSuppressed,
+			maxAstParseErrLogs:    maxAstParseErrLogs,
+		}
+		unitCanceled := prehandle.consume(prefetchedFiles)
+		astErr = prehandle.astErr
+		astParseErrLogged = prehandle.astParseErrLogged
+		astParseErrSuppressed = prehandle.astParseErrSuppressed
+		log.Infof("compile unit prehandler batch=%d units=%d files=%d concurrency=%d cost=%v",
+			batchIndex+1, len(unitKeys), len(batchFiles), prehandle.concurrency, time.Since(prehandleStart))
+		if unitCanceled {
 			prog.EndCompileUnit()
-			if unitCanceled {
-				return nil, ErrContextCancel
-			}
+			return nil, ErrContextCancel
 		}
 		if c.isStop() {
 			return nil, ErrContextCancel
@@ -509,18 +491,20 @@ func (c *Config) parseProjectWithFSUnits(
 			language.AfterPreHandlerProject(builder)
 			language.Clearup()
 		}
+		// Binding then hierarchy run after every skeleton has released its
+		// builder and before prehandler mode is cleared. Frontends register
+		// those phases by kind. Other deferred work stays on the later pass.
+		for _, kind := range []ssa.DeferredBuildKind{ssa.DeferredBuildKindBinding, ssa.DeferredBuildKindHierarchy} {
+			if !prog.RunDeferredBuildsForUnitsOfKind(unitKeys, kind, nil, nil) {
+				return nil, ErrContextCancel
+			}
+		}
 		prog.SetPreHandler(false)
 		if holdSCCIR && !structScanOn && prog.Cache != nil {
 			prog.Cache.EnableInstructionSpill()
 		}
 		compilePhase = "f3_unit_build"
 		unitBuildStart := time.Now()
-		// Unit-end and batch-boundary instruction flushes enqueue ordinary
-		// instructions for asynchronous persistence. Boundary instructions stay
-		// resident for cross-unit resolution, while the completion callback logs
-		// the real post-eviction state. Incremental compile still skips both
-		// paths to preserve its overlay semantics.
-		// Skip both for incremental compile to preserve overlay.
 		flushThreshold := flushCompileUnitThreshold()
 		isIncremental := c.compileMode() != compileModeFull
 		flushedUnits := make(map[string]bool)
@@ -528,8 +512,9 @@ func (c *Config) parseProjectWithFSUnits(
 			func(index int, total int) bool {
 				// Match legacy deferred band: pre-handler ends ~0.40, builds fill to ~0.88.
 				// Spread that band across all batches so batch 1/N cannot claim ~87%.
-				process = deferredBuildProcessFraction(batchIndex, len(batches), index, total)
-				processCallback(process, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
+				p := deferredBuildProcessFraction(batchIndex, len(batches), index, total)
+				storeProcess(p)
+				reportProcess(p, fmt.Sprintf("[%s] deferred build progress(%d/%d) batch(%d/%d)", compilePhase, index, total, batchIndex+1, len(batches)))
 				return !c.isStop()
 			},
 			func(unitKey string) bool {
@@ -547,59 +532,49 @@ func (c *Config) parseProjectWithFSUnits(
 		) {
 			return nil, ErrContextCancel
 		}
+		// Unit-end and batch-boundary instruction flushes enqueue ordinary
+		// instructions for asynchronous persistence. Boundary instructions stay
+		// resident for cross-unit resolution, while the completion callback logs
+		// the real post-eviction state. Incremental compile still skips both
+		// paths to preserve its overlay semantics.
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
 		// Second phase of this batch: expand method-body LazyBuilders that
-		// belong to these units. PreHandler already built the skeleton;
-		// without this drain, bodies wait for Application.Finish and the
-		// unit cannot scan or recycle AST/IR on its own.
-		prog.LazyBuildForUnits(unitKeys)
+		// belong to these units. The same DAG scheduler serves every frontend;
+		// buildWorkers 1 is its serial mode, not a second implementation.
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
-		parseTime += time.Since(unitBuildStart)
-		if structScanOn {
-			if structProgAPI == nil {
-				structProgAPI = NewProgram(prog, c)
-			}
-			for _, unit := range batch.units {
-				if unit == nil {
-					continue
-				}
-				processCallback(process, fmt.Sprintf("[struct_scan] package=%s", unit.Key))
-				c.structScan.ScanStruct(structProgAPI, unit)
-				if c.isStop() {
-					return nil, ErrContextCancel
-				}
-			}
-			c.structScan.WaitSaves()
-			if prog.Cache != nil {
-				prog.Cache.EnableInstructionSpill()
-			}
+		// A single-batch project has no future declarations to add to the
+		// application entry functions. Finish their lazy top-level work before
+		// the struct scan observes resident instructions.
+		if structScanOn && len(batches) == 1 {
+			prog.Finish()
 		}
-		// Per-batch flush: evict ordinary instructions to DB, keeping
-		// Function/Parameter/BasicBlock boundary instructions resident for
-		// cross-unit calls. Persistence goes through the program cache, which
-		// already uses ssadb.GetDB, so this loop does not pick a database or
-		// retune SQLite.
-		if prog.Cache != nil {
-			if !isIncremental {
-				prog.Cache.FlushCompileUnit(strings.Join(unitKeys, ","))
+		if structScanOn && structProgAPI == nil {
+			structProgAPI = NewProgram(prog, c)
+		}
+		cleanup := compileBatchCleanup{
+			config: c, program: prog, apiProgram: structProgAPI,
+			batch: batch, unitKeys: unitKeys, structScan: structScanOn,
+			incremental: isIncremental, batchIndex: batchIndex,
+			batchCount: len(batches), buildStarted: unitBuildStart,
+			loadProgress: loadProcess, reportProgress: reportProcess,
+		}
+		// The scan and cache mutate or traverse shared IR. Finish them before
+		// starting the next batch; compilation parallelism is inside the DAG
+		// scheduler above, not in an unowned cleanup goroutine.
+		buildCost, err := executeCompileUnitBatch(
+			c.GetContext(), prog, plan, batch, buildWorkers, batchIndex, cleanup, drainUnscheduled,
+		)
+		parseTime += buildCost
+		if err != nil {
+			if c.isStop() || errors.Is(err, context.Canceled) {
+				return nil, ErrContextCancel
 			}
-			prog.Cache.FlushInstructionSaver()
-			prog.Cache.FlushAuxSavers()
-			// Type/index serialization can reload instructions and enqueue their
-			// eviction again; settle those writes before declaring the batch done.
-			prog.Cache.FlushInstructionSaver()
-			prog.CheckMemoryPressure(batchIndex+1, len(batches))
+			return nil, err
 		}
-		if compileUnitLogEnabled() {
-			prog.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v", batchIndex+1, len(batches), strings.Join(unitKeys, ","), time.Since(unitBuildStart))
-		}
-		logPhaseHeap(fmt.Sprintf("unit_batch_%03d", batchIndex+1))
-		prog.SetPreHandler(true)
-		compilePhase = "f1_units"
 	}
 	preHandlerTime = time.Since(unitStart) - parseTime
 	if astErr != nil && c.GetCompileStrictMode() {
@@ -609,7 +584,7 @@ func (c *Config) parseProjectWithFSUnits(
 	compilePhase = "f4_finish"
 	log.Debugf("ssa.compile.phase enter %s", compilePhase)
 	finishStart := time.Now()
-	process = 0.88
+	storeProcess(0.88)
 	prog.SetPreHandler(false)
 	if !prog.RunDeferredBuildsWithCallback(func(index int, total int) bool {
 		return !c.isStop()
@@ -647,16 +622,17 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.Cache.FlushCompileUnit("final")
 		prog.Cache.FlushInstructionSaver()
 	}
-	remaining := prog.Cache.CountInstruction()
-	persisted := prog.Cache.InstructionPersistedCount()
-	total := remaining + persisted
-	process = 0.90
+	accounting := prog.Cache.GetFlushAccounting()
+	remaining := int(accounting.RemainingDirty)
+	persisted := int(accounting.AlreadyPersisted)
+	total := int(accounting.InstructionsTotal)
+	storeProcess(0.90)
 	// Log memory state before the heaviest save phase
 	{
 		var ms runtime.MemStats
 		runtime.ReadMemStats(&ms)
-		log.Infof("[ssa-compile] f5_save_db enter: program=%s remaining=%d persisted=%d total=%d heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
-			prog.Name, remaining, persisted, total,
+		log.Infof("[ssa-compile] f5_save_db enter: program=%s remaining=%d persisted=%d total=%d resident=%d heapAlloc=%.1fMB heapSys=%.1fMB heapObjects=%d numGC=%d",
+			prog.Name, remaining, persisted, total, accounting.Resident,
 			float64(ms.Alloc)/1024/1024, float64(ms.Sys)/1024/1024, ms.HeapObjects, ms.NumGC)
 	}
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
@@ -666,7 +642,7 @@ func (c *Config) parseProjectWithFSUnits(
 		prog.ProcessInfof("[SSA/persist] program %s finishing cache instruction(len:%d) (memory only, not saved)", prog.Name, remaining)
 	}
 	if err := prog.Cache.SaveToDatabase(irSaveProgressCallback(prog, total, persisted, 0.90, 1.0, func(p float64) {
-		process = p
+		storeProcess(p)
 	})); err != nil {
 		return nil, utils.Errorf("persist IR to database failed: %w", err)
 	}
@@ -786,7 +762,7 @@ func (c *Config) parseProjectWithFSLegacy(
 	// This is runtime tuning input, not persistent project metadata.
 	c.Config.SetCompileProjectBytes(scanResult.HandlerBytes)
 	emitCompileScale(processCallback, 0, scanResult)
-	if restoreGC := c.applyLargeProjectGCPercent(); restoreGC != nil {
+	if restoreGC := c.applyCompileProjectGCPercent(); restoreGC != nil {
 		defer restoreGC()
 	}
 	c.Config.SetCompileUnitSplit(false)
@@ -1027,9 +1003,10 @@ func (c *Config) parseProjectWithFSLegacy(
 
 	f5 := func() error {
 		saveStart := time.Now()
-		remaining := prog.Cache.CountInstruction()
-		persisted := prog.Cache.InstructionPersistedCount()
-		total := remaining + persisted
+		accounting := prog.Cache.GetFlushAccounting()
+		remaining := int(accounting.RemainingDirty)
+		persisted := int(accounting.AlreadyPersisted)
+		total := int(accounting.InstructionsTotal)
 		process = 0.90
 		if prog.DatabaseKind != ssa.ProgramCacheMemory {
 			prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",

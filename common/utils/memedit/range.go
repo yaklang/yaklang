@@ -59,6 +59,27 @@ type Range struct {
 	text        string
 }
 
+// Clone owns its positions and cached text, allowing the original range to
+// be edited after the clone is published to a shared source-position index.
+func (r *Range) Clone() *Range {
+	if r == nil {
+		return nil
+	}
+	clone := *r
+	if r.start != nil {
+		p := *r.start
+		clone.start = &p
+	}
+	if r.end != nil {
+		p := *r.end
+		clone.end = &p
+	}
+	if clone.text == "" && clone.editor != nil {
+		clone.text = clone.editor.GetTextFromRange(&clone)
+	}
+	return &clone
+}
+
 func NewRange(p1, p2 *Position) *Range {
 	if p1 == nil || p2 == nil {
 		log.Warn("NewRange called with nil position(s)")
@@ -189,8 +210,11 @@ func (p *Range) GetText() string {
 		log.Warn("range.editor is nil")
 		return ""
 	}
-	p.text = p.editor.GetTextFromRange(p)
-	return p.text
+	text := p.editor.GetTextFromRange(p)
+	if text != "" {
+		p.text = text
+	}
+	return text
 }
 
 func (r *Range) Len() int {

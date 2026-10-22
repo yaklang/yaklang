@@ -254,10 +254,24 @@ type MethodBuilder interface {
 
 // ExternMethodBuilder is the default for standalone type queries and programs
 // without a configured method builder. Parse configurations belong to Program.
+// Deprecated: use SetExternMethodBuilder when programs can compile concurrently.
 var ExternMethodBuilder MethodBuilder
+var externMethodBuilderMu sync.RWMutex
+
+func SetExternMethodBuilder(builder MethodBuilder) {
+	externMethodBuilderMu.Lock()
+	ExternMethodBuilder = builder
+	externMethodBuilderMu.Unlock()
+}
+
+func getExternMethodBuilder() MethodBuilder {
+	externMethodBuilderMu.RLock()
+	defer externMethodBuilderMu.RUnlock()
+	return ExternMethodBuilder
+}
 
 func GetMethod(t Type, id string, peek ...bool) *Function {
-	return getMethodWithBuilder(t, id, ExternMethodBuilder, peek...)
+	return getMethodWithBuilder(t, id, getExternMethodBuilder(), peek...)
 }
 
 func (prog *Program) getMethod(t Type, id string, peek ...bool) *Function {
@@ -268,7 +282,7 @@ func (prog *Program) getExternMethodBuilder() MethodBuilder {
 	if prog != nil && prog.externMethodBuilder != nil {
 		return prog.externMethodBuilder
 	}
-	return ExternMethodBuilder
+	return getExternMethodBuilder()
 }
 
 func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool) *Function {
@@ -281,7 +295,7 @@ func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool
 		f = fun
 		// peek is true, don't build
 		if len(peek) == 0 || !peek[0] {
-			f.Build()
+			f.buildOnLookup()
 		}
 	}
 
@@ -298,7 +312,7 @@ func getMethodWithBuilder(t Type, id string, builder MethodBuilder, peek ...bool
 }
 
 func GetMethodsName(t Type) []string {
-	return getMethodsNameWithBuilder(t, ExternMethodBuilder)
+	return getMethodsNameWithBuilder(t, getExternMethodBuilder())
 }
 
 func getMethodsNameWithBuilder(t Type, builder MethodBuilder) []string {
@@ -311,7 +325,7 @@ func getMethodsNameWithBuilder(t Type, builder MethodBuilder) []string {
 }
 
 func GetAllKey(t Type) []string {
-	return getAllKeyWithBuilder(t, ExternMethodBuilder)
+	return getAllKeyWithBuilder(t, getExternMethodBuilder())
 }
 
 // GetAllKey includes this program's configured methods when suggesting member
@@ -476,11 +490,8 @@ type baseType struct {
 	// id is read by every IR marshal of a shared type and assigned lazily by
 	// typeStore.remember, so it must never be a plain field: persist workers run
 	// concurrently over the same *FunctionType and friends.
-	id           atomic.Int64
-	method       map[string]*Function
-	methodGetter func() map[string]*Function
-	methodOnce   sync.Once
-	methodLock   sync.RWMutex
+	id      atomic.Int64
+	methods atomic.Pointer[typeMethodState]
 }
 
 func NewBaseType() *baseType {
@@ -511,42 +522,126 @@ func (b *baseType) claimIdIfUnset(candidate int64) (int64, bool) {
 	}
 }
 
+// Mutable method metadata is absent on the common primitive type.
+type typeMethodState struct {
+	mu       sync.RWMutex
+	once     sync.Once
+	getter   func() map[string]*Function
+	snapshot map[string]*Function // immutable, retained for the public Type API
+}
+
+func (b *baseType) methodState() *typeMethodState {
+	if state := b.methods.Load(); state != nil {
+		return state
+	}
+	created := &typeMethodState{}
+	if b.methods.CompareAndSwap(nil, created) {
+		return created
+	}
+	return b.methods.Load()
+}
+
 func (b *baseType) SetMethodGetter(f func() map[string]*Function) {
-	b.methodGetter = f
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.getter = f
+}
+
+func cloneTypeMethods(src map[string]*Function) map[string]*Function {
+	if len(src) == 0 {
+		return nil
+	}
+	copy := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range src {
+		copy.Set(name, fn)
+	}
+	return copy.GetAll()
 }
 
 func (b *baseType) SetMethod(m map[string]*Function) {
-	b.method = m
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	state.snapshot = cloneTypeMethods(m)
 }
 
 func (b *baseType) AddMethod(id string, f *Function) {
-	if b.method == nil {
-		// init
-		b.GetMethod()
+	b.GetMethod()
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	if old, exists := state.snapshot[id]; exists && old == f {
+		return
 	}
-	b.methodLock.Lock()
-	defer b.methodLock.Unlock()
-	b.method[id] = f
+	methods := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range state.snapshot {
+		methods.Set(name, fn)
+	}
+	methods.Set(id, f)
+	state.snapshot = methods.GetAll()
+}
+
+// AddMethods copies once and publishes an immutable snapshot. The SafeMap
+// owns construction; the returned map preserves the existing Type API.
+func (b *baseType) AddMethods(additions map[string]*Function) {
+	if len(additions) == 0 {
+		return
+	}
+	b.GetMethod()
+	state := b.methodState()
+	state.mu.Lock()
+	defer state.mu.Unlock()
+	changed := false
+	for name, fn := range additions {
+		if old, exists := state.snapshot[name]; !exists || old != fn {
+			changed = true
+			break
+		}
+	}
+	if !changed {
+		return
+	}
+	methods := utils.NewSafeMapWithKey[string, *Function]()
+	for name, fn := range state.snapshot {
+		methods.Set(name, fn)
+	}
+	for name, fn := range additions {
+		methods.Set(name, fn)
+	}
+	state.snapshot = methods.GetAll()
 }
 
 func (b *baseType) GetMethod() map[string]*Function {
-	if b.method == nil {
-		// 防止并发
-		b.methodOnce.Do(func() {
-			if b.methodGetter == nil {
-				b.method = make(map[string]*Function)
-			} else {
-				b.method = b.methodGetter()
-			}
-		})
+	state := b.methods.Load()
+	if state == nil {
+		return nil
 	}
-	return b.method
+	state.once.Do(func() {
+		state.mu.RLock()
+		getter, initialized := state.getter, state.snapshot != nil
+		state.mu.RUnlock()
+		if initialized {
+			return
+		}
+		var methods map[string]*Function
+		if getter != nil {
+			methods = getter()
+		}
+		state.mu.Lock()
+		defer state.mu.Unlock()
+		if state.snapshot == nil {
+			state.snapshot = cloneTypeMethods(methods)
+		}
+		state.getter = nil // lazy getter may capture parser and type graphs
+	})
+	state.mu.RLock()
+	defer state.mu.RUnlock()
+	return state.snapshot
 }
 
 func (b *baseType) RangeMethod(f func(string, *Function)) {
-	b.methodLock.RLock()
-	defer b.methodLock.RUnlock()
-	for k, v := range b.method {
+	for k, v := range b.GetMethod() {
 		f(k, v)
 	}
 }
@@ -554,43 +649,47 @@ func (b *baseType) RangeMethod(f func(string, *Function)) {
 type BasicType struct {
 	// Basic types are numerous and own their base state. Keep it in the same
 	// allocation, avoiding a separate GC object and pointer per type. BasicType
-	// must not be copied after use (baseType contains atomics and locks).
+	// must not be copied after use (baseType contains atomics).
 	baseType
-	Kind    TypeKind
-	name    string
-	pkgPath string
+	Kind        TypeKind
+	description *basicTypeDescription
 
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
+type basicTypeDescription struct{ name string }
+type basicTypeDescriptionKey struct {
+	kind TypeKind
+	name string
+}
+
+// Only immutable descriptions are shared. Keep this constructor fallback
+// bounded; each program's NameCache provides the full lifetime string pool.
+var basicTypeDescriptions = utils.NewSafeMapWithKey[basicTypeDescriptionKey, *basicTypeDescription]()
+
 func NewBasicType(kind TypeKind, name string) *BasicType {
-	typ := &BasicType{
-		Kind:         kind,
-		name:         name,
-		pkgPath:      name,
-		fullTypeName: make([]string, 0),
+	key := basicTypeDescriptionKey{kind, name}
+	description, exists := basicTypeDescriptions.Get(key)
+	if !exists {
+		if len(name) <= 4096 && basicTypeDescriptions.Count() < 4096 {
+			key.name = strings.Clone(name)
+			description, _ = basicTypeDescriptions.GetOrLoad(key, func() (*basicTypeDescription, error) {
+				return &basicTypeDescription{name: key.name}, nil
+			})
+		} else {
+			description = &basicTypeDescription{name: strings.Clone(name)}
+		}
 	}
+	typ := &BasicType{Kind: kind, description: description}
 	typ.id.Store(-1)
 	return typ
 }
 
 var _ Type = (*BasicType)(nil)
 
-func (b *BasicType) String() string {
-	return b.name
-}
-
-func (b *BasicType) PkgPathString() string {
-	result := b.pkgPath
-	if result == "" {
-		result = b.RawString()
-	}
-	return result
-}
-
-func (b *BasicType) RawString() string {
-	return b.name
-}
+func (b *BasicType) String() string        { return b.description.name }
+func (b *BasicType) PkgPathString() string { return b.description.name }
+func (b *BasicType) RawString() string     { return b.description.name }
 
 func (b *BasicType) GetTypeKind() TypeKind {
 	return b.Kind
@@ -600,21 +699,21 @@ func (b *BasicType) AddFullTypeName(name string) {
 	if b == nil {
 		return
 	}
-	fullTypeNameAdd(&b.fullTypeName, name, b)
+	b.fullTypeName.add(name)
 }
 
 func (b *BasicType) GetFullTypeNames() []string {
 	if b == nil {
 		return nil
 	}
-	return b.fullTypeName
+	return b.fullTypeName.list()
 }
 
 func (b *BasicType) SetFullTypeNames(names []string) {
 	if b == nil {
 		return
 	}
-	fullTypeNameSet(&b.fullTypeName, names, b)
+	b.fullTypeName.set(names)
 }
 
 func (b *BasicType) IsAny() bool {
@@ -638,7 +737,7 @@ func (b *BasicType) IsNull() bool {
 }
 
 func (b *BasicType) GetName() string {
-	return b.name
+	return b.description.name
 }
 
 // func (b *BasicType) GetAllKey() []string {
@@ -728,7 +827,7 @@ type AliasType struct {
 	elem         Type
 	Name         string
 	pkgPath      string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ Type = (*AliasType)(nil)
@@ -746,21 +845,21 @@ func (a *AliasType) AddFullTypeName(name string) {
 	if a == nil {
 		return
 	}
-	fullTypeNameAdd(&a.fullTypeName, name, a)
+	a.fullTypeName.add(name)
 }
 
 func (a *AliasType) GetFullTypeNames() []string {
 	if a == nil {
 		return nil
 	}
-	return a.fullTypeName
+	return a.fullTypeName.list()
 }
 
 func (a *AliasType) SetFullTypeNames(names []string) {
 	if a == nil {
 		return
 	}
-	fullTypeNameSet(&a.fullTypeName, names, a)
+	a.fullTypeName.set(names)
 }
 
 // func (b *AliasType) GetAllKey() []string {
@@ -800,8 +899,9 @@ type InterfaceType struct {
 	*baseType
 	object       map[string]*ObjectType
 	name         string
+	nameMu       sync.Mutex
 	pkgPath      string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 	parents      []*InterfaceType
 	childs       []*InterfaceType
 }
@@ -836,11 +936,12 @@ func (i *InterfaceType) GetTypeKind() TypeKind {
 }
 
 func (i *InterfaceType) String() string {
+	i.nameMu.Lock()
+	defer i.nameMu.Unlock()
 	if i.name != "" {
 		return i.name
-	} else {
-		return i.RawString()
 	}
+	return fmt.Sprintf("type %s interface{}", i.name)
 }
 
 func (i *InterfaceType) PkgPathString() string {
@@ -852,6 +953,8 @@ func (i *InterfaceType) PkgPathString() string {
 }
 
 func (i *InterfaceType) RawString() string {
+	i.nameMu.Lock()
+	defer i.nameMu.Unlock()
 	return fmt.Sprintf("type %s interface{}", i.name)
 }
 
@@ -868,29 +971,31 @@ func (i *InterfaceType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
+	i.nameMu.Lock()
 	i.name = name
-	fullTypeNameAdd(&i.fullTypeName, name, i)
+	i.nameMu.Unlock()
+	i.fullTypeName.add(name)
 }
 
 func (i *InterfaceType) GetFullTypeNames() []string {
 	if i == nil {
 		return nil
 	}
-	return i.fullTypeName
+	return i.fullTypeName.list()
 }
 
 func (i *InterfaceType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	fullTypeNameSet(&i.fullTypeName, names, i)
+	i.fullTypeName.set(names)
 }
 
 // ====================== chan type
 type ChanType struct {
 	*baseType
 	Elem         Type
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*ChanType)(nil)
@@ -899,21 +1004,21 @@ func (c *ChanType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *ChanType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *ChanType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 // func (b *ChanType) GetAllKey() []string {
@@ -964,7 +1069,7 @@ type ObjectType struct {
 	KeyTyp    Type
 	FieldType Type
 
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*ObjectType)(nil)
@@ -981,21 +1086,21 @@ func (i *ObjectType) AddFullTypeName(name string) {
 	if i == nil {
 		return
 	}
-	fullTypeNameAdd(&i.fullTypeName, name, i)
+	i.fullTypeName.add(name)
 }
 
 func (i *ObjectType) GetFullTypeNames() []string {
 	if i == nil {
 		return nil
 	}
-	return i.fullTypeName
+	return i.fullTypeName.list()
 }
 
 func (i *ObjectType) SetFullTypeNames(names []string) {
 	if i == nil {
 		return
 	}
-	fullTypeNameSet(&i.fullTypeName, names, i)
+	i.fullTypeName.set(names)
 }
 
 func (i *ObjectType) SetName(name string) {
@@ -1022,7 +1127,6 @@ func NewObjectType() *ObjectType {
 		keyTypes:   make([]Type, 0),
 		FieldTypes: make([]Type, 0),
 
-		fullTypeName:   []string{},
 		AnonymousField: map[string]*ObjectType{},
 	}
 }
@@ -1057,22 +1161,7 @@ func NewPointerType() *ObjectType {
 }
 
 func (itype *ObjectType) String() string {
-	if itype.Combination {
-		return strings.Join(
-			lo.Map(
-				itype.FieldTypes,
-				func(t Type, _ int) string { return t.String() },
-			),
-			", ",
-		)
-	}
-	if itype.Name != "" {
-		return itype.Name
-	}
-	itype.Name = "..." // avoid RawString -> String -> RawString loop
-	ret := itype.RawString()
-	itype.Name = ""
-	return ret
+	return (&typeStringer{}).format(itype)
 }
 
 func (i *ObjectType) PkgPathString() string {
@@ -1084,15 +1173,20 @@ func (i *ObjectType) PkgPathString() string {
 }
 
 func (itype *ObjectType) RawString() string {
+	formatter := &typeStringer{active: []Type{itype}}
+	return itype.rawString(formatter.format)
+}
+
+func (itype *ObjectType) rawString(format func(Type) string) string {
 	ret := ""
 	switch itype.Kind {
 	case SliceTypeKind:
 		if itype.FieldType != nil {
 			// map[int]T
 			if itype.Len == 0 {
-				ret += fmt.Sprintf("[]%s", itype.FieldType.String())
+				ret += fmt.Sprintf("[]%s", format(itype.FieldType))
 			} else {
-				ret += fmt.Sprintf("[%d]%s", itype.Len, itype.FieldType.String())
+				ret += fmt.Sprintf("[%d]%s", itype.Len, format(itype.FieldType))
 			}
 		}
 	case MapTypeKind:
@@ -1106,13 +1200,13 @@ func (itype *ObjectType) RawString() string {
 		if utils.IsNil(fieldType) {
 			fieldType = CreateAnyType()
 		}
-		ret += fmt.Sprintf("map[%s]%s", keyTyp.String(), fieldType.String())
+		ret += fmt.Sprintf("map[%s]%s", format(keyTyp), format(fieldType))
 	case StructTypeKind:
 		// map[string](T/U/xx)
 		ret += fmt.Sprintf(
 			"struct {%s}",
 			strings.Join(
-				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
+				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return format(field) }),
 				",",
 			),
 		)
@@ -1122,7 +1216,7 @@ func (itype *ObjectType) RawString() string {
 		// [T,U,V]
 		ret += fmt.Sprintf(
 			"[%s]", strings.Join(
-				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return field.String() }),
+				lo.Map(itype.FieldTypes, func(field Type, _ int) string { return format(field) }),
 				",",
 			),
 		)
@@ -1272,6 +1366,7 @@ func (s *ObjectType) Finish() {
 }
 
 type FunctionType struct {
+	receiverMu sync.RWMutex
 	*baseType
 	Name            string
 	pkgPath         string
@@ -1289,42 +1384,47 @@ type FunctionType struct {
 	IsModifySelf    bool // if this is method function
 
 	AnnotationFunc    []func(Value)
-	fullTypeName      []string
+	fullTypeName      orderedTypeNames
 	isAnyFunctionType bool
 
 	// stringCache caches the RawString result so repeated String() calls
 	// on FunctionType with many SideEffects don't re-allocate ~MB strings
 	// (63GB on engineercms). Cleared via resetStringCache when the type
 	// mutates (Name/params/return/side effects change).
-	stringCache string
+	stringCache atomic.Pointer[string]
 }
 
 var _ Type = (*FunctionType)(nil)
 
 func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
+	if f == nil {
+		return
+	}
+	f.receiverMu.Lock()
 	f.IsMethod = isMethod
 	f.ObjectType = obj
+	f.receiverMu.Unlock()
 }
 
 func (f *FunctionType) AddFullTypeName(name string) {
 	if f == nil {
 		return
 	}
-	fullTypeNameAdd(&f.fullTypeName, name, f)
+	f.fullTypeName.add(name)
 }
 
 func (f *FunctionType) GetFullTypeNames() []string {
 	if f == nil {
 		return nil
 	}
-	return f.fullTypeName
+	return f.fullTypeName.list()
 }
 
 func (f *FunctionType) SetFullTypeNames(names []string) {
 	if f == nil {
 		return
 	}
-	fullTypeNameSet(&f.fullTypeName, names, f)
+	f.fullTypeName.set(names)
 }
 
 func (f *FunctionType) SetModifySelf(b bool) { f.IsModifySelf = b }
@@ -1357,7 +1457,7 @@ func NewAnyFunctionType() *FunctionType {
 
 func (s *FunctionType) resetStringCache() {
 	if s != nil {
-		s.stringCache = ""
+		s.stringCache.Store(nil)
 	}
 }
 
@@ -1391,30 +1491,23 @@ func (s *FunctionType) PkgPathString() string {
 }
 
 func (s *FunctionType) String() string {
-	// Re-entrancy guard: RawString() may call String() on this same type
-	// (e.g. a FunctionType that contains itself as parameter or return
-	// type). Return the guard marker instead of recursing forever.
-	if s.Name == "..." {
-		return "..."
-	}
-	// A named function type (e.g. a Go named function type like
-	// ssaconfig.Option) prints its name, not its full signature. This
-	// matches the pre-cache behavior and keeps user-facing error messages
-	// stable.
 	if s.Name != "" {
 		return s.Name
 	}
-	if s.stringCache != "" {
-		return s.stringCache
+	if cached := s.stringCache.Load(); cached != nil {
+		return *cached
 	}
-	s.Name = "..." // avoid RawString -> String -> RawString loop
-	ret := s.RawString()
-	s.Name = ""
-	s.stringCache = ret
+	ret := (&typeStringer{}).format(s)
+	s.stringCache.Store(&ret)
 	return ret
 }
 
 func (s *FunctionType) RawString() string {
+	formatter := &typeStringer{active: []Type{s}}
+	return s.rawString(formatter.format)
+}
+
+func (s *FunctionType) rawString(format func(Type) string) string {
 	variadic := ""
 	if s.IsVariadic {
 		variadic += "..."
@@ -1422,11 +1515,11 @@ func (s *FunctionType) RawString() string {
 
 	paras := make([]string, 0, s.ParameterLen)
 	for i := 0; i < s.ParameterLen; i++ {
-		paras = append(paras, s.Parameter[i].String())
+		paras = append(paras, format(s.Parameter[i]))
 	}
 	returnTypeStr := ""
 	if s.ReturnType != nil {
-		returnTypeStr = s.ReturnType.String()
+		returnTypeStr = format(s.ReturnType)
 	}
 
 	var sideEffectBuilder strings.Builder
@@ -1491,7 +1584,7 @@ func (f *FunctionType) AddAnnotationFunc(handler ...func(Value)) {
 type GenericType struct {
 	*baseType
 	symbol       string
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*GenericType)(nil)
@@ -1500,21 +1593,21 @@ func (c *GenericType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *GenericType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *GenericType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 func (c *GenericType) GetTypeKind() TypeKind {
@@ -1677,7 +1770,7 @@ func CloneType(t Type) (Type, bool) {
 type OrType struct {
 	*baseType
 	types        Types
-	fullTypeName []string
+	fullTypeName orderedTypeNames
 }
 
 var _ (Type) = (*OrType)(nil)
@@ -1686,21 +1779,21 @@ func (c *OrType) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *OrType) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 func (c *OrType) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *OrType) GetTypeKind() TypeKind {

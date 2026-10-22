@@ -182,7 +182,8 @@ func UpdateProgramWithError(prog *IrProgram) error {
 	if prog == nil {
 		return utils.Errorf("update program failed: program is nil")
 	}
-	return GetDB().Model(&IrProgram{}).
+	db := GetDB()
+	return db.Model(&IrProgram{}).
 		Omit("id").
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).

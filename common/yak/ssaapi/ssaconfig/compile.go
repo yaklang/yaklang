@@ -21,9 +21,11 @@ type BaseInfo struct {
 type ASTSequenceType int
 
 const (
+	// OutOfOrder parses concurrently and delivers each file as it finishes.
+	// Compile results must not depend on source order. A dependency that only
+	// appears when files are sorted is a bug in the frontend, not a reason to
+	// buffer every AST until the input order can be restored.
 	OutOfOrder ASTSequenceType = iota
-	Order
-	ReverseOrder
 )
 
 // --- 基础信息配置 Get/Set 方法 ---
@@ -306,14 +308,19 @@ func WithProjectLanguage(language Language) Option {
 // SSACompileConfig controls project-wide SSA compilation (JSON field `SSACompile` on the root config).
 //
 // Large-project notes:
-//   - compile_concurrency: only parallelizes pre-handler read+ParseAST; main per-file SSA build stays serial.
+//   - compile_concurrency: one cap for AST parse workers, declaration
+//     PreHandler, independent compile-unit groups, and opted-in Java
+//     library/method-body drains. Default is machine CPU (GOMAXPROCS-1)
+//     further capped so each worker has at least 256MiB of usable RAM.
+//   - compile_memory_limit: Go soft heap limit. Default is 80% of
+//     cgroup/host RAM. 0 in JSON means that auto value.
 //   - exclude_files / entry_files: primary levers to shrink work.
 //   - peephole_size: splits the virtual FS into multiple compile chunks (multiple programs).
 //   - enable_incremental_compile + base_program_name: incremental / diff workflows.
 //   - memory_compile: memory-only program cache (some CLIs force DB mode).
 //
-// AST parse ordering (OutOfOrder vs Order vs ReverseOrder) is not a field here; it is set via ssaapi.WithASTOrder
-// / extra option key `ssa_compile/ast_order`. Non-OutOfOrder modes buffer all file ASTs before main build — high RAM on large trees.
+// Parsed files are delivered as they finish. There is no input-order or
+// reverse-order mode: both buffered every AST and hid order-dependent builds.
 // Pre-handler pipeline channel sizing is capped in ssareducer.pipeInitBufSize (not proportional to total file count).
 type SSACompileConfig struct {
 	StrictMode   bool     `json:"strict_mode"`
@@ -323,19 +330,19 @@ type SSACompileConfig struct {
 	// patterns (test fixtures, build outputs, dependency archives, ...).
 	// When true, only ExcludeFiles (user-provided patterns) apply. This is
 	// the escape hatch for embedders/tests that need full-tree scanning.
-	DisableDefaultExcludes   bool            `json:"disable_default_excludes,omitempty"`
-	EntryFiles               []string        `json:"entry_files,omitempty"`
-	ReCompile                bool            `json:"re_compile"`
-	MemoryCompile            bool            `json:"memory_compile"`
-	Concurrency              int             `json:"compile_concurrency"`
-	ASTSequence              ASTSequenceType `json:"ast_sequence"`
-	CompileIrCacheTTL        time.Duration   `json:"compile_ir_cache_ttl"`
-	CompileIrCacheMax        int             `json:"compile_ir_cache_max"`
-	FilePerformanceLog       bool            `json:"file_performance_log"`
-	Diagnostics              bool            `json:"diagnostics"`
-	StopOnCliCheck           bool            `json:"stop_on_cli_check"`
-	EnableIncrementalCompile bool            `json:"enable_incremental_compile"`
-	BaseProgramName          string          `json:"base_program_name"`
+	DisableDefaultExcludes   bool          `json:"disable_default_excludes,omitempty"`
+	EntryFiles               []string      `json:"entry_files,omitempty"`
+	ReCompile                bool          `json:"re_compile"`
+	MemoryCompile            bool          `json:"memory_compile"`
+	Concurrency              int           `json:"compile_concurrency"`
+	MemoryLimit              int64         `json:"compile_memory_limit,omitempty"`
+	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
+	CompileIrCacheMax        int           `json:"compile_ir_cache_max"`
+	FilePerformanceLog       bool          `json:"file_performance_log"`
+	Diagnostics              bool          `json:"diagnostics"`
+	StopOnCliCheck           bool          `json:"stop_on_cli_check"`
+	EnableIncrementalCompile bool          `json:"enable_incremental_compile"`
+	BaseProgramName          string        `json:"base_program_name"`
 	// CompileProjectBytes is runtime-only input for adaptive compile IR cache
 	// tuning. It reflects the total source bytes that will enter the compile
 	// stage and is intentionally excluded from JSON persistence.
@@ -481,21 +488,21 @@ func (c *Config) SetCompileConcurrency(concurrency int) {
 	c.SSACompile.Concurrency = concurrency
 }
 
-func (c *Config) GetCompileASTSequence() ASTSequenceType {
-	if c == nil || c.SSACompile == nil {
-		return OutOfOrder
+func (c *Config) GetCompileMemoryLimit() int64 {
+	if c != nil && c.SSACompile != nil && c.SSACompile.MemoryLimit > 0 {
+		return c.SSACompile.MemoryLimit
 	}
-	return c.SSACompile.ASTSequence
+	return DefaultCompileMemoryLimit()
 }
 
-func (c *Config) SetCompileASTSequence(sequence ASTSequenceType) {
+func (c *Config) SetCompileMemoryLimit(limit int64) {
 	if c == nil {
 		return
 	}
 	if c.SSACompile == nil {
 		c.SSACompile = defaultSSACompileConfig()
 	}
-	c.SSACompile.ASTSequence = sequence
+	c.SSACompile.MemoryLimit = limit
 }
 
 func (c *Config) GetCompileIrCacheTTL() time.Duration {
@@ -762,18 +769,10 @@ func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 	}
 }
 
-// WithCompileConcurrency 设置编译并发数（导出名为 ssa.withConcurrency）
-// 参数:
-//   - concurrency: 并发数（仅并行化预处理阶段的读取与 AST 解析）
-//
-// 返回值:
-//   - 编译配置可选项
-//
-// Example:
-// ```
-// opt = ssa.withConcurrency(5)
-// println(opt)
-// ```
+// WithCompileConcurrency sets the compile worker cap (ssa.withConcurrency).
+// AST parse, declaration PreHandler, independent unit groups, and opted-in
+// Java library body drains all share this value. 0 or unset uses the
+// machine default from CompileConcurrencyFor.
 func WithCompileConcurrency(concurrency int) Option {
 	return func(c *Config) error {
 		if err := c.ensureSSACompile("Compile Concurrency"); err != nil {
@@ -784,12 +783,14 @@ func WithCompileConcurrency(concurrency int) Option {
 	}
 }
 
-func WithCompileASTSequence(sequence ASTSequenceType) Option {
+// WithCompileMemoryLimit sets the compile soft heap limit in bytes.
+// 0 restores the machine default (80% of cgroup/host RAM).
+func WithCompileMemoryLimit(limit int64) Option {
 	return func(c *Config) error {
-		if err := c.ensureSSACompile("Compile AST Sequence"); err != nil {
+		if err := c.ensureSSACompile("Compile Memory Limit"); err != nil {
 			return err
 		}
-		c.SSACompile.ASTSequence = sequence
+		c.SSACompile.MemoryLimit = limit
 		return nil
 	}
 }

@@ -71,7 +71,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 			continue
 		}
 		parent.Apply(obj)
-		_, i := lo.Difference(c.fullTypeName, parent.fullTypeName)
+		_, i := lo.Difference(c.GetFullTypeNames(), parent.GetFullTypeNames())
 		c.addFullTypeNames(i)
 	}
 
@@ -81,7 +81,7 @@ func (c *Blueprint) Apply(obj Value) Type {
 			continue
 		}
 		bp.Apply(obj)
-		_, i := lo.Difference(c.fullTypeName, bp.fullTypeName)
+		_, i := lo.Difference(c.GetFullTypeNames(), bp.GetFullTypeNames())
 		c.addFullTypeNames(i)
 	}
 

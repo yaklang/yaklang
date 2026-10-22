@@ -267,6 +267,7 @@ func NewSideEffect(variable string, call *Call, value Value) *SideEffect {
 }
 
 func (i *If) SetCondition(t Value) {
+	defer i.markPersistenceDirty()
 	i.Cond = t.GetId()
 	if b := i.GetBlock(); b != nil {
 		b.SetConditionInstID(i.GetId())
@@ -276,6 +277,7 @@ func (i *If) SetCondition(t Value) {
 }
 
 func (i *If) AddTrue(t *BasicBlock) {
+	defer i.markPersistenceDirty()
 	if t == nil {
 		return
 	}
@@ -286,6 +288,7 @@ func (i *If) AddTrue(t *BasicBlock) {
 }
 
 func (i *If) AddFalse(f *BasicBlock) {
+	defer i.markPersistenceDirty()
 	if f == nil {
 		return
 	}
@@ -296,6 +299,7 @@ func (i *If) AddFalse(f *BasicBlock) {
 }
 
 func (l *Loop) Finish(init, step []Value) {
+	defer l.markPersistenceDirty()
 	// check cond
 	check := func(id int64) bool {
 		v, ok := l.GetValueById(id)
@@ -351,11 +355,15 @@ func (l *Loop) Finish(init, step []Value) {
 }
 
 func (e *ErrorHandler) AddFinal(f *BasicBlock) {
+	defer e.markPersistenceDirty()
+	defer f.markPersistenceDirty()
 	e.Final = f.GetId()
 	f.Handler = e.GetId()
 }
 
 func (e *ErrorHandler) AddDone(d *BasicBlock) {
+	defer e.markPersistenceDirty()
+	defer d.markPersistenceDirty()
 	e.Done = d.GetId()
 	d.Handler = e.GetId()
 }

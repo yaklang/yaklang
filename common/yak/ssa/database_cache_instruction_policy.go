@@ -78,16 +78,29 @@ func shouldKeepCompileUnitBoundaryResident(inst Instruction) bool {
 		SSAOpcodeExternLib:
 		return true
 	case SSAOpcodeBasicBlock:
-		// BasicBlocks carry the ScopeTable that FunctionBuilder relies on for
-		// CreateVariable/NewParam during lazy/deferred builds. The scope is not
-		// restored when a spilled block is reloaded from DB, so a reloaded block
-		// has a nil ScopeTable and the next NewParam panics (nil Variable). Keep
-		// blocks resident under compile-unit split; they are small (metadata +
-		// scope) compared to the instruction stream that the split path spills.
+		// The cache eviction callback may run on a saver goroutine while a
+		// function is being built. Only the compile-thread flush may decide to
+		// spill a completed private block (see below).
 		return true
 	default:
 		return false
 	}
+}
+
+// The compile-thread flush runs after a function is finished, where its
+// original CFG scopes are no longer needed for later lazy builds. Never use
+// this from the async cache eviction callback: Function.finished is owned by
+// the builder and must not be read concurrently with Finish().
+func canSpillFinishedPrivateBlock(inst Instruction) bool {
+	if utils.IsNil(inst) || inst.GetOpcode() != SSAOpcodeBasicBlock {
+		return false
+	}
+	cached, ok := inst.(interface{ GetCachedFunc() *Function })
+	if !ok {
+		return false
+	}
+	fn := cached.GetCachedFunc()
+	return fn != nil && fn.IsFinished() && !shouldKeepFunctionForCrossUnitReference(fn)
 }
 
 func shouldDelayInstructionEviction(inst Instruction) bool {

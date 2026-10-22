@@ -244,8 +244,9 @@ func TestCompileUnitPlanDynamicLanguageStillBuildsDirectoryUnits(t *testing.T) {
 	plan := buildPlanForLanguage(t, ssaconfig.PHP, vf, []string{"app/index.php", "app/lib/a.php"})
 
 	require.Len(t, plan.Units, 2)
-	require.Empty(t, plan.Edges)
-	require.Len(t, plan.Order, 2)
+	require.Contains(t, plan.Units, "dir:app")
+	require.Contains(t, plan.Units, "dir:app/lib")
+	require.Contains(t, plan.Edges, UnitRef{From: "dir:app", To: "dir:app/lib", Kind: "require", Raw: "./lib/a.php"})
 }
 
 func TestCompileUnitPlanPythonModuleFileImportTopoOrder(t *testing.T) {
@@ -320,6 +321,16 @@ var PI = 3.1415926
 	require.Contains(t, plan.Edges, UnitRef{From: "dir:src/main/go/A", To: "dir:src/main/go/B", Kind: "import", Raw: "github.com/yaklang/yaklang/B"})
 	requireUnitBefore(t, plan, "dir:src/main/go/B", "dir:src/main/go/A")
 	requireUnitBefore(t, plan, "dir:src/main/go/A", "dir:src/main/go")
+}
+
+func TestCompileUnitGoDeclaredPackageOwner(t *testing.T) {
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("named/a.go", "package actual\nfunc A() {}\n")
+	vf.AddFile("mixed/a.go", "package first\n")
+	vf.AddFile("mixed/b.go", "package second\n")
+	plan := buildPlanForLanguage(t, ssaconfig.GO, vf, []string{"named/a.go", "mixed/a.go", "mixed/b.go"})
+	require.Equal(t, "actual", plan.Units["dir:named"].LibraryName)
+	require.Empty(t, plan.Units["dir:mixed"].LibraryName)
 }
 
 func TestCompileUnitPlanGoSourceRootAliasImportTopoOrder(t *testing.T) {

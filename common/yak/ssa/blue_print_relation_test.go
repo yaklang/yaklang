@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"fmt"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -81,4 +83,51 @@ func TestBlueprintRelationOnlyStillFindsInheritedMethods(t *testing.T) {
 	parentType, ok := ToFunctionType(parentMethod.GetType())
 	require.True(t, ok)
 	require.Same(t, parent, parentType.ObjectType, "inherited lookup must retain the declaring owner")
+}
+
+// Relation registration must not execute either declaration's lazy body or
+// create assignments in their source scopes. Those bodies belong to unit workers.
+func TestBlueprintRelationDoesNotBuildOrMutateDeclarationScope(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	parent := builder.CreateBlueprint("Parent")
+	child := builder.CreateBlueprint("Child")
+	parentName, childName := parent.Container().GetVerboseName(), child.Container().GetVerboseName()
+	insts := append([]int64(nil), builder.CurrentBlock.Insts...)
+	built := false
+	parent.AddLazyBuilder(func() { built = true })
+	child.AddLazyBuilder(func() { built = true })
+
+	child.AddParentBlueprintRelationOnly(parent)
+
+	require.False(t, built)
+	require.Equal(t, insts, builder.CurrentBlock.Insts)
+	require.Equal(t, parentName, parent.Container().GetVerboseName())
+	require.Equal(t, childName, child.Container().GetVerboseName())
+	require.Len(t, parent.Container().GetMembersByKeyString(string(BlueprintRelationInherit)), 1)
+	require.Len(t, child.Container().GetMembersByKeyString(string(BlueprintRelationParents)), 1)
+}
+
+func TestBlueprintConcurrentReverseRelations(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	parent := builder.CreateBlueprint("Parent")
+	const count = 32
+	children := make([]*Blueprint, count)
+	for i := range children {
+		children[i] = builder.CreateBlueprint(fmt.Sprintf("Child%d", i))
+	}
+	insts := append([]int64(nil), builder.CurrentBlock.Insts...)
+	var wg sync.WaitGroup
+	for _, child := range children {
+		wg.Add(1)
+		go func(child *Blueprint) {
+			defer wg.Done()
+			child.AddParentBlueprintRelationOnly(parent)
+		}(child)
+	}
+	wg.Wait()
+	require.Equal(t, insts, builder.CurrentBlock.Insts)
+	require.Len(t, parent.Container().GetMembersByKeyString(string(BlueprintRelationInherit)), count)
+	for _, child := range children {
+		require.Len(t, child.Container().GetMembersByKeyString(string(BlueprintRelationParents)), 1)
+	}
 }

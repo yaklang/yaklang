@@ -95,13 +95,16 @@ YAK_SSA_DM_URL_FILE=/private/dm-ir.url \
 YAK_SSA_PG_URL_FILE=/private/pg-ir.url \
 YAKIT_HOME=/private/isolated-engine-state \
 GOWORK=off go test -mod=readonly -tags dameng ./common/yak/ssaapi \
-  -run '^Test((DM|Postgres)IRCompileAndCrossProcessReload|DMIRBatchFailurePreservesPreviousRows)$' \
+  -run '^Test((DM|Postgres)IRCompileAndCrossProcessReload|DMIR(BatchFailurePreservesPreviousRows|TypeBatchReuseAndRollback|TypeIndexUpgradePreservesRows))$' \
   -count=1 -timeout=6m
 ```
 
-Both backends compile Java with a long Chinese string, reload it in a fresh
-process, execute SyntaxFlow, persist/reload an incremental layer, and delete the
-programs. The DM failure case checks rollback after a uniqueness conflict.
+Both backends compile three reachable Java units with two compile workers and a
+long Chinese string, reload them in a fresh process, execute SyntaxFlow,
+persist/reload an incremental layer, and delete the programs. DM cases check
+cross-chunk code rollback, type rollback and repeated identity-bearing writes,
+index-error propagation, and conservative type-uniqueness upgrades that preserve
+duplicate historical rows until explicitly repaired.
 DM-enabled Linux glibc tests require the PIC libpcap setup above. Use the shared
 musl build script when validating static product binaries.
 

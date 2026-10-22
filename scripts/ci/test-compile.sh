@@ -145,8 +145,9 @@ should_enable_race() {
     
     # 支持通配符匹配
     if [[ "$pattern" == *"..." ]]; then
-      # 前缀匹配（递归）
-      if [[ "$pkg_normalized" == "$pattern_normalized"* ]]; then
+      # Recursive match must be the package itself or a child path.
+      # A raw prefix would treat common/yak/ssa as matching common/yak/ssaapi.
+      if [[ "$pkg_normalized" == "$pattern_normalized" || "$pkg_normalized" == "$pattern_normalized"/* ]]; then
         return 0
       fi
     elif [[ "$pattern" == */. ]]; then

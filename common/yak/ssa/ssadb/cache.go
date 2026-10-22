@@ -31,22 +31,41 @@ var irCodeSingleFlight singleflight.Group
 var initIrCodeOnce = sync.Once{}
 var irCodeCaches *utils.CacheEx[*utils.CacheExWithKey[int64, *IrCode]]
 
+var programRowCacheMu sync.Mutex
+
+// A parent entry owns its child cache's two background workers. Dropping a
+// pointer alone leaves those workers (and their cached rows) alive indefinitely.
+func newProgramRowCache[T any]() *utils.CacheEx[*utils.CacheExWithKey[int64, T]] {
+	parent := utils.NewCacheEx[*utils.CacheExWithKey[int64, T]](utils.WithCacheTTL(ProgramCacheTTL))
+	parent.SetExpirationCallback(func(_ string, child *utils.CacheExWithKey[int64, T], _ utils.EvictionReason) {
+		if child != nil {
+			child.Close()
+		}
+	})
+	return parent
+}
+
+func getProgramRowCache[T any](parent *utils.CacheEx[*utils.CacheExWithKey[int64, T]], name string) *utils.CacheExWithKey[int64, T] {
+	if child, ok := parent.Get(name); ok {
+		return child
+	}
+	programRowCacheMu.Lock()
+	defer programRowCacheMu.Unlock()
+	if child, ok := parent.Get(name); ok {
+		return child
+	}
+	child := utils.NewCacheExWithKey[int64, T](utils.WithCacheCapacity(irCacheCapacity), utils.WithCacheTTL(irCacheTTL))
+	// GetOrLoad retains completed flight results separately from TTL entries;
+	// using it here would resurrect a closed child after parent eviction.
+	parent.Set(name, child)
+	return child
+}
+
 func GetIrTypeCache(progName string) *utils.CacheExWithKey[int64, *IrType] {
 	initIrTypeOnce.Do(func() {
-		irTypeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrType]](
-			utils.WithCacheTTL(ProgramCacheTTL),
-		)
+		irTypeCaches = newProgramRowCache[*IrType]()
 	})
-	if ret, err := irTypeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrType], error) {
-		return utils.NewCacheExWithKey[int64, *IrType](
-			utils.WithCacheCapacity(irCacheCapacity),
-			utils.WithCacheTTL(irCacheTTL),
-		), nil
-	}); err == nil {
-		return ret
-	} else {
-		return nil
-	}
+	return getProgramRowCache(irTypeCaches, progName)
 }
 
 func deleteCache(progName string) {
@@ -60,18 +79,9 @@ func deleteCache(progName string) {
 
 func GetIrCodeCache(progName string) *utils.CacheExWithKey[int64, *IrCode] {
 	initIrCodeOnce.Do(func() {
-		irCodeCaches = utils.NewCacheEx[*utils.CacheExWithKey[int64, *IrCode]](utils.WithCacheTTL(ProgramCacheTTL))
+		irCodeCaches = newProgramRowCache[*IrCode]()
 	})
-
-	if ret, err := irCodeCaches.GetOrLoad(progName, func() (*utils.CacheExWithKey[int64, *IrCode], error) {
-		return utils.NewCacheExWithKey[int64, *IrCode](
-			utils.WithCacheCapacity(irCacheCapacity),
-			utils.WithCacheTTL(irCacheTTL),
-		), nil
-	}); err == nil {
-		return ret
-	}
-	return nil
+	return getProgramRowCache(irCodeCaches, progName)
 }
 
 func dbKey(programName string, id int64) string {
@@ -102,50 +112,50 @@ func GetIrCodeById(db *gorm.DB, progName string, id int64) *IrCode {
 		itemsToCache := make(map[int64]*IrCode)
 		var ret *IrCode
 
-		utils.GormTransaction(db, func(tx *gorm.DB) error {
-			idsToLoad := make(map[int64]struct{})
-			addID := func(id int64) {
-				// check
-				if id < 0 {
-					return
-				}
-				if _, ok := cache.Get(id); ok {
-					return
-				}
-				if _, ok := idsToLoad[id]; ok {
-					return
-				}
-				idsToLoad[id] = struct{}{}
+		// These are reads only. The SSA SQLite connection uses
+		// _txlock=immediate for write transactions, so wrapping this cache
+		// prefetch in GormTransaction would reserve the sole SQLite writer
+		// slot until all neighboring instructions had been loaded.
+		idsToLoad := make(map[int64]struct{})
+		addID := func(id int64) {
+			if id < 0 {
+				return
 			}
+			if _, ok := cache.Get(id); ok {
+				return
+			}
+			if _, ok := idsToLoad[id]; ok {
+				return
+			}
+			idsToLoad[id] = struct{}{}
+		}
 
-			// load self
-			ret = GetIrCodeItemById(tx, progName, id)
-			if ret == nil {
-				return nil
-			}
-			itemsToCache[ret.CodeID] = ret
+		// Load the requested instruction before prefetching its neighbors.
+		ret = GetIrCodeItemById(db, progName, id)
+		if ret == nil {
+			return nil, nil
+		}
+		itemsToCache[ret.CodeID] = ret
 
-			// load user and function/block
-			for _, userId := range ret.Users {
-				addID(userId)
-			}
-			addID(ret.CurrentFunction)
-			addID(ret.CurrentBlock)
+		// Load users and enclosing function/block.
+		for _, userId := range ret.Users {
+			addID(userId)
+		}
+		addID(ret.CurrentFunction)
+		addID(ret.CurrentBlock)
 
-			// load [id-relation ... id ... id+relation]
-			for i := int64(1); i < irRelationCount; i++ {
-				addID(id + i)
-				addID(id - i)
-			}
+		// Prefetch nearby IDs.
+		for i := int64(1); i < irRelationCount; i++ {
+			addID(id + i)
+			addID(id - i)
+		}
 
-			// update cache
-			ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
-			tx = bizhelper.ExactQueryInt64ArrayOr(tx, "code_id", ids).Where("program_name = ?", progName)
-			for ir := range bizhelper.YieldModel[*IrCode](ctx, tx, bizhelper.WithYieldModel_Fast()) {
-				itemsToCache[ir.CodeID] = ir
-			}
-			return nil
-		})
+		// Fetch outside a transaction so reads do not reserve the write slot.
+		ids := lo.MapToSlice(idsToLoad, func(key int64, _ struct{}) int64 { return key })
+		query := bizhelper.ExactQueryInt64ArrayOr(db, "code_id", ids).Where("program_name = ?", progName)
+		for ir := range bizhelper.YieldModel[*IrCode](ctx, query, bizhelper.WithYieldModel_Fast()) {
+			itemsToCache[ir.CodeID] = ir
+		}
 
 		// 更新缓存
 		for id, item := range itemsToCache {

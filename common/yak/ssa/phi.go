@@ -209,6 +209,7 @@ func generatePhi(builder *FunctionBuilder, block *BasicBlock, cfgEntryBlock Valu
 		if utils.IsNil(phi) {
 			return nil
 		}
+		inheritPhiMemberReceiver(phi, vs)
 		phi.GetProgram().SetVirtualRegister(phi)
 		phi.GetProgram().SetInstructionWithName(name, phi)
 		phi.SetVerboseName(vs[0].GetVerboseName())

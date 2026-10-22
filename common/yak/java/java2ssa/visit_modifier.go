@@ -53,8 +53,10 @@ type AnnotationDescription struct {
 }
 
 func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnotationContext) (instanceCallback func(ssa.Value), defCallback func(ssa.Value)) {
-	start := time.Now()
-	defer deltaAnnotationCostFrom(start)
+	if javaCompileProfileOn() {
+		start := time.Now()
+		defer deltaAnnotationCostFrom(start)
+	}
 	recoverRange := y.SetRange(annotationContext)
 	defer recoverRange()
 
@@ -121,8 +123,11 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 	// 而不仅是在本functionBuilder
 	store := y.StoreFunctionBuilder()
 	return func(v ssa.Value) {
-			start := time.Now()
-			defer deltaAnnotationCostFrom(start)
+			y := y.forkForLazyBuild()
+			if javaCompileProfileOn() {
+				start := time.Now()
+				defer deltaAnnotationCostFrom(start)
+			}
 
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
@@ -140,6 +145,7 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 			ref := y.CreateMemberCallVariable(thisAnnotation, y.EmitConstInstPlaceholder("__ref__"))
 			y.AssignVariable(ref, v)
 		}, func(value ssa.Value) {
+			y := y.forkForLazyBuild()
 			/*
 				@RequestParam(value = "xml_str") String xmlStr
 
@@ -149,8 +155,10 @@ func (y *singleFileBuilder) VisitAnnotation(annotationContext javaparser.IAnnota
 			*/
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
-			start := time.Now()
-			defer deltaAnnotationCostFrom(start)
+			if javaCompileProfileOn() {
+				start := time.Now()
+				defer deltaAnnotationCostFrom(start)
+			}
 
 			// function instance
 			// parameter instance

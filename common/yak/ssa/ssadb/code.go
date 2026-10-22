@@ -2,8 +2,8 @@ package ssadb
 
 import (
 	"encoding/json"
+	"fmt"
 	"slices"
-	"time"
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaklang/yaklang/common/utils"
@@ -147,13 +147,14 @@ func (ir *IrCode) Save(db *gorm.DB) error {
 	return db.Save(ir).Error
 }
 
+// UpsertIrCode writes one row. It shares the batched upsert path so a single
+// row is still one INSERT ... ON CONFLICT statement instead of a per-row
+// FirstOrCreate SELECT that PG can resolve via the wrong (program_name, opcode)
+// index on large tables (30ms+ scans).
 func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 	if db == nil || ir == nil {
 		return nil
 	}
-	// Prefer the batched delete+insert path even for one row: FirstOrCreate
-	// issues a SELECT that PG can resolve via the wrong (program_name, opcode)
-	// index on large tables, turning each upsert into a 30ms+ scan.
 	return SaveIrCodeBatch(db, []*IrCode{ir})
 }
 
@@ -162,65 +163,23 @@ func UpsertIrCode(db *gorm.DB, ir *IrCode) error {
 // host-parameter ceiling.
 const irCodeBatchChunk = 500
 
-// SaveIrCodeBatch issues a chunked batched UPSERT for IR codes: per chunk it
-// DELETEs the (program_name, code_id) rows this batch is about to write, then
-// bulk-INSERTs them. Same pattern as SaveIrTypeBatch — replaces N
-// FirstOrCreate round-trips (SELECT+UPDATE) with one DELETE + one multi-row
-// INSERT. Soft-deleted rows are removed with Unscoped so the UNIQUE index
-// ux_ir_codes_program_code cannot block the insert.
+// SaveIrCodeBatch writes IR snapshots as batched in-place upserts on
+// (program_name, code_id) via gorm SaveInBatches (INSERT ... ON CONFLICT DO
+// UPDATE). Updating in place keeps row ids and their secondary-index entries
+// stable across the resident-cache flush, and a rejected statement cannot first
+// remove the previous snapshot. The batch still inserts rows that do not exist
+// yet, so one call both publishes new IR and refreshes changed IR.
+// ux_ir_codes_program_code is created with the schema; SaveInBatches skips nil
+// elements itself. DM retains an atomic delete/insert fallback instead.
 func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	if needsDMIRTransaction(db) {
-		return inIRTransaction(db, func(tx *gorm.DB) error { return SaveIrCodeBatch(tx, items) })
+	if db.Dialect().GetName() == "dm" {
+		return saveDMIRCodeBatch(db, items)
 	}
-	clean := make([]*IrCode, 0, len(items))
-	for _, it := range items {
-		if it != nil {
-			clean = append(clean, it)
-		}
-	}
-	for start := 0; start < len(clean); start += irCodeBatchChunk {
-		end := start + irCodeBatchChunk
-		if end > len(clean) {
-			end = len(clean)
-		}
-		if err := bulkUpsertIrCode(db, clean[start:end]); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func bulkUpsertIrCode(db *gorm.DB, items []*IrCode) error {
-	if len(items) == 0 {
-		return nil
-	}
-	progCodeIDs := make(map[string][]interface{}, 1)
-	for _, it := range items {
-		progCodeIDs[it.ProgramName] = append(progCodeIDs[it.ProgramName], it.CodeID)
-		// Fresh insert after delete: clear primary key / soft-delete state so
-		// CreateInBatches allocates a new row instead of colliding on id.
-		it.ID = 0
-		it.CreatedAt = time.Time{}
-		it.UpdatedAt = time.Time{}
-		it.DeletedAt = nil
-	}
-	for prog, ids := range progCodeIDs {
-		for i := 0; i < len(ids); i += 999 {
-			end := i + 999
-			if end > len(ids) {
-				end = len(ids)
-			}
-			if err := db.Where("program_name = ? AND code_id IN (?)", prog, ids[i:end]).
-				Unscoped().Delete(&IrCode{}).Error; err != nil {
-				return err
-			}
-		}
-	}
-	if err := createIRBatch(db, items, irCodeBatchChunk); err != nil {
-		return err
+	if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
+		return fmt.Errorf("upsert IR snapshot: %w", err)
 	}
 	return nil
 }
