@@ -5,4 +5,4 @@ package consts
 // ExistedBuildInForgeEmbedFSHash contains the SHA256 hash of the embedded build-in forge filesystem.
 // This hash is used to verify the integrity of the built-in forge templates and resources.
 // The forge system provides templates for code generation and vulnerability testing scenarios.
-const ExistedBuildInForgeEmbedFSHash string = "c4f879d9e680440ec3a1b434973c28315c4c2154cd4aefaf6ecc71b66630845c"
+const ExistedBuildInForgeEmbedFSHash string = "1af19b189e7e6eafcd0d22cf2066b6686478635110c18ba0510f10a696dd9e9c"
