@@ -2121,6 +2121,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	}
 	opts = append(opts,
 		crep.MITM_EnableMITMCACertPage(!disableCACertPage),
+		crep.MITM_UseEMudhra(firstReq.GetUseEMudhra()),
 		crep.MITM_EnableWebsocketCompression(!disableWebsocketCompression),
 		crep.MITM_SetSNI(sni, overwriteSNI),
 		crep.MITM_SetSNIMapping(sniMapping),
