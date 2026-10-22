@@ -31,7 +31,7 @@ func TestNativeActionRetryUsesAdvertisedActions(t *testing.T) {
 	loop.initActionMustUse = []string{"finish_exploration"}
 	_, prompt, err := loop.prepareLoopActionSchemas(nil)
 	require.NoError(t, err)
-	require.True(t, loop.initActionApplied, "recomputing filters now would widen the advertised set")
+	require.False(t, loop.initActionApplied, "schema rendering must not consume initialization constraints")
 	require.NotContains(t, prompt, "hidden_action")
 	calls, stop, _, err := loop.callAILoopTransaction(&sync.WaitGroup{}, prompt, "n", nil,
 		func(io.Reader, io.Reader) {}, func(string, string, io.Reader, io.Reader) {})

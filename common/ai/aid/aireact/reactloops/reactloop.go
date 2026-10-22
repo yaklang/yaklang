@@ -230,7 +230,7 @@ type ReActLoop struct {
 	observationInflight sync.WaitGroup
 
 	// Init handler action constraints
-	// These are set by the init handler and cleared after first iteration
+	// These remain active through rendering, retries and compression until a business action is dispatched.
 	initActionMustUse  []string // Actions that MUST be used (set by init)
 	initActionDisabled []string // Actions that are DISABLED (set by init)
 	initActionApplied  bool     // Whether the init constraints have been applied
