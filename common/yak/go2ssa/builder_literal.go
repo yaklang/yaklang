@@ -783,6 +783,13 @@ func (b *astbuilder) buildFieldDecl(stmt *gol.FieldDeclContext, structTyp *ssa.O
 				for _, fn := range fromLib.GetFullTypeNames() {
 					structTyp.AddFullTypeName(fn)
 				}
+			} else if forward, ok := parent.(*forwardNamedType); ok {
+				fieldType := parent
+				if strings.HasPrefix(typ.GetText(), "*") {
+					fieldType = goPointerType(parent)
+				}
+				structTyp.AddField(b.EmitConstInst(name), fieldType)
+				b.noteEmbeddedForward(structTyp, name, forward)
 			} else if notUse, ok := parent.(*ssa.BasicType); ok {
 				// b.NewError(ssa.Warn, TAG, Unreachable())
 				structTyp.AddField(b.EmitConstInst(name), notUse)
@@ -1005,9 +1012,20 @@ func (b *astbuilder) getDefaultValue(ityp ssa.Type, depth int, nodes *int, path 
 	case ssa.ObjectTypeKind, ssa.InterfaceTypeKind, ssa.SliceTypeKind, ssa.MapTypeKind:
 		return b.EmitMakeBuildWithType(ityp, nil, nil)
 	case ssa.ClassBluePrintTypeKind:
-		// TODO
-		return b.EmitConstInst(0)
+		return b.unknownDefault(ityp)
 	default:
+		// Any, unresolved and external types are not the number 0. Keep the
+		// type identity and say the value is unknown.
+		return b.unknownDefault(ityp)
+	}
+}
+
+func (b *astbuilder) unknownDefault(typ ssa.Type) ssa.Value {
+	value := b.EmitUndefined("default")
+	if value == nil {
 		return b.EmitConstInst(0)
 	}
+	// Keep the blueprint or any identity. SetType would instantiate a class.
+	value.SetTypeExact(typ)
+	return value
 }

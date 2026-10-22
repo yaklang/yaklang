@@ -455,6 +455,17 @@ func (n *anValue) LazySaveType() {
 	}
 }
 
+// SetTypeExact stores typ without instantiating a class. Blueprint.Apply builds
+// an instance and can replace the type; a zero or unresolved value must keep
+// the declaration identity it was given.
+func (n *anValue) SetTypeExact(typ Type) {
+	if n == nil || typ == nil {
+		return
+	}
+	defer n.markPersistenceDirty()
+	n.typId = n.cacheType(typ)
+}
+
 func (n *anValue) SetType(typ Type) {
 	defer n.markPersistenceDirty()
 	if typ == nil {

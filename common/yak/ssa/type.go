@@ -894,6 +894,15 @@ func (a *AliasType) GetType() Type {
 	return a.elem
 }
 
+// Retarget points an alias at the type that was declared after it was used.
+// The alias identity stays put; only its target changes.
+func (a *AliasType) Retarget(elem Type) {
+	if a == nil || elem == nil {
+		return
+	}
+	a.elem = elem
+}
+
 // ====================== interface type
 type InterfaceType struct {
 	*baseType
@@ -1501,6 +1510,23 @@ func (s *FunctionType) resetStringCache() {
 	if s != nil {
 		s.stringCache.Store(nil)
 	}
+}
+
+// ForgetStringCache drops text cached before a nested type was resolved.
+func (s *FunctionType) ForgetStringCache() {
+	s.resetStringCache()
+}
+
+// ReplaceBoundReceiver corrects a receiver that was recorded before its
+// declaration existed. Unlike setMethodBinding, it replaces an existing type.
+func (s *FunctionType) ReplaceBoundReceiver(typ Type) {
+	if s == nil {
+		return
+	}
+	s.receiverMu.Lock()
+	s.ObjectType = typ
+	s.receiverMu.Unlock()
+	s.resetStringCache()
 }
 
 func NewFunctionType(name string, Parameter []Type, ReturnType Type, IsVariadic bool) *FunctionType {
