@@ -47,6 +47,10 @@ type databaseOpenOptions struct {
 	sqliteTxLock string
 	// sqliteBusyTimeoutMS is PRAGMA busy_timeout. Zero keeps the 10s default.
 	sqliteBusyTimeoutMS int
+	// sqliteJournalSizeLimitBytes caps the WAL file after a checkpoint
+	// (PRAGMA journal_size_limit). Zero keeps SQLite's default of no limit,
+	// which lets the WAL file grow to its high-water mark and stay there.
+	sqliteJournalSizeLimitBytes int64
 }
 
 func defaultDatabaseOpenOptions() databaseOpenOptions {
@@ -60,6 +64,23 @@ func sqliteBusyTimeout(options databaseOpenOptions) int {
 	return 10000
 }
 
+// applySQLiteConnectionPragmas runs on every new pooled connection.
+// database/sql checks a connection out, runs one statement, and returns it,
+// so a PRAGMA executed through *gorm.DB only ever reaches whichever
+// connection happens to be checked out — and a replacement connection opened
+// later never sees it. The driver hook is the only place that covers the
+// whole pool. (mattn/go-sqlite3 has no generic _pragma DSN parameter; the
+// upstream change is still an unmerged pull request.)
+func applySQLiteConnectionPragmas(conn *sqlite3.SQLiteConn, options databaseOpenOptions) error {
+	if options.sqliteJournalSizeLimitBytes > 0 {
+		_, err := conn.Exec(fmt.Sprintf("PRAGMA journal_size_limit = %d;", options.sqliteJournalSizeLimitBytes), nil)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func DeleteDatabaseFile(path string) error {
 	err := os.RemoveAll(path)
 	if err != nil {
@@ -69,6 +90,22 @@ func DeleteDatabaseFile(path string) error {
 	os.RemoveAll(path + "-wal")
 	os.RemoveAll(path + "-shm")
 	return nil
+}
+
+// sqliteConnectionPragmas is installed by registerDriver and read by the
+// SQLiteExtend driver's ConnectHook. registerDriver runs exactly once, so
+// the hook closes over this variable instead of the options of whichever
+// database happened to trigger driver registration.
+//
+// It is published before any SQLiteExtend pool exists (pools are opened
+// only after RegisterDriverOnce) and the SSA options are fixed for the
+// process, so there is no concurrent writer.
+var sqliteConnectionPragmas = defaultDatabaseOpenOptions()
+
+// SetSQLiteConnectionPragmas selects the PRAGMA profile applied to every
+// SQLiteExtend connection. Call it before the first database opens.
+func SetSQLiteConnectionPragmas(options databaseOpenOptions) {
+	sqliteConnectionPragmas = options
 }
 
 func registerDriver() {
@@ -102,7 +139,7 @@ func registerDriver() {
 				if err != nil {
 					return err
 				}
-				return nil
+				return applySQLiteConnectionPragmas(conn, sqliteConnectionPragmas)
 			},
 		})
 }

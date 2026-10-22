@@ -35,6 +35,11 @@ const (
 	// 10s busy_timeout. SSA waits 60s so the other store retries inside SQLite
 	// instead of failing with "database is locked".
 	ssaSQLiteBusyTimeoutMS = 60000
+	// Without a journal_size_limit the WAL file keeps its high-water size
+	// forever. A checkpoint then has to walk that whole file on every pass,
+	// which is what pinned scans when the disk was already busy. 64MiB matches
+	// the cap the project-database tuner uses.
+	ssaSQLiteJournalSizeLimitBytes int64 = 64 * 1024 * 1024
 )
 
 var (
@@ -125,6 +130,11 @@ func CreateSSAProjectDatabaseRaw(raw string) (*gorm.DB, error) {
 
 func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	options := ssaDatabaseOpenOptions()
+	// Connection PRAGMAs are applied by the driver hook, which is installed
+	// once, so the profile has to be published before the pool opens.
+	if dialect == SQLiteExtend || dialect == SQLite {
+		SetSQLiteConnectionPragmas(options)
+	}
 	db, err := createAndConfigDatabaseWithOptions(path, options, dialect)
 	if err != nil {
 		return nil, err
@@ -155,11 +165,12 @@ func ssaDatabaseOpenOptions() databaseOpenOptions {
 	// defaultDatabaseOpenOptions() (single connection, synchronous=OFF,
 	// no _txlock). Injected via databaseOpenOptions so database.go stays generic.
 	return databaseOpenOptions{
-		sqliteMaxOpenConns:  ssaSQLiteMaxOpenConns,
-		sqlitePrivateCache:  true,
-		sqliteSynchronous:   ssaSQLiteSynchronous,
-		sqliteTxLock:        ssaSQLiteTxLock,
-		sqliteBusyTimeoutMS: ssaSQLiteBusyTimeoutMS,
+		sqliteMaxOpenConns:          ssaSQLiteMaxOpenConns,
+		sqlitePrivateCache:          true,
+		sqliteSynchronous:           ssaSQLiteSynchronous,
+		sqliteTxLock:                ssaSQLiteTxLock,
+		sqliteBusyTimeoutMS:         ssaSQLiteBusyTimeoutMS,
+		sqliteJournalSizeLimitBytes: ssaSQLiteJournalSizeLimitBytes,
 	}
 }
 

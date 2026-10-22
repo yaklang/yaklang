@@ -1,10 +1,12 @@
 package ssadb
 
 import (
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestDBOpStatsAccumulateByKind(t *testing.T) {
@@ -38,4 +40,26 @@ func TestDBOpStatsAccumulateByKind(t *testing.T) {
 	require.Equal(t, int64(20), delta.Ops[DBOpQuery].TotalMs)
 	require.Equal(t, int64(20), delta.Ops[DBOpQuery].AvgMs)
 	require.Equal(t, int64(1), delta.TotalCount)
+}
+
+// TestDBOpCallbacksTimeCreatesOnDatabasesOpenedLater pins the registration
+// point. The callbacks live on gorm.DefaultCallback and are copied into a
+// database exactly once, inside gorm.Open, so a database opened after
+// EnsureDBOpCallbacks must count its inserts. Registering on an
+// already-open handle does not.
+func TestDBOpCallbacksTimeCreatesOnDatabasesOpenedLater(t *testing.T) {
+	ResetDBOpStats()
+	EnsureDBOpCallbacks(nil)
+
+	db, err := consts.CreateSSAProjectDatabase(consts.SQLiteExtend, filepath.Join(t.TempDir(), "db-op.db"))
+	require.NoError(t, err)
+	defer db.Close()
+
+	before := SnapshotDBOpStats()
+	require.NoError(t, db.Create(&IrProgram{ProgramName: "db-op-callback", Language: "go"}).Error)
+	after := SnapshotDBOpStats()
+
+	delta := DeltaDBOpStats(before, after)
+	require.Equal(t, int64(1), delta.Ops[DBOpCreate].Count)
+	require.Greater(t, delta.Ops[DBOpCreate].TotalMs+delta.Ops[DBOpCreate].Count, int64(0))
 }

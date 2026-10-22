@@ -43,8 +43,8 @@ type DBOpStats struct {
 	// WindowMs is the wall-clock span this delta covers (set by the pprof
 	// collector when writing db-stats/*.db.json). UI uses it as the
 	// denominator for "DB time / window · xx%" evaluation.
-	WindowMs   int64                   `json:"window_ms,omitempty"`
-	ErrorCount int64                   `json:"error_count,omitempty"`
+	WindowMs   int64 `json:"window_ms,omitempty"`
+	ErrorCount int64 `json:"error_count,omitempty"`
 }
 
 type dbOpAccumulator struct {
@@ -237,30 +237,34 @@ func markScopeStart(scope *gorm.Scope) {
 
 // EnsureDBOpCallbacks registers GORM callbacks that time IR DB ops by kind.
 // Safe to call repeatedly.
+//
+// The callbacks go on gorm.DefaultCallback, not on db. This fork clones the
+// global default exactly once, inside gorm.Open, and never re-reads it, so a
+// callback registered on an already-open *gorm.DB is invisible to every
+// database opened earlier — which is why scan runs recorded all-zero db-stats.
+// Registering on the default makes every database opened afterwards count.
 func EnsureDBOpCallbacks(db *gorm.DB) {
-	if db == nil {
-		return
+	if db != nil {
+		if name := strings.TrimSpace(db.Dialect().GetName()); name != "" {
+			SetDBOpDialect(name)
+		}
+		attachSQLLogger(db)
 	}
-	if name := strings.TrimSpace(db.Dialect().GetName()); name != "" {
-		SetDBOpDialect(name)
-	}
-	dbOpCallbackOnce.Do(func() {
-		registerDBOpCallbacks(db)
-	})
-	attachSQLLogger(db)
+	dbOpCallbackOnce.Do(registerDefaultDBOpCallbacks)
 }
 
-func registerDBOpCallbacks(db *gorm.DB) {
-	db.Callback().Query().Before("gorm:query").Register("ssadb:stats:before_query", markScopeStart)
-	db.Callback().Query().After("gorm:query").Register("ssadb:stats:after_query", recordScopeOp(DBOpQuery))
-	db.Callback().Create().Before("gorm:create").Register("ssadb:stats:before_create", markScopeStart)
-	db.Callback().Create().After("gorm:create").Register("ssadb:stats:after_create", recordScopeOp(DBOpCreate))
-	db.Callback().Update().Before("gorm:update").Register("ssadb:stats:before_update", markScopeStart)
-	db.Callback().Update().After("gorm:update").Register("ssadb:stats:after_update", recordScopeOp(DBOpUpdate))
-	db.Callback().Delete().Before("gorm:delete").Register("ssadb:stats:before_delete", markScopeStart)
-	db.Callback().Delete().After("gorm:delete").Register("ssadb:stats:after_delete", recordScopeOp(DBOpDelete))
-	db.Callback().RowQuery().Before("gorm:row_query").Register("ssadb:stats:before_row_query", markScopeStart)
-	db.Callback().RowQuery().After("gorm:row_query").Register("ssadb:stats:after_row_query", recordScopeOp(DBOpQuery))
+func registerDefaultDBOpCallbacks() {
+	defaults := gorm.DefaultCallback
+	defaults.Query().Before("gorm:query").Register("ssadb:stats:before_query", markScopeStart)
+	defaults.Query().After("gorm:query").Register("ssadb:stats:after_query", recordScopeOp(DBOpQuery))
+	defaults.Create().Before("gorm:create").Register("ssadb:stats:before_create", markScopeStart)
+	defaults.Create().After("gorm:create").Register("ssadb:stats:after_create", recordScopeOp(DBOpCreate))
+	defaults.Update().Before("gorm:update").Register("ssadb:stats:before_update", markScopeStart)
+	defaults.Update().After("gorm:update").Register("ssadb:stats:after_update", recordScopeOp(DBOpUpdate))
+	defaults.Delete().Before("gorm:delete").Register("ssadb:stats:before_delete", markScopeStart)
+	defaults.Delete().After("gorm:delete").Register("ssadb:stats:after_delete", recordScopeOp(DBOpDelete))
+	defaults.RowQuery().Before("gorm:row_query").Register("ssadb:stats:before_row_query", markScopeStart)
+	defaults.RowQuery().After("gorm:row_query").Register("ssadb:stats:after_row_query", recordScopeOp(DBOpQuery))
 }
 
 // bindSQLPlaceholdersDB rewrites "?" placeholders for the active dialect.

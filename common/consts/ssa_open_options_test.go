@@ -1,6 +1,7 @@
 package consts
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 
@@ -17,6 +18,7 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 	require.Equal(t, ssaSQLiteSynchronous, opt.sqliteSynchronous)
 	require.Equal(t, ssaSQLiteTxLock, opt.sqliteTxLock)
 	require.Equal(t, 60000, opt.sqliteBusyTimeoutMS)
+	require.Equal(t, int64(64*1024*1024), opt.sqliteJournalSizeLimitBytes)
 
 	projectOpt := defaultDatabaseOpenOptions()
 	require.Equal(t, 1, projectOpt.sqliteMaxOpenConns)
@@ -41,6 +43,19 @@ func TestSSADatabaseOpenOptions(t *testing.T) {
 	var busyTimeout int
 	require.NoError(t, db.Raw("PRAGMA busy_timeout").Row().Scan(&busyTimeout))
 	require.Equal(t, 60000, busyTimeout)
+
+	// journal_size_limit is applied by the driver hook, so it has to hold on
+	// every pooled connection, not just the one db.Exec happened to reach.
+	ctx := context.Background()
+	for i := 0; i < opt.sqliteMaxOpenConns; i++ {
+		conn, err := db.DB().Conn(ctx)
+		require.NoError(t, err)
+		var limit int64
+		err = conn.QueryRowContext(ctx, "PRAGMA journal_size_limit").Scan(&limit)
+		conn.Close()
+		require.NoError(t, err)
+		require.Equal(t, int64(64*1024*1024), limit, "connection %d", i)
+	}
 }
 
 func TestSSADatabaseSynchronousNotOff(t *testing.T) {

@@ -371,10 +371,12 @@ func (s *structScanState) scanStructWithOpcodeIndex(progAPI *Program, unit *ssa.
 			riskCount := int64(res.RiskCount())
 			s.noteRule(rule, programName, start, end, riskCount, nil)
 			alerts := len(res.GetAlertVariables())
-			log.Infof("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=%d risks=%d",
+			// One line per rule is most of the scan log and never changes a
+			// decision; failures stay at warning. Enable debug for the trace.
+			log.Debugf("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=%d risks=%d",
 				unit.Key, programName, rule.RuleName, ruleDuration, ruleDuration.Milliseconds(), alerts, riskCount)
 		} else {
-			log.Infof("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=0 risks=0",
+			log.Debugf("[struct_scan-rule] unit=%q program=%q rule=%q status=success duration=%s duration_ms=%d alerts=0 risks=0",
 				unit.Key, programName, rule.RuleName, ruleDuration, ruleDuration.Milliseconds())
 		}
 		progAPI.ResetInterRuleState()
