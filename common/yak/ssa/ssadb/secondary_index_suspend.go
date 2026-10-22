@@ -127,3 +127,18 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 	log.Infof("restored %d secondary IR indexes in %s", len(ddls), time.Since(started))
 	return nil
 }
+
+// CheckpointSQLiteWAL folds the WAL into the main database once. SSA turns
+// automatic checkpoints off so a multi-gigabyte compile does not copy the
+// database on every commit; this is the single fold before queries.
+func CheckpointSQLiteWAL(db *gorm.DB) error {
+	if !isSQLiteDB(db) || db.DB() == nil {
+		return nil
+	}
+	started := time.Now()
+	if err := db.Exec("PRAGMA wal_checkpoint(TRUNCATE)").Error; err != nil {
+		return err
+	}
+	log.Infof("sqlite wal checkpoint in %s", time.Since(started))
+	return nil
+}

@@ -57,8 +57,10 @@ type databaseOpenOptions struct {
 	// sqliteMmapBytes is PRAGMA mmap_size. Zero leaves SQLite's default.
 	sqliteMmapBytes int64
 	// sqliteWALAutocheckpoint is PRAGMA wal_autocheckpoint in pages.
-	// Zero leaves SQLite's default of 1000.
-	sqliteWALAutocheckpoint int
+	// Applied only when sqliteWALAutocheckpointSet is true, because zero is a
+	// real setting: it turns automatic checkpoints off.
+	sqliteWALAutocheckpoint    int
+	sqliteWALAutocheckpointSet bool
 }
 
 func defaultDatabaseOpenOptions() databaseOpenOptions {
@@ -98,7 +100,7 @@ func applySQLiteConnectionPragmas(conn *sqlite3.SQLiteConn, options databaseOpen
 			return err
 		}
 	}
-	if options.sqliteWALAutocheckpoint > 0 {
+	if options.sqliteWALAutocheckpointSet {
 		_, err := conn.Exec(fmt.Sprintf("PRAGMA wal_autocheckpoint = %d;", options.sqliteWALAutocheckpoint), nil)
 		if err != nil {
 			return err
