@@ -258,6 +258,9 @@ func mergeLoopActionOperator(dst, src *LoopActionHandlerOperator) {
 	if feedback := strings.TrimSpace(src.GetFeedback().String()); feedback != "" {
 		dst.Feedback(feedback)
 	}
+	if src.contextCompressionError != nil {
+		dst.contextCompressionError = src.contextCompressionError
+	}
 	dst.nextActionMustUse = append(dst.nextActionMustUse, src.nextActionMustUse...)
 	dst.nextActionDisabled = append(dst.nextActionDisabled, src.nextActionDisabled...)
 	if src.GetDisallowLoopExit() {
@@ -413,6 +416,12 @@ func (r *ReActLoop) execOneCall(
 		handler.ActionHandler(r, action, op)
 	}()
 	r.applyActionExecutionRecord(record, op)
+	if op.contextCompressionError != nil {
+		result.countsEffectiveIteration = false
+		result.skipPostIteration = true
+		emitLoopActionEvent(eventSink, call, "rejected", op.contextCompressionError.Error())
+		return result
+	}
 	if err := r.recordSubAgentControl(actionName, op, appliedTodoDelta); err != nil {
 		result.result, result.err = loopActionsError, err
 		result.skipErrorSummary = true

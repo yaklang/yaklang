@@ -34,6 +34,7 @@ type LoopActionHandlerOperator struct {
 	requestPrompt            string
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
+	contextCompressionError  error
 
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool

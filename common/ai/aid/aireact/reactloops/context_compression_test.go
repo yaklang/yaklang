@@ -168,7 +168,7 @@ func contextCompressionTestResponse(t *testing.T, c aicommon.AICallerConfigIf, r
 
 func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 	for _, native := range []bool{false, true} {
-		for _, invalid := range []string{"wrong_action", "missing_action", "todo_delta"} {
+		for _, invalid := range []string{"wrong_action", "missing_action", "todo_delta", "retire_type"} {
 			t.Run(fmt.Sprintf("native=%v/%s", native, invalid), func(t *testing.T) {
 				ctx := context.Background()
 				qualityCalls, otherCalls := 0, 0
@@ -193,6 +193,8 @@ func TestContextCompressionTransactionEnforcesAction(t *testing.T) {
 								name = ""
 							case "todo_delta":
 								params["todo_delta"] = map[string]any{"add": []any{map[string]any{"id": "bad", "text": "must not apply"}}}
+							case "retire_type":
+								params["retire_skill_names"] = "not-an-array"
 							}
 						} else {
 							require.Contains(t, req.GetPrompt(), "# 重试纠正")
@@ -245,8 +247,10 @@ func TestContextCompressionHandlerParsesSelection(t *testing.T) {
 	require.NoError(t, loop.verifyContextCompressionAction(action), "verification only checks action compliance")
 	op := NewActionHandlerOperator(nil)
 	handleCompressContext(loop, action, op)
-	_, err := op.IsTerminated()
-	require.ErrorContains(t, err, "retain_timeline")
+	terminated, err := op.IsTerminated()
+	require.NoError(t, err)
+	require.False(t, terminated, "an invalid selection must be correctable without ending the task")
+	require.ErrorContains(t, op.contextCompressionError, "retain_timeline")
 }
 
 func TestContextCompressionExamplesSupportScatteredRanges(t *testing.T) {

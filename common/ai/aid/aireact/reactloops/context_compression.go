@@ -24,6 +24,12 @@ var contextOptimizationStatusNames = []actionStatusName{
 
 const defaultWholePromptTokenLimit int64 = 300 * 1024
 
+// Selection mistakes can be corrected by the model; runtime failures cannot.
+type contextCompressionSelectionError struct{ err error }
+
+func (e *contextCompressionSelectionError) Error() string { return e.err.Error() }
+func (e *contextCompressionSelectionError) Unwrap() error { return e.err }
+
 // wholePromptTokenLimit is the limit for the assembled main-loop prompt.
 // The configured timeline limit defaults to 300k; a too-large response lowers it.
 func (r *ReActLoop) wholePromptTokenLimit() int64 {
@@ -151,13 +157,14 @@ func (r *ReActLoop) prepareContextCompression(action *aicommon.Action, request .
 		candidates = visible
 	}
 	selection, err := r.parseContextCompressionSelection(action, candidates, aicommon.TimelineCompressionMaxSummaryTokens)
-	if err == nil && len(through) > 0 {
+	if err != nil {
+		return nil, &contextCompressionSelectionError{err: err}
+	}
+	if len(through) > 0 {
 		selection.ThroughID = &through[0]
 	}
-	if err == nil {
-		selection.ObservedIDs = observedIDs
-	}
-	return selection, err
+	selection.ObservedIDs = observedIDs
+	return selection, nil
 }
 
 func parseContextCompressionRetainedIDs(text string, candidates []aicommon.TimelineCompressionCandidate) ([]int64, error) {
@@ -198,8 +205,14 @@ func parseContextCompressionRetainedIDs(text string, candidates []aicommon.Timel
 }
 
 func resolveContextCompressionRetirements(action *aicommon.Action, candidates []aicommon.TimelineCompressionCandidate) ([]int64, error) {
-	skills := action.GetStringSlice("retire_skill_names")
-	evidence := action.GetStringSlice("retire_evidence_ids")
+	skills, err := contextCompressionStringArray(action, "retire_skill_names")
+	if err != nil {
+		return nil, err
+	}
+	evidence, err := contextCompressionStringArray(action, "retire_evidence_ids")
+	if err != nil {
+		return nil, err
+	}
 	knownSkills := map[string][]int64{}
 	knownEvidence := map[string][]int64{}
 	for _, candidate := range candidates {
@@ -240,6 +253,26 @@ func resolveContextCompressionRetirements(action *aicommon.Action, candidates []
 	}
 	sort.Slice(retired, func(i, j int) bool { return retired[i] < retired[j] })
 	return retired, nil
+}
+
+func contextCompressionStringArray(action *aicommon.Action, name string) ([]string, error) {
+	raw, _ := action.LookupCanonicalParam(name)
+	switch values := raw.(type) {
+	case []string:
+		return values, nil
+	case []any:
+		result := make([]string, 0, len(values))
+		for _, value := range values {
+			text, ok := value.(string)
+			if !ok {
+				return nil, fmt.Errorf("%s must be an array of strings", name)
+			}
+			result = append(result, text)
+		}
+		return result, nil
+	default:
+		return nil, fmt.Errorf("%s must be an array of strings", name)
+	}
 }
 
 func contextCompressionSkillName(candidate aicommon.TimelineCompressionCandidate) string {
