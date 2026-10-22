@@ -449,7 +449,7 @@ func attachCompiledSourceTargets(config *Config) {
 			continue
 		}
 		src := ssaapi.NewSourceQueryTargetFromProgram(prog)
-		if src == nil || len(src.Files()) == 0 {
+		if src == nil || len(src.Paths()) == 0 {
 			continue
 		}
 		config.QueryTargets = append(config.QueryTargets, src)

@@ -256,15 +256,18 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	// runtime
 	var res *sfvm.SFFrameResult
 	if sfvm.FrameIsSourceMode(frame) {
-		files, ferr := collectFilesForSourceMode(config)
-		if ferr != nil {
-			return nil, ferr
+		root := existingPatternRoot(config)
+		if root == nil {
+			files, ferr := collectFilesForSourceMode(config)
+			if ferr != nil {
+				return nil, ferr
+			}
+			root = sfpattern.NewRoot(files)
 		}
-		root := sfpattern.NewRoot(files)
 		if config.sourceScanRuntime != nil {
 			root.SetFileFilterMatcher(config.sourceScanRuntime.Matcher(queryCtx))
 		}
-		if config.program != nil {
+		if config.program != nil && root.GetProgramName() == "" {
 			root.SetProgramName(config.program.GetProgramName())
 		}
 		res, err = executeSourceFrameBatches(frame, root, config)

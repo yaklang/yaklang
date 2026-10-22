@@ -182,7 +182,7 @@ func TestSourceScanRuntime_WaitCancellationAndErrors(t *testing.T) {
 	failed := plan.Start(context.Background(), map[string]string{"a.txt": "key"})
 	defer failed.Close()
 	require.ErrorIs(t, failed.Wait(context.Background()), minirehs.ErrClosed)
-	root := NewRoot(failed.files)
+	root := NewRoot(map[string]string{"a.txt": "key"})
 	root.SetFileFilterMatcher(failed.Matcher(context.Background()))
 	_, err = root.FileFilter("*", "regexp", nil, []string{"key"})
 	require.True(t, errors.Is(err, minirehs.ErrClosed), "failed scan must never masquerade as an empty complete result")

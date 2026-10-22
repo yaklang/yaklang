@@ -83,22 +83,22 @@ func (m *scanManager) prepareSourceRuntimes() (map[ssaapi.SyntaxFlowQueryInstanc
 		if _, exists := runtimes[target]; exists {
 			continue
 		}
-		var files map[string]string
+		var store sfpattern.SourceStore
 		switch target := target.(type) {
 		case *ssaapi.SourceQueryTarget:
 			if target != nil {
-				files = target.Files()
+				store = target.SourceStore()
 			}
 		case *ssaapi.Program:
-			if target != nil {
-				files = target.CollectSourceFiles()
+			if target != nil && target.Program != nil {
+				store = ssaapi.NewProgramSourceStore(target)
 			}
 		default:
 			// Overlay/custom targets retain their own snapshot/routing semantics.
 			continue
 		}
-		if files != nil {
-			runtimes[target] = plan.Start(m.ctx, files)
+		if store != nil {
+			runtimes[target] = plan.StartStore(m.ctx, store)
 		}
 	}
 	log.Infof("source pre-scan prepared: rules=%d targets=%d elapsed=%s", len(frames), len(runtimes), time.Since(start))

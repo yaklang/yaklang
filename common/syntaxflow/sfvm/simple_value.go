@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"hash/fnv"
+	"sort"
 	"strings"
 	"sync"
 
@@ -28,9 +29,11 @@ type SimpleValue struct {
 	empty  bool
 	editor *memedit.MemEditor // optional full-file editor containing this hit
 
-	// files backs chained context search ($a.regexp(...)): the path→content
-	// map the hit was produced from. Set by sfpattern when creating hits.
-	files map[string]string
+	// files backs chained context search ($a.regexp(...)) when the caller
+	// already has a snapshot. readFile is the on-demand alternative: it loads
+	// one file through the scan's FileSystem instead of keeping every file.
+	files    map[string]string
+	readFile func(string) (string, error)
 }
 
 // NewSimpleValue builds a pattern hit value.
@@ -58,6 +61,38 @@ func (v *SimpleValue) SetFiles(files map[string]string) {
 	if v != nil {
 		v.files = files
 	}
+}
+
+// SetFileReader supplies one file at a time for chained searches.
+func (v *SimpleValue) SetFileReader(read func(string) (string, error)) {
+	if v != nil {
+		v.readFile = read
+	}
+}
+
+func (v *SimpleValue) fileContent() (string, error) {
+	if v == nil {
+		return "", utils.Error("simple value: nil hit")
+	}
+	if v.files != nil {
+		if content, ok := v.files[v.path]; ok {
+			return content, nil
+		}
+	}
+	if v.readFile != nil {
+		return v.readFile(v.path)
+	}
+	if v.files == nil {
+		return "", utils.Error("simple value: no files backing for chained search")
+	}
+	return "", utils.Errorf("simple value: file %q not in backing files", v.path)
+}
+
+func copyText(s string) string {
+	if s == "" {
+		return ""
+	}
+	return string([]byte(s))
 }
 
 // NewSimpleConst builds a const-like simple value (no path).
@@ -168,12 +203,9 @@ func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]str
 	if v.path == "" {
 		return nil, utils.Error("simple value: hit has no file path")
 	}
-	if v.files == nil {
-		return nil, utils.Error("simple value: no files backing for chained search")
-	}
-	content, ok := v.files[v.path]
-	if !ok {
-		return nil, utils.Errorf("simple value: file %q not in backing files", v.path)
+	content, err := v.fileContent()
+	if err != nil {
+		return nil, err
 	}
 
 	// scope=region searches within the hit's own range; default scope=file
@@ -239,8 +271,9 @@ func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]str
 			if start < 0 || end > len(content) || end < start {
 				continue
 			}
-			hit := NewSimpleValue(content[start:end], v.path, start, end)
+			hit := NewSimpleValue(copyText(content[start:end]), v.path, start, end)
 			hit.SetFiles(v.files)
+			hit.SetFileReader(v.readFile)
 			out = append(out, hit)
 		}
 	}
@@ -293,8 +326,9 @@ func chainedRegexpWithNegatives(v *SimpleValue, content string, from, to int, po
 		if overlap {
 			continue
 		}
-		hit := NewSimpleValue(content[h.start:h.end], v.path, h.start, h.end)
+		hit := NewSimpleValue(copyText(content[h.start:h.end]), v.path, h.start, h.end)
 		hit.SetFiles(v.files)
+		hit.SetFileReader(v.readFile)
 		out = append(out, hit)
 	}
 	return NewValues(out), nil
@@ -334,6 +368,8 @@ func (v *SimpleValue) SetAnchorBitVector(*utils.BitVector)  {}
 // FileFilter by delegating to a registered regexp matcher (set by sfpattern).
 type PatternRoot struct {
 	files            map[string]string
+	paths            []string
+	readFile         func(string) (string, error)
 	matcher          FileFilterFunc
 	programName      string
 	sourceMu         sync.RWMutex
@@ -447,18 +483,25 @@ func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
 		return nil
 	}
 	r.sourceMu.Lock()
+	if editor, ok := r.sourceHitEditors[path]; ok {
+		r.sourceMu.Unlock()
+		return editor
+	}
+	r.sourceMu.Unlock()
+	// Read outside the lock. The reader may block on the in-flight cap.
+	content, err := r.FileContent(path)
+	if err != nil {
+		return nil
+	}
+	editor := memedit.NewMemEditorWithFileUrl(content, path)
+	r.sourceMu.Lock()
 	defer r.sourceMu.Unlock()
 	if r.sourceHitEditors == nil {
 		r.sourceHitEditors = make(map[string]*memedit.MemEditor)
 	}
-	if editor, ok := r.sourceHitEditors[path]; ok {
-		return editor
+	if existing, ok := r.sourceHitEditors[path]; ok {
+		return existing
 	}
-	content, ok := r.files[path]
-	if !ok {
-		return nil
-	}
-	editor := memedit.NewMemEditorWithFileUrl(content, path)
 	r.sourceHitEditors[path] = editor
 	return editor
 }
@@ -471,7 +514,56 @@ func (r *PatternRoot) GetProgramName() string {
 	return r.programName
 }
 
-// Files returns the underlying path→content map.
+// SetFileSource installs an on-demand reader. paths are the scan list;
+// read loads one of them. The root does not keep the file bodies.
+func (r *PatternRoot) SetFileSource(paths []string, read func(string) (string, error)) {
+	if r == nil {
+		return
+	}
+	r.paths = append([]string(nil), paths...)
+	r.readFile = read
+}
+
+// FileReader returns the on-demand reader, or nil when the root only has a map.
+func (r *PatternRoot) FileReader() func(string) (string, error) {
+	if r == nil {
+		return nil
+	}
+	return r.readFile
+}
+
+// FilePaths returns the scan list. A map-backed root lists its keys in order.
+func (r *PatternRoot) FilePaths() []string {
+	if r == nil {
+		return nil
+	}
+	if len(r.paths) > 0 {
+		return r.paths
+	}
+	paths := make([]string, 0, len(r.files))
+	for path := range r.files {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// FileContent returns one file body, from the map or the reader.
+func (r *PatternRoot) FileContent(path string) (string, error) {
+	if r == nil {
+		return "", utils.Error("nil pattern root")
+	}
+	if content, ok := r.files[path]; ok {
+		return content, nil
+	}
+	if r.readFile != nil {
+		return r.readFile(path)
+	}
+	return "", utils.Errorf("pattern root: file %q is not available", path)
+}
+
+// Files returns the underlying path→content map. It is nil when the root
+// reads through FileContent instead of keeping every file.
 func (r *PatternRoot) Files() map[string]string {
 	if r == nil {
 		return nil
@@ -482,7 +574,9 @@ func (r *PatternRoot) Files() map[string]string {
 func (r *PatternRoot) String() string { return "pattern-root" }
 func (r *PatternRoot) IsMap() bool    { return false }
 func (r *PatternRoot) IsList() bool   { return false }
-func (r *PatternRoot) IsEmpty() bool  { return r == nil || len(r.files) == 0 }
+func (r *PatternRoot) IsEmpty() bool {
+	return r == nil || (len(r.files) == 0 && len(r.paths) == 0)
+}
 func (r *PatternRoot) ShouldUseConditionCandidate() bool {
 	return false
 }

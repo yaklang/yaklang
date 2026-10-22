@@ -21,9 +21,14 @@ func TestNewSourceQueryTargetFromProgramUsesCompiledSnapshot(t *testing.T) {
 	require.NotEmpty(t, progs)
 
 	src := ssaapi.NewSourceQueryTargetFromProgram(progs[0])
-	require.NotEmpty(t, src.Files())
+	require.NotEmpty(t, src.Paths())
 	found := false
-	for _, content := range src.Files() {
+	for _, path := range src.Paths() {
+		content, release, err := src.SourceStore().Read(path)
+		require.NoError(t, err)
+		if release != nil {
+			release()
+		}
 		if strings.Contains(content, "AKIAIOSFODNN7EXAMPLE") {
 			found = true
 			break
