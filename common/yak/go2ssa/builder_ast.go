@@ -2393,7 +2393,10 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 		}
 		if ssatyp == nil {
 			b.NewError(ssa.Warn, TAG, StructNotFind(name))
-			ssatyp = ssa.CreateAnyType()
+			// The declaration may be later in this package. Keep a forward use and
+			// retarget it once every file has published its types, instead of
+			// freezing the field as any.
+			ssatyp = b.forwardNamedType(name)
 		}
 
 		return ssatyp

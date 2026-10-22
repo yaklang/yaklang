@@ -19,6 +19,17 @@ func zeroValueTestBuilder(t *testing.T) *astbuilder {
 	return &astbuilder{FunctionBuilder: builder}
 }
 
+func TestGoDefaultValueUnknownTypeDoesNotInventNumber(t *testing.T) {
+	for _, typ := range []ssa.Type{ssa.CreateAnyType(), ssa.NewBlueprint("ExternalState")} {
+		t.Run(typ.String(), func(t *testing.T) {
+			b := zeroValueTestBuilder(t)
+			value := b.GetDefaultValue(typ)
+			require.True(t, value.IsUndefined(), "an unresolved zero must remain unknown, never a known numeric zero")
+			require.Same(t, typ, value.GetType(), "unknown zero values must preserve the available type identity")
+		})
+	}
+}
+
 // Match the four repeated type identities in ARTEX's pre-fix goroutine dump.
 // Malformed/incomplete type graphs must not allocate an unbounded stream of IR.
 // The expansion guard degrades a type already on the active path to a typed

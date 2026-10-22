@@ -96,10 +96,7 @@ func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
 		if !lib.IsVirtualImport() {
 			return nil, nil
 		}
-		var blueprint *Blueprint
-		lib.withVirtualBuilder(func(builder *FunctionBuilder) {
-			blueprint = builder.CreateBlueprint(name, token...)
-		})
+		blueprint := createVirtualBlueprint(lib, name)
 		return lib.rememberExportType(name, blueprint), nil
 	})
 	if v == nil {
@@ -107,6 +104,23 @@ func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
 	}
 	typ, _ := v.(Type)
 	return typ
+}
+
+// createVirtualBlueprint materializes one shared external type. The importer's
+// cursor is a use site, not the declaration, so neither the blueprint nor its
+// container keeps that range.
+func createVirtualBlueprint(lib *Program, name string) *Blueprint {
+	var blueprint *Blueprint
+	lib.withVirtualBuilder(func(builder *FunctionBuilder) {
+		if builder == nil {
+			return
+		}
+		builder.SetEditor(lib.GetCurrentEditor())
+		restore := builder.SetRangePure(nil)
+		blueprint = builder.CreateBlueprint(name)
+		restore()
+	})
+	return blueprint
 }
 
 func fakeImportValue(lib *Program, name string) Value {
@@ -160,12 +174,7 @@ func fakeImportType(lib *Program, name string, token CanStartStopToken) Type {
 		}
 		// Shared @virtual builder. The lock is virtualEmitMu, not the
 		// magic-method map: GetMagicMethod must not take it.
-		var bluePrint *Blueprint
-		lib.withVirtualBuilder(func(builder *FunctionBuilder) {
-			builder.SetEditor(lib.GetCurrentEditor())
-			bluePrint = builder.CreateBlueprint(name, token)
-		})
-		return lib.rememberExportType(name, bluePrint), nil
+		return lib.rememberExportType(name, createVirtualBlueprint(lib, name)), nil
 	})
 	if v == nil {
 		return nil
