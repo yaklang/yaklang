@@ -28,8 +28,11 @@ type structScanState struct {
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
-	ruleLoader    *sfvm.RuleLoader
-	riskCB        func(*schema.SSARisk)
+	// ruleLoader is owned when ensureStructScan allocates it for a standalone
+	// compile. WithStructRuleLoader replaces that pointer with the product
+	// scan's preparation loader; the compile then borrows it.
+	ruleLoader *sfvm.RuleLoader
+	riskCB     func(*schema.SSARisk)
 	// onRisk is the scan's callbacks. When set, each finding is handed to them
 	// and this compile does not write the risk row.
 	onRisk     []func(*schema.SSARisk, ...func(*gorm.DB) error)

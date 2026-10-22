@@ -29,6 +29,8 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 			ruleGetRuleName(rule), p.GetProgramName(),
 		)
 	}
+	// A scan passes its preparation loader through base. Only a standalone
+	// struct query owns a private cache.
 	loader := &sfvm.RuleLoader{}
 	if base != nil && base.ruleLoader != nil {
 		loader = base.ruleLoader
