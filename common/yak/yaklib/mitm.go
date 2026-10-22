@@ -34,6 +34,7 @@ var MitmExports = map[string]interface{}{
 	"rootCA":               mitmConfigCertAndKey,
 	"gmRootCA":             mitmConfigGMCertAndKey,
 	"useDefaultCA":         mitmConfigUseDefault,
+	"emudhra":              mitmConfigEMudhra,
 	"gmtls":                mitmConfigGMTLS,
 	"gmtlsPrefer":          mitmConfigGMTLSPrefer,
 	"gmtlsOnly":            mitmConfigGMTLSOnly,
@@ -83,6 +84,7 @@ type mitmConfig struct {
 	mitmCert, mitmPkey     []byte
 	mitmGMCert, mitmGMPKey []byte
 	useDefaultMitmCert     bool
+	useEMudhra             bool
 	maxContentLength       int
 	gmtls                  bool
 	gmtlsPrefer            bool
@@ -214,6 +216,20 @@ func mitmConfigContext(ctx context.Context) MitmConfigOpt {
 func mitmConfigUseDefault(t bool) MitmConfigOpt {
 	return func(config *mitmConfig) {
 		config.useDefaultMitmCert = t
+	}
+}
+
+// emudhra 使用已公开泄露的 eMudhra 中间 CA 进行 TLS 信任测试，默认关闭。
+// 已更新吊销信息或强制证书透明度的客户端会拒绝此证书。
+// 不可与 mitm.rootCA 同时使用；不会覆盖本地保存的默认 CA。
+//
+// Example:
+// ```
+// mitm.Start(8080, mitm.emudhra(true))
+// ```
+func mitmConfigEMudhra(enabled bool) MitmConfigOpt {
+	return func(config *mitmConfig) {
+		config.useEMudhra = enabled
 	}
 }
 
@@ -699,7 +715,10 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 		config.host = "127.0.0.1"
 	}
 
-	if config.mitmPkey == nil || config.mitmCert == nil {
+	if config.useEMudhra && (config.mitmCert != nil || config.mitmPkey != nil) {
+		return nil, utils.Errorf("mitm.emudhra and mitm.rootCA cannot be used together")
+	}
+	if !config.useEMudhra && (config.mitmPkey == nil || config.mitmCert == nil) {
 		if !config.useDefaultMitmCert {
 			return nil, utils.Errorf("empty root CA, please use tls to generate or use mitm.useDefaultCA(true) to allow buildin ca.")
 		}
@@ -712,6 +731,11 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 
 	if config.ctx == nil {
 		config.ctx = context.Background()
+	}
+
+	caOption := crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey)
+	if config.useEMudhra {
+		caOption = crep.MITM_UseEMudhra(true)
 	}
 
 	var mitmOpts []crep.MITMConfig
@@ -837,7 +861,7 @@ func initMitmServer(downstreamProxy []string, config *mitmConfig) (*crep.MITMSer
 			fmt.Println("-----------------------------")
 		}),
 		crep.MITM_SetDownstreamProxy(downstreamProxy...),
-		crep.MITM_SetCaCertAndPrivKey(config.mitmCert, config.mitmPkey, config.mitmGMCert, config.mitmGMPKey),
+		caOption,
 		crep.MITM_SetHTTPRequestHijackRaw(func(isHttps bool, reqIns *http.Request, req []byte) []byte {
 			if reqIns.Method == "CONNECT" {
 				return req
