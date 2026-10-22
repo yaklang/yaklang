@@ -248,6 +248,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	if mode == compileModeIncrementalDiff {
 		programNameToDelete = c.GetLatestProgramName()
 	}
+	// Non-unique IR indexes are rebuilt once, after the inserts, instead of
+	// being maintained row by row. The captured DDL is what gets replayed.
+	var suspendedIndexes []string
 	defer func() {
 		c.Cleanup()
 
@@ -265,6 +268,14 @@ func (c *Config) parseProject() (progs Programs, err error) {
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
 		}
+		// Rebuild after a failed compile's cleanup so a shared database is not
+		// left without the indexes other programs are queried through.
+		if restoreErr := ssadb.RestoreSecondaryIndexes(ssadb.GetDB(), suspendedIndexes); restoreErr != nil {
+			log.Errorf("restore secondary indexes: %v", restoreErr)
+			if err == nil {
+				err = restoreErr
+			}
+		}
 	}()
 
 	// Old IR rows must go before a full compile re-inserts under the same
@@ -275,6 +286,12 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		}
 	} else if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
 		return nil, err
+	}
+
+	var suspendErr error
+	suspendedIndexes, suspendErr = ssadb.SuspendSecondaryIndexes(ssadb.GetDB())
+	if suspendErr != nil {
+		log.Warnf("suspend secondary indexes: %v", suspendErr)
 	}
 
 	c.Processf(0, "recompile project, start compile")
