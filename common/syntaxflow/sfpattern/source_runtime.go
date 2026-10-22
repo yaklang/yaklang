@@ -23,9 +23,10 @@ import (
 // runtime for raw hits while assignments, set operations and alerts run as usual.
 // The owner must close runtimes before closing their shared plan.
 type SourceScanPlan struct {
-	searches map[string]sourceSearch
-	patterns []sourcePattern
-	db       minirehs.Database
+	searches  map[string]sourceSearch
+	patterns  []sourcePattern
+	db        minirehs.Database
+	pathIndex *pathIndex
 }
 
 type sourcePattern struct {
@@ -73,7 +74,7 @@ func NewSourceScanPlan(frames []*sfvm.SFFrame) (*SourceScanPlan, error) {
 				continue
 			}
 			positive, negative := code.Values, []string(nil)
-			if code.FileFilterMethodItem["__sf_pattern_not_list"] == "1" {
+			if sfvm.FileFilterParamOn(code.FileFilterMethodItem, sfvm.FileFilterParamPatternNotList) {
 				if len(positive) < 2 {
 					continue
 				}
@@ -129,6 +130,7 @@ func NewSourceScanPlan(frames []*sfvm.SFFrame) (*SourceScanPlan, error) {
 	if err != nil {
 		return nil, fmt.Errorf("compile source pre-scan: %w", err)
 	}
+	p.pathIndex = buildPathIndex(p.searches)
 	return p, nil
 }
 
@@ -166,15 +168,79 @@ func directSearchKey(path string, params map[string]string, patterns []string) s
 		Path     string
 		Patterns []string
 		NotList  bool
-	}{path, patterns, params["__sf_pattern_not_list"] == "1"})
+	}{path, patterns, sfvm.FileFilterParamOn(params, sfvm.FileFilterParamPatternNotList)})
 	return string(key)
 }
 
-func (p *SourceScanPlan) Close() error {
-	if p != nil && p.db != nil {
-		return p.db.Close()
+// StartFrameRuntime scans one frame's direct file searches once. The root's
+// current source is captured before the runtime replaces it, so the cache reads
+// the original bodies and every later read goes through that cache. A frame
+// with no direct file search returns a nil runtime and keeps the root's matcher.
+func StartFrameRuntime(ctx context.Context, frame *sfvm.SFFrame, root *sfvm.PatternRoot) (*SourceScanRuntime, *SourceScanPlan, error) {
+	if ctx == nil {
+		ctx = context.Background()
 	}
-	return nil
+	if frame == nil || root == nil || root.Source() == nil {
+		return nil, nil, nil
+	}
+	plan, err := NewSourceScanPlan([]*sfvm.SFFrame{frame})
+	if err != nil || plan == nil || len(plan.patterns) == 0 {
+		if plan != nil {
+			_ = plan.Close()
+		}
+		return nil, nil, err
+	}
+	rt := plan.StartStore(ctx, storeFromSource(root.Source()))
+	root.SetSource(rt)
+	return rt, plan, nil
+}
+
+type capturedSource struct {
+	paths  []string
+	source sfvm.Source
+}
+
+func storeFromSource(source sfvm.Source) SourceStore {
+	return &capturedSource{paths: append([]string(nil), source.Paths()...), source: source}
+}
+
+func (c *capturedSource) Paths() []string {
+	if c == nil {
+		return nil
+	}
+	return c.paths
+}
+
+func (c *capturedSource) Read(path string) (string, func(), error) {
+	if c == nil || c.source == nil {
+		return "", nil, fmt.Errorf("source body %q is not available", path)
+	}
+	text, err := c.source.Read(path)
+	return text, nil, err
+}
+
+func (c *capturedSource) SharedBody(path string) (*memedit.SafeString, bool) {
+	shared, ok := c.source.(sfvm.SharedBodySource)
+	if !ok || shared == nil {
+		return nil, false
+	}
+	return shared.SharedBody(path)
+}
+
+func (p *SourceScanPlan) Close() error {
+	if p == nil {
+		return nil
+	}
+	var err error
+	if p.pathIndex != nil {
+		err = p.pathIndex.Close()
+	}
+	if p.db != nil {
+		if closeErr := p.db.Close(); err == nil {
+			err = closeErr
+		}
+	}
+	return err
 }
 
 type storedSpan struct {
@@ -292,44 +358,24 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 	}
 	paths := append([]string(nil), r.store.Paths()...)
 	sort.Strings(paths)
-	type scanJob struct {
-		path    string
-		allowed []bool
-	}
-	var jobs []scanJob
-	for _, path := range paths {
-		allowed := make([]bool, len(r.plan.patterns))
-		eligible := false
-		for _, search := range r.plan.searches {
-			if search.matchPath(path) {
-				eligible = true
-				for _, id := range search.positive {
-					allowed[id] = true
-				}
-				for _, id := range search.negative {
-					allowed[id] = true
-				}
-			}
-		}
-		if eligible {
-			jobs = append(jobs, scanJob{path, allowed})
-		}
-	}
-	if len(jobs) == 0 {
-		return nil
-	}
-	// The compiled database is immutable. Scratch is not, so each worker owns one.
 	workers := runtime.GOMAXPROCS(0)
 	if workers < 1 {
 		workers = 1
 	}
-	if workers > len(jobs) {
-		workers = len(jobs)
+	if workers > len(paths) {
+		workers = len(paths)
+	}
+	if workers == 0 {
+		return nil
 	}
 	r.stats.Workers = workers
-	log.Infof("source pre-scan workers=%d files=%d", workers, len(jobs))
+	log.Infof("source pre-scan workers=%d files=%d", workers, len(paths))
 
-	jobCh := make(chan scanJob)
+	// The compiled databases are immutable and shared. Each worker owns its
+	// path and content scratch plus one reusable allow buffer, and handles a
+	// file from path selection through content scan. The queue carries paths
+	// only, so ineligible files never materialize an allow slice.
+	pathCh := make(chan string)
 	var wg sync.WaitGroup
 	var scanErr error
 	recordErr := func(err error) {
@@ -359,22 +405,46 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 			scratch, err := r.plan.db.NewScratch()
 			if err != nil {
 				recordErr(err)
-				for range jobCh {
+				for range pathCh {
 				}
 				return
 			}
 			defer scratch.Close()
-			for job := range jobCh {
+			pathState, err := r.plan.pathIndex.newPathState()
+			if err != nil {
+				recordErr(fmt.Errorf("source path index scratch: %w", err))
+				for range pathCh {
+				}
+				return
+			}
+			defer pathState.Close()
+			allowed := make([]bool, len(r.plan.patterns))
+			for path := range pathCh {
 				if ctx.Err() != nil || failed() {
 					continue
 				}
 				func() {
-					content, _, err := r.body(job.path)
-					if err != nil {
-						log.Warnf("source pre-scan: skip %s: %v", job.path, err)
+					clear(allowed)
+					// Positive and negative content patterns are both enabled: a
+					// negative regexp still has to produce ranges before overlap
+					// filtering. RestrictScratch skips patterns this path cannot see.
+					r.plan.pathIndex.fillAllow(path, pathState, allowed)
+					eligible := false
+					for _, on := range allowed {
+						if on {
+							eligible = true
+							break
+						}
+					}
+					if !eligible {
 						return
 					}
-					hits, fallback, err := r.scanFile(ctx, scratch, locators, job.path, content, job.allowed, failed)
+					content, _, err := r.body(path)
+					if err != nil {
+						log.Warnf("source pre-scan: skip %s: %v", path, err)
+						return
+					}
+					hits, fallback, err := r.scanFile(ctx, scratch, locators, path, content, allowed, failed)
 					if err != nil {
 						recordErr(err)
 						return
@@ -382,21 +452,21 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 					if ctx.Err() != nil || failed() {
 						return
 					}
-					r.publish(job.path, len(content), hits, fallback)
+					r.publish(path, len(content), hits, fallback)
 				}()
 			}
 		}()
 	}
 	sendErr := func() error {
-		defer close(jobCh)
-		for _, job := range jobs {
+		defer close(pathCh)
+		for _, path := range paths {
 			if failed() {
 				return nil
 			}
 			select {
 			case <-ctx.Done():
 				return ctx.Err()
-			case jobCh <- job:
+			case pathCh <- path:
 			}
 		}
 		return nil
@@ -564,25 +634,38 @@ func (r *SourceScanRuntime) body(path string) (string, *memedit.SafeString, erro
 	return cached.text, cached.raw, cached.err
 }
 
-func sharedScanFiles(root *sfvm.PatternRoot, files map[string]string) map[string]string {
-	if root != nil && root.UsesSharedBody() {
+// Paths implements sfvm.Source. The list is the store's list, not a copy of
+// each rule's root.
+func (r *SourceScanRuntime) Paths() []string {
+	if r == nil || r.store == nil {
 		return nil
 	}
-	return files
+	return r.store.Paths()
 }
 
-func (r *SourceScanRuntime) bind(root *sfvm.PatternRoot) {
+// Read implements sfvm.Source through the scan's one cached body.
+func (r *SourceScanRuntime) Read(path string) (string, error) {
+	text, _, err := r.body(path)
+	return text, err
+}
+
+// SharedBody implements sfvm.SharedBodySource. Editors share the cached
+// SafeString instead of copying the file into another editor.
+func (r *SourceScanRuntime) SharedBody(path string) (*memedit.SafeString, bool) {
+	_, raw, err := r.body(path)
+	if err != nil || raw == nil {
+		return nil, false
+	}
+	return raw, true
+}
+
+// Use installs this runtime as the root's only source. Direct search, fallback,
+// chained search and editors then read the same cached body.
+func (r *SourceScanRuntime) Use(root *sfvm.PatternRoot) {
 	if r == nil || root == nil {
 		return
 	}
-	root.SetFileReader(func(path string) (string, error) {
-		text, _, err := r.body(path)
-		return text, err
-	})
-	root.SetSharedSource(func(path string) (*memedit.SafeString, error) {
-		_, raw, err := r.body(path)
-		return raw, err
-	})
+	root.SetSource(r)
 }
 
 // Matcher decorates only PatternRoot's direct searches. Unknown requests still
@@ -590,13 +673,13 @@ func (r *SourceScanRuntime) bind(root *sfvm.PatternRoot) {
 // result is handled, not a miss. Cancellation stops this caller's wait, not
 // the shared scan.
 func (r *SourceScanRuntime) Matcher(ctx context.Context) sfvm.FileFilterFunc {
-	return func(root *sfvm.PatternRoot, files map[string]string, path, matchType string, params map[string]string, patterns []string) (sfvm.Values, error) {
-		r.bind(root)
+	return func(root *sfvm.PatternRoot, path, matchType string, params map[string]string, patterns []string) (sfvm.Values, error) {
+		r.Use(root)
 		key := directSearchKey(path, params, patterns)
 		search, ok := r.plan.searches[key]
 		matchType = strings.ToLower(matchType)
 		if !ok || (matchType != "regexp" && matchType != "re" && matchType != "pattern_regex" && matchType != "pattern-regex" && matchType != "") {
-			return MatchFileFilter(root, sharedScanFiles(root, files), path, matchType, params, patterns)
+			return MatchFileFilter(root, path, matchType, params, patterns)
 		}
 		if err := r.Wait(ctx); err != nil {
 			return nil, err
