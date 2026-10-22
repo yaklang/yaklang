@@ -2,6 +2,8 @@ package ssa
 
 import (
 	"strings"
+
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 func (p *Program) GenerateVirtualLib(packagePath string) (*Program, error) {
@@ -88,7 +90,7 @@ func fakeGetValue(lib *Program, name string) Value {
 	return nil
 }
 
-func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
+func fakeGetType(lib *Program, name string, tokenizers ...CanStartStopToken) Type {
 	v, _, _ := lib.virtualImportGroup.Do("type:"+name, func() (any, error) {
 		if t, ok := lib.exportType(name); ok {
 			return t, nil
@@ -96,7 +98,11 @@ func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
 		if !lib.IsVirtualImport() {
 			return nil, nil
 		}
-		blueprint := createVirtualBlueprint(lib, name)
+		var token CanStartStopToken
+		if len(tokenizers) > 0 {
+			token = tokenizers[0]
+		}
+		blueprint := createVirtualBlueprint(lib, name, token)
 		return lib.rememberExportType(name, blueprint), nil
 	})
 	if v == nil {
@@ -106,19 +112,24 @@ func fakeGetType(lib *Program, name string, token ...CanStartStopToken) Type {
 	return typ
 }
 
-// createVirtualBlueprint materializes one shared external type. The importer's
-// cursor is a use site, not the declaration, so neither the blueprint nor its
-// container keeps that range.
-func createVirtualBlueprint(lib *Program, name string) *Blueprint {
+// createVirtualBlueprint materializes one shared external type. A language that
+// passes a declaration token (Java/PHP import statement) keeps it as the import
+// reference. Go/TS/Python pass none: the importer's cursor is a use site, not a
+// declaration, so neither the blueprint nor its container keeps that range.
+func createVirtualBlueprint(lib *Program, name string, token CanStartStopToken) *Blueprint {
 	var blueprint *Blueprint
 	lib.withVirtualBuilder(func(builder *FunctionBuilder) {
 		if builder == nil {
 			return
 		}
 		builder.SetEditor(lib.GetCurrentEditor())
-		restore := builder.SetRangePure(nil)
-		blueprint = builder.CreateBlueprint(name)
-		restore()
+		if utils.IsNil(token) {
+			restore := builder.SetRangePure(nil)
+			blueprint = builder.CreateBlueprint(name)
+			restore()
+			return
+		}
+		blueprint = builder.CreateBlueprint(name, token)
 	})
 	return blueprint
 }
@@ -174,7 +185,7 @@ func fakeImportType(lib *Program, name string, token CanStartStopToken) Type {
 		}
 		// Shared @virtual builder. The lock is virtualEmitMu, not the
 		// magic-method map: GetMagicMethod must not take it.
-		return lib.rememberExportType(name, createVirtualBlueprint(lib, name)), nil
+		return lib.rememberExportType(name, createVirtualBlueprint(lib, name, token)), nil
 	})
 	if v == nil {
 		return nil
