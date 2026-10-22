@@ -237,8 +237,8 @@ func (b *FunctionBuilder) checkAndCreateDefaultMember(res checkMemberResult, obj
 		return
 	}
 	if !res.exist {
-			object.NewError(Error, "ObjectError",
-			InvalidField(TypeStringLimited(res.ObjType), GetKeyString(key)),
+		object.NewError(Error, "ObjectError",
+			InvalidField(res.ObjType.String(), GetKeyString(key)),
 		)
 	}
 
