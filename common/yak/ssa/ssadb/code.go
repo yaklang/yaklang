@@ -255,11 +255,11 @@ func (r *IrCode) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Positio
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
 	startOff, endOff := memedit.ClampOffsetPair(editor, int(r.SourceCodeStartOffset), int(r.SourceCodeEndOffset))
-	start, startErr := editor.GetPositionByOffsetWithError(startOff)
+	start, startErr := editor.GetSourceBoundaryPosition(startOff)
 	if startErr != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions start: %v", startErr)
 	}
-	end, endErr := editor.GetPositionByOffsetWithError(endOff)
+	end, endErr := editor.GetSourceBoundaryPosition(endOff)
 	if endErr != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions end: %v", endErr)
 	}

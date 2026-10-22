@@ -129,11 +129,11 @@ func (r *IrOffset) GetStartAndEndPositions() (*memedit.MemEditor, *memedit.Posit
 	if err != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions failed: %v", err)
 	}
-	start, startErr := editor.GetPositionByOffsetWithError(int(r.StartOffset))
+	start, startErr := editor.GetSourceBoundaryPosition(int(r.StartOffset))
 	if startErr != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions start: %v", startErr)
 	}
-	end, endErr := editor.GetPositionByOffsetWithError(int(r.EndOffset))
+	end, endErr := editor.GetSourceBoundaryPosition(int(r.EndOffset))
 	if endErr != nil {
 		return nil, nil, nil, utils.Errorf("GetStartAndEndPositions end: %v", endErr)
 	}
