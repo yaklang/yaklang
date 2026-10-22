@@ -11,7 +11,7 @@ import (
 
 var renderUIAction = &reactloops.LoopAction{
 	ActionType:  "render_ui",
-	Description: "Present a small independent UI block using ONLY the negotiated component catalog. Never output HTML/CSS/JS, functions or expressions. Give properties in catalog order and declared types. Use stable document/node IDs and explicit children IDs. Supply meaningful plain-text fallback. Local input stays on the client until submit_to_chat. This call does not wait. Diagnostics permit ONE correction with the SAME IDs; invalid properties will not take effect.",
+	Description: "Render a small UI block using definitions from load_ui_components. Follow UI_COMPONENT_DEFINITIONS, use stable IDs and a meaningful text fallback. Returns immediately; diagnostics allow one correction with the same IDs.",
 	Options: []aitool.ToolOption{aitool.WithRawParam("ui", map[string]any{
 		"type": "object", "required": []string{"id", "catalogVersion", "fallback", "root", "nodes"},
 		"properties": map[string]any{

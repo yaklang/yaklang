@@ -6,7 +6,20 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 )
+
+func TestUIComponentDiscoveryContinuesDecision(t *testing.T) {
+	for _, name := range []string{"load_ui_components", "search_ui_components"} {
+		loop := reactloops.NewMinimalReActLoop(&aicommon.Config{}, nil)
+		recordDecision(loop, name, nil)
+		d := currentDecision(loop)
+		require.True(t, d.continuation)
+		require.True(t, d.toolResult)
+		require.False(t, d.handledUser, "loading a schema is not an answer to pending user input")
+	}
+}
 
 func TestDecisionBoundaryDoesNotSwallowUserInputOrUnreviewedResult(t *testing.T) {
 	c, h := executionFixture(t, false)

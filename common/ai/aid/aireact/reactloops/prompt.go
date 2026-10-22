@@ -419,6 +419,9 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	// Keep deliveries in the formal dynamic section so prompt analysis and the
 	// model request agree about which evidence belongs to this iteration.
 	reactiveData += subAgentInput
+	// Replaceable task-local definitions: never append schemas to feedback or
+	// Timeline, where old loads would survive eviction and accumulate forever.
+	reactiveData += r.renderUIComponents()
 	todoCheckpoint := input.todoCheckpoint
 
 	// Render extra capabilities discovered via intent recognition
