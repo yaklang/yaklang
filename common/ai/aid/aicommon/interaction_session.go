@@ -369,6 +369,17 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 		if previous.Metadata.RequestID != receipt.RequestID || previous.Metadata.Source != receipt.Source || previous.Metadata.NodeID != receipt.NodeID {
 			return fmt.Errorf("submission id already belongs to another request")
 		}
+		// Table receipts include server-owned rows and canonical ordering. Compare
+		// retries after the same normalization used on their first admission.
+		if receipt.Source == "component" {
+			if artifact := s.artifacts[receipt.RequestID]; artifact != nil {
+				var err error
+				receipt, err = artifact.Document.NormalizeSubmission(receipt)
+				if err != nil {
+					return err
+				}
+			}
+		}
 		before, _ := json.Marshal(previous.Metadata)
 		after, _ := json.Marshal(receipt)
 		if string(before) != string(after) {

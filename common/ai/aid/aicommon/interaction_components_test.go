@@ -234,6 +234,8 @@ func TestUIDataTableSubmissionIsCanonicalOnceAndRecoverable(t *testing.T) {
 	for i := 0; i < 12; i++ {
 		require.NoError(t, cfg.AcceptQuestionAnswer(answer(fmt.Sprint(i)), deliver))
 	}
+	// Retries use the original transport ID and omit canonical server row data.
+	require.NoError(t, cfg.AcceptQuestionAnswer(answer("0"), deliver))
 	require.Equal(t, 1, deliveries)
 	require.Equal(t, "0", accepted.ID)
 	require.Equal(t, float64(12), accepted.Metadata.Values["rows"].([]any)[0].(map[string]any)["values"].(map[string]any)["count"])
@@ -246,6 +248,7 @@ func TestUIDataTableSubmissionIsCanonicalOnceAndRecoverable(t *testing.T) {
 	recovered, _ := uiDataTableFixture(t, WithPersistentSessionId("table-session"))
 	recovered.BaseCheckpointableStorage = NewCheckpointableStorageWithDB("table-runtime", db)
 	require.NoError(t, recovered.RestoreUIInteractions())
+	require.NoError(t, recovered.AcceptQuestionAnswer(answer("0"), deliver))
 	require.NoError(t, recovered.AcceptQuestionAnswer(answer("after-restart"), deliver))
 	require.Equal(t, 1, deliveries)
 	require.Equal(t, "0", recovered.UISession().artifacts[doc.ID].Submissions["details"].ID)
