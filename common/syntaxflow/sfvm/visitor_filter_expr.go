@@ -71,9 +71,9 @@ func (y *SyntaxFlowVisitor) VisitFilterItem(raw sf.IFilterItemContext) error {
 			paramMap := make(map[string]string)
 			switch method {
 			case "pattern_regex_not", "pattern-regex-not", "patternregexnot":
-				paramMap["__sf_pattern_not_list"] = "1"
+				paramMap = SetFileFilterParam(paramMap, FileFilterParamPatternNotList)
 			case "pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
-				paramMap["__sf_pattern_not"] = "1"
+				paramMap = SetFileFilterParam(paramMap, FileFilterParamPatternNot)
 			}
 			y.EmitFileFilterReg("", paramMap, params)
 			return nil

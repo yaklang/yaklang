@@ -322,6 +322,99 @@ func (s *scriptedSource) SharedBody(path string) (*memedit.SafeString, bool) {
 	return nil, false
 }
 
+func TestOneRuleManyRegexesShareOneScan(t *testing.T) {
+	frames := sourceFrames(t, `${*.txt}.pattern_regex(/alpha/) as $a
+${*.txt}.pattern_regex(/beta/) as $b
+$a + $b as $hit
+alert $hit`)
+	store := &scriptedSource{
+		files: map[string]string{"a.txt": "alpha beta", "b.go": "alpha beta"},
+		paths: []string{"a.txt", "b.go"},
+	}
+	root := NewRootFromStore(store)
+	runtime, plan, err := StartFrameRuntime(context.Background(), frames[0], root)
+	require.NoError(t, err)
+	require.NotNil(t, runtime)
+	require.NotNil(t, plan)
+	defer plan.Close()
+	defer runtime.Close()
+	require.Len(t, plan.patterns, 2, "both direct searches stay in one compiled scan")
+	require.Len(t, plan.searches, 2)
+	root.SetFileFilterMatcher(runtime.Matcher(context.Background()))
+	result, err := frames[0].Feed(sfvm.ValuesOf(root))
+	require.NoError(t, err)
+	joined := strings.Join(sourceAlertSnapshot(result), "\n")
+	require.Contains(t, joined, "alpha")
+	require.Contains(t, joined, "beta")
+	require.NotContains(t, joined, "b.go")
+	require.Equal(t, int64(1), store.reads.Load(), "one rule with two regexes reads an eligible file once")
+	require.Equal(t, 1, runtime.Stats().Files)
+}
+
+func TestSourceScanRuntime_ConcurrentRulesShareBodies(t *testing.T) {
+	frames := sourceFrames(t,
+		`${*.txt}.pattern_regex(/alpha/) as $hit
+alert $hit`,
+		`${*.txt}.pattern_regex(/beta/) as $hit
+alert $hit`,
+	)
+	store := &scriptedSource{
+		files: map[string]string{"a.txt": "alpha beta"},
+		paths: []string{"a.txt"},
+	}
+	plan, err := NewSourceScanPlan(frames)
+	require.NoError(t, err)
+	defer plan.Close()
+	runtime := plan.StartStore(context.Background(), store)
+	defer runtime.Close()
+	var wg sync.WaitGroup
+	errs := make(chan error, len(frames))
+	for _, frame := range frames {
+		wg.Add(1)
+		go func(frame *sfvm.SFFrame) {
+			defer wg.Done()
+			root := NewRootFromStore(store)
+			root.SetFileFilterMatcher(runtime.Matcher(context.Background()))
+			result, feedErr := frame.Feed(sfvm.ValuesOf(root))
+			if feedErr != nil {
+				errs <- feedErr
+				return
+			}
+			if len(sourceAlertSnapshot(result)) == 0 {
+				errs <- fmt.Errorf("rule produced no alert")
+			}
+		}(frame)
+	}
+	wg.Wait()
+	close(errs)
+	for feedErr := range errs {
+		require.NoError(t, feedErr)
+	}
+	require.Equal(t, int64(1), store.reads.Load(), "concurrent rules share the cached body")
+}
+
+func TestSourceScanRuntime_WorkerSkipsIneligibleBody(t *testing.T) {
+	frames := sourceFrames(t, `${*.txt}.pattern_regex(/alpha/) as $hit
+alert $hit`)
+	store := &scriptedSource{
+		files: map[string]string{"a.txt": "alpha", "b.go": "alpha"},
+		paths: []string{"a.txt", "b.go"},
+	}
+	plan, err := NewSourceScanPlan(frames)
+	require.NoError(t, err)
+	defer plan.Close()
+	runtime := plan.StartStore(context.Background(), store)
+	defer runtime.Close()
+	root := NewRootFromStore(store)
+	root.SetFileFilterMatcher(runtime.Matcher(context.Background()))
+	result, err := frames[0].Feed(sfvm.ValuesOf(root))
+	require.NoError(t, err)
+	require.Contains(t, strings.Join(sourceAlertSnapshot(result), "\n"), "a.txt")
+	require.Equal(t, int64(1), store.reads.Load(), "path selection inside the worker must skip an ineligible body")
+	require.Equal(t, 1, runtime.Stats().Files)
+	require.Equal(t, 1, runtime.Stats().Hits)
+}
+
 func TestSourceScanRuntime_ReusesOneBody(t *testing.T) {
 	shared := memedit.NewSafeString("key once")
 	store := &scriptedSource{

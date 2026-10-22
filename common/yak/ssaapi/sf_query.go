@@ -48,8 +48,10 @@ type queryConfig struct {
 	rule        *schema.SyntaxFlowRule // use this
 
 	// runtime
-	vm         *sfvm.SyntaxFlowVirtualMachine
-	frame      *sfvm.SFFrame
+	vm    *sfvm.SyntaxFlowVirtualMachine
+	frame *sfvm.SFFrame
+	// ruleLoader is borrowed from the scan's rulePreparation when a product
+	// scan set it. Nil means this query has no shared instruction cache.
 	ruleLoader *sfvm.RuleLoader
 
 	// sourceResultCallback lets source-mode bounded hit batches stream to a
@@ -57,8 +59,9 @@ type queryConfig struct {
 	// that do not provide a result callback.
 	sourceResultCallback func(*SyntaxFlowResult)
 
-	// sourceScanRuntime optionally supplies scan-local, precomputed direct
-	// searches. It never replaces the frame or its subsequent operations.
+	// sourceScanRuntime is the scan-owned pre-scan. A nil runtime means this
+	// query builds one for its own direct file searches; either way the frame
+	// and its later opcodes stay on this query.
 	sourceScanRuntime *sfpattern.SourceScanRuntime
 
 	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
@@ -265,7 +268,18 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			root = sfpattern.NewRoot(files)
 		}
 		if config.sourceScanRuntime != nil {
+			config.sourceScanRuntime.Use(root)
 			root.SetFileFilterMatcher(config.sourceScanRuntime.Matcher(queryCtx))
+		} else {
+			owned, plan, startErr := sfpattern.StartFrameRuntime(queryCtx, frame, root)
+			if startErr != nil {
+				log.Warnf("source pre-scan: single rule stays on the per-search matcher: %v", startErr)
+			}
+			if owned != nil {
+				defer plan.Close()
+				defer owned.Close()
+				root.SetFileFilterMatcher(owned.Matcher(queryCtx))
+			}
 		}
 		if config.program != nil && root.GetProgramName() == "" {
 			root.SetProgramName(config.program.GetProgramName())
@@ -438,8 +452,9 @@ func QueryWithRuleLoader(loader *sfvm.RuleLoader) QueryOption {
 	return func(c *queryConfig) { c.ruleLoader = loader }
 }
 
-// QueryWithSourceScanRuntime supplies direct-search results from the same
-// source snapshot. Standalone queries without it keep the original matcher.
+// QueryWithSourceScanRuntime supplies direct-search results from a scan-owned
+// runtime. Queries that do not set one still pre-scan that frame's own direct
+// searches; this option is how several rules share a single pre-scan.
 func QueryWithSourceScanRuntime(runtime *sfpattern.SourceScanRuntime) QueryOption {
 	return func(c *queryConfig) {
 		c.sourceScanRuntime = runtime
