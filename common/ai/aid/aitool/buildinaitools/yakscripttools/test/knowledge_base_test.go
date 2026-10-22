@@ -74,6 +74,8 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	added := invoke("manage_knowledge_base", map[string]any{"op": "add_entry", "name": "yak-tool-fixture", "entry": map[string]any{"title": "启动说明", "content": "原始内容\n引号\" 反斜杠\\ 😀"}, "skip_index": true})
 	require.False(t, added["indexed"].(bool), "skip_index must survive the tool/CLI boundary")
 	queried := invoke("query_knowledge_base", map[string]any{"name": "yak-tool-fixture", "mode": "get", "entry_id": added["entry_id"], "token_limit": 512})
+	require.Equal(t, false, queried["has_more"])
+	require.Equal(t, float64(0), queried["next_offset"])
 	hits := queried["results"].([]any)
 	require.Len(t, hits, 1)
 	require.Equal(t, "原始内容\n引号\" 反斜杠\\ 😀", hits[0].(map[string]any)["content"])
@@ -95,6 +97,7 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	require.Contains(t, scopeError["message"], `"op":"list"`)
 	listed := invoke("manage_knowledge_base", map[string]any{"op": "list", "keyword": "yak-tool-fixture"})
 	require.Equal(t, float64(1), listed["total"])
+	require.Equal(t, float64(1), listed["knowledge_bases"].([]any)[0].(map[string]any)["entry_count"])
 	for _, tc := range []struct {
 		name   string
 		params map[string]any
@@ -140,6 +143,14 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	require.Contains(t, built.Stdout, "embedding ready")
 	require.Contains(t, built.Stdout, "persisted_entries=1")
 	require.Contains(t, built.Stdout, "completed; all reported entries persisted")
+	for _, title := range []string{"indexed first", "indexed second"} {
+		invoke("manage_knowledge_base", map[string]any{"op": "add_entry", "name": "yak-tool-fixture", "entry": map[string]any{"title": title, "content": "ORBIT-731 recovery"}})
+	}
+	semantic := invoke("query_knowledge_base", map[string]any{"name": "yak-tool-fixture", "mode": "semantic", "query": "ORBIT-731", "limit": 1, "token_limit": 1024})
+	require.Greater(t, semantic["total"].(float64), float64(1))
+	require.Len(t, semantic["results"], 1)
+	require.Equal(t, false, semantic["has_more"])
+	require.Equal(t, float64(0), semantic["next_offset"])
 	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-fixture"})
 	invoke("manage_knowledge_base", map[string]any{"op": "delete", "name": "yak-tool-other"})
 	require.Equal(t, float64(0), invoke("manage_knowledge_base", map[string]any{"op": "list"})["total"])

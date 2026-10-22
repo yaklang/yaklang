@@ -4,10 +4,10 @@ __VERBOSE_NAME_ZH__ = "管理知识库"
 __KEYWORDS__ = "knowledge base,knowledge,rag,create,build,list,update,delete,知识库,知识,管理,构建,索引"
 __USAGE__ = <<<USAGE
 知识库管理的唯一入口；先 require_tool 加载 manage_knowledge_base，再传参数。与 Yakit 共用本次运行的 profile 数据库。
-op=list：keyword 匹配库名/描述，limit 1..100，offset 非负；has_more=true 时用 next_offset 续查。这里列的是知识库，不是长期记忆空间或单独的向量集合。
+op=list：keyword 匹配库名/描述，limit 1..100，offset 非负；每个库直接包含 entry_count（包括空库的0），口径与 get 一致。has_more=true 时用 next_offset 续查。这里列的是知识库，不是长期记忆空间或单独的向量集合。
 其他 op 必须传精确 name；不存在报错，只有 create 能新建库。create 重复名称报错；先创建再 build，build 追加，不覆盖既有知识。
 op=create：metadata 可含 description/type/tags(字符串数组)/is_default；index_options 可含 embedding_model/dimension/m/ml/ef_search/ef_construct（省略用引擎默认值，余弦距离）。只创建元信息，不请求 embedding。模型和维度必须与配置的 embedding 服务一致；后续操作使用保存的参数。
-op=get：库元信息、知识条目数和保存的向量集合参数。
+op=get：库元信息、知识条目数和保存的向量集合参数。描述统一以 knowledge_base.description 为准；旧库的集合描述副本若不一致，collection.Description 返回规范描述，stored_collection_description 保留原值供诊断。get 只读，不迁移历史数据；需要持久同步时用 update 的 metadata.description。
 op=update：metadata 仅更新给出的字段；空字符串、空 tags、is_default=false 可以清空。描述在同一事务中同步到知识库和向量集合。库名保持稳定。
 op=delete：删除指定库及关联知识、向量和实体关系；删除后 list 确认。
 op=add_entry/update_entry：entry 是完整条目 {title,content,summary?,type?,keywords?,potential_questions?}；update_entry 还需 entry_id，只操作该库中的条目。默认调用 embedding 更新向量；skip_index=true 仅存知识并移除旧索引，之后用 rebuild_index。entry_id 从写入结果或 query_knowledge_base 获取。

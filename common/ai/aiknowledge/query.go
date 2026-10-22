@@ -243,8 +243,7 @@ func (c *config) queryKnowledge(req queryRequest) (*QueryResult, error) {
 			hit.NextContentOffset = req.ContentOffset + len([]rune(hit.Content))
 			hit.Truncated = hit.NextContentOffset < len(content)
 			result.Results = append(result.Results, hit)
-			result.NextOffset = req.Offset + len(result.Results)
-			result.HasMore = result.NextOffset < result.Total
+			result.setPagination(req.Offset)
 			result.UsedTokens = result.tokenEstimate()
 			data, _ := json.Marshal(hit)
 			if result.UsedTokens <= req.TokenLimit && ytoken.CalcTokenCount(string(data)) <= req.PerEntryTokenLimit && (!hit.Truncated || hit.Content != "") {
@@ -263,13 +262,22 @@ func (c *config) queryKnowledge(req queryRequest) (*QueryResult, error) {
 			break
 		} // Never skip an unreturned hit.
 	}
-	result.NextOffset = req.Offset + len(result.Results)
-	result.HasMore = result.NextOffset < result.Total
+	result.setPagination(req.Offset)
 	result.UsedTokens = result.tokenEstimate()
 	if result.UsedTokens > req.TokenLimit {
 		return nil, invalidArgumentf("token_limit is too small for response metadata; increase token_limit")
 	}
 	return result, c.ctx.Err()
+}
+
+func (r *QueryResult) setPagination(offset int) {
+	// Only keyword queries support entry pagination. Semantic totals describe
+	// bounded ANN candidates; get continues within an entry via content_offset.
+	r.NextOffset, r.HasMore = 0, false
+	if r.Mode == "keyword" {
+		r.NextOffset = offset + len(r.Results)
+		r.HasMore = r.NextOffset < r.Total
+	}
 }
 
 // Reserve eight tokens for the self-referential used_tokens value. The estimate

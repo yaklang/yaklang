@@ -62,9 +62,16 @@ func TestKnowledgeQueryExplicitScopeAndGlobalBounds(t *testing.T) {
 		scope["mode"], scope["query"], scope["limit"] = "semantic", "MATCH", 2
 		r = query(scope)
 		require.Len(t, r.Results, 2)
+		require.Greater(t, r.Total, len(r.Results))
+		require.False(t, r.HasMore, "semantic must not advertise an unsupported offset continuation")
+		require.Zero(t, r.NextOffset)
 		require.NotNil(t, r.Results[0].Score)
 		require.GreaterOrEqual(t, *r.Results[0].Score, *r.Results[1].Score)
 	}
+	r = query(map[string]any{"all": true, "mode": "semantic", "query": "MATCH", "limit": 50})
+	require.True(t, r.BudgetExhausted)
+	require.False(t, r.HasMore)
+	require.Zero(t, r.NextOffset)
 	r = query(map[string]any{"all": true, "limit": 50})
 	require.True(t, r.BudgetExhausted)
 	require.Less(t, len(r.Results), 9)

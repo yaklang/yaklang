@@ -11,7 +11,12 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
-// List returns a bounded page of knowledge base metadata, without reading content.
+type listedBaseInfo struct {
+	baseInfo
+	EntryCount int `json:"entry_count"`
+}
+
+// List returns a bounded page of metadata and live entry counts, without reading content.
 func List(opts ...Option) (map[string]any, error) {
 	c, err := newConfig(opts)
 	if err != nil {
@@ -36,9 +41,28 @@ func List(opts ...Option) (map[string]any, error) {
 	if err := query.Order("id ASC").Limit(r.Limit).Offset(r.Offset).Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	bases := make([]baseInfo, 0, len(rows))
+	ids := make([]uint, 0, len(rows))
 	for i := range rows {
-		bases = append(bases, info(&rows[i]))
+		ids = append(ids, rows[i].ID)
+	}
+	counts := map[uint]int{}
+	if len(ids) > 0 {
+		var grouped []struct {
+			KnowledgeBaseID uint
+			EntryCount      int
+		}
+		if err := c.db.Model(&schema.KnowledgeBaseEntry{}).
+			Select("knowledge_base_id, COUNT(*) AS entry_count").Where("knowledge_base_id IN (?)", ids).
+			Group("knowledge_base_id").Scan(&grouped).Error; err != nil {
+			return nil, err
+		}
+		for _, count := range grouped {
+			counts[count.KnowledgeBaseID] = count.EntryCount
+		}
+	}
+	bases := make([]listedBaseInfo, 0, len(rows))
+	for i := range rows {
+		bases = append(bases, listedBaseInfo{baseInfo: info(&rows[i]), EntryCount: counts[rows[i].ID]})
 	}
 	next := r.Offset + len(rows)
 	return map[string]any{"op": "list", "knowledge_bases": bases, "total": total, "has_more": next < total, "next_offset": next}, c.ctx.Err()
@@ -119,7 +143,14 @@ func Get(name string, opts ...Option) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"op": "get", "name": name, "knowledge_base": info(base), "entry_count": count, "collection": collection}, c.ctx.Err()
+	result := map[string]any{"op": "get", "name": name, "knowledge_base": info(base), "entry_count": count, "collection": collection}
+	// The knowledge base owns the description. Older collections may retain a
+	// stale copy; expose it for diagnosis without making a read mutate the DB.
+	if collection.Description != base.KnowledgeBaseDescription {
+		result["stored_collection_description"] = collection.Description
+		collection.Description = base.KnowledgeBaseDescription
+	}
+	return result, c.ctx.Err()
 }
 
 // Update applies only supplied metadata options, including empty values/false.
