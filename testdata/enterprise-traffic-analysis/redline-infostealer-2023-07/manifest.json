@@ -1,0 +1,20 @@
+{
+  "id": "redline-infostealer-2023-07",
+  "title": "RedLine Stealer infection: identity, download chain and C2",
+  "capture": "capture.pcap",
+  "format": "pcap",
+  "size_bytes": 1419604,
+  "sha256": "7349b0cab7fbc605f31dd7db95748a23b16b3fc2f5d370a7afb3e99cd9f17c8e",
+  "packet_count": 2497,
+  "start_time": "2023-07-11 06:39:22.849048",
+  "end_time": "2023-07-11 06:39:58.364177",
+  "source": {
+    "publisher": "Palo Alto Networks Unit 42",
+    "page": "https://unit42.paloaltonetworks.com/wireshark-quiz-redline-stealer/",
+    "download": "https://raw.githubusercontent.com/pan-unit42/Wireshark-quizzes/main/2023-07-Unit42-Wireshark-quiz.pcap.zip",
+    "archive_password": "infected"
+  },
+  "capabilities": ["dhcp", "dns", "mdns", "kerberos", "http", "tls-sni", "tcp-unknown-c2"],
+  "tasks": "TASKS.md",
+  "safety": "Malicious training capture. Do not contact embedded infrastructure or execute extracted content."
+}

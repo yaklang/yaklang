@@ -5,9 +5,11 @@ __KEYWORDS__ = "pcap,pcapng,pcapdb,query,流量分析,协议字段,session,strea
 __INPUT_CONSTRAINTS__ = '{"oneOf":[{"required":["id"],"not":{"required":["pcapfile"]}},{"required":["pcapfile"],"not":{"required":["id"]}}]}'
 __USAGE__ = <<<USAGE
 id 为 load_pcapfile 返回的 dataset_id；或传 pcapfile 自动导入/按内容复用，并开启协议和 stream 分析。只能传一个身份参数，后续优先使用返回的 dataset_id。
-query_type: metadata / packets / protocols(default) / fields / sessions / streams / details / packet_data / protocol_data / stream_data / protocol_packets / chunk_packets / packet_sessions。
-details、*_data、protocol_packets、chunk_packets、packet_sessions 必须给正整数 record_id，其类型分别是消息/包/消息/流/消息/块/包。其余模式不传 record_id。
-details/packet_data/protocol_data 只传身份、query_type、record_id 和预算；省略 protocol、field_path、transport、IP/端口、时间和 session/stream 条件。切换模式后重新选择参数，不要复制上一轮筛选。详情示例：{"id":"dataset-uuid","query_type":"details","record_id":1,"result_bytes":16384}。
+query_type: metadata / packets / protocols(default) / fields / sessions / streams / details / body_summary / packet_data / protocol_data / stream_data / protocol_packets / chunk_packets / packet_sessions。
+这是 PCAP/PCAPNG 应用层分析的首选工具。不要因为缺少 tshark 而自行解析 pcapng 或猜 HTTP 字段：protocols 摘要包含 transaction_id/response_to，response_to 指向对应请求的消息 ID。先用 protocol=http 获取摘要，再用 details 核对 URL、Host、Method、Path、状态码和正文边界。旧 analyze_pcap 只做包级摘要，不用于这类问题。
+body_summary 用 record_id 选择一条 HTTP/1 消息，在后端完成完整读取、传输解码、Content-Encoding 解码、SHA256 和内容统计，只返回长度、完整性、编码/压缩/二进制特征、敏感类别和哈希，不返回正文或正文前缀。需要正文哈希、上传是否完整、压缩/二进制判断或敏感内容提示时必须用它，不要用 protocol_data 预览或导出到 shell 自行计算。
+details、body_summary、*_data、protocol_packets、chunk_packets、packet_sessions 必须给正整数 record_id，其类型分别是消息/包/消息/流/消息/块/包。其余模式不传 record_id。
+details/body_summary/packet_data/protocol_data 只传身份、query_type、record_id 和预算；省略 protocol、field_path、transport、IP/端口、时间和 session/stream 条件。切换模式后重新选择参数，不要复制上一轮筛选。详情示例：{"id":"dataset-uuid","query_type":"details","record_id":1,"result_bytes":16384}。
 筛选：packets/sessions/packet_sessions 支持 transport、source_ip/destination_ip、source_port/destination_port；protocols/fields 支持 transport、protocol 和一个 field 条件；packets/protocols/fields/sessions/packet_sessions 支持 time_start_ns/time_end_ns（十进制字符串，[start,end)）；sessions 按首包时间。packets/protocols/fields/sessions/streams/packet_sessions 支持 session_id/stream_id。其他模式拒绝这些筛选。
 field_path 从 fields 的真实发现结果中选择，details 核实值，然后用 query_type=protocols + field 条件取命中消息。fields 只返回采样字段目录（occurrences 是页内出现次数），不能当消息命中列表。field_op=eq/exists/missing；eq 的 field_type=string/integer/real/boolean/null，field_value 总是字符串（整数用精确十进制；布尔只用 true/false；null 不传值）。Field 条件从 Fields 根开始，不搜索 Session 快照；不支持任意 SQL、LIKE、OR、范围或字段通配符。
 返回结构化 result。先检查 error，再判断 has_more；after=上次 next_cursor，保持身份、模式、record_id 和筛选条件一致。limit 1–1000，result_bytes 4096–65536，preview_bytes 0–4096。fields 是有界采样，scanned/skipped/sampled/truncated 必须保留；protocol_count 是消息数。Data 的 JSON 编码为 base64；截断预览不能作为完整流，stream_data 游标为块 ID。
@@ -26,7 +28,7 @@ arguments 示例：
 USAGE
 id = cli.String("id", cli.setHelp("持久流量库 DatasetID；与 pcapfile 二选一"))
 pcapfile = cli.String("pcapfile", cli.setHelp("自动导入/复用的捕获文件路径；与 id 二选一"))
-mode = cli.String("query_type", cli.setDefault("protocols"), cli.setHelp("metadata/packets/protocols/fields/sessions/streams/details/packet_data/protocol_data/stream_data/protocol_packets/chunk_packets/packet_sessions"))
+mode = cli.String("query_type", cli.setDefault("protocols"), cli.setHelp("metadata/packets/protocols/fields/sessions/streams/details/body_summary/packet_data/protocol_data/stream_data/protocol_packets/chunk_packets/packet_sessions"))
 recordID = cli.Int("record_id", cli.setDefault(0), cli.setHelp("详情、预览或关联的目标记录 ID，类型由 query_type 决定"))
 limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("本页记录数 1–1000；fields 为采样消息数"))
 after = cli.Int("after", cli.setDefault(0), cli.setHelp("前一页 next_cursor，首次为 0；不是页号"))
@@ -49,12 +51,12 @@ fieldValue = cli.String("field_value", cli.setHelp("eq 条件的文本值；允�
 cli.check()
 
 assert (id != "") != (pcapfile != ""), "Provide exactly one of id or pcapfile"
-assert mode in ["metadata","packets","protocols","fields","sessions","streams","details","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"], "Unsupported query_type"
+assert mode in ["metadata","packets","protocols","fields","sessions","streams","details","body_summary","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"], "Unsupported query_type"
 assert limit >= 1 && limit <= 1000 && after >= 0, "Invalid limit/after"
 assert resultBytes >= 4096 && resultBytes <= 65536 && previewBytes >= 0 && previewBytes <= 4096, "Invalid output budget"
 assert sourcePort >= -1 && sourcePort <= 65535 && destinationPort >= -1 && destinationPort <= 65535, "Invalid port"
 assert sessionID >= 0 && streamID >= 0 && recordID >= 0, "Invalid association ID"
-recordModes = ["details","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"]
+recordModes = ["details","body_summary","packet_data","protocol_data","stream_data","protocol_packets","chunk_packets","packet_sessions"]
 assert (mode in recordModes) == (recordID > 0), "record_id is required only for detail/preview/reference queries"
 assert (timeStart == "") == (timeEnd == ""), "Both time boundaries are required"
 if protocol != "" || fieldPath != "" { assert mode in ["protocols","fields"], "Protocol/field filters require protocols or fields" }
@@ -138,6 +140,7 @@ case "fields": page,err = db.DiscoverProtocolFields(options...)
 case "sessions": page,err = db.QuerySessionsPage(options...)
 case "streams": page,err = db.QueryStreamsPage(options...)
 case "details": page,err = db.ProtocolDetailsPage(recordID,options...)
+case "body_summary": page,err = db.BodySummaryPage(recordID,options...)
 case "packet_data": page,err = db.ReadPacketPage(recordID,options...)
 case "protocol_data": page,err = db.ReadProtocolPage(recordID,options...)
 case "stream_data": page,err = db.ReadStreamPage(recordID,options...)
