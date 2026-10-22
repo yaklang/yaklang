@@ -439,6 +439,11 @@ type Config struct {
 	// Multiple sources can be added via WithSkillsLocalDir, WithSkillsZipFile, WithSkillsFS
 	skillLoader *aiskillloader.AutoSkillLoader
 
+	// Session 入口使用独立 manager；loop 保留自己的 manager，通过 Timeline 互相可见。
+	// 不经 ConvertConfigToOptions 传播，避免子 config 重新绑定父 manager。
+	skillsContextManagerMu sync.Mutex
+	skillsContextManager   *aiskillloader.SkillsContextManager
+
 	// disableAutoSkills controls whether to automatically load skills from the default directory
 	// (~/.yakit-projects/ai-skills). Default is false (auto-load enabled).
 	// Use WithDisableAutoSkills(true) to disable this behavior (e.g., in tests).

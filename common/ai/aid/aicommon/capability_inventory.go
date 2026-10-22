@@ -256,7 +256,7 @@ func resolveCapabilityInventorySkills(cfg *Config, loop CapabilityInventoryLoopC
 	if cfg == nil {
 		return nil
 	}
-	return BuildInventorySkillsFromLoader(cfg.GetSkillLoader(), nil)
+	return BuildInventorySkillsFromManager(cfg.GetSkillsContextManager())
 }
 
 // BuildBaseCapabilityInventoryPayload 保留给 coordinator 初始化 emit.
