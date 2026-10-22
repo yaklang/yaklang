@@ -459,15 +459,14 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if r.allowUserInteract != nil && r.allowUserInteract() {
-		info["AllowAskForClarification"] = true
-	} else {
-		info["AllowAskForClarification"] = false
-	}
-	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
+	info["AllowAskForClarification"] = r.CheckClarificationAllowed(false) == nil
+	info["AllowBlockingClarification"] = r.CheckClarificationAllowed(true) == nil
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
 		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
-		info["UserInteractionDisabled"] = !cfg.GetAllowUserInteraction()
+		info["AllowAskForClarification"] = r.CheckClarificationAllowed(true) == nil || (cfg.UIQuestionsEnabled() && r.CheckClarificationAllowed(false) == nil)
+		info["AskForClarificationCurrentTime"], info["AskForClarificationMaxTimes"] = cfg.ClarificationUsage(r.clarificationTaskID())
+		info["WorkerClarificationDisabled"] = r.IsSubAgent() || r.loopName == "pe_task"
+		info["UserInteractionDisabled"] = !cfg.GetAllowUserInteraction() && !r.IsSubAgent() && r.loopName != "pe_task"
 		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
 			info["UIComponentIndex"] = catalog.PromptIndex()
 		}
@@ -882,17 +881,17 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if err != nil {
 			return nil, err
 		}
-		r.actions.Set(ac.ActionType, ac)
 		if cfg, ok := r.GetConfig().(*aicommon.Config); ok && cfg.UIQuestionsEnabled() {
-			r.actions.Delete(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
-			for _, name := range []string{"request_user_input_async", "request_user_input"} {
-				action, err := requireRegisteredLoopAction(name, "structured user interaction enabled")
-				if err != nil {
-					return nil, err
-				}
-				r.actions.Set(action.ActionType, action)
+			if ac.ClientQuestionsAction != nil {
+				ac = ac.ClientQuestionsAction
 			}
+			async, err := requireRegisteredLoopAction("ask_for_clarification_async", "structured user interaction enabled")
+			if err != nil {
+				return nil, err
+			}
+			r.actions.Set(async.ActionType, async)
 		}
+		r.actions.Set(ac.ActionType, ac)
 	}
 
 	// UI schemas are loaded on demand; the complete catalog remains in Config.
@@ -1038,7 +1037,7 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 }
 
 func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
-	if !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+	if !r.actionAllowed(actionName) {
 		return nil, utils.Errorf("action[%s] denied by runtime policy", actionName)
 	}
 	ac, ok := r.actions.Get(actionName)
@@ -1059,12 +1058,12 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 func (r *ReActLoop) GetAllActionNames() []string {
 	var actionNames []string
 	for _, name := range r.actions.Keys() {
-		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, name) {
+		if r.actionAllowed(name) {
 			actionNames = append(actionNames, name)
 		}
 	}
 	for _, actionName := range r.loopActions.Keys() {
-		if !r.actions.Have(actionName) && aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		if !r.actions.Have(actionName) && r.actionAllowed(actionName) {
 			actionNames = append(actionNames, actionName)
 		}
 	}
@@ -1078,12 +1077,12 @@ func (r *ReActLoop) NoActions() bool {
 func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
 	for _, action := range r.actions.Values() {
-		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
+		if r.actionAllowed(action.ActionType) {
 			actions = append(actions, r.actionForProtocol(action))
 		}
 	}
 	for _, actionName := range r.loopActions.Keys() {
-		if r.actions.Have(actionName) || !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		if r.actions.Have(actionName) || !r.actionAllowed(actionName) {
 			continue
 		}
 		actionFac, ok := r.loopActions.Get(actionName)

@@ -25,3 +25,5 @@
 {{ if .FunctionCallMode }}使用原生 function call：函数名选择 action，参数放在 arguments；使用 adjust_todolist 的 todo_delta 维护本轮微观事项。
 {{ else }}使用文本流 JSON action：@action 选择动作，字段遵循 SCHEMA，流式字段遵循主循环 AITAG/Nonce；本轮 todo_delta 维护微观事项。
 {{ end }}不要复制大任务树到微观事项。两种协议共用校验及审批权限，遵循当前声明，不混用调用格式。
+
+用户澄清仅使用当前可用的 ask_for_clarification / ask_for_clarification_async。优先异步：立即返回，回答稍后作为普通用户消息到达，继续独立工作，不要等待、轮询或重复提问。同步、异步共用调用额度（每批最多三题计一次）；PLAN 阶段受 AllowPlanUserInteract 和规划次数限制，执行阶段禁止阻塞。没有暴露的提问入口不可绕过。跳过、超时、取消均不是同意。

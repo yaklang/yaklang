@@ -9,7 +9,7 @@ func init() {
 	reactloops.RegisterAction(searchUIComponentsAction)
 	reactloops.RegisterAction(renderUIAction)
 	reactloops.RegisterAction(userQuestionsAction(false))
-	reactloops.RegisterAction(userQuestionsAction(true))
+	loopAction_AskForClarification.ClientQuestionsAction = userQuestionsAction(true)
 	reactloops.RegisterAction(loopAction_toolRequireAndCall)
 	reactloops.RegisterAction(loopAction_directlyCallTool)
 	reactloops.RegisterAction(loopAction_AskForClarification)

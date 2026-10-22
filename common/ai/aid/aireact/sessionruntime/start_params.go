@@ -53,8 +53,9 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 		opts = append(opts, aicommon.WithTimelineContentLimit(int(i.GetRuntimeContextSizeLimit())))
 	}
 
+	opts = append(opts, aicommon.WithAllowPlanUserInteract(i.AllowPlanUserInteract), aicommon.WithPlanUserInteractMaxCount(i.PlanUserInteractMaxCount))
 	if i.UserInteractLimit > 0 {
-		opts = append(opts, aicommon.WithPlanUserInteractMaxCount(i.UserInteractLimit))
+		opts = append(opts, aicommon.WithPerTaskUserInteractiveLimitedTimes(i.UserInteractLimit))
 	}
 
 	if i.GetDisableToolUse() {

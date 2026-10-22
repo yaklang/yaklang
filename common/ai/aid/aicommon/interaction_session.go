@@ -198,6 +198,12 @@ func (c *Config) emitQuestion(q *uiQuestion) error {
 // RequestQuestions returns immediately in async mode. Blocking mode waits only
 // for this request; cancellation never implies authorization for another action.
 func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions []interaction.Question, blocking bool, timeoutSeconds int) (any, error) {
+	if ctx == nil {
+		ctx = c.GetContext()
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !c.UIQuestionsEnabled() {
 		return nil, fmt.Errorf("client does not support structured questions")
 	}
@@ -220,6 +226,9 @@ func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions 
 	}
 	done := make(chan struct{})
 	q := &uiQuestion{Request: request, origin: c, ctx: ctx, done: done}
+	if err := c.AcquireClarification(taskID, blocking); err != nil {
+		return nil, err
+	}
 	s := c.UISession()
 	s.mu.Lock()
 	pending := 0
@@ -230,11 +239,13 @@ func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions 
 	}
 	if pending >= 3 {
 		s.mu.Unlock()
+		c.ReleaseClarification(taskID)
 		return nil, fmt.Errorf("three questions are already pending; continue independent work instead of asking again")
 	}
 	s.questions[request.ID] = q
 	if err := c.emitQuestion(q); err != nil {
 		delete(s.questions, request.ID)
+		c.ReleaseClarification(taskID)
 		s.mu.Unlock()
 		return nil, err
 	}
@@ -272,7 +283,7 @@ func (c *Config) UpdateQuestion(id, operation string) error {
 	if q == nil {
 		return fmt.Errorf("question request does not belong to this session")
 	}
-	if q.Request.State == "submitted" {
+	if q.Request.State == "submitted" || q.Request.State == "skipped" || q.Request.State == "cancelled" {
 		return nil
 	}
 	switch operation {
@@ -383,6 +394,9 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 	if q.Request.State == "submitted" {
 		return fmt.Errorf("question already answered")
 	}
+	if q.Request.State == "skipped" || q.Request.State == "cancelled" {
+		return fmt.Errorf("question is already closed")
+	}
 	text, err := q.Request.AnswerText(receipt.Answers)
 	if err != nil {
 		return err
@@ -405,6 +419,7 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 		}
 		q.Request.State = "submitted"
 	} else {
+		s.receipts[receipt.ID] = UIUserMessage{ID: receipt.ID, Metadata: receipt}
 		q.Request.State = "skipped"
 	}
 	q.answer = text

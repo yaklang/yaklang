@@ -45,21 +45,15 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 		return nil
 	},
 	ActionHandler: func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
-		callCount := loop.GetInt("ask_for_clarification_call_count")
-
-		delta := func(i int) {
-			loop.Set("ask_for_clarification_call_count", callCount+i)
-			if callCount+i >= int(loop.GetConfig().GetUserInteractiveLimitedTimes()) {
-				loop.RemoveAction(schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION)
-				loop.DisallowAskForClarification()
-			}
+		defer operator.Continue()
+		if err := loop.CheckClarificationAllowed(true); err != nil {
+			operator.Feedback(err.Error())
+			return
 		}
 
 		question := loop.Get("question")
 		if question == "" {
 			operator.Feedback(utils.Error("ask_for_clarification action must have 'question' field in 'ask_for_clarification_payload'"))
-			operator.Continue()
-			delta(1)
 			return
 		}
 		options := loop.GetStringSlice("options")
@@ -71,8 +65,8 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 		}
 		suggestion := invoker.AskForClarification(ctx, question, options)
 		if suggestion == "" {
-			suggestion = "user did not provide a valid suggestion, using default 'continue' action"
+			suggestion = "No answer was received. This is not consent; continue only work that does not depend on the answer."
 		}
-		delta(1)
+		operator.Feedback(suggestion)
 	},
 }
