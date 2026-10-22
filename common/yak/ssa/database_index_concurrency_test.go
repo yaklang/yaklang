@@ -95,7 +95,7 @@ func BenchmarkResidentIndexRemoveMiss(b *testing.B) {
 }
 
 func TestBlueprintFieldReplaceMissDoesNotCopy(t *testing.T) {
-	fields := utils.NewSafeMapWithKey[string, []Value]()
+	fields := newBlueprintMemberMap()
 	from := NewConst("from")
 	to := NewConst("to")
 	other := NewConst("other")

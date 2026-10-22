@@ -78,12 +78,12 @@ type Blueprint struct {
 	// outside SafeMap's lock; ForEach already drops the lock before its callback.
 	MagicMethod *utils.SafeMapWithKey[BlueprintMagicMethodKind, Value]
 
-	// Member lists are shared by parallel compile units (global variables and
-	// inherited blueprints). SafeMap makes one key's append atomic. The lock
-	// stays inside that update and is not held across storeField or Emit.
-	NormalMember *utils.SafeMapWithKey[string, []Value]
-	StaticMember *utils.SafeMapWithKey[string, []Value]
-	ConstValue   *utils.SafeMapWithKey[string, []Value]
+	// Member lists and their value-to-field lookup are published atomically.
+	// Readers retain immutable slices; rewriting one ID need not scan every
+	// other member history in every blueprint.
+	NormalMember *blueprintMemberMap
+	StaticMember *blueprintMemberMap
+	ConstValue   *blueprintMemberMap
 
 	CallBack []func()
 
@@ -120,9 +120,9 @@ func NewBlueprint(name string) *Blueprint {
 		id:           -1,
 		Name:         name,
 		Kind:         BlueprintNone,
-		NormalMember: utils.NewSafeMapWithKey[string, []Value](),
-		StaticMember: utils.NewSafeMapWithKey[string, []Value](),
-		ConstValue:   utils.NewSafeMapWithKey[string, []Value](),
+		NormalMember: newBlueprintMemberMap(),
+		StaticMember: newBlueprintMemberMap(),
+		ConstValue:   newBlueprintMemberMap(),
 
 		NormalMethod: make(map[string]*Function),
 		StaticMethod: make(map[string]*Function),

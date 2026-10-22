@@ -9,27 +9,11 @@ func sameBlueprintMemberValue(left, right Value) bool {
 	return left.GetId() == right.GetId()
 }
 
-func appendBlueprintMember(members *utils.SafeMapWithKey[string, []Value], name string, val Value) bool {
-	if members == nil || utils.IsNil(val) {
-		return false
-	}
-	added := false
-	members.Update(name, func(old []Value, loaded bool) ([]Value, bool) {
-		if loaded && len(old) > 0 && sameBlueprintMemberValue(old[len(old)-1], val) {
-			return old, false
-		}
-		// Copy so a reader still holding the previous slice does not share
-		// the backing array with this append.
-		next := make([]Value, len(old)+1)
-		copy(next, old)
-		next[len(old)] = val
-		added = true
-		return next, true
-	})
-	return added
+func appendBlueprintMember(members *blueprintMemberMap, name string, val Value) bool {
+	return members.append(name, val)
 }
 
-func blueprintMemberValues(members *utils.SafeMapWithKey[string, []Value], name string) ([]Value, bool) {
+func blueprintMemberValues(members *blueprintMemberMap, name string) ([]Value, bool) {
 	if members == nil {
 		return nil, false
 	}
@@ -38,7 +22,7 @@ func blueprintMemberValues(members *utils.SafeMapWithKey[string, []Value], name 
 
 // inheritBlueprintMembers copies a parent's member list onto a child that
 // does not already have that name. Register runs outside the source map lock.
-func inheritBlueprintMembers(dst, src *utils.SafeMapWithKey[string, []Value], register func(string, Value)) {
+func inheritBlueprintMembers(dst, src *blueprintMemberMap, register func(string, Value)) {
 	if dst == nil || src == nil || register == nil {
 		return
 	}

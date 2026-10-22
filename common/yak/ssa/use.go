@@ -15,41 +15,8 @@ func ReplaceAllValue(v Value, to Value) {
 	ReplaceValue(v, to, func(i Instruction) bool { return false })
 }
 
-func replaceBlueprintFieldReference(fields *utils.SafeMapWithKey[string, []Value], from Value, to Value) {
-	if fields == nil || utils.IsNil(from) {
-		return
-	}
-	for _, name := range fields.Keys() {
-		fields.Update(name, func(values []Value, loaded bool) ([]Value, bool) {
-			if !loaded || len(values) == 0 {
-				return values, false
-			}
-			// Most fields do not contain the replaced value. Find one hit before
-			// copying so a miss does not allocate a same-sized slice.
-			hit := -1
-			fromID := from.GetId()
-			for index, current := range values {
-				if utils.IsNil(current) || current.GetId() != fromID {
-					continue
-				}
-				hit = index
-				break
-			}
-			if hit < 0 {
-				return values, false
-			}
-			next := make([]Value, len(values))
-			copy(next, values)
-			for index := hit; index < len(next); index++ {
-				current := next[index]
-				if utils.IsNil(current) || current.GetId() != fromID {
-					continue
-				}
-				next[index] = to
-			}
-			return next, true
-		})
-	}
+func replaceBlueprintFieldReference(fields *blueprintMemberMap, from Value, to Value) {
+	fields.replace(from, to)
 }
 
 func replaceProgramBlueprintReference(prog *Program, from Value, to Value) {
