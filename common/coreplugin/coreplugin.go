@@ -453,7 +453,7 @@ func loadCorePluginDefinitions() (map[string]*builtinCorePlugin, error) {
 
 	registerBuildInPlugin(
 		"yak", "证书生成",
-		withPluginHelp("通过各种选项生成所需的证书文件"),
+		withPluginHelp("通过各种选项生成所需的证书文件，支持 eMudhra 测试服务器证书；仅生成文件，不启动代理"),
 		withPluginEnableGenerateParam(true),
 	)
 

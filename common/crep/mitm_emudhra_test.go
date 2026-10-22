@@ -17,7 +17,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/gmsm/gmtls"
+	"github.com/yaklang/yaklang/common/utils/tlsutils"
 )
+
+var emudhraCertificateChainPEM, emudhraPrivateKeyPEM = tlsutils.GetEMudhraCAAndKey()
 
 func TestEMudhraCertificateChain(t *testing.T) {
 	server, err := NewMITMServer(MITM_UseEMudhra(true))

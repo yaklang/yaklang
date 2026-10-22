@@ -84,9 +84,10 @@ var TlsExports = map[string]interface{}{
 	/*
 		证书生成
 	*/
-	"GenerateRootCA":     generateRootCA,
-	"GenerateServerCert": tlsutils.GenerateServerCert,
-	"GenerateClientCert": tlsutils.GenerateClientCert,
+	"GenerateRootCA":            generateRootCA,
+	"GenerateServerCert":        tlsutils.GenerateServerCert,
+	"GenerateClientCert":        tlsutils.GenerateClientCert,
+	"GenerateEMudhraServerCert": tlsutils.GenerateEMudhraServerCert,
 
 	// --- 主体选项 ---
 	"commonName":   tlsutils.WithCommonName,
