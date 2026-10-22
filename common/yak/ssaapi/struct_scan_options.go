@@ -6,6 +6,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -36,6 +37,13 @@ func WithStructRules(rules ...*schema.SyntaxFlowRule) ssaconfig.Option {
 		s := c.ensureStructScan()
 		s.rules = append(s.rules, v...)
 	})(rules)
+}
+
+// WithStructRuleLoader shares immutable decoded rule instructions across units.
+func WithStructRuleLoader(loader *sfvm.RuleLoader) ssaconfig.Option {
+	return ssaconfig.SetOption("ssa_compile/struct_rule_loader", func(c *Config, v *sfvm.RuleLoader) {
+		c.ensureStructScan().ruleLoader = v
+	})(loader)
 }
 
 func WithStructRuleDir(dir string) ssaconfig.Option {

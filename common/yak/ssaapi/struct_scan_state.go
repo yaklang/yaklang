@@ -13,6 +13,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa"
@@ -27,6 +28,7 @@ type structScanState struct {
 	extraDirs     []string
 	extraRaw      []string
 	rules         []*schema.SyntaxFlowRule
+	ruleLoader    *sfvm.RuleLoader
 	riskCB        func(*schema.SSARisk)
 	// onRisk is the scan's callbacks. When set, each finding is handed to them
 	// and this compile does not write the risk row.
@@ -158,8 +160,9 @@ func (s *structScanState) filterLanguage(language ssaconfig.Language, ignore boo
 func (c *Config) ensureStructScan() *structScanState {
 	if c.structScan == nil {
 		c.structScan = &structScanState{
-			taskID:    uuid.NewString(),
-			workLimit: ssaconfig.DefaultScanRuleWorkLimit,
+			ruleLoader: &sfvm.RuleLoader{},
+			taskID:     uuid.NewString(),
+			workLimit:  ssaconfig.DefaultScanRuleWorkLimit,
 		}
 	}
 	return c.structScan
@@ -183,10 +186,14 @@ func (s *structScanState) resolveRules() error {
 		}
 		rules = append(rules, loaded...)
 	}
-	for _, raw := range s.extraRaw {
-		rule, err := compileStructRuleContent(raw)
-		if err != nil {
-			return err
+	compiled, errs := sfvm.CompileRules(s.extraRaw)
+	for i, rule := range compiled {
+		if errs[i] != nil {
+			return errs[i]
+		}
+		rule.NormalizeMode()
+		if !rule.IsStructMode() {
+			return utils.Errorf("rule mode %s is not struct", rule.Mode)
 		}
 		rules = append(rules, rule)
 	}
@@ -218,7 +225,7 @@ func loadBuiltinStructRules() []*schema.SyntaxFlowRule {
 }
 
 func loadStructRulesFromDir(dir string) ([]*schema.SyntaxFlowRule, error) {
-	var rules []*schema.SyntaxFlowRule
+	var paths, texts []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -230,18 +237,30 @@ func loadStructRulesFromDir(dir string) ([]*schema.SyntaxFlowRule, error) {
 		if err != nil {
 			return err
 		}
-		rule, err := compileStructRuleContent(string(raw))
-		if err != nil {
-			log.Warnf("[struct_scan] skip %s: %v", path, err)
-			return nil
-		}
-		if rule.RuleName == "" {
-			rule.RuleName = info.Name()
-		}
-		rules = append(rules, rule)
+		paths, texts = append(paths, path), append(texts, string(raw))
 		return nil
 	})
-	return rules, err
+	if err != nil {
+		return nil, err
+	}
+	compiled, errs := sfvm.CompileRules(texts)
+	var rules []*schema.SyntaxFlowRule
+	for i, rule := range compiled {
+		if errs[i] != nil {
+			log.Warnf("[struct_scan] skip %s: %v", paths[i], errs[i])
+			continue
+		}
+		rule.NormalizeMode()
+		if !rule.IsStructMode() {
+			log.Warnf("[struct_scan] skip non-struct rule %s", paths[i])
+			continue
+		}
+		if rule.RuleName == "" {
+			rule.RuleName = filepath.Base(paths[i])
+		}
+		rules = append(rules, rule)
+	}
+	return rules, nil
 }
 
 func compileStructRuleContent(raw string) (*schema.SyntaxFlowRule, error) {
@@ -372,7 +391,12 @@ func (s *structScanState) frameForRule(rule *schema.SyntaxFlowRule) (*sfvm.SFFra
 	if rule == nil {
 		return nil, utils.Error("nil struct rule")
 	}
-	frame, _, err := sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
+	frame, resave, err := s.ruleLoader.Load(sfvm.NewSyntaxFlowVirtualMachine(), rule)
+	if err == nil && resave && rule.ID > 0 {
+		if saveErr := sfdb.MigrateSyntaxFlow("", rule); saveErr != nil {
+			return nil, saveErr
+		}
+	}
 	return frame, err
 }
 

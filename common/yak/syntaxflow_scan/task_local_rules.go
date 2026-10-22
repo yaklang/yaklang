@@ -11,7 +11,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
+	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -194,17 +194,22 @@ func parseTaskLocalSyntaxFlowRulesWithMetadata(
 func parseTaskLocalSyntaxFlowRules(
 	inputs []*ypb.SyntaxFlowRuleInput,
 ) ([]*schema.SyntaxFlowRule, map[string]*schema.SyntaxFlowRule, error) {
-	rules := make([]*schema.SyntaxFlowRule, 0, len(inputs))
-	libraries := make(map[string]*schema.SyntaxFlowRule)
+	texts := make([]string, len(inputs))
 	for index, input := range inputs {
 		if input == nil {
 			return nil, nil, utils.Errorf("task-local rule input %d is nil", index)
 		}
-		content := strings.TrimSpace(input.GetContent())
-		if content == "" {
+		texts[index] = strings.TrimSpace(input.GetContent())
+		if texts[index] == "" {
 			return nil, nil, utils.Errorf("task-local rule input %d content is required", index)
 		}
-		rule, err := sfdb.CheckSyntaxFlowRuleContent(content)
+	}
+	compiled, compileErrs := sfvm.CompileRules(texts)
+	rules := make([]*schema.SyntaxFlowRule, 0, len(inputs))
+	libraries := make(map[string]*schema.SyntaxFlowRule)
+	for index, input := range inputs {
+		content := texts[index]
+		rule, err := compiled[index], compileErrs[index]
 		if err != nil {
 			return nil, nil, utils.Wrapf(err, "compile task-local rule input %d", index)
 		}
