@@ -32,6 +32,7 @@ PCAP/PCAPNG 的应用层问题默认走本 Skill 的结构化链路。`read_file
 - 总包数、消息数及能力：query_type=metadata。protocol_count 是协议消息数，不是协议种类数。
 - 协议、请求路径、响应状态：先 query_type=protocols 取摘要，按实际 protocol 名筛选。协议消息可跨多个包。
 - HTTP 请求响应关联：protocols 摘要中的 response_to 直接指向请求消息 ID，transaction_id 表示同一事务。先配对消息，再用 details 获取字段；不要自行根据相邻行或时间猜测配对。
+- HTTP Body 的哈希、完整性、Content-Encoding、压缩/二进制特征和敏感类别：使用 query_type=body_summary 和消息 record_id。它在 pcapdb 后端读取完整消息并返回非可逆摘要，不返回正文或正文前缀。不要先用 protocol_data 截断预览，也不要导出到 shell 自行算哈希。
 - 查具体字段：query_type=fields 发现真实 Path、Types 和 ExampleMessageID；再 details 核对示例值，最后 query_type=protocols 配合 field_path / field_op / field_type / field_value 返回命中的消息。fields 返回字段目录，不能代替消息命中列表。不要猜协议字段名；integer 值用十进制字符串，null 与 missing 分开。
 - IP、端口、捕获时间：query_type=packets。source/destination 有方向；不支持 CIDR 或任意文本 SQL。
 - 连接与重组：query_type=sessions 读取完整性标记；streams 配合 session_id 找方向流。Direction=0 是会话 Source→Destination，1 为反向，不能仅据此认定应用 client/server。
