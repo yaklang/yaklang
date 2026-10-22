@@ -630,6 +630,7 @@ func (r *ReActLoop) ExecuteWithExistedTask(task aicommon.AIStatefulTask) (finalE
 
 	needSummary := utils.NewBool(false)
 	lastCompressionTokens := 0
+	compressionSelectionFailures := int64(0)
 LOOP:
 	for {
 		if r.asyncReviewRequiresAnswer() {
@@ -731,7 +732,7 @@ LOOP:
 			if r.promptMode == aicommon.LoopPromptModeCompressContext {
 				r.noteCompressionStatus()
 			}
-			if r.promptMode == aicommon.LoopPromptModeCompressContext && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
+			if r.promptMode == aicommon.LoopPromptModeCompressContext && operator.contextCompressionError == nil && lastCompressionTokens > 0 && tokens >= lastCompressionTokens*99/100 {
 				finalError = utils.Errorf("context compression made no progress (%d -> %d tokens)", lastCompressionTokens, tokens)
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
@@ -782,9 +783,6 @@ LOOP:
 				r.finishIterationLoopWithError(iterationCount, task, finalError)
 				return finalError
 			}
-			lastCompressionTokens = aicommon.MeasureTokens(prompt)
-		} else {
-			lastCompressionTokens = 0
 		}
 		if len(loopCalls) == 0 {
 			r.recordModelThinkingTimeline(iterationModelThinking, "", nonce, false)
@@ -831,6 +829,25 @@ LOOP:
 				needSummary.SetTo(true)
 			}
 			return finalError
+		}
+		if operator.contextCompressionError != nil {
+			compressionSelectionFailures++
+			maxAttempts := r.config.GetAITransactionAutoRetryCount()
+			if maxAttempts <= 0 {
+				maxAttempts = 3
+			}
+			if compressionSelectionFailures >= maxAttempts {
+				finalError = utils.Wrapf(operator.contextCompressionError, "context compression selection rejected after %d attempts", compressionSelectionFailures)
+				r.finishIterationLoopWithError(iterationCount, task, finalError)
+				return finalError
+			}
+			continue LOOP
+		}
+		compressionSelectionFailures = 0
+		if r.promptMode == aicommon.LoopPromptModeCompressContext {
+			lastCompressionTokens = aicommon.MeasureTokens(prompt)
+		} else {
+			lastCompressionTokens = 0
 		}
 		if batch.result == loopActionsExit || batch.result == loopActionsAsync {
 			r.finishIterationLoopWithError(iterationCount, task, nil)

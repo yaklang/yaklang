@@ -522,7 +522,8 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	}
 	limit := r.wholePromptTokenLimit()
 	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
-	if timeline := timelineFromConfig(r.config); timeline != nil && promptTokens > limit {
+	retryCompression := operator != nil && operator.contextCompressionError != nil
+	if timeline := timelineFromConfig(r.config); timeline != nil && (promptTokens > limit || retryCompression) {
 		ctx := r.config.GetContext()
 		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
 			ctx = task.GetContext()
@@ -536,6 +537,10 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(compressContextDynamicText) + "\n\n" + guide
+		if retryCompression {
+			assembly.CompressionGuide += "\n\n# 上次压缩选择未通过校验\n请修正以下错误，重新提交 compress_context；当前历史尚未按这次无效选择修改。\n" +
+				utils.ShrinkString(operator.contextCompressionError.Error(), 2048)
+		}
 		result, err = assemble()
 		if err != nil {
 			return nil, err

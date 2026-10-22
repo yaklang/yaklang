@@ -1,6 +1,7 @@
 package reactloops
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -60,6 +61,11 @@ func (r *ReActLoop) verifyContextCompressionAction(action *aicommon.Action) erro
 	} else if _, ok := raw.(string); !ok {
 		return fmt.Errorf("compress_context retain_timeline must be a string")
 	}
+	for _, name := range []string{"retire_skill_names", "retire_evidence_ids"} {
+		if _, err := contextCompressionStringArray(action, name); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -80,6 +86,12 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 		throughID: operator.requestTimelineThroughID, itemIDs: operator.requestTimelineItemIDs,
 	})
 	if err != nil {
+		var rejected *contextCompressionSelectionError
+		if errors.As(err, &rejected) {
+			operator.contextCompressionError = err
+			operator.Continue()
+			return
+		}
 		operator.Fail(err)
 		return
 	}
