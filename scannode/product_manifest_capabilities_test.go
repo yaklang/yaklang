@@ -5,6 +5,8 @@ import (
 	"os"
 	"slices"
 	"testing"
+
+	"github.com/yaklang/gorm/dialects/dameng"
 )
 
 func TestProductNodeManifestCapabilitiesMatchCompiledSurface(t *testing.T) {
@@ -26,6 +28,15 @@ func TestProductNodeManifestCapabilitiesMatchCompiledSurface(t *testing.T) {
 		legionCapabilitySSADebugQuery, legionCapabilitySSALogTail)
 	if !slices.Contains(want, "hids") {
 		want = append(want, "hids")
+	}
+	// The JSON contract is the baseline. Product packaging adds optional
+	// protocols from its verified build tags rather than hard-coding them.
+	if slices.Contains(advertised, capabilityKeySSAIRDMV1) {
+		t.Fatal("baseline manifest must not unconditionally declare the optional DM driver")
+	}
+	if dameng.NativeEnabled() {
+		advertised = append(advertised, capabilityKeySSAIRDMV1)
+		want = append(want, capabilityKeySSAIRDMV1)
 	}
 	slices.Sort(advertised)
 	slices.Sort(want)

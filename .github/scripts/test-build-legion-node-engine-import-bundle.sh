@@ -20,7 +20,7 @@ binary_size="$(stat -c %s "$artifact_dir/legion-smoke-node")"
 jq -n \
   --arg source_sha "$source_sha" \
   --arg binary_sha "$binary_sha" \
-  --argjson capabilities "$(jq -c . "$script_dir/legion-product-node-capabilities.json")" \
+  --argjson capabilities "$(bash "$script_dir/legion-product-node-capabilities.sh" hids,musl,dameng)" \
   --argjson binary_size "$binary_size" '
   {
     schema_version:"1",
@@ -28,7 +28,7 @@ jq -n \
     version:"legion-node-v1.2.3",
     source:{repository:"yaklang/yaklang",commit:$source_sha,dirty:false},
     ci:{provider:"github-actions",run_id:"123",workflow:"Build Trusted Legion Product Node"},
-    recipe:{goos:"linux",goarch:"amd64"},
+    recipe:{goos:"linux",goarch:"amd64",build_tags:"hids,musl,dameng"},
     capabilities:$capabilities,
     binary:{sha256:$binary_sha,size:$binary_size}
   }
@@ -102,10 +102,12 @@ jq -e \
   (.capability_keys | index("yak.execute") != null) and
   (.capability_keys | index("ai.code_workspace.v1") != null) and
   (.capability_keys | index("ssa.rule_snapshot.execution.v2") != null) and
+  (.capability_keys | index("ssa.ir.dm.v1") != null) and
   .runtime.archive_sha256 == $runtime_archive_sha and
   .runtime.producer_manifest_sha256 == $runtime_manifest_sha and
   .runtime.image_ref == $runtime_image_ref and
-  (.runtime.capability_keys | index("ai.session.runtime") != null)
+  (.runtime.capability_keys | index("ai.session.runtime") != null) and
+  (.runtime.capability_keys | index("ssa.ir.dm.v1") == null)
 ' "$extract_dir/manifest.json" >/dev/null
 jq -e \
   --arg binary_sha "$binary_sha" \
@@ -141,6 +143,33 @@ tar -xzf "$unsigned_output" -C "$unsigned_extract_dir"
 cmp "$artifact_dir/legion-smoke-node" "$unsigned_extract_dir/yaklang-node"
 cmp "$artifact_dir/SESSION_RUNTIME_MANIFEST.json" "$unsigned_extract_dir/runtime-manifest.json"
 cmp "$artifact_dir/legion-ai-session-runtime_linux_amd64.docker.tar.gz" "$unsigned_extract_dir/ai-session-runtime.docker.tar.gz"
+
+for capability_case in host_driver_missing host_capability_missing runtime_claims_dm; do
+  contradictory="$test_root/$capability_case"
+  cp -a "$artifact_dir" "$contradictory"
+  case "$capability_case" in
+    host_driver_missing)
+      jq '.recipe.build_tags = "hids,musl"' "$contradictory/PRODUCT_NODE_MANIFEST.json" >"$test_root/changed.json"
+      mv "$test_root/changed.json" "$contradictory/PRODUCT_NODE_MANIFEST.json"
+      ;;
+    host_capability_missing)
+      jq '.capabilities -= ["ssa.ir.dm.v1"]' "$contradictory/PRODUCT_NODE_MANIFEST.json" >"$test_root/changed.json"
+      mv "$test_root/changed.json" "$contradictory/PRODUCT_NODE_MANIFEST.json"
+      ;;
+    runtime_claims_dm)
+      jq '.capabilities += ["ssa.ir.dm.v1"]' "$contradictory/SESSION_RUNTIME_MANIFEST.json" >"$test_root/changed.json"
+      mv "$test_root/changed.json" "$contradictory/SESSION_RUNTIME_MANIFEST.json"
+      ;;
+  esac
+  if "$builder" \
+    --version legion-node-v1.2.3 \
+    --source-sha "$source_sha" \
+    --artifact-dir "$contradictory" \
+    --output "$test_root/$capability_case.tar.gz"; then
+    echo "inconsistent DM capability unexpectedly accepted: $capability_case" >&2
+    exit 1
+  fi
+done
 
 if "$builder" \
   --version legion-node-v1.2.3 \

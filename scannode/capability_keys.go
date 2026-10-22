@@ -4,12 +4,14 @@ import (
 	"os"
 	"strings"
 
+	"github.com/yaklang/gorm/dialects/dameng"
 	"github.com/yaklang/yaklang/scannode/inputresolver"
 )
 
 const (
 	capabilityKeySSARuleSyncExport          = "ssa.rule_sync.export"
 	capabilityKeySSARuleSnapshotExecutionV2 = ruleSnapshotExecutionV2
+	capabilityKeySSAIRDMV1                  = "ssa.ir.dm.v1"
 	capabilityKeyAIBindEpochV1              = "ai.session.bind_epoch.v1"
 	capabilityKeyAITurnLifecycleV1          = "ai.session.turn_lifecycle.v1"
 	capabilityKeyAISkillBundleV1            = "ai.skill_bundle.v1"
@@ -22,17 +24,31 @@ const (
 )
 
 func normalizeScanNodeCapabilityKeys(input []string) []string {
+	return normalizeScanNodeCapabilityKeysForNode(input, "")
+}
+
+func normalizeScanNodeCapabilityKeysForNode(input []string, kind string) []string {
 	runtimeMode, _ := normalizeAISessionRuntimeMode(os.Getenv("LEGION_AI_RUNTIME"))
-	return normalizeScanNodeCapabilityKeysForRuntime(input, runtimeMode)
+	return normalizeScanNodeCapabilityKeysForRuntimeAndKind(input, runtimeMode, kind)
 }
 
 func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode string) []string {
+	return normalizeScanNodeCapabilityKeysForRuntimeAndKind(input, runtimeMode, "")
+}
+
+func normalizeScanNodeCapabilityKeysForRuntimeAndKind(input []string, runtimeMode, kind string) []string {
 	result := make([]string, 0, len(input)+len(compiledScanNodeCapabilityKeys()))
 	seen := make(map[string]struct{}, len(input)+len(compiledScanNodeCapabilityKeys()))
+	// AI session containers have no shared IR database configuration contract.
+	// Driver linkage alone must not advertise that execution path for the role.
+	supportsDMIR := dameng.NativeEnabled() && strings.TrimSpace(kind) != "ai_session"
 
 	appendKey := func(key string) {
 		trimmed := strings.TrimSpace(key)
 		if trimmed == "" {
+			return
+		}
+		if trimmed == capabilityKeySSAIRDMV1 && !supportsDMIR {
 			return
 		}
 		if (trimmed == aiTrafficAnalysisCapabilityV1 || trimmed == capabilityKeyAICodeWorkspaceV1 || trimmed == capabilityKeyAIManagedInputV1 || trimmed == capabilityKeyAIForgeReleaseV1 || trimmed == capabilityKeyAISkillBundleV1) && runtimeMode == aiSessionRuntimeModeStateful {
@@ -59,6 +75,9 @@ func normalizeScanNodeCapabilityKeysForRuntime(input []string, runtimeMode strin
 
 	for _, key := range compiledScanNodeCapabilityKeys() {
 		appendKey(key)
+	}
+	if supportsDMIR {
+		appendKey(capabilityKeySSAIRDMV1)
 	}
 	for _, key := range input {
 		appendKey(key)

@@ -89,15 +89,8 @@ fi
 binary_sha="$(sha256sum "$binary" | awk '{print $1}')"
 binary_size="$(stat -c %s "$binary")"
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-capabilities_file="$repo_root/.github/scripts/legion-product-node-capabilities.json"
-capabilities_json="$(jq -ce '
-  if type == "array" and length > 0 and
-     all(.[]; type == "string" and length > 0) and
-     . == (sort | unique)
-  then .
-  else error("product-node capability contract must be a sorted unique string array")
-  end
-' "$capabilities_file")" || die "invalid Product Node capability contract: $capabilities_file"
+capabilities_json="$(bash "$repo_root/.github/scripts/legion-product-node-capabilities.sh" "$build_tags")" || \
+  die "invalid Product Node capability contract"
 
 jq -n \
   --arg version "$version" \

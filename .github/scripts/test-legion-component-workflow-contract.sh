@@ -180,4 +180,5 @@ fi
 # shellcheck disable=SC2016 # Match literal workflow environment syntax.
 grep -Fq 'yaklang-node-engine_${NODE_PACKAGE_VERSION}_${NODE_GOOS}_${NODE_GOARCH}.tar.gz' "$product_workflow"
 
+bash "$repo_root/.github/scripts/test-legion-product-node-capabilities.sh"
 echo 'Legion component workflow contract tests passed'
