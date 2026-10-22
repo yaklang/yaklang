@@ -32,8 +32,9 @@ type scanManager struct {
 
 	// record {{
 	// task record
-	lock         sync.Mutex
-	taskRecorder *schema.SyntaxFlowScanTask
+	lock          sync.Mutex
+	taskRecorder  *schema.SyntaxFlowScanTask
+	snapshotSaver *taskSnapshotSaver
 
 	// config {{
 	kind schema.SyntaxflowResultKind
@@ -165,8 +166,36 @@ func (m *scanManager) setScanBatch() {
 	}
 }
 
-// SaveTask save task info which is from manager to database
+// SaveTask persists the latest task snapshot before returning. Rule completion
+// uses queueTaskSnapshot instead; this is the stage, pause, error, and finish
+// boundary, so the row is durable when it returns.
 func (m *scanManager) SaveTask() error {
+	snapshot := m.captureTaskSnapshot(true)
+	if snapshot == nil {
+		return nil
+	}
+	return m.taskSnapshots().Save(snapshot)
+}
+
+// queueTaskSnapshot records the latest progress without waiting for SQLite.
+// The scan-level SaveTask flushes it. Calling this after that flush can publish
+// a stale status, so rule goroutines queue before releasing the wait group.
+func (m *scanManager) queueTaskSnapshot() {
+	snapshot := m.captureTaskSnapshot(false)
+	if snapshot == nil {
+		return
+	}
+	m.taskSnapshots().Enqueue(snapshot)
+}
+
+func (m *scanManager) taskSnapshots() *taskSnapshotSaver {
+	if m != nil && m.snapshotSaver != nil {
+		return m.snapshotSaver
+	}
+	return defaultTaskSnapshotSaver
+}
+
+func (m *scanManager) captureTaskSnapshot(withLevelCounts bool) *schema.SyntaxFlowScanTask {
 	if m == nil {
 		return nil
 	}
@@ -188,7 +217,7 @@ func (m *scanManager) SaveTask() error {
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	m.taskRecorder.ProjectId = m.Config.GetProjectID()
-	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
+	if withLevelCounts && (m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED) {
 		levelCounts, errLC := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
 		})
@@ -217,7 +246,7 @@ func (m *scanManager) SaveTask() error {
 			}
 		}
 	}
-	return schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
+	return cloneSyntaxFlowScanTask(m.taskRecorder)
 }
 
 func (m *scanManager) RestoreTask() error {

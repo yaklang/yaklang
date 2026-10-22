@@ -110,8 +110,10 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
-				defer m.SaveTask()
+				// Done runs last, so Wait cannot return while this snapshot is still
+				// being queued. The scan boundary then flushes a newer snapshot.
 				defer swg.Done()
+				defer m.queueTaskSnapshot()
 				if utils.IsNil(target) {
 					log.Errorf("SyntaxFlow Scan Failed:the query target is nil")
 					return
