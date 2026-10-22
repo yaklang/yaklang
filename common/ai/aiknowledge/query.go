@@ -38,15 +38,15 @@ func Query(scope any, query string, tokenLimit int, opts ...Option) (*QueryResul
 		for _, value := range names {
 			name, ok := value.(string)
 			if !ok {
-				return nil, fmt.Errorf("scope must contain exact knowledge base names as strings")
+				return nil, invalidArgumentf("scope must contain exact knowledge base names as strings")
 			}
 			req.Names = append(req.Names, name)
 		}
 	default:
-		return nil, fmt.Errorf("scope must be one exact name or an array of exact names; use nil with all(true) for all bases")
+		return nil, invalidArgumentf("scope must be one exact name or an array of exact names; use nil with all(true) for all bases")
 	}
 	if err := req.validate(); err != nil {
-		return nil, err
+		return nil, withErrorCode("INVALID_ARGUMENT", err)
 	}
 	if err := c.initialize(); err != nil {
 		return nil, err
@@ -174,14 +174,14 @@ func (c *config) queryBases(req queryRequest) ([]*schema.KnowledgeBaseInfo, erro
 		return nil, err
 	}
 	if len(bases) > maxQueryBases {
-		return nil, fmt.Errorf("all=true exceeds the %d-base safety limit; call manage_knowledge_base with op=list, then query explicit names in batches of at most %d", maxQueryBases, maxQueryBases)
+		return nil, invalidArgumentf("all=true exceeds the %d-base safety limit; call manage_knowledge_base with op=list, then query explicit names in batches of at most %d", maxQueryBases, maxQueryBases)
 	}
 	if !req.All && len(bases) != len(req.Names) {
-		return nil, fmt.Errorf("one or more knowledge base names do not exist; call manage_knowledge_base with op=list to inspect exact names")
+		return nil, withErrorCode("NOT_FOUND", fmt.Errorf("one or more knowledge base names do not exist; call manage_knowledge_base with op=list to inspect exact names"))
 	}
 	for _, base := range bases {
 		if len(base.KnowledgeBaseName) > 256 {
-			return nil, fmt.Errorf("knowledge base name exceeds the 256-byte query safety limit")
+			return nil, invalidArgumentf("knowledge base name exceeds the 256-byte query safety limit")
 		}
 	}
 	return bases, c.ctx.Err()
@@ -230,7 +230,7 @@ func (c *config) queryKnowledge(req queryRequest) (*QueryResult, error) {
 		}
 		content := []rune(row.KnowledgeDetails)
 		if req.ContentOffset > len(content) {
-			return nil, fmt.Errorf("content_offset exceeds entry length %d", len(content))
+			return nil, invalidArgumentf("content_offset exceeds entry length %d", len(content))
 		}
 		title := []rune(row.KnowledgeTitle)
 		if len(title) > 128 {
@@ -267,7 +267,7 @@ func (c *config) queryKnowledge(req queryRequest) (*QueryResult, error) {
 	result.HasMore = result.NextOffset < result.Total
 	result.UsedTokens = result.tokenEstimate()
 	if result.UsedTokens > req.TokenLimit {
-		return nil, fmt.Errorf("token_limit is too small for response metadata; increase token_limit")
+		return nil, invalidArgumentf("token_limit is too small for response metadata; increase token_limit")
 	}
 	return result, c.ctx.Err()
 }
@@ -297,7 +297,7 @@ func (c *config) contentCandidates(req queryRequest, bases []*schema.KnowledgeBa
 		return nil, 0, err
 	}
 	if req.Mode == "get" && total == 0 {
-		return nil, 0, fmt.Errorf("entry_id not found in the specified knowledge base")
+		return nil, 0, withErrorCode("NOT_FOUND", fmt.Errorf("entry_id not found in the specified knowledge base"))
 	}
 	var rows []*schema.KnowledgeBaseEntry
 	if err := query.Order("id ASC").Offset(req.Offset).Limit(req.Limit).Find(&rows).Error; err != nil {

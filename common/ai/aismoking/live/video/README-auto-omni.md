@@ -4,10 +4,16 @@
 `构建知识库` plugin probe the locally configured Omni model before processing a
 video, image, or PDF. Text files continue through text chunking.
 
+Omni is the default multimedia knowledge extraction and build backend. Omitting
+`omniMode` uses `auto`: prefer Omni, retaining the legacy extractors for failure
+recovery. Use `required` when a build must fail instead of falling back.
+
 The default AIBalance model is `qwen3.8-omni-flash`. A configured Omni model's
 credentials, endpoint, headers and proxy are preserved. Credentials are supplied
 through local provider configuration or `rag.omniConfig`; they are never stored
 in this example.
+The built-in free AIBalance identity is not reused for non-free Omni routes;
+the user's configured provider credentials are selected instead.
 
 ```yak
 opts = [

@@ -56,7 +56,16 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		require.NoError(t, err)
 		var value map[string]any
 		require.NoError(t, json.Unmarshal([]byte(out.Stdout), &value), "stdout=%s", out.Stdout)
-		if name == "query_knowledge_base" {
+		if value["success"] == false {
+			raw, err := json.Marshal(out.Result)
+			require.NoError(t, err)
+			var semantic map[string]any
+			require.NoError(t, json.Unmarshal(raw, &semantic))
+			require.Equal(t, value, semantic, "business errors must reach the structured result channel")
+			status, _ := (&aitool.ToolResult{Success: true, Data: out}).GetExecutionStatus()
+			require.Equal(t, aitool.ToolExecutionStatusFailed, status)
+		}
+		if name == "query_knowledge_base" && value["success"] != false {
 			require.LessOrEqual(t, ytoken.CalcTokenCount(out.Stdout), int(value["token_limit"].(float64)), "the actual tool stdout must fit the whole-response budget")
 		}
 		return value
@@ -80,9 +89,10 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 	multi := invoke("query_knowledge_base", map[string]any{"names": []string{"yak-tool-fixture", "yak-tool-other"}, "token_limit": 1024, "limit": 1})
 	require.Equal(t, float64(2), multi["total"])
 	require.Len(t, multi["results"], 1, "multiple names must survive CLI conversion and share one result limit")
-	_, scopeError := execute("query_knowledge_base", map[string]any{"all": false, "token_limit": 512})
-	require.ErrorContains(t, scopeError, "manage_knowledge_base")
-	require.ErrorContains(t, scopeError, `"op":"list"`)
+	scopeError := invoke("query_knowledge_base", map[string]any{"all": false, "token_limit": 512})
+	require.Equal(t, "INVALID_ARGUMENT", scopeError["error_code"])
+	require.Contains(t, scopeError["message"], "manage_knowledge_base")
+	require.Contains(t, scopeError["message"], `"op":"list"`)
 	listed := invoke("manage_knowledge_base", map[string]any{"op": "list", "keyword": "yak-tool-fixture"})
 	require.Equal(t, float64(1), listed["total"])
 	for _, tc := range []struct {
@@ -90,9 +100,6 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		params map[string]any
 	}{
 		{"query_knowledge_base", map[string]any{"name": "yak-tool-fixture"}},
-		{"query_knowledge_base", map[string]any{"token_limit": 512}},
-		{"manage_knowledge_base", map[string]any{"op": "create", "name": "yak-tool-fixture"}},
-		{"manage_knowledge_base", map[string]any{"op": "build", "name": "missing", "content": "must not create"}},
 		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_mode": "unknown"}}},
 		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_segment_seconds": -1}}},
 		{"manage_knowledge_base", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "must reject", "build_options": map[string]any{"omni_payload_bytes": 100}}},
@@ -100,6 +107,31 @@ func TestKnowledgeBaseYakTools(t *testing.T) {
 		_, err := execute(tc.name, tc.params)
 		require.Error(t, err)
 	}
+	for _, tc := range []struct {
+		name, code string
+		params     map[string]any
+	}{
+		{"query_knowledge_base", "INVALID_ARGUMENT", map[string]any{"token_limit": 512}},
+		{"query_knowledge_base", "INVALID_ARGUMENT", map[string]any{"name": "yak-tool-fixture", "all": true, "token_limit": 512}},
+		{"query_knowledge_base", "INVALID_ARGUMENT", map[string]any{"name": "yak-tool-fixture", "names": []string{"yak-tool-other"}, "token_limit": 512}},
+		{"query_knowledge_base", "INVALID_ARGUMENT", map[string]any{"name": "yak-tool-fixture", "mode": "get", "token_limit": 512}},
+		{"query_knowledge_base", "NOT_FOUND", map[string]any{"name": "yak-tool-fixture", "mode": "get", "entry_id": "missing", "token_limit": 512}},
+		{"manage_knowledge_base", "ALREADY_EXISTS", map[string]any{"op": "create", "name": "yak-tool-fixture"}},
+		{"manage_knowledge_base", "NOT_FOUND", map[string]any{"op": "get", "name": "missing"}},
+		{"manage_knowledge_base", "NOT_FOUND", map[string]any{"op": "build", "name": "missing", "content": "must not create"}},
+		{"manage_knowledge_base", "INVALID_ARGUMENT", map[string]any{"op": "add_entry", "name": "yak-tool-fixture", "entry": map[string]any{}}},
+		{"manage_knowledge_base", "INVALID_ARGUMENT", map[string]any{"op": "build", "name": "yak-tool-fixture", "content": "x", "source_file": "also supplied"}},
+	} {
+		value := invoke(tc.name, tc.params)
+		require.Equal(t, false, value["success"], "%s %v", tc.name, tc.params)
+		require.Equal(t, tc.code, value["error_code"], "%s %v", tc.name, tc.params)
+		require.NotEmpty(t, value["message"])
+		require.NotContains(t, value["message"], "YakVM Panic")
+	}
+	invoke("manage_knowledge_base", map[string]any{"op": "update", "name": "yak-tool-fixture", "metadata": map[string]any{"description": "updated description"}})
+	details := invoke("manage_knowledge_base", map[string]any{"op": "get", "name": "yak-tool-fixture"})
+	require.Equal(t, "updated description", details["knowledge_base"].(map[string]any)["description"])
+	require.Equal(t, "updated description", details["collection"].(map[string]any)["Description"])
 	oldMock := vectorstore.IsMockMode
 	vectorstore.IsMockMode = true
 	t.Cleanup(func() { vectorstore.IsMockMode = oldMock })

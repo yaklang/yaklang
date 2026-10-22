@@ -8,7 +8,7 @@ op=list：keyword 匹配库名/描述，limit 1..100，offset 非负；has_more=
 其他 op 必须传精确 name；不存在报错，只有 create 能新建库。create 重复名称报错；先创建再 build，build 追加，不覆盖既有知识。
 op=create：metadata 可含 description/type/tags(字符串数组)/is_default；index_options 可含 embedding_model/dimension/m/ml/ef_search/ef_construct（省略用引擎默认值，余弦距离）。只创建元信息，不请求 embedding。模型和维度必须与配置的 embedding 服务一致；后续操作使用保存的参数。
 op=get：库元信息、知识条目数和保存的向量集合参数。
-op=update：metadata 仅更新给出的字段；空字符串、空 tags、is_default=false 可以清空。库名保持稳定。
+op=update：metadata 仅更新给出的字段；空字符串、空 tags、is_default=false 可以清空。描述在同一事务中同步到知识库和向量集合。库名保持稳定。
 op=delete：删除指定库及关联知识、向量和实体关系；删除后 list 确认。
 op=add_entry/update_entry：entry 是完整条目 {title,content,summary?,type?,keywords?,potential_questions?}；update_entry 还需 entry_id，只操作该库中的条目。默认调用 embedding 更新向量；skip_index=true 仅存知识并移除旧索引，之后用 rebuild_index。entry_id 从写入结果或 query_knowledge_base 获取。
 op=delete_entry：entry_id 必填，只删该库的指定条目及其索引。
@@ -16,6 +16,7 @@ op=build：source_file（引擎本地文件绝对路径）和 content 必须且�
 op=rebuild_index：使用已保存的模型/维度/HNSW 参数为全部条目重建索引，不用于更换模型；可能耗时且需要 embedding 服务。index_options 只允许在 create 使用。
 查询知识正文另行 require query_knowledge_base，必须显式选择 name、names 或 all=true，并指定 token_limit；库名未知先用本工具 op=list。不要把列表当成知识内容，也不要声称失败的操作成功。
 build 会即时输出阶段变化，并每 5 秒输出耗时、已抽取块、正在索引/写入块和实际落库条数。以这些日志判断进度；遇到错误须同时报告原始模型/ffmpeg 原因及部分落库数量，不能把没有输出解释为没有讲解内容。
+业务失败返回 {success:false,error_code,message}，不抛 YakVM Panic；INVALID_ARGUMENT 表示参数组合无效，NOT_FOUND 表示库或条目不存在，ALREADY_EXISTS 表示名称已存在，OPERATION_FAILED 表示执行失败。工具调用完成不等于业务成功，须检查 success/error_code。
 
 [[- if .FunctionCallMode -]]
 ```json
@@ -48,8 +49,14 @@ content = cli.String("content", cli.setHelp("build 输入文本，与 source_fil
 buildOptions = cli.Json("build_options", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","properties":{"mode":{"type":"string","enum":["chunks","question_index"]},"chunk_size":{"type":"integer","minimum":256,"maximum":1048576},"concurrency":{"type":"integer","minimum":1,"maximum":16},"extra_prompt":{"type":"string"},"omni_mode":{"type":"string","enum":["auto","required","disabled"]},"omni_model":{"type":"string"},"omni_segment_seconds":{"type":"number","exclusiveMinimum":0,"maximum":600},"omni_payload_bytes":{"type":"integer","minimum":1024,"maximum":10485760}},"additionalProperties":false}`), cli.setHelp("build 模式、分块、并发、Omni 路径/模型和视频编码大小"))
 yakit.AutoInitYakit()
 cli.check()
-if op == "" { die("op is required") }
-if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" { die("metadata, index_options and build_options must be JSON objects") }
+RESULT = nil
+invalid = message => { return {"success":false,"operation_status":"error","error_code":"INVALID_ARGUMENT","message":message} }
+if op == "" { RESULT=invalid("op is required"); println(json.dumps(RESULT)); return }
+if json.dumps(metadata)=="null" || json.dumps(indexOptions)=="null" || json.dumps(buildOptions)=="null" {
+    RESULT = invalid("metadata, index_options and build_options must be JSON objects")
+    println(json.dumps(RESULT))
+    return
+}
 opts = [aiknowledge.keyword(keyword),aiknowledge.limit(limit),aiknowledge.offset(offset),aiknowledge.index(!skipIndex)]
 opts = append(opts, aiknowledge.onProgress(message => { yakit.Info("%s", message) }))
 if "description" in metadata { opts=append(opts,aiknowledge.description(metadata.description)) }
@@ -63,7 +70,11 @@ if "ml" in indexOptions { opts=append(opts,aiknowledge.hnswML(indexOptions.ml)) 
 if "ef_search" in indexOptions { opts=append(opts,aiknowledge.hnswEFSearch(int(indexOptions.ef_search))) }
 if "ef_construct" in indexOptions { opts=append(opts,aiknowledge.hnswEFConstruct(int(indexOptions.ef_construct))) }
 if op=="add_entry" || op=="update_entry" {
-    assert "title" in entry && "content" in entry, "entry requires title and content"
+    if !("title" in entry && "content" in entry) {
+        RESULT = invalid("entry requires title and content")
+        println(json.dumps(RESULT))
+        return
+    }
     if "summary" in entry { opts=append(opts,aiknowledge.entrySummary(entry.summary)) }
     if "type" in entry { opts=append(opts,aiknowledge.entryType(entry.type)) }
     if "keywords" in entry { opts=append(opts,aiknowledge.entryKeywords(entry.keywords...)) }
@@ -78,19 +89,32 @@ if "omni_model" in buildOptions { opts=append(opts,aiknowledge.omniModel(buildOp
 if "omni_segment_seconds" in buildOptions { opts=append(opts,aiknowledge.omniSegmentSeconds(buildOptions.omni_segment_seconds)) }
 if "omni_payload_bytes" in buildOptions { opts=append(opts,aiknowledge.omniPayloadBytes(int64(buildOptions.omni_payload_bytes))) }
 result = nil
+err = nil
 switch op {
-case "list": result = aiknowledge.List(opts...)~
-case "create": result = aiknowledge.Add(name,opts...)~
-case "get": result = aiknowledge.Get(name,opts...)~
-case "update": result = aiknowledge.Update(name,opts...)~
-case "delete": result = aiknowledge.Delete(name,opts...)~
-case "add_entry": result = aiknowledge.AddEntry(name,entry.title,entry.content,opts...)~
-case "update_entry": result = aiknowledge.UpdateEntry(name,entryID,entry.title,entry.content,opts...)~
-case "delete_entry": result = aiknowledge.DeleteEntry(name,entryID,opts...)~
-case "rebuild_index": result = aiknowledge.RebuildIndex(name,opts...)~
+case "list": result,err = aiknowledge.List(opts...)
+case "create": result,err = aiknowledge.Add(name,opts...)
+case "get": result,err = aiknowledge.Get(name,opts...)
+case "update": result,err = aiknowledge.Update(name,opts...)
+case "delete": result,err = aiknowledge.Delete(name,opts...)
+case "add_entry": result,err = aiknowledge.AddEntry(name,entry.title,entry.content,opts...)
+case "update_entry": result,err = aiknowledge.UpdateEntry(name,entryID,entry.title,entry.content,opts...)
+case "delete_entry": result,err = aiknowledge.DeleteEntry(name,entryID,opts...)
+case "rebuild_index": result,err = aiknowledge.RebuildIndex(name,opts...)
 case "build":
-    assert (sourceFile!="") != (str.TrimSpace(content)!=""), "build requires exactly one of source_file or content"
-    if sourceFile!="" { result=aiknowledge.BuildFromFile(name,sourceFile,opts...)~ } else { result=aiknowledge.Build(name,content,opts...)~ }
-default: die("unknown knowledge base operation: "+op)
+    if (sourceFile!="") == (str.TrimSpace(content)!="") {
+        RESULT = invalid("build requires exactly one of source_file or content")
+        println(json.dumps(RESULT))
+        return
+    }
+    if sourceFile!="" { result,err=aiknowledge.BuildFromFile(name,sourceFile,opts...) } else { result,err=aiknowledge.Build(name,content,opts...) }
+default:
+    RESULT = invalid("unknown knowledge base operation: "+op)
+    println(json.dumps(RESULT))
+    return
+}
+if err != nil {
+    RESULT = aiknowledge.ErrorResult(err)
+    println(json.dumps(RESULT))
+    return
 }
 println(json.dumps(result))

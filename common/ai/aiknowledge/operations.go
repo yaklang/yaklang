@@ -22,7 +22,7 @@ func List(opts ...Option) (map[string]any, error) {
 		r.Limit = 20
 	}
 	if r.Limit < 1 || r.Limit > 100 || r.Offset < 0 {
-		return nil, fmt.Errorf("limit must be 1..100 and offset non-negative")
+		return nil, invalidArgumentf("limit must be 1..100 and offset non-negative")
 	}
 	query := c.db.Model(&schema.KnowledgeBaseInfo{})
 	if r.Keyword != "" {
@@ -48,7 +48,7 @@ func List(opts ...Option) (map[string]any, error) {
 // creating an existing name fails and does not contact the embedding provider.
 func Add(name string, opts ...Option) (map[string]any, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("name is required (exact knowledge base name)")
+		return nil, invalidArgumentf("name is required (exact knowledge base name)")
 	}
 	c, err := newConfig(opts)
 	if err != nil {
@@ -57,7 +57,7 @@ func Add(name string, opts ...Option) (map[string]any, error) {
 	r := c.manage
 	colOpts, err := r.IndexOptions.options()
 	if err != nil {
-		return nil, err
+		return nil, withErrorCode("INVALID_ARGUMENT", err)
 	}
 	if c.embedding != nil {
 		colOpts = append(colOpts, vectorstore.WithEmbeddingClient(c.embedding))
@@ -88,14 +88,14 @@ func Add(name string, opts ...Option) (map[string]any, error) {
 
 func namedConfig(name string, opts []Option) (*config, *schema.KnowledgeBaseInfo, error) {
 	if strings.TrimSpace(name) == "" {
-		return nil, nil, fmt.Errorf("name is required (exact knowledge base name)")
+		return nil, nil, invalidArgumentf("name is required (exact knowledge base name)")
 	}
 	c, err := newConfig(opts)
 	if err != nil {
 		return nil, nil, err
 	}
 	if c.manage.IndexOptions != (indexOptions{}) {
-		return nil, nil, fmt.Errorf("index_options apply only to create")
+		return nil, nil, invalidArgumentf("index_options apply only to create")
 	}
 	base, err := yakit.GetKnowledgeBaseByName(c.db, name)
 	if err != nil {
@@ -129,7 +129,7 @@ func Update(name string, opts ...Option) (map[string]any, error) {
 		return nil, err
 	}
 	if c.manage.Metadata == (metadata{}) {
-		return nil, fmt.Errorf("update requires metadata fields")
+		return nil, invalidArgumentf("update requires metadata fields")
 	}
 	if err := c.updateMetadata(int64(base.ID), c.manage.Metadata); err != nil {
 		return nil, err
