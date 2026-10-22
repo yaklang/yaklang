@@ -182,6 +182,11 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 		}
 	}
 
+	// 黑名单过滤结束后加回后台管理，下面的 MustUse 可以看见并点名它。
+	if asyncManagement != nil {
+		filteredValues = append(filteredValues, asyncManagement)
+	}
+
 	// Apply init handler must-use action constraints
 	// If must-use actions are specified, only keep those actions
 	if !r.initActionApplied && len(r.initActionMustUse) > 0 {
@@ -220,12 +225,6 @@ func (r *ReActLoop) getFilteredActions(disallowExit bool, actionOperators ...*Lo
 		}
 	}
 
-	// Owner-scoped management remains available during action narrowing so
-	// existing work can always be observed or stopped. GetAllActions has
-	// already applied the host's runtime action policy.
-	if asyncManagement != nil {
-		filteredValues = append(filteredValues, asyncManagement)
-	}
 	// Maintenance admission is controlled by the loop's prompt mode, not the
 	// business action filters. Keep its contract stable across both modes.
 	if contextCompression != nil {
