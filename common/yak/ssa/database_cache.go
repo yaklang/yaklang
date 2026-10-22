@@ -451,6 +451,14 @@ func (c *ProgramCache) FlushAuxSavers() {
 	if c == nil || !c.HaveDatabaseBackend() {
 		return
 	}
+	// Name ids are referenced by index rows. Persist the batch assigned in
+	// memory before those rows, and never while holding the name-cache lock
+	// across the instruction writer's transaction.
+	if c.program != nil && c.program.NameCache != nil {
+		if err := c.program.NameCache.Flush(); err != nil {
+			log.Errorf("FlushAuxSavers: name cache flush failed: %v", err)
+		}
+	}
 	if c.indexes != nil {
 		if _, err := c.indexes.Flush(); err != nil {
 			log.Errorf("FlushAuxSavers: index store flush failed: %v", err)
