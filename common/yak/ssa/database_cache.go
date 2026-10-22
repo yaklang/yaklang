@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"go.uber.org/atomic"
@@ -426,6 +427,17 @@ func (c *ProgramCache) FlushInstructionSaver() {
 		return
 	}
 	c.instructions.FlushSaver()
+}
+
+// InstructionCacheStats reports the instruction writer's residency count and
+// async-saver counters (batch count/size, pending depth, save loop time).
+// Read-only telemetry for the compile-batch barrier log; it must not disturb
+// the cache.
+func (c *ProgramCache) InstructionCacheStats() dbcache.CacheStats {
+	if c == nil || c.instructions == nil {
+		return dbcache.CacheStats{}
+	}
+	return c.instructions.Stats()
 }
 
 func (c *ProgramCache) CountReleasedEditors() int {

@@ -47,20 +47,44 @@ func (task compileBatchCleanup) run() error {
 	// The cache owns database selection. A batch may hand off persistence only
 	// after its unit bodies have finished building.
 	if task.program.Cache != nil {
+		// One barrier line per batch. Without it a slow scan cannot be
+		// attributed between building, spilling, auxiliary stores and
+		// release: the per-batch wall clock alone does not say which step
+		// held the compile thread.
+		var barrierStart = time.Now()
+		stepStart := barrierStart
+		step := func() time.Duration {
+			d := time.Since(stepStart)
+			stepStart = time.Now()
+			return d
+		}
 		if !task.incremental {
 			task.program.Cache.FlushCompileUnit(strings.Join(task.unitKeys, ","))
 		}
+		flushUnit := step()
 		task.program.Cache.FlushInstructionSaver()
+		flushInst := step()
 		task.program.Cache.FlushAuxSavers()
 		// Type/index serialization can reload instructions and enqueue their
 		// eviction again; settle those writes before dropping ordinary values.
+		flushAux := step()
 		task.program.Cache.FlushInstructionSaver()
+		flushInst2 := step()
 		// Workers for this batch have joined, and the saver barriers have
 		// returned. Only then may ordinary persisted values leave the scopes.
 		// The index dedup release is the same barrier: one call, no extra goroutine.
 		task.program.ReleasePersistedOrdinaryValues()
+		releaseOrdinary := step()
 		task.program.ReleaseSettledIndexes()
+		releaseIndex := step()
 		task.program.CheckMemoryPressure(task.batchIndex+1, task.batchCount)
+		memPressure := step()
+		if stats := task.program.Cache.InstructionCacheStats(); true {
+			log.Infof("[compile-barrier] batch=%d/%d units=%d flush_unit=%s flush_inst=%s flush_aux=%s flush_inst2=%s release_ordinary=%s release_index=%s mem_pressure=%s total=%s resident=%d saver{%s}",
+				task.batchIndex+1, task.batchCount, len(task.batch.units),
+				flushUnit, flushInst, flushAux, flushInst2, releaseOrdinary, releaseIndex, memPressure,
+				time.Since(barrierStart), stats.ResidentCount, stats.Saver)
+		}
 	}
 	if compileUnitLogEnabled() {
 		task.program.ProcessInfof("compile unit batch(%d/%d) build finished units=%s cost=%v",
