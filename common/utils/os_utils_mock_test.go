@@ -11,6 +11,7 @@ import (
 	"math/big"
 	"net"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -66,5 +67,29 @@ func TestDebugMockHTTPClosesCompletedResponse(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, "HTTP/1.1 200 OK\r\nConnection: close\r\n\r\n"+body, string(response))
 		})
+	}
+}
+
+func TestDebugMockHTTPWithTimeoutDoesNotReuseLivePort(t *testing.T) {
+	const count = 24
+	var wg sync.WaitGroup
+	errs := make(chan error, count)
+	wg.Add(count)
+	for i := 0; i < count; i++ {
+		go func() {
+			defer wg.Done()
+			host, port := DebugMockHTTPWithTimeout(2*time.Second, []byte("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"))
+			conn, err := net.DialTimeout("tcp", HostPort(host, port), time.Second)
+			if err != nil {
+				errs <- err
+				return
+			}
+			_ = conn.Close()
+		}()
+	}
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		require.NoError(t, err)
 	}
 }
