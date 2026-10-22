@@ -170,7 +170,7 @@ func startPprofHTTPServer() (string, error) {
 		pprofServerStarted = true
 		go func(listener net.Listener, listenAddr string) {
 			log.Infof("[pprof] starting HTTP server on %s", listenAddr)
-			if err := http.Serve(listener, nil); err != nil {
+			if err := http.Serve(listener, sharedPprofHandler()); err != nil {
 				log.Errorf("[pprof] HTTP server error: %v", err)
 			}
 		}(ln, bound)
@@ -322,18 +322,21 @@ func (c *pprofCollector) fetchDBStats(label string) {
 
 // RuntimeStatsSnapshot captures host vs scan-task CPU/memory at one sample.
 type RuntimeStatsSnapshot struct {
-	Timestamp             string  `json:"timestamp"`
-	NumCPU                int     `json:"num_cpu"`
-	Load1                 float64 `json:"load1,omitempty"`
-	HostCPUPercent        float64 `json:"host_cpu_percent"`
-	ProcessCPUPercent     float64 `json:"process_cpu_percent"`
-	HostMemTotalBytes     uint64  `json:"host_mem_total_bytes"`
-	HostMemUsedBytes      uint64  `json:"host_mem_used_bytes"`
-	HostMemAvailableBytes uint64  `json:"host_mem_available_bytes"`
-	ProcessRSSBytes       uint64  `json:"process_rss_bytes"`
-	ProcessHeapAllocBytes uint64  `json:"process_heap_alloc_bytes"`
-	ProcessHeapSysBytes   uint64  `json:"process_heap_sys_bytes"`
-	Goroutines            int     `json:"goroutines"`
+	Timestamp                string  `json:"timestamp"`
+	NumCPU                   int     `json:"num_cpu"`
+	Load1                    float64 `json:"load1,omitempty"`
+	HostCPUPercent           float64 `json:"host_cpu_percent"`
+	ProcessCPUPercent        float64 `json:"process_cpu_percent"`
+	HostMemTotalBytes        uint64  `json:"host_mem_total_bytes"`
+	HostMemUsedBytes         uint64  `json:"host_mem_used_bytes"`
+	HostMemAvailableBytes    uint64  `json:"host_mem_available_bytes"`
+	ProcessRSSBytes          uint64  `json:"process_rss_bytes"`
+	ProcessHeapAllocBytes    uint64  `json:"process_heap_alloc_bytes"`
+	ProcessHeapSysBytes      uint64  `json:"process_heap_sys_bytes"`
+	ProcessHeapIdleBytes     uint64  `json:"process_heap_idle_bytes"`
+	ProcessHeapInuseBytes    uint64  `json:"process_heap_inuse_bytes"`
+	ProcessHeapReleasedBytes uint64  `json:"process_heap_released_bytes"`
+	Goroutines               int     `json:"goroutines"`
 }
 
 const runtimeStatsSampleWindow = 200 * time.Millisecond
@@ -378,6 +381,9 @@ func captureRuntimeStats() (*RuntimeStatsSnapshot, error) {
 	runtime.ReadMemStats(&memStats)
 	snapshot.ProcessHeapAllocBytes = memStats.HeapAlloc
 	snapshot.ProcessHeapSysBytes = memStats.HeapSys
+	snapshot.ProcessHeapIdleBytes = memStats.HeapIdle
+	snapshot.ProcessHeapInuseBytes = memStats.HeapInuse
+	snapshot.ProcessHeapReleasedBytes = memStats.HeapReleased
 
 	if vm, err := mem.VirtualMemory(); err == nil && vm != nil {
 		snapshot.HostMemTotalBytes = vm.Total

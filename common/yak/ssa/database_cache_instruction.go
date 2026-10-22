@@ -992,30 +992,45 @@ func (s *instructionStore) acknowledgeCloseFlushIfPersisted(inst Instruction) bo
 	return true
 }
 
+// expandRelationPersistRecords adds relation-only neighbors to the insert set.
+// It must not pull a settled object's whole member graph back through the
+// reverse edge: a new member pointing at an already-saved owner would
+// otherwise re-marshal that owner and every member it has (the Hue review
+// batch amplification), and an insert-only copy would shadow the explicit
+// UPDATE for a dirty owner.
 func (s *instructionStore) expandRelationPersistRecords(records []*instructionPersistRecord) []*instructionPersistRecord {
 	if s == nil || s.program == nil || s.program.Cache == nil || len(records) == 0 {
 		return records
 	}
 	expanded := make([]*instructionPersistRecord, 0, len(records)*2)
-	queued := make(map[int64]struct{}, len(records)*2)
+	queued := make(map[int64]int, len(records)*2)
 	appendRecord := func(record *instructionPersistRecord) {
 		if record == nil || record.IrCode == nil {
 			return
 		}
-		if _, ok := queued[record.CodeID]; ok {
+		if i, ok := queued[record.CodeID]; ok {
+			if record.UpdateExisting && !expanded[i].UpdateExisting {
+				expanded[i] = record
+			}
 			return
 		}
-		queued[record.CodeID] = struct{}{}
+		queued[record.CodeID] = len(expanded)
 		expanded = append(expanded, record)
 	}
-	var walk func(record *instructionPersistRecord)
-	walk = func(record *instructionPersistRecord) {
+	// Register every explicit root before following either relation direction,
+	// so an insert-only neighbor cannot shadow a later root's UPDATE.
+	for _, record := range records {
 		appendRecord(record)
-		if record == nil || record.IrCode == nil {
-			return
-		}
+	}
+	for cursor := 0; cursor < len(expanded); cursor++ {
+		record := expanded[cursor]
 		for _, id := range relationInstructionIDs(record.IrCode) {
 			if _, ok := queued[id]; ok {
+				continue
+			}
+			// Already-saved neighbors are read from their settled row during
+			// reload; walking them here would only rebuild the same graph.
+			if s.isPersisted(id) {
 				continue
 			}
 			linked, ok := s.writer.GetResident(id)
@@ -1035,11 +1050,8 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 				Reason: record.Reason,
 				CodeID: linked.GetId(),
 			}
-			walk(relRecord)
+			appendRecord(relRecord)
 		}
-	}
-	for _, record := range records {
-		walk(record)
 	}
 	return expanded
 }

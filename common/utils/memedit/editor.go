@@ -622,6 +622,30 @@ func (ve *MemEditor) GetRangeOffset(start, end int) *Range {
 	return NewRangeFromOffsets(ve, start, end)
 }
 
+// GetSourceBoundaryPosition resolves an offset for a persisted source range.
+// Unlike GetPositionByOffsetWithError, offset == CodeLength() is a valid
+// exclusive end boundary (half-open ranges): an empty file has only offset 0,
+// and a suite ending at EOF reports the file length. Offsets beyond that stay
+// errors so corrupt rows are still diagnosed instead of clamped silently.
+func (ve *MemEditor) GetSourceBoundaryPosition(offset int) (*Position, error) {
+	if ve == nil {
+		return NewPosition(1, 1), errors.New("empty source editor")
+	}
+	length := ve.CodeLength()
+	if offset != length {
+		return ve.GetPositionByOffsetWithError(offset)
+	}
+	lm := ve.getLineMappings()
+	if lm == nil || len(lm.startOffsets) == 0 || len(lm.lens) == 0 {
+		return ve.GetPositionByOffsetWithError(offset)
+	}
+	last := len(lm.startOffsets) - 1
+	if offset == 0 {
+		return NewPosition(1, 1), nil
+	}
+	return NewPosition(last+1, offset-lm.startOffsets[last]+1), nil
+}
+
 func (ve *MemEditor) GetRangeByPosition(start, end *Position) *Range {
 	if ve == nil || start == nil || end == nil {
 		return NewRange(start, end)
