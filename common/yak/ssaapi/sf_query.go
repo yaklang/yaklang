@@ -48,8 +48,9 @@ type queryConfig struct {
 	rule        *schema.SyntaxFlowRule // use this
 
 	// runtime
-	vm    *sfvm.SyntaxFlowVirtualMachine
-	frame *sfvm.SFFrame
+	vm         *sfvm.SyntaxFlowVirtualMachine
+	frame      *sfvm.SFFrame
+	ruleLoader *sfvm.RuleLoader
 
 	// sourceResultCallback lets source-mode bounded hit batches stream to a
 	// consumer immediately. The fallback aggregate path is retained for callers
@@ -100,7 +101,7 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 
 	// use rule compiled
 	if config.rule != nil {
-		frame, resave, err := vm.Load(config.rule)
+		frame, resave, err := config.ruleLoader.Load(vm, config.rule)
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
 		}
@@ -132,7 +133,7 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s from db error: %v", config.ruleName, err)
 		}
-		frame, resave, err := vm.Load(rule)
+		frame, resave, err := config.ruleLoader.Load(vm, rule)
 		if resave {
 			// save rule to db
 			sfdb.MigrateSyntaxFlow("", rule)
@@ -427,6 +428,11 @@ func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
 			sfvm.WithRuntimeOption(WithStructBound(bound)),
 		)
 	}
+}
+
+// QueryWithRuleLoader reuses scan-local decoded instructions, never a frame.
+func QueryWithRuleLoader(loader *sfvm.RuleLoader) QueryOption {
+	return func(c *queryConfig) { c.ruleLoader = loader }
 }
 
 // QueryWithSourceScanRuntime supplies direct-search results from the same

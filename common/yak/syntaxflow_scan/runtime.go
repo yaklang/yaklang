@@ -71,6 +71,9 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
 
+	// Initialize before launching rule goroutines; the loader's entries are
+	// concurrency-safe, but lazy assignment of the config pointer is not.
+	m.Config.rulePreparationState()
 	sourceRuntimes, closeSourceRuntimes := m.prepareSourceRuntimes()
 	defer closeSourceRuntimes()
 
@@ -248,6 +251,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		option := []ssaapi.QueryOption{}
 		option = append(option,
 			ssaapi.QueryWithSSAConfig(m.Config.Config),
+			ssaapi.QueryWithRuleLoader(&m.Config.rulePreparationState().loader),
 			ssaapi.QueryWithContext(ruleCtx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {

@@ -77,8 +77,7 @@ type ScanTaskCallback struct {
 	// an earlier finding.
 	scanRuntime *ssaapi.ScanRuntime `json:"-"`
 
-	parsedCustomRules     []*schema.SyntaxFlowRule
-	parsedCustomRulesDone bool
+	rulePreparation *rulePreparation
 }
 
 const (

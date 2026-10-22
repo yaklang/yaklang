@@ -532,33 +532,11 @@ func (c *Config) customRules() []*schema.SyntaxFlowRule {
 	if c == nil {
 		return nil
 	}
-	if c.parsedCustomRulesDone {
-		return c.parsedCustomRules
+	rules, _, err := c.preparedRuleInputs()
+	if err != nil {
+		return nil
 	}
-	c.parsedCustomRulesDone = true
-	var raws []string
-	if c.IsTaskLocalRuleInput() {
-		rules, _, err := loadTaskLocalSyntaxFlowRules(c.SyntaxFlowRule)
-		if err != nil {
-			return nil
-		}
-		c.parsedCustomRules = rules
-		return rules
-	}
-	for _, in := range c.GetRuleInput() {
-		if in == nil || strings.TrimSpace(in.Content) == "" {
-			continue
-		}
-		raws = append(raws, in.Content)
-	}
-	for _, raw := range raws {
-		rule, err := compileRuleContent(raw)
-		if err != nil {
-			continue
-		}
-		c.parsedCustomRules = append(c.parsedCustomRules, rule)
-	}
-	return c.parsedCustomRules
+	return rules
 }
 
 func hasCodeSource(cfg *Config) bool {
@@ -875,17 +853,15 @@ func structCompileOptions(cfg *Config) []ssaconfig.Option {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
 	rules := cfg.customRules()
-	var structRaws []string
+	opts = append(opts, ssaapi.WithStructRuleLoader(&cfg.rulePreparationState().loader))
+	var structRules []*schema.SyntaxFlowRule
 	for _, rule := range rules {
 		if rule != nil && rule.IsStructMode() && strings.TrimSpace(rule.Content) != "" {
-			structRaws = append(structRaws, rule.Content)
+			structRules = append(structRules, rule)
 		}
 	}
-	if len(structRaws) > 0 {
-		for _, raw := range structRaws {
-			opts = append(opts, ssaapi.WithStructRuleRaw(raw))
-		}
-		return opts
+	if len(structRules) > 0 {
+		return append(opts, ssaapi.WithStructRules(structRules...))
 	}
 	if len(rules) > 0 {
 		return opts
@@ -975,6 +951,7 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil {
 		return opts
 	}
+	opts = append(opts, withRulePreparation(cfg.rulePreparationState()))
 	// ScanProject starts nested scans via StartScan, which rebuilds the
 	// config from the forwarded options only. Rule-detail reporting must be
 	// forwarded explicitly or every per-rule snapshot inside a product scan

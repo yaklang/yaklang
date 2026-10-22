@@ -57,13 +57,15 @@ func (m *scanManager) prepareSourceRuntimes() (map[ssaapi.SyntaxFlowQueryInstanc
 		if rule == nil || !rule.IsSourceMode() {
 			continue
 		}
-		frame, resave, err := sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
+		frame, resave, err := m.Config.rulePreparationState().loader.Load(sfvm.NewSyntaxFlowVirtualMachine(), rule)
 		if err != nil {
 			// The regular query reports and counts this rule's compilation error.
 			log.Debugf("source pre-scan: rule %s stays on legacy path: %v", rule.RuleName, err)
 			continue
 		}
 		if resave && rule.ID > 0 {
+			// Same migration gate as queryConfig.GetFrame. Load also memoizes
+			// opcodes so concurrent target queries do not recompile this rule.
 			sfdb.MigrateSyntaxFlow("", rule)
 		}
 		frames = append(frames, frame)

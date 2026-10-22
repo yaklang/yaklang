@@ -331,6 +331,15 @@ func ParseSyntaxFlowInput(ruleInput *ypb.SyntaxFlowRuleInput) (*schema.SyntaxFlo
 		return nil, utils.Error("parse syntaxflow rule failed: rule input is nil")
 	}
 	rule, _ := sfdb.CheckSyntaxFlowRuleContent(ruleInput.Content)
+	return ApplySyntaxFlowRuleInput(ruleInput, rule)
+}
+
+// ApplySyntaxFlowRuleInput applies input metadata to an already compiled rule.
+// Scan preparation can compile inputs in parallel without parsing them again.
+func ApplySyntaxFlowRuleInput(ruleInput *ypb.SyntaxFlowRuleInput, rule *schema.SyntaxFlowRule) (*schema.SyntaxFlowRule, error) {
+	if ruleInput == nil {
+		return nil, utils.Error("parse syntaxflow rule failed: rule input is nil")
+	}
 	if rule == nil {
 		rule = &schema.SyntaxFlowRule{}
 	}
