@@ -49,7 +49,6 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 	if err := r.config.AcquireClarification(taskID, true); err != nil {
 		return "Clarification unavailable: " + err.Error() + ". No user consent was given."
 	}
-	r.currentUserInteractiveCount++
 	ep := r.config.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 	var opts []map[string]any

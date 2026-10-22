@@ -102,27 +102,31 @@ func CheckSchema(value any, depth int) error {
 }
 
 func ValidateSchema(s map[string]any, value any) error {
-	// JSON Schema validators expect JSON-shaped arrays/numbers, including when
-	// definitions originate in Go rather than a decoded manifest.
-	raw, err := json.Marshal(s)
-	if err != nil {
-		return err
-	}
-	if err := json.Unmarshal(raw, &s); err != nil {
-		return err
-	}
-	if err := CheckSchema(s, 0); err != nil {
-		return err
-	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", s); err != nil {
-		return err
-	}
-	schema, err := compiler.Compile("schema.json")
+	schema, err := compileSchema(s)
 	if err != nil {
 		return err
 	}
 	return schema.Validate(value)
+}
+
+func compileSchema(s map[string]any) (*jsonschema.Schema, error) {
+	// JSON Schema validators expect JSON-shaped arrays/numbers, including when
+	// definitions originate in Go rather than a decoded manifest.
+	raw, err := json.Marshal(s)
+	if err != nil {
+		return nil, err
+	}
+	if err := json.Unmarshal(raw, &s); err != nil {
+		return nil, err
+	}
+	if err := CheckSchema(s, 0); err != nil {
+		return nil, err
+	}
+	compiler := jsonschema.NewCompiler()
+	if err := compiler.AddResource("schema.json", s); err != nil {
+		return nil, err
+	}
+	return compiler.Compile("schema.json")
 }
 
 func (c Catalog) Definition(name string) *ComponentDefinition {
@@ -295,7 +299,7 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 				diagnose("action", "invalid action disabled")
 			}
 		}
-		if !NormalizeVisualization(&node, diagnose) || !NormalizeNavigation(&node, diagnose) {
+		if !NormalizeVisualization(&node, diagnose) || !NormalizeNavigation(&node, diagnose) || !normalizeForm(node, diagnose) {
 			continue
 		}
 		components[node.Component] = true

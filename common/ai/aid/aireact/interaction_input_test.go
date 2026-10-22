@@ -140,3 +140,17 @@ func TestLegacyClarificationUsesRichLifecycleWhenSupported(t *testing.T) {
 	}
 	require.ErrorContains(t, cfg.CheckClarificationAllowed("", false), "limit")
 }
+
+func TestClarificationPromptUsesSharedTaskBudget(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	require.NoError(t, err)
+	cfg := r.GetConfig().(*aicommon.Config)
+	require.NoError(t, cfg.AcquireClarification("", false))
+	_, info, err := r.GetBasicPromptInfo(nil)
+	require.NoError(t, err)
+	require.EqualValues(t, 1, info["AskForClarificationCurrentTime"])
+	require.EqualValues(t, 1, info["AskForClarificationMaxTimes"])
+	require.Equal(t, false, info["AllowAskForClarification"])
+}

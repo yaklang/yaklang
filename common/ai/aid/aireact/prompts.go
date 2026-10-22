@@ -189,10 +189,14 @@ func (pm *PromptManager) GetBasicPromptInfo(tools []*aitool.Tool) (string, map[s
 		result["AIForgeList"] = pm.GetAvailableAIForgeBlueprints()
 	}
 	result["ShowForgeList"] = pm.react.config.GetShowForgeListInPrompt()
-	result["AllowAskForClarification"] = pm.react.config.GetEnableUserInteract()
+	taskID := ""
+	if task := pm.react.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+	result["AllowAskForClarification"] = pm.react.config.CheckClarificationAllowed(taskID, true) == nil ||
+		(pm.react.config.UIQuestionsEnabled() && pm.react.config.CheckClarificationAllowed(taskID, false) == nil)
 	result["AllowKnowledgeEnhanceAnswer"] = true // Legacy template key; retrieval uses Skill-guided tools.
-	result["AskForClarificationCurrentTime"] = pm.react.currentUserInteractiveCount
-	result["AskForClarificationMaxTimes"] = pm.react.config.GetUserInteractiveLimitedTimes()
+	result["AskForClarificationCurrentTime"], result["AskForClarificationMaxTimes"] = pm.react.config.ClarificationUsage(taskID)
 
 	if len(tools) > 0 {
 		// caller-supplied subset: render verbatim, no token-budget trimming.
