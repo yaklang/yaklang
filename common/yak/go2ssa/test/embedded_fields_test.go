@@ -436,6 +436,31 @@ func run(c *Controller) { promoted := c.Ctx; own := c.ID; println(promoted); pri
 	}
 }
 
+func TestGoExternalNestedCallDoesNotBindOuterMethod(t *testing.T) {
+	ssatest.CheckSyntaxFlowContain(t, `package main
+
+import (
+	beego "github.com/beego/beego/v2/server/web"
+)
+
+type CorsVuln1Controller struct {
+	beego.Controller
+}
+
+func (c *CorsVuln1Controller) Get() {
+	origin := c.Ctx.Request.Header.Get("Origin")
+	c.Ctx.ResponseWriter.Header().Set("Access-Control-Allow-Origin", origin)
+}
+`, `
+.Ctx.Request.Header.Get #-> as $beego
+$beego?{<fullTypeName>?{have: 'github.com/beego/beego/v2/server/web'}} as $input
+.Ctx.ResponseWriter.Header().Set?(*<slice(index=1)>?{have: "Access-Control-Allow-Origin"}) as $header
+$header<getCallee>?(*<slice(index=2)> ?{* #{until: `+"`* & $input`"+`}-> }) as $high
+`, map[string][]string{
+		"high": {"Access-Control-Allow-Origin", "Header.Get"},
+	}, ssaapi.WithLanguage(ssaconfig.GO))
+}
+
 func TestGoEmbeddedFieldsAcrossPackages(t *testing.T) {
 	fs := filesys.NewVirtualFs()
 	fs.AddFile("go.mod", "module example.com/embedded\n\ngo 1.22\n")
