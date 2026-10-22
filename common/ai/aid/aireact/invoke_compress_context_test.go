@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,15 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aispec"
 )
 
+func compressionHistoryIDFromPrompt(t *testing.T, prompt, marker string) string {
+	t.Helper()
+	index := strings.Index(prompt, marker)
+	require.GreaterOrEqual(t, index, 0, "the selected record must be visible to the model")
+	matches := regexp.MustCompile(`\[item_id:(\d+)\]`).FindAllStringSubmatch(prompt[:index], -1)
+	require.NotEmpty(t, matches, "the model must be able to read the selected record's ID")
+	return matches[len(matches)-1][1]
+}
+
 // compress_context is a default main-loop action. An ordinary turn built by
 // the real prompt manager advertises it, and a model-chosen call compacts the
 // live timeline before the loop continues.
@@ -23,7 +33,6 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
 			var decisions atomic.Int32
-			var keptID int64
 			var secondPrompt atomic.Value
 			oldHistory, keptHistory, summary := uuid.NewString(), uuid.NewString(), uuid.NewString()
 			react, err := NewTestReAct(
@@ -62,7 +71,7 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 						name = aicommon.ContextCompressionAction
 						params, _ := json.Marshal(map[string]any{
 							"summary":             summary,
-							"retain_timeline":     fmt.Sprint(keptID),
+							"retain_timeline":     compressionHistoryIDFromPrompt(t, req.GetPrompt(), keptHistory),
 							"retire_skill_names":  []string{},
 							"retire_evidence_ids": []string{},
 						})
@@ -95,8 +104,7 @@ func TestReAct_CompressContextAvailableOnNormalTurn(t *testing.T) {
 			require.NoError(t, err)
 			tl := react.config.Timeline
 			tl.PushText(react.config.AcquireId(), "%s", oldHistory)
-			keptID = react.config.AcquireId()
-			tl.PushText(keptID, "%s", keptHistory)
+			tl.PushText(react.config.AcquireId(), "%s", keptHistory)
 
 			loop, err := reactloops.NewReActLoop("compress-context", react,
 				reactloops.WithFunctionCallMode(native), reactloops.WithDisablePeriodicVerification(true),
@@ -127,7 +135,6 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 		t.Run(fmt.Sprintf("native=%t", native), func(t *testing.T) {
 			var compressionTurns, normalTurns atomic.Int32
 			var compressionPrompt, normalPrompt atomic.Value
-			var historyIDs []int64
 			var history []string
 			summary := uuid.NewString()
 			var react *ReAct
@@ -172,7 +179,7 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 							require.Contains(t, names, "finish", "the full tool list stays in the request")
 						}
 						params, err := json.Marshal(map[string]any{
-							"summary": summary, "retain_timeline": fmt.Sprint(historyIDs[len(historyIDs)-1]),
+							"summary": summary, "retain_timeline": compressionHistoryIDFromPrompt(t, req.GetPrompt(), history[len(history)-1]),
 							"retire_skill_names": []string{}, "retire_evidence_ids": []string{},
 						})
 						if err != nil {
@@ -199,7 +206,7 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 			for i := 0; i < 4; i++ {
 				marker := uuid.NewString()
 				id := react.config.AcquireId()
-				historyIDs, history = append(historyIDs, id), append(history, marker)
+				history = append(history, marker)
 				react.config.Timeline.PushText(id, "%s", marker+" "+strings.Repeat(uuid.NewString()+" ", 400))
 			}
 			loop, err := reactloops.NewReActLoop("compress-context-overflow", react,

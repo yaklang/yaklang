@@ -6,7 +6,7 @@
 
 ## 各段怎么用
 
-- Frozen Prefix 和 Open Tail 里的普通历史：用 summary 承接进展、依据、未完成事项和衔接。仍要原样留下的原文，在 retain_timeline 填该条 timeline item 的 ID 或闭区间，例如 "12,18-23"。ID 从上文这两段里每条 `HH:MM:SS [类型]` 记录分析，不要复制正文，也不要依赖本段再列一份 ID。范围只保留普通历史，夹在其中的技能、证据和用户输入不受影响。一条工具调用及其结果作为整体保留。
+- Frozen Prefix 和 Open Tail 里的普通历史：用 summary 承接进展、依据、未完成事项和衔接。仍要原样留下的原文，在 retain_timeline 填该条标题中 `[item_id:N]` 的数字 N 或闭区间，例如 "12,18-23"。标题格式是 `HH:MM:SS [类型] [item_id:N]`；不要把时间、工具调用 id 或块标签当作历史 ID，不要复制正文，也不要依赖本段再列一份 ID。范围只保留普通历史，夹在其中的技能、证据和用户输入不受影响。一条工具调用及其结果作为整体保留。
 - semi-dynamic 的 `=== Skill: 名字 ===`：按技能名整份判断。当前和后续任务都用不到时，把名字写入 retire_skill_names，分页和 metadata 会一起去掉。
 - 「已知观测（Evidence）」：按里面 `[id: ...]` 的 id 判断，本段不重复列出。被后续结果覆盖、重复或不再影响下一步的，把 id 写入 retire_evidence_ids。不必等到被证伪；仍支撑判断的证据保留。
 - Recently Used Tools 里的工具 Schema：本次不能删除。需要时它仍是直接调用的依据，summary 不能代替 Schema。
