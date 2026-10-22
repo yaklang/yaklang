@@ -251,6 +251,9 @@ type LoopPromptAssemblyInput struct {
 	// changes; compression carries instructions and the snapshot's candidates.
 	PromptMode       LoopPromptMode
 	CompressionGuide string
+	// HistoryThroughID, when set, renders and reports timeline history only
+	// through that ID. Later items stay outside this request.
+	HistoryThroughID *int64
 	// FunctionCallMode describes this request's output protocol, not the loop's
 	// global preference. Auxiliary parameter-generation requests remain textual.
 	FunctionCallMode bool

@@ -30,15 +30,27 @@ type TimelineCompressionSelection struct {
 
 // CompressionBoundary captures identities, not bodies. A result may reserve a
 // low ID before execution and arrive after newer entries have already rendered.
-func (m *Timeline) CompressionBoundary() (int64, []int64) {
+// An optional through ID caps both the reported boundary and its item IDs.
+func (m *Timeline) CompressionBoundary(throughID ...int64) (int64, []int64) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.getMaxIDLocked(), m.compressionItemIDsLocked()
+	through := m.getMaxIDLocked()
+	if len(throughID) > 0 && throughID[0] >= 0 {
+		through = min(throughID[0], through)
+	}
+	return through, m.compressionItemIDsLocked(through)
 }
 
-func (m *Timeline) compressionItemIDsLocked() []int64 {
+func (m *Timeline) compressionItemIDsLocked(throughID ...int64) []int64 {
+	through := m.getMaxIDLocked()
+	if len(throughID) > 0 && throughID[0] >= 0 {
+		through = min(throughID[0], through)
+	}
 	ids := make([]int64, 0, m.idToTimelineItem.Len())
 	for _, id := range m.idToTimelineItem.Keys() {
+		if id > through {
+			continue
+		}
 		if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
 			ids = append(ids, id)
 		}
@@ -57,7 +69,11 @@ func (m *Timeline) RenderCompressionGuide(options TimelineCompressionOptions) (s
 		return "", err
 	}
 	m.mu.RLock()
-	snapshot, err := m.captureCompressionSnapshotLocked()
+	through := m.getMaxIDLocked()
+	if options.ThroughID != nil {
+		through = *options.ThroughID
+	}
+	snapshot, err := m.captureCompressionSnapshotThroughLocked(through)
 	m.mu.RUnlock()
 	if err != nil {
 		return "", err
