@@ -46,11 +46,18 @@ func CompileRules(texts []string) ([]*schema.SyntaxFlowRule, []error) {
 // RuleLoader is a scan-local cache of immutable decoded instructions, not of
 // execution frames/results. Each query/unit still gets a fresh VM and frame.
 // Rules are owned by this scan and must not be mutated concurrently by callers.
-// A separate entry lock allows different rules to compile in parallel while
-// duplicate requests for one rule compile/decode only once.
+// The map is a SafeMap; each entry still has its own lock so different rules
+// compile in parallel while one rule compiles only once.
 type RuleLoader struct {
-	mu      sync.Mutex
-	entries map[*schema.SyntaxFlowRule]*loadedRule
+	once    sync.Once
+	entries *utils.SafeMapWithKey[*schema.SyntaxFlowRule, *loadedRule]
+}
+
+func (loader *RuleLoader) cache() *utils.SafeMapWithKey[*schema.SyntaxFlowRule, *loadedRule] {
+	loader.once.Do(func() {
+		loader.entries = utils.NewSafeMapWithKey[*schema.SyntaxFlowRule, *loadedRule]()
+	})
+	return loader.entries
 }
 
 type loadedRule struct {
@@ -68,17 +75,12 @@ func (loader *RuleLoader) Load(vm *SyntaxFlowVirtualMachine, rule *schema.Syntax
 	if loader == nil {
 		return vm.Load(rule)
 	}
-	loader.mu.Lock()
-	if loader.entries == nil {
-		loader.entries = make(map[*schema.SyntaxFlowRule]*loadedRule)
+	entry, loadErr := loader.cache().GetOrLoad(rule, func() (*loadedRule, error) {
+		return &loadedRule{}, nil
+	})
+	if loadErr != nil {
+		return nil, false, loadErr
 	}
-	entry := loader.entries[rule]
-	if entry == nil {
-		entry = &loadedRule{}
-		loader.entries[rule] = entry
-	}
-	loader.mu.Unlock()
-
 	entry.mu.Lock()
 	defer entry.mu.Unlock()
 	build := consts.GetYakVersion()

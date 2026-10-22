@@ -18,7 +18,9 @@ type rulePreparation struct {
 	rules     []*schema.SyntaxFlowRule
 	libraries map[string]*schema.SyntaxFlowRule
 	err       error
-	loader    sfvm.RuleLoader
+	// loader is owned by this preparation. Source, struct and SSA stages of
+	// one product scan borrow its address; they do not allocate another cache.
+	loader sfvm.RuleLoader
 }
 
 func (c *Config) rulePreparationState() *rulePreparation {
