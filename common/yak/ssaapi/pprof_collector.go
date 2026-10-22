@@ -89,6 +89,11 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	if err != nil {
 		return nil, err
 	}
+	// Contention profiles stay empty unless the runtime is told to sample them.
+	// Fraction/rate 1 records every event so a short source scan still has data.
+	runtime.SetMutexProfileFraction(1)
+	runtime.SetBlockProfileRate(1)
+	log.Infof("[pprof] mutex fraction=1 block rate=1")
 
 	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
 
@@ -222,6 +227,10 @@ func (c *pprofCollector) collectSnapshot(ctx context.Context, tag string) {
 	// Memory and goroutine snapshots are fast (non-blocking)
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
+	c.fetchGoroutineDebug2(label)
+	c.fetchNamedProfile(label, "allocs", "")
+	c.fetchNamedProfile(label, "mutex", "")
+	c.fetchNamedProfile(label, "block", "")
 	c.fetchDBStats(label)
 	c.fetchRuntimeStats(label)
 
@@ -240,6 +249,10 @@ func (c *pprofCollector) collectSnapshotFinal(tag string) {
 
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
+	c.fetchGoroutineDebug2(label)
+	c.fetchNamedProfile(label, "allocs", "")
+	c.fetchNamedProfile(label, "mutex", "")
+	c.fetchNamedProfile(label, "block", "")
 	c.fetchDBStats(label)
 	c.fetchRuntimeStats(label)
 }
@@ -434,6 +447,31 @@ func (c *pprofCollector) fetchGoroutine(label string) {
 		return
 	}
 	log.Infof("[pprof] goroutine profile saved: %s", target)
+}
+
+func (c *pprofCollector) fetchGoroutineDebug2(label string) {
+	url := fmt.Sprintf("http://%s/debug/pprof/goroutine?debug=2", c.httpAddr)
+	target := filepath.Join(c.goroutineDir, label+".goroutine.txt")
+	if err := fetchPprof(url, target); err != nil {
+		log.Errorf("[pprof] goroutine debug=2 failed: %v", err)
+		return
+	}
+	log.Infof("[pprof] goroutine debug=2 saved: %s", target)
+}
+
+func (c *pprofCollector) fetchNamedProfile(label, name, query string) {
+	dir := filepath.Join(c.dir, name+"-pprof")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		log.Errorf("[pprof] create %s dir failed: %v", name, err)
+		return
+	}
+	url := fmt.Sprintf("http://%s/debug/pprof/%s%s", c.httpAddr, name, query)
+	target := filepath.Join(dir, label+"."+name+".prof")
+	if err := fetchPprof(url, target); err != nil {
+		log.Errorf("[pprof] %s profile failed: %v", name, err)
+		return
+	}
+	log.Infof("[pprof] %s profile saved: %s", name, target)
 }
 
 func fetchPprof(url, target string) error {
