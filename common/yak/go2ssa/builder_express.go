@@ -325,12 +325,20 @@ func (b *astbuilder) buildPrimaryExpression(exp *gol.PrimaryExprContext, IslValu
 			} else {
 				var isValue bool
 				rightv, isValue = readMemberCall(owner, b.EmitConstInstPlaceholder(text))
+				// Keep the owner's library path so rules can still see the import.
+				// Do not reuse the owner's struct type: that copies its method set
+				// onto every unresolved field, and Header.Get then resolves as the
+				// enclosing controller method instead of the external call.
+				names := []string(nil)
+				if typ := rv.GetType(); typ != nil {
+					names = typ.GetFullTypeNames()
+				}
 				if isValue {
-					// Unknown external members retain their owner's type context.
-					// Known struct fields above keep their declared field types.
-					rightv.SetType(HandleFullTypeNames(rv.GetType(), rv.GetType().GetFullTypeNames()))
-				} else {
-					rightv.SetType(HandleFullTypeNames(rightv.GetType(), rv.GetType().GetFullTypeNames()))
+					if typ := rightv.GetType(); typ != nil {
+						rightv.SetType(HandleFullTypeNames(typ, names))
+					}
+				} else if typ := rightv.GetType(); typ != nil {
+					rightv.SetType(HandleFullTypeNames(typ, names))
 				}
 			}
 			// log.Infof("rightv = %v", rightv)
