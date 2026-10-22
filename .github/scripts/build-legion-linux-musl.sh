@@ -6,7 +6,7 @@ set -eu
 builder_digest=1699c10032ca2582ec89a24a1312d986a3f094aed3d5c1147b19880afe40e052
 default_builder="docker.io/library/golang:1.22.12-alpine3.21@sha256:$builder_digest"
 musl_version=1.2.5
-build_packages='musl=1.2.5-r11 musl-dev=1.2.5-r11 gcc=14.2.0-r4 g++=14.2.0-r4 libgcc=14.2.0-r4 libstdc++=14.2.0-r4 binutils=2.43.1-r3 build-base=0.5-r3 make=4.4.1-r2 file=5.46-r2 git=2.47.3-r0 linux-headers=6.6-r1 pkgconf=2.3.0-r0 jq=1.7.1-r0'
+build_packages='musl=1.2.5-r12 musl-dev=1.2.5-r12 gcc=14.2.0-r4 g++=14.2.0-r4 libgcc=14.2.0-r4 libstdc++=14.2.0-r4 binutils=2.43.1-r3 build-base=0.5-r3 make=4.4.1-r2 file=5.46-r2 git=2.47.3-r0 linux-headers=6.6-r1 pkgconf=2.3.0-r0 jq=1.7.1-r0'
 
 die() { printf '[legion-node-musl][error] %s\n' "$*" >&2; exit 1; }
 log() { printf '[legion-node-musl] %s\n' "$*"; }
