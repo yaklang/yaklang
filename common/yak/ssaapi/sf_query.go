@@ -56,6 +56,10 @@ type queryConfig struct {
 	// that do not provide a result callback.
 	sourceResultCallback func(*SyntaxFlowResult)
 
+	// sourceScanRuntime optionally supplies scan-local, precomputed direct
+	// searches. It never replaces the frame or its subsequent operations.
+	sourceScanRuntime *sfpattern.SourceScanRuntime
+
 	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
 	structBound *structBound
 
@@ -256,6 +260,9 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 			return nil, ferr
 		}
 		root := sfpattern.NewRoot(files)
+		if config.sourceScanRuntime != nil {
+			root.SetFileFilterMatcher(config.sourceScanRuntime.Matcher(queryCtx))
+		}
 		if config.program != nil {
 			root.SetProgramName(config.program.GetProgramName())
 		}
@@ -419,6 +426,14 @@ func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
 			sfvm.WithRuntimeOption(bound),
 			sfvm.WithRuntimeOption(WithStructBound(bound)),
 		)
+	}
+}
+
+// QueryWithSourceScanRuntime supplies direct-search results from the same
+// source snapshot. Standalone queries without it keep the original matcher.
+func QueryWithSourceScanRuntime(runtime *sfpattern.SourceScanRuntime) QueryOption {
+	return func(c *queryConfig) {
+		c.sourceScanRuntime = runtime
 	}
 }
 

@@ -979,8 +979,11 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	// config from the forwarded options only. Rule-detail reporting must be
 	// forwarded explicitly or every per-rule snapshot inside a product scan
 	// degrades to counter-only events.
-	if cfg.ScanTaskCallback != nil && cfg.ProcessWithRule {
-		opts = append(opts, WithProcessRuleDetail(true))
+	if cfg.ScanTaskCallback != nil {
+		opts = append(opts, WithSourceScanRuntime(!cfg.disableSourceScanRuntime))
+		if cfg.ProcessWithRule {
+			opts = append(opts, WithProcessRuleDetail(true))
+		}
 	}
 	if dir := strings.TrimSpace(cfg.GetDebugDir()); dir != "" {
 		opts = append(opts, ssaconfig.WithDebugDir(dir))
