@@ -112,6 +112,10 @@ type ReActLoop struct {
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
 
+	// Task-local model projection. Never persist full UI definitions in history.
+	uiComponentsMu sync.Mutex
+	uiComponents   *uiComponentView
+
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.
 	asyncExecutionManager      *asyncexecmanager.Manager
@@ -329,6 +333,7 @@ func (r *ReActLoop) Release() {
 	if r == nil {
 		return
 	}
+	r.clearUIComponents()
 	r.shutdownSubAgents()
 	r.onReleaseMutex.Lock()
 	if r.released {
@@ -464,7 +469,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
 		info["UserInteractionDisabled"] = !cfg.GetAllowUserInteraction()
 		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
-			info["UICatalog"] = string(utils.Jsonify(catalog))
+			info["UIComponentIndex"] = catalog.PromptIndex()
 		}
 	}
 
@@ -528,6 +533,9 @@ func (r *ReActLoop) SetCurrentTask(t aicommon.AIStatefulTask) {
 	r.ensureTaskMutex()
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()
+	if r.currentTask == nil || r.currentTask.GetId() != t.GetId() {
+		r.clearUIComponents()
+	}
 	r.currentTask = t
 	t.SetReActLoop(r)
 	// Also set on invoker to keep task state centralized
@@ -887,13 +895,15 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	// Register skills actions conditionally
+	// UI schemas are loaded on demand; the complete catalog remains in Config.
 	if cfg, ok := r.GetConfig().(*aicommon.Config); ok && len(cfg.UICatalog().Components) > 0 {
-		action, err := requireRegisteredLoopAction("render_ui", "client UI catalog available")
-		if err != nil {
-			return nil, err
+		for _, name := range []string{"load_ui_components", "search_ui_components", "render_ui"} {
+			action, err := requireRegisteredLoopAction(name, "client UI catalog available")
+			if err != nil {
+				return nil, err
+			}
+			r.actions.Set(action.ActionType, action)
 		}
-		r.actions.Set(action.ActionType, action)
 	}
 
 	if r.skillsContextManager != nil {

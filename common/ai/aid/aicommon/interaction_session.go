@@ -67,8 +67,8 @@ func (c *Config) UISession() *UISession {
 
 func WithClientUI(raw string) ConfigOption {
 	return func(c *Config) error {
-		if len(raw) > 64*1024 {
-			return fmt.Errorf("client UI catalog exceeds 64 KiB")
+		if len(raw) > 1024*1024 {
+			return fmt.Errorf("client UI catalog exceeds 1 MiB")
 		}
 		var client UIClientCapabilities
 		if raw != "" {

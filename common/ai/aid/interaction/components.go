@@ -11,6 +11,8 @@ import (
 
 const ComponentContentType = "application/vnd.memfit.ui+json"
 
+const MaxCatalogComponents = 512
+
 type ComponentDefinition struct {
 	Name        string                    `json:"name"`
 	Description string                    `json:"description"`
@@ -133,12 +135,12 @@ func (c Catalog) Definition(name string) *ComponentDefinition {
 }
 
 func (c Catalog) Validate() error {
-	if c.Version == "" || len(c.Components) < 1 || len(c.Components) > 32 {
+	if c.Version == "" || len(c.Version) > 64 || len(c.Components) < 1 || len(c.Components) > MaxCatalogComponents {
 		return fmt.Errorf("invalid component catalog")
 	}
 	names := map[string]bool{}
 	for _, entry := range c.Components {
-		if entry.Name == "" || names[entry.Name] || entry.Schema["type"] != "object" {
+		if entry.Name == "" || len(entry.Name) > 64 || names[entry.Name] || entry.Schema["type"] != "object" {
 			return fmt.Errorf("invalid component definition")
 		}
 		names[entry.Name] = true
