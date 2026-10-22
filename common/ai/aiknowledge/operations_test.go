@@ -1,6 +1,7 @@
 package aiknowledge
 
 import (
+	"encoding/json"
 	"math"
 	"testing"
 
@@ -8,6 +9,68 @@ import (
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 	"github.com/yaklang/yaklang/common/schema"
 )
+
+func TestKnowledgeListEntryCounts(t *testing.T) {
+	db, opts, _, calls := fixture(t)
+	for _, name := range []string{"count-a", "count-empty", "count-b"} {
+		create(t, opts, name)
+	}
+	for _, name := range []string{"count-a", "count-a", "count-b"} {
+		_, err := AddEntry(name, "entry", "content", append(opts, WithIndex(false))...)
+		require.NoError(t, err)
+	}
+	deleted, err := AddEntry("count-a", "deleted", "excluded", append(opts, WithIndex(false))...)
+	require.NoError(t, err)
+	require.NoError(t, db.Where("hidden_index = ?", deleted["entry_id"]).Delete(&schema.KnowledgeBaseEntry{}).Error)
+	listed, err := List(append(opts, WithKeyword("count-"), WithLimit(2))...)
+	require.NoError(t, err)
+	require.Equal(t, 3, listed["total"])
+	require.Equal(t, true, listed["has_more"])
+	page := listed["knowledge_bases"].([]listedBaseInfo)
+	require.Len(t, page, 2)
+	for i, want := range []int{2, 0} {
+		details, err := Get(page[i].Name, opts...)
+		require.NoError(t, err)
+		require.Equal(t, want, page[i].EntryCount)
+		require.Equal(t, details["entry_count"], page[i].EntryCount)
+	}
+	raw, err := json.Marshal(page)
+	require.NoError(t, err)
+	require.Contains(t, string(raw), `"entry_count":0`, "empty bases must include their zero count")
+	last, err := List(append(opts, WithKeyword("count-"), WithOffset(listed["next_offset"].(int)), WithLimit(2))...)
+	require.NoError(t, err)
+	require.Equal(t, false, last["has_more"])
+	require.Equal(t, 1, last["knowledge_bases"].([]listedBaseInfo)[0].EntryCount)
+	empty, err := List(append(opts, WithKeyword("missing"))...)
+	require.NoError(t, err)
+	require.Empty(t, empty["knowledge_bases"])
+	require.Zero(t, calls.Load(), "listing/counting must not contact embedding")
+}
+
+func TestKnowledgeLegacyDescriptionReadIsConsistentAndReadOnly(t *testing.T) {
+	db, opts, _, _ := fixture(t)
+	_, err := Add("legacy", append(opts, WithDescription("canonical 描述"))...)
+	require.NoError(t, err)
+	require.NoError(t, db.Model(&schema.VectorStoreCollection{}).Where("name = ?", "legacy").Update("description", "").Error)
+	require.NoError(t, db.Exec(`CREATE TRIGGER reject_description BEFORE UPDATE OF description ON `+(&schema.VectorStoreCollection{}).TableName()+` BEGIN SELECT RAISE(ABORT, 'READ_MUST_NOT_WRITE'); END`).Error)
+	result, err := Get("legacy", opts...)
+	require.NoError(t, err)
+	require.Equal(t, "canonical 描述", result["knowledge_base"].(baseInfo).Description)
+	require.Equal(t, "canonical 描述", result["collection"].(*vectorstore.CollectionInfo).Description)
+	require.Equal(t, "", result["stored_collection_description"])
+	stored, err := vectorstore.GetCollectionInfo(db, "legacy")
+	require.NoError(t, err)
+	require.Empty(t, stored.Description, "Get must leave historical storage untouched")
+	require.NoError(t, db.Exec(`DROP TRIGGER reject_description`).Error)
+	_, err = Update("legacy", append(opts, WithDescription("updated"))...)
+	require.NoError(t, err)
+	result, err = Get("legacy", opts...)
+	require.NoError(t, err)
+	require.NotContains(t, result, "stored_collection_description")
+	stored, err = vectorstore.GetCollectionInfo(db, "legacy")
+	require.NoError(t, err)
+	require.Equal(t, "updated", stored.Description)
+}
 
 func TestKnowledgeDescriptionUpdatesAreAtomic(t *testing.T) {
 	db, opts, _, _ := fixture(t)
