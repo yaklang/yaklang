@@ -109,6 +109,41 @@ func (i *Value) visitedDefs(actx *AnalyzeContext, opt ...OperationOption) (resul
 	return vals
 }
 
+// crossFunctionMemberTopDefs follows package-level field writes that land on
+// the same object after this const was captured. Members are latest-first, so
+// values before this const are newer writes. Same-function writes are left
+// alone: a read compiled before an assignment in that function must not see it.
+func crossFunctionMemberTopDefs(i *Value, actx *AnalyzeContext, opt ...OperationOption) Values {
+	raw := i.getValue()
+	if utils.IsNil(raw) || !raw.IsMember() {
+		return nil
+	}
+	obj := raw.GetObject()
+	key := raw.GetKey()
+	if utils.IsNil(obj) || utils.IsNil(key) {
+		return nil
+	}
+	ownFunction := raw.GetFunc()
+	members := ssa.GetMembersByKey(obj, key)
+	var later Values
+	for _, member := range members {
+		if utils.IsNil(member) {
+			continue
+		}
+		if member.GetId() == raw.GetId() {
+			break
+		}
+		memberFunction := member.GetFunc()
+		if ownFunction != nil && memberFunction != nil && ownFunction.GetId() == memberFunction.GetId() {
+			continue
+		}
+		if traced := i.NewValue(member); traced != nil {
+			later = append(later, traced.getTopDefs(actx, opt...)...)
+		}
+	}
+	return later
+}
+
 func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result Values) {
 
 	if i == nil {
@@ -235,6 +270,14 @@ func (i *Value) getTopDefs(actx *AnalyzeContext, opt ...OperationOption) (result
 		}
 		return getMemberCall(i, inst, actx)
 	case *ssa.ConstInst:
+		// A struct zero value is a const member. A later write in another
+		// function does not rewrite that const, so a package-level field read
+		// compiled first would otherwise stop at "". Follow only writes that
+		// belong to a different function; a same-function use keeps the value
+		// observed at that instruction.
+		if later := crossFunctionMemberTopDefs(i, actx, opt...); len(later) > 0 {
+			return later
+		}
 		return i.visitedDefs(actx, opt...)
 	case *ssa.Phi:
 		conds := inst.GetControlFlowConditions()
