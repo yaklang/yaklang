@@ -765,9 +765,18 @@ LOOP:
 				return answerErr
 			}
 			if transactionErr == nil {
+				r.noteFittingTimelineThroughID(assembled.TimelineThroughID)
 				break
 			}
-			if attempt >= retryMax || !aicommon.IsPromptTooLong(transactionErr) || !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
+			if !aicommon.IsPromptTooLong(transactionErr) || buildInput.overflowCompression {
+				break
+			}
+			if r.lastFittingTimelineThroughID != nil {
+				buildInput.overflowCompression = true
+				log.Warnf("prompt overflow detected; compressing through the last fitting timeline boundary")
+				continue
+			}
+			if attempt >= retryMax || !r.reduceTimelineLimitForPromptOverflow(transactionErr, prompt) {
 				break
 			}
 			log.Warnf("prompt overflow detected; rebuilding the context (retry %d/%d)", attempt+1, retryMax)

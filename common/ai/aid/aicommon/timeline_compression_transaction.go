@@ -54,6 +54,8 @@ type TimelineCompressionOptions struct {
 	MaxSummaryTokens int
 	PromptTokens     int64
 	TargetTokens     int64
+	// ThroughID limits the guide to history at or below this ID. Nil uses the current timeline.
+	ThroughID *int64
 	// OnProgress runs synchronously outside Timeline locks, only when work or
 	// waiting actually occurs. It must not schedule another compression.
 	OnProgress func(TimelineCompressionStage)

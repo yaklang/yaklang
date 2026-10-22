@@ -193,11 +193,10 @@ func (m *Timeline) freezeLocked(all bool) TimelineFreezeResult {
 	return result
 }
 
-// frozenPromptBlocksLocked is read-only. Pending evidence/tool-cache events are
+// promptBlocksLocked is read-only. Pending evidence/tool-cache events are
 // rendered in place; frozen controls appear only in semi-dynamic snapshots.
-// Filtering occurs after bucket selection, so helper prompts share the same
-// freeze boundaries without receiving unrelated tool-cache schemas.
-func (m *Timeline) frozenPromptBlocksLocked(excludeToolCache bool, onlyUserInput bool, promoteUserInput bool) TimelineRenderableBlocks {
+// It builds the complete view; Open-tail capping happens in prompt assembly.
+func (m *Timeline) promptBlocksLocked(excludeToolCache bool, onlyUserInput bool, promoteUserInput bool) TimelineRenderableBlocks {
 	var blocks TimelineRenderableBlocks
 	if !onlyUserInput && m.compressedHead != nil && strings.TrimSpace(m.compressedHead.Text) != "" {
 		blocks = append(blocks, &TimelineCompressedHeadBlock{

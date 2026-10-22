@@ -229,6 +229,47 @@ type TimelinePromptOptions struct {
 	// UserInputOnly supplies exact user context, skill guidance and session evidence to
 	// lightweight loops; ordinary execution history uses a separate recent window.
 	UserInputOnly bool
+	// ThroughID caps only the Open tail. Nil renders the current timeline.
+	// Frozen and semi-dynamic sections are owned by compression.
+	ThroughID *int64
+}
+
+func (timeline *Timeline) promptThroughLocked(options TimelinePromptOptions) (through int64, limited bool) {
+	through = timeline.getMaxIDLocked()
+	if options.ThroughID == nil || *options.ThroughID < 0 {
+		return through, false
+	}
+	return min(*options.ThroughID, through), true
+}
+
+// capOpenTimelineBlocks caps only Open intervals. Frozen intervals and the
+// compressed head are compression-owned state and remain unchanged.
+func capOpenTimelineBlocks(blocks TimelineRenderableBlocks, throughID int64) TimelineRenderableBlocks {
+	out := make(TimelineRenderableBlocks, 0, len(blocks))
+	for _, block := range blocks {
+		interval, ok := block.(*TimelineIntervalBlock)
+		if !ok || !interval.Open {
+			out = append(out, block)
+			continue
+		}
+		// An empty Open interval may be retained to preserve a filtered tool-cache
+		// boundary. Keep that boundary; only cap intervals that have real items.
+		if len(interval.Items) == 0 {
+			out = append(out, block)
+			continue
+		}
+		copy := *interval
+		copy.Items = nil
+		for _, item := range interval.Items {
+			if item != nil && item.GetID() <= throughID {
+				copy.Items = append(copy.Items, item)
+			}
+		}
+		if len(copy.Items) > 0 {
+			out = append(out, &copy)
+		}
+	}
+	return out
 }
 
 func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePromptOptions) TimelineFrozenOpenBlocks {
@@ -245,19 +286,21 @@ func RenderTimelineFrozenOpenWithOptions(timeline *Timeline, options TimelinePro
 // one lock, so Open and promoted content cannot be omitted or counted twice
 // while moving across a freeze boundary.
 func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptions) TimelineFrozenOpenBlocks {
-	rb := timeline.frozenPromptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly)
-	var recentTools string
-	if !options.ExcludeToolCache && !options.UserInputOnly {
-		recentTools = renderPromotedRecentTools(timeline.promotedState)
+	// Resolve the optional Open-tail boundary first. Frozen and semi-dynamic
+	// content are independent of this cap.
+	through, limited := timeline.promptThroughLocked(options)
+
+	// Build the complete block view, then cap only Open intervals before
+	// prompt projection.
+	rawBlocks := timeline.promptBlocksLocked(options.ExcludeToolCache, options.UserInputOnly, options.PromoteUserInput || options.UserInputOnly)
+	if limited {
+		rawBlocks = capOpenTimelineBlocks(rawBlocks, through)
 	}
-	evidenceSemi := timeline.projectEvidenceLocked()
-	promptBlocks := projectTimelineRenderableBlocksForPrompt(rb)
+	promptBlocks := projectTimelineRenderableBlocksForPrompt(rawBlocks)
 	if options.IncludeLatestModelReplay {
-		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rb)
+		promptBlocks = projectTimelineRenderableBlocksForPromptWithLatestModelReplay(rawBlocks)
 	}
 	if options.ExcludeToolCache {
-		// Keep empty filtered intervals in rb for boundary metadata, but avoid
-		// sending an empty Timeline envelope to a parameter-generation prompt.
 		visible := make(TimelineRenderableBlocks, 0, len(promptBlocks))
 		for _, block := range promptBlocks {
 			if interval, ok := block.(*TimelineIntervalBlock); ok && len(interval.Items) == 0 {
@@ -267,20 +310,31 @@ func (timeline *Timeline) renderTimelinePromptLocked(options TimelinePromptOptio
 		}
 		promptBlocks = visible
 	}
+
+	// Semi-dynamic sections are stable snapshots and never capped by ThroughID.
+	promoted := timeline.promotedState
+	var recentTools string
+	if !options.ExcludeToolCache && !options.UserInputOnly {
+		recentTools = renderPromotedRecentTools(promoted)
+	}
 	var userInputHistory string
 	if options.PromoteUserInput || options.UserInputOnly {
 		userInputHistory = timeline.projectUserInputHistoryLocked()
 	}
+
+	// Compression candidates share the same Open boundary as the rendered tail.
+	itemIDs := timeline.compressionItemIDsLocked(through)
+
 	return TimelineFrozenOpenBlocks{
-		ThroughID:                timeline.getMaxIDLocked(),
-		ItemIDs:                  timeline.compressionItemIDsLocked(),
+		ThroughID:                through,
+		ItemIDs:                  itemIDs,
 		Frozen:                   promptBlocks.RenderFrozenOnly(TimelineDumpDefaultAITagName),
 		Open:                     promptBlocks.RenderOpenOnly(TimelineDumpDefaultAITagName),
-		SkillsContext:            renderPromotedSkillContent(timeline.promotedState),
+		SkillsContext:            renderPromotedSkillContent(promoted),
 		PromotedRecentTools:      recentTools,
 		PromotedUserInputHistory: userInputHistory,
-		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rb),
-		EvidenceSemiDynamic:      evidenceSemi,
+		FrozenTimeUnix:           timelineFrozenTimeUnixFromRenderable(rawBlocks),
+		EvidenceSemiDynamic:      timeline.projectEvidenceLocked(),
 	}
 }
 

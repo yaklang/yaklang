@@ -191,6 +191,7 @@ func (pm *PromptManager) AssembleLoopPrompt(tools []*aitool.Tool, input *reactlo
 		IncludeLatestModelReplay: input.IncludeLatestModelReplay,
 		PromoteUserInput:         true,
 		UserInputOnly:            input.Lightweight,
+		ThroughID:                input.HistoryThroughID,
 	})
 	if err != nil {
 		return nil, err

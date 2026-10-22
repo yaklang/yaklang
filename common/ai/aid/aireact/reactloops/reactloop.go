@@ -117,6 +117,9 @@ type ReActLoop struct {
 	promptMode               aicommon.LoopPromptMode
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
+	// lastFittingTimelineThroughID is the boundary of the latest prompt the
+	// provider accepted. Overflow compression rebuilds only through this ID.
+	lastFittingTimelineThroughID *int64
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.

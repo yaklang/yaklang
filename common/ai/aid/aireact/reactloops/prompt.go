@@ -312,6 +312,9 @@ type loopPromptBuildInput struct {
 	subAgentRevision uint64
 	todoCheckpoint   string
 	actionSchemas    *loopPromptActionSchemas
+	// overflowCompression asks this rebuild to compress only through the last
+	// provider-accepted timeline boundary.
+	overflowCompression bool
 }
 
 type loopPromptActionSchemas struct {
@@ -503,10 +506,14 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 	assemble := func() (*LoopPromptAssemblyResult, error) {
 		// Custom assemblers may not report a watermark. Capture a conservative
 		// boundary before rendering so their in-flight writes are still protected.
-		var throughID int64
-		var itemIDs []int64
+		var fallbackThroughID int64
+		var fallbackItemIDs []int64
 		if timeline := timelineFromConfig(r.config); timeline != nil {
-			throughID, itemIDs = timeline.CompressionBoundary()
+			if assembly.HistoryThroughID != nil {
+				fallbackThroughID, fallbackItemIDs = timeline.CompressionBoundary(*assembly.HistoryThroughID)
+			} else {
+				fallbackThroughID, fallbackItemIDs = timeline.CompressionBoundary()
+			}
 		}
 		result, err := r.invoker.AssembleLoopPrompt(tools, assembly)
 		if err != nil {
@@ -517,37 +524,51 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		}
 		result.Mode = assembly.PromptMode
 		if result.TimelineThroughID == nil {
-			result.TimelineThroughID = &throughID
+			result.TimelineThroughID = &fallbackThroughID
 		}
 		if result.TimelineItemIDs == nil {
-			result.TimelineItemIDs = itemIDs
+			result.TimelineItemIDs = fallbackItemIDs
 		}
 		return result, nil
 	}
+	limit := r.wholePromptTokenLimit()
 	result, err := assemble()
 	if err != nil {
 		return nil, err
 	}
-	limit := r.wholePromptTokenLimit()
 	promptTokens := int64(aicommon.MeasureTokens(result.Prompt))
-	retryCompression := operator != nil && operator.contextCompressionError != nil
-	if timeline := timelineFromConfig(r.config); timeline != nil && (promptTokens > limit || retryCompression) {
+	var compressionSelectionErr error
+	if operator != nil {
+		compressionSelectionErr = operator.contextCompressionError
+	}
+
+	// A selection error is a correction retry, independent of prompt volume.
+	// overflowCompression is a provider signal and may use the last fitting
+	// timeline boundary; an ordinary over-limit prompt keeps the full history.
+	if timeline := timelineFromConfig(r.config); timeline != nil &&
+		(compressionSelectionErr != nil || input.overflowCompression || promptTokens > limit) {
 		ctx := r.config.GetContext()
 		if task := r.GetCurrentTask(); task != nil && task.GetContext() != nil {
 			ctx = task.GetContext()
 		}
 		target := max(int64(1), limit/6)
-		guide, err := timeline.RenderCompressionGuide(aicommon.TimelineCompressionOptions{
+		options := aicommon.TimelineCompressionOptions{
 			Context: ctx, PromptTokens: promptTokens, TargetTokens: target,
-		})
-		if err != nil {
-			return nil, err
+		}
+		if input.overflowCompression && r.lastFittingTimelineThroughID != nil {
+			throughID := *r.lastFittingTimelineThroughID
+			options.ThroughID = &throughID
+			assembly.HistoryThroughID = &throughID
+		}
+		guide, guideErr := timeline.RenderCompressionGuide(options)
+		if guideErr != nil {
+			return nil, guideErr
 		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
 		assembly.CompressionGuide = strings.TrimSpace(compressContextDynamicText) + "\n\n" + guide
-		if retryCompression {
+		if compressionSelectionErr != nil {
 			assembly.CompressionGuide += "\n\n# 上次压缩选择未通过校验\n请修正以下错误，重新提交 compress_context；当前历史尚未按这次无效选择修改。\n" +
-				utils.ShrinkString(operator.contextCompressionError.Error(), 2048)
+				utils.ShrinkString(compressionSelectionErr.Error(), 2048)
 		}
 		result, err = assemble()
 		if err != nil {
