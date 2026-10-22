@@ -176,16 +176,22 @@ func (p *SourceScanPlan) Close() error {
 	return nil
 }
 
+type storedSpan struct {
+	Start, End int
+	Text       string
+}
+
 // SourceScanRuntime precomputes raw offsets for one immutable files snapshot.
 // It publishes only complete results by closing done. SFVM roots, values,
 // editors and batch cursors remain query-local, never shared between rules.
+// File bodies are borrowed from store and dropped after each file is scanned.
 type SourceScanRuntime struct {
 	plan    *SourceScanPlan
-	files   map[string]string
+	store   SourceStore
 	done    chan struct{}
 	cancel  context.CancelFunc
 	err     error
-	matches []map[string][]byteIndex
+	matches []map[string][]storedSpan
 	stats   SourceScanStats
 	lookups atomic.Int64
 	mu      sync.Mutex
@@ -194,11 +200,17 @@ type SourceScanRuntime struct {
 
 // Start begins the shared scan independently of any individual rule's context.
 // Closing the runtime cancels and joins its worker; no detached scan survives.
+// The map adapter keeps existing callers working. Live scans use StartStore.
 func (p *SourceScanPlan) Start(ctx context.Context, files map[string]string) *SourceScanRuntime {
+	return p.StartStore(ctx, MapSource(files))
+}
+
+// StartStore scans store.Paths() and reads each body through store.Read.
+func (p *SourceScanPlan) StartStore(ctx context.Context, store SourceStore) *SourceScanRuntime {
 	ctx, cancel := context.WithCancel(ctx)
 	r := &SourceScanRuntime{
-		plan: p, files: files, done: make(chan struct{}), cancel: cancel,
-		matches: make([]map[string][]byteIndex, len(p.patterns)),
+		plan: p, store: store, done: make(chan struct{}), cancel: cancel,
+		matches: make([]map[string][]storedSpan, len(p.patterns)),
 		stats:   SourceScanStats{Patterns: len(p.patterns), Searches: len(p.searches)},
 	}
 	go func() {
@@ -254,10 +266,10 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 		}
 		locators[id] = regexp_utils.NewYakRegexpUtils(expr)
 	}
-	paths := make([]string, 0, len(r.files))
-	for path := range r.files {
-		paths = append(paths, path)
+	if r.store == nil {
+		return nil
 	}
+	paths := append([]string(nil), r.store.Paths()...)
 	sort.Strings(paths)
 	type scanJob struct {
 		path    string
@@ -335,15 +347,25 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 				if ctx.Err() != nil || failed() {
 					continue
 				}
-				hits, fallback, err := r.scanFile(ctx, scratch, locators, job.path, job.allowed, failed)
-				if err != nil {
-					recordErr(err)
-					continue
-				}
-				if ctx.Err() != nil || failed() {
-					continue
-				}
-				r.publish(job.path, hits, fallback)
+				func() {
+					content, release, err := r.store.Read(job.path)
+					if release != nil {
+						defer release()
+					}
+					if err != nil {
+						log.Warnf("source pre-scan: skip %s: %v", job.path, err)
+						return
+					}
+					hits, fallback, err := r.scanFile(ctx, scratch, locators, job.path, content, job.allowed, failed)
+					if err != nil {
+						recordErr(err)
+						return
+					}
+					if ctx.Err() != nil || failed() {
+						return
+					}
+					r.publish(job.path, len(content), hits, fallback)
+				}()
 			}
 		}()
 	}
@@ -371,9 +393,8 @@ func (r *SourceScanRuntime) scan(ctx context.Context) error {
 	return scanErr
 }
 
-func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scratch, locators []*regexp_utils.YakRegexpUtils, path string, allowed []bool, stop func() bool) ([][]byteIndex, bool, error) {
-	content := r.files[path]
-	fileHits := make([][]byteIndex, len(r.plan.patterns))
+func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scratch, locators []*regexp_utils.YakRegexpUtils, path, content string, allowed []bool, stop func() bool) ([][]storedSpan, bool, error) {
+	fileHits := make([][]storedSpan, len(r.plan.patterns))
 	located := make([]bool, len(r.plan.patterns))
 	var locateErr error
 	err := r.plan.db.Scan([]byte(content), scratch, func(m minirehs.Match) bool {
@@ -389,11 +410,13 @@ func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scrat
 			// report captures. Locate once per candidate, not once per match.
 			if !located[id] {
 				located[id] = true
-				fileHits[id], locateErr = locateContent(locators[id], content, r.plan.patterns[id].captures)
+				var locatedHits []byteIndex
+				locatedHits, locateErr = locateContent(locators[id], content, r.plan.patterns[id].captures)
+				fileHits[id] = ownSpans(content, locatedHits)
 			}
 			return locateErr == nil
 		}
-		fileHits[id] = append(fileHits[id], byteIndex{m.From, m.To})
+		fileHits[id] = append(fileHits[id], ownSpan(content, m.From, m.To))
 		return true
 	})
 	if err := ctx.Err(); err != nil {
@@ -415,7 +438,9 @@ func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scrat
 			if err := ctx.Err(); err != nil {
 				return nil, false, err
 			}
-			fileHits[id], err = locateContent(locator, content, r.plan.patterns[id].captures)
+			var locatedHits []byteIndex
+			locatedHits, err = locateContent(locator, content, r.plan.patterns[id].captures)
+			fileHits[id] = ownSpans(content, locatedHits)
 			if err != nil {
 				return nil, false, fmt.Errorf("source pre-scan %s pattern %d: %w", path, id, err)
 			}
@@ -425,11 +450,26 @@ func (r *SourceScanRuntime) scanFile(ctx context.Context, scratch minirehs.Scrat
 	return fileHits, false, nil
 }
 
-func (r *SourceScanRuntime) publish(path string, fileHits [][]byteIndex, fallback bool) {
+func ownSpan(content string, start, end int) storedSpan {
+	if start < 0 || end < start || end > len(content) {
+		return storedSpan{Start: start, End: end}
+	}
+	return storedSpan{Start: start, End: end, Text: detachString(content[start:end])}
+}
+
+func ownSpans(content string, spans []byteIndex) []storedSpan {
+	out := make([]storedSpan, len(spans))
+	for i, span := range spans {
+		out[i] = ownSpan(content, span.Start, span.End)
+	}
+	return out
+}
+
+func (r *SourceScanRuntime) publish(path string, size int, fileHits [][]storedSpan, fallback bool) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	r.stats.Files++
-	r.stats.Bytes += int64(len(r.files[path]))
+	r.stats.Bytes += int64(size)
 	if fallback {
 		r.stats.FallbackFiles++
 	}
@@ -438,7 +478,7 @@ func (r *SourceScanRuntime) publish(path string, fileHits [][]byteIndex, fallbac
 			continue
 		}
 		if r.matches[id] == nil {
-			r.matches[id] = make(map[string][]byteIndex)
+			r.matches[id] = make(map[string][]storedSpan)
 		}
 		r.matches[id][path] = hits
 		r.stats.Hits += len(hits)
@@ -502,7 +542,7 @@ func (r *SourceScanRuntime) Matcher(ctx context.Context) sfvm.FileFilterFunc {
 							}
 						}
 						if !overlaps {
-							hits = append(hits, Hit{Path: path, Text: r.files[path][span.Start:span.End], Start: span.Start, End: span.End})
+							hits = append(hits, Hit{Path: path, Text: span.Text, Start: span.Start, End: span.End})
 						}
 					}
 				}
@@ -521,7 +561,7 @@ func (r *SourceScanRuntime) Matcher(ctx context.Context) sfvm.FileFilterFunc {
 		}
 		if len(hits) == 0 {
 			matchedFile := false
-			for path := range r.files {
+			for _, path := range r.store.Paths() {
 				if search.matchPath(path) {
 					matchedFile = true
 					break

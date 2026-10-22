@@ -1,6 +1,8 @@
 package ssaapi
 
 import (
+	"sort"
+
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
@@ -16,6 +18,7 @@ type SourceQueryTarget struct {
 	name  string
 	lang  ssaconfig.Language
 	files map[string]string
+	store sfpattern.SourceStore
 }
 
 var _ SyntaxFlowQueryInstance = (*SourceQueryTarget)(nil)
@@ -32,16 +35,30 @@ func NewSourceQueryTarget(name string, files map[string]string) *SourceQueryTarg
 		name:  name,
 		lang:  ssaconfig.General,
 		files: files,
+		store: sfpattern.MapSource(files),
 	}
 }
 
-// NewSourceQueryTargetFromFS loads all files then NewSourceQueryTarget.
+// NewSourceQueryTargetFromStore scans a store without copying every file body
+// into the target.
+func NewSourceQueryTargetFromStore(name string, store sfpattern.SourceStore) *SourceQueryTarget {
+	if name == "" {
+		name = "source"
+	}
+	return &SourceQueryTarget{
+		name:  name,
+		lang:  ssaconfig.General,
+		store: store,
+	}
+}
+
+// NewSourceQueryTargetFromFS lists fsys and reads bodies on demand.
 func NewSourceQueryTargetFromFS(name string, fsys fi.FileSystem) (*SourceQueryTarget, error) {
-	files, err := sfpattern.LoadFilesFromFS(fsys)
+	store, err := sfpattern.OpenStreamingSource(fsys, nil, sfpattern.DefaultSourceInFlight)
 	if err != nil {
 		return nil, err
 	}
-	return NewSourceQueryTarget(name, files), nil
+	return NewSourceQueryTargetFromStore(name, store), nil
 }
 
 // NewSourceQueryTargetFromProgram builds a source-mode target from the
@@ -51,29 +68,79 @@ func NewSourceQueryTargetFromProgram(prog *Program) *SourceQueryTarget {
 	if prog == nil || prog.Program == nil {
 		return NewSourceQueryTarget("", nil)
 	}
-	name := prog.GetProgramName()
-	files := make(map[string]string)
-	for _, listing := range []map[string]string{prog.Program.FileList, prog.Program.ExtraFile} {
-		for path, hash := range listing {
-			key := normalizeOverlayFilePath(path, name)
-			if key == "" || files[key] != "" {
-				continue
-			}
-			editor, err := prog.getEditor(path, hash)
-			if err != nil || editor == nil {
-				if content, ok := readProgramFileContent(prog, path); ok {
-					files[key] = content
-				}
-				continue
-			}
-			files[key] = editor.GetSourceCode()
-		}
-	}
-	target := NewSourceQueryTarget(name, files)
+	target := NewSourceQueryTargetFromStore(prog.GetProgramName(), newProgramSource(prog))
 	if lang := prog.GetLanguage(); lang != "" {
 		target.lang = lang
 	}
 	return target
+}
+
+// programSource reads one compiled file when a rule asks for it. The program
+// already owns the editors; this does not copy them into another map.
+type programSource struct {
+	prog  *Program
+	paths []string
+	raw   map[string]string
+	hash  map[string]string
+}
+
+// NewProgramSourceStore reads a compiled program one file at a time.
+func NewProgramSourceStore(prog *Program) sfpattern.SourceStore {
+	if prog == nil || prog.Program == nil {
+		return sfpattern.MapSource(nil)
+	}
+	return newProgramSource(prog)
+}
+
+func newProgramSource(prog *Program) sfpattern.SourceStore {
+	name := prog.GetProgramName()
+	raw := map[string]string{}
+	hash := map[string]string{}
+	var paths []string
+	for _, listing := range []map[string]string{prog.Program.FileList, prog.Program.ExtraFile} {
+		for path, fileHash := range listing {
+			key := normalizeOverlayFilePath(path, name)
+			if key == "" {
+				continue
+			}
+			if _, seen := raw[key]; seen {
+				continue
+			}
+			raw[key] = path
+			hash[key] = fileHash
+			paths = append(paths, key)
+		}
+	}
+	sort.Strings(paths)
+	return &programSource{prog: prog, paths: paths, raw: raw, hash: hash}
+}
+
+func (p *programSource) Paths() []string {
+	if p == nil {
+		return nil
+	}
+	return p.paths
+}
+
+func (p *programSource) Read(path string) (string, func(), error) {
+	if p == nil || p.prog == nil {
+		return "", nil, utils.Error("nil program source")
+	}
+	raw, ok := p.raw[path]
+	if !ok {
+		return "", nil, utils.Errorf("source file %q not found", path)
+	}
+	editor, err := p.prog.getEditor(raw, p.hash[path])
+	if err != nil || editor == nil {
+		if content, ok := readProgramFileContent(p.prog, raw); ok {
+			return content, func() {}, nil
+		}
+		if err == nil {
+			err = utils.Errorf("source file %q has no editor", path)
+		}
+		return "", nil, err
+	}
+	return editor.GetSourceCode(), func() {}, nil
 }
 
 func (t *SourceQueryTarget) GetProgramName() string {
@@ -111,6 +178,25 @@ func (t *SourceQueryTarget) Files() map[string]string {
 	return t.files
 }
 
+// Paths returns the scan list without reading file bodies.
+func (t *SourceQueryTarget) Paths() []string {
+	if t == nil || t.store == nil {
+		return nil
+	}
+	return t.store.Paths()
+}
+
+// SourceStore returns the reader used by the source pre-scan and rule root.
+func (t *SourceQueryTarget) SourceStore() sfpattern.SourceStore {
+	if t == nil {
+		return nil
+	}
+	if t.store != nil {
+		return t.store
+	}
+	return sfpattern.MapSource(t.files)
+}
+
 func (t *SourceQueryTarget) SyntaxFlowWithError(i string, opts ...QueryOption) (*SyntaxFlowResult, error) {
 	return t.syntaxFlow(opts, QueryWithRuleContent(i))
 }
@@ -133,13 +219,25 @@ func (t *SourceQueryTarget) syntaxFlow(opts []QueryOption, ruleOpt QueryOption) 
 	if t == nil {
 		return nil, utils.Error("nil SourceQueryTarget")
 	}
-	root := sfpattern.NewRoot(t.files)
+	root := sfpattern.NewRootFromStore(t.SourceStore())
 	root.SetProgramName(t.name)
 	prog := NewTmpProgram(t.name)
 	all := make([]QueryOption, 0, len(opts)+3)
 	all = append(all, QueryWithValue(root), ruleOpt, QueryWithResultProgram(prog))
 	all = append(all, opts...)
 	return QuerySyntaxflow(all...)
+}
+
+func existingPatternRoot(config *queryConfig) *sfvm.PatternRoot {
+	if config == nil {
+		return nil
+	}
+	for _, v := range config.value {
+		if root, ok := v.(*sfvm.PatternRoot); ok && root != nil && !root.IsEmpty() {
+			return root
+		}
+	}
+	return nil
 }
 
 // collectFilesForSourceMode gathers path→content for mode=source frames.

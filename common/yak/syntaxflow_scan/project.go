@@ -887,24 +887,26 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 	if cfg == nil {
 		return utils.Errorf("scan config is nil")
 	}
-	files, err := sfpattern.LoadFilesFromDir(dir)
+	fsys := filesys.NewUnifiedFS(filesys.NewRelLocalFs(dir))
+	opt := sfpattern.DefaultLoadOptions()
+	store, err := sfpattern.OpenStreamingSource(fsys, &opt, sfpattern.DefaultSourceInFlight)
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
-		files, err = sfpattern.LoadFilesFromFS(filesys.NewRelLocalFs(dir))
+	if len(store.Paths()) == 0 {
+		store, err = sfpattern.OpenStreamingSource(fsys, nil, sfpattern.DefaultSourceInFlight)
 		if err != nil {
 			return err
 		}
 	}
-	files = filterCompileExcludedSourceFiles(cfg.Config, files)
+	store = filterCompileExcludedSourcePaths(cfg.Config, store)
 	name := "source-target"
 	if n := strings.TrimSpace(cfg.GetProjectName()); n != "" {
 		name = n
 	} else if n := strings.TrimSpace(cfg.GetProgramName()); n != "" {
 		name = n
 	}
-	cfg.QueryTargets = append(cfg.QueryTargets, ssaapi.NewSourceQueryTarget(name, files))
+	cfg.QueryTargets = append(cfg.QueryTargets, ssaapi.NewSourceQueryTargetFromStore(name, store))
 	return nil
 }
 
@@ -915,23 +917,18 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 // compiled program, so without this filter compile-excluded files re-enter the
 // scan through source-mode rules (e.g. *_test.go in a CI diff alerting via
 // source-go-listen-and-serve).
-func filterCompileExcludedSourceFiles(sc *ssaconfig.Config, files map[string]string) map[string]string {
-	if sc == nil || len(files) == 0 {
-		return files
+func filterCompileExcludedSourcePaths(sc *ssaconfig.Config, store *sfpattern.StreamingSource) *sfpattern.StreamingSource {
+	if store == nil || sc == nil || len(store.Paths()) == 0 {
+		return store
 	}
 	var userExclude []string
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
 	exclude := ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
-	out := make(map[string]string, len(files))
-	for path, content := range files {
-		if exclude(path) {
-			continue
-		}
-		out[path] = content
-	}
-	return out
+	return store.FilterPaths(func(path string) bool {
+		return !exclude(path)
+	})
 }
 
 func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {

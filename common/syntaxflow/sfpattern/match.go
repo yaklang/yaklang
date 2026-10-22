@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/gobwas/glob"
@@ -63,7 +64,7 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, p
 	hits, cached := root.SourceHits(positiveKey)
 	if !cached {
 		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, []string{positive})
+		hits, err = scanRegexpHits(root, files, pathPattern, []string{positive})
 		if err != nil {
 			return nil, err
 		}
@@ -81,8 +82,12 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, p
 	}
 
 	var kept []Hit
+	_, read := fileBodies(root, files)
 	for filePath, fileHits := range byFile {
-		content := files[filePath]
+		content, err := read(filePath)
+		if err != nil {
+			return nil, err
+		}
 		negRanges := negativeMatcher(content)
 		for _, h := range fileHits {
 			overlap := false
@@ -111,13 +116,48 @@ func NewRoot(files map[string]string) *sfvm.PatternRoot {
 	return root
 }
 
-// NewRootFromFS loads all files from fsys into a PatternRoot.
+// NewRootFromStore builds a root that reads one file at a time.
+func NewRootFromStore(store SourceStore) *sfvm.PatternRoot {
+	if store == nil {
+		return NewRoot(nil)
+	}
+	root := sfvm.NewPatternRoot(nil)
+	root.SetFileSource(store.Paths(), func(path string) (string, error) {
+		content, release, err := store.Read(path)
+		if release != nil {
+			defer release()
+		}
+		if err != nil {
+			return "", err
+		}
+		return content, nil
+	})
+	root.SetFileFilterMatcher(MatchFileFilter)
+	return root
+}
+
+// NewRootFromFS lists fsys and reads file bodies on demand.
 func NewRootFromFS(fsys fi.FileSystem) (*sfvm.PatternRoot, error) {
-	files, err := LoadFilesFromFS(fsys)
+	store, err := OpenStreamingSource(fsys, nil, DefaultSourceInFlight)
 	if err != nil {
 		return nil, err
 	}
-	return NewRoot(files), nil
+	return NewRootFromStore(store), nil
+}
+
+func fileBodies(root *sfvm.PatternRoot, files map[string]string) ([]string, func(string) (string, error)) {
+	if len(files) > 0 {
+		paths := make([]string, 0, len(files))
+		for p := range files {
+			paths = append(paths, p)
+		}
+		sort.Strings(paths)
+		return paths, func(p string) (string, error) { return files[p], nil }
+	}
+	if root != nil && len(root.FilePaths()) > 0 {
+		return root.FilePaths(), root.FileContent
+	}
+	return nil, func(string) (string, error) { return "", utils.Error("sfpattern: no source files") }
 }
 
 // Hit is a raw match before wrapping as SimpleValue.
@@ -140,7 +180,7 @@ func matchRegexp(root *sfvm.PatternRoot, files map[string]string, pathPattern st
 	hits, cached := root.SourceHits(key)
 	if !cached {
 		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, patterns)
+		hits, err = scanRegexpHits(root, files, pathPattern, patterns)
 		if err != nil {
 			return nil, err
 		}
@@ -173,6 +213,7 @@ func sourceHitsToValues(root *sfvm.PatternRoot, hits []Hit) (sfvm.Values, error)
 			root.SourceHitEditor(h.Path),
 		)
 		sv.SetFiles(root.Files())
+		sv.SetFileReader(root.FileReader())
 		vals = append(vals, sv)
 	}
 	return sfvm.NewValues(vals), nil
@@ -184,6 +225,10 @@ func sourceHitKey(pathPattern string, patterns []string) string {
 
 // MatchRegexpHits returns raw hits (for tests / callers that skip ValueOperator).
 func MatchRegexpHits(files map[string]string, pathPattern string, patterns []string) ([]Hit, error) {
+	return scanRegexpHits(nil, files, pathPattern, patterns)
+}
+
+func scanRegexpHits(root *sfvm.PatternRoot, files map[string]string, pathPattern string, patterns []string) ([]Hit, error) {
 	if pathPattern == "" {
 		return nil, utils.Error("sfpattern: empty path pattern")
 	}
@@ -193,11 +238,16 @@ func MatchRegexpHits(files map[string]string, pathPattern string, patterns []str
 		return nil, utils.Error("sfpattern: no content patterns")
 	}
 
+	paths, read := fileBodies(root, files)
 	var hits []Hit
 	matchedFile := false
-	for filePath, content := range files {
+	for _, filePath := range paths {
 		if !matchFile(filePath) {
 			continue
+		}
+		content, err := read(filePath)
+		if err != nil {
+			return nil, err
 		}
 		matchedFile = true
 		for _, idx := range matchContent(content) {
@@ -206,7 +256,7 @@ func MatchRegexpHits(files map[string]string, pathPattern string, patterns []str
 			}
 			hits = append(hits, Hit{
 				Path:  filePath,
-				Text:  content[idx.Start:idx.End],
+				Text:  detachString(content[idx.Start:idx.End]),
 				Start: idx.Start,
 				End:   idx.End,
 			})
