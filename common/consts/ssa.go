@@ -46,10 +46,12 @@ const (
 	// starts at the large-database tier.
 	ssaSQLiteCacheKiB  int64 = 256 * 1024
 	ssaSQLiteMmapBytes int64 = 512 * 1024 * 1024
-	// 0 disables automatic checkpoints (sqlite.org: zero or negative turns
-	// wal_autocheckpoint off). Repeated checkpoints were copying the growing
-	// database back onto the slow disk; the compile folds the WAL once at the end.
-	ssaSQLiteWALAutocheckpoint = 0
+	// 100000 pages is about 400MB. hue-cache-01 checkpointed every ~80MB and
+	// rewrote the growing file (2127s). Turning the checkpoint off entirely
+	// (hue-wal-01) let the WAL reach 13GB and made compile reads slower, so the
+	// run was already behind at review 100%. 400MB is the middle: fewer copies
+	// than 80MB, without a multi-gigabyte WAL for readers to scan.
+	ssaSQLiteWALAutocheckpoint = 100000
 )
 
 var (
