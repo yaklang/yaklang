@@ -16,7 +16,7 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestStartScan_SourceRuntimeEquivalence(t *testing.T) {
+func TestStartScan_SourceRuntimeMatchesStandaloneQueries(t *testing.T) {
 	bodies := []string{
 		`${*.txt}.pattern_regex(/key/) as $hit
 alert $hit`,
@@ -28,39 +28,55 @@ alert $hit`,
 $ctx.regexp(/flag/) as $hit
 alert $hit`,
 	}
-	run := func(enabled bool) []string {
-		var mu sync.Mutex
-		var actual []string
-		options := []ssaconfig.Option{
-			WithSourceScanRuntime(enabled),
-			WithSourceFiles("left", map[string]string{"a.txt": `"key" key require flag`, "ignored.go": "key"}),
-			WithSourceFiles("right", map[string]string{"b.txt": "你好key key"}),
-			ssaconfig.WithScanConcurrency(4),
-			ssaconfig.WithSyntaxFlowMemory(true),
-			WithScanResultCallback(func(batch *ScanResult) {
-				if batch == nil || batch.Result == nil {
-					return
-				}
-				mu.Lock()
-				defer mu.Unlock()
-				for _, risk := range batch.Result.GetRisks() {
-					actual = append(actual, fmt.Sprintf("%s:%s:%s:%s", risk.Title, risk.CodeSourceUrl, risk.CodeRange, risk.CodeFragment))
-				}
-			}),
-		}
-		for i, body := range bodies {
-			options = append(options, ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
-				RuleName: fmt.Sprintf("source-runtime-%d", i),
-				Content:  fmt.Sprintf("desc(mode: \"source\", language: general, title: \"runtime-%d\")\n%s", i, body),
-			}))
-		}
-		require.NoError(t, StartScan(context.Background(), options...))
-		sort.Strings(actual)
-		return actual
+	targets := []struct {
+		name  string
+		files map[string]string
+	}{
+		{"left", map[string]string{"a.txt": `"key" key require flag`, "ignored.go": "key"}},
+		{"right", map[string]string{"b.txt": "你好key key"}},
 	}
-	baseline := run(false)
+	var baseline []string
+	for i, body := range bodies {
+		content := fmt.Sprintf("desc(mode: \"source\", language: general, title: \"runtime-%d\")\n%s", i, body)
+		for _, target := range targets {
+			res, err := ssaapi.NewSourceQueryTarget(target.name, target.files).SyntaxFlowWithError(content, ssaapi.QueryWithMemory())
+			require.NoError(t, err)
+			for _, risk := range res.GetRisks() {
+				baseline = append(baseline, fmt.Sprintf("%s:%s:%s:%s", risk.Title, risk.CodeSourceUrl, risk.CodeRange, risk.CodeFragment))
+			}
+		}
+	}
+	sort.Strings(baseline)
 	require.Len(t, baseline, 8)
-	require.Equal(t, baseline, run(true), "risks, source paths, ranges and fragments must remain identical")
+
+	var mu sync.Mutex
+	var actual []string
+	options := []ssaconfig.Option{
+		ssaconfig.WithScanConcurrency(4),
+		ssaconfig.WithSyntaxFlowMemory(true),
+		WithScanResultCallback(func(batch *ScanResult) {
+			if batch == nil || batch.Result == nil {
+				return
+			}
+			mu.Lock()
+			defer mu.Unlock()
+			for _, risk := range batch.Result.GetRisks() {
+				actual = append(actual, fmt.Sprintf("%s:%s:%s:%s", risk.Title, risk.CodeSourceUrl, risk.CodeRange, risk.CodeFragment))
+			}
+		}),
+	}
+	for _, target := range targets {
+		options = append(options, WithSourceFiles(target.name, target.files))
+	}
+	for i, body := range bodies {
+		options = append(options, ssaconfig.WithRuleInput(&ypb.SyntaxFlowRuleInput{
+			RuleName: fmt.Sprintf("source-runtime-%d", i),
+			Content:  fmt.Sprintf("desc(mode: \"source\", language: general, title: \"runtime-%d\")\n%s", i, body),
+		}))
+	}
+	require.NoError(t, StartScan(context.Background(), options...))
+	sort.Strings(actual)
+	require.Equal(t, baseline, actual, "risks, source paths, ranges and fragments must remain identical")
 }
 
 func TestStartScan_SourceRuntimeBatchedBranches(t *testing.T) {
@@ -119,12 +135,4 @@ func TestPrepareSourceRuntimes_PreservesRuleOrderAndTargetIsolation(t *testing.T
 		restored = append(restored, rule)
 	}
 	require.Equal(t, rules, restored, "resume task indices depend on original rule order")
-}
-
-func TestSourceRuntimeSwitchForwardsToProductStages(t *testing.T) {
-	cfg, err := NewConfig(WithSourceScanRuntime(false))
-	require.NoError(t, err)
-	stage, err := NewConfig(sharedScanCallbackOptions(cfg)...)
-	require.NoError(t, err)
-	require.True(t, stage.disableSourceScanRuntime)
 }

@@ -1514,10 +1514,6 @@ Exports structured report (sarif/irify).`,
 			Name:  "mode",
 			Usage: "product scan stages, stacked: source, struct, ssa. Repeat or comma-separate, e.g. --mode source --mode struct. code-scan defaults to all three; the ScanProject primitive defaults to compile-only when no mode is given",
 		},
-		cli.BoolFlag{
-			Name:  "disable-source-scan-runtime",
-			Usage: "use the legacy per-rule file regexp matcher instead of the shared source pre-scan",
-		},
 
 		cli.StringFlag{
 			Name:  "debug",
@@ -1646,10 +1642,6 @@ Exports structured report (sarif/irify).`,
 			modes = []string{syntaxflow_scan.SourceMode, syntaxflow_scan.StructMode, syntaxflow_scan.SSAMode}
 		}
 		scanOpt = append(scanOpt, syntaxflow_scan.WithMode(modes...))
-		if c.Bool("disable-source-scan-runtime") {
-			scanOpt = append(scanOpt, syntaxflow_scan.WithSourceScanRuntime(false))
-			log.Infof("[code-scan] source pre-scan disabled; using legacy file matchers")
-		}
 
 		scanOpt = append(scanOpt,
 			syntaxflow_scan.WithReporter(reportInstance),

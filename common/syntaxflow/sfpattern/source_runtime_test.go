@@ -7,11 +7,13 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/minirehs"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 func sourceFrames(t testing.TB, bodies ...string) []*sfvm.SFFrame {
@@ -288,4 +290,69 @@ func BenchmarkSourceScanRuntime(b *testing.B) {
 			}
 		}
 	})
+}
+
+type scriptedSource struct {
+	reads atomic.Int64
+	files map[string]string
+	fail  map[string]error
+	paths []string
+	body  *memedit.SafeString
+	share string
+}
+
+func (s *scriptedSource) Paths() []string { return s.paths }
+
+func (s *scriptedSource) Read(path string) (string, func(), error) {
+	s.reads.Add(1)
+	if err := s.fail[path]; err != nil {
+		return "", func() {}, err
+	}
+	content, ok := s.files[path]
+	if !ok {
+		return "", func() {}, fmt.Errorf("missing %s", path)
+	}
+	return content, func() {}, nil
+}
+
+func (s *scriptedSource) SharedBody(path string) (*memedit.SafeString, bool) {
+	if s.body != nil && path == s.share {
+		return s.body, true
+	}
+	return nil, false
+}
+
+func TestSourceScanRuntime_ReusesOneBody(t *testing.T) {
+	shared := memedit.NewSafeString("key once")
+	store := &scriptedSource{
+		files: map[string]string{
+			"a.txt":     "key key",
+			"empty.txt": "",
+			"owned.txt": "key once",
+		},
+		fail:  map[string]error{"bad.txt": fmt.Errorf("boom")},
+		paths: []string{"a.txt", "empty.txt", "bad.txt", "owned.txt"},
+		body:  shared,
+		share: "owned.txt",
+	}
+	frames := sourceFrames(t, `${*}.pattern_regex(/key/) as $hit
+alert $hit`)
+	plan, err := NewSourceScanPlan(frames)
+	require.NoError(t, err)
+	defer plan.Close()
+	runtime := plan.StartStore(context.Background(), store)
+	defer runtime.Close()
+	require.NoError(t, runtime.Wait(context.Background()))
+
+	text, raw, err := runtime.body("empty.txt")
+	require.NoError(t, err)
+	require.Empty(t, text)
+	require.NotNil(t, raw)
+	_, _, err = runtime.body("bad.txt")
+	require.EqualError(t, err, "boom")
+	_, owned, err := runtime.body("owned.txt")
+	require.NoError(t, err)
+	require.True(t, memedit.NewMemEditorFromSafeString(shared, "owned.txt").SameSource(
+		memedit.NewMemEditorFromSafeString(owned, "owned.txt")))
+	require.Equal(t, int64(3), store.reads.Load(), "an owned body is not read again, and a failed read stays cached")
 }

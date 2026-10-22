@@ -15,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 )
 
 // countingFS records ReadFile calls so a test can prove the scan does not open
@@ -101,6 +102,48 @@ alert $hit`)
 	require.LessOrEqual(t, max, 2)
 	require.Equal(t, int64(6), store.ReadCount())
 	require.LessOrEqual(t, store.MaxInFlight(), 2)
+}
+
+func TestStreamingSource_RuntimeReusesOneBodyAcrossRules(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("a.txt", "alpha second\n")
+	vfs.AddFile("b.txt", "alpha second\n")
+	vfs.AddFile("c.txt", "alpha second\n")
+	vfs.AddFile("note.md", "second\n")
+	counted := &countingFS{FileSystem: vfs}
+	store, err := OpenStreamingSource(counted, nil, 2)
+	require.NoError(t, err)
+	frames := sourceFrames(t,
+		`${*.txt}.pattern_regex(/alpha/) as $hit
+alert $hit`,
+		`${*.txt}.pattern_regex(/alpha/) as $ctx
+$ctx.regexp(/second/) as $hit
+alert $hit`,
+	)
+	plan, err := NewSourceScanPlan(frames)
+	require.NoError(t, err)
+	defer plan.Close()
+	runtime := plan.StartStore(context.Background(), store)
+	defer runtime.Close()
+	require.NoError(t, runtime.Wait(context.Background()))
+
+	var editors []*memedit.MemEditor
+	for _, frame := range frames {
+		root := NewRootFromStore(store)
+		root.SetFileFilterMatcher(runtime.Matcher(context.Background()))
+		_, err := frame.Feed(sfvm.ValuesOf(root))
+		require.NoError(t, err)
+		_, err = root.FileFilter("*.md", "regexp", nil, []string{"second"})
+		require.NoError(t, err)
+		editor := root.SourceHitEditor("a.txt")
+		require.NotNil(t, editor)
+		editors = append(editors, editor)
+	}
+	reads, _ := counted.snapshot()
+	require.Equal(t, 4, reads, "each file is read once through the filesystem")
+	require.Equal(t, int64(4), store.ReadCount())
+	require.NotSame(t, editors[0], editors[1])
+	require.True(t, editors[0].SameSource(editors[1]))
 }
 
 func TestStreamingSource_VirtualZipAndDirMatch(t *testing.T) {
