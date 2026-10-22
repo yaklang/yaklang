@@ -121,6 +121,14 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			for idx := classEnd - 1; idx > 0; idx-- {
 				pkgName := strings.Join(pkgNames[:idx], ".")
 				candidateClassName := strings.Join(pkgNames[idx:classEnd], ".")
+				if deferForeignPackage && y.packageIsCompileUnit(pkgName) {
+					unitLibrary = true
+					if lib, _ := y.GetProgram().GetLibrary(pkgName); tryLibrary(lib, candidateClassName, false) {
+						break
+					}
+					ownerBusy = true
+					break
+				}
 				// The post-skeleton link runs after the owner finished. The unit
 				// library already exists; compiling the directory again duplicates
 				// the class. hasFile is not existence.
@@ -177,25 +185,26 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 			for idx := len(pkgNames) - 1; idx > 0; idx-- {
 				className = strings.Join(pkgNames[idx:], ".")
 				pkgName := strings.Join(pkgNames[:idx], ".")
-				// Pass1, and only for a package this project is still compiling.
-				// The scheduler creates that library before its classes exist, and
-				// fakeImportType would plant an empty blueprint the real declaration
-				// then reuses. A virtual library created for an earlier external
-				// import is not one of those packages: later classes from the same
-				// import list still have to be recorded.
+				// The scheduler owns every project unit, including units whose
+				// library has not been created yet. Recursively compiling one here
+				// would declare its methods again when its scheduled task starts.
+				// Link missing project types after all skeletons are available;
+				// external imports still use the directory/virtual fallback below.
 				if deferForeignPackage && y.packageIsCompileUnit(pkgName) {
-					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil && !hasImportType(lib, className) {
-						unitLibrary = true
+					unitLibrary = true
+					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil && (all || hasImportType(lib, className)) {
+						prog = lib
+					} else {
 						ownerBusy = true
-						break
 					}
+					break
 				}
 				// Post-skeleton: do not compile a package the unit scheduler
 				// already owns. A second build shows up as an extra typeName.
 				if resolveStaticTypes {
 					if lib, _ := y.GetProgram().GetLibrary(pkgName); lib != nil {
 						unitLibrary = true
-						if hasImportType(lib, className) {
+						if all || hasImportType(lib, className) {
 							prog = lib
 							break
 						}
@@ -252,6 +261,13 @@ func (y *singleFileBuilder) visitCapturedImportDeclarations(decls []javaImportDe
 		// get class
 		if all {
 			_ = y.GetProgram().ImportAll(prog)
+			// Project declarations use ExportType; ImportAll also supports the
+			// legacy external-type map, which does not contain these skeletons.
+			if prog.ExportType != nil {
+				for name := range prog.ExportType.GetAll() {
+					_ = y.GetProgram().ImportTypeFromLib(prog, name, pkgImport.token)
+				}
+			}
 		} else {
 			_ = y.GetProgram().ImportTypeFromLib(prog, className, pkgImport.token)
 		}
