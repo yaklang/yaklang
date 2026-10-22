@@ -294,6 +294,11 @@ func snapshotSubAgentConfig(parent *aicommon.Config, contextMode ...string) []ai
 // 不得继承 plan / goal mode / dispatch / increase iteration。
 func buildSubAgentStrategyOptions() []aicommon.ConfigOption {
 	return []aicommon.ConfigOption{
+		aicommon.WithAllowRequireForUserInteract(false),
+		func(c *aicommon.Config) error {
+			c.SetClarificationPolicy(func() (bool, bool, int64) { return false, false, 0 })
+			return nil
+		},
 		aicommon.WithEnablePlanAndExec(false),
 		aicommon.WithEnableGoalMode(false),
 		aicommon.WithPreferDispatchSubReactAgents(false),

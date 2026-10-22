@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -28,7 +29,7 @@ func TestUIQuestionActionRegistrationHonorsSessionPolicy(t *testing.T) {
 			require.NoError(t, err)
 			loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, react)
 			require.NoError(t, err)
-			for _, name := range []string{"request_user_input_async", "request_user_input"} {
+			for _, name := range []string{"ask_for_clarification_async", "ask_for_clarification"} {
 				_, err := loop.GetActionHandler(name)
 				if allow {
 					require.NoError(t, err, name)
@@ -88,4 +89,54 @@ func TestUIAnswersSteerRunningTaskAndQueueLateReplies(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestClarificationGoalAndSubagentVisibility(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableGoalMode(true), aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	require.NoError(t, err)
+	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r)
+	require.NoError(t, err)
+	require.Contains(t, loop.GetAllActionNames(), "ask_for_clarification_async")
+	require.NotContains(t, loop.GetAllActionNames(), "ask_for_clarification")
+	require.NotContains(t, loop.GetAllActionNames(), "request_user_input")
+	loop.Set(reactloops.SubAgentDepthLoopVar, 1)
+	require.NotContains(t, loop.GetAllActionNames(), "ask_for_clarification_async")
+	_, err = loop.GetActionHandler("ask_for_clarification_async")
+	require.Error(t, err)
+}
+
+func TestLegacyClarificationUsesRichLifecycleWhenSupported(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	requests := make(chan interaction.QuestionRequest, 1)
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`), aicommon.WithEventHandler(func(e *schema.AiOutputEvent) {
+		if e.Type == "ui_question" {
+			var q interaction.QuestionRequest
+			if json.Unmarshal(e.Content, &q) == nil && q.State == "pending" {
+				requests <- q
+			}
+		}
+	}))
+	require.NoError(t, err)
+	done := make(chan string, 1)
+	go func() { done <- r.AskForClarification(ctx, "请选择范围", []string{"前端", "后端"}) }()
+	var q interaction.QuestionRequest
+	select {
+	case q = <-requests:
+	case <-time.After(3 * time.Second):
+		t.Fatal("rich question was not emitted")
+	}
+	require.Equal(t, "blocking", q.Mode)
+	raw, _ := json.Marshal(interaction.Submission{ID: "legacy-answer", Source: "questionnaire", RequestID: q.ID, Answers: []interaction.Answer{{QuestionID: "clarification", Selected: []string{"2"}}}})
+	cfg := r.GetConfig().(*aicommon.Config)
+	require.NoError(t, cfg.AcceptQuestionAnswer(&ypb.AIInputEvent{UserInteraction: string(raw)}, func(string, string, *aicommon.Config) (string, error) { return "", nil }))
+	select {
+	case answer := <-done:
+		require.Contains(t, answer, "后端")
+	case <-time.After(3 * time.Second):
+		t.Fatal("blocking call did not resume")
+	}
+	require.ErrorContains(t, cfg.CheckClarificationAllowed("", false), "limit")
 }
