@@ -2350,7 +2350,9 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 
 		if lib != nil && path != "" {
 			if _, ok := lib.GetExportType(libName); !ok {
-				if err := b.GetProgram().ImportTypeFromLib(lib, libName, iqul); err != nil {
+				// Go names the type at its use site, not in a declaration header. Passing
+				// no token keeps the shared external type free of the first importer.
+				if err := b.GetProgram().ImportTypeFromLib(lib, libName, nil); err != nil {
 					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
 				}
 			}
@@ -2359,7 +2361,7 @@ func (b *astbuilder) buildTypeName(tname *gol.TypeNameContext) ssa.Type {
 			if ok {
 				return exportType
 			} else { // 找到包但没有找到类型，可能是包中引用了golang库
-				if err := b.GetProgram().ImportTypeFromLib(lib, typName, iqul); err != nil {
+				if err := b.GetProgram().ImportTypeFromLib(lib, typName, nil); err != nil {
 					b.NewError(ssa.Warn, TAG, "get namespace type fail: %s", err)
 				}
 			}
