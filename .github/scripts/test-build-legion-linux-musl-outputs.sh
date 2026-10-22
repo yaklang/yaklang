@@ -74,7 +74,7 @@ case "$(basename "$0")" in
       *) [ "${MUSL_OUTPUT_TEST_FAILURE:-}" != verify ] || exit 42 ;;
     esac ;;
   strings) : ;;
-  apk) echo musl-1.2.5-r11 ;;
+  apk) echo musl-1.2.5-r12 ;;
   jq)
     if [ "${MUSL_OUTPUT_TEST_FAILURE:-}" = metadata ]; then
       printf '{incomplete'
