@@ -242,8 +242,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "8106ba6c0070a676a75fb9a51663cf476ce515b7e725c35d896118f9c1571caa",
-    "version": "20261022.0001"
+    "hash": "5e959ebaff4b249db501db62b9dd5887fe1b24025d24e9a042f9902603b52f69",
+    "version": "20261022.0002"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -1058,8 +1058,8 @@
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
     "rule_name": "检测Java配置文件中不当的密码配置",
-    "hash": "57a21c563e43f60fdf4772cd6c8b8460263eec084c091d2a3791ccb852d5aaad",
-    "version": "20260901.0001"
+    "hash": "b4b0b85247e145553015f676aa791f2348314867374b0984f23a494c80271801",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "b717bf17-1dee-4b38-b048-61aaaf1957a1",
