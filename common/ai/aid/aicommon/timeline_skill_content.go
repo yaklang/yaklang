@@ -313,6 +313,9 @@ type SkillContextPart struct {
 	ReachedEnd bool
 	// TokenCount 累加该部分仍在 Open 或已提升的正文，不计渲染标签与目录。
 	TokenCount int
+	// Content 是该部分仍在 Open 或已提升的正文。同一路径和范围存在多个不同
+	// 版本时，在可见结果中按 Timeline 顺序保留。
+	Content string
 }
 
 // VisibleSkillParts 返回目标技能当前仍可见的 metadata 和 content。
@@ -380,6 +383,10 @@ func (m *Timeline) VisibleSkillParts(name string) []SkillContextPart {
 			frozenHashes[identity] = hash
 		}
 		parts[position].TokenCount += MeasureTokens(payload.Content)
+		if parts[position].Content != "" {
+			parts[position].Content += "\n"
+		}
+		parts[position].Content += payload.Content
 	}
 	sort.Slice(parts, func(i, j int) bool {
 		if parts[i].Name != parts[j].Name {
@@ -735,7 +742,7 @@ func (a *SkillContentTimelineAdapter) VisibleSkillParts(name string) []aiskilllo
 		out = append(out, aiskillloader.SkillContextPart{
 			Name: part.Name, Kind: part.Kind, Path: part.Path,
 			StartLine: part.StartLine, EndLine: part.EndLine, Total: part.Total, ReachedEnd: part.ReachedEnd,
-			TokenCount: part.TokenCount,
+			TokenCount: part.TokenCount, Content: part.Content,
 		})
 	}
 	return out
