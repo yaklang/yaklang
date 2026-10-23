@@ -147,7 +147,7 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 			schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 		}
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
-		if dialect == damenggorm.Dialect && db.Error != nil {
+		if db.Error != nil {
 			_ = db.Close()
 			return nil, db.Error
 		}
