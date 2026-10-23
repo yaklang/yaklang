@@ -18,6 +18,7 @@
 - 15 条静态归属重放：13 条已生成。`a/ct` 与 `module/n` 仍拒绝。本机 javac：限定名、static import、两个单类型 import 都非法；另一个同名类型自己也不能写限定名。简单名被占时不再把调用绑到错误类型。
 - 全量 `051047`（二进制 `b8d01f6063a4c69b…`，exit=1）：语法失败 54→25，空单元 0，FrontendRaw 失败 0，stub 1635。25 条构成：jaxb 编译器协议 13、常量体身份 5（Comparison 两份、es、dq、ez）、Comparators$1 三份、静态归属 2、Groovy 构造来源 2。未新增 suppression。
 - 2026-10-23 11:2x 定向重放（不是全量）：5 条常量体身份已生成，提交 `3a31605`。混淆器把常量体改成无关类名并删掉 InnerClasses/EnclosingMethod 后，共享 marker 只留在构造器描述符的 `L<marker>;` 里，常量池没有对应 CONSTANT_Class。`eu.class`（266 字节）即此形状。无嵌套行时不再要求 marker 的 Class 项；有行时仍拒绝指向其它类的行。`TestRenamedEnumConstantBodyWithoutNestingRows` 在去掉这条放行时失败、恢复后通过（javac 重编译 + driver）。`audit/replay-const5-fix2`：Comparison 两份、es、dq、ez 均为 emitted，LE/LT 方向与字节码一致。jaxb 7 条仍拒绝。未跑新全量，台账勾选不改。
+- 同日 javac `--release 8`（`audit/obscure3`）：`a/ct` 要同时写出 `cn.mailtech.utils.g.a` 和返回类型 `cn.mailtech.cm.preview.g`。同包类 `a.cn` 让这两条限定名都非法；两个单类型 import 报 `a type with the same simple name is already defined`。只 import `utils.g` 时，限定的 `preview.g` 是 `cannot find symbol`。`module/n` 的目标包根 `a` 被同包类 `module/a` 挡住，编译单元自己又声明了 `n`，不能再 import `a.n`。这两条保持拒绝，没有放宽证书。
 
 证据根：`/mnt/data/scan-outputs/coremail-2b-v2-20261023/audit/`。原不安全工作区补丁及测试保存在 workspace `build/backup/coremail-2b-audit-20261023-0406/`，未删除历史证据。
 
