@@ -44,6 +44,9 @@ type TagInfo struct {
 	typ   TagType
 	attrs map[string]string
 	funcs []func()
+	// deferBody means c:forTokens saw <jsp:attribute>/<jsp:body>. The
+	// loop is emitted after those children fill attrs, not before.
+	deferBody bool
 }
 
 func newTagInfo(tag TagType) *TagInfo {
@@ -84,6 +87,16 @@ func (y *JSPVisitor) EmitAttrFunc() {
 	}
 	for _, f := range tagInfo.funcs {
 		f()
+	}
+}
+
+func tagUsesFragmentAttrs(t TagType) bool {
+	switch t {
+	case JSP_TAG_CORE_OUT, JSP_TAG_CORE_SET, JSP_TAG_CORE_IF, JSP_TAG_CORE_WHEN,
+		JSP_TAG_CORE_FOREACH, JSP_TAG_CORE_FOR_TOKENS, JSP_TAG_CORE_IMPORT, JSP_TAG_CORE_URL:
+		return true
+	default:
+		return false
 	}
 }
 
