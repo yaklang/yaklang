@@ -60,9 +60,9 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 			currentBuilder := b.FunctionBuilder
 			b.FunctionBuilder = subBuilder
 			defer func() {
-				for _, e := range subBuilder.GetProgram().GetErrors() {
-					currentBuilder.GetProgram().AddError(e)
-				}
+				// Library programs share the application's error list; re-adding the
+				// whole list here doubled it on every built file.
+				currentBuilder.GetProgram().CopyErrorsFrom(subBuilder.GetProgram())
 				b.FunctionBuilder = currentBuilder
 			}()
 		}
@@ -126,9 +126,9 @@ func (b *builder) VisitSourceFile(sourcefile *ast.SourceFile) interface{} {
 		currentBuilder := b.FunctionBuilder
 		b.FunctionBuilder = subBuilder
 		defer func() {
-			for _, e := range subBuilder.GetProgram().GetErrors() {
-				currentBuilder.GetProgram().AddError(e)
-			}
+			// Library programs share the application's error list; re-adding the
+			// whole list here doubled it on every built file.
+			currentBuilder.GetProgram().CopyErrorsFrom(subBuilder.GetProgram())
 			b.FunctionBuilder = currentBuilder
 		}()
 	}
