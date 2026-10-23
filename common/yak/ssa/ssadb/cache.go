@@ -183,6 +183,10 @@ func ExistsIrCodeById(db *gorm.DB, progName string, id int64) bool {
 			return true
 		}
 	}
+	if irCodeIdentitySuspended.Load() {
+		_, ok := lookupIrCodeRowID(progName, id)
+		return ok
+	}
 	var count int64
 	if err := db.Model(&IrCode{}).
 		Where("program_name = ? AND code_id = ?", progName, id).

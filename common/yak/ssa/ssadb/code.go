@@ -177,6 +177,11 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
+	// Without the unique (program_name, code_id) index, ON CONFLICT has no
+	// target. Inserts append by rowid and updates use the remembered rowid.
+	if irCodeIdentitySuspended.Load() {
+		return saveIrCodesWithoutIdentityIndex(db, items)
+	}
 	if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
 	}
