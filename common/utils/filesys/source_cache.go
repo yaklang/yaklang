@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/yaklang/yaklang/common/log"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -50,12 +51,15 @@ type SourceMaterializer struct {
 	mu       sync.Mutex
 	inflight map[string]*materializeCall
 
-	hits       atomic.Int64
-	misses     atomic.Int64
-	diskHits   atomic.Int64
-	errors     atomic.Int64
-	loadedB    atomic.Int64
-	prefetched atomic.Int64
+	hits        atomic.Int64
+	misses      atomic.Int64
+	diskHits    atomic.Int64
+	errors      atomic.Int64
+	loadedB     atomic.Int64
+	prefetched  atomic.Int64
+	baseReadNS  atomic.Int64
+	storeNS     atomic.Int64
+	diskWriteNS atomic.Int64
 }
 
 type materializeCall struct {
@@ -180,7 +184,9 @@ func (m *SourceMaterializer) produce(base fi.FileSystem, name string) ([]byte, e
 		m.store(name, data)
 		return data, nil
 	}
+	started := time.Now()
 	data, err := base.ReadFile(name)
+	m.baseReadNS.Add(time.Since(started).Nanoseconds())
 	if err != nil {
 		m.errors.Add(1)
 		return nil, err
@@ -203,6 +209,8 @@ func (m *SourceMaterializer) store(name string, data []byte) {
 	if m.overlay == nil || len(data) == 0 {
 		return
 	}
+	started := time.Now()
+	defer func() { m.storeNS.Add(time.Since(started).Nanoseconds()) }()
 	m.overlayMu.Lock()
 	// VirtualFS.AddFile keeps the first content it sees and silently ignores a
 	// later write of the same path. That breaks the JSP flow, which reads the raw
@@ -245,6 +253,8 @@ func (m *SourceMaterializer) writeDisk(name string, data []byte) {
 	if target == "" || len(data) == 0 {
 		return
 	}
+	started := time.Now()
+	defer func() { m.diskWriteNS.Add(time.Since(started).Nanoseconds()) }()
 	if m.maxDisk > 0 && m.diskBytes.Load() > m.maxDisk {
 		return
 	}
@@ -351,6 +361,12 @@ type SourceMaterializerStats struct {
 	Prefetched int64
 	Loaded     int64 // bytes held in the virtual tree
 	Paths      int64
+	// Worker durations overlap under parallel prefetch; never add these to
+	// wall-clock phase durations. BaseRead includes archive I/O + decompilation.
+	BaseReadSeconds  float64
+	StoreSeconds     float64
+	DiskWriteSeconds float64
+	DiskWriteBytes   int64
 }
 
 // Stats reports the current counters.
@@ -359,13 +375,17 @@ func (m *SourceMaterializer) Stats() SourceMaterializerStats {
 		return SourceMaterializerStats{}
 	}
 	return SourceMaterializerStats{
-		Hits:       m.hits.Load(),
-		Misses:     m.misses.Load(),
-		DiskHits:   m.diskHits.Load(),
-		Errors:     m.errors.Load(),
-		Prefetched: m.prefetched.Load(),
-		Loaded:     m.loadedB.Load(),
-		Paths:      m.pathCount.Load(),
+		Hits:             m.hits.Load(),
+		Misses:           m.misses.Load(),
+		DiskHits:         m.diskHits.Load(),
+		Errors:           m.errors.Load(),
+		Prefetched:       m.prefetched.Load(),
+		Loaded:           m.loadedB.Load(),
+		Paths:            m.pathCount.Load(),
+		BaseReadSeconds:  float64(m.baseReadNS.Load()) / float64(time.Second),
+		StoreSeconds:     float64(m.storeNS.Load()) / float64(time.Second),
+		DiskWriteSeconds: float64(m.diskWriteNS.Load()) / float64(time.Second),
+		DiskWriteBytes:   m.diskBytes.Load(),
 	}
 }
 
@@ -414,6 +434,26 @@ func unwrapMaterializerBase(m *SourceMaterializer, base fi.FileSystem) fi.FileSy
 }
 
 var _ fi.FileSystem = (*materializedSourceFS)(nil)
+
+// ReleasePreparedSourceCaches releases producer scratch after every prepare
+// worker has joined. Reads already materialized in VirtualFS remain available;
+// a later uncached read can reconstruct producer caches. No read may overlap
+// this phase-boundary operation.
+func ReleasePreparedSourceCaches(fsys fi.FileSystem) {
+	for fsys != nil {
+		switch wrapper := fsys.(type) {
+		case *materializedSourceFS:
+			fsys = wrapper.FileSystem
+		case *UnifiedFS:
+			fsys = wrapper.GetFileSystem()
+		default:
+			if producer, ok := fsys.(interface{ ReleasePreparationCaches() }); ok {
+				producer.ReleasePreparationCaches()
+			}
+			return
+		}
+	}
+}
 
 // PrefetchWorkers returns the worker count for the pre-scan source
 // preparation. It uses the full compile concurrency from config (jar, zip,

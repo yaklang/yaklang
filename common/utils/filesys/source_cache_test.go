@@ -60,6 +60,27 @@ func seedSourceFS(t *testing.T, paths ...string) *countingSourceFS {
 	return fsys
 }
 
+type releasableSourceFS struct {
+	*countingSourceFS
+	released int
+}
+
+func (f *releasableSourceFS) ReleasePreparationCaches() { f.released++ }
+
+func TestReleasePreparedSourceCachesPreservesVirtualFS(t *testing.T) {
+	base := &releasableSourceFS{countingSourceFS: seedSourceFS(t, "a/B.java")}
+	materializer := NewSourceMaterializer()
+	fsys := WithMaterializedSources(NewUnifiedFS(base), materializer)
+	first, err := fsys.ReadFile("a/B.java")
+	require.NoError(t, err)
+	ReleasePreparedSourceCaches(fsys)
+	require.Equal(t, 1, base.released)
+	again, err := fsys.ReadFile("a/B.java")
+	require.NoError(t, err)
+	require.Equal(t, first, again)
+	require.Equal(t, 1, base.readCount("a/B.java"), "released scratch must not force materialized sources to be produced twice")
+}
+
 // TestSourceMaterializerDecompilesOncePerPath is the core contract: a class is
 // read once even when several compile stages (and goroutines) ask for it.
 func TestSourceMaterializerDecompilesOncePerPath(t *testing.T) {

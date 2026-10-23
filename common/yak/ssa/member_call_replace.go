@@ -139,12 +139,18 @@ func ReplaceMemberCall(old, replacement Value) map[string]Value {
 				}
 			}
 			if utils.IsNil(toMember) {
-				// An undefined member has no payload to merge. Reuse it on the
-				// replacement instead of synthesizing a fresh undefined and deleting
-				// the old one: that create/delete pair indexes both instructions, and
-				// on a decompiled loop it ran once per historical pair until the
-				// process was tens of gigabytes into one file.
-				if member.GetOpcode() == SSAOpcodeUndefined {
+				// An undefined member has no payload to merge. Reuse it when the
+				// replacement is another unresolved object: synthesizing a fresh
+				// undefined and deleting the old one indexes both instructions, and
+				// on a decompiled loop that ran once per historical pair.
+				// A parameter (or parameter member) is not unresolved. Reading it
+				// creates the one ParameterMember the call site already promised;
+				// reusing the undefined would hide that member from every consumer.
+				// A phi is a merge: its member exists to join the edge members, so
+				// reading it is the point. Reusing the undefined would drop the merge.
+				if member.GetOpcode() == SSAOpcodeUndefined &&
+					!replacementBindsRealMember(replacement) &&
+					replacement.GetOpcode() != SSAOpcodePhi {
 					setMemberCallRelationship(replacement, key, member)
 					toMember = member
 				} else {
@@ -316,6 +322,22 @@ func snapshotMemberReplacementSources(root Value) map[int64]memberReplacementSou
 		sources[id] = source
 	}
 	return sources
+}
+
+// replacementBindsRealMember reports that reading a member of replacement
+// has a declared form (parameter member), so an undefined placeholder must
+// not be reused in its place.
+func replacementBindsRealMember(replacement Value) bool {
+	if utils.IsNil(replacement) {
+		return false
+	}
+	if _, ok := ToParameter(replacement); ok {
+		return true
+	}
+	if _, ok := ToParameterMember(replacement); ok {
+		return true
+	}
+	return false
 }
 
 func pickMemberKey(member, fallback Value) Value {
