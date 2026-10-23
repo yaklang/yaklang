@@ -58,6 +58,8 @@ func (r *ReAct) handleFreeValue(event *ypb.AIInputEvent) error {
 		err := r.config.AcceptQuestionAnswer(event, func(text, taskID string, origin *aicommon.Config) (string, error) {
 			if origin != nil {
 				stamp := time.Now()
+				// The ordinary input entry point journals into Timeline Open.
+				// Only the existing freeze transaction promotes it to SemiDynamic1.
 				history, err := r.config.AppendUserInputHistory(text, stamp)
 				if err != nil {
 					return "", err
