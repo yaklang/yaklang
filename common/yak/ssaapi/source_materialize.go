@@ -26,7 +26,7 @@ import (
 
 // sourceCacheFormatVersion must be bumped whenever the materialized source tree layout or
 // the decompiler contract changes in a way that invalidates a previously written cache.
-const sourceCacheFormatVersion = "v1"
+const sourceCacheFormatVersion = "v2"
 
 // decompilerGateEnv lists the decompiler kill-switches that change the emitted source. They
 // are part of the cache namespace so flipping one never serves sources produced under a
