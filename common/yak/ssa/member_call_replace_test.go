@@ -111,6 +111,27 @@ func TestReplaceMemberCallKeepsUndefinedMembers(t *testing.T) {
 	require.Equal(t, undefinedMember.GetId(), latest.GetId())
 }
 
+func TestReplaceMemberCallOnParameterCreatesParameterMember(t *testing.T) {
+	_, builder := newTestBuilder(t)
+	holder := emitObject(builder, "loop-phi")
+	parameter := builder.NewParam("t")
+	key := builder.EmitConstInst("a")
+	undefinedMember := builder.EmitValueOnlyDeclare("undefined-member")
+	setMemberCallRelationship(holder, key, undefinedMember)
+
+	result := ReplaceMemberCall(holder, parameter)
+
+	name := checkCanMemberCallExist(parameter, key).name
+	require.Contains(t, result, name)
+	updated := result[name]
+	member, ok := ToParameterMember(updated)
+	require.True(t, ok, "moving an unresolved member onto a parameter must create a parameter member, got %T", updated)
+	require.NotEqual(t, undefinedMember.GetId(), member.GetId())
+	latest, ok := GetLatestMemberByKey(parameter, key)
+	require.True(t, ok)
+	require.Equal(t, member.GetId(), latest.GetId())
+}
+
 func TestReplaceMemberCallMergesMemberWithoutResolvedOwner(t *testing.T) {
 	_, builder := newTestBuilder(t)
 
