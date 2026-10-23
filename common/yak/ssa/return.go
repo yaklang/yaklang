@@ -264,8 +264,10 @@ func (f *Function) Finish() {
 			program.Cache.CoolDownFunctionInstructions(f)
 		}
 	}()
-	f.EnterBlock = f.Blocks[0]
-	f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+	if len(f.Blocks) > 0 {
+		f.EnterBlock = f.Blocks[0]
+		f.ExitBlock = f.Blocks[len(f.Blocks)-1]
+	}
 
 	if f.DeferBlock != 0 {
 		block, ok := f.GetInstructionById(f.DeferBlock)

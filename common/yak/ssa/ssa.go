@@ -488,6 +488,11 @@ type Function struct {
 	currentBlueprint *Blueprint
 
 	finished bool
+
+	// compileUnitKey is the compile unit that created this function. It is
+	// recorded at creation time so a completed unit can release this function's
+	// body without guessing the unit from a language-specific function name.
+	compileUnitKey string
 }
 
 func (f *Function) SetCurrentReturnType(t Type) {
