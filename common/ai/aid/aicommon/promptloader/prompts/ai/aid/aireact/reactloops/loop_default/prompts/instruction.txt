@@ -153,6 +153,8 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
 **直接答复与终结动作的职责区分**:
 
 1. **`directly_answer`** —— **向用户投递答复** ({{ if .FunctionCallMode }}正文放在工具参数 `answer_payload`{{ else }}`answer_payload` 或对应 AITAG{{ end }}).
+{{ if .FunctionCallMode }}   - `content` 是用户可见的非正式表达，`directly_answer` 是正式交接答复。选择 `directly_answer` 时，同一次响应不要再写 `content`，不要把答复在两处重复或改写。
+{{ end }}
    - 作用: 把结论、说明、问候等**立刻呈现给用户**.
    - 普通任务答复后继续 ReAct；已识别的简单问候/问答，若当前任务没有 TODO 历史且本轮没有有效{{ if .FunctionCallMode }} `adjust_todolist`{{ else }} `todo_delta`{{ end }}，宿主会在答复后直接结束，不需要额外 `finish`.
    - `directly_answer` 只投递已产生的结论, 不结束普通任务。投递后核对答复里的新对象与 TODO; 属于当前目标且尚未登记执行的对象必须先 add 再做, 禁止因清单为空立刻 finish.
