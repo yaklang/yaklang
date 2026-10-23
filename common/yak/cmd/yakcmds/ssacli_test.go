@@ -295,3 +295,47 @@ func TestSSACompilePprofRequiresDebug(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "--pprof requires --debug")
 }
+
+// --ast-only parses source/prepared ASTs and stops before prehandler and SSA
+// body build. This allows fast verification of jar/jsp decompiler output and
+// parser correctness without paying for full SSA construction.
+func TestSSACompileAstOnlySucceedsOnValidJava(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(srcDir, "Valid.java"),
+		[]byte("package com.test;\npublic class Valid {\n  public int sum(int a, int b) { return a + b; }\n}\n"),
+		0o644,
+	))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", srcDir,
+		"--memory",
+		"--ast-only",
+	})
+	require.NoError(t, err)
+}
+
+// In ast-only mode, any syntax error rejected by the language parser must cause
+// the command to fail and report the parser error.
+func TestSSACompileAstOnlyFailsOnSyntaxError(t *testing.T) {
+	srcDir := t.TempDir()
+	require.NoError(t, os.WriteFile(
+		filepath.Join(srcDir, "Broken.java"),
+		[]byte("public class Broken { this is not valid java code !!! }"),
+		0o644,
+	))
+
+	app := cli.NewApp()
+	addCommands(app, yakcmds.SSACompilerCommands...)
+	err := app.Run([]string{
+		"yak", "ssa-compile",
+		"-t", srcDir,
+		"--memory",
+		"--ast-only",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "parse")
+}

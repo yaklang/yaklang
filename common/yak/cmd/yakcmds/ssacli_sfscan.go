@@ -425,6 +425,9 @@ func parseCompileConfigFromCli(c *cli.Context) (res *ssaCliConfig, err error) {
 	if entry := c.String("entry"); entry != "" {
 		opts = append(opts, ssaconfig.WithCompileEntryFiles(entry))
 	}
+	if c.Bool("ast-only") {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(true))
+	}
 
 	cfg, err := ssaconfig.NewCLIScanConfig(opts...)
 	if err != nil {
@@ -452,6 +455,9 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	opts = append(opts, ssaconfig.WithProjectRawLanguage(string(cfg.GetLanguage())))
 	if cfg.GetCompileMemory() || cfg.GetSyntaxFlowMemory() {
 		opts = append(opts, ssaconfig.WithCompileMemoryCompile(true))
+	}
+	if cfg.GetCompileAstOnly() {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(true))
 	}
 	if excludes := cfg.GetCompileExcludeFiles(); len(excludes) > 0 {
 		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludes...))
@@ -506,6 +512,9 @@ func applyCompileCliOverrides(cfg *ssaconfig.Config, cliCtx *cli.Context) error 
 			ssaconfig.WithCompileMemoryCompile(enable),
 			ssaconfig.WithSyntaxFlowMemory(enable),
 		)
+	}
+	if cliCtx.IsSet("ast-only") {
+		opts = append(opts, ssaconfig.WithCompileAstOnly(cliCtx.Bool("ast-only")))
 	}
 	if cliCtx.IsSet("no-save-risk") {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(cliCtx.Bool("no-save-risk")))
