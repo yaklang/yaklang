@@ -2,6 +2,7 @@ package ssa_compile_test
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path"
 	"regexp"
@@ -634,4 +635,30 @@ func TestExcludeFile(t *testing.T) {
 		require.NotContains(t, fileList, "/a/a.java")
 		require.NotContains(t, fileList, "/a/b.java")
 	})
+}
+
+// A Java webapp ships its classes inside .war/.jar archives and its UI inside
+// thousands of .js files. The score comparison alone picks js, and a js builder
+// never expands archives, so every class stayed invisible (coremail:
+// class/java=0 jsp=701). Archives must decide the language.
+func TestSSAAutoDetectivePrefersJavaWhenArchivesExist(t *testing.T) {
+	initDB.Do(func() {
+		yakit.InitialDatabase()
+	})
+
+	dir := t.TempDir()
+	require.NoError(t, os.WriteFile(path.Join(dir, "app.war"), []byte("PK\x03\x04"), 0o644))
+	for i := 0; i < 300; i++ {
+		require.NoError(t, os.WriteFile(path.Join(dir, fmt.Sprintf("m%d.js", i)), []byte("var a = 1;"), 0o644))
+	}
+
+	res, err := ssa_compile.ParseProjectWithAutoDetective(context.Background(), &ssa_compile.SSADetectConfig{
+		Target: dir,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Info)
+	cfg := res.Info.Config
+	require.Equal(t, "java", string(cfg.GetLanguage()))
+	require.True(t, cfg.GetCodeSourceJarRecursiveParse(),
+		"jar expansion must stay enabled: the detect plugin declares it default true")
 }
