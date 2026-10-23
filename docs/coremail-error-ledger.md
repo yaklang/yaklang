@@ -2,7 +2,7 @@
 
 ## 当前结论（2026-10-23 审计修正）
 
-**未完成。** 最近全量为 `122333`：语法失败 20，exit=1，stub 1635。20 条都是已单独证明写不出的（jaxb 13、`Comparators$1` 3、静态归属 2、Groovy 2），但都仍计入失败，没有加 suppression。没有以重放或子集代替验收；未跑 ekp、未 push。
+**未完成。** 最近全量为 `131834`：语法失败 20，exit=1，stub 1637。20 条都是已单独证明写不出的（jaxb 13、`Comparators$1` 3、静态归属 2、Groovy 2），但都仍计入失败，没有加 suppression。没有以重放或子集代替验收；未跑 ekp、未 push。
 
 上一轮“当前只剩约 5 条”已撤回：13 个 legacy `valueOf(String)` 被错误地显式写进 enum，javac 报 duplicate method；23 个缺词法元数据类曾被随意补无界泛型，可能改变物理描述符。这两条放行已撤回，原协议反例仍拒绝。
 
@@ -20,6 +20,7 @@
 - 15 条静态归属重放：13 条已生成。`a/ct` 与 `module/n` 仍拒绝。本机 javac：限定名、static import、两个单类型 import 都非法；另一个同名类型自己也不能写限定名。简单名被占时不再把调用绑到错误类型。
 - 全量 `051047`（二进制 `b8d01f6063a4c69b…`，exit=1）：语法失败 54→25，空单元 0，FrontendRaw 失败 0，stub 1635。25 条构成：jaxb 编译器协议 13、常量体身份 5（Comparison 两份、es、dq、ez）、Comparators$1 三份、静态归属 2、Groovy 构造来源 2。未新增 suppression。
 - 2026-10-23 12:23–13:03 全量 `122333`（二进制 `810cece2…`，javajive `b509347`，yaklang `02e7e6f5…`）：`files=41765 checked=41765 materialization_errors=0 syntax_failures=20 stub_methods=1635 stub_files=1286 suppressed=2887 empty_units=0 frontend_failures=0`，exit=1，墙钟 2381.299s（prepare 1473.148s、verify 647.679s），RSS 峰 9466856 KiB。与 051047 逐文件对比：不再拒的正好 5 条（两份 `Comparison`、`es`、`mt/dq`、`ez`），新增拒绝 0，stub 文件/方法数不变。剩下 20 条：jaxb 13、`Comparators$1` 3、静态归属 2、Groovy 2。证据 `coremail-2b-v2-20261023-122333/verification.json`，对比用 `audit/compare_runs.py`。注：该次运行的 stub 计数漏了两条 `<clinit>`（见下条），真实值是 1637。仍未验收，未 push。
+- 2026-10-23 13:18–13:58 全量 `131834`（二进制 `a916d091…`，含 `cf83af94` 的计数器修复；yaklang `7cb99695…`，javajive `8241da4`）：`files=41765 checked=41765 materialization_errors=0 syntax_failures=20 stub_methods=1637 stub_files=1286 suppressed=2887 empty_units=0 frontend_failures=0`，exit=1，墙钟 2408.052s（prepare 1480.513s、verify 665.194s），RSS 峰 9527576 KiB。与 122333 对比：只有 `stub_methods 1635→1637`，拒绝集合与 suppressed 完全不变，正是那两条 `<clinit>` stub（`groovy/util/JavadocAssertionTestSuite`、`groovy/ui/Console`）被补计。验收仍未达成。
 - 2026-10-23 13:3x 构造函数前缀 stub 的根因定位（`LinkedHashCache$1`，webapp 的 wmsvr.jar）：该匿名类继承 `java.util.LinkedHashMap`，构造器前缀是 `this.this$0 = 参数`（字段 `ACC_FINAL|ACC_SYNTHETIC`，名字 `this$0`），然后 `super(IFZ)`。单独重放复现拒绝；临时追踪确认前缀三元组和委托都通过，卡在 `constructorCaptureChainDoesNotObserve("java/util/LinkedHashMap","(IFZ)V")`。平台字节齐全（release 8 的 LinkedHashMap/HashMap/AbstractMap/Object 均命中），但 `HashMap(int,float)` 校验分支里的 `"Illegal initial capacity: " + int` 编译成 `new StringBuilder(...).append(int).toString()`，而接收者效应分析对“对新分配对象的虚调用”一律拒绝（`constructor_receiver_effects.go` 的 invoke 分支），所以整条链不可证。这是证书故意保守的取舍，不是 bug；要放宽必须另做健全性论证和对抗测试，本轮不改。。
 - 2026-10-23 13:2x 验收漏洞修复（提交 `cf83af94`）：`<clinit>` 的 stub 只能写成注释（`/* yak-decompiler: undecompilable <clinit>: ... */`），而 `method body` 形式是抛异常的字符串。旧的 `verifySource` 只数后者，所以静态初始化块丢失的类会被当成 0 stub 通过。现在两种形式都计入。语料里真有两处：`groovy/util/JavadocAssertionTestSuite`、`groovy/ui/Console`（均在 `weixin.war/WEB-INF/lib/groovy-all-2.0.1.jar`）。同一份输入 `audit/subset-groovy`：旧二进制 `stub_methods=1024`、两类分别 13/105；新二进制 `stub_methods=1026`、两类分别 14/106，`files/checked/syntax_failures/stub_files/empty_units/frontend_failures` 完全一致。所以 122333 的真实 stub 数是 **1637**，不是 1635（当时计数器漏了这两条）；下一次全量会直接报 1637。- 2026-10-23 12:23–13:03 全量 `122333`（二进制 `810cece2…`，javajive `b509347`，yaklang `02e7e6f5…`）：`files=41765 checked=41765 materialization_errors=0 syntax_failures=20 stub_methods=1635 stub_files=1286 suppressed=2887 empty_units=0 frontend_failures=0`，exit=1，墙钟 2381.299s（prepare 1473.148s、verify 647.679s），RSS 峰 9466856 KiB。与 051047 逐文件对比：不再拒的正好 5 条（两份 `Comparison`、`es`、`mt/dq`、`ez`），新增拒绝 0，stub 文件/方法数不变。剩下 20 条：jaxb 13、`Comparators$1` 3、静态归属 2、Groovy 2。证据 `coremail-2b-v2-20261023-122333/verification.json`，对比用 `audit/compare_runs.py`。仍未验收，未 push。
 - 2026-10-23 12:1x 子集端到端对比（不是全量验收）：`audit/subset-const5/src` 放四个 jar（wmsvr/apiws/mailsms/webinst），同一份输入分别跑旧二进制 `b8d01f60…`（051047 那个）和新二进制 `783be31b…`（含 `3a31605`）。
@@ -69,6 +70,7 @@
 | 030517 | 41765/41765 | 0 | 54 | 1634 | 1 | 1682.451 | 696.069 | 2667.653 | 9312860 |
 | 051047 | 41765/41765 | 0 | 25 | 1635 | 1 | 1696.754 | 763.500 | 2746.081 | 9457064 |
 | 122333 | 41765/41765 | 0 | 20 | 1635 | 1 | 1473.148 | 647.679 | 2381.299 | 9466856 |
+| 131834 | 41765/41765 | 0 | 20 | 1637 | 1 | 1480.513 | 665.194 | 2408.052 | 9527576 |
 
 - run：`/mnt/data/scan-outputs/coremail-2b-v2-20261023-030517`
 - binary SHA256：`8f58bd0b662ac3a0ac3530a195f030e996ceef670ea631ef1e4fe8e09e75ea6d`
