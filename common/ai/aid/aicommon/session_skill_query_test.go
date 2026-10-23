@@ -29,32 +29,37 @@ func newSessionSkillQueryConfig(t *testing.T) *Config {
 	)
 }
 
-func TestBuildSessionSkillInventoryMatchesCapabilityInventoryShape(t *testing.T) {
+func TestBuildSessionSkillListsSplitLoadedAndAvailable(t *testing.T) {
 	cfg := newSessionSkillQueryConfig(t)
 	mgr := cfg.GetSkillsContextManager()
 	require.NoError(t, mgr.LoadSkill("loaded"))
 
-	inventory, err := BuildSessionSkillInventory(mgr, 1, 100)
+	loaded := BuildSessionLoadedSkillInventory(mgr)
+	require.Equal(t, 1, loaded.Total)
+	require.Len(t, loaded.Skills, 1)
+	require.Equal(t, "loaded", loaded.Skills[0].Name)
+	require.Equal(t, CapabilityInventoryStageLoaded, loaded.Skills[0].Stage)
+	require.Equal(t, CapabilityInventorySkillLoadLoaded, loaded.Skills[0].Data.(map[string]any)["skill_load_state"])
+
+	available, err := BuildSessionAvailableSkillInventory(mgr, 1, 100)
 	require.NoError(t, err)
-	require.Len(t, inventory.Skills, 2)
-	require.Equal(t, 2, inventory.Total)
-	require.False(t, inventory.HasMore)
-	byName := make(map[string]CapabilityInventoryItem, len(inventory.Skills))
-	for _, item := range inventory.Skills {
+	require.Equal(t, 1, available.Total)
+	require.Len(t, available.Skills, 1)
+	require.Equal(t, "available", available.Skills[0].Name)
+	for _, item := range append(loaded.Skills, available.Skills...) {
 		require.Equal(t, "skill", item.Type)
 		require.Equal(t, CapabilityInventoryPositionSemiDynamic, item.Position)
 		require.False(t, item.IsFixed)
-		byName[item.Name] = item
 	}
-	require.Equal(t, CapabilityInventoryStageLoaded, byName["loaded"].Stage)
-	require.Equal(t, CapabilityInventorySkillLoadLoaded, byName["loaded"].Data.(map[string]any)["skill_load_state"])
-	require.Equal(t, CapabilityInventoryStageMetadata, byName["available"].Stage)
-	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["available"].Data.(map[string]any)["skill_load_state"])
-	require.NotContains(t, byName["available"].Data.(map[string]any), "token_count")
+	require.Equal(t, CapabilityInventoryStageMetadata, available.Skills[0].Stage)
+	require.Equal(t, CapabilityInventorySkillLoadMetadata, available.Skills[0].Data.(map[string]any)["skill_load_state"])
+	require.NotContains(t, available.Skills[0].Data.(map[string]any), "token_count")
+
 	require.True(t, mgr.UnloadSkill("loaded"))
-	inventory, err = BuildSessionSkillInventory(mgr, 1, 100)
+	require.Empty(t, BuildSessionLoadedSkillInventory(mgr).Skills)
+	available, err = BuildSessionAvailableSkillInventory(mgr, 1, 100)
 	require.NoError(t, err)
-	require.Equal(t, CapabilityInventoryStageMetadata, inventory.Skills[1].Stage)
+	require.Equal(t, 2, available.Total)
 }
 
 func TestBuildSessionSkillInventoryPaginatesWithoutPromptBudget(t *testing.T) {
@@ -71,21 +76,27 @@ func TestBuildSessionSkillInventoryPaginatesWithoutPromptBudget(t *testing.T) {
 	mgr := cfg.GetSkillsContextManager()
 	require.NoError(t, mgr.LoadSkill("loaded"))
 
-	first, err := BuildSessionSkillInventory(mgr, 1, 40)
+	loaded := BuildSessionLoadedSkillInventory(mgr)
+	require.Len(t, loaded.Skills, 1)
+	require.Equal(t, "loaded", loaded.Skills[0].Name)
+
+	first, err := BuildSessionAvailableSkillInventory(mgr, 1, 40)
 	require.NoError(t, err)
 	require.Len(t, first.Skills, 40)
-	require.Equal(t, 101, first.Total)
+	require.Equal(t, 100, first.Total)
 	require.True(t, first.HasMore)
 	require.Equal(t, 1, first.Page)
 	require.Equal(t, 40, first.PageSize)
 
-	last, err := BuildSessionSkillInventory(mgr, 3, 40)
+	last, err := BuildSessionAvailableSkillInventory(mgr, 3, 40)
 	require.NoError(t, err)
-	require.Len(t, last.Skills, 21)
-	require.Equal(t, 101, last.Total)
+	require.Len(t, last.Skills, 20)
+	require.Equal(t, 100, last.Total)
 	require.False(t, last.HasMore)
-	require.Equal(t, "loaded", last.Skills[len(last.Skills)-1].Name)
-	require.Equal(t, CapabilityInventoryStageLoaded, last.Skills[len(last.Skills)-1].Stage)
+	for _, item := range append(first.Skills, last.Skills...) {
+		require.NotEqual(t, "loaded", item.Name)
+		require.Equal(t, CapabilityInventoryStageMetadata, item.Stage)
+	}
 }
 
 func TestBuildSessionSkillInventoryIncludesLazyDatabaseSkills(t *testing.T) {
@@ -109,7 +120,7 @@ func TestBuildSessionSkillInventoryIncludesLazyDatabaseSkills(t *testing.T) {
 	require.Len(t, metas, 3)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
 
-	inventory, err := BuildSessionSkillInventory(mgr, 1, 100)
+	inventory, err := BuildSessionAvailableSkillInventory(mgr, 1, 100)
 	require.NoError(t, err)
 	require.Equal(t, 3, inventory.Total)
 	require.Len(t, inventory.Skills, 3)
@@ -203,7 +214,8 @@ func TestBuildSessionSkillDetailUnknownAndEmptyName(t *testing.T) {
 	require.ErrorContains(t, err, "name is empty")
 	_, err = BuildSessionSkillDetail(mgr, "missing")
 	require.ErrorContains(t, err, `skill "missing" not found`)
-	inventory, err := BuildSessionSkillInventory(nil, 1, 100)
+	require.Empty(t, BuildSessionLoadedSkillInventory(nil).Skills)
+	inventory, err := BuildSessionAvailableSkillInventory(nil, 1, 100)
 	require.NoError(t, err)
 	require.Empty(t, inventory.Skills)
 }

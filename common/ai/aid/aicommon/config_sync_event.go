@@ -41,9 +41,11 @@ const (
 	// 关键词: SYNC_TYPE_LOAD_SKILL, 用户指定加载, timeline, 来源标记
 	SYNC_TYPE_LOAD_SKILL = "load_skill_sync"
 
-	// SYNC_TYPE_SKILL_INVENTORY 返回 session 当前已加载和可加载的 SKILL 分页。
-	// 响应 NodeId 为 skill_inventory，请求支持 page/page_size/limit。
-	SYNC_TYPE_SKILL_INVENTORY = "skill_inventory_sync"
+	// SYNC_TYPE_SKILL_LOADED 返回全部已加载 SKILL，不分页。
+	SYNC_TYPE_SKILL_LOADED = "skill_loaded_sync"
+
+	// SYNC_TYPE_SKILL_AVAILABLE 只分页返回可加载且未加载的 SKILL。
+	SYNC_TYPE_SKILL_AVAILABLE = "skill_available_sync"
 
 	// SYNC_TYPE_SKILL_DETAIL 按名称返回 SKILL 详情。输入支持 skill_name 或 name。
 	SYNC_TYPE_SKILL_DETAIL = "skill_detail_sync"

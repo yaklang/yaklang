@@ -13,8 +13,8 @@ import (
 const SessionSkillResourceURLPath = "/api/ai/skill"
 
 const (
-	DefaultSessionSkillInventoryPageSize = 100
-	MaxSessionSkillInventoryPageSize     = 500
+	DefaultSessionSkillAvailablePageSize = 100
+	MaxSessionSkillAvailablePageSize     = 500
 )
 
 // SessionSkillDetail 是 session 级 SKILL 详情。已加载技能返回 Timeline 中当前
@@ -31,9 +31,15 @@ type SessionSkillDetail struct {
 	URL            string                   `json:"url,omitempty"`
 }
 
-// SessionSkillInventoryPage 是 session 管理面的技能清单分页。Skills 不经过 prompt
-// registry 的 token 预算，Total 始终表示本地、数据库和 Timeline-only 技能并集。
-type SessionSkillInventoryPage struct {
+// SessionSkillList 是完整、不分页的技能集合，用于已加载状态和旧版清单。
+type SessionSkillList struct {
+	Skills []CapabilityInventoryItem `json:"skills"`
+	Total  int                       `json:"total"`
+}
+
+// SessionSkillAvailablePage 只分页可加载且尚未加载的技能。已加载技能由
+// skill_loaded_sync 独立返回，不占用这里的页码。
+type SessionSkillAvailablePage struct {
 	Skills   []CapabilityInventoryItem `json:"skills"`
 	Page     int                       `json:"page"`
 	PageSize int                       `json:"page_size"`
@@ -41,67 +47,60 @@ type SessionSkillInventoryPage struct {
 	HasMore  bool                      `json:"has_more"`
 }
 
-// BuildSessionSkillInventory 返回当前 session 全部可加载和已加载技能的分页清单。
-// 它不复用 prompt inventory 的预算裁剪逻辑；数据库来源在首次加载前也会出现。
-func BuildSessionSkillInventory(mgr *aiskillloader.SkillsContextManager, page, pageSize int) (*SessionSkillInventoryPage, error) {
+// BuildSessionLoadedSkillInventory 返回 Timeline 中全部已加载技能，不分页。
+func BuildSessionLoadedSkillInventory(mgr *aiskillloader.SkillsContextManager) *SessionSkillList {
+	result := &SessionSkillList{Skills: []CapabilityInventoryItem{}}
+	if mgr == nil {
+		return result
+	}
+	items := loadedSkillInventory(mgr)
+	names := make([]string, 0, len(items))
+	for name := range items {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{items[name]})...)
+	}
+	result.Total = len(result.Skills)
+	return result
+}
+
+// BuildSessionAvailableSkillInventory 分页返回可加载且未加载的技能。查询不使用
+// prompt registry 的 token 预算，数据库来源在首次加载前也会出现。
+func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager, page, pageSize int) (*SessionSkillAvailablePage, error) {
 	if page <= 0 {
 		page = 1
 	}
 	if pageSize <= 0 {
-		pageSize = DefaultSessionSkillInventoryPageSize
+		pageSize = DefaultSessionSkillAvailablePageSize
 	}
-	if pageSize > MaxSessionSkillInventoryPageSize {
-		pageSize = MaxSessionSkillInventoryPageSize
+	if pageSize > MaxSessionSkillAvailablePageSize {
+		pageSize = MaxSessionSkillAvailablePageSize
 	}
-	result := &SessionSkillInventoryPage{Page: page, PageSize: pageSize}
+	result := &SessionSkillAvailablePage{Page: page, PageSize: pageSize, Skills: []CapabilityInventoryItem{}}
 	if mgr == nil {
 		return result, nil
 	}
 
-	byName := make(map[string]CapabilityInventoryNamedItem)
-	for _, skill := range mgr.GetCurrentSelectedSkills() {
-		if skill == nil || strings.TrimSpace(skill.Name) == "" {
+	loaded := loadedSkillInventory(mgr)
+	metas, err := allLoadableSkillMetas(mgr)
+	if err != nil {
+		return nil, err
+	}
+	available := make(map[string]CapabilityInventoryNamedItem)
+	for _, meta := range metas {
+		if meta == nil || strings.TrimSpace(meta.Name) == "" {
 			continue
 		}
-		meta := skill.SkillMeta
-		if meta == nil {
-			meta = &aiskillloader.SkillMeta{Name: skill.Name}
+		if _, isLoaded := loaded[meta.Name]; isLoaded {
+			continue
 		}
-		item := skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadLoaded)
-		item.TokenCount = skill.TokenCount
-		byName[skill.Name] = item
+		available[meta.Name] = skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadMetadata)
 	}
 
-	if loader := mgr.GetLoader(); loader != nil {
-		var (
-			metas []*aiskillloader.SkillMeta
-			err   error
-		)
-		if pager, ok := loader.(aiskillloader.SkillMetaPager); ok {
-			metas, _, err = pager.ListSkillMetas(0, 0)
-		} else {
-			metas = loader.AllSkillMetas()
-		}
-		if err != nil {
-			return nil, err
-		}
-		for _, meta := range metas {
-			if meta == nil || strings.TrimSpace(meta.Name) == "" {
-				continue
-			}
-			if existing, found := byName[meta.Name]; found {
-				if existing.Description == "" {
-					existing.Description = meta.Description
-					byName[meta.Name] = existing
-				}
-				continue
-			}
-			byName[meta.Name] = skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadMetadata)
-		}
-	}
-
-	names := make([]string, 0, len(byName))
-	for name := range byName {
+	names := make([]string, 0, len(available))
+	for name := range available {
 		names = append(names, name)
 	}
 	sort.Strings(names)
@@ -117,10 +116,45 @@ func BuildSessionSkillInventory(mgr *aiskillloader.SkillsContextManager, page, p
 	}
 	result.Skills = make([]CapabilityInventoryItem, 0, end-start)
 	for _, name := range names[start:end] {
-		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{byName[name]})...)
+		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{available[name]})...)
 	}
 	result.HasMore = end < result.Total
 	return result, nil
+}
+
+func loadedSkillInventory(mgr *aiskillloader.SkillsContextManager) map[string]CapabilityInventoryNamedItem {
+	result := make(map[string]CapabilityInventoryNamedItem)
+	if mgr == nil {
+		return result
+	}
+	for _, skill := range mgr.GetCurrentSelectedSkills() {
+		if skill == nil || strings.TrimSpace(skill.Name) == "" {
+			continue
+		}
+		meta := skill.SkillMeta
+		if meta == nil {
+			meta = &aiskillloader.SkillMeta{Name: skill.Name}
+		}
+		item := skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadLoaded)
+		item.TokenCount = skill.TokenCount
+		result[skill.Name] = item
+	}
+	return result
+}
+
+func allLoadableSkillMetas(mgr *aiskillloader.SkillsContextManager) ([]*aiskillloader.SkillMeta, error) {
+	if mgr == nil {
+		return nil, nil
+	}
+	loader := mgr.GetLoader()
+	if loader == nil {
+		return nil, nil
+	}
+	if pager, ok := loader.(aiskillloader.SkillMetaPager); ok {
+		metas, _, err := pager.ListSkillMetas(0, 0)
+		return metas, err
+	}
+	return loader.AllSkillMetas(), nil
 }
 
 // BuildSessionSkillDetail 查询指定技能。加载状态只由 Timeline 决定，因此即使技能
