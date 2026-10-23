@@ -79,11 +79,18 @@ func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, jarRecursiveParse 
 	if fs == nil || !jarRecursiveParse {
 		return fs
 	}
-	if _, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
+	if expanded, ok := fs.(*javaclassparser.ExpandedZipFS); ok {
+		// SSA parses the rendered text. Keep a unique original member when javac
+		// cannot recompile that spelling, instead of replacing the class with a
+		// failure comment.
+		expanded.SetRetainUnprovedSource(true)
 		return fs
 	}
 
 	wrapped := javaclassparser.MaybeWrapExpandedArchiveFS(fs, jarRecursiveParse)
+	if expanded, ok := wrapped.(*javaclassparser.ExpandedZipFS); ok {
+		expanded.SetRetainUnprovedSource(true)
+	}
 	if wrapped == fs {
 		return fs
 	}
