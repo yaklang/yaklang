@@ -333,7 +333,7 @@ func (c *Config) parseProjectWithFSUnits(
 	storeProcess(compilePlanProcessEnd)
 	reportProcess(compilePlanProcessEnd, "[%s] compile unit planning start files=%d", "f0_plan", len(preHandlerFiles))
 
-	plan := buildCompileUnitPlan(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles)
+	plan := buildCompileUnitPlanEdges(c.LanguageBuilder, c.GetLanguage(), filesystem, preHandlerFiles, !c.GetCompileAstOnly())
 	if len(plan.Order) == 0 {
 		unit := &CompileUnit{Key: "unit:all", Path: ".", Files: append([]string(nil), preHandlerFiles...), Language: c.GetLanguage()}
 		plan = &UnitPlan{Units: map[string]*CompileUnit{unit.Key: unit}, Order: [][]*CompileUnit{{unit}}}
