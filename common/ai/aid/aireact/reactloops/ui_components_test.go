@@ -63,11 +63,11 @@ func TestUIComponentProjectionLifecycle(t *testing.T) {
 
 func TestUIComponentProjectionInvalidatesVersionAndPermissions(t *testing.T) {
 	loop, cfg := newUIProjectionLoop(t)
-	_, err := loop.LoadUIComponents([]string{"ParameterForm", "DataTable"})
+	_, err := loop.LoadUIComponents([]string{"DataTable"})
 	require.NoError(t, err)
 	require.NotEmpty(t, loop.renderUIComponents())
 	require.NoError(t, aicommon.WithAllowRequireForUserInteract(false)(cfg))
-	require.Empty(t, loop.renderUIComponents())
+	require.NotEmpty(t, loop.renderUIComponents(), "display definitions do not depend on question permission")
 	_, err = loop.LoadUIComponents([]string{"ParameterForm"})
 	require.Error(t, err)
 	page, err := loop.SearchUIComponents("ParameterForm", 0)

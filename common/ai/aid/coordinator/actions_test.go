@@ -33,11 +33,14 @@ func (r *actionArtifactInvoker) EmitFileArtifactWithExt(_ string, _ string, body
 	return r.path
 }
 
-func newActionFixture(t *testing.T, approved bool) *actionFixture {
+func newActionFixture(t *testing.T, approved bool, options ...aicommon.ConfigOption) *actionFixture {
 	t.Helper()
 	ctx, cancel := context.WithCancel(context.Background())
 	t.Cleanup(cancel)
 	cfg := aicommon.NewConfig(ctx, aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true), aicommon.WithDisallowMCPServers(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithGenerateReport(false))
+	for _, option := range options {
+		require.NoError(t, option(cfg))
+	}
 	cfg.Timeline.SetTimelineBucketByteSize(-1)
 	runtime := &actionArtifactInvoker{MockInvoker: mock.NewMockInvoker(ctx), path: filepath.Join(t.TempDir(), "report.md")}
 	runtime.SetConfig(cfg)

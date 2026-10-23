@@ -81,7 +81,7 @@ func (r *ReActLoop) renderUIComponents() string {
 	if r.uiComponents == nil {
 		return ""
 	}
-	// Version, schema contents and permission changes all invalidate the view.
+	// Version and schema content changes all invalidate the view.
 	if r.uiComponents.taskID != taskID || r.uiComponents.catalogHash != uiCatalogHash(catalog) || (task != nil && task.GetContext().Err() != nil) {
 		r.uiComponents = nil
 		return ""

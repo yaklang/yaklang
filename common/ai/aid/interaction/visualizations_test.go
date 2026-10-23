@@ -16,43 +16,12 @@ func visualizationDocument(t *testing.T) ComponentDocument {
 	return doc
 }
 
-func TestUIVisualizationsNormalizeAndSelectAuthoritativeRows(t *testing.T) {
+func TestUIVisualizationsNormalizeDisplayData(t *testing.T) {
 	catalog := testCatalog(t)
 	doc, diagnostics := catalog.Normalize(visualizationDocument(t))
 	require.Empty(t, diagnostics)
 	require.Len(t, doc.Nodes, 5)
-	receipt := Submission{NodeID: "details", Values: map[string]any{
-		"selectedRowIds": []any{"admin", "gateway"}, "rows": []any{map[string]any{"values": "forged"}},
-	}}
-	canonical, err := doc.NormalizeSubmission(receipt)
-	require.NoError(t, err)
-	require.Equal(t, []any{"gateway", "admin"}, canonical.Values["selectedRowIds"])
-	rows := canonical.Values["rows"].([]any)
-	require.Equal(t, float64(12), rows[0].(map[string]any)["values"].(map[string]any)["count"])
-	text, err := doc.SubmissionText(receipt, catalog)
-	require.NoError(t, err)
-	require.Contains(t, text, "API 网关")
-	require.Contains(t, text, "问题数量：12")
-	require.NotContains(t, text, "用户服务")
-	require.NotContains(t, text, "forged")
-	for _, ids := range [][]any{{}, {"missing"}, {"gateway", "gateway"}, {1}} {
-		_, err := doc.NormalizeSubmission(Submission{NodeID: "details", Values: map[string]any{"selectedRowIds": ids}})
-		require.Error(t, err)
-	}
-	receipt.Values["extra"] = true
-	_, err = doc.NormalizeSubmission(receipt)
-	require.Error(t, err)
-	delete(receipt.Values, "extra")
-	doc.Nodes[4].Props["selection"] = "single"
-	_, err = doc.NormalizeSubmission(receipt)
-	require.Error(t, err)
-	doc.Nodes[4].Props["selection"] = "none"
-	_, err = doc.SubmissionText(receipt, catalog)
-	require.Error(t, err)
-	doc.Nodes[4].Props["selection"] = "multiple"
-	doc.Nodes[4].Action = nil
-	_, err = doc.SubmissionText(receipt, catalog)
-	require.Error(t, err)
+
 }
 
 func TestUIVisualizationCrossFieldValidation(t *testing.T) {

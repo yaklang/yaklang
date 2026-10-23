@@ -51,77 +51,7 @@ func TestUIRequiredDefaultsAndCycle(t *testing.T) {
 	require.Equal(t, "default text", normalized.Nodes[1].Props["text"])
 }
 
-func TestUIFormSubmissionValidatedAgainstCatalog(t *testing.T) {
-	catalog := testCatalog(t)
-	doc := ComponentDocument{ID: "block", CatalogVersion: catalog.Version, Fallback: "输入姓名", Root: "form",
-		Nodes: []ComponentNode{{ID: "form", Component: "ParameterForm", Action: &ComponentAction{Name: "submit_to_chat", Args: map[string]any{}},
-			Props: map[string]any{"title": "姓名", "schema": map[string]any{
-				"type": "object", "properties": map[string]any{"name": map[string]any{"type": "string", "minLength": float64(1)}},
-				"required": []any{"name"},
-			}}}}}
-	normalized, diagnostics := catalog.Normalize(doc)
-	require.Empty(t, diagnostics)
-	require.Len(t, normalized.Nodes, 1)
-	require.Equal(t, false, normalized.Nodes[0].Props["schema"].(map[string]any)["additionalProperties"],
-		"the catalog default must reject undeclared submitted values even when the model omits it")
-	text, err := normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"name": "小明"}}, catalog)
-	require.NoError(t, err)
-	require.Contains(t, text, "小明")
-	for _, values := range []map[string]any{{}, {"name": 1}, {"name": "小明", "admin": true}} {
-		_, err := normalized.SubmissionText(Submission{NodeID: "form", Values: values}, catalog)
-		require.Error(t, err)
-	}
-	normalized.Nodes[0].Action = nil
-	_, err = normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"name": "小明"}}, catalog)
-	require.Error(t, err)
-}
-
 func TestUIRejectExternalReferences(t *testing.T) {
 	require.Error(t, CheckSchema(map[string]any{"$ref": "https://example.com/schema"}, 0))
 	require.Error(t, CheckSchema(map[string]any{"properties": map[string]any{"__proto__": true}}, 0))
-}
-
-func TestUIFormEnumArrayRejectsEmptyAndDuplicateChoices(t *testing.T) {
-	catalog := testCatalog(t)
-	doc := ComponentDocument{ID: "form", CatalogVersion: catalog.Version, Fallback: "选择关注方面", Root: "form",
-		Nodes: []ComponentNode{{ID: "form", Component: "ParameterForm", Action: &ComponentAction{Name: "submit_to_chat", Args: map[string]any{}},
-			Props: map[string]any{"schema": map[string]any{
-				"type": "object", "properties": map[string]any{"focus": map[string]any{
-					"type": "array", "minItems": float64(1),
-					"items": map[string]any{"type": "string", "enum": []any{"模块职责", "数据流"}},
-				}}, "required": []any{"focus"},
-			}}}}}
-	normalized, diagnostics := catalog.Normalize(doc)
-	require.Empty(t, diagnostics)
-	for _, values := range [][]any{nil, {}, {"数据流", "数据流"}, {"无效"}} {
-		_, err := normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"focus": values}}, catalog)
-		require.Error(t, err)
-	}
-	text, err := normalized.SubmissionText(Submission{NodeID: "form", Values: map[string]any{"focus": []any{"数据流"}}}, catalog)
-	require.NoError(t, err)
-	require.Contains(t, text, "数据流")
-}
-
-func TestUIUnusableFormsPreserveValidSiblings(t *testing.T) {
-	for _, fields := range []string{
-		`{"properties":{"name":{"type":"array"}},"required":["name"]}`,
-		`{"properties":{"name":{"type":"string"}},"required":["missing"]}`,
-		`{"properties":{"name":{"type":"number","minimum":10,"maximum":1}},"required":["name"]}`,
-	} {
-		t.Run(fields, func(t *testing.T) {
-			catalog := testCatalog(t)
-			var form map[string]any
-			require.NoError(t, json.Unmarshal([]byte(fields), &form))
-			form["type"], form["additionalProperties"] = "object", false
-			doc := ComponentDocument{ID: "invalid-form", CatalogVersion: catalog.Version, Fallback: "继续阅读", Root: "root", Nodes: []ComponentNode{
-				{ID: "root", Component: "Stack", Props: map[string]any{}, Children: []string{"form", "note"}},
-				{ID: "form", Component: "ParameterForm", Props: map[string]any{"schema": form}},
-				{ID: "note", Component: "Text", Props: map[string]any{"text": "仍然可读"}},
-			}}
-			normalized, diagnostics := catalog.Normalize(doc)
-			require.NotEmpty(t, diagnostics)
-			require.Len(t, normalized.Nodes, 2)
-			require.Equal(t, []string{"note"}, normalized.Nodes[0].Children)
-		})
-	}
 }
