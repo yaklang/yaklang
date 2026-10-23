@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 	"github.com/yaklang/yaklang/common/yak/ssa/reportstore"
 )
 
@@ -85,6 +86,12 @@ func patchIrSourceQuotedCode(db *gorm.DB) {
 
 // doSSAPatch 添加数据库索引以优化查询性能
 func patchIrCodeIndex(db *gorm.DB) {
+	if damenggorm.IsDM(db) {
+		if err := installDMIRIndexes(db); err != nil {
+			db.AddError(err)
+		}
+		return
+	}
 	if !db.HasTable(TableIrCodes) {
 		return
 	}

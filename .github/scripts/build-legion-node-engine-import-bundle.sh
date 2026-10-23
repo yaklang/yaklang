@@ -95,6 +95,8 @@ jq -e \
     .ci.workflow == "Build Trusted Legion Product Node" and
     .recipe.goos == $target_os and
     .recipe.goarch == $target_arch and
+    (((.recipe.build_tags // "") | split(",") | index("dameng") != null) ==
+      (.capabilities | index("ssa.ir.dm.v1") != null)) and
     .binary.sha256 == $binary_sha and
     .binary.size == $binary_size
   ' "$producer_manifest" >/dev/null || die "producer manifest does not describe this trusted release"
@@ -130,6 +132,7 @@ jq -e \
     .recipe.packaging_source_sha == $source_sha and
     .recipe.packaging_dirty == false and
     (.capabilities | index("ai.session.runtime") != null) and
+    (.capabilities | index("ssa.ir.dm.v1") == null) and
     (.capabilities | index("yak.execute") != null) and
     (.binary.sha256 | test("^[0-9a-f]{64}$")) and
     (.binary.size > 0) and

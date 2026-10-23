@@ -184,6 +184,7 @@ func UpdateProgramWithError(prog *IrProgram) error {
 	}
 	db := GetDB()
 	return db.Model(&IrProgram{}).
+		Omit("id").
 		Where("id = ?", prog.ID).
 		Where("program_name = ?", prog.ProgramName).
 		Where("program_kind = ?", prog.ProgramKind).

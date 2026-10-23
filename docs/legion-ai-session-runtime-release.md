@@ -42,7 +42,7 @@ Runtime through `legion-node-v*`; candidate bytes are never promoted in place.
 The Runtime node is a CGO-enabled, fully static musl executable built through
 the same `.github/scripts/build-legion-linux-musl.sh` recipe as the Linux host
 and portable nodes. The Runtime omits HIDS and uses
-`musl,netgo,osusergo,sqlite_omit_load_extension`. Go 1.22.12, Alpine 3.21, musl
+`musl,netgo,osusergo,sqlite_omit_load_extension,dameng`. Go 1.22.12, Alpine 3.21, musl
 1.2.5 and GCC 14.2.0 are pinned by the recipe. The final image remains Debian
 with CA certificates; the node has no dynamic libc dependency on that image.
 

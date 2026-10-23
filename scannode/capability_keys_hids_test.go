@@ -3,6 +3,7 @@
 package scannode
 
 import (
+	"github.com/yaklang/gorm/dialects/dameng"
 	"github.com/yaklang/yaklang/scannode/inputresolver"
 	"reflect"
 	"testing"
@@ -39,6 +40,9 @@ func TestNormalizeScanNodeCapabilityKeysAddsHIDSCapabilityWhenCompiled(t *testin
 		copy(want[index+1:], want[index:])
 		want[index] = capabilityKeyAIManagedInputV1
 	}
+	if dameng.NativeEnabled() {
+		want = append(want, capabilityKeySSAIRDMV1)
+	}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}
@@ -68,7 +72,6 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		capabilityKeyAICodeWorkspaceV1,
 		capabilityKeyAIToolsBuiltinV1,
 		capabilityKeyPluginBundleV1,
-		"extra.capability",
 	}
 	if inputresolver.Supported() {
 		index := len(want)
@@ -82,6 +85,10 @@ func TestNormalizeScanNodeCapabilityKeysDeduplicatesCompiledHIDSCapability(t *te
 		copy(want[index+1:], want[index:])
 		want[index] = capabilityKeyAIManagedInputV1
 	}
+	if dameng.NativeEnabled() {
+		want = append(want, capabilityKeySSAIRDMV1)
+	}
+	want = append(want, "extra.capability")
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("unexpected capability keys: got=%#v want=%#v", got, want)
 	}

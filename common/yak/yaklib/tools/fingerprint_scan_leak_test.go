@@ -100,3 +100,43 @@ func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_BufferedSucceeds(t *testing.
 		t.Fatal("expected result in outC after send")
 	}
 }
+
+func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelledRetainsReadyResult(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	// A single trial can pass by chance when send and cancellation compete.
+	for i := 0; i < 1000; i++ {
+		out := make(chan *fp.MatchResult, 1)
+		want := &fp.MatchResult{}
+		sendMatchResultOrDrop(ctx, out, want)
+		select {
+		case got := <-out:
+			if got != want {
+				t.Fatal("completed probe was replaced")
+			}
+		default:
+			t.Fatalf("cancelled context lost a deliverable result on trial %d", i)
+		}
+	}
+}
+
+func TestMUSTPASS_Fingerprint_SendMatchResultOrDrop_CancelledFullBufferExits(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	out := make(chan *fp.MatchResult, 1)
+	first := &fp.MatchResult{}
+	out <- first
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		sendMatchResultOrDrop(ctx, out, &fp.MatchResult{})
+	}()
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("cancelled producer blocked on a full buffer")
+	}
+	if got := <-out; got != first {
+		t.Fatal("cancellation overwrote an earlier completed probe")
+	}
+}

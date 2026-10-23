@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 )
 
 const defaultNativeQueryTimeout = 30 * time.Second
@@ -397,6 +398,9 @@ func nativeQueryRowContext(db *gorm.DB, ctx context.Context, query string, args 
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	if damenggorm.IsDM(db) {
+		query = damenggorm.NormalizeQuery(query)
+	}
 	switch q := common.(type) {
 	case *sql.DB:
 		return q.QueryRowContext(ctx, query, args...)
@@ -416,6 +420,9 @@ func nativeQueryContextDB(db *gorm.DB, ctx context.Context, query string, args .
 	}
 	if err := ctx.Err(); err != nil {
 		return nil, err
+	}
+	if damenggorm.IsDM(db) {
+		query = damenggorm.NormalizeQuery(query)
 	}
 	switch q := db.CommonDB().(type) {
 	case *sql.DB:

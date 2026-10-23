@@ -70,7 +70,7 @@ cat >"$test_root/tools/go" <<'EOF'
 #!/usr/bin/env bash
 set -eu
 [[ "$1" == version && "$2" == -m ]]
-tags=musl,netgo,osusergo,sqlite_omit_load_extension
+tags=musl,netgo,osusergo,sqlite_omit_load_extension,dameng
 if [[ "$MOCK_PROFILE" == product ]]; then tags="hids,$tags"; fi
 if [[ "$MOCK_FAILURE" == missing-tag ]]; then tags="${tags/osusergo,/}"; fi
 printf '\tbuild\t-tags=%s\n' "$tags"

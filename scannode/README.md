@@ -1,5 +1,18 @@
 # scannode
 
+## DM IR capability
+
+Host and scan nodes advertise `ssa.ir.dm.v1` only when the optional native DM
+driver is linked with the `dameng` build tag. Registering the GORM dialect is
+insufficient. Enrollment capabilities cannot enable an absent driver.
+Product Node manifests derive this key from the verified build recipe; the
+shared JSON contract contains only the baseline capabilities.
+
+AI Session Runtime nodes (`kind=ai_session`) do not advertise this key, even
+when their binary links the driver. Their current container API has no shared
+IR database credential or configuration contract and retains local SQLite
+state. Host DM IR configuration is not passed into session containers.
+
 Managed AI execution inputs, resource admission, storage and scoped file access
 are documented in [Managed input workspaces](../docs/legion-managed-input-workspaces.md).
 

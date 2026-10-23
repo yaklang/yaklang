@@ -6,7 +6,7 @@ set -eu
 builder_digest=1699c10032ca2582ec89a24a1312d986a3f094aed3d5c1147b19880afe40e052
 default_builder="docker.io/library/golang:1.22.12-alpine3.21@sha256:$builder_digest"
 musl_version=1.2.5
-build_packages='musl=1.2.5-r11 musl-dev=1.2.5-r11 gcc=14.2.0-r4 g++=14.2.0-r4 libgcc=14.2.0-r4 libstdc++=14.2.0-r4 binutils=2.43.1-r3 build-base=0.5-r3 make=4.4.1-r2 file=5.46-r2 git=2.47.3-r0 linux-headers=6.6-r1 pkgconf=2.3.0-r0 jq=1.7.1-r0'
+build_packages='musl=1.2.5-r12 musl-dev=1.2.5-r12 gcc=14.2.0-r4 g++=14.2.0-r4 libgcc=14.2.0-r4 libstdc++=14.2.0-r4 binutils=2.43.1-r3 build-base=0.5-r3 make=4.4.1-r2 file=5.46-r2 git=2.47.3-r0 linux-headers=6.6-r1 pkgconf=2.3.0-r0 jq=1.7.1-r0'
 
 die() { printf '[legion-node-musl][error] %s\n' "$*" >&2; exit 1; }
 log() { printf '[legion-node-musl] %s\n' "$*"; }
@@ -39,8 +39,8 @@ install_toolchain() {
 
 tags_for_profile() {
   case "$1" in
-    product) printf 'hids,musl,netgo,osusergo,sqlite_omit_load_extension' ;;
-    portable|runtime) printf 'musl,netgo,osusergo,sqlite_omit_load_extension' ;;
+    product) printf 'hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng' ;;
+    portable|runtime) printf 'musl,netgo,osusergo,sqlite_omit_load_extension,dameng' ;;
     *) die "unsupported Node build profile: $1" ;;
   esac
 }
@@ -178,10 +178,13 @@ C
   staged_binary="$binary_stage_dir/node"
   staged_metadata="$metadata_stage_dir/musl-build.json"
   log "building Linux $target_arch $profile node with musl $actual_musl_version, GCC $compiler_version"
+  # Go 1.22 selects gold for ARM64 programs importing plugin, including the DM
+  # driver's optional cipher loader. Alpine ships the pinned modern BFD linker;
+  # select it explicitly for this static build instead of requiring ld.gold.
   (
     cd "$build_source_dir"
     go build -mod=readonly -trimpath -buildvcs="$buildvcs" -tags "$build_tags" \
-      -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static"' \
+      -ldflags '-s -w -buildid= -linkmode external -extld gcc -extldflags "-static -fuse-ld=bfd"' \
       -o "$staged_binary" ./cmd/legion-smoke-node
   )
   verify_binary "$staged_binary" "$target_arch" "$build_tags"

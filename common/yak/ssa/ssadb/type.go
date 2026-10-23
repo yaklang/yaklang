@@ -8,7 +8,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// irTypeBatchChunk bounds rows per CreateInBatches call under SQLite's
+// irTypeBatchChunk bounds rows per SaveInBatches chunk under SQLite's
 // MAX_VARIABLE_NUMBER=250000 ceiling; 1000 rows is safe for the wide IrType
 // model and reduces the number of multi-row INSERT statements per flush.
 const irTypeBatchChunk = 1000
@@ -65,7 +65,10 @@ func UpsertIrType(db *gorm.DB, ir *IrType) error {
 // SaveIrTypeBatch writes types as in-place upserts on (program_name, type_id).
 // ux_ir_types_program_type is created with the schema, so the row id stays
 // stable across flushes. SaveInBatches skips nil elements. The in-process
-// GetIrTypeCache is warmed either way.
+// GetIrTypeCache is warmed after a successful write. GORM selects the native
+// upsert or DM MERGE and owns a transaction unless a caller supplied one.
+// With a caller-owned transaction, the caller also owns commit/rollback and
+// must discard the program cache if it rolls back after this function succeeds.
 func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil

@@ -107,7 +107,7 @@ func NewScanNode(cfg node.BaseConfig, options ...ScanNodeOption) (*ScanNode, err
 			legionCapabilitySSALogTail,
 		)
 	}
-	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeys(cfg.CapabilityKeys)
+	cfg.CapabilityKeys = normalizeScanNodeCapabilityKeysForNode(cfg.CapabilityKeys, cfg.Kind)
 	if cfg.StatusProvider == nil {
 		cfg.StatusProvider = agent
 	}

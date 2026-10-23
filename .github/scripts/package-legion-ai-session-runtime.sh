@@ -102,7 +102,7 @@ musl_recipe="$(jq -ce --arg arch "$target_arch" --arg builder "$runtime_builder_
       .go_version == $go_version and .c_library == "musl" and
       (.c_library_version | type == "string" and length > 0) and
       .cgo_enabled == true and .link_mode == "external-static" and
-      .build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension")
+      .build_tags == "musl,netgo,osusergo,sqlite_omit_load_extension,dameng")
   ' "$runtime_musl_metadata")" || die 'Runtime musl recipe does not match the built image'
 if [[ "${CI:-}" == true ]]; then
   [[ "$(jq -r .builder_execution <<<"$musl_recipe")" == native ]] || die 'CI Runtime must use a native musl builder'
@@ -193,7 +193,7 @@ jq -n \
       goarch: $target_arch,
       cgo_enabled: true,
       link_mode: "external-static",
-      build_tags: "musl,netgo,osusergo,sqlite_omit_load_extension",
+      build_tags: "musl,netgo,osusergo,sqlite_omit_load_extension,dameng",
       module_go_version: $module_go_version,
       go_version: $runtime_go_version
     }),
