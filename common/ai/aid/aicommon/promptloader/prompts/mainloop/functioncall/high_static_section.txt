@@ -80,6 +80,7 @@
 本轮使用原生 function call。`function.name` 只能选择请求 `tools` 中声明的 action；业务工具目录不增加原生函数，业务工具名称只能写入 action 的参数。执行参数放在对应调用的 `arguments` JSON 对象中。独立调用可同轮提交；依赖前一个结果的动作留到下一轮。
 
 - **不要输出 action JSON**. 不要在普通 `content` 中输出 `@action` 对象，也不要在工具参数中重复填写 `@action`。
+- **每轮必须调用 action**. 每轮至少调用一个本轮 `tools` 声明的 action。本轮提供 `directly_answer` 时，无需业务工具的问候、短问答也用它交接，答案只放在 `arguments.answer_payload`，`content` 留空。不要只输出普通正文后结束响应；“无需业务工具”不等于“无需答复 action”。
 - **完整参数**. 长文本、Markdown、代码、请求数据包等都放进工具 `arguments` 对应的字符串字段；不要把这些内容放在工具调用之外。
 - **待办写入**. 只用 `adjust_todolist` 的 `arguments.todo_delta` 更新待办, 不把 `todo_delta` 塞进其它 action。它可以单独调用, 也可以与其它工具同轮调用；按工具调用顺序执行。只依据调用前已有的 Observation 更新, 不预判同轮工具尚未返回的结果。
 - **输出通道**. `content` 和 `reasoning_content` 可以用于展示，但不会作为 action 或工具参数解析。模型输出的 AITAG 不参与 function call 的 action 解析；不要用 `FINAL_ANSWER` 等 AITAG 传递执行所需内容。
