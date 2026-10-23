@@ -92,8 +92,14 @@ func ConvertJSPLinear(content, filePath string) (tl.TemplateGeneratedInfo, error
 }
 
 func ConvertTemplateToJava(typ JavaTemplateType, content, filePath string) (tl.TemplateGeneratedInfo, error) {
-	if content == "" || filePath == "" {
-		return nil, utils.Errorf("content or filePath is empty")
+	if filePath == "" {
+		return nil, utils.Errorf("filePath is empty")
+	}
+	// An empty page is still a compilation unit. Rejecting it failed the
+	// whole project on a zero-byte nav.jsp.
+	if content == "" {
+		editor := memedit.NewMemEditorWithFileUrl(" ", filePath)
+		return ConvertTemplateToJavaWithEditor(typ, editor)
 	}
 	editor := memedit.NewMemEditorWithFileUrl(content, filePath)
 	return ConvertTemplateToJavaWithEditor(typ, editor)

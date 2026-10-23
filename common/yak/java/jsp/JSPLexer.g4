@@ -2,16 +2,38 @@ lexer grammar  JSPLexer;
 
 @lexer::members {
 func (l *JSPLexer) attrLTStartsTag() bool {
-	// A quoted attribute may contain a bare "<" (option value="<").
-	// That is text. A nested tag is "<" followed by a name, "</", "<%",
-	// "<!". Treating every "<" as a tag start leaves the lexer inside the
-	// attribute and turns the rest of the page into scriptlets.
-	next := l.GetInputStream().LA(1)
-	switch next {
-	case '/', '!', '%', '?', ':', '_':
+	// value="<soap:Body>" is text. A nested tag has attributes, so the name is
+	// followed by whitespace: <fmt:message key=...>. <%, <!, <? stay tags.
+	in := l.GetInputStream()
+	first := in.LA(1)
+	switch first {
+	case '!', '%', '?':
 		return true
 	}
-	if next >= 'A' && next <= 'Z' || next >= 'a' && next <= 'z' || next > 127 {
+	i := 1
+	if first == '/' {
+		i = 2
+	}
+	saw := false
+	for {
+		c := in.LA(i)
+		if c == ':' || c == '_' || c == '-' || c == '.' ||
+			(c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') ||
+			(c >= '0' && c <= '9') || c > 127 {
+			if (c >= '0' && c <= '9') && !saw {
+				return false
+			}
+			saw = true
+			i++
+			continue
+		}
+		break
+	}
+	if !saw {
+		return false
+	}
+	switch in.LA(i) {
+	case ' ', '\t', '\n', '\r':
 		return true
 	}
 	return false
