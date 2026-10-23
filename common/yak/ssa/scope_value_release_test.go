@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
@@ -175,6 +176,27 @@ func TestReleaseSavedLocalsFromResidentFastPath(t *testing.T) {
 	require.False(t, prog.Cache.hasResidentInstruction(value.GetId()), "detaching the scope must also drop clean fast-path residency")
 	require.Equal(t, value.GetId(), variable.GetValue().GetId())
 	require.False(t, variable.GetValue() == value)
+}
+
+func TestReleaseDropsOffsetPointerAndReloadsByID(t *testing.T) {
+	fn, variable, value := assignLocal(t, "helper")
+	prog := fn.GetProgram()
+	editor := memedit.NewMemEditor("local")
+	prog.SetOffsetVariable(variable, editor.GetFullRange())
+	persistFinished(t, fn)
+	end := editor.GetFullRange().GetEndOffset()
+	prog.offsetMu.RLock()
+	item := prog.OffsetMap[end]
+	prog.offsetMu.RUnlock()
+	require.NotNil(t, item)
+
+	released := prog.ReleasePersistedOrdinaryValues()
+	require.Greater(t, released, 0)
+	require.Nil(t, item.value, "the offset table must not keep the saved value object")
+	reloaded := item.GetValue()
+	require.NotNil(t, reloaded)
+	require.Equal(t, value.GetId(), reloaded.GetId())
+	require.False(t, reloaded == value)
 }
 
 func TestReleaseKeepsExportedAndCapturedValues(t *testing.T) {

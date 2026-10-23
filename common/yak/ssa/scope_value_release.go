@@ -48,6 +48,7 @@ func (prog *Program) ReleasePersistedOrdinaryValues() int {
 		}
 		seen[p] = struct{}{}
 		released += releaseProgramOrdinaryValues(p)
+		released += releasePersistedOffsetValues(p)
 		if p.UpStream == nil {
 			return
 		}
@@ -57,6 +58,42 @@ func (prog *Program) ReleasePersistedOrdinaryValues() int {
 		})
 	}
 	visit(app)
+	return released
+}
+
+// releasePersistedOffsetValues drops offset pointers to ordinary values that
+// have already been saved. The id stays, and GetValue reloads it. Exported
+// parameters and closure captures remain objects for cross-unit binding.
+func releasePersistedOffsetValues(prog *Program) int {
+	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return 0
+	}
+	prog.offsetMu.Lock()
+	defer prog.offsetMu.Unlock()
+	released := 0
+	for _, item := range prog.OffsetMap {
+		if item == nil || utils.IsNil(item.value) {
+			continue
+		}
+		if valueCapturedByClosure(item.value) {
+			continue
+		}
+		if shouldKeepCompileUnitBoundaryResident(item.value) && !canSpillFinishedPrivateBlock(item.value) && !canSpillFinishedFunctionMember(item.value) {
+			continue
+		}
+		id := item.value.GetId()
+		if id <= 0 || !prog.Cache.instructions.isPersisted(id) {
+			continue
+		}
+		if item.valueID == 0 {
+			item.valueID = id
+		}
+		if item.program == nil {
+			item.program = prog
+		}
+		item.value = nil
+		released++
+	}
 	return released
 }
 

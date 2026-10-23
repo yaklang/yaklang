@@ -153,7 +153,10 @@ func TestCompileUnitWriterFlushKeepsFunctionBoundaryResident(t *testing.T) {
 	prog.Cache.FlushInstructionSaver()
 
 	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()), "compile-unit function metadata must stay resident for later cross-unit calls")
-	require.True(t, prog.Cache.hasResidentInstruction(param.GetId()), "compile-unit parameters must stay resident for later cross-unit call argument binding")
+	require.False(t, prog.Cache.hasResidentInstruction(param.GetId()), "a finished private function reloads its parameter by id")
+	reloadedParam := prog.Cache.GetInstruction(param.GetId())
+	require.NotNil(t, reloadedParam)
+	require.Equal(t, param.GetId(), reloadedParam.GetId())
 	require.False(t, prog.Cache.hasResidentInstruction(bin.GetId()), "ordinary expression instructions should still be flushed and released at unit boundary")
 
 	require.NoError(t, prog.Cache.SaveToDatabase())
