@@ -110,7 +110,6 @@ func (c *Config) RestoreUIInteractions() error {
 	if s.restored {
 		return nil
 	}
-	var componentReceipts []interaction.Submission
 	if c.PersistentSessionId != "" && c.GetDB() != nil {
 		events, err := yakit.QueryAIEvent(c.GetDB(), &ypb.AIEventFilter{
 			SessionID: c.PersistentSessionId, EventType: []string{"ui_question", "user_message", "ui_component"},
@@ -134,35 +133,11 @@ func (c *Config) RestoreUIInteractions() error {
 				var message UIUserMessage
 				if json.Unmarshal(e.Content, &message) == nil && message.ID != "" {
 					s.receipts[message.ID] = message
-					if message.Metadata.Source == "component" {
-						componentReceipts = append(componentReceipts, message.Metadata)
-					}
 				}
 			}
 		}
 	}
 	s.restored = true
-	// Receipts from older engines may have no terminal component snapshot.
-	// Replay in journal order so the first accepted answer owns the form.
-	repairedComponents := make(map[string]*UIArtifact)
-	for _, receipt := range componentReceipts {
-		artifact := s.artifacts[receipt.RequestID]
-		if artifact == nil {
-			continue
-		}
-		if artifact.Submissions == nil {
-			artifact.Submissions = make(map[string]interaction.Submission)
-		}
-		if _, exists := artifact.Submissions[receipt.NodeID]; !exists {
-			artifact.Submissions[receipt.NodeID] = receipt
-			repairedComponents[receipt.RequestID] = artifact
-		}
-	}
-	for _, artifact := range repairedComponents {
-		if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
-			return err
-		}
-	}
 	// A durable user message can precede its terminal question snapshot if the
 	// process stops between the two writes. Recover from the accepted receipt.
 	for _, receipt := range s.receipts {
@@ -198,6 +173,13 @@ func (c *Config) emitQuestion(q *uiQuestion) error {
 // RequestQuestions returns immediately in async mode. Blocking mode waits only
 // for this request; cancellation never implies authorization for another action.
 func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions []interaction.Question, blocking bool, timeoutSeconds int) (any, error) {
+	return c.RequestClarification(ctx, taskID, questions, nil, blocking, timeoutSeconds)
+}
+
+func (c *Config) RequestClarification(ctx context.Context, taskID string, questions []interaction.Question, form *interaction.QuestionForm, blocking bool, timeoutSeconds int) (any, error) {
+	if err := c.CheckClarificationAllowed(taskID, blocking); err != nil {
+		return nil, err
+	}
 	if ctx == nil {
 		ctx = c.GetContext()
 	}
@@ -214,7 +196,7 @@ func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions 
 	if blocking {
 		mode = "blocking"
 	}
-	request := interaction.QuestionRequest{ID: uuid.NewString(), TaskID: taskID, Mode: mode, Questions: questions, State: "pending"}
+	request := interaction.QuestionRequest{ID: uuid.NewString(), TaskID: taskID, Mode: mode, Questions: questions, Form: form, State: "pending"}
 	if err := request.Validate(); err != nil {
 		return nil, err
 	}
@@ -231,6 +213,12 @@ func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions 
 	}
 	s := c.UISession()
 	s.mu.Lock()
+	// Serialize admission with disabling/cancelling questions in this session.
+	if !c.GetAllowUserInteraction() {
+		s.mu.Unlock()
+		c.ReleaseClarification(taskID)
+		return nil, fmt.Errorf("user clarification is disabled for this session")
+	}
 	pending := 0
 	for _, old := range s.questions {
 		if old.Request.State == "pending" {
@@ -270,6 +258,32 @@ func (c *Config) RequestQuestions(ctx context.Context, taskID string, questions 
 		defer s.mu.Unlock()
 		return map[string]any{"status": q.Request.State, "answer": q.answer}, nil
 	}
+}
+
+// Disabling this runtime also releases its pending waits. A worker shares the
+// session journal but must not cancel questions owned by its parent.
+func (c *Config) cancelPendingClarifications() error {
+	s := c.UISession()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var firstErr error
+	for _, q := range s.questions {
+		if q.origin != c || (q.Request.State != "pending" && q.Request.State != "expired") {
+			continue
+		}
+		q.Request.State, q.Request.Deadline = "cancelled", 0
+		if q.timer != nil {
+			q.timer.Stop()
+		}
+		if q.done != nil {
+			close(q.done)
+			q.done = nil
+		}
+		if err := c.emitQuestion(q); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func (c *Config) UpdateQuestion(id, operation string) error {
@@ -349,6 +363,9 @@ func (c *Config) HandleUIControl(event *ypb.AIInputEvent) error {
 // AcceptQuestionAnswer owns deduplication, validation, journaling and wakeup.
 // deliver chooses current-task steering or new-task admission at the server.
 func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(string, string, *Config) (string, error)) error {
+	if !c.GetAllowUserInteraction() {
+		return fmt.Errorf("user clarification is disabled for this session")
+	}
 	if err := c.RestoreUIInteractions(); err != nil {
 		return err
 	}
@@ -359,44 +376,23 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 	if err := json.Unmarshal([]byte(event.UserInteraction), &receipt); err != nil {
 		return err
 	}
-	if strings.TrimSpace(receipt.ID) == "" || len(receipt.ID) > 128 || (receipt.Source != "questionnaire" && receipt.Source != "component") {
+	if strings.TrimSpace(receipt.ID) == "" || len(receipt.ID) > 128 || receipt.Source != "questionnaire" {
 		return fmt.Errorf("invalid submission id or source")
 	}
 	s := c.UISession()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if previous, exists := s.receipts[receipt.ID]; exists {
-		if previous.Metadata.RequestID != receipt.RequestID || previous.Metadata.Source != receipt.Source || previous.Metadata.NodeID != receipt.NodeID {
+		if previous.Metadata.RequestID != receipt.RequestID || previous.Metadata.Source != receipt.Source {
 			return fmt.Errorf("submission id already belongs to another request")
-		}
-		// Table receipts include server-owned rows and canonical ordering. Compare
-		// retries after the same normalization used on their first admission.
-		if receipt.Source == "component" {
-			if artifact := s.artifacts[receipt.RequestID]; artifact != nil {
-				var err error
-				receipt, err = artifact.Document.NormalizeSubmission(receipt)
-				if err != nil {
-					return err
-				}
-			}
 		}
 		before, _ := json.Marshal(previous.Metadata)
 		after, _ := json.Marshal(receipt)
 		if string(before) != string(after) {
 			return fmt.Errorf("submission id was reused with different answers")
 		}
-		if receipt.Source == "component" {
-			if artifact := s.artifacts[receipt.RequestID]; artifact != nil {
-				if _, err := c.EmitJSON("ui_component", "ui_component", artifact); err != nil {
-					return err
-				}
-			}
-		}
 		c.EmitSyncJSON("ui_receipt", "ui_receipt", map[string]any{"id": receipt.ID, "ok": true}, event.SyncID)
 		return nil
-	}
-	if receipt.Source == "component" {
-		return c.acceptComponentAnswerLocked(s, event, receipt, deliver)
 	}
 	q := s.questions[receipt.RequestID]
 	if q == nil {
@@ -408,7 +404,19 @@ func (c *Config) AcceptQuestionAnswer(event *ypb.AIInputEvent, deliver func(stri
 	if q.Request.State == "skipped" || q.Request.State == "cancelled" {
 		return fmt.Errorf("question is already closed")
 	}
-	text, err := q.Request.AnswerText(receipt.Answers)
+	var text string
+	var err error
+	if q.Request.Form != nil {
+		if len(receipt.Answers) != 0 {
+			return fmt.Errorf("form replies must use values")
+		}
+		text, err = q.Request.Form.AnswerText(receipt.Values)
+	} else {
+		if receipt.Values != nil {
+			return fmt.Errorf("question replies must use answers")
+		}
+		text, err = q.Request.AnswerText(receipt.Answers)
+	}
 	if err != nil {
 		return err
 	}

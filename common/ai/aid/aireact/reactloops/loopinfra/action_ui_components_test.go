@@ -51,3 +51,30 @@ func TestUIComponentActionsValidateRequests(t *testing.T) {
 		})
 	}
 }
+
+func TestClarificationFormActionValidatesAndRejectsStaleCalls(t *testing.T) {
+	ctx := context.Background()
+	cfg := aicommon.NewConfig(ctx, aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	loop := reactloops.NewMinimalReActLoop(cfg, newTestInvoker(ctx))
+	ask := userQuestionsAction(false)
+	invoke := func(params string) string {
+		action := parseToolBatchPromptExample(t, `{"@action":"ask_for_clarification_async",`+params+`}`, "ask_for_clarification_async")
+		op := reactloops.NewActionHandlerOperator(newTestTask(ctx))
+		ask.ActionHandler(loop, action, op)
+		require.True(t, op.IsContinued())
+		return op.GetFeedback().String()
+	}
+	for _, params := range []string{
+		`"questions":[],"form":{}`,
+		`"form":{"title":"参数","schema":{"type":"object","properties":{"count":{"type":"integer"}}},"unknown":"invalid"}`,
+		`"form":null`,
+	} {
+		require.NotContains(t, invoke(params), `"status":"accepted"`)
+	}
+	const valid = `"form":{"title":"参数","schema":{"type":"object","properties":{"count":{"type":"integer","default":2}},"required":["count"]}}`
+	require.Contains(t, invoke(valid), `"status":"accepted"`)
+	require.NoError(t, aicommon.WithAllowRequireForUserInteract(false)(cfg))
+	require.Contains(t, invoke(valid), "disabled")
+	require.Error(t, ask.ActionVerifier(loop, nil))
+	require.Error(t, loopAction_AskForClarification.ActionVerifier(loop, nil))
+}

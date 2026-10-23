@@ -2084,6 +2084,9 @@ func WithAllowRequireForUserInteract(v bool) ConfigOption {
 		c.m.Lock()
 		c.AllowRequireForUserInteract = v
 		c.m.Unlock()
+		if !v {
+			return c.cancelPendingClarifications()
+		}
 		return nil
 	}
 }
@@ -4085,6 +4088,10 @@ func (c *Config) GetMaxIterationCount() int64 {
 }
 
 func (c *Config) GetAllowUserInteraction() bool {
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
 	return c.AllowRequireForUserInteract
 }
 

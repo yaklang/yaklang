@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -76,7 +77,13 @@ func NewLoop(r aicommon.AIInvokeRuntime, opts ...reactloops.ReActLoopOption) (*r
 			} else if !planningOnly(l) && controller(l).ReportReady() && !hasDelivery(controller(l)) {
 				template = reportInstruction
 			}
-			text, err := utils.RenderTemplate(template, map[string]any{"FunctionCallMode": l.FunctionCallModeEnabled(), "ExplorationEnabled": explorationEnabled(l)})
+			actions := l.GetAllActionNames()
+			text, err := utils.RenderTemplate(template, map[string]any{
+				"FunctionCallMode":           l.FunctionCallModeEnabled(),
+				"ExplorationEnabled":         explorationEnabled(l),
+				"AllowBlockingClarification": slices.Contains(actions, "ask_for_clarification"),
+				"AllowAsyncClarification":    slices.Contains(actions, "ask_for_clarification_async"),
+			})
 			if err != nil {
 				return "", err
 			}

@@ -1,10 +1,8 @@
 package interaction
 
 import (
-	"encoding/json"
 	"fmt"
 	"math"
-	"strings"
 )
 
 func uiObjects(value any) ([]map[string]any, bool) {
@@ -139,100 +137,7 @@ func NormalizeVisualization(node *ComponentNode, diagnose func(string, string)) 
 				diagnose("props.initialSort", "unknown or unsortable column")
 			}
 		}
-		if (props["selection"] == nil || props["selection"] == "none") && node.Action != nil {
-			node.Action = nil
-			diagnose("action", "selection is disabled")
-		}
+
 	}
 	return true
-}
-
-// NormalizeSubmission derives table receipts from the server's document. A client
-// may select row IDs, but cannot supply authoritative row values or extra fields.
-func (doc ComponentDocument) NormalizeSubmission(receipt Submission) (Submission, error) {
-	for _, node := range doc.Nodes {
-		if node.ID != receipt.NodeID || node.Component != "DataTable" {
-			continue
-		}
-		selection, _ := node.Props["selection"].(string)
-		if selection != "single" && selection != "multiple" {
-			return receipt, fmt.Errorf("table selection is disabled")
-		}
-		for key := range receipt.Values {
-			if key != "selectedRowIds" && key != "rows" {
-				return receipt, fmt.Errorf("undeclared table submission field")
-			}
-		}
-		ids, ok := receipt.Values["selectedRowIds"].([]any)
-		if !ok || len(ids) == 0 || len(ids) > 200 || (selection == "single" && len(ids) != 1) {
-			return receipt, fmt.Errorf("invalid table selection")
-		}
-		selected := map[string]bool{}
-		for _, value := range ids {
-			id, ok := value.(string)
-			if !ok || id == "" || selected[id] {
-				return receipt, fmt.Errorf("missing or duplicate selected row id")
-			}
-			selected[id] = true
-		}
-		rows, ok := uiObjects(node.Props["rows"])
-		if !ok {
-			return receipt, fmt.Errorf("invalid table rows")
-		}
-		acceptedIDs, acceptedRows := []any{}, []any{}
-		for _, row := range rows {
-			id, _ := row["id"].(string)
-			if selected[id] {
-				acceptedIDs = append(acceptedIDs, id)
-				acceptedRows = append(acceptedRows, map[string]any{"id": id, "values": row["values"]})
-			}
-		}
-		if len(acceptedIDs) != len(ids) {
-			return receipt, fmt.Errorf("selected row does not belong to this table")
-		}
-		receipt.Values = map[string]any{"selectedRowIds": acceptedIDs, "rows": acceptedRows}
-		return receipt, nil
-	}
-	return receipt, nil
-}
-
-func tableSubmissionText(node ComponentNode, receipt Submission) (string, error) {
-	rows, ok := uiObjects(receipt.Values["rows"])
-	if !ok {
-		return "", fmt.Errorf("missing canonical table rows")
-	}
-	columns, ok := uiObjects(node.Props["columns"])
-	if !ok {
-		return "", fmt.Errorf("invalid table columns")
-	}
-	title, _ := node.Props["title"].(string)
-	lines := []string{"数据表选择：" + title}
-	for _, row := range rows {
-		values, _ := row["values"].(map[string]any)
-		cells := []string{}
-		for _, column := range columns {
-			key, _ := column["key"].(string)
-			label, _ := column["label"].(string)
-			value := "—"
-			if values[key] != nil {
-				value = fmt.Sprint(values[key])
-			}
-			cells = append(cells, label+"："+value)
-		}
-		lines = append(lines, "- "+fmt.Sprint(row["id"])+"："+strings.Join(cells, "；"))
-	}
-	return strings.Join(lines, "\n"), nil
-}
-
-// DisplayOnly retains local inspection while removing message-producing actions.
-func (entry ComponentDefinition) DisplayOnly() ComponentDefinition {
-	raw, _ := json.Marshal(entry)
-	var copy ComponentDefinition
-	_ = json.Unmarshal(raw, &copy)
-	copy.Actions, copy.Bindings = nil, nil
-	if props, ok := copy.Schema["properties"].(map[string]any); ok {
-		props["selection"] = map[string]any{"type": "string", "enum": []any{"none"}, "default": "none"}
-	}
-	copy.Description = "只读数据明细。允许本地排序、筛选、分页；当前会话禁止行选择、状态绑定和提交动作。"
-	return copy
 }

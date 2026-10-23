@@ -31,3 +31,17 @@ func TestWorkerClarificationPolicySurvivesGlobalHotpatch(t *testing.T) {
 	require.Error(t, worker.CheckClarificationAllowed(false))
 	require.ErrorContains(t, f.cfg.CheckClarificationAllowed("worker", true), "disabled")
 }
+
+func TestCoordinatorClarificationInstructionsFollowAvailability(t *testing.T) {
+	for _, approved := range []bool{false, true} {
+		f := newActionFixture(t, approved, aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`), aicommon.WithAllowPlanUserInteract(true))
+		require.Contains(t, f.loop.GetPersistentInstruction(), "ask_for_clarification_async")
+		require.NoError(t, aicommon.WithAllowRequireForUserInteract(false)(f.cfg))
+		require.NotContains(t, f.loop.GetPersistentInstruction(), "ask_for_clarification")
+		require.NoError(t, aicommon.WithAllowRequireForUserInteract(true)(f.cfg))
+		if !approved {
+			require.NoError(t, aicommon.WithAllowPlanUserInteract(false)(f.cfg))
+			require.NotContains(t, f.loop.GetPersistentInstruction(), "ask_for_clarification")
+		}
+	}
+}

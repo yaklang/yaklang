@@ -11,7 +11,7 @@ import (
 
 var renderUIAction = &reactloops.LoopAction{
 	ActionType:  "render_ui",
-	Description: "Render a small UI block using definitions from load_ui_components. Follow UI_COMPONENT_DEFINITIONS, use stable IDs and a meaningful text fallback. Returns immediately; diagnostics allow one correction with the same IDs.",
+	Description: "Display structured data only; no forms or user-input submission. Render a small UI block using definitions from load_ui_components. Follow UI_COMPONENT_DEFINITIONS, use stable IDs and a meaningful text fallback. Returns immediately; diagnostics allow one correction with the same IDs.",
 	Options: []aitool.ToolOption{aitool.WithRawParam("ui", map[string]any{
 		"type": "object", "required": []string{"id", "catalogVersion", "fallback", "root", "nodes"},
 		"properties": map[string]any{
@@ -19,14 +19,10 @@ var renderUIAction = &reactloops.LoopAction{
 			"fallback": map[string]any{"type": "string"}, "root": map[string]any{"type": "string"},
 			"requiredComponents": map[string]any{"type": "array", "maxItems": 32, "items": map[string]any{"type": "string"}},
 			"nodes": map[string]any{"type": "array", "maxItems": 64, "items": map[string]any{
-				"type": "object", "required": []string{"id", "component", "props"}, "properties": map[string]any{
+				"type": "object", "additionalProperties": false, "required": []string{"id", "component", "props"}, "properties": map[string]any{
 					"id": map[string]any{"type": "string"}, "component": map[string]any{"type": "string"},
 					"props":    map[string]any{"type": "object"},
 					"children": map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
-					"bindings": map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}},
-					"action": map[string]any{"type": "object", "required": []string{"name", "args"}, "properties": map[string]any{
-						"name": map[string]any{"type": "string", "enum": []string{"submit_to_chat"}}, "args": map[string]any{"type": "object"},
-					}},
 				},
 			}},
 		},

@@ -26,13 +26,14 @@ type Question struct {
 }
 
 type QuestionRequest struct {
-	ID        string     `json:"id"`
-	TaskID    string     `json:"taskId"`
-	Mode      string     `json:"mode"`
-	Questions []Question `json:"questions"`
-	Deadline  int64      `json:"deadline,omitempty"` // Unix milliseconds; absent means no timeout.
-	State     string     `json:"state"`
-	Touched   bool       `json:"touched"`
+	ID        string        `json:"id"`
+	TaskID    string        `json:"taskId"`
+	Mode      string        `json:"mode"`
+	Questions []Question    `json:"questions,omitempty"`
+	Form      *QuestionForm `json:"form,omitempty"`
+	Deadline  int64         `json:"deadline,omitempty"` // Unix milliseconds; absent means no timeout.
+	State     string        `json:"state"`
+	Touched   bool          `json:"touched"`
 }
 
 type Answer struct {
@@ -49,11 +50,16 @@ type Submission struct {
 	Source    string         `json:"source"`
 	RequestID string         `json:"requestId"`
 	Answers   []Answer       `json:"answers,omitempty"`
-	NodeID    string         `json:"nodeId,omitempty"`
 	Values    map[string]any `json:"values,omitempty"`
 }
 
 func (r *QuestionRequest) Validate() error {
+	if r.Form != nil {
+		if len(r.Questions) != 0 {
+			return fmt.Errorf("provide either questions or form, not both")
+		}
+		return r.Form.Validate()
+	}
 	if len(r.Questions) < 1 || len(r.Questions) > 3 {
 		return fmt.Errorf("questions must contain 1 to 3 questions")
 	}

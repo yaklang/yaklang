@@ -3,6 +3,7 @@ package aicommon
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/interaction"
@@ -40,6 +41,23 @@ func ProjectUIEvent(event *schema.AiOutputEvent, client UIClientCapabilities) *s
 			return event
 		}
 		var lines []string
+		if request.Form != nil {
+			lines = append(lines, request.Form.Title)
+			fields, _ := request.Form.Schema["properties"].(map[string]any)
+			keys := make([]string, 0, len(fields))
+			for key := range fields {
+				keys = append(keys, key)
+			}
+			sort.Strings(keys)
+			for _, key := range keys {
+				field, _ := fields[key].(map[string]any)
+				title, _ := field["title"].(string)
+				if title == "" {
+					title = key
+				}
+				lines = append(lines, "- "+title)
+			}
+		}
 		for _, question := range request.Questions {
 			lines = append(lines, question.Title+": "+question.Prompt)
 			for _, option := range question.Options {

@@ -14,12 +14,13 @@ const ComponentContentType = "application/vnd.memfit.ui+json"
 const MaxCatalogComponents = 512
 
 type ComponentDefinition struct {
-	Name        string                    `json:"name"`
-	Description string                    `json:"description"`
-	Schema      map[string]any            `json:"schema"`
-	Children    bool                      `json:"children,omitempty"`
-	Bindings    []string                  `json:"bindings,omitempty"`
-	Actions     map[string]map[string]any `json:"actions,omitempty"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	Schema      map[string]any `json:"schema"`
+	Children    bool           `json:"children,omitempty"`
+	// Forbidden input fields are retained only to reject them at the wire boundary.
+	Bindings []string                  `json:"bindings,omitempty"`
+	Actions  map[string]map[string]any `json:"actions,omitempty"`
 }
 
 type Catalog struct {
@@ -51,12 +52,13 @@ type ComponentAction struct {
 }
 
 type ComponentNode struct {
-	ID        string            `json:"id"`
-	Component string            `json:"component"`
-	Props     map[string]any    `json:"props"`
-	Children  []string          `json:"children,omitempty"`
-	Bindings  map[string]string `json:"bindings,omitempty"`
-	Action    *ComponentAction  `json:"action,omitempty"`
+	ID        string         `json:"id"`
+	Component string         `json:"component"`
+	Props     map[string]any `json:"props"`
+	Children  []string       `json:"children,omitempty"`
+	// These fields are rejected; display components never bind or submit answers.
+	Bindings map[string]string `json:"bindings,omitempty"`
+	Action   *ComponentAction  `json:"action,omitempty"`
 }
 
 type ComponentDocument struct {
@@ -151,13 +153,8 @@ func (c Catalog) Validate() error {
 		if err := CheckSchema(entry.Schema, 0); err != nil {
 			return err
 		}
-		for name, schema := range entry.Actions {
-			if name != "submit_to_chat" {
-				return fmt.Errorf("unsupported UI action %s", name)
-			}
-			if err := CheckSchema(schema, 0); err != nil {
-				return err
-			}
+		if entry.Name == "ParameterForm" || len(entry.Actions) > 0 || len(entry.Bindings) > 0 {
+			return fmt.Errorf("render_ui catalog only supports display components")
 		}
 	}
 	return nil
@@ -286,20 +283,11 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 			node.Children = nil
 			diagnose("children", "component does not accept children")
 		}
-		for key, value := range node.Bindings {
-			if key != "value" || len(entry.Bindings) == 0 || len(value) > 64 {
-				delete(node.Bindings, key)
-				diagnose("bindings", "unsupported binding removed")
-			}
+		if node.Action != nil || node.Bindings != nil {
+			diagnose("action", "display components cannot collect or submit user input")
+			continue
 		}
-		if node.Action != nil {
-			actionSchema, exists := entry.Actions[node.Action.Name]
-			if node.Action.Name != "submit_to_chat" || !exists || ValidateSchema(actionSchema, node.Action.Args) != nil {
-				node.Action = nil
-				diagnose("action", "invalid action disabled")
-			}
-		}
-		if !NormalizeVisualization(&node, diagnose) || !NormalizeNavigation(&node, diagnose) || !normalizeForm(node, diagnose) {
+		if !NormalizeVisualization(&node, diagnose) || !NormalizeNavigation(&node, diagnose) {
 			continue
 		}
 		components[node.Component] = true
@@ -345,36 +333,4 @@ func (c Catalog) Normalize(doc ComponentDocument) (ComponentDocument, []Diagnost
 		}
 	}
 	return doc, diagnostics
-}
-
-func (doc ComponentDocument) SubmissionText(receipt Submission, catalog Catalog) (string, error) {
-	var err error
-	receipt, err = doc.NormalizeSubmission(receipt)
-	if err != nil {
-		return "", err
-	}
-	for _, node := range doc.Nodes {
-		if node.ID != receipt.NodeID {
-			continue
-		}
-		entry := catalog.Definition(node.Component)
-		if entry == nil || node.Action == nil || node.Action.Name != "submit_to_chat" {
-			return "", fmt.Errorf("node has no authorized submit action")
-		}
-		actionSchema, exists := entry.Actions[node.Action.Name]
-		if !exists || ValidateSchema(actionSchema, node.Action.Args) != nil {
-			return "", fmt.Errorf("action is not allowed by the catalog")
-		}
-		if node.Component == "DataTable" {
-			return tableSubmissionText(node, receipt)
-		}
-		schema, ok := node.Props["schema"].(map[string]any)
-		if !ok || ValidateSchema(schema, receipt.Values) != nil {
-			return "", fmt.Errorf("form values do not match the declared schema")
-		}
-		encoded, _ := json.MarshalIndent(receipt.Values, "", "  ")
-		title, _ := node.Props["title"].(string)
-		return "表单回答：" + title + "\n" + string(encoded), nil
-	}
-	return "", fmt.Errorf("node does not belong to this component block")
 }

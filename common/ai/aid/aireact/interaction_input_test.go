@@ -154,3 +154,27 @@ func TestClarificationPromptUsesSharedTaskBudget(t *testing.T) {
 	require.EqualValues(t, 1, info["AskForClarificationMaxTimes"])
 	require.Equal(t, false, info["AllowAskForClarification"])
 }
+
+func TestClarificationDisabledRemovesDefaultInstructionsAndStaleHandlers(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
+	require.NoError(t, err)
+	factory, ok := reactloops.GetLoopFactory(schema.AI_REACT_LOOP_NAME_DEFAULT)
+	require.True(t, ok)
+	loop, err := factory(r)
+	require.NoError(t, err)
+	require.Contains(t, loop.GetPersistentInstruction(), "ask_for_clarification_async")
+	cfg := r.GetConfig().(*aicommon.Config)
+	require.NoError(t, aicommon.WithAllowRequireForUserInteract(false)(cfg))
+	for _, text := range []string{loop.GetPersistentInstruction(), loop.GetOutputExample()} {
+		require.NotContains(t, text, "ask_for_clarification")
+		require.NotContains(t, text, "DisallowRequireForUserPrompt")
+		require.NotContains(t, text, "向用户提问澄清")
+	}
+	for _, name := range []string{"ask_for_clarification", "ask_for_clarification_async"} {
+		require.NotContains(t, loop.GetAllActionNames(), name)
+		_, err = loop.GetActionHandler(name)
+		require.Error(t, err)
+	}
+}

@@ -17,18 +17,14 @@ func informationDocument(t *testing.T) ComponentDocument {
 	return doc
 }
 
-func TestUIInformationContainersAndNestedSubmission(t *testing.T) {
+func TestUIInformationContainers(t *testing.T) {
 	catalog := testCatalog(t)
 	doc, diagnostics := catalog.Normalize(informationDocument(t))
 	require.Empty(t, diagnostics)
 	require.Len(t, doc.Nodes, 10)
 	require.Equal(t, []string{"summary", "parameters"}, doc.Nodes[4].Children)
 	require.Equal(t, []string{"request-text", "response-text"}, doc.Nodes[7].Children)
-	text, err := doc.SubmissionText(Submission{NodeID: "parameters", Values: map[string]any{"scope": "API 网关", "note": "只读验证"}}, catalog)
-	require.NoError(t, err)
-	require.Contains(t, text, "只读验证")
-	_, err = doc.SubmissionText(Submission{NodeID: "parameters", Values: map[string]any{"scope": "未知服务"}}, catalog)
-	require.Error(t, err)
+
 }
 
 func TestUIInformationTabReferenceValidation(t *testing.T) {
