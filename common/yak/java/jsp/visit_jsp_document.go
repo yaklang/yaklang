@@ -196,6 +196,9 @@ func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
 	if y == nil || raw == nil {
 		return
 	}
+	if y.consumeAbsorbedJSPFragment(raw) {
+		return
+	}
 	recoverRange := y.SetRange(raw)
 	defer recoverRange()
 
@@ -222,6 +225,11 @@ func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
 	// Recovering SLL can keep htmlContents after the closing token failed to
 	// match. Dropping those contents is how a whole page collapsed to `<html>`.
 	if i.HtmlContents() != nil || i.CLOSE_TAG_BEGIN() != nil {
+		// <c:forTokens var="slogan"><jsp:attribute name="items">...</jsp:attribute>
+		// puts items on the tag before the loop is emitted. XML attributes win.
+		if i.HtmlContents() != nil {
+			y.absorbJSPAttributes(i.HtmlContents())
+		}
 		y.AddAttrFunc(func() {
 			if close := i.TAG_CLOSE(0); close != nil {
 				y.EmitPureText(close.GetText())
@@ -537,4 +545,148 @@ func (y *JSPVisitor) VisitJspIfBlock(raw jspparser.IJspIfBlockContext) {
 		}
 	}
 	y.EmitPureCode("}")
+}
+
+// absorbJSPAttributes copies <jsp:attribute name="items">...</jsp:attribute>
+// onto the current JSTL tag. coremail writes c:forTokens items that way, and
+// the XML attribute map is otherwise empty.
+func (y *JSPVisitor) absorbJSPAttributes(contents jspparser.IHtmlContentsContext) {
+	tag := y.PeekTagInfo()
+	if tag == nil || contents == nil || !tagUsesFragmentAttrs(tag.typ) {
+		return
+	}
+	for _, el := range directHTMLElements(contents) {
+		cat, name := openTagNames(el)
+		if !strings.EqualFold(cat, "jsp") {
+			continue
+		}
+		switch strings.ToLower(name) {
+		case "body":
+			tag.deferBody = true
+		case "attribute":
+			tag.deferBody = true
+			attrs := y.readOpenAttributes(el.HtmlBegin())
+			attrName := strings.TrimSpace(attrs["name"])
+			if attrName == "" {
+				continue
+			}
+			if _, exists := tag.attrs[attrName]; exists {
+				continue
+			}
+			tag.attrs[attrName] = y.jspAttributeExpr(el)
+		}
+	}
+}
+
+// consumeAbsorbedJSPFragment drops a jsp:attribute that was already copied
+// onto the parent, and visits jsp:body without emitting the wrapper tags.
+func (y *JSPVisitor) consumeAbsorbedJSPFragment(raw jspparser.IHtmlElementContext) bool {
+	parent := y.PeekTagInfo()
+	if parent == nil || !parent.deferBody {
+		return false
+	}
+	el, ok := raw.(*jspparser.HtmlElementContext)
+	if !ok || el == nil {
+		return false
+	}
+	cat, name := openTagNames(el)
+	if !strings.EqualFold(cat, "jsp") {
+		return false
+	}
+	switch strings.ToLower(name) {
+	case "attribute":
+		return true
+	case "body":
+		if c := el.HtmlContents(); c != nil {
+			y.VisitHtmlContents(c)
+		}
+		return true
+	default:
+		return false
+	}
+}
+
+func (y *JSPVisitor) readOpenAttributes(begin jspparser.IHtmlBeginContext) map[string]string {
+	out := map[string]string{}
+	b, ok := begin.(*jspparser.HtmlBeginContext)
+	if !ok || b == nil {
+		return out
+	}
+	y.PushTagInfo(JSP_TAG_PURE_HTML)
+	for _, el := range b.AllHtmlBeginElement() {
+		if el != nil && el.HtmlAttribute() != nil {
+			y.VisitAttribute(el.HtmlAttribute())
+		}
+	}
+	if info := y.PeekTagInfo(); info != nil {
+		for k, v := range info.attrs {
+			out[k] = v
+		}
+	}
+	y.PopTagInfo()
+	return out
+}
+
+func (y *JSPVisitor) jspAttributeExpr(el *jspparser.HtmlElementContext) string {
+	if el == nil {
+		return `""`
+	}
+	inners := directHTMLElements(el.HtmlContents())
+	if len(inners) == 1 {
+		attrs := y.readOpenAttributes(inners[0].HtmlBegin())
+		if key := strings.TrimSpace(attrs["key"]); key != "" {
+			return key
+		}
+		if value := strings.TrimSpace(attrs["value"]); value != "" {
+			return value
+		}
+	}
+	if el.HtmlContents() == nil {
+		return `""`
+	}
+	return y.appendElParseMethod(strings.TrimSpace(el.HtmlContents().GetText()))
+}
+
+func directHTMLElements(contents jspparser.IHtmlContentsContext) []*jspparser.HtmlElementContext {
+	c, ok := contents.(*jspparser.HtmlContentsContext)
+	if !ok || c == nil {
+		return nil
+	}
+	var out []*jspparser.HtmlElementContext
+	for _, content := range c.AllHtmlContent() {
+		if content == nil || content.JspElements() == nil {
+			continue
+		}
+		je, ok := content.JspElements().(*jspparser.JspElementsContext)
+		if !ok || je == nil || je.HtmlElement() == nil {
+			continue
+		}
+		el, ok := je.HtmlElement().(*jspparser.HtmlElementContext)
+		if ok && el != nil {
+			out = append(out, el)
+		}
+	}
+	return out
+}
+
+func openTagNames(el *jspparser.HtmlElementContext) (string, string) {
+	if el == nil || el.HtmlBegin() == nil {
+		return "", ""
+	}
+	begin, ok := el.HtmlBegin().(*jspparser.HtmlBeginContext)
+	if !ok || begin == nil || begin.HtmlTag() == nil {
+		return "", ""
+	}
+	tag, ok := begin.HtmlTag().(*jspparser.HtmlTagContext)
+	if !ok || tag == nil {
+		return "", ""
+	}
+	names := tag.AllHtmlTagName()
+	if len(names) == 0 {
+		return "", ""
+	}
+	if len(names) == 1 {
+		return "", names[0].GetText()
+	}
+	return names[0].GetText(), names[1].GetText()
 }

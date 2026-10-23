@@ -86,6 +86,30 @@ func TestForTokensLiteralAndMixedELParse(t *testing.T) {
 	}
 }
 
+// coremail writes items as a nested jsp:attribute, not an XML attribute.
+func TestForTokensItemsFromJSPAttribute(t *testing.T) {
+	src := `<c:forEach begin="1" end="2" var="sloganIndex">
+  <c:forTokens delims="|" var="slogan">
+    <jsp:attribute name="items">
+      <fmt:message key="login_slogan${sloganIndex}" />
+    </jsp:attribute>
+    <jsp:body>
+      <div>${slogan}</div>
+    </jsp:body>
+  </c:forTokens>
+</c:forEach>`
+	code := convertJSPForTest(t, src)
+	if strings.Contains(code, "jsp:attribute") || strings.Contains(code, "jsp:body") {
+		t.Fatalf("jsp:attribute wrapper leaked into Java:\n%s", code)
+	}
+	if !strings.Contains(code, `String.valueOf("login_slogan" + elExpr.parse("sloganIndex"))`) {
+		t.Fatalf("items from jsp:attribute missing:\n%s", code)
+	}
+	if !strings.Contains(code, `elExpr.parse("slogan")`) {
+		t.Fatalf("jsp:body was dropped:\n%s", code)
+	}
+}
+
 // The items form must keep working exactly as before.
 func TestForeachItemsStillIteratesEl(t *testing.T) {
 	code := convertJSPForTest(t, `<c:forEach items="${list}" var="x">${x}</c:forEach>`)
