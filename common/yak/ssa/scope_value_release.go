@@ -131,6 +131,12 @@ func releaseProgramOrdinaryValues(prog *Program) int {
 			}
 			released += releaseScopeOrdinaryValues(prog, block.ScopeTable, visitedScopes, reload)
 		}
+		// The id list has been walked. A non-exported finished body does not
+		// need it anymore; an exported function keeps the ids for cross-unit
+		// lookup. EnterBlock/ExitBlock are separate fields and stay set.
+		if !shouldKeepFunctionForCrossUnitReference(fn) {
+			fn.Blocks = nil
+		}
 	})
 	return released
 }
