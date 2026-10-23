@@ -179,8 +179,18 @@ func (m *SourceMaterializer) ReadFile(base fi.FileSystem, name string) ([]byte, 
 	}
 }
 
+func isJSPSource(name string) bool {
+	lower := strings.ToLower(name)
+	return strings.HasSuffix(lower, ".jsp") || strings.HasSuffix(lower, ".jspx")
+}
+
 func (m *SourceMaterializer) lookup(name string) ([]byte, bool) {
 	if m.dropMemory {
+		// The tree file for a page is generated Java. Reading it back and
+		// converting again wraps that Java in out.write(...).
+		if isJSPSource(name) {
+			return nil, false
+		}
 		return m.readTree(name)
 	}
 	if m.overlay == nil {
@@ -223,10 +233,18 @@ func (m *SourceMaterializer) produce(base fi.FileSystem, name string) ([]byte, e
 // Put stores an already-transformed source (decompiled class, generated JSP)
 // so later reads skip the transform. Empty data is ignored.
 func (m *SourceMaterializer) Put(name string, data []byte) {
-	if m == nil {
+	if m == nil || len(data) == 0 {
 		return
 	}
 	m.store(name, data)
+	if m.treeDir != "" && isJSPSource(name) {
+		if err := m.writeTree(name, data); err != nil {
+			m.errors.Add(1)
+			log.Warnf("[source-materialize] write %s: %v", name, err)
+			return
+		}
+		m.noteTree(name, int64(len(data)))
+	}
 }
 
 func (m *SourceMaterializer) store(name string, data []byte) {
@@ -235,7 +253,8 @@ func (m *SourceMaterializer) store(name string, data []byte) {
 	}
 	started := time.Now()
 	defer func() { m.storeNS.Add(time.Since(started).Nanoseconds()) }()
-	if m.treeDir != "" {
+	// Raw JSP must not overwrite the generated .jsp.java. Put writes that file.
+	if m.treeDir != "" && !isJSPSource(name) {
 		if err := m.writeTree(name, data); err != nil {
 			m.errors.Add(1)
 			log.Warnf("[source-materialize] write %s: %v", name, err)
@@ -243,7 +262,9 @@ func (m *SourceMaterializer) store(name string, data []byte) {
 		}
 	}
 	if m.dropMemory {
-		m.noteTree(name, int64(len(data)))
+		if !isJSPSource(name) {
+			m.noteTree(name, int64(len(data)))
+		}
 		return
 	}
 	if m.overlay == nil {

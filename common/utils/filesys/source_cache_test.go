@@ -246,6 +246,9 @@ func TestSourceMaterializerTreeWritesJavaWithoutRetainingBytes(t *testing.T) {
 	_, err := m.ReadFile(base, "pkg/A.class")
 	require.NoError(t, err)
 	m.Put("web/index.jsp", []byte("class Index {}"))
+	again, err := m.ReadFile(base, "web/index.jsp")
+	require.NoError(t, err)
+	require.Equal(t, "source-of:web/index.jsp", string(again), "a later prepare must read the page, not the generated Java")
 
 	classBytes, err := os.ReadFile(filepath.Join(dir, "pkg", "A.java"))
 	require.NoError(t, err)
