@@ -496,9 +496,6 @@ func (y *JSPVisitor) emitCoreURL(params []string) {
 }
 
 var (
-	// elBraceRe matches one ${...} expression. It is compiled once: coremail-sized
-	// pages call this on every text node and every attribute.
-	elBraceRe = regexp.MustCompile(`\$\{(.+?)\}`)
 	// elParseCallRe matches a finished elExpr.parse("...") call, including
 	// escaped quotes. The previous ([^)]*) form stopped at the first ')' inside
 	// the expression, so fn:escapeXml(...) became an unclosed Java string
@@ -509,13 +506,47 @@ var (
 func (y *JSPVisitor) appendElParseMethod(expr string) string {
 	expr = strings.TrimSpace(expr)
 	expr = yakunquote.TryUnquote(expr)
-	return elBraceRe.ReplaceAllStringFunc(expr, func(match string) string {
-		inner := elBraceRe.FindStringSubmatch(match)
-		if len(inner) < 2 {
-			return match
+	return replaceDollarEL(expr)
+}
+
+// replaceDollarEL finds ${...} with nested braces. ${param.idx eq '!{index}'}
+// contains a '}' that a non-greedy regex treats as the end of the EL.
+func replaceDollarEL(expr string) string {
+	var b strings.Builder
+	i := 0
+	for i < len(expr) {
+		if i+1 < len(expr) && expr[i] == '$' && expr[i+1] == '{' {
+			end := matchingBrace(expr, i+1)
+			if end < 0 {
+				b.WriteByte(expr[i])
+				i++
+				continue
+			}
+			inner := expr[i+2 : end]
+			b.WriteString(fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, javaLiteralBody(inner)))
+			i = end + 1
+			continue
 		}
-		return fmt.Sprintf("%s(\"%s\")", JSP_EL_PARSE_METHOD, javaLiteralBody(inner[1]))
-	})
+		b.WriteByte(expr[i])
+		i++
+	}
+	return b.String()
+}
+
+func matchingBrace(s string, open int) int {
+	depth := 0
+	for i := open; i < len(s); i++ {
+		switch s[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // javaLiteralBody escapes text placed between double quotes in generated Java.
@@ -594,10 +625,24 @@ func javaLiteralBody(s string) string {
 }
 
 func (y *JSPVisitor) replaceElExprInText(text string) string {
-	text = elBraceRe.ReplaceAllStringFunc(text, func(match string) string {
-		y.EmitOutput(y.appendElParseMethod(match))
-		return ""
-	})
+	var b strings.Builder
+	i := 0
+	for i < len(text) {
+		if i+1 < len(text) && text[i] == '$' && text[i+1] == '{' {
+			end := matchingBrace(text, i+1)
+			if end < 0 {
+				b.WriteByte(text[i])
+				i++
+				continue
+			}
+			y.EmitOutput(y.appendElParseMethod(text[i : end+1]))
+			i = end + 1
+			continue
+		}
+		b.WriteByte(text[i])
+		i++
+	}
+	text = b.String()
 	text = elParseCallRe.ReplaceAllStringFunc(text, func(match string) string {
 		y.EmitOutput(match)
 		return ""

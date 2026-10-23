@@ -510,12 +510,12 @@ func buildLinearScriptletJSPVisitor(visitor *JSPVisitor, src string) (*JSPVisito
 				visitor.EmitOutput(expr)
 			}
 		case strings.HasPrefix(body, "!"):
-			code := strings.TrimSpace(body[1:])
+			code := normalizeJSPEmbeddedJava(strings.TrimSpace(body[1:]))
 			if code != "" {
 				visitor.EmitDeclarationCode(code)
 			}
 		default:
-			code := strings.TrimSpace(body)
+			code := normalizeJSPEmbeddedJava(strings.TrimSpace(body))
 			if code != "" {
 				visitor.EmitPureCode(code)
 			}

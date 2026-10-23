@@ -60,3 +60,16 @@ func TestScriptletIfElseStillParses(t *testing.T) {
 	require.Contains(t, code, "if (ready)")
 	require.Contains(t, code, "else")
 }
+
+func TestMissingEqualsParenBeforeOr(t *testing.T) {
+	src := `<%
+if("int".equals(p.getString("type")) || "long".equals(p.getString("type")|| "double".equals(p.getString("type"))){
+}
+%>`
+	info, err := j.ConvertTemplateToJava(j.JSP, src, "rest.jsp")
+	require.NoError(t, err)
+	code := info.GetContent()
+	require.Contains(t, code, `getString("type"))||`)
+	_, err = java2ssa.Frontend(code)
+	require.NoError(t, err, code)
+}
