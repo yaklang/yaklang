@@ -2,6 +2,7 @@ package aicommon
 
 import (
 	"fmt"
+	"net/url"
 	"sort"
 	"strings"
 
@@ -9,20 +10,20 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const SessionSkillResourceURLPath = "/api/ai/skill"
+
 // SessionSkillDetail 是 session 级 SKILL 详情。已加载技能返回 Timeline 中当前
-// 可见的正文及分片；未加载技能返回 SKILL.md 和文件系统预览。
-//
-// FileSystemAvailable 是后续按需读取资源文件的预留边界。FileSystem 本身是运行时
-// 句柄，不进入 JSON 响应，也不持久化到 Timeline。
+// 可见的正文；未加载技能返回 SKILL.md 和文件树。
+// URL 标识 session 中的技能资源，后续可由服务端统一解析 Timeline、文件系统或
+// 数据库来源，前端不需要理解技能的实际存储位置。
 type SessionSkillDetail struct {
-	Name                string                           `json:"name"`
-	Loaded              bool                             `json:"loaded"`
-	Meta                *aiskillloader.SkillMeta         `json:"meta,omitempty"`
-	PromptContent       string                           `json:"prompt_content,omitempty"`
-	Parts               []aiskillloader.SkillContextPart `json:"parts,omitempty"`
-	SkillMDContent      string                           `json:"skill_md,omitempty"`
-	FileSystemAvailable bool                             `json:"file_system_available"`
-	FileTree            string                           `json:"file_tree,omitempty"`
+	Name           string                   `json:"name"`
+	Loaded         bool                     `json:"loaded"`
+	Meta           *aiskillloader.SkillMeta `json:"meta,omitempty"`
+	PromptContent  string                   `json:"prompt_content,omitempty"`
+	SkillMDContent string                   `json:"skill_md,omitempty"`
+	FileTree       string                   `json:"file_tree,omitempty"`
+	URL            string                   `json:"url,omitempty"`
 }
 
 // BuildSessionSkillInventory 返回当前 Timeline 中已加载的技能以及 loader 中可加载
@@ -51,12 +52,10 @@ func BuildSessionSkillDetail(mgr *aiskillloader.SkillsContextManager, name strin
 		}
 		parts := mgr.VisibleSkillParts(name)
 		return &SessionSkillDetail{
-			Name:                name,
-			Loaded:              true,
-			Meta:                selected.SkillMeta,
-			PromptContent:       RenderSessionSkillPromptContent(name, parts),
-			Parts:               parts,
-			FileSystemAvailable: managerHasSkillFileSystem(mgr, name),
+			Name:          name,
+			Loaded:        true,
+			Meta:          selected.SkillMeta,
+			PromptContent: RenderSessionSkillPromptContent(name, parts),
 		}, nil
 	}
 
@@ -72,11 +71,10 @@ func BuildSessionSkillDetail(mgr *aiskillloader.SkillsContextManager, name strin
 		return nil, utils.Errorf("skill %q has no metadata", name)
 	}
 	detail := &SessionSkillDetail{
-		Name:                name,
-		Loaded:              false,
-		Meta:                loaded.Meta,
-		SkillMDContent:      loaded.SkillMDContent,
-		FileSystemAvailable: loaded.FileSystem != nil,
+		Name:           name,
+		Loaded:         false,
+		Meta:           loaded.Meta,
+		SkillMDContent: loaded.SkillMDContent,
 	}
 	if loaded.FileSystem != nil {
 		detail.FileTree = aiskillloader.RenderFileSystemTreeFull(loaded.FileSystem)
@@ -84,13 +82,22 @@ func BuildSessionSkillDetail(mgr *aiskillloader.SkillsContextManager, name strin
 	return detail, nil
 }
 
-func managerHasSkillFileSystem(mgr *aiskillloader.SkillsContextManager, name string) bool {
-	loader := mgr.GetLoader()
-	if loader == nil {
-		return false
+// BuildSessionSkillResourceURL 生成来源无关的 session 技能资源 URL。当前只定义
+// 稳定访问契约，具体 HTTP handler 后续通过同一路径统一读取技能。
+func BuildSessionSkillResourceURL(cfg *Config, skillName string) string {
+	skillName = strings.TrimSpace(skillName)
+	if cfg == nil || skillName == "" {
+		return ""
 	}
-	fs, err := loader.GetFileSystem(name)
-	return err == nil && fs != nil
+	query := url.Values{}
+	query.Set("skill_name", skillName)
+	if sessionID := strings.TrimSpace(cfg.GetPersistentSessionID()); sessionID != "" {
+		query.Set("session_id", sessionID)
+	}
+	if runtimeID := strings.TrimSpace(cfg.GetRuntimeId()); runtimeID != "" {
+		query.Set("runtime_id", runtimeID)
+	}
+	return SessionSkillResourceURLPath + "?" + query.Encode()
 }
 
 // RenderSessionSkillPromptContent 把 Timeline 可见分片组织成与技能块一致的可读
