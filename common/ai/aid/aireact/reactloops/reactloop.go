@@ -473,7 +473,6 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
 		info["AllowAskForClarification"] = r.CheckClarificationAllowed(true) == nil || (cfg.UIQuestionsEnabled() && r.CheckClarificationAllowed(false) == nil)
 		info["AskForClarificationCurrentTime"], info["AskForClarificationMaxTimes"] = cfg.ClarificationUsage(r.clarificationTaskID())
-		info["WorkerClarificationDisabled"] = r.IsSubAgent() || r.loopName == "pe_task"
 		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
 			info["UIComponentIndex"] = catalog.PromptIndex()
 		}

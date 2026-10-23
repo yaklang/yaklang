@@ -96,15 +96,24 @@ func TestClarificationGoalAndSubagentVisibility(t *testing.T) {
 	defer cancel()
 	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithEnableGoalMode(true), aicommon.WithClientUI(`{"protocol":"memfit.ui/1","questions":true}`))
 	require.NoError(t, err)
-	loop, err := reactloops.NewReActLoop(schema.AI_REACT_LOOP_NAME_DEFAULT, r)
+	factory, ok := reactloops.GetLoopFactory(schema.AI_REACT_LOOP_NAME_DEFAULT)
+	require.True(t, ok)
+	loop, err := factory(r)
 	require.NoError(t, err)
 	require.Contains(t, loop.GetAllActionNames(), "ask_for_clarification_async")
+	require.Contains(t, loop.GetPersistentInstruction(), "ask_for_clarification_async")
 	require.NotContains(t, loop.GetAllActionNames(), "ask_for_clarification")
 	require.NotContains(t, loop.GetAllActionNames(), "request_user_input")
 	loop.Set(reactloops.SubAgentDepthLoopVar, 1)
-	require.NotContains(t, loop.GetAllActionNames(), "ask_for_clarification_async")
-	_, err = loop.GetActionHandler("ask_for_clarification_async")
-	require.Error(t, err)
+	for _, name := range []string{"ask_for_clarification", "ask_for_clarification_async"} {
+		require.NotContains(t, loop.GetAllActionNames(), name)
+		_, err = loop.GetActionHandler(name)
+		require.Error(t, err)
+	}
+	for _, prompt := range []string{loop.GetPersistentInstruction(), loop.GetOutputExample()} {
+		require.NotContains(t, prompt, "ask_for_clarification")
+		require.NotContains(t, prompt, "禁止直接向用户提问或等待回答")
+	}
 }
 
 func TestLegacyClarificationUsesRichLifecycleWhenSupported(t *testing.T) {
