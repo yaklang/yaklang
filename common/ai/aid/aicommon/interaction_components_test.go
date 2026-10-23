@@ -84,6 +84,40 @@ func uiDataTableFixture(t *testing.T, options ...ConfigOption) (*Config, interac
 	return cfg, doc
 }
 
+func TestUIComponentInputCollectionIsRejectedWithoutPublishing(t *testing.T) {
+	for _, forbidden := range []string{"ParameterForm", "action", "bindings"} {
+		t.Run(forbidden, func(t *testing.T) {
+			events := make(chan *schema.AiOutputEvent, 8)
+			cfg, doc := uiDisplayFixture(t, WithEventHandler(func(e *schema.AiOutputEvent) {
+				if e.Type == "ui_component" || e.Type == schema.EVENT_TYPE_RESULT {
+					events <- e
+				}
+			}))
+			valid := doc.Nodes[0]
+			switch forbidden {
+			case "ParameterForm":
+				doc.Nodes[0].Component = forbidden
+			case "action":
+				doc.Nodes[0].Action = &interaction.ComponentAction{Name: "submit_to_chat"}
+			case "bindings":
+				doc.Nodes[0].Bindings = map[string]string{"value": "answer"}
+			}
+			result, err := cfg.RenderUI(cfg.GetContext(), "task", doc)
+			require.ErrorContains(t, err, "input collection is not supported")
+			require.Nil(t, result)
+			require.Empty(t, events, "rejection must not publish a component or text fallback")
+			require.NotContains(t, cfg.UISession().artifacts, doc.ID)
+			// Rejection does not consume the successful-render correction budget.
+			doc.Nodes[0] = valid
+			_, err = cfg.RenderUI(cfg.GetContext(), "task", doc)
+			require.NoError(t, err)
+			require.Zero(t, cfg.UISession().artifacts[doc.ID].Revision)
+			require.Len(t, events, 1)
+			require.Equal(t, schema.EventType("ui_component"), (<-events).Type)
+		})
+	}
+}
+
 func TestUIDataTablePolicyAndVersionFallback(t *testing.T) {
 	cfg, doc := uiDataTableFixture(t, WithAllowRequireForUserInteract(false))
 	catalog := cfg.UICatalog()
