@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"sort"
 	"strconv"
@@ -16,7 +17,11 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 	tj "github.com/yaklang/yaklang/common/yak/java/template2java"
+	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
 // sourceCacheFormatVersion must be bumped whenever the materialized source tree layout or
@@ -154,6 +159,26 @@ func (c *Config) codeSourceFingerprint() string {
 	return b.String()
 }
 
+// SourcePreparationTimings keeps serial phase wall times separate from summed
+// worker service times. ArchiveReadWorkerSeconds includes I/O + decompilation;
+// it is deliberately not mislabeled as pure decompiler CPU time.
+type SourcePreparationTimings struct {
+	SourceCount                      int     `json:"source_count"`
+	TemplateCount                    int     `json:"template_count"`
+	WalkSeconds                      float64 `json:"walk_seconds"`
+	ArchivePrepareSeconds            float64 `json:"archive_prepare_seconds"`
+	TemplatePrepareSeconds           float64 `json:"template_prepare_seconds"`
+	TemplateTranslationWorkerSeconds float64 `json:"template_translation_worker_seconds"`
+	TemplateJavaWorkerSeconds        float64 `json:"template_java_worker_seconds"`
+	ArchiveReadWorkerSeconds         float64 `json:"archive_read_worker_seconds"`
+	StoreWorkerSeconds               float64 `json:"store_worker_seconds"`
+	DiskWriteWorkerSeconds           float64 `json:"disk_write_worker_seconds"`
+	DiskWriteBytes                   int64   `json:"disk_write_bytes"`
+	ReleaseSeconds                   float64 `json:"release_seconds"`
+	TemplateErrors                   int64   `json:"template_errors"`
+	WalkErrors                       int64   `json:"walk_errors"`
+}
+
 // prepareProjectSources runs before the source scan. Jar/zip entries (already
 // expanded by the language filesystem), .class files and .jsp/.jspx files are
 // independent file transforms: each class or archive member decompiles into one
@@ -164,7 +189,7 @@ func (c *Config) prepareProjectSources(
 	filesystem fi.FileSystem,
 	reportProcess func(float64, string, ...any),
 	storeProcess func(float64),
-) {
+) (timings SourcePreparationTimings) {
 	if c == nil || filesystem == nil {
 		return
 	}
@@ -173,6 +198,7 @@ func (c *Config) prepareProjectSources(
 		return
 	}
 	var sources, templates []string
+	walkStarted := time.Now()
 	err := filesys.Recursive(c.programPath,
 		filesys.WithFileSystem(filesystem),
 		filesys.WithContext(c.GetContext()),
@@ -198,7 +224,10 @@ func (c *Config) prepareProjectSources(
 			return nil
 		}),
 	)
+	timings.WalkSeconds = time.Since(walkStarted).Seconds()
+	timings.SourceCount, timings.TemplateCount = len(sources), len(templates)
 	if err != nil {
+		timings.WalkErrors++
 		log.Warnf("[ssa-compile] source prepare walk: %v", err)
 	}
 	total := len(sources) + len(templates)
@@ -235,12 +264,29 @@ func (c *Config) prepareProjectSources(
 		reportProcess(p, fmt.Sprintf("[%s] prepare sources jar/zip/class/jsp (%d/%d)", "f0_prepare", n, total))
 	}
 
+	archiveStarted := time.Now()
 	if len(sources) > 0 {
-		_ = materializer.Prefetch(c.GetContext(), filesystem, sources, workers, func(_, _ int) { report() })
+		if err := materializer.Prefetch(c.GetContext(), filesystem, sources, workers, func(_, _ int) { report() }); err != nil {
+			timings.WalkErrors++
+			log.Warnf("[ssa-compile] source prepare prefetch: %v", err)
+		}
 	}
-	c.prepareTemplates(filesystem, materializer, templates, workers, report)
+	timings.ArchivePrepareSeconds = time.Since(archiveStarted).Seconds()
+	templatesStarted := time.Now()
+	timings.TemplateTranslationWorkerSeconds, timings.TemplateJavaWorkerSeconds, timings.TemplateErrors = c.prepareTemplates(filesystem, materializer, templates, workers, report)
+	timings.TemplatePrepareSeconds = time.Since(templatesStarted).Seconds()
+	releaseStarted := time.Now()
+	filesys.ReleasePreparedSourceCaches(filesystem)
+	// The virtual filesystem now holds the generated Java. JSP prediction state
+	// must not survive into prehandler: the shared DFA only grows, and the
+	// prepare allocation peak stays mapped until the heap doubles.
+	c.releasePreparedJSPRuntime()
+	timings.ReleaseSeconds = time.Since(releaseStarted).Seconds()
 
 	stats := materializer.Stats()
+	timings.ArchiveReadWorkerSeconds = stats.BaseReadSeconds
+	timings.StoreWorkerSeconds = stats.StoreSeconds
+	timings.DiskWriteWorkerSeconds, timings.DiskWriteBytes = stats.DiskWriteSeconds, stats.DiskWriteBytes
 	log.Infof("[ssa-compile] source prepare finish cost=%v %s", time.Since(start), filesys.FormatSourceMaterializerStats(stats))
 	if reportProcess != nil {
 		reportProcess(sourcePrefetchProcessEnd, fmt.Sprintf(
@@ -248,37 +294,121 @@ func (c *Config) prepareProjectSources(
 			stats.Paths, len(templates), time.Since(start).Round(time.Millisecond), filesys.FormatSourceMaterializerStats(stats),
 		))
 	}
+	return timings
 }
 
 // jspJavaForSSA is the JSP side of the java2ssa contract: structured translation
-// first, and the grammar-free translation when that Java does not parse.
-func jspJavaForSSA(content, path string) (string, error) {
-	info, err := tj.ConvertTemplateToJava(tj.JSP, content, path)
-	if err == nil && info != nil && javaSourceParses(info.GetContent()) {
-		return info.GetContent(), nil
-	}
-	linear, lerr := tj.ConvertJSPLinear(content, path)
-	if lerr != nil {
-		if err != nil {
-			return "", err
-		}
-		return "", lerr
-	}
-	if linear == nil || !javaSourceParses(linear.GetContent()) {
-		if err != nil {
-			return "", err
-		}
-		return "", fmt.Errorf("jsp %s did not produce java that java2ssa can parse", path)
-	}
-	return linear.GetContent(), nil
+// first, and the grammar-free translation when that Java does not parse. cache is
+// the per-worker Java parser cache; without one every parse would use the
+// package-shared DFA tables and keep every state it ever explored.
+func jspJavaForSSA(content, path string, cache *ssa.AntlrCache) (tl.TemplateGeneratedInfo, error) {
+	info, _, _, err := jspJavaForSSAWithTiming(content, path, cache)
+	return info, err
 }
 
-func javaSourceParses(src string) bool {
+func jspJavaForSSAWithTiming(content, path string, cache *ssa.AntlrCache) (info tl.TemplateGeneratedInfo, translation, javaParse time.Duration, err error) {
+	parses := func(src string) bool {
+		started := time.Now()
+		ok := javaSourceParses(src, cache)
+		javaParse += time.Since(started)
+		return ok
+	}
+	started := time.Now()
+	info, err = tj.ConvertTemplateToJava(tj.JSP, content, path)
+	translation += time.Since(started)
+	if err == nil && info != nil && parses(info.GetContent()) {
+		return info, translation, javaParse, nil
+	}
+	started = time.Now()
+	linear, lerr := tj.ConvertJSPLinear(content, path)
+	translation += time.Since(started)
+	if lerr != nil {
+		if err != nil {
+			return nil, translation, javaParse, err
+		}
+		return nil, translation, javaParse, lerr
+	}
+	if linear == nil || !parses(linear.GetContent()) {
+		if err != nil {
+			return nil, translation, javaParse, err
+		}
+		return nil, translation, javaParse, fmt.Errorf("jsp %s did not produce java that java2ssa can parse", path)
+	}
+	return linear, translation, javaParse, nil
+}
+
+func (c *Config) rememberPreparedTemplate(path string, info tl.TemplateGeneratedInfo) {
+	if c == nil || info == nil || path == "" {
+		return
+	}
+	c.preparedTemplatesMu.Lock()
+	defer c.preparedTemplatesMu.Unlock()
+	if c.preparedTemplates == nil {
+		c.preparedTemplates = map[string]tl.TemplateGeneratedInfo{}
+	}
+	c.preparedTemplates[path] = info
+}
+
+func (c *Config) applyPreparedTemplates(prog *ssa.Program) {
+	if c == nil || prog == nil {
+		return
+	}
+	c.preparedTemplatesMu.Lock()
+	templates := c.preparedTemplates
+	c.preparedTemplates = nil
+	c.preparedTemplatesMu.Unlock()
+	seen := map[any]struct{}{}
+	for path, info := range templates {
+		prog.SetTemplate(path, info)
+		if info == nil {
+			continue
+		}
+		// Range offsets belong to the original page, not the generated Java.
+		// The database reloads a range by that editor's hash, so the page has
+		// to be saved with the program or the reloaded call has a nil range.
+		for _, rng := range info.GetRangeMap() {
+			if rng == nil {
+				continue
+			}
+			editor := rng.GetEditor()
+			if editor == nil {
+				continue
+			}
+			if _, ok := seen[editor]; ok {
+				continue
+			}
+			seen[editor] = struct{}{}
+			if editor.GetProgramName() == "" {
+				editor.SetProgramName(prog.GetProgramName())
+			}
+			prog.SaveEditor(editor)
+		}
+	}
+}
+
+func javaSourceParses(src string, cache *ssa.AntlrCache) bool {
 	if strings.TrimSpace(src) == "" {
 		return false
 	}
-	_, err := java2ssa.Frontend(src)
+	_, err := java2ssa.FrontendRaw(src, cache)
 	return err == nil
+}
+
+// newJavaParseCache builds an isolated parser cache for one prepare worker.
+func newJavaParseCache() *ssa.AntlrCache {
+	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	if !ok {
+		return nil
+	}
+	return builder.GetAntlrCache()
+}
+
+// currentHeapInuseMB reports live heap for prepare-phase attribution logs. The
+// counter is sampled, not a limit, so it stays cheap on the conversion path.
+func currentHeapInuseMB() float64 {
+	var ms runtime.MemStats
+	runtime.ReadMemStats(&ms)
+	return float64(ms.HeapInuse) / 1048576
 }
 
 func (c *Config) prepareTemplates(
@@ -287,7 +417,7 @@ func (c *Config) prepareTemplates(
 	paths []string,
 	workers int,
 	report func(),
-) {
+) (translationSeconds, javaSeconds float64, conversionErrors int64) {
 	if len(paths) == 0 || materializer == nil {
 		return
 	}
@@ -299,10 +429,22 @@ func (c *Config) prepareTemplates(
 	}
 	jobs := make(chan string)
 	var wg sync.WaitGroup
+	var generatedBytes atomic.Int64
+	var converted atomic.Int64
+	var doneCount atomic.Int64
+	var translationNS, javaNS, errors atomic.Int64
+	started := time.Now()
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			cache := newJavaParseCache()
+			defer func() {
+				if cache != nil {
+					cache.Clear()
+				}
+			}()
+			workerParses := 0
 			for path := range jobs {
 				if c.GetContext() != nil && c.GetContext().Err() != nil {
 					report()
@@ -314,13 +456,34 @@ func (c *Config) prepareTemplates(
 					report()
 					continue
 				}
-				javaSource, err := jspJavaForSSA(string(raw), path)
+				fileStart := time.Now()
+				info, translated, parsed, err := jspJavaForSSAWithTiming(string(raw), path, cache)
+				translationNS.Add(translated.Nanoseconds())
+				javaNS.Add(parsed.Nanoseconds())
+				elapsed := time.Since(fileStart)
+				workerParses++
+				if cache != nil && workerParses%50 == 0 {
+					cache.ResetRuntimeCaches()
+				}
 				if err != nil {
-					log.Debugf("[ssa-compile] prepare jsp %s: %v", path, err)
+					errors.Add(1)
+					log.Warnf("[ssa-compile] prepare jsp %s: %v", path, err)
 					report()
 					continue
 				}
+				javaSource := info.GetContent()
+				if elapsed > 2*time.Second {
+					log.Warnf("[ssa-compile] slow jsp convert %s cost=%v source=%d generated=%d", path, elapsed, len(raw), len(javaSource))
+				}
+				c.rememberPreparedTemplate(path, info)
 				materializer.Put(path, []byte(javaSource))
+				converted.Add(1)
+				generatedBytes.Add(int64(len(javaSource)))
+				n := doneCount.Add(1)
+				if n%100 == 0 || int(n) == len(paths) {
+					log.Infof("[ssa-compile] jsp convert progress=%d/%d converted=%d generated=%.1fMB heap=%.1fMB cost=%v",
+						n, len(paths), converted.Load(), float64(generatedBytes.Load())/1048576, currentHeapInuseMB(), time.Since(started))
+				}
 				report()
 			}
 		}()
@@ -330,6 +493,89 @@ func (c *Config) prepareTemplates(
 	}
 	close(jobs)
 	wg.Wait()
+	return float64(translationNS.Load()) / float64(time.Second), float64(javaNS.Load()) / float64(time.Second), errors.Load()
+}
+
+// releasePreparedJSPRuntime runs at the virtual-filesystem boundary, before
+// prehandler. Generated Java is already stored; the JSP lexer/parser tables and
+// any Java caches created while checking that Java are scratch. Drop them and
+// return the prepare peak to the OS so prehandler does not start on top of it.
+func (c *Config) releasePreparedJSPRuntime() {
+	before := currentHeapInuseMB()
+	if c != nil && c.LanguageBuilder != nil {
+		c.LanguageBuilder.Clearup()
+	}
+	jspparser.ResetJSPRuntimeCaches()
+	runtime.GC()
+	debug.FreeOSMemory()
+	log.Infof("[ssa-compile] jsp runtime released before prehandler heap %.1fMB -> %.1fMB", before, currentHeapInuseMB())
+}
+
+// MaterializeResult is the in-memory Java tree produced from jars, classes and JSP.
+// VirtualFS is the only source store retained after preparation.
+type MaterializeResult struct {
+	VirtualFS *filesys.VirtualFS
+	Files     int64
+	Bytes     int64
+	Errors    int64
+	Elapsed   time.Duration
+	HeapMB    float64
+	Timings   SourcePreparationTimings
+}
+
+// MaterializeLocalProject turns a local Java project into one virtual filesystem of
+// generated Java. It decompiles jar/class files and converts JSP, then drops the
+// JSP parser tables. It does not compile SSA.
+func MaterializeLocalProject(root string, concurrency int) (*MaterializeResult, error) {
+	local := filesys.NewRelLocalFs(root)
+	opts := []ssaconfig.Option{
+		WithFileSystem(local),
+		WithProgramPath("."),
+		WithLanguage(ssaconfig.JAVA),
+		ssaconfig.WithCompileDisableDefaultExcludes(true),
+	}
+	if concurrency > 0 {
+		opts = append(opts, WithConcurrency(concurrency))
+	}
+	cfg, err := DefaultConfig(opts...)
+	if err != nil {
+		return nil, err
+	}
+	cfg.resolveLanguageBuilder(local)
+	wrapped := cfg.swapLanguageFs(local)
+	started := time.Now()
+	timings := cfg.prepareProjectSources(wrapped, nil, nil)
+	materializer := filesys.MaterializerOf(wrapped)
+	if materializer == nil || materializer.VirtualFS() == nil {
+		return nil, fmt.Errorf("prepare did not produce a virtual filesystem")
+	}
+	var files int64
+	var nbytes int64
+	err = filesys.Recursive(".",
+		filesys.WithFileSystem(materializer.VirtualFS()),
+		filesys.WithFileStat(func(path string, info fs.FileInfo) error {
+			if info == nil || info.IsDir() {
+				return nil
+			}
+			files++
+			nbytes += info.Size()
+			return nil
+		}),
+	)
+	if err != nil {
+		return nil, err
+	}
+	runtime.GC()
+	debug.FreeOSMemory()
+	return &MaterializeResult{
+		VirtualFS: materializer.VirtualFS(),
+		Files:     files,
+		Bytes:     nbytes,
+		Errors:    materializer.Stats().Errors + timings.TemplateErrors + timings.WalkErrors,
+		Timings:   timings,
+		Elapsed:   time.Since(started),
+		HeapMB:    currentHeapInuseMB(),
+	}, nil
 }
 
 // prefetchCompileSources materializes every compile input before the compile-unit planning

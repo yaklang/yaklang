@@ -105,5 +105,6 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 	builder.WithExternBuildValueHandler(c.externBuildValueHandler)
 	builder.WithDefineFunction(c.defineFunc)
 	builder.SetContext(c.GetContext())
+	c.applyPreparedTemplates(application)
 	return application, builder, nil
 }
