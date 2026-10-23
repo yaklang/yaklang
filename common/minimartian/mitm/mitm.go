@@ -26,6 +26,7 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"errors"
+	"fmt"
 	"math/big"
 	"net"
 	"net/http"
@@ -49,6 +50,7 @@ var MaxSerialNumber = big.NewInt(0).SetBytes(bytes.Repeat([]byte{255}, 20))
 // capable of MITM.
 type Config struct {
 	ca                     *x509.Certificate
+	caChain                [][]byte
 	capriv                 interface{}
 	priv                   *rsa.PrivateKey
 	keyID                  []byte
@@ -124,6 +126,28 @@ func NewAuthority(name, organization string, validity time.Duration) (*x509.Cert
 
 type ConfigOption func(*Config) error
 
+// WithCertificateChain adds the issuer certificates following the signing CA,
+// in order. The signing CA itself is included automatically.
+func WithCertificateChain(issuers ...[]byte) ConfigOption {
+	return func(c *Config) error {
+		chain := [][]byte{c.ca.Raw}
+		previous := c.ca
+		for i, der := range issuers {
+			issuer, err := x509.ParseCertificate(der)
+			if err != nil {
+				return fmt.Errorf("parse CA chain certificate %d: %w", i+1, err)
+			}
+			if err := previous.CheckSignatureFrom(issuer); err != nil {
+				return fmt.Errorf("verify CA chain certificate %d: %w", i+1, err)
+			}
+			chain = append(chain, append([]byte(nil), der...))
+			previous = issuer
+		}
+		c.caChain = chain
+		return nil
+	}
+}
+
 func WithObsoleteTLS(ca, gmCA *gmx509.Certificate, privateKey, gmPrivateKey interface{}) ConfigOption {
 	return func(c *Config) error {
 		config, err := NewObsoleteTLSConfig(ca, gmCA, privateKey, gmPrivateKey)
@@ -159,6 +183,7 @@ func NewConfig(ca *x509.Certificate, privateKey interface{}, opts ...ConfigOptio
 
 	config := &Config{
 		ca:       ca,
+		caChain:  [][]byte{ca.Raw},
 		capriv:   privateKey,
 		priv:     priv,
 		keyID:    keyID,
@@ -173,6 +198,9 @@ func NewConfig(ca *x509.Certificate, privateKey interface{}, opts ...ConfigOptio
 		if err != nil {
 			return nil, err
 		}
+	}
+	if config.obsoleteConfig != nil {
+		config.obsoleteConfig.caChain = config.caChain
 	}
 	return config, nil
 }
@@ -384,7 +412,7 @@ func (c *Config) cert(hostname string) (*tls.Certificate, error) {
 	}
 
 	tlsc = &tls.Certificate{
-		Certificate: [][]byte{raw, c.ca.Raw},
+		Certificate: append([][]byte{raw}, c.caChain...),
 		PrivateKey:  c.priv,
 		Leaf:        x509c,
 	}

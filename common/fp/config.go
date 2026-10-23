@@ -40,6 +40,12 @@ type Config struct {
 	ProbeTimeout time.Duration
 
 	// 发送 Probe 的数量限制，默认值为 10。
+	// 这只限制没有命中目标端口的通用探针。默认配置会把通用预算放到
+	// defaultGenericProbeBudget，给被调低稀有度的常见协议留位置。
+	// 端口命中的探针另有预算，默认配置下两者加起来不超过
+	// defaultProbeTotalBudget，避免静默端口把扫描拖死。
+	// 显式调小 ProbesMax 时仍按该值截断通用探针；显式调大时端口预算和
+	// 通用预算都不低于默认下限，总发包数最多为两份预算之和。
 	// 服务匹配正则由 minirehs 预编译后一次筛选，再用 pcre2-lite 确认捕获组，
 	// 因此可以提高参与指纹的数量，同时用同样的并发把这些探测一次发出。
 	ProbesMax int
@@ -463,7 +469,7 @@ func NewConfig(options ...ConfigOption) *Config {
 		TransportProtos:           []TransportProto{TCP},
 		ActiveMode:                true,
 		RarityMax:                 5,
-		ProbesMax:                 10,
+		ProbesMax:                 defaultProbesMax,
 		ProbeTimeout:              5 * time.Second,
 		ProbesConcurrentMax:       10,
 		OnlyEnableWebFingerprint:  false,
@@ -511,9 +517,10 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 	return c.FingerprintRules
 }
 
-// maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的最大探测包数量，默认值为 10
+// maxProbes servicescan 的配置选项，在主动模式发包的基础上设置本次扫描使用的通用探测包数量上限，默认值为 10
+// 命中目标端口的探针另有预算，不占用该值，因此单个服务的实际发包数可能大于 m（见 Config.ProbesMax 注释）
 // 参数:
-//   - m: 最大探测包数量
+//   - m: 通用探测包数量上限
 //
 // 返回值:
 //   - 一个 servicescan.Scan 可接收的配置选项
@@ -533,7 +540,7 @@ func (c *Config) GetFingerprintRules() map[*NmapProbe][]*NmapMatch {
 // ```
 func WithProbesMax(m int) ConfigOption {
 	if m <= 0 {
-		m = 10
+		m = defaultProbesMax
 	}
 
 	return func(config *Config) {

@@ -31,7 +31,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string, token ...CanStart
 
 	getInCurrent := func() (Type, bool) {
 		if blueprint, exit := p.Blueprint.Get(name); exit {
-			if !p.PreHandler() {
+			if p.shouldBuildOnLookup() {
 				blueprint.Build()
 			}
 			return blueprint, true
@@ -47,7 +47,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string, token ...CanStart
 		getInCurrent,
 	); ok {
 		if c, ok := typ.(*Blueprint); ok {
-			if !p.PreHandler() {
+			if p.shouldBuildOnLookup() {
 				c.Build()
 			}
 			return c
@@ -67,7 +67,7 @@ func (p *Program) GetClassBlueprintEx(name string, pkg string, token ...CanStart
 func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 	getFunc := func() (Value, bool) {
 		if fun, ok := prog.Funcs.Get(name); ok {
-			if !prog.PreHandler() {
+			if prog.shouldBuildOnLookup() {
 				fun.Build()
 			}
 			return fun, true
@@ -82,7 +82,7 @@ func (prog *Program) GetFunctionEx(name, pkg string) *Function {
 	); ok {
 		if fun, ok := ToFunction(val); ok {
 			//todo: fix se
-			if !prog.PreHandler() {
+			if prog.shouldBuildOnLookup() {
 				fun.Build()
 			}
 			return fun

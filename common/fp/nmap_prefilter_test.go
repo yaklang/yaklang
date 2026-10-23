@@ -65,7 +65,7 @@ func TestDefaultProbeBudgetAdmitsMoreFingerprints(t *testing.T) {
 	_, more, ok := GetRuleBlockByConfig(80, cfg)
 	require.True(t, ok)
 	require.Greater(t, len(more), len(few))
-	require.LessOrEqual(t, len(more), cfg.ProbesMax)
+	require.LessOrEqual(t, len(more), selectionCap(cfg))
 
 	fewRules := 0
 	for _, block := range few {

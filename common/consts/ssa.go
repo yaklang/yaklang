@@ -13,6 +13,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 
 	"github.com/yaklang/gorm"
 )
@@ -35,7 +36,10 @@ const (
 var (
 	SSA_PROJECT_DB_RAW     = "default-yakssa.db"
 	SSA_PROJECT_DB_DIALECT = SQLiteExtend
-	ssaDatabase            *gorm.DB
+	// Plain pointer, same as profileDatabase. initYakitDatabaseOnce is the
+	// only guard: the handle is published when it is still unset, and later
+	// SetGormSSAProjectDatabase calls are explicit rebinds.
+	ssaDatabase *gorm.DB
 )
 
 const (
@@ -75,6 +79,8 @@ func parseDatabaseURL(raw string) (string, string) {
 			// Keep the full raw string to preserve URL scheme.
 			// lib/pq and gorm both accept URL DSNs like: postgres://user:pass@host:5432/db?sslmode=disable
 			return Postgres, raw
+		case "dm":
+			return damenggorm.Dialect, raw
 		// Add other supported dialects here
 		// case "postgres", "postgresql":
 		// 	return PostgreSQL, connectionDetails // Assuming PostgreSQL constant exists
@@ -104,9 +110,7 @@ func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	if err != nil {
 		return err
 	}
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
-	schema.SetDefaultSSADatabase(db)
+	SetGormSSAProjectDatabase(db)
 	return nil
 }
 
@@ -124,8 +128,19 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	// SSA-IR DB may be accessed with a read-only credential (scan-only nodes).
 	// In that case, AutoMigrate would fail even if the schema already exists.
 	if !utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE)) {
-		schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+		if dialect == damenggorm.Dialect {
+			if err := schema.AutoMigrateChecked(db, schema.KEY_SCHEMA_SSA_DATABASE); err != nil {
+				_ = db.Close()
+				return nil, err
+			}
+		} else {
+			schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
+		}
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
+		if dialect == damenggorm.Dialect && db.Error != nil {
+			_ = db.Close()
+			return nil, db.Error
+		}
 	}
 	configureAndOptimizeDBWithOptions(dialect, db, options)
 	return db, nil
@@ -149,9 +164,9 @@ func GetTempSSADataBase() (*gorm.DB, error) {
 }
 
 func SetGormSSAProjectDatabase(db *gorm.DB) {
-	ssaDatabase = db
-	// 同步更新 schema 包中的默认 SSA 数据库
+	// schema 里的句柄只是这里的镜像，一起赋值。
 	schema.SetDefaultSSADatabase(db)
+	ssaDatabase = db
 }
 
 func GetGormSSAProjectDataBase() *gorm.DB {

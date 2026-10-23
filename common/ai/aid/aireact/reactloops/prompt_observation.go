@@ -4,12 +4,13 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
-	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/ytoken"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -31,67 +32,43 @@ const lastPromptObservationStatusLoopKey = "last_ai_decision_prompt_observation_
 const lastPromptTokenLoopKey = "last_ai_decision_prompt_token"
 const ReActPromptObservationStatusKey = "re-act-prompt-observation-status"
 
-type PromptSectionRole string
+// publishPromptObservation is called only after the main loop accepts a prompt
+// for a decision request. The caller transfers the immutable assembly snapshot;
+// compression probes must never update the last-request state or emit profiles.
+func (r *ReActLoop) publishPromptObservation(nonce string, result *LoopPromptAssemblyResult, promptTokens int) {
+	if r == nil || result == nil {
+		return
+	}
+	prompt := result.Prompt
+	sections := result.Sections
+	loopName, debugMode, emitter := r.loopName, r.isDebugModeEnabled(), r.emitter
 
-// PromptSectionRole 是上下文字节统计图 / 上下文成分面板用来按段分类的枚举.
-//
-// P1.1 之后, 老 PromptSectionRoleSemiDynamic ("semi_dynamic") 已经被彻底
-// 拆成两个独立 Role:
-//   - PromptSectionRoleSemiDynamic1 ("semi_dynamic_1") -> "半动态段1"
-//   - PromptSectionRoleSemiDynamic2 ("semi_dynamic_2") -> "半动态段2"
-//
-// 这样字节统计图能把两块的趋势分开展示, 避免合并掩盖单边抖动. 老的
-// SemiDynamic Role 不再保留, 主路径与所有 caller (含 reactloops 内部 fallback
-// liteforge / aireduce 等) 已迁移到 1/2 版本.
-//
-// 字节统计图的 "从下往上" 堆叠顺序由 promptSectionRolesInOrder 决定:
-//
-//	high_static -> frozen_block -> semi_dynamic_1 -> semi_dynamic_2 ->
-//	timelineOpen -> dynamic
-//
-// 关键词: PromptSectionRole 拆 SemiDynamic1/2, 字节统计独立分类, P1.1,
-//
-//	老 SemiDynamic 已移除
-const (
-	PromptSectionRoleHighStatic   PromptSectionRole = "high_static"
-	PromptSectionRoleFrozenBlock  PromptSectionRole = "frozen_block"
-	PromptSectionRoleSemiDynamic1 PromptSectionRole = "semi_dynamic_1"
-	PromptSectionRoleSemiDynamic2 PromptSectionRole = "semi_dynamic_2"
-	PromptSectionRoleTimelineOpen PromptSectionRole = "timelineOpen"
-	PromptSectionRoleDynamic      PromptSectionRole = "dynamic"
-)
-
-type PromptSectionRoleZH string
-
-const (
-	PromptSectionRoleZHHighStatic   PromptSectionRoleZH = "高静态段"
-	PromptSectionRoleZHFrozenBlock  PromptSectionRoleZH = "冻结块"
-	PromptSectionRoleZHSemiDynamic1 PromptSectionRoleZH = "半动态段1"
-	PromptSectionRoleZHSemiDynamic2 PromptSectionRoleZH = "半动态段2"
-	PromptSectionRoleZHTimelineOpen PromptSectionRoleZH = "时间线开放段"
-	PromptSectionRoleZHDynamic      PromptSectionRoleZH = "动态段"
-)
-
-type PromptSectionObservation struct {
-	Key          string              `json:"key"`
-	Label        string              `json:"label"`
-	Role         PromptSectionRole   `json:"role"`
-	RoleZh       PromptSectionRoleZH `json:"role_zh"`
-	Included     bool                `json:"included"`
-	Compressible bool                `json:"compressible"`
-	Bytes        int                 `json:"bytes"`
-	Lines        int                 `json:"lines"`
-	// EstimatedTokens 使用 ytoken.CalcTokenCount (Qwen BPE) 对本段 Content 或
-	// (容器段) 各子段之和做预估计数, 与同树 Bytes 聚合口径一致.
-	EstimatedTokens int                         `json:"estimated_tokens,omitempty"`
-	Content         string                      `json:"content,omitempty"`
-	Children        []*PromptSectionObservation `json:"children,omitempty"`
+	r.SetLastPromptToken(promptTokens)
+	r.observationInflight.Add(1)
+	go func() {
+		defer r.observationInflight.Done()
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Warnf("async observation build panic recovered: %v", rec)
+			}
+		}()
+		observation := BuildPromptObservation(loopName, nonce, prompt, sections)
+		status := observation.BuildStatus(defaultPromptSummaryBytes)
+		r.SetLastPromptObservation(observation)
+		r.SetLastPromptObservationStatus(status)
+		if emitter != nil {
+			emitter.EmitPromptProfile(status)
+		}
+		if debugMode {
+			log.Infof("prompt section build report:\n%s", observation.RenderCLIReport(120))
+		}
+	}()
 }
 
 type PromptObservationRoleStat struct {
-	RoleName   PromptSectionRole   `json:"role_name"`
-	RoleNameZh PromptSectionRoleZH `json:"role_name_zh"`
-	RoleBytes  int                 `json:"role_bytes"`
+	RoleName   aicommon.PromptSectionRole   `json:"role_name"`
+	RoleNameZh aicommon.PromptSectionRoleZH `json:"role_name_zh"`
+	RoleBytes  int                          `json:"role_bytes"`
 	// RoleTokens 为各叶子成分按 Role 汇总的 ytoken.CalcTokenCount 预估值.
 	RoleTokens int `json:"role_tokens,omitempty"`
 }
@@ -103,20 +80,20 @@ type PromptObservationStats struct {
 }
 
 type PromptObservation struct {
-	LoopName             string                      `json:"loop_name"`
-	Nonce                string                      `json:"nonce"`
-	GeneratedAt          time.Time                   `json:"generated_at"`
-	PromptBytes          int                         `json:"prompt_bytes"`
-	PromptTokens         int                         `json:"prompt_tokens"`
-	PromptLines          int                         `json:"prompt_lines"`
-	SectionCount         int                         `json:"section_count"`
-	IncludedSectionCount int                         `json:"included_section_count"`
-	Stats                PromptObservationStats      `json:"stats"`
-	Sections             []*PromptSectionObservation `json:"sections"`
+	LoopName             string                               `json:"loop_name"`
+	Nonce                string                               `json:"nonce"`
+	GeneratedAt          time.Time                            `json:"generated_at"`
+	PromptBytes          int                                  `json:"prompt_bytes"`
+	PromptTokens         int                                  `json:"prompt_tokens"`
+	PromptLines          int                                  `json:"prompt_lines"`
+	SectionCount         int                                  `json:"section_count"`
+	IncludedSectionCount int                                  `json:"included_section_count"`
+	Stats                PromptObservationStats               `json:"stats"`
+	Sections             []*aicommon.PromptSectionObservation `json:"sections"`
 }
 
 // PromptSectionStatus 是发往前端 (yakit "上下文成分" 面板 / EmitPromptProfile)
-// 的单段状态, 是 PromptSectionObservation 的可序列化快照.
+// 的单段状态, 是 aicommon.PromptSectionObservation 的可序列化快照.
 //
 // 老字段 (key/label/role/included/can_compress/bytes/lines/summary/children)
 // 保持向后兼容. 新增字段 (BytesPercent / EstimatedTokens / ContentHash /
@@ -128,21 +105,21 @@ type PromptObservation struct {
 // 关键词: PromptSectionStatus, EmitPromptProfile, 上下文成分, bytes_percent,
 // estimated_tokens, content_hash, summary_truncated, role_zh
 type PromptSectionStatus struct {
-	Key         string                 `json:"key"`
-	Label       string                 `json:"label"`
-	Role        PromptSectionRole      `json:"role"`
-	RoleZh      PromptSectionRoleZH    `json:"role_zh"`
-	Included    bool                   `json:"included"`
-	CanCompress bool                   `json:"can_compress"`
-	Bytes       int                    `json:"bytes"`
-	Lines       int                    `json:"lines"`
-	Summary     string                 `json:"summary,omitempty"`
-	Children    []*PromptSectionStatus `json:"children,omitempty"`
+	Key         string                       `json:"key"`
+	Label       string                       `json:"label"`
+	Role        aicommon.PromptSectionRole   `json:"role"`
+	RoleZh      aicommon.PromptSectionRoleZH `json:"role_zh"`
+	Included    bool                         `json:"included"`
+	CanCompress bool                         `json:"can_compress"`
+	Bytes       int                          `json:"bytes"`
+	Lines       int                          `json:"lines"`
+	Summary     string                       `json:"summary,omitempty"`
+	Children    []*PromptSectionStatus       `json:"children,omitempty"`
 
 	// BytesPercent 该段 (含 children) 字节占整 prompt 的百分比, 0-100, 保留两位小数.
 	// 前端可直接用作进度条 / 排序依据, 帮用户找到"哪段最大".
 	BytesPercent float64 `json:"bytes_percent,omitempty"`
-	// EstimatedTokens 与 PromptSectionObservation 一致: ytoken.CalcTokenCount
+	// EstimatedTokens 与 aicommon.PromptSectionObservation 一致: ytoken.CalcTokenCount
 	// (Qwen BPE). 与上游计费 token 可能略有偏差, 段间相对量级可比.
 	EstimatedTokens int `json:"estimated_tokens,omitempty"`
 	// ContentHash 本段 (含 children 渲染后) 内容的 sha1 前 8 字符 (16 hex chars).
@@ -169,36 +146,7 @@ type PromptObservationStatus struct {
 	Sections             []*PromptSectionStatus      `json:"sections"`
 }
 
-func newPromptSectionObservation(
-	key string,
-	label string,
-	role PromptSectionRole,
-	compressible bool,
-	content string,
-) *PromptSectionObservation {
-	section := &PromptSectionObservation{
-		Key:          key,
-		Label:        label,
-		Role:         role,
-		RoleZh:       promptSectionRoleZH(role),
-		Compressible: compressible,
-		Content:      aiprojection.RedactNonce(content),
-	}
-	section.refreshMetrics()
-	return section
-}
-
-func NewPromptSectionObservation(
-	key string,
-	label string,
-	role PromptSectionRole,
-	compressible bool,
-	content string,
-) *PromptSectionObservation {
-	return newPromptSectionObservation(key, label, role, compressible, content)
-}
-
-func buildPromptObservation(loopName string, nonce string, prompt string, sections []*PromptSectionObservation) *PromptObservation {
+func buildPromptObservation(loopName string, nonce string, prompt string, sections []*aicommon.PromptSectionObservation) *PromptObservation {
 	observation := &PromptObservation{
 		LoopName:     loopName,
 		Nonce:        nonce,
@@ -217,11 +165,11 @@ func buildPromptObservation(loopName string, nonce string, prompt string, sectio
 	return observation
 }
 
-func BuildPromptObservation(loopName string, nonce string, prompt string, sections []*PromptSectionObservation) *PromptObservation {
+func BuildPromptObservation(loopName string, nonce string, prompt string, sections []*aicommon.PromptSectionObservation) *PromptObservation {
 	return buildPromptObservation(loopName, nonce, prompt, sections)
 }
 
-func countPromptSections(section *PromptSectionObservation) int {
+func countPromptSections(section *aicommon.PromptSectionObservation) int {
 	if section == nil {
 		return 0
 	}
@@ -232,7 +180,7 @@ func countPromptSections(section *PromptSectionObservation) int {
 	return total
 }
 
-func collectPromptObservationStats(section *PromptSectionObservation, observation *PromptObservation) {
+func collectPromptObservationStats(section *aicommon.PromptSectionObservation, observation *PromptObservation) {
 	if section == nil || observation == nil || !section.IsIncluded() {
 		return
 	}
@@ -257,96 +205,11 @@ func collectPromptObservationStats(section *PromptSectionObservation, observatio
 	}
 }
 
-func (s *PromptSectionObservation) IsIncluded() bool {
-	if s == nil {
-		return false
-	}
-	return s.Included
-}
-
-func (s *PromptSectionObservation) refreshMetrics() {
-	if s == nil {
-		return
-	}
-	s.Bytes = len(s.Content)
-	s.Lines = countPromptLines(s.Content)
-	s.Included = strings.TrimSpace(s.Content) != ""
-	s.EstimatedTokens = 0
-	if len(s.Children) == 0 {
-		s.EstimatedTokens = ytoken.CalcTokenCount(s.Content)
-		return
-	}
-	for _, child := range s.Children {
-		if child == nil {
-			continue
-		}
-		child.refreshMetrics()
-		if child.Included {
-			s.Included = true
-		}
-		s.Bytes += child.Bytes
-		s.Lines += child.Lines
-		s.EstimatedTokens += child.EstimatedTokens
-	}
-}
-
-func (s *PromptSectionObservation) ContentBytes() int {
-	if s == nil {
-		return 0
-	}
-	return s.Bytes
-}
-
-func (s *PromptSectionObservation) LineCount() int {
-	if s == nil {
-		return 0
-	}
-	return s.Lines
-}
-
 func countPromptLines(content string) int {
 	if content == "" {
 		return 0
 	}
 	return strings.Count(content, "\n") + 1
-}
-
-func newPromptContainerSection(
-	key string,
-	label string,
-	role PromptSectionRole,
-) *PromptSectionObservation {
-	section := &PromptSectionObservation{
-		Key:          key,
-		Label:        label,
-		Role:         role,
-		RoleZh:       promptSectionRoleZH(role),
-		Included:     false,
-		Compressible: false,
-		Bytes:        0,
-		Lines:        0,
-		Content:      "",
-	}
-	return section
-}
-
-func NewPromptContainerSection(
-	key string,
-	label string,
-	role PromptSectionRole,
-) *PromptSectionObservation {
-	return newPromptContainerSection(key, label, role)
-}
-
-func finalizePromptContainerSection(section *PromptSectionObservation) *PromptSectionObservation {
-	if section != nil {
-		section.refreshMetrics()
-	}
-	return section
-}
-
-func FinalizePromptContainerSection(section *PromptSectionObservation) *PromptSectionObservation {
-	return finalizePromptContainerSection(section)
 }
 
 func newPromptObservationStats() PromptObservationStats {
@@ -361,7 +224,7 @@ func newPromptObservationRoleStats() []PromptObservationRoleStat {
 	for _, role := range roles {
 		stats = append(stats, PromptObservationRoleStat{
 			RoleName:   role,
-			RoleNameZh: promptSectionRoleZH(role),
+			RoleNameZh: role.Zh(),
 			RoleBytes:  0,
 			RoleTokens: 0,
 		})
@@ -378,7 +241,7 @@ func clonePromptObservationRoleStats(stats []PromptObservationRoleStat) []Prompt
 	return cloned
 }
 
-func addPromptObservationRoleBytes(stats []PromptObservationRoleStat, role PromptSectionRole, bytes int) []PromptObservationRoleStat {
+func addPromptObservationRoleBytes(stats []PromptObservationRoleStat, role aicommon.PromptSectionRole, bytes int) []PromptObservationRoleStat {
 	if bytes == 0 {
 		return stats
 	}
@@ -389,13 +252,13 @@ func addPromptObservationRoleBytes(stats []PromptObservationRoleStat, role Promp
 	}
 	return append(stats, PromptObservationRoleStat{
 		RoleName:   role,
-		RoleNameZh: promptSectionRoleZH(role),
+		RoleNameZh: role.Zh(),
 		RoleBytes:  bytes,
 		RoleTokens: 0,
 	})
 }
 
-func addPromptObservationRoleTokens(stats []PromptObservationRoleStat, role PromptSectionRole, tokens int) []PromptObservationRoleStat {
+func addPromptObservationRoleTokens(stats []PromptObservationRoleStat, role aicommon.PromptSectionRole, tokens int) []PromptObservationRoleStat {
 	if tokens == 0 {
 		return stats
 	}
@@ -406,13 +269,13 @@ func addPromptObservationRoleTokens(stats []PromptObservationRoleStat, role Prom
 	}
 	return append(stats, PromptObservationRoleStat{
 		RoleName:   role,
-		RoleNameZh: promptSectionRoleZH(role),
+		RoleNameZh: role.Zh(),
 		RoleBytes:  0,
 		RoleTokens: tokens,
 	})
 }
 
-func promptObservationRoleStatIndex(stats []PromptObservationRoleStat, role PromptSectionRole) int {
+func promptObservationRoleStatIndex(stats []PromptObservationRoleStat, role aicommon.PromptSectionRole) int {
 	for i := range stats {
 		if stats[i].RoleName == role {
 			return i
@@ -494,7 +357,7 @@ func (o *PromptObservation) BuildStatus(maxSummaryBytes int) *PromptObservationS
 	return status
 }
 
-func buildPromptSectionStatus(section *PromptSectionObservation, maxSummaryBytes int, totalPromptBytes int) *PromptSectionStatus {
+func buildPromptSectionStatus(section *aicommon.PromptSectionObservation, maxSummaryBytes int, totalPromptBytes int) *PromptSectionStatus {
 	if section == nil {
 		return nil
 	}
@@ -608,7 +471,7 @@ func cachedContentHash8(content string) string {
 	return h
 }
 
-func appendPromptSectionCLI(buf *strings.Builder, section *PromptSectionObservation, prefix string, isLast bool, maxPreviewBytes int) {
+func appendPromptSectionCLI(buf *strings.Builder, section *aicommon.PromptSectionObservation, prefix string, isLast bool, maxPreviewBytes int) {
 	if buf == nil || section == nil {
 		return
 	}
@@ -656,47 +519,28 @@ func renderPromptSectionPreview(content string, maxPreviewBytes int) string {
 	return utils.ShrinkString(content, maxPreviewBytes)
 }
 
-func sectionRoleLabel(role PromptSectionRole) string {
+func sectionRoleLabel(role aicommon.PromptSectionRole) string {
 	switch role {
-	case PromptSectionRoleHighStatic:
+	case aicommon.PromptSectionRoleHighStatic:
 		return "high_static"
-	case PromptSectionRoleFrozenBlock:
+	case aicommon.PromptSectionRoleFrozenBlock:
 		return "frozen_block"
-	case PromptSectionRoleSemiDynamic1:
+	case aicommon.PromptSectionRoleSemiDynamic1:
 		return "semi_dynamic_1"
-	case PromptSectionRoleSemiDynamic2:
+	case aicommon.PromptSectionRoleSemiDynamic2:
 		return "semi_dynamic_2"
-	case PromptSectionRoleTimelineOpen:
+	case aicommon.PromptSectionRoleTimelineOpen:
 		return "timelineOpen"
-	case PromptSectionRoleDynamic:
+	case aicommon.PromptSectionRoleDynamic:
 		return "dynamic"
 	default:
 		return "unknown"
 	}
 }
 
-func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
-	switch role {
-	case PromptSectionRoleHighStatic:
-		return PromptSectionRoleZHHighStatic
-	case PromptSectionRoleFrozenBlock:
-		return PromptSectionRoleZHFrozenBlock
-	case PromptSectionRoleSemiDynamic1:
-		return PromptSectionRoleZHSemiDynamic1
-	case PromptSectionRoleSemiDynamic2:
-		return PromptSectionRoleZHSemiDynamic2
-	case PromptSectionRoleTimelineOpen:
-		return PromptSectionRoleZHTimelineOpen
-	case PromptSectionRoleDynamic:
-		return PromptSectionRoleZHDynamic
-	default:
-		return ""
-	}
-}
-
 // promptSectionRolesInOrder 返回字节统计图 / 上下文成分面板 "从下往上" 的
 // 堆叠渲染顺序. P1.1 之后老 SemiDynamic 已经被拆成 SemiDynamic1 / SemiDynamic2
-// 两个独立 Role, 老的 PromptSectionRoleSemiDynamic 已删除, 这里也不再保留兜底.
+// 两个独立 Role, 老的 aicommon.PromptSectionRoleSemiDynamic 已删除, 这里也不再保留兜底.
 //
 // 顺序固定为:
 //
@@ -704,14 +548,14 @@ func promptSectionRoleZH(role PromptSectionRole) PromptSectionRoleZH {
 //	timelineOpen -> dynamic
 //
 // 关键词: promptSectionRolesInOrder, 字节统计排序, 堆叠顺序, P1.1
-func promptSectionRolesInOrder() []PromptSectionRole {
-	return []PromptSectionRole{
-		PromptSectionRoleHighStatic,
-		PromptSectionRoleFrozenBlock,
-		PromptSectionRoleSemiDynamic1,
-		PromptSectionRoleSemiDynamic2,
-		PromptSectionRoleTimelineOpen,
-		PromptSectionRoleDynamic,
+func promptSectionRolesInOrder() []aicommon.PromptSectionRole {
+	return []aicommon.PromptSectionRole{
+		aicommon.PromptSectionRoleHighStatic,
+		aicommon.PromptSectionRoleFrozenBlock,
+		aicommon.PromptSectionRoleSemiDynamic1,
+		aicommon.PromptSectionRoleSemiDynamic2,
+		aicommon.PromptSectionRoleTimelineOpen,
+		aicommon.PromptSectionRoleDynamic,
 	}
 }
 
@@ -808,7 +652,7 @@ func (r *ReActLoop) SetLastPromptObservationStatus(status *PromptObservationStat
 }
 
 // SetLastPromptToken 同步存储当前 prompt 的 token 估算值，供 verification
-// gate 的 token 门判断使用。这是 observation 异步化后唯一的同步副产物。
+// gate 的 token 门判断使用。只记录已用于主模型请求的 prompt。
 func (r *ReActLoop) SetLastPromptToken(tokens int) {
 	if r == nil {
 		return

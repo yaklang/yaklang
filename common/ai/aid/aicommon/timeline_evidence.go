@@ -65,10 +65,19 @@ func (m *Timeline) importSessionEvidence(session *Timeline) {
 // Evidence mutations use the same journal and freeze transaction as cached
 // tools. The runtime view includes pending operations; the semi-dynamic view
 // includes only committed operations. Neither view advances a freeze boundary.
-func (m *Timeline) evidenceStoreLocked() (*EvidenceStore, bool) {
+func (m *Timeline) evidenceStoreLocked(throughID ...int64) (*EvidenceStore, bool) {
+	return m.evidenceStoreMatchingLocked(func(id int64) bool {
+		return len(throughID) == 0 || id <= throughID[0]
+	})
+}
+
+func (m *Timeline) evidenceStoreMatchingLocked(include func(int64) bool) (*EvidenceStore, bool) {
 	store := NewEvidenceStore()
 	found := m.evidenceInitialized
 	for _, id := range m.idToTimelineItem.Keys() {
+		if !include(id) {
+			continue
+		}
 		item, ok := m.idToTimelineItem.Get(id)
 		if !ok || item == nil {
 			continue

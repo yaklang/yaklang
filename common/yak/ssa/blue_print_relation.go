@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -61,34 +62,25 @@ func (c *Blueprint) storeBlueprintRelation(other *Blueprint, relation BlueprintR
 		return
 	}
 
-	// assign will fix value's verbose name
-	// but for blueprint, we need to keep the original verbose name
-	cName := c._container.GetVerboseName()
-	otherName := other._container.GetVerboseName()
-
-	storeRelation := func(builder *FunctionBuilder, container Value, key BlueprintRelationKind, target Value) {
-		relationKey := builder.EmitConstInstPlaceholder(string(key))
-		// Blueprint relations are SSA-owned metadata rather than source-language
-		// members. Register the known edge before the generic member-variable path
-		// validates it, otherwise class-aware frontends report an ObjectError for
-		// these internal keys. AssignVariable records the normal variable metadata;
-		// the identical member edge is de-duplicated by AddMember.
+	// These edges describe types, not source-language assignments. In particular,
+	// recording the reverse edge must not enter the dependency's builder: doing
+	// so mutates its scope and may recursively start its field initializers.
+	storeRelation := func(container Value, key BlueprintRelationKind, target Value) {
+		relationKey := NewConst(string(key), true)
+		relationKey.SetRange(container.GetRange())
+		relationKey.SetBlock(container.GetBlock())
+		relationKey.SetFunc(container.GetFunc())
+		container.GetProgram().SetVirtualRegister(relationKey)
 		setMemberCallRelationship(container, relationKey, target)
-		variable := builder.CreateMemberCallVariable(container, relationKey)
-		builder.AssignVariable(variable, target)
+		// Global member queries (including DB reload) use the member index,
+		// which source assignments normally populate through variable creation.
+		// Publish that index explicitly without creating a source-scope variable.
+		container.GetProgram().Cache.AddVariable(fmt.Sprintf("#%d.%s", container.GetId(), key), target)
 	}
-
-	builder := c._container.GetFunc().builder
-	storeRelation(builder, c._container, relation, other._container)
-	other._container.SetVerboseName(otherName)
-	// set relative relation
-	otherBuilder := other._container.GetFunc().builder
-	relativeRela := relation.getRelativeRelation()
-	if string(relativeRela) == "" {
-		return
+	storeRelation(c._container, relation, other._container)
+	if relative := relation.getRelativeRelation(); relative != "" {
+		storeRelation(other._container, relative, c._container)
 	}
-	storeRelation(otherBuilder, other._container, relativeRela, c._container)
-	c._container.SetVerboseName(cName)
 }
 
 func (c *Blueprint) IsInterface() bool {

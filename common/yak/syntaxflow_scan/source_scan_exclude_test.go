@@ -25,13 +25,13 @@ func writeLiveSourceTree(t *testing.T, dir string) {
 	write("generated/consts.go", "package generated\n")
 }
 
-func liveSourceFiles(t *testing.T, cfg *Config, dir string) map[string]string {
+func liveSourceFiles(t *testing.T, cfg *Config, dir string) []string {
 	t.Helper()
 	require.NoError(t, attachLiveSourceTarget(cfg, dir))
 	require.Len(t, cfg.QueryTargets, 1)
 	target, ok := cfg.QueryTargets[0].(*ssaapi.SourceQueryTarget)
 	require.True(t, ok, "live source target should be a *ssaapi.SourceQueryTarget")
-	return target.Files()
+	return target.Paths()
 }
 
 func TestAttachLiveSourceTarget_AppliesDefaultCompileExcludes(t *testing.T) {

@@ -57,15 +57,13 @@ func TestManageAsyncExecutionRuntime(t *testing.T) {
 			handler, err := loop.GetActionHandler(name)
 			require.NoError(t, err, "core action exists even with tool calls disabled")
 			loop.actionFilters = []func(*LoopAction) bool{func(action *LoopAction) bool { return action.ActionType == "finish" }}
-			loop.initActionMustUse = []string{"finish"}
 			loop.initActionDisabled = []string{name}
 			textSchema, nativeSchema, err := loop.prepareLoopActionSchemas(nil)
 			require.NoError(t, err)
-			require.Contains(t, textSchema+nativeSchema, name)
+			require.Contains(t, textSchema+nativeSchema, name, "disable and filter narrowing still advertise management")
 			narrow := NewActionHandlerOperator(task)
-			narrow.NextAction("finish")
 			narrow.RemoveNextAction(name)
-			require.Contains(t, loop.getFilteredActions(false, narrow), handler, "management survives next-action narrowing")
+			require.Contains(t, loop.getFilteredActions(false, narrow), handler, "management survives disable narrowing")
 			require.Nil(t, loop.asyncExecutionManager, "registration and rendering must not create a manager")
 
 			run := func(params aitool.InvokeParams) map[string]json.RawMessage {

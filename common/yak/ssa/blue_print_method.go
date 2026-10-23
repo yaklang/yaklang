@@ -17,10 +17,21 @@ const (
 
 // magic
 func (c *Blueprint) IsMagicMethodName(name BlueprintMagicMethodKind) bool {
-	return slices.Contains(c._container.GetProgram().magicMethodName, string(name))
+	if c == nil || utils.IsNil(c._container) {
+		return false
+	}
+	program := c._container.GetProgram()
+	return program != nil && slices.Contains(program.magicMethodName, string(name))
 }
 
 func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value) {
+	c.registerMagicMethod(name, val)
+}
+
+// registerMagicMethod publishes the slot before any builder call. storeField
+// and Point run after SafeMap's lock is released: member lowering re-enters
+// GetMagicMethod on this goroutine, and a package-level mutex there deadlocks.
+func (c *Blueprint) registerMagicMethod(name BlueprintMagicMethodKind, val Value) {
 	if c == nil || utils.IsNil(val) {
 		return
 	}
@@ -28,13 +39,23 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 		log.Debugf("register magic method fail: not magic method: %q", name)
 		//return
 	}
-	if method, exit := c.MagicMethod[name]; exit {
-		if utils.IsNil(method) {
-			c.MagicMethod[name] = val
-		} else if val.GetId() != method.GetId() {
+	if c.MagicMethod == nil {
+		c.MagicMethod = utils.NewSafeMapWithKey[BlueprintMagicMethodKind, Value]()
+	}
+	_, loaded := c.MagicMethod.Update(name, func(old Value, loaded bool) (Value, bool) {
+		switch name {
+		case Constructor:
+			c.Constructor = val
+		case Destructor:
+			c.Destructor = val
+		}
+		if !loaded || utils.IsNil(old) {
+			return val, true
+		}
+		if val.GetId() != old.GetId() {
 			alreadyLinked := false
-			if reference := val.GetReference(); !utils.IsNil(reference) && reference.GetId() == method.GetId() {
-				for _, pointer := range method.GetPointer() {
+			if reference := val.GetReference(); !utils.IsNil(reference) && reference.GetId() == old.GetId() {
+				for _, pointer := range old.GetPointer() {
 					if !utils.IsNil(pointer) && pointer.GetId() == val.GetId() {
 						alreadyLinked = true
 						break
@@ -42,55 +63,89 @@ func (c *Blueprint) RegisterMagicMethod(name BlueprintMagicMethodKind, val Value
 				}
 			}
 			if !alreadyLinked {
-				Point(val, method)
+				Point(val, old)
 			}
 		}
-	} else {
-		c.MagicMethod[name] = val
-	}
+		return old, false
+	})
+	// storeField stays outside the SafeMap lock: it re-enters GetMagicMethod.
+	// Concurrent emits on a missing-import container are serialized by
+	// Program.virtualEmitMu inside storeField, so every registration still
+	// stores its member. Dropping a later storeField loses Go dataflow.
+	_ = loaded
 	switch name {
 	case Constructor:
-		c.Constructor = val
 		c.storeField(c.Name, val, BluePrintMagicMethod)
 		val.SetVerboseName(c.Name)
 		return
 	case Destructor:
-		c.Destructor = val
 	}
 	c.storeField(val.GetName(), val, BluePrintMagicMethod)
 }
 
-func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
-	var _method Value
-	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
+func (c *Blueprint) containerIsVirtual() bool {
+	if c == nil || utils.IsNil(c._container) {
+		return false
+	}
+	owner := c._container.GetFunc()
+	return owner != nil && owner.GetName() == string(VirtualFunctionName)
+}
+
+func (c *Blueprint) readMagicMethod(name BlueprintMagicMethodKind) Value {
+	if c == nil || c.MagicMethod == nil {
+		return nil
+	}
+	var out Value
+	c.MagicMethod.Update(name, func(old Value, _ bool) (Value, bool) {
 		switch name {
 		case Constructor:
-			if utils.IsNil(bluePrint.Constructor) {
-				return false
-			} else {
-				//check blueprint is virtual
-				_func := bluePrint._container.GetFunc()
-				if _func.name == string(VirtualFunctionName) {
-					return false
-				}
-				_method = bluePrint.Constructor
-				return true
+			if !utils.IsNil(c.Constructor) {
+				out = c.Constructor
+				break
 			}
 		case Destructor:
-			if utils.IsNil(bluePrint.Destructor) {
-				return false
-			} else {
-				_method = bluePrint.Destructor
-				return true
-			}
-		default:
-			if value := bluePrint.MagicMethod[name]; utils.IsNil(value) {
-				return false
-			} else {
-				_method = value
-				return true
+			if !utils.IsNil(c.Destructor) {
+				out = c.Destructor
+				break
 			}
 		}
+		if utils.IsNil(out) {
+			out = old
+		}
+		return old, false
+	})
+	return out
+}
+
+func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
+	method := c.resolveMagicMethod(name, fb)
+	if !utils.IsNil(method) {
+		if function, ok := ToFunction(method); ok {
+			function.buildOnLookup()
+		}
+	}
+	return method
+}
+
+func (c *Blueprint) resolveMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBuilder) Value {
+	var _method Value
+	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
+		value := bluePrint.readMagicMethod(name)
+		if utils.IsNil(value) {
+			return false
+		}
+		// External and detached blueprints can have a constructor
+		// without a container function. Only an actual virtual owner
+		// makes that constructor ineligible for lookup.
+		if name == Constructor {
+			if container := bluePrint._container; !utils.IsNil(container) {
+				if owner := container.GetFunc(); owner != nil && owner.name == string(VirtualFunctionName) {
+					return false
+				}
+			}
+		}
+		_method = value
+		return true
 	})
 	if utils.IsNil(_method) {
 		if c.Range != nil {
@@ -110,7 +165,7 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
 			_method.SetType(functionType)
-			c.RegisterMagicMethod(Constructor, _method)
+			c.registerMagicMethod(Constructor, _method)
 		case Destructor:
 			_name := fmt.Sprintf("%s-destructor", c.Name)
 			destructor := fb.EmitUndefined(_name)
@@ -118,15 +173,9 @@ func (c *Blueprint) GetMagicMethod(name BlueprintMagicMethodKind, fb *FunctionBu
 			functionType := NewFunctionType(fmt.Sprintf("%s-%s", c.Name, string(name)), []Type{c}, c, true)
 			functionType.SetFullTypeNames(c.GetFullTypeNames())
 			_method.SetType(functionType)
-			c.RegisterMagicMethod(Destructor, _method)
+			c.registerMagicMethod(Destructor, _method)
 		default:
 			return nil
-		}
-	}
-	if !utils.IsNil(_method) {
-		if function, b := ToFunction(_method); b {
-			_ = function
-			function.Build()
 		}
 	}
 	return _method
@@ -166,7 +215,7 @@ func (c *Blueprint) GetNormalMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.NormalMethod[key]; ok {
 			f = function
-			function.Build()
+			function.buildOnLookup()
 			return true
 		}
 		return false
@@ -200,7 +249,7 @@ func (c *Blueprint) GetStaticMethod(key string) Value {
 	c.getFieldWithParent(func(bluePrint *Blueprint) bool {
 		if function, ok := bluePrint.StaticMethod[key]; ok {
 			f = function
-			function.Build()
+			function.buildOnLookup()
 			return true
 		}
 		return false

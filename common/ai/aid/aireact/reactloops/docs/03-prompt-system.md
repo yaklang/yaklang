@@ -32,8 +32,12 @@ flowchart TD
     D4 --> F
     D5 --> F
     E --> F
-    F --> G["输出 final prompt"]
-    F --> H["buildPromptObservation()<br/>(emit prompt_profile + 落盘)"]
+    F --> G["返回 Prompt + Sections"]
+    G --> H{"主循环长度 / 重试检查"}
+    H -->|需要压缩| I["压缩后重建；不发布观测"]
+    I --> B
+    H -->|确定请求主模型| J["publishPromptObservation()<br/>异步 emit prompt_profile"]
+    J --> K["callAILoopTransaction()"]
 ```
 
 **两层渲染**的含义：
@@ -247,17 +251,15 @@ flowchart TD
 
 ## 3.9 prompt 可观测性
 
-`generateLoopPrompt` 末尾有：
+成分模型、角色枚举及构建方法统一定义在 `aicommon/prompt_sections.go`。`LoopPromptAssemblyResult.Sections` 是 `[]*aicommon.PromptSectionObservation`，构建方和观测方直接使用同一类型，不再经由 `any` 或运行时类型断言。UI 状态、CLI 报告和事件发布仍属于 `reactloops`。
+
+`generateLoopPromptFromInput` 只返回正文和成分快照。主循环通过长度与重试检查后，在实际请求模型前调用：
 
 ```go
-observation := buildPromptObservation(r.loopName, nonce, prompt, sections)
-r.SetLastPromptObservation(observation)
-status := observation.BuildStatus(1 * 1024)
-r.SetLastPromptObservationStatus(status)
-r.emitPromptObservationStatus(status)
+r.publishPromptObservation(nonce, assembled, promptTokens)
 ```
 
-`buildPromptObservation` 给每个段落计算 token 数、字节数。`emitPromptObservationStatus` 把摘要通过 Emitter 发到 `prompt_profile` 节点（前端可以看到每段的开销）。
+该方法同步记录已测得的 token 数，直接异步构建观测、更新 LastObservation 并通过 `Emitter.EmitPromptProfile` 发出事件，不添加额外的排序锁或等待链。压缩中的容量检查、压缩重建以及因重试无进展而丢弃的 prompt 都不发布观测；真实的溢出重试会为新请求发布一份观测。默认成分内容完整透传，不截断。
 
 debug 模式（`YAKIT_AI_WORKSPACE_DEBUG=1`）下还会落盘 markdown：`debug/<loop_name>/prompts/<iteration>.md`。
 

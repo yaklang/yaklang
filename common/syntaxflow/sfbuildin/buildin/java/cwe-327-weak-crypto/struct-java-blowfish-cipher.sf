@@ -4,7 +4,7 @@ desc(
 	title: "Struct scan: Java Blowfish Cipher"
 	title_zh: "结构扫描：Java Blowfish 加密"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-java-blowfish-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 Cipher.getInstance(*?{have: "Blowfish"}) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Struct scan: Java Blowfish Cipher",
 	title_zh: "结构扫描：Java Blowfish 加密",
 	message: "结构扫描：Java Blowfish 加密",

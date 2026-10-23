@@ -51,29 +51,20 @@ func SaveIrIndex(db *gorm.DB, idx *IrIndex) {
 	SaveIrIndexBatch(db, []*IrIndex{idx})
 }
 
-func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) {
+func SaveIrIndexBatch(db *gorm.DB, items []*IrIndex) error {
 	if db == nil || len(items) == 0 {
-		return
+		return nil
 	}
-	clean := make([]*IrIndex, 0, len(items))
-	for _, it := range items {
-		if it != nil {
-			clean = append(clean, it)
-		}
-	}
-	if len(clean) == 0 {
-		return
-	}
-
 	err := diagnostics.TrackLow("Database.SaveIRIndexBatch", func() error {
-		if r := db.CreateInBatches(clean, irIndexBatchChunk); r.Error != nil {
-			return r.Error
+		if err := db.CreateInBatches(items, irIndexBatchChunk).Error; err != nil {
+			return err
 		}
 		return nil
 	})
 	if err != nil {
 		fmt.Printf("SaveIrIndexBatch failed: %v\n", err)
 	}
+	return err
 }
 
 type IrVariable struct {

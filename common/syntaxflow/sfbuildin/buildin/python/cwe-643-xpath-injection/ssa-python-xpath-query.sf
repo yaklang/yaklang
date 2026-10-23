@@ -4,7 +4,7 @@ desc(
 	title: "数据流：Python XPath 拼接"
 	title_zh: "数据流：Python XPath 拼接"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "ssa-python-xpath-query"
 	risk: "xpath-injection"
 	cwe: "CWE-643"
@@ -48,7 +48,7 @@ NEG
 )
 xpath(*?{!opcode: const && !opcode: param} as $dyn) as $call
 alert $dyn for {
-	level: "high",
+	level: "middle",
 	title: "数据流：Python XPath 拼接",
 	title_zh: "数据流：Python XPath 拼接",
 	message: "数据流：Python XPath 拼接",

@@ -1,6 +1,8 @@
 package ssa
 
 import (
+	"sync/atomic"
+
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
@@ -8,8 +10,8 @@ import (
 
 type Variable struct {
 	*ssautil.Versioned[Value]
-	DefRange *memedit.Range
-	UseRange *utils.SafeMapWithKey[*memedit.Range, struct{}]
+	DefRange  *memedit.Range
+	useRanges atomic.Pointer[variableUseRanges]
 
 	// for object.member variable  access
 	object      Value
@@ -31,7 +33,6 @@ func NewVariable(globalIndex int, name string, local bool, scope ssautil.ScopedV
 	ret := &Variable{
 		Versioned: ssautil.NewVersioned[Value](globalIndex, name, local, scope).(*ssautil.Versioned[Value]),
 		DefRange:  nil,
-		UseRange:  utils.NewSafeMapWithKey[*memedit.Range, struct{}](),
 	}
 	return ret
 }
@@ -108,6 +109,7 @@ func (v *Variable) SetDefRange(r *memedit.Range) {
 		log.Error("SetDefRange: range is nil use fallback")
 		return
 	}
+	r = v.internRange(r)
 	v.DefRange = r
 	v.verboseName = r.GetText()
 	v.persistOffset(r)
@@ -116,6 +118,7 @@ func (v *Variable) SetDefRange(r *memedit.Range) {
 func (v *Variable) AddRange(r *memedit.Range, force bool) {
 	if utils.IsNil(r) {
 		log.Error("AddRange: range is nil")
+		return
 	}
 	//if force || len(*p.SourceCode) == len(v.GetName()) {
 	//	v.UseRange[p] = struct{}{}
@@ -125,8 +128,19 @@ func (v *Variable) AddRange(r *memedit.Range, force bool) {
 	isPhi := !utils.IsNil(value) && value.GetOpcode() == SSAOpcodePhi
 
 	if force || isPhi || r.GetText() == v.verboseName {
-		v.UseRange.Set(r, struct{}{})
-		v.persistOffset(r)
+		r = v.internRange(r)
+		uses := v.useRanges.Load()
+		if uses == nil {
+			created := &variableUseRanges{}
+			if v.useRanges.CompareAndSwap(nil, created) {
+				uses = created
+			} else {
+				uses = v.useRanges.Load()
+			}
+		}
+		if uses.add(r) {
+			v.persistOffset(r)
+		}
 	}
 }
 
@@ -168,13 +182,12 @@ func (v *Variable) NewError(kind ErrorKind, tag ErrorTag, msg string) {
 }
 
 func (v *Variable) ForEachUseRange(fn func(*memedit.Range)) {
-	if v == nil || fn == nil || v.UseRange == nil {
+	if v == nil || fn == nil {
 		return
 	}
-	v.UseRange.ForEach(func(r *memedit.Range, _ struct{}) bool {
-		fn(r)
-		return true
-	})
+	if uses := v.useRanges.Load(); uses != nil {
+		uses.each(fn)
+	}
 }
 
 func (v *Variable) IsPointer() bool {
@@ -206,54 +219,41 @@ func ReadVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
 }
 
 func GetFristVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
-		for _, variable := range variables {
-			if ret, ok := variable.(*Variable); ok {
-				return ret
-			}
-		}
-	}
-	return nil
+	return findVariableFromScope(scope, name, true, false)
 }
 
 func GetFristVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariablesByName(name); variables != nil {
-		for _, variable := range variables {
-			if ret, ok := variable.(*Variable); ok {
-				return ret
-			}
-		}
-	}
-	return nil
+	return findVariableFromScope(scope, name, false, false)
 }
 
 func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
-	if variables := scope.GetAllVariablesByName(name, true); variables != nil {
-		for _, variable := range variables {
-			if variable.GetLocal() {
-				if ret, ok := variable.(*Variable); ok {
-					return ret
-				}
-			}
-		}
-	}
-	return nil
+	return findVariableFromScope(scope, name, true, true)
 }
 
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {
+	return findVariableFromScope(scope, name, false, true)
+}
+
+func findVariableFromScope(scope ScopeIF, name string, current, local bool) *Variable {
 	if utils.IsNil(scope) {
 		return nil
 	}
-	if variables := scope.GetAllVariablesByName(name); variables != nil {
-		for _, variable := range variables {
-			if variable.GetLocal() {
-				if ret, ok := variable.(*Variable); ok {
-					return ret
-				}
-			}
-		}
+	match := isVariableVersion
+	if local {
+		match = isLocalVariableVersion
 	}
-	return nil
+	found := ssautil.FindVariableByName[Value](scope, name, current, match)
+	ret, _ := found.(*Variable)
+	return ret
+}
+
+func isVariableVersion(variable ssautil.VersionedIF[Value]) bool {
+	_, ok := variable.(*Variable)
+	return ok
+}
+
+func isLocalVariableVersion(variable ssautil.VersionedIF[Value]) bool {
+	return isVariableVersion(variable) && variable.GetLocal()
 }
 
 func GetAllVariablesFromScope(scope ScopeIF, name string) []*Variable {

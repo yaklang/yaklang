@@ -81,5 +81,5 @@ type PromptPrefixAssemblyResult struct {
 	SemiDynamic1 string
 	SemiDynamic2 string
 	TimelineOpen string
-	Sections     []*PromptSectionObservation
+	Sections     []*aicommon.PromptSectionObservation
 }

@@ -7,6 +7,45 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa"
 )
 
+// registerJavaHierarchyTask relates extends/implements after every skeleton and
+// before any library body. The class lazy task stays separate and is the one
+// that declares a supertype nobody has written: that declaration has to be
+// emitted where the reference is, which may be a branch of a field initializer.
+// Sharing one closure between the two passes consumed the declaration early and
+// appended it after the branch terminator.
+// switchToLiveDeclarationBlock moves a missing-supertype container out of the
+// function entry and out of a block that already has a terminator. The entry
+// is where a later field initializer emits its branch; sharing that block
+// appends the declaration under the terminator. The caller's block is restored.
+func (y *singleFileBuilder) switchToLiveDeclarationBlock() func() {
+	nop := func() {}
+	if y == nil || y.FunctionBuilder == nil || y.CurrentBlock == nil {
+		return nop
+	}
+	finished := y.IsBlockFinish()
+	inEntry := y.EnterBlock != 0 && y.CurrentBlock.GetId() == y.EnterBlock
+	if !finished && !inEntry {
+		return nop
+	}
+	previous := y.CurrentBlock
+	block := y.NewBasicBlock("declare")
+	y.CurrentBlock = block
+	return func() {
+		y.CurrentBlock = previous
+	}
+}
+
+func (y *singleFileBuilder) registerJavaHierarchyTask(blueprint *ssa.Blueprint, relateExisting func()) {
+	if y == nil || blueprint == nil || relateExisting == nil {
+		return
+	}
+	prog := y.GetProgram()
+	if prog == nil {
+		return
+	}
+	prog.RegisterDeferredBuild(ssa.DeferredBuildKindHierarchy, blueprint.Name, relateExisting)
+}
+
 func (y *singleFileBuilder) GetBluePrint(name string) *ssa.Blueprint {
 	if y == nil {
 		return nil

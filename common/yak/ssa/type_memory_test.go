@@ -58,22 +58,22 @@ func TestFullTypeNamesBoundedAndOwned(t *testing.T) {
 	for i := range names {
 		names[i] = fmt.Sprintf("pkg.Type%d", i/2)
 	}
-	var target []string
-	require.True(t, fullTypeNameSet(&target, names, nil))
-	require.Equal(t, clean(names)[:maxFullTypeNameEntries], target)
-	require.LessOrEqual(t, cap(target), 256, "truncation must not retain the unbounded input backing array")
+	var target orderedTypeNames
+	require.True(t, target.set(names))
+	got := target.list()
+	require.Equal(t, clean(names)[:maxFullTypeNameEntries], got)
+	require.LessOrEqual(t, cap(got), 256, "truncation must not retain the unbounded input backing array")
 	names[0] = "mutated"
-	require.Equal(t, "pkg.Type0", target[0])
-	require.False(t, fullTypeNameSet(&target, append([]string(nil), target...), nil))
+	require.Equal(t, "pkg.Type0", target.list()[0])
+	require.False(t, target.set(append([]string(nil), target.list()...)))
 	// Set historically retains empty strings; Add ignores them. Preserve this.
-	require.True(t, fullTypeNameSet(&target, []string{"", "a", "", "b", "a"}, nil))
-	require.Equal(t, []string{"", "a", "b"}, target)
-	target[2] = "a"
-	require.True(t, fullTypeNameSet(&target, target, nil))
-	require.Equal(t, []string{"", "a"}, target)
-	require.True(t, fullTypeNameSet(&target, nil, nil))
-	require.Nil(t, target)
-	require.False(t, fullTypeNameSet(&target, []string{}, nil))
+	require.True(t, target.set([]string{"", "a", "", "b", "a"}))
+	require.Equal(t, []string{"", "a", "b"}, target.list())
+	require.True(t, target.set([]string{"", "a", "a"}))
+	require.Equal(t, []string{"", "a"}, target.list())
+	require.True(t, target.set(nil))
+	require.Nil(t, target.list())
+	require.False(t, target.set([]string{}))
 }
 
 func BenchmarkTypeFingerprintStorage(b *testing.B) {
@@ -121,18 +121,19 @@ func BenchmarkFullTypeNameSet(b *testing.B) {
 	b.Run("bounded", func(b *testing.B) {
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			var target []string
-			fullTypeNameSet(&target, names, nil)
-			if len(target) != 200 {
+			var target orderedTypeNames
+			target.set(names)
+			if len(target.list()) != 200 {
 				b.Fatal("missing")
 			}
 		}
 	})
 	b.Run("unchanged-small", func(b *testing.B) {
-		target := []string{"a", "b", "c"}
+		var target orderedTypeNames
+		target.set([]string{"a", "b", "c"})
 		b.ReportAllocs()
 		for i := 0; i < b.N; i++ {
-			fullTypeNameSet(&target, target, nil)
+			target.set([]string{"a", "b", "c"})
 		}
 	})
 }

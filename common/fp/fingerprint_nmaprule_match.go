@@ -22,9 +22,10 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 	}
 
 	result := &MatchResult{
-		Target: host,
-		Port:   port,
-		State:  UNKNOWN,
+		Target:         host,
+		Port:           port,
+		State:          UNKNOWN,
+		ProtocolFields: make(map[string]any),
 	}
 	deliver := func() (*MatchResult, error) {
 		if result.State == OPEN {
@@ -50,6 +51,9 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			state, info, err := f.matchBlock(ctx, ip, port, firstBlock, config)
 			result.State = state
 			result.Fingerprint = info
+			if info != nil {
+				result.mergeProtocolFields(info.protocolFields)
+			}
 			if err != nil {
 				result.Reason = err.Error()
 			}
@@ -96,8 +100,8 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 			}()
 
 			if block.Probe != nil {
-				if block.Probe.Rarity > config.RarityMax && !utils2.IntArrayContains(block.Probe.DefaultPorts, port) {
-					log.Debugf("filter probe[%v] for raritymax: %v current: %v", block.Probe.Name, config.RarityMax, block.Probe.Rarity)
+				if effectiveProbeRarity(block.Probe) > config.RarityMax && !utils2.IntArrayContains(block.Probe.DefaultPorts, port) {
+					log.Debugf("filter probe[%v] for raritymax: %v current: %v", block.Probe.Name, config.RarityMax, effectiveProbeRarity(block.Probe))
 					return
 				}
 			}
@@ -114,6 +118,11 @@ func (f *Matcher) matchWithContext(ctx context.Context, ip net.IP, port int, hos
 		}()
 	}
 	probeSwg.Wait()
+	for _, info := range infos {
+		if info != nil {
+			result.mergeProtocolFields(info.protocolFields)
+		}
+	}
 
 	if result.State != OPEN {
 		result.State = mergeStates(states...)

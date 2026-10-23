@@ -42,26 +42,26 @@ func (c *Blueprint) AddFullTypeName(name string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameAdd(&c.fullTypeName, name, c)
+	c.fullTypeName.add(name)
 }
 
 func (c *Blueprint) GetFullTypeNames() []string {
 	if c == nil {
 		return nil
 	}
-	return c.fullTypeName
+	return c.fullTypeName.list()
 }
 
 func (c *Blueprint) SetFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameSet(&c.fullTypeName, names, c)
+	c.fullTypeName.set(names)
 }
 
 func (c *Blueprint) addFullTypeNames(names []string) {
 	if c == nil {
 		return
 	}
-	fullTypeNameAddList(&c.fullTypeName, names, c)
+	c.fullTypeName.addList(names)
 }

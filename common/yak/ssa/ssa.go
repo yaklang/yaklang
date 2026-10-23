@@ -3,6 +3,7 @@ package ssa
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/sca/dxtypes"
@@ -14,6 +15,7 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
+	"golang.org/x/sync/singleflight"
 )
 
 type ErrorLogger interface {
@@ -236,6 +238,8 @@ type ReExportInfo struct {
 
 // both instruction and value
 type Program struct {
+	mapsOnce             sync.Once
+	variableRanges       *utils.SafeMapWithKey[*memedit.MemEditor, *utils.SafeMapWithKey[variableRangePosition, *memedit.Range]]
 	compileDiagnosticsMu sync.Mutex
 	compileDiagnostics   CompileDiagnostics
 	// project
@@ -247,6 +251,7 @@ type Program struct {
 	Language        ssaconfig.Language
 	magicMethodName []string
 	// from pom.xml file
+	metaMu      sync.Mutex
 	SCAPackages []*dxtypes.Package
 
 	// filename and data,
@@ -277,20 +282,61 @@ type Program struct {
 	diagnosticsRecorder *diagnostics.Recorder
 
 	// TODO: this four map should need????!
-	editorStack *omap.OrderedMap[string, *memedit.MemEditor]
-	FileList    map[string]string // file-name and file hash
-	LineCount   int
+	editorStackMu sync.RWMutex
+	editorStack   *omap.OrderedMap[string, *memedit.MemEditor]
+	fileListMu    sync.Mutex
+	// libraryCreateMu serializes publication of a named library.
+	// Hold it only until UpStream is updated. Do not call Emit, fake import,
+	// or GetAndCreateFunctionBuilder while holding it.
+	// Lock order: libraryCreateMu -> fileListMu / editorStackMu.
+	libraryCreateMu sync.Mutex
+	// builderMu publishes a function's single FunctionBuilder.
+	// The critical section stops at NewBuilder; it does not Emit.
+	builderMu sync.Mutex
+	// virtualImportGroup runs one materialization per type name.
+	// The callback builds on a private function, so it does not share a
+	// CurrentBlock and does not hold a mutex across Emit. Re-entering Do
+	// with the same key on the same goroutine deadlocks; CreateBlueprint
+	// must not call back into fake import for that same name.
+	virtualImportGroup singleflight.Group
+	// virtualEmitMu serializes Emit on this library's one @virtual builder.
+	// It is not reentrant. GetMagicMethod does not take it. storeField takes
+	// Function.emitMu instead. Do not call withVirtualBuilder or
+	// GetAndCreateFunctionBuilder(VirtualFunctionName) while holding it.
+	virtualEmitMu sync.Mutex
+	// dirPkgSlots compiles one directory package at a time per name.
+	// The goroutine that owns a slot must not wait on any slot: two owners
+	// compiling packages that import each other would wait for each other.
+	// dirPkgDepthMu only guards dirPkgDepth. Never hold it across compile,
+	// Emit, or a receive on slot.done, and do not take it under another lock.
+	dirPkgSlots    sync.Map
+	dirPkgDepthMu  sync.Mutex
+	dirPkgDepth    map[uint64]int
+	FileList       map[string]string // file-name and file hash
+	fileLineCounts *utils.SafeMapWithKey[string, int]
+	LineCount      int
 
+	libraryFileMu         sync.RWMutex
 	LibraryFile           map[string][]string //library and file relation
 	CurrentIncludingStack *utils.Stack[string]
 
 	Cache *ProgramCache
 
 	finished           bool
+	deferredBuildsMu   sync.Mutex
 	deferredBuilds     *omap.OrderedMap[string, *deferredBuildTask]
 	deferredBuildTotal int
-	currentCompileUnit string
-	CompileUnits       []*CompileUnit
+	// compileUnitContexts maps the registering goroutine to its unit key.
+	// Values are immutable strings; EndCompileUnit removes the worker's entry.
+	// Load/Store/Delete finish before any deferred callback or Emit runs.
+	compileUnitContexts sync.Map
+	// dirPkgPrehandle maps a package name to the goroutine currently inside
+	// that library's skeleton. It is not a compile lock and is never held
+	// across Emit, a database call, or a directory-package wait.
+	dirPkgPrehandle     sync.Map
+	concurrentUnitBuild bool
+	deferMethodBuild    bool
+	CompileUnits        []*CompileUnit
 
 	//consts
 	Consts map[string]Value
@@ -298,9 +344,9 @@ type Program struct {
 	Funcs          *omap.OrderedMap[string, *Function]
 	Blueprint      *omap.OrderedMap[string, *Blueprint]
 	BlueprintStack *utils.Stack[*Blueprint]
-	ExportValue    map[string]Value
-	ExportType     map[string]Type
-	ReExportTable  map[string]*ReExportInfo // re-export name/type --from--> filepath
+	ExportValue    *utils.SafeMapWithKey[string, Value]
+	ExportType     *utils.SafeMapWithKey[string, Type]
+	ReExportTable  *utils.SafeMapWithKey[string, *ReExportInfo] // re-export name/type --from--> filepath
 
 	// GlobalVariablesBlueprint is a virtual Blueprint that wraps global variables,
 	// enabling them to be lazily built through the LazyBuilder mechanism
@@ -330,7 +376,8 @@ type Program struct {
 	Build       Build
 	_preHandler bool
 
-	errors SSAErrors
+	errorsMu sync.Mutex
+	errors   SSAErrors
 
 	// process
 	ProcessInfof func(string, ...any)
@@ -351,7 +398,8 @@ type Program struct {
 	ProjectConfig map[string]*ProjectConfig
 
 	// Template Language
-	Template map[string]tl.TemplateGeneratedInfo
+	templateMu sync.Mutex
+	Template   map[string]tl.TemplateGeneratedInfo
 
 	config *LanguageConfig
 	ctx    context.Context
@@ -370,7 +418,16 @@ type Function struct {
 	methodName string
 
 	// Type
-	Type *FunctionType
+	typeMu sync.RWMutex
+	Type   *FunctionType
+
+	// emitMu covers this function's builder cursor. Same-goroutine reentry
+	// (storeField -> GetMagicMethod -> storeField) does not lock again.
+	// Do not call withVirtualBuilder or GetAndCreateFunctionBuilder of the
+	// virtual function while holding it: those take virtualEmitMu first.
+	emitMu    sync.Mutex
+	emitOwner atomic.Uint64
+	emitDepth int
 
 	// just function parameter
 	Params      []int64 // parameter
@@ -411,6 +468,9 @@ type Function struct {
 	scopeId int
 	// builder
 	builder *FunctionBuilder
+	// Active private lexical view during a unit-owned lazy build. Same-function
+	// tasks are serialized by the unit scheduler, but may nest across files.
+	executionBuilder *FunctionBuilder
 	// this function is variadic parameter, for function type create
 	hasEllipsis bool
 
@@ -440,6 +500,7 @@ func (f *Function) GetCurrentReturnType() Type {
 }
 
 func (f *Function) SetMethodName(name string) {
+	defer f.markPersistenceDirty()
 	f.isMethod = true
 	f.methodName = name
 }
@@ -529,6 +590,7 @@ type BlockConditionSummary struct {
 }
 
 func (b *BasicBlock) SetReachable(boolean bool) {
+	defer b.markPersistenceDirty()
 	if boolean {
 		b.canBeReached = BasicBlockReachable
 	} else {
@@ -980,6 +1042,7 @@ type Parameter struct {
 }
 
 func (p *Parameter) ReplaceValue(v Value, to Value) {
+	defer p.markPersistenceDirty()
 	if p.defaultValue == v.GetId() {
 		p.defaultValue = to.GetId()
 	}
@@ -993,6 +1056,7 @@ func (p *Parameter) SetDefault(v Value) {
 	if p == nil {
 		return
 	}
+	defer p.markPersistenceDirty()
 	p.defaultValue = v.GetId()
 	//增加一个ud关系绑定
 	v.AddPointer(p)

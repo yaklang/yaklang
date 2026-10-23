@@ -118,18 +118,12 @@ func (y *SyntaxFlowVisitor) VisitFileFilterContentMethod(raw sf.IFileFilterConte
 	case "pattern_regex_not", "pattern-regex-not", "patternregexnot":
 		// pattern_regex_not: first param is positive, remaining are negative
 		// (Semgrep pattern-regex + pattern-not-regex in one call).
-		if paramMap == nil {
-			paramMap = make(map[string]string)
-		}
-		paramMap["__sf_pattern_not_list"] = "1"
+		paramMap = SetFileFilterParam(paramMap, FileFilterParamPatternNotList)
 		y.EmitFileFilterReg(fileInput, paramMap, paramList)
 	case "pattern_not_regex", "pattern-not-regex", "patternnotregex", "not_regexp", "not_re":
 		// Negative content regex (Semgrep pattern-not-regex). Marked for backends;
 		// sfpattern treats hits as candidates for set-difference / post-filter.
-		if paramMap == nil {
-			paramMap = make(map[string]string)
-		}
-		paramMap["__sf_pattern_not"] = "1"
+		paramMap = SetFileFilterParam(paramMap, FileFilterParamPatternNot)
 		y.EmitFileFilterReg(fileInput, paramMap, paramList)
 	case "jsonpath", "json":
 		y.EmitFileFilterJsonPath(fileInput, paramMap, paramList)

@@ -343,20 +343,22 @@ func (y *builder) VisitUseDeclaration(raw phpparser.IUseDeclarationContext) inte
 					}
 
 					//todo:
-					for exportName, value := range namespace.ExportValue {
-						if function, b := ssa.ToFunction(value); b {
+					namespace.ExportValue.ForEach(func(exportName string, value ssa.Value) bool {
+						if function, ok := ssa.ToFunction(value); ok {
 							name := fmt.Sprintf("%s\\%s", currentName, function.GetName())
 							prog.Funcs.Set(name, function)
 						}
 						_ = exportName
-					}
-					for exportName, t := range namespace.ExportType {
+						return true
+					})
+					namespace.ExportType.ForEach(func(exportName string, t ssa.Type) bool {
 						if bluePrint, ok := t.(*ssa.Blueprint); ok {
 							name := fmt.Sprintf("%s\\%s", currentName, bluePrint.Name)
 							prog.Blueprint.Set(name, bluePrint)
 						}
 						_ = exportName
-					}
+						return true
+					})
 
 					return nil
 				}

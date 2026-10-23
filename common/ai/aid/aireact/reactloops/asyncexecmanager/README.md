@@ -287,8 +287,9 @@ direct_answer 时仍通过原屏障取消兄弟调用，避免未审批完就开
 与参数、真实 Inspector、部分提交失败、执行失败及 owner 取消后的清理。
 
 `manage_async_execution_runtime` 是核心 action，始终注册，不依赖工具、MCP 或 forge
-开关；普通 action 过滤和单轮 must-use/disabled 约束不会隐藏它，宿主 runtime action
-policy 仍生效。文本和 native function call 协议共享同一个 verifier/handler。
+开关。普通 action 过滤和 disabled 列表不会隐藏它。它在 MustUse 之前回到候选：
+没有点名时会被收掉，点名则会留下，没有命中而回退为全量动作时仍然提供。
+宿主 runtime action policy 仍生效。文本和 native function call 协议共享同一个 verifier/handler。
 参数 `op` 支持 `list / inspect / stop / wait / stop_all`，省略时默认为 list；
 inspect、stop、wait 必须提供 `execute_id`。OP 和 ID 会去除前后空白，OP 忽略大小写。
 `timeout_seconds` 仅用于 wait，默认 10 秒，允许 0–60 秒（支持数字字符串）；0 表示
@@ -304,7 +305,7 @@ stop/wait 返回元信息 `execution`。错误放在反馈的 `error` 字段，�
 ```
 
 接入验证见 [管理 action 综合测试](../action_manage_async_execution_runtime_test.go)：
-mock 模型通过真实文本/native 解析链路执行全部 OP，验证始终可用、实时观察、等待
+mock 模型通过真实文本/native 解析链路执行全部 OP，验证禁用约束下仍可调用、实时观察、等待
 超时不取消、正常完成、取消、stop_all 后继续提交以及非法参数保护。
 action、AutoContext 和 UI 使用同一个 owner
 Manager 的状态与 Inspector，UI 的持续刷新另由展示层实现。

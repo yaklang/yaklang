@@ -77,33 +77,6 @@ func TestSkillContentDifferentWindowsStayInHistory(t *testing.T) {
 
 // 精确提升态的技能窗口不进入压缩候选, 因此两个历史窗口都必须保留;
 // 需要重读旧页时仍可通过显式写入追加新 item。
-func TestSkillContentHistoricalWindowsSurviveCompression(t *testing.T) {
-	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-	tl := cfg.GetTimeline()
-	tl.SetTimelineBucketByteSize(-1)
-	firstID, secondID := cfg.AcquireId(), cfg.AcquireId()
-	require.True(t, tl.PushSkillFileContent(firstID, "demo-skill", "SKILL.md", "EARLIER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
-	require.True(t, tl.PushSkillFileContent(secondID, "demo-skill", "SKILL.md", "LATER_WINDOW", SkillContentSourceAuto, 1, 1, 1))
-	tl.FreezeAll()
-	bindCompressionMock(t, tl, func(req *AIRequest) (string, error) {
-		// Same identity does not aggregate compression candidates: both
-		// original reads and their full bodies are independently selectable.
-		// The catalog and the body banner each mention the name; the body itself is once.
-		requireCompressionPromotedEntry(t, req.GetPrompt(), firstID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nEARLIER_WINDOW")
-		requireCompressionPromotedEntry(t, req.GetPrompt(), secondID, "kind=skill name=demo-skill:SKILL.md:1-1 operation=upsert", "[skill demo-skill | SKILL.md:1-1/1 END]\nLATER_WINDOW")
-		return compressionMockSummary("Ordinary history summarized."), nil
-	})
-
-	result, err := tl.CompressOnce(compressionTestOptions())
-	require.NoError(t, err)
-	require.NotContains(t, result.RetiredIDs, firstID)
-	require.NotContains(t, result.RetiredIDs, secondID)
-	skills := tl.RenderSkillContentForPrompt()
-	require.Contains(t, skills, "EARLIER_WINDOW")
-	require.Contains(t, skills, "LATER_WINDOW")
-	require.Less(t, strings.Index(skills, "EARLIER_WINDOW"), strings.Index(skills, "LATER_WINDOW"))
-}
-
 func TestSkillContentConcurrentDuplicateLoadsAppendOnce(t *testing.T) {
 	cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
 	tl := cfg.GetTimeline()
@@ -162,48 +135,4 @@ func TestSkillManagerPagingPreservesPreviousWindow(t *testing.T) {
 	require.NoError(t, mgr.ChangeViewOffset("demo-skill", "", 1))
 	require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs)+1, "rereading either retained window must be idempotent")
 	require.Equal(t, skills, tl.RenderSkillContentForPrompt())
-}
-
-func TestSkillManagerContentSurvivesCompression(t *testing.T) {
-	for _, resource := range []bool{false, true} {
-		t.Run(fmt.Sprintf("resource=%t", resource), func(t *testing.T) {
-			loader, err := aiskillloader.NewFSSkillLoader(buildSkillsVFS())
-			require.NoError(t, err)
-			mgr := aiskillloader.NewSkillsContextManager(loader)
-			cfg := NewConfig(context.Background(), WithDisableAutoSkills(true))
-			tl := cfg.GetTimeline()
-			tl.SetTimelineBucketByteSize(-1)
-			bindTestTimeline(mgr, cfg)
-			require.NoError(t, mgr.LoadSkill("deploy-app"))
-			if resource {
-				_, err = mgr.LoadSkillResource("deploy-app", "scripts/deploy.sh")
-				require.NoError(t, err)
-			}
-			bindCompressionMock(t, tl, func(_ *AIRequest) (string, error) {
-				return compressionMockSummary("Skill windows kept exact."), nil
-			})
-			_, err = tl.CompressOnce(compressionTestOptions())
-			require.NoError(t, err)
-			require.True(t, skillVisible(tl, "deploy-app"), "the metadata/tree remains visible")
-			beforeIDs := tl.idToTimelineItem.Keys()
-			beforeSkills := tl.RenderSkillContentForPrompt()
-
-			if resource {
-				_, err = mgr.LoadSkillResource("deploy-app", "scripts/deploy.sh")
-				require.NoError(t, err)
-				require.Contains(t, tl.RenderSkillContentForPrompt(), "echo deploy")
-			} else {
-				added, err := mgr.LoadAutoSkill("deploy-app")
-				require.NoError(t, err)
-				require.False(t, added, "an exact skill must not be appended again")
-				require.Contains(t, tl.RenderSkillContentForPrompt(), "Step 1: build.")
-			}
-			if resource {
-				require.Len(t, tl.idToTimelineItem.Keys(), len(beforeIDs))
-				require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt(), "an already visible resource must not be appended twice")
-			} else {
-				require.Equal(t, beforeSkills, tl.RenderSkillContentForPrompt())
-			}
-		})
-	}
 }

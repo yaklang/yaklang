@@ -74,12 +74,13 @@ func Scan(ctx context.Context, option ...ssaconfig.Option) (retErr error) {
 		}
 		// Stop waits for queued result callbacks, so the final task row includes
 		// the complete in-memory risk count even when risks are not persisted.
+		// SaveTask flushes the coalesced snapshot. A failed write is returned and
+		// must not be followed by the terminal callback: callers load this row by
+		// task ID as soon as they see done.
 		if err := m.SaveTask(); err != nil {
 			log.Errorf("save syntaxflow task failed: %v", err)
-		}
-		// Publish the terminal callback after the task row is durable so callers
-		// can immediately load the final status and counters by task ID.
-		if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
+			retErr = utils.JoinErrors(retErr, err)
+		} else if success && m.status == schema.SYNTAXFLOWSCAN_DONE {
 			m.notifyDone()
 		}
 		// Stop waits for the queued risk callbacks, so the report already holds

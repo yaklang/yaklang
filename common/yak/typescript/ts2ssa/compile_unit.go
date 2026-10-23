@@ -20,6 +20,8 @@ var jsModuleExtensions = []string{".ts", ".tsx", ".js", ".jsx", ".mts", ".cts", 
 // CompileUnitDependencies extracts JS/TS import edges for relative imports
 // (those starting with "."), resolved against file/path indexes. Bare module
 // specifiers are ignored (no reliable on-disk target).
+func (*SSABuilder) SupportsConcurrentUnitBuild() bool { return true }
+
 func (*SSABuilder) CompileUnitDependencies(fs filesys_interface.FileSystem, units []*ssa.CompileUnit) []ssa.UnitRef {
 	pathToKey := ssa.UnitPathIndex(units)
 	fileToKey := ssa.UnitFileIndex(fs, units)

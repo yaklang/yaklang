@@ -1,0 +1,98 @@
+# Parallel compile-unit execution
+
+The compiler partitions files into language-owned units and condenses their
+dependency graph into strongly connected components (SCCs). Memory limits may
+combine several SCCs in an execution batch, or split an oversized SCC across
+batches. A memory batch is therefore not itself proof that its units are
+independent.
+
+`compileUnitBuildWaves` derives dependency-ready waves inside each batch. Each
+wave runs independent SCC groups concurrently. After declaration registration,
+library body builds inside one SCC also run concurrently: Java packages in a
+cycle still need a shared skeleton, but method bodies only need signatures and
+can overlap. Dependencies in earlier batches have already completed. Splitting
+an SCC still does not let its fragments overlap across the batch lifecycle
+barrier.
+
+## Ownership and lifecycle
+
+1. One bounded AST parser pool serves all files in a batch. Small single-file
+   packages can use multiple workers together. A bounded input-order queue
+   preserves unit/declaration order even when later ASTs finish first. Admission
+   slots are released by the consumer; a slow head cannot retain the whole batch
+   or starve behind later files. Prefetching for the next batch can overlap the
+   previous batch's semantic scan and persistence.
+2. Declaration PreHandler is serial inside one unit and concurrent across
+   units in a batch. Each Java package gets its own builder that inherits
+   application build support. Application-owned resource units stay on one
+   worker. Editor recording uses the builder's program stack. Import names
+   are recorded locally during the skeleton pass; linking into other
+   libraries waits for the deferred post-skeleton import task after every
+   unit in the batch has registered its declarations.
+3. Frontends opt into library body parallelism through `ConcurrentUnitBuilder`.
+   Java supplies package units. Python and JS/TS map directory units onto
+   libraries (`dir:helper` → library `helper`) so independent dirs can drain
+   together. Go and PHP keep serial drain until their package/global ownership
+   can be isolated safely.
+   The project-root directory and `resource:` keys stay on the application.
+   Application-owned units execute exclusively. Each actual Program owner is
+   drained once per batch, without recursively draining its upstream libraries;
+   the scheduler controls when those library bodies run. Independent libraries
+   in the same SCC drain concurrently after skeletons exist. A type or function
+   lookup does not start another library's lazy body; the scheduler drains each
+   owner. Method bodies that share a declaration builder stay serial inside one
+   library. Frontends that
+   have not opted in retain the original single serial batch drain.
+4. All active body builders join before semantic scanning, persistence and
+   release. Cancellation also joins active builders before returning and does
+   not start queued work.
+5. The completed batch is semantically scanned, persisted and released before
+   the next batch mutates shared IR. IR compilation does not yet overlap a
+   semantic scan that enumerates the same live instruction cache.
+
+Shared dependency values can acquire users and member relations even when the
+consumer packages are independent. Their ID lists use per-value locks. Published
+slice prefixes are immutable: removals and replacements allocate a new slice,
+and readers resolve IDs after releasing the lock. Resident indexes use atomic
+read/append/write operations to avoid lost entries. Application diagnostic
+errors are appended and snapshotted under the same lock so concurrent units
+cannot drop records.
+
+Private builder scopes commit their resulting basic block back to the owning
+declaration after execution. This preserves control flow between consecutive
+field initializers while keeping editors and lexical state local. Tasks owned
+by that declaration remain serial. Shared type-name updates use per-type locks;
+default constructor lookup and registration use a short critical section, with
+constructor body execution outside it to permit recursive construction.
+
+Blueprint inheritance edges are registered as IR metadata without assignments
+in either declaration scope. Reverse edges must not start a dependency's lazy
+body. For frontends opted into concurrent units, missing dependency members
+are synthesized in the consuming library;
+the dependency retains the member relation but its block and scope remain
+unchanged. Type method maps publish immutable snapshots after lazy initialization.
+Type formatting uses a per-call recursion path instead of temporarily renaming
+shared types; completed root function strings retain an atomic cache. A missing
+memory-mode relation never falls back to a same-named persisted program.
+
+## Validation
+
+Use `scripts/ssa-test.sh` for all tests. Focused coverage includes dependency
+diamonds and SCCs, real library overlap, cancellation, shared static fields,
+snapshot stability, a shared bounded AST window, and database reload with
+cross-package dataflow and source ranges. Run these tests with `-race` as well as
+the Java, PHP, SSA and scan lifecycle regression suites.
+
+For project measurements, use `yak code-scan -t TARGET -l LANGUAGE --debug DIR`.
+Start with small projects in `--memory` mode, then validate persistence before a
+large DB-backed run. Retain the source commit, binary hash, arguments, risk
+results, phase timing, process CPU/RSS/swap samples and profiles together.
+
+Each build-wave log records `groups`, requested `concurrency`, `peak_active` and
+elapsed `cost`. `peak_active` measures overlapping group workers, not occupied
+CPU cores. Compare it with process CPU samples. AST parse, declaration
+PreHandler, independent groups and opted-in library drains share
+`ssaconfig` `compile_concurrency`. The default is `GOMAXPROCS-1`, further
+capped so each worker has at least 256MiB of usable RAM (80% of cgroup/host
+memory). `compile_memory_limit` defaults to that same 80% as Go's soft heap
+limit. Explicit options win over the machine default.

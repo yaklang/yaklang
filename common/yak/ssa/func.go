@@ -93,14 +93,20 @@ func (f *Function) GetCurrentBlueprint() *Blueprint {
 	return f.currentBlueprint
 }
 func (f *Function) GetType() Type {
-	if f != nil && f.Type != nil {
-		return f.Type
-	} else {
+	if f == nil {
 		return defaultAnyType
 	}
+	f.typeMu.RLock()
+	ft := f.Type
+	f.typeMu.RUnlock()
+	if ft != nil {
+		return ft
+	}
+	return defaultAnyType
 }
 
 func (f *Function) AddThrow(vs ...Value) {
+	defer f.markPersistenceDirty()
 	f.Throws = append(f.Throws, lo.Map(vs, func(v Value, _ int) int64 {
 		return v.GetId()
 	})...)
@@ -110,9 +116,15 @@ func (f *Function) SetType(t Type) {
 	if utils.IsNil(f) || utils.IsNil(t) {
 		return
 	}
+	defer f.markPersistenceDirty()
 
 	if funTyp, ok := ToFunctionType(t); ok {
+		f.typeMu.Lock()
 		f.Type = funTyp
+		f.typeMu.Unlock()
+		// Final persistence closes the type store before dirty IR. Register
+		// a replacement now so its row exists when that IR is saved.
+		f.anValue.typId = f.anValue.cacheType(funTyp)
 	} else if t.GetTypeKind() == AnyTypeKind {
 		// Assigning AnyType to a function is an expected, benign condition that
 		// fires once per function on large projects (hadoop scan produced ~59k
@@ -142,6 +154,8 @@ func (f *Function) GetCachedFunc() *Function {
 }
 
 func (f *Function) addAnonymous(anon *Function) {
+	defer f.markPersistenceDirty()
+	defer anon.markPersistenceDirty()
 	f.ChildFuncs = append(f.ChildFuncs, anon.GetId())
 	anon.parent = f.GetId()
 }
@@ -153,9 +167,11 @@ func (f *FunctionBuilder) NewParam(name string, pos ...CanStartStopToken) *Param
 }
 
 func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Value) *ParameterMember {
+	defer f.Function.markPersistenceDirty()
 	paraMember := NewParamMember(name, f, obj, key)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
+	paraMember.markPersistenceDirty()
 	if f.MarkedThisObject != nil &&
 		obj.GetDefault() != nil &&
 		f.MarkedThisObject.GetId() == obj.GetDefault().GetId() {
@@ -166,15 +182,19 @@ func (f *FunctionBuilder) NewParameterMember(name string, obj *Parameter, key Va
 	return paraMember
 }
 func (f *FunctionBuilder) NewMoreParameterMember(name string, member *ParameterMember, key Value) *ParameterMember {
+	defer f.Function.markPersistenceDirty()
 	paraMember := NewMoreParamMember(name, f, member, key)
 	variable := f.CreateVariable(name)
 	f.AssignVariable(variable, paraMember)
 	f.ParameterMembers = append(f.ParameterMembers, paraMember.GetId())
 	paraMember.FormalParameterIndex = len(f.ParameterMembers) - 1
+	paraMember.markPersistenceDirty()
 	return paraMember
 }
 
 func (f *FunctionBuilder) appendParam(p *Parameter, token ...CanStartStopToken) {
+	defer f.Function.markPersistenceDirty()
+	defer p.markPersistenceDirty()
 	f.Params = append(f.Params, p.GetId())
 	p.FormalParameterIndex = len(f.Params) - 1
 	p.IsFreeValue = false
@@ -226,21 +246,57 @@ func NewFunctionWithType(name string, typ *FunctionType) *Function {
 	return f
 }
 
-func (f *Function) IsMethod() bool {
+func (f *Function) functionType() *FunctionType {
+	if f == nil {
+		return nil
+	}
+	f.typeMu.RLock()
+	ft := f.Type
+	f.typeMu.RUnlock()
+	return ft
+}
+
+// AddAnnotationFunc initializes the function type only when annotations need
+// to be attached. Some frontends leave it unset until the deferred body build.
+func (f *Function) AddAnnotationFunc(handlers ...func(Value)) {
+	if f == nil || len(handlers) == 0 {
+		return
+	}
+	f.typeMu.Lock()
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)
 		f.Type.This = f
 	}
-	return f.Type.IsMethod
+	f.Type.AddAnnotationFunc(handlers...)
+	f.typeMu.Unlock()
+}
+
+func (f *Function) IsMethod() bool {
+	ft := f.functionType()
+	if ft == nil {
+		return false
+	}
+	ft.receiverMu.RLock()
+	is := ft.IsMethod
+	ft.receiverMu.RUnlock()
+	return is
 }
 
 func (f *Function) SetMethod(is bool, objType Type) {
+	if f == nil {
+		return
+	}
+	f.typeMu.Lock()
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)
 		f.Type.This = f
 	}
-	f.Type.IsMethod = is
-	f.Type.ObjectType = objType
+	ft := f.Type
+	f.typeMu.Unlock()
+	ft.receiverMu.Lock()
+	ft.IsMethod = is
+	ft.ObjectType = objType
+	ft.receiverMu.Unlock()
 }
 
 func (f *Function) SetVerboseName(name string) {

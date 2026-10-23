@@ -4,7 +4,7 @@ desc(
 	title: "检测到未使用 defusedxml"
 	title_zh: "检测到未使用 defusedxml"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-insecure-api-use-defused-xml"
 	risk: "xxe"
 	desc: <<<DESC
@@ -38,7 +38,7 @@ NEG
 
 ${*.py}.pattern_regex(/(?:import\s+xml)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测到未使用 defusedxml",
 	title_zh: "检测到未使用 defusedxml",
 	message: "检测到未使用 defusedxml",

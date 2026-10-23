@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/damenggorm"
 	"github.com/yaklang/yaklang/common/utils/permutil"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
@@ -150,7 +151,20 @@ func createAndConfigDatabaseWithOptions(path string, options databaseOpenOptions
 	default:
 	}
 
-	db, err := gorm.Open(driver, path)
+	var db *gorm.DB
+	var err error
+	if driver == damenggorm.Dialect {
+		sqlDB, openErr := openDMSQLDatabase(path, damenggorm.OpenDB)
+		if openErr != nil {
+			return nil, openErr
+		}
+		db, err = gorm.Open(damenggorm.ORMName, sqlDB)
+		if err != nil {
+			_ = sqlDB.Close()
+		}
+	} else {
+		db, err = gorm.Open(driver, path)
+	}
 	if err != nil && (driver == SQLite || driver == SQLiteExtend) {
 		log.Warnf("open database[%s] with driver[%s] failed: %s, try to check and fix it", purePath, driver, err)
 		err = checkAndTryFixDatabase(purePath)
@@ -212,6 +226,14 @@ func configureAndOptimizeDB(drive string, db *gorm.DB) {
 }
 
 func configureAndOptimizeDBWithOptions(drive string, db *gorm.DB, options databaseOpenOptions) {
+	if damenggorm.IsDialect(drive) {
+		// The DM factory configures its pool before handing it to GORM. SSA
+		// configures again after migration; preserve that caller-selected pool.
+		if db.DB().Stats().MaxOpenConnections == 0 {
+			defaultDMDatabasePool().apply(db.DB())
+		}
+		return
+	}
 	// reference: https://stackoverflow.com/questions/35804884/sqlite-concurrent-writing-performance
 	db.DB().SetConnMaxLifetime(time.Hour)
 	// SQLite must keep a single writer connection to avoid "database is locked" under concurrent writes.

@@ -20,6 +20,7 @@ import (
 
 type ObsoleteTLSConfig struct {
 	ca                     *gmx509.Certificate
+	caChain                [][]byte
 	gmCA                   *gmx509.Certificate
 	capriv                 interface{}
 	gmCAPriv               interface{}
@@ -82,6 +83,7 @@ func NewObsoleteTLSConfig(ca, gmCA *gmx509.Certificate, privateKey, gmPrivateKey
 
 	return &ObsoleteTLSConfig{
 		ca:                   ca,
+		caChain:              [][]byte{ca.Raw},
 		gmCA:                 gmCA,
 		capriv:               privateKey,
 		gmCAPriv:             gmPrivateKey,
@@ -333,7 +335,7 @@ func (c *ObsoleteTLSConfig) cert(hostname string) (*gmtls.Certificate, error) {
 	}
 
 	tlsc = &gmtls.Certificate{
-		Certificate: [][]byte{raw},
+		Certificate: append([][]byte{raw}, c.caChain...),
 		PrivateKey:  c.priv,
 		Leaf:        x509c,
 	}

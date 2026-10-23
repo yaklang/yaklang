@@ -4,7 +4,7 @@ desc(
 	title: "检测 JavaScript innerHTML 赋值"
 	title_zh: "检测 JavaScript innerHTML 赋值"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-js-innerhtml"
 	risk: "xss"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 ${*.js}.pattern_regex(/\.innerHTML\s*=/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript innerHTML 赋值",
 	title_zh: "检测 JavaScript innerHTML 赋值",
 	message: "检测 JavaScript innerHTML 赋值",

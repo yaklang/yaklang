@@ -35,7 +35,7 @@ func TestPromptManagerSkillTransferUsesPromotedTimelineWithoutManager(t *testing
 				require.Contains(t, loopPromptSection(t, after.Prompt, "semi-dynamic-1"), "ACTUAL_PROMPT_SKILL_BODY")
 				require.NotContains(t, after.Prompt, "<|SKILLS_CONTEXT_OPEN_")
 				require.Equal(t, 1, strings.Count(after.Prompt, "ACTUAL_PROMPT_SKILL_BODY"))
-				sections := mustLoopPromptSections(t, after.Sections)
+				sections := after.Sections
 				var observed string
 				for _, section := range sections {
 					if section.Key == "section.semi_dynamic_1" {

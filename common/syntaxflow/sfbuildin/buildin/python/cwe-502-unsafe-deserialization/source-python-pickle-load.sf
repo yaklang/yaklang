@@ -4,7 +4,7 @@ desc(
 	title: "检测 Python pickle.load"
 	title_zh: "检测 Python pickle.load",
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-python-pickle-load"
 	risk: "deserialization"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 ${*.py}.pattern_regex(/\bpickle\.(loads?|Unpickler)\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Python pickle.load",
 	title_zh: "检测 Python pickle.load",
 	message: "检测 Python pickle.load",

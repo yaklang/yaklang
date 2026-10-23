@@ -120,7 +120,6 @@ func (m *Timeline) ReassignIDs(generator func() int64) int64 {
 		m.freezeState.Version++
 	}
 	m.rebuildPromotedStateLocked(m.frozenThroughLocked())
-	m.compressionLastFailure = ""
 	if wasCovered {
 		m.memoryCoveredState = m.memoryFingerprintLocked()
 	}

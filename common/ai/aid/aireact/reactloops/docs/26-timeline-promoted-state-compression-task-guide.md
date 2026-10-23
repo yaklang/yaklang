@@ -4,7 +4,7 @@
 
 ## 1. 判断依据与完成目标
 
-Timeline 的占用是它实际提供给主模型 prompt 的材料，不是原始 journal 大小，也不是辅助压缩请求的大小。
+触发依据是完整主循环 prompt 的 token 数，不是原始 journal 大小，也不单独统计 Timeline。
 
 `RenderTimelineFrozenOpenWithOptions` 是共用材料入口：
 
@@ -12,55 +12,34 @@ Timeline 的占用是它实际提供给主模型 prompt 的材料，不是原始
 - 普通及 promoted Open Timeline；
 - 已冻结的技能正文、工具 Schema、Evidence、用户输入历史。
 
-模板消费这些字段；压缩检查使用同一返回值的 `PromptText()` 统计 token。主循环传入与组装 prompt 一致的 `IncludeLatestModelReplay`、`PromoteUserInput`、`UserInputOnly` 选项。统计不额外重放有效状态，也不把已经渲染过的正文重复加一遍。
+模板消费这些字段，再拼入静态指令、任务、TODO 和动态状态。构建完成后统一测量最终 prompt，不重复计算已渲染的正文。
 
 上限与压缩目标不同：
 
 ```text
-触发：实际占用 >= TimelineContentSizeLimit
+触发：完整 prompt > TimelineContentSizeLimit
 完成：实际占用 <= max(1, TimelineContentSizeLimit / 6)
 ```
 
-历史实现 `a7e888c2b^` 的 `timeline_compression.go` 使用 `currentSize / 6`。本次改为上限的二分之一，并按配置上限计算目标，使突发输入不会抬高压缩后的水位。默认上限仍为 `300 * 1024` tokens，目标为 `150 * 1024` tokens。
+当前按配置上限的六分之一计算目标，而不是按当前体积计算，使突发输入不会抬高压缩后的水位。默认上限为 `300 * 1024` tokens，目标为 `50 * 1024` tokens。正常组装和 prompt 模式选择集中在 `generateLoopPromptFromInput`；主循环统一解析并执行 `compress_context`。
 
-非正上限关闭自动检查。未触发时，即使材料大于目标，也不整理、不调用 AI、不改变冻结块。
+非正上限回退到默认值。未触发时，即使材料大于目标，也不整理、不调用 AI、不改变冻结块。
 
 ## 2. 主流程
 
-`CompressBeforePrompt` 负责完整流程：
+`generateLoopPromptFromInput` 负责构建和模式选择，返回 prompt、成分快照和模式：
 
-1. 渲染主模型使用的 Timeline 材料并测量；
-2. 未到上限则结束；达到上限后进入本次优化；
-3. 调用一次 `foldTimelineWithoutAI`，独立提交不需要 AI 的确定性折叠；
-4. 重新渲染，满足低水位目标即可结束，否则构建原始 item 压缩快照；
-5. 折叠后仍高于目标时，最多一次模型调用完成本轮的普通历史筛选、摘要及 promoted 黑名单；
-6. 原子提交后返回。一次检查不再继续调用模型；仍高于上限时，下一次检查再处理。
+1. 正常组装完整 prompt 并测量；
+2. 未超过上限则返回正常模式；
+3. 超限时直接通过 `RenderCompressionGuide` 读取当前 timeline，只把动态段换成压缩指引和当前任务只读状态，返回压缩模式；不保留快照，也不再单独做无 AI 折叠。
 
-触发后由 `foldThenCompressTimelineToTarget` 按“无 AI 折叠一次 → 复测 → 必要时一次 AI 压缩”的顺序推进。整个检查有独立等待通道，多个检查者共享同一进程中的优化进展；AI 事务走 `compressTimelineOnceWithAI`。写入和渲染不会自行启动压缩。
+主循环在原有 AI transaction 中解析 action。`compress_context` 没有单独开关，普通轮也可以主动调用。verifier 只检查 action 类型、字段类型和禁止的 TODO 修改；handler 读取当前 timeline 并把 action 展开成 `TimelineCompressionSelection`，Timeline 按应用当时的内容原子提交。
 
-取消和失败退避保持。折叠已经达到低水位就不再请求模型。一次 AI 后仍高于目标不是失败，也不在同一次检查里重试。用户输入等不可删材料本身过大时保留原文，不强删或截断。
+action 只原子提交结果，不再请求 AI。压缩回合不重复写入模型响应；完成后继续循环，从正常组装重新开始。连续压缩仍无有效缩减时明确退出。用户输入等不可删材料保留原文，不强删或截断。
 
-## 3. 无 AI 折叠
+写入、渲染、保存和恢复不会自行启动 AI 压缩。模型报告超长时只降低运行时上限，并复用上述构建流程；旧自动调度器与失败退避状态已删除。
 
-在已经触发优化之后，`foldTimelineWithoutAI` 只在 AI 循环前执行一次，折叠 journal 中的冗余操作，并将捕获水位内仍存活的内容冻结、重建 `promotedState`。当前有效状态无损不代表所有历史版本仍能逐条回滚。
-
-工具缓存：
-
-- 同 key 的旧 UPSERT 已被覆盖，保留最后一次 UPSERT；
-- 保留其后最后一次 REUSE，维持工具使用顺序；
-- 最终操作为 DELETE 的 key，可以退休整条失效链。
-
-Evidence：
-
-- 同证据 ID 保留最终 UPSERT；
-- 最终 DELETE 的失效链可全部退休；
-- malformed/未知操作保守保留。
-
-Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。写入入口已有去重，不再凭“同名”清理技能。
-
-整理和 AI 分别提交：整理后复测已达到目标就不请求模型；模型失败也不撤销已成功完成的确定性整理。退休前通过已有持久化入口保存源，锁外保存后重新校验来源；保存失败不退休。退休、冻结成员、state 重建在同一 Timeline 写锁中发布。
-
-## 4. 压缩候选直接来自 item
+## 3. 压缩候选直接来自 item
 
 `captureCompressionSnapshotLocked` 已经按 ID 遍历原始 Timeline。在已有 promotable 分支中直接分类：
 
@@ -75,29 +54,17 @@ Skill 是追加阅读语义，不在这里折叠不同正文或不同范围。�
 
 一个原始 item 对应一条快照项。没有聚合句柄、没有成员链、没有第二次全集收集，也不从 `promotedState` 反推候选。已经整理过的冗余 item 不会进入下一次 AI 快照。
 
-请求示例：
-
-```text
-========== RETIRE_ID 310 ==========
-
-========== RETIRE_ID 310 ==========
-kind=recent-tool-cache name=read_file operation=upsert
-[UPSERT] read_file
-<完整工具描述与参数 Schema>
-========== END RETIRE_ID 310 ==========
-```
-
-正文全量，不做预览或条数截断。内部技能身份中的 NUL 分隔符不会直接渲染。Evidence 全文已在 promoted 项中出现时，不重复添加 `SESSION_EVIDENCE` 参考块；该字段仍用于旧记忆快照兼容和现有记忆指纹。
+正文沿用整个主循环上下文，不复制进另一份压缩请求。动态段的普通历史索引使用 ID 和定位片段；技能、证据分别列出可选的技能名、证据 id。定位片段不代替上文正文，也不要求模型复制正文来标识保留条目。工具 Schema 不能淘汰。
 
 固定 Skill Inventory 是初始化目录，不在 Timeline 中，不参与此处的占用或删除；运行时推荐目录 item 则属于 skill。
 
 ## 5. 选择和提交
 
-- `ratain_timeline_item_range` 保留既有拼写，只解释普通 item ID：未选中的普通原文可由摘要替代。
-- `retire_promoted_entries` 是可选字符串，只接受本次列出的原始 promoted item ID，逗号分隔，不支持区间。缺失、空字符串、非法类型均不删；未知 ID 忽略。
-- 未点名的 promoted item 默认原样保留。不能从一个 ID 扩大到整个同名工具、技能或证据。
-- Skill 不同资源页独立选择；删除后按剩余原始 item 重建累计技能块。
-- Evidence 与其它 item 一样退休，不增加 Config/session 的第二条 post-commit 删除通道。它会改变当前 Timeline 重放出的证据账本。提示词要求按当前进度主动淘汰不再影响下一步的证据、工具和技能；用户输入不可删除。
+- `retain_timeline` 支持散落 ID 与多个闭区间混合，例如 `"3-8,12,20-26,37,41-45"`；只筛选本轮普通候选，未选中的原文由摘要承接。空字符串表示全部概括。
+- `retire_skill_names` 按完整技能名整份淘汰，包含该技能的分页与 metadata。
+- `retire_evidence_ids` 按当前观测 id 淘汰证据。
+- 未点名的技能和证据默认保留。非法 ID、范围或名字直接报错，由 AI transaction 引导纠正。
+- 用户输入、工具 Schema、TODO、任务指令和固定目录不可删除。淘汰技能或证据时，summary 要说明淘汰了什么，便于后续理解和重新加载。
 
 解析阶段已将删除名单限制在本次快照列出的 promoted item ID 中。提交直接使用该名单，不扩大或取消删除，不按同 key 的 REUSE、DELETE 或水位后新操作调整选择。未点名的原始 item 和水位后的新 item 不退休；删除后按剩余 journal 正常重放。
 
@@ -107,15 +74,15 @@ kind=recent-tool-cache name=read_file operation=upsert
 
 ## 6. 流式响应、预算与失败
 
-有 promoted 候选时，提前发布必须等待删除名单字段；旧模型响应缺少字段时，完成解析后按“不删”回退。摘要、普通选择、黑名单一起成为已发布的选择。发布后尾流变更选择会使记忆尾流失败，不会倒推撤销已经提交的 Timeline。`FinalizeMemory` 保持等待完整结果的既有语义。
+transaction 完成响应解析后，action handler 才转换并提交摘要、普通选择与 promoted 淘汰名单；只会被校验的 action 输入不会直接改变 Timeline。退出和失败时释放快照占用。
 
-仅有 promoted 候选时允许空摘要；没有可决策材料时保留 freeze-only 能力。压缩请求直接给出当前占用、目标、缺口，以及普通历史和 promoted 内容两个可优化部分的大小。目标覆盖整个 Timeline，而不是只约束 summary。
+存在普通历史或实际淘汰 promoted 时，摘要不能为空。动态指引给出完整 prompt 的占用、目标和缺口；目标覆盖整份主循环 prompt，而不是只约束 summary。
 
 预算分别处理：
 
 - 主上下文触发上限默认 300K；
-- 目标为上限的二分之一；
-- 辅助请求完整输入默认安全上限为 512K，避免原来的 256K 本地上限先于 300K 触发拒绝；调用方可覆盖，模型/provider 仍可能有更小容量；
+- 目标为上限的六分之一；
+- 压缩模式完整输入安全上限为 512K，模型/provider 仍可能有更小容量；
 - 摘要、保留普通原文和记忆候选保持现有 16K 输出安全检查；
 - 不截断输入绕过检查，不把未达目标当成功。
 

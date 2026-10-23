@@ -2,12 +2,15 @@ package ssadb
 
 import (
 	"regexp"
+	"strings"
 	"sync"
 
 	"github.com/gobwas/glob"
+	"github.com/yaklang/yaklang/common/utils"
 )
 
 type NameCache struct {
+	strings *utils.SafeMapWithKey[string, string]
 	sync.RWMutex
 	nameToId map[string]int64
 	idToName map[int64]string
@@ -28,6 +31,7 @@ type NameCache struct {
 // pass false for in-memory programs so the cache never touches the SSA database.
 func NewNameCache(program string, useDB bool) *NameCache {
 	cache := &NameCache{
+		strings:  utils.NewSafeMapWithKey[string, string](),
 		nameToId: make(map[string]int64),
 		idToName: make(map[int64]string),
 		program:  program,
@@ -37,6 +41,37 @@ func NewNameCache(program string, useDB bool) *NameCache {
 		cache.Preload()
 	}
 	return cache
+}
+
+// Intern returns the single canonical copy of name that this cache keeps.
+//
+// It is string interning, not name->id resolution: the map's key and value are
+// always the same string, so a lookup result is exactly the canonical copy. Two
+// reasons to route names through it:
+//
+//  1. Memory: IR names arrive as substrings of a source buffer or JSON blob.
+//     Holding a substring keeps the whole backing array alive, so the first
+//     occurrence is cloned (strings.Clone) and every later caller receives that
+//     owned copy instead of pinning a large buffer.
+//  2. Identity: repeated names collapse to one allocation, which makes name
+//     comparisons and dedup cheap for the millions of IR records a large
+//     project produces.
+//
+// The DB-backed name->id pool is a separate concern (Preload/GetNameID); Intern
+// never assigns an id or runs SQL, so it is safe in the in-memory (useDB=false)
+// mode too.
+func (c *NameCache) Intern(name string) string {
+	if c == nil || name == "" {
+		return name
+	}
+	if canonical, exists := c.strings.Get(name); exists {
+		return canonical
+	}
+	owned := strings.Clone(name)
+	canonical, _ := c.strings.GetOrLoad(owned, func() (string, error) {
+		return owned, nil
+	})
+	return canonical
 }
 
 func (c *NameCache) Preload() {
@@ -77,6 +112,7 @@ func (c *NameCache) Preload() {
 }
 
 func (c *NameCache) GetID(name string) int64 {
+	name = c.Intern(name)
 	// id=0 约定表示空字符串 ""，数据库 namepool 表中 id=0 对应 name=""
 	if name == "" {
 		c.Lock()

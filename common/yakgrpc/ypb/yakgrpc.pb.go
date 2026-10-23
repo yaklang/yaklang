@@ -72988,8 +72988,10 @@ type MITMV2Request struct {
 	ExtraPorts []uint32 `protobuf:"varint,57,rep,packed,name=ExtraPorts,proto3" json:"ExtraPorts,omitempty"`
 	// disable built-in TrafficGuard sensitive-info scanning
 	DisableTrafficGuard bool `protobuf:"varint,58,opt,name=DisableTrafficGuard,proto3" json:"DisableTrafficGuard,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Opt in to the compromised eMudhra CA for TLS trust testing. Default: false.
+	UseEMudhra    bool `protobuf:"varint,59,opt,name=UseEMudhra,proto3" json:"UseEMudhra,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *MITMV2Request) Reset() {
@@ -73424,6 +73426,13 @@ func (x *MITMV2Request) GetExtraPorts() []uint32 {
 func (x *MITMV2Request) GetDisableTrafficGuard() bool {
 	if x != nil {
 		return x.DisableTrafficGuard
+	}
+	return false
+}
+
+func (x *MITMV2Request) GetUseEMudhra() bool {
+	if x != nil {
+		return x.UseEMudhra
 	}
 	return false
 }
@@ -85201,7 +85210,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x14WatchProcessResponse\x12\x16\n" +
 	"\x06Action\x18\x01 \x01(\tR\x06Action\x12*\n" +
 	"\aProcess\x18\x02 \x01(\v2\x10.ypb.ProcessInfoR\aProcess\x125\n" +
-	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xb8\x14\n" +
+	"\vConnections\x18\x03 \x03(\v2\x13.ypb.ConnectionInfoR\vConnections\"\xd8\x14\n" +
 	"\rMITMV2Request\x12\x12\n" +
 	"\x04Host\x18\x01 \x01(\tR\x04Host\x12\x12\n" +
 	"\x04Port\x18\x02 \x01(\rR\x04Port\x12(\n" +
@@ -85271,7 +85280,10 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\n" +
 	"ExtraPorts\x189 \x03(\rR\n" +
 	"ExtraPorts\x120\n" +
-	"\x13DisableTrafficGuard\x18: \x01(\bR\x13DisableTrafficGuard\"\xe3\x05\n" +
+	"\x13DisableTrafficGuard\x18: \x01(\bR\x13DisableTrafficGuard\x12\x1e\n" +
+	"\n" +
+	"UseEMudhra\x18; \x01(\bR\n" +
+	"UseEMudhra\"\xe3\x05\n" +
 	"\x0eMITMV2Response\x12\x1e\n" +
 	"\n" +
 	"JustFilter\x18\x01 \x01(\bR\n" +

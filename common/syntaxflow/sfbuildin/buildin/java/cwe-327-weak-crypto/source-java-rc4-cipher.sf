@@ -4,7 +4,7 @@ desc(
 	title: "检测 Java RC4 Cipher"
 	title_zh: "检测 Java RC4 Cipher"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-java-rc4-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -41,7 +41,7 @@ NEG
 
 ${*.java}.pattern_regex(/Cipher\.getInstance\(\s*["'](RC4|ARCFOUR)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Java RC4 Cipher",
 	title_zh: "检测 Java RC4 Cipher",
 	message: "检测 Java RC4 Cipher",

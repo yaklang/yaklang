@@ -234,9 +234,9 @@ func TestRuleBlockMerging(t *testing.T) {
 		}
 	}
 
-	// Verify blocks are within ProbesMax limit
-	assert.LessOrEqual(t, len(blocks), config.ProbesMax,
-		"Total blocks should not exceed ProbesMax")
+	// Port-matched probes have their own budget, so the total can exceed ProbesMax.
+	assert.LessOrEqual(t, len(blocks), selectionCap(config),
+		"Total blocks should stay inside the combined probe budget")
 }
 
 // TestAMQPRuleSelection verifies that AMQP rule is included in the selection
@@ -319,9 +319,9 @@ func TestProbesMaxLimitation(t *testing.T) {
 
 			_, blocks, _ := GetRuleBlockByConfig(testPort, config)
 
-			assert.LessOrEqual(t, len(blocks), tc.probesMax,
-				"Blocks count should not exceed ProbesMax(%d), got %d",
-				tc.probesMax, len(blocks))
+			assert.LessOrEqual(t, len(blocks), selectionCap(config),
+				"Blocks count should not exceed the combined probe budget %d, got %d",
+				selectionCap(config), len(blocks))
 
 			log.Infof("ProbesMax=%d: Got %d blocks", tc.probesMax, len(blocks))
 		})
@@ -342,7 +342,7 @@ func TestAMQPDetectionWithDifferentProbesMax(t *testing.T) {
 		probesMax    int
 		shouldDetect bool
 	}{
-		{"ProbesMax_3_MayNotDetect", 3, false},  // Might not detect if port-specific rules take all slots
+		{"ProbesMax_3_ShouldDetect", 3, true},   // Port decoys no longer consume the generic budget
 		{"ProbesMax_5_ShouldDetect", 5, true},   // Should detect with default value
 		{"ProbesMax_10_ShouldDetect", 10, true}, // Definitely should detect
 	}

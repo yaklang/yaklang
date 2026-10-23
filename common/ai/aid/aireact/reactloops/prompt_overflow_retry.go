@@ -44,6 +44,14 @@ func (r *ReActLoop) syncPromptOverflowTimelineLimit() {
 // reduceTimelineLimitForPromptOverflow records the confirmed overflow for the
 // model that rejected the prompt and lowers the timeline limit for the rebuild.
 // It returns false when no tighter limit is available, so the caller stops.
+func (r *ReActLoop) noteFittingTimelineThroughID(id *int64) {
+	if r == nil || id == nil {
+		return
+	}
+	copied := *id
+	r.lastFittingTimelineThroughID = &copied
+}
+
 func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prompt string) bool {
 	config, ok := r.config.(*aicommon.Config)
 	if !ok || config == nil {
@@ -63,8 +71,5 @@ func (r *ReActLoop) reduceTimelineLimitForPromptOverflow(overflowErr error, prom
 		return false
 	}
 	timeline.SetTimelineContentLimit(limit)
-	// A confirmed overflow is new evidence that compression is required; do not
-	// let an earlier compression failure suppress this attempt for a minute.
-	timeline.ClearCompressionBackoff()
 	return true
 }

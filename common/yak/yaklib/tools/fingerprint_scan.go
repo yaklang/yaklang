@@ -110,7 +110,7 @@ func openPortGuardLimit(config *fp.Config) int {
 }
 
 // sendMatchResultOrDrop 把 fingerprint 结果送入 outC. 当 ctx 已 cancel
-// 时主动放弃, 防止下游已停止消费时 inner goroutine 永久阻塞 (chan send hang).
+// 时仍优先保留可立即送达的结果；仅在下游阻塞时放弃，防止 goroutine 泄漏。
 //
 // 这是 fingerprint goroutine 泄漏修复的核心点. 历史问题: 当上游 yak VM 或
 // servicescan 调用方在 cancel ctx 后停止 range outC, 但 outC 未关闭 (因为
@@ -121,6 +121,14 @@ func openPortGuardLimit(config *fp.Config) int {
 func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, result *fp.MatchResult) {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	// A completed probe must survive cancellation when the consumer or buffer
+	// can accept it now. Selecting directly against Done randomly drops results
+	// when both cases are ready, even with an empty output buffer.
+	select {
+	case outC <- result:
+		return
+	default:
 	}
 	select {
 	case outC <- result:
@@ -940,6 +948,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"ScanFromSynResult":   _scanFromTargetStream,
 	"ScanFromSpaceEngine": _scanFromTargetStream,
 	"ScanFromPing":        _scanFromPingUtils,
+	"ParseProtocolFields": fp.ParseProtocolFields,
 
 	"proto": _protoOption,
 
@@ -988,7 +997,8 @@ var FingerprintScanExports = map[string]interface{}{
 	// 主动发包模式打开
 	"active": fp.WithActiveMode,
 
-	// 每个服务最多主动发几个包？
+	// 每个服务最多主动发几个通用探测包？端口命中的探针另有预算，
+	// 实际发包上限见 fp.Config.ProbesMax 的注释。
 	"maxProbes": fp.WithProbesMax,
 
 	// 主动发包模式下，并发量？

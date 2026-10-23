@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"fmt"
 	"github.com/samber/lo"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/log"
@@ -170,6 +171,16 @@ func AutoMigrate(db *gorm.DB, key uint8) {
 	} else {
 		log.Errorf("Database schema key: %v is %v", key, KeySchemaToName(key))
 	}
+}
+
+// AutoMigrateChecked is used by stores whose initialization must reject partial
+// schema creation. Existing callers retain their historical migration behavior.
+func AutoMigrateChecked(db *gorm.DB, key uint8) error {
+	models, ok := databaseSchemas[key]
+	if !ok || len(models) == 0 {
+		return fmt.Errorf("database schema %d is unavailable", key)
+	}
+	return db.AutoMigrate(models...).Error
 }
 
 func RegisterDatabasePatch(key uint8, patch func(db *gorm.DB)) {

@@ -41,7 +41,7 @@ func (r *Return) calcType() Type {
 		// we need to build them first to ensure their Type is set
 		// before we try to get the return type
 		if fun, ok := ToFunction(v); ok && fun.Type == nil {
-			fun.Build()
+			fun.buildOnLookup()
 		}
 		t := v.GetType()
 		if objTyp, ok := ToObjectType(t); ok {
@@ -106,6 +106,7 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 			continue
 		}
 		param.FormalParameterIndex = i
+		param.markPersistenceDirty()
 	}
 	// fixup side effect,
 	// if this side-effect is member call, the index just "--"
@@ -118,6 +119,7 @@ func (b *FunctionBuilder) fixupParameterWithThis() {
 
 // Finish current function builder
 func (b *FunctionBuilder) Finish() {
+	defer func() { b.placeholderConstants = nil }()
 	b.fixupParameterWithThis()
 
 	for _, fun := range b.MarkedFunctions {
@@ -252,6 +254,7 @@ func (f *Function) Finish() {
 	if utils.IsNil(f) {
 		return
 	}
+	defer f.markPersistenceDirty()
 	if f.finished {
 		return
 	}
@@ -273,10 +276,12 @@ func (f *Function) Finish() {
 		}
 	}
 
+	f.typeMu.Lock()
 	if f.Type == nil {
 		f.Type = NewFunctionType("", nil, nil, false)
 	}
 	funType := f.Type
+	f.typeMu.Unlock()
 
 	funType.Parameter = lo.Map(f.Params, func(id int64, _ int) Type {
 		p, ok := f.GetValueById(id)
@@ -287,11 +292,13 @@ func (f *Function) Finish() {
 		return t
 	})
 	// 优先使用显式设置的返回类型（如 TypeScript 的类型注解）
-	// 否则从 return 语句中推导
+	// 否则从 return 语句中推导。推导不能持有 typeMu：它会读取别的
+	// 函数的类型。算完再在锁里发布，调用方才能原子地看到 ReturnType。
+	var computedReturn Type
 	if f.currentReturnType != nil {
-		funType.ReturnType = f.currentReturnType
+		computedReturn = f.currentReturnType
 	} else {
-		funType.ReturnType = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
+		computedReturn = handlerReturnType(lo.FilterMap(f.Return, func(i int64, _ int) (*Return, bool) {
 			inst, ok := f.GetValueById(i)
 			if !ok {
 				return nil, false
@@ -299,6 +306,9 @@ func (f *Function) Finish() {
 			return ToReturn(inst)
 		}), funType)
 	}
+	f.typeMu.Lock()
+	funType.ReturnType = computedReturn
+	f.typeMu.Unlock()
 	funType.IsVariadic = f.hasEllipsis
 	funType.This = f
 	funType.ParameterLen = f.ParamLength
@@ -328,7 +338,9 @@ func (f *Function) Finish() {
 			log.Warnf("free value %s is not a parameter", n)
 		}
 	}
+	f.typeMu.Lock()
 	funType.SetFreeValue(result)
+	f.typeMu.Unlock()
 	f.builder.SetReturnSideEffects()
 	ses := funType.SideEffects
 	tmpSideEffects := make(map[*Variable]*FunctionSideEffect)

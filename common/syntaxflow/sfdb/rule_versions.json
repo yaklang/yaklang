@@ -242,8 +242,8 @@
   {
     "rule_id": "48c2c107-024f-4abc-a940-ed637847f22c",
     "rule_name": "检测通用硬编码凭据",
-    "hash": "2ae4112e627e2d8d59439fdc23d1f8bb01f6fb26768be1cc2e2d9635c543b799",
-    "version": "20260930.0001"
+    "hash": "5e959ebaff4b249db501db62b9dd5887fe1b24025d24e9a042f9902603b52f69",
+    "version": "20261022.0002"
   },
   {
     "rule_id": "5b485362-1df1-40df-afc4-a3252bee0150",
@@ -1058,8 +1058,8 @@
   {
     "rule_id": "50d74e0f-2353-4367-a53c-18e8d48d22e1",
     "rule_name": "检测Java配置文件中不当的密码配置",
-    "hash": "57a21c563e43f60fdf4772cd6c8b8460263eec084c091d2a3791ccb852d5aaad",
-    "version": "20260901.0001"
+    "hash": "b4b0b85247e145553015f676aa791f2348314867374b0984f23a494c80271801",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "b717bf17-1dee-4b38-b048-61aaaf1957a1",
@@ -1358,20 +1358,20 @@
   {
     "rule_id": "7691bedd-84dd-44bd-a403-d8c72e9d5378",
     "rule_name": "检测Java java.sql Connection 资源未释放",
-    "hash": "6767143a6d4d9979cb23721f4121d8c60431a5387b76e24f51e182d43cdcafcb",
-    "version": "20260901.0002"
+    "hash": "ed74ce83674c56c885a52e0ea340acb7231102b8a846c78e0ab566d42cd29d1a",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "4dc8d2a1-6cca-4025-a219-7c52ac3a5fd7",
     "rule_name": "检测Java java.sql Statement查询结果集ResultSet资源未释放",
-    "hash": "533866b5175e263f37ff327a32b00aab96833ec0b929c3b83084153d744f0e74",
-    "version": "20260901.0002"
+    "hash": "9407cbe7e66f808ca9aba47a9f5aba5cac77d6b06490d3baf0b35db699143bdb",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "195768f2-de1d-4e9f-9a72-7244efbc0abf",
     "rule_name": "检测Java java.sql 数据库Statement资源未释放",
-    "hash": "8ac7c62fa35519ae0ce143fd698703c1d5c74c594efd5cd46cf7ae0b00aaea02",
-    "version": "20260901.0002"
+    "hash": "081b3c6398dbaab5c43efeb2ec273eee8fdf798c8d45e1b8e739e8ff084f0640",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "8a2c763a-d909-4dd4-a44c-cad0f46b7041",
@@ -1430,8 +1430,8 @@
   {
     "rule_id": "b8ede24d-8ff0-4d81-ab97-903495a6cb61",
     "rule_name": "检测Java SQL注入漏洞",
-    "hash": "e5bddf00f2e4733b5ebf00a890f0483761c4c849c512af4bf74e1572b4b073fa",
-    "version": "20260920.0001"
+    "hash": "094fe3720fd94198f0f8513bb7077931940ba30a293abcfc6dc5499b86858e67",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "e53aa369-2d16-445a-a9e9-fb2155791246",
@@ -1682,8 +1682,8 @@
   {
     "rule_id": "a258e671-339e-4d8f-af91-e2493a4e91dd",
     "rule_name": "审计Java Servlet用户输入",
-    "hash": "fd409489295fe22f8342c7656c9798e398b217ea87f6fc5562e871bfcc4827a9",
-    "version": "20260901.0002"
+    "hash": "0e8cee892145dcea96e134c209f85d77c9d55ca55e1732214f8249344327d772",
+    "version": "20261019.0001"
   },
   {
     "rule_id": "1314089e-e030-4436-89d2-2aabe2758683",
@@ -2048,8 +2048,8 @@
   {
     "rule_id": "7e9783e9-58c5-46b4-96d7-0cfa184ae67a",
     "rule_name": "检测Python Jinja2 from_string SSTI漏洞",
-    "hash": "cb9e24310cb5d65a66134ffbb8977e6dc89c71f407cebd6c77300aa1db8f24c9",
-    "version": "20260901.0002"
+    "hash": "c9971d25c99e1b77236e82d782880fe8bd7cbdfdac11077b900bfa4d86a7f828",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "b0e529e8-d502-4178-81d6-c2554863f2e6",
@@ -2090,8 +2090,8 @@
   {
     "rule_id": "de8fe36b-568d-4b52-b223-7694ffe2014f",
     "rule_name": "检测Python eval/exec/compile代码注入漏洞",
-    "hash": "2c579b63165aa9a86ce46366507e0ef86013d8f36eb58ff161f39cef60005e66",
-    "version": "20260901.0002"
+    "hash": "dddf0d5018388b4df770debf27ac16e8bc4633ef363fda5cebe9272ccacbcc1e",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "c1d2e3f4-a5b6-7890-cdef-112233445566",
@@ -2294,8 +2294,8 @@
   {
     "rule_id": "source-config-spring-datasource-password",
     "rule_name": "检测配置中的 Spring 数据源密码",
-    "hash": "c3c0fcece6ec665bfcb087e138d7a3af1626be00e7921d8fc34a7273abea45ec",
-    "version": "20260914.0001"
+    "hash": "63f4027939739d7c9493e3c3f1b4a1d3cb20b1471f0ca2d896fdd43ef0608ccc",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-gha-workflow-env-secret",
@@ -2456,14 +2456,14 @@
   {
     "rule_id": "source-js-eval",
     "rule_name": "检测 JavaScript eval 调用",
-    "hash": "7802b67d6176279ce85765a52c2cb5df03322b73e193dd6df6e1f3e725334fb4",
-    "version": "20260914.0001"
+    "hash": "5413421657e4047e19b5f7de01a648b01a4b11179a816a932c4a1d00e1d7cf8f",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-eval",
     "rule_name": "检测 Python eval 调用",
-    "hash": "0d3d44b9534f22eab67c11042d8cbef2eab9e4f6f0697f578100e0fea866cd34",
-    "version": "20260914.0001"
+    "hash": "cff910b8fa5b9a80b4e66f3e85997054cd7731cda7f21c0119af06926dfb2bd2",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-os-system",
@@ -2474,8 +2474,8 @@
   {
     "rule_id": "source-python-pickle-load",
     "rule_name": "检测 Python pickle.load",
-    "hash": "a358e8460105618010006ba6d8f4eef8277946e5b86c28889f84cc63ce6a59fb",
-    "version": "20260914.0001"
+    "hash": "7afa886a2fecea342a71743b3b4fd42f7b84455c861fdbaec41ea1a3f3564992",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-scala-slick-sql-non-literal",
@@ -2510,8 +2510,8 @@
   {
     "rule_id": "source-secret-aws-akia",
     "rule_name": "检测 AWS 访问密钥 ID",
-    "hash": "8f0ade6ef76e4e2884f29bd18b38cdd2463b9eb6846338c6b4c79fec935dce0f",
-    "version": "20260914.0001"
+    "hash": "b40562f01c677e5dc03aa7f5a269cdf0017ab303a6e593cfc9b300d63b23c4d1",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-secret-aws-secret-access-key",
@@ -2576,20 +2576,20 @@
   {
     "rule_id": "source-secret-password-assignment",
     "rule_name": "检测硬编码密码赋值",
-    "hash": "1dd0f8e4c7b59fb5e9374658d2aa1e28032d7c49a86fc69d2dd8b39677f41b3b",
-    "version": "20260930.0001"
+    "hash": "100af4285c21562fd74066723b12de92e3bb437b730d3de77809ad287e05ce2f",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-secret-pem-private-key",
     "rule_name": "检测 PEM 私钥块",
-    "hash": "97f68c8ec0cf9b7b283e7a2328041c991763ada94af564ff1fe8216de7e6965c",
-    "version": "20260914.0001"
+    "hash": "1920849a486e75cbde0f3411d9216a3889265380ff4501dbc139732d6befa17c",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-secret-private-key-block",
     "rule_name": "检测私钥 PEM 块",
-    "hash": "a3da12ea49f6eea8ebc134729d5ff90edb7dc69596eb1b133d49af10644acacc",
-    "version": "20260914.0001"
+    "hash": "5af7f664acdb6ee433068c8b74c37dceaba75e3f0807f9200bcd816e84e3ee20",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-secret-sendgrid-api-key",
@@ -4172,8 +4172,8 @@
   {
     "rule_id": "source-insecure-api-use-defused-xml",
     "rule_name": "检测到未使用 defusedxml",
-    "hash": "885175389168689a4a91ec935642457a202e745c0cf843900f5b75300ebd93e9",
-    "version": "20260914.0001"
+    "hash": "9e5cbbabbe8cde05190bda0c0452e2467ca139964ab10cd84650aa34b893ff01",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-insecure-api-use-defused-xmlrpc",
@@ -4988,8 +4988,8 @@
   {
     "rule_id": "source-java-blowfish-cipher",
     "rule_name": "检测 Java Blowfish 加密",
-    "hash": "f7fc85d25affc9726fe2296c80c3b25706e213687e54ff34be5afed03eb1e8c8",
-    "version": "20260914.0001"
+    "hash": "31012b29baa12b5ae9addd43d4b36957172c290a1d25148d57ae1bdfa4d057c6",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-java-class-forname",
@@ -5024,8 +5024,8 @@
   {
     "rule_id": "source-java-desede-cipher",
     "rule_name": "检测 Java 3DES 加密",
-    "hash": "c3bfa0f45d16ebac3ec35cb3dcc5dc05dbad9a66b01086b481a4dc3533606817",
-    "version": "20260914.0001"
+    "hash": "c779628c00b07a7fe635c8572dc6e695da1d2a3eb1cac1db593c2f70ac6f20e3",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-java-digestutils-md5",
@@ -5150,20 +5150,20 @@
   {
     "rule_id": "source-java-rc4-cipher",
     "rule_name": "检测 Java RC4 Cipher",
-    "hash": "8c8bf4b622d7faff7f9102d36ef922ee10b76ef5529f5b5cf0116b60bc3ebfa0",
-    "version": "20260914.0001"
+    "hash": "143bec71258adda57326dd030866417794930475c6e38f64856bc89b25f84722",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-java-rsa-pkcs1",
     "rule_name": "检测 Java RSA PKCS1Padding",
-    "hash": "0a02cd5086ae44e34c394144ccc8ce2183f26ecfb9555a26c2cd8197d1ee5805",
-    "version": "20260914.0001"
+    "hash": "b23ce3e9fa27d8754d13339c70cc89d8e1e95e6bbc9a793e904af2c3f885f993",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-java-script-engine-eval",
     "rule_name": "检测 Java ScriptEngine.eval 调用",
-    "hash": "5612a8ef36d2823e0de718bee9ec5424cfd583625efc794b5fbdd7163c2fde7d",
-    "version": "20260914.0001"
+    "hash": "56b66285308df96d62a98cddf488e2a81a9e09217ea0af697583181c51a04403",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-java-secretkeyspec",
@@ -5288,8 +5288,8 @@
   {
     "rule_id": "source-js-document-write",
     "rule_name": "检测 JavaScript document.write",
-    "hash": "f1b2f485dd07cf4b833dcf073c0eeb40bd443df253f7a634622e38dbd8ae8e57",
-    "version": "20260914.0001"
+    "hash": "ac155db527cf3f6f91d46182c27ba0fe2bbb554d3790555a02139e93d31f97ad",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-js-ejs-render",
@@ -5300,14 +5300,14 @@
   {
     "rule_id": "source-js-function-constructor",
     "rule_name": "检测 JavaScript Function 构造器",
-    "hash": "1dcb0fdef57fbb42970752200bd7fd7e5c4aab91826de89eb9b54c4b9b0e568b",
-    "version": "20260914.0001"
+    "hash": "399f07ea33935d56123fed420eb38d6b67002ae703123bee1b89b399e962bb6d",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-js-innerhtml",
     "rule_name": "检测 JavaScript innerHTML 赋值",
-    "hash": "1a5806f4ee215bc14022e80ab9d6f83be2882e983df736597f24a5f82c383839",
-    "version": "20260914.0001"
+    "hash": "73324712e06b1258a688471a7f2cfd5fa066953cb63cee9f256bb8e1b52539e7",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-js-jwt-decode",
@@ -5360,8 +5360,8 @@
   {
     "rule_id": "source-js-settimeout-string",
     "rule_name": "检测 JavaScript setTimeout 字符串参数",
-    "hash": "c57da1418b357baf1db44374a098e388a7cabed2755818dc5017ac5fd1404dfd",
-    "version": "20260914.0001"
+    "hash": "be637523db8bdae168588c4eaeba5d8bbed069604a732f3fa4b7e0457f25b5cf",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-js-spawn-shell-true",
@@ -5606,8 +5606,8 @@
   {
     "rule_id": "source-python-compile",
     "rule_name": "检测 Python compile 调用",
-    "hash": "09421c318e2fe996af64fa3b9b690712aa0403430fe639013cddb3899fe24239",
-    "version": "20260914.0001"
+    "hash": "0b7dcc29f3d6a0dd61953901e6e00b992b575d25c7d8d56020922ba1291f00af",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-cryptography-ecb",
@@ -5678,8 +5678,8 @@
   {
     "rule_id": "source-python-jinja2-from-string",
     "rule_name": "检测 Python jinja2 字符串模板",
-    "hash": "30d25c5d71cdca6cdc200446ff481496e42ac0a96391216c1c66415eade6c5b9",
-    "version": "20260914.0001"
+    "hash": "5109a9013ec6ea26bbf625888a1128de53136dcd6b582c709e7e7ed4103c2cce",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-jsonpickle",
@@ -6014,8 +6014,8 @@
   {
     "rule_id": "struct-java-blowfish-cipher",
     "rule_name": "结构扫描：Java Blowfish 加密",
-    "hash": "02a68ab8f856b69aea6c38a4670ea663448ec47f5e7e1c3992485fe6668e6907",
-    "version": "20260916.0001"
+    "hash": "c749a0a2956c730710ce5456ba272bb37c775391b741ca511872cbca6bddeaa1",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-java-class-forname",
@@ -6032,14 +6032,14 @@
   {
     "rule_id": "struct-java-des-cipher",
     "rule_name": "结构扫描：Java DES 加密算法",
-    "hash": "50b2aa1f2abf710623d9e9955460b83fdb53d6ac93716ec0ad3fa8c6950368ef",
-    "version": "20260916.0001"
+    "hash": "34d218bde4c0da01237b7116478ad4cae0e45c5562eea5102f7107aff456375a",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-java-desede-cipher",
     "rule_name": "结构扫描：Java 3DES 加密",
-    "hash": "640be1e27cf486ca55bf749adc12351e658bbfca3466d21371f1175fa75ee0fb",
-    "version": "20260916.0001"
+    "hash": "efd759ad7d2e0e66c8d8db390a2df2f9a6ecac2b2d251844b70ed973b5c1ed7e",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-java-digestutils-md5",
@@ -6128,14 +6128,14 @@
   {
     "rule_id": "struct-java-rc4-cipher",
     "rule_name": "结构扫描：Java RC4/ARCFOUR 加密",
-    "hash": "87805e7f829377a3005102dcabb18bac5f38ad16ccd772ed0fd2c0d979a0744c",
-    "version": "20260916.0001"
+    "hash": "464426f3dd2fa571ac8068d2c56637a5202ac0e4d84d1a72f8876a5ed1479ee2",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-java-rsa-pkcs1",
     "rule_name": "结构扫描：Java RSA PKCS1Padding",
-    "hash": "9451b1e86c360706211c4e0170221cfbeb1d61fde5974a13e632184a2af7d1f0",
-    "version": "20260916.0001"
+    "hash": "5c0a202b0469603c870075d46280321aeb1216e087946f7b45792cef16b6cd17",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-java-script-engine-eval",
@@ -6440,8 +6440,8 @@
   {
     "rule_id": "struct-python-compile",
     "rule_name": "结构扫描：Python compile 调用",
-    "hash": "9a27268cdcef183f80b16ed44cdb3199bde24b4c7fd040c47e045a7e4fc87aa2",
-    "version": "20260916.0001"
+    "hash": "1afc7320d7d6c9887120887f75b06db1f1a442fc3a1d2504fb3024319c6905c2",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-python-cryptography-ecb",
@@ -6752,8 +6752,8 @@
   {
     "rule_id": "source-java-xml-string-concat",
     "rule_name": "源码扫描：Java XML 字符串拼接",
-    "hash": "271d3ed6ef32c812fe22c4fd184dbbd925d646dffe5c879c7524299c95d3d820",
-    "version": "20260928.0001"
+    "hash": "593ce9f060b7d4bbd36fbd6e106cf4c8fb1c8b9e9b2579da4997b8295ceaa4cc",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-js-console-log-req",
@@ -6866,8 +6866,8 @@
   {
     "rule_id": "source-python-model-create-request",
     "rule_name": "源码扫描：Python 模型批量接收请求体",
-    "hash": "0d52b65d9687e6c0d8244883f94b4c56af80058656499579ad98b103a3212cc7",
-    "version": "20260928.0001"
+    "hash": "d7d04438ee4c5cda405705d0a34b916b280b7cd65ede39897306573714c2a1d9",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-redirect-request",
@@ -6878,8 +6878,8 @@
   {
     "rule_id": "source-python-response-header",
     "rule_name": "源码扫描：Python 响应头写入外部值",
-    "hash": "b8c24894c2949b7c6512dee953e1b35e57a7ddee1a36a9233a3766af928e6eec",
-    "version": "20260928.0001"
+    "hash": "09bc8433bb05506e088902343151d5c98fe2abe40710838e4a9030fda65f7ecb",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-python-set-cookie-httponly-false",
@@ -6902,8 +6902,8 @@
   {
     "rule_id": "source-python-xpath-query",
     "rule_name": "源码扫描：Python XPath 拼接",
-    "hash": "eae8ff96bbde44780174a7928a7806d34e4282b13eb42e5b1ef6ccdad773e8b6",
-    "version": "20260928.0001"
+    "hash": "4fae12947e56d6a8515875ffca51d47f3369caf47be0567bf31724af511336ad",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-ruby-html-safe",
@@ -6944,8 +6944,8 @@
   {
     "rule_id": "source-secrets-username-password-uri",
     "rule_name": "源码扫描：URI 中的用户名和口令",
-    "hash": "c1a8177c8a44e361b62640ec310f532d7ce93e78182a3bcc629e10fc6df97fcc",
-    "version": "20260928.0001"
+    "hash": "cb066e0d21856b7ca6701a381984c263e96354733374c3b7f63b3ee099e25fe0",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "source-solidity-delegatecall",
@@ -7028,8 +7028,8 @@
   {
     "rule_id": "ssa-java-mongodb-nosql",
     "rule_name": "数据流：Java MongoDB 查询拼接",
-    "hash": "6e6615f191821d075c60e8e509850617f8ff9df5d89cf0d93fcb79ebb15f5fe7",
-    "version": "20260928.0001"
+    "hash": "eee1ae154da3751e4c0b907668d7fac1fbd763784c1f0ef36161200f33d1c3ae",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "ssa-java-pattern-from-request",
@@ -7052,8 +7052,8 @@
   {
     "rule_id": "ssa-java-system-set-property",
     "rule_name": "数据流：Java System.setProperty 接受外部值",
-    "hash": "3b18cda2925058fd205a8befb6476db5d60f67acd2068fbebefa2fbc38967030",
-    "version": "20260928.0001"
+    "hash": "4494c6d1c5e8a8867c87e77d58ddf81c9fd04d89617a3dd86d0c392b870b4ee1",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "ssa-js-console-log-req",
@@ -7106,20 +7106,20 @@
   {
     "rule_id": "ssa-python-redirect-request",
     "rule_name": "数据流：Python redirect 使用请求数据",
-    "hash": "b6ef0f63ece3823a714523d7c0e7b52c2f28c8876d07b229535f07fac7a0d6fc",
-    "version": "20260928.0001"
+    "hash": "261318f9e076f8bc3b7b560a8026e45a548cbea26898d6e46321ba36917719b7",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "ssa-python-response-header",
     "rule_name": "数据流：Python 响应头写入外部值",
-    "hash": "fadf2afb1b5c6740cf0518f07449224be6945807ec03e52ef60b68ba53ad8ba1",
-    "version": "20260928.0001"
+    "hash": "4b5c6b31e1529946bf1344078a3c1f7a696a4ce064d47c5f113b8bc3b629e40f",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "ssa-python-xpath-query",
     "rule_name": "数据流：Python XPath 拼接",
-    "hash": "b7884822bc6c311c175a2e1cb83755ee0e5defefc93b21f5e21efec92842a39d",
-    "version": "20260928.0001"
+    "hash": "010f9804072f103e2770a0a3cfa0073c2971cebc04322fd32632dbf31e687971",
+    "version": "20261022.0001"
   },
   {
     "rule_id": "struct-c-des-set-key",
@@ -7172,7 +7172,7 @@
   {
     "rule_id": "struct-python-model-create-request",
     "rule_name": "结构扫描：Python 模型批量接收请求体",
-    "hash": "001822d0d7ebb2cd9a6802cac3508e9cd12d247dbe444f618df2a30ca541905d",
-    "version": "20260928.0001"
+    "hash": "28f63e21e8145bcf4f165db23fe233505798b72d856060a895951af096aba437",
+    "version": "20261022.0001"
   }
 ]

@@ -210,7 +210,9 @@ func TestFinalFlushAfterFinishEvictsDeferredTail(t *testing.T) {
 	builder.Finish()
 	prog.Cache.FlushCompileUnit("unit-first")
 
-	secondBuilder := prog.GetAndCreateFunctionBuilder("deferred", string(MainFunctionName))
+	secondBuilder := prog.GetAndCreateFunctionBuilder("", "deferred")
+	require.NotEqual(t, builder.Function.GetId(), secondBuilder.Function.GetId(),
+		"the deferred tail must belong to a different compile-unit function")
 	second := secondBuilder.EmitUndefined("second")
 	secondBuilder.Finish()
 	require.True(t, prog.Cache.hasResidentInstruction(second.GetId()),

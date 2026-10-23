@@ -9,49 +9,158 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
 )
 
-// BeginCompileUnit marks the start of a compile unit so deferred file builds
-// capture this unitKey. Function/class LazyBuild is owned by the unit's
-// library Program (see ProgramForCompileUnit), not by this string.
-func (prog *Program) BeginCompileUnit(unitKey string) {
-	if prog == nil {
+// AppendLibraryFile records a frontend's library-to-file relation on the
+// application. Compile-unit prehandlers may call this from different owners.
+func (prog *Program) AppendLibraryFile(name, filename string) {
+	if prog == nil || name == "" || filename == "" {
 		return
 	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
 	}
-	app.currentCompileUnit = unitKey
+	app.libraryFileMu.Lock()
+	if app.LibraryFile == nil {
+		app.LibraryFile = make(map[string][]string)
+	}
+	app.LibraryFile[name] = append(app.LibraryFile[name], filename)
+	app.libraryFileMu.Unlock()
+}
+
+// LibraryFiles returns a snapshot so readers do not share the mutable slice.
+func (prog *Program) LibraryFiles(name string) []string {
+	if prog == nil || name == "" {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	app.libraryFileMu.RLock()
+	files := append([]string(nil), app.LibraryFile[name]...)
+	app.libraryFileMu.RUnlock()
+	return files
+}
+
+// BeginCompileUnit records the registering worker's unitKey. A Program may be
+// visited by another worker (for example through an import); that visitor must
+// not inherit or clear this worker's context. Only deferred task registration
+// consults this context, not instruction emission or the library body owner.
+func (prog *Program) BeginCompileUnit(unitKey string) {
+	if prog == nil {
+		return
+	}
+	if unitKey == "" {
+		prog.EndCompileUnit()
+		return
+	}
+	prog.compileUnitContexts.Store(currentGoroutineID(), unitKey)
 }
 
 func (prog *Program) EndCompileUnit() {
 	if prog == nil {
 		return
 	}
-	app := prog.GetApplication()
-	if app == nil {
-		app = prog
-	}
-	app.currentCompileUnit = ""
+	prog.compileUnitContexts.Delete(currentGoroutineID())
 }
 
 func (prog *Program) CurrentCompileUnit() string {
 	if prog == nil {
 		return ""
 	}
+	gid := currentGoroutineID()
+	if unit, ok := prog.compileUnitContexts.Load(gid); ok {
+		return unit.(string)
+	}
+	// Deferred helpers run with the application context restored on their own
+	// goroutine. Never fall back to another worker's active library context.
+	if app := prog.GetApplication(); app != nil && app != prog {
+		if unit, ok := app.compileUnitContexts.Load(gid); ok {
+			return unit.(string)
+		}
+	}
+	return ""
+}
+
+// EnsureLibraryForCompileUnit returns the Program that will own this unit.
+// Library-backed units are created before concurrent pre-handlers start so
+// NewLibrary is not called from worker goroutines.
+func (prog *Program) EnsureLibraryForCompileUnit(unitKey string) *Program {
+	if prog == nil {
+		return nil
+	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
 	}
-	return app.currentCompileUnit
+	name := prog.libraryNameForCompileUnit(unitKey)
+	if name == "" {
+		return app
+	}
+	if lib, _ := app.GetLibrary(name); lib != nil {
+		return lib
+	}
+	if lib, ok := app.UpStream.Get(name); ok && lib != nil {
+		return lib
+	}
+	return app.NewLibrary(name, strings.Split(name, "."))
+}
+
+// GetOrCreateUnitBuilder returns a fully initialized builder for this unit.
+// Library builders inherit build support from the application builder so
+// CurrentBlock, language config and parent scope are present before PreHandler.
+func (prog *Program) GetOrCreateUnitBuilder(unitKey string, parent *FunctionBuilder) *FunctionBuilder {
+	if prog == nil {
+		return parent
+	}
+	name := prog.libraryNameForCompileUnit(unitKey)
+	if name == "" {
+		if parent != nil {
+			return parent
+		}
+		return prog.GetAndCreateFunctionBuilder(string(MainFunctionName), string(MainFunctionName))
+	}
+	owner := prog.EnsureLibraryForCompileUnit(unitKey)
+	if owner == nil {
+		return parent
+	}
+	owner.SetPackageName(name)
+	fun := owner.GetAndCreateFunction(name, string(MainFunctionName))
+	if fun == nil {
+		return parent
+	}
+	if fun.builder != nil {
+		if parent != nil {
+			fun.builder.SetBuildSupport(parent)
+			fun.builder.DefineFunc = parent.DefineFunc
+			fun.builder.ctx = parent.ctx
+		}
+		if fun.builder.CurrentBlock == nil {
+			if block, ok := fun.GetBasicBlockByID(fun.EnterBlock); ok && block != nil {
+				fun.builder.CurrentBlock = block
+				block.restoreScopeIfMissing()
+			}
+		}
+		return fun.builder
+	}
+	builder := NewBuilder(nil, fun, nil)
+	if parent != nil {
+		builder.SetBuildSupport(parent)
+		builder.DefineFunc = parent.DefineFunc
+		builder.ctx = parent.ctx
+	}
+	return builder
 }
 
 // libraryNameFromCompileUnitKey maps a compile-unit key onto the library
 // Program that owns that unit's functions and classes.
 //
 // Language-prefixed keys encode the package/namespace after the first colon
-// (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar). Unprefixed keys are used as-is
-// (tests, explicit NewLibrary names). Directory/resource keys have no library
-// name: their IR lives on the Application.
+// (java:a.b → a.b, csharp:Foo.Bar → Foo.Bar, php:App.Http → App.Http).
+// Directory keys (dir:helper/db) become library names so Python/JS/TS
+// directory units can drain concurrently. Go uses its declared package name;
+// PHP keeps the serial application drain.
+// Resource keys and the project-root directory stay on the Application.
 func libraryNameFromCompileUnitKey(unitKey string) string {
 	if unitKey == "" {
 		return ""
@@ -61,11 +170,43 @@ func libraryNameFromCompileUnitKey(unitKey string) string {
 		return unitKey
 	}
 	switch strings.ToLower(prefix) {
-	case "dir", "resource", "unit":
+	case "resource":
 		return ""
+	case "dir", "unit":
+		rest = strings.Trim(strings.ReplaceAll(rest, "\\", "/"), "/")
+		if rest == "" || rest == "." {
+			return ""
+		}
+		return strings.ReplaceAll(rest, "/", ".")
 	default:
-		return rest
+		return strings.ReplaceAll(rest, "\\", ".")
 	}
+}
+
+// A frontend that sets DeclaredLibrary owns the library itself. Declaration
+// registration stays on the application; ProgramForCompileUnit maps the body
+// build onto LibraryName.
+func (prog *Program) libraryNameForCompileUnit(unitKey string) string {
+	if unit := prog.compileUnitByKey(unitKey); unit != nil && unit.DeclaredLibrary {
+		return ""
+	}
+	return libraryNameFromCompileUnitKey(unitKey)
+}
+
+func (prog *Program) compileUnitByKey(unitKey string) *CompileUnit {
+	if prog == nil || unitKey == "" {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	for _, unit := range app.CompileUnits {
+		if unit != nil && unit.Key == unitKey {
+			return unit
+		}
+	}
+	return nil
 }
 
 // ProgramForCompileUnit returns the Program that owns this compile unit.
@@ -80,19 +221,31 @@ func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
 	if app == nil {
 		app = prog
 	}
-	if name := libraryNameFromCompileUnitKey(unitKey); name != "" {
+	if unit := app.compileUnitByKey(unitKey); unit != nil && unit.DeclaredLibrary {
+		if unit.LibraryName != "" {
+			if lib, _ := app.GetLibrary(unit.LibraryName); lib != nil {
+				return lib
+			}
+		}
+		return app
+	}
+	if name := prog.libraryNameForCompileUnit(unitKey); name != "" {
 		if lib, _ := app.GetLibrary(name); lib != nil {
 			return lib
 		}
 		if lib, ok := app.UpStream.Get(name); ok && lib != nil {
 			return lib
 		}
+		prefix, _, _ := strings.Cut(unitKey, ":")
+		switch strings.ToLower(prefix) {
+		case "dir", "unit":
+			return app
+		}
 		return nil
 	}
 	if lib, ok := app.UpStream.Get(unitKey); ok && lib != nil {
 		return lib
 	}
-	// Directory-keyed units (python/go default) host IR on Application.
 	return app
 }
 

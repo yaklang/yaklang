@@ -454,12 +454,11 @@ func (b *builder) createLocalNamespaceObject(modulePath string, localName string
 		}
 		cnt := 0
 		// 从模块的ExportValue中添加所有导出
-		if moduleProgram.ExportValue != nil {
-			for exportName, exportValue := range moduleProgram.ExportValue {
-				namespaceObj.RegisterStaticMember(exportName, exportValue)
-				cnt++
-			}
-		}
+		moduleProgram.ExportValue.ForEach(func(exportName string, exportValue ssa.Value) bool {
+			namespaceObj.RegisterStaticMember(exportName, exportValue)
+			cnt++
+			return true
+		})
 		container := moduleProgram.GlobalVariablesBlueprint.Container()
 		if container != nil {
 			for _, pair := range ssa.GetLastWinsMemberPairs(container) {

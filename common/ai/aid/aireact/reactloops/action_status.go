@@ -12,10 +12,11 @@ import (
 type actionStatusName struct{ zh, en string }
 
 var actionStatusNames = map[string]actionStatusName{
-	"adjust_todolist":                        {"调整待办事项", "updating the task list"},
-	"directly_answer":                        {"回复用户", "answering the user"},
-	"finish":                                 {"完成任务", "finishing the task"},
-	schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL: {"加载工具定义", "loading tool schemas"},
+	aicommon.ContextCompressionAction:                     {"压缩上下文", "compacting the context"},
+	"adjust_todolist":                                     {"调整待办事项", "updating the task list"},
+	"directly_answer":                                     {"回复用户", "answering the user"},
+	"finish":                                              {"完成任务", "finishing the task"},
+	schema.AI_REACT_LOOP_ACTION_REQUIRE_TOOL:              {"加载工具定义", "loading tool schemas"},
 	schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL:        {"执行工具", "running tools"},
 	schema.AI_REACT_LOOP_ACTION_SEARCH_CAPABILITIES:       {"查找可用能力", "finding available capabilities"},
 	schema.AI_REACT_LOOP_ACTION_ASK_FOR_CLARIFICATION:     {"确认需求", "clarifying the request"},

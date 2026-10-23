@@ -71,6 +71,12 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 		return utils.Errorf("SyntaxFlow scan start with a wrong task index")
 	}
 
+	// Initialize before launching rule goroutines; the loader's entries are
+	// concurrency-safe, but lazy assignment of the config pointer is not.
+	m.Config.rulePreparationState()
+	sourceRuntimes, closeSourceRuntimes := m.prepareSourceRuntimes()
+	defer closeSourceRuntimes()
+
 	var errs error
 	var taskIndex atomic.Int64
 	var concurrency int
@@ -104,17 +110,28 @@ func (m *scanManager) StartQuerySF(startIndex ...int64) error {
 
 			swg.Add()
 			go func(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
-				defer m.SaveTask()
+				// Done runs last, so Wait cannot return while this snapshot is still
+				// being queued. The scan boundary then flushes a newer snapshot.
 				defer swg.Done()
+				defer m.queueTaskSnapshot()
 				if utils.IsNil(target) {
 					log.Errorf("SyntaxFlow Scan Failed:the query target is nil")
 					return
 				}
-				m.Query(rule, target)
+				var options []ssaapi.QueryOption
+				if rule.IsSourceMode() && sourceRuntimes[target] != nil {
+					options = append(options, ssaapi.QueryWithSourceScanRuntime(sourceRuntimes[target]))
+				}
+				m.Query(rule, target, options...)
 			}(rule, target)
 		}
 	}
 	swg.Wait()
+	for _, runtime := range sourceRuntimes {
+		if err := runtime.Wait(m.ctx); err != nil {
+			errs = errors.Join(errs, err)
+		}
+	}
 	return errs
 }
 
@@ -163,7 +180,7 @@ func ruleMatchesQueryTarget(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 	}
 }
 
-func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance) {
+func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlowQueryInstance, queryOptions ...ssaapi.QueryOption) {
 	targetName := queryTargetName(target)
 	if !ruleMatchesQueryTarget(rule, target) {
 		m.skipRule(targetName, rule.RuleName, "skipped: target-mode mismatch")
@@ -236,6 +253,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 		option := []ssaapi.QueryOption{}
 		option = append(option,
 			ssaapi.QueryWithSSAConfig(m.Config.Config),
+			ssaapi.QueryWithRuleLoader(&m.Config.rulePreparationState().loader),
 			ssaapi.QueryWithContext(ruleCtx),
 			ssaapi.QueryWithTaskID(m.taskID),
 			ssaapi.QueryWithProcessCallback(func(f float64, info string) {
@@ -248,6 +266,7 @@ func (m *scanManager) Query(rule *schema.SyntaxFlowRule, target ssaapi.SyntaxFlo
 			}),
 			ssaapi.QueryWithProjectId(m.Config.GetProjectID()),
 		)
+		option = append(option, queryOptions...)
 		if m.Config != nil && m.Config.scanRuntime != nil {
 			rt := m.Config.scanRuntime
 			option = append(option, ssaapi.QueryWithOnRisk(func(risk *schema.SSARisk, audits ...func(*gorm.DB) error) {

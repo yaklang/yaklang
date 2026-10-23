@@ -4,7 +4,7 @@ desc(
 	title: "数据流：Java System.setProperty 接受外部值"
 	title_zh: "数据流：Java System.setProperty 接受外部值"
 	type: vuln
-	level: high
+	level: low
 	rule_id: "ssa-java-system-set-property"
 	risk: "security-misconfiguration"
 	cwe: "CWE-15"
@@ -46,7 +46,7 @@ NEG
 )
 setProperty(*?{opcode: call} as $dyn) as $call
 alert $dyn for {
-	level: "high",
+	level: "low",
 	title: "数据流：Java System.setProperty 接受外部值",
 	title_zh: "数据流：Java System.setProperty 接受外部值",
 	message: "数据流：Java System.setProperty 接受外部值",

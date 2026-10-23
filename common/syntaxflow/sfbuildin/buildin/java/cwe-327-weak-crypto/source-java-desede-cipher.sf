@@ -4,7 +4,7 @@ desc(
 	title: "检测 Java 3DES 加密"
 	title_zh: "检测 Java 3DES 加密"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-java-desede-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 ${*.java}.pattern_regex(/Cipher\.getInstance\(\s*[\"'](DESede|TripleDES)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Java 3DES 加密",
 	title_zh: "检测 Java 3DES 加密",
 	message: "检测 Java 3DES 加密",

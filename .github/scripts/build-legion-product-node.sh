@@ -69,7 +69,7 @@ log "building ${target_os}/${target_arch} HIDS node from $source_sha with the pi
 musl_recipe="$(jq -ce --arg arch "$target_arch" '
   select(.c_library == "musl" and .cgo_enabled == true and
     .link_mode == "external-static" and .goarch == $arch and
-    .build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension")
+    .build_tags == "hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng")
 ' "$build_dir/recipe.json")" || die 'musl Node build recipe is invalid'
 build_tags="$(jq -er .build_tags <<<"$musl_recipe")"
 go_version="$(jq -er .go_version <<<"$musl_recipe")"
@@ -89,15 +89,8 @@ fi
 binary_sha="$(sha256sum "$binary" | awk '{print $1}')"
 binary_size="$(stat -c %s "$binary")"
 built_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-capabilities_file="$repo_root/.github/scripts/legion-product-node-capabilities.json"
-capabilities_json="$(jq -ce '
-  if type == "array" and length > 0 and
-     all(.[]; type == "string" and length > 0) and
-     . == (sort | unique)
-  then .
-  else error("product-node capability contract must be a sorted unique string array")
-  end
-' "$capabilities_file")" || die "invalid Product Node capability contract: $capabilities_file"
+capabilities_json="$(bash "$repo_root/.github/scripts/legion-product-node-capabilities.sh" "$build_tags")" || \
+  die "invalid Product Node capability contract"
 
 jq -n \
   --arg version "$version" \

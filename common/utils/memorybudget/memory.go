@@ -38,6 +38,19 @@ func Total() int64 {
 	return constrainedTotal(total, string(groups), string(mounts), os.ReadFile)
 }
 
+// Usable is 80% of Total: leave 20% for the OS, cgroup neighbors, and non-Go
+// allocations. Compile soft limits and pressure warnings share this fraction.
+func Usable() int64 {
+	return UsableFrom(Total())
+}
+
+func UsableFrom(total int64) int64 {
+	if total <= 0 {
+		return 0
+	}
+	return total / 5 * 4
+}
+
 func constrainedTotal(total int64, groups, mounts string, read func(string) ([]byte, error)) int64 {
 	for _, group := range strings.Split(groups, "\n") {
 		parts := strings.SplitN(group, ":", 3)

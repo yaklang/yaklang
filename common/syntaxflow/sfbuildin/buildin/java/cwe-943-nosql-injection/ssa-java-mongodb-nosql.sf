@@ -4,7 +4,7 @@ desc(
 	title: "数据流：Java MongoDB 查询拼接"
 	title_zh: "数据流：Java MongoDB 查询拼接"
 	type: vuln
-	level: high
+	level: low
 	rule_id: "ssa-java-mongodb-nosql"
 	risk: "nosql-injection"
 	cwe: "CWE-943"
@@ -46,7 +46,7 @@ NEG
 )
 put(*?{!opcode: const && !opcode: param} as $dyn) as $call
 alert $dyn for {
-	level: "high",
+	level: "low",
 	title: "数据流：Java MongoDB 查询拼接",
 	title_zh: "数据流：Java MongoDB 查询拼接",
 	message: "数据流：Java MongoDB 查询拼接",

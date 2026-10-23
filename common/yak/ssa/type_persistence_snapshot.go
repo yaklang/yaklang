@@ -47,7 +47,7 @@ func snapshotTypePersistence(typ Type) typePersistenceSnapshot {
 	case *ObjectType:
 		s.shape, s.name = typePersistenceNamed, t.Name
 	case *BasicType:
-		s.shape, s.name, s.extraKind = typePersistenceBasic, t.name, int(t.Kind)
+		s.shape, s.name, s.extraKind = typePersistenceBasic, t.GetName(), int(t.Kind)
 	case *Blueprint:
 		s.shape, s.name, s.blueprintKind = typePersistenceBlueprint, t.Name, string(t.Kind)
 		for _, p := range t.ParentBlueprints {

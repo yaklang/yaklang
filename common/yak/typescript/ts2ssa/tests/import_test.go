@@ -7,7 +7,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
-	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/test/ssatest"
 )
 
@@ -551,7 +550,7 @@ import { DefaultImportColor } from './enums/colors';
 console.log(DefaultImportColor.Red);
 `)
 
-	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS), ssaapi.WithASTOrder(ssareducer.Order))
+	checkResolvedEnumImportValue(t, vf, "3.14", ssaapi.WithLanguage(ssaconfig.TS))
 }
 
 func TestRenamedImportWithGlobalVar(t *testing.T) {

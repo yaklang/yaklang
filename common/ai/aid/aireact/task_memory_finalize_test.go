@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aimem"
@@ -19,6 +20,7 @@ import (
 type finalizationTestMemory struct {
 	aicommon.MemoryTriage
 	triage  atomic.Int32
+	saved   atomic.Int32
 	failed  atomic.Bool
 	started chan struct{}
 	release chan struct{}
@@ -26,6 +28,10 @@ type finalizationTestMemory struct {
 }
 
 func (m *finalizationTestMemory) HandleMemory(any) error { m.triage.Add(1); return nil }
+func (m *finalizationTestMemory) AddRawText(string) ([]*aicommon.MemoryEntity, error) {
+	m.triage.Add(1)
+	return nil, fmt.Errorf("unexpected memory extraction at task completion")
+}
 func (m *finalizationTestMemory) PersistTimelineMemories(ctx context.Context, candidates []any) error {
 	if len(candidates) == 0 {
 		return nil
@@ -41,7 +47,54 @@ func (m *finalizationTestMemory) PersistTimelineMemories(ctx context.Context, ca
 	if m.failed.Load() {
 		return fmt.Errorf("injected persistence failure")
 	}
+	m.saved.Add(1)
 	return nil
+}
+
+// Completion drains previously extracted candidates; it no longer runs the
+// removed auxiliary compressor to manufacture candidates from the live tail.
+func restoreFinalizationCandidates(t *testing.T, r *ReAct) {
+	t.Helper()
+	raw, err := aicommon.MarshalTimeline(r.config.Timeline)
+	require.NoError(t, err)
+	var snapshot map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(raw), &snapshot))
+	snapshot["session_memory_candidates"], err = json.Marshal([]any{timelinePersistenceCandidate()})
+	require.NoError(t, err)
+	rawSnapshot, err := json.Marshal(snapshot)
+	require.NoError(t, err)
+	timeline, err := aicommon.UnmarshalTimeline(string(rawSnapshot))
+	require.NoError(t, err)
+	timeline.SoftBindConfig(r.config, nil)
+	r.config.Timeline = timeline
+	require.Len(t, timeline.GetSessionMemoryCandidates(), 1)
+}
+
+func TestUserTaskMemoryCompletionWithoutCandidatesDoesNotExtract(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	memory := &finalizationTestMemory{MemoryTriage: aimem.NewMockMemoryTriage()}
+	var calls atomic.Int32
+	r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()),
+		aicommon.WithDisableCreateDBRuntime(true), aicommon.WithMemoryTriage(memory),
+		aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAICallback(func(aicommon.AICallerConfigIf, *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			calls.Add(1)
+			return nil, fmt.Errorf("completion must not create a memory extraction request")
+		}))
+	require.NoError(t, err)
+	source := uuid.NewString()
+	task := aicommon.NewStatefulTaskBase("no-candidates", source, ctx, r.Emitter, true)
+	r.persistTaskUserInput(task)
+	r.completeUserTaskMemory(task)
+	require.Zero(t, calls.Load())
+	require.Zero(t, memory.triage.Load())
+	require.Zero(t, memory.saved.Load())
+	require.Empty(t, r.config.Timeline.GetSessionMemoryCandidates())
+	require.True(t, r.config.Timeline.HasPendingMemoryFinalization())
+	archive, err := aicommon.MarshalTimeline(r.config.Timeline)
+	require.NoError(t, err)
+	require.Contains(t, archive, source)
 }
 
 func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
@@ -55,10 +108,9 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 				var loopCalls, compressionCalls atomic.Int32
 				model := func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					name, params := "finish", map[string]any{}
-					if req.GetCallerLabel() == aicommon.CallerLabelTimelineCompress {
+					if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
 						compressionCalls.Add(1)
-						require.Contains(t, req.GetPrompt(), "FULL_USER_TASK")
-						name, params = "timeline-summary", map[string]any{"summary": "business task completed", "ratain_timeline_item_range": "", "memory_entities": []any{timelinePersistenceCandidate()}}
+						return nil, fmt.Errorf("task finalization must not request timeline compression")
 					} else if strings.HasPrefix(req.GetCallerLabel(), "react-loop:") {
 						if loopCalls.Add(1) == 1 {
 							name, params = "directly_answer", map[string]any{"answer_payload": "checked the supplied material"}
@@ -85,7 +137,9 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 					aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
 					aicommon.WithAICallback(model), aicommon.WithSpeedPriorityAICallback(model))
 				require.NoError(t, err)
-				task := aicommon.NewStatefulTaskBase("full-user", "FULL_USER_TASK: preserve explicit report requirements", ctx, r.Emitter, true)
+				restoreFinalizationCandidates(t, r)
+				taskSource := uuid.NewString()
+				task := aicommon.NewStatefulTaskBase("full-user", taskSource+": preserve explicit report requirements", ctx, r.Emitter, true)
 				r.setCurrentTask(task)
 				r.persistTaskUserInput(task)
 				task.SetStatus(aicommon.AITaskState_Processing)
@@ -105,17 +159,22 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 					t.Fatal("full task did not finish")
 				}
 				require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
-				require.EqualValues(t, 1, compressionCalls.Load())
-				require.Zero(t, memory.triage.Load(), "automatic extraction must only use compression")
-				require.Equal(t, failure, r.config.Timeline.HasPendingMemoryFinalization())
+				require.Zero(t, compressionCalls.Load(), "completion only persists existing candidates")
+				require.Zero(t, memory.triage.Load(), "completion must not start another memory extraction")
+				require.True(t, r.config.Timeline.HasPendingMemoryFinalization(), "the unextracted live tail must remain pending")
+				if !failure {
+					require.EqualValues(t, 1, memory.saved.Load())
+				}
 				if failure {
 					archive, err := aicommon.MarshalTimeline(r.config.Timeline)
 					require.NoError(t, err)
-					require.Contains(t, archive, "FULL_USER_TASK", "failed save must retain its source")
+					require.Contains(t, archive, taskSource, "failed save must retain its source")
+					require.Zero(t, memory.saved.Load())
 					memory.failed.Store(false)
 					require.NoError(t, aimem.CompleteTimelineMemory(r.config, ctx, task.GetOriginUserInput()))
-					require.EqualValues(t, 1, compressionCalls.Load(), "save retry must not extract again")
-					require.False(t, r.config.Timeline.HasPendingMemoryFinalization())
+					require.Zero(t, compressionCalls.Load(), "save retry must not compress or extract")
+					require.EqualValues(t, 1, memory.saved.Load())
+					require.True(t, r.config.Timeline.HasPendingMemoryFinalization(), "saving old candidates does not cover new task records")
 				}
 			})
 		}
@@ -152,36 +211,33 @@ func TestUserTaskMemoryAsyncIncludesFinalHostRecords(t *testing.T) {
 			memory := &finalizationTestMemory{MemoryTriage: aimem.NewMockMemoryTriage(), started: make(chan struct{}), release: make(chan struct{})}
 			var calls atomic.Int32
 			model := func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
-				if req.GetCallerLabel() != aicommon.CallerLabelTimelineCompress {
-					return nil, fmt.Errorf("unexpected request: %s", req.GetCallerLabel())
-				}
 				calls.Add(1)
-				require.Contains(t, req.GetPrompt(), "plan: ASYNC_MEMORY_TASK is finished")
-				require.Contains(t, req.GetPrompt(), "FINAL_HOST_ARTIFACT")
-				data, _ := json.Marshal(map[string]any{"@action": "timeline-summary", "summary": "final host record checked", "memory_entities": []any{timelinePersistenceCandidate()}})
-				rsp := cfg.NewAIResponse()
-				rsp.EmitOutputStream(strings.NewReader(string(data)))
-				rsp.Close()
-				return rsp, nil
+				return nil, fmt.Errorf("async completion must not request AI: %s", req.GetCallerLabel())
 			}
 			r, err := NewTestReAct(aicommon.WithContext(ctx), aicommon.WithWorkdir(t.TempDir()), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithMemoryTriage(memory),
 				aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(model), aicommon.WithSpeedPriorityAICallback(model), aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1))
 			require.NoError(t, err)
-			task := aicommon.NewStatefulTaskBase("async-memory", "ASYNC_MEMORY_TASK", ctx, r.Emitter, true)
+			restoreFinalizationCandidates(t, r)
+			taskName, taskSource, artifact := uuid.NewString(), uuid.NewString(), uuid.NewString()
+			task := aicommon.NewStatefulTaskBase(taskName, taskSource, ctx, r.Emitter, true)
 			task.SetAsyncMode(true)
 			task.SetStatus(aicommon.AITaskState_Processing)
 			task.SetAsyncDeferCallback(func(err error) { require.NoError(t, err); task.SetStatus(aicommon.AITaskState_Completed) })
 			r.setCurrentTask(task)
 			r.persistTaskUserInput(task)
-			r.config.HijackPERequest = func(context.Context, string) error { r.AddToTimeline("artifact", "FINAL_HOST_ARTIFACT"); return nil }
+			r.config.HijackPERequest = func(context.Context, string) error { r.AddToTimeline("artifact", artifact); return nil }
 			done := make(chan struct{})
-			r.AsyncPlanAndExecute(ctx, "ASYNC_MEMORY_TASK", func(err error) { require.NoError(t, err); close(done) })
+			r.AsyncPlanAndExecute(ctx, taskName, func(err error) { require.NoError(t, err); close(done) })
 			select {
 			case <-memory.started:
 			case <-ctx.Done():
 				t.Fatal("async final save did not start")
 			}
 			require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus())
+			archive, err := aicommon.MarshalTimeline(r.config.Timeline)
+			require.NoError(t, err)
+			require.Contains(t, archive, "plan: "+taskName+" is finished")
+			require.Contains(t, archive, artifact, "host records must be present before final persistence")
 			close(memory.release)
 			select {
 			case <-done:
@@ -189,9 +245,10 @@ func TestUserTaskMemoryAsyncIncludesFinalHostRecords(t *testing.T) {
 				t.Fatal("async task did not finish")
 			}
 			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
-			require.EqualValues(t, 1, calls.Load())
+			require.Zero(t, calls.Load())
+			require.EqualValues(t, 1, memory.saved.Load())
 			require.Zero(t, memory.triage.Load())
-			require.False(t, r.config.Timeline.HasPendingMemoryFinalization())
+			require.True(t, r.config.Timeline.HasPendingMemoryFinalization(), "final host records still need extraction")
 		})
 	}
 }

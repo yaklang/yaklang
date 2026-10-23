@@ -60,7 +60,7 @@ func (p *Program) TryReadImportDeclare(name string) (Type, bool) {
 			for libName := range p.importDeclares.GetMap() {
 				lib, exist := p.GetLibrary(libName)
 				if lib != nil && exist {
-					ret, ok = lib.ExportType[name]
+					ret, ok = lib.GetExportType(name)
 				}
 				if ok && ret != nil {
 					break
@@ -258,7 +258,8 @@ func (p *Program) ImportAll(lib *Program) error {
 		return err
 	}
 	maps.Copy(pkg.typ, lib.externType)
-	maps.Copy(pkg.val, lib.ExportValue)
+	lib.initConcurrentMaps()
+	maps.Copy(pkg.val, lib.ExportValue.GetAll())
 	_ = pkg
 	return nil
 }

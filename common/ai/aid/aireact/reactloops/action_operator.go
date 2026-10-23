@@ -30,6 +30,12 @@ type LoopActionHandlerOperator struct {
 
 	task aicommon.AIStatefulTask
 
+	// requestPrompt is the prompt of this call, used by compression callbacks.
+	requestPrompt            string
+	requestTimelineThroughID *int64
+	requestTimelineItemIDs   []int64
+	contextCompressionError  error
+
 	// dynamic async mode: handler can request async mode at runtime
 	requestedAsyncMode bool
 
@@ -163,14 +169,14 @@ func (l *LoopActionHandlerOperator) IsAsyncModeRequested() bool {
 	return l.requestedAsyncMode
 }
 
-// NextAction restricts the next model iteration to the named actions. The
-// constraint applies to one iteration only and is ignored if no named action
+// NextAction restricts the next business turn to the named actions. Maintenance
+// and its retries preserve it. It is ignored if no named action
 // exists after the loop's normal security filters run.
 func (l *LoopActionHandlerOperator) NextAction(actions ...string) {
 	l.nextActionMustUse = append(l.nextActionMustUse, actions...)
 }
 
-// RemoveNextAction hides the named actions from the next model iteration.
+// RemoveNextAction hides the named actions until the next business turn runs.
 func (l *LoopActionHandlerOperator) RemoveNextAction(actions ...string) {
 	l.nextActionDisabled = append(l.nextActionDisabled, actions...)
 }

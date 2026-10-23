@@ -225,6 +225,9 @@ func showValueMap(buf *bytes.Buffer, varName string, value Values, cfg *showConf
 		}
 		start, end := ssaRange.GetStart(), ssaRange.GetEnd()
 		editor := ssaRange.GetEditor()
+		if editor == nil {
+			continue
+		}
 		fileName := editor.GetUrl()
 		if fileName == "" {
 			var err error

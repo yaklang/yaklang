@@ -24,6 +24,18 @@ func Test_Type_ContainSelf(t *testing.T) {
 	})
 }
 
+func TestFunctionAddAnnotationFuncInitializesDeferredType(t *testing.T) {
+	f := &ssa.Function{}
+	called := false
+	f.AddAnnotationFunc(func(ssa.Value) { called = true })
+	ft, ok := ssa.ToFunctionType(f.GetType())
+	require.True(t, ok)
+	require.Same(t, f, ft.This)
+	require.Len(t, ft.AnnotationFunc, 1)
+	ft.AnnotationFunc[0](nil)
+	require.True(t, called)
+}
+
 func Test_Type_CheckOrType(t *testing.T) {
 	// {
 	// 	str1 := ssa.CreateStringType()
@@ -37,7 +49,7 @@ func Test_Type_CheckOrType(t *testing.T) {
 		num1 := ssa.CreateNumberType()
 		targetType := ssa.NewOrType(str1, num1)
 		require.Equal(t, ssa.OrTypeKind, targetType.GetTypeKind())
-		ssa.ExternMethodBuilder = &ssa_option.Builder{}
+		ssa.SetExternMethodBuilder(&ssa_option.Builder{})
 
 		method := ssa.GetMethod(str1, "Contains")
 		require.NotNil(t, method)
@@ -74,4 +86,58 @@ func TestFunctionTypeString_CachesRawStringResult(t *testing.T) {
 	// Also verify RawString itself is bounded (no infinite recursion).
 	raw := ft.RawString()
 	require.NotEmpty(t, raw)
+}
+
+// diamondStructType returns a struct whose raw field tree holds 2^(levels+1)-1
+// nodes: each level embeds the previous one twice by value.
+func diamondStructType(levels int) *ssa.ObjectType {
+	typ := ssa.NewStructType()
+	for i := 0; i < levels; i++ {
+		next := ssa.NewStructType()
+		next.AddField(ssa.NewConst("l"), typ)
+		next.AddField(ssa.NewConst("r"), typ)
+		typ = next
+	}
+	return typ
+}
+
+// Test_ObjectTypeString_BoundedOutput pins the join bound inside
+// ObjectType.String()/RawString(): small types render fully, exponential
+// field graphs abbreviate with "..." and stay far below the raw expansion
+// size, and cyclic anonymous field graphs terminate through typeStringer's
+// active-path check instead of recursing forever.
+func Test_ObjectTypeString_BoundedOutput(t *testing.T) {
+	t.Run("small type renders fully", func(t *testing.T) {
+		small := ssa.NewStructType()
+		small.AddField(ssa.NewConst("a"), ssa.CreateStringType())
+		s := small.String()
+		require.Contains(t, s, "struct {")
+		require.NotContains(t, s, "...")
+	})
+
+	t.Run("exponential nesting abbreviates", func(t *testing.T) {
+		big := diamondStructType(16).String() // raw tree > 100k nodes
+		require.Contains(t, big, "...")
+		require.Less(t, len(big), 2*4096+64)
+	})
+
+	t.Run("wide flat struct truncates at the width limit", func(t *testing.T) {
+		wide := ssa.NewStructType()
+		for i := 0; i < 4000; i++ {
+			wide.AddField(ssa.NewConst(int64(i)), ssa.CreateNumberType())
+		}
+		s := wide.String()
+		require.Contains(t, s, "...")
+		require.Less(t, len(s), 2*4096+64)
+	})
+
+	t.Run("cyclic anonymous field graph terminates", func(t *testing.T) {
+		a := ssa.NewStructType()
+		b := ssa.NewStructType()
+		a.AddField(ssa.NewConst("b"), b)
+		b.AddField(ssa.NewConst("a"), a)
+		s := a.String()
+		require.Contains(t, s, "struct {")
+		require.Less(t, len(s), 2*4096+64)
+	})
 }

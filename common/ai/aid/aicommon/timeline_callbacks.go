@@ -213,9 +213,11 @@ func (m *Timeline) notifyFreeze(result TimelineFreezeResult) {
 	}
 }
 
-func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapshot, result *TimelineCompressionResult) func() {
+func (m *Timeline) compressionCallbackLocked(summaryPrompt string, memory *timelineCompressionCompletion, result *TimelineCompressionResult) (func(), *TimelineFreezeResult) {
 	// Capture all lists before invoking user code. Registration changes made by
 	// one callback apply to later transactions, not later stages of this commit.
+	// Watermarks come from the live timeline; call this before publishing the
+	// new freeze state.
 	freezeCallbacks := m.freezeCallbacks.snapshot()
 	compressCallbacks := m.compressFreezeCallbacks.snapshot()
 	summaryCallbacks := m.summaryCallbacks.snapshot()
@@ -223,17 +225,22 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 	if m.sessionMemory != nil {
 		memoryCallbacks = append(memoryCallbacks, m.sessionMemory.callbacks.snapshot()...)
 	}
-	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks)+len(memoryCallbacks) == 0 && snapshot.MemoryCompletion == nil {
-		return nil
+	if len(freezeCallbacks)+len(compressCallbacks)+len(summaryCallbacks)+len(memoryCallbacks) == 0 && memory == nil {
+		return nil, nil
 	}
-	freeze := TimelineFreezeResult{Version: snapshot.FreezeVersion + 1, ThroughID: snapshot.ThroughID}
+	frozenThrough := m.frozenThroughLocked()
+	version := int64(0)
+	if m.freezeState != nil {
+		version = m.freezeState.Version
+	}
+	freeze := &TimelineFreezeResult{Version: version + 1, ThroughID: result.ThroughID}
 	retired := make(map[int64]bool, len(result.RetiredIDs))
 	for _, id := range result.RetiredIDs {
 		retired[id] = true
 	}
 	if len(freezeCallbacks)+len(compressCallbacks) > 0 {
 		for _, id := range m.idToTimelineItem.Keys() {
-			if id <= snapshot.FrozenThroughID || id > snapshot.ThroughID {
+			if id <= frozenThrough || id > result.ThroughID {
 				continue
 			}
 			if item, ok := m.idToTimelineItem.Get(id); ok && item != nil && !item.deleted {
@@ -244,15 +251,14 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			}
 		}
 	}
-	snapshot.CommittedFreeze = freeze
 	return func() {
-		if m.sessionMemory != nil && snapshot.MemoryCompletion != nil {
+		if m.sessionMemory != nil && memory != nil {
 			m.sessionMemory.saveOwner()
 		}
-		freeze := snapshot.CommittedFreeze
-		if len(freeze.NewlyFrozenIDs) > 0 {
+		receipt := *freeze
+		if len(receipt.NewlyFrozenIDs) > 0 {
 			for _, callback := range freezeCallbacks {
-				invokeTimelineCallback(callback, cloneTimelineFreezeResult(freeze))
+				invokeTimelineCallback(callback, cloneTimelineFreezeResult(receipt))
 			}
 		}
 		for _, callback := range compressCallbacks {
@@ -260,24 +266,24 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			compression.RetiredIDs = append([]int64(nil), result.RetiredIDs...)
 			compression.RetainedIDs = append([]int64(nil), result.RetainedIDs...)
 			compression.RetiredPromotedEntryIDs = append([]int64(nil), result.RetiredPromotedEntryIDs...)
-			invokeTimelineCallback(callback, TimelineCompressFreezeEvent{cloneTimelineFreezeResult(freeze), compression})
+			invokeTimelineCallback(callback, TimelineCompressFreezeEvent{cloneTimelineFreezeResult(receipt), compression})
 		}
 		// Exact-only commits promote journals without asking AI for a summary.
-		if snapshot.SummaryPrompt == "" {
+		if summaryPrompt == "" {
 			return
 		}
 		for _, callback := range summaryCallbacks {
 			invokeTimelineCallback(callback, TimelineSummaryEvent{
 				ThroughID: result.ThroughID, Summary: strings.NewReader(result.Summary),
-				Prompt:      snapshot.SummaryPrompt,
+				Prompt:      summaryPrompt,
 				RetainedIDs: append([]int64(nil), result.RetainedIDs...), RetainedRange: result.RetainedRange,
 			})
 		}
-		if snapshot.MemoryCompletion == nil {
+		if memory == nil {
 			return
 		}
 		go func() {
-			completion := snapshot.MemoryCompletion
+			completion := memory
 			defer close(completion.notified)
 			<-completion.done
 			notifyErr := completion.err
@@ -294,9 +300,9 @@ func (m *Timeline) compressionCallbackLocked(snapshot *timelineCompressionSnapsh
 			}
 			for _, callback := range memoryCallbacks {
 				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: result.ThroughID,
-					Prompt:         snapshot.SummaryPrompt,
+					Prompt:         summaryPrompt,
 					MemoryEntities: cloneCompressionMemoryEntities(entities), Err: notifyErr})
 			}
 		}()
-	}
+	}, freeze
 }

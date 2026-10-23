@@ -18,6 +18,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
+	"github.com/yaklang/yaklang/common/utils/memedit"
 	regexp_utils "github.com/yaklang/yaklang/common/utils/regexp-utils"
 )
 
@@ -30,18 +31,18 @@ var defaultMatcher sfvm.FileFilterFunc
 
 // MatchFileFilter is the sfvm.FileFilterFunc implementation for regexp (and
 // rejects unsupported match types so xpath/json stay on other backends).
-func MatchFileFilter(root *sfvm.PatternRoot, files map[string]string, pathPattern, matchType string, paramMap map[string]string, patterns []string) (sfvm.Values, error) {
+func MatchFileFilter(root *sfvm.PatternRoot, pathPattern, matchType string, paramMap map[string]string, patterns []string) (sfvm.Values, error) {
 	// pattern_regex_not: first pattern is positive, remaining are negative
 	// (Semgrep pattern-regex + pattern-not-regex combined in one call).
-	if paramMap != nil && paramMap["__sf_pattern_not_list"] == "1" {
+	if sfvm.FileFilterParamOn(paramMap, sfvm.FileFilterParamPatternNotList) {
 		if len(patterns) < 2 {
 			return nil, utils.Error("sfpattern: pattern_regex_not requires at least one positive and one negative pattern")
 		}
-		return matchRegexpWithNegatives(root, files, pathPattern, patterns[0], patterns[1:])
+		return matchRegexpWithNegatives(root, pathPattern, patterns[0], patterns[1:])
 	}
 	switch strings.ToLower(matchType) {
 	case "regexp", "re", "pattern_regex", "pattern-regex", "":
-		return matchRegexp(root, files, pathPattern, patterns)
+		return matchRegexp(root, pathPattern, patterns)
 	default:
 		return nil, utils.Errorf("sfpattern: unsupported match type %q (use regexp)", matchType)
 	}
@@ -52,10 +53,10 @@ func MatchFileFilter(root *sfvm.PatternRoot, files map[string]string, pathPatter
 // This mirrors Semgrep's pattern-regex + pattern-not-regex semantics.
 func MatchRegexpWithNegatives(files map[string]string, pathPattern string, positive string, negatives []string) (sfvm.Values, error) {
 	root := sfvm.NewPatternRoot(files)
-	return matchRegexpWithNegatives(root, files, pathPattern, positive, negatives)
+	return matchRegexpWithNegatives(root, pathPattern, positive, negatives)
 }
 
-func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, pathPattern string, positive string, negatives []string) (sfvm.Values, error) {
+func matchRegexpWithNegatives(root *sfvm.PatternRoot, pathPattern string, positive string, negatives []string) (sfvm.Values, error) {
 	// Reuse the regular regexp cache for the positive set; then apply the
 	// negative filter ourselves. This avoids recomputing the (often large)
 	// positive hit list every time a pattern_regex_not statement runs.
@@ -63,7 +64,7 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, p
 	hits, cached := root.SourceHits(positiveKey)
 	if !cached {
 		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, []string{positive})
+		hits, err = scanRegexpHits(root, pathPattern, []string{positive})
 		if err != nil {
 			return nil, err
 		}
@@ -82,7 +83,10 @@ func matchRegexpWithNegatives(root *sfvm.PatternRoot, files map[string]string, p
 
 	var kept []Hit
 	for filePath, fileHits := range byFile {
-		content := files[filePath]
+		content, err := root.FileContent(filePath)
+		if err != nil {
+			return nil, err
+		}
 		negRanges := negativeMatcher(content)
 		for _, h := range fileHits {
 			overlap := false
@@ -111,13 +115,58 @@ func NewRoot(files map[string]string) *sfvm.PatternRoot {
 	return root
 }
 
-// NewRootFromFS loads all files from fsys into a PatternRoot.
+// NewRootFromStore builds a root that reads one file at a time.
+func NewRootFromStore(store SourceStore) *sfvm.PatternRoot {
+	if store == nil {
+		return NewRoot(nil)
+	}
+	root := sfvm.NewPatternRoot(nil)
+	root.SetSource(storeSource{store: store})
+	root.SetFileFilterMatcher(MatchFileFilter)
+	return root
+}
+
+// storeSource adapts a SourceStore to the one sfvm.Source a root holds.
+type storeSource struct {
+	store SourceStore
+}
+
+func (s storeSource) Paths() []string {
+	if s.store == nil {
+		return nil
+	}
+	return s.store.Paths()
+}
+
+func (s storeSource) Read(path string) (string, error) {
+	if s.store == nil {
+		return "", utils.Error("nil source")
+	}
+	content, release, err := s.store.Read(path)
+	if release != nil {
+		defer release()
+	}
+	if err != nil {
+		return "", err
+	}
+	return content, nil
+}
+
+func (s storeSource) SharedBody(path string) (*memedit.SafeString, bool) {
+	shared, ok := s.store.(SharedBodySource)
+	if !ok {
+		return nil, false
+	}
+	return shared.SharedBody(path)
+}
+
+// NewRootFromFS lists fsys and reads file bodies on demand.
 func NewRootFromFS(fsys fi.FileSystem) (*sfvm.PatternRoot, error) {
-	files, err := LoadFilesFromFS(fsys)
+	store, err := OpenStreamingSource(fsys, nil, DefaultSourceInFlight)
 	if err != nil {
 		return nil, err
 	}
-	return NewRoot(files), nil
+	return NewRootFromStore(store), nil
 }
 
 // Hit is a raw match before wrapping as SimpleValue.
@@ -132,15 +181,15 @@ type Hit = sfvm.SourceHit
 const DefaultSourceHitBatchSize = 512
 
 func MatchRegexp(files map[string]string, pathPattern string, patterns []string) (sfvm.Values, error) {
-	return matchRegexp(sfvm.NewPatternRoot(files), files, pathPattern, patterns)
+	return matchRegexp(sfvm.NewPatternRoot(files), pathPattern, patterns)
 }
 
-func matchRegexp(root *sfvm.PatternRoot, files map[string]string, pathPattern string, patterns []string) (sfvm.Values, error) {
+func matchRegexp(root *sfvm.PatternRoot, pathPattern string, patterns []string) (sfvm.Values, error) {
 	key := sourceHitKey(pathPattern, patterns)
 	hits, cached := root.SourceHits(key)
 	if !cached {
 		var err error
-		hits, err = MatchRegexpHits(files, pathPattern, patterns)
+		hits, err = scanRegexpHits(root, pathPattern, patterns)
 		if err != nil {
 			return nil, err
 		}
@@ -172,7 +221,9 @@ func sourceHitsToValues(root *sfvm.PatternRoot, hits []Hit) (sfvm.Values, error)
 			h.End,
 			root.SourceHitEditor(h.Path),
 		)
-		sv.SetFiles(root.Files())
+		if root != nil {
+			sv.SetSource(root.Source())
+		}
 		vals = append(vals, sv)
 	}
 	return sfvm.NewValues(vals), nil
@@ -184,6 +235,10 @@ func sourceHitKey(pathPattern string, patterns []string) string {
 
 // MatchRegexpHits returns raw hits (for tests / callers that skip ValueOperator).
 func MatchRegexpHits(files map[string]string, pathPattern string, patterns []string) ([]Hit, error) {
+	return scanRegexpHits(sfvm.NewPatternRoot(files), pathPattern, patterns)
+}
+
+func scanRegexpHits(root *sfvm.PatternRoot, pathPattern string, patterns []string) ([]Hit, error) {
 	if pathPattern == "" {
 		return nil, utils.Error("sfpattern: empty path pattern")
 	}
@@ -193,11 +248,19 @@ func MatchRegexpHits(files map[string]string, pathPattern string, patterns []str
 		return nil, utils.Error("sfpattern: no content patterns")
 	}
 
+	if root == nil {
+		return nil, utils.Error("sfpattern: no source files")
+	}
+	paths := root.FilePaths()
 	var hits []Hit
 	matchedFile := false
-	for filePath, content := range files {
+	for _, filePath := range paths {
 		if !matchFile(filePath) {
 			continue
+		}
+		content, err := root.FileContent(filePath)
+		if err != nil {
+			return nil, err
 		}
 		matchedFile = true
 		for _, idx := range matchContent(content) {
@@ -206,7 +269,7 @@ func MatchRegexpHits(files map[string]string, pathPattern string, patterns []str
 			}
 			hits = append(hits, Hit{
 				Path:  filePath,
-				Text:  content[idx.Start:idx.End],
+				Text:  detachString(content[idx.Start:idx.End]),
 				Start: idx.Start,
 				End:   idx.End,
 			})

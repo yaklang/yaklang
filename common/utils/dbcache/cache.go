@@ -558,6 +558,27 @@ func (c *ResidencyCacheWithKey[K, T]) DeleteWithoutSave(key K) {
 	}
 }
 
+// DeleteIfSettled drops a clean resident copy without starting another DB
+// write. A pending item may contain an update that has not reached the saver,
+// so it must be left for FinishPersist instead.
+func (c *ResidencyCacheWithKey[K, T]) DeleteIfSettled(key K) bool {
+	if c == nil {
+		return false
+	}
+	c.mu.Lock()
+	item, ok := c.data[key]
+	if !ok || item.pending {
+		c.mu.Unlock()
+		return false
+	}
+	delete(c.data, key)
+	c.mu.Unlock()
+	if c.evictionCache != nil {
+		c.evictionCache.Delete(key)
+	}
+	return true
+}
+
 func (c *ResidencyCacheWithKey[K, T]) ForEach(f func(K, T) bool) {
 	if c == nil || f == nil {
 		return

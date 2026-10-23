@@ -32,8 +32,9 @@ type scanManager struct {
 
 	// record {{
 	// task record
-	lock         sync.Mutex
-	taskRecorder *schema.SyntaxFlowScanTask
+	lock          sync.Mutex
+	taskRecorder  *schema.SyntaxFlowScanTask
+	snapshotSaver *taskSnapshotSaver
 
 	// config {{
 	kind schema.SyntaxflowResultKind
@@ -165,10 +166,37 @@ func (m *scanManager) setScanBatch() {
 	}
 }
 
-// SaveTask save task info which is from manager to database
+// SaveTask persists the latest task snapshot before returning. Rule completion
+// uses queueTaskSnapshot instead; this is the stage, pause, error, and finish
+// boundary, so the row is durable when it returns.
 func (m *scanManager) SaveTask() error {
+	snapshot := m.captureTaskSnapshot(true)
+	if snapshot == nil {
+		return nil
+	}
+	return m.taskSnapshots().Save(snapshot)
+}
+
+// queueTaskSnapshot records the latest progress without waiting for SQLite.
+// The scan-level SaveTask flushes it. Calling this after that flush can publish
+// a stale status, so rule goroutines queue before releasing the wait group.
+func (m *scanManager) queueTaskSnapshot() {
+	snapshot := m.captureTaskSnapshot(false)
+	if snapshot == nil {
+		return
+	}
+	m.taskSnapshots().Enqueue(snapshot)
+}
+
+func (m *scanManager) taskSnapshots() *taskSnapshotSaver {
+	if m != nil && m.snapshotSaver != nil {
+		return m.snapshotSaver
+	}
+	return defaultTaskSnapshotSaver
+}
+
+func (m *scanManager) captureTaskSnapshot(withLevelCounts bool) *schema.SyntaxFlowScanTask {
 	if m == nil {
-		// return utils.Errorf("manager is nil ")
 		return nil
 	}
 	m.lock.Lock()
@@ -188,9 +216,8 @@ func (m *scanManager) SaveTask() error {
 	m.taskRecorder.Kind = m.kind
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
-	// m.taskRecorder.RuleNames, _ = json.Marshal(m.ruleNames)
 	m.taskRecorder.ProjectId = m.Config.GetProjectID()
-	if m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED {
+	if withLevelCounts && (m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED) {
 		levelCounts, errLC := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
 		})
@@ -219,8 +246,7 @@ func (m *scanManager) SaveTask() error {
 			}
 		}
 	}
-	err := schema.SaveSyntaxFlowScanTask(ssadb.GetDB(), m.taskRecorder)
-	return err
+	return cloneSyntaxFlowScanTask(m.taskRecorder)
 }
 
 func (m *scanManager) RestoreTask() error {
@@ -351,7 +377,7 @@ func (m *scanManager) initByConfig() error {
 
 	// log.Errorf("config: %v", config.Config.GetRuleInput())
 	if config.IsTaskLocalRuleInput() {
-		parsedRules, libraries, err := loadTaskLocalSyntaxFlowRules(config.SyntaxFlowRule)
+		parsedRules, libraries, err := config.preparedRuleInputs()
 		if err != nil {
 			return err
 		}
@@ -366,16 +392,11 @@ func (m *scanManager) initByConfig() error {
 		m.rulesCount = int64(len(parsedRules))
 		m.kind = ruleInputResultKind(true)
 		m.ctx = ssaapi.WithTaskLocalSyntaxFlowRuleLibraries(m.ctx, libraries)
-	} else if input := config.GetRuleInput(); len(input) != 0 {
-		// start debug mode scan task (use provided rule inputs)
-		rules := make([]*schema.SyntaxFlowRule, 0, len(input))
-		for _, rinput := range input {
-			rule, err := yakit.ParseSyntaxFlowInput(rinput)
-			if err != nil {
-				m.errorCallback("compile rule failed: %s", err)
-				continue
-			}
-			rules = append(rules, rule)
+	} else if len(config.GetRuleInput()) != 0 {
+		// Nested stages reuse the product scan's parallel preparation.
+		rules, _, err := config.preparedRuleInputs()
+		if err != nil {
+			return err
 		}
 		rules = filterTaskLocalSyntaxFlowRulesByMode(rules, ruleFilterModes(config))
 		ruleCh := make(chan *schema.SyntaxFlowRule, len(rules))
@@ -428,7 +449,7 @@ func attachCompiledSourceTargets(config *Config) {
 			continue
 		}
 		src := ssaapi.NewSourceQueryTargetFromProgram(prog)
-		if src == nil || len(src.Files()) == 0 {
+		if src == nil || len(src.Paths()) == 0 {
 			continue
 		}
 		config.QueryTargets = append(config.QueryTargets, src)

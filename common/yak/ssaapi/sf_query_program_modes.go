@@ -29,13 +29,19 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 			ruleGetRuleName(rule), p.GetProgramName(),
 		)
 	}
+	// A scan passes its preparation loader through base. Only a standalone
+	// struct query owns a private cache.
+	loader := &sfvm.RuleLoader{}
+	if base != nil && base.ruleLoader != nil {
+		loader = base.ruleLoader
+	}
 	var accumulated *sfvm.SFFrameResult
 	var sharedConfig *ssaconfig.Config
 	for _, unit := range units {
 		if unit == nil {
 			continue
 		}
-		frame, _, err := sfvm.NewSyntaxFlowVirtualMachine().Load(rule)
+		frame, _, err := loader.Load(sfvm.NewSyntaxFlowVirtualMachine(), rule)
 		if err != nil {
 			return nil, utils.Wrapf(err, "struct rule %s: load frame failed", ruleGetRuleName(rule))
 		}

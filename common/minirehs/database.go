@@ -18,6 +18,26 @@ type Scratch interface {
 	Close() error
 }
 
+// RestrictScratch limits the next Scan on this scratch to pattern IDs with
+// allow[id] == true. A nil slice scans every pattern. The slice is not copied
+// and must not be mutated until Scan returns. Engine and stdlib honor it;
+// other backends ignore it and keep scanning every pattern.
+func RestrictScratch(s Scratch, allow []bool) {
+	sc, _ := s.(*scratch)
+	if sc == nil {
+		return
+	}
+	sc.allow = allow
+}
+
+func patternAllowed(sc *scratch, id PatternID) bool {
+	if sc == nil || sc.allow == nil {
+		return true
+	}
+	i := int(id)
+	return i >= 0 && i < len(sc.allow) && sc.allow[i]
+}
+
 // BatchMatchHandler 接收批扫描中的记录下标及其匹配。ScanBatch 保证按 records
 // 的输入顺序串行调用 handler，因此 handler 无需承担并发同步。
 type BatchMatchHandler func(record int, match Match) bool
@@ -33,6 +53,9 @@ type batchMatch struct {
 type scratch struct {
 	verifierText   string // Immutable subject window, shared by one record's verification worker.
 	verifierTextLo int    // Absolute start of verifierText in the record.
+	// allow, when non-nil, is indexed by PatternID. False entries are not
+	// verified. nil means every pattern. The caller owns the slice.
+	allow []bool
 
 	lower      []byte                // ASCII 小写化数据缓冲 (供大小写无关的字面量预过滤复用)
 	hits       []litHit              // 字面量预过滤命中缓冲 (含位置)

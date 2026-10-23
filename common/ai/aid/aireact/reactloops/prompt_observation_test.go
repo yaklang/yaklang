@@ -18,7 +18,7 @@ type promptObservationTestInvoker struct {
 	*mock.MockInvoker
 }
 
-func requirePromptObservationRoleStat(t *testing.T, stats []PromptObservationRoleStat, role PromptSectionRole) PromptObservationRoleStat {
+func requirePromptObservationRoleStat(t *testing.T, stats []PromptObservationRoleStat, role aicommon.PromptSectionRole) PromptObservationRoleStat {
 	t.Helper()
 	for _, stat := range stats {
 		if stat.RoleName == role {
@@ -31,56 +31,56 @@ func requirePromptObservationRoleStat(t *testing.T, stats []PromptObservationRol
 
 func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, input *aicommon.LoopPromptAssemblyInput) (*aicommon.LoopPromptAssemblyResult, error) {
 	_ = tools
-	highStatic := NewPromptContainerSection("section.high_static", "Highly Static", PromptSectionRoleHighStatic)
-	highStatic.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.high_static.task_instruction", "Task Instruction", PromptSectionRoleHighStatic, false, "# Task Instruction\npersistent instruction"),
-		NewPromptSectionObservation("section.high_static.output_example", "Output Example", PromptSectionRoleHighStatic, false, "# Output Example\nexample output"),
+	highStatic := aicommon.NewPromptContainerSection("section.high_static", "Highly Static", aicommon.PromptSectionRoleHighStatic)
+	highStatic.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.high_static.task_instruction", "Task Instruction", aicommon.PromptSectionRoleHighStatic, false, "# Task Instruction\npersistent instruction"),
+		aicommon.NewPromptSectionObservation("section.high_static.output_example", "Output Example", aicommon.PromptSectionRoleHighStatic, false, "# Output Example\nexample output"),
 	}
-	highStatic = FinalizePromptContainerSection(highStatic)
+	highStatic = aicommon.FinalizePromptContainerSection(highStatic)
 
-	frozenBlock := NewPromptContainerSection("section.frozen_block", "Frozen Block", PromptSectionRoleFrozenBlock)
-	frozenBlock.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.frozen_block.tool_inventory", "Tool Inventory", PromptSectionRoleFrozenBlock, true, "# Tool Inventory\ntool-a\ntool-b"),
+	frozenBlock := aicommon.NewPromptContainerSection("section.frozen_block", "Frozen Block", aicommon.PromptSectionRoleFrozenBlock)
+	frozenBlock.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.frozen_block.tool_inventory", "Tool Inventory", aicommon.PromptSectionRoleFrozenBlock, true, "# Tool Inventory\ntool-a\ntool-b"),
 	}
-	frozenBlock = FinalizePromptContainerSection(frozenBlock)
+	frozenBlock = aicommon.FinalizePromptContainerSection(frozenBlock)
 
-	semiDynamic1 := NewPromptContainerSection("section.semi_dynamic_1", "Semi Dynamic 1", PromptSectionRoleSemiDynamic1)
-	semiDynamic1.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.semi_dynamic_1.skills_context", "Skills Context", PromptSectionRoleSemiDynamic1, true, "# Skills Context\nloaded skill-a"),
+	semiDynamic1 := aicommon.NewPromptContainerSection("section.semi_dynamic_1", "Semi Dynamic 1", aicommon.PromptSectionRoleSemiDynamic1)
+	semiDynamic1.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.semi_dynamic_1.skills_context", "Skills Context", aicommon.PromptSectionRoleSemiDynamic1, true, "# Skills Context\nloaded skill-a"),
 	}
-	semiDynamic1 = FinalizePromptContainerSection(semiDynamic1)
+	semiDynamic1 = aicommon.FinalizePromptContainerSection(semiDynamic1)
 
-	semiDynamic2 := NewPromptContainerSection("section.semi_dynamic_2", "Semi Dynamic 2", PromptSectionRoleSemiDynamic2)
-	semiDynamic2.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.semi_dynamic_2.schema", "Schema", PromptSectionRoleSemiDynamic2, false, "# Schema\n{\"type\":\"object\"}"),
+	semiDynamic2 := aicommon.NewPromptContainerSection("section.semi_dynamic_2", "Semi Dynamic 2", aicommon.PromptSectionRoleSemiDynamic2)
+	semiDynamic2.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.semi_dynamic_2.schema", "Schema", aicommon.PromptSectionRoleSemiDynamic2, false, "# Schema\n{\"type\":\"object\"}"),
 	}
-	semiDynamic2 = FinalizePromptContainerSection(semiDynamic2)
+	semiDynamic2 = aicommon.FinalizePromptContainerSection(semiDynamic2)
 
-	timelineOpen := NewPromptContainerSection("section.timeline_open", "Timeline", PromptSectionRoleTimelineOpen)
-	timelineOpen.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.timeline_open.timeline_open", "Timeline Memory", PromptSectionRoleTimelineOpen, true, "# Timeline Memory\nstep1\nstep2"),
-		NewPromptSectionObservation("section.timeline_open.current_time", "Current Time", PromptSectionRoleTimelineOpen, false, "# Current Time\n2026-04-01 12:00:00"),
+	timelineOpen := aicommon.NewPromptContainerSection("section.timeline_open", "Timeline", aicommon.PromptSectionRoleTimelineOpen)
+	timelineOpen.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.timeline_open.timeline_open", "Timeline Memory", aicommon.PromptSectionRoleTimelineOpen, true, "# Timeline Memory\nstep1\nstep2"),
+		aicommon.NewPromptSectionObservation("section.timeline_open.current_time", "Current Time", aicommon.PromptSectionRoleTimelineOpen, false, "# Current Time\n2026-04-01 12:00:00"),
 	}
-	timelineOpen = FinalizePromptContainerSection(timelineOpen)
+	timelineOpen = aicommon.FinalizePromptContainerSection(timelineOpen)
 
-	dynamic := NewPromptContainerSection("section.dynamic", "Pure Dynamic", PromptSectionRoleDynamic)
-	dynamic.Children = []*PromptSectionObservation{
-		NewPromptSectionObservation("section.dynamic.user_query", "User Query", PromptSectionRoleDynamic, false, "<|USER_QUERY_"+input.Nonce+"|>\nraw user input\n<|USER_QUERY_END_"+input.Nonce+"|>"),
-		NewPromptSectionObservation("section.dynamic.reactive_data", "Reactive Data", PromptSectionRoleDynamic, true, "<|REACTIVE_DATA_"+input.Nonce+"|>\nreactive context\n<|REACTIVE_DATA_END_"+input.Nonce+"|>"),
-		NewPromptSectionObservation("section.dynamic.injected_memory", "Injected Memory", PromptSectionRoleDynamic, true, "<|INJECTED_MEMORY_"+input.Nonce+"|>\nmemory content\n<|INJECTED_MEMORY_END_"+input.Nonce+"|>"),
+	dynamic := aicommon.NewPromptContainerSection("section.dynamic", "Pure Dynamic", aicommon.PromptSectionRoleDynamic)
+	dynamic.Children = []*aicommon.PromptSectionObservation{
+		aicommon.NewPromptSectionObservation("section.dynamic.user_query", "User Query", aicommon.PromptSectionRoleDynamic, false, "<|USER_QUERY_"+input.Nonce+"|>\nraw user input\n<|USER_QUERY_END_"+input.Nonce+"|>"),
+		aicommon.NewPromptSectionObservation("section.dynamic.reactive_data", "Reactive Data", aicommon.PromptSectionRoleDynamic, true, "<|REACTIVE_DATA_"+input.Nonce+"|>\nreactive context\n<|REACTIVE_DATA_END_"+input.Nonce+"|>"),
+		aicommon.NewPromptSectionObservation("section.dynamic.injected_memory", "Injected Memory", aicommon.PromptSectionRoleDynamic, true, "<|INJECTED_MEMORY_"+input.Nonce+"|>\nmemory content\n<|INJECTED_MEMORY_END_"+input.Nonce+"|>"),
 	}
 	if strings.TrimSpace(input.TodoCheckpoint) != "" {
 		dynamic.Children = append(dynamic.Children,
-			NewPromptSectionObservation("section.dynamic.todo_checkpoint", "TODO Checkpoint", PromptSectionRoleDynamic, false, input.TodoCheckpoint),
+			aicommon.NewPromptSectionObservation("section.dynamic.todo_checkpoint", "TODO Checkpoint", aicommon.PromptSectionRoleDynamic, false, input.TodoCheckpoint),
 		)
 	}
-	dynamic = FinalizePromptContainerSection(dynamic)
+	dynamic = aicommon.FinalizePromptContainerSection(dynamic)
 	dynamicContent := make([]string, 0, len(dynamic.Children))
 	for _, child := range dynamic.Children {
 		dynamicContent = append(dynamicContent, child.Content)
 	}
 
-	sections := []*PromptSectionObservation{highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen, dynamic}
+	sections := []*aicommon.PromptSectionObservation{highStatic, frozenBlock, semiDynamic1, semiDynamic2, timelineOpen, dynamic}
 	prompt := strings.Join([]string{
 		"<|PROMPT_SECTION_high-static|>\n" + strings.TrimSpace(highStatic.Children[0].Content+"\n\n"+highStatic.Children[1].Content) + "\n<|PROMPT_SECTION_END_high-static|>",
 		"<|AI_CACHE_FROZEN_semi-dynamic|>\n" + strings.TrimSpace(frozenBlock.Children[0].Content) + "\n<|AI_CACHE_FROZEN_END_semi-dynamic|>",
@@ -95,7 +95,7 @@ func (i *promptObservationTestInvoker) AssembleLoopPrompt(tools []*aitool.Tool, 
 	}, nil
 }
 
-func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
+func TestPublishLoopPrompt_RecordsObservation(t *testing.T) {
 	invoker := &promptObservationTestInvoker{MockInvoker: mock.NewMockInvoker(context.Background())}
 	config := invoker.GetConfig()
 	loop := &ReActLoop{
@@ -128,11 +128,17 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	loop.requestFinishTodoCheckpoint()
 	operator := NewActionHandlerOperator(task)
 
-	prompt, err := loop.generateLoopPrompt("nonce1", "raw user input", "", nil, "memory content", operator)
+	assembled, err := loop.generateLoopPromptFromInput(loop.captureLoopPromptBuildInput("nonce1", "raw user input", "", nil, "memory content", operator))
 	require.NoError(t, err)
+	prompt := assembled.Prompt
 	require.NotEmpty(t, prompt)
+	loop.WaitForInflightObservation()
+	require.Nil(t, loop.GetLastPromptObservation(), "assembly alone must not publish an observation")
+	require.Zero(t, loop.GetLastPromptToken())
 
-	// observation is built async; wait for it before asserting
+	tokens := aicommon.MeasureTokens(prompt)
+	loop.publishPromptObservation("nonce1", assembled, tokens)
+	require.Equal(t, tokens, loop.GetLastPromptToken(), "the accepted request's token count is recorded synchronously")
 	loop.WaitForInflightObservation()
 
 	observation := loop.GetLastPromptObservation()
@@ -145,8 +151,8 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Greater(t, observation.SectionCount, len(observation.Sections))
 
 	require.Equal(t, "section.high_static", observation.Sections[0].Key)
-	require.Equal(t, PromptSectionRoleHighStatic, observation.Sections[0].Role)
-	require.Equal(t, PromptSectionRoleZHHighStatic, observation.Sections[0].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleHighStatic, observation.Sections[0].Role)
+	require.Equal(t, aicommon.PromptSectionRoleZHHighStatic, observation.Sections[0].RoleZh)
 	require.NotEmpty(t, observation.Sections[0].Children)
 	require.Equal(t, "section.high_static.task_instruction", observation.Sections[0].Children[0].Key)
 	require.Greater(t, observation.Sections[0].ContentBytes(), 0)
@@ -154,9 +160,9 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Empty(t, observation.Sections[0].Content)
 	require.Equal(t, "section.frozen_block", observation.Sections[1].Key)
 	require.Equal(t, "section.semi_dynamic_1", observation.Sections[2].Key)
-	require.Equal(t, PromptSectionRoleSemiDynamic1, observation.Sections[2].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic1, observation.Sections[2].Role)
 	require.Equal(t, "section.semi_dynamic_2", observation.Sections[3].Key)
-	require.Equal(t, PromptSectionRoleSemiDynamic2, observation.Sections[3].Role)
+	require.Equal(t, aicommon.PromptSectionRoleSemiDynamic2, observation.Sections[3].Role)
 	require.Equal(t, "section.timeline_open", observation.Sections[4].Key)
 	require.Equal(t, "section.dynamic", observation.Sections[5].Key)
 	require.Equal(t, "section.dynamic.user_query", observation.Sections[5].Children[0].Key)
@@ -169,18 +175,18 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Less(t, strings.Index(prompt, "<|INJECTED_MEMORY_END_nonce1|>"), strings.Index(prompt, "[FINISH BLOCKED BY TODO]"))
 	require.Less(t, strings.Index(prompt, "[FINISH BLOCKED BY TODO]"), strings.Index(prompt, "<|PROMPT_SECTION_dynamic_END_nonce1|>"))
 	require.Len(t, observation.Stats.RoleStats, 6)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleHighStatic).RoleTokens)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleFrozenBlock).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleFrozenBlock).RoleTokens)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic1).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic1).RoleTokens)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic2).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleSemiDynamic2).RoleTokens)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleTimelineOpen).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleTimelineOpen).RoleTokens)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleDynamic).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, PromptSectionRoleDynamic).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleHighStatic).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleHighStatic).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleFrozenBlock).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleFrozenBlock).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleSemiDynamic1).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleSemiDynamic1).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleSemiDynamic2).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleSemiDynamic2).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleTimelineOpen).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleTimelineOpen).RoleTokens)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleDynamic).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, observation.Stats.RoleStats, aicommon.PromptSectionRoleDynamic).RoleTokens)
 
 	report := observation.RenderCLIReport(80)
 	t.Logf("prompt observation cli report:\n%s", report)
@@ -199,24 +205,24 @@ func TestGenerateLoopPrompt_RecordsObservation(t *testing.T) {
 	require.Equal(t, observation.PromptBytes, status.PromptBytes)
 	require.Equal(t, observation.PromptTokens, status.PromptTokens)
 	require.Len(t, status.RoleStats, 6)
-	require.Equal(t, PromptSectionRoleZHHighStatic, requirePromptObservationRoleStat(t, status.RoleStats, PromptSectionRoleHighStatic).RoleNameZh)
-	require.NotZero(t, requirePromptObservationRoleStat(t, status.RoleStats, PromptSectionRoleDynamic).RoleBytes)
-	require.NotZero(t, requirePromptObservationRoleStat(t, status.RoleStats, PromptSectionRoleDynamic).RoleTokens)
+	require.Equal(t, aicommon.PromptSectionRoleZHHighStatic, requirePromptObservationRoleStat(t, status.RoleStats, aicommon.PromptSectionRoleHighStatic).RoleNameZh)
+	require.NotZero(t, requirePromptObservationRoleStat(t, status.RoleStats, aicommon.PromptSectionRoleDynamic).RoleBytes)
+	require.NotZero(t, requirePromptObservationRoleStat(t, status.RoleStats, aicommon.PromptSectionRoleDynamic).RoleTokens)
 	require.NotEmpty(t, status.Sections)
 	require.Equal(t, "section.high_static", status.Sections[0].Key)
-	require.Equal(t, PromptSectionRoleZHHighStatic, status.Sections[0].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleZHHighStatic, status.Sections[0].RoleZh)
 	require.NotEmpty(t, status.Sections[0].Children)
 	require.Greater(t, status.Sections[0].Bytes, 0)
 	require.Greater(t, status.Sections[0].Lines, 0)
 	require.Empty(t, status.Sections[0].Summary)
 	require.Equal(t, "section.high_static.task_instruction", status.Sections[0].Children[0].Key)
 	require.Equal(t, "section.semi_dynamic_1", status.Sections[2].Key)
-	require.Equal(t, PromptSectionRoleZHSemiDynamic1, status.Sections[2].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleZHSemiDynamic1, status.Sections[2].RoleZh)
 	require.Equal(t, "section.semi_dynamic_2", status.Sections[3].Key)
-	require.Equal(t, PromptSectionRoleZHSemiDynamic2, status.Sections[3].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleZHSemiDynamic2, status.Sections[3].RoleZh)
 	require.Equal(t, "section.dynamic", status.Sections[5].Key)
 	require.Equal(t, "section.dynamic.user_query", status.Sections[5].Children[0].Key)
-	require.Equal(t, PromptSectionRoleZHDynamic, status.Sections[5].Children[0].RoleZh)
+	require.Equal(t, aicommon.PromptSectionRoleZHDynamic, status.Sections[5].Children[0].RoleZh)
 	require.Contains(t, status.Sections[5].Children[0].Summary, "raw user input")
 
 	// 新增字段验证: bytes_percent / estimated_tokens / content_hash / summary_truncated
@@ -279,12 +285,12 @@ func TestPreviewSectionContent_KeepNewlinesAndTruncate(t *testing.T) {
 func TestBuildStatus_DefaultNoTruncate(t *testing.T) {
 	bigContent := strings.Repeat("hostscan-evidence-line\n", 400) // ~9.2 KiB, 仿真 8K 段
 	veryBig := strings.Repeat("frozen-timeline-row\n", 1600)      // ~32 KiB, 仿真 timeline frozen 段
-	a := NewPromptSectionObservation("k1", "small", PromptSectionRoleHighStatic, false, "alpha\nbeta")
-	b := NewPromptSectionObservation("k2", "big-8k", PromptSectionRoleFrozenBlock, true, bigContent)
-	c := NewPromptSectionObservation("k3", "very-big-32k", PromptSectionRoleTimelineOpen, true, veryBig)
+	a := aicommon.NewPromptSectionObservation("k1", "small", aicommon.PromptSectionRoleHighStatic, false, "alpha\nbeta")
+	b := aicommon.NewPromptSectionObservation("k2", "big-8k", aicommon.PromptSectionRoleFrozenBlock, true, bigContent)
+	c := aicommon.NewPromptSectionObservation("k3", "very-big-32k", aicommon.PromptSectionRoleTimelineOpen, true, veryBig)
 
 	prompt := a.Content + "\n\n" + b.Content + "\n\n" + c.Content
-	obs := BuildPromptObservation("loop-no-trunc", "n1", prompt, []*PromptSectionObservation{a, b, c})
+	obs := BuildPromptObservation("loop-no-trunc", "n1", prompt, []*aicommon.PromptSectionObservation{a, b, c})
 
 	// 默认路径: maxSummaryBytes=0 -> 不截断
 	defStatus := obs.BuildStatus(0)
@@ -313,11 +319,11 @@ func TestBuildStatus_DefaultNoTruncate(t *testing.T) {
 // TestPromptSectionStatus_BytesPercentAndHash 单测新字段 BytesPercent / ContentHash
 // 关键词: prompt_profile new fields test, BytesPercent, ContentHash, EstimatedTokens
 func TestPromptSectionStatus_BytesPercentAndHash(t *testing.T) {
-	a := NewPromptSectionObservation("k1", "L1", PromptSectionRoleHighStatic, false, "alpha\nbeta")
-	b := NewPromptSectionObservation("k2", "L2", PromptSectionRoleDynamic, true, strings.Repeat("x", 4096))
+	a := aicommon.NewPromptSectionObservation("k1", "L1", aicommon.PromptSectionRoleHighStatic, false, "alpha\nbeta")
+	b := aicommon.NewPromptSectionObservation("k2", "L2", aicommon.PromptSectionRoleDynamic, true, strings.Repeat("x", 4096))
 
 	prompt := a.Content + "\n\n" + b.Content
-	obs := BuildPromptObservation("loopX", "nonceX", prompt, []*PromptSectionObservation{a, b})
+	obs := BuildPromptObservation("loopX", "nonceX", prompt, []*aicommon.PromptSectionObservation{a, b})
 	status := obs.BuildStatus(0) // 0 -> 默认不截断
 	require.NotNil(t, status)
 	require.Len(t, status.Sections, 2)

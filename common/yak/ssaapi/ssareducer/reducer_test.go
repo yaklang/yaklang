@@ -208,14 +208,6 @@ func TestPipeInitBufSize_envOverride(t *testing.T) {
 	require.Equal(t, 1, pipeInitBufSize(100, 8))
 }
 
-func TestEffectiveASTSequence_downgradesLargeOrderedMode(t *testing.T) {
-	t.Setenv("YAK_SSA_ORDERED_AST_MAX_FILES", "2")
-	require.Equal(t, Order, effectiveASTSequence(Order, 2))
-	require.Equal(t, OutOfOrder, effectiveASTSequence(Order, 3))
-	require.Equal(t, ReverseOrder, effectiveASTSequence(ReverseOrder, 2))
-	require.Equal(t, OutOfOrder, effectiveASTSequence(ReverseOrder, 3))
-}
-
 func TestFilesHandler_OutOfOrderBackpressuresParsedAST(t *testing.T) {
 	vfs := filesys.NewVirtualFs()
 	var paths []string
@@ -238,7 +230,6 @@ func TestFilesHandler_OutOfOrderBackpressuresParsedAST(t *testing.T) {
 			return path, nil
 		},
 		nil,
-		OutOfOrder,
 		2,
 		0,
 	)
@@ -279,7 +270,6 @@ func TestFilesHandler_OutOfOrderWaitsForConsumerBeforeParsingNextAST(t *testing.
 			return path, nil
 		},
 		nil,
-		OutOfOrder,
 		4,
 		0,
 	)

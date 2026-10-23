@@ -250,6 +250,7 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) 
 		// 配置mitm选项
 		opts := []mitm.ConfigOption{
 			mitm.WithObsoleteTLS(gmx509FormCert, gmCert, c.PrivateKey, gmPrivateKey),
+			mitm.WithCertificateChain(c.Certificate[1:]...),
 		}
 
 		mc, err := mitm.NewConfig(cert, c.PrivateKey, opts...)
@@ -274,6 +275,8 @@ func MITM_SetCaCertAndPrivKey(ca []byte, key []byte, gmCA []byte, gmKey []byte) 
 
 		server.caCert = ca
 		server.caKey = key
+		server.gmCACert = gmCA
+		server.gmCAKey = gmKey
 		server.mitmConfig = mc
 
 		return nil

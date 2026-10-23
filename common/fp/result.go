@@ -20,6 +20,7 @@ import (
 )
 
 type FingerprintInfo struct {
+	protocolFields    map[string]any
 	IP                string                   `json:"ip"`
 	Port              int                      `json:"port"`
 	Proto             TransportProto           `json:"proto"`
