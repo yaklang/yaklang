@@ -308,7 +308,7 @@ func (s *VulinServer) registerSSRF() {
 		{
 			DefaultQuery: "",
 			Path:         "/in-json-body",
-			Title:        "SSRF JSON Body SSRF",
+			Title:        "SSRF POST JSON Body 中 URL 参数",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
 				if request.Method == "GET" {
 					writer.Header().Set("Content-Type", "text/html; charset=utf8")
