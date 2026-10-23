@@ -2,10 +2,12 @@ package jsp
 
 import (
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/yakunquote"
-	"regexp"
-	"strings"
 )
 
 const (
@@ -306,21 +308,61 @@ func (y *JSPVisitor) emitCoreForEach(body func()) {
 	if tag == nil {
 		return
 	}
-	variable, ok := tag.attrs["var"]
-	if !ok {
-		log.Errorf("JSTL foreach tag must have var attribute")
+	variable, hasVar := tag.attrs["var"]
+	if items, ok := tag.attrs["items"]; ok {
+		if !hasVar {
+			log.Errorf("JSTL foreach tag must have var attribute")
+			return
+		}
+		y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
+		if body != nil {
+			body()
+		}
+		y.EmitPureCode("}")
 		return
 	}
-	items, ok := tag.attrs["items"]
-	if !ok {
-		log.Errorf("JSTL foreach tag must have items attribute")
+	// JSTL also allows the counting form begin/end/step without items. Dropping
+	// it removes the body from the generated Java, so every statement inside a
+	// page's numeric loop went unanalyzed.
+	end, hasEnd := tag.attrs["end"]
+	if !hasEnd {
+		log.Errorf("JSTL foreach tag must have items or begin/end attributes")
 		return
 	}
-	y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
+	begin := tag.attrs["begin"]
+	if strings.TrimSpace(begin) == "" {
+		begin = "0"
+	}
+	step := tag.attrs["step"]
+	if strings.TrimSpace(step) == "" {
+		step = "1"
+	}
+	if !hasVar {
+		variable = "_jspForEachIndex"
+	}
+	y.EmitPureCode(fmt.Sprintf("for (int %s = %s; %s <= %s; %s += %s) {",
+		variable, jspIntExpr(begin), variable, jspIntExpr(end), variable, jspIntExpr(step)))
 	if body != nil {
 		body()
 	}
 	y.EmitPureCode("}")
+}
+
+// jspIntExpr turns a JSTL numeric attribute into a Java int expression.
+// Literals stay literals so the SSA sees a constant bound; EL values go through
+// Number.intValue, which is valid Java for the Object that elExpr.parse returns.
+func jspIntExpr(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "0"
+	}
+	if _, err := strconv.Atoi(value); err == nil {
+		return value
+	}
+	if strings.HasPrefix(value, "elExpr.parse(") {
+		return "((Number)" + value + ").intValue()"
+	}
+	return "java.lang.Integer.parseInt(String.valueOf(" + javaValueArg(value) + "))"
 }
 
 func (y *JSPVisitor) emitCoreForTokens(body func()) {
