@@ -70,8 +70,21 @@ type verification struct {
 	Issues                []sourceCheck                   `json:"issues,omitempty"`
 }
 
+// A stubbed method body carries the marker as a quoted string literal, while a
+// stubbed static initializer can only carry it as a comment (there is no body
+// to throw from). Counting one form alone would report a class whose <clinit>
+// was dropped as a clean file with zero stubs.
+const (
+	stubMethodMarker = `"yak-decompiler: undecompilable method body"`
+	stubClinitMarker = `yak-decompiler: undecompilable <clinit>`
+)
+
+func countStubs(src []byte) int {
+	return bytes.Count(src, []byte(stubMethodMarker)) + bytes.Count(src, []byte(stubClinitMarker))
+}
+
 func verifySource(path string, src []byte, cache *ssa.AntlrCache) sourceCheck {
-	check := sourceCheck{Path: path, Kind: "java", Stubs: bytes.Count(src, []byte(`"yak-decompiler: undecompilable method body"`))}
+	check := sourceCheck{Path: path, Kind: "java", Stubs: countStubs(src)}
 	if bytes.Contains(src, []byte("// decompile parse failed")) || bytes.Contains(src, []byte("// decompile dump failed")) {
 		check.Kind = "decompiler_refusal"
 		check.Error = strings.TrimSpace(string(src))
