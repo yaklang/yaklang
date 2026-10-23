@@ -95,7 +95,12 @@ func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 	// use local
 	if c.GetCodeSourceLocalFile() != "" {
-		return javaclassparser.NewJarFSFromLocalWithOptions(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
+		jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
+		if err != nil {
+			return nil, err
+		}
+		jarFS.SetRetainUnprovedSource(true)
+		return jarFS, nil
 	}
 	if c.GetCodeSourceURL() == "" {
 		return nil, utils.Errorf("url is empty ")
@@ -120,7 +125,12 @@ func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 		return nil, utils.Errorf("write temp file error: %v", err)
 	}
 	tmpFile.Close()
-	return javaclassparser.NewJarFSFromLocalWithOptions(tmpPath, c.GetCodeSourceJarRecursiveParse())
+	jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(tmpPath, c.GetCodeSourceJarRecursiveParse())
+	if err != nil {
+		return nil, err
+	}
+	jarFS.SetRetainUnprovedSource(true)
+	return jarFS, nil
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {
