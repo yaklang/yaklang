@@ -2,7 +2,7 @@
 
 ## 当前结论（2026-10-23 审计修正）
 
-**未完成。** 最近全量为 `030517`：249 → 54 条拒绝（195 条不再报原错误，新增语法错误 0），exit=1，另有 1634 个 stub。没有以重放或测试代替验收；未跑 ekp、未 push。
+**未完成。** 最近全量为 `051047`：语法失败 25，exit=1，stub 1635。其后只做了定向重放，没有新的全量验收。没有以重放或测试代替验收；未跑 ekp、未 push。
 
 上一轮“当前只剩约 5 条”已撤回：13 个 legacy `valueOf(String)` 被错误地显式写进 enum，javac 报 duplicate method；23 个缺词法元数据类曾被随意补无界泛型，可能改变物理描述符。这两条放行已撤回，原协议反例仍拒绝。
 
@@ -17,6 +17,7 @@
 - `NestingType`、`CompilePhaseAdapter` 仍拒绝。`<clinit>` 用 `CallSite.callStatic` 加 `castToType` 赋值，没有声明处的 `new`。JLS 16.5：enum 常量是用实例创建表达式初始化的 static final 字段。未加 suppression。
 - 15 条静态归属重放：13 条已生成。`a/ct` 与 `module/n` 仍拒绝。本机 javac：限定名、static import、两个单类型 import 都非法；另一个同名类型自己也不能写限定名。简单名被占时不再把调用绑到错误类型。
 - 全量 `051047`（二进制 `b8d01f6063a4c69b…`，exit=1）：语法失败 54→25，空单元 0，FrontendRaw 失败 0，stub 1635。25 条构成：jaxb 编译器协议 13、常量体身份 5（Comparison 两份、es、dq、ez）、Comparators$1 三份、静态归属 2、Groovy 构造来源 2。未新增 suppression。
+- 2026-10-23 11:2x 定向重放（不是全量）：5 条常量体身份已生成，提交 `3a31605`。混淆器把常量体改成无关类名并删掉 InnerClasses/EnclosingMethod 后，共享 marker 只留在构造器描述符的 `L<marker>;` 里，常量池没有对应 CONSTANT_Class。`eu.class`（266 字节）即此形状。无嵌套行时不再要求 marker 的 Class 项；有行时仍拒绝指向其它类的行。`TestRenamedEnumConstantBodyWithoutNestingRows` 在去掉这条放行时失败、恢复后通过（javac 重编译 + driver）。`audit/replay-const5-fix2`：Comparison 两份、es、dq、ez 均为 emitted，LE/LT 方向与字节码一致。jaxb 7 条仍拒绝。未跑新全量，台账勾选不改。
 
 证据根：`/mnt/data/scan-outputs/coremail-2b-v2-20261023/audit/`。原不安全工作区补丁及测试保存在 workspace `build/backup/coremail-2b-audit-20261023-0406/`，未删除历史证据。
 
