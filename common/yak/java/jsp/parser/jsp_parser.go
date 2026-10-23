@@ -48,6 +48,7 @@ func jspparserParserInit() {
 		"TAG_SLASH_END", "TAG_CLOSE", "TAG_SLASH", "DIRECTIVE_END", "TAG_IDENTIFIER",
 		"TAG_WHITESPACE", "SCRIPT_BODY", "SCRIPT_SHORT_BODY", "STYLE_BODY",
 		"STYLE_SHORT_BODY", "ATTVAL_WHITESPACE_SKIP", "ATTVAL_EL_EXPR", "EL_EXPR_CONTENT",
+		"ATTVAL_SINGLE_QUOTE_LT",
 	}
 	staticData.RuleNames = []string{
 		"jspDocuments", "jspDocument", "jspStart", "jspElements", "htmlMiscs",
@@ -61,7 +62,7 @@ func jspparserParserInit() {
 	}
 	staticData.PredictionContextCache = antlr.NewPredictionContextCache()
 	staticData.serializedATN = []int32{
-		4, 1, 49, 325, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
+		4, 1, 50, 325, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7,
 		4, 2, 5, 7, 5, 2, 6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7,
 		10, 2, 11, 7, 11, 2, 12, 7, 12, 2, 13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15,
 		2, 16, 7, 16, 2, 17, 7, 17, 2, 18, 7, 18, 2, 19, 7, 19, 2, 20, 7, 20, 2,
@@ -292,6 +293,7 @@ const (
 	JSPParserATTVAL_WHITESPACE_SKIP     = 47
 	JSPParserATTVAL_EL_EXPR             = 48
 	JSPParserEL_EXPR_CONTENT            = 49
+	JSPParserATTVAL_SINGLE_QUOTE_LT     = 50
 )
 
 // JSPParser rules.

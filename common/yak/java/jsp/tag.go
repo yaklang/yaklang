@@ -314,7 +314,9 @@ func (y *JSPVisitor) emitCoreForEach(body func()) {
 			log.Errorf("JSTL foreach tag must have var attribute")
 			return
 		}
-		y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
+		// items may be several EL calls plus literal text. javaValueArg joins
+		// those into one expression; a raw splice does not parse.
+		y.EmitPureCode("for (Object " + variable + " : " + javaValueArg(items) + ") {")
 		if body != nil {
 			body()
 		}
@@ -359,10 +361,11 @@ func jspIntExpr(value string) string {
 	if _, err := strconv.Atoi(value); err == nil {
 		return value
 	}
-	if strings.HasPrefix(value, "elExpr.parse(") {
-		return "((Number)" + value + ").intValue()"
+	expr := javaValueArg(value)
+	if elParseCallRe.FindString(expr) == expr {
+		return "((Number)" + expr + ").intValue()"
 	}
-	return "java.lang.Integer.parseInt(String.valueOf(" + javaValueArg(value) + "))"
+	return "java.lang.Integer.parseInt(String.valueOf(" + expr + "))"
 }
 
 func (y *JSPVisitor) emitCoreForTokens(body func()) {
@@ -384,7 +387,9 @@ func (y *JSPVisitor) emitCoreForTokens(body func()) {
 	if delims == "" {
 		delims = ","
 	}
-	y.EmitPureCode("for (String " + variable + " : String.valueOf(" + items + ").split(\"" + javaLiteralBody(delims) + "\")) {")
+	// A literal such as 0500|0930 is not a Java expression: 0930 is not an
+	// octal token, and the '|' is bitwise or. Quote it. EL stays an expression.
+	y.EmitPureCode("for (String " + variable + " : String.valueOf(" + javaValueArg(items) + ").split(\"" + javaLiteralBody(delims) + "\")) {")
 	if body != nil {
 		body()
 	}
@@ -487,13 +492,39 @@ func javaValueArg(value string) string {
 	if value == "" {
 		return `""`
 	}
-	if strings.HasPrefix(value, "elExpr.parse(") {
-		return value
+	if !strings.Contains(value, "elExpr.parse(") {
+		if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+			return value
+		}
+		return `"` + javaLiteralBody(value) + `"`
 	}
-	if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
-		return value
+	// ${a}${b} and greet_${name} are stored as adjacent elExpr.parse calls
+	// with the literal text left in between. Java needs '+' between them.
+	// Returning on a prefix match left the tail (`elExpr.parse("a"),`) raw.
+	var parts []string
+	rest := value
+	for {
+		loc := elParseCallRe.FindStringIndex(rest)
+		if loc == nil {
+			if rest != "" {
+				parts = append(parts, `"`+javaLiteralBody(rest)+`"`)
+			}
+			break
+		}
+		if loc[0] > 0 {
+			parts = append(parts, `"`+javaLiteralBody(rest[:loc[0]])+`"`)
+		}
+		parts = append(parts, rest[loc[0]:loc[1]])
+		rest = rest[loc[1]:]
 	}
-	return `"` + javaLiteralBody(value) + `"`
+	switch len(parts) {
+	case 0:
+		return `""`
+	case 1:
+		return parts[0]
+	default:
+		return strings.Join(parts, " + ")
+	}
 }
 
 // asJavaCondition makes a tag test usable as a Java expression. EL becomes
