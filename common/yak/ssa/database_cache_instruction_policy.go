@@ -40,14 +40,6 @@ const (
 	saveIrCodeInsertBatchSize = 500
 )
 
-var hotInstructionOpcodeBlacklist = map[Opcode]struct{}{
-	SSAOpcodeBasicBlock: {},
-	SSAOpcodeFunction:   {},
-	SSAOpcodeConstInst:  {},
-	SSAOpcodeUndefined:  {},
-	SSAOpcodeMake:       {},
-}
-
 func instructionCacheDebugEnabled() bool {
 	return log.Level >= stdlog.DebugLevel
 }
@@ -58,14 +50,6 @@ func instructionCacheEventDebugEnabled() bool {
 
 func instructionReloadStackDebugEnabled() bool {
 	return os.Getenv("YAK_SSA_IR_CACHE_RELOAD_STACK_DEBUG") != ""
-}
-
-func shouldKeepInstructionResident(inst Instruction) bool {
-	if utils.IsNil(inst) {
-		return false
-	}
-	_, ok := hotInstructionOpcodeBlacklist[inst.GetOpcode()]
-	return ok
 }
 
 func shouldKeepCompileUnitBoundaryResident(inst Instruction) bool {
@@ -98,12 +82,55 @@ func canSpillFinishedPrivateBlock(inst Instruction) bool {
 	if utils.IsNil(inst) || inst.GetOpcode() != SSAOpcodeBasicBlock {
 		return false
 	}
-	cached, ok := inst.(interface{ GetCachedFunc() *Function })
-	if !ok {
+	fn := cachedFinishedFunction(inst)
+	return fn != nil && !shouldKeepFunctionForCrossUnitReference(fn)
+}
+
+// A finished private function is not a cross-unit callable. Its parameters
+// and parameter members are ID-addressed, so the resident cache does not
+// need to keep one object per call target for the rest of the program.
+func canSpillFinishedFunctionMember(inst Instruction) bool {
+	if utils.IsNil(inst) {
 		return false
 	}
+	switch inst.GetOpcode() {
+	case SSAOpcodeParameter, SSAOpcodeParameterMember:
+	default:
+		return false
+	}
+	fn := cachedFinishedFunction(inst)
+	return fn != nil && !fn.IsExtern() && !shouldKeepFunctionForCrossUnitReference(fn)
+}
+
+func cachedFinishedFunction(inst Instruction) *Function {
+	cached, ok := inst.(interface{ GetCachedFunc() *Function })
+	if !ok {
+		return nil
+	}
 	fn := cached.GetCachedFunc()
-	return fn != nil && fn.IsFinished() && !shouldKeepFunctionForCrossUnitReference(fn)
+	if fn == nil || !fn.IsFinished() {
+		return nil
+	}
+	return fn
+}
+
+// skipInstructionEviction reports values the capacity cache must not drop.
+// Functions and basic blocks stay through TTL so a deferred build still has
+// its scope; the unit flush spills finished private blocks itself.
+// Const, undefined and make used to be pinned the same way, and that pin is
+// what kept every unit's values resident until the final close.
+func skipInstructionEviction(inst Instruction, compileUnitSplit bool) bool {
+	if utils.IsNil(inst) || shouldDelayInstructionEviction(inst) {
+		return true
+	}
+	switch inst.GetOpcode() {
+	case SSAOpcodeBasicBlock, SSAOpcodeFunction:
+		return true
+	}
+	if compileUnitSplit && shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedFunctionMember(inst) {
+		return true
+	}
+	return false
 }
 
 func shouldDelayInstructionEviction(inst Instruction) bool {

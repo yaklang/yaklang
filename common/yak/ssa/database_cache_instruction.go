@@ -153,7 +153,7 @@ func newInstructionStore(
 			},
 			store.loadInstruction,
 			func(inst Instruction) bool {
-				return shouldKeepInstructionResident(inst) || shouldDelayInstructionEviction(inst)
+				return skipInstructionEviction(inst, store.compileUnitSplit)
 			},
 		)
 		store.reader = reader
@@ -194,9 +194,7 @@ func newInstructionStore(
 			dbcache.WithSaveTimeout(saveTime),
 			dbcache.WithName("Instruction"),
 			dbcache.WithSkipEviction(func(inst Instruction) bool {
-				return shouldKeepInstructionResident(inst) ||
-					(store.compileUnitSplit && shouldKeepCompileUnitBoundaryResident(inst)) ||
-					shouldDelayInstructionEviction(inst)
+				return skipInstructionEviction(inst, store.compileUnitSplit)
 			}),
 		)
 		// Register settlement callback: unreserveID on ALL terminal paths
@@ -486,7 +484,7 @@ func (s *instructionStore) flushCompileUnitWriter(onComplete func()) {
 	ids := make([]int64, 0, 1024)
 	persistedResident := make([]int64, 0)
 	s.writer.ForEach(func(id int64, inst Instruction) bool {
-		if shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedPrivateBlock(inst) {
+		if shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedPrivateBlock(inst) && !canSpillFinishedFunctionMember(inst) {
 			return true // continue
 		}
 		// A later unit may reload a persisted instruction. It no longer needs

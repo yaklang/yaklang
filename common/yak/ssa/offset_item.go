@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"golang.org/x/exp/slices"
 )
@@ -11,6 +12,8 @@ import (
 type OffsetItem struct {
 	variable    *Variable // maybe nil
 	value       Value
+	valueID     int64
+	program     *Program
 	rangeLength int
 }
 
@@ -27,12 +30,26 @@ func (item *OffsetItem) GetVariable() *Variable {
 }
 
 func (item *OffsetItem) GetValue() Value {
-	if item.value != nil {
-		return item.value
-	} else if item.variable != nil {
-		return item.variable.GetValue()
+	if item == nil {
+		return nil
 	}
-	return nil
+	if !utils.IsNil(item.value) {
+		return item.value
+	}
+	if item.variable != nil {
+		if value := item.variable.GetValue(); !utils.IsNil(value) {
+			return value
+		}
+	}
+	if item.valueID <= 0 || item.program == nil || item.program.Cache == nil || item.program.Cache.instructions == nil {
+		return nil
+	}
+	inst := item.program.Cache.instructions.reloadPersistedInstruction(item.valueID)
+	value, ok := ToValue(inst)
+	if !ok || utils.IsNil(value) {
+		return nil
+	}
+	return value
 }
 
 func InsertSortedIntSlice(ts []int, t int) []int {
@@ -73,9 +90,12 @@ func (prog *Program) SetOffsetVariable(v *Variable, r *memedit.Range) {
 	}
 
 	prog.OffsetSortedSlice = InsertSortedIntSlice(prog.OffsetSortedSlice, endOffset)
+	value := v.GetValue()
 	prog.OffsetMap[endOffset] = &OffsetItem{
 		variable:    v,
-		value:       v.GetValue(),
+		value:       value,
+		valueID:     offsetValueID(value),
+		program:     prog,
 		rangeLength: r.Len(),
 	}
 }
@@ -105,6 +125,15 @@ func (prog *Program) SetOffsetValueEx(v Value, r *memedit.Range, force bool) {
 	prog.OffsetMap[endOffset] = &OffsetItem{
 		variable:    nil,
 		value:       v,
+		valueID:     offsetValueID(v),
+		program:     prog,
 		rangeLength: r.Len(),
 	}
+}
+
+func offsetValueID(value Value) int64 {
+	if utils.IsNil(value) {
+		return 0
+	}
+	return value.GetId()
 }

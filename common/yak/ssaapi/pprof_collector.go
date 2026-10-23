@@ -55,14 +55,19 @@ type pprofCollector struct {
 const (
 	// pprof listens on a random free localhost port (not a fixed 18080) so
 	// concurrent debug compiles / leftover servers do not collide.
-	pprofCPUInterval          = time.Minute
-	pprofCPUDuration          = 30 * time.Second
-	pprofInterval             = 5 * time.Minute
-	pprofHTTPTimeout          = 10 * time.Minute
-	pprofListenAttempts       = 8
-	pprofAllocInterval        = 15 * time.Minute
-	pprofMutexProfileFraction = 1
-	pprofBlockProfileRate     = 1
+	// 10s every 5 minutes is about 3% duty cycle. The previous 30s sample
+	// every minute kept the process-wide profiler on for half the scan and
+	// showed up as ~17% of the Hue CPU profile.
+	pprofCPUInterval    = 5 * time.Minute
+	pprofCPUDuration    = 10 * time.Second
+	pprofInterval       = 5 * time.Minute
+	pprofHTTPTimeout    = 10 * time.Minute
+	pprofListenAttempts = 8
+	pprofAllocInterval  = 15 * time.Minute
+	// Fraction 10 records about 1/10 mutex events. Block rate is nanoseconds
+	// per sample; 1ms still shows stalls without recording every channel wait.
+	pprofMutexProfileFraction = 10
+	pprofBlockProfileRate     = 1_000_000
 
 	// OOM investigations need early evidence. Large source scans have been
 	// killed by the kernel around 3-5 minutes, before the first periodic
@@ -92,20 +97,14 @@ func StartPprofCollector(debugDir string) (func(), error) {
 	}
 
 	previousMutexFraction := runtime.SetMutexProfileFraction(pprofMutexProfileFraction)
-	actualMutexFraction := runtime.SetMutexProfileFraction(-1)
 	runtime.SetBlockProfileRate(pprofBlockProfileRate)
 	log.Infof("[pprof] runtime profile rates active: MutexProfileFraction=%d BlockProfileRate=%d (previous mutex fraction=%d)",
-		actualMutexFraction, pprofBlockProfileRate, previousMutexFraction)
+		pprofMutexProfileFraction, pprofBlockProfileRate, previousMutexFraction)
 
 	addr, err := startPprofHTTPServer()
 	if err != nil {
 		return nil, err
 	}
-	// Contention profiles stay empty unless the runtime is told to sample them.
-	// Fraction/rate 1 records every event so a short source scan still has data.
-	runtime.SetMutexProfileFraction(1)
-	runtime.SetBlockProfileRate(1)
-	log.Infof("[pprof] mutex fraction=1 block rate=1")
 
 	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
 

@@ -183,12 +183,17 @@ func TestPerBatchFlushKeepsBoundaryResident(t *testing.T) {
 	builder.Finish()
 
 	prog.Cache.FlushCompileUnit("unit-a")
+	prog.Cache.FlushInstructionSaver()
 
-	// Boundary instructions stay resident.
+	// The function object stays. A finished private parameter is persisted
+	// and reloaded by id; holding every parameter is the whole-program set.
 	require.True(t, prog.Cache.hasResidentInstruction(builder.Function.GetId()),
 		"function should stay resident")
-	require.True(t, prog.Cache.hasResidentInstruction(param.GetId()),
-		"parameter should stay resident")
+	require.False(t, prog.Cache.hasResidentInstruction(param.GetId()),
+		"finished private parameter should be released")
+	reloadedParam := prog.Cache.GetInstruction(param.GetId())
+	require.NotNil(t, reloadedParam)
+	require.Equal(t, param.GetId(), reloadedParam.GetId())
 
 	// But they are also in DB after final save.
 	require.NoError(t, prog.Cache.SaveToDatabase())
