@@ -30,6 +30,35 @@
 
 证据根：`/mnt/data/scan-outputs/coremail-2b-v2-20261023/audit/`。原不安全工作区补丁及测试保存在 workspace `build/backup/coremail-2b-audit-20261023-0406/`，未删除历史证据。
 
+## 122333 剩余 20 条的逐文件清单
+
+状态：全部**未**修好，都计入 syntax_failures。每一类的“写不出来”证据在上面证据段。没有新增 suppression。
+
+| 文件 | 拒绝原因（尾部） |
+| --- | --- |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/Messages.java` | original com/sun/xml/bind/v2/Messages.valueOf(Ljava/lang/String;)Lcom/ |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/annotation/Messages.java` | original com/sun/xml/bind/v2/model/annotation/Messages.valueOf(Ljava/l |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/core/ID.java` | original com/sun/xml/bind/v2/model/core/ID.valueOf(Ljava/lang/String;) |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/core/PropertyKind.java` | original com/sun/xml/bind/v2/model/core/PropertyKind.valueOf(Ljava/lan |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/core/WildcardMode.java` | original com/sun/xml/bind/v2/model/core/WildcardMode.valueOf(Ljava/lan |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/impl/ClassInfoImpl$PropertyGroup.java` | original com/sun/xml/bind/v2/model/impl/ClassInfoImpl$PropertyGroup.va |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/impl/ClassInfoImpl$SecondaryAnnotation.java` | original com/sun/xml/bind/v2/model/impl/ClassInfoImpl$SecondaryAnnotat |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/model/impl/Messages.java` | original com/sun/xml/bind/v2/model/impl/Messages.valueOf(Ljava/lang/St |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/runtime/Messages.java` | original com/sun/xml/bind/v2/runtime/Messages.valueOf(Ljava/lang/Strin |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/runtime/property/Messages.java` | original com/sun/xml/bind/v2/runtime/property/Messages.valueOf(Ljava/l |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/runtime/reflect/Messages.java` | original com/sun/xml/bind/v2/runtime/reflect/Messages.valueOf(Ljava/la |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/runtime/unmarshaller/Messages.java` | original com/sun/xml/bind/v2/runtime/unmarshaller/Messages.valueOf(Lja |
+| `apiws.war/WEB-INF/lib/jaxb-impl-2.0.5.jar/com/sun/xml/bind/v2/schemagen/Form.java` | original com/sun/xml/bind/v2/schemagen/Form.valueOf(Ljava/lang/String; |
+| `gtadmin.war/WEB-INF/lib/webadmin.jar/com/tebie/commons/collections/Comparators$1.java` | unproven original enclosing method type scope for com/tebie/commons/co |
+| `icmagent.war/WEB-INF/lib/webadmin.jar/com/tebie/commons/collections/Comparators$1.java` | unproven original enclosing method type scope for com/tebie/commons/co |
+| `webadmin.war/WEB-INF/lib/webadmin.jar/com/tebie/commons/collections/Comparators$1.java` | unproven original enclosing method type scope for com/tebie/commons/co |
+| `webapp/WEB-INF/lib/wmsvr.jar/a/ct.java` | method namespace or original static target unproved |
+| `webapp/WEB-INF/lib/wmsvr.jar/com/tebie/cmapp/ajxvr/module/n.java` | method namespace or original static target unproved |
+| `weixin.war/WEB-INF/lib/groovy-all-2.0.1.jar/groovy/inspect/swingui/CompilePhaseAdapter.java` | constant constructor origin |
+| `weixin.war/WEB-INF/lib/logback-classic-1.1.1.jar/ch/qos/logback/classic/gaffer/NestingType.java` | constant constructor origin |
+
+构建一致性：本仓库提交在不带本地 javajive replace 的情况下可编译（`go build -modfile=<去掉 replace 的 go.mod> ./common/yak/ssaapi/cmd/materialize` exit 0，产物 183451120 字节）。本地 replace 只用于验证未发布的 javajive 改动，不提交。
+
 ## 全量运行记录
 
 | run | files/checked | materialization errors | syntax failures | stub methods | exit | prepare s | verify s | process wall s | peak RSS KiB |
