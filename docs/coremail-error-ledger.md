@@ -9,6 +9,7 @@
 ### 新证据（不是全量验收）
 
 - `audit/ReservedFactory.javac.log`：显式 enum valueOf(String) javac exit=1，method already defined。13 条目前保持拒绝，尚未加入任何新 suppression。
+- `audit/obscure4/plain.log`：`class Plain extends Enum<Plain>` 被 javac 拒：`classes cannot directly extend java.lang.Enum`（构造器 `Enum` 也无法调用）。所以这 13 个类既不能作为 enum 声明 `valueOf(String)`（重复声明），也不能作为普通类继承 `Enum`；在当前源码层面确实不可表达。仍未加 suppression，计入 syntax_failures。
 - `TestEnumLegacyValueOfCannotBeSilentlyReplaced`：有效的原字节码运行确认 null/缺名均为 IllegalArgumentException，不能静默换成默认 Enum.valueOf；新测试要求拒绝而非非法源码。
 - `TestMissingEnclosingMethodPreservesPhysicalDescriptors`：RED→GREEN，`none` 与 `source,lines,vars` 两种编译元数据；改用原始 descriptor 渲染并保留必要的参数桥；javac 重编译和 Java driver（反射检查 Bound 参数/返回）一致。不是为 T 猜测 Object bound。
 - `audit/replay-descriptor`：20 个无 EnclosingMethod 的原文件生成，3 个 method_index=0 且无构造器的 Comparators$1 继续拒绝。20 个中 LinkedHashCache$1 仍含一个旧构造器 stub，不能算完全修复。
