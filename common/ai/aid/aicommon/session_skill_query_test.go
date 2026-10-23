@@ -3,13 +3,16 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
 func newSessionSkillQueryConfig(t *testing.T) *Config {
@@ -31,10 +34,13 @@ func TestBuildSessionSkillInventoryMatchesCapabilityInventoryShape(t *testing.T)
 	mgr := cfg.GetSkillsContextManager()
 	require.NoError(t, mgr.LoadSkill("loaded"))
 
-	items := BuildSessionSkillInventory(mgr)
-	require.Len(t, items, 2)
-	byName := make(map[string]CapabilityInventoryItem, len(items))
-	for _, item := range items {
+	inventory, err := BuildSessionSkillInventory(mgr, 1, 100)
+	require.NoError(t, err)
+	require.Len(t, inventory.Skills, 2)
+	require.Equal(t, 2, inventory.Total)
+	require.False(t, inventory.HasMore)
+	byName := make(map[string]CapabilityInventoryItem, len(inventory.Skills))
+	for _, item := range inventory.Skills {
 		require.Equal(t, "skill", item.Type)
 		require.Equal(t, CapabilityInventoryPositionSemiDynamic, item.Position)
 		require.False(t, item.IsFixed)
@@ -46,7 +52,76 @@ func TestBuildSessionSkillInventoryMatchesCapabilityInventoryShape(t *testing.T)
 	require.Equal(t, CapabilityInventorySkillLoadMetadata, byName["available"].Data.(map[string]any)["skill_load_state"])
 	require.NotContains(t, byName["available"].Data.(map[string]any), "token_count")
 	require.True(t, mgr.UnloadSkill("loaded"))
-	require.Equal(t, CapabilityInventoryStageMetadata, BuildSessionSkillInventory(mgr)[1].Stage)
+	inventory, err = BuildSessionSkillInventory(mgr, 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, CapabilityInventoryStageMetadata, inventory.Skills[1].Stage)
+}
+
+func TestBuildSessionSkillInventoryPaginatesWithoutPromptBudget(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("loaded/SKILL.md", buildSkillMD("loaded", "Loaded guide", "LOADED"))
+	for i := 0; i < 100; i++ {
+		name := fmt.Sprintf("available-%03d", i)
+		vfs.AddFile(name+"/SKILL.md", buildSkillMD(name, "Available guide", "BODY"))
+	}
+	cfg := NewConfig(context.Background(),
+		WithDisableAutoSkills(true),
+		WithSkillsFS(vfs),
+	)
+	mgr := cfg.GetSkillsContextManager()
+	require.NoError(t, mgr.LoadSkill("loaded"))
+
+	first, err := BuildSessionSkillInventory(mgr, 1, 40)
+	require.NoError(t, err)
+	require.Len(t, first.Skills, 40)
+	require.Equal(t, 101, first.Total)
+	require.True(t, first.HasMore)
+	require.Equal(t, 1, first.Page)
+	require.Equal(t, 40, first.PageSize)
+
+	last, err := BuildSessionSkillInventory(mgr, 3, 40)
+	require.NoError(t, err)
+	require.Len(t, last.Skills, 21)
+	require.Equal(t, 101, last.Total)
+	require.False(t, last.HasMore)
+	require.Equal(t, "loaded", last.Skills[len(last.Skills)-1].Name)
+	require.Equal(t, CapabilityInventoryStageLoaded, last.Skills[len(last.Skills)-1].Stage)
+}
+
+func TestBuildSessionSkillInventoryIncludesLazyDatabaseSkills(t *testing.T) {
+	db := newAutoloadTestDB(t)
+	defer db.Close()
+	source, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(buildAutoloadVFS()))
+	require.NoError(t, err)
+	persisted, err := aiskillloader.ImportAISkillsToDB(db, source)
+	require.NoError(t, err)
+	require.Equal(t, 3, persisted)
+	forges, err := yakit.GetAIForgesByType(db, schema.FORGE_TYPE_SkillMD)
+	require.NoError(t, err)
+	require.Len(t, forges, 3)
+
+	loader, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_Database(db))
+	require.NoError(t, err)
+	require.Empty(t, loader.AllSkillMetas(), "fixture must keep database skills out of the eager cache")
+	metas, total, err := loader.ListSkillMetas(0, 0)
+	require.NoError(t, err)
+	require.Equal(t, 3, total)
+	require.Len(t, metas, 3)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+
+	inventory, err := BuildSessionSkillInventory(mgr, 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, 3, inventory.Total)
+	require.Len(t, inventory.Skills, 3)
+	names := make(map[string]bool)
+	for _, item := range inventory.Skills {
+		names[item.Name] = true
+		require.Equal(t, CapabilityInventoryStageMetadata, item.Stage)
+	}
+	require.True(t, names["deploy-app"])
+	require.True(t, names["vuln-scan"])
+	require.True(t, names["code-review"])
+	require.Empty(t, loader.AllSkillMetas(), "listing inventory must not populate the lazy loader cache")
 }
 
 func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
@@ -128,6 +203,7 @@ func TestBuildSessionSkillDetailUnknownAndEmptyName(t *testing.T) {
 	require.ErrorContains(t, err, "name is empty")
 	_, err = BuildSessionSkillDetail(mgr, "missing")
 	require.ErrorContains(t, err, `skill "missing" not found`)
-	items := BuildSessionSkillInventory(nil)
-	require.Empty(t, items)
+	inventory, err := BuildSessionSkillInventory(nil, 1, 100)
+	require.NoError(t, err)
+	require.Empty(t, inventory.Skills)
 }
