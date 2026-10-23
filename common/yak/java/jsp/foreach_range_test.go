@@ -147,6 +147,37 @@ func TestIncludeDirectiveIsNotEmittedAsCode(t *testing.T) {
 	}
 }
 
+func TestELWithNestedBracesStaysOneExpression(t *testing.T) {
+	code := convertJSPForTest(t, "<c:if test=\"${param.idx eq '!{index}'}\">x</c:if>")
+	if !strings.Contains(code, "!{index}") {
+		t.Fatalf("nested braces were cut out of the EL:\n%s", code)
+	}
+	if strings.Contains(code, `index"`) {
+		t.Fatalf("EL string ended at the inner brace:\n%s", code)
+	}
+}
+
+func TestScriptletEmptyStringStaysDoubleQuoted(t *testing.T) {
+	code := convertJSPForTest(t, `<c:out value="x"/><%=subject!=null?subject.getValue():""%>`)
+	if strings.Contains(code, "''") {
+		t.Fatalf("empty string became single quotes:\n%s", code)
+	}
+	if !strings.Contains(code, `""`) {
+		t.Fatalf("empty string missing:\n%s", code)
+	}
+}
+
+func TestMultilineELInTextBecomesParseCall(t *testing.T) {
+	src := "<p>位置:${off['fd_MonitorAddress']\n},\u9762积:${off['fd_MonitorSize'] }</p>"
+	code := convertJSPForTest(t, src)
+	if strings.Contains(code, "${") {
+		t.Fatalf("multiline EL stayed raw:\n%s", code)
+	}
+	if !strings.Contains(code, "fd_MonitorAddress") {
+		t.Fatalf("address EL missing:\n%s", code)
+	}
+}
+
 func TestCOutMixedValueIsOneExpression(t *testing.T) {
 	code := convertJSPForTest(t, `<c:out value="${gatewayMatterMainForm.fdName} - " />`)
 	if !strings.Contains(code, `elExpr.parse("gatewayMatterMainForm.fdName") + " -"`) {

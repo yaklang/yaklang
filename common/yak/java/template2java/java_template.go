@@ -31,10 +31,11 @@ type JavaTemplate struct {
 	classDeclLine int
 	builder       strings.Builder
 	currentLine   int
-	// methodDepth is brace depth inside _JavaTemplateService. It starts at 1
-	// when the method opens. A scriptlet '}' whose '{' was not emitted must
-	// not close this method.
-	methodDepth int
+	// frames tracks braces inside _JavaTemplateService. 'm' is the method,
+	// 'b' a normal block, 't' a try. A '}' that would pop 'm' is dropped.
+	// Finish closes a leftover try with a catch so the method still parses
+	// when the catch scriptlet was not emitted.
+	frames []byte
 }
 
 func (t *JavaTemplate) WriteDeclaration(code string) {
@@ -124,9 +125,14 @@ func (t *JavaTemplate) CurrentLine() int {
 }
 
 func (t *JavaTemplate) Finish() {
-	for t.methodDepth > 1 {
+	for len(t.frames) > 1 {
+		top := t.frames[len(t.frames)-1]
+		t.frames = t.frames[:len(t.frames)-1]
+		if top == 't' {
+			t.append("\t} catch (Throwable __jspCaught) {}\r\n")
+			continue
+		}
 		t.append("\t}\r\n")
-		t.methodDepth--
 	}
 	t.append("}}")
 }
@@ -156,7 +162,7 @@ func (t *JavaTemplate) generateTemplate() {
 	t.append("public class " + t.className + " {\r\n")
 	t.classDeclLine = len(strings.Split(t.builder.String(), "\r\n")) - 1
 	t.append("public void _JavaTemplateService(" + "HttpServletRequest request, HttpServletResponse response" + ") {\r\n")
-	t.methodDepth = 1
+	t.frames = []byte{'m'}
 	t.append("\tout = response.getWriter(); \r\n")
 }
 
@@ -166,15 +172,23 @@ func (t *JavaTemplate) keepMethodOpen(code string) string {
 	if t == nil || code == "" {
 		return code
 	}
+	if t.frames == nil {
+		t.frames = []byte{'m'}
+	}
 	var b strings.Builder
 	b.Grow(len(code))
 	var inStr byte
 	esc := false
+	ident := ""
 	i := 0
+	flushIdent := func() {
+		ident = ""
+	}
 	for i < len(code) {
 		c := code[i]
 		if inStr != 0 {
 			b.WriteByte(c)
+			flushIdent()
 			if esc {
 				esc = false
 			} else if c == '\\' {
@@ -188,16 +202,54 @@ func (t *JavaTemplate) keepMethodOpen(code string) string {
 		if c == '"' || c == '\'' {
 			inStr = c
 			b.WriteByte(c)
+			flushIdent()
 			i++
 			continue
 		}
-		if c == '{' {
-			t.methodDepth++
+		// Braces inside comments are not blocks. Counting them made Finish emit
+		// an extra '}' after the class.
+		if c == '/' && i+1 < len(code) && (code[i+1] == '/' || code[i+1] == '*') {
+			if code[i+1] == '/' {
+				for i < len(code) && code[i] != '\n' {
+					b.WriteByte(code[i])
+					i++
+				}
+				flushIdent()
+				continue
+			}
+			b.WriteByte(code[i])
+			b.WriteByte(code[i+1])
+			i += 2
+			for i+1 < len(code) && !(code[i] == '*' && code[i+1] == '/') {
+				b.WriteByte(code[i])
+				i++
+			}
+			if i+1 < len(code) {
+				b.WriteByte(code[i])
+				b.WriteByte(code[i+1])
+				i += 2
+			}
+			flushIdent()
+			continue
+		}
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || (len(ident) > 0 && c >= '0' && c <= '9') {
+			ident += string(c)
 			b.WriteByte(c)
 			i++
 			continue
 		}
-		if c == '}' && t.methodDepth <= 1 {
+		if c == '{' {
+			kind := byte('b')
+			if ident == "try" {
+				kind = 't'
+			}
+			t.frames = append(t.frames, kind)
+			b.WriteByte(c)
+			flushIdent()
+			i++
+			continue
+		}
+		if c == '}' && len(t.frames) <= 1 {
 			i++
 			j := i
 			for j < len(code) && (code[j] == ' ' || code[j] == '\t' || code[j] == '\n' || code[j] == '\r') {
@@ -213,10 +265,14 @@ func (t *JavaTemplate) keepMethodOpen(code string) string {
 				}
 				i = j
 			}
+			flushIdent()
 			continue
 		}
 		if c == '}' {
-			t.methodDepth--
+			t.frames = t.frames[:len(t.frames)-1]
+		}
+		if c != ' ' && c != '\t' && c != '\n' && c != '\r' {
+			flushIdent()
 		}
 		b.WriteByte(c)
 		i++
