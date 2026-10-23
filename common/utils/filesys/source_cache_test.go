@@ -3,6 +3,9 @@ package filesys
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -234,6 +237,35 @@ func TestSourceMaterializerKeepsSourcesInVirtualFS(t *testing.T) {
 	require.EqualValues(t, len("source-of:a/B.java"), stats.Loaded)
 	require.EqualValues(t, 1, stats.Misses)
 	require.GreaterOrEqual(t, stats.Hits, int64(1))
+}
+
+func TestSourceMaterializerTreeWritesJavaWithoutRetainingBytes(t *testing.T) {
+	dir := t.TempDir()
+	base := seedSourceFS(t, "pkg/A.class", "web/index.jsp")
+	m := NewSourceMaterializer(WithSourceMaterializerTree(dir))
+	_, err := m.ReadFile(base, "pkg/A.class")
+	require.NoError(t, err)
+	m.Put("web/index.jsp", []byte("class Index {}"))
+
+	classBytes, err := os.ReadFile(filepath.Join(dir, "pkg", "A.java"))
+	require.NoError(t, err)
+	require.Equal(t, "source-of:pkg/A.class", string(classBytes))
+	jspBytes, err := os.ReadFile(filepath.Join(dir, "web", "index.jsp.java"))
+	require.NoError(t, err)
+	require.Equal(t, "class Index {}", string(jspBytes))
+
+	require.False(t, m.Has("pkg/A.class"), "tree mode must not keep source bytes in memory")
+	got, err := m.ReadFile(base, "pkg/A.class")
+	require.NoError(t, err)
+	require.Equal(t, "source-of:pkg/A.class", string(got))
+	require.Equal(t, 1, base.readCount("pkg/A.class"))
+
+	rel, err := materializeTreeRel("../../etc/passwd.java")
+	require.NoError(t, err)
+	require.NotContains(t, rel, "..")
+	full, err := m.treeFile("../../etc/passwd.java")
+	require.NoError(t, err)
+	require.True(t, strings.HasPrefix(full, filepath.Clean(dir)+string(os.PathSeparator)) || full == filepath.Clean(dir))
 }
 
 // TestSourceMaterializerPrefetchHonorsContext makes sure a cancelled scan does

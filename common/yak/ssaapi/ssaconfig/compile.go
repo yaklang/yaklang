@@ -330,11 +330,14 @@ type SSACompileConfig struct {
 	// patterns (test fixtures, build outputs, dependency archives, ...).
 	// When true, only ExcludeFiles (user-provided patterns) apply. This is
 	// the escape hatch for embedders/tests that need full-tree scanning.
-	DisableDefaultExcludes   bool          `json:"disable_default_excludes,omitempty"`
-	EntryFiles               []string      `json:"entry_files,omitempty"`
-	ReCompile                bool          `json:"re_compile"`
-	MemoryCompile            bool          `json:"memory_compile"`
-	AstOnly                  bool          `json:"ast_only,omitempty"`
+	DisableDefaultExcludes bool     `json:"disable_default_excludes,omitempty"`
+	EntryFiles             []string `json:"entry_files,omitempty"`
+	ReCompile              bool     `json:"re_compile"`
+	MemoryCompile          bool     `json:"memory_compile"`
+	AstOnly                bool     `json:"ast_only,omitempty"`
+	// MaterializeOut is a directory. When set, jar/class/jsp preparation
+	// writes .java files there and compilation stops before AST parsing.
+	MaterializeOut           string        `json:"materialize_out,omitempty"`
 	Concurrency              int           `json:"compile_concurrency"`
 	MemoryLimit              int64         `json:"compile_memory_limit,omitempty"`
 	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
@@ -477,6 +480,13 @@ func (c *Config) GetCompileAstOnly() bool {
 		return false
 	}
 	return c.SSACompile.AstOnly
+}
+
+func (c *Config) GetCompileMaterializeOut() string {
+	if c == nil || c.SSACompile == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.SSACompile.MaterializeOut)
 }
 
 func (c *Config) SetCompileAstOnly(astOnly bool) {
@@ -799,6 +809,18 @@ func WithCompileAstOnly(astOnly ...bool) Option {
 			enable = astOnly[0]
 		}
 		c.SSACompile.AstOnly = enable
+		return nil
+	}
+}
+
+// WithCompileMaterializeOut writes prepared Java sources to dir and stops
+// before AST parsing. dir is created by the materializer as files are written.
+func WithCompileMaterializeOut(dir string) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Materialize Out"); err != nil {
+			return err
+		}
+		c.SSACompile.MaterializeOut = strings.TrimSpace(dir)
 		return nil
 	}
 }

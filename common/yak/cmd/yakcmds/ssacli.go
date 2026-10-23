@@ -304,6 +304,10 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Name:  "ast-only,parse-only",
 			Usage: "only run source prepare (jar/jsp) and AST parsing; skip prehandler and SSA body build",
 		},
+		cli.StringFlag{
+			Name:  "materialize-out",
+			Usage: "write decompiled jar/class and converted jsp to this directory as .java files, then exit before AST parsing",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -394,6 +398,14 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		if c.Bool("ast-only") {
 			if err := compileConfig.Config.Update(ssaconfig.WithCompileAstOnly(true)); err != nil {
 				return utils.Errorf("set ast-only failed: %v", err)
+			}
+		}
+		if out := strings.TrimSpace(c.String("materialize-out")); out != "" {
+			if err := compileConfig.Config.Update(
+				ssaconfig.WithCompileMaterializeOut(out),
+				ssaconfig.WithCompileMemoryCompile(true),
+			); err != nil {
+				return utils.Errorf("set materialize-out failed: %v", err)
 			}
 		}
 
