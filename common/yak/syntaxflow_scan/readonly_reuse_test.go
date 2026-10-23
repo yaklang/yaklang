@@ -13,6 +13,7 @@ import (
 	"github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/gorm"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
@@ -31,6 +32,9 @@ func TestResilienceScanProjectReadOnlyNamedProgram(t *testing.T) {
 	writer, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
 	require.NoError(t, writer.AutoMigrate(ssadb.SSAProjectTables...).Error)
+	// Use the production patches too: IR upserts require the unique indexes.
+	schema.ApplyPatches(writer, schema.KEY_SCHEMA_SSA_DATABASE)
+	require.NoError(t, writer.Error)
 	ssadb.SetDB(writer)
 	t.Cleanup(func() { ssadb.SetDB(oldDB) })
 

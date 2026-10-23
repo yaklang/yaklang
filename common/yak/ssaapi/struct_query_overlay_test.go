@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -17,6 +18,9 @@ func TestProgramQueryStructRetainsOnlyVisibleOverlayFiles(t *testing.T) {
 	dbPath, db, err := consts.GetTempTestDatabase()
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(ssadb.SSAProjectTables...).Error)
+	// Use the production patches too: IR upserts require the unique indexes.
+	schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
+	require.NoError(t, db.Error)
 	ssadb.SetDB(db)
 	t.Cleanup(func() { ssadb.SetDB(old); _ = db.Close(); _ = consts.DeleteDatabaseFile(dbPath) })
 	fs := filesys.NewVirtualFs()
