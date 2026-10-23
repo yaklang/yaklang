@@ -523,6 +523,9 @@ func (c *Config) parseProjectWithFSUnits(
 		if c.isStop() {
 			return nil, ErrContextCancel
 		}
+		if c.GetCompileAstOnly() {
+			continue
+		}
 		if language := c.LanguageBuilder; language != nil {
 			phaseStart := time.Now()
 			language.AfterPreHandlerProject(builder)
@@ -619,8 +622,19 @@ func (c *Config) parseProjectWithFSUnits(
 		}
 	}
 	preHandlerTime = time.Since(unitStart) - parseTime
-	if astErr != nil && c.GetCompileStrictMode() {
+	if astErr != nil && (c.GetCompileStrictMode() || c.GetCompileAstOnly()) {
 		return nil, utils.Errorf("pre-handler parse project error: %v", astErr)
+	}
+	if c.GetCompileAstOnly() {
+		log.Infof("[ssa-compile] ast-only mode: successfully parsed ASTs for all %d files", len(preHandlerFiles))
+		prog.Finish()
+		p := structProgAPI
+		if p == nil {
+			p = NewProgram(prog, c)
+		}
+		SaveConfig(c, p)
+		SetProgramCache(p)
+		return p, nil
 	}
 
 	compilePhase = "f4_finish"

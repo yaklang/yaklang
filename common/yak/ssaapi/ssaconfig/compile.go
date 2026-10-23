@@ -334,6 +334,7 @@ type SSACompileConfig struct {
 	EntryFiles               []string      `json:"entry_files,omitempty"`
 	ReCompile                bool          `json:"re_compile"`
 	MemoryCompile            bool          `json:"memory_compile"`
+	AstOnly                  bool          `json:"ast_only,omitempty"`
 	Concurrency              int           `json:"compile_concurrency"`
 	MemoryLimit              int64         `json:"compile_memory_limit,omitempty"`
 	CompileIrCacheTTL        time.Duration `json:"compile_ir_cache_ttl"`
@@ -469,6 +470,23 @@ func (c *Config) SetCompileMemory(memory bool) {
 		c.SSACompile = defaultSSACompileConfig()
 	}
 	c.SSACompile.MemoryCompile = memory
+}
+
+func (c *Config) GetCompileAstOnly() bool {
+	if c == nil || c.SSACompile == nil {
+		return false
+	}
+	return c.SSACompile.AstOnly
+}
+
+func (c *Config) SetCompileAstOnly(astOnly bool) {
+	if c == nil {
+		return
+	}
+	if c.SSACompile == nil {
+		c.SSACompile = defaultSSACompileConfig()
+	}
+	c.SSACompile.AstOnly = astOnly
 }
 
 func (c *Config) GetCompileConcurrency() int {
@@ -765,6 +783,22 @@ func WithCompileMemoryCompile(memoryCompile ...bool) Option {
 			enable = memoryCompile[0]
 		}
 		c.SSACompile.MemoryCompile = enable
+		return nil
+	}
+}
+
+// WithCompileAstOnly limits compilation to source preparation (jar/jsp) and
+// ANTLR AST parsing, skipping language PreHandler and SSA body building.
+func WithCompileAstOnly(astOnly ...bool) Option {
+	return func(c *Config) error {
+		if err := c.ensureSSACompile("Compile Ast Only"); err != nil {
+			return err
+		}
+		enable := true
+		if len(astOnly) > 0 {
+			enable = astOnly[0]
+		}
+		c.SSACompile.AstOnly = enable
 		return nil
 	}
 }

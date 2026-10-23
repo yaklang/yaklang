@@ -299,6 +299,11 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Name:  "pprof",
 			Usage: "collect periodic pprof snapshots under the --debug directory (requires --debug)",
 		},
+
+		cli.BoolFlag{
+			Name:  "ast-only,parse-only",
+			Usage: "only run source prepare (jar/jsp) and AST parsing; skip prehandler and SSA body build",
+		},
 	},
 	Action: func(c *cli.Context) error {
 		if ret, err := log.ParseLevel(c.String("log")); err == nil {
@@ -385,6 +390,12 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		}
 		log.Infof("[ssa-compile] mode: compile only; optional --syntaxflow runs SyntaxFlowQuery for manual rule verification")
 		logCompileStageMessage("ssa-compile", compileConfig)
+
+		if c.Bool("ast-only") {
+			if err := compileConfig.Config.Update(ssaconfig.WithCompileAstOnly(true)); err != nil {
+				return utils.Errorf("set ast-only failed: %v", err)
+			}
+		}
 
 		programName := compileConfig.GetProgramName()
 		reCompile := compileConfig.GetCompileReCompile()

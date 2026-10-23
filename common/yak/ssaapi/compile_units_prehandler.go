@@ -216,6 +216,10 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 		env.astErr = utils.Errorf("parse Ast file: %s error: %s", fileContent.Path, fileContent.Err)
 		env.astErrMu.Unlock()
 	}
+	if env.c.GetCompileAstOnly() {
+		ssa.ReleaseASTRoot(fileContent.AST)
+		return
+	}
 	editor := env.prog.CreateEditor(fileContent.Content, fileContent.Path)
 	fileContent.Editor = editor
 	fileContent.Content = nil
