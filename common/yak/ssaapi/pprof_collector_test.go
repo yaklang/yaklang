@@ -154,7 +154,7 @@ func TestPprofCollectorWritesRequiredProfiles(t *testing.T) {
 		"cpu-pprof/*.cpu.prof",
 		"memory-pprof/*.mem.prof",
 		"goroutine-pprof/*.goroutine.prof",
-		"goroutine-pprof/*.goroutine.debug2.txt",
+		"goroutine-pprof/*.goroutine.txt",
 		"mutex-pprof/*.mutex.prof",
 		"block-pprof/*.block.prof",
 		"allocs-pprof/*.allocs.prof",
@@ -185,7 +185,7 @@ func TestPprofCollectorWritesRequiredProfiles(t *testing.T) {
 	}
 	require.True(t, foundTestFunction, "CPU profile does not resolve the smoke test function")
 
-	stackFiles, err := filepath.Glob(filepath.Join(debugDir, "goroutine-pprof", "*.goroutine.debug2.txt"))
+	stackFiles, err := filepath.Glob(filepath.Join(debugDir, "goroutine-pprof", "*.goroutine.txt"))
 	require.NoError(t, err)
 	stackData, err := os.ReadFile(stackFiles[0])
 	require.NoError(t, err)
