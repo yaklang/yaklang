@@ -161,13 +161,24 @@ func (b *singleFileBuilder) forkForLazyBuild() *singleFileBuilder {
 }
 
 func Frontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
+	src = preprocessJavaUnicodeEscapes(src)
+	src = preprocessJavaRecordPatternSwitchCases(src)
+	src = normalizeDecompiledJava(src)
+	return parseFrontend(src, caches...)
+}
+
+// FrontendRaw checks generated Java without repairing decompiler output. Only
+// Java's Unicode-escape translation is applied. Preparation/verification must
+// not hide an upstream malformed signature or control-flow structure.
+func FrontendRaw(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
+	return parseFrontend(preprocessJavaUnicodeEscapes(src), caches...)
+}
+
+func parseFrontend(src string, caches ...*ssa.AntlrCache) (javaparser.ICompilationUnitContext, error) {
 	var cache *ssa.AntlrCache
 	if len(caches) > 0 {
 		cache = caches[0]
 	}
-	src = preprocessJavaUnicodeEscapes(src)
-	src = preprocessJavaRecordPatternSwitchCases(src)
-	src = normalizeDecompiledJava(src)
 	lexicalErrors := antlr4util.NewErrorListener()
 	ast, err := antlr4util.ParseASTWithSLLFirst(
 		src,
