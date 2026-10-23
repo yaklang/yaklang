@@ -268,6 +268,7 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 	checkedFuncs := 0
 	skippedPublic := 0
 	skippedNoMatch := 0
+	skippedUnfinished := 0
 
 	// Build a set of completed unit keys for O(1) lookup
 	completedUnits := make(map[string]struct{}, len(unitKeys))
@@ -282,17 +283,22 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		}
 	}
 
-	// Iterate through all functions and release bodies for completed units
-	app.Funcs.ForEach(func(funcKey string, fn *Function) bool {
+	releaseOne := func(funcKey string, fn *Function) {
 		if fn == nil {
-			return true
+			return
 		}
 		checkedFuncs++
 
-		// Extract unit key from function key
-		fnUnitKey := extractUnitKeyFromFunctionKey(funcKey)
+		// Prefer the compile unit recorded when the function was created: the
+		// key parser below only understands the Java package naming scheme and
+		// returns "" for Python/Go/C function names, which silently disabled the
+		// body release for those languages.
+		fnUnitKey := fn.compileUnitKey
 		if fnUnitKey == "" {
-			return true
+			fnUnitKey = extractUnitKeyFromFunctionKey(funcKey)
+		}
+		if fnUnitKey == "" {
+			return
 		}
 
 		// Debug first few functions
@@ -304,13 +310,22 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 		_, isCompleted := completedUnits[fnUnitKey]
 		if !isCompleted {
 			skippedNoMatch++
-			return true
+			return
+		}
+
+		// Only a finished body can be dropped. A unit can be marked complete
+		// while a lazily registered function of that unit still waits for its
+		// Finish(); dropping its Blocks early makes Finish read Blocks[0] and
+		// panic, which then discards the whole compiled program.
+		if !fn.IsFinished() {
+			skippedUnfinished++
+			return
 		}
 
 		// Skip functions that should be kept for cross-unit references
 		if shouldKeepFunctionForCrossUnitReference(fn) {
 			skippedPublic++
-			return true
+			return
 		}
 
 		// Release the function body. Keep EnterBlock/ExitBlock: they are valid
@@ -327,12 +342,31 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 				log.Debugf("[split-compile] released func=%s blocks=%d", funcKey, blockCount)
 			}
 		}
+	}
+
+	// File/directory units live in library Programs ("dir:pkg" -> library
+	// "pkg"), so the application's Funcs is not the whole program. Walk the
+	// upstream libraries too, otherwise every Go/Python/Java unit body stayed
+	// resident for the whole compile.
+	app.Funcs.ForEach(func(funcKey string, fn *Function) bool {
+		releaseOne(funcKey, fn)
 		return true
 	})
+	if app.UpStream != nil {
+		app.UpStream.ForEach(func(_ string, lib *Program) bool {
+			if lib != nil && lib != app {
+				lib.Funcs.ForEach(func(funcKey string, fn *Function) bool {
+					releaseOne(funcKey, fn)
+					return true
+				})
+			}
+			return true
+		})
+	}
 
 	if compileUnitMemoryDebugEnabled() {
-		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_nomatch=%d blocks=%d",
-			checkedFuncs, releasedFuncs, skippedPublic, skippedNoMatch, releasedBlocks)
+		log.Debugf("[split-compile] release summary checked=%d released=%d skipped_public=%d skipped_unfinished=%d skipped_nomatch=%d blocks=%d",
+			checkedFuncs, releasedFuncs, skippedPublic, skippedUnfinished, skippedNoMatch, releasedBlocks)
 	}
 
 	return releasedFuncs
@@ -379,6 +413,16 @@ func shouldKeepFunctionForCrossUnitReference(fn *Function) bool {
 
 	if fn.IsExtern() {
 		return true
+	}
+
+	// A method is reached through the owning type's member map, not as a
+	// top-level cross-unit symbol. The Function object stays referenced by the
+	// blueprint, so its body and parameters can be reloaded by ID. Without this
+	// every method of every class stays pinned for the whole program as soon as
+	// its generated name starts with the (capitalised) class name, which is the
+	// Python/Java method naming convention.
+	if fn.IsMethod() || fn.GetMethodName() != "" {
+		return false
 	}
 
 	name := fn.GetName()
