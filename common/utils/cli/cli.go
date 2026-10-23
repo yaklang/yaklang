@@ -495,7 +495,14 @@ func (c *CliApp) Bool(name string, opts ...SetCliExtraParam) bool {
 
 	index := p.foundArgsIndex()
 	if index < 0 {
-		return false // c.GetDefaultValue(false).(bool)
+		// A boolean flag with an explicit default keeps that default when the
+		// flag is absent. Plugins executed programmatically have no argv at all:
+		// "SSA 项目探测" declares jar-recursive-parse default true, and ignoring
+		// it silently disabled jar expansion for every CLI compile.
+		if p.defaultValue != nil {
+			return utils.InterfaceToBoolean(p.defaultValue)
+		}
+		return false
 	}
 	return true
 }
