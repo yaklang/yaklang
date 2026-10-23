@@ -459,6 +459,9 @@ func buildCompileOptionsForDetect(cfg *ssaconfig.Config) []ssaconfig.Option {
 	if cfg.GetCompileAstOnly() {
 		opts = append(opts, ssaconfig.WithCompileAstOnly(true))
 	}
+	if out := cfg.GetCompileMaterializeOut(); out != "" {
+		opts = append(opts, ssaconfig.WithCompileMaterializeOut(out))
+	}
 	if excludes := cfg.GetCompileExcludeFiles(); len(excludes) > 0 {
 		opts = append(opts, ssaconfig.WithCompileExcludeFiles(excludes...))
 	}
