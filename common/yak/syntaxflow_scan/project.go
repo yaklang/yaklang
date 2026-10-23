@@ -309,6 +309,12 @@ func ScanProject(ctx context.Context, opts ...ssaconfig.Option) (result ProjectR
 				recorder.mu.Unlock()
 			}
 		}
+		if wantReview && err == nil && prog != nil && prog.IsIncrementalCompile() {
+			// Diff compilation cannot review unchanged base units. Review the
+			// persisted overlay before publishing a successful semantic stage.
+			prog = reloadCompiledProgram(prog)
+			err = scanLoadedProgramStruct(cfg, prog)
+		}
 		if wantReview && err == nil {
 			emitStructResults(cfg, prog)
 			recorder.observeStruct(prog)
@@ -815,6 +821,17 @@ func reloadCompiledProgram(prog *ssaapi.Program) *ssaapi.Program {
 	return ssaapi.ReloadProgramFromDatabase(prog)
 }
 
+func scanLoadedProgramStruct(cfg *Config, prog *ssaapi.Program) error {
+	if prog == nil {
+		return nil
+	}
+	opts := structCompileOptions(cfg)
+	if len(opts) == 0 {
+		return nil
+	}
+	return prog.ScanProgramStruct(opts...)
+}
+
 func loadNamedPrograms(cfg *Config) error {
 	if cfg == nil {
 		return utils.Errorf("scan config is nil")
@@ -984,7 +1001,7 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 		ssaconfig.WithScanRuleTimeout(cfg.GetScanRuleTimeout()),
 		ssaconfig.WithScanRuleWorkLimit(cfg.GetScanRuleWorkLimit()),
 	)
-	// Propagate the risk-persistence setting to nested scan stages.
+	// Propagate the independent result/task persistence settings to nested stages.
 	if cfg.IsNoSaveRisk() {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
@@ -993,6 +1010,9 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	// earlier mode's finding.
 	if cfg.scanRuntime != nil {
 		opts = append(opts, WithScanRuntime(cfg.scanRuntime))
+	}
+	if cfg.IsNoSaveTask() {
+		opts = append(opts, ssaconfig.WithNoSaveTask(true))
 	}
 	return opts
 }

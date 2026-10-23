@@ -57,6 +57,20 @@ func (b *structBound) Allow(inst ssa.Instruction) bool {
 		return true
 	}
 	fp := ssa.InstructionFilePath(inst)
+	if fp == "" {
+		// Graph traversal can unwrap a lazy instruction before its source range
+		// is restored. Resolve that range before applying the unit boundary.
+		if prog := inst.GetProgram(); structScanUseDatabase(prog) {
+			ir := ssadb.GetIrCodeByIdFast(ssadb.GetDBInProgram(prog.GetProgramName()), prog.GetProgramName(), inst.GetId())
+			if persisted, err := ssa.NewLazyInstructionFromIrCode(ir, prog); err == nil {
+				inst.SetRange(persisted.GetRange())
+				fp = ssa.InstructionFilePath(inst)
+			}
+			if fp == "" {
+				return false // Persisted non-extern IR must prove its source boundary.
+			}
+		}
+	}
 	if ssadb.PathPassesFileFilter(fp, b.files, ssadb.FileFilterInclude, b.programName) {
 		return true
 	}

@@ -150,7 +150,7 @@ func deleteDuplicateIrCodes(db *gorm.DB) (int64, error) {
 		SELECT id FROM (
 			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, code_id ORDER BY id) AS rn
 			FROM ` + TableIrCodes + `
-		) WHERE rn > 1
+		) AS duplicate_rows WHERE rn > 1
 	)`)
 	if res.Error != nil {
 		return 0, res.Error
@@ -169,7 +169,7 @@ func deleteDuplicateIrOffsets(db *gorm.DB) (int64, error) {
 				ORDER BY id
 			) AS rn
 			FROM ` + TableIrOffsets + `
-		) WHERE rn > 1
+		) AS duplicate_rows WHERE rn > 1
 	)`)
 	if res.Error != nil {
 		return 0, res.Error
@@ -190,7 +190,14 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 
 	// Check if the unique index already exists
 	var exists int64
-	db.Raw(`SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`, indexName).Row().Scan(&exists)
+	indexQuery := `SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND tbl_name='ir_codes' AND name=?`
+	if db.Dialect().GetName() == "postgres" {
+		indexQuery = `SELECT COUNT(*) FROM pg_indexes WHERE schemaname=current_schema() AND tablename='ir_codes' AND indexname=?`
+	}
+	if err := db.Raw(indexQuery, indexName).Row().Scan(&exists); err != nil {
+		db.AddError(err)
+		return
+	}
 	if exists > 0 {
 		return // already created
 	}
@@ -199,7 +206,13 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 	// except the oldest (MIN id) per (program_name, code_id) in one window
 	// query, so the unique index can be created. This runs only once: after
 	// the index exists the function returns at the top.
-	removed, err := deleteDuplicateIrCodes(db)
+	var removed int64
+	var err error
+	// Operations never silently discard historical PostgreSQL rows.
+	// A conflicting unique index fails the transaction and requires repair.
+	if db.Dialect().GetName() != "postgres" {
+		removed, err = deleteDuplicateIrCodes(db)
+	}
 	if err != nil {
 		log.Warnf("[unique-constraint] failed to remove duplicate ir_codes rows: %v", err)
 		return
@@ -278,10 +291,11 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 		SQL  string
 	}
 	var existing []idxInfo
-	rows, err := db.Raw(
-		`SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`,
-		indexName,
-	).Rows()
+	indexQuery := `SELECT name, sql FROM sqlite_master WHERE type='index' AND tbl_name='ir_offsets' AND name=?`
+	if db.Dialect().GetName() == "postgres" {
+		indexQuery = `SELECT indexname, indexdef FROM pg_indexes WHERE schemaname=current_schema() AND tablename='ir_offsets' AND indexname=?`
+	}
+	rows, err := db.Raw(indexQuery, indexName).Rows()
 	if err == nil {
 		for rows.Next() {
 			var info idxInfo
@@ -300,6 +314,10 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 
 	// If the index exists WITHOUT COALESCE, drop it so we can recreate
 	if len(existing) > 0 {
+		if db.Dialect().GetName() == "postgres" {
+			db.AddError(fmt.Errorf("legacy offset index requires explicit operations repair"))
+			return
+		}
 		log.Infof("[unique-constraint] dropping old non-COALESCE index %s to upgrade", indexName)
 		if err := db.Exec("DROP INDEX IF EXISTS " + indexName).Error; err != nil {
 			log.Errorf("[unique-constraint] failed to drop old index %s: %v", indexName, err)
@@ -310,7 +328,10 @@ func ensureUniqueIrOffsetsIndex(db *gorm.DB) {
 	// Legacy async-persist runs can leave duplicate rows. Remove every row
 	// except the oldest (MIN id) per composite key in one window query, so
 	// the unique index can be created.
-	removed, err := deleteDuplicateIrOffsets(db)
+	var removed int64
+	if db.Dialect().GetName() != "postgres" {
+		removed, err = deleteDuplicateIrOffsets(db)
+	}
 	if err != nil {
 		log.Warnf("[unique-constraint] failed to remove duplicate ir_offsets rows: %v", err)
 		return
