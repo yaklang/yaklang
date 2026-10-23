@@ -50,7 +50,9 @@ func TestReleaseCompletedUnitMemoryUsesRecordedUnitKey(t *testing.T) {
 
 	released := prog.ReleaseCompletedUnitMemory([]string{"dir:pkg"})
 	require.Greater(t, released, 0, "function of a completed unit must be released")
-	require.Empty(t, fn.Blocks, "released function body must be dropped")
+	require.NotEmpty(t, fn.Blocks, "block ids must stay until scope values are unlinked")
+	prog.ReleasePersistedOrdinaryValues()
+	require.Empty(t, fn.Blocks, "private function block ids are dropped after the scope walk")
 	require.NoError(t, prog.Cache.SaveToDatabase())
 }
 

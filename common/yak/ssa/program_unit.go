@@ -328,18 +328,18 @@ func (prog *Program) ReleaseCompletedUnitMemory(unitKeys []string) int {
 			return
 		}
 
-		// Release the function body. Keep EnterBlock/ExitBlock: they are valid
-		// block ids that may still be referenced or flushed later, and zeroing
-		// them would write empty block ids into the DB.
+		// Do not clear fn.Blocks here. The slice is only block ids, and
+		// ReleasePersistedOrdinaryValues walks those ids to unlink scope
+		// values. Clearing it first makes that walk a no-op, so the values
+		// stay reachable for the rest of the compile. The id list is dropped
+		// after that walk. EnterBlock/ExitBlock stay either way: they are
+		// valid block ids that may still be flushed.
 		if len(fn.Blocks) > 0 {
-			blockCount := len(fn.Blocks)
-			fn.Blocks = nil
-
 			releasedFuncs++
-			releasedBlocks += blockCount
+			releasedBlocks += len(fn.Blocks)
 
 			if compileUnitMemoryDebugEnabled() && releasedFuncs <= 3 {
-				log.Debugf("[split-compile] released func=%s blocks=%d", funcKey, blockCount)
+				log.Debugf("[split-compile] release eligible func=%s blocks=%d", funcKey, len(fn.Blocks))
 			}
 		}
 	}
