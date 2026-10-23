@@ -135,6 +135,48 @@ func TestBuildSessionSkillInventoryIncludesLazyDatabaseSkills(t *testing.T) {
 	require.Empty(t, loader.AllSkillMetas(), "listing inventory must not populate the lazy loader cache")
 }
 
+func TestBuildSessionAvailableSkillInventoryMergesLocalAndDatabaseSources(t *testing.T) {
+	db := newAutoloadTestDB(t)
+	defer db.Close()
+	dbVFS := filesys.NewVirtualFs()
+	dbVFS.AddFile("db-alpha/SKILL.md", buildSkillMD("db-alpha", "Database alpha", "DB_ALPHA"))
+	dbVFS.AddFile("db-omega/SKILL.md", buildSkillMD("db-omega", "Database omega", "DB_OMEGA"))
+	dbSource, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(dbVFS))
+	require.NoError(t, err)
+	persisted, err := aiskillloader.ImportAISkillsToDB(db, dbSource)
+	require.NoError(t, err)
+	require.Equal(t, 2, persisted)
+
+	localVFS := filesys.NewVirtualFs()
+	for _, name := range []string{"local-alpha", "local-mid", "local-omega"} {
+		localVFS.AddFile(name+"/SKILL.md", buildSkillMD(name, "Local "+name, "LOCAL"))
+	}
+	loader, err := aiskillloader.NewAutoSkillLoader(
+		aiskillloader.WithAutoLoad_FileSystem(localVFS),
+		aiskillloader.WithAutoLoad_Database(db),
+	)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
+	require.NoError(t, mgr.LoadSkill("local-mid"))
+
+	first, err := BuildSessionAvailableSkillInventory(mgr, 1, 2)
+	require.NoError(t, err)
+	require.Equal(t, 4, first.Total)
+	require.Equal(t, []string{"db-alpha", "db-omega"}, []string{first.Skills[0].Name, first.Skills[1].Name})
+	require.True(t, first.HasMore)
+
+	second, err := BuildSessionAvailableSkillInventory(mgr, 2, 2)
+	require.NoError(t, err)
+	require.Equal(t, 4, second.Total)
+	require.Equal(t, []string{"local-alpha", "local-omega"}, []string{second.Skills[0].Name, second.Skills[1].Name})
+	require.False(t, second.HasMore)
+
+	loaded := BuildSessionLoadedSkillInventory(mgr)
+	require.Equal(t, 1, loaded.Total)
+	require.Equal(t, "local-mid", loaded.Skills[0].Name)
+}
+
 func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
 	cfg := newSessionSkillQueryConfig(t)
 	detail, err := BuildSessionSkillDetail(cfg.GetSkillsContextManager(), "available")
