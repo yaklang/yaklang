@@ -12,9 +12,6 @@
 需要结构化展示时，先 load_ui_components({"names":[组件名]}) 加载当前需要的定义，再 render_ui；缺少定义时不要猜参数。不确定组件名时用 search_ui_components 搜索。加载定义不渲染、不等待用户；仅保留当前任务的一批定义，新批次替换旧批次，names:[] 清空。只使用当前 UI_COMPONENT_DEFINITIONS 中的契约。简单文字无需组件。
 有界组件索引（仅名称，不含定义）：{{ .UIComponentIndex }}
 {{ end }}
-{{ if .WorkerClarificationDisabled }}
-当前为子代理/执行 worker：禁止直接向用户提问或等待回答。缺少必要信息时向父任务报告所需信息和受阻工作。
-{{ end }}
 
 
 ================================================================================
