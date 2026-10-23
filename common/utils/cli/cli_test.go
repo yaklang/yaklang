@@ -332,3 +332,24 @@ func TestPeekStringSliceDoesNotRegisterMetadata(t *testing.T) {
 
 	assert.Len(t, app.extraParams, registeredBefore)
 }
+
+// A bool flag keeps its declared default when the caller passes no argv at all.
+// Programmatic plugin execution relies on this: the SSA auto-detect plugin
+// declares jar-recursive-parse default true, and ignoring the default disabled
+// jar expansion for every CLI compile of a webapp.
+func TestCliBoolHonorsDefaultWithoutArgv(t *testing.T) {
+	testCliParam(t, nil, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.True(app.Bool("enabled-by-default", app.SetDefault(true)))
+		test.False(app.Bool("disabled-by-default", app.SetDefault(false)))
+		test.False(app.Bool("no-default"))
+		check()
+	})
+}
+
+// An explicitly passed flag still wins over the declared default.
+func TestCliBoolFlagOverridesDefault(t *testing.T) {
+	testCliParam(t, []string{"--enabled"}, func(test *assert.Assertions, app *CliApp, check func()) {
+		test.True(app.Bool("enabled", app.SetDefault(false)))
+		check()
+	})
+}
