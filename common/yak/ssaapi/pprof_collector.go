@@ -226,7 +226,7 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 		case <-cpuTicker.C:
 			c.startCPUProfile(ctx, time.Now().Format("150405"))
 		case <-allocsTicker.C:
-			c.fetchAllocs(time.Now().Format("20060102-150405-allocs"))
+			c.fetchNamedProfile(time.Now().Format("20060102-150405-allocs"), "allocs", "")
 		}
 	}
 }
