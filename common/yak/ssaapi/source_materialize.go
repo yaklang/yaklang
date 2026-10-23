@@ -483,7 +483,9 @@ func javaSourceParses(src string, cache *ssa.AntlrCache) bool {
 	if strings.TrimSpace(src) == "" {
 		return false
 	}
-	_, err := java2ssa.FrontendRaw(src, cache)
+	// Use the same frontend the AST stage uses. FrontendRaw skips
+	// decompiler-output normalization and rejected JSP pages that compile.
+	_, err := java2ssa.Frontend(src, cache)
 	return err == nil
 }
 
