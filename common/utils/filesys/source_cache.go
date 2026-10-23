@@ -479,7 +479,7 @@ func (m *SourceMaterializer) Prefetch(
 				if _, ok := m.lookup(path); ok {
 					m.hits.Add(1)
 				} else if _, err := m.ReadFile(base, path); err != nil {
-					log.Debugf("[source-materialize] read %s failed: %v", path, err)
+					log.Warnf("[source-materialize] read %s failed: %v", path, err)
 				} else {
 					m.prefetched.Add(1)
 				}
