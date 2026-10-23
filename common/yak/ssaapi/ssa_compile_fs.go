@@ -15,6 +15,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -273,7 +274,25 @@ func (c *Config) parseProjectWithFSUnits(
 	filesystem = c.swapLanguageFs(filesystem)
 	// Jar/zip members, class files and JSP are transformed into source before the
 	// source scan. ScanProjectFiles then only classifies an already-prepared tree.
-	c.prepareProjectSources(filesystem, reportProcess, storeProcess)
+	timings := c.prepareProjectSources(filesystem, reportProcess, storeProcess)
+	if out := c.GetCompileMaterializeOut(); out != "" {
+		if timings.TemplateErrors > 0 {
+			return nil, utils.Errorf("materialize-out %s: %d jsp files failed to convert", out, timings.TemplateErrors)
+		}
+		materializer := filesys.MaterializerOf(filesystem)
+		var paths, nbytes int64
+		var readErrors int64
+		if materializer != nil {
+			st := materializer.Stats()
+			paths, nbytes, readErrors = st.Paths, st.Loaded, st.Errors
+		}
+		if readErrors > 0 {
+			return nil, utils.Errorf("materialize-out %s: %d source reads failed", out, readErrors)
+		}
+		log.Infof("[ssa-compile] materialize-out: wrote %d sources (%.1fMB) to %s in %v; AST not run",
+			paths, float64(nbytes)/1048576, out, time.Since(start).Round(time.Millisecond))
+		return &Program{}, nil
+	}
 	reportProcess(sourcePrefetchProcessEnd, "[%s] calculate total size of project", compilePhase)
 	scanResult, err := ScanProjectFiles(ScanConfig{
 		ProgramName:     programName,

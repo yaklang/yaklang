@@ -61,6 +61,17 @@ func TestScriptletIfElseStillParses(t *testing.T) {
 	require.Contains(t, code, "else")
 }
 
+func TestForEachWithoutVarKeepsBodyParsable(t *testing.T) {
+	src := `<c:forEach items="${rows}"><p>kept-row</p></c:forEach>`
+	info, err := j.ConvertTemplateToJava(j.JSP, src, "rows.jsp")
+	require.NoError(t, err)
+	code := info.GetContent()
+	require.Contains(t, code, "kept-row")
+	require.NotContains(t, code, "for (Object")
+	_, err = java2ssa.Frontend(code)
+	require.NoError(t, err, code)
+}
+
 func TestMissingEqualsParenBeforeOr(t *testing.T) {
 	src := `<%
 if("int".equals(p.getString("type")) || "long".equals(p.getString("type")|| "double".equals(p.getString("type"))){

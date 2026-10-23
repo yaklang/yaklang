@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strconv"
@@ -48,6 +49,12 @@ type SourceMaterializer struct {
 	maxDisk   int64
 	diskBytes atomic.Int64
 
+	// treeDir is a real directory of .java files. dropMemory means those
+	// files are the source of truth: the overlay does not keep their bytes.
+	treeDir    string
+	dropMemory bool
+	treeSeen   map[string]int64
+
 	mu       sync.Mutex
 	inflight map[string]*materializeCall
 
@@ -85,6 +92,20 @@ func WithSourceMaterializerDisk(dir, namespace string, maxBytes int64) SourceMat
 		sum := sha256.Sum256([]byte(namespace))
 		m.diskDir = filepath.Join(dir, hex.EncodeToString(sum[:])[:32])
 		m.maxDisk = maxBytes
+	}
+}
+
+// WithSourceMaterializerTree writes each materialized source into dir as a
+// real file and does not retain the bytes in memory. A later compile can
+// read that directory without the decompiler.
+func WithSourceMaterializerTree(dir string) SourceMaterializerOption {
+	return func(m *SourceMaterializer) {
+		dir = strings.TrimSpace(dir)
+		if dir == "" {
+			return
+		}
+		m.treeDir = dir
+		m.dropMemory = true
 	}
 }
 
@@ -159,6 +180,9 @@ func (m *SourceMaterializer) ReadFile(base fi.FileSystem, name string) ([]byte, 
 }
 
 func (m *SourceMaterializer) lookup(name string) ([]byte, bool) {
+	if m.dropMemory {
+		return m.readTree(name)
+	}
 	if m.overlay == nil {
 		return nil, false
 	}
@@ -206,11 +230,25 @@ func (m *SourceMaterializer) Put(name string, data []byte) {
 }
 
 func (m *SourceMaterializer) store(name string, data []byte) {
-	if m.overlay == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return
 	}
 	started := time.Now()
 	defer func() { m.storeNS.Add(time.Since(started).Nanoseconds()) }()
+	if m.treeDir != "" {
+		if err := m.writeTree(name, data); err != nil {
+			m.errors.Add(1)
+			log.Warnf("[source-materialize] write %s: %v", name, err)
+			return
+		}
+	}
+	if m.dropMemory {
+		m.noteTree(name, int64(len(data)))
+		return
+	}
+	if m.overlay == nil {
+		return
+	}
 	m.overlayMu.Lock()
 	// VirtualFS.AddFile keeps the first content it sees and silently ignores a
 	// later write of the same path. That breaks the JSP flow, which reads the raw
@@ -280,6 +318,98 @@ func (m *SourceMaterializer) writeDisk(name string, data []byte) {
 		return
 	}
 	m.diskBytes.Add(int64(len(data)))
+}
+
+// materializeTreeRel maps a virtual source path onto a .java file. JSP stays
+// distinguishable (page.jsp.java) so it cannot collide with page.java.
+func materializeTreeRel(name string) (string, error) {
+	name = strings.ReplaceAll(name, "\\", "/")
+	name = path.Clean("/" + name)
+	name = strings.TrimPrefix(name, "/")
+	if name == "" || name == "." || strings.HasPrefix(name, "../") || strings.Contains(name, "/../") {
+		return "", fmt.Errorf("materialize path %q escapes the output tree", name)
+	}
+	lower := strings.ToLower(name)
+	switch {
+	case strings.HasSuffix(lower, ".class"):
+		name = name[:len(name)-len(".class")] + ".java"
+	case strings.HasSuffix(lower, ".jsp"), strings.HasSuffix(lower, ".jspx"):
+		name += ".java"
+	}
+	return name, nil
+}
+
+func (m *SourceMaterializer) treeFile(name string) (string, error) {
+	if m == nil || m.treeDir == "" {
+		return "", nil
+	}
+	rel, err := materializeTreeRel(name)
+	if err != nil {
+		return "", err
+	}
+	root := filepath.Clean(m.treeDir)
+	full := filepath.Clean(filepath.Join(root, filepath.FromSlash(rel)))
+	if full != root && !strings.HasPrefix(full, root+string(os.PathSeparator)) {
+		return "", fmt.Errorf("materialize path %q escapes %s", name, m.treeDir)
+	}
+	return full, nil
+}
+
+func (m *SourceMaterializer) writeTree(name string, data []byte) error {
+	target, err := m.treeFile(name)
+	if err != nil || target == "" {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		return err
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(target), ".mat-*")
+	if err != nil {
+		return err
+	}
+	tmpName := tmp.Name()
+	_, werr := tmp.Write(data)
+	cerr := tmp.Close()
+	if werr != nil || cerr != nil {
+		_ = os.Remove(tmpName)
+		if werr != nil {
+			return werr
+		}
+		return cerr
+	}
+	if err := os.Rename(tmpName, target); err != nil {
+		_ = os.Remove(tmpName)
+		return err
+	}
+	return nil
+}
+
+func (m *SourceMaterializer) readTree(name string) ([]byte, bool) {
+	target, err := m.treeFile(name)
+	if err != nil || target == "" {
+		return nil, false
+	}
+	data, err := os.ReadFile(target)
+	if err != nil || len(data) == 0 {
+		return nil, false
+	}
+	return data, true
+}
+
+func (m *SourceMaterializer) noteTree(name string, n int64) {
+	m.overlayMu.Lock()
+	defer m.overlayMu.Unlock()
+	if m.treeSeen == nil {
+		m.treeSeen = map[string]int64{}
+	}
+	if old, ok := m.treeSeen[name]; ok {
+		m.loadedB.Add(n - old)
+		m.treeSeen[name] = n
+		return
+	}
+	m.treeSeen[name] = n
+	m.pathCount.Add(1)
+	m.loadedB.Add(n)
 }
 
 // Prefetch materializes every path with a bounded worker pool. Paths already

@@ -347,8 +347,13 @@ func (y *JSPVisitor) emitCoreForEach(body func()) {
 	}
 	variable, hasVar := tag.attrs["var"]
 	if items, ok := tag.attrs["items"]; ok {
+		// var is required to bind items, but dropping the body removes the
+		// page from analysis and can leave later scriptlets unbalanced.
+		// Emit the body once so the generated method still parses.
 		if !hasVar {
-			log.Errorf("JSTL foreach tag must have var attribute")
+			if body != nil {
+				body()
+			}
 			return
 		}
 		// items may be several EL calls plus literal text. javaValueArg joins

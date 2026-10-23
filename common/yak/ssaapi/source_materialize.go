@@ -57,6 +57,9 @@ func (c *Config) sourceMaterializer() *filesys.SourceMaterializer {
 			dir, c.sourceCacheNamespace(), filesys.DefaultSourceDiskBudget(),
 		))
 	}
+	if dir := c.GetCompileMaterializeOut(); dir != "" {
+		opts = append(opts, filesys.WithSourceMaterializerTree(dir))
+	}
 	c.materializedSources = filesys.NewSourceMaterializer(opts...)
 	return c.materializedSources
 }
