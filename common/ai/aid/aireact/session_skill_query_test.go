@@ -14,41 +14,63 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
-func TestSessionSkillInventorySyncWithoutLoop(t *testing.T) {
+func TestSessionSkillListsSyncWithoutLoop(t *testing.T) {
 	react, events := newSessionSkillTestRuntime(t, false)
 	require.Nil(t, react.GetCurrentLoop())
 	require.NoError(t, react.HandleSyncTypeLoadSkillEvent(&ypb.AIInputEvent{
 		SyncType: aicommon.SYNC_TYPE_LOAD_SKILL, SyncID: "load-for-inventory",
 		SyncJsonInput: `{"skill_names":["session"]}`,
 	}))
-	event := &ypb.AIInputEvent{SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "inventory"}
-	require.NoError(t, react.handleSyncMessage(event))
-	var inventory aicommon.SessionSkillInventoryPage
-	events.read(t, "skill_inventory", &inventory)
-	require.Len(t, inventory.Skills, 2)
-	require.Equal(t, 2, inventory.Total)
-	byName := make(map[string]aicommon.CapabilityInventoryItem)
-	for _, item := range inventory.Skills {
-		require.Equal(t, "skill", item.Type)
-		byName[item.Name] = item
-	}
-	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, byName["session"].Stage)
-	require.Equal(t, aicommon.CapabilityInventoryStageMetadata, byName["available"].Stage)
+	require.NoError(t, react.handleSyncMessage(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_LOADED, SyncID: "loaded",
+	}))
+	require.NoError(t, react.handleSyncMessage(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_AVAILABLE, SyncID: "available",
+	}))
+	var loaded aicommon.SessionSkillList
+	events.read(t, "skill_loaded", &loaded)
+	require.Equal(t, 1, loaded.Total)
+	require.Equal(t, "session", loaded.Skills[0].Name)
+	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, loaded.Skills[0].Stage)
+
+	var available aicommon.SessionSkillAvailablePage
+	events.read(t, "skill_available", &available)
+	require.Equal(t, 1, available.Total)
+	require.Equal(t, "available", available.Skills[0].Name)
+	require.Equal(t, aicommon.CapabilityInventoryStageMetadata, available.Skills[0].Stage)
 }
 
 func TestSessionSkillInventorySyncPagination(t *testing.T) {
 	react, events := newSessionSkillTestRuntime(t, false)
-	require.NoError(t, react.HandleSyncTypeSkillInventoryEvent(&ypb.AIInputEvent{
-		SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "inventory-page-2",
+	require.NoError(t, react.HandleSyncTypeSkillAvailableEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_AVAILABLE, SyncID: "available-page-2",
 		SyncJsonInput: `{"page":2,"page_size":1}`,
 	}))
-	var inventory aicommon.SessionSkillInventoryPage
-	events.read(t, "skill_inventory", &inventory)
+	var inventory aicommon.SessionSkillAvailablePage
+	events.read(t, "skill_available", &inventory)
 	require.Equal(t, 2, inventory.Page)
 	require.Equal(t, 1, inventory.PageSize)
 	require.Equal(t, 2, inventory.Total)
 	require.Len(t, inventory.Skills, 1)
 	require.False(t, inventory.HasMore)
+}
+
+func TestSessionSkillLoadedSyncReturnsAllWithoutPagination(t *testing.T) {
+	react, events := newSessionSkillTestRuntime(t, false)
+	require.NoError(t, react.HandleSyncTypeLoadSkillEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_LOAD_SKILL, SyncID: "load-loaded",
+		SyncJsonInput: `{"skill_names":["session"]}`,
+	}))
+	require.NoError(t, react.HandleSyncTypeSkillLoadedEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_LOADED, SyncID: "loaded",
+		SyncJsonInput: `{"page":99,"page_size":1}`,
+	}))
+	var inventory aicommon.SessionSkillList
+	events.read(t, "skill_loaded", &inventory)
+	require.Equal(t, 1, inventory.Total)
+	require.Len(t, inventory.Skills, 1)
+	require.Equal(t, "session", inventory.Skills[0].Name)
+	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, inventory.Skills[0].Stage)
 }
 
 func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
@@ -109,11 +131,11 @@ func TestSessionSkillInventoryUsesActiveLoopLoader(t *testing.T) {
 	loop.SetCurrentTask(task)
 	require.Same(t, loop, react.GetCurrentLoop())
 
-	require.NoError(t, react.HandleSyncTypeSkillInventoryEvent(&ypb.AIInputEvent{
-		SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "custom-inventory",
+	require.NoError(t, react.HandleSyncTypeSkillAvailableEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_AVAILABLE, SyncID: "custom-inventory",
 	}))
-	var inventory aicommon.SessionSkillInventoryPage
-	events.read(t, "skill_inventory", &inventory)
+	var inventory aicommon.SessionSkillAvailablePage
+	events.read(t, "skill_available", &inventory)
 	names := make(map[string]bool)
 	for _, item := range inventory.Skills {
 		names[item.Name] = true

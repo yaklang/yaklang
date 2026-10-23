@@ -49,20 +49,25 @@ func parseSkillDetailRequest(event *ypb.AIInputEvent) string {
 	return strings.TrimSpace(req.Name)
 }
 
-// HandleSyncTypeSkillInventoryEvent 返回 session 当前已加载和可加载的 SKILL。
-// 查询不要求存在活跃 task/loop。
-func (r *ReAct) HandleSyncTypeSkillInventoryEvent(event *ypb.AIInputEvent) error {
-	mgr := r.skillManagerForSessionInput()
+// HandleSyncTypeSkillLoadedEvent 返回全部已加载 SKILL，不占用可加载清单分页。
+func (r *ReAct) HandleSyncTypeSkillLoadedEvent(event *ypb.AIInputEvent) error {
+	inventory := aicommon.BuildSessionLoadedSkillInventory(r.skillManagerForSessionInput())
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_loaded", inventory, event.SyncID)
+	return nil
+}
+
+// HandleSyncTypeSkillAvailableEvent 只分页返回可加载且未加载的 SKILL。
+func (r *ReAct) HandleSyncTypeSkillAvailableEvent(event *ypb.AIInputEvent) error {
 	page, pageSize := parseSkillInventoryRequest(event)
-	inventory, err := aicommon.BuildSessionSkillInventory(mgr, page, pageSize)
+	inventory, err := aicommon.BuildSessionAvailableSkillInventory(r.skillManagerForSessionInput(), page, pageSize)
 	if err != nil {
-		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_inventory", map[string]any{
+		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", map[string]any{
 			"skills": []any{},
 			"error":  err.Error(),
 		}, event.SyncID)
 		return nil
 	}
-	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_inventory", inventory, event.SyncID)
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", inventory, event.SyncID)
 	return nil
 }
 
