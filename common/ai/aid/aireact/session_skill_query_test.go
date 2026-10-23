@@ -23,16 +23,32 @@ func TestSessionSkillInventorySyncWithoutLoop(t *testing.T) {
 	}))
 	event := &ypb.AIInputEvent{SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "inventory"}
 	require.NoError(t, react.handleSyncMessage(event))
-	var items []aicommon.CapabilityInventoryItem
-	events.read(t, "skill_inventory", &items)
-	require.Len(t, items, 2)
+	var inventory aicommon.SessionSkillInventoryPage
+	events.read(t, "skill_inventory", &inventory)
+	require.Len(t, inventory.Skills, 2)
+	require.Equal(t, 2, inventory.Total)
 	byName := make(map[string]aicommon.CapabilityInventoryItem)
-	for _, item := range items {
+	for _, item := range inventory.Skills {
 		require.Equal(t, "skill", item.Type)
 		byName[item.Name] = item
 	}
 	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, byName["session"].Stage)
 	require.Equal(t, aicommon.CapabilityInventoryStageMetadata, byName["available"].Stage)
+}
+
+func TestSessionSkillInventorySyncPagination(t *testing.T) {
+	react, events := newSessionSkillTestRuntime(t, false)
+	require.NoError(t, react.HandleSyncTypeSkillInventoryEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "inventory-page-2",
+		SyncJsonInput: `{"page":2,"page_size":1}`,
+	}))
+	var inventory aicommon.SessionSkillInventoryPage
+	events.read(t, "skill_inventory", &inventory)
+	require.Equal(t, 2, inventory.Page)
+	require.Equal(t, 1, inventory.PageSize)
+	require.Equal(t, 2, inventory.Total)
+	require.Len(t, inventory.Skills, 1)
+	require.False(t, inventory.HasMore)
 }
 
 func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
@@ -96,10 +112,10 @@ func TestSessionSkillInventoryUsesActiveLoopLoader(t *testing.T) {
 	require.NoError(t, react.HandleSyncTypeSkillInventoryEvent(&ypb.AIInputEvent{
 		SyncType: aicommon.SYNC_TYPE_SKILL_INVENTORY, SyncID: "custom-inventory",
 	}))
-	var items []aicommon.CapabilityInventoryItem
-	events.read(t, "skill_inventory", &items)
+	var inventory aicommon.SessionSkillInventoryPage
+	events.read(t, "skill_inventory", &inventory)
 	names := make(map[string]bool)
-	for _, item := range items {
+	for _, item := range inventory.Skills {
 		names[item.Name] = true
 	}
 	require.True(t, names["loop-only"])

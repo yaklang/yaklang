@@ -304,6 +304,65 @@ func (l *AutoSkillLoader) AllSkillMetas() []*SkillMeta {
 	return result
 }
 
+// ListSkillMetas returns all local and database-backed skill metadata without
+// using the prompt registry token budget. Database rows are selected without
+// loading their serialized filesystem blobs.
+func (l *AutoSkillLoader) ListSkillMetas(offset, limit int) ([]*SkillMeta, int, error) {
+	if l == nil {
+		return nil, 0, nil
+	}
+	l.mu.RLock()
+	byName := make(map[string]*SkillMeta, len(l.skills))
+	for name, entry := range l.skills {
+		if entry != nil && entry.meta != nil {
+			byName[name] = entry.meta
+		}
+	}
+	db := l.db
+	l.mu.RUnlock()
+
+	if db != nil {
+		var forges []*schema.AIForge
+		err := db.Model(&schema.AIForge{}).
+			Omit("fs_bytes", "forge_content", "params", "params_ui_config", "user_persistent_data").
+			Where("forge_type = ?", schema.FORGE_TYPE_SkillMD).
+			Order("forge_name ASC").
+			Find(&forges).Error
+		if err != nil {
+			return nil, 0, utils.Wrap(err, "list skillmd forges failed")
+		}
+		for _, forge := range forges {
+			meta := forgeToSkillMetaPreview(forge)
+			if meta == nil || strings.TrimSpace(meta.Name) == "" {
+				continue
+			}
+			if _, exists := byName[meta.Name]; !exists {
+				byName[meta.Name] = meta
+			}
+		}
+	}
+
+	metas := make([]*SkillMeta, 0, len(byName))
+	for _, meta := range byName {
+		if meta != nil && strings.TrimSpace(meta.Name) != "" {
+			metas = append(metas, meta)
+		}
+	}
+	sort.Slice(metas, func(i, j int) bool { return metas[i].Name < metas[j].Name })
+	total := len(metas)
+	if offset < 0 {
+		offset = 0
+	}
+	if offset >= total {
+		return nil, total, nil
+	}
+	if limit > 0 && offset+limit < total {
+		totalPage := append([]*SkillMeta(nil), metas[offset:offset+limit]...)
+		return totalPage, total, nil
+	}
+	return append([]*SkillMeta(nil), metas[offset:]...), total, nil
+}
+
 // GetSkillMeta returns skill metadata by name, using lazy DB lookup when needed.
 func (l *AutoSkillLoader) GetSkillMeta(name string) (*SkillMeta, error) {
 	l.mu.RLock()

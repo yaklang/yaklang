@@ -12,6 +12,11 @@ import (
 
 const SessionSkillResourceURLPath = "/api/ai/skill"
 
+const (
+	DefaultSessionSkillInventoryPageSize = 100
+	MaxSessionSkillInventoryPageSize     = 500
+)
+
 // SessionSkillDetail 是 session 级 SKILL 详情。已加载技能返回 Timeline 中当前
 // 可见的正文；未加载技能返回 SKILL.md 和文件树。
 // URL 标识 session 中的技能资源，后续可由服务端统一解析 Timeline、文件系统或
@@ -26,13 +31,96 @@ type SessionSkillDetail struct {
 	URL            string                   `json:"url,omitempty"`
 }
 
-// BuildSessionSkillInventory 返回当前 Timeline 中已加载的技能以及 loader 中可加载
-// 的技能。返回项沿用 capability_inventory 的扁平结构，调用方可按 Stage 区分。
-func BuildSessionSkillInventory(mgr *aiskillloader.SkillsContextManager) []CapabilityInventoryItem {
-	if mgr == nil {
-		return nil
+// SessionSkillInventoryPage 是 session 管理面的技能清单分页。Skills 不经过 prompt
+// registry 的 token 预算，Total 始终表示本地、数据库和 Timeline-only 技能并集。
+type SessionSkillInventoryPage struct {
+	Skills   []CapabilityInventoryItem `json:"skills"`
+	Page     int                       `json:"page"`
+	PageSize int                       `json:"page_size"`
+	Total    int                       `json:"total"`
+	HasMore  bool                      `json:"has_more"`
+}
+
+// BuildSessionSkillInventory 返回当前 session 全部可加载和已加载技能的分页清单。
+// 它不复用 prompt inventory 的预算裁剪逻辑；数据库来源在首次加载前也会出现。
+func BuildSessionSkillInventory(mgr *aiskillloader.SkillsContextManager, page, pageSize int) (*SessionSkillInventoryPage, error) {
+	if page <= 0 {
+		page = 1
 	}
-	return BuildCapabilityInventorySkillItems(BuildInventorySkillsFromManager(mgr))
+	if pageSize <= 0 {
+		pageSize = DefaultSessionSkillInventoryPageSize
+	}
+	if pageSize > MaxSessionSkillInventoryPageSize {
+		pageSize = MaxSessionSkillInventoryPageSize
+	}
+	result := &SessionSkillInventoryPage{Page: page, PageSize: pageSize}
+	if mgr == nil {
+		return result, nil
+	}
+
+	byName := make(map[string]CapabilityInventoryNamedItem)
+	for _, skill := range mgr.GetCurrentSelectedSkills() {
+		if skill == nil || strings.TrimSpace(skill.Name) == "" {
+			continue
+		}
+		meta := skill.SkillMeta
+		if meta == nil {
+			meta = &aiskillloader.SkillMeta{Name: skill.Name}
+		}
+		item := skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadLoaded)
+		item.TokenCount = skill.TokenCount
+		byName[skill.Name] = item
+	}
+
+	if loader := mgr.GetLoader(); loader != nil {
+		var (
+			metas []*aiskillloader.SkillMeta
+			err   error
+		)
+		if pager, ok := loader.(aiskillloader.SkillMetaPager); ok {
+			metas, _, err = pager.ListSkillMetas(0, 0)
+		} else {
+			metas = loader.AllSkillMetas()
+		}
+		if err != nil {
+			return nil, err
+		}
+		for _, meta := range metas {
+			if meta == nil || strings.TrimSpace(meta.Name) == "" {
+				continue
+			}
+			if existing, found := byName[meta.Name]; found {
+				if existing.Description == "" {
+					existing.Description = meta.Description
+					byName[meta.Name] = existing
+				}
+				continue
+			}
+			byName[meta.Name] = skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadMetadata)
+		}
+	}
+
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	result.Total = len(names)
+	start := (page - 1) * pageSize
+	if start >= result.Total {
+		result.Skills = []CapabilityInventoryItem{}
+		return result, nil
+	}
+	end := start + pageSize
+	if end > result.Total {
+		end = result.Total
+	}
+	result.Skills = make([]CapabilityInventoryItem, 0, end-start)
+	for _, name := range names[start:end] {
+		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{byName[name]})...)
+	}
+	result.HasMore = end < result.Total
+	return result, nil
 }
 
 // BuildSessionSkillDetail 查询指定技能。加载状态只由 Timeline 决定，因此即使技能
