@@ -115,7 +115,9 @@ func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
 	} else if i.JspScript() != nil {
 		y.VisitJspScript(i.JspScript())
 	} else if i.JspExpression() != nil {
-		y.VisitJspExpression(i.JspExpression())
+		if expr := y.VisitJspExpression(i.JspExpression()); expr != "" {
+			y.EmitOutput(expr)
+		}
 	} else if i.JspIfBlock() != nil {
 		y.VisitJspIfBlock(i.JspIfBlock())
 	} else if i.Style() != nil {
@@ -402,7 +404,9 @@ func (y *JSPVisitor) VisitAttribute(raw jspparser.IHtmlAttributeContext) (key, v
 		value = y.VisitHtmlAttributeValue(ret.HtmlAttributeValue())
 		y.AddTagAttr(key, value)
 	case *jspparser.JSPExpressionAttributeContext:
-		y.VisitJspExpression(ret.JspExpression())
+		if expr := y.VisitJspExpression(ret.JspExpression()); expr != "" {
+			y.EmitOutput(expr)
+		}
 	}
 	y.AddAttrFunc(func() {
 		y.EmitPureText(key)

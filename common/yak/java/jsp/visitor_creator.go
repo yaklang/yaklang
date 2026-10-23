@@ -281,8 +281,44 @@ func stripJSPScriptComments(src string) string {
 	return b.String()
 }
 
+// stripJSPIncludeDirectives removes <%@ include ... %> before lexing. The
+// lexer skip rule is only active in the default mode. Inside a tag or a
+// script the same directive becomes a scriptlet body "@ include file=..."
+// and the generated Java does not parse. Includes are not expanded either
+// way; this matches the lexer rule when that rule does match.
+func stripJSPIncludeDirectives(src string) string {
+	if !strings.Contains(src, "<%@") {
+		return src
+	}
+	var b strings.Builder
+	b.Grow(len(src))
+	i := 0
+	for i < len(src) {
+		if strings.HasPrefix(src[i:], "<%@") {
+			j := i + 3
+			for j < len(src) && (src[j] == ' ' || src[j] == '\t' || src[j] == '\n' || src[j] == '\r') {
+				j++
+			}
+			if strings.HasPrefix(src[j:], "include") {
+				end := strings.Index(src[i:], "%>")
+				if end < 0 {
+					b.WriteString(src[i:])
+					break
+				}
+				b.WriteByte(' ')
+				i += end + 2
+				continue
+			}
+		}
+		b.WriteByte(src[i])
+		i++
+	}
+	return b.String()
+}
+
 func preprocessMalformedJSPHTML(src string) string {
 	src = stripJSPScriptComments(src)
+	src = stripJSPIncludeDirectives(src)
 	if strings.Contains(src, "<?xml") || strings.Contains(src, "<?XML") {
 		src = xmlDeclPattern.ReplaceAllString(src, "")
 	}

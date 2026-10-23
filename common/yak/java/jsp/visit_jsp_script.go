@@ -69,7 +69,9 @@ func (y *JSPVisitor) VisitJspScriptlet(raw jspparser.IJspScriptletContext) {
 			}
 		}
 	} else if i.JspExpression() != nil {
-		y.VisitJspExpression(i.JspExpression())
+		if expr := y.VisitJspExpression(i.JspExpression()); expr != "" {
+			y.EmitOutput(expr)
+		}
 	}
 }
 
@@ -85,11 +87,10 @@ func (y *JSPVisitor) VisitJspExpression(raw jspparser.IJspExpressionContext) str
 		return ""
 	}
 	if i.ScriptletContent() != nil {
-		expr := normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
-		if expr != "" {
-			y.EmitOutput(expr)
-		}
-		return expr
+		// Callers decide whether this is a statement (<%= 1+1 %>) or an
+		// attribute value (test="<%= expr %>"). Emitting here put out.print
+		// inside switch (true) before any case label.
+		return normalizeJSPEmbeddedJava(y.VisitScriptletContent(i.ScriptletContent()))
 	}
 	return ""
 }

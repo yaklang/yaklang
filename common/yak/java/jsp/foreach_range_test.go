@@ -110,6 +110,64 @@ func TestForTokensItemsFromJSPAttribute(t *testing.T) {
 	}
 }
 
+func TestChooseWhenScriptletIsCaseLabel(t *testing.T) {
+	src := `<c:choose>
+<c:when test="<%=UserUtil.getKMSSUser().isAdmin()%>">
+<p>admin</p>
+</c:when>
+</c:choose>
+<%=1+1%>`
+	code := convertJSPForTest(t, src)
+	if !strings.Contains(code, "case UserUtil.getKMSSUser().isAdmin():") {
+		t.Fatalf("scriptlet test must be the case label:\n%s", code)
+	}
+	switchAt := strings.Index(code, "switch (true)")
+	caseAt := strings.Index(code, "case UserUtil")
+	printAt := strings.Index(code, "out.print(UserUtil")
+	if switchAt < 0 || caseAt < 0 || caseAt < switchAt {
+		t.Fatalf("case label missing after switch:\n%s", code)
+	}
+	if printAt >= 0 && printAt < caseAt {
+		t.Fatalf("scriptlet attribute was printed before the case label:\n%s", code)
+	}
+	if !strings.Contains(code, "1+1") {
+		t.Fatalf("standalone expression must still be emitted:\n%s", code)
+	}
+}
+
+func TestIncludeDirectiveIsNotEmittedAsCode(t *testing.T) {
+	// c:out keeps this on the structured path. A directive-only page is
+	// emitted as text by a different bypass and is not this bug.
+	code := convertJSPForTest(t, "<c:out value=\"x\"/>\n<%@ include file=\"/sys/ui/jsp/common.jsp\"%>\n<p>hi</p>")
+	if strings.Contains(code, "include file") || strings.Contains(code, "<%@") {
+		t.Fatalf("include directive leaked into Java:\n%s", code)
+	}
+	if !strings.Contains(code, "hi") || !strings.Contains(code, `"x"`) {
+		t.Fatalf("page text was dropped with the include:\n%s", code)
+	}
+}
+
+func TestCOutMixedValueIsOneExpression(t *testing.T) {
+	code := convertJSPForTest(t, `<c:out value="${gatewayMatterMainForm.fdName} - " />`)
+	if !strings.Contains(code, `elExpr.parse("gatewayMatterMainForm.fdName") + " -"`) {
+		t.Fatalf("mixed c:out value must be one Java expression:\n%s", code)
+	}
+}
+
+func TestPairedOutAndParamDoNotDropValue(t *testing.T) {
+	src := `<c:out value="${login_user_name}"></c:out>
+<c:url value="/x">
+  <c:param name="modelName" value="com.example.SysNumberMain"></c:param>
+</c:url>`
+	code := convertJSPForTest(t, src)
+	if !strings.Contains(code, `elExpr.parse("login_user_name")`) {
+		t.Fatalf("paired c:out dropped its value:\n%s", code)
+	}
+	if !strings.Contains(code, `modelName`) {
+		t.Fatalf("paired c:param dropped its name:\n%s", code)
+	}
+}
+
 // The items form must keep working exactly as before.
 func TestForeachItemsStillIteratesEl(t *testing.T) {
 	code := convertJSPForTest(t, `<c:forEach items="${list}" var="x">${x}</c:forEach>`)

@@ -180,21 +180,7 @@ func (y *JSPVisitor) ParseSingleTag() {
 	case JSP_TAG_CORE_IMPORT:
 		y.emitCoreImport()
 	case JSP_TAG_CORE_OUT:
-		variable, ok := tagInfo.attrs["value"]
-		if !ok {
-			log.Errorf("JSTL out tag must have value attribute")
-			return
-		}
-		// check escapeXml attribute
-		var noEscape bool
-		if v, ok := tagInfo.attrs["escapeXml"]; ok {
-			noEscape = v == "false"
-		}
-		if noEscape {
-			y.EmitOutput(variable)
-		} else {
-			y.EmitEscapeOutput(variable)
-		}
+		y.emitCoreOut(nil)
 	case JSP_TAG_CORE_SET:
 		y.emitCoreSet()
 	default:
@@ -264,10 +250,48 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 		y.EmitPureCode("}")
 	case JSP_TAG_CORE_FOREACH:
 		y.emitCoreForEach(visitContent)
+	case JSP_TAG_CORE_OUT:
+		// <c:out value="${x}"></c:out> is paired, not self-closing. The
+		// single-tag path already handled the value; this one must too.
+		y.emitCoreOut(visitContent)
+	case JSP_TAG_CORE_PARAM:
+		y.recordCoreParam()
+		if visitContent != nil {
+			visitContent()
+		}
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 		y.EmitAttrFunc()
 	}
+}
+
+func (y *JSPVisitor) emitCoreOut(body func()) {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	variable, ok := tag.attrs["value"]
+	if !ok {
+		// JSTL uses the element body when value is absent.
+		if body != nil {
+			body()
+			return
+		}
+		log.Errorf("JSTL out tag must have value attribute")
+		return
+	}
+	var noEscape bool
+	if v, ok := tag.attrs["escapeXml"]; ok {
+		noEscape = v == "false"
+	}
+	// ${name} -  is an expression plus literal text. Passing it through raw
+	// makes printWithEscape(elExpr.parse("name") - ), which is not Java.
+	expr := javaValueArg(variable)
+	if noEscape {
+		y.EmitOutput(expr)
+		return
+	}
+	y.EmitEscapeOutput(expr)
 }
 
 func (y *JSPVisitor) emitCoreIf(body func()) {
@@ -547,6 +571,11 @@ func (y *JSPVisitor) asJavaCondition(condition string) string {
 	condition = strings.TrimSpace(condition)
 	if condition == "" {
 		return "false"
+	}
+	// <%= UserUtil.getKMSSUser().isAdmin() %> is already a Java call. EL
+	// functions use a colon (fn:escapeXml) and must stay quoted.
+	if strings.Contains(condition, "(") && !strings.Contains(condition, ":") && !strings.Contains(condition, "${") && !strings.Contains(condition, "elExpr.parse(") {
+		return condition
 	}
 	converted := y.appendElParseMethod(condition)
 	if strings.Contains(converted, "elExpr.parse(") {
