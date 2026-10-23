@@ -13,6 +13,7 @@
 - `TestEnumLegacyValueOfCannotBeSilentlyReplaced`：有效的原字节码运行确认 null/缺名均为 IllegalArgumentException，不能静默换成默认 Enum.valueOf；新测试要求拒绝而非非法源码。
 - `TestMissingEnclosingMethodPreservesPhysicalDescriptors`：RED→GREEN，`none` 与 `source,lines,vars` 两种编译元数据；改用原始 descriptor 渲染并保留必要的参数桥；javac 重编译和 Java driver（反射检查 Bound 参数/返回）一致。不是为 T 猜测 Object bound。
 - `audit/replay-descriptor`：20 个无 EnclosingMethod 的原文件生成，3 个 method_index=0 且无构造器的 Comparators$1 继续拒绝。20 个中 LinkedHashCache$1 仍含一个旧构造器 stub，不能算完全修复。
+- `Comparators$1`（3 份，`gtadmin/icmagent/webadmin` 的 `webadmin.jar`）字节码：`final class`、`ACC_FINAL|ACC_SUPER`、1 个字段 `val$t`（`ACC_FINAL|ACC_SYNTHETIC`）、1 个方法 `compare`，**没有任何 `<init>`**。javac 总会生成至少一个构造器，所以这个类被改过；带 blank final 字段的源码类必须在其构造器里赋值，而原类根本没有构造器。补一个构造器就是发明原类不存在的成员，也不满足 source-ownership（EnclosingMethod 的 method_index=0）。所以保持拒绝，不加 suppression。
 - 枚举 clinit 的改名 backing 赋值泄漏已针对修复，3 条（es/dq/ez）在本表重开，等待新全量。
 - 2026-10-23 04:4x 重放（不是全量）：`Comparison` 已生成，六个比较常量折回常量体，方向与字节码一致。证书允许常量体保留 static 自身行（可带 ACC_ENUM）和指向共享 marker 的第二行。`TestRenamedEnumConstantBody` exit 0。
 - `NestingType`、`CompilePhaseAdapter` 仍拒绝。`<clinit>` 用 `CallSite.callStatic` 加 `castToType` 赋值，没有声明处的 `new`。JLS 16.5：enum 常量是用实例创建表达式初始化的 static final 字段。未加 suppression。
