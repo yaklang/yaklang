@@ -128,6 +128,31 @@ func (prog *Program) AddError(err *SSAError) {
 	app.errors = append(app.errors, err)
 }
 
+// CopyErrorsFrom moves src's errors onto prog's error owner.
+// Sub programs share the application's error list, so the common case is a
+// no-op: cloning and re-appending the list there used to double the error
+// slice on every built file, which made memory use quadratic in a project's
+// error count. Only truly separated owners need a transfer.
+func (prog *Program) CopyErrorsFrom(src *Program) {
+	if prog == nil || src == nil {
+		return
+	}
+	srcOwner := src.errorOwner()
+	dstOwner := prog.errorOwner()
+	if srcOwner == dstOwner {
+		return
+	}
+	srcOwner.errorsMu.Lock()
+	errs := slices.Clone(srcOwner.errors)
+	srcOwner.errorsMu.Unlock()
+	if len(errs) == 0 {
+		return
+	}
+	dstOwner.errorsMu.Lock()
+	dstOwner.errors = append(dstOwner.errors, errs...)
+	dstOwner.errorsMu.Unlock()
+}
+
 func (prog *Program) GetErrors() SSAErrors {
 	app := prog.errorOwner()
 	app.errorsMu.Lock()
