@@ -179,6 +179,62 @@ type SourcePreparationTimings struct {
 	WalkErrors                       int64   `json:"walk_errors"`
 }
 
+// archiveGroupKey is the archive that owns path. Nested archives use the
+// innermost jar/war/ear/zip. A loose class or jsp is its own group.
+func archiveGroupKey(path string) string {
+	normalized := strings.ToLower(strings.ReplaceAll(path, "\\", "/"))
+	best := -1
+	extLen := 0
+	for _, ext := range []string{".jar/", ".war/", ".ear/", ".par/", ".zip/"} {
+		if i := strings.LastIndex(normalized, ext); i > best {
+			best = i
+			extLen = len(ext) - 1
+		}
+	}
+	if best < 0 {
+		return path
+	}
+	return normalized[:best+extLen]
+}
+
+// stripeByArchive round-robins paths across archives. The walk lists every
+// class of one jar before the next, so a small worker window would otherwise
+// decompile a single jar while the rest wait.
+func stripeByArchive(paths []string) []string {
+	if len(paths) < 2 {
+		return paths
+	}
+	groups := make(map[string][]string)
+	order := make([]string, 0)
+	for _, path := range paths {
+		key := archiveGroupKey(path)
+		if _, ok := groups[key]; !ok {
+			order = append(order, key)
+		}
+		groups[key] = append(groups[key], path)
+	}
+	if len(order) < 2 {
+		return paths
+	}
+	out := make([]string, 0, len(paths))
+	for {
+		advanced := false
+		for _, key := range order {
+			group := groups[key]
+			if len(group) == 0 {
+				continue
+			}
+			out = append(out, group[0])
+			groups[key] = group[1:]
+			advanced = true
+		}
+		if !advanced {
+			break
+		}
+	}
+	return out
+}
+
 // prepareProjectSources runs before the source scan. Jar/zip entries (already
 // expanded by the language filesystem), .class files and .jsp/.jspx files are
 // independent file transforms: each class or archive member decompiles into one
@@ -264,17 +320,51 @@ func (c *Config) prepareProjectSources(
 		reportProcess(p, fmt.Sprintf("[%s] prepare sources jar/zip/class/jsp (%d/%d)", "f0_prepare", n, total))
 	}
 
-	archiveStarted := time.Now()
+	// Classes inside one jar are consecutive after the walk. A worker window
+	// then sits inside a single jar. Round-robin puts several jars in flight
+	// together. JSP conversion does not depend on decompilation, so it runs
+	// on the same pool instead of waiting for every class.
+	sources = stripeByArchive(sources)
+	var prep sync.WaitGroup
+	var archiveSeconds float64
+	var prefetchErrors int64
+	var templateSeconds, templateTranslation, templateJava float64
+	var templateErrors int64
 	if len(sources) > 0 {
-		if err := materializer.Prefetch(c.GetContext(), filesystem, sources, workers, func(_, _ int) { report() }); err != nil {
-			timings.WalkErrors++
-			log.Warnf("[ssa-compile] source prepare prefetch: %v", err)
-		}
+		prep.Add(1)
+		go func() {
+			defer prep.Done()
+			archiveStarted := time.Now()
+			if err := materializer.Prefetch(c.GetContext(), filesystem, sources, workers, func(_, _ int) { report() }); err != nil {
+				prefetchErrors++
+				log.Warnf("[ssa-compile] source prepare prefetch: %v", err)
+			}
+			archiveSeconds = time.Since(archiveStarted).Seconds()
+		}()
 	}
-	timings.ArchivePrepareSeconds = time.Since(archiveStarted).Seconds()
-	templatesStarted := time.Now()
-	timings.TemplateTranslationWorkerSeconds, timings.TemplateJavaWorkerSeconds, timings.TemplateErrors = c.prepareTemplates(filesystem, materializer, templates, workers, report)
-	timings.TemplatePrepareSeconds = time.Since(templatesStarted).Seconds()
+	templateWorkers := workers / 4
+	if templateWorkers < 1 {
+		templateWorkers = workers
+	}
+	if templateWorkers > 8 {
+		templateWorkers = 8
+	}
+	if len(templates) > 0 {
+		prep.Add(1)
+		go func() {
+			defer prep.Done()
+			templatesStarted := time.Now()
+			templateTranslation, templateJava, templateErrors = c.prepareTemplates(filesystem, materializer, templates, templateWorkers, report)
+			templateSeconds = time.Since(templatesStarted).Seconds()
+		}()
+	}
+	prep.Wait()
+	timings.ArchivePrepareSeconds = archiveSeconds
+	timings.WalkErrors += prefetchErrors
+	timings.TemplatePrepareSeconds = templateSeconds
+	timings.TemplateTranslationWorkerSeconds = templateTranslation
+	timings.TemplateJavaWorkerSeconds = templateJava
+	timings.TemplateErrors = templateErrors
 	releaseStarted := time.Now()
 	filesys.ReleasePreparedSourceCaches(filesystem)
 	// The virtual filesystem now holds the generated Java. JSP prediction state
