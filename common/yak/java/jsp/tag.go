@@ -33,6 +33,9 @@ const (
 	JSP_TAG_CORE_IMPORT
 	JSP_TAG_CORE_URL
 	JSP_TAG_CORE_PARAM
+
+	// Directives that do not produce Java (taglib, attribute, variable, tag).
+	JSP_DIRECTIVE_IGNORED
 )
 
 type TagInfo struct {
@@ -117,8 +120,9 @@ func (y *JSPVisitor) GetDirectiveTag(name string) TagType {
 		return JSP_DIRECTIVE_PAGE
 	case "include":
 		return JSP_DIRECTIVE_INCLUDE
+	default:
+		return JSP_DIRECTIVE_IGNORED
 	}
-	return -1
 }
 
 // ParseSingleTag parse only open or close tag
@@ -141,9 +145,25 @@ func (y *JSPVisitor) ParseSingleTag() {
 			}
 		}
 		return
-	case JSP_DIRECTIVE_INCLUDE:
-		// TODO: expand static include target into the generated output when needed.
+	case JSP_DIRECTIVE_INCLUDE, JSP_DIRECTIVE_IGNORED:
 		return
+	case JSP_TAG_CORE_CHOOSE, JSP_TAG_CORE_WHEN, JSP_TAG_CORE_OTHERWISE:
+		// A choose/when/otherwise without a body is not a statement. The paired
+		// path owns the real switch. Emitting the tag text here only logged
+		// "Unknown JSTL tag type" and wrote the markup into the Java.
+		return
+	case JSP_TAG_CORE_IF:
+		y.emitCoreIf(nil)
+	case JSP_TAG_CORE_FOREACH:
+		y.emitCoreForEach(nil)
+	case JSP_TAG_CORE_FOR_TOKENS:
+		y.emitCoreForTokens(nil)
+	case JSP_TAG_CORE_URL:
+		y.emitCoreURL(nil)
+	case JSP_TAG_CORE_PARAM:
+		y.recordCoreParam()
+	case JSP_TAG_CORE_IMPORT:
+		y.emitCoreImport()
 	case JSP_TAG_CORE_OUT:
 		variable, ok := tagInfo.attrs["value"]
 		if !ok {
@@ -161,16 +181,7 @@ func (y *JSPVisitor) ParseSingleTag() {
 			y.EmitEscapeOutput(variable)
 		}
 	case JSP_TAG_CORE_SET:
-		variable, ok := tagInfo.attrs["var"]
-		if !ok {
-			log.Errorf("JSTL set tag must have var attribute")
-			return
-		}
-		value := ""
-		if v, ok := tagInfo.attrs["value"]; ok {
-			value = v
-		}
-		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + javaValueArg(value) + ");")
+		y.emitCoreSet()
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 		y.EmitAttrFunc()
@@ -190,14 +201,21 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 	case JSP_TAG_SYNTHETIC_FRAGMENT:
 		visitContent()
 	case JSP_TAG_CORE_IF:
-		condition, ok := tagInfo.attrs["test"]
-		if !ok {
-			log.Errorf("JSTL if tag must have test attribute")
-			return
-		}
-		y.EmitPureCode("if (" + y.asJavaCondition(condition) + ") {")
+		y.emitCoreIf(visitContent)
+	case JSP_TAG_CORE_SET:
+		y.emitCoreSet()
 		visitContent()
-		y.EmitPureCode("}")
+	case JSP_TAG_CORE_FOR_TOKENS:
+		y.emitCoreForTokens(visitContent)
+	case JSP_TAG_CORE_IMPORT:
+		y.emitCoreImport()
+		visitContent()
+	case JSP_TAG_CORE_URL:
+		y.urlParams = append(y.urlParams, nil)
+		visitContent()
+		params := y.urlParams[len(y.urlParams)-1]
+		y.urlParams = y.urlParams[:len(y.urlParams)-1]
+		y.emitCoreURL(params)
 	case JSP_TAG_CORE_CHOOSE:
 		y.switchDepth++
 		y.EmitPureCode("switch (true) {")
@@ -230,23 +248,167 @@ func (y *JSPVisitor) ParseDoubleTag(endText string, visitContent func()) {
 		visitContent()
 		y.EmitPureCode("}")
 	case JSP_TAG_CORE_FOREACH:
-		variable, ok := tagInfo.attrs["var"]
-		if !ok {
-			log.Errorf("JSTL foreach tag must have var attribute")
-			return
-		}
-		items, ok := tagInfo.attrs["items"]
-		if !ok {
-			log.Errorf("JSTL foreach tag must have items attribute")
-			return
-		}
-		y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
-		visitContent()
-		y.EmitPureCode("}")
+		y.emitCoreForEach(visitContent)
 	default:
 		log.Errorf("Unknown JSTL tag type: %v", tagInfo.typ)
 		y.EmitAttrFunc()
 	}
+}
+
+func (y *JSPVisitor) emitCoreIf(body func()) {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	condition, ok := tag.attrs["test"]
+	if !ok {
+		log.Errorf("JSTL if tag must have test attribute")
+		return
+	}
+	cond := y.asJavaCondition(condition)
+	if variable, ok := tag.attrs["var"]; ok {
+		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + cond + ");")
+	}
+	if body == nil {
+		return
+	}
+	y.EmitPureCode("if (" + cond + ") {")
+	body()
+	y.EmitPureCode("}")
+}
+
+func (y *JSPVisitor) emitCoreSet() {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	value := tag.attrs["value"]
+	if variable, ok := tag.attrs["var"]; ok {
+		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + javaValueArg(value) + ");")
+		return
+	}
+	target, hasTarget := tag.attrs["target"]
+	property, hasProperty := tag.attrs["property"]
+	if !hasTarget || !hasProperty {
+		log.Errorf("JSTL set tag must have var or target/property")
+		return
+	}
+	valueExpr := javaValueArg(value)
+	if strings.Contains(target, "pageContext.request") && property == "characterEncoding" {
+		y.EmitPureCode("request.setCharacterEncoding(" + valueExpr + ");")
+		return
+	}
+	y.EmitPureCode("if (" + target + " instanceof java.util.Map) { ((java.util.Map)" + target + ").put(\"" + javaLiteralBody(property) + "\", " + valueExpr + "); }")
+}
+
+func (y *JSPVisitor) emitCoreForEach(body func()) {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	variable, ok := tag.attrs["var"]
+	if !ok {
+		log.Errorf("JSTL foreach tag must have var attribute")
+		return
+	}
+	items, ok := tag.attrs["items"]
+	if !ok {
+		log.Errorf("JSTL foreach tag must have items attribute")
+		return
+	}
+	y.EmitPureCode("for (Object " + variable + " : " + items + ") {")
+	if body != nil {
+		body()
+	}
+	y.EmitPureCode("}")
+}
+
+func (y *JSPVisitor) emitCoreForTokens(body func()) {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	variable, ok := tag.attrs["var"]
+	if !ok {
+		log.Errorf("JSTL forTokens tag must have var attribute")
+		return
+	}
+	items, ok := tag.attrs["items"]
+	if !ok {
+		log.Errorf("JSTL forTokens tag must have items attribute")
+		return
+	}
+	delims := tag.attrs["delims"]
+	if delims == "" {
+		delims = ","
+	}
+	y.EmitPureCode("for (String " + variable + " : String.valueOf(" + items + ").split(\"" + javaLiteralBody(delims) + "\")) {")
+	if body != nil {
+		body()
+	}
+	y.EmitPureCode("}")
+}
+
+func (y *JSPVisitor) emitCoreImport() {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	url, ok := tag.attrs["url"]
+	if !ok {
+		log.Errorf("JSTL import tag must have url attribute")
+		return
+	}
+	expr := javaValueArg(url)
+	if variable, ok := tag.attrs["var"]; ok {
+		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + expr + ");")
+		return
+	}
+	y.EmitPureCode("out.print(String.valueOf(" + expr + "));")
+}
+
+func (y *JSPVisitor) recordCoreParam() {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	name := tag.attrs["name"]
+	value := javaValueArg(tag.attrs["value"])
+	piece := "\"" + javaLiteralBody(name) + "=\" + " + value
+	if len(y.urlParams) == 0 {
+		y.EmitPureCode("request.getParameterMap().put(\"" + javaLiteralBody(name) + "\", new String[]{" + value + "});")
+		return
+	}
+	last := len(y.urlParams) - 1
+	y.urlParams[last] = append(y.urlParams[last], piece)
+}
+
+func (y *JSPVisitor) emitCoreURL(params []string) {
+	tag := y.PeekTagInfo()
+	if tag == nil {
+		return
+	}
+	value, ok := tag.attrs["value"]
+	if !ok {
+		log.Errorf("JSTL url tag must have value attribute")
+		return
+	}
+	expr := javaValueArg(value)
+	if context, ok := tag.attrs["context"]; ok && context != "" {
+		expr = javaValueArg(context) + " + " + expr
+	}
+	for i, param := range params {
+		sep := "?"
+		if i > 0 {
+			sep = "&"
+		}
+		expr += " + \"" + sep + "\" + " + param
+	}
+	if variable, ok := tag.attrs["var"]; ok {
+		y.EmitPureCode("request.setAttribute(\"" + javaLiteralBody(variable) + "\", " + expr + ");")
+		return
+	}
+	y.EmitPureCode("out.print(String.valueOf(" + expr + "));")
 }
 
 var (

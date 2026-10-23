@@ -6,6 +6,35 @@ import (
 	"strings"
 )
 
+// javaReservedWords are the keywords that cannot be used as a package segment
+// or an identifier. A webapp directory may legitimately be named "public" or
+// "static"; the generated Java then needs a distinct name.
+var javaReservedWords = map[string]struct{}{
+	"abstract": {}, "assert": {}, "boolean": {}, "break": {}, "byte": {},
+	"case": {}, "catch": {}, "char": {}, "class": {}, "const": {},
+	"continue": {}, "default": {}, "do": {}, "double": {}, "else": {},
+	"enum": {}, "extends": {}, "final": {}, "finally": {}, "float": {},
+	"for": {}, "goto": {}, "if": {}, "implements": {}, "import": {},
+	"instanceof": {}, "int": {}, "interface": {}, "long": {}, "native": {},
+	"new": {}, "package": {}, "private": {}, "protected": {}, "public": {},
+	"return": {}, "short": {}, "static": {}, "strictfp": {}, "super": {},
+	"switch": {}, "synchronized": {}, "this": {}, "throw": {}, "throws": {},
+	"transient": {}, "try": {}, "void": {}, "volatile": {}, "while": {},
+	"true": {}, "false": {}, "null": {}, "var": {}, "record": {},
+	"sealed": {}, "permits": {}, "yield": {}, "non": {}, "module": {},
+	"open": {}, "opens": {}, "requires": {}, "exports": {}, "to": {},
+	"uses": {}, "provides": {}, "with": {}, "transitive": {},
+}
+
+// escapeJavaIdentifier prefixes a reserved word so it stays a valid identifier.
+// Java keywords are case-sensitive: a segment named "Public" is already valid.
+func escapeJavaIdentifier(name string) string {
+	if _, reserved := javaReservedWords[name]; reserved {
+		return "_" + name
+	}
+	return name
+}
+
 func validatePackagePath(path string) string {
 	slash := filepath.ToSlash(path)
 	parts := strings.FieldsFunc(slash, func(r rune) bool {
@@ -25,6 +54,7 @@ func validatePackagePath(path string) string {
 		if regexp.MustCompile(`^[0-9]`).MatchString(part) {
 			part = "_" + part
 		}
+		part = escapeJavaIdentifier(part)
 		sanitized = append(sanitized, part)
 	}
 	return strings.Join(sanitized, ".")
@@ -42,5 +72,5 @@ func validateClassName(fileName string) string {
 	if !isValidClassName(name) {
 		name = "_" + name
 	}
-	return name
+	return escapeJavaIdentifier(name)
 }

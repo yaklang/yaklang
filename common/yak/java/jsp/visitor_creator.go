@@ -2,11 +2,13 @@ package jsp
 
 import (
 	"fmt"
+	"os"
 	"regexp"
 	"strings"
-	"time"
+	"sync/atomic"
 
 	"github.com/yaklang/antlr/v4"
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
@@ -71,16 +73,48 @@ func (b *VisitorCreator) Create(editor *memedit.MemEditor) (tl.TemplateVisitor, 
 		// java2ssa can parse: keep scriptlets as code and the rest as text.
 		return buildLinearScriptletJSPVisitor(visitor, src)
 	}
-	visitor.VisitJspDocuments(ast)
+	// A partially recovered tree can miss tokens the visitor assumes are there.
+	// Treat that like a parse failure: the page still has to reach java2ssa, and
+	// the grammar-free translator preserves every scriptlet.
+	if err := visitJspDocumentsSafely(visitor, ast); err != nil {
+		log.Warnf("[jsp] structured visit failed, using linear translation: %v", err)
+		linear := NewJSPVisitor()
+		linear.Editor = editor
+		return buildLinearScriptletJSPVisitor(linear, src)
+	}
 	appendTrailingScriptletIfNeeded(visitor, src)
 	return visitor, nil
+}
+
+func visitJspDocumentsSafely(visitor *JSPVisitor, ast jspparser.IJspDocumentsContext) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = utils.Errorf("jsp visit panic: %v", recovered)
+		}
+	}()
+	visitor.VisitJspDocuments(ast)
+	return nil
 }
 
 // TODO: This parser is on the real template2java path for JSP. If profiling
 // later shows JSP mixed static-content/template parsing has the same kind of
 // ANTLR decision explosion as PHP, consider adding a JSP-specific token-source
 // coalescing optimization here instead of treating it as test-only code.
+// maxJSPStructuredParseBytes bounds the pages that may use the LL diagnostic
+// path. The default path never runs LL.
 const maxJSPStructuredParseBytes = 64 * 1024
+
+// jspFrontLLEnabled keeps the historical SLL-then-LL parse available for
+// differential diagnostics. LL full-context recovery on the ambiguous
+// HTML/JSP grammar costs tens of seconds and hundreds of megabytes per page,
+// so it is off unless explicitly requested.
+func jspFrontLLEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("YAK_JSP_FRONT_LL"))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
 
 func Front(code string) (jspparser.IJspDocumentsContext, error) {
 	if canBypassFullJSPFront(code) || canBypassDirectiveOnlyJSP(code) || canUseLinearScriptletJSPFastPath(code) {
@@ -97,38 +131,88 @@ func Front(code string) (jspparser.IJspDocumentsContext, error) {
 	return ast, nil
 }
 
-func parseJSPDocuments(code string) (ast jspparser.IJspDocumentsContext, err error) {
-	if len(code) <= maxJSPStructuredParseBytes {
-		return antlr4util.ParseASTWithSLLFirst(
-			code,
-			jspparser.NewJSPLexer,
-			jspparser.NewJSPParser,
-			newMixedContentCoalescingTokenSource,
-			nil,
-			func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
-				return parser.JspDocuments()
-			},
-		)
-	}
-	// Large mixed HTML/JSP pages can spend minutes and gigabytes in LL
-	// full-context recovery. Their Java translation does not need an HTML AST;
-	// let the caller use the grammar-free scriptlet-preserving translator.
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		ast, err = parseJSPDocumentsSLL(code)
+func parseJSPDocuments(code string) (jspparser.IJspDocumentsContext, error) {
+	defer resetJSPRuntimeCachesIfNeeded()
+	return jspparser.WithJSPRuntimeLock(func() (jspparser.IJspDocumentsContext, error) {
+		if jspFrontLLEnabled() && len(code) <= maxJSPStructuredParseBytes {
+			return antlr4util.ParseASTWithSLLFirst(
+				code,
+				jspparser.NewJSPLexer,
+				jspparser.NewJSPParser,
+				newMixedContentCoalescingTokenSource,
+				nil,
+				func(parser *jspparser.JSPParser) jspparser.IJspDocumentsContext {
+					return parser.JspDocuments()
+				},
+			)
+		}
+		// SLL with bail is bounded: it aborts at the first syntax error instead of
+		// exploring full-context alternatives. A page the grammar cannot structure
+		// then goes through the scriptlet-preserving translator in
+		// VisitorCreator.Create, which is the same contract as an LL failure.
+		ast, err := parseJSPDocumentsSLL(code)
+		if err == nil {
+			return ast, nil
+		}
+		// Bail stops at the first error; a page with one bad tag still has
+		// structure worth keeping. Recovering SLL stays bounded (no full-context
+		// exploration) and returns the partial tree the visitor can walk. Its
+		// cost grows with the amount of malformed content, so it is limited to
+		// pages that measured in the millisecond range; larger pages go straight
+		// to the grammar-free translator.
+		if len(code) <= maxJSPStructuredParseBytes {
+			if recovered, rerr := parseJSPDocumentsRecovering(code); rerr == nil {
+				return recovered, nil
+			}
+		}
+		return nil, err
+	})
+}
+
+// parseJSPDocumentsRecovering runs SLL with the default recovery strategy so a
+// partially valid page still yields a tree. Errors are not reported: the tree is
+// the product here, and VisitorCreator.Create falls back to the grammar-free
+// translator when generation from it fails.
+func parseJSPDocumentsRecovering(code string) (ast jspparser.IJspDocumentsContext, parseErr error) {
+	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(code))
+	lexer.RemoveErrorListeners()
+	tokens := antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel)
+	tokens.SetTokenSource(newMixedContentCoalescingTokenSource(lexer))
+	parser := jspparser.NewJSPParser(tokens)
+	defer antlr4util.DetachParserATNSimulatorCaches(parser)
+	defer antlr4util.DetachLexerTokenSource(lexer)
+	parser.RemoveErrorListeners()
+	parser.GetInterpreter().SetPredictionMode(antlr.PredictionModeSLL)
+	parser.SetErrorHandler(antlr.NewDefaultErrorStrategy())
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			ast = nil
+			parseErr = fmt.Errorf("recovering SLL parse failed: %v", recovered)
+		}
 	}()
-	select {
-	case <-done:
-		return ast, err
-	case <-time.After(2 * time.Second):
-		return nil, fmt.Errorf("large JSP SLL parse exceeded 2s")
+	ast = parser.JspDocuments()
+	if ast == nil {
+		return nil, fmt.Errorf("recovering SLL parse produced no tree")
+	}
+	return ast, nil
+}
+
+// jspRuntimeParseCount triggers a periodic rebuild of the shared lexer/parser
+// DFA tables. Prediction only adds states to them, so a scan of thousands of
+// pages would otherwise keep every state it ever explored.
+var jspRuntimeParseCount atomic.Int64
+
+const jspRuntimeResetEvery = 256
+
+func resetJSPRuntimeCachesIfNeeded() {
+	if jspRuntimeParseCount.Add(1)%jspRuntimeResetEvery == 0 {
+		jspparser.ResetJSPRuntimeCaches()
 	}
 }
 
-// parseJSPDocumentsSLL avoids LL full-context recovery for large mixed
-// HTML/JSP pages. Those pages use the grammar-free translator in
-// VisitorCreator.Create when their syntax needs recovery.
+// parseJSPDocumentsSLL avoids LL full-context recovery. Those pages use the
+// grammar-free translator in VisitorCreator.Create when their syntax needs
+// recovery. The caller holds the shared-DFA read lock.
 func parseJSPDocumentsSLL(code string) (ast jspparser.IJspDocumentsContext, parseErr error) {
 	var messages []string
 	listener := antlr4util.NewErrorListener(antlr4util.SimpleSyntaxErrorHandler(func(msg string, start, _ *memedit.Position) {

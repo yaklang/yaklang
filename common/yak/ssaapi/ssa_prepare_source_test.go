@@ -6,9 +6,32 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
+	jspparser "github.com/yaklang/yaklang/common/yak/java/jsp/parser"
 )
+
+// TestPrepareReleasesJSPRuntimeBeforePrehandler is the memory boundary: JSP
+// prediction state is scratch for generating the virtual filesystem. Once that
+// Java is stored, the shared DFA must be empty before prehandler starts.
+func TestPrepareReleasesJSPRuntimeBeforePrehandler(t *testing.T) {
+	jspparser.ResetJSPRuntimeCaches()
+	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(`<html><body>seed</body></html>`))
+	parser := jspparser.NewJSPParser(antlr.NewCommonTokenStream(lexer, antlr.TokenDefaultChannel))
+	parser.RemoveErrorListeners()
+	_ = parser.JspDocuments()
+	require.Greater(t, jspparser.JSPRuntimeDFAStates(), 0)
+
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("webapp/index.jsp", `<html><body>hello</body></html>`)
+	cfg, err := DefaultConfig(WithFileSystem(vf), WithProgramPath("."))
+	require.NoError(t, err)
+	cfg.resolveLanguageBuilder(vf)
+	cfg.prepareProjectSources(cfg.swapLanguageFs(vf), nil, nil)
+
+	require.Zero(t, jspparser.JSPRuntimeDFAStates())
+}
 
 // TestPreparedSourceParsesWithJava2SSA is the source-stage contract: whatever
 // prepareProjectSources leaves behind for the compile must be Java that
