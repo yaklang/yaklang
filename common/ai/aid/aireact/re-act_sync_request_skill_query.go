@@ -49,6 +49,7 @@ func (r *ReAct) HandleSyncTypeSkillDetailEvent(event *ypb.AIInputEvent) error {
 		}, event.SyncID)
 		return nil
 	}
+	detail.URL = aicommon.BuildSessionSkillResourceURL(r.config, name)
 	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_detail", detail, event.SyncID)
 	return nil
 }

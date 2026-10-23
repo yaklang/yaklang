@@ -3,6 +3,7 @@ package aicommon
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
 	"testing"
 
@@ -20,6 +21,8 @@ func newSessionSkillQueryConfig(t *testing.T) *Config {
 	return NewConfig(context.Background(),
 		WithDisableAutoSkills(true),
 		WithSkillsFS(vfs),
+		WithID("runtime-session-skill"),
+		WithPersistentSessionId("persistent-session-skill"),
 	)
 }
 
@@ -54,15 +57,14 @@ func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
 	require.Equal(t, "available", detail.Name)
 	require.Equal(t, "Available guide", detail.Meta.Description)
 	require.Contains(t, detail.SkillMDContent, "AVAILABLE_SKILL_BODY")
-	require.True(t, detail.FileSystemAvailable)
 	require.Contains(t, detail.FileTree, "SKILL.md")
 	require.Empty(t, detail.PromptContent)
-	require.Empty(t, detail.Parts)
 
 	raw, err := json.Marshal(detail)
 	require.NoError(t, err)
 	require.Contains(t, string(raw), `"skill_md":`)
 	require.NotContains(t, string(raw), `"file_system":`)
+	require.NotContains(t, string(raw), `"parts":`)
 	require.False(t, skillVisible(cfg.GetTimeline(), "available"), "detail lookup must not load the skill into Timeline")
 }
 
@@ -80,8 +82,6 @@ func TestBuildSessionSkillDetailUsesVisibleTimelineContentWhenLoaded(t *testing.
 	require.NoError(t, err)
 	require.True(t, detail.Loaded)
 	require.Empty(t, detail.SkillMDContent)
-	require.True(t, detail.FileSystemAvailable)
-	require.Len(t, detail.Parts, 3)
 	require.Contains(t, detail.PromptContent, "=== Skill: loaded ===")
 	require.Contains(t, detail.PromptContent, "[metadata]")
 	require.Contains(t, detail.PromptContent, "[SKILL.md:1-5/5 END]")
@@ -105,9 +105,21 @@ func TestBuildSessionSkillDetailCanReadTimelineWithoutLoader(t *testing.T) {
 	detail, err := BuildSessionSkillDetail(mgr, "timeline-only")
 	require.NoError(t, err)
 	require.True(t, detail.Loaded)
-	require.False(t, detail.FileSystemAvailable)
 	require.Contains(t, detail.PromptContent, "TIMELINE_METADATA")
 	require.Contains(t, detail.PromptContent, "TIMELINE_BODY")
+}
+
+func TestBuildSessionSkillResourceURL(t *testing.T) {
+	cfg := newSessionSkillQueryConfig(t)
+	rawURL := BuildSessionSkillResourceURL(cfg, "loaded skill")
+	parsed, err := url.Parse(rawURL)
+	require.NoError(t, err)
+	require.Equal(t, SessionSkillResourceURLPath, parsed.Path)
+	require.Equal(t, "loaded skill", parsed.Query().Get("skill_name"))
+	require.Equal(t, "persistent-session-skill", parsed.Query().Get("session_id"))
+	require.Equal(t, "runtime-session-skill", parsed.Query().Get("runtime_id"))
+	require.Empty(t, BuildSessionSkillResourceURL(nil, "loaded"))
+	require.Empty(t, BuildSessionSkillResourceURL(cfg, ""))
 }
 
 func TestBuildSessionSkillDetailUnknownAndEmptyName(t *testing.T) {

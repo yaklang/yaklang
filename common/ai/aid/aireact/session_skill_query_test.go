@@ -3,6 +3,7 @@ package aireact
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -49,8 +50,11 @@ func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
 	available := request("available-detail", `{"skill_name":"available"}`)
 	require.False(t, available.Loaded)
 	require.Contains(t, available.SkillMDContent, "Available body")
-	require.True(t, available.FileSystemAvailable)
 	require.Empty(t, available.PromptContent)
+	availableURL, err := url.Parse(available.URL)
+	require.NoError(t, err)
+	require.Equal(t, aicommon.SessionSkillResourceURLPath, availableURL.Path)
+	require.Equal(t, "available", availableURL.Query().Get("skill_name"))
 
 	require.NoError(t, react.HandleSyncTypeLoadSkillEvent(&ypb.AIInputEvent{
 		SyncType: aicommon.SYNC_TYPE_LOAD_SKILL, SyncID: "load-session",
@@ -61,7 +65,7 @@ func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
 	require.Empty(t, loaded.SkillMDContent)
 	require.Contains(t, loaded.PromptContent, "=== Skill: session ===")
 	require.Contains(t, loaded.PromptContent, "Session skill instructions")
-	require.NotEmpty(t, loaded.Parts)
+	require.NotEmpty(t, loaded.URL)
 }
 
 func TestSessionSkillDetailSyncErrorsAreStructured(t *testing.T) {
