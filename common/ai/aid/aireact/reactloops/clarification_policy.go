@@ -14,6 +14,9 @@ func (r *ReActLoop) clarificationTaskID() string {
 }
 
 func (r *ReActLoop) CheckClarificationAllowed(blocking bool) error {
+	if !r.GetConfig().GetAllowUserInteraction() {
+		return fmt.Errorf("user clarification is disabled for this session")
+	}
 	if r.IsSubAgent() || (r.GetCurrentTask() != nil && r.GetCurrentTask().IsSubAgent()) {
 		return fmt.Errorf("subagents must report missing input to their parent, not question the user directly")
 	}

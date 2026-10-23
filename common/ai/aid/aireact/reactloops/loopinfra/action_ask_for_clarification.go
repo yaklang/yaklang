@@ -32,6 +32,9 @@ var loopAction_AskForClarification = &reactloops.LoopAction{
 		},
 	},
 	ActionVerifier: func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
+		if err := loop.CheckClarificationAllowed(true); err != nil {
+			return err
+		}
 		result := action.GetInvokeParams("ask_for_clarification_payload")
 		if !result.Has("question") {
 			result = action.GetInvokeParams("next_action").GetObject("ask_for_clarification_payload")

@@ -1,6 +1,6 @@
 {
   "id": "information-demo",
-  "catalogVersion": "1.2",
+  "catalogVersion": "1.3",
   "fallback": "扫描结果：API 网关有 3 个待确认问题。RTT 为往返耗时。验证范围可选 API 网关或用户服务，可补充说明。请求 GET /health，响应 HTTP 200。",
   "root": "root",
   "nodes": [
@@ -81,43 +81,9 @@
     },
     {
       "id": "parameters",
-      "component": "ParameterForm",
+      "component": "Text",
       "props": {
-        "title": "验证参数",
-        "schema": {
-          "type": "object",
-          "properties": {
-            "scope": {
-              "type": "string",
-              "title": "验证范围",
-              "enum": [
-                "API 网关",
-                "用户服务"
-              ]
-            },
-            "note": {
-              "type": "string",
-              "title": "补充说明"
-            }
-          },
-          "required": [
-            "scope"
-          ],
-          "additionalProperties": false
-        },
-        "fieldOrder": [
-          "scope",
-          "note"
-        ]
-      },
-      "bindings": {
-        "value": "verification"
-      },
-      "action": {
-        "name": "submit_to_chat",
-        "args": {
-          "label": "提交验证参数"
-        }
+        "text": "当前范围：API 网关；验证方式：只读验证"
       }
     },
     {
@@ -158,7 +124,6 @@
   "requiredComponents": [
     "Alert",
     "Metrics",
-    "ParameterForm",
     "Popover",
     "Stack",
     "Tabs",
