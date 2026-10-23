@@ -1,6 +1,7 @@
 package test
 
 import (
+	"os"
 	"strings"
 	"testing"
 
@@ -59,6 +60,18 @@ func TestScriptletIfElseStillParses(t *testing.T) {
 	require.NoError(t, err, code)
 	require.Contains(t, code, "if (ready)")
 	require.Contains(t, code, "else")
+}
+
+func TestEKPModuleJSPParses(t *testing.T) {
+	path := "/home/wlz/Target/ekp/hotdeploy/ekp/third/pda/module.jsp"
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		t.Skip(err)
+	}
+	info, err := j.ConvertTemplateToJava(j.JSP, string(raw), "module.jsp")
+	require.NoError(t, err)
+	_, err = java2ssa.Frontend(info.GetContent())
+	require.NoError(t, err, info.GetContent())
 }
 
 func TestForEachWithoutVarKeepsBodyParsable(t *testing.T) {
