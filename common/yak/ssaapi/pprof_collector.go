@@ -45,6 +45,7 @@ type pprofCollector struct {
 	allocsDir       string
 	dbStatsDir      string
 	runtimeStatsDir string
+	skipDBStats     bool
 	httpAddr        string
 	wg              sync.WaitGroup
 	lastDBStats     ssadb.DBOpStats
@@ -77,11 +78,44 @@ const (
 	pprofEarlyInterval = 1 * time.Minute
 )
 
+// PprofCollectorOptions tunes what the collector is allowed to touch.
+type PprofCollectorOptions struct {
+	// SkipDBStats keeps the collector from opening the SSA database. Memory-mode
+	// compiles own no database, and opening one just to read callbacks would
+	// create the very ssadb.db the caller asked us not to write.
+	SkipDBStats bool
+}
+
+// PprofCollectorOption mutates PprofCollectorOptions.
+type PprofCollectorOption func(*PprofCollectorOptions)
+
+// WithoutPprofDBStats disables every database touch inside the collector.
+func WithoutPprofDBStats() PprofCollectorOption {
+	return func(o *PprofCollectorOptions) { o.SkipDBStats = true }
+}
+
+func newPprofCollectorOptions(opts []PprofCollectorOption) *PprofCollectorOptions {
+	o := &PprofCollectorOptions{}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(o)
+		}
+	}
+	return o
+}
+
+// ensureDBOpCallbacksImpl is an indirection so tests can prove that a
+// memory-mode collector never touches the SSA database.
+var ensureDBOpCallbacksImpl = func() {
+	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
+}
+
 // StartPprofCollector creates the output directories, starts the pprof HTTP server,
 // and launches a background goroutine that periodically collects pprof snapshots.
 // The returned cleanup function stops the collector, waits for in-progress
 // collections to flush on cancellation, and collects a final non-CPU snapshot.
-func StartPprofCollector(debugDir string) (func(), error) {
+func StartPprofCollector(debugDir string, opts ...PprofCollectorOption) (func(), error) {
+	options := newPprofCollectorOptions(opts)
 	cpuDir := filepath.Join(debugDir, "cpu-pprof")
 	memDir := filepath.Join(debugDir, "memory-pprof")
 	goroutineDir := filepath.Join(debugDir, "goroutine-pprof")
@@ -107,7 +141,9 @@ func StartPprofCollector(debugDir string) (func(), error) {
 		return nil, err
 	}
 
-	ssadb.EnsureDBOpCallbacks(ssadb.GetDB())
+	if !options.SkipDBStats {
+		ensureDBOpCallbacksImpl()
+	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	collector := &pprofCollector{
@@ -121,6 +157,7 @@ func StartPprofCollector(debugDir string) (func(), error) {
 		dbStatsDir:      dbStatsDir,
 		runtimeStatsDir: runtimeStatsDir,
 		httpAddr:        addr,
+		skipDBStats:     options.SkipDBStats,
 		lastDBStats:     ssadb.SnapshotDBOpStats(),
 		lastDBStatsAt:   time.Now(),
 	}
@@ -273,7 +310,7 @@ func (c *pprofCollector) collectSnapshotFinal(tag string) {
 }
 
 func (c *pprofCollector) fetchDBStats(label string) {
-	if c == nil || c.dbStatsDir == "" {
+	if c == nil || c.dbStatsDir == "" || c.skipDBStats {
 		return
 	}
 	now := time.Now()
