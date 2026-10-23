@@ -951,8 +951,11 @@ func (y *singleFileBuilder) VisitStatement(raw javaparser.IStatementContext) {
 		}
 
 		loop.SetBody(func() {
-			if block := ret.Block(); block != nil {
-				y.VisitBlock(block)
+			// Java allows a single statement as the do-while body: `do x++;
+			// while (cond);`. Accepting only a block rejected valid sources that
+			// ship inside jars (coremail's weixin.war ZipInputStream.java).
+			if stmt := ret.Statement(); stmt != nil {
+				y.VisitStatement(stmt)
 			}
 		})
 

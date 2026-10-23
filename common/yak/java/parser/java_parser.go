@@ -715,7 +715,7 @@ func javaparserParserInit() {
 		1136, 3, 208, 104, 0, 1136, 1137, 5, 79, 0, 0, 1137, 1138, 3, 164, 82,
 		0, 1138, 1215, 1, 0, 0, 0, 1139, 1140, 5, 50, 0, 0, 1140, 1141, 3, 214,
 		107, 0, 1141, 1142, 3, 164, 82, 0, 1142, 1215, 1, 0, 0, 0, 1143, 1144,
-		5, 13, 0, 0, 1144, 1145, 3, 166, 83, 0, 1145, 1146, 5, 50, 0, 0, 1146,
+		5, 13, 0, 0, 1144, 1145, 3, 184, 92, 0, 1145, 1146, 5, 50, 0, 0, 1146,
 		1147, 3, 216, 108, 0, 1147, 1148, 5, 84, 0, 0, 1148, 1215, 1, 0, 0, 0,
 		1149, 1150, 5, 47, 0, 0, 1150, 1160, 3, 166, 83, 0, 1151, 1153, 3, 196,
 		98, 0, 1152, 1151, 1, 0, 0, 0, 1153, 1154, 1, 0, 0, 0, 1154, 1152, 1, 0,
@@ -20326,10 +20326,10 @@ func (s *DoWhileStatementContext) DO() antlr.TerminalNode {
 	return s.GetToken(JavaParserDO, 0)
 }
 
-func (s *DoWhileStatementContext) Block() IBlockContext {
+func (s *DoWhileStatementContext) Statement() IStatementContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IBlockContext); ok {
+		if _, ok := ctx.(IStatementContext); ok {
 			t = ctx.(antlr.RuleContext)
 			break
 		}
@@ -20339,7 +20339,7 @@ func (s *DoWhileStatementContext) Block() IBlockContext {
 		return nil
 	}
 
-	return t.(IBlockContext)
+	return t.(IStatementContext)
 }
 
 func (s *DoWhileStatementContext) WHILE() antlr.TerminalNode {
@@ -20577,7 +20577,7 @@ func (p *JavaParser) Statement() (localctx IStatementContext) {
 		}
 		{
 			p.SetState(1144)
-			p.Block()
+			p.Statement()
 		}
 		{
 			p.SetState(1145)

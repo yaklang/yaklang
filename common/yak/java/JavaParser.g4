@@ -549,7 +549,7 @@ statement
     | ifstmt                                                                    # IfStatement
     | FOR '(' forControl ')' blockOrState                                       # ForStatement
     | WHILE parExpression blockOrState                                          # WhileStatement
-    | DO block WHILE parExpressionList ';'                                      # DoWhileStatement
+    | DO statement WHILE parExpressionList ';'                                  # DoWhileStatement
     | TRY block (catchClause+ finallyBlock? | finallyBlock)                     # TryStatement
     | TRY resourceSpecification block catchClause* finallyBlock?                # TryWithResourcesStatement
     | switchStatement                                                           # PureSwitchStatement
