@@ -285,9 +285,19 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			Usage: `exclude files by glob, e.g. targets/*, vendor/*`,
 		},
 
+		cli.BoolFlag{
+			Name:  "memory,mem",
+			Usage: "compile in memory and do not persist: no SSA database is opened or written",
+		},
+
 		cli.StringFlag{
 			Name:  "debug",
-			Usage: "enable pprof/debug output: specify a directory path; creates structured output with ssadb.db, log, report, cmd.txt, and pprof subdirectories",
+			Usage: "write pprof/log/cmd diagnostics here; with --memory no ssadb.db is created",
+		},
+
+		cli.BoolFlag{
+			Name:  "pprof",
+			Usage: "collect periodic pprof snapshots under the --debug directory (requires --debug)",
 		},
 	},
 	Action: func(c *cli.Context) error {
@@ -296,17 +306,20 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		}
 
 		if debugDir := c.String("debug"); debugDir != "" {
-			cleanup, err := setupDebugDir(c, debugDir)
+			cleanup, err := setupDebugDir(c, debugDir, c.Bool("memory"))
 			if err != nil {
 				return utils.Errorf("setup debug dir failed: %v", err)
 			}
 			defer cleanup()
+		} else if c.Bool("pprof") {
+			return utils.Errorf("--pprof requires --debug <dir>; snapshots are written under that directory")
 		}
 
 		configFilePath := c.String("config")
 		databaseFileRaw := c.String("database")
 		databaseDialect := c.String("database-dialect")
 		noOverride := c.Bool("no-override")
+		memoryMode := c.Bool("memory")
 		syntaxFlow := c.String("syntaxflow")
 		dbDebug := c.Bool("database-debug")
 		sfDebug := c.Bool("syntaxflow-debug")
@@ -314,7 +327,13 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		withCode := c.Bool("with-code")
 
 		// set database
-		if databaseDialect != "" {
+		if memoryMode {
+			// Memory mode must not open or create an SSA database. Ignoring the
+			// path here is the difference between a dry parse and a real write.
+			if databaseDialect != "" || databaseFileRaw != "" {
+				log.Warn("[ssa-compile] --memory ignores --database and --database-dialect; nothing will be persisted")
+			}
+		} else if databaseDialect != "" {
 			// if set dialect, open gorm and set db
 			if databaseFileRaw == "" {
 				return utils.Errorf("database path is required when using database dialect")
@@ -326,7 +345,7 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			consts.SetGormSSAProjectDatabase(db)
 		}
 		// if not set dialect, bind the current process to the target SSA database path
-		if databaseDialect == "" && databaseFileRaw != "" {
+		if !memoryMode && databaseDialect == "" && databaseFileRaw != "" {
 			consts.SetSSADatabaseInfo(databaseFileRaw)
 			if err := consts.SetGormSSAProjectDatabaseByInfo(databaseFileRaw); err != nil {
 				return utils.Errorf("open database failed: %v", err)
@@ -346,8 +365,17 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			return err
 		}
 		defer compileConfig.DeferFunc()
-		if compileConfig.GetCompileMemory() || compileConfig.GetSyntaxFlowMemory() {
-			log.Warn("ssa-compile does not support memory mode, ignore memory-related settings")
+		if memoryMode {
+			// The CLI flag is authoritative: a config file cannot silently turn
+			// a dry parse back into a database write.
+			if err := compileConfig.Config.Update(
+				ssaconfig.WithCompileMemoryCompile(true),
+				ssaconfig.WithSyntaxFlowMemory(true),
+			); err != nil {
+				return utils.Errorf("normalize compile config failed: %v", err)
+			}
+		} else if compileConfig.GetCompileMemory() || compileConfig.GetSyntaxFlowMemory() {
+			log.Warn("ssa-compile persists to an SSA database; memory settings were ignored. Use --memory to compile without a database")
 			if err := compileConfig.Config.Update(
 				ssaconfig.WithCompileMemoryCompile(false),
 				ssaconfig.WithSyntaxFlowMemory(false),
@@ -363,7 +391,7 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 		targetPath := compileConfig.GetCodeSourceLocalFileOrURL()
 
 		// check program name duplicate
-		if programName != "" {
+		if programName != "" && !memoryMode {
 			if prog, err := ssadb.GetProgram(programName, ssa.Application); prog != nil && err == nil {
 				if !reCompile {
 					return utils.Errorf(
@@ -382,17 +410,19 @@ use log=info for [ssa.compile.summary] and log=debug for per-phase timings (ssa.
 			}
 		}
 
-		if !noOverride && programName != "" {
+		if !memoryMode && !noOverride && programName != "" {
 			ssadb.DeleteProgram(ssadb.GetDB(), programName)
-		} else if noOverride && programName != "" {
+		} else if !memoryMode && noOverride && programName != "" {
 			log.Warnf("no-override flag is set, will not delete existed program: %v", programName)
 		}
 
 		if targetPath != "" {
 			log.Infof("start to compile file: %v", targetPath)
 		}
-		if programName != "" {
+		if programName != "" && !memoryMode {
 			log.Infof("compile save to database with program name: %v", programName)
+		} else if programName != "" {
+			log.Infof("[ssa-compile] memory mode: program name %q is kept in memory only", programName)
 		}
 		progs, err := getProgram(context.Background(), compileConfig)
 		if err != nil {
@@ -1517,7 +1547,7 @@ Exports structured report (sarif/irify).`,
 
 		cli.StringFlag{
 			Name:  "debug",
-			Usage: "enable pprof/debug output: specify a directory path; creates structured output with ssadb.db, log, report, cmd.txt, and pprof subdirectories",
+			Usage: "write pprof/log/report diagnostics here; with --memory no ssadb.db is created",
 		},
 	},
 	Action: func(c *cli.Context) (e error) {
@@ -1533,7 +1563,7 @@ Exports structured report (sarif/irify).`,
 		ctx := context.Background()
 
 		if debugDir := c.String("debug"); debugDir != "" {
-			cleanup, err := setupDebugDir(c, debugDir)
+			cleanup, err := setupDebugDir(c, debugDir, c.Bool("memory"))
 			if err != nil {
 				return utils.Errorf("setup debug dir failed: %v", err)
 			}

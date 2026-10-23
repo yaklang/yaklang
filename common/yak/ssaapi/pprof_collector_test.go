@@ -256,3 +256,27 @@ func TestCPUProfileCancellationFlushesPartialProfile(t *testing.T) {
 	// Stopping must release the process-wide profiler for the next scan.
 	require.NoError(t, collectCPUProfile(context.Background(), filepath.Join(t.TempDir(), "next.cpu.prof"), time.Millisecond))
 }
+
+// A memory-mode compile owns no SSA database. Starting the pprof collector must
+// therefore never open one, otherwise --memory would create ssadb.db anyway.
+func TestPprofCollectorMemoryModeSkipsDatabase(t *testing.T) {
+	orig := ensureDBOpCallbacksImpl
+	calls := 0
+	ensureDBOpCallbacksImpl = func() { calls++ }
+	t.Cleanup(func() { ensureDBOpCallbacksImpl = orig })
+
+	cleanup, err := StartPprofCollector(t.TempDir(), WithoutPprofDBStats())
+	require.NoError(t, err)
+	cleanup()
+	require.Zero(t, calls, "memory mode must not touch the SSA database")
+}
+
+// Even if a snapshot fires, memory mode must not write db-stats files.
+func TestPprofCollectorMemoryModeSkipsDBStatsFile(t *testing.T) {
+	dir := t.TempDir()
+	c := &pprofCollector{dbStatsDir: dir, skipDBStats: true}
+	c.fetchDBStats("test")
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	require.Empty(t, entries)
+}

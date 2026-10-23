@@ -38,7 +38,7 @@ func TestSetupDebugDirCreatesLogAndDirs(t *testing.T) {
 
 func TestSetupDebugDirPanicDoesNotEscape(t *testing.T) {
 	orig := startDebugOutputImpl
-	startDebugOutputImpl = func(string, bool) (DebugOutputCleanup, error) {
+	startDebugOutputImpl = func(string, bool, ...DebugOutputOption) (DebugOutputCleanup, error) {
 		panic("boom: debug setup")
 	}
 	t.Cleanup(func() { startDebugOutputImpl = orig })

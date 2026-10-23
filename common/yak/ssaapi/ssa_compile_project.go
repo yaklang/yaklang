@@ -235,6 +235,9 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	defer debugCleanup()
 
 	programName := c.GetProgramName()
+	// A memory-mode compile owns no database row, so it must not look one up,
+	// delete one, or open the database just to clean up after a failure.
+	memoryOnly := c.GetCompileMemory()
 	// Routing mode: the incremental paths diff against a filesystem, so a
 	// config without one degrades to a full compile regardless of the flags.
 	mode := c.compileMode()
@@ -259,12 +262,12 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			err = utils.Errorf("compile panic: %v", r)
 			log.Errorf("compile panic: %v", r)
 			utils.PrintCurrentGoroutineRuntimeStack()
-			if programNameToDelete != "" {
+			if !memoryOnly && programNameToDelete != "" {
 				log.Infof("cleaning up program data due to panic: %s", programNameToDelete)
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
 		} else if err != nil {
-			if programNameToDelete != "" {
+			if !memoryOnly && programNameToDelete != "" {
 				log.Infof("cleaning up program data due to error: %s", programNameToDelete)
 				ssadb.DeleteProgram(ssadb.GetDB(), programNameToDelete)
 			}
@@ -291,8 +294,10 @@ func (c *Config) parseProject() (progs Programs, err error) {
 		if c.GetCompileReCompile() {
 			c.Processf(0, "recompile incremental project, keep base program...")
 		}
-	} else if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
-		return nil, err
+	} else if !memoryOnly {
+		if err := c.cleanupProgramBeforeCompile(programName, c.GetCompileReCompile()); err != nil {
+			return nil, err
+		}
 	}
 
 	var suspendErr error
