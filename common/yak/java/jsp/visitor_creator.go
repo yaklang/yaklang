@@ -253,7 +253,36 @@ func parseJSPDocumentsSLL(code string) (ast jspparser.IJspDocumentsContext, pars
 	return ast, nil
 }
 
+// stripJSPScriptComments removes <%-- ... --%> before lexing. The comment
+// rule only exists in the default lexer mode. Once a quoted "<" or a nested
+// tag leaves the lexer in TAG mode, <%-- becomes a scriptlet and the comment
+// body is emitted as Java ("-- text --"), which does not parse.
+func stripJSPScriptComments(src string) string {
+	if !strings.Contains(src, "<%--") {
+		return src
+	}
+	var b strings.Builder
+	b.Grow(len(src))
+	i := 0
+	for i < len(src) {
+		if strings.HasPrefix(src[i:], "<%--") {
+			end := strings.Index(src[i+4:], "--%>")
+			if end < 0 {
+				b.WriteString(src[i:])
+				break
+			}
+			b.WriteByte(' ')
+			i += 4 + end + len("--%>")
+			continue
+		}
+		b.WriteByte(src[i])
+		i++
+	}
+	return b.String()
+}
+
 func preprocessMalformedJSPHTML(src string) string {
+	src = stripJSPScriptComments(src)
 	if strings.Contains(src, "<?xml") || strings.Contains(src, "<?XML") {
 		src = xmlDeclPattern.ReplaceAllString(src, "")
 	}

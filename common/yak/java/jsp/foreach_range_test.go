@@ -56,6 +56,36 @@ func TestForeachRangeWithoutVarUsesSyntheticIndex(t *testing.T) {
 	}
 }
 
+func TestForTokensLiteralAndMixedELParse(t *testing.T) {
+	src := `<c:set var="queryIntOptions">
+<option value="<"><fmt:message key="op_int_lt" /></option>
+</c:set>
+<%--StripedByPackage--%>
+<c:forTokens items="0500|0930|1200" delims="|" var="boundary">
+  <c:set var="greetKey" value="greet_${boundary}"/>
+</c:forTokens>
+<c:set var="to" value="${to}${empty cc ? '' : ','}${cc}"/>
+<c:forTokens items="contains excludes = != startsWith endsWith" delims=" " var="key">
+  <c:out value="${key}"/>
+</c:forTokens>`
+	code := convertJSPForTest(t, src)
+	if strings.Contains(code, "--Striped") || strings.Contains(code, "<%") {
+		t.Fatalf("jsp comment leaked into Java:\n%s", code)
+	}
+	if !strings.Contains(code, `String.valueOf("0500|0930|1200")`) {
+		t.Fatalf("literal forTokens items must be a Java string:\n%s", code)
+	}
+	if !strings.Contains(code, `"greet_" + elExpr.parse("boundary")`) {
+		t.Fatalf("mixed literal/EL must be joined with +:\n%s", code)
+	}
+	if !strings.Contains(code, `elExpr.parse("to") + elExpr.parse("empty cc ? '' : ','") + elExpr.parse("cc")`) {
+		t.Fatalf("adjacent EL must be joined with +:\n%s", code)
+	}
+	if !strings.Contains(code, `String.valueOf("contains excludes = != startsWith endsWith")`) {
+		t.Fatalf("word-list items must be a Java string:\n%s", code)
+	}
+}
+
 // The items form must keep working exactly as before.
 func TestForeachItemsStillIteratesEl(t *testing.T) {
 	code := convertJSPForTest(t, `<c:forEach items="${list}" var="x">${x}</c:forEach>`)

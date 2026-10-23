@@ -1,5 +1,23 @@
 lexer grammar  JSPLexer;
 
+@lexer::members {
+func (l *JSPLexer) attrLTStartsTag() bool {
+	// A quoted attribute may contain a bare "<" (option value="<").
+	// That is text. A nested tag is "<" followed by a name, "</", "<%",
+	// "<!". Treating every "<" as a tag start leaves the lexer inside the
+	// attribute and turns the rest of the page into scriptlets.
+	next := l.GetInputStream().LA(1)
+	switch next {
+	case '/', '!', '%', '?', ':', '_':
+		return true
+	}
+	if next >= 'A' && next <= 'Z' || next >= 'a' && next <= 'z' || next > 127 {
+		return true
+	}
+	return false
+}
+}
+
 JSP_COMMENT: '<!--' .*? '-->'->skip;
 
 JSP_SCRIPT_COMMENT: '<%--' .*? '--%>' -> skip;
@@ -413,7 +431,11 @@ ATTVAL_SINGLE_QUOTE_END_TAG_OPEN
     ;
 
 ATTVAL_SINGLE_QUOTE_TAG_OPEN
-    :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
+    : '<' { this.attrLTStartsTag() }? -> type(TAG_BEGIN), pushMode(TAG)
+    ;
+
+ATTVAL_SINGLE_QUOTE_LT
+    : '<' -> type(ATTVAL_ATTRIBUTE)
     ;
 
 ATTVAL_SINGLE_QUOTE_TEXT
@@ -439,7 +461,11 @@ ATTVAL_DOUBLE_QUOTE_END_TAG_OPEN
     ;
 
 ATTVAL_DOUBLE_QUOTE_TAG_OPEN
-    :  BEGIN_ELEMENT_OPEN_TAG -> type(TAG_BEGIN),pushMode(TAG)
+    : '<' { this.attrLTStartsTag() }? -> type(TAG_BEGIN), pushMode(TAG)
+    ;
+
+ATTVAL_DOUBLE_QUOTE_LT
+    : '<' -> type(ATTVAL_ATTRIBUTE)
     ;
 
 ATTVAL_DOUBLE_QUOTE_TEXT
