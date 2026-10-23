@@ -69,8 +69,8 @@ func jspparserParserInit() {
 		7, 26, 2, 27, 7, 27, 2, 28, 7, 28, 2, 29, 7, 29, 2, 30, 7, 30, 2, 31, 7,
 		31, 2, 32, 7, 32, 2, 33, 7, 33, 2, 34, 7, 34, 2, 35, 7, 35, 2, 36, 7, 36,
 		1, 0, 5, 0, 76, 8, 0, 10, 0, 12, 0, 79, 9, 0, 1, 0, 4, 0, 82, 8, 0, 11,
-		0, 12, 0, 83, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 93, 8, 1,
-		1, 2, 1, 2, 3, 2, 97, 8, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1,
+		0, 12, 0, 83, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 94,
+		8, 1, 1, 2, 1, 2, 3, 2, 98, 8, 2, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1, 3, 1,
 		3, 3, 3, 107, 8, 3, 1, 3, 1, 3, 1, 4, 5, 4, 112, 8, 4, 10, 4, 12, 4, 115,
 		9, 4, 1, 5, 1, 5, 3, 5, 119, 8, 5, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
 		1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6, 1, 6,
@@ -98,7 +98,7 @@ func jspparserParserInit() {
 		12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 34, 36, 38, 40, 42, 44, 46,
 		48, 50, 52, 54, 56, 58, 60, 62, 64, 66, 68, 70, 72, 0, 5, 2, 0, 9, 9, 23,
 		23, 2, 0, 1, 1, 3, 3, 2, 0, 15, 15, 18, 18, 1, 0, 43, 44, 1, 0, 45, 46,
-		342, 0, 77, 1, 0, 0, 0, 2, 92, 1, 0, 0, 0, 4, 96, 1, 0, 0, 0, 6, 98, 1,
+		342, 0, 77, 1, 0, 0, 0, 2, 93, 1, 0, 0, 0, 4, 97, 1, 0, 0, 0, 6, 99, 1,
 		0, 0, 0, 8, 113, 1, 0, 0, 0, 10, 118, 1, 0, 0, 0, 12, 139, 1, 0, 0, 0,
 		14, 141, 1, 0, 0, 0, 16, 145, 1, 0, 0, 0, 18, 156, 1, 0, 0, 0, 20, 158,
 		1, 0, 0, 0, 22, 160, 1, 0, 0, 0, 24, 165, 1, 0, 0, 0, 26, 204, 1, 0, 0,
@@ -112,22 +112,22 @@ func jspparserParserInit() {
 		1, 0, 0, 0, 76, 79, 1, 0, 0, 0, 77, 75, 1, 0, 0, 0, 77, 78, 1, 0, 0, 0,
 		78, 81, 1, 0, 0, 0, 79, 77, 1, 0, 0, 0, 80, 82, 3, 2, 1, 0, 81, 80, 1,
 		0, 0, 0, 82, 83, 1, 0, 0, 0, 83, 81, 1, 0, 0, 0, 83, 84, 1, 0, 0, 0, 84,
-		85, 1, 0, 0, 0, 85, 86, 5, 0, 0, 1, 86, 1, 1, 0, 0, 0, 87, 93, 3, 60, 30,
-		0, 88, 93, 3, 52, 26, 0, 89, 93, 3, 10, 5, 0, 90, 93, 3, 30, 15, 0, 91,
-		93, 3, 6, 3, 0, 92, 87, 1, 0, 0, 0, 92, 88, 1, 0, 0, 0, 92, 89, 1, 0, 0,
-		0, 92, 90, 1, 0, 0, 0, 92, 91, 1, 0, 0, 0, 93, 3, 1, 0, 0, 0, 94, 97, 3,
-		10, 5, 0, 95, 97, 5, 9, 0, 0, 96, 94, 1, 0, 0, 0, 96, 95, 1, 0, 0, 0, 97,
-		5, 1, 0, 0, 0, 98, 106, 3, 8, 4, 0, 99, 107, 3, 12, 6, 0, 100, 107, 3,
-		14, 7, 0, 101, 107, 3, 10, 5, 0, 102, 107, 3, 64, 32, 0, 103, 107, 3, 30,
-		15, 0, 104, 107, 3, 72, 36, 0, 105, 107, 3, 70, 35, 0, 106, 99, 1, 0, 0,
-		0, 106, 100, 1, 0, 0, 0, 106, 101, 1, 0, 0, 0, 106, 102, 1, 0, 0, 0, 106,
-		103, 1, 0, 0, 0, 106, 104, 1, 0, 0, 0, 106, 105, 1, 0, 0, 0, 107, 108,
-		1, 0, 0, 0, 108, 109, 3, 8, 4, 0, 109, 7, 1, 0, 0, 0, 110, 112, 3, 46,
-		23, 0, 111, 110, 1, 0, 0, 0, 112, 115, 1, 0, 0, 0, 113, 111, 1, 0, 0, 0,
-		113, 114, 1, 0, 0, 0, 114, 9, 1, 0, 0, 0, 115, 113, 1, 0, 0, 0, 116, 119,
-		3, 24, 12, 0, 117, 119, 3, 62, 31, 0, 118, 116, 1, 0, 0, 0, 118, 117, 1,
-		0, 0, 0, 119, 11, 1, 0, 0, 0, 120, 121, 3, 16, 8, 0, 121, 122, 5, 38, 0,
-		0, 122, 123, 3, 26, 13, 0, 123, 124, 5, 12, 0, 0, 124, 125, 3, 22, 11,
+		85, 1, 0, 0, 0, 85, 86, 5, 0, 0, 1, 86, 1, 1, 0, 0, 0, 87, 94, 3, 60, 30,
+		0, 88, 94, 3, 52, 26, 0, 89, 94, 3, 10, 5, 0, 90, 94, 3, 30, 15, 0, 91,
+		94, 3, 6, 3, 0, 92, 94, 3, 14, 7, 0, 93, 87, 1, 0, 0, 0, 93, 88, 1, 0,
+		0, 0, 93, 89, 1, 0, 0, 0, 93, 90, 1, 0, 0, 0, 93, 91, 1, 0, 0, 0, 93, 92,
+		1, 0, 0, 0, 94, 3, 1, 0, 0, 0, 95, 98, 3, 10, 5, 0, 96, 98, 5, 9, 0, 0,
+		97, 95, 1, 0, 0, 0, 97, 96, 1, 0, 0, 0, 98, 5, 1, 0, 0, 0, 99, 106, 3,
+		8, 4, 0, 100, 107, 3, 12, 6, 0, 101, 107, 3, 10, 5, 0, 102, 107, 3, 64,
+		32, 0, 103, 107, 3, 30, 15, 0, 104, 107, 3, 72, 36, 0, 105, 107, 3, 70,
+		35, 0, 106, 100, 1, 0, 0, 0, 106, 101, 1, 0, 0, 0, 106, 102, 1, 0, 0, 0,
+		106, 103, 1, 0, 0, 0, 106, 104, 1, 0, 0, 0, 106, 105, 1, 0, 0, 0, 107,
+		108, 1, 0, 0, 0, 108, 109, 3, 8, 4, 0, 109, 7, 1, 0, 0, 0, 110, 112, 3,
+		46, 23, 0, 111, 110, 1, 0, 0, 0, 112, 115, 1, 0, 0, 0, 113, 111, 1, 0,
+		0, 0, 113, 114, 1, 0, 0, 0, 114, 9, 1, 0, 0, 0, 115, 113, 1, 0, 0, 0, 116,
+		119, 3, 24, 12, 0, 117, 119, 3, 62, 31, 0, 118, 116, 1, 0, 0, 0, 118, 117,
+		1, 0, 0, 0, 119, 11, 1, 0, 0, 0, 120, 121, 3, 16, 8, 0, 121, 122, 5, 38,
+		0, 0, 122, 123, 3, 26, 13, 0, 123, 124, 5, 12, 0, 0, 124, 125, 3, 22, 11,
 		0, 125, 126, 5, 38, 0, 0, 126, 140, 1, 0, 0, 0, 127, 128, 3, 16, 8, 0,
 		128, 129, 5, 38, 0, 0, 129, 130, 5, 12, 0, 0, 130, 131, 3, 22, 11, 0, 131,
 		132, 5, 38, 0, 0, 132, 140, 1, 0, 0, 0, 133, 134, 3, 16, 8, 0, 134, 135,
@@ -202,7 +202,7 @@ func jspparserParserInit() {
 		67, 1, 0, 0, 0, 315, 316, 5, 34, 0, 0, 316, 317, 5, 33, 0, 0, 317, 69,
 		1, 0, 0, 0, 318, 319, 5, 4, 0, 0, 319, 320, 7, 3, 0, 0, 320, 71, 1, 0,
 		0, 0, 321, 322, 5, 5, 0, 0, 322, 323, 7, 4, 0, 0, 323, 73, 1, 0, 0, 0,
-		32, 77, 83, 92, 96, 106, 113, 118, 139, 150, 156, 163, 170, 176, 184, 188,
+		32, 77, 83, 93, 97, 106, 113, 118, 139, 150, 156, 163, 170, 176, 184, 188,
 		193, 197, 201, 204, 212, 226, 233, 237, 242, 246, 254, 265, 277, 280, 284,
 		299, 308,
 	}
@@ -582,6 +582,7 @@ type IJspDocumentContext interface {
 	JspScript() IJspScriptContext
 	JspIfBlock() IJspIfBlockContext
 	JspElements() IJspElementsContext
+	HtmlCloseElement() IHtmlCloseElementContext
 
 	// IsJspDocumentContext differentiates from other interfaces.
 	IsJspDocumentContext()
@@ -699,6 +700,22 @@ func (s *JspDocumentContext) JspElements() IJspElementsContext {
 	return t.(IJspElementsContext)
 }
 
+func (s *JspDocumentContext) HtmlCloseElement() IHtmlCloseElementContext {
+	var t antlr.RuleContext
+	for _, ctx := range s.GetChildren() {
+		if _, ok := ctx.(IHtmlCloseElementContext); ok {
+			t = ctx.(antlr.RuleContext)
+			break
+		}
+	}
+
+	if t == nil {
+		return nil
+	}
+
+	return t.(IHtmlCloseElementContext)
+}
+
 func (s *JspDocumentContext) GetRuleContext() antlr.RuleContext {
 	return s
 }
@@ -723,7 +740,7 @@ func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
 
 	localctx = NewJspDocumentContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 2, JSPParserRULE_jspDocument)
-	p.SetState(92)
+	p.SetState(93)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -763,6 +780,13 @@ func (p *JSPParser) JspDocument() (localctx IJspDocumentContext) {
 		{
 			p.SetState(91)
 			p.JspElements()
+		}
+
+	case 6:
+		p.EnterOuterAlt(localctx, 6)
+		{
+			p.SetState(92)
+			p.HtmlCloseElement()
 		}
 
 	case antlr.ATNInvalidAltNumber:
@@ -873,7 +897,7 @@ func (p *JSPParser) JspStart() (localctx IJspStartContext) {
 
 	localctx = NewJspStartContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 4, JSPParserRULE_jspStart)
-	p.SetState(96)
+	p.SetState(97)
 	p.GetErrorHandler().Sync(p)
 	if p.HasError() {
 		goto errorExit
@@ -883,14 +907,14 @@ func (p *JSPParser) JspStart() (localctx IJspStartContext) {
 	case JSPParserDIRECTIVE_BEGIN, JSPParserDECLARATION_BEGIN, JSPParserECHO_EXPRESSION_OPEN, JSPParserSCRIPTLET_OPEN:
 		p.EnterOuterAlt(localctx, 1)
 		{
-			p.SetState(94)
+			p.SetState(95)
 			p.JspScript()
 		}
 
 	case JSPParserWHITESPACES:
 		p.EnterOuterAlt(localctx, 2)
 		{
-			p.SetState(95)
+			p.SetState(96)
 			p.Match(JSPParserWHITESPACES)
 			if p.HasError() {
 				// Recognition error - abort rule
@@ -939,7 +963,6 @@ type IJspElementsContext interface {
 	AllHtmlMiscs() []IHtmlMiscsContext
 	HtmlMiscs(i int) IHtmlMiscsContext
 	HtmlElement() IHtmlElementContext
-	HtmlCloseElement() IHtmlCloseElementContext
 	JspScript() IJspScriptContext
 	JspExpression() IJspExpressionContext
 	JspIfBlock() IJspIfBlockContext
@@ -1049,22 +1072,6 @@ func (s *JspElementsContext) HtmlElement() IHtmlElementContext {
 	return t.(IHtmlElementContext)
 }
 
-func (s *JspElementsContext) HtmlCloseElement() IHtmlCloseElementContext {
-	var t antlr.RuleContext
-	for _, ctx := range s.GetChildren() {
-		if _, ok := ctx.(IHtmlCloseElementContext); ok {
-			t = ctx.(antlr.RuleContext)
-			break
-		}
-	}
-
-	if t == nil {
-		return nil
-	}
-
-	return t.(IHtmlCloseElementContext)
-}
-
 func (s *JspElementsContext) JspScript() IJspScriptContext {
 	var t antlr.RuleContext
 	for _, ctx := range s.GetChildren() {
@@ -1171,7 +1178,7 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 	p.EnterRule(localctx, 6, JSPParserRULE_jspElements)
 	p.EnterOuterAlt(localctx, 1)
 	{
-		p.SetState(98)
+		p.SetState(99)
 
 		var _x = p.HtmlMiscs()
 
@@ -1186,41 +1193,35 @@ func (p *JSPParser) JspElements() (localctx IJspElementsContext) {
 	switch p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 4, p.GetParserRuleContext()) {
 	case 1:
 		{
-			p.SetState(99)
+			p.SetState(100)
 			p.HtmlElement()
 		}
 
 	case 2:
 		{
-			p.SetState(100)
-			p.HtmlCloseElement()
-		}
-
-	case 3:
-		{
 			p.SetState(101)
 			p.JspScript()
 		}
 
-	case 4:
+	case 3:
 		{
 			p.SetState(102)
 			p.JspExpression()
 		}
 
-	case 5:
+	case 4:
 		{
 			p.SetState(103)
 			p.JspIfBlock()
 		}
 
-	case 6:
+	case 5:
 		{
 			p.SetState(104)
 			p.Style()
 		}
 
-	case 7:
+	case 6:
 		{
 			p.SetState(105)
 			p.JavaScript()
@@ -2946,7 +2947,7 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 
 	localctx = NewHtmlContentsContext(p, p.GetParserRuleContext(), p.GetState())
 	p.EnterRule(localctx, 26, JSPParserRULE_htmlContents)
-	var _alt int
+	var _la int
 
 	p.SetState(204)
 	p.GetErrorHandler().Sync(p)
@@ -2966,39 +2967,32 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
-		if p.HasError() {
-			goto errorExit
-		}
-		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
-			if _alt == 1 {
-				{
-					p.SetState(182)
-					p.HtmlContent()
-				}
-				p.SetState(184)
-				p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
 
-				if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
-					{
-						p.SetState(183)
-						p.HtmlChardata()
-					}
-
-				} else if p.HasError() { // JIM
-					goto errorExit
-				}
-
+		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4711098) != 0 {
+			{
+				p.SetState(182)
+				p.HtmlContent()
 			}
+			p.SetState(184)
+			p.GetErrorHandler().Sync(p)
+
+			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 13, p.GetParserRuleContext()) == 1 {
+				{
+					p.SetState(183)
+					p.HtmlChardata()
+				}
+
+			} else if p.HasError() { // JIM
+				goto errorExit
+			}
+
 			p.SetState(190)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 14, p.GetParserRuleContext())
-			if p.HasError() {
-				goto errorExit
-			}
+			_la = p.GetTokenStream().LA(1)
 		}
 
 	case 2:
@@ -3024,39 +3018,32 @@ func (p *JSPParser) HtmlContents() (localctx IHtmlContentsContext) {
 		if p.HasError() {
 			goto errorExit
 		}
-		_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
-		if p.HasError() {
-			goto errorExit
-		}
-		for _alt != 2 && _alt != antlr.ATNInvalidAltNumber {
-			if _alt == 1 {
-				{
-					p.SetState(195)
-					p.HtmlContent()
-				}
-				p.SetState(197)
-				p.GetErrorHandler().Sync(p)
+		_la = p.GetTokenStream().LA(1)
 
-				if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
-					{
-						p.SetState(196)
-						p.HtmlChardata()
-					}
-
-				} else if p.HasError() { // JIM
-					goto errorExit
-				}
-
+		for (int64(_la) & ^0x3f) == 0 && ((int64(1)<<_la)&4711098) != 0 {
+			{
+				p.SetState(195)
+				p.HtmlContent()
 			}
+			p.SetState(197)
+			p.GetErrorHandler().Sync(p)
+
+			if p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 16, p.GetParserRuleContext()) == 1 {
+				{
+					p.SetState(196)
+					p.HtmlChardata()
+				}
+
+			} else if p.HasError() { // JIM
+				goto errorExit
+			}
+
 			p.SetState(203)
 			p.GetErrorHandler().Sync(p)
 			if p.HasError() {
 				goto errorExit
 			}
-			_alt = p.GetInterpreter().AdaptivePredict(p.BaseParser, p.GetTokenStream(), 17, p.GetParserRuleContext())
-			if p.HasError() {
-				goto errorExit
-			}
+			_la = p.GetTokenStream().LA(1)
 		}
 
 	case antlr.ATNInvalidAltNumber:

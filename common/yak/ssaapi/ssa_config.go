@@ -3,6 +3,7 @@ package ssaapi
 import (
 	"context"
 	"fmt"
+	"sync"
 
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
@@ -13,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	tl "github.com/yaklang/yaklang/common/yak/templateLanguage"
 )
 
 type ProcessFunc func(msg string, process float64)
@@ -88,6 +90,11 @@ type Config struct {
 	// sources (jar/war/class). It is created lazily per compile and keeps every
 	// source in memory so planning and AST build read each class exactly once.
 	materializedSources *filesys.SourceMaterializer
+	// preparedTemplates keeps JSP range maps after the page bytes are replaced
+	// by generated Java. Without them, findings point at the synthetic method
+	// name instead of the original scriptlet.
+	preparedTemplatesMu sync.Mutex
+	preparedTemplates   map[string]tl.TemplateGeneratedInfo
 }
 
 func (c *Config) CalcHash() string {

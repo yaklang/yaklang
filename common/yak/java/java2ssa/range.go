@@ -30,7 +30,9 @@ func (y *singleFileBuilder) SetRange(token ssa.CanStartStopToken) func() {
 	if t := prog.TryGetTemplate(editor.GetFilename()); t != nil {
 		m := t.GetRangeMap()
 		line := owner.CurrentRange.GetStart().GetLine()
-		if tr, ok := m[line]; ok && tr != nil {
+		if tr, ok := m[line]; ok && tr != nil && tr.GetStart() != nil {
+			// The call is often emitted after SetRange returns. Leaving the
+			// template range in place is what makes that call point at the JSP.
 			backup = tr
 			owner.CurrentRange = tr
 		}

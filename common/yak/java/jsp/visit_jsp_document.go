@@ -18,6 +18,8 @@ type JSPVisitor struct {
 	// switchDepth is how many c:choose bodies are currently being emitted.
 	// A c:when/c:otherwise seen outside one cannot be a Java case/default label.
 	switchDepth int
+	// urlParams collects c:param values while a c:url body is visited.
+	urlParams [][]string
 }
 
 func NewJSPVisitor() *JSPVisitor {
@@ -73,6 +75,8 @@ func (y *JSPVisitor) VisitJspDocument(raw jspparser.IJspDocumentContext) {
 		y.VisitJspScript(i.JspScript())
 	} else if i.JspElements() != nil {
 		y.VisitJspElements(i.JspElements())
+	} else if i.HtmlCloseElement() != nil {
+		y.VisitHtmlCloseElement(i.HtmlCloseElement())
 	}
 }
 
@@ -108,8 +112,6 @@ func (y *JSPVisitor) VisitJspElements(raw jspparser.IJspElementsContext) {
 
 	if i.HtmlElement() != nil {
 		y.VisitHtmlElement(i.HtmlElement())
-	} else if i.HtmlCloseElement() != nil {
-		y.VisitHtmlCloseElement(i.HtmlCloseElement())
 	} else if i.JspScript() != nil {
 		y.VisitJspScript(i.JspScript())
 	} else if i.JspExpression() != nil {
@@ -210,29 +212,45 @@ func (y *JSPVisitor) VisitHtmlElement(raw jspparser.IHtmlElementContext) {
 	if i.TAG_SLASH_END() != nil {
 		// single tag
 		y.AddAttrFunc(func() {
-			y.EmitPureText(i.TAG_SLASH_END().GetText())
+			if i.TAG_SLASH_END() != nil {
+				y.EmitPureText(i.TAG_SLASH_END().GetText())
+			}
 		})
 		y.ParseSingleTag()
-	} else {
-		if i.CLOSE_TAG_BEGIN() != nil {
-			// double tag
-			y.AddAttrFunc(func() {
-				y.EmitPureText(i.TAG_CLOSE(0).GetText())
-			})
-			if i.HtmlContents() != nil {
-				end := i.CLOSE_TAG_BEGIN().GetText() + i.HtmlTag().GetText() + i.TAG_CLOSE(1).GetText()
-				y.ParseDoubleTag(end, func() {
-					y.VisitHtmlContents(i.HtmlContents())
-				})
-			}
-		} else {
-			// single tag
-			y.AddAttrFunc(func() {
-				y.EmitPureText(i.TAG_CLOSE(0).GetText())
-			})
-			y.ParseSingleTag()
-		}
+		return
 	}
+	// Recovering SLL can keep htmlContents after the closing token failed to
+	// match. Dropping those contents is how a whole page collapsed to `<html>`.
+	if i.HtmlContents() != nil || i.CLOSE_TAG_BEGIN() != nil {
+		y.AddAttrFunc(func() {
+			if close := i.TAG_CLOSE(0); close != nil {
+				y.EmitPureText(close.GetText())
+			}
+		})
+		end := ""
+		if begin := i.CLOSE_TAG_BEGIN(); begin != nil {
+			end = begin.GetText()
+			if tag := i.HtmlTag(); tag != nil {
+				end += tag.GetText()
+			}
+			if close := i.TAG_CLOSE(1); close != nil {
+				end += close.GetText()
+			}
+		}
+		y.ParseDoubleTag(end, func() {
+			if i.HtmlContents() != nil {
+				y.VisitHtmlContents(i.HtmlContents())
+			}
+		})
+		return
+	}
+	// single tag
+	y.AddAttrFunc(func() {
+		if close := i.TAG_CLOSE(0); close != nil {
+			y.EmitPureText(close.GetText())
+		}
+	})
+	y.ParseSingleTag()
 }
 
 func (y *JSPVisitor) VisitHtmlBegin(raw jspparser.IHtmlBeginContext) {
