@@ -95,7 +95,7 @@ func canSpillFinishedFunctionMember(inst Instruction) bool {
 		return false
 	}
 	switch inst.GetOpcode() {
-	case SSAOpcodeParameter, SSAOpcodeParameterMember:
+	case SSAOpcodeParameter, SSAOpcodeParameterMember, SSAOpcodeSideEffect:
 	default:
 		return false
 	}

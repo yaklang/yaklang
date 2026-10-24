@@ -1031,7 +1031,9 @@ func (s *instructionStore) expandRelationPersistRecords(records []*instructionPe
 			if s.isPersisted(id) {
 				continue
 			}
-			linked, ok := s.writer.GetResident(id)
+			// Peek, do not GetResident: a flush already queued this id, and
+			// GetResident would cancel that save so FinishPersist never deletes it.
+			linked, ok := s.writer.PeekResident(id)
 			if !ok || linked == nil {
 				continue
 			}

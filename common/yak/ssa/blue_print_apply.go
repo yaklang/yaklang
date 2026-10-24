@@ -25,11 +25,9 @@ func ParseClassBluePrint(this Value, objectTyp *ObjectType) (ret Type) {
 		}
 
 		funTyp := typ.(*FunctionType)
-		if len(funTyp.ParameterValue) > 0 {
-			if para := funTyp.ParameterValue[0]; para != nil && (para.IsObject() || para.HasUsers()) {
-				blue.AddMethod(keyName, funTyp.This)
-				continue
-			}
+		if para := funTyp.ParameterValueAt(0); para != nil && (para.IsObject() || para.HasUsers()) {
+			blue.AddMethod(keyName, funTyp.This)
+			continue
 		}
 
 		blue.RegisterNormalMember(keyName, member)

@@ -453,4 +453,7 @@ func (f *Function) Finish() {
 	}
 	funType.SetSideEffect(ses)
 	f.SetType(funType)
+	// Finish is the only reader. The maps key every return-site variable, and
+	// those variables keep the body scope alive after the function returns.
+	f.SideEffectsReturn = nil
 }

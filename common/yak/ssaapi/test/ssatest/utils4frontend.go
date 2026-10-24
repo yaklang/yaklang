@@ -361,7 +361,18 @@ func CheckParameter(t *testing.T, tc TestCase) {
 		funTyp, ok := ssa.ToFunctionType(typ)
 		require.True(t, ok)
 
-		parameters := lo.Map(funTyp.ParameterValue, func(v *ssa.Parameter, _ int) string { return v.GetVerboseName() })
+		parameters := []string{}
+		if funTyp.ParameterValue != nil {
+			parameters = lo.Map(funTyp.ParameterValue, func(v *ssa.Parameter, _ int) string { return v.GetVerboseName() })
+		} else {
+			for i := 0; ; i++ {
+				param := funTyp.ParameterValueAt(i)
+				if param == nil {
+					break
+				}
+				parameters = append(parameters, param.GetVerboseName())
+			}
+		}
 		require.Equal(t, want, parameters)
 	}
 	CheckTestCase(t, tc)
@@ -380,7 +391,7 @@ func CheckParameterMember(t *testing.T, tc TestCase) {
 		funTyp, ok := ssa.ToFunctionType(typ)
 		require.True(t, ok)
 
-		parameters := lo.Map(funTyp.ParameterMember, func(v *ssa.ParameterMember, _ int) string { return v.String() })
+		parameters := lo.Map(funTyp.LiveParameterMembers(), func(v *ssa.ParameterMember, _ int) string { return v.String() })
 		require.Equal(t, want, parameters)
 	}
 	CheckTestCase(t, tc)
