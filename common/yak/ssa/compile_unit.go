@@ -20,6 +20,11 @@ type CompileUnit struct {
 	// LibraryName identifies a frontend-owned library when its name cannot be
 	// derived from the unit key (notably Go's declared package name).
 	LibraryName string
+	// LibraryNames lists every declared package in this unit when one directory
+	// contains more than one Go package (package foo and package foo_test).
+	// The non-test name comes first so the implementation is built before the
+	// external test package. A single name stays in LibraryName only.
+	LibraryNames []string
 	// DeclaredLibrary means the frontend owns this unit's library. An empty
 	// LibraryName then stays on the application instead of the path-derived name.
 	DeclaredLibrary bool

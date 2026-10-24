@@ -484,7 +484,11 @@ func (s *instructionStore) flushCompileUnitWriter(onComplete func()) {
 	ids := make([]int64, 0, 1024)
 	persistedResident := make([]int64, 0)
 	s.writer.ForEach(func(id int64, inst Instruction) bool {
-		if shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedPrivateBlock(inst) && !canSpillFinishedFunctionMember(inst) {
+		// Finished body blocks stay until ReleasePersistedOrdinaryValues
+		// walks fn.Blocks and clears ScopeTable. Spilling them here made that
+		// walk miss every private block, so the scope maps stayed reachable
+		// from Parameter.block. dropFinishedBodyBlocks saves them afterwards.
+		if shouldKeepCompileUnitBoundaryResident(inst) && !canSpillFinishedFunctionMember(inst) {
 			return true // continue
 		}
 		// A later unit may reload a persisted instruction. It no longer needs

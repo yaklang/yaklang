@@ -39,13 +39,22 @@ func compileUnitBuildNodes(prog *ssa.Program, plan *UnitPlan, batch compileUnitE
 			}
 			byKey[unit.Key] = len(nodes)
 			node.keys = append(node.keys, unit.Key)
-			library := prog.ProgramForCompileUnit(unit.Key)
-			if library == nil || builtOwner[library] {
-				continue
+			// One directory can own several libraries (package foo and
+			// package foo_test). Build every one of them in this batch.
+			// More than one library shares the directory's files, so they
+			// run one after another.
+			libs := prog.ProgramsForCompileUnit(unit.Key)
+			if len(libs) > 1 {
+				node.exclusive = true
 			}
-			builtOwner[library] = true
-			node.libraries = append(node.libraries, library)
-			node.exclusive = node.exclusive || library == application
+			for _, library := range libs {
+				if library == nil || builtOwner[library] {
+					continue
+				}
+				builtOwner[library] = true
+				node.libraries = append(node.libraries, library)
+				node.exclusive = node.exclusive || library == application
+			}
 		}
 		if len(node.keys) != 0 {
 			nodes = append(nodes, node)
