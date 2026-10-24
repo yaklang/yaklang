@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **616** 项：限定范围 `done` **211**，`partial` **5**，`todo` **400**。目录共 **471** 个入口：`stable` **15**，`partial` **273**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **211**，`partial` **7**，`todo` **400**。目录共 **485** 个入口：`stable` **15**，`partial` **287**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -174,6 +174,8 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | Q.931 | todo | 需核对别名/Fields 入口 |
 | P2 | QEMU QMP | todo | 需核对别名/Fields 入口 |
 | P2 | RARP | todo | [partial / RARPFrame](rules/rarp.yaml) |
+| P2 | RDPUDP | partial | [partial / RDPUDP](rules/application-layer/rdpudp.yaml) |
+| P2 | RDPUDP2 | partial | [partial / RDPUDP2](rules/application-layer/rdpudp.yaml) |
 | P2 | RESTCONF | todo | 需核对别名/Fields 入口 |
 | P2 | RIPng | todo | [partial / RIPng](rules/ripng.yaml) |
 | P2 | RPRN | todo | 需核对别名/Fields 入口 |
@@ -539,6 +541,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/prometheus.yaml](rules/application-layer/prometheus.yaml) | Prometheus exposition (`PrometheusExposition`, partial) |
 | [application-layer/quic.yaml](rules/application-layer/quic.yaml) | QUIC (``, new) |
 | [application-layer/radius.yaml](rules/application-layer/radius.yaml) | RADIUS (``, new) |
+| [application-layer/rdpudp.yaml](rules/application-layer/rdpudp.yaml) | RDPUDP (`RDPUDP`, partial)<br>RDPUDP2 (`RDPUDP2`, partial) |
 | [application-layer/redfish.yaml](rules/application-layer/redfish.yaml) | Redfish (`RedfishServiceRootRequest`, partial) |
 | [application-layer/redfish_ssdp.yaml](rules/application-layer/redfish_ssdp.yaml) | Redfish SSDP (`RedfishSSDP`, partial) |
 | [application-layer/redis.yaml](rules/application-layer/redis.yaml) | Redis (``, new) |
@@ -555,8 +558,9 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/snmp.yaml](rules/application-layer/snmp.yaml) | SNMP (``, new) |
 | [application-layer/snmpv3.yaml](rules/application-layer/snmpv3.yaml) | SNMPv3 (`SNMPv3`, partial) |
 | [application-layer/spnego.yaml](rules/application-layer/spnego.yaml) | SPNEGO (``, new) |
+| [application-layer/ssdp.yaml](rules/application-layer/ssdp.yaml) | SSDP (`SSDP`, partial) |
 | [application-layer/ssh.yaml](rules/application-layer/ssh.yaml) | SSH (``, new) |
-| [application-layer/ssh_plaintext.yaml](rules/application-layer/ssh_plaintext.yaml) | SSH DH Group Exchange (`SSHPlaintextDHGEX`, partial)<br>SSH Fixed Group DH (`SSHPlaintextDH`, partial)<br>SSH Initial Plaintext Packet (`SSHPlaintextPacket`, partial)<br>SSH P-256 ECDH (`SSHPlaintextECDHP256`, partial) |
+| [application-layer/ssh_plaintext.yaml](rules/application-layer/ssh_plaintext.yaml) | SSH Curve25519 Initial Packet (`SSHPlaintextCurve25519`, partial)<br>SSH DH Group Exchange (`SSHPlaintextDHGEX`, partial)<br>SSH Fixed Group DH (`SSHPlaintextDH`, partial)<br>SSH Initial Plaintext Packet (`SSHPlaintextPacket`, partial)<br>SSH P-256 ECDH (`SSHPlaintextECDHP256`, partial) |
 | [application-layer/steam_discovery.yaml](rules/application-layer/steam_discovery.yaml) | Steam (`SteamDiscovery`, partial) |
 | [application-layer/t3.yaml](rules/application-layer/t3.yaml) | T3 (``, new) |
 | [application-layer/t38_sdp.yaml](rules/application-layer/t38_sdp.yaml) | T.38 (`T38H248SDPAdvertisement`, partial) |
@@ -574,7 +578,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/tns.yaml](rules/application-layer/tns.yaml) | Oracle TNS (``, new)<br>TNS (``, new) |
 | [application-layer/tns_fields.yaml](rules/application-layer/tns_fields.yaml) | TNS Accept 315 Fields (`TNSAccept315Fields`, partial)<br>TNS Connect 315 Fields (`TNSConnect315Fields`, partial)<br>TNS Parameters Native LE64 32 Fields (`TNSParametersNativeLE6432Fields`, partial)<br>TNS Protocol Request 32 Fields (`TNSProtocolRequest32Fields`, partial)<br>TNS Protocol Response 32 Fields (`TNSProtocolResponse32Fields`, partial)<br>TNS Resend 16 Fields (`TNSResend16Fields`, partial)<br>TNS Services 32 Fields (`TNSServices32Fields`, partial)<br>TNS Types Request Native 32 Fields (`TNSTypesRequestNative32Fields`, partial)<br>TNS Types Response Native 32 Fields (`TNSTypesResponseNative32Fields`, partial) |
 | [application-layer/trdp.yaml](rules/application-layer/trdp.yaml) | TRDP (`TRDPMessage`, partial) |
-| [application-layer/upnp.yaml](rules/application-layer/upnp.yaml) | SSDP (`UPnPSSDPNotify`, partial)<br>UPnP (`UPnPSSDPNotify`, new) |
+| [application-layer/upnp.yaml](rules/application-layer/upnp.yaml) | UPnP (`UPnPSSDPNotify`, new) |
 | [application-layer/websocket.yaml](rules/application-layer/websocket.yaml) | WebSocket (``, new) |
 | [application-layer/winrm.yaml](rules/application-layer/winrm.yaml) | WinRM HTTP (`WinRMHTTP`, partial) |
 | [application-layer/wpad.yaml](rules/application-layer/wpad.yaml) | WPAD (`WPADRequest`, partial)<br>WPAD proxy (`WPADRequest`, partial) |
@@ -643,6 +647,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [nbt_dg.yaml](rules/nbt_dg.yaml) | NBT DG (``, new) |
 | [net_remoting.yaml](rules/net_remoting.yaml) | .NET Remoting (``, new) |
 | [netbios_frame.yaml](rules/netbios_frame.yaml) | NetBEUI (`NetBIOSFrame`, partial) |
+| [network_control_fields.yaml](rules/network_control_fields.yaml) | IKE NAT-T Wire Message (`IKENATTMessage`, partial)<br>IKE Wire Message (`IKEMessage`, partial)<br>IPMI Wire Message (`IPMIMessage`, partial)<br>L2TP Wire Message (`L2TPMessage`, partial)<br>NetBIOS Datagram Wire Message (`NBTDGMessage`, partial)<br>NetBIOS Session Control (`NBSSControl`, partial)<br>ONC RPC Wire Message (`ONCRPCMessage`, partial)<br>OpenVPN Wire Message (`OpenVPNMessage`, partial)<br>RIP Wire Message (`RIPMessage`, partial)<br>Telnet Wire Message (`TelnetMessage`, partial)<br>WireGuard Wire Message (`WireGuardMessage`, partial) |
 | [network_samples.yaml](rules/network_samples.yaml) | IPcomp (`IPComp`, partial)<br>MPLS PW (`MPLSEthernetPW`, partial)<br>NVGRE (`NVGRE`, partial) |
 | [nhrp.yaml](rules/nhrp.yaml) | NHRP (`NHRP`, partial) |
 | [onc_rpc.yaml](rules/onc_rpc.yaml) | Mount (`ONCRPC`, partial)<br>NFS (`ONCRPC`, new)<br>ONC RPC (``, new)<br>Portmap/Rpcbind (`ONCRPC`, partial)<br>RPC (`ONCRPC`, partial) |

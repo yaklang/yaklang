@@ -58,6 +58,8 @@ field_types = {
     "rip.command": "int", "rip.version": "int", "rip.metric": "int",
     "nbss.type": "int", "nbss.length": "int", "l2tp.flags": "int", "l2tp.length": "int",
     "rpc.xid": "int", "rpc.msgtyp": "int", "rpc.program": "int", "rpc.procedure": "int",
+    "rdpudp.flags":"int", "rdpudp.synex.version":"int", "rdpudp.data.seqnum":"int",
+    "rdpudp.data.channelseqnumber":"int", "rdpudp.data.sourceStart":"int",
 }
 fields = ["frame.number", "frame.interface_id", "frame.encap_type", "frame.len", "frame.cap_len",
           "frame.protocols", "_ws.col.Protocol", "_ws.col.Info", "ip.src", "ip.dst", "ipv6.src", "ipv6.dst",

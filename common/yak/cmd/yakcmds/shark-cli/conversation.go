@@ -134,6 +134,9 @@ func (s *streamStore) datagramVersion(raw *capturedPacket) uint64 {
 }
 
 func eventCarriers(e *pcaputil.ProtocolEvent) []string {
+	if e != nil && len(e.CarrierLayers) > 0 {
+		return append([]string(nil), e.CarrierLayers...)
+	}
 	if e != nil && e.Session["Carrier"] == "NetBIOS Session Service" {
 		if names := authenticationLayers(e); len(names) > 0 {
 			return append([]string{"NBSS", "SMB2"}, names[:len(names)-1]...)

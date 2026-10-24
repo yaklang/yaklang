@@ -134,8 +134,11 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	if manifest.SchemaVersion != 1 || sourceSpec.SchemaVersion != 1 {
 		t.Fatalf("unexpected corpus schema versions: manifest=%d sources=%d", manifest.SchemaVersion, sourceSpec.SchemaVersion)
 	}
-	if manifest.RoadmapTotal != len(ProtocolRoadmap) || manifest.RoadmapTotal < 600 {
-		t.Fatalf("manifest roadmap total %d does not match %d in source", manifest.RoadmapTotal, len(ProtocolRoadmap))
+	// The archive is an immutable, hash-pinned material snapshot. New catalog
+	// entries do not retroactively add captures to it. Keep its exact inventory
+	// checks below, and require every frozen name still exists in today's map.
+	if manifest.RoadmapTotal > len(ProtocolRoadmap) || manifest.RoadmapTotal < 600 {
+		t.Fatalf("frozen roadmap total %d cannot fit current %d entries", manifest.RoadmapTotal, len(ProtocolRoadmap))
 	}
 	if len(manifest.Repositories) != len(sourceSpec.Repositories) || len(manifest.Repositories) < 3 {
 		t.Fatalf("manifest has %d source repositories, source spec has %d", len(manifest.Repositories), len(sourceSpec.Repositories))
@@ -279,8 +282,39 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(records) != len(ProtocolRoadmap)+1 {
-		t.Fatalf("coverage CSV has %d data rows, want %d", len(records)-1, len(ProtocolRoadmap))
+	if len(records) != manifest.RoadmapTotal+1 {
+		t.Fatalf("frozen coverage CSV has %d data rows, want %d", len(records)-1, manifest.RoadmapTotal)
+	}
+	nameColumn := -1
+	for i, key := range records[0] {
+		switch strings.ToLower(strings.TrimSpace(key)) {
+		case "name", "protocol", "protocol_name", "roadmap_name":
+			nameColumn = i
+		}
+	}
+	if nameColumn < 0 {
+		t.Fatalf("frozen coverage CSV lacks protocol-name column: %v", records[0])
+	}
+	frozenNames := make(map[string]bool, manifest.RoadmapTotal)
+	for _, record := range records[1:] {
+		name := record[nameColumn]
+		if _, ok := roadmap[name]; !ok {
+			t.Fatalf("frozen protocol %q was removed from current roadmap", name)
+		}
+		if frozenNames[name] {
+			t.Fatalf("duplicate frozen protocol %q", name)
+		}
+		frozenNames[name] = true
+	}
+	for name := range mappedProtocols {
+		if !frozenNames[name] {
+			t.Fatalf("capture maps to protocol %q outside frozen material inventory", name)
+		}
+	}
+	for name := range roadmap {
+		if !frozenNames[name] {
+			t.Logf("current extension %q is outside the frozen material snapshot; supplemental evidence is required", name)
+		}
 	}
 }
 

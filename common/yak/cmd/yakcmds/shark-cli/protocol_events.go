@@ -384,6 +384,8 @@ func (p *capturedPacket) protocolEvents() []*pcaputil.ProtocolEvent {
 	for _, id := range ids {
 		if e := retainedProtocolDetail(p.history, id); e != nil {
 			events = append(events, boundedEvent(e, &remaining))
+		} else if p.history.Evicted() > 0 {
+			events = append(events, &pcaputil.ProtocolEvent{ID: id, Protocol: "message", Status: "limited", Completeness: "evicted", Summary: "Protocol detail evicted from bounded message history", Error: "Protocol detail evicted from bounded message history", ExpertCode: string(pcaputil.ErrResourceExceeded)})
 		}
 	}
 	return events

@@ -23,7 +23,7 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 		t.recoveryFailures[dir] = 0
 		return plain, typ, nil
 	}
-	if !tlsAuthenticationError(err) || f.transportFlow == nil {
+	if !tlsAuthenticationError(err) || f.transportFlow == nil && !f.orderedTLSCarrier {
 		return nil, 0, err
 	}
 	commit := func(trial binTLS, p []byte, kind byte, missing bool) ([]byte, byte, error) {
@@ -95,7 +95,7 @@ func (f *binFlow) markTLSInnerGap(dir int) {
 	}
 }
 func (f *binFlow) noteTLSRecordFailure(dir int, info map[string]any) {
-	if f.transportFlow == nil || f.tls == nil {
+	if f.transportFlow == nil && !f.orderedTLSCarrier || f.tls == nil {
 		return
 	}
 	t := f.tls
