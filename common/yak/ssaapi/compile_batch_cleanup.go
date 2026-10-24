@@ -64,15 +64,19 @@ func (task compileBatchCleanup) run() error {
 		flushUnit := step()
 		task.program.Cache.FlushInstructionSaver()
 		flushInst := step()
+		// Unlink ordinary scope values as soon as the instruction saver has
+		// settled, before FlushAuxSavers can trigger another round of evictions.
+		// FlushCompileUnit also evicts finished private BasicBlocks; waiting
+		// until after FlushAuxSavers meant those blocks were already gone from
+		// the resident map, so their scopes were never visited and stayed
+		// reachable through Function.builder.CurrentBlock.
+		task.program.ReleasePersistedOrdinaryValues()
 		task.program.Cache.FlushAuxSavers()
 		// Type/index serialization can reload instructions and enqueue their
-		// eviction again; settle those writes before dropping ordinary values.
+		// eviction again; settle those writes before the final scope pass.
 		flushAux := step()
 		task.program.Cache.FlushInstructionSaver()
 		flushInst2 := step()
-		// Workers for this batch have joined, and the saver barriers have
-		// returned. Only then may ordinary persisted values leave the scopes.
-		// The index dedup release is the same barrier: one call, no extra goroutine.
 		task.program.ReleasePersistedOrdinaryValues()
 		releaseOrdinary := step()
 		task.program.ReleaseSettledIndexes()
