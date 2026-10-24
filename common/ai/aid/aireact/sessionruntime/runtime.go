@@ -2,6 +2,7 @@ package sessionruntime
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"sync"
 	"time"
@@ -417,6 +418,7 @@ func (r *reActSessionRuntime) connectWithOptions(
 		log.Warnf("ensure user yak focus modes failed: %v", err)
 	}
 	delivery := newReActEventDelivery(ctx, onEvent, onEventError)
+	_ = json.Unmarshal([]byte(startParams.GetClientUI()), &delivery.uiClient)
 
 	waitCtx := ctx
 	var cancelWait context.CancelFunc
@@ -687,6 +689,10 @@ func (r *reActSessionRuntime) attachConnection(
 	reservation *sessionReservation,
 ) (ReActConnection, error) {
 	log.Infof("attach connection to running aireact session: %s", sessionID)
+	if err := aicommon.WithClientUI(startParams.GetClientUI())(reAct.GetConfig().(*aicommon.Config)); err != nil {
+		delivery.cancel()
+		return nil, err
+	}
 	if _, err := yakit.CreateOrUpdateAISessionMetaOnStart(r.projectDatabase(), sessionID, startParams, time.Now()); err != nil {
 		log.Warnf("persist ai session start meta failed for %s: %v", sessionID, err)
 	}
@@ -699,6 +705,7 @@ func (r *reActSessionRuntime) attachConnection(
 }
 
 type reActEventDelivery struct {
+	uiClient     aicommon.UIClientCapabilities
 	ctx          context.Context
 	cancelFn     context.CancelFunc
 	onEvent      ReActEventHandler
@@ -740,6 +747,10 @@ func (d *reActEventDelivery) deliver(event *schema.AiOutputEvent) {
 
 func (d *reActEventDelivery) deliverWithResult(event *schema.AiOutputEvent) error {
 	if d == nil || event == nil || d.ctx.Err() != nil {
+		return nil
+	}
+	event = aicommon.ProjectUIEvent(event, d.uiClient)
+	if event == nil {
 		return nil
 	}
 	if event.Timestamp <= 0 {

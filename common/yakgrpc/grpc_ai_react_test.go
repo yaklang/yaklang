@@ -25,9 +25,8 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 
 	// make sure risk > 0
 	risk := utils.RandFloat64()
-	maxIter := rand.Intn(10) + 1                 // >0
-	timelineLimit := int32(rand.Intn(2000) + 1)  // >0
-	userInteractLimit := int32(rand.Intn(5) + 1) // >0
+	maxIter := rand.Intn(10) + 1                // >0
+	timelineLimit := int32(rand.Intn(2000) + 1) // >0
 
 	includeKeywords := []string{uuid.New().String(), uuid.New().String()}
 	aiService := uuid.NewString()
@@ -45,7 +44,10 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		AIReviewRiskControlScore:     risk,
 		ReActMaxIteration:            int64(maxIter),
 		RuntimeContextSizeLimit:      int64(timelineLimit),
-		UserInteractLimit:            int64(userInteractLimit),
+		// Distinct, non-default limits catch cross-wiring between task and plan budgets.
+		UserInteractLimit:            2,
+		AllowPlanUserInteract:        true,
+		PlanUserInteractMaxCount:     4,
 		DisableToolUse:               disableToolUse,
 		IncludeSuggestedToolKeywords: includeKeywords,
 		AIService:                    aiService,
@@ -86,7 +88,9 @@ func TestConvertYPBAIStartParamsToReActConfig(t *testing.T) {
 		cfg.MaxIterationCount,
 	)
 	require.Equal(t, int(start.RuntimeContextSizeLimit), cfg.TimelineContentSizeLimit)
-	require.Equal(t, int64(start.UserInteractLimit), cfg.PlanUserInteractMaxCount)
+	require.Equal(t, start.UserInteractLimit, cfg.GetUserInteractiveLimitedTimes())
+	require.Equal(t, start.AllowPlanUserInteract, cfg.AllowPlanUserInteract)
+	require.Equal(t, start.PlanUserInteractMaxCount, cfg.PlanUserInteractMaxCount)
 	require.Equal(t, start.DisableToolUse, cfg.DisableToolUse)
 	require.ElementsMatch(t, start.IncludeSuggestedToolKeywords, cfg.Keywords)
 	require.Equal(t, start.AICallTokenLimit, cfg.AiCallTokenLimit)

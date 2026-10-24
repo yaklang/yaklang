@@ -398,6 +398,11 @@ type Config struct {
 	singleAIModelMode                  bool // 单模型简易模式：辅助任务统一调度，详见 config_auxiliary_scheduler.go
 	singleAIModelModeResolved          bool // NewConfig freezes the effective mode after applying options.
 	PerTaskUserInteractiveLimitedTimes int64
+	userInteractLimitExplicit          bool
+	clarificationPolicy                func() (allowed, blocking bool, limit int64)
+	clarificationCounts                map[string]int64
+	clarificationMu                    sync.Mutex
+	disableBlockingClarification       bool
 
 	/*
 		Meta Info
@@ -2084,6 +2089,9 @@ func WithAllowRequireForUserInteract(v bool) ConfigOption {
 		c.m.Lock()
 		c.AllowRequireForUserInteract = v
 		c.m.Unlock()
+		if !v {
+			return c.cancelPendingClarifications()
+		}
 		return nil
 	}
 }
@@ -2862,6 +2870,7 @@ func WithPerTaskUserInteractiveLimitedTimes(n int64) ConfigOption {
 		}
 		c.m.Lock()
 		c.PerTaskUserInteractiveLimitedTimes = n
+		c.userInteractLimitExplicit = n > 0
 		c.m.Unlock()
 		return nil
 	}
@@ -4084,6 +4093,10 @@ func (c *Config) GetMaxIterationCount() int64 {
 }
 
 func (c *Config) GetAllowUserInteraction() bool {
+	if c.m != nil {
+		c.m.Lock()
+		defer c.m.Unlock()
+	}
 	return c.AllowRequireForUserInteract
 }
 
@@ -4335,6 +4348,12 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	}
 
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
+	// Goal strategy itself is top-level only, but its no-blocking boundary must
+	// survive a handoff into a coordinator or another nested runtime.
+	opts = append(opts, func(c *Config) error {
+		c.disableBlockingClarification = i.disableBlockingClarification || i.EnableGoalMode
+		return nil
+	})
 
 	// aiCallback
 	if i.AiServerName != "" {
@@ -4379,7 +4398,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 
 	// Other boolean/flag options
 	opts = append(opts, WithAllowRequireForUserInteract(i.AllowRequireForUserInteract))
-	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract))
+	opts = append(opts, WithAllowPlanUserInteract(i.AllowPlanUserInteract), WithPlanUserInteractMaxCount(i.PlanUserInteractMaxCount))
 	opts = append(opts, WithEnablePlanAndExec(i.EnablePlanAndExec))
 	opts = append(opts, WithEnableDetachedPlan(i.EnableDetachedPlan))
 	opts = append(opts, WithEnableSubagentsInPlan(i.EnableSubagentsInPlan))
@@ -4439,7 +4458,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	opts = append(opts, WithPeriodicVerificationInterval(i.PeriodicVerificationInterval))
 
 	if i.PerTaskUserInteractiveLimitedTimes > 0 {
-		opts = append(opts, WithPerTaskUserInteractiveLimitedTimes(i.PerTaskUserInteractiveLimitedTimes))
+		opts = append(opts, WithPerTaskUserInteractiveLimitedTimes(i.PerTaskUserInteractiveLimitedTimes), func(c *Config) error { c.userInteractLimitExplicit = i.userInteractLimitExplicit; return nil })
 	}
 
 	// Timeline / memory limits

@@ -67,10 +67,9 @@ var (
 type ReAct struct {
 	*aicommon.Emitter
 
-	currentIteration            int
-	currentUserInteractiveCount int64 // 当前用户交互次数
-	config                      *aicommon.Config
-	promptManager               *PromptManager
+	currentIteration int
+	config           *aicommon.Config
+	promptManager    *PromptManager
 
 	// 任务队列相关
 	currentTaskMu sync.RWMutex
@@ -564,6 +563,9 @@ func (r *ReAct) SendInputEventAndWaitAccepted(event *ypb.AIInputEvent) (ret erro
 	}
 	if r.config.InputEventManager != nil {
 		r.config.InputEventManager.CallMirrorOfAIInputEvent(event)
+		if event.GetUserInteraction() != "" {
+			defer r.config.InputEventManager.CallAfterInputEvent(event)
+		}
 	}
 	return r.handleFreeValue(event)
 }

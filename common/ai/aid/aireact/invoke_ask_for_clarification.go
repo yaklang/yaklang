@@ -2,8 +2,10 @@ package aireact
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/interaction"
 
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -23,7 +25,30 @@ func (r *ReAct) AskForClarification(ctx context.Context, question string, payloa
 	default:
 	}
 
-	r.currentUserInteractiveCount++
+	taskID := ""
+	if task := r.GetCurrentTask(); task != nil {
+		taskID = task.GetId()
+	}
+	// Existing framework callers use the same rich request lifecycle on capable
+	// clients. Truly open-ended legacy questions retain their original transport.
+	if r.config.UIQuestionsEnabled() && len(payloads) >= 2 && len(payloads) <= 10 {
+		options := make([]interaction.Option, 0, len(payloads))
+		for i, label := range payloads {
+			options = append(options, interaction.Option{ID: fmt.Sprint(i + 1), Label: label})
+		}
+		result, err := r.config.RequestQuestions(ctx, taskID, []interaction.Question{{ID: "clarification", Title: "Clarification", Prompt: question, AllowFreeText: true, Options: options}}, true, 0)
+		if err != nil {
+			return "Clarification unavailable: " + err.Error() + ". No user consent was given."
+		}
+		r.SaveTimeline()
+		if reply, ok := result.(map[string]any); ok && reply["status"] == "submitted" {
+			return utils.InterfaceToString(reply["answer"])
+		}
+		return "No answer was received. This is not consent."
+	}
+	if err := r.config.AcquireClarification(taskID, true); err != nil {
+		return "Clarification unavailable: " + err.Error() + ". No user consent was given."
+	}
 	ep := r.config.Epm.CreateEndpointWithEventType(schema.EVENT_TYPE_REQUIRE_USER_INTERACTIVE)
 	ep.SetDefaultSuggestionContinue()
 	var opts []map[string]any

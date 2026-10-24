@@ -7,3 +7,5 @@
 - 使用 save_evidence 保存经过确认的会话证据，{{ if .FunctionCallMode }}使用 adjust_todolist 的 arguments.todo_delta{{ else }}使用本轮 JSON action 的 todo_delta{{ end }}维护本任务的微观工作清单。
 - 产出实际 artifacts 和 Evidence 后，调用 submit_task_result 提交结果摘要及真实引用，再调用 finish。
 - 验收、重试、计划修改和整体调度由协调员负责。不能启动其他专注模式、规划循环、蓝图或子 Agent。
+
+执行 worker 不得直接向用户提问或等待用户输入；缺失必要信息时在任务结果中说明阻碍及需要父任务澄清的内容。

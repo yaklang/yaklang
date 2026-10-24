@@ -30,10 +30,12 @@ type LoopAction struct {
 	// FunctionCallAction is a static protocol variant, selected only by loops
 	// that explicitly opt into native action behavior (not merely native tools).
 	FunctionCallAction *LoopAction `json:"-"`
-	ActionVerifier     LoopActionVerifierFunc
-	ActionHandler      LoopActionHandlerFunc
-	StreamFields       []*LoopStreamField
-	AITagStreamFields  []*LoopAITagField
+	// Rich question contract selected only for clients advertising question support.
+	ClientQuestionsAction *LoopAction `json:"-"`
+	ActionVerifier        LoopActionVerifierFunc
+	ActionHandler         LoopActionHandlerFunc
+	StreamFields          []*LoopStreamField
+	AITagStreamFields     []*LoopAITagField
 
 	// OutputExamples provides usage examples for this action, describing when and how to use it.
 	// This field helps AI understand the appropriate scenarios for selecting this action.
