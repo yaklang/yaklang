@@ -491,9 +491,25 @@ func shouldKeepFunctionForCrossUnitReference(fn *Function) bool {
 	return false
 }
 
-// CheckMemoryPressure checks memory usage after each batch. It only reports;
-// reclamation is left to the per-unit flush path and the adaptive GC
-// (GOMEMLIMIT) started at compile start.
+// shouldReturnIdleHeap is true when the runtime is holding more unused
+// heap than the live heap, and that unused part is at least 1GiB.
+// GOMEMLIMIT on a large machine lets RSS stay at the high-water mark long
+// after a batch has dropped its values, so the next batch has no headroom.
+func shouldReturnIdleHeap(inuse, unreleased uint64) bool {
+	const floor = 1 << 30
+	return unreleased > floor && unreleased > inuse/2
+}
+
+func idleHeapUnreleased(m runtime.MemStats) uint64 {
+	if m.HeapIdle < m.HeapReleased {
+		return 0
+	}
+	return m.HeapIdle - m.HeapReleased
+}
+
+// CheckMemoryPressure checks memory usage after each batch. It reports
+// pressure and, when the runtime is holding a large idle heap, returns
+// those pages so RSS follows the live set instead of the high-water mark.
 func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	if prog == nil {
 		return false
@@ -509,16 +525,24 @@ func (prog *Program) CheckMemoryPressure(batchIndex, totalBatches int) bool {
 	managedMB := float64(managed) / (1024 * 1024)
 	warningMB, criticalMB := float64(warning)/(1024*1024), float64(critical)/(1024*1024)
 
+	pressured := false
 	if managed > uint64(critical) {
-		log.Warnf("[split-compile] high memory pressure: managed=%.1fMB warning=%.1fMB critical=%.1fMB batch=%d/%d - relying on per-unit flush + adaptive GC for reclaim",
+		log.Warnf("[split-compile] high memory pressure: managed=%.1fMB warning=%.1fMB critical=%.1fMB batch=%d/%d",
 			managedMB, warningMB, criticalMB, batchIndex, totalBatches)
-		return true
-	}
-
-	if managed > uint64(warning) {
+		pressured = true
+	} else if managed > uint64(warning) {
 		log.Warnf("[split-compile] memory pressure: managed=%.1fMB warning=%.1fMB critical=%.1fMB batch=%d/%d",
 			managedMB, warningMB, criticalMB, batchIndex, totalBatches)
 	}
 
-	return false
+	if shouldReturnIdleHeap(m.HeapInuse, idleHeapUnreleased(m)) {
+		before := idleHeapUnreleased(m)
+		debug.FreeOSMemory()
+		runtime.ReadMemStats(&m)
+		log.Infof("[split-compile] returned idle heap: before=%.1fMB after=%.1fMB inuse=%.1fMB batch=%d/%d",
+			float64(before)/(1024*1024), float64(idleHeapUnreleased(m))/(1024*1024),
+			float64(m.HeapInuse)/(1024*1024), batchIndex, totalBatches)
+	}
+
+	return pressured
 }

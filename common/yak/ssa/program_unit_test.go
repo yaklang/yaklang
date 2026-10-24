@@ -8,6 +8,13 @@ import (
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
+func TestShouldReturnIdleHeap(t *testing.T) {
+	const gib = uint64(1 << 30)
+	require.False(t, shouldReturnIdleHeap(4*gib, 512<<20), "under 1GiB idle stays")
+	require.False(t, shouldReturnIdleHeap(8*gib, 2*gib), "idle smaller than half the live heap stays")
+	require.True(t, shouldReturnIdleHeap(4*gib, 10*gib), "a large idle heap is returned")
+}
+
 func TestExtractUnitKeyFromFunctionKey(t *testing.T) {
 	// Java style: lang:package.Class.method
 	require.Equal(t, "java:com.example", extractUnitKeyFromFunctionKey("java:com.example.Service.handle"))
