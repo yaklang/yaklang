@@ -55,6 +55,10 @@ native = collections.defaultdict(list)
 ws_tcp = collections.Counter()
 native_tcp = collections.Counter()
 carriers = collections.Counter()
+native_carriers = collections.Counter()
+ws_by_carrier = collections.defaultdict(collections.Counter)
+native_by_carrier = collections.defaultdict(collections.Counter)
+rdp_retransmissions = []
 native_header_fields_checked = collections.Counter()
 native_header_field_differences = []
 incomplete_ws = 0
@@ -72,6 +76,7 @@ for packet in oracle:
             digest = hashlib.sha256(raw).hexdigest()
             ws[digest].append({"frame": frame, "type": raw[0], "length": len(raw) - 5, "carrier": carrier})
             carriers[carrier] += 1
+            ws_by_carrier[carrier][digest] += 1
             if carrier == "TCP":
                 ws_tcp[digest] += 1
         else:
@@ -81,12 +86,17 @@ with events.open(encoding="utf-8-sig") as f:
         if not line.startswith("{"):
             continue
         e = json.loads(line)
+        if e['protocol'] == 'rdpudp' and e.get('session', {}).get('Retransmission') is True:
+            rdp_retransmissions.append({'pdu':e['id'],'frames':[r['Number'] for r in e['source_bytes'].get('PacketRefs') or []], 'original_carrier_pdu':e['session'].get('Original Carrier PDU')})
         if e["protocol"] != "tls":
             continue
         raw = base64.b64decode(e.get("raw") or "")
         if valid_record(raw):
             digest = hashlib.sha256(raw).hexdigest()
             native[digest].append({"frames": [r["Number"] for r in e["source_bytes"].get("PacketRefs") or []], "flow": e["flow"], "source": e["source"], "destination": e["destination"], "type": raw[0], "length": len(raw) - 5, "status": e["status"]})
+            carrier = 'TCP' if e['transport']=='tcp' else 'RDPUDP' if e.get('carrier_layers')==['RDPUDP2'] or e.get('carrier_layers')==['RDPUDP'] else 'EAP/RADIUS' if 'RADIUS' in (e.get('carrier_layers') or []) else 'other'
+            native_carriers[carrier] += 1
+            native_by_carrier[carrier][digest] += 1
             if e["transport"] == "tcp":
                 native_tcp[digest] += 1
             values = e.get("field_values", {}).get("values", [])
@@ -101,6 +111,9 @@ summary = {"wireshark_complete_records": sum(map(len, ws.values())),
            "byte_identical_record_occurrences": sum(min(len(ws[k]), len(native[k])) for k in shared),
            "wireshark_incomplete_record_views": incomplete_ws,
            "wireshark_carrier_record_counts": dict(carriers),
+           "native_carrier_record_counts":dict(native_carriers),
+           "carrier_record_check":{c:{'wireshark':sum(ws_by_carrier[c].values()),'native':sum(native_by_carrier[c].values()),'matching':sum((ws_by_carrier[c]&native_by_carrier[c]).values()),'missing':sum((ws_by_carrier[c]-native_by_carrier[c]).values()),'extra':sum((native_by_carrier[c]-ws_by_carrier[c]).values())} for c in sorted(set(ws_by_carrier)|set(native_by_carrier))},
+           "observed_rdp_carrier_retransmissions":rdp_retransmissions,
            "tcp_record_check": {"wireshark": sum(ws_tcp.values()), "native": sum(native_tcp.values()), "byte_identical_occurrences": sum((ws_tcp & native_tcp).values()), "missing_occurrences": sum((ws_tcp-native_tcp).values()), "extra_occurrences": sum((native_tcp-ws_tcp).values())},
            "native_header_fields_checked": dict(native_header_fields_checked),
            "native_header_field_differences": native_header_field_differences,
@@ -109,4 +122,4 @@ summary = {"wireshark_complete_records": sum(map(len, ws.values())),
            "occurrence_differences": {k: {"wireshark": ws[k], "native": native[k]} for k in shared if len(ws[k]) != len(native[k])},
            "scope": "Complete TLS record bytes only. Flow partitions, decryption and protocol fields remain separate acceptance checks."}
 (out / "tls-record-summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
-print(json.dumps({k: v for k, v in summary.items() if not isinstance(v, dict)}, indent=2))
+print(json.dumps({k: v for k, v in summary.items() if isinstance(v,(str,int))}, indent=2))

@@ -68,3 +68,19 @@ func TestInspectorPhysicalRecordLookupDoesNotWeakenExactDomainLookup(t *testing.
 	physical.Domain.Interface = 2
 	require.Empty(t, v.PhysicalPacketEventIDs(physical, 128))
 }
+
+func TestInspectorLargeOrdinaryWindowKeepsPacketQueriesIndexed(t *testing.T) {
+	v, err := NewProtocolInspector(80000, 64<<20)
+	require.NoError(t, err)
+	for i := uint64(1); i <= 40000; i++ {
+		v.OnEvent(&ProtocolEvent{ID: i, SourceBytes: ByteSource{PacketRefs: []PacketReference{{Number: i}}}})
+	}
+	require.Zero(t, v.Evicted())
+	require.Zero(t, v.unindexed, "ordinary retained PDUs should not force a full-window scan for every packet")
+	for _, id := range []uint64{1, 20000, 40000} {
+		ref := PacketReference{Number: id}
+		require.Equal(t, []uint64{id}, v.PacketEventIDs(ref, 128))
+		require.Equal(t, []uint64{id}, v.PhysicalPacketEventIDs(ref, 128))
+	}
+	require.LessOrEqual(t, v.packetIndexLinks, v.packetIndexLimit)
+}

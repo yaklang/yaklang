@@ -17,41 +17,45 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
-	nativeOPCUAObservation                   bool
-	nativeMMSObservation                     bool
-	nativeFINSObservation                    bool
-	nativeENIPObservation                    bool
-	nativeHARTIPObservation                  bool
-	nativeTLSObservation                     bool
-	nativeDTLSObservation                    bool
-	nativeRADIUSObservation                  bool
-	radiusApplicationRefusal                 bool
-	nativeSNMPObservation                    bool
-	nativeSTUNObservation                    bool
-	nativeSIPObservation                     bool
-	nativeTFTPObservation                    bool
-	nativeATGObservation                     bool
-	nativeDHCPObservation                    bool
-	nativeDNSObservation                     bool
-	nativeDNSStreamObservation               bool
-	nativeDLMSOrSLMPObservation              bool
-	nativeUnrecognizedUDP                    bool
-	nativeBACnetRead                         bool
-	nativeBACnetRoutedRead                   bool
-	Admission                                string
-	nativeDiagnosticError                    string // immutable query refusal; public caches are not authority
-	semanticFields                           map[string]any
-	semanticSession                          map[string]any
-	semanticMetadata                         any
-	ownedRuleEnvelope, hasRuleMetadata       bool
-	nativeQUICObservation                    bool
-	nativeQUICWire                           bool
-	nativeDoIPObservation                    bool
-	doipAssociationRefusal                   bool // private complete-frame refusal scope
-	nativeCANRecord                          bool
-	ocpp                                     bool
-	Domain                                   CaptureDomain
-	SourceBytes                              ByteSource
+	nativeCarrierObservation           bool
+	nativeOPCUAObservation             bool
+	nativeMMSObservation               bool
+	nativeFINSObservation              bool
+	nativeENIPObservation              bool
+	nativeHARTIPObservation            bool
+	nativeTLSObservation               bool
+	nativeDTLSObservation              bool
+	nativeRADIUSObservation            bool
+	radiusApplicationRefusal           bool
+	nativeSNMPObservation              bool
+	nativeSTUNObservation              bool
+	nativeSIPObservation               bool
+	nativeTFTPObservation              bool
+	nativeATGObservation               bool
+	nativeDHCPObservation              bool
+	nativeDNSObservation               bool
+	nativeDNSStreamObservation         bool
+	nativeDLMSOrSLMPObservation        bool
+	nativeUnrecognizedUDP              bool
+	nativeBACnetRead                   bool
+	nativeBACnetRoutedRead             bool
+	Admission                          string
+	nativeDiagnosticError              string // immutable query refusal; public caches are not authority
+	semanticFields                     map[string]any
+	semanticSession                    map[string]any
+	semanticMetadata                   any
+	ownedRuleEnvelope, hasRuleMetadata bool
+	nativeQUICObservation              bool
+	nativeQUICWire                     bool
+	nativeDoIPObservation              bool
+	doipAssociationRefusal             bool // private complete-frame refusal scope
+	nativeCANRecord                    bool
+	ocpp                               bool
+	Domain                             CaptureDomain
+	SourceBytes                        ByteSource
+	// CarrierLayers lists observed protocol envelopes between the physical
+	// transport and this PDU. It does not turn a UDP carrier into TCP.
+	CarrierLayers                            []string
 	Profile, Completeness, ExpertCode        string
 	TransactionID, ResponseTo                uint64
 	ID, FlowID                               uint64
@@ -118,7 +122,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedContext := e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedContext := e.nativeCarrierObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedContext && e.semanticFields != nil {
 			session = e.semanticFields
@@ -172,6 +176,15 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	// Native QUIC identity survives edits to all public labels and caches.
 	// A refused packet cannot become a successful rule decode, and accepted
 	// wire fields keep their legacy metadata envelope and private context.
+	if e.nativeCarrierObservation {
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+	}
 	if e.nativeQUICObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
@@ -383,6 +396,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeCarrierObservation {
+		return true
+	}
 	if e.nativeQUICObservation {
 		return true
 	}
@@ -647,6 +663,9 @@ type binParser struct {
 	lan                                                                        dnsCorrelation
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
+	carrierMu                                                                  sync.Mutex
+	rdpUDP                                                                     *rdpUDPStore
+	eapTLS                                                                     *eapTLSStore
 	udpSessions                                                                *binUDPStore
 	tftpUntrackedRefusal                                                       bool // udpMu; unknown refused client/server identity
 	sipUntrackedRefusal                                                        bool // udpMu; uncertainty for identities that could not be retained
@@ -868,6 +887,7 @@ type binFlow struct {
 	byteSource        string
 	parentID          uint64
 	captureTCP        bool
+	orderedTLSCarrier bool // separately validated reliable UDP carrier; never a TCP identity
 	tcpClientKnown    bool
 	tcpClientDir      int
 	syslogStreamProbe bool
@@ -1938,7 +1958,7 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
 		return nil, errors.New("inspector requires positive bounded message/byte limits")
 	}
-	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(64<<10, max(1, bytes/128))}, nil
+	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(256<<10, max(1, bytes/128))}, nil
 }
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {

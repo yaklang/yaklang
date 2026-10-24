@@ -658,6 +658,9 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	for _, e := range a.closeCarrierSessions() {
+		a.emit(e)
+	}
 	a.closeMAVLinkSigning()
 	// Snapshot incomplete native block and information segmentation observations.
 	// Emit after unlocking; user callbacks must not run under udpMu.

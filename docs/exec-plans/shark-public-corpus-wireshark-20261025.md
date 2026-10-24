@@ -92,13 +92,34 @@ TLS 记录结果见 [独立记录汇总](shark-public-corpus-20261025/weber-tls-
 另行核对，流分区和解密结果仍是不同验收项。
 
 最终主文件得到 2,735 条完整 TLS 记录：TCP 2,639、RDPUDP 49、EAP/RADIUS 47。
-TCP 的 2,639 条原始字节和重复出现次数完全一致，记录 version/length/wire_type 共
-7,917 项导出检查无差异；**另两种载体缺失的 96 条仍未解决**，没有混进成功比例。
+TCP 的 2,639 条原始字节和重复出现次数完全一致。后续修复已接入 PEAP/TTLS 和
+可靠 RDPUDP/2，不能将原先的 96 个缺失视图简单复制成 96 个独立 TLS PDU：
+
+| 载体 | 原文件 WS 完整记录视图 | 原生独立 TLS 记录 | 原文件对照结果 |
+|---|---:|---:|---|
+| TCP | 2,639 | 2,639 | 字节及出现次数全部一致 |
+| EAP/RADIUS | 47 | 47 | PEAP 两代、TTLS 一代，逐记录字节及次数一致 |
+| RDPUDP2 | 49 | 1,718 | 原文件 48 个独立记录字节一致；另一个视图是同一通道重传；后续 WS 解析失步，见下文 |
+
+完整记录 version/length/wire_type 共 **13,212** 项原生导出检查无差异。
+RDPUDP2 的原始第 44,209 帧重传了 44,208 帧的相同通道数据；原生载体事件保留
+`Retransmission` 和原载体 PDU 关联，TLS 接收器只消费一次。原文件 WS 又显示一次
+TLS Application Data，此后在 44,213 帧起连续出现 `Ignored Unknown Record`。
+原始差分仍保留：WS 多一个重复记录视图，原生多 1,670 个后续独立记录，不能称为
+原文件全部记录次数一致。
+
+另用独立 Python 工具从原文件的 RDPUDP2 线格式及 WS 通道序号字段提取载荷，按通道
+序号检查连续性，确认 **105 次相同载荷重传**，消除重传后生成外部派生 TCP 捕获。
+该捕获只用来绕过 WS 的 RDPUDP 重组路径，不替换原始 oracle、不冒充真实 TCP。
+派生捕获中的 Wireshark TLS 解析与原生 **1,718 / 1,718** 条记录字节和出现次数完全一致，
+两方向原始源块分别为 570、875 个。输入和派生捕获均不提交。
+原始结果、派生结果、typed header 检查分别汇总在
+[载体 TLS 检查](shark-public-corpus-20261025/carrier-tls-summary.json)。
 同一捕获域内的 824 组 TCP stream、3,367 组 UDP 端点分区，在双向分区检查中没有
 缺关联、额外拆分或合并。它不证明所有应用会话/事务已经等价，也不要求跨域合并。
 
 IKE 的五项已登记头字段各检查 719 帧，无值差异。通用逐帧字段检查仍保留
-89 项差异：83 项 TLS record length 的贡献包/完成 PDU 集合归属，以及 6 项 DNS
+本轮登记 RDPUDP 字段并接入 EAP TLS 后有 94 项差异：88 项 TLS record length 的贡献包/完成 PDU 集合归属，以及 6 项 DNS
 名字显示差异（四帧空格转义，两帧非 UTF-8 标签）。6 项均保留，不以有损文本替换
 消掉差异。原始/捕获长度双文件全部一致；字段缺失与未比较字段仍见 JSON 汇总。
 
@@ -114,10 +135,18 @@ NEW_CONNECTION_ID、无 keylog 的短头，不能仅凭原端点就确认新的 
 
 ## 尚未通过的内容及修复顺序
 
-1. **RDPUDP/2、EAP/RADIUS 中的 TLS。** 必须先实现载体可靠重组、分片/重传及代际，
-   再接 TLS；不能搜索载荷里的五字节 TLS 头冒充完成。本次完整树新增的缺失记录直接
-   保留在汇总里。
-2. **真实未接入的协议。** BGP/AJP/RTMP、HSRP/GLBP、BFD、L2TPv3、RDPUDP、IS-IS、
+1. **载体解析的剩余范围。** 本轮实现可靠 RDPUDP/2 的完整包头校验、选版、源/通道序号
+   重组、回绕、重传去重、冲突隔离、缺口等待、先数据后 SYN-ACK 的恢复和新代隔离；
+   TLS Hello 可跨载体块和 TLS 记录。PEAP/TTLS v0 使用已捕获 Start、State 回显、方法、
+   EAP Identifier 与 RADIUS 请求/响应链，处理双向分片、ACK、乱序和重传；未见初始
+   RADIUS 事务时不伪造关联。不放宽 NAS/Message-Authenticator 验证，类型 13 保留原有
+   严格链，不重复输出。FEC 丢失恢复、lossy DTLS、PEAP/TTLS 内层认证还没有实现。
+   RDPUDP 的 cookie、RADIUS authenticator、证书信任均不因此变成已验证。
+   可靠接收与线格式依据 [MS-RDPEUDP2](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpeudp2/98f1d4e7-b9ee-4434-97c0-72c88fdfaf27)
+   和[接收可靠性控制](https://learn.microsoft.com/de-at/openspecs/windows_protocols/ms-rdpeudp2/a1d1f871-c282-4f97-8f51-f821aca00c8d)；
+   EAP TLS 分片参考 [RFC 5216 §2.1.5](https://www.rfc-editor.org/rfc/rfc5216.html#section-2.1.5)
+   和 [RFC 5281 §9.2.2](https://www.rfc-editor.org/rfc/rfc5281.html#section-9.2.2)。
+2. **真实未接入的协议。** BGP/AJP/RTMP、HSRP/GLBP、BFD、L2TPv3、IS-IS、
    以及部分路由/工业协议都有明确缺口。先按主文件数量与常用性补齐入口、完整消息校验、
    canonical 规则、字段注册和复用边界，逐项通过后才能加回能力清单。
 3. **字段、事务与分片展示覆盖。** ClientHello 提供的套件列表与已协商套件不能混为一个上下文字段；
@@ -137,6 +166,7 @@ NEW_CONNECTION_ID、无 keylog 的短头，不能仅凭原端点就确认新的 
 
 审计工具位于 `common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/`：
 `public_corpus.py` 做完整逐帧差分，`tls_record_audit.py` 做独立完整记录对照，
+`rdpudp_tls_oracle.py` 做独立有明确标记的派生载荷对照，
 `summarize_public_corpus.py` 仅导出白名单汇总。输入和输出目录若在 Git checkout 内，
 原始审计会拒绝运行。不要将外部目录整体复制进仓库。
 
@@ -160,3 +190,29 @@ CLI 唯一失败来自原库存测试仍要求三个 catalog-only 协议必须�
 CI：初始提交有一个 Shark QUIC 展示失败，已修复有效 PDU 被后续诊断覆盖的状态；
 本机对应测试通过。另有 `common/mcp` 在线插件查询超时，与本轮协议改动分开记录。
 不能把本机专项回归称为全仓库、全部 OS 或最新 PR CI 全部通过。
+
+本轮外部工作目录为 `C:/tmp/yak-shark-carriers-20261025`。新增回归覆盖载体/TLS 双层
+分片、乱序、16 位回绕、相同/冲突重传、捕获域、换代、资源释放和认证失败后恢复；
+TLS 载体 fuzz 运行 23,178 次通过。RDPUDP/2 规则、嵌入 archive、catalog、roadmap、
+原生入口与五项 typed 字段已经接通，条目仍标 partial，不冒充完整 RDP 应用协议。
+
+Windows 原生页面复测发现固定 4,096 PDU 历史早于默认 20k 物理包窗口淘汰详情，出现
+“TLS 标签仍在、字段只剩 UDP”的不一致。CLI 历史改为最多 80k PDU / 64 MiB，仍有界；
+淘汰的已知事件明确显示详情不可用。递进路径保留真实载体，如
+`Ethernet › IPv6 › UDP › RADIUS › PEAP › TLSv1.2` 和 `UDP › RDPUDP2 › TLSv1.2`，
+TLS 子消息不会被外层优先级盖住，展开字节与重组字节也不会指向虚构的原包偏移。
+RDPUDP SYN 线格式切换到 RDPUDP2 是同一载体的选版，不额外画成一层嵌套协议。
+索引仍受字节和引用数上限约束；扩大窗口后的普通包关联不再因旧上限而逐包扫描全窗，
+索引不足时仍完整回退，域隔离和多 PDU 贡献包查询断言均保留。
+
+本轮分组回归：pcaputil 完整包通过（502.096s），随后新增 FIN、低预算暂存、跨 TLS
+记录 Hello 与大窗口索引均通过专项回归；bin-parser 核心完整包通过（149.891s），
+其余子包及完整 Shark CLI 也分别通过。冻结 corpus 的 616 项材料快照保持原哈希、
+原捕获和精确行数，新增目录共 618 项；完整性测试逐一检查历史名字仍存在，不能因
+新增两项就重写冻结 archive 或假装它已有新协议材料。新 RDPUDP 材料是独立 Go
+构造边界测试和本报告外部公开捕获验证，不归入旧快照的覆盖率。
+
+最终可执行文件和完整输出以本轮 JSON 汇总哈希为准。Windows 的 PEAP、RDPUDP2
+原生页面检查通过；CP936 在退出后恢复。总体仍未全部验收：主文件保留 94 项逐帧字段
+集合差异，fuzz 文件保留 39 项（35 项 TLS 长度归属、4 项 DNS 名字显示），大量畸形
+输入的流分区差异及前述未接入协议仍需继续逐类分析，没有把它们标为完成。
