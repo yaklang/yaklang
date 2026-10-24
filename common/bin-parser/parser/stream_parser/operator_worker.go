@@ -220,6 +220,8 @@ func reusableBridgeName(name string) bool {
 		"parseKubernetesAPIRequest",
 		"parseWinRMRecord",
 		"parseGSSAPIToken",
+		"parseSSDPMessage",
+		"parseNetworkControl",
 		"parseSMB3Negotiate",
 		"parseRMIRecord",
 		"parseXTPMessage",

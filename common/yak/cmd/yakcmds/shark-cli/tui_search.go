@@ -28,6 +28,7 @@ func (u *tui) applySearch(input string) error {
 	u.listTop = 0
 	u.fieldTop, u.fieldSelection, u.hexTop = 0, 0, 0
 	u.hexStart, u.hexEnd = 0, 0
+	u.bytesSource = 0
 	return nil
 }
 

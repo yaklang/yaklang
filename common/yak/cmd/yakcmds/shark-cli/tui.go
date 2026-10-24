@@ -50,6 +50,9 @@ func (e *packetEntry) row() packetSummary {
 }
 
 type tui struct {
+	streamApplication                                   bool
+	tlsKeysConfigured                                   bool
+	bytesSource                                         int
 	streamBeginning                                     bool
 	streamPinned                                        bool
 	streamRefresh                                       time.Time
@@ -109,6 +112,11 @@ type detailResult struct {
 }
 
 func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg captureConfig, capacity int) error {
+	restoreConsole, err := prepareTerminal(os.Stdin, os.Stdout)
+	if err != nil {
+		return err
+	}
+	defer restoreConsole()
 	old, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return err
@@ -116,7 +124,14 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 	defer term.Restore(int(os.Stdin.Fd()), old)
 	fmt.Fprint(os.Stdout, terminalEnter)
 	defer fmt.Fprint(os.Stdout, terminalLeave)
-	ui := &tui{ring: newPacketRing(capacity), follow: !src.offline, width: 100, height: 32, color: os.Getenv("NO_COLOR") == "", streams: s.streams}
+	ui := &tui{ring: newPacketRing(capacity), follow: !src.offline, width: 100, height: 32, color: os.Getenv("NO_COLOR") == "", streams: s.streams, tlsKeysConfigured: cfg.tlsSecrets != nil}
+	if cfg.initialDisplayFilter != "" {
+		search, err := compileSearch("fields " + cfg.initialDisplayFilter)
+		if err != nil {
+			return err
+		}
+		ui.search, ui.searchText, ui.searchGeneration = search, "fields "+cfg.initialDisplayFilter, 1
+	}
 	ui.rate.reset(time.Now(), s)
 	keyCtx, cancel := context.WithCancel(ctx)
 	inputs := make(chan []byte, 64)
@@ -166,7 +181,7 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 	}()
 	var lastCapture time.Time
 	dirty := false
-	screen := screenWriter{out: os.Stdout}
+	screen := screenWriter{out: os.Stdout, color: ui.color}
 	refresh := func(drain bool) error {
 		// One bounded batch per frame. Capture never waits for rendering live data.
 		for i := 0; drain && packets != nil && i < cap(s.packets); i++ {
@@ -285,6 +300,7 @@ func (u *tui) syncInspection(now time.Time) {
 	if raw == nil {
 		if u.follow || u.inspect == nil {
 			u.inspect = nil
+			u.bytesSource = 0
 			u.fields = packetDetail{}
 			u.hexStart, u.hexEnd = 0, 0
 			u.pendingDetail = nil
@@ -303,6 +319,7 @@ func (u *tui) syncInspection(now time.Time) {
 	u.fieldSelection = 0
 	u.fieldTop = 0
 	u.hexTop = 0
+	u.bytesSource = 0
 	u.hexStart, u.hexEnd = 0, 0
 	u.decodeStatus = "Live headers · Enter pins and decodes this packet"
 }
@@ -448,6 +465,17 @@ func (u *tui) key(key string, src *captureSource) bool {
 		u.focusPane(2)
 	case "4", "s":
 		u.focusPane(3)
+	case "b":
+		u.focusPane(2)
+		u.bytesSource = (u.bytesSource + 1) % (len(u.fields.sources) + 1)
+		u.hexTop, u.hexStart, u.hexEnd = 0, 0, 0
+	case "a":
+		if u.pane == 3 {
+			u.streamPinned = true
+			u.streamApplication = !u.streamApplication
+			u.streamMode, u.streamTop = 0, 0
+			u.streamRows = nil
+		}
 	case "q":
 		return true
 	case "\t":
@@ -522,6 +550,7 @@ func (u *tui) key(key string, src *captureSource) bool {
 			if key == "e" {
 				u.streamMode = 3
 			} else {
+				u.streamApplication = false
 				u.streamBeginning = key == "h"
 				u.streamMode = 0
 			}

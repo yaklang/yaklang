@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -25,6 +26,7 @@ type binSSH struct {
 	newkeys            [2]bool
 	selected           map[string]string
 	encrypted          bool
+	guessPending       [2]bool
 }
 
 type sshKexLists struct {
@@ -283,11 +285,50 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("ssh: empty payload")
 	}
 	msg := payload[0]
+	profile := "transport"
+	kex := s.selected["Kex Algorithm"]
+	switch {
+	case strings.HasPrefix(kex, "diffie-hellman-group-exchange-"):
+		profile = "dh-gex"
+	case strings.HasPrefix(kex, "diffie-hellman-group"):
+		profile = "dh"
+	case kex == "ecdh-sha2-nistp256":
+		profile = "ecdh-nistp256"
+	case kex == "curve25519-sha256" || kex == "curve25519-sha256@libssh.org":
+		profile = "ecdh-curve25519"
+	}
+	ignoredGuess := false
+	if msg != 20 && s.guessPending[dir] {
+		if s.haveKEX[0] && s.haveKEX[1] {
+			own := s.kex[dir]
+			ignoredGuess = strings.Split(own.Kex, ",")[0] != kex || strings.Split(own.HostKey, ",")[0] != s.selected["Host Key Algorithm"]
+			if ignoredGuess {
+				profile = "transport"
+			}
+		}
+	}
+	initial, err := stream_parser.DecodeSSHInitialPacket(raw, profile)
+	if err != nil {
+		return nil, protocolError(ErrMalformedMessage, err.Error())
+	}
 	info := map[string]any{
-		"Packet Name":    sshMsgName(msg),
+		"Packet Name":    sshExchangeMessageName(msg, kex),
 		"Message Number": msg,
 		"Context Level":  "observed",
 		"Identification": s.ident[dir],
+	}
+	if msg != 20 {
+		for key, value := range s.selected {
+			info[key] = value
+		}
+	}
+	if msg != 20 && s.guessPending[dir] {
+		s.guessPending[dir] = false
+		if ignoredGuess {
+			info["Packet Name"] = "Ignored guessed key-exchange packet"
+			info["Payload Interpretation"] = "discarded after algorithm mismatch"
+			return info, nil
+		}
 	}
 	switch msg {
 	case 20:
@@ -304,6 +345,16 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		info["MAC C2S"] = lists.MACC2S
 		info["MAC S2C"] = lists.MACS2C
 		info["Compression C2S"] = lists.CompC2S
+		info["Compression S2C"] = lists.CompS2C
+		if wf, ok := initial["Wire Fields"].(map[string]any); ok {
+			if p, ok := wf["Payload"].(map[string]any); ok {
+				for _, key := range []string{"Languages C2S", "Languages S2C", "First Kex Packet Follows", "Reserved"} {
+					info[key] = p[key]
+				}
+				follows, _ := p["First Kex Packet Follows"].(byte)
+				s.guessPending[dir] = follows != 0
+			}
+		}
 		if s.haveKEX[0] && s.haveKEX[1] {
 			s.selected = sshNegotiate(s.kex[s.client], s.kex[1-s.client])
 			for k, v := range s.selected {
@@ -323,7 +374,11 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		if !s.haveKEX[0] || !s.haveKEX[1] {
 			info["Context Level"] = "partial"
 		}
-	case 31:
+	case 31, 33:
+		if kex == "" || msg == 31 && profile == "dh-gex" || msg == 33 && profile != "dh-gex" {
+			info["Kex Family"] = sshKexFamily(kex)
+			break
+		}
 		host, err := sshParseHostKey(payload[1:])
 		if err != nil {
 			return nil, err
@@ -332,7 +387,12 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		info["Host Key Format"] = sshHostKeyFormat(host)
 		info["Host Key Fingerprint"] = "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])
 		info["Host Key SHA256"] = fmt.Sprintf("%x", sum[:])
+		info["Signature Verified"], info["Peer Identity Verified"] = false, false
 		info["Kex Family"] = sshKexFamily(s.selected["Kex Algorithm"])
+	}
+	if msg >= 30 && msg <= 34 && profile != "transport" {
+		info["Initial Packet Fields"] = initial["Wire Fields"]
+		info["Signature Verified"], info["Peer Identity Verified"] = false, false
 	}
 	return info, nil
 }
@@ -352,7 +412,45 @@ func sshParseKexInit(body []byte) (sshKexLists, error) {
 		*dst = s
 		i = n
 	}
+	// The two language lists, follows boolean and reserved word are mandatory,
+	// even when their values do not affect algorithm choice.
+	for n := 0; n < 2; n++ {
+		_, next, err := sshReadString(body, i)
+		if err != nil {
+			return lists, err
+		}
+		i = next
+	}
+	if len(body)-i != 5 {
+		return lists, fmt.Errorf("ssh: KEXINIT missing or trailing fields")
+	}
 	return lists, nil
+}
+
+func sshExchangeMessageName(msg byte, kex string) string {
+	if msg < 30 || msg > 49 {
+		return sshMsgName(msg)
+	}
+	if strings.HasPrefix(kex, "diffie-hellman-group-exchange-") {
+		if name := map[byte]string{30: "KEX_DH_GEX_REQUEST_OLD", 31: "KEX_DH_GEX_GROUP", 32: "KEX_DH_GEX_INIT", 33: "KEX_DH_GEX_REPLY", 34: "KEX_DH_GEX_REQUEST"}[msg]; name != "" {
+			return name
+		}
+	} else if strings.Contains(kex, "curve25519") || strings.HasPrefix(kex, "ecdh-") {
+		if msg == 30 {
+			return "KEX_ECDH_INIT"
+		}
+		if msg == 31 {
+			return "KEX_ECDH_REPLY"
+		}
+	} else if strings.HasPrefix(kex, "diffie-hellman-group") {
+		if msg == 30 {
+			return "KEXDH_INIT"
+		}
+		if msg == 31 {
+			return "KEXDH_REPLY"
+		}
+	}
+	return fmt.Sprintf("KEY_EXCHANGE_%d (layout unconfirmed)", msg)
 }
 
 func sshParseHostKey(body []byte) ([]byte, error) {
@@ -410,7 +508,7 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		return ""
 	}
 	return map[string]string{
-		"Kex Algorithm":      pick(client.Kex, server.Kex),
+		"Kex Algorithm":      pick(sshRealKexNames(client.Kex), sshRealKexNames(server.Kex)),
 		"Host Key Algorithm": pick(client.HostKey, server.HostKey),
 		"Encryption C2S":     pick(client.EncC2S, server.EncC2S),
 		"Encryption S2C":     pick(client.EncS2C, server.EncS2C),
@@ -419,6 +517,16 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		"Compression C2S":    pick(client.CompC2S, server.CompC2S),
 		"Compression S2C":    pick(client.CompS2C, server.CompS2C),
 	}
+}
+
+func sshRealKexNames(names string) string {
+	var out []string
+	for _, n := range strings.Split(names, ",") {
+		if !strings.HasPrefix(n, "ext-info-") && !strings.HasPrefix(n, "kex-strict-") {
+			out = append(out, n)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func sshKexFamily(name string) string {

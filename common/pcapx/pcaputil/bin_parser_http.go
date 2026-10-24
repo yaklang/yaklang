@@ -109,6 +109,10 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameDCERPC(w)
 		case "ssh":
 			return f.frameSSH(dir, w)
+		case "telnet":
+			return f.frameTelnet(w)
+		case "nbss":
+			return f.frameNBSS(dir, w)
 		case "nfs":
 			return f.frameNFS(w)
 		case "snmp":

@@ -336,7 +336,7 @@ var protocolCorpusParseContracts = map[string]protocolCorpusParseContract{
 	"RDP":                {RuleFile: "application-layer/msrdp.yaml", EntryNode: "RDPConnectionRequest", Layer: "L7"},
 	"SMTPS":              {RuleFile: "application-layer/tls.yaml", Layer: "L7", OuterOnly: true},
 	"SOAP":               {RuleFile: "application-layer/http.yaml", EntryNode: "HTTP", Layer: "L7"},
-	"SSDP":               {RuleFile: "application-layer/upnp.yaml", EntryNode: "UPnPSSDPNotify", Layer: "L7"},
+	"SSDP":               {RuleFile: "application-layer/ssdp.yaml", EntryNode: "SSDP", Layer: "L7"},
 	"WebDAV":             {RuleFile: "application-layer/http.yaml", EntryNode: "HTTP", Layer: "L7"},
 	"WeChat/MicroMsg":    {RuleFile: "application-layer/tls.yaml", Layer: "L7", OuterOnly: true},
 }
@@ -1451,7 +1451,7 @@ var protocolCorpusRequiredNodes = map[string][]string{
 	"SNMP":                      {"Version", "Community", "PDU Tag"},
 	"SOAP":                      {"HTTP Response", "Status", "Headers"},
 	"SOCKS5":                    {"Version", "Command", "AddressType"},
-	"SSDP":                      {"Method", "Target", "Version", "Headers", "Line", "Message End"},
+	"SSDP":                      {"Method", "Target", "Version", "Headers", "Name", "Value", "Message End"},
 	"SRVLOC/SLP":                {"Version", "Function ID", "XID", "Language Tag"},
 	"STOMP":                     {"Command", "Headers", "Terminator"},
 	"SSH":                       {"Identification"},

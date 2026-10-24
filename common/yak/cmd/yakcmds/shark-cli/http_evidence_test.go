@@ -57,9 +57,10 @@ func TestConnectionAttributionDoesNotLabelBinaryPacketsAsHTTP(t *testing.T) {
 	s.add(body)
 	u := &tui{streams: s}
 	row := u.packetRow(&packetEntry{packet: body})
-	require.Equal(t, "TCP/HTTP", row.Protocol)
-	require.Equal(t, "connection prefix, not this packet", row.ProtocolScope)
-	require.Contains(t, row.Info, "prefix=HTTP")
+	require.Equal(t, "TCP", row.Protocol)
+	require.Equal(t, "packet", row.ProtocolScope)
+	require.Equal(t, "HTTP", row.ConnectionProtocol)
+	require.Contains(t, row.Info, "connection #")
 	row = u.packetRow(&packetEntry{packet: h})
 	require.Equal(t, "HTTP", row.Protocol)
 	require.Equal(t, "packet", row.ProtocolScope)

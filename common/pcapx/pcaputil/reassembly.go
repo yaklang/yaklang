@@ -398,6 +398,9 @@ func (t *TrafficConnection) FeedClient(tcp *layers.TCP, ts time.Time) {
 	}
 	seq := tcp.Seq
 	if tcp.SYN {
+		if t.initialed && !t.synSeen && tcp.Seq+1 == t.isn {
+			t.isn = tcp.Seq
+		}
 		if t.initialed && tcp.Seq != t.isn {
 			t.Flow.reassemblyIncomplete = true
 			t.Flow.pool.invalidSegment("TCP SYN changes an established initial sequence number")

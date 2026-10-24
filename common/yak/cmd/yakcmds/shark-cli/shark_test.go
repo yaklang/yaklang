@@ -201,7 +201,7 @@ func TestRingFilterNavigationAndTerminalLayout(t *testing.T) {
 	s := &captureSession{}
 	view := u.view(s, src, captureConfig{})
 	require.Contains(t, view, "EOF")
-	require.Contains(t, view, "PROTOCOL FIELDS")
+	require.Contains(t, view, "DNS FIELDS")
 	require.Contains(t, view, "PACKET BYTES")
 	require.LessOrEqual(t, len(strings.Split(view, "\r\n")), u.height)
 	u.pane = 1

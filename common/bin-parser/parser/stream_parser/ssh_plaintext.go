@@ -29,7 +29,7 @@ func parseSSHPlaintextPacket(node *base.Node, process func(*base.Node) (func(boo
 
 func sshPlaintextProfile(profile string) bool {
 	switch profile {
-	case "transport", "dh", "dh-gex", "ecdh-nistp256":
+	case "transport", "dh", "dh-gex", "ecdh-nistp256", "ecdh-curve25519":
 		return true
 	}
 	return false
@@ -158,7 +158,7 @@ func (r *sshPlaintextReader) point(name string) {
 	})
 }
 
-func (r *sshPlaintextReader) reply(ecdh bool, info map[string]any) {
+func (r *sshPlaintextReader) reply(exchange string, info map[string]any) {
 	r.nested("Host Key", func(sub *sshPlaintextReader) {
 		format := sub.str("Host Key Format", "string")
 		if !sshPlaintextName(format) {
@@ -174,7 +174,12 @@ func (r *sshPlaintextReader) reply(ecdh bool, info map[string]any) {
 			sub.take("Opaque Host Key Data", "raw", sub.end-sub.at)
 		}
 	})
-	if ecdh {
+	if exchange == "curve25519" {
+		b := r.str("Server Curve25519 Public Key", "raw")
+		if len(b) != 32 {
+			r.err = fmt.Errorf("ssh-plaintext: Curve25519 public key requires 32 bytes")
+		}
+	} else if exchange == "ecdh" {
 		r.point("Server Point")
 	} else {
 		r.mpint("Server Exchange Value")
@@ -239,11 +244,18 @@ func decodeSSHPlaintextPacket(wire []byte, profile string) ([]tlsCertificateFiel
 	case profile == "dh-gex" && msg == 32 || profile == "dh" && msg == 30:
 		r.mpint("Client Exchange Value")
 	case profile == "dh-gex" && msg == 33 || profile == "dh" && msg == 31:
-		r.reply(false, info)
+		r.reply("dh", info)
 	case profile == "ecdh-nistp256" && msg == 30:
 		r.point("Client Point")
 	case profile == "ecdh-nistp256" && msg == 31:
-		r.reply(true, info)
+		r.reply("ecdh", info)
+	case profile == "ecdh-curve25519" && msg == 30:
+		b := r.str("Client Curve25519 Public Key", "raw")
+		if len(b) != 32 {
+			r.err = fmt.Errorf("ssh-plaintext: Curve25519 public key requires 32 bytes")
+		}
+	case profile == "ecdh-curve25519" && msg == 31:
+		r.reply("curve25519", info)
 	default:
 		info["Payload Layout Decoded"] = false
 		r.take("Opaque Message Data", "raw", r.end-r.at)
@@ -257,4 +269,38 @@ func decodeSSHPlaintextPacket(wire []byte, profile string) ([]tlsCertificateFiel
 		{Name: "Payload", Start: 5, End: end, Children: r.fields},
 		{Name: "Padding", Type: "raw", Start: end, End: len(wire)},
 	}, info, nil
+}
+
+// DecodeSSHInitialPacket validates exactly the grammar used by the public
+// bounded YAML entry. The caller must supply the initial, unencrypted boundary.
+// It does not authenticate a host key, signature, or negotiated session.
+func DecodeSSHInitialPacket(wire []byte, profile string) (map[string]any, error) {
+	fields, info, err := decodeSSHPlaintextPacket(wire, profile)
+	if err != nil {
+		return nil, err
+	}
+	var values func([]tlsCertificateField) map[string]any
+	values = func(fs []tlsCertificateField) map[string]any {
+		out := map[string]any{}
+		for _, f := range fs {
+			if len(f.Children) > 0 {
+				out[f.Name] = values(f.Children)
+				continue
+			}
+			b := wire[f.Start:f.End]
+			switch f.Type {
+			case "uint8":
+				out[f.Name] = b[0]
+			case "uint32":
+				out[f.Name] = binary.BigEndian.Uint32(b)
+			case "string":
+				out[f.Name] = string(b)
+			default:
+				out[f.Name] = bytes.Clone(b)
+			}
+		}
+		return out
+	}
+	info["Wire Fields"] = values(fields)
+	return info, nil
 }

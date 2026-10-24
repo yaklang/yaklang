@@ -196,6 +196,15 @@ func TestProtocolSessionSSHDirectionKeysPreservePeerNEWKEYS(t *testing.T) {
 					require.Equal(t, byte(21), e.Raw[5])
 					require.Equal(t, int(binary.BigEndian.Uint32(e.Raw[:4]))+4, len(e.Raw))
 					want := map[string]any{"Packet Name": "NEWKEYS", "Message Number": 21, "Context Level": "observed", "Identification": "SSH-2.0-Go"}
+					// Literal algorithms configured by the independent SSH pair above.
+					// Later handshake PDUs retain this observed negotiation context.
+					want["Kex Algorithm"] = "diffie-hellman-group14-sha256"
+					want["Host Key Algorithm"] = "ssh-ed25519"
+					for _, suffix := range []string{"C2S", "S2C"} {
+						want["Encryption "+suffix] = "aes128-ctr"
+						want["MAC "+suffix] = "hmac-sha2-256"
+						want["Compression "+suffix] = "none"
+					}
 					if i == 1 {
 						want["Encrypted"] = true
 						want["Protocol Transition"] = "ssh->encrypted"
