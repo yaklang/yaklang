@@ -183,8 +183,11 @@ func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStor
 		// a later batch may still emit into the same library. Its saved consts and
 		// makes do not. Drop those values only; the builder and scope stay.
 		if !fn.finished {
-			if isLongLivedPackageFunction(fn) {
+			if isLongLivedPackageFunction(fn) || isLiveContainerFunction(fn) {
 				released += releaseFunctionScopeOrdinaryValues(prog, fn, visitedScopes, reload)
+				if fn.builder != nil {
+					fn.builder.placeholderConstants = nil
+				}
 			}
 			return
 		}
@@ -204,6 +207,9 @@ func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStor
 			// The scope is already detached, so the object itself is only weight.
 			// Collect the ids and save-then-drop them once for the whole release.
 			collectFinishedBodyBlocks(bodyBlocks, prog, fn)
+		} else if retainsCapture {
+			// One captured name used to keep every local version in the function.
+			dropUncapturedScopeNames(prog, fn)
 		} else if !retainsCapture && !shouldKeepFunctionForCrossUnitReference(fn) {
 			// A captured function must keep its builder: capturedNames is how the
 			// next batch tells this function's closure apart from a shared value
@@ -272,6 +278,56 @@ func functionScopeRetainsCapture(prog *Program, fn *Function) bool {
 		}
 	}
 	return found
+}
+
+func dropUncapturedScopeNames(prog *Program, fn *Function) {
+	if fn == nil || fn.builder == nil || fn.builder.capturedNames == nil {
+		return
+	}
+	captured := map[string]struct{}{}
+	fn.builder.capturedNames.ForEach(func(name string, _ struct{}) bool {
+		if name != "" {
+			captured[name] = struct{}{}
+		}
+		return true
+	})
+	visit := func(scope ScopeIF) {
+		current, ok := scope.(*ScopeInstance)
+		if !ok || current == nil || current.ScopedVersionedTable == nil {
+			return
+		}
+		var drop []string
+		for _, latest := range current.GetAllVariables() {
+			if latest == nil {
+				continue
+			}
+			name := latest.GetName()
+			if _, keep := captured[name]; keep || name == "" {
+				continue
+			}
+			drop = append(drop, name)
+		}
+		for _, name := range drop {
+			current.ScopedVersionedTable.DropName(name)
+		}
+	}
+	if fn.builder.CurrentBlock != nil {
+		visit(fn.builder.CurrentBlock.ScopeTable)
+	}
+	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return
+	}
+	for _, id := range fn.Blocks {
+		inst, ok := prog.Cache.instructions.residentInstruction(id)
+		if !ok || utils.IsNil(inst) {
+			continue
+		}
+		block, ok := ToBasicBlock(inst)
+		if !ok || block == nil {
+			continue
+		}
+		visit(block.ScopeTable)
+	}
 }
 
 func isLiveContainerFunction(fn *Function) bool {
