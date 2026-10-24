@@ -212,6 +212,9 @@ func TestReleaseKeepsExportedAndCapturedValues(t *testing.T) {
 	require.Equal(t, originalID, reloaded.GetId())
 	require.False(t, reloaded == exportedValue, "reload must not keep the detached local")
 	require.Nil(t, exportedFn.builder, "a finished exported body must not keep its builder")
+	if variable := param.GetLastVariable(); variable != nil {
+		require.Nil(t, variable.GetScope(), "a kept parameter must not pin the finished body scope")
+	}
 	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(exportedFn.GetId()), "the function object stays resident for cross-unit calls")
 	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(param.GetId()), "parameters stay resident for call binding")
 	gotParam, ok := exportedFn.GetValueById(param.GetId())
