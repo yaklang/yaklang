@@ -1,7 +1,9 @@
 package ssaconfig
 
 import (
+	"os"
 	"runtime"
+	"strconv"
 
 	"github.com/yaklang/yaklang/common/utils/memorybudget"
 )
@@ -24,6 +26,11 @@ func DefaultCPUConcurrency() int {
 }
 
 func defaultCompileConcurrency() int {
+	if raw := os.Getenv("YAK_SSA_COMPILE_CONCURRENCY"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			return n
+		}
+	}
 	return CompileConcurrencyFor(runtime.GOMAXPROCS(0), memorybudget.Total())
 }
 

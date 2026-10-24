@@ -101,7 +101,11 @@ func executeCompileUnitBatch(
 	drainUnscheduled bool,
 ) (time.Duration, error) {
 	buildStart := time.Now()
-	peak, err := buildCompileUnitPipeline(ctx, prog, plan, batch, concurrency)
+	peak, err := buildCompileUnitPipelineIdle(ctx, prog, plan, batch, concurrency, func() {
+		// A batch holds every library until the barrier. Releasing each time
+		// the pipeline is idle keeps the live IR at one wave, not the batch.
+		cleanup.releaseBuiltBodies()
+	})
 	buildCost := time.Since(buildStart)
 	log.Infof("compile unit pipeline batch=%d groups=%d concurrency=%d peak_active=%d cost=%v",
 		batchIndex+1, len(batch.unitKeys), concurrency, peak, buildCost)
@@ -122,6 +126,10 @@ func executeCompileUnitBatch(
 // semaphore bounds all library builds, and application work is exclusive.
 // On cancellation or panic it joins all running work before returning.
 func buildCompileUnitPipeline(ctx context.Context, prog *ssa.Program, plan *UnitPlan, batch compileUnitExecutionBatch, concurrency int) (int, error) {
+	return buildCompileUnitPipelineIdle(ctx, prog, plan, batch, concurrency, nil)
+}
+
+func buildCompileUnitPipelineIdle(ctx context.Context, prog *ssa.Program, plan *UnitPlan, batch compileUnitExecutionBatch, concurrency int, onIdle func()) (int, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -186,6 +194,9 @@ func buildCompileUnitPipeline(ctx context.Context, prog *ssa.Program, plan *Unit
 			if nodes[dependent].remaining == 0 {
 				ready = append(ready, dependent)
 			}
+		}
+		if activeGroups == 0 && onIdle != nil && runErr == nil && completed < len(nodes) {
+			onIdle()
 		}
 	}
 	return int(peakLibraries.Load()), runErr

@@ -25,6 +25,22 @@ type compileBatchCleanup struct {
 	reportProgress func(float64, string, ...any)
 }
 
+// releaseBuiltBodies spills finished function bodies while the pipeline
+// is between waves. The batch barrier still runs the full cleanup.
+func (task compileBatchCleanup) releaseBuiltBodies() {
+	if task.incremental || task.program == nil || task.program.Cache == nil {
+		return
+	}
+	task.program.DetachFinishedFunctionBodyScopes()
+	task.program.Cache.FlushCompileUnit("scc")
+	task.program.Cache.FlushInstructionSaver()
+	task.program.ReleasePersistedOrdinaryValues()
+	task.program.Cache.FlushAuxSavers()
+	task.program.Cache.FlushInstructionSaver()
+	task.program.ReleasePersistedOrdinaryValues()
+	task.program.ReleaseSettledIndexes()
+}
+
 func (task compileBatchCleanup) run() error {
 	if task.structScan {
 		index := &structResidentOpcodeIndex{prog: task.program}
