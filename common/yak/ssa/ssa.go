@@ -487,7 +487,8 @@ type Function struct {
 	//if blueprint method,we need record.
 	currentBlueprint *Blueprint
 
-	finished bool
+	finished           bool
+	bodyScopesDetached bool
 
 	// compileUnitKey is the compile unit that created this function. It is
 	// recorded at creation time so a completed unit can release this function's

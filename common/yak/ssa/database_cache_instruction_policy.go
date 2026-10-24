@@ -83,7 +83,13 @@ func canSpillFinishedPrivateBlock(inst Instruction) bool {
 		return false
 	}
 	fn := cachedFinishedFunction(inst)
-	return fn != nil && !shouldKeepFunctionForCrossUnitReference(fn)
+	if fn == nil || fn.IsExtern() || isLiveContainerFunction(fn) || !fn.bodyScopesDetached {
+		return false
+	}
+	// Exported functions keep their block ids. The object can reload.
+	// Spill only after DetachFinishedFunctionBodyScopes has nil'd ScopeTable,
+	// or Parameter.block keeps the whole version map alive.
+	return true
 }
 
 // A finished function's parameters and parameter members are ID-addressed.

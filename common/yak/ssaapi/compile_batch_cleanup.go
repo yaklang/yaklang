@@ -58,6 +58,10 @@ func (task compileBatchCleanup) run() error {
 			stepStart = time.Now()
 			return d
 		}
+		// Nil finished body scopes before the flush evicts their blocks.
+		// Otherwise the block leaves the resident map while Parameter.block
+		// still owns the scope, and the version maps stay until the process ends.
+		task.program.DetachFinishedFunctionBodyScopes()
 		if !task.incremental {
 			task.program.Cache.FlushCompileUnit(strings.Join(task.unitKeys, ","))
 		}
