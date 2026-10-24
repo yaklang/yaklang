@@ -1229,6 +1229,51 @@ func (b *astbuilder) buildReceiverDecl(para *gol.ParameterDeclContext) ssa.Type 
 	return typeType
 }
 
+// functionTypeSignature collects the types of a function type literal
+// without emitting Parameter instructions into the enclosing function.
+func (b *astbuilder) functionTypeSignature(stmt *gol.SignatureContext) ([]ssa.Type, ssa.Type) {
+	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
+	defer recoverRange()
+	var paramt []ssa.Type
+	var rett ssa.Type
+	if paras := stmt.Parameters(); paras != nil {
+		paramt = b.functionTypeParameters(paras.(*gol.ParametersContext))
+	}
+	if rety := stmt.Result(); rety != nil {
+		rett = b.buildResult(rety.(*gol.ResultContext))
+	}
+	return paramt, rett
+}
+
+func (b *astbuilder) functionTypeParameters(parms *gol.ParametersContext) []ssa.Type {
+	recoverRange := b.SetRange(&parms.BaseParserRuleContext)
+	defer recoverRange()
+	var paramt []ssa.Type
+	for _, decl := range parms.AllParameterDecl() {
+		a, ok := decl.(*gol.ParameterDeclContext)
+		if !ok {
+			continue
+		}
+		typ := ssa.CreateAnyType()
+		if raw := a.Type_(); raw != nil {
+			typ = b.buildType(raw.(*gol.Type_Context))
+		}
+		n := 1
+		if ids := a.IdentifierList(); ids != nil {
+			if list := ids.(*gol.IdentifierListContext).AllIdentifier(); len(list) > 0 {
+				n = len(list)
+			}
+		}
+		for i := 0; i < n; i++ {
+			paramt = append(paramt, typ)
+		}
+	}
+	if len(paramt) == 0 {
+		paramt = append(paramt, ssa.CreateAnyType())
+	}
+	return paramt
+}
+
 func (b *astbuilder) buildSignature(stmt *gol.SignatureContext) ([]ssa.Type, ssa.Type) {
 	recoverRange := b.SetRange(&stmt.BaseParserRuleContext)
 	defer recoverRange()

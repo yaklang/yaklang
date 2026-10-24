@@ -185,16 +185,17 @@ func (prog *Program) LazyBuildForUnits(unitKeys []string) {
 	}
 	seen := make(map[*Program]struct{})
 	for _, key := range unitKeys {
-		lib := prog.ProgramForCompileUnit(key)
-		if lib == nil {
-			continue
+		for _, lib := range prog.ProgramsForCompileUnit(key) {
+			if lib == nil {
+				continue
+			}
+			if _, ok := seen[lib]; ok {
+				continue
+			}
+			seen[lib] = struct{}{}
+			drainProgramLazy(lib)
+			drainApplicationUpstreams(key, lib, seen)
 		}
-		if _, ok := seen[lib]; ok {
-			continue
-		}
-		seen[lib] = struct{}{}
-		drainProgramLazy(lib)
-		drainApplicationUpstreams(key, lib, seen)
 	}
 }
 

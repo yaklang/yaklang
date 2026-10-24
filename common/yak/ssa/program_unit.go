@@ -221,6 +221,47 @@ func (prog *Program) compileUnitByKey(unitKey string) *CompileUnit {
 	return nil
 }
 
+// ProgramsForCompileUnit returns every library this unit must build.
+// A Go directory that holds package foo and package foo_test owns both
+// libraries. Draining only the application (LibraryName empty) left every
+// function body pending until the final Finish.
+func (prog *Program) ProgramsForCompileUnit(unitKey string) []*Program {
+	if prog == nil || unitKey == "" {
+		return nil
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	unit := app.compileUnitByKey(unitKey)
+	if unit == nil || !unit.DeclaredLibrary || len(unit.LibraryNames) == 0 {
+		if one := prog.ProgramForCompileUnit(unitKey); one != nil {
+			return []*Program{one}
+		}
+		return nil
+	}
+	out := make([]*Program, 0, len(unit.LibraryNames))
+	seen := map[*Program]struct{}{}
+	for _, name := range unit.LibraryNames {
+		if name == "" {
+			continue
+		}
+		lib, _ := app.GetLibrary(name)
+		if lib == nil {
+			continue
+		}
+		if _, ok := seen[lib]; ok {
+			continue
+		}
+		seen[lib] = struct{}{}
+		out = append(out, lib)
+	}
+	if len(out) == 0 {
+		return []*Program{app}
+	}
+	return out
+}
+
 // ProgramForCompileUnit returns the Program that owns this compile unit.
 // A unit is that library: it already contains the package's functions and
 // classes, so LazyBuildForUnits drains this Program rather than walking
@@ -234,6 +275,11 @@ func (prog *Program) ProgramForCompileUnit(unitKey string) *Program {
 		app = prog
 	}
 	if unit := app.compileUnitByKey(unitKey); unit != nil && unit.DeclaredLibrary {
+		if len(unit.LibraryNames) > 0 {
+			if lib, _ := app.GetLibrary(unit.LibraryNames[0]); lib != nil {
+				return lib
+			}
+		}
 		if unit.LibraryName != "" {
 			if lib, _ := app.GetLibrary(unit.LibraryName); lib != nil {
 				return lib

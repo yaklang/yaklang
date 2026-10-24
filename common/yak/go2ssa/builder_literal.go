@@ -588,7 +588,10 @@ func (b *astbuilder) buildFunctionTypeLiteral(stmt *gol.FunctionTypeContext) ssa
 	defer recoverRange()
 
 	if signature := stmt.Signature(); signature != nil {
-		paramt, rett := b.buildSignature(signature.(*gol.SignatureContext))
+		// A function type is only a type. buildSignature would emit Parameter
+		// instructions into whatever function is current, including @main and
+		// every callback parameter of a real function.
+		paramt, rett := b.functionTypeSignature(signature.(*gol.SignatureContext))
 		return ssa.NewFunctionType("", paramt, rett, false)
 	}
 

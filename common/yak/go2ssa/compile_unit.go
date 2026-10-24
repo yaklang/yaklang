@@ -68,27 +68,57 @@ func (*SSABuilder) PartitionCompileUnits(fs filesys_interface.FileSystem, files 
 		sort.Strings(unit.Files)
 		if strings.HasPrefix(unit.Key, "dir:") {
 			unit.DeclaredLibrary = true
-			unit.LibraryName = goUnitPackageName(fs, unit.Files)
+			names := goUnitPackageNames(fs, unit.Files)
+			if len(names) == 1 {
+				unit.LibraryName = names[0]
+			} else if len(names) > 1 {
+				// foo and foo_test share the directory. Both libraries must be
+				// drained in this unit; leaving LibraryName empty used to skip
+				// every function body until the final Finish.
+				unit.LibraryNames = names
+			}
 		}
 	}
 	return order
 }
 
 func goUnitPackageName(fs filesys_interface.FileSystem, files []string) string {
-	var owner string
+	names := goUnitPackageNames(fs, files)
+	if len(names) == 1 {
+		return names[0]
+	}
+	return ""
+}
+
+// goUnitPackageNames returns every distinct non-empty package clause in the
+// directory. Non-test names sort before "*_test" so the implementation library
+// is built before the external test package that imports it.
+func goUnitPackageNames(fs filesys_interface.FileSystem, files []string) []string {
+	seen := map[string]struct{}{}
+	var names []string
 	for _, file := range files {
 		if !strings.EqualFold(fs.Ext(file), ".go") {
 			continue
 		}
 		name := scanGoPackageName(ssa.ReadUnitSource(fs, file))
-		if name == "" || (owner != "" && owner != name) {
-			// Multiple packages in one directory cannot be drained as one
-			// library. Keep that unit on the serial application path.
-			return ""
+		if name == "" {
+			continue
 		}
-		owner = name
+		if _, ok := seen[name]; ok {
+			continue
+		}
+		seen[name] = struct{}{}
+		names = append(names, name)
 	}
-	return owner
+	sort.SliceStable(names, func(i, j int) bool {
+		iTest := strings.HasSuffix(names[i], "_test")
+		jTest := strings.HasSuffix(names[j], "_test")
+		if iTest != jTest {
+			return !iTest
+		}
+		return names[i] < names[j]
+	})
+	return names
 }
 
 func scanGoPackageName(src string) string {
