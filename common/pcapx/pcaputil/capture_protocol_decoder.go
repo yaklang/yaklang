@@ -26,6 +26,9 @@ func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
 	if _, ok := decoded[0].(*capturePPILayer); ok {
 		decoder = capturePPIDecoder{}
 	}
+	if _, ok := decoded[0].(*captureMPacket); ok {
+		decoder = captureMPacketDecoder{}
+	}
 	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
 	p.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
 	return p
@@ -36,6 +39,15 @@ type protocolPacketDecoder struct{ decoder gopacket.Decoder }
 func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilder) error {
 	b := &protocolPacketBuilder{PacketBuilder: builder}
 	decoder := d.decoder
+	if decoder == layers.LayerTypeGRE {
+		decoder = captureGREDecoder{}
+	}
+	if decoder == layers.EthernetType(0x22eb) {
+		decoder = captureERSPAN3Decoder{}
+	}
+	if decoder == layers.LayerTypeDot1Q {
+		decoder = captureVLANDecoder{}
+	}
 	if link, ok := decoder.(layers.LinkType); ok {
 		decoder = captureLinkDecoder(link)
 		if link == layers.LinkTypeRaw && len(data) > 0 && data[0]>>4 == 4 {
@@ -61,6 +73,12 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 type protocolPacketBuilder struct {
 	gopacket.PacketBuilder
 	udp bool
+	pim gopacket.NetworkLayer
+}
+
+func (b *protocolPacketBuilder) SetNetworkLayer(n gopacket.NetworkLayer) {
+	b.PacketBuilder.SetNetworkLayer(n)
+	b.pim = pimNetwork(n)
 }
 
 func (b *protocolPacketBuilder) SetTransportLayer(layer gopacket.TransportLayer) {
@@ -73,6 +91,16 @@ func udpEncapsulation(next gopacket.LayerType) bool {
 }
 
 func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
+	if b.pim != nil {
+		next = capturePIMDecoder{network: b.pim}
+		b.pim = nil
+	}
+	// The carrier adapter preserves legacy display decoding. Native dispatch
+	// must inspect the actual next layer before deciding whether a UDP payload
+	// is an encapsulation; an opaque wrapper must not hide Geneve/VXLAN here.
+	if carrier, ok := next.(captureCarrierDecoder); ok {
+		next = carrier.inner
+	}
 	// These complete Ethernet PDUs have bounded native codecs. Do not invoke
 	// gopacket's unknown-EtherType decoder before their ingress can run.
 	if kind, ok := next.(layers.EthernetType); ok && (kind == 0x88ba || kind == 0x88a4) {

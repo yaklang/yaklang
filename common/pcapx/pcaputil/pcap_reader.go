@@ -99,7 +99,7 @@ func (r *classicPcapReader) read() ([]byte, gopacket.CaptureInfo, error) {
 	return raw, ci, err
 }
 
-// PcapReaderOptions controls classic PCAP metadata compatibility only.
+// PcapReaderOptions controls explicit offline capture metadata policies.
 // It never relaxes captured-byte, snapshot, allocation or protocol bounds.
 type PcapReaderOptions struct {
 	// NormalizeLegacyOriginalLength repairs legacy record metadata when the
@@ -108,6 +108,10 @@ type PcapReaderOptions struct {
 	// readers remain strict. PCAP draft-ietf-opsawg-pcap-09 section 5 permits
 	// this conversion; it is not proof of valid on-wire packet contents.
 	NormalizeLegacyOriginalLength bool
+	// IgnoreEmbeddedSecrets validates and discards PCAPNG Decryption Secrets
+	// Blocks. It never loads or authorizes their contents. Supply authorized
+	// keys separately with WithTLSSecrets. The default rejects these blocks.
+	IgnoreEmbeddedSecrets bool
 }
 
 // PcapOriginalLength is the unmodified record-header value before an explicitly

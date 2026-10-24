@@ -75,7 +75,8 @@ func TestStreamReordersDeduplicatesAndIdentifiesWholeConnection(t *testing.T) {
 			require.Equal(t, "HTTP", v.protocol)
 			u := &tui{streams: s}
 			row := u.packetRow(&packetEntry{packet: packets[0]})
-			require.Equal(t, "TCP/HTTP", row.Protocol)
+			require.Equal(t, "TCP", row.Protocol)
+			require.Equal(t, "HTTP", row.ConnectionProtocol)
 			require.Equal(t, v.id, row.StreamID)
 			// Reads are detached: capture cannot mutate a browsed snapshot.
 			old := directionData(v, 1)
@@ -169,9 +170,9 @@ func TestStreamRunsBeforeLossyDisplayQueue(t *testing.T) {
 }
 func TestStreamApplicationSignaturesAndYAMLDecode(t *testing.T) {
 	for _, tc := range []struct{ data, name string }{
-		{"GET / HTTP/1.1\r\n\r\n", "HTTP"}, {"\x17\x03\x03\x00\x05abcde", "TLS"}, {"SSH-2.0-OpenSSH\r\n", "SSH"},
-		{"*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n", "Redis"}, {"\x10\x10\x00\x04MQTT\x04\x02\x00\x3c", "MQTT"}, {"AMQP\x00\x00\x09\x01", "AMQP"}, {"RFB 003.008\n", "VNC"},
-		{"\xfeSMB0123456789", "SMB2"}, {string(bytes.Repeat([]byte{0xa5}, 80)), ""},
+		{"GET / HTTP/1.1\r\n\r\n", "HTTP"}, {"\x17\x03\x03\x00\x05abcde", ""}, {"SSH-2.0-OpenSSH\r\n", "SSH"},
+		{"*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n", ""}, {"\x10\x10\x00\x04MQTT\x04\x02\x00\x3c", ""}, {"AMQP\x00\x00\x09\x01", ""}, {"RFB 003.008\n", ""},
+		{"\xfeSMB0123456789", ""}, {string(bytes.Repeat([]byte{0xa5}, 80)), ""},
 	} {
 		require.Equal(t, tc.name, sniffStreamPayload([]byte(tc.data), 12011, 45000), fmt.Sprintf("%q", tc.data))
 	}

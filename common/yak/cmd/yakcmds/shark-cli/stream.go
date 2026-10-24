@@ -4,6 +4,7 @@ import (
 	"container/list"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,7 @@ func connectionKey(network, transport gopacket.Flow) streamKey {
 }
 
 type streamChunk struct {
+	pdu       uint64
 	direction int
 	offset    uint64
 	gap       int // -1: capture starts midstream; >0: missing sequence bytes
@@ -48,6 +50,14 @@ type streamSide struct {
 	synSeq           uint32
 }
 type tcpStream struct {
+	nativeFlowID                                    uint64
+	protocolStack                                   []string
+	nativeIdentity                                  bool
+	firstReference, lastReference                   uint64
+	acceptedPacketNumber                            uint64
+	lastTLSRecordID                                 uint64
+	tlsRecordCount                                  uint8
+	sshEncrypted                                    [2]bool
 	first                                           time.Time
 	store                                           *streamStore
 	id                                              uint64
@@ -56,6 +66,7 @@ type tcpStream struct {
 	sides                                           [2]streamSide
 	chunks                                          []streamChunk
 	protocol, evidence, closed                      string
+	decodeDiagnostic                                string
 	packets, retransmits, outOfOrder, gaps, missing uint64
 	retained, omitted                               int
 	version                                         uint64
@@ -66,6 +77,8 @@ type tcpStream struct {
 // All assembly happens before the lossy display queue. The UI only reads copied
 // snapshots, so display skips and a pinned packet list cannot lose stream bytes.
 type streamStore struct {
+	udpConversations                map[udpConversationKey]*list.Element
+	udpLRU                          list.List
 	history                         *pcaputil.ProtocolInspector
 	mu                              sync.RWMutex
 	assembler                       *reassembly.Assembler
@@ -95,7 +108,10 @@ func newStreamStore(maxStreams, perStream int) *streamStore {
 	return s
 }
 
-type streamContext struct{ ci gopacket.CaptureInfo }
+type streamContext struct {
+	ci     gopacket.CaptureInfo
+	number uint64
+}
 
 func (c streamContext) GetCaptureInfo() gopacket.CaptureInfo { return c.ci }
 
@@ -121,6 +137,9 @@ func directionIndex(d reassembly.TCPFlowDirection) int {
 	return 0
 }
 func (r *tcpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassembly.TCPFlowDirection, next reassembly.Sequence, start *bool, ac reassembly.AssemblerContext) bool {
+	if c, ok := ac.(streamContext); ok {
+		r.acceptedPacketNumber = c.number
+	}
 	d := directionIndex(dir)
 	if tcp.SYN {
 		r.sides[d].syn, r.sides[d].synSeq = true, tcp.Seq
@@ -136,7 +155,12 @@ func (r *tcpStream) Accept(tcp *layers.TCP, ci gopacket.CaptureInfo, dir reassem
 	if r.first.IsZero() {
 		r.first = ci.Timestamp
 	}
-	r.last = ci.Timestamp
+	if ci.Timestamp.Before(r.first) {
+		r.first = ci.Timestamp
+	}
+	if ci.Timestamp.After(r.last) {
+		r.last = ci.Timestamp
+	}
 	if next >= 0 && len(tcp.Payload) > 0 {
 		diff := int32(tcp.Seq - uint32(next))
 		if diff < 0 {
@@ -179,7 +203,7 @@ func (r *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 			side.startKnown = side.syn && skip == 0 && side.bytes == 0
 		}
 		side.prefix = append(side.prefix, data[:min(n, streamPrefixLimit-len(side.prefix))]...)
-		if protocol := sniffStreamPayload(side.prefix, side.port, r.sides[1-d].port); protocol != "" {
+		if protocol := sniffStreamPayload(side.prefix, side.port, r.sides[1-d].port); protocol != "" && !r.nativeIdentity && r.store.history == nil {
 			if r.protocol != protocol || r.evidence != "bin-parser + verified prefix" {
 				r.protocol, r.evidence = protocol, "verified prefix"
 			}
@@ -207,10 +231,10 @@ func (r *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 		if skip == 0 && last.direction == d && len(last.data)+len(data) <= 16<<10 {
 			last.data = append(last.data, data...)
 		} else {
-			r.chunks = append(r.chunks, streamChunk{d, offset, skip, append([]byte(nil), data...)})
+			r.chunks = append(r.chunks, streamChunk{direction: d, offset: offset, gap: skip, data: append([]byte(nil), data...)})
 		}
 	} else {
-		r.chunks = append(r.chunks, streamChunk{d, offset, skip, append([]byte(nil), data...)})
+		r.chunks = append(r.chunks, streamChunk{direction: d, offset: offset, gap: skip, data: append([]byte(nil), data...)})
 	}
 	r.retained += len(data)
 	r.store.retained += len(data)
@@ -230,16 +254,39 @@ func (r *tcpStream) ReassemblyComplete(reassembly.AssemblerContext) bool {
 }
 
 func (s *streamStore) add(raw *capturedPacket) {
-	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	network := p.NetworkLayer()
-	tcp, ok := p.TransportLayer().(*layers.TCP)
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	network, selectedTransport := pcaputil.CaptureTransport(p)
+	tcp, ok := selectedTransport.(*layers.TCP)
 	if network == nil || !ok {
+		return
+	}
+	// gopacket can publish a partially initialized TCP layer before reporting
+	// a short header. Such endpoints cannot enter the assembler (their port
+	// formatters require two captured bytes).
+	if p.ErrorLayer() != nil || len(tcp.LayerContents()) < 20 || tcp.DataOffset < 5 {
 		return
 	}
 	key := connectionKey(network.NetworkFlow(), tcp.TransportFlow())
 	key.domain = pcaputil.PacketDomain(raw.data, raw.ci, raw.link)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if raw.tcpFlowID != 0 && !tcp.SYN && len(tcp.Payload) == 0 && s.active[key] == nil {
+		for e := s.lru.Back(); e != nil; e = e.Prev() {
+			r := e.Value.(*tcpStream)
+			if r.nativeFlowID == raw.tcpFlowID && r.key == key && r.closed != "" && !r.evicted {
+				r.packets++
+				r.version++
+				s.attachPacket(raw, r)
+				return
+			}
+		}
+	}
+	if r := s.active[key]; r != nil && r.closed == "RST" && !(tcp.SYN && !tcp.ACK) {
+		// Without a new SYN, late data and a new generation are ambiguous.
+		// Keep these packet rows unassociated instead of inheriting the old
+		// TLS/application identity or joining their bytes to a reset stream.
+		return
+	}
 	s.currentDomain = key.domain
 	assembler := s.assemblers[key.domain]
 	if assembler == nil {
@@ -262,7 +309,13 @@ func (s *streamStore) add(raw *capturedPacket) {
 	if r := s.active[key]; r != nil && tcp.SYN && !tcp.ACK {
 		sender := net.JoinHostPort(network.NetworkFlow().Src().String(), fmt.Sprint(uint16(tcp.SrcPort)))
 		for _, side := range r.sides {
-			if side.endpoint == sender && side.syn && side.synSeq != tcp.Seq {
+			if side.endpoint == sender && (side.syn && side.synSeq != tcp.Seq || !side.syn && r.nativeIdentity) {
+				if raw.tcpFlowID != 0 && r.nativeFlowID == raw.tcpFlowID {
+					// The core rejected a conflicting SYN in this generation.
+					// Do not reset the preview or its unrelated connections.
+					s.attachPacket(raw, r)
+					return
+				}
 				reused = true
 			}
 		}
@@ -274,27 +327,40 @@ func (s *streamStore) add(raw *capturedPacket) {
 		}
 		s.flushReason = ""
 	}
-	assembler.AssembleWithContext(network.NetworkFlow(), tcp, streamContext{raw.ci})
+	assembler.AssembleWithContext(network.NetworkFlow(), tcp, streamContext{ci: raw.ci, number: raw.number})
 	// A FIN/RST may close the stream during this call, so use the latest record
 	// for this key if it is no longer in the active map.
 	r := s.active[key]
 	if r == nil {
 		for e := s.lru.Back(); e != nil; e = e.Prev() {
-			if candidate := e.Value.(*tcpStream); candidate.key == key {
+			if candidate := e.Value.(*tcpStream); candidate.key == key && candidate.acceptedPacketNumber == raw.number {
 				r = candidate
 				break
 			}
 		}
 	}
 	if r != nil {
-		raw.streamID = r.id
-		raw.application, raw.evidence = r.protocol, r.evidence
-		if r.lru != nil {
-			s.lru.MoveToBack(r.lru)
-		}
+		r.nativeFlowID = raw.tcpFlowID
+		s.attachPacket(raw, r)
 	}
 	s.flushLocked(raw.ci.Timestamp)
 	s.trim()
+}
+
+func (s *streamStore) attachPacket(raw *capturedPacket, r *tcpStream) {
+	ref := raw.reference.Number
+	if ref == 0 {
+		ref = raw.number
+	}
+	if r.firstReference == 0 {
+		r.firstReference = ref
+	}
+	r.lastReference = ref
+	raw.streamID = r.id
+	raw.application, raw.evidence = r.protocol, r.evidence
+	if r.lru != nil {
+		s.lru.MoveToBack(r.lru)
+	}
 }
 
 func (s *streamStore) trim() {
@@ -363,6 +429,9 @@ func (s *streamStore) label(id uint64) (string, string) {
 }
 
 type streamSnapshot struct {
+	retentionNotice                                 string
+	transport                                       string
+	protocolStack                                   []string
 	domain                                          pcaputil.CaptureDomain
 	first, last                                     time.Time
 	events                                          []*pcaputil.ProtocolEvent
@@ -392,6 +461,7 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 		return nil
 	}
 	v := &streamSnapshot{first: r.first, last: r.last, id: r.id, version: r.version, protocol: r.protocol, evidence: r.evidence, closed: r.closed, packets: r.packets, retransmits: r.retransmits, outOfOrder: r.outOfOrder, gaps: r.gaps, missing: r.missing, omitted: r.omitted}
+	v.protocolStack = append([]string(nil), r.protocolStack...)
 	for d, side := range r.sides {
 		v.startKnown[d], v.prefixGap[d], v.prefixTime[d] = side.startKnown, side.broken, side.prefixTime
 		v.endpoints[d] = side.endpoint
@@ -410,6 +480,15 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 	return v
 }
 func (v *streamSnapshot) description() string {
+	if v.transport == "udp" {
+		return fmt.Sprintf("Conversation #%d · UDP › %s · retained datagrams", v.id & ^(uint64(1)<<63), strings.Join(v.protocolStack, " › "))
+	}
+	if len(v.protocolStack) > 0 {
+		return fmt.Sprintf("Stream #%d · TCP › %s · observed connection", v.id, strings.Join(v.protocolStack, " › "))
+	}
+	if p := presentEvents(v.events); p.protocol != "" {
+		return fmt.Sprintf("Stream #%d · TCP › %s · parsed messages", v.id, strings.Join(p.stack, " › "))
+	}
 	protocol := v.protocol
 	if protocol == "" {
 		protocol = "TCP / unidentified application"
@@ -439,6 +518,9 @@ func (s *streamStore) identify(id uint64, protocol string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r := s.records[id]; r != nil {
+		if r.nativeIdentity {
+			return false
+		}
 		verified := false
 		for d, side := range r.sides {
 			if sniffStreamPayload(side.prefix, side.port, r.sides[1-d].port) == protocol {

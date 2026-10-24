@@ -85,9 +85,17 @@ func (u *tui) selectFieldBytes() bool {
 	}
 	f := u.fields.fields[indices[u.fieldSelection]]
 	raw := u.inspectedPacket()
-	if !f.hasRange || raw == nil || f.start < 0 || f.end > len(raw.data) || f.end <= f.start {
+	if !f.hasRange || raw == nil || f.source < 0 || f.source > len(u.fields.sources) {
 		return false
 	}
+	data := raw.data
+	if f.source > 0 {
+		data = u.fields.sources[f.source-1].Data
+	}
+	if f.start < 0 || f.end > len(data) || f.end <= f.start {
+		return false
+	}
+	u.bytesSource = f.source
 	u.hexStart, u.hexEnd = f.start, f.end
 	perRow := bytesPerRow(u.viewport(2).w - 2)
 	u.setTop(2, f.start/perRow)
@@ -106,16 +114,16 @@ func (u *tui) selectByteAt(x, y int) {
 			break
 		}
 	}
-	raw := u.inspectedPacket()
+	data := u.byteData()
 	offset := (u.hexTop+y-r.y)*perRow + column
-	if column < 0 || raw == nil || offset < 0 || offset >= len(raw.data) {
+	if column < 0 || offset < 0 || offset >= len(data) {
 		return
 	}
 	u.touchFields()
 	u.hexStart, u.hexEnd = offset, offset+1
-	best, span := -1, len(raw.data)+1
+	best, span := -1, len(data)+1
 	for i, f := range u.fields.fields {
-		if f.hasRange && offset >= f.start && offset < f.end && f.end-f.start < span {
+		if f.hasRange && f.source == u.bytesSource && offset >= f.start && offset < f.end && f.end-f.start < span {
 			best, span = i, f.end-f.start
 		}
 	}
@@ -128,8 +136,22 @@ func (u *tui) selectByteAt(x, y int) {
 }
 
 func (u *tui) bytesLabel() string {
-	if u.hexEnd > u.hexStart {
-		return fmt.Sprintf("0x%x–0x%x · %d bytes", u.hexStart, u.hexEnd-1, u.hexEnd-u.hexStart)
+	label := "Captured frame"
+	if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
+		label = u.fields.sources[u.bytesSource-1].Name
 	}
-	return "hex / ascii · click to locate field"
+	if u.hexEnd > u.hexStart {
+		return fmt.Sprintf("%s · 0x%x–0x%x · %d bytes", label, u.hexStart, u.hexEnd-1, u.hexEnd-u.hexStart)
+	}
+	return label + " · b source · click bytes"
+}
+
+func (u *tui) byteData() []byte {
+	if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
+		return u.fields.sources[u.bytesSource-1].Data
+	}
+	if raw := u.inspectedPacket(); raw != nil {
+		return raw.data
+	}
+	return nil
 }

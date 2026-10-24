@@ -174,7 +174,7 @@ func probeRTSP(w []byte, limit int) ProbeResult {
 	if bytes.HasPrefix(w, []byte("RTSP/")) {
 		return probeAccept("rtsp", "1.0", 99)
 	}
-	if bytes.HasPrefix(w, []byte("GET ")) {
+	if bytes.HasPrefix(w, []byte("GET ")) || bytes.HasPrefix(w, []byte("POST ")) {
 		line, _, _ := bytes.Cut(w, []byte("\r\n"))
 		if bytes.HasSuffix(line, []byte(" RTSP/1.0")) {
 			return probeAccept("rtsp", "1.0", 98)
@@ -359,6 +359,10 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 				known = true
 			}
 		}
+		if (parts[0] == "GET" || parts[0] == "POST") && rtspAppleControlHeader(h) {
+			known = true
+			out["Profile"], out["CSeq Observed"] = "apple-control", true
+		}
 		if !known {
 			return nil, protocolError(ErrUnsupportedFeature, "RTSP method")
 		}
@@ -486,7 +490,7 @@ func rtspAppleControlHeader(h textproto.MIMEHeader) bool {
 			return true
 		}
 	}
-	return strings.HasPrefix(h.Get("Server"), "AirTunes/") || h.Get("Content-Type") == "application/x-apple-binary-plist"
+	return strings.HasPrefix(h.Get("Server"), "AirTunes/") || strings.HasPrefix(h.Get("User-Agent"), "AirPlay/") || strings.HasPrefix(h.Get("User-Agent"), "AirTunes/") || h.Get("Content-Type") == "application/x-apple-binary-plist"
 }
 
 func rtspAppleControlWire(wire []byte, max int) bool {

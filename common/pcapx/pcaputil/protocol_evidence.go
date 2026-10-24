@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"github.com/gopacket/gopacket"
@@ -69,6 +70,23 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 			outer = a + "~" + b
 		}
 		switch v := l.(type) {
+		case *capturePIM:
+			if v.Type == 1 && !v.NullRegister && v.ChecksumVerified {
+				e.Ref.Domain.Encapsulation += "/pim-register:" + outer
+			}
+		case *captureERSPAN3:
+			e.Ref.Domain.Encapsulation += fmt.Sprintf("/erspan3:%d:%d:%t:%d:%d", v.SessionID, v.HardwareID, v.OptionalPlatform, v.PlatformID, v.SourceIndex)
+			if v.PlatformID == 1 && v.OptionalPlatform {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf(":vsm%d", binary.BigEndian.Uint32(v.contents[12:])&0xfff)
+			}
+		case *captureMPacket:
+			e.Ref.Domain.Encapsulation += "/mpacket:express"
+		case *layers.PPPoE:
+			e.Ref.Domain.Encapsulation += fmt.Sprintf("/pppoe:%d", v.SessionId)
+		case *layers.IPv6:
+			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/ip6-tunnel:%s:%d", outer, v.NextHeader)
+			}
 		case *capturePPILayer:
 			e.Ref.Domain.Encapsulation += "/ppi:ethernet"
 			if v.aggregation {
@@ -247,18 +265,49 @@ func CapturePacketReference(ci gopacket.CaptureInfo) PacketReference { return ev
 // PacketEventIDs finds retained PDUs contributed by this packet, including
 // PDUs completed by later packets. Evicted history is deliberately unavailable.
 func (v *ProtocolInspector) PacketEventIDs(ref PacketReference, limit int) []uint64 {
+	return v.packetEventIDs(ref, limit, false)
+}
+
+// PhysicalPacketEventIDs finds all retained PDUs contributing to a capture
+// record, including an encapsulation discovered after outer reassembly. It
+// ignores Encapsulation but preserves section/interface. Use only when record
+// numbers are globally unique in that capture, as assigned by CaptureReader.
+// PacketEventIDs retains exact domain matching for caller-supplied references.
+func (v *ProtocolInspector) PhysicalPacketEventIDs(ref PacketReference, limit int) []uint64 {
+	return v.packetEventIDs(ref, limit, true)
+}
+func (v *ProtocolInspector) packetEventIDs(ref PacketReference, limit int, physical bool) []uint64 {
 	if limit <= 0 || limit > 128 {
 		limit = 128
 	}
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	var ids []uint64
+	if physical {
+		ref = physicalReference(ref)
+	}
+	if v.unindexed == 0 {
+		entries := v.byPacket[ref]
+		if physical {
+			entries = v.byPhysical[ref]
+		}
+		for _, row := range entries {
+			ids = append(ids, row.ID)
+			if len(ids) >= limit {
+				break
+			}
+		}
+		return ids
+	}
 	for i := 0; i < v.count; i++ {
 		row := v.rows[(v.head+i)%len(v.rows)]
 		if row == nil {
 			continue
 		}
 		for _, r := range row.SourceBytes.PacketRefs {
+			if physical {
+				r = physicalReference(r)
+			}
 			if r == ref {
 				ids = append(ids, row.ID)
 				break
