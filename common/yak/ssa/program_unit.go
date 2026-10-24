@@ -495,9 +495,9 @@ func shouldKeepFunctionForCrossUnitReference(fn *Function) bool {
 // heap than the live heap, and that unused part is at least 1GiB.
 // GOMEMLIMIT on a large machine lets RSS stay at the high-water mark long
 // after a batch has dropped its values, so the next batch has no headroom.
-func shouldReturnIdleHeap(inuse, unreleased uint64) bool {
+func shouldReturnIdleHeap(_, unreleased uint64) bool {
 	const floor = 1 << 30
-	return unreleased > floor && unreleased > inuse/2
+	return unreleased > floor
 }
 
 func idleHeapUnreleased(m runtime.MemStats) uint64 {

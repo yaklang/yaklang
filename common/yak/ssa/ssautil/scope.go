@@ -534,6 +534,17 @@ func (scope *ScopedVersionedTable[T]) UnlinkValue(value T) {
 // TrimSettledVersion unlinks one persisted ordinary version. The lexical head
 // stays, so ReadVariable order does not change; callers that already hold the
 // removed version keep its id and reload path.
+// DropName removes one lexical name and every version under it. The
+// caller has already detached the values that must stay reloadable by id.
+func (scope *ScopedVersionedTable[T]) DropName(name string) {
+	if scope == nil || name == "" {
+		return
+	}
+	scope.linkMu.Lock()
+	scope.linkValues.Delete(name)
+	scope.linkMu.Unlock()
+}
+
 func (scope *ScopedVersionedTable[T]) TrimSettledVersion(variable VersionedIF[T]) bool {
 	if scope == nil || variable == nil {
 		return false

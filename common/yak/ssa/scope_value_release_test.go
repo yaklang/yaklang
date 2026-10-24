@@ -262,6 +262,27 @@ func TestReleaseDropsScopeThatOnlyMentionsCapturedValue(t *testing.T) {
 	require.Nil(t, otherB.CurrentBlock.ScopeTable, "loading a value captured elsewhere must not pin this scope")
 }
 
+func TestReleaseDropsUncapturedNamesFromCapturingFunction(t *testing.T) {
+	prog := newSplitWriteProgram(t)
+	fn := prog.NewFunction("owner")
+	b := fn.GetOrCreateBuilder()
+	shared := b.EmitConstInst("shared")
+	sharedVar := b.CreateVariable("shared")
+	b.AssignVariable(sharedVar, shared)
+	noteCapturedByClosure(shared, "shared")
+	b.capturedNames.Set("shared", struct{}{})
+	local := b.EmitConstInst("local")
+	localVar := b.CreateVariable("local")
+	b.AssignVariable(localVar, local)
+	scope := b.CurrentBlock.ScopeTable
+	persistFinished(t, fn)
+
+	require.Greater(t, prog.ReleasePersistedOrdinaryValues(), 0)
+	require.NotNil(t, b.CurrentBlock.ScopeTable, "a real capture keeps the scope")
+	require.NotNil(t, scope.ReadVariable("shared"))
+	require.Nil(t, scope.ReadVariable("local"), "uncaptured locals must leave the capturing scope")
+}
+
 // Package entry functions stay unfinished so a later batch can still emit.
 // Their saved ordinary values must still leave the scope.
 func TestReleaseDropsPersistedPackageEntryValues(t *testing.T) {

@@ -163,6 +163,16 @@ func (m linkNodeMap[T]) GetHead(key string) VersionedIF[T] {
 	return nil
 }
 
+func (m linkNodeMap[T]) Delete(key string) {
+	if m.val == nil || key == "" {
+		return
+	}
+	m.val.Delete(key)
+	if m.locals != nil {
+		delete(m.locals, key)
+	}
+}
+
 func (m linkNodeMap[T]) ForEach(handler VariableHandler[T]) {
 	m.val.ForEach(func(k string, v *LinkNode[T]) bool {
 		handler(k, v.Last())
