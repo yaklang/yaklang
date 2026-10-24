@@ -98,8 +98,16 @@ func (b *FunctionBuilder) GetGlobalVariableR(name string) Value {
 	return nil
 }
 
+// One method used to copy every global's member pairs into its own
+// scope. A package with many maps under the per-object cap made one
+// LoadGlobalVariable allocate millions of versions and pushed batch 105
+// through the host RAM. The object itself is still bound; only the
+// pre-seeded member names are capped.
+const maxGlobalMemberRestores = 1024
+
 func (b *FunctionBuilder) LoadGlobalVariable() {
 	prog := b.GetProgram()
+	restoredMembers := 0
 
 	if utils.IsNil(prog) || utils.IsNil(prog.GlobalVariablesBlueprint) {
 		return
@@ -141,10 +149,16 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 		// entries): restoring all of them per block is O(N) and only needed
 		// within the declaring file, not cross-file. Normal globals have a
 		// handful of member call results.
+		if restoredMembers >= maxGlobalMemberRestores {
+			continue
+		}
 		if av, ok := ToValue(member); ok && av != nil {
 			rawAv := av.getAnValue()
 			if pairs := rawAv.snapshotMemberPairs(); len(pairs) <= 5000 {
 				for _, pair := range pairs {
+					if restoredMembers >= maxGlobalMemberRestores {
+						break
+					}
 					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
 					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)
 					if !ok1 || !ok2 {
@@ -172,6 +186,7 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 						continue
 					}
 					b.AssignVariable(mcVar, memberVal)
+					restoredMembers++
 				}
 			}
 		}
