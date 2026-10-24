@@ -1,8 +1,6 @@
 package ssa
 
 import (
-	"fmt"
-
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -98,16 +96,8 @@ func (b *FunctionBuilder) GetGlobalVariableR(name string) Value {
 	return nil
 }
 
-// One method used to copy every global's member pairs into its own
-// scope. A package with many maps under the per-object cap made one
-// LoadGlobalVariable allocate millions of versions and pushed batch 105
-// through the host RAM. The object itself is still bound; only the
-// pre-seeded member names are capped.
-const maxGlobalMemberRestores = 1024
-
 func (b *FunctionBuilder) LoadGlobalVariable() {
 	prog := b.GetProgram()
-	restoredMembers := 0
 
 	if utils.IsNil(prog) || utils.IsNil(prog.GlobalVariablesBlueprint) {
 		return
@@ -144,52 +134,10 @@ func (b *FunctionBuilder) LoadGlobalVariable() {
 		}
 		b.AssignVariable(variable, member)
 
-		// Restore member call results for this global variable.
-		// Skip globals with huge memberPairs (e.g. gb2312 map with 21792
-		// entries): restoring all of them per block is O(N) and only needed
-		// within the declaring file, not cross-file. Normal globals have a
-		// handful of member call results.
-		if restoredMembers >= maxGlobalMemberRestores {
-			continue
-		}
-		if av, ok := ToValue(member); ok && av != nil {
-			rawAv := av.getAnValue()
-			if pairs := rawAv.snapshotMemberPairs(); len(pairs) <= 5000 {
-				for _, pair := range pairs {
-					if restoredMembers >= maxGlobalMemberRestores {
-						break
-					}
-					keyVal, ok1 := rawAv.resolveLinkedValue(pair.key)
-					memberVal, ok2 := rawAv.resolveLinkedValue(pair.member)
-					if !ok1 || !ok2 {
-						continue
-					}
-					keyStr := GetKeyString(keyVal)
-					if keyStr == "" {
-						continue
-					}
-					// Member call variable name must match the format used
-					// by checkCanMemberCallExist:
-					// - Number key (slice index):  #objectId[number]
-					// - String key (map/struct):   #objectId.keyStr
-					var mcName string
-					if constInst, ok := ToConstInst(keyVal); ok && constInst.IsNumber() {
-						mcName = fmt.Sprintf("#%d[%d]", member.GetId(), constInst.Number())
-					} else {
-						mcName = fmt.Sprintf("#%d.%s", member.GetId(), keyStr)
-					}
-					mcVar := b.CreateVariableCross(mcName)
-					if mcVar == nil {
-						continue
-					}
-					if cur := mcVar.GetValue(); !utils.IsNil(cur) && cur.GetId() == memberVal.GetId() {
-						continue
-					}
-					b.AssignVariable(mcVar, memberVal)
-					restoredMembers++
-				}
-			}
-		}
+		// Member call values stay attached to the global object. ReadMemberCallValue
+		// resolves them from that object on demand; copying every member relation
+		// into every function scope duplicates values and version chains.
+
 	}
 }
 

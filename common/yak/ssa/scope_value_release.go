@@ -159,53 +159,6 @@ func (prog *Program) DetachFinishedFunctionBodyScopes() {
 	visit(app)
 }
 
-// releaseOneFinishedFunction drops one finished function's body as soon
-// as it is saved. The batch barrier still walks anything this missed.
-func (prog *Program) releaseOneFinishedFunction(fn *Function) {
-	if prog == nil || fn == nil || !fn.finished || fn.IsExtern() || fn.bodyScopesDetached {
-		return
-	}
-	if isLongLivedPackageFunction(fn) || isLiveContainerFunction(fn) {
-		return
-	}
-	if prog.Cache == nil || prog.Cache.instructions == nil || !prog.Cache.HaveDatabaseBackend() {
-		return
-	}
-	prog.Cache.FlushInstructionSaver()
-	if prog.Cache.indexes != nil && prog.Cache.indexes.offsetSaver != nil {
-		_ = prog.Cache.indexes.offsetSaver.Flush()
-	}
-	reload := func(id int64) (Value, bool) {
-		inst := prog.Cache.instructions.reloadPersistedInstruction(id)
-		if utils.IsNil(inst) {
-			return nil, false
-		}
-		value, ok := ToValue(inst)
-		return value, ok && !utils.IsNil(value)
-	}
-	visited := map[*ScopeInstance]struct{}{}
-	releaseFunctionScopeOrdinaryValues(prog, fn, visited, reload)
-	if functionScopeRetainsCapture(prog, fn) {
-		dropUncapturedScopeNames(prog, fn)
-		prog.ReleaseSettledIndexes()
-		releasePersistedOffsetValues(prog)
-		return
-	}
-	clearFunctionBodyScopes(prog, fn)
-	fn.bodyScopesDetached = true
-	fn.builder = nil
-	bodyBlocks := map[*instructionStore][]int64{}
-	collectFinishedBodyBlocks(bodyBlocks, prog, fn)
-	if !shouldKeepFunctionForCrossUnitReference(fn) {
-		fn.Blocks = nil
-	}
-	for store, ids := range bodyBlocks {
-		dropFinishedBodyBlocks(store, ids)
-	}
-	prog.ReleaseSettledIndexes()
-	releasePersistedOffsetValues(prog)
-}
-
 func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStore][]int64) int {
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return 0
