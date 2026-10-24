@@ -82,6 +82,21 @@ func TestResidencyCache(t *testing.T) {
 	require.Equal(t, "1", loaded)
 }
 
+func TestResidencyCache_GetDoesNotCancelFlush(t *testing.T) {
+	cache := dbcache.NewResidencyCacheWithKey[int, string](0, 0, nil, nil)
+	cache.Set(1, "flush-me")
+	requests := cache.MarkPending([]int{1}, utils.EvictionReasonCapacityReached)
+	require.Len(t, requests, 1)
+	_, ok := cache.GetResident(1)
+	require.True(t, ok)
+	value, ok := cache.SnapshotForPersist(1, requests[0].Generation)
+	require.True(t, ok, "a read must not cancel a capacity flush")
+	require.Equal(t, "flush-me", value)
+	cache.FinishPersist(1, requests[0].Generation, true)
+	_, ok = cache.GetResident(1)
+	require.False(t, ok, "a flush queued before the read must still delete the resident entry")
+}
+
 func TestResidencyCache_GetReactivatesPendingEntry(t *testing.T) {
 	database := utils.NewSafeMapWithKey[int, string]()
 	ttl := 50 * time.Millisecond
