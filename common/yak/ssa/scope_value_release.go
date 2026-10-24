@@ -37,6 +37,7 @@ func (prog *Program) ReleasePersistedOrdinaryValues() int {
 		app = prog
 	}
 	released := 0
+	bodyBlocks := map[*instructionStore][]int64{}
 	seen := map[*Program]struct{}{}
 	var visit func(*Program)
 	visit = func(p *Program) {
@@ -47,7 +48,7 @@ func (prog *Program) ReleasePersistedOrdinaryValues() int {
 			return
 		}
 		seen[p] = struct{}{}
-		released += releaseProgramOrdinaryValues(p)
+		released += releaseProgramOrdinaryValues(p, bodyBlocks)
 		released += releasePersistedOffsetValues(p)
 		if p.UpStream == nil {
 			return
@@ -58,6 +59,9 @@ func (prog *Program) ReleasePersistedOrdinaryValues() int {
 		})
 	}
 	visit(app)
+	for store, ids := range bodyBlocks {
+		dropFinishedBodyBlocks(store, ids)
+	}
 	return released
 }
 
@@ -111,7 +115,7 @@ func releasePersistedOffsetValues(prog *Program) int {
 	return released
 }
 
-func releaseProgramOrdinaryValues(prog *Program) int {
+func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStore][]int64) int {
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return 0
 	}
@@ -154,6 +158,10 @@ func releaseProgramOrdinaryValues(prog *Program) int {
 		if !functionScopeRetainsCapture(prog, fn) && !isLiveContainerFunction(fn) {
 			clearFunctionBodyScopes(prog, fn)
 			fn.builder = nil
+			// Flush keeps these blocks: a BasicBlock is a boundary instruction.
+			// The scope is already detached, so the object itself is only weight.
+			// Collect the ids and save-then-drop them once for the whole release.
+			collectFinishedBodyBlocks(bodyBlocks, prog, fn)
 		} else if !shouldKeepFunctionForCrossUnitReference(fn) {
 			fn.builder = nil
 		}
@@ -251,6 +259,71 @@ func clearFunctionBodyScopes(prog *Program, fn *Function) {
 		}
 		detachScope(block.ScopeTable)
 		block.ScopeTable = nil
+	}
+}
+
+func collectFinishedBodyBlocks(dst map[*instructionStore][]int64, prog *Program, fn *Function) {
+	if dst == nil || prog == nil || fn == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return
+	}
+	store := prog.Cache.instructions
+	add := func(id int64) {
+		if id <= 0 {
+			return
+		}
+		dst[store] = append(dst[store], id)
+	}
+	for _, id := range fn.Blocks {
+		add(id)
+	}
+	add(fn.EnterBlock)
+	add(fn.ExitBlock)
+}
+
+// dropFinishedBodyBlocks saves body blocks that are still only in memory,
+// then removes them from the resident cache. Delete without a completed save
+// would drop the CFG row. Already-persisted rows are removed immediately.
+func dropFinishedBodyBlocks(store *instructionStore, ids []int64) {
+	if store == nil || len(ids) == 0 {
+		return
+	}
+	seen := map[int64]struct{}{}
+	pending := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			continue
+		}
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if store.writer != nil {
+			if _, resident := store.writer.GetResident(id); !resident {
+				continue
+			}
+			if store.isPersisted(id) {
+				store.writer.DeleteIfSettled(id)
+				continue
+			}
+			store.reserveID(id)
+			pending = append(pending, id)
+			continue
+		}
+		if store.residentCache != nil && store.isPersisted(id) {
+			store.residentCache.DeleteClean(id)
+		}
+	}
+	if store.writer == nil || len(pending) == 0 {
+		return
+	}
+	store.writer.MarkDirty(pending, utils.EvictionReasonCapacityReached)
+	if err := store.writer.Barrier(); err != nil {
+		return
+	}
+	for _, id := range pending {
+		if store.isPersisted(id) {
+			store.writer.Delete(id)
+		}
 	}
 }
 
