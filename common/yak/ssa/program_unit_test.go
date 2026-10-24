@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	javaparser "github.com/yaklang/yaklang/common/yak/java/parser"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -62,6 +63,40 @@ func newTestProgramForUnitRelease(t *testing.T, name string) *Program {
 	require.NoError(t, err)
 	cfg.SetCompileUnitSplit(true)
 	return NewProgram(cfg, ProgramCacheDBWrite, Application, nil, "", 1)
+}
+
+// Finishing a private function and running a unit flush must release its
+// builder so the function skeleton no longer pins CurrentBlock and its scope.
+func TestReleaseCompletedUnitMemoryDropsPrivateFunctionBuilder(t *testing.T) {
+	prog := newTestProgramForUnitRelease(t, "drop-private-builder")
+	prog.BeginCompileUnit("dir:pkg")
+	builder := prog.GetAndCreateFunctionBuilder("", "helper")
+	fn := builder.Function
+	builder.EmitConstInst(1)
+	builder.Finish()
+	prog.EndCompileUnit()
+
+	require.NotNil(t, fn.builder)
+	released := prog.ReleaseCompletedUnitMemory([]string{"dir:pkg"})
+	require.Greater(t, released, 0)
+	prog.ReleasePersistedOrdinaryValues()
+	require.Nil(t, fn.builder, "private finished function must drop its builder after scope release")
+	require.Empty(t, fn.Blocks)
+	require.NoError(t, prog.Cache.SaveToDatabase())
+}
+
+// One-off ANTLR caches created by CreateAntlrCache must not stay pinned in
+// PreHandlerBase.Caches once a worker cache is used: GetAntlrCache is called
+// per worker and per external file, and keeping every cache in a slice retains
+// every past batch's DFA until compile end.
+func TestCreateAntlrCacheDoesNotAccumulateInPreHandlerBase(t *testing.T) {
+	base := NewPreHandlerBase()
+	cache := base.CreateAntlrCache(
+		javaparser.GetJavaLexerSerializedATN(),
+		javaparser.GetJavaParserSerializedATN(),
+	)
+	require.NotNil(t, cache)
+	require.Empty(t, base.Caches, "CreateAntlrCache must not retain worker caches on the shared builder")
 }
 
 // Finish must tolerate a body that was already released. ReleaseCompletedUnitMemory

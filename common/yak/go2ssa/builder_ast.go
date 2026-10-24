@@ -576,10 +576,11 @@ func (b *astbuilder) buildVarSpec(varSpec *gol.VarSpecContext, isglobal bool) {
 		}
 		registerExpr := func(id string, expr *gol.ExpressionContext) {
 			checkCannotAssign(id)
+			capturedExpr := ssa.DetachAST(expr)
 			b.AddGlobalVariable(id, func() ssa.Value {
 				switchHandler := b.SwitchFunctionBuilder(store)
 				defer switchHandler()
-				rightv, _ := b.buildExpression(expr, false)
+				rightv, _ := b.buildExpression(capturedExpr, false)
 				return rightv
 			})
 		}
