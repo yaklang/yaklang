@@ -135,7 +135,7 @@ func (b *astbuilder) build(ast *gol.SourceFileContext) {
 
 			for i, name := range names {
 				pathl := strings.Split(paths[i], "/")
-				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], impo.(*gol.ImportDeclContext).ImportSpec(i))
+				b.SetImportPackage(name, pathl[len(pathl)-1], paths[i], ssa.DetachAST(impo.(*gol.ImportDeclContext).ImportSpec(i)))
 				importUseNames = append(importUseNames, name)
 			}
 		}

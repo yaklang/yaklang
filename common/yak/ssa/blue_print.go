@@ -471,6 +471,14 @@ func (c *Blueprint) storeField(name string, val Value, _type BlueprintFieldKind)
 	unlock := fn.lockEmit()
 	defer unlock()
 	builder := fn.builder
+	if builder == nil || builder.CurrentBlock == nil {
+		// A finished container may have had its body scopes released. Rebuild
+		// the placeholder scope so a later static field can still be stored.
+		builder = fn.GetOrCreateBuilder()
+	}
+	if builder == nil || builder.CurrentBlock == nil {
+		return
+	}
 	createVariable(builder, builder.CreateMemberCallVariable(c._container, builder.EmitConstInstPlaceholder(name)))
 }
 

@@ -109,3 +109,24 @@ func TestFunctionFinishWithoutBlocksDoesNotPanic(t *testing.T) {
 	require.NotPanics(t, func() { builder.Function.Finish() })
 	require.NoError(t, prog.Cache.SaveToDatabase())
 }
+
+// A frontend may start a compile unit on a directory library and then create a
+// separate package library inside the prehandler. Deferred tasks registered on
+// that package library must inherit the same unit key so the batch runner
+// drains and releases them instead of keeping them until compile end.
+func TestBeginCompileUnitOnLibraryIsVisibleToSiblingLibrary(t *testing.T) {
+	app := newTestProgramForUnitRelease(t, "unit-visible-across-libs")
+	dirLib := app.EnsureLibraryForCompileUnit("dir:foo/bar")
+	dirLib.BeginCompileUnit("dir:foo/bar")
+	pkgLib := app.NewLibrary("bar", []string{"foo", "bar"})
+	require.Equal(t, "dir:foo/bar", pkgLib.CurrentCompileUnit())
+	ran := false
+	pkgLib.RegisterDeferredBuild(DeferredBuildKindBinding, "test-bind", func() {
+		ran = true
+	})
+	dirLib.EndCompileUnit()
+	require.Empty(t, pkgLib.CurrentCompileUnit())
+	require.True(t, app.RunDeferredBuildsForUnitsOfKind([]string{"dir:foo/bar"}, DeferredBuildKindBinding, nil, nil))
+	require.True(t, ran, "deferred task on sibling library must match the active unit")
+	require.NoError(t, app.Cache.SaveToDatabase())
+}

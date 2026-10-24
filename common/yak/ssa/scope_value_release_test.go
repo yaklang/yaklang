@@ -101,8 +101,7 @@ func TestReleasePersistedOrdinaryValueVersions(t *testing.T) {
 		require.NotNil(t, reloaded)
 		require.Equal(t, ids[i], reloaded.GetId(), "historical variable lookup must keep its own saved instruction")
 	}
-	current := builder.CurrentBlock.ScopeTable.ReadVariable("local")
-	require.Same(t, variables[len(variables)-1], current, "release must not change lexical version order")
+	require.Nil(t, builder.CurrentBlock.ScopeTable, "a finished body with no closure capture must drop its scope table")
 }
 
 func TestReleaseTrimsSettledOrdinaryVersionChain(t *testing.T) {
@@ -212,6 +211,7 @@ func TestReleaseKeepsExportedAndCapturedValues(t *testing.T) {
 	require.NotNil(t, reloaded)
 	require.Equal(t, originalID, reloaded.GetId())
 	require.False(t, reloaded == exportedValue, "reload must not keep the detached local")
+	require.Nil(t, exportedFn.builder, "a finished exported body must not keep its builder")
 	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(exportedFn.GetId()), "the function object stays resident for cross-unit calls")
 	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(param.GetId()), "parameters stay resident for call binding")
 	gotParam, ok := exportedFn.GetValueById(param.GetId())
