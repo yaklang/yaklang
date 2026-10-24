@@ -134,8 +134,6 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		"DUP":           flags&8 != 0,
 		"Context Level": "observed",
 	}
-	info["Protocol Level"] = m.level
-	info["Version Name"] = map[byte]string{3: "3.1", 4: "3.1.1", 5: "5.0"}[m.level]
 	if meta, ok := result["metadata"].(map[string]any); ok {
 		if v, ok := meta["Topic Alias"]; ok {
 			info["Topic Alias"] = v
@@ -302,19 +300,7 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			m.aliasBytes += aliasDelta
 		}
 		info["Topic Name"] = topic
-		payloadAt := 2 + int(binary.BigEndian.Uint16(body[:2]))
-		if qos > 0 {
-			payloadAt += 2
-		}
-		if m.level == 5 {
-			n, h, _ := mqtt5SkipVBI(body[payloadAt:])
-			payloadAt += n + h
-		}
-		if payloadAt <= len(body) {
-			info["Payload Bytes"] = len(body) - payloadAt
-			info["Payload"] = body[payloadAt:]
-			info["Payload Offset"] = header + payloadAt
-		}
+
 		if qos > 0 {
 			info["Packet Identifier"] = uint64(pid)
 			next := "PUBACK"

@@ -14,6 +14,10 @@ func TestNativeSSDPDatagramsDoNotUsePortStickiness(t *testing.T) {
 	require.Equal(t, "ssdp", e.Protocol)
 	require.Equal(t, "decoded", e.Status, e.Error)
 	require.Zero(t, e.FlowID)
+	extra := &ProtocolEvent{}
+	require.True(t, a.decodeNativeDatagram(extra, append(append([]byte(nil), w...), '\r', '\n'), 15978, 1900))
+	require.Equal(t, "decoded", extra.Status, extra.Error)
+	require.NotEmpty(t, extra.Session["Conformance Warnings"])
 	f, err := e.GetFields()
 	require.NoError(t, err)
 	require.Equal(t, uint64(66), f["Maximum Age Seconds"])

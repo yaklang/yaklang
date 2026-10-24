@@ -98,6 +98,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			networks++
 		}
 		switch v := l.(type) {
+		case *capturePIM:
+			if v.Type == 1 && !v.NullRegister {
+				tunnels++
+			}
 		case *layers.GRE, *layers.VXLAN:
 			tunnels++
 		case *layers.Geneve:
@@ -112,6 +116,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			}
 		case *layers.IPv4:
 			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
+				tunnels++
+			}
+		case *layers.IPv6:
+			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
 				tunnels++
 			}
 		}

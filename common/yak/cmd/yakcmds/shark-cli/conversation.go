@@ -174,7 +174,7 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 	for _, id := range raw.eventIDs {
 		targets[id] = true
 	}
-	for _, id := range raw.history.PacketEventIDs(raw.reference, 128) {
+	for _, id := range raw.historyPacketEventIDs() {
 		targets[id] = true
 	}
 	for i, meta := range metadata {

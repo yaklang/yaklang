@@ -252,7 +252,7 @@ func TestBinParserCoalescedMessageLimitAndBindingIndex(t *testing.T) {
 	var events []*BinParserEvent
 	var stats BinParserStats
 	// MQTT 3.x now accounts negotiated session state as well as wire buffers.
-	config := BinParserConfig{MaxMessageBytes: 64, MaxBufferedBytes: 1024, OnEvent: func(e *BinParserEvent) { events = append(events, e) }, OnStats: func(s BinParserStats) { stats = s }}
+	config := BinParserConfig{MaxMessageBytes: 64, MaxBufferedBytes: 128, OnEvent: func(e *BinParserEvent) { events = append(events, e) }, OnStats: func(s BinParserStats) { stats = s }}
 	publish := binMQTTPublish(58)
 	wire := string(append(append([]byte{}, publish...), publish...))
 	steps := []tcpStep{{seq: 0, syn: true}, {seq: 1, data: string(binMQTTConnect)}, {seq: 17, data: wire[:50]}, {seq: 67, data: wire[50:]}}

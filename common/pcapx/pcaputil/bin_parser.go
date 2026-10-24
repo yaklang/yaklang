@@ -1915,6 +1915,11 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 type ProtocolInspector struct {
 	mu                           sync.Mutex
 	rows                         []*protocolHistoryEntry
+	byID                         map[uint64][]*protocolHistoryEntry
+	byPacket                     map[PacketReference][]*protocolHistoryEntry
+	byPhysical                   map[PacketReference][]*protocolHistoryEntry
+	packetIndexLinks, unindexed  int
+	packetIndexLimit             int
 	head, count, bytes, maxBytes int
 	evicted                      uint64
 	received                     uint64
@@ -1922,7 +1927,8 @@ type ProtocolInspector struct {
 
 type protocolHistoryEntry struct {
 	BinParserEvent
-	retainedCost int
+	retainedCost  int
+	packetIndexed bool
 }
 
 // BinParserInspector is retained for source compatibility. Use ProtocolInspector.
@@ -1932,7 +1938,7 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
 		return nil, errors.New("inspector requires positive bounded message/byte limits")
 	}
-	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes}, nil
+	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(64<<10, max(1, bytes/128))}, nil
 }
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
@@ -1959,6 +1965,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	v.received++
 	row.historySequence = v.received
 	for v.count > 0 && (v.count == len(v.rows) || row.retainedCost > v.maxBytes-v.bytes) {
+		v.unindex(v.rows[v.head])
 		v.bytes -= v.rows[v.head].retainedCost
 		v.rows[v.head] = nil
 		v.head = (v.head + 1) % len(v.rows)
@@ -1968,6 +1975,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	v.rows[(v.head+v.count)%len(v.rows)] = &row
 	v.count++
 	v.bytes += row.retainedCost
+	v.index(&row)
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -1992,20 +2000,17 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 	v.mu.Lock()
 	var row *BinParserEvent
-	for i := 0; i < v.count; i++ {
-		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
-		if e.ID == id {
-			copyEvent := *e
-			cloneEvidence(&copyEvent)
-			copyEvent.Structured = cloneSession(e.Structured)
-			copyEvent.semanticFields = cloneSession(e.semanticFields)
-			copyEvent.semanticSession = cloneSession(e.semanticSession)
-			copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
-			copyEvent.Session = cloneSession(e.Session)
-			copyEvent.Raw = append([]byte(nil), e.Raw...)
-			row = &copyEvent
-			break
-		}
+	if entries := v.byID[id]; len(entries) != 0 {
+		e := &entries[0].BinParserEvent
+		copyEvent := *e
+		cloneEvidence(&copyEvent)
+		copyEvent.Structured = cloneSession(e.Structured)
+		copyEvent.semanticFields = cloneSession(e.semanticFields)
+		copyEvent.semanticSession = cloneSession(e.semanticSession)
+		copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
+		copyEvent.Session = cloneSession(e.Session)
+		copyEvent.Raw = append([]byte(nil), e.Raw...)
+		row = &copyEvent
 	}
 	v.mu.Unlock()
 	if row == nil {

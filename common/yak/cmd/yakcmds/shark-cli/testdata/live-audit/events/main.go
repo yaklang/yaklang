@@ -23,8 +23,10 @@ func main() {
 	opts := []pcaputil.CaptureOption{pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		fields, err := e.GetFields()
 		message := map[string]any{"id": e.ID, "flow": e.FlowID, "protocol": e.Protocol, "status": e.Status, "profile": e.Profile, "completeness": e.Completeness, "summary": e.Summary, "expert": e.ExpertCode, "source_bytes": e.SourceBytes, "fields": fields, "session": e.Session}
+		message["field_values"] = e.DisplayFieldValues()
 		message["raw"], message["entry"], message["admission"] = e.Raw, e.Entry, e.Admission
 		message["source"], message["destination"], message["direction"] = e.Source, e.Destination, e.Direction
+		message["transport"], message["domain"] = e.Transport, e.Domain
 		message["transaction"], message["response_to"] = e.TransactionID, e.ResponseTo
 		if err != nil {
 			message["fields_error"] = err.Error()
@@ -42,6 +44,10 @@ func main() {
 		opts = append(opts, pcaputil.WithTLSSecrets(keys))
 	}
 	for _, arg := range os.Args[min(4, len(os.Args)):] {
+		if arg == "--ignore-embedded-secrets" {
+			opts = append(opts, pcaputil.WithIgnoreEmbeddedSecrets(true))
+			continue
+		}
 		parts := strings.Split(arg, ":")
 		if len(parts) != 3 {
 			panic("expected udp:PORT:PROFILE")

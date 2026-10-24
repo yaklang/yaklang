@@ -46,6 +46,7 @@ type CaptureConfig struct {
 	outputFile            string
 	captureBuffer         int
 	normalizePcapLength   bool
+	ignoreEmbeddedSecrets bool
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
 	Context               context.Context
@@ -80,6 +81,12 @@ type CaptureOption func(*CaptureConfig) error
 // PCAPNG validation is unchanged. Native/live sources reject this option.
 func WithLegacyPcapLengthNormalization(enabled bool) CaptureOption {
 	return func(c *CaptureConfig) error { c.normalizePcapLength = enabled; return nil }
+}
+
+// WithIgnoreEmbeddedSecrets validates and discards PCAPNG secret blocks during
+// offline replay. It never enables decryption; keys must be supplied separately.
+func WithIgnoreEmbeddedSecrets(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error { c.ignoreEmbeddedSecrets = enabled; return nil }
 }
 
 func emptyOption(_ *CaptureConfig) error {
@@ -131,8 +138,9 @@ func WithBeforeTransportPacket(h func(gopacket.Packet)) CaptureOption {
 	}
 }
 
-// WithOnTrafficFlowPacket observes admitted TCP packets before their payload is
-// fed to reassembly, including handshake/control packets and retransmissions.
+// WithOnTrafficFlowPacket observes TCP packets associated with a flow before
+// sequence validation and reassembly, including control packets and retransmissions.
+// Association does not imply that a segment's sequence or payload is accepted.
 // References own their slice. Callbacks must not retain pooled flows/connections.
 func WithOnTrafficFlowPacket(h func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)) CaptureOption {
 	return func(c *CaptureConfig) error {

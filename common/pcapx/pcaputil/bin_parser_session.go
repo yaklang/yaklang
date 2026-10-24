@@ -180,7 +180,7 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		return
 	}
-	if bytes.HasPrefix(wire, []byte("GET ")) && probeRTSP(wire, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+	if (bytes.HasPrefix(wire, []byte("GET ")) || bytes.HasPrefix(wire, []byte("POST "))) && probeRTSP(wire, f.a.config.ProbeBytes).Verdict == ProbeAccept {
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
 		return
 	}
@@ -561,9 +561,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
 		if err == nil && e.Session["Profile"] == "apple-control" {
 			e.Profile = "rtsp-apple-control"
-			e.ExpertCode = "RTSPSequenceNotObserved"
 			e.Completeness = "message"
-			e.Summary = fmt.Sprintf("RTSP Apple control %v (CSeq absent; transaction association unavailable)", e.Session["Packet Name"])
+			if e.Session["CSeq Observed"] == false {
+				e.ExpertCode = "RTSPSequenceNotObserved"
+				e.Summary = fmt.Sprintf("RTSP Apple control %v (CSeq absent; transaction association unavailable)", e.Session["Packet Name"])
+			}
 		}
 	case "stun":
 		e.Session, err = f.stun.consume(dir, e.Timestamp, e.Raw, f.a.budget.MaxCollectionElements, true)

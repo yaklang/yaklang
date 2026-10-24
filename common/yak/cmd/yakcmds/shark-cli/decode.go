@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -17,14 +18,21 @@ import (
 )
 
 type packetSummary struct {
-	PDUs                 []map[string]any `json:"pdus,omitempty"`
-	ProtocolStack        []string         `json:"protocol_stack,omitempty"`
-	ConnectionProtocol   string           `json:"connection_protocol,omitempty"`
-	ConnectionStack      []string         `json:"connection_stack,omitempty"`
-	ConnectionEvidence   string           `json:"connection_evidence,omitempty"`
-	ConnectionDiagnostic string           `json:"connection_diagnostic,omitempty"`
-	Visibility           string           `json:"visibility,omitempty"`
-	ProtocolStatus       string           `json:"protocol_status,omitempty"`
+	TCPFlowID            uint64                  `json:"tcp_flow_id,omitempty"`
+	TCPFlowDomain        *pcaputil.CaptureDomain `json:"tcp_flow_domain,omitempty"`
+	MessageSource        string                  `json:"message_source,omitempty"`
+	MessageDestination   string                  `json:"message_destination,omitempty"`
+	MessageTransport     string                  `json:"message_transport,omitempty"`
+	MessageDomain        *pcaputil.CaptureDomain `json:"message_domain,omitempty"`
+	CaptureDomain        pcaputil.CaptureDomain  `json:"capture_domain"`
+	PDUs                 []map[string]any        `json:"pdus,omitempty"`
+	ProtocolStack        []string                `json:"protocol_stack,omitempty"`
+	ConnectionProtocol   string                  `json:"connection_protocol,omitempty"`
+	ConnectionStack      []string                `json:"connection_stack,omitempty"`
+	ConnectionEvidence   string                  `json:"connection_evidence,omitempty"`
+	ConnectionDiagnostic string                  `json:"connection_diagnostic,omitempty"`
+	Visibility           string                  `json:"visibility,omitempty"`
+	ProtocolStatus       string                  `json:"protocol_status,omitempty"`
 	packetProtocol       string
 	packetInfo           string
 	connectionAnnotated  bool
@@ -50,12 +58,24 @@ type packetSummary struct {
 
 // The hot path never invokes the Yak VM. Deep dissectors run only for selected packets.
 func summarize(raw *capturedPacket) packetSummary {
-	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{NoCopy: true})
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 	row := packetSummary{Number: raw.number, Time: raw.ci.Timestamp, Length: raw.ci.Length, CapturedLength: len(raw.data), Protocol: raw.link.String()}
+	row.CaptureDomain = raw.reference.Domain
+	row.TCPFlowID = raw.tcpFlowID
+	if raw.tcpFlowID != 0 {
+		d := raw.tcpFlowDomain
+		row.TCPFlowDomain = &d
+	}
+	row.MessageSource, row.MessageDestination, row.MessageTransport = raw.messageSource, raw.messageDestination, raw.messageTransport
+	if raw.messageTransport != "" {
+		d := raw.messageDomain
+		row.MessageDomain = &d
+	}
+	network, selectedTransport := pcaputil.CaptureTransport(p)
 	if l := p.LinkLayer(); l != nil {
 		row.Source, row.Destination = l.LinkFlow().Src().String(), l.LinkFlow().Dst().String()
 	}
-	if l := p.NetworkLayer(); l != nil {
+	if l := network; l != nil {
 		row.Source, row.Destination = l.NetworkFlow().Src().String(), l.NetworkFlow().Dst().String()
 	}
 	transportBoundary := false
@@ -67,12 +87,12 @@ func summarize(raw *capturedPacket) packetSummary {
 			row.Protocol = l.LayerType().String()
 			row.Layers = append(row.Layers, row.Protocol)
 		}
-		transportBoundary = l.LayerType() == layers.LayerTypeTCP || l.LayerType() == layers.LayerTypeUDP
+		transportBoundary = l == selectedTransport
 	}
 	var srcPort, dstPort uint16
 	var payload []byte
 	transport := ""
-	if tcp, ok := p.Layer(layers.LayerTypeTCP).(*layers.TCP); ok {
+	if tcp, ok := selectedTransport.(*layers.TCP); ok {
 		transport = "tcp"
 		srcPort, dstPort = uint16(tcp.SrcPort), uint16(tcp.DstPort)
 		payload = tcp.Payload
@@ -86,11 +106,24 @@ func summarize(raw *capturedPacket) packetSummary {
 			}
 		}
 		row.Info = fmt.Sprintf("%d → %d [%s] Seq=%d Ack=%d Payload=%d", srcPort, dstPort, strings.Join(flags, ","), tcp.Seq, tcp.Ack, len(payload))
-	} else if udp, ok := p.Layer(layers.LayerTypeUDP).(*layers.UDP); ok {
+	} else if udp, ok := selectedTransport.(*layers.UDP); ok {
 		transport = "udp"
 		srcPort, dstPort = uint16(udp.SrcPort), uint16(udp.DstPort)
 		payload = udp.Payload
 		row.Info = fmt.Sprintf("%d → %d Payload=%d", srcPort, dstPort, len(payload))
+	}
+	if raw.messageTransport != "" && transport == "" {
+		// A validated reassembled message can reveal an inner TCP/UDP header
+		// that is absent from this physical fragment. Preserve both endpoints
+		// explicitly; never combine outer IPs with inner transport ports.
+		src, sp, se := net.SplitHostPort(raw.messageSource)
+		dst, dp, de := net.SplitHostPort(raw.messageDestination)
+		sn, spe := strconv.ParseUint(sp, 10, 16)
+		dn, dpe := strconv.ParseUint(dp, 10, 16)
+		if se == nil && de == nil && spe == nil && dpe == nil && net.ParseIP(src) != nil && net.ParseIP(dst) != nil {
+			row.Source, row.Destination = src, dst
+			srcPort, dstPort, transport = uint16(sn), uint16(dn), raw.messageTransport
+		}
 	}
 	dns, hasDNS := p.Layer(layers.LayerTypeDNS).(*layers.DNS)
 	validDNS := false
@@ -259,7 +292,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		rule = "internet_protocol_version_6"
 	default:
 		// Handles loopback, raw IP, radiotap, etc. using the decoded network layer.
-		p := gopacket.NewPacket(data, raw.link, gopacket.DecodeOptions{NoCopy: true})
+		p := gopacket.NewPacket(data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if l := p.NetworkLayer(); l != nil {
 			for _, preceding := range p.Layers() {
 				if preceding == l {
@@ -325,7 +358,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		}
 		d.fields = append(d.fields, field{text: fmt.Sprintf("YAML dissector incomplete: %v; showing available packet layers", err)})
 	}
-	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{NoCopy: true})
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 	for _, layer := range p.Layers() {
 		d.fields = append(d.fields, field{text: safeText(gopacket.LayerString(layer))})
 	}
@@ -401,7 +434,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 	}
-	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{NoCopy: true})
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 	add := func(name string, value any) {
 		d.fields = append(d.fields, field{depth: 1, text: name + ": " + formatFieldValue(name, value)})
 	}

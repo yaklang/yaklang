@@ -79,3 +79,24 @@ func TestSSDPObservedAndroidAllTargetIsIdentifiedWithConformanceWarning(t *testi
 	require.Equal(t, "ssdp:all", f["Discovery Target"])
 	require.Equal(t, false, f["Full UDA Conformance Validated"])
 }
+
+func TestSSDPTrailingEmptyLinesRemainVisibleWithoutAcceptingABody(t *testing.T) {
+	w := ssdpFixtures()[3]
+	for _, suffix := range []string{"\r\n", "\r\n\r\n"} {
+		wire := []byte(w + suffix)
+		f, err := stream_parser.DecodeSSDPMessage(wire)
+		require.NoError(t, err)
+		require.Equal(t, len(suffix)/2, f["Trailing Empty Lines"])
+		require.NotEmpty(t, f["Conformance Warnings"])
+		n := protocolCorpusRequireBoundedRuleParse(t, wire, "application-layer.ssdp", "SSDP")
+		found := false
+		for _, child := range n.Children {
+			found = found || child.Name == "Trailing Empty Lines"
+		}
+		require.True(t, found)
+	}
+	for _, suffix := range []string{"\r", "\n", "\r\n ", "\r\nbody", "\r\n" + w} {
+		_, err := stream_parser.DecodeSSDPMessage([]byte(w + suffix))
+		require.Error(t, err)
+	}
+}

@@ -23,7 +23,8 @@ func decodeSSDPMessage(w []byte) ([]ssdpField, map[string]any, error) {
 		return nil, nil, fmt.Errorf("ssdp: incomplete header block or unsupported body")
 	}
 	end := bytes.Index(w, []byte("\r\n\r\n"))
-	if end+4 != len(w) {
+	trailing := w[end+4:]
+	if len(trailing)%2 != 0 || len(bytes.ReplaceAll(trailing, []byte("\r\n"), nil)) != 0 {
 		return nil, nil, fmt.Errorf("ssdp: body or concatenated datagrams unsupported")
 	}
 	var fields []ssdpField
@@ -100,6 +101,10 @@ func decodeSSDPMessage(w []byte) ([]ssdpField, map[string]any, error) {
 		at = last + 2
 	}
 	fields = append(fields, ssdpField{Name: "Headers", Start: lineEnd + 2, End: end + 2, Children: headerFields}, text("Message End", end+2, end+4))
+	if len(trailing) > 0 {
+		fields = append(fields, text("Trailing Empty Lines", end+4, len(w)))
+		info["Trailing Empty Lines"] = len(trailing) / 2
+	}
 	info["Headers"] = headers
 	decimal := func(s string, limit uint64) (uint64, error) {
 		if s == "" || strings.Trim(s, "0123456789") != "" {
@@ -131,6 +136,9 @@ func decodeSSDPMessage(w []byte) ([]ssdpField, map[string]any, error) {
 	var required error
 	target := ""
 	var warnings []string
+	if len(trailing) > 0 {
+		warnings = append(warnings, "extra empty lines after the discovery header block")
+	}
 	switch kind {
 	case "Notification":
 		required = require("host", "nt", "nts", "usn")
