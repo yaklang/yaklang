@@ -265,6 +265,8 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "Rlogin", Family: "remote", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "RSH", Family: "remote", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "RDP", Family: "remote", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "TPKT + X224 CR/CC + Cookie/Negotiation"},
+	{Name: "RDPUDP", Family: "remote", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "RDP carrier extension, not the P0 RDP application profile; reliable TLS selected; FEC recovery/lossy DTLS unimplemented"},
+	{Name: "RDPUDP2", Family: "remote", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "RDP carrier extension; selected wire envelope and bounded channel reassembly/retransmissions; no peer authentication"},
 	{Name: "CREDSSP", Family: "remote", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "VNC/RFB", Family: "remote", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "X11", Family: "remote", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},

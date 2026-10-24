@@ -160,6 +160,7 @@ func (e *ProtocolEvent) finalizeEvidence() {
 	}
 }
 func cloneEvidence(e *ProtocolEvent) {
+	e.CarrierLayers = append([]string(nil), e.CarrierLayers...)
 	e.SourceBytes.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)
 	e.SourceBytes.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
 }

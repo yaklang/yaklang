@@ -672,8 +672,24 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			}
 			return
 		}
+		if events, ok := a.decodeRDPUDPDatagram(e, wire); ok {
+			for _, event := range events {
+				a.emit(event)
+			}
+			return
+		}
 		if a.decodeNativeDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			var children []*ProtocolEvent
+			if e.Protocol == "radius" {
+				if e.ID == 0 {
+					e.ID = a.ids.Add(1)
+				}
+				children = a.decodeEAPTLSCarrier(e, wire)
+			}
 			a.emit(e)
+			for _, event := range children {
+				a.emit(event)
+			}
 			return
 		}
 		var spec *binSpec
@@ -682,7 +698,17 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
 		}
 		if spec == nil && a.decodeSessionDatagram(e, wire) {
+			var children []*ProtocolEvent
+			if e.Protocol == "radius" {
+				if e.ID == 0 {
+					e.ID = a.ids.Add(1)
+				}
+				children = a.decodeEAPTLSCarrier(e, wire)
+			}
 			a.emit(e)
+			for _, event := range children {
+				a.emit(event)
+			}
 			return
 		}
 		if spec != nil {

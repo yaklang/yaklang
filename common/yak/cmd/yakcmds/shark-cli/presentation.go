@@ -30,7 +30,7 @@ var protocolDisplayNames = map[string]string{
 	"http": "HTTP", "http2": "HTTP/2", "http3": "HTTP/3", "grpc": "gRPC",
 	"tls": "TLS", "dtls": "DTLS", "dns": "DNS", "dot": "DoT", "doh": "DoH", "doq": "DoQ",
 	"quic": "QUIC", "websocket": "WebSocket", "postgresql": "PostgreSQL", "mysql": "MySQL",
-	"ssdp":  "SSDP",
+	"ssdp": "SSDP", "rdpudp": "RDPUDP",
 	"redis": "Redis", "mongodb": "MongoDB", "kafka": "Kafka", "mqtt": "MQTT",
 	"smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
 	"ntlmssp": "NTLMSSP", "spnego": "SPNEGO", "mdns": "mDNS", "llmnr": "LLMNR",
@@ -118,6 +118,9 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "rdpudp" && number(eventValues(e)["Protocol Version"]) == 0x101 {
+		return "RDPUDP2"
+	}
 	if e.Protocol == "ike" {
 		if v := number(eventValues(e)["Version"]); v == 0x10 || v == 0x20 {
 			return fmt.Sprintf("IKEv%d", v>>4)
@@ -455,6 +458,9 @@ func eventPriority(e *pcaputil.ProtocolEvent) int {
 	if e.Protocol == "tls" || e.Protocol == "quic" || e.Protocol == "dtls" {
 		p = 10
 	}
+	if e.Protocol == "tls" && len(e.CarrierLayers) > 0 {
+		p = 20 + 5*len(e.CarrierLayers)
+	}
 	if e.Protocol == "grpc" {
 		p = 30
 	}
@@ -584,6 +590,15 @@ func (p *packetPresentation) addLayer(label string) {
 			return
 		}
 		if label == "TLS" && strings.HasPrefix(old, "TLSv") {
+			return
+		}
+		// SYN uses the legacy header before the selected RDPUDP2 wire format.
+		// This is one evolving carrier, not RDPUDP nested inside RDPUDP2.
+		if label == "RDPUDP2" && old == "RDPUDP" {
+			p.stack[i] = label
+			return
+		}
+		if label == "RDPUDP" && old == "RDPUDP2" {
 			return
 		}
 	}

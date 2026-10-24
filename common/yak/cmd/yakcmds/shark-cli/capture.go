@@ -177,7 +177,10 @@ func (s *captureSession) Stop()         { s.stopOnce.Do(s.cancel); <-s.done }
 func (s *captureSession) result() error { <-s.done; return s.err }
 
 func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) (result error) {
-	history, _ := pcaputil.NewProtocolInspector(4096, 32<<20)
+	// A retained physical packet can contribute multiple carrier/inner PDUs.
+	// Keep the default 20k packet window useful after a full-file replay while
+	// bounding both observation count and retained structured/raw bytes.
+	history, _ := pcaputil.NewProtocolInspector(80000, 64<<20)
 	if s.streams != nil {
 		s.streams.mu.Lock()
 		s.streams.history = history

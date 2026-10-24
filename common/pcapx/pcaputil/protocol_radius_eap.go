@@ -161,11 +161,20 @@ func radiusEAPFields(out map[string]any, max int, depths ...int) (bool, error) {
 					}
 				case 6:
 					radiusGTCFields(inner, ec, data, note)
-				case 3, 5, 13, 254:
+				case 3, 5, 13, 21, 25, 254:
 					var dissected bool
 					var err error
-					if typ == 13 {
+					if typ == 13 || typ == 21 || typ == 25 {
+						if typ != 13 && len(data) > 0 && data[0]&7 != 0 {
+							inner["Type Name"] = map[byte]string{21: "EAP-TTLS", 25: "PEAP"}[typ]
+							return true, protocolError(ErrUnsupportedFeature, "EAP tunnel version requires a separate profile")
+						}
 						dissected, err = radiusTLSFields(inner, ec, data, max, note, depths...)
+						if typ != 13 {
+							inner["Type Name"] = map[byte]string{21: "EAP-TTLS", 25: "PEAP"}[typ]
+							inner["Tunnel Version"] = byte(0)
+							inner["Inner Authentication Verified"] = false
+						}
 					} else if typ == 5 {
 						dissected, err = radiusOTPFields(inner, ec, data, max, note)
 					} else {

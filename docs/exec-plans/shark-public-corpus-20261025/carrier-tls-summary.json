@@ -1,0 +1,67 @@
+{
+  "scope": "Original full capture, independent derived TLS oracle and typed fields remain separate checks; no peer/cookie/RADIUS authentication or complete inner application claim.",
+  "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+  "yak_sha256": "adf58fea34074d9ae4637fde0cee7339468981b99867edc22832ecda03bc8bc3",
+  "events_binary_sha256": "4b2549cadb43d185fcf68b82500aad444aab9a8dda535292784034b52959434a",
+  "frames_completed": {
+    "weber": 51328,
+    "sharon": 328127
+  },
+  "original_carrier_record_check": {
+    "EAP/RADIUS": {
+      "wireshark": 47,
+      "native": 47,
+      "matching": 47,
+      "missing": 0,
+      "extra": 0
+    },
+    "RDPUDP": {
+      "wireshark": 49,
+      "native": 1718,
+      "matching": 48,
+      "missing": 1,
+      "extra": 1670
+    },
+    "TCP": {
+      "wireshark": 2639,
+      "native": 2639,
+      "matching": 2639,
+      "missing": 0,
+      "extra": 0
+    }
+  },
+  "derived_RDPUDP_check": {
+    "scope": "Supplemental DERIVED TCP TLS dissection; original-capture oracle retained separately",
+    "derived_wireshark_records": 1718,
+    "native_records": 1718,
+    "matching_occurrences": 1718,
+    "missing": 0,
+    "extra": 0,
+    "direction_chunk_counts": [
+      570,
+      875
+    ],
+    "derived_capture_sha256": "66eed42e17ad07fb9dff331874320f3ffe11b565529c64c4968b21d990014824"
+  },
+  "identical_carrier_retransmissions": 105,
+  "native_record_header_fields_checked": {
+    "tls.record.version": 4404,
+    "tls.record.length": 4404,
+    "tls.record.wire_type": 4404
+  },
+  "native_record_header_field_difference_count": 0,
+  "RDPUDP_field_frames_checked": {
+    "rdpudp.flags": 2380,
+    "rdpudp.synex.version": 2,
+    "rdpudp.data.seqnum": 2045,
+    "rdpudp.data.channelseqnumber": 1550
+  },
+  "RDPUDP_field_value_differences": 0,
+  "fuzz_execution_count": 23178,
+  "limitations": [
+    "FEC erasure recovery and lossy DTLS not implemented",
+    "PEAP/TTLS inner authentication not implemented; authenticators and peer identity unverified",
+    "BGP/AJP/RTMP and other native coverage gaps remain",
+    "Raw frame field-set and fuzz differences remain reported; not full-protocol acceptance"
+  ]
+}

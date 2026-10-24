@@ -157,6 +157,11 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		bits                               int
 	}{
 		{"tls", "tls.handshake.extensions_server_name", "TLS server name", "SNI", "context", DisplayString, 0},
+		{"rdpudp", "rdpudp.flags", "RDPUDP selected header flags", "Flags", "pdu", DisplayUnsigned, 16},
+		{"rdpudp", "rdpudp.synex.version", "RDPUDP offered version", "Offered Version", "pdu", DisplayUnsigned, 16},
+		{"rdpudp", "rdpudp.data.seqnum", "RDPUDP2 transport data sequence", "Data Sequence", "pdu", DisplayUnsigned, 16},
+		{"rdpudp", "rdpudp.data.channelseqnumber", "RDPUDP2 reliable channel sequence", "Channel Sequence", "pdu", DisplayUnsigned, 16},
+		{"rdpudp", "rdpudp.data.sourceStart", "RDPUDP reliable source sequence", "Source Sequence", "pdu", DisplayUnsigned, 32},
 		{"tls", "tls.version", "Negotiated TLS version", "Negotiated Version", "context", DisplayUnsigned, 16},
 		{"tls", "tls.record.authenticated", "TLS record authentication verified", "Authentication Verified", "derived", DisplayBoolean, 0},
 		{"tls", "tls.record.wire_type", "TLS on-wire record type", "Record Type", "pdu", DisplayUnsigned, 8},

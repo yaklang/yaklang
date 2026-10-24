@@ -27,6 +27,7 @@ func main() {
 		message["raw"], message["entry"], message["admission"] = e.Raw, e.Entry, e.Admission
 		message["source"], message["destination"], message["direction"] = e.Source, e.Destination, e.Direction
 		message["transport"], message["domain"] = e.Transport, e.Domain
+		message["carrier_layers"] = e.CarrierLayers
 		message["transaction"], message["response_to"] = e.TransactionID, e.ResponseTo
 		if err != nil {
 			message["fields_error"] = err.Error()

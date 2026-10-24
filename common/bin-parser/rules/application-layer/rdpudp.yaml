@@ -1,0 +1,13 @@
+# MS-RDPEUDP and MS-RDPEUDP2. Entry selection is supplied by the caller;
+# a two-byte prefix is not an automatic version or TLS identity heuristic.
+# Native capture selects the data version from a complete SYN/SYN-ACK exchange.
+endian: big
+Package:
+  RDPUDP:
+    operator: |
+      err = parseRDPUDPEnvelope("v1")
+      if err != nil { panic(err) }
+  RDPUDP2:
+    operator: |
+      err = parseRDPUDPEnvelope("v2")
+      if err != nil { panic(err) }
