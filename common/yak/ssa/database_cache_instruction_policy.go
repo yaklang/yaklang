@@ -86,9 +86,10 @@ func canSpillFinishedPrivateBlock(inst Instruction) bool {
 	return fn != nil && !shouldKeepFunctionForCrossUnitReference(fn)
 }
 
-// A finished private function is not a cross-unit callable. Its parameters
-// and parameter members are ID-addressed, so the resident cache does not
-// need to keep one object per call target for the rest of the program.
+// A finished function's parameters and parameter members are ID-addressed.
+// Call binding reloads them. Keeping one object per parameter of every
+// exported Go function retains the whole program. Externs and a blueprint
+// container that later batches still emit into stay resident.
 func canSpillFinishedFunctionMember(inst Instruction) bool {
 	if utils.IsNil(inst) {
 		return false
@@ -99,7 +100,10 @@ func canSpillFinishedFunctionMember(inst Instruction) bool {
 		return false
 	}
 	fn := cachedFinishedFunction(inst)
-	return fn != nil && !fn.IsExtern() && !shouldKeepFunctionForCrossUnitReference(fn)
+	if fn == nil || fn.IsExtern() || fn.hasPending() || isLiveContainerFunction(fn) {
+		return false
+	}
+	return true
 }
 
 func cachedFinishedFunction(inst Instruction) *Function {
