@@ -48,6 +48,7 @@ type FunctionBuilder struct {
 	//正在解析的include栈
 	SyntaxIncludingStack *utils.Stack[string]
 	includeStack         *utils.Stack[*Program]
+	includedValues       []map[string]int64
 
 	Included bool
 	IsReturn bool
@@ -140,6 +141,11 @@ func (f *FunctionBuilder) AddCaptureFreevalue(name string) {
 	f.captureFreeValue[name] = struct{}{}
 }
 func (b *FunctionBuilder) GetFunc(name, pkg string) (*Function, bool) {
+	if value := b.readIncludedValue(name); value != nil {
+		if function, ok := ToFunction(value); ok {
+			return function, true
+		}
+	}
 	var function *Function
 	b.includeStack.ForeachStack(func(program *Program) bool {
 		functionEx := program.GetFunctionEx(name, pkg)

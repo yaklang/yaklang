@@ -2,6 +2,10 @@ package ssa
 
 import "context"
 
+func (b *FunctionBuilder) GetContext() context.Context {
+	return b.ctx
+}
+
 func (b *FunctionBuilder) IsStop() bool {
 	if b.ctx == nil {
 		return false

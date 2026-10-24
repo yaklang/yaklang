@@ -110,7 +110,38 @@ func (b *FunctionBuilder) PeekExternInRoot(name string) Value {
 	return root.readValueEx(name, false, false, false)
 }
 
+// AddIncludedValues exposes a completed file's immutable bindings as include
+// fallbacks. Keep IDs so bindings survive compile-unit cache eviction. Unlike
+// assignment, includes must not overwrite the caller's lexical variables.
+func (b *FunctionBuilder) AddIncludedValues(values map[string]int64) error {
+	snapshot := make(map[string]int64, len(values))
+	for name, id := range values {
+		if value, ok := b.GetValueById(id); !ok || value == nil {
+			return utils.Errorf("included binding %s (id %d) is unavailable", name, id)
+		}
+		snapshot[name] = id
+	}
+	b.includedValues = append(b.includedValues, snapshot)
+	return nil
+}
+
+func (b *FunctionBuilder) readIncludedValue(name string) Value {
+	for i := len(b.includedValues) - 1; i >= 0; i-- {
+		if id, exists := b.includedValues[i][name]; exists {
+			if value, ok := b.GetValueById(id); ok {
+				return value
+			}
+			log.Errorf("included binding %s (id %d) is unavailable", name, id)
+			return nil
+		}
+	}
+	return nil
+}
+
 func (b *FunctionBuilder) readValueFromIncludeStack(name string) Value {
+	if value := b.readIncludedValue(name); value != nil {
+		return value
+	}
 	// read value from include stack
 	var value Value
 	b.includeStack.ForeachStack(func(program *Program) bool {
