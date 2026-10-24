@@ -182,13 +182,6 @@ func (b *FunctionBuilder) Finish() {
 
 	// function finish
 	b.Function.Finish()
-	// A library drain builds every method before the batch barrier. Each
-	// method copies package globals into its own scope, and those version
-	// chains stayed live until the library finished. Batch 105 held 5.3GiB
-	// of them and was killed at 26.28GiB RSS. Drop this function now.
-	if prog := b.GetProgram(); prog != nil {
-		prog.releaseOneFinishedFunction(b.Function)
-	}
 }
 
 // calculate all return instruction in function, get return type
