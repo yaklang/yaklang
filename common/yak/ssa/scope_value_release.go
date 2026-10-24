@@ -68,13 +68,21 @@ func releasePersistedOffsetValues(prog *Program) int {
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return 0
 	}
+	// Copy the items out before inspecting them. valueCapturedByClosure on a
+	// LazyInstruction reloads the row, and that reload assigns the value back
+	// through SetOffsetValue, which takes offsetMu. Holding the lock across
+	// that call deadlocks the compile thread.
 	prog.offsetMu.Lock()
-	defer prog.offsetMu.Unlock()
-	released := 0
+	items := make([]*OffsetItem, 0, len(prog.OffsetMap))
 	for _, item := range prog.OffsetMap {
-		if item == nil || utils.IsNil(item.value) {
-			continue
+		if item != nil && !utils.IsNil(item.value) {
+			items = append(items, item)
 		}
+	}
+	prog.offsetMu.Unlock()
+
+	released := 0
+	for _, item := range items {
 		if valueCapturedByClosure(item.value) {
 			continue
 		}
@@ -85,6 +93,11 @@ func releasePersistedOffsetValues(prog *Program) int {
 		if id <= 0 || !prog.Cache.instructions.isPersisted(id) {
 			continue
 		}
+		prog.offsetMu.Lock()
+		if utils.IsNil(item.value) {
+			prog.offsetMu.Unlock()
+			continue
+		}
 		if item.valueID == 0 {
 			item.valueID = id
 		}
@@ -92,6 +105,7 @@ func releasePersistedOffsetValues(prog *Program) int {
 			item.program = prog
 		}
 		item.value = nil
+		prog.offsetMu.Unlock()
 		released++
 	}
 	return released
