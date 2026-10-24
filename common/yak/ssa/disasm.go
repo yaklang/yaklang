@@ -267,7 +267,13 @@ func (b *BasicBlock) String() string {
 
 // ----------- const
 func (c Const) String() string {
-	return c.str
+	if c.str != "" {
+		return c.str
+	}
+	if c.value == nil {
+		return "nil"
+	}
+	return fmt.Sprintf("%v", c.value)
 }
 
 // ----------- const instruction

@@ -262,6 +262,13 @@ func TestReleaseDropsScopeThatOnlyMentionsCapturedValue(t *testing.T) {
 	require.Nil(t, otherB.CurrentBlock.ScopeTable, "loading a value captured elsewhere must not pin this scope")
 }
 
+func TestConstStringIsLazy(t *testing.T) {
+	c := newConstCreate("hello")
+	require.Empty(t, c.str)
+	require.Equal(t, "hello", c.String())
+	require.Equal(t, "nil", (&Const{}).String())
+}
+
 func TestReleaseDropsUncapturedNamesFromCapturingFunction(t *testing.T) {
 	prog := newSplitWriteProgram(t)
 	fn := prog.NewFunction("owner")

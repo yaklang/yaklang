@@ -241,6 +241,35 @@ func (f *FunctionBuilder) emitEx(i Instruction, insert func(Instruction)) {
 	f.GetProgram().SetVirtualRegister(i)
 	insert(i)
 	fixupUseChain(i) // this function should after set Program
+	f.maybeFlushEmitted()
+}
+
+// maybeFlushEmitted writes the saver queues of a large function before they
+// hold every offset row. Batch 105 of the yaklang self-scan reached 23GiB
+// in use while one batch was still building; 4GiB of that was offset rows
+// and their dedup keys waiting for the batch barrier.
+func (f *FunctionBuilder) maybeFlushEmitted() {
+	const emitFlushEvery = 8192
+	if f == nil || f.flushingEmits {
+		return
+	}
+	f.emitSinceFlush++
+	if f.emitSinceFlush < emitFlushEvery {
+		return
+	}
+	f.emitSinceFlush = 0
+	f.flushingEmits = true
+	defer func() { f.flushingEmits = false }()
+	prog := f.GetProgram()
+	if prog == nil || prog.Cache == nil || !prog.Cache.HaveDatabaseBackend() {
+		return
+	}
+	prog.Cache.FlushInstructionSaver()
+	if prog.Cache.indexes != nil && prog.Cache.indexes.offsetSaver != nil {
+		_ = prog.Cache.indexes.offsetSaver.Flush()
+	}
+	prog.ReleaseSettledIndexes()
+	releasePersistedOffsetValues(prog)
 }
 
 // EmitUndefined emit undefined value

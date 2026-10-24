@@ -102,6 +102,11 @@ type FunctionBuilder struct {
 	capturedNames *utils.SafeMapWithKey[string, struct{}]
 
 	placeholderConstants *utils.SafeMapWithKey[placeholderConstantKey, placeholderConstant]
+
+	// emitSinceFlush counts instructions since the last mid-function save.
+	// flushingEmits stops that save from re-entering itself.
+	emitSinceFlush int
+	flushingEmits  bool
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {

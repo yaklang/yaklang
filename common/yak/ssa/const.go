@@ -89,10 +89,11 @@ func NewConst(i any, isPlaceHolder ...bool) *ConstInst {
 }
 
 func newConstCreate(i any) *Const {
-	// build new const
+	// The formatted text is computed by String when something reads it.
+	// Keeping it here retained a copy of every distinct literal for the
+	// whole process. One yaklang batch held 1.3GiB of these strings.
 	c := &Const{
 		value: i,
-		str:   fmt.Sprintf("%v", i),
 	}
 	ConstMapMutex.Lock()
 	ConstMap[i] = c
