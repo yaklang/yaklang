@@ -126,15 +126,15 @@ func (c *ResidencyCacheWithKey[K, T]) GetResident(key K) (T, bool) {
 	// upgrade to the exclusive lock to cancel the stale queued persist.
 	c.mu.RLock()
 	if item, exists := c.data[key]; exists {
-		if item.pending && !item.persisting {
-			// A lookup means the value is hot again. Cancel the queued eviction so
-			// FinishPersist does not drop it when the old save acks. Callers that
-			// only want to read a value already queued by this flush must use
-			// PeekResident, or the read would drop that flush's delete.
+		if item.pending && !item.persisting && item.reason == utils.EvictionReasonExpired {
+			// A TTL eviction is cancelled when the value is read again, so
+			// FinishPersist does not drop a hot entry. A flush (capacity or
+			// delete) must keep pending: cancelling it leaves the object
+			// resident after the row is saved.
 			c.mu.RUnlock()
 			c.mu.Lock()
 			item2, exists2 := c.data[key]
-			if exists2 && item2.pending && !item2.persisting {
+			if exists2 && item2.pending && !item2.persisting && item2.reason == utils.EvictionReasonExpired {
 				item2.pending = false
 				item2.updatedWhilePersisting = false
 				item2.persistSnapshot = *new(T)
