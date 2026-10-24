@@ -1,6 +1,8 @@
 package pcaputil
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 )
@@ -32,6 +34,12 @@ type binQUIC struct {
 	decryptedSource string
 	dcid, scid      []byte
 	initialDCID     []byte
+	originalDCID    []byte
+	initialSCID     []byte
+	retrySCID       []byte
+	retrySeen       bool
+	retryTokenHash  [32]byte
+	retryTokenLen   int
 	spaces          [2][3]quicPNSpace
 	streams         map[uint64]*quicStream
 	crypto          [2][3][]quicRange
@@ -193,7 +201,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Connection State"] = "retry-observed"
 		info["Authentication Verified"] = false
 		if q.native {
-			return info, protocolError(ErrUnsupportedFeature, "QUIC Retry requires original-DCID integrity context")
+			return q.consumeRetry(dir, raw, h, info, max)
 		}
 		return info, nil
 	}
@@ -220,6 +228,47 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	}
 	candidate := *q
 	candidate.keys = cloneQUICKeyring(q.keys)
+	oldInitial := false
+	if q.native && q.retrySeen && h.typeName == "Initial" && dir == 1 && !bytes.Equal(candidate.initialDCID, q.retrySCID) {
+		// The client Initial after Retry can be lost/reordered in a capture.
+		// Verified Retry context already supplies the server's Initial salt
+		// input. Commit these candidate keys only after packet protection passes.
+		candidate.initialDCID = bytes.Clone(q.retrySCID)
+		if candidate.keys != nil {
+			candidate.keys.initial = [2]*quicTrafficKeys{}
+		}
+	}
+	if q.native && q.retrySeen && h.typeName == "Initial" && dir == 0 {
+		switch {
+		case bytes.Equal(h.dcid, q.retrySCID):
+			if len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
+				return info, protocolError(ErrContextRequired, "QUIC Initial does not carry the observed Retry token")
+			}
+			if !bytes.Equal(candidate.initialDCID, h.dcid) {
+				candidate.initialDCID = bytes.Clone(h.dcid)
+				if candidate.keys != nil {
+					candidate.keys.initial = [2]*quicTrafficKeys{}
+				}
+			}
+		case bytes.Equal(h.dcid, q.originalDCID):
+			// A reordered duplicate of the old Initial can still be verified.
+			// It must never roll the active key generation back.
+			oldInitial = true
+			candidate.initialDCID = bytes.Clone(q.originalDCID)
+			if candidate.keys != nil {
+				candidate.keys.initial = [2]*quicTrafficKeys{}
+			}
+		case q.spaces[1][quicSpaceInitial].init:
+			// After an authenticated server Initial the client uses that new
+			// server SCID, while the Initial keys still derive from Retry SCID.
+			owner, observed := q.cids[string(h.dcid)]
+			if !observed || owner != 1 || len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
+				return info, protocolError(ErrContextRequired, "QUIC Initial does not match the post-Retry server CID/token")
+			}
+		default:
+			return info, protocolError(ErrContextRequired, "QUIC Initial DCID differs from observed Retry context")
+		}
+	}
 	if h.space == quicSpaceInitial && dir == 0 && len(candidate.initialDCID) == 0 {
 		candidate.initialDCID = append([]byte(nil), h.dcid...)
 	}
@@ -278,6 +327,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Frames"] = frames // Retain authenticated wire evidence without delivering it twice.
 		return info, nil
 	}
+	if oldInitial {
+		return info, protocolError(ErrContextRequired, "QUIC unseen pre-Retry Initial cannot advance the post-Retry connection")
+	}
 	if !h.long && !previous && phase != q.keyPhase[dir] {
 		next, err := quicNextPhase(candidate.keys.app[dir][phase])
 		if err != nil {
@@ -288,6 +340,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		q.keyPhase[dir] = phase
 	}
 	q.keys, q.initialDCID = candidate.keys, candidate.initialDCID
+	if q.native && h.typeName == "Initial" && dir == 0 && len(q.originalDCID) == 0 {
+		q.originalDCID, q.initialSCID = bytes.Clone(h.dcid), bytes.Clone(h.scid)
+	}
 	commitHeader()
 	if q.native {
 		if q.cids == nil {
@@ -1201,6 +1256,7 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 // without Handshake/Application keys. Include slice capacity in its reservation.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
+	n += int64(cap(q.originalDCID) + cap(q.initialSCID) + cap(q.retrySCID))
 	for d := range q.cryptoData {
 		for sp := range q.cryptoData[d] {
 			n += q.cryptoData[d][sp].memory()

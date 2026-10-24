@@ -369,7 +369,7 @@ func (p *capturedPacket) protocolEvents() []*pcaputil.ProtocolEvent {
 	var events []*pcaputil.ProtocolEvent
 	remaining := 256 << 10
 	ids := append([]uint64(nil), p.eventIDs...)
-	for _, id := range p.history.PacketEventIDs(p.reference, 128) {
+	for _, id := range p.historyPacketEventIDs() {
 		found := false
 		for _, old := range ids {
 			if old == id {
@@ -387,6 +387,16 @@ func (p *capturedPacket) protocolEvents() []*pcaputil.ProtocolEvent {
 		}
 	}
 	return events
+}
+
+func (p *capturedPacket) historyPacketEventIDs() []uint64 {
+	if p.history == nil {
+		return nil
+	}
+	if p.physicalRecord {
+		return p.history.PhysicalPacketEventIDs(p.reference, 128)
+	}
+	return p.history.PacketEventIDs(p.reference, 128)
 }
 
 func boundedEvent(e *pcaputil.ProtocolEvent, remaining *int) *pcaputil.ProtocolEvent {

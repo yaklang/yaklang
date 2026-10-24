@@ -18,6 +18,10 @@ import (
 // type and avoiding process-wide changes to the dependency's metadata table.
 func captureLinkDecoder(link layers.LinkType) gopacket.Decoder {
 	switch link {
+	case layers.LinkTypeEthernet, layers.LinkTypeLinuxSLL:
+		return captureCarrierDecoder{inner: link}
+	case layers.LinkType(274): // LINKTYPE_ETHERNET_MPACKET
+		return captureMPacketDecoder{}
 	case layers.LinkType(192): // LINKTYPE_PPI, selected version0 Ethernet profile
 		return capturePPIDecoder{}
 	case layers.LinkType(227): // LINKTYPE_CAN_SOCKETCAN

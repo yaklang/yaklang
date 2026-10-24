@@ -10,6 +10,8 @@ import (
 type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
+	// Legacy YAML availability alone is not native ingress. AJP, BGP and
+	// RTMP remain catalog rules until their capture/session dispatch is wired.
 	return []ProtocolProfile{
 		{"hart-ip", "tcp/udp", "v1 initiate/close/keepalive and token-passing commands0/1/2/3", "observed primary-master session pairs; HART5/6/7 identity, IEEE32 values and selected three/four-variable layouts; exact counts/checksum/direction/logical address/command/sequence; bounded first-use history, retry and ambiguity quarantine; no authenticated/device success, TLSv2/direct-PDU/arbitrary HART command"},
 		{"enip", "tcp", "encapsulation-v1 RegisterSession and SendRRData selected ANSI simple-tag single-DINT read/write", "exact opaque8-byte RegisterSession echo; observed per-flow handle, direction, CIP service and first-use sender context; distinct-context pipelining, byte-identical active retries, ambiguous completed-context reuse refused; owned fields and typed refusals, bounded pending/history/high-water memory and incomplete Close; no physical write/authentication, connected IO, arbitrary CIP object/service or unobserved tag inference"},
@@ -17,9 +19,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"bacnet-routed-read-property", "explicit-udp", "BACnet/IP NPDUv1 selected direct or routed ReadProperty", "bounded one-to-six-byte logical source/destination MAC observations, network and present-only hop count; reversed physical endpoints plus logical route addresses/domain/invoke/descriptor association; unknown/refused routes quarantine the physical relay pair; same primitive/terminal APDU scope as direct profile, no network services, broadcast peer inference, forwarded BVLC, segmentation, device/authentication or router-operation claim"},
 		{"bacnet-read-property", "explicit-udp", "BACnet/IP original unicast, NPDUv1 unsegmented ReadProperty", "bounded request/ComplexACK primitive application values and Error/Reject/server Abort; exact object/property/optional index and reversed endpoint/domain/invoke observation, reuse/retry/expiry quarantined; no constructed property schemas, segmentation, routing, client Abort, authentication or device-operation success claim"},
 		{"nbss", "tcp", "RFC1002 session request/control and observed SMB2 carrier", "encoded called/calling names, response and keepalive; SMB1/retarget execution unavailable"},
-		{"ajp", "tcp", "AJP length-prefixed messages", "bounded native profile; port never establishes identity"},
 		{"amqp", "tcp", "AMQP protocol header and frames", "observed native negotiated profile"},
-		{"bgp", "tcp", "BGP marker and declared length", "bounded supported BGP messages"},
 		{"dcerpc", "tcp", "connection-oriented fragments", "observed bind/context/call identifiers"},
 		{"ftp", "tcp", "control command/reply lines", "observed command order and STARTTLS boundary"},
 		{"ftp-data", "tcp", "control-associated passive data", "bounded one-use PASV/EPSV endpoint association"},
@@ -31,7 +31,6 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"mqtt", "tcp", "variable-length packets", "observed 3.x/5 capabilities, aliases and QoS state"},
 		{"mongodb", "tcp", "Mongo wire messages", "observed request/response IDs and negotiated profile"},
 		{"rdp", "tcp", "TPKT/X224 negotiation and selected TLS carrier", "no complete desktop/session decoding claim"},
-		{"rtmp", "tcp", "RTMP handshake and chunks", "observed chunk stream state"},
 		{"rtsp", "tcp", "RTSP control/interleaved frames", "observed CSeq/session/SETUP mapping"},
 		{"redis", "tcp", "RESP messages", "complete structured initial admission and observed flow"},
 		{"smb2", "tcp", "direct TCP SMB2/3 messages", "observed dialect/session/MID; encrypted SMB3 opaque"},

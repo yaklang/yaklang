@@ -24,6 +24,7 @@ type captureConfig struct {
 	snaplen, count                int
 	duration                      time.Duration
 	promisc                       bool
+	ignoreEmbeddedSecrets         bool
 	maxStreams, streamBytes       int
 	tlsSecrets                    pcaputil.TLSSecretProvider
 	decodeAs                      []pcaputil.CaptureOption
@@ -38,6 +39,8 @@ type captureSource struct {
 	reader  packetReader
 	file    *os.File
 	bpf     *pcap.BPF
+	filter  string
+	bpfs    map[layers.LinkType]*pcap.BPF
 	snaplen uint32
 	handle  *pcap.Handle
 	name    string
@@ -52,7 +55,7 @@ func openCapture(cfg captureConfig) (*captureSource, error) {
 	name := cfg.input
 	gateway := ""
 	if cfg.input != "" {
-		return openOffline(cfg.input, cfg.filter)
+		return openOffline(cfg.input, cfg.filter, cfg.ignoreEmbeddedSecrets)
 	} else {
 		name = cfg.device
 		if name == "" {
@@ -88,9 +91,8 @@ func (s *captureSource) Close() {
 }
 
 // Use pcapgo for offline input: the dynamically loaded pcap implementation does
-// not support all pcapng files. Reject mixed link types instead of silently
-// skipping interfaces or exporting their bytes with the wrong link type.
-func openOffline(name, filter string) (_ *captureSource, result error) {
+// not support all pcapng files. Link types are carried per packet.
+func openOffline(name, filter string, ignoreSecrets ...bool) (_ *captureSource, result error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("open capture: %w", err)
@@ -100,22 +102,32 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 			_ = f.Close()
 		}
 	}()
-	reader, err := pcaputil.NewCaptureReader(f)
+	reader, err := pcaputil.NewCaptureReaderWithOptions(f, pcaputil.PcapReaderOptions{IgnoreEmbeddedSecrets: len(ignoreSecrets) > 0 && ignoreSecrets[0]})
 	if err != nil {
 		return nil, fmt.Errorf("read capture header: %w", err)
 	}
-	src := &captureSource{file: f, name: name, offline: true, reader: reader, link: reader.LinkType(), snaplen: reader.Snaplen()}
+	src := &captureSource{file: f, name: name, offline: true, reader: reader, link: reader.LinkType(), snaplen: reader.Snaplen(), filter: filter, bpfs: make(map[layers.LinkType]*pcap.BPF)}
 
 	if filter != "" {
-		src.bpf, err = pcap.NewBPF(src.link, int(src.snaplen), filter)
+		src.bpf, err = pcap.NewBPF(bpfLinkType(src.link), int(src.snaplen), filter)
 		if err != nil {
 			return nil, fmt.Errorf("invalid capture BPF %q: %w", filter, err)
 		}
+	}
+	if src.bpf != nil {
+		src.bpfs[src.link] = src.bpf
 	}
 	return src, nil
 }
 
 type capturedPacket struct {
+	physicalRecord        bool
+	tcpFlowID             uint64
+	tcpFlowDomain         pcaputil.CaptureDomain
+	messageTransport      string
+	messageSource         string
+	messageDestination    string
+	messageDomain         pcaputil.CaptureDomain
 	conversationID        uint64
 	connectionStack       []string
 	connectionDiagnostic  string
@@ -175,7 +187,17 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	// Inspection must retain useful packets from imperfect captures. The engine
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
-	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
+	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, _ *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, _ time.Time) {
+		if current != nil {
+			for _, ref := range refs {
+				if ref.Number == current.reference.Number {
+					current.tcpFlowID = flow.Index // Copy a scalar; never retain the pooled flow.
+					current.tcpFlowDomain = flow.CaptureDomain()
+					break
+				}
+			}
+		}
+	}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		history.OnEvent(e)
 		if s.streams != nil {
 			s.streams.observeProtocol(e)
@@ -185,7 +207,10 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 			// Time-based flushing can emit events from another flow. Only an
 			// event with this packet among its contributors may label its row.
 			for _, ref := range e.SourceBytes.PacketRefs {
-				if ref == current.reference {
+				// CLI record numbers are global across sections/interfaces. Outer
+				// fragment reassembly can add a proven tunnel domain to this same
+				// record; exact domain equality would hide its completed PDU.
+				if ref.Number == current.reference.Number {
 					if e.Transport == "udp" && e.FlowID != 0 {
 						current.conversationID = e.FlowID
 					}
@@ -193,6 +218,10 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 						current.eventIDs = append(current.eventIDs, e.ID)
 					}
 					current.presentation.add(e)
+					if (e.Status == "decoded" || e.Status == "deferred" || protectedSSHEvent(e) || protectedConversationEvent(e)) && (e.Transport == "tcp" || e.Transport == "udp") {
+						current.messageTransport, current.messageSource, current.messageDestination = e.Transport, e.Source, e.Destination
+						current.messageDomain = e.Domain
+					}
 					break
 				}
 			}
@@ -208,6 +237,12 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		defer s.streams.finish()
 	}
 	var writer packetWriter
+	var ngWriter *pcapgo.NgWriter
+	type outputDomain struct {
+		domain pcaputil.CaptureDomain
+		link   layers.LinkType
+	}
+	interfaces := make(map[outputDomain]int)
 	if cfg.output != "" {
 		// Exclusive creation also protects the input capture, including symlink/hardlink aliases.
 		file, err := os.OpenFile(cfg.output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -225,6 +260,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				return err
 			}
 			writer = ng
+			ngWriter = ng
 			defer func() {
 				if err := ng.Flush(); result == nil {
 					result = err
@@ -274,17 +310,46 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if err != nil {
 			return fmt.Errorf("read capture: %w", err)
 		}
-		if reader, ok := src.reader.(*pcaputil.CaptureReader); ok && reader.LinkType() != src.link {
-			return fmt.Errorf("shark does not yet export mixed link types; capture interface changed")
+		link := src.link
+		if reader, ok := src.reader.(*pcaputil.CaptureReader); ok {
+			link = reader.LinkType()
 		}
-		if src.bpf != nil && !src.bpf.Matches(ci, data) {
-			continue
+		if src.offline && src.filter != "" {
+			bpf := src.bpfs[link]
+			if bpf == nil {
+				bpf, err = pcap.NewBPF(bpfLinkType(link), int(src.snaplen), src.filter)
+				if err != nil {
+					return fmt.Errorf("compile capture BPF for link %d: %w", link, err)
+				}
+				src.bpfs[link] = bpf
+			}
+			if !bpf.Matches(ci, data) {
+				continue
+			}
 		}
+
 		if writer != nil {
-			// A classic pcap source may carry a nonzero InterfaceIndex. The exported
-			// file has one interface, regardless of the source OS index.
 			outputInfo := ci
 			outputInfo.InterfaceIndex = 0
+			if ngWriter != nil {
+				domain := pcaputil.CapturePacketReference(ci).Domain
+				key := outputDomain{domain: domain, link: link}
+				index, ok := interfaces[key]
+				if !ok {
+					if len(interfaces) == 0 && link == src.link {
+						index = 0
+					} else {
+						index, err = ngWriter.AddInterface(pcapgo.NgInterface{Name: fmt.Sprintf("section-%d-interface-%d", domain.Section, domain.Interface), LinkType: link, TimestampResolution: 9})
+						if err != nil {
+							return fmt.Errorf("write output interface: %w", err)
+						}
+					}
+					interfaces[key] = index
+				}
+				outputInfo.InterfaceIndex = index
+			} else if link != src.link {
+				return fmt.Errorf("classic PCAP cannot represent link change %d to %d; use .pcapng output", src.link, link)
+			}
 			if err := writer.WritePacket(outputInfo, data); err != nil {
 				return fmt.Errorf("write output capture: %w", err)
 			}
@@ -295,13 +360,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if ref.Number == 0 {
 			ref.Number = n
 		}
-		ref.Domain = pcaputil.PacketDomain(data, ci, src.link)
-		packet := &capturedPacket{number: n, data: data, ci: ci, link: src.link, history: history, reference: ref}
+		ref.Domain = pcaputil.PacketDomain(data, ci, link)
+		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref}
 		if s.streams != nil {
 			s.streams.add(packet)
 		}
 		current = packet
-		if err := analyzer.Feed(data, ci, src.link); err != nil {
+		if err := analyzer.Feed(data, ci, link); err != nil {
 			return err
 		}
 		if s.streams != nil {
@@ -344,4 +409,12 @@ func (s *captureSession) enqueueLatest(packet *capturedPacket) {
 	default:
 		s.skipped.Add(1)
 	}
+}
+
+// libpcap consumes DLT_RAW (12), while capture files record LINKTYPE_RAW (101).
+func bpfLinkType(link layers.LinkType) layers.LinkType {
+	if link == layers.LinkTypeRaw {
+		return layers.LinkType(12)
+	}
+	return link
 }

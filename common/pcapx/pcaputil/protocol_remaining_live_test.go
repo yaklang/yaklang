@@ -143,9 +143,15 @@ func TestMQTT311KeepsPayloadAndQoS2State(t *testing.T) {
 		require.Len(t, es, 6)
 		for _, e := range es {
 			require.Equal(t, "decoded", e.Status, e.Error)
-			require.EqualValues(t, 4, e.Session["Protocol Level"])
+			decoded, err := e.Decode()
+			require.NoError(t, err)
+			meta, ok := decoded["metadata"].(map[string]any)
+			require.True(t, ok)
+			require.EqualValues(t, 4, meta["Protocol Level Context"])
 		}
-		require.Equal(t, payload, es[2].Session["Payload"])
+		fields, err := es[2].GetFields()
+		require.NoError(t, err)
+		require.Equal(t, payload, findSessionField(fields, "Application Message"))
 		for _, e := range es[3:] {
 			require.Equal(t, true, e.Session["Matched Request"])
 		}

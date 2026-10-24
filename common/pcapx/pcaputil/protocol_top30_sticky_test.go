@@ -19,6 +19,39 @@ func TestTop30StreamSegmentationAndStickyAdmission(t *testing.T) {
 			c.steps = append([]sessionStep(nil), c.steps...)
 			c.steps[4].wire = sshValidCurveInit()
 		}
+		if c.name == "snmpv3-get-response" {
+			// The historical mixed sample deliberately changes contextEngineID
+			// on its replies. The strengthened correlator correctly leaves those
+			// requests unmatched. This positive segmentation companion uses one
+			// context consistently; the original negative remains unchanged.
+			c.steps = append([]sessionStep(nil), c.steps...)
+			engine := []byte{0x80, 0, 0, 0, 1}
+			for _, i := range []int{2, 4, 7} {
+				wire := c.steps[i].wire
+				_, msg, _, err := snmpReadTLV(wire, 0)
+				require.NoError(t, err)
+				_, _, at, err := snmpReadTLV(msg, 0)
+				require.NoError(t, err)
+				_, _, at, err = snmpReadTLV(msg, at)
+				require.NoError(t, err)
+				_, _, at, err = snmpReadTLV(msg, at)
+				require.NoError(t, err)
+				_, scoped, _, err := snmpReadTLV(msg, at)
+				require.NoError(t, err)
+				_, _, at, err = snmpReadTLV(scoped, 0)
+				require.NoError(t, err)
+				_, _, at, err = snmpReadTLV(scoped, at)
+				require.NoError(t, err)
+				id := int64(2)
+				if i == 4 {
+					id = 3
+				}
+				if i == 7 {
+					id = 4
+				}
+				c.steps[i].wire = snmpV3(id, 65507, snmpFlagReportable, snmpPlainUSM(), snmpScoped(engine, nil, scoped[at:]))
+			}
+		}
 		switch c.protocol {
 		case "postgresql", "ldap", "redis", "smb2", "ssh", "mqtt", "smtp", "imap", "pop3", "ftp", "rdp", "snmp":
 			cases = append(cases, c)
@@ -60,7 +93,7 @@ func TestTop30StreamSegmentationAndStickyAdmission(t *testing.T) {
 					var signatures []string
 					valid := 0
 					for _, e := range events {
-						require.NotContains(t, []string{"malformed", "unrecognized", "incomplete", "limited"}, e.Status, "positive fixture must not hide a failed decoder: %s", e.Error)
+						require.NotContains(t, []string{"malformed", "unrecognized", "incomplete", "limited"}, e.Status, "positive fixture must not hide a failed decoder: %s %s", e.Error, e.Summary)
 						signatures = append(signatures, fmt.Sprintf("%s/%s/%x/%v/%v", e.Protocol, e.Status, sha256.Sum256(e.Raw), e.Session["Packet Name"], e.Session["Message Name"]))
 						if e.Status == "decoded" || e.Status == "deferred" {
 							valid++

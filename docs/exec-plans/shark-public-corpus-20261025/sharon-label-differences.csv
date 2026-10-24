@@ -1,0 +1,3782 @@
+﻿wireshark_label_to_yak_label,packets
+GSMTAP -> UDP,17864
+IPv4 -> Fragment,16121
+SCCP (Int. ITU) -> Fragment,5831
+TCP -> Fragment,5395
+BACnet-APDU -> LLC,4953
+802.11 -> GRE,4479
+BACnet-APDU -> UDP,4274
+IPv4 -> IPv6HopByHop,4113
+802.11 -> UDP,3704
+F1AP -> SCTP,3699
+NBAP -> SCTP,3406
+X2AP -> SCTP,3304
+GTP -> UDP,3129
+WSP -> UDP,3065
+TCP -> IPv4,3006
+ICMPv6 -> ICMPV6,2985
+TCP -> UDP,2768
+F1AP -> UDP,2694
+NBAP -> UDP,2609
+TCP -> IPv6HopByHop,2427
+S1AP -> SCTP,2417
+GTPv2 -> UDP,2222
+STP -> SNAP,2205
+ZigBee  -> UDP,2145
+802.11 -> IPv4,2048
+XnAP -> SCTP,2030
+RNSAP -> Fragment,2006
+ZigBee  -> Fragment,1963
+LTP -> UDP,1920
+UMA -> IPv6HopByHop,1858
+NBAP -> IPv4,1767
+XnAP -> UDP,1667
+RSVP -> IPv4,1641
+SCTP -> UDP,1635
+NGAP -> UDP,1620
+NGAP -> SCTP,1592
+S7COMM -> IPv4,1464
+CoAP -> UDP,1391
+L2TPv3 -> IPv4,1356
+UMA -> IPv4,1336
+PFCP -> UDP,1305
+F1AP -> IPv4,1286
+SSLv3 -> Fragment,1212
+Q.931 -> IPv4,1198
+ISIS LSP -> IPv4,1191
+S1AP -> IPv4,1183
+X2AP -> UDP,1132
+RTPS -> UDP,1118
+NHRP -> IPv4,1089
+X2AP -> IPv4,1070
+QUIC -> UDP,1066
+ESP -> IPSecESP,1003
+S1AP -> UDP,995
+SMB -> IPv4,962
+UAUDP -> UDP,949
+ZigBee ZDP -> UDP,940
+NGAP -> IPv4,937
+RSVP-E2EI -> UDP,874
+MIH -> UDP,868
+SMB -> UDP,825
+TDLS -> GRE,824
+E1AP -> SCTP,778
+GLBP -> UDP,777
+GTP -> IPv6HopByHop,776
+SCTP -> IPv4,773
+GEONW -> IPv4,771
+ieee1905 -> Ethernet,769
+HSRPv2 -> UDP,768
+MMSE -> UDP,764
+Kafka -> IPv4,760
+DHCPv6 -> UDP,758
+BACnet-APDU -> IPv4,745
+RSVP -> IPv6HopByHop,729
+DNS -> UDP,725
+ICMPv6 -> IPv4,722
+MIH -> Ethernet,714
+NGAP/NAS-5GS -> SCTP,699
+ICMPv6 -> UDP,692
+LDP -> UDP,677
+IEEE 802.15.4 -> Ethernet,662
+MPEG TS -> Ethernet,653
+NTP -> UDP,629
+H.225.0 -> UDP,626
+GTPv2 -> IPv6HopByHop,625
+CLNP -> GRE,608
+BSSGP -> IPv4,605
+XnAP -> IPv4,600
+ZigBee Green Power -> UDP,599
+BICC(ITU) -> UDP,589
+LLC -> GRE,587
+BSSGP -> IPv6HopByHop,575
+ISIS LSP -> UDP,572
+MMS/IEC61850 -> IPv4,567
+MIPv6 -> IPv4,566
+ISIS HELLO -> LLC,561
+ULP -> Fragment,558
+CDMA2K -> SCTP,556
+ZigBee ZDP -> Fragment,552
+R3 -> Fragment,546
+BACnet-APDU -> GRE,541
+ieee1905 -> IPv4,538
+LDP -> IPv4,533
+ULP -> UDP,529
+S7COMM -> GRE,529
+DTLS -> UDP,528
+CIMD -> Fragment,524
+LTP -> IPv4,523
+IPv6 -> UDP,518
+TCP -> GRE,502
+Q.931 -> UDP,498
+H.501 -> IPv4,485
+BSSAP -> Fragment,479
+CFLOW -> UDP,476
+ieee1905 -> UDP,474
+BFD Echo -> UDP,473
+F1AP/NR RRC -> SCTP,460
+WCCP -> UDP,459
+DMP -> UDP,450
+E1AP -> IPv4,450
+ZigBee IPM -> Fragment,447
+RSL -> Fragment,445
+LISP -> UDP,436
+BICC(ITU) -> IPv4,436
+IVIM -> IPv4,431
+SIP -> Fragment,430
+TELNET -> IPv4,430
+NGAP/NRPPa -> SCTP,429
+UFTP -> UDP,423
+DMP -> Fragment,403
+THRIFT -> UDP,402
+BICC(ITU) -> SCTP,400
+AMQP -> IPv6HopByHop,398
+MDNS -> mDNS,396
+Couchbase -> Fragment,395
+GTPv2 -> IPv4,395
+SES -> IPv4,384
+SCCP (Int. ITU) -> UDP,383
+DNS -> IPv4,379
+Q.933 -> Ethernet,379
+X.25 -> IPv4,379
+eDonkey -> UDP,376
+ZigBee -> UDP,370
+IPv4 -> GRE,368
+iSCSI -> IPv4,367
+CIP -> UDP,365
+LLRP -> Fragment,362
+SSHv2 -> SSH,359
+POWERLINK -> Ethernet,359
+DCCP -> IPv4,358
+SMB2 -> Fragment,355
+MMS/IEC61850 -> GRE,354
+RTPS -> IPv6HopByHop,351
+MGCP -> Fragment,345
+ECMP -> UDP,344
+LOOP -> EthernetCTPReply,339
+PRES -> IPv4,338
+BSSGP -> UDP,337
+CoAP -> IPv4,335
+EAP -> GRE,332
+H.501 -> UDP,330
+ULP/RRLP -> UDP,327
+ISIS HELLO -> IPv4,325
+M2AP -> IPv4,318
+MLE -> UDP,317
+FF -> IPv4,317
+MQTT -> Fragment,316
+IPComp -> IPv4,312
+LBT-TCP -> Fragment,311
+CAPWAP-Control -> UDP,308
+ICMPv6 -> IPv6HopByHop,306
+HomePlug -> Ethernet,304
+H.264 -> Ethernet,300
+DIS -> UDP,299
+ALCAP -> UDP,292
+GTP -> IPv4,292
+RRoCE -> UDP,291
+POWERLINK -> GRE,291
+GSM RLC/MAC -> SCTP,288
+CoAP -> IPv6HopByHop,288
+LAT -> UDP,286
+GTPv2/NAS-EPS -> IPv6HopByHop,284
+ZigBee -> Fragment,282
+3Com XNS -> GRE,280
+MIPv6 -> UDP,279
+IEEE 802.15.4 -> UDP,279
+R3 -> IPv4,276
+IDN -> UDP,275
+X.25 -> UDP,268
+SSDP -> UDP,265
+EIGRP -> IPv4,263
+X11 -> UDP,261
+CDP -> GRE,260
+CDMA2K -> UDP,260
+SBcAP -> UDP,259
+H.225.0/H.245 -> Fragment,258
+X11 -> IPv6HopByHop,256
+LAT -> Ethernet,256
+CLDAP -> UDP,254
+XMPP/XML -> Fragment,254
+RANAP -> SCTP,251
+TFTP -> UDP,250
+MPLS ECHO -> Fragment,247
+SGSAP -> SCTP,242
+ISAKMP -> IKEv1,239
+slsk -> IPv4,239
+V52 -> SCTP,239
+Kafka -> IPv6HopByHop,236
+SSL -> Fragment,234
+DHCPv6 BulkLease -> Fragment,234
+RoCE -> Ethernet,234
+PCEP -> Fragment,234
+HomePlug -> UDP,233
+NAN -> GRE,233
+SAP/SDP -> UDP,230
+BGP -> TCP,229
+S1AP/LPPa -> SCTP,227
+TDS -> Fragment,225
+ENIP -> Fragment,223
+RTCP -> UDP,222
+packetbb -> UDP,221
+TIPC -> UDP,221
+PGM -> IPv4,221
+SBcAP -> SCTP,220
+802.11 -> Fragment,220
+LLTD -> Ethernet,219
+CIP -> Fragment,218
+M3AP -> IPv4,218
+THRIFT -> Fragment,217
+E2AP -> SCTP,214
+PPP MP -> GRE,213
+DLEP -> UDP,210
+WTP+WSP -> UDP,209
+DEC DNA -> GRE,209
+STUN -> IPv4,207
+M2AP -> UDP,205
+COTP -> GRE,205
+HiQnet -> UDP,203
+openSAFETY/UDP -> UDP,202
+X11 -> IPv4,202
+DICOM -> Fragment,201
+Q.933 -> LLC,201
+HIP -> IPv4,199
+CFLOW -> IPv4,198
+SW_ILS -> Ethernet,197
+PPP MP -> UDP,196
+NDMP -> IPv6HopByHop,196
+A21 -> UDP,195
+3Com XNS|ROHC -> GRE,195
+0x88a9 -> Ethernet,195
+ASTERIX -> UDP,194
+TELNET -> Fragment,194
+NBNS -> UDP,193
+HNBAP -> UDP,193
+5co-legacy -> Fragment,192
+FC -> GRE,191
+DEC DNA -> UDP,190
+HNBAP -> SCTP,190
+MAPEM -> IPv4,189
+M2AP -> SCTP,189
+CPMv1 -> IPv4,189
+GQUIC -> UDP,188
+LCSAP -> SCTP,188
+H.225.0 -> Fragment,188
+RSVP -> UDP,187
+IAX2 -> UDP,186
+IEEE 802.15.4 -> GRE,186
+ULP/RRLP -> Fragment,185
+RSIP -> UDP,185
+ECMP -> IPv4,181
+LCSAP -> UDP,180
+SNMP -> Fragment,179
+NCP -> UDP,178
+SES -> UDP,177
+IEC 60870-5 ASDU -> IPv4,177
+TCP -> RTSP,176
+SABP -> UDP,175
+RELOAD -> UDP,174
+TPKT -> IPv4,171
+IPv6 -> IPv4,171
+O-RAN-FH-C -> Ethernet,171
+IEEE1722-1 -> Ethernet,170
+DTLS 1.0 (OpenSSL pre 0.9.8f) -> SCTP,169
+SMPP -> Fragment,167
+NDS -> LLC,167
+M3AP -> UDP,166
+ASAM-CMP -> Ethernet,166
+PCP -> IPv4,166
+NTP -> Fragment,166
+TIPC -> Ethernet,165
+SUA (RFC 3868) -> SCTP,163
+MIH -> IPv4,163
+TR MAC -> UDP,162
+HomePlug AV -> Ethernet,160
+ASAP -> IPv4,159
+R3 -> IPv6HopByHop,158
+SNA -> GRE,158
+TN3270 -> IPv4,158
+QNET_KIF -> IPv4,158
+ZigBee HA -> UDP,157
+FC ELS -> Ethernet,157
+WTLS+WSP -> UDP,156
+Bundle -> UDP,156
+ALCAP -> SCTP,156
+ENRP -> SCTP,156
+LMP -> UDP,154
+9P -> Fragment,153
+MQ -> IPv4,153
+GTP -> Fragment,152
+SCoP -> Fragment,151
+SNA -> UDP,150
+LDAP -> IPv4,149
+ISAKMP -> Fragment,149
+LBT-TCP -> IPv4,149
+SABP -> SCTP,148
+M3AP -> SCTP,148
+LLC -> UDP,147
+C15 -> IPv4,147
+DCCP -> UDP,146
+GEONW -> GRE,145
+WLCCP -> Ethernet,145
+ISIS HELLO -> UDP,144
+GIOP -> UDP,144
+XMCP -> IPv4,144
+Omni-Path -> IPv4,144
+CoAP -> Fragment,144
+OAM -> Ethernet,143
+BSSGP -> SCTP,143
+CIGI -> UDP,142
+ALCAP -> IPv4,140
+HTTP -> IPv4,140
+AFP -> GRE,140
+H.264 -> UDP,139
+S1AP -> Fragment,139
+TCP -> TLSv1.3,138
+LBMSRS -> IPv4,138
+ENRP -> IPv4,138
+CAPWAP-Data -> UDP,137
+RIPng -> UDP,137
+ASAP -> SCTP,137
+RTPproxy -> UDP,136
+NGAP/NRPPa -> UDP,135
+RADIUS -> UDP,135
+ESIS -> IPv4,135
+HIP -> UDP,134
+OAPv1  -> UDP,134
+ISAKMP -> UDP,133
+0x0000 -> GRE,132
+TELNET -> UDP,131
+RSH -> TCP,130
+NCP -> LLC,130
+TELNET -> Telnet,129
+DDP -> GRE,129
+AgentX -> Fragment,128
+HART_IP -> IPv6HopByHop,128
+slsk -> Fragment,128
+MEMCACHE -> IPv6HopByHop,128
+PGM -> UDP,127
+SRVLOC -> Fragment,127
+CMP -> Fragment,127
+SMPP -> UDP,126
+DNS -> Fragment,126
+SNA -> LLC,125
+SRVLOC -> UDP,123
+R3 -> UDP,123
+RTPS -> IPv4,123
+RakNet -> UDP,122
+DSR -> UDP,122
+CoAP/XML -> UDP,121
+PCEP -> IPv6HopByHop,121
+RTPproxy -> Fragment,120
+IRC -> Fragment,120
+AMQP -> IPv4,118
+X.25 -> Fragment,118
+IMAP -> Fragment,118
+MCX -> Ethernet,118
+PPP BCP -> GRE,118
+NHRP -> UDP,116
+DSR -> IPv4,116
+P_MUL -> Fragment,115
+RSVP-E2EI -> IPv4,115
+SAPIGS -> IPv4,115
+ISIS CSNP -> LLC,114
+SNMP -> UDP,114
+IRC -> UDP,114
+DLEP -> Fragment,114
+DPPv2  -> UDP,113
+TETRA -> UDP,112
+DPLAY -> UDP,112
+3GPP2 A11 -> UDP,111
+ENRP -> UDP,111
+GIOP -> IPv6HopByHop,111
+SMPP -> IPv4,111
+MPLS ECHO -> UDP,110
+ICMP -> UDP,110
+openSAFETY/Powerlink -> Ethernet,110
+NLSP -> IPv4,110
+RSIP -> Fragment,110
+F1AP/NR RRC -> Fragment,110
+CDP -> CiscoDiscoveryInfo,109
+PCP -> IPv6HopByHop,108
+ESIS -> UDP,106
+ASAP -> UDP,106
+S1AP/NAS-EPS -> SCTP,106
+Tibia -> Fragment,106
+MPEG SECT -> Ethernet,105
+ULP/LPP/LPPe -> UDP,105
+TRP  -> UDP,105
+FC ELS -> UDP,105
+TN5250 -> IPv4,105
+PRES -> UDP,104
+FCP -> UDP,104
+DPNSS -> SCTP,104
+IAPP -> UDP,103
+MobileIP -> UDP,103
+Zone Server -> Ethernet,103
+FF -> IPv6HopByHop,102
+BACnet-NPDU -> GRE,102
+ILP -> Fragment,102
+PPP PPPMux -> UDP,101
+SKINNY -> IPv6HopByHop,101
+XTI -> Fragment,101
+BATADV_BATMAN -> Ethernet,101
+ILP/LPP -> Fragment,101
+DOCSIS -> Ethernet,100
+MEGACO -> SCTP,100
+AX4000 -> IPv4,99
+Modbus/TCP -> IPv4,99
+IEEE 802.15.4 -> Fragment,99
+EAPOL-MKA -> UDP,98
+DTLS 1.0 (OpenSSL pre 0.9.8f) -> UDP,98
+GTPv2/NAS-EPS -> IPv4,98
+ICMP -> GRE,98
+CUPS -> UDP,97
+ALLJOYN -> Fragment,97
+RNSAP -> UDP,96
+EIGRP -> UDP,96
+PIMv2 -> UDP,96
+DCERPC -> UDP,96
+BACnet-NPDU -> LLC,96
+SBcAP -> IPv4,96
+Syslog -> UDP,95
+IEEE1722-1 -> UDP,95
+Modbus/UDP -> UDP,95
+MGCP -> UDP,94
+MSDP -> Fragment,94
+TPKT -> IPv6HopByHop,94
+COTP -> IPv4,94
+MPEG TS -> UDP,93
+FCP -> Ethernet,93
+RTSP -> Fragment,93
+NBAP -> Fragment,93
+TR MAC -> Ethernet,93
+NetBIOS -> GRE,93
+TZSP -> UDP,92
+HiQnet -> Fragment,92
+BATADV_IV_OGM -> Ethernet,92
+BATADV_ICMP -> GRE,92
+SAPIGS -> IPv6HopByHop,92
+TCP -> Syslog,91
+OpenWire -> Fragment,90
+CBSP -> IPv6HopByHop,90
+OpenFlow -> Fragment,90
+SKINNY/RESP -> IPv6HopByHop,89
+BT-DHT -> UDP,88
+S7COMM -> UDP,88
+BACnet-NPDU -> UDP,88
+eCPRI -> Ethernet,87
+ICMP -> IPv4,87
+DISCARD -> Fragment,87
+ETI -> Fragment,87
+M3UA (RFC 4666) -> SCTP,86
+QUAKE2 -> UDP,85
+S5066 -> Fragment,85
+EAP -> UDP,84
+E1AP -> UDP,84
+PPP CCP -> Ethernet,84
+HiSLIP -> IPv4,84
+LBT-TCP -> IPv6HopByHop,84
+TR MAC -> LLC,84
+CFM -> Ethernet,84
+DECT RFP -> Ethernet,84
+DVMRP -> UDP,83
+CLNP -> IPv4,83
+X11 -> Fragment,82
+GSM RLC/MAC -> Fragment,82
+SPATEM -> IPv4,82
+EAPOL-MKA -> IPv4,82
+V5UA -> SCTP,82
+Ethernet -> UDP,81
+ALLJOYN-NS -> UDP,81
+RUA -> SCTP,81
+PPP IPCP -> Ethernet,81
+DVMRP -> IPv4,81
+CBSP -> IPv4,80
+TISTPG -> IPv4,80
+M2UA -> SCTP,80
+IEC 60870-5 ASDU -> IPv6HopByHop,80
+ALC -> UDP,78
+XIP -> Ethernet,78
+BZR -> IPv6HopByHop,78
+ARP -> GRE,78
+DEC DNA -> Ethernet,78
+V5UA (draft) -> SCTP,77
+BFD Control -> UDP,76
+ieee1905 -> MPLS,76
+MEGACO -> IPv4,76
+GDS DB -> Fragment,75
+SRT -> UDP,75
+E-LMI -> Ethernet,75
+Ceph -> Fragment,75
+RUA -> UDP,74
+SUA (RFC 3868) -> UDP,74
+BPv7 -> UDP,74
+ANSI C12.22 -> UDP,74
+SIII MDT -> Ethernet,74
+WHOIS -> TCP,73
+6LoWPAN -> Ethernet,73
+IUA (RFC 3057) -> SCTP,73
+PCEP -> IPv4,73
+6LoWPAN -> UDP,72
+FC ELS -> GRE,72
+GIOP -> IPv4,72
+OAM -> GRE,72
+SliMP3 -> UDP,71
+LLC -> Ethernet,71
+DCERPC -> Fragment,70
+POWERLINK/UDP -> UDP,70
+SMTP -> IPv6HopByHop,70
+TELNET -> IPv6HopByHop,70
+BACnet-APDU -> IPv6HopByHop,70
+PIMv2 -> IPv4,70
+E2AP -> IPv4,70
+RUA -> IPv4,70
+ANSI C12.22 -> Fragment,69
+TPKT -> Fragment,69
+PPP PPPMux -> LLC,69
+RIPv2 -> RIP,68
+MPTCP -> UDP,68
+RTMP -> UDP,68
+DCCP -> GRE,68
+DENMv1 -> IPv4,68
+MARS -> GRE,68
+WASSP -> UDP,67
+MMS/IEC61850 -> UDP,67
+6LoWPAN -> Fragment,67
+PPP BAP -> Ethernet,67
+BATADV_BATMAN -> UDP,66
+802.11 -> Ethernet,66
+IGMPv3 -> IGMP,65
+TCP -> IPP,65
+MQTT -> UDP,65
+H.248 -> SCTP,65
+SMTP -> UDP,64
+SIP -> UDP,64
+ETCH -> Fragment,64
+PAP -> GRE,64
+GTPv2/NAS-EPS/NAS-EPS -> IPv6HopByHop,63
+LCSAP -> IPv4,63
+openSAFETY/SercosIII -> Ethernet,63
+IPX -> GRE,63
+EIGRP -> IPv6,62
+HCrt -> UDP,62
+QNET_KIF -> UDP,62
+E-LMI -> UDP,62
+COPS -> IPv4,62
+NGAP/NAS-5GS/NAS-5GS -> SCTP,62
+T.125 -> GRE,62
+NDMP -> IPv4,62
+LINX -> Ethernet,61
+ISIS LSP -> IPv6HopByHop,61
+M3UA (RFC 4666) -> UDP,60
+ULP/LPP -> UDP,60
+SSLv3 -> TCP,60
+SW_ILS -> UDP,59
+PPP BCP -> UDP,59
+LLDP -> IPv4,59
+ILP/LPP/LPPe -> Fragment,59
+LLRP -> IPv4,59
+Elasticsearch -> Fragment,59
+FC -> Ethernet,58
+ISIS CSNP -> IPv4,58
+AYIYA -> UDP,58
+GTPv2 -> Fragment,58
+DUA -> SCTP,58
+MGCP/SDP -> Fragment,58
+GSM SMS -> IPv6HopByHop,58
+SKINNY/REQ -> IPv6HopByHop,58
+DSPv2  -> UDP,57
+ZIP -> GRE,57
+RSL -> UDP,56
+PTPv2 -> UDP,56
+MANOLITO -> UDP,56
+Wreth -> GRE,56
+MPTCP -> IPv6HopByHop,56
+CQL -> Fragment,56
+MPTCP -> IPv4,55
+gcsna -> UDP,55
+MIPv6 -> IPv6HopByHop,55
+ISO -> GRE,55
+SMTP -> Fragment,55
+NR RRC -> Fragment,55
+openSAFETY over UDP -> UDP,54
+T.38 -> UDP,54
+RPL -> LLC,54
+WCP -> GRE,54
+PPP MPLSCP -> GRE,54
+MEGACO -> UDP,53
+PTPv2 -> Ethernet,53
+SSLv2 -> Fragment,53
+IPComp -> IPv6HopByHop,53
+BATADV_BATMAN -> GRE,53
+ICMPv6 -> GRE,53
+CFM -> GRE,53
+slsk -> IPv6HopByHop,53
+LDP -> Fragment,53
+IEEE1722 -> UDP,52
+PCP v2 -> UDP,52
+M3UA (RFC 4666) -> IPv4,52
+PIMv1 -> IPv4,52
+CRTP -> GRE,52
+SSL -> IPv4,52
+HCrt -> Ethernet,52
+NCP -> Fragment,52
+Netsync -> Fragment,52
+BAT_VIS -> UDP,51
+XIP -> UDP,51
+Z39.50 -> IPv4,51
+0x0045 -> GRE,51
+Pathport -> UDP,50
+MINT -> UDP,50
+MIH -> GRE,50
+MTP3MG (Int. ITU) -> IPv4,50
+ECP -> Ethernet,50
+MS NLB -> Ethernet,50
+MPEG PES -> Ethernet,49
+MDP -> UDP,49
+ICEP -> UDP,49
+ISIS HELLO -> GRE,49
+O-RAN-FH-U -> Ethernet,49
+PPP BCP NCP -> GRE,49
+Ethernet -> GRE,49
+IEEE1722 -> Ethernet,49
+TDLS -> Fragment,49
+HART_IP -> UDP,48
+CFLOW -> Fragment,48
+ICAP -> IPv4,48
+WSMP -> Ethernet,47
+WCP -> Ethernet,47
+UDLD -> SNAP,46
+FTP-DATA -> TCP,46
+DoIP -> UDP,46
+V5UA (draft) -> UDP,46
+ZigBee HC -> UDP,46
+MEMCACHE -> IPv4,46
+EAP -> EAPOL,46
+OAPv1 OAPv1  -> Fragment,46
+OMRON -> UDP,45
+KRB5 -> UDP,45
+ZigBee IPM -> UDP,45
+5co-legacy -> UDP,45
+DISCARD -> IPv4,45
+ISIS LSP -> GRE,45
+RELOAD -> Fragment,45
+V5UA -> IPv4,45
+UMA/GPRS-LLC -> IPv6HopByHop,45
+CDP -> UDP,44
+RTSP -> IPv4,44
+H.501 -> IPv6HopByHop,44
+GTPv2/NAS-EPS/NAS-EPS -> IPv4,44
+0x0081 -> GRE,44
+POP/IMF -> Fragment,44
+0x0005 -> GRE,43
+DENM -> IPv4,43
+AoE -> GRE,43
+DISCARD -> IPv6HopByHop,43
+BATADV_VIS -> GRE,43
+STP -> GRE,43
+HTTP -> TCP,42
+M2UA -> UDP,42
+FC -> UDP,42
+CLNP -> UDP,42
+DPPs  -> Fragment,42
+SMPP -> IPv6HopByHop,42
+HSR/PRP -> Ethernet,42
+AX.25 -> IPv4,42
+WINS-Replication -> Fragment,42
+LACP -> Ethernet,41
+L2TPv3 -> UDP,41
+AODV -> UDP,41
+IPDC -> UDP,41
+Modbus/TCP -> IPv6HopByHop,41
+MRP-MSRP -> Ethernet,41
+CAMv1 -> IPv4,41
+TDMoE -> Ethernet,41
+PTPv2 -> GRE,41
+iSCSI -> IPv6HopByHop,41
+RDT -> UDP,40
+RANAP -> UDP,40
+NLSP -> UDP,40
+QUAKEWORLD -> UDP,40
+LwMesh -> UDP,40
+SCCP (Int. ITU) -> TCP,40
+RTcfg -> GRE,40
+BATADV_VIS -> Ethernet,40
+LLC -> IPv4,40
+IP -> GRE,40
+HiSLIP -> UDP,39
+MEMCACHE -> UDP,39
+MTP3MG (Int. ITU) -> UDP,39
+DDP -> UDP,39
+ARTNET -> UDP,39
+SAMETIME -> Fragment,39
+MARS -> IPv4,39
+IPX WAN -> IPv4,39
+IPv6 -> Ethernet,39
+SCCP (Int. ITU) -> IPv4,39
+TN3270 -> IPv6HopByHop,39
+FTP -> TCP,38
+PIMv1 -> UDP,38
+IGMPv3 -> UDP,38
+HTTP2 -> UDP,38
+CLASSIC-STUN -> UDP,38
+HL7 -> IPv6HopByHop,38
+GSM SMS -> Fragment,38
+Gadu-Gadu -> Fragment,38
+CSM_ENCAPS -> GRE,38
+BATADV_UNICAST_FRAG -> GRE,38
+ASP -> GRE,38
+Q.931 -> IPv6HopByHop,38
+AC DR -> UDP,37
+RTSP -> UDP,37
+IUA (RFC 3057) -> UDP,37
+ACF-CAN -> UDP,37
+CRTP -> UDP,37
+ISIS PSNP -> IPv4,37
+FIX -> IPv4,37
+wifi_dpp -> Ethernet,37
+ASAM-CMP -> GRE,37
+HTTP -> HTTP/1.1,36
+IPv6 -> Fragment,36
+CIP -> TCP,36
+ASAM-CMP -> UDP,36
+OAM -> UDP,36
+PKTC -> UDP,36
+slsk -> UDP,36
+SABP -> Fragment,36
+WSMP -> GRE,36
+RSVP -> Fragment,36
+PPP -> GRE,36
+NCSI -> GRE,36
+IEEE1722 -> GRE,36
+ICEP -> Fragment,36
+SSL -> GRE,36
+DCCP -> IPv6HopByHop,36
+PPP CHAP -> GRE,36
+ieee1905 -> GRE,36
+DNS -> IPv6HopByHop,36
+ISAKMP -> IKEv2,35
+CL-PRES -> IPv4,35
+CIP I/O -> UDP,35
+MGCP/SDP -> UDP,35
+IGMPv3 -> IPv4,35
+AFP -> IPv4,35
+DPPv2  -> Fragment,35
+SABP -> IPv4,35
+MySQL -> IPv4,35
+IGRP -> IPv4,35
+BEEP -> IPv6HopByHop,35
+S1AP/LPPa -> UDP,34
+ISIS PSNP -> UDP,34
+F1AP/NR RRC -> UDP,34
+TCPCL -> Fragment,34
+IPDC -> IPv4,34
+L2TPv3 -> IPv6HopByHop,34
+Bundle -> IPv4,34
+BitTorrent -> IPv4,34
+SMUX -> IPv4,34
+RTMP -> Fragment,34
+ISIS PSNP -> GRE,34
+FC-FCS -> Ethernet,34
+SMPP -> GRE,34
+IUA (RFC 3057) -> IPv4,34
+TLSv1.2 -> TLS,33
+PAP -> UDP,33
+MPLS -> UDP,33
+IMAP -> UDP,33
+OpenVPN -> UDP,33
+IPX -> UDP,33
+KNET -> UDP,33
+COTP -> UDP,33
+Q.933 -> UDP,33
+PIMv2 -> IPv6HopByHop,33
+NetBIOS -> LLC,33
+NWP -> Ethernet,33
+RARP -> GRE,33
+T.125 -> IPv4,33
+ZEBRA -> IPv4,33
+gcsna -> SCTP,33
+MAC CTRL -> GRE,33
+bluecom -> Ethernet,33
+XMCP -> IPv6HopByHop,33
+E1AP -> Fragment,33
+F1AP/NR RRC/NR RRC -> SCTP,33
+Gearman -> Fragment,33
+eDonkey -> IPv6HopByHop,33
+TACACS+ -> Fragment,33
+ESIS -> GRE,33
+FIP -> Ethernet,33
+FC-SB3 -> Ethernet,33
+DIAMETER -> UDP,32
+openSAFETY/SercosIII -> UDP,32
+SSL -> UDP,32
+IPVS -> UDP,32
+V5UA -> UDP,32
+C15 -> Ethernet,32
+BZR -> IPv4,32
+STUN -> IPv6HopByHop,32
+MTP3MG (Int. ITU) -> SCTP,32
+IPv6 -> IPv6HopByHop,32
+TECMP -> Ethernet,32
+SSEM -> IPv4,32
+LLTD -> UDP,31
+AppleMIDI -> UDP,31
+DISCARD -> UDP,31
+sFlow -> UDP,31
+FF -> UDP,31
+WCP -> UDP,31
+PNIO -> Ethernet,31
+CAM -> IPv4,31
+CESoETH -> GRE,31
+M2PA -> IPv4,31
+NSSS -> LLC,31
+M2TP -> SCTP,31
+TCP -> TLSv1.2,30
+MSproxy -> UDP,30
+WHO -> UDP,30
+AgentX -> UDP,30
+RTP -> UDP,30
+SGMPv1  -> Fragment,30
+IPDC -> Fragment,30
+TLSv1.2 -> Fragment,30
+0x005d -> GRE,30
+MSRP -> IPv4,30
+EVCSN -> IPv4,30
+MARS -> ARP,30
+NMAS -> LLC,30
+OAPv1  -> Fragment,30
+IDMP -> Fragment,30
+TIPC -> GRE,30
+UMA -> UDP,29
+HSR/PRP -> UDP,29
+DUA -> UDP,29
+PROXYv2 -> UDP,29
+WLAN -> UDP,29
+SNMP -> TCP,29
+KDSP -> Fragment,29
+ICMPv6 -> Fragment,29
+H.248 -> IPv4,29
+NCP -> IPv4,29
+F1AP -> Fragment,29
+RSL/NBIFOM -> Fragment,29
+TLSv1 -> Fragment,29
+0x0001 -> GRE,29
+NSH -> UDP,28
+AFP -> UDP,28
+MDNS -> UDP,28
+MDP -> Ethernet,28
+TLSv1.1 -> Fragment,28
+DHCPFO -> Fragment,28
+ESP -> GRE,28
+X2AP -> Fragment,28
+RPKI-RTR -> IPv6HopByHop,28
+ACF-CAN -> Ethernet,27
+TDMoE -> UDP,27
+STP -> UDP,27
+ALLJOYN -> UDP,27
+RIP -> UDP,27
+0x0619 -> GRE,27
+dNS -> Ethernet,27
+DHCPv6 BulkLease -> IPv4,27
+ICEP -> IPv6HopByHop,27
+0x0053 -> GRE,27
+KT -> Fragment,27
+kismet -> Fragment,27
+LDAP -> Fragment,27
+FLIP -> GRE,27
+PPPoED -> IPv4,27
+RTMP -> GRE,27
+PPP LCP -> PPP,26
+TPM -> Fragment,26
+KPASSWD -> UDP,26
+TCAP -> UDP,26
+EAPOL -> UDP,26
+MEGACO -> IPv6HopByHop,26
+ISIS -> GRE,26
+LNET -> IPv6HopByHop,26
+PPP CBCP -> Ethernet,26
+YMSG -> Fragment,26
+NR RRC -> SCTP,26
+IVIM -> Fragment,26
+LMI -> LLC,26
+AH -> IPv4,26
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS -> IPv6HopByHop,26
+XIP -> GRE,26
+DICOM -> IPv4,26
+MINT -> Ethernet,26
+SIII MDT -> GRE,26
+SPDY -> Fragment,26
+FR -> GRE,26
+ROHC/3Com XNS|ROHC -> GRE,26
+MCX -> GRE,25
+BAT_BATMAN -> UDP,25
+IP -> UDP,25
+IGRP -> UDP,25
+TPKT -> UDP,25
+DMX Channels -> UDP,25
+Vines SRTP -> IPv4,25
+HomePlug AV -> GRE,25
+DSR -> IPv6HopByHop,25
+M2UA -> IPv4,25
+LACP -> GRE,25
+Unzoned NS -> Ethernet,25
+HART_IP -> IPv4,25
+XTP -> IPv4,25
+NMPI -> IPv4,25
+FTP -> Fragment,25
+OPSI -> Fragment,25
+FC -> IPv4,25
+ISMP.EDP -> Ethernet,25
+SMB -> Fragment,25
+IDMP -> IPv6HopByHop,24
+BATADV_VIS -> UDP,24
+Netsync -> UDP,24
+MySQL -> UDP,24
+Link 16 -> UDP,24
+FC-SB3 -> UDP,24
+MPEG SECT -> UDP,24
+CFM -> UDP,24
+Gearman -> UDP,24
+CLASSIC-STUN -> IPv6HopByHop,24
+MIPv6 -> GRE,24
+FTP -> IPv4,24
+UMA/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,24
+HomePlug -> GRE,24
+Ceph -> GRE,24
+DPLAY -> Fragment,24
+SCTP -> Fragment,24
+SCTE-35 -> Ethernet,24
+LON -> UDP,23
+RDM -> UDP,23
+JXTA -> UDP,23
+MRP-MSRP -> UDP,23
+ISMP.EDP -> UDP,23
+RSVP -> GRE,23
+0x00ff -> GRE,23
+MPTCP -> TCP,23
+IP -> IPv6HopByHop,23
+SKINNY -> IPv4,23
+SCTP -> IPv6HopByHop,23
+HTTP2 -> IPv4,23
+ATMARP -> IPv4,23
+Xcsl -> IPv4,23
+LISP -> Fragment,23
+LLDP -> GRE,23
+RK512 -> Fragment,23
+HiSLIP -> IPv6HopByHop,23
+Wreth -> Ethernet,23
+AARP -> GRE,23
+PNIO -> IPv4,23
+DCCP -> Fragment,23
+LLTD -> GRE,23
+DTP -> SNAP,22
+Vines SRTP -> UDP,22
+WSP/XML -> UDP,22
+DICOM -> UDP,22
+RDP -> UDP,22
+IEC 60870-5 ASDU -> UDP,22
+RTPproxy-ng -> UDP,22
+QNET_LR -> IPv4,22
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS -> IPv4,22
+NCSI -> IPv4,22
+NEMO -> IPv4,22
+ICMP -> Fragment,22
+openSAFETY/Powerlink -> Fragment,22
+LwMesh -> Fragment,22
+JDWP -> Fragment,22
+LISP -> IPv4,22
+X.29 -> IPv4,22
+QNET_QOS -> IPv4,22
+LPD -> TCP,21
+AFS (RX) -> UDP,21
+HomePlug AV -> UDP,21
+QNET_LR -> UDP,21
+ISIS CSNP -> UDP,21
+AX.25 -> UDP,21
+DCC -> UDP,21
+RSH -> UDP,21
+LINX -> GRE,21
+ISIS CSNP -> GRE,21
+WOW -> Fragment,21
+CAST -> IPv6HopByHop,21
+0x0e33 -> GRE,21
+MRP-MVRP -> Ethernet,21
+NGAP -> Fragment,21
+DLR -> Ethernet,21
+RSVP-E2EI -> IPv6HopByHop,21
+DCERPC -> GRE,21
+Inverse ARP -> GRE,21
+VRRP -> IPv4,21
+X.25 -> IPv6HopByHop,21
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> IPv6HopByHop,21
+ATP -> GRE,21
+SIGCOMP -> Fragment,21
+RSH -> Syslog,20
+Elasticsearch -> UDP,20
+LNET -> UDP,20
+LACP -> UDP,20
+DHCPFO -> UDP,20
+"SCTP, NetPerfMeter -> UDP",20
+M2TP -> UDP,20
+BitTorrent -> UDP,20
+ICAP -> UDP,20
+AMQP -> GRE,20
+CFLOW -> IPv6HopByHop,20
+IGMPv3 -> IPv6HopByHop,20
+DVMRP -> IPv6HopByHop,20
+DNS -> GRE,20
+MPLS -> GRE,20
+Turbocell -> IPv4,20
+BEEP -> IPv4,20
+SKINNY/REQ -> IPv4,20
+TRP  -> Fragment,20
+RSL Cell Broadcast -> Fragment,20
+CSM_ENCAPS -> Ethernet,20
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,20
+IPP -> TCP,19
+ACF-LIN -> Ethernet,19
+IPv4 -> UDP,19
+QNET_QOS -> UDP,19
+X.29 -> UDP,19
+? KNXnet/IP -> IPv4,19
+DCERPC -> IPv4,19
+Roofnet -> Ethernet,19
+MPLS PM (DLM+DM) -> MPLS,19
+DCERPC -> TCP,19
+ZigBee IPM -> GRE,19
+RDP -> IPv4,19
+SSP -> IPv4,19
+Q.931 -> Fragment,19
+RPCAP -> Fragment,19
+PPP BAP -> GRE,19
+BATADV_TT_QUERY -> GRE,19
+SNA -> IPv4,19
+RANAP -> Fragment,19
+MDP -> IPv4,19
+SES -> GRE,19
+DPPs DPPs  -> Fragment,19
+EIGRP -> IPv6HopByHop,19
+GOOSE -> Ethernet,19
+SSLv3 -> IPv4,19
+Turbocell -> GRE,19
+FIP -> GRE,19
+RSIP -> IPv6HopByHop,19
+IEC 60870-5 ASDU -> Fragment,19
+TCP -> HTTP/1.1,18
+SPDY -> UDP,18
+RPL -> UDP,18
+XDMCP -> UDP,18
+IPX RIP -> UDP,18
+SGSAP -> UDP,18
+VRRP -> UDP,18
+ZEBRA -> UDP,18
+AMR -> UDP,18
+SGMPv1  -> UDP,18
+Auto-RP -> UDP,18
+PCOM/TCP -> IPv4,18
+SPX -> IPv4,18
+OAM -> IPv4,18
+RTmac -> GRE,18
+SIII AT -> GRE,18
+CDP -> Fragment,18
+Xcsl -> Fragment,18
+DSPv2  -> Fragment,18
+MRP-MMRP -> Ethernet,18
+IP -> IPv4,18
+9P -> IPv6HopByHop,18
+BACnet-APDU -> Fragment,18
+RoCE -> Fragment,18
+0x003f -> GRE,18
+OSPF -> IPv6,17
+FTP-DATA -> UDP,17
+Vines ICP -> UDP,17
+Clique-rm -> UDP,17
+HICP -> UDP,17
+Roofnet -> UDP,17
+NMPI -> UDP,17
+GRE -> UDP,17
+TACACS+ -> UDP,17
+BT BR/EDR RF -> UDP,17
+eCPRI -> UDP,17
+DPNET -> UDP,17
+SCoP -> UDP,17
+Vines RTP -> IPv4,17
+CLNP -> IPv6HopByHop,17
+IPX RIP -> IPv4,17
+ARP -> IPv4,17
+SKINNY/RESP -> IPv4,17
+NSH -> Ethernet,17
+HNBAP -> IPv4,17
+Omni-Path -> IPv6HopByHop,17
+DEC DNA -> IPv4,17
+FR -> Ethernet,17
+JXTA -> IPv6HopByHop,17
+NET/ROM -> IPv4,17
+SREM -> IPv4,17
+TSCF -> GRE,17
+0x00b1 -> GRE,17
+TNS -> Fragment,17
+BSSAP+ -> Fragment,17
+FTP -> IPv6HopByHop,17
+LDP -> TCP,16
+OCSP -> HTTP/1.0,16
+SSLv2 -> UDP,16
+MARS -> UDP,16
+RDPUDP -> UDP,16
+bluecom -> UDP,16
+DHCPv6 BulkLease -> UDP,16
+NBSS -> UDP,16
+WCP -> LLC,16
+STP -> IPv4,16
+LMI -> Ethernet,16
+RPCH -> Fragment,16
+KNET -> Fragment,16
+ISAKMP -> IPv6HopByHop,16
+BATADV_ICMP -> Ethernet,16
+AFP -> IPv6HopByHop,16
+NCSI -> Ethernet,16
+H1 -> GRE,16
+ZigBee ZDP -> Ethernet,16
+NVMe/TCP -> Fragment,16
+NTP -> IPv4,16
+NCP -> GRE,16
+HTTP -> Fragment,16
+IGMP -> IPv4,16
+PGSQL -> IPv6HopByHop,16
+Z39.50 -> IPv6HopByHop,16
+ECP -> GRE,16
+X2AP/NAS-EPS -> SCTP,16
+HL7 -> Fragment,16
+BATADV_TT_QUERY -> Ethernet,16
+DJIUAV -> Fragment,16
+GSUP -> Fragment,16
+Broadcom tag -> GRE,16
+IGMP -> UDP,15
+SPX -> UDP,15
+IDMP -> UDP,15
+TAPA -> UDP,15
+DNPv1  -> UDP,15
+DPPs  -> UDP,15
+ENIP -> UDP,15
+FTP -> UDP,15
+Nano -> UDP,15
+AH -> UDP,15
+ECMP -> IPv6HopByHop,15
+SUA (RFC 3868) -> IPv4,15
+Socks -> IPv4,15
+KNET -> IPv4,15
+MACSEC -> GRE,15
+DLSw -> IPv6HopByHop,15
+PPP PAP -> GRE,15
+NSRP -> GRE,15
+HPEXT -> GRE,15
+AX.25 -> GRE,15
+FDDI -> Fragment,15
+NFS CB -> IPv6HopByHop,15
+BATADV_BCAST -> GRE,15
+0x22f1 -> GRE,15
+NDPS -> Fragment,15
+NWP -> GRE,15
+TLSv1.3 -> Fragment,14
+ACF-LIN -> UDP,14
+MSDP -> UDP,14
+VITA 49 -> UDP,14
+SIGCOMP -> UDP,14
+IPX WAN -> UDP,14
+ZigBee -> Ethernet,14
+HNBAP -> Fragment,14
+LLC -> Fragment,14
+MPEG SECT -> Fragment,14
+Vines IPC -> GRE,14
+DSI -> IPv4,14
+JXTA -> GRE,14
+DoIP -> IPv4,14
+RTSP -> TCP,14
+TNS -> IPv4,14
+QNET_LWL4 -> IPv4,14
+OML -> Fragment,14
+MINT -> MPLS,14
+V5UA (draft) -> IPv4,14
+BATADV_UNICAST_TVLV -> GRE,14
+PGSQL -> Fragment,14
+MSNIP -> IPv4,14
+LLC -> IPv6HopByHop,14
+S101 -> Fragment,14
+S5066 -> IPv4,14
+CFM -> MPLS,14
+UMA/GPRS-LLC -> IPv4,14
+Q.933 -> GRE,14
+DSM-CC -> Ethernet,14
+WAI -> IPv4,14
+HTTP2 -> SCTP,14
+ISIS LSP -> LLC,13
+0x0015 -> GRE,13
+NR RRC -> UDP,13
+Vines RTP -> UDP,13
+SAMETIME -> UDP,13
+MPLS PM (DLM+DM) -> UDP,13
+2*DCERPC -> UDP,13
+LINX -> UDP,13
+USB -> UDP,13
+IPMB -> UDP,13
+AUTOSAR NM -> UDP,13
+GEONW -> UDP,13
+IDP -> Ethernet,13
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> IPv4,13
+X.25 -> LLC,13
+PGSQL -> IPv4,13
+NVMe -> Fragment,13
+PPP BACP -> Ethernet,13
+DHCPv6 BulkLease -> TCP,13
+TCAP -> Fragment,13
+SCCP (Int. ITU) -> SCTP,13
+KRB5 -> IPv4,13
+ZigBee WSN -> Fragment,13
+IPv4 -> IPv6Destination,13
+SMB -> TCP,13
+DICOM -> IPv6HopByHop,13
+SSLv2 -> IPv4,13
+IGMP -> GRE,13
+POP/IMF -> IPv4,13
+0x807b -> GRE,13
+P1 -> IPv4,13
+S7COMM -> Fragment,13
+PROXYv2 -> Fragment,13
+GRE -> IPv4,13
+NBSS -> Fragment,13
+EISS -> Ethernet,13
+ISUP(ITU) -> SCTP,13
+0x007b -> GRE,13
+MTP3 (Int. ITU) -> SCTP,13
+BATADV_ELP -> GRE,13
+openSAFETY/Powerlink -> GRE,13
+LDP -> IPv6HopByHop,13
+RTCDC -> IPv4,13
+XOT -> Fragment,13
+GOOSE -> GRE,13
+X.25 -> GRE,13
+ROHC/Ethernet -> Ethernet,13
+TCP -> DNS,12
+LACP -> Dot1Q,12
+XTP -> UDP,12
+ARP -> UDP,12
+0x0000 -> UDP,12
+DPNSS -> UDP,12
+PTPv1 -> UDP,12
+NDMP -> UDP,12
+NBDS -> UDP,12
+QNET_LWL4 -> UDP,12
+NET/ROM -> UDP,12
+RIPv2 -> UDP,12
+ISAKMP -> GRE,12
+TIPC -> IPv4,12
+SMTP -> IPv4,12
+RTCDC -> SCTP,12
+DUA -> IPv4,12
+9P -> IPv4,12
+CRTP -> LLC,12
+DCERPC -> IPv6HopByHop,12
+Ethernet -> IPv4,12
+PPPoED -> GRE,12
+DISTCC  -> Fragment,12
+LAPD -> Ethernet,12
+KT -> IPv4,12
+BATADV_UNICAST -> Ethernet,12
+IGAP -> IPv4,12
+ISO15765 -> Ethernet,12
+RTcfg -> Ethernet,12
+SSH -> SCTP,12
+PPP OSINLCP -> GRE,12
+ZIOP -> IPv4,12
+ANSI C12.22 -> IPv4,12
+UMA/GPRS-LLC/GPRS-LLC -> IPv4,12
+Q.931 -> GRE,12
+IPX SAP -> IPv4,12
+ENIP -> TCP,12
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,12
+TFP -> Fragment,12
+FC_CT -> Ethernet,12
+0x0043 -> GRE,12
+Vines SARP -> GRE,12
+GSM SMS -> IPv4,12
+IEC 60870-5-104 -> IPv4,12
+SMUX -> IPv6HopByHop,11
+EV-RSR -> IPv4,11
+PMPROXY -> UDP,11
+Z39.50 -> UDP,11
+RX -> UDP,11
+MMSE/XML -> UDP,11
+TEPv1  -> UDP,11
+NBP -> UDP,11
+T.125 -> UDP,11
+SMUX -> UDP,11
+KRB4 -> UDP,11
+EXEC -> UDP,11
+Modbus/TCP -> UDP,11
+MSMMS -> UDP,11
+LBT-TCP -> GRE,11
+Couchbase -> IPv6HopByHop,11
+MPLS PM (ILM) -> MPLS,11
+NEMO -> GRE,11
+DTLS -> IPv4,11
+MRP-MMRP -> IPv4,11
+0x0000 -> Ethernet,11
+VRRP -> GRE,11
+RTMP -> Ethernet,11
+0x0080 -> GRE,11
+E-LMI -> GRE,11
+0x0003 -> GRE,11
+EXEC -> TCP,11
+HAZELCAST -> Fragment,11
+NFS CB -> Fragment,11
+PRES -> GRE,11
+LISP -> IPv6HopByHop,11
+bluecom -> IPv4,11
+Vines SPP -> GRE,11
+IDP -> GRE,11
+HSR/PRP -> GRE,11
+RTCMEM -> IPv4,11
+NBD -> Fragment,11
+MIH -> IPv6HopByHop,11
+0x1800 -> GRE,11
+FC ELS -> IPv4,11
+PPPoED -> Ethernet,11
+FMTP -> Fragment,11
+STP -> LLC,11
+MEMCACHE -> Fragment,11
+Vines ICP -> IPv4,11
+BATADV_BCAST -> Ethernet,11
+RMP -> LLC,11
+0x00a7 -> GRE,11
+RELOAD Frame -> Fragment,11
+TDMA -> GRE,11
+TCP -> SSH,10
+UDP -> TFTP,10
+TCP -> IMAP,10
+ICMPv6 -> MLDv2MulticastListenerReport,10
+0x6002 -> Ethernet,10
+PPP CHAP -> UDP,10
+TSCF -> UDP,10
+Tibia -> UDP,10
+VSNP -> UDP,10
+synergy -> UDP,10
+Armagetronad -> UDP,10
+PPPoED -> UDP,10
+ADwin -> UDP,10
+MPLS-MAC -> UDP,10
+CAN-ETH -> UDP,10
+DPPv0  -> UDP,10
+ALLJOYN-ARDP -> UDP,10
+ATP -> UDP,10
+O-RAN-FH-U -> UDP,10
+XOT -> UDP,10
+Q.931 -> SCTP,10
+BATADV_ROAM_ADV -> GRE,10
+RPL -> GRE,10
+SIII AT -> Ethernet,10
+NBSS -> TCP,10
+ZIP -> Ethernet,10
+CLASSIC-STUN -> Fragment,10
+BICC(ITU) -> Fragment,10
+MSNMS -> Fragment,10
+DIAMETER -> Fragment,10
+CLTP -> IPv4,10
+RPCH -> IPv6HopByHop,10
+LAPB -> GRE,10
+CLASSIC-STUN -> IPv4,10
+FractalGeneratorProtocol -> IPv4,10
+RPCAP -> IPv4,10
+0xb6d7 -> GRE,10
+IGMPv0 -> GRE,10
+6top -> Ethernet,10
+NCP -> TCP,10
+Inverse ATMARP -> GRE,10
+PAP -> Ethernet,10
+X.29 -> Fragment,10
+IEC61850 Sampled Values -> Ethernet,10
+ISUP(ITU) -> IPv4,10
+SUA (RFC 3868) -> Fragment,10
+SSP -> SCTP,10
+Rlogin -> Fragment,10
+MPLS-MAC -> IPv4,10
+IGMPv0 -> IPv4,10
+Git -> Fragment,10
+TFTP -> IPv4,10
+PIMv2 -> GRE,10
+BATADV_??? -> GRE,10
+"SCTP, NetPerfMeter -> SCTP",10
+BFD Control -> MPLS,10
+Spice CURSOR -> Fragment,10
+0x1c7a -> GRE,10
+ISAKMP -> IPv4,10
+OAPv1 OAPv1 OAPv1 OAPv1  -> Fragment,10
+Gadu-Gadu -> IPv6HopByHop,10
+SKINNY/RESP -> Fragment,10
+RK512 -> IPv6HopByHop,10
+IEC 60870-5-104 -> IPv6HopByHop,10
+XMCP -> Fragment,10
+LBT-TCP -> TCP,10
+HIP -> IPv6HopByHop,10
+KT -> TCP,10
+BATADV_UNICAST_FRAG -> Ethernet,10
+NDPS -> IPv4,10
+TSCF -> Ethernet,10
+bluecom -> GRE,10
+TLCP -> Fragment,9
+H.248 -> UDP,9
+AARP -> UDP,9
+RTcfg -> UDP,9
+ICP -> UDP,9
+DLSw -> UDP,9
+NDPS -> UDP,9
+GTPv2/NAS-EPS -> UDP,9
+POP -> UDP,9
+collectd -> UDP,9
+IEC 60870-5-104 -> UDP,9
+Vines IP -> UDP,9
+WLCCP -> UDP,9
+DNPv0  -> UDP,9
+CGMP -> UDP,9
+RRC -> UDP,9
+Rlogin -> UDP,9
+PPP IPCP -> UDP,9
+LTE RRC UL_DCCH -> UDP,9
+TDS -> UDP,9
+Omni-Path -> UDP,9
+SSP -> UDP,9
+Modbus/TCP -> Fragment,9
+Gopher -> Fragment,9
+MPLS -> IPv4,9
+0x008a -> GRE,9
+OpenFlow -> IPv4,9
+0x82c6 -> GRE,9
+MRP-MMRP -> GRE,9
+RPC -> IPv6HopByHop,9
+IMAP -> IPv6HopByHop,9
+STP -> Ethernet,9
+0x0006 -> GRE,9
+LINX -> IPv4,9
+Vines RTP -> GRE,9
+0x000f -> GRE,9
+POP -> Fragment,9
+SMB2 -> TCP,9
+HIP -> Fragment,9
+0x00b9 -> GRE,9
+NBP -> GRE,9
+Spice Unknown -> IPv6HopByHop,9
+BTPA -> IPv4,9
+NSH -> IPv4,9
+RDP -> GRE,9
+PTP/IP -> Fragment,9
+0x4819 -> GRE,9
+0x0095 -> GRE,9
+0x002f -> GRE,9
+ZigBee T1 -> Fragment,9
+SMRSE -> Fragment,9
+TDMoE -> GRE,9
+0x00e3 -> GRE,9
+LWAPP -> GRE,9
+0x0018 -> GRE,9
+CVSPSERVER -> Fragment,9
+0x0009 -> GRE,9
+0x0041 -> GRE,9
+ILP/LPP/LPPe/LPPe -> Fragment,9
+0x0076 -> GRE,9
+EPL_V1 -> Ethernet,9
+THRIFT -> IPv6HopByHop,9
+EIGRP -> GRE,9
+0x2c01 -> GRE,9
+PPPoED -> PPPoE,8
+TCP -> TLS,8
+TCP -> WHOIS,8
+IPX SAP -> UDP,8
+Gnutella -> UDP,8
+NCSI -> UDP,8
+SAP -> UDP,8
+DSI -> UDP,8
+ZIP -> UDP,8
+NTSCF -> UDP,8
+Vuze-DHT -> UDP,8
+RTCDC -> UDP,8
+Gopher -> UDP,8
+openSAFETY/Powerlink -> UDP,8
+EPMD -> UDP,8
+ENRP -> IPv6HopByHop,8
+TALI -> IPv4,8
+DB-LSP -> Fragment,8
+AoE -> Ethernet,8
+RSL CBCH -> Fragment,8
+Roofnet -> GRE,8
+CRTP -> Ethernet,8
+H.225.0 -> TCP,8
+SBcAP -> Fragment,8
+0x4623 -> GRE,8
+QNET_NR -> IPv4,8
+0x4e88 -> GRE,8
+FCP -> GRE,8
+EIGRP -> Fragment,8
+FCIP -> IPv4,8
+IRC -> IPv4,8
+MRP-MSRP -> GRE,8
+0x0025 -> GRE,8
+RSH -> IPv6HopByHop,8
+LMI -> GRE,8
+NFS CB -> IPv4,8
+Ethernet -> LLC,8
+PPP MP -> LLC,8
+S1AP/NAS-EPS/NAS-EPS -> SCTP,8
+CLTP -> GRE,8
+ETCH -> IPv4,8
+BACnet-NPDU -> IPv4,8
+Vines IP -> GRE,8
+iSNS -> Fragment,8
+LCSAP -> Fragment,8
+0x00f5 -> GRE,8
+EAP -> IPv4,8
+DTLSv1.2 -> SCTP,8
+0x30e2 -> GRE,8
+ULP/LPP -> Fragment,8
+Gnutella -> Fragment,8
+JXTA -> Fragment,8
+MTP2 -> SCTP,8
+MGCP/SDP/SDP -> Fragment,8
+PingPongProtocol -> SCTP,8
+PingPongProtocol -> IPv4,8
+NSH -> GRE,8
+PPP OSINLCP -> Ethernet,8
+CFM -> IPv4,8
+LAT -> IPv4,8
+0xb4bc -> GRE,8
+TN5250 -> IPv6HopByHop,8
+0xc200 -> GRE,8
+DEC DNA -> LLC,8
+LLTD -> IPv4,8
+HiSLIP -> Fragment,8
+ISL -> LLC,8
+TLSv1.3 -> TLS,7
+PPP CHAP -> Ethernet,7
+N/A -> UDP,7
+POP/IMF -> UDP,7
+IGAP -> UDP,7
+ARTEMIS -> UDP,7
+CTDB -> UDP,7
+DTLSv1.0 -> UDP,7
+GVCP -> UDP,7
+PPP PPPMuxCP -> UDP,7
+ZIOP -> UDP,7
+MSNMS -> UDP,7
+QNET_NR -> UDP,7
+FLIP -> UDP,7
+Geneve -> UDP,7
+FDDI -> UDP,7
+FIX -> UDP,7
+NAT-PMP -> UDP,7
+PPP Comp -> UDP,7
+NNTP -> UDP,7
+AMT -> UDP,7
+Rlogin -> TCP,7
+0x0000 -> IPv4,7
+BATADV_IV_OGM -> GRE,7
+ARTEMIS -> Fragment,7
+TELNET -> TCP,7
+0x2245 -> GRE,7
+0x5e80 -> Fragment,7
+X.25 -> Ethernet,7
+NHRP -> Fragment,7
+PPP PPPMuxCP -> Ethernet,7
+IEC61850 Sampled Values -> GRE,7
+RSL -> IPv4,7
+CoLa B -> Fragment,7
+COPS -> Fragment,7
+DTLS -> SCTP,7
+0xfff2 -> Ethernet,7
+LOOP -> GRE,7
+Z39.50 -> Fragment,7
+0x10ff -> GRE,7
+0x009f -> GRE,7
+0x00d1 -> GRE,7
+Paltalk -> IPv4,7
+EAPOL -> GRE,7
+0x4000 -> GRE,7
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv4,7
+M2TP -> IPv4,7
+GIOP -> Fragment,7
+DTLSv1.0 -> SCTP,7
+UMA/SNDCP -> IPv4,7
+R3 -> TCP,7
+VSNCP -> LLC,7
+MRP-MVRP -> GRE,7
+RPKI-RTR -> IPv4,7
+NBIPX -> IPv4,7
+ICAP -> Fragment,7
+AH -> IPv6HopByHop,7
+OAM -> Fragment,7
+0x004f -> GRE,7
+CMD -> GRE,7
+MTP3 (Int. ITU) -> IPv4,7
+0x0033 -> GRE,7
+EPMD -> IPv4,7
+ERSPAN -> GRE,7
+Ethernet -> EtherIP,7
+PN-RT -> GRE,7
+0x00fb -> GRE,7
+R-GOOSE -> IPv4,7
+DSPv2 DSPv2  -> Fragment,7
+0x0030 -> GRE,7
+DECT PP -> Ethernet,7
+DHCPv6 BulkLease -> IPv6HopByHop,7
+PPPoES -> GRE,7
+LAT -> GRE,7
+MAC CTRL -> Ethernet,7
+SMC-R -> Ethernet,7
+BOFL -> GRE,7
+SYNCHROPHASOR -> Fragment,7
+FTP-DATA -> IPv6HopByHop,7
+ESP -> IPv4,7
+ESIS (X.25) -> GRE,7
+ZEBRA -> IPv6HopByHop,7
+CMP -> TCP,7
+MS NLB -> GRE,7
+RTI-TCP -> IPv4,7
+DVB-DATA -> Ethernet,7
+NLSP -> GRE,7
+POP -> GRE,7
+SKINNY -> Fragment,7
+PN-RT -> LLC,7
+IGMPv1 -> IGMP,6
+SIP/SDP -> SIP,6
+ASF -> UDP,6
+BSSAP+ -> UDP,6
+L2TP -> UDP,6
+TR -> UDP,6
+TSP -> UDP,6
+CIP CM -> UDP,6
+BVLC -> UDP,6
+LAPD -> UDP,6
+LLMNR -> UDP,6
+PCP v1 -> UDP,6
+YMSG -> UDP,6
+IGMPv0 -> UDP,6
+RPCAP -> UDP,6
+KDP -> UDP,6
+ATMARP -> UDP,6
+SSH -> UDP,6
+FractalGeneratorProtocol -> UDP,6
+ESP -> UDP,6
+NEMO -> UDP,6
+RDPUDP2 -> UDP,6
+MACSEC -> Ethernet,6
+WINS-Replication -> IPv6HopByHop,6
+TR -> LLC,6
+PPP PPPMux -> GRE,6
+M2PA -> SCTP,6
+UMA -> Fragment,6
+M2AP -> Fragment,6
+BZR -> Fragment,6
+VMLAB -> Ethernet,6
+CQL -> IPv6HopByHop,6
+UMA/SNDCP/SNDCP -> IPv4,6
+MDS Header -> GRE,6
+PPP BCP -> LLC,6
+PPP MPLSCP -> Ethernet,6
+ALLJOYN -> TCP,6
+IGMPv1 -> GRE,6
+HP -> GRE,6
+ZigBee CBA -> Fragment,6
+NBSS -> IPv4,6
+ISMP -> GRE,6
+0x7c00 -> GRE,6
+ISIS HELLO -> IPv6HopByHop,6
+NBSS -> IPv6HopByHop,6
+SSL -> TCP,6
+0xf800 -> GRE,6
+RNSAP -> TCP,6
+IDRP -> GRE,6
+ASP -> Ethernet,6
+F1AP/ -> SCTP,6
+C15CH_HBEAT -> Ethernet,6
+KRB5 -> IPv6HopByHop,6
+0x7600 -> GRE,6
+TCPCL -> TCP,6
+0x46ff -> GRE,6
+Generic Data Transfer Protocol -> IPv4,6
+PPP CHAP -> Fragment,6
+R-STP -> GRE,6
+IEEE802a -> GRE,6
+ICMP -> IPv6HopByHop,6
+DLEP -> IPv4,6
+ZIOP -> IPv6HopByHop,6
+NBIPX -> LLC,6
+ALLJOYN-NS -> Fragment,6
+MGCP -> TCP,6
+LCSAP/LPPa -> SCTP,6
+MPEG -> Ethernet,6
+FractalGeneratorProtocol -> SCTP,6
+NBP -> IPv4,6
+Inverse ARP -> ARP,6
+0x00c7 -> GRE,6
+0x1200 -> GRE,6
+ISIS PSNP -> Fragment,6
+0xae00 -> GRE,6
+0x88e5 -> Ethernet,6
+Ethernet -> MPLS,6
+OpenVPN -> Fragment,6
+MAPOS -> GRE,6
+0x009b -> GRE,6
+IDMP -> IPv4,6
+FLIP -> IPv4,6
+UMA/GSM MAP/GSM MAP -> IPv6HopByHop,6
+DRARP -> GRE,6
+SMTP -> TCP,6
+PPP IPV6CP -> Ethernet,6
+0x0011 -> GRE,6
+AARP -> Ethernet,6
+PCF -> Fragment,6
+0x3200 -> GRE,6
+Rlogin -> IPv6HopByHop,6
+BTPA -> GRE,6
+PCOM/TCP -> Fragment,6
+0xc20b -> GRE,6
+OAPv1 OAPv1 OAPv1  -> Fragment,6
+NTP -> TCP,6
+RSVP -> ICMPv4,6
+PIMv0 -> GRE,6
+RTI-TCP -> Fragment,6
+SSH -> IPv4,6
+AUTOSAR NM -> Ethernet,6
+PPP Comp -> LLC,6
+0x0019 -> GRE,6
+VTP -> SNAP,5
+UDP -> SSDP,5
+PPP IPCP -> PPP,5
+ACAP -> UDP,5
+CIPS Supervisor -> UDP,5
+LPD -> UDP,5
+QUAKE3 -> UDP,5
+OSCORE -> UDP,5
+PPP -> UDP,5
+IPComp -> UDP,5
+PPP CDPCP -> UDP,5
+LTE RRC DL_CCCH -> UDP,5
+MSRCP -> UDP,5
+TPM -> UDP,5
+ISO -> UDP,5
+MAC CTRL -> UDP,5
+TPCP -> UDP,5
+NBIPX -> UDP,5
+CESoETH -> UDP,5
+WINS-Replication -> UDP,5
+H.263  -> UDP,5
+RFTAP -> UDP,5
+PPP BAP -> UDP,5
+RIPv1 -> UDP,5
+SEBEK -> UDP,5
+ISUP(ITU) -> UDP,5
+giFT -> UDP,5
+SSLv3 -> UDP,5
+NGAP/NAS-5GS -> UDP,5
+FMTP -> UDP,5
+DEC_STP -> UDP,5
+PPP CCP -> GRE,5
+0x002d -> GRE,5
+PPP PAP -> Ethernet,5
+UDP -> Fragment,5
+MPLS PM (DM) -> IPv4,5
+Ethernet -> Dot1Q,5
+SIGCOMP -> IPv4,5
+PGM -> Fragment,5
+P-GSL -> SCTP,5
+0x0082 -> GRE,5
+LDAP -> IPv6HopByHop,5
+ITDM -> MPLS,5
+FIX -> Fragment,5
+TNS -> TCP,5
+TWAMP-Control -> Fragment,5
+NGAP/NAS-5GS/EAP -> SCTP,5
+TEPv1  -> Fragment,5
+0x0047 -> GRE,5
+EXEC -> IPv4,5
+MPTCP -> Fragment,5
+MIPv6 -> Fragment,5
+COPS -> TCP,5
+PPP CBCP -> GRE,5
+SKINNY/REQ -> TCP,5
+TELKONET -> GRE,5
+Gadu-Gadu -> TCP,5
+PSC -> GRE,5
+F1AP/PDCP-NR -> SCTP,5
+0x8201 -> GRE,5
+HCrt -> GRE,5
+HL7 -> IPv4,5
+RTmac -> Ethernet,5
+CL3 -> Ethernet,5
+IPv4 -> IPv6Routing,5
+0xffff -> GRE,5
+0x00f1 -> GRE,5
+0x0049 -> GRE,5
+PPTP -> IPv4,5
+P-GSL -> Fragment,5
+AFP -> Fragment,5
+Thread -> Ethernet,5
+DLR -> Fragment,5
+0x009c -> GRE,5
+UMA/SNDCP -> IPv6HopByHop,5
+Q.933 -> MPLS,5
+Socks -> IPv6HopByHop,5
+BACnet-APDU -> Ethernet,5
+BATADV_BATMAN -> Fragment,5
+RPKI-RTR -> Fragment,5
+0x007f -> GRE,5
+POP -> IPv4,5
+SCoP -> GRE,5
+AARP -> LLC,5
+Gadu-Gadu -> IPv4,5
+RPCH -> IPv4,5
+TACACS+ -> IPv4,5
+RMI -> Fragment,5
+ATMRARP -> GRE,5
+RPCAP -> IPv6HopByHop,5
+0x00cf -> GRE,5
+EERO -> GRE,5
+TPKT -> TCP,5
+MDP -> GRE,5
+LACP -> Fragment,5
+0x46d7 -> GRE,5
+DSI -> IPv6HopByHop,5
+0x804b -> GRE,5
+SES -> Fragment,5
+OSSP -> GRE,5
+ILP/RRLP -> Fragment,5
+ELCOM -> IPv6HopByHop,5
+CLNP -> Ethernet,5
+SSL -> IPv6HopByHop,5
+Vines SRTP -> GRE,5
+LNET -> Ethernet,5
+PPP Comp -> GRE,5
+0x4018 -> Fragment,5
+Broadcom tag -> Ethernet,5
+COPS -> IPv6HopByHop,5
+DPPs DPPv2  -> Fragment,5
+LNET -> IPv4,5
+0x7c80 -> GRE,5
+ZigBee SE -> Fragment,5
+UMA/GSM MAP -> IPv6HopByHop,5
+ZIOP -> Fragment,5
+SSL -> SCTP,5
+0x00af -> GRE,5
+Vines ARP -> GRE,5
+Spice MAIN -> Fragment,5
+WLCCP -> GRE,5
+IDP -> IPv4,5
+0x9404 -> GRE,5
+PPP MPLSCP -> IPv4,5
+VRRP -> Fragment,5
+RSH -> IPv4,5
+JXTA -> SCTP,5
+LBMSRS -> IPv6HopByHop,5
+0x0069 -> GRE,5
+IPv4 -> TCP,5
+M2UA -> Fragment,5
+LLAP -> GRE,5
+ZIP -> IPv6HopByHop,5
+VSNCP -> GRE,5
+PPP PAP -> IPv4,5
+LLC -> MPLS,5
+0x4a80 -> GRE,5
+0x00a9 -> GRE,5
+0x0007 -> GRE,5
+0x00f7 -> GRE,5
+SSLv3 -> IPv6HopByHop,5
+RARP -> Ethernet,4
+HTTP -> HTTP/1.0,4
+HTTP/XML -> TCP,4
+PPP IPV6CP -> PPP,4
+OSPF -> IPSecAH,4
+BATADV_OGM2 -> Ethernet,4
+Kafka -> UDP,4
+WTLS+WTP+WSP -> UDP,4
+APP(80) -> UDP,4
+NFS CB -> UDP,4
+0xfff2 -> UDP,4
+NSRP -> UDP,4
+DSM-CC -> UDP,4
+ASP -> UDP,4
+IPA -> UDP,4
+LCSAP/LPP -> UDP,4
+FR -> UDP,4
+DDTP -> UDP,4
+RTP Evrc -> UDP,4
+lw_res -> UDP,4
+MCX -> UDP,4
+LCSAP/LPPa -> UDP,4
+RMI -> UDP,4
+MAAP -> UDP,4
+TNS -> UDP,4
+CVSPSERVER -> UDP,4
+PEEKREMOTE -> UDP,4
+LOOP -> UDP,4
+S1AP/LPPa/LPPa -> UDP,4
+CMP -> UDP,4
+0x0a0a -> UDP,4
+C15CH_HBEAT -> UDP,4
+BEEP -> UDP,4
+CSM_ENCAPS -> UDP,4
+RTP EVENT -> UDP,4
+PGSQL -> UDP,4
+JPEG -> UDP,4
+VSNCP -> UDP,4
+IDRP -> UDP,4
+PPP CCP -> UDP,4
+ILP -> IPv4,4
+IGMPv2 -> IGMP,4
+IP -> LLC,4
+ATMARP -> GRE,4
+DOCSIS -> Fragment,4
+0x4601 -> GRE,4
+PPTP -> IPv6HopByHop,4
+0x4600 -> GRE,4
+KPASSWD -> Fragment,4
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",4
+0x1818 -> GRE,4
+VSNP -> GRE,4
+OAPv1 OAPv1 DPPv2  -> Fragment,4
+SNA -> IPv6HopByHop,4
+FC -> LLC,4
+WOW -> TCP,4
+NTSCF -> Ethernet,4
+DLSw -> IPv4,4
+Unzoned NS -> Fragment,4
+TR -> Ethernet,4
+NNTP -> IPv4,4
+0x7000 -> GRE,4
+Modbus/TCP -> TCP,4
+LLRP -> TCP,4
+UMA/SNDCP/SNDCP/SNDCP -> IPv6HopByHop,4
+IGMPv2 -> GRE,4
+PPP IPCP -> GRE,4
+3Com XNS -> Fragment,4
+RSYNC -> IPv4,4
+0xc281 -> GRE,4
+0x803d -> GRE,4
+0x3030 -> GRE,4
+S1AP/NAS-EPS/NAS-EPS/NAS-EPS -> SCTP,4
+Inverse ARP -> IPv4,4
+ETI -> IPv4,4
+DIAMETER -> TCP,4
+Generic Data Transfer Protocol -> SCTP,4
+0x063d -> GRE,4
+0xff02 -> GRE,4
+Wi-SUN -> Ethernet,4
+0x20ff -> GRE,4
+BATADV_UNICAST -> GRE,4
+M2PA -> Fragment,4
+MQTT -> TCP,4
+NGAP/NRPPa/NRPPa -> SCTP,4
+IPA -> Fragment,4
+NNTP -> IPv6HopByHop,4
+MPLS -> IPv6HopByHop,4
+0x0842 -> Ethernet,4
+NTP -> IPv6HopByHop,4
+FR -> LLC,4
+0x0020 -> GRE,4
+SGSAP -> IPv4,4
+0x8205 -> GRE,4
+L2TPv3 -> Fragment,4
+CBSP -> Fragment,4
+ETV-DII -> Ethernet,4
+NEMO -> Fragment,4
+0x746e -> GRE,4
+MGCP/SDP/SDP/SDP/SDP -> Fragment,4
+Spice INPUTS -> Fragment,4
+VSNP -> LLC,4
+MRP-MVRP -> IPv4,4
+MPLS PM (DM) -> IPv6HopByHop,4
+IPDR/SP -> IPv4,4
+PTP/IP -> IPv6HopByHop,4
+RK512 -> IPv4,4
+DICOM -> TCP,4
+0x0002 -> GRE,4
+0x3239 -> GRE,4
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv4,4
+VLAN -> GRE,4
+LLT -> GRE,4
+CGMP -> GRE,4
+0xc010 -> GRE,4
+0x8400 -> GRE,4
+ISO -> IPv4,4
+DTLS 1.0 (OpenSSL pre 0.9.8f) -> IPv4,4
+PPP -> Fragment,4
+slsk -> TCP,4
+Couchbase/JSON -> Fragment,4
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",4
+HomePNA -> Ethernet,4
+0x88ab -> Ethernet,4
+LOOP -> EthernetCTP,4
+FF -> Fragment,4
+GDS DB -> IPv6HopByHop,4
+F1AP/NR RRC/NR RRC/NR RRC -> SCTP,4
+JPEG -> Ethernet,4
+HP NIC Team -> GRE,4
+NTSCF -> Fragment,4
+MS-DO -> Fragment,4
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",4
+CGMP -> Ethernet,4
+PMPROXY -> IPv4,4
+XTI -> IPv4,4
+DDP -> Ethernet,4
+IUA (RFC 3057) -> Fragment,4
+NLSP -> LLC,4
+0x00c1 -> GRE,4
+NET/ROM -> IPv6HopByHop,4
+LLRP -> IPv6HopByHop,4
+0x00cd -> GRE,4
+0x6073 -> GRE,4
+RARP -> ARP,4
+MQ -> Fragment,4
+Vines IP -> IPv4,4
+WINS-Replication -> IPv4,4
+MMS/IEC61850 -> IPv6HopByHop,4
+DRARP -> IPv4,4
+0xb100 -> GRE,4
+PPP CDPCP -> Ethernet,4
+HTTP -> SCTP,4
+PIMv1 -> IPv6HopByHop,4
+TLSv1.2 -> IPv4,4
+0xe0f7 -> GRE,4
+MDP -> IPv6HopByHop,4
+0x0000 -> MPLS,4
+TPM -> IPv4,4
+NNTP -> Fragment,4
+iSCSI -> Fragment,4
+0x8881 -> GRE,4
+HART_IP -> Fragment,4
+ROHC/ROHC/Ethernet -> Ethernet,4
+BATADV_CODED -> GRE,4
+HSR -> Ethernet,4
+0x0086 -> GRE,4
+0x8000 -> GRE,4
+NSRP -> Ethernet,4
+Marker -> Ethernet,4
+MRP-MSRP -> IPv4,4
+0x2c92 -> GRE,4
+Realtek -> GRE,4
+TCP -> HTTP/1.0,3
+TDLS -> UDP,3
+MAC-Telnet -> UDP,3
+RTP FEC -> UDP,3
+Inverse ARP -> UDP,3
+SPP -> UDP,3
+MPLS-TP LI -> UDP,3
+MRP-MMRP -> UDP,3
+BLS -> UDP,3
+ELCOM -> UDP,3
+DB-LSP -> UDP,3
+M2PA -> UDP,3
+NGAP/NAS-5GS/NAS-5GS -> UDP,3
+WSMP -> UDP,3
+CIPS Validator -> UDP,3
+APP(40) -> UDP,3
+Vines IPC -> UDP,3
+DRARP -> UDP,3
+TFP over TCP -> UDP,3
+ULP/LPP/LPP -> UDP,3
+IGMPv2 -> UDP,3
+XTACACS -> UDP,3
+Geneve|ROHC -> UDP,3
+0x06b6 -> UDP,3
+CL3 -> UDP,3
+NDS -> UDP,3
+XYPLEX -> UDP,3
+MCPE -> UDP,3
+Fragmented -> UDP,3
+RMCP -> UDP,3
+LDAP -> UDP,3
+LTE RRC DL_SCH_MBMS -> UDP,3
+PCP -> UDP,3
+S1AP/LPPa/LPPa/LPPa -> UDP,3
+9P -> UDP,3
+MPLS PM (DM) -> UDP,3
+TLCP -> UDP,3
+PingPongProtocol -> UDP,3
+MIOP -> UDP,3
+OLSR v1 -> UDP,3
+Thread -> UDP,3
+RARP -> UDP,3
+Asphodel -> UDP,3
+ECP -> UDP,3
+HomePNA -> UDP,3
+ADP -> UDP,3
+SIII MDT -> UDP,3
+PPTP -> UDP,3
+E2AP -> UDP,3
+SIII AT -> UDP,3
+Laplink -> UDP,3
+FIND -> UDP,3
+UNKNOWN -> UDP,3
+STUN -> UDP,3
+EISS -> UDP,3
+AoE -> UDP,3
+BitTorrent -> TCP,3
+HAZELCAST -> IPv6HopByHop,3
+0x0008 -> GRE,3
+DPNSS -> Fragment,3
+BATADV_VIS -> Fragment,3
+BSSGP -> Fragment,3
+ILP/LPP/LPP -> Fragment,3
+IPv6 -> LLC,3
+FTP-DATA -> Fragment,3
+RSL/NBIFOM -> TCP,3
+ACAP -> TCP,3
+DPPv0  -> Fragment,3
+ZigBee -> GRE,3
+MMS/IEC61850 -> Fragment,3
+BOFL -> Ethernet,3
+CGMP -> Fragment,3
+Laplink -> IPv6HopByHop,3
+"SCTP, NetPerfMeter, NetPerfMeter -> SCTP",3
+APP(92) -> Fragment,3
+0x1c08 -> GRE,3
+BSSAP -> SCTP,3
+UMA/SNDCP/SNDCP/SNDCP/SNDCP -> IPv6HopByHop,3
+BACnet-NPDU -> Fragment,3
+SGMPv1  -> TCP,3
+FC -> Fragment,3
+0x00d0 -> GRE,3
+DPPs DPPs DPPs  -> Fragment,3
+GDS DB -> IPv4,3
+VRRP -> IPv6HopByHop,3
+0xf000 -> GRE,3
+XnAP -> Fragment,3
+0x786d -> Fragment,3
+ISL -> Ethernet,3
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> IPv6HopByHop,3
+0x001d -> GRE,3
+BATADV_OGM2 -> GRE,3
+IRC -> TCP,3
+SMTP/IMF -> IPv6HopByHop,3
+Inverse ATMARP -> IPv4,3
+XID -> GRE,3
+UMA/UMA/SNDCP -> IPv4,3
+MAPOS -> ARP,3
+ZigBee IP -> Ethernet,3
+GEONW -> Fragment,3
+CLASSIC-STUN -> TCP,3
+NSSS -> Fragment,3
+RRB -> GRE,3
+0x0040 -> GRE,3
+swIPe -> IPv4,3
+0x9ace -> GRE,3
+Ethernet -> IPv6HopByHop,3
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,3
+TACACS+ -> IPv6HopByHop,3
+FCoE -> GRE,3
+0x7a00 -> GRE,3
+AoE -> Fragment,3
+BLS -> Ethernet,3
+C15 -> GRE,3
+LDAP -> TCP,3
+BATADV_ROAM_ADV -> Ethernet,3
+MPLS ECHO -> IPv4,3
+HIP -> GRE,3
+0x0004 -> GRE,3
+MAPOS -> IPv4,3
+UMA/SNDCP/SNDCP -> IPv6HopByHop,3
+IPDR/SP -> Fragment,3
+ISIS PSNP -> IPv6HopByHop,3
+SMPP -> TCP,3
+TCP -> SMB2,3
+DPLAY -> IPv4,3
+DSPv2 DPPs  -> Fragment,3
+PRES -> TCP,3
+0x0075 -> GRE,3
+0x886c -> GRE,3
+NBP -> LLC,3
+0x3889 -> GRE,3
+ESIS -> IPv6HopByHop,3
+CL-PRES -> GRE,3
+PIMv2 -> Fragment,3
+PPP PPPMuxCP -> LLC,3
+F1AP/F1AP/F1AP/F1AP/F1AP/F1AP -> IPv4,3
+IP -> Ethernet,3
+NBP -> Ethernet,3
+0x0078 -> GRE,3
+0x00df -> GRE,3
+CRTP -> IPv4,3
+ILP/LPP/LPP/LPP -> Fragment,3
+X.25 -> TCP,3
+LWAPP -> Ethernet,3
+eDonkey -> IPv4,3
+0x0028 -> GRE,3
+PROXYv1 -> Fragment,3
+0x2459 -> GRE,3
+NHRP -> IPv6HopByHop,3
+TCP/MIKEY -> IPv4,3
+MPLS PM (ILM+DM) -> IPv4,3
+UMA/NBIFOM -> IPv6HopByHop,3
+0x0083 -> GRE,3
+0x1212 -> GRE,3
+EXEC -> Fragment,3
+RPCAP -> TCP,3
+0x008d -> GRE,3
+XTP -> IPv6HopByHop,3
+MQTT -> IPv4,3
+"E1AP, NetPerfMeter -> IPv4",3
+0x0057 -> GRE,3
+Socks -> Fragment,3
+ZigBee  -> Ethernet,3
+UMA/NBIFOM -> IPv4,3
+BATADV_UNICAST_4ADDR -> GRE,3
+0xf1f1 -> Ethernet,3
+UCP -> IPv6HopByHop,3
+WAI -> Ethernet,3
+CESoETH -> Ethernet,3
+ICEP -> IPv4,3
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,3
+MSNIP -> Fragment,3
+MPLS PM (DM) -> MPLS,3
+ELCOM -> IPv4,3
+LOOP -> EthernetCTPForwardData,3
+TALI -> Fragment,3
+DLEP -> IPv6HopByHop,3
+IPv6 -> GRE,3
+Slow Protocols -> GRE,3
+XTP -> Fragment,3
+0x00e2 -> GRE,3
+F1AP/NR RRC/NAS-5GS -> SCTP,3
+BATADV_CODED -> Ethernet,3
+Vines ARP -> IPv4,3
+CTDB -> Fragment,3
+POP/IMF -> IPv6HopByHop,3
+0x0039 -> GRE,3
+0x04b7 -> GRE,3
+SMUX -> Fragment,3
+MSDP -> TCP,3
+DRDA -> Fragment,3
+ITDM-Control -> MPLS,3
+Vines Echo -> GRE,3
+BATADV_UNICAST_TVLV -> Ethernet,3
+Vines IPC -> IPv4,3
+AARP -> Fragment,3
+0x0071 -> GRE,3
+0xa088 -> GRE,3
+TDMA -> Ethernet,3
+IPv4 -> LLC,3
+OpenVPN -> IPv4,3
+0x001f -> GRE,3
+0xbcbc -> GRE,3
+CSM_ENCAPS -> IPv4,3
+TDLS -> IPv6HopByHop,3
+DEC_STP -> GRE,3
+0x0077 -> GRE,3
+WOW -> IPv4,3
+TFP over TCP -> IPv6HopByHop,3
+MDS Header -> Ethernet,3
+KNET -> SCTP,3
+MGCP/SDP/SDP/SDP -> Fragment,3
+0x6000 -> GRE,3
+ieee1905 -> Fragment,3
+FC -> IPv6HopByHop,3
+CalcAppProtocol -> IPv4,3
+MAAP -> Ethernet,3
+DNS -> SCTP,3
+0x006f -> GRE,3
+0xc27f -> GRE,3
+MySQL -> TCP,3
+FLIP -> Ethernet,3
+OpenFlow -> TCP,3
+DSR -> GRE,3
+MPEG-1 -> Ethernet,3
+MPEG TS -> Fragment,3
+PMPROXY -> IPv6HopByHop,3
+M3AP -> Fragment,3
+IPv4 -> Ethernet,3
+F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP -> IPv4,3
+PPP CDPCP -> GRE,3
+Spice Unknown -> Fragment,3
+CTDB -> IPv4,3
+PIMv1 -> GRE,3
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",3
+ICAP -> TCP,3
+RSL -> TCP,3
+IGMPv2 -> IPv4,3
+SKINNY/RESP -> TCP,3
+CDP -> IPv4,3
+NGAP/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,3
+0x00c3 -> GRE,3
+DPPs APP(30815)DPPs DPPs  -> Fragment,3
+0x0093 -> GRE,3
+0x0013 -> GRE,3
+Nano Bootstrap -> IPv4,3
+ULP -> IPv4,3
+DSPv2 DPPv2  -> Fragment,3
+0xfed0 -> GRE,3
+0x5082 -> GRE,3
+MySQL -> IPv6HopByHop,3
+0x6002 -> Dot1Q,2
+ISIS PSNP -> LLC,2
+UMA/SNDCP/IPv4 -> IPv4,2
+HAZELCAST -> UDP,2
+WireGuard -> UDP,2
+AMQP -> UDP,2
+MPLS PM (ILM) -> UDP,2
+ATMTCP -> UDP,2
+MRP-MVRP -> UDP,2
+PKTGEN -> UDP,2
+CL-PRES -> UDP,2
+DAYTIME -> UDP,2
+ECHO -> UDP,2
+MPEG PES -> UDP,2
+PPP PAP -> UDP,2
+Git -> UDP,2
+ULP/LPP/LPP/LPP/LPP -> UDP,2
+APP(124) -> UDP,2
+GSM RLC/MAC -> UDP,2
+MTP3 (Int. ITU) -> UDP,2
+LWAPP -> UDP,2
+DTLSv1.2 -> UDP,2
+S1AP/NAS-EPS -> UDP,2
+RTP Modem Bypass -> UDP,2
+MPLS PM (ILM+DM) -> UDP,2
+TUNv0 -> UDP,2
+NGAP/NAS-5GS/NAS-5GS/NAS-5GS -> UDP,2
+XMCP -> UDP,2
+EPL_V1 -> UDP,2
+DLR -> UDP,2
+NWP -> UDP,2
+RRCP -> UDP,2
+NR RRC/NAS-5GS -> UDP,2
+APP(93) -> UDP,2
+AC_CAS -> UDP,2
+RTP AMR -> UDP,2
+FC_CT -> UDP,2
+F1AP/ -> UDP,2
+NetBIOS -> UDP,2
+OPSI -> UDP,2
+UDT -> UDP,2
+FIP -> UDP,2
+COPS -> UDP,2
+RSL CBCH -> UDP,2
+ar_drone -> UDP,2
+Wreth -> UDP,2
+TRILL -> UDP,2
+PSC -> UDP,2
+RTP Rfc2833 -> UDP,2
+RTmac -> UDP,2
+ssyncp -> UDP,2
+SCCPMG (Int. ITU) -> UDP,2
+Generic Data Transfer Protocol -> UDP,2
+RELOAD Frame -> UDP,2
+BJNP -> UDP,2
+BATADV_ICMP -> UDP,2
+RPCH -> UDP,2
+QUAKE -> UDP,2
+BAT_GW -> UDP,2
+IEC61850 Sampled Values -> UDP,2
+BSSAP -> UDP,2
+swIPe -> UDP,2
+GSM SMS -> UDP,2
+TS2 -> UDP,2
+PANA -> UDP,2
+APP(8) -> UDP,2
+CN/IP -> UDP,2
+HPEXT -> UDP,2
+0x00cf -> UDP,2
+CIP CCO -> UDP,2
+AVSP -> UDP,2
+HSR -> UDP,2
+IGMPv1 -> UDP,2
+WOL -> UDP,2
+Teredo -> UDP,2
+H1 -> UDP,2
+0x0a3b -> UDP,2
+GPRS-LLC -> UDP,2
+LANforge -> UDP,2
+MACSEC -> UDP,2
+CAST -> UDP,2
+UDPENCAP -> UDP,2
+TACACS -> UDP,2
+Vines ARP -> UDP,2
+? KNXnet/IP -> UDP,2
+APP(123) -> UDP,2
+dpp -> UDP,2
+ISIS -> UDP,2
+MPLS-TP FM -> UDP,2
+SYNCHROPHASOR -> UDP,2
+DVB-DATA -> UDP,2
+TIME -> UDP,2
+RSYNC -> UDP,2
+CBSP -> UDP,2
+F1AP/PDCP-NR -> UDP,2
+RMCP+ -> UDP,2
+0x88a9 -> UDP,2
+WHOIS -> UDP,2
+BATADV_??? -> UDP,2
+0x00ad -> GRE,2
+ZigBee  -> TCP,2
+LTP -> Fragment,2
+CalcAppProtocol -> IPv6HopByHop,2
+0xfe00 -> GRE,2
+SSH -> TCP,2
+0x3025 -> GRE,2
+NWP -> IPv4,2
+DNPv0 DNPv0  -> Fragment,2
+FC_CT -> GRE,2
+ISMP -> Ethernet,2
+TN3270 -> Fragment,2
+0x006b -> GRE,2
+StarTeam -> IPv4,2
+FIP -> Fragment,2
+"SCTP, NetPerfMeter, NetPerfMeter -> IPv4",2
+0x0060 -> GRE,2
+DPPv8DPPv0  -> Fragment,2
+KNET -> TCP,2
+RPL -> IPv4,2
+H.225.0/ -> Fragment,2
+POP/IMF -> GRE,2
+DNPv0  -> Fragment,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+DSR -> Fragment,2
+OSSP -> Ethernet,2
+NCS -> IPv4,2
+RSIP -> IPv4,2
+0x008f -> GRE,2
+0x0200 -> GRE,2
+gcsna -> IPv4,2
+CSM_ENCAPS -> Fragment,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+0x664b -> GRE,2
+DPPs DSPv2  -> Fragment,2
+DPPs DNPv1  -> Fragment,2
+IPX SAP -> Fragment,2
+SMB -> IPv6HopByHop,2
+RDP -> IPv6HopByHop,2
+RTPproxy -> TCP,2
+0xf888 -> GRE,2
+NetBIOS -> IPv6HopByHop,2
+MARS -> IPv6HopByHop,2
+EPMD -> TCP,2
+ZIP -> IPv4,2
+APP(94) -> Fragment,2
+PNIO -> GRE,2
+PIMv0 -> IPv4,2
+IPv4 -> ICMPv4,2
+0x008e -> GRE,2
+MQTT -> IPv6HopByHop,2
+NVMe/TCP -> IPv6HopByHop,2
+0x8200 -> Fragment,2
+DNS -> TCP,2
+0x3e3f -> Ethernet,2
+TECMP -> GRE,2
+PPTP -> Fragment,2
+0x24f7 -> GRE,2
+ACF-CAN -> Fragment,2
+SIP -> GRE,2
+DIAMETER -> SCTP,2
+0x30ff -> GRE,2
+LAPB -> Ethernet,2
+CredSSP -> IPv4,2
+GRE -> Fragment,2
+Vines ICP -> IPv6HopByHop,2
+RTcfg -> IPv4,2
+NetBIOS -> IPv4,2
+0x88ab -> GRE,2
+UMA/GSM MAP/GSM MAP -> IPv4,2
+0x0000 -> LLC,2
+0x021e -> GRE,2
+ISO -> LLC,2
+0x00db -> GRE,2
+SASP -> IPv6HopByHop,2
+0x0001 -> IPv4,2
+MPLS-TP LI -> MPLS,2
+0x00b5 -> GRE,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+MQ -> IPv6HopByHop,2
+TDLS -> IPv4,2
+R-STP -> LLC,2
+Vines SARP -> IPv6HopByHop,2
+BFD Control -> IPv6HopByHop,2
+ZigBee Green Power -> Fragment,2
+IEEE 802.15.4 -> IPv4,2
+0x00e9 -> GRE,2
+MSDP -> IPv4,2
+0x0e01 -> GRE,2
+KRB5 -> Fragment,2
+0x240a -> GRE,2
+0xd0d0 -> GRE,2
+BSSAP/BSSAP -> Fragment,2
+0x122f -> GRE,2
+SPP -> Ethernet,2
+LPD -> Fragment,2
+0x02ff -> GRE,2
+RSVP -> IPSecESP,2
+0x303f -> GRE,2
+DLM3 -> SCTP,2
+0x0412 -> GRE,2
+0x60ff -> GRE,2
+IGAP -> Fragment,2
+Vines LLC -> GRE,2
+0x4477 -> GRE,2
+ETCH -> IPv6HopByHop,2
+LAPB -> IPv4,2
+0xf1fe -> GRE,2
+Gadu-Gadu/XML -> Fragment,2
+DHCPFO -> TCP,2
+0x0010 -> GRE,2
+EAPOL -> IPv4,2
+X11 -> TCP,2
+0x4600 -> Fragment,2
+DPPs  -> TCP,2
+PPP LCP -> GRE,2
+QNET_LWL4 -> GRE,2
+BTPB -> IPv4,2
+APP(48)DPPs  -> Fragment,2
+AFP -> Ethernet,2
+FMTP -> IPv6HopByHop,2
+SMC-R -> Fragment,2
+PPP LCP -> Ethernet,2
+0x8028 -> GRE,2
+POP -> TCP,2
+DNPv65 -> Fragment,2
+SCCPMG (Int. ITU) -> Fragment,2
+PGM -> IPv6HopByHop,2
+DPPv0 DPPv0 DPPv0 TUNv0 -> Fragment,2
+PCP -> Fragment,2
+DPPv0 DNPv1  -> Fragment,2
+0x1000 -> GRE,2
+TELKONET -> Ethernet,2
+DPPv31DPPs  -> Fragment,2
+PLE -> IPv4,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+DVMRP -> Fragment,2
+0x320e -> GRE,2
+Gopher -> IPv4,2
+LLDP -> Ethernet,2
+APP(2) -> Fragment,2
+H.501 -> Fragment,2
+0x88b4 -> Ethernet,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+MIPv6 -> Ethernet,2
+DPPs DPPs DSPv2 DPPs DPPv1 -> Fragment,2
+IGMPv0 -> IPv6HopByHop,2
+XOT -> TCP,2
+TPM -> TCP,2
+SMB Pipe -> IPv4,2
+PN-PTCP -> Ethernet,2
+AVSP -> Ethernet,2
+H.225.0 -> IPv4,2
+FCoE -> Ethernet,2
+0x2401 -> GRE,2
+CIMD -> TCP,2
+EAPOL -> Ethernet,2
+0x462f -> GRE,2
+Spice RECORD -> Fragment,2
+APP(8)DPPs  -> Fragment,2
+AX.25 -> Fragment,2
+C15CH_HBEAT -> GRE,2
+HomePlug -> Fragment,2
+5co-legacy -> TCP,2
+NDS -> IPv4,2
+0x809a -> GRE,2
+Vines SPP -> IPv4,2
+HyperSCSI -> GRE,2
+0x4880 -> GRE,2
+RPCAP -> ICMPv4,2
+PPP BCP -> IPv4,2
+SPP -> IPv4,2
+0x6820 -> GRE,2
+0x3423 -> GRE,2
+802.11 -> IPv6HopByHop,2
+JXTA -> IPv4,2
+0x0200 -> Fragment,2
+RSYNC -> TCP,2
+NGAP/NAS-5GS -> Fragment,2
+SCCP (Int. ITU) -> GRE,2
+BSSAP/BSSLAP -> Fragment,2
+DECT -> GRE,2
+IPv4 -> IPv6Fragment,2
+0xdc00 -> GRE,2
+DPPv53DPPv0  -> Fragment,2
+DPPv0 DPPv0 DPPv0  -> Fragment,2
+MPLS-MAC -> MPLS,2
+0x2051 -> GRE,2
+PPP IPCP -> MPLS,2
+SMB Mailslot -> IPv4,2
+0x45bb -> GRE,2
+H.225.0/H.225.0/H.245 -> Fragment,2
+0x0678 -> GRE,2
+SRVLOC -> IPv4,2
+ISIS -> IPv4,2
+CVSPSERVER -> TCP,2
+SAPNI -> IPv6HopByHop,2
+XMCP/XML -> IPv4,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+0x081c -> GRE,2
+synergy -> Fragment,2
+OAPv1 DPPs  -> Fragment,2
+DRARP -> ARP,2
+AVSP -> IPv4,2
+LACP -> IPv6HopByHop,2
+0x10b1 -> Fragment,2
+0xa0a0 -> GRE,2
+0x1050 -> GRE,2
+GTP -> ICMPv4,2
+QNET_KIF -> IPv6HopByHop,2
+DNP 3.0 -> IPv4,2
+BATADV_ELP -> Ethernet,2
+0xa441 -> GRE,2
+GPRS-LLC -> IPv4,2
+MSRP -> Fragment,2
+DSI -> TCP,2
+RMI -> IPv4,2
+NBP -> Fragment,2
+POP/IMF -> TCP,2
+FINGER -> Fragment,2
+IGMP -> IPv6HopByHop,2
+RSL/GSM MAP -> Fragment,2
+QNET_KIF -> ICMPv4,2
+IPX -> IPv4,2
+CIP CCO -> Fragment,2
+DECT Unk -> GRE,2
+THRIFT -> TCP,2
+0x00a5 -> GRE,2
+H1 -> IPv4,2
+UDP -> Ethernet,2
+AX.25 -> IPv6HopByHop,2
+0x0632 -> GRE,2
+FIX -> IPv6HopByHop,2
+IRC -> IPv6HopByHop,2
+UMA/SNDCP/SNDCP/SNDCP/SNDCP -> IPv4,2
+Couchbase -> TCP,2
+0x3453 -> GRE,2
+IGMPv1 -> IPv4,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+TFP -> SCTP,2
+RPC -> IPv4,2
+HTTP -> IPv6HopByHop,2
+TIME -> TCP,2
+SKINNY/REQ -> Fragment,2
+BATADV_UNICAST_4ADDR -> Ethernet,2
+giFT -> IPv4,2
+RRCP -> Ethernet,2
+SMCv2 -> Fragment,2
+0x00f6 -> GRE,2
+POWERLINK -> Fragment,2
+0xbeef -> GRE,2
+MSMMS -> Fragment,2
+S5066 -> TCP,2
+PIM -> IPv4,2
+UMA/GSM MAP/GSM MAP/GSM MAP -> IPv6HopByHop,2
+SIII MDT -> Dot1Q,2
+0x0600 -> GRE,2
+ESP -> Fragment,2
+Ethernet -> Fragment,2
+0x0051 -> GRE,2
+APP(3) -> Fragment,2
+BGP -> IPv4,2
+H.225.0 -> IPv6HopByHop,2
+Gnutella -> IPv4,2
+0x1882 -> GRE,2
+CIP MB -> Fragment,2
+WHOIS -> IPv4,2
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",2
+CAST -> IPv4,2
+TRILL -> IPv4,2
+DSPv2 APP(11272)DPPv2  -> Fragment,2
+PPP OSINLCP -> MPLS,2
+IGRP -> IPv6HopByHop,2
+0x000d -> GRE,2
+ECHO -> TCP,2
+0x08bb -> GRE,2
+MDS Header -> MPLS,2
+EPL_V1 -> GRE,2
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,2
+TDS -> IPv4,2
+802.11 -> LLC,2
+SIGCOMP -> IPv6HopByHop,2
+0x827a -> GRE,2
+802.1ah -> Ethernet,2
+0xe031 -> GRE,2
+0x807f -> GRE,2
+SSL -> EAPOL,2
+F1AP/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,2
+0x887b -> GRE,2
+0x824b -> GRE,2
+IEEE1722 -> IPv4,2
+IPX -> Ethernet,2
+TNS -> IPv6HopByHop,2
+0x32e2 -> GRE,2
+WCP -> IPv4,2
+ETV-DDB -> Ethernet,2
+VLAN -> IPv4,2
+0x002e -> GRE,2
+WHOIS -> IPv6HopByHop,2
+SMTP/IMF -> SMTP,1
+TDS -> TCP,1
+PVFS -> IPv4,1
+IPSICTL -> UDP,1
+BATADV_BCAST -> UDP,1
+S1AP/LPPa/LPPa/LPPa/LPPa -> UDP,1
+NSSS -> UDP,1
+NGAP/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> UDP,1
+DPPv46DPPv46 -> UDP,1
+0x5bbf -> UDP,1
+Vines LLC -> UDP,1
+LLAP -> UDP,1
+C15 -> UDP,1
+DPPv1DPPv0 -> UDP,1
+PTP/IP -> UDP,1
+0x5920 -> UDP,1
+APP(81) -> UDP,1
+wifi_dpp -> UDP,1
+DPPv46 -> UDP,1
+Chargen -> UDP,1
+0x0001 -> UDP,1
+S1AP/LPPa/LPPa/LPPa/LPPa/LPPa/LPPa/LPPa/LPPa -> UDP,1
+PPP BACP -> UDP,1
+GTP/IPv4 -> UDP,1
+0x0071 -> UDP,1
+REP -> UDP,1
+NGAP/NRPPa/NRPPa -> UDP,1
+0x3bab -> UDP,1
+GBCS Message -> UDP,1
+TN3270 -> UDP,1
+S1AP/NAS-EPS/NAS-EPS -> UDP,1
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS -> UDP,1
+MAPOS -> UDP,1
+PPP IPV6CP -> UDP,1
+PPP CBCP -> UDP,1
+APP(41) -> UDP,1
+RRB -> UDP,1
+0x0030 -> UDP,1
+0x0707 -> UDP,1
+DTLS data -> UDP,1
+GDS DB -> UDP,1
+Babel -> UDP,1
+GTPv2/NAS-EPS/NAS-EPS -> UDP,1
+VoiceAI -> UDP,1
+DECT Unk -> UDP,1
+AC DR/XML -> UDP,1
+BATADV_TT_QUERY -> UDP,1
+0x2900 -> UDP,1
+0x0019 -> UDP,1
+CCM  -> UDP,1
+APP(2) -> UDP,1
+Nano Bootstrap -> UDP,1
+POWERLINK -> UDP,1
+APP(91) -> UDP,1
+LLS/XML -> UDP,1
+ISMP -> UDP,1
+OMAPI -> UDP,1
+DECT -> UDP,1
+0xa07e -> UDP,1
+WTP+WSP/XML -> UDP,1
+LLT -> UDP,1
+EXEH -> UDP,1
+CIP PCCC -> UDP,1
+0x2100 -> UDP,1
+LAPB -> UDP,1
+G.723.1 -> UDP,1
+IPMI -> UDP,1
+DB-LSP-DISC -> UDP,1
+AX4000 -> UDP,1
+NGAP/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> UDP,1
+RF4CE NWK -> UDP,1
+APP(52) -> UDP,1
+PIMv4 -> UDP,1
+SMC-R -> UDP,1
+DPPv69 -> UDP,1
+F1AP/NR RRC/NR RRC -> UDP,1
+APP(12) -> UDP,1
+LAPDm -> UDP,1
+ULP/LPP/LPP/LPP -> UDP,1
+FINGER -> UDP,1
+H.261 -> UDP,1
+Vines SARP -> UDP,1
+0x0015 -> UDP,1
+APP(104) -> UDP,1
+Wi-SUN -> UDP,1
+AX.25-NoL3 -> UDP,1
+APP(65) -> UDP,1
+DNPv127 -> UDP,1
+DISTCC  -> UDP,1
+0x4000 -> UDP,1
+NCS -> UDP,1
+BATADV_CODED -> UDP,1
+EERO -> UDP,1
+0xe313 -> UDP,1
+ETI -> UDP,1
+ESIS (X.25) -> UDP,1
+TUNv6 -> UDP,1
+0x0808 -> UDP,1
+RF4CE GDP -> UDP,1
+UDP/MIKEY -> UDP,1
+INTERLINK -> UDP,1
+LTE RRC DL_DCCH -> UDP,1
+HTTP -> UDP,1
+SINEC-AP -> UDP,1
+PPP LCP -> UDP,1
+TELKONET -> UDP,1
+TECMP -> UDP,1
+T38 over RTP -> UDP,1
+OICQ -> UDP,1
+ETCH -> UDP,1
+0x2b04 -> UDP,1
+Couchbase -> UDP,1
+WTP+WSP/XML/XML -> UDP,1
+DNPv64 -> UDP,1
+ANSI TCAP -> UDP,1
+OpenFlow -> UDP,1
+LMI -> UDP,1
+3*DCERPC -> UDP,1
+LSD -> UDP,1
+APP(20945) -> UDP,1
+APP(66) -> UDP,1
+RMP -> UDP,1
+Slow Protocols -> UDP,1
+0xaefe -> UDP,1
+CLSES -> UDP,1
+PLE -> UDP,1
+openSAFETY/Modbus TCP -> UDP,1
+MPLS PM (DLM) -> UDP,1
+BATADV_UNICAST_4ADDR -> UDP,1
+0x8ffd -> UDP,1
+0x2216 -> UDP,1
+PW OAM -> UDP,1
+RLM -> UDP,1
+GTPv2 -> IPv6,1
+LTE RRC DL_SCH_NB -> UDP,1
+APP(69) -> UDP,1
+CLTP -> UDP,1
+ZigBee T2 -> UDP,1
+Wi-SUN Netricity -> UDP,1
+IDP -> UDP,1
+0x000d -> UDP,1
+CARP -> UDP,1
+BOFL -> UDP,1
+ISL -> UDP,1
+0xeb01 -> UDP,1
+NGAP/NRPPa/NRPPa/NRPPa -> UDP,1
+NW_SERIAL -> UDP,1
+0x8f01 -> UDP,1
+APP(3) -> UDP,1
+XTI -> UDP,1
+Inverse ATMARP -> UDP,1
+ULP/LPP/LPPe/LPPe -> UDP,1
+FSSO -> UDP,1
+Vines FRP -> UDP,1
+6top -> UDP,1
+PCOM/TCP -> UDP,1
+ZigBee IP -> UDP,1
+R-GOOSE -> UDP,1
+MMSE/XML/XML -> UDP,1
+PPP OSINLCP -> UDP,1
+BOOTP -> UDP,1
+CQL -> UDP,1
+0x7f7f -> UDP,1
+Flexnet -> UDP,1
+MMSE/XML/XML/XML -> UDP,1
+0x1306 -> UDP,1
+ICQv2 -> UDP,1
+0x7e7e -> UDP,1
+0x9696 -> UDP,1
+ZigBee SE -> UDP,1
+NGAP/NRPPa/NRPPa/NRPPa/NRPPa -> UDP,1
+BATADV_UNICAST_FRAG -> UDP,1
+R-STP -> UDP,1
+BATADV_UNICAST -> UDP,1
+0x88e5 -> UDP,1
+BATADV_ROAM_ADV -> UDP,1
+ALC/XML -> UDP,1
+Ceph -> UDP,1
+3Com XNS -> UDP,1
+DPPv1DPPv1DPPv1DPPv1 -> UDP,1
+0x2121 -> UDP,1
+IEEE802a -> UDP,1
+0x887b -> UDP,1
+0xd7d7 -> UDP,1
+0xecec -> UDP,1
+DNPv0 DNPv0 DNPv0  -> UDP,1
+WOW -> UDP,1
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> UDP,1
+"UDP, NetPerfMeter -> UDP",1
+GTP/ARP -> UDP,1
+Socks -> UDP,1
+0x0909 -> UDP,1
+0x4203 -> UDP,1
+APP(25) -> UDP,1
+Vines Echo -> UDP,1
+DPPv1 -> UDP,1
+BATADV_IV_OGM -> UDP,1
+0x88ab -> UDP,1
+0x6431 -> UDP,1
+TLS -> UDP,1
+Mojito -> UDP,1
+TUNv119 -> UDP,1
+RLDP -> UDP,1
+JDWP -> UDP,1
+PPP MPLSCP -> UDP,1
+LLC|ROHC -> UDP,1
+PCEP -> UDP,1
+0x08c3 -> UDP,1
+VxLAN -> UDP,1
+0xa902 -> UDP,1
+CIP MB -> UDP,1
+0x00cd -> UDP,1
+ZRTP -> UDP,1
+CalcAppProtocol -> UDP,1
+APP(34) -> UDP,1
+DPPv55 -> UDP,1
+0x0a5c -> UDP,1
+TTE/PCF -> UDP,1
+TLSv1 -> UDP,1
+ICQv5 -> UDP,1
+IPX MSG -> UDP,1
+RSL Cell Broadcast -> UDP,1
+0x00c5 -> UDP,1
+Vines SPP -> UDP,1
+VLAN -> UDP,1
+0xa8a8 -> UDP,1
+Laplink -> TCP,1
+ANSI C12.22 -> TCP,1
+DLEP -> TCP,1
+OAPv1 OAPv1 APP(66) -> Fragment,1
+0x2500 -> LLC,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+0xd00d -> Ethernet,1
+TTE/MAC CTRL -> GRE,1
+JDWP -> IPv6HopByHop,1
+S1AP/NAS-EPS -> IPv4,1
+MRDISC -> GRE,1
+EXEH -> Ethernet,1
+GEONW -> MPLS,1
+APP(32551) -> Fragment,1
+0xb100 -> MPLS,1
+DPPv66DNPv1  -> Fragment,1
+MPLS PM (DLM) -> MPLS,1
+DNPv119 -> TCP,1
+TTE/0x891d -> MPLS,1
+HPEXT -> LLC,1
+0x1888 -> GRE,1
+0x32ff -> GRE,1
+M3UA (RFC 4666) -> IPv6HopByHop,1
+0x4533 -> Ethernet,1
+0x3a46 -> GRE,1
+DEC_STP -> LLC,1
+0x3400 -> GRE,1
+APP(17) -> Fragment,1
+IGAP -> IPv6HopByHop,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/UMA -> IPv4,1
+DPPs APP(32520) -> Fragment,1
+0x8430 -> GRE,1
+APP(106)TUNv7 -> Fragment,1
+0x88f8 -> GRE,1
+0x9b00 -> Ethernet,1
+PTPv2 -> Fragment,1
+OAPv1 TUNv0 -> Fragment,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,1
+HAZELCAST -> IPv4,1
+H.501 -> ICMPv4,1
+SCoP -> IPv4,1
+DPPv0 DPPv0  -> Fragment,1
+SMC -> IPv4,1
+E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|E2AP|NGAP -> IPv4,1
+0x22b1 -> GRE,1
+PPP CCP -> LLC,1
+INAP -> Fragment,1
+OAPv1 OAPv1 TUNv27 -> Fragment,1
+F1AP/F1AP/F1AP/F1AP/F1AP -> IPv4,1
+DIAMETER -> IPv4,1
+DSPv2 APP(13320)DPPv2  -> Fragment,1
+openSAFETY/SercosIII -> Fragment,1
+UMA/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP -> IPv6HopByHop,1
+Netsync -> TCP,1
+0x185b -> GRE,1
+RPC -> Ethernet,1
+RSL Cell Broadcast -> TCP,1
+3Com XNS -> Ethernet,1
+LLAP -> Ethernet,1
+ESIS (X.25) -> IPv4,1
+DPPv1DPPv124DPPv1DPPv92DPPv1DPPv47DPPv1DPPv92DPPv1DPPv1 -> Fragment,1
+P_MUL -> TCP,1
+0x0087 -> GRE,1
+Gopher -> IPv6HopByHop,1
+Gadu-Gadu/XML/XML -> Fragment,1
+0x4e4b -> GRE,1
+DSPv2 APP(5)DPPv2  -> Fragment,1
+IMAP -> TCP,1
+COTP -> IPv6HopByHop,1
+0x000c -> GRE,1
+0x2a23 -> GRE,1
+OAPv1 OAPv1 TUNv13 -> Fragment,1
+PPP BCP -> Ethernet,1
+UDP -> IPv4,1
+APP(45) -> Fragment,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/UMA/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,1
+0x0222 -> GRE,1
+TUNv0 -> Fragment,1
+0x2647 -> GRE,1
+NGAP/NRPPa -> Fragment,1
+0xc900 -> Ethernet,1
+0x00cb -> GRE,1
+DCERPC -> DCE/RPC,1
+0x8f09 -> Ethernet,1
+GSM SMS/GSM SMS -> Fragment,1
+TTE/TTE/TTE/TTE/PPP BCP -> GRE,1
+0x6a00 -> Ethernet,1
+HSR -> GRE,1
+CLSES -> IPv4,1
+NGAP/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,1
+DPPs OAPv1  -> Fragment,1
+UMA/GSM MAP/GSM MAP/GSM MAP/GSM MAP -> IPv6HopByHop,1
+0xbb45 -> Ethernet,1
+DNPv0 TUNv0 -> Fragment,1
+BPQ -> GRE,1
+IRC -> GRE,1
+0x165d -> GRE,1
+VSNP -> Fragment,1
+TCAP -> SCTP,1
+RLDP -> GRE,1
+DPPs DPPs DPPs DPPs  -> Fragment,1
+TEPv1 TEPv1  -> Fragment,1
+0x0a52 -> Ethernet,1
+RMI -> TCP,1
+DPPv53DPPv1DNPv1  -> Fragment,1
+0x0277 -> GRE,1
+H.501 -> GRE,1
+DEC_STP -> IPv4,1
+DSPv2 TUNv0 -> Fragment,1
+0x02f4 -> GRE,1
+FCP -> Fragment,1
+POP/0x0000 -> GRE,1
+OAPv1 OAPv1 OAPv1 DSPv2  -> Fragment,1
+CTDB -> TCP,1
+IPv4 -> SCTP,1
+SNA -> Ethernet,1
+OAPv1 OAPv1 TUNv45 -> Fragment,1
+0x5f06 -> LLC,1
+0xff00 -> MPLS,1
+F1AP/NAS-5GS/NAS-5GS -> SCTP,1
+ELCOM -> Fragment,1
+SRVLOC -> TCP,1
+0x2f0a -> GRE,1
+UMA/SNDCP/IP/IP/IP/IP/SNDCP/IP/IP/IP/SNDCP/IP/IP/IP/IP/IP/IP/IP/IP/IP/SNDCP/IP/IP/IP/SNDCP/IP/IP/IP/IP/IP/IP/IP/SNDCP/IP/IP/IP -> IPv6HopByHop,1
+ETCH -> TCP,1
+APP(17)APP(17) -> Fragment,1
+Vines LLC -> LLC,1
+VLAN -> Ethernet,1
+APP(93)APP(12027)DPPv2  -> Fragment,1
+IPX -> Fragment,1
+OAPv1 OAPv1 OAPv1 OAPv1 OAPv1  -> Fragment,1
+APP(60)DPPs  -> Fragment,1
+Marker -> IPv4,1
+TR MAC -> IPv4,1
+IEEE 802.15.4 -> IPv6HopByHop,1
+TCP -> ICMPv6,1
+0x0c88 -> GRE,1
+6LoWPAN -> LLC,1
+0x3d00 -> Ethernet,1
+UMA/NBIFOM/NBIFOM -> IPv4,1
+OSPF -> GRE,1
+0x00b3 -> GRE,1
+0xe201 -> GRE,1
+UMA/SNDCP/IP/IP/IP/IP/SNDCP/IP/IP/IP/SNDCP/IP/IP/IP/IP/IP/IP -> IPv6HopByHop,1
+ECMP -> Fragment,1
+APP(17090)APP(8)DPPv22 -> Fragment,1
+LLC -> SNAP,1
+UMA/UMA/UMA/UMA/UMA/UMA -> IPv6HopByHop,1
+HCrt -> IPv4,1
+0xc0de -> Ethernet,1
+STP -> Fragment,1
+0x6c6e -> GRE,1
+0x0046 -> GRE,1
+OAPv1 OAPv1 TUNv102 -> Fragment,1
+IDP -> IPv6HopByHop,1
+V5UA -> IPv6HopByHop,1
+0xa231 -> IPv4,1
+UCP -> IPv4,1
+ITS -> IPv4,1
+BitTorrent -> IPv6HopByHop,1
+SSH -> IPv6HopByHop,1
+LTE RRC DL_DCCH -> SCTP,1
+DSM-CC -> Fragment,1
+Laplink -> Fragment,1
+APP(6163)DSPv2 DPPv2  -> Fragment,1
+DSPv2 DPPv2 DPPv2  -> Fragment,1
+SERCOS III V1.1 -> GRE,1
+MARS -> LLC,1
+0x82bb -> IPv4,1
+X2AP/NAS-5GS -> SCTP,1
+RSL/NBIFOM -> IPv4,1
+MPLS-TP FM -> IPv4,1
+SAMETIME -> IPv4,1
+BSSAP -> TCP,1
+0xe0e0 -> Ethernet,1
+MRDISC -> IPv6HopByHop,1
+IEC 60870-5-104 -> Fragment,1
+Flexnet -> IPv4,1
+0x463e -> Ethernet,1
+0xfcff -> GRE,1
+0x3c45 -> GRE,1
+HPEXT -> IPv6HopByHop,1
+APP(8) -> Fragment,1
+DSPv2 DSPv2  -> TCP,1
+0x1515 -> Ethernet,1
+KT -> IPv6HopByHop,1
+DSPv2 TUNv105 -> Fragment,1
+BICC(ITU)/SDP -> SCTP,1
+0xf100 -> GRE,1
+SNMP -> GRE,1
+TLSv1.1 -> IPv4,1
+DPPs DNPv0  -> Fragment,1
+F1AP/NR RRC/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,1
+RNSAP -> IPv6HopByHop,1
+0x3e06 -> GRE,1
+OAPv1 OAPv1 TUNv69 -> Fragment,1
+RDP -> Fragment,1
+H.225.0/TPKT -> Fragment,1
+PCEP -> TCP,1
+GTPv2/NAS-EPS/NBIFOM -> IPv4,1
+GSUP/BSSAP/GSM MAP/GSM MAP -> Fragment,1
+VICP -> Fragment,1
+V52 -> Fragment,1
+0x2445 -> GRE,1
+0x06b2 -> GRE,1
+0x00ff -> Ethernet,1
+0x3000 -> Ethernet,1
+TUNv185 -> Fragment,1
+Intel ANS probe -> Ethernet,1
+RSL -> SCTP,1
+KPASSWD -> IPv6HopByHop,1
+CVSPSERVER -> IPv4,1
+0xf8ff -> GRE,1
+BitTorrent -> Fragment,1
+DUA -> IPv6HopByHop,1
+PN-RT -> Ethernet,1
+0x0063 -> GRE,1
+OAPv1 DPPv2 DPPv2  -> Fragment,1
+VNTAG -> IPv4,1
+0x463f -> GRE,1
+0x2ae2 -> GRE,1
+0x1250 -> Ethernet,1
+SNA -> Fragment,1
+CalcAppProtocol -> SCTP,1
+0x8899 -> Ethernet,1
+0x8ffd -> IPv4,1
+DAYTIME -> Fragment,1
+ETAG -> Ethernet,1
+0xe0e0 -> GRE,1
+SAPIGS -> Fragment,1
+0x0081 -> IPv4,1
+GDS DB -> TCP,1
+ECMP -> TCP,1
+0xdbe8 -> GRE,1
+LCSAP/LPPa -> IPv4,1
+Elasticsearch -> TCP,1
+CLNP -> LLC,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+DPPs DPPs DPPv2  -> Fragment,1
+UMA/SNDCP/IP/IP/IP/IP/SNDCP/IP/IP/IP/IP -> IPv6HopByHop,1
+Kafka -> Fragment,1
+"BICC(ITU), NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",1
+0x328f -> Ethernet,1
+0x2983 -> Ethernet,1
+CDP -> CiscoDiscovery,1
+PN-RT -> IPv4,1
+UMA/SNDCP/IP/IP/IP/IP/SNDCP/IP/IP/IP/SNDCP/IP/IP/IP/IP/IP/IP/IP/IP/IP/SNDCP/IP/IP/IP/SNDCP/IP/IP/IP/IP -> IPv6HopByHop,1
+0x00ae -> GRE,1
+ETHERIP -> IPv6HopByHop,1
+0x022e -> GRE,1
+EXEC -> IPv6HopByHop,1
+3Com XNS -> IPv4,1
+ULP -> TCP,1
+M2UA -> IPv6HopByHop,1
+0x2b00 -> Dot1Q,1
+OpenVPN -> IPv6HopByHop,1
+F1AP/NR RRC/PDCP-NR -> SCTP,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,1
+0x4800 -> GRE,1
+0x2488 -> GRE,1
+MAAP -> IPv4,1
+AgentX -> TCP,1
+0x2121 -> IPv4,1
+NCSI -> Fragment,1
+ROHC/IPv4 -> Ethernet,1
+HyperSCSI -> Ethernet,1
+Rlogin -> IPv4,1
+0xe3f6 -> Ethernet,1
+RMI -> IPv6HopByHop,1
+0x32b9 -> GRE,1
+0x6060 -> GRE,1
+SABP -> IPv6HopByHop,1
+0x4e80 -> GRE,1
+0x5c00 -> GRE,1
+E2AP|E2AP|E2AP|E2AP|E2AP -> IPv4,1
+TTE/TTE/PPP BCP -> GRE,1
+0x4729 -> IPv4,1
+NCP -> IPv6HopByHop,1
+0xc288 -> GRE,1
+0x0033 -> PPPoE,1
+MGCP/SDP/SDP -> GRE,1
+0x1806 -> GRE,1
+DPPv103DPPv0 DPPv0  -> Fragment,1
+FC ELS -> MPLS,1
+OpenWire -> IPv4,1
+BPv7 -> IPv4,1
+0x540d -> GRE,1
+0x2604 -> GRE,1
+0xe000 -> GRE,1
+0xa000 -> GRE,1
+LANforge -> IPv4,1
+PN-PTCP -> IPv4,1
+0x4600 -> Ethernet,1
+DPPs DPPs TUNv114 -> Fragment,1
+DPPs APP(4) -> Fragment,1
+SASP -> Fragment,1
+0x4969 -> Dot1Q,1
+UMA/NBIFOM/NBIFOM/NBIFOM -> IPv4,1
+EERO -> Ethernet,1
+0xae0e -> GRE,1
+LBT-TCP -> ICMPv4,1
+ULP/LPP/LPP/LPP -> Fragment,1
+NBD -> IPv6HopByHop,1
+APP(91) -> Fragment,1
+SASP -> IPv4,1
+PA-HB-Bak -> Ethernet,1
+RUA -> Fragment,1
+MPLS -> Fragment,1
+0xdff6 -> IPv4,1
+DNPv0 DPPs  -> Fragment,1
+XMPP/XML -> TCP,1
+WLCCP -> Fragment,1
+REP -> GRE,1
+0x9090 -> GRE,1
+RSVP-E2EI -> GRE,1
+0x104b -> GRE,1
+APP(6144)DSPv2 DPPv2  -> Fragment,1
+0x8600 -> GRE,1
+0x4663 -> GRE,1
+RSVP-E2EI -> Fragment,1
+SNAETH -> Ethernet,1
+0x0c0c -> GRE,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv4,1
+0x8034 -> GRE,1
+0x4742 -> Fragment,1
+PROXYv2 -> IPv4,1
+0x100a -> GRE,1
+0x469d -> GRE,1
+SIP -> SCTP,1
+0x0038 -> GRE,1
+0x0001 -> Ethernet,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+0x803f -> GRE,1
+GTPv2/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> IPv6HopByHop,1
+0x6464 -> GRE,1
+Vines IPC -> IPv6HopByHop,1
+TLSv1 -> TLS?,1
+F1AP/F1AP/F1AP/F1AP/F1AP/ -> IPv4,1
+0x005b -> GRE,1
+FC-SB3 -> IPv4,1
+LLC -> Dot1Q,1
+GTPv2/NAS-EPS -> Fragment,1
+0x0059 -> GRE,1
+Couchbase -> IPv4,1
+RSH -> Fragment,1
+ECMP -> ICMPv4,1
+APP(64)DSPv2 DSPv2 DSPv2  -> Fragment,1
+9P -> TCP,1
+UMA/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP -> IPv6HopByHop,1
+IEEE1722-1 -> GRE,1
+0xff45 -> Ethernet,1
+DTPT -> IPv6HopByHop,1
+TIME -> Fragment,1
+DLR -> GRE,1
+UMA/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP -> IPv6HopByHop,1
+TTE/TTE/MAC CTRL -> GRE,1
+0xaa02 -> GRE,1
+0xc03d -> GRE,1
+DUA -> Fragment,1
+IEEE802a -> Ethernet,1
+DTLS 1.0 (OpenSSL pre 0.9.8f) -> Fragment,1
+"FractalGeneratorProtocol, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",1
+FIP -> MPLS,1
+CoLa B -> IPv4,1
+TTE/PCF -> IPv4,1
+0x207b -> GRE,1
+Vines FRP -> IPv4,1
+HomePlug AV -> IPv4,1
+0x004e -> GRE,1
+OML -> IPv4,1
+POP/0x1200 -> GRE,1
+SMB Pipe -> TCP,1
+0x82c2 -> GRE,1
+F1AP/NR RRC/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,1
+APP(64)DPPv3DPPv5 -> Fragment,1
+C15CH_HBEAT -> Fragment,1
+XMCP/XML/XML/XML -> IPv4,1
+TFTP -> IPv6HopByHop,1
+ECP -> MPLS,1
+SSLv3 -> TLS,1
+RPKI-RTR -> ICMPv4,1
+UMA/SNDCP/IP/GPRS-LLC -> IPv6HopByHop,1
+DPPv46 -> TCP,1
+ASAP -> IPv6HopByHop,1
+0x00e7 -> GRE,1
+0x32e3 -> GRE,1
+802.1ad -> Dot1Q,1
+HiQnet -> TCP,1
+0x00d7 -> GRE,1
+0x9a3a -> GRE,1
+SUA (RFC 3868) -> IPv6HopByHop,1
+MARS -> Ethernet,1
+"NGAP, NetPerfMeter -> SCTP",1
+X.29 -> TCP,1
+0x00ab -> GRE,1
+RLDP -> Ethernet,1
+CIPS Validator -> Fragment,1
+DPLAY -> IPv6HopByHop,1
+CARP -> Fragment,1
+0x9660 -> GRE,1
+X2AP/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> SCTP,1
+VIPC -> IPv4,1
+PSC -> IPv6HopByHop,1
+DPPs TUNv0 -> Fragment,1
+APP(8)APP(13320)DPPv2  -> Fragment,1
+DECT Unk -> Ethernet,1
+UMA/SNDCP/SNDCP/SNDCP/SNDCP/SNDCP -> IPv6HopByHop,1
+APP(8)DPPv2  -> Fragment,1
+CFLOW -> SCTP,1
+GTPv2/NAS-EPS/LPP -> IPv4,1
+Intel ANS probe -> GRE,1
+0xfefe -> GRE,1
+LPD -> IPv6HopByHop,1
+UMA/IP/IP -> IPv6HopByHop,1
+0x8282 -> GRE,1
+VNC -> IPv4,1
+KDSP -> IPv4,1
+IPDC -> TCP,1
+DPPs DPPs DSPv2 DPPs DPPs DPPs DSPv2 DPPs  -> Fragment,1
+OML -> IPv6HopByHop,1
+0xbe81 -> GRE,1
+LLT -> Ethernet,1
+AH -> GRE,1
+S1AP -> IPv6HopByHop,1
+CQL -> TCP,1
+0x887b -> Ethernet,1
+MDS Header -> IPv4,1
+CCM  -> Fragment,1
+0x8047 -> GRE,1
+ILP/LPP/LPP/LPP/LPP -> Fragment,1
+dpp -> Fragment,1
+0x0101 -> Ethernet,1
+PPP IPV6CP -> LLC,1
+UMA/SNDCP/SNDCP/GPRS-LLC -> IPv6HopByHop,1
+0x0f3e -> Ethernet,1
+NGAP -> IPv6HopByHop,1
+EPMD -> IPv6HopByHop,1
+HL7 -> TCP,1
+CIPS Supervisor -> Fragment,1
+HP -> LLC,1
+MTP2 -> IPv4,1
+NGAP/NAS-5GS -> IPv4,1
+0x6800 -> GRE,1
+0xaefe -> Ethernet,1
+APP(30528)APP(16128) -> Fragment,1
+ALLJOYN-NS -> IPv4,1
+0x0000 -> Fragment,1
+BACnet-APDU -> MPLS,1
+0xf230 -> GRE,1
+0x4d4c -> IPv4,1
+0xff6c -> IPv4,1
+ATMTCP -> IPv4,1
+0x0201 -> GRE,1
+MPLS PM (ILM) -> IPv4,1
+DPPv32DPPv32DPPv0  -> Fragment,1
+Socks -> TCP,1
+0x9898 -> Ethernet,1
+EIGRP -> ICMPv4,1
+0x8800 -> Dot1Q,1
+ECP -> IPv4,1
+0xb439 -> IPv4,1
+SSLv2 -> IPv6HopByHop,1
+0xff10 -> IPv4,1
+0x786d -> GRE,1
+0x7a00 -> Fragment,1
+PPP CHAP -> IPv4,1
+FLIP -> MPLS,1
+ULP/LPP/LPP -> Fragment,1
+0xf902 -> IPv4,1
+SERCOS III V1.1 -> Ethernet,1
+IPv6 -> TCP,1
+SMP -> Fragment,1
+ROHC/ROHC/IPv4 -> Ethernet,1
+0x2631 -> Ethernet,1
+0x2000 -> GRE,1
+3Com XNS -> IPv6HopByHop,1
+0x6e73 -> GRE,1
+0x2e00 -> Ethernet,1
+UMA/// -> IPv6HopByHop,1
+ISAKMP -> TCP,1
+0x8500 -> MPLS,1
+0x6045 -> GRE,1
+TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/0x008b -> GRE,1
+"ICMP, HiPerConTracer -> ICMP",1
+REP -> Ethernet,1
+0x047b -> GRE,1
+TR -> IPv4,1
+0x5819 -> IPv4,1
+CESoETH (w RTP) -> GRE,1
+T.125 -> IPv6HopByHop,1
+LLTD -> Fragment,1
+ROHC/IPv6 -> Ethernet,1
+UMA/IP/IP/IP/GPRS-LLC -> IPv6HopByHop,1
+ZigBee HC -> Fragment,1
+0x022f -> GRE,1
+DPPv0 DPPv0 DPPv0 DPPv0  -> Fragment,1
+Vines IP -> LLC,1
+Z39.50 -> TCP,1
+0x1c34 -> GRE,1
+OMAPI -> IPv4,1
+0x7bfe -> Ethernet,1
+ETAG -> GRE,1
+0xff76 -> GRE,1
+NR RRC/NAS-5GS -> Fragment,1
+CMD -> Fragment,1
+UMA/UMA -> IPv4,1
+DSPv2 DSPv2 DSPv2 DSPv2  -> Fragment,1
+ISIS -> Fragment,1
+0x0400 -> GRE,1
+0x6666 -> Ethernet,1
+0x462c -> GRE,1
+0xd604 -> GRE,1
+CAST -> Fragment,1
+APP(32512) -> Fragment,1
+TTE/TTE/TTE/TTE/TTE/TTE/TTE/TTE/0x30e2 -> GRE,1
+Spice DISPLAY -> Fragment,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/UMA -> IPv4,1
+0x607b -> GRE,1
+HPEXT -> IPv4,1
+0x0b0b -> PPP,1
+0xb2b2 -> Ethernet,1
+DNPv0 DNPv0 DNPv0 DNPv0  -> Fragment,1
+IPDC -> IPv6HopByHop,1
+SRVLOC -> IPv6HopByHop,1
+PPPoES -> Ethernet,1
+UMA/NBIFOM/NBIFOM/NBIFOM/NBIFOM -> IPv4,1
+0x3023 -> GRE,1
+APP(17090)APP(8) -> Fragment,1
+CMD -> Ethernet,1
+DPPv2  -> TCP,1
+0x069b -> GRE,1
+NW_SERIAL -> IPv4,1
+MySQL -> Fragment,1
+Bitcoin -> Fragment,1
+VNTAG -> Ethernet,1
+CMPP -> TCP,1
+IEEE1722 -> Fragment,1
+LANforge -> Fragment,1
+0x00b1 -> Fragment,1
+0x0406 -> GRE,1
+0x0084 -> Ethernet,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+CMD -> IPv4,1
+DAYTIME -> TCP,1
+MSRP -> IPv6HopByHop,1
+802.11 -> MPLS,1
+PPP LCP -> IPv4,1
+0xb8b8 -> GRE,1
+0x0036 -> GRE,1
+TTE/TTE/TTE/0x891d -> GRE,1
+DNPv0 DNPv0 DNPv0  -> Fragment,1
+0x8424 -> GRE,1
+MIH -> MPLS,1
+S1AP/LPPa/LPPa -> SCTP,1
+FC -> MPLS,1
+0x2623 -> GRE,1
+0x1302 -> IPv4,1
+UMA/IP/GPRS-LLC -> IPv4,1
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",1
+dpp -> TCP,1
+F1AP/NAS-5GS -> SCTP,1
+GSM MAP -> Fragment,1
+0x7fff -> GRE,1
+OSPF -> IPv4,1
+0x0005 -> LLC,1
+SNMP -> IPv4,1
+UMA/IP/SNDCP/IP -> IPv6HopByHop,1
+0x7a7a -> GRE,1
+NGAP/NAS-5GS/LPP -> SCTP,1
+ZigBee Green Power -> IPv4,1
+BSSGP/RRLP -> IPv6HopByHop,1
+RSL CBCH -> IPv4,1
+DPPs TUNv38 -> Fragment,1
+0x8445 -> GRE,1
+S1AP/NAS-EPS/NAS-EPS/NAS-EPS/NAS-EPS -> SCTP,1
+DPPs DPPs TUNv0 -> Fragment,1
+iSCSI -> TCP,1
+DPPv5DPPv127DPPv0 DPPv5DPPv127 -> Fragment,1
+IMAP -> IPv4,1
+IDRP -> IPv6HopByHop,1
+0x8686 -> Ethernet,1
+0x8888 -> PPPoE,1
+S5066 -> IPv6HopByHop,1
+RARP -> IPv4,1
+0x3a3a -> MPLS,1
+0x005f -> GRE,1
+ASAP -> Fragment,1
+0x4e7b -> GRE,1
+APP(64)APP(25891)APP(64)APP(32) -> Fragment,1
+DPPv0 DPPv0 TUNv61 -> Fragment,1
+DPPv2 DPPv2  -> Fragment,1
+0x82c7 -> GRE,1
+M2PA -> IPv6HopByHop,1
+0xdaff -> GRE,1
+Vines Echo -> LLC,1
+0x0058 -> GRE,1
+0xd008 -> GRE,1
+0x00eb -> GRE,1
+BSSGP/RRLP -> IPv4,1
+BATADV_ICMP -> Fragment,1
+GSUP/BSSAP/BSSAP/GSM MAP/GSM MAP -> Fragment,1
+"SCTP, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter, NetPerfMeter -> IPv4",1
+SKINNY -> TCP,1
+KNET -> IPv6HopByHop,1
+Modbus/TCP -> MODBUS,1
+MI-DECToE -> Ethernet,1
+UMA/SNDCP/IP/IP/IP/IP -> IPv6HopByHop,1
+E1AP -> IPv6HopByHop,1
+RGMP -> IPv6HopByHop,1
+0x5656 -> GRE,1
+Nano Bootstrap -> IPv6HopByHop,1
+0x1888 -> Fragment,1
+0x0073 -> GRE,1
+OAPv1 DPPv66OAPv1 OAPv1  -> Fragment,1
+TFP over TCP -> IPv4,1
+XMCP/XML/XML -> IPv4,1
+OAPv1 OAPv1 OAPv1 OAPv1 DPPv0  -> Fragment,1
+DSPv2 DPPs DSPv2 DPPs  -> Fragment,1
+IGRP -> Fragment,1
+WOW -> IPv6HopByHop,1
+SPDY -> IPv4,1
+MIH -> Fragment,1
+0x383f -> GRE,1
+0xc0df -> Ethernet,1
+RRB -> Ethernet,1
+CTDB -> IPv6HopByHop,1
+0x3001 -> GRE,1
+0xa220 -> Ethernet,1
+F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP/F1AP -> IPv4,1
+0xff00 -> Ethernet,1
+UMA/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP/GSM MAP -> IPv6HopByHop,1
+APP(17090)APP(8)APP(17090) -> Fragment,1
+IGAP -> GRE,1
+RPCoRDMA -> Fragment,1
+0x0055 -> GRE,1
+SMUX -> TCP,1
+PIMv7 -> IPv4,1
+0x7045 -> GRE,1
+0x7c81 -> GRE,1
+NCS -> IPv6HopByHop,1
+FR -> IPv4,1
+ZigBee IP -> Fragment,1
+APP(83)APP(71) -> Fragment,1
+APP(64)DNPv1  -> Fragment,1
+DPPv2 DPPv2 DPPv2  -> Fragment,1
+0x7423 -> GRE,1
+CESoETH (w RTP) -> Ethernet,1
+IPComp -> Fragment,1
+HomePlug -> IPv4,1
+0xf402 -> GRE,1
+SMRSE -> TCP,1
+FDDI -> IPv4,1
+0x7070 -> Ethernet,1
+IDMP -> TCP,1
+ETAG -> Fragment,1
+DPPv0 DPPv0 DPPv0 DPPv0 TUNv0 -> Fragment,1
+DECT -> Fragment,1
+UMA/GPRS-LLC/SNDCP -> IPv4,1
+0x4000 -> Ethernet,1
+wifi_dpp -> Fragment,1
+0xd000 -> GRE,1
+DNPv1  -> Fragment,1
+0xca32 -> Ethernet,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+DPPs DPPs DSPv2 DPPs  -> Fragment,1
+PIMv1 -> Fragment,1
+OAPv1 TUNv27 -> Fragment,1
+NCS -> GRE,1
+SCoP -> TCP,1
+FCoE -> LLC,1
+0x00d9 -> GRE,1
+ISAKMP -> EAPOL,1
+FractalGeneratorProtocol -> IPv6HopByHop,1
+ENRP -> Fragment,1
+0x002a -> GRE,1
+UMA/UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,1
+HSR -> MPLS,1
+0xd000 -> Ethernet,1
+0x2e00 -> GRE,1
+0xd493 -> Ethernet,1
+0xc631 -> GRE,1
+CARP -> IPv6HopByHop,1
+UMA/IP -> IPv6HopByHop,1
+Spice Unknown -> IPv4,1
+BSSAP/BSSAP/BSSAP -> Fragment,1
+0x0000 -> IPv6HopByHop,1
+0x00e5 -> GRE,1
+0x314a -> IPv4,1
+0x26fe -> GRE,1
+IDRP -> IPv4,1
+0x5b80 -> Ethernet,1
+APP(17)DPPv2  -> Fragment,1
+HomePNA -> GRE,1
+0xc208 -> GRE,1
+ZigBee -> IPv4,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+0x3300 -> IPv4,1
+UMA/SNDCP/SNDCP/SNDCP -> IPv4,1
+ZigBee T2 -> Fragment,1
+ACAP -> Fragment,1
+0xbe46 -> Ethernet,1
+CGMP -> IPv4,1
+MGCP/SDP/SDP/SDP/SDP -> GRE,1
+E2AP/JSON -> SCTP,1
+VSPP -> IPv4,1
+NGAP/NAS-5GS/NAS-EPS -> SCTP,1
+APP(104)DPPv2  -> Fragment,1
+RTPproxy-ng -> Fragment,1
+ALCAP -> IPv6HopByHop,1
+0x00cd -> Ethernet,1
+ESIS -> LLC,1
+0x00dd -> GRE,1
+Chargen -> TCP,1
+X.29 -> IPv6HopByHop,1
+FTP -> SMTP,1
+AFP -> TCP,1
+DPPv124DPPv1DPPv0DNPv0 DNPv0 DNPv0 DNPv0 DNPv0 DPPv1DPPv47DPPv1DPPv0DNPv0 DPPv1DNPv1  -> TCP,1
+SPX -> LLC,1
+0x00fd -> Fragment,1
+0x0089 -> GRE,1
+iSNS -> TCP,1
+0x3671 -> Ethernet,1
+0x006d -> GRE,1
+0x88f8 -> Ethernet,1
+0x804d -> GRE,1
+PPP CBCP -> IPv4,1
+UMA/ -> IPv6HopByHop,1
+RSVP -> ICMPv6,1
+DPPv96DPPv127 -> Fragment,1
+DISTCC  -> IPv4,1
+0x02fc -> GRE,1
+UMA// -> IPv6HopByHop,1
+DSPv2 APP(32511)TUNv1 -> Fragment,1
+IGMPv3 -> Fragment,1
+VSNCP -> IPv4,1
+OPSI -> TCP,1
+0x007f -> Fragment,1
+JDWP -> IPv4,1
+PW OAM -> IPv4,1
+DPPv5DPPv0  -> Fragment,1
+MGCP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP/SDP -> Fragment,1
+0x00d5 -> GRE,1
+0x0084 -> GRE,1
+UMA/SNDCP/SNDCP/SNDCP/UMA/SNDCP/SNDCP/SNDCP/SNDCP -> IPv6HopByHop,1
+0x4609 -> GRE,1
+0x3826 -> GRE,1
+CLSES -> GRE,1
+AX.25-NoL3 -> IPv4,1
+BSSAP/BSSLAP -> SCTP,1
+APP(66)APP(8)APP(32698)TUNv38 -> Fragment,1
+0x1eff -> GRE,1
+BATADV_VIS -> LLC,1
+TCP -> IPv6,1
+OAPv1 OAPv1 TUNv197 -> Fragment,1
+RTMP -> MPLS,1
+GIOP -> TCP,1
+0x8235 -> GRE,1
+PROXYv2 -> IPv6HopByHop,1
+NFS CB -> ICMPv4,1
+VSPP -> GRE,1
+UMA/SNDCP/IP/IP/IP/IP/IP/GPRS-LLC/IP/IP -> IPv6HopByHop,1
+Slow Protocols -> Ethernet,1
+0x80af -> LLC,1
+0x84a0 -> LLC,1
+F1AP/NR RRC/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS/NAS-5GS -> SCTP,1
+0x084d -> GRE,1
+0x008b -> GRE,1
+QNET_KIF -> Fragment,1
+DPPv39 -> Fragment,1
+0x007c -> GRE,1
+0x2323 -> Ethernet,1
+UMA//// -> IPv6HopByHop,1
+APP(4)TUNv0 -> Fragment,1
+NGAP/NRPPa -> IPv4,1
+YMSG -> TCP,1
+ATMARP -> IPv6HopByHop,1
+MGCP/SDP -> TCP,1
+0x2c80 -> GRE,1
+APP(32511) -> Fragment,1
+NET/ROM -> Fragment,1
+LOOP -> Ethernet,1
+0x0037 -> GRE,1
+0xffff -> Ethernet,1
+ATP -> Ethernet,1
+EAP -> Ethernet,1
+ARP -> LLC,1
+0xfe29 -> GRE,1
+0x800d -> GRE,1
+X2AP/NAS-EPS/NAS-EPS -> SCTP,1
+CESoETH -> IPv4,1
+XID -> LLC,1
+IPX MSG -> LLC,1
+0x3c82 -> GRE,1
+0x84db -> Ethernet,1
+6LoWPAN -> GRE,1
+0xf634 -> GRE,1
+O-RAN-FH-C -> Fragment,1
+OpenVPN -> TCP,1
+AX.25 -> Ethernet,1
+0x4088 -> PPP,1
+TACACS+ -> TCP,1
+0x363f -> GRE,1
+BATADV_??? -> Ethernet,1
+ICAP -> IPv6HopByHop,1
+PPPoES -> PPPoE,1
+0x5b46 -> Ethernet,1
+OAPv1 OAPv1 TUNv0 -> Fragment,1
+FMTP -> IPv4,1
+DDP -> Fragment,1
+TPM -> IPv6HopByHop,1
+UMA/UMA/GPRS-LLC -> IPv6HopByHop,1
+Ceph -> IPv6HopByHop,1
+FTP-DATA -> IPv4,1
+DPPv5DPPv127DPPv127 -> Fragment,1
+FIX -> TCP,1
+SAMETIME -> IPv6HopByHop,1
+APP(30968) -> Fragment,1
+0x7272 -> GRE,1
+UMA/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC/GPRS-LLC -> IPv6HopByHop,1
+DSI -> Fragment,1
+0x0a07 -> GRE,1
+APP(5)APP(2) -> Fragment,1
+DPPv127APP(76) -> Fragment,1
+0x9181 -> LLC,1
+0x1230 -> GRE,1
+UMA/SNDCP/IP -> IPv4,1
+RTMP -> IPv6HopByHop,1
+AMQP -> TCP,1
+GSUP//// -> Fragment,1
+0x5300 -> GRE,1
+0x55e4 -> Ethernet,1
+0x6672 -> GRE,1
+0x98c6 -> Ethernet,1
+0x89f2 -> MPLS,1
+Spice PLAYBACK -> Fragment,1
+ROHC/DCCP -> Ethernet,1
+0x2600 -> GRE,1
+UMA/SNDCP/GPRS-LLC -> IPv4,1
+COTP -> Fragment,1
+0x2e80 -> GRE,1
+TCP -> ICMPv4,1
+0x8901 -> IPv4,1
+0x82fe -> GRE,1

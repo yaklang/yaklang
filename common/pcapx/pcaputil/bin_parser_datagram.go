@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 )
 
 // UDP already supplies message boundaries. Do not feed these bytes through TCP
@@ -27,6 +28,15 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 	case probeNTP(wire, len(wire)).Verdict == ProbeAccept:
 		e.Protocol, spec = "ntp", a.specs["application-layer.ntp/NTP"]
 		if len(wire) != 48 {
+			// A complete base header remains observable even when its trailing
+			// extensions/MAC need an unsupported profile. Never claim that the
+			// extension or its authentication was verified.
+			if strings.HasSuffix(e.Source, ":123") || strings.HasSuffix(e.Destination, ":123") {
+				session, _ = (&binNTP{}).consume(wire[:48])
+				session["Trailing Bytes"] = len(wire) - 48
+				session["Trailing Content"] = "extension-or-authentication-unparsed"
+				e.Session, e.Completeness = session, "headers"
+			}
 			err = protocolError(ErrUnsupportedFeature, "NTP extensions/authentication require an unsupported profile")
 		} else {
 			session, err = (&binNTP{}).consume(wire)

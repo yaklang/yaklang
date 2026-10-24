@@ -39,6 +39,7 @@ var Command = &cli.Command{
 		cli.StringFlag{Name: "interface,i", Usage: "Capture interface (default: physical interface with router gateway; excludes VPN/TUN)"},
 		cli.StringFlag{Name: "pcap-file,r", Usage: "Read a pcap or pcapng capture instead of live traffic"},
 		cli.StringFlag{Name: "output-file,w", Usage: "Save captured packets as .pcap or .pcapng (new file only)"},
+		cli.BoolFlag{Name: "ignore-embedded-secrets", Usage: "Validate and discard PCAPNG secret blocks; supply authorized keys separately with --tls-keylog"},
 		cli.StringFlag{Name: "tls-keylog", Usage: "Authorized NSS key log (bounded TLS AES-GCM/ChaCha20-Poly1305 profiles; never exported)"},
 		cli.StringSliceFlag{Name: "decode-as", Usage: "Explicit validated UDP profile, e.g. udp:55000:ike (repeatable; does not bypass grammar or authentication)"},
 		cli.StringFlag{Name: "bpf,f", Usage: "BPF capture filter, combined with --protocol using AND"},
@@ -132,7 +133,7 @@ func run(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc")}
+	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc"), ignoreEmbeddedSecrets: c.Bool("ignore-embedded-secrets")}
 	cfg.initialDisplayFilter = c.String("display-filter")
 	displayFilter, err := pcaputil.CompileDisplayFilter(cfg.initialDisplayFilter)
 	if err != nil {

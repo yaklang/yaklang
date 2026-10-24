@@ -1,1 +1,12 @@
 __pycache__/
+
+# External public corpora, local secrets and generated audit artifacts.
+*.pcap
+*.pcapng
+*.pcap.gz
+*.pcapng.gz
+*.zip
+*.7z
+*.keys
+*.keylog
+*.exe

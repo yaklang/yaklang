@@ -122,7 +122,16 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	// Preserve already observed negotiation on encrypted records too. Missing
 	// keys and unsupported suites return early; neither erases the wire-proven
 	// version, SNI or selected ALPN from the connection.
-	info := map[string]any{"Record Type": typ, "Record Version": binary.BigEndian.Uint16(w[1:3]), "Record Length": len(plain), "Authentication Verified": false, "Certificate Trust": "not-evaluated", "Negotiated Version": t.version, "Cipher Suite": t.suite, "SNI": t.sni, "ALPN": t.alpn}
+	info := map[string]any{"Record Type": typ, "Record Version": binary.BigEndian.Uint16(w[1:3]), "Record Length": len(plain), "Authentication Verified": false, "Certificate Trust": "not-evaluated"}
+	if t.version != 0 && t.suite != 0 {
+		info["Negotiated Version"], info["Cipher Suite"] = t.version, t.suite
+	}
+	if t.sni != "" {
+		info["SNI"] = t.sni
+	}
+	if t.alpn != "" {
+		info["ALPN"] = t.alpn
+	}
 	e.Session = info
 	if t.version == 0x304 && typ == 22 && t.finalHello {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 cleartext handshake after ServerHello")
