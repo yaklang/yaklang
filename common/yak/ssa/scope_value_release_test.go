@@ -262,6 +262,21 @@ func TestReleaseDropsScopeThatOnlyMentionsCapturedValue(t *testing.T) {
 	require.Nil(t, otherB.CurrentBlock.ScopeTable, "loading a value captured elsewhere must not pin this scope")
 }
 
+func TestReleaseOneFinishedFunctionDropsItsScope(t *testing.T) {
+	fn, variable, value := assignLocal(t, "helper")
+	persistFinished(t, fn)
+	originalID := value.GetId()
+
+	fn.GetProgram().releaseOneFinishedFunction(fn)
+
+	require.Nil(t, fn.builder)
+	require.True(t, fn.bodyScopesDetached)
+	require.Nil(t, variable.Value)
+	reloaded := variable.GetValue()
+	require.NotNil(t, reloaded)
+	require.Equal(t, originalID, reloaded.GetId())
+}
+
 func TestConstStringIsLazy(t *testing.T) {
 	c := newConstCreate("hello")
 	require.Empty(t, c.str)
