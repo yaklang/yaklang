@@ -115,6 +115,50 @@ func releasePersistedOffsetValues(prog *Program) int {
 	return released
 }
 
+// DetachFinishedFunctionBodyScopes nils the scope tables of finished
+// functions before the unit flush evicts their blocks. Capture scopes and
+// the live blueprint container stay. The flag lets the flush spill the
+// block objects afterwards, including exported functions.
+func (prog *Program) DetachFinishedFunctionBodyScopes() {
+	if prog == nil {
+		return
+	}
+	app := prog.GetApplication()
+	if app == nil {
+		app = prog
+	}
+	seen := map[*Program]struct{}{}
+	var visit func(*Program)
+	visit = func(p *Program) {
+		if p == nil {
+			return
+		}
+		if _, ok := seen[p]; ok {
+			return
+		}
+		seen[p] = struct{}{}
+		p.forEachFunction(func(fn *Function) {
+			if fn == nil || !fn.finished || fn.IsExtern() || fn.bodyScopesDetached {
+				return
+			}
+			if functionScopeRetainsCapture(p, fn) || isLiveContainerFunction(fn) {
+				return
+			}
+			clearFunctionBodyScopes(p, fn)
+			fn.bodyScopesDetached = true
+			fn.builder = nil
+		})
+		if p.UpStream == nil {
+			return
+		}
+		p.UpStream.ForEach(func(_ string, child *Program) bool {
+			visit(child)
+			return true
+		})
+	}
+	visit(app)
+}
+
 func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStore][]int64) int {
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return 0
@@ -154,6 +198,7 @@ func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStor
 		retainsCapture := functionScopeRetainsCapture(prog, fn)
 		if !retainsCapture && !isLiveContainerFunction(fn) {
 			clearFunctionBodyScopes(prog, fn)
+			fn.bodyScopesDetached = true
 			fn.builder = nil
 			// Flush keeps these blocks: a BasicBlock is a boundary instruction.
 			// The scope is already detached, so the object itself is only weight.
