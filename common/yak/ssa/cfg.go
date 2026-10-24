@@ -350,6 +350,11 @@ func (i *IfBuilder) Build() *IfBuilder {
 	// just use ssautil scope cfg ScopeBuilder
 	SSABuilder := i.builder
 	i.enter.restoreScopeIfMissing()
+	// Syntax recovery can produce an unfinished if with no condition or body.
+	// Keep its valid prefix scope instead of creating an unscoped CFG block.
+	if len(i.items) == 0 && i.elseBody == nil {
+		return i
+	}
 	scope := i.enter.ScopeTable
 	ScopeBuilder := ssautil.NewIfStmt(ssautil.ScopedVersionedTableIF[Value](scope))
 
