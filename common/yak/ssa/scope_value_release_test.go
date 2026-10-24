@@ -218,10 +218,10 @@ func TestReleaseKeepsExportedAndCapturedValues(t *testing.T) {
 	require.NotZero(t, exportedFn.EnterBlock)
 	require.False(t, exportedFn.GetProgram().Cache.hasResidentInstruction(exportedFn.EnterBlock), "a finished exported body block must leave the resident cache")
 	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(exportedFn.GetId()), "the function object stays resident for cross-unit calls")
-	require.True(t, exportedFn.GetProgram().Cache.hasResidentInstruction(param.GetId()), "parameters stay resident for call binding")
+	require.False(t, exportedFn.GetProgram().Cache.hasResidentInstruction(param.GetId()), "a finished exported parameter is reloaded by id")
 	gotParam, ok := exportedFn.GetValueById(param.GetId())
 	require.True(t, ok)
-	require.True(t, gotParam == param, "parameter identity must survive the ordinary-value release")
+	require.Equal(t, param.GetId(), gotParam.GetId())
 
 	capturedFn, capturedVar, capturedValue := assignLocal(t, "helper")
 	noteCapturedByClosure(capturedValue, "local")
