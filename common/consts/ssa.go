@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 
 	"github.com/google/uuid"
 
@@ -39,7 +40,8 @@ var (
 	// Plain pointer, same as profileDatabase. initYakitDatabaseOnce is the
 	// only guard: the handle is published when it is still unset, and later
 	// SetGormSSAProjectDatabase calls are explicit rebinds.
-	ssaDatabase *gorm.DB
+	ssaDatabase            *gorm.DB
+	ssaDatabaseSkipMigrate atomic.Bool
 )
 
 const (
@@ -104,6 +106,14 @@ func SetSSADatabaseInfo(raw string) {
 	SSA_PROJECT_DB_RAW = connectionDetails
 }
 
+func SetSSADatabaseSkipMigrate(skip bool) {
+	ssaDatabaseSkipMigrate.Store(skip)
+}
+
+func SSADatabaseSkipMigrate() bool {
+	return ssaDatabaseSkipMigrate.Load() || utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE))
+}
+
 func SetGormSSAProjectDatabaseByInfo(raw string) error {
 	SetSSADatabaseInfo(raw)
 	db, err := CreateSSAProjectDatabaseRaw(raw)
@@ -127,7 +137,7 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 	}
 	// SSA-IR DB may be accessed with a read-only credential (scan-only nodes).
 	// In that case, AutoMigrate would fail even if the schema already exists.
-	if !utils.InterfaceToBoolean(os.Getenv(ENV_SSA_DB_SKIP_MIGRATE)) {
+	if !SSADatabaseSkipMigrate() {
 		if dialect == damenggorm.Dialect {
 			if err := schema.AutoMigrateChecked(db, schema.KEY_SCHEMA_SSA_DATABASE); err != nil {
 				_ = db.Close()
@@ -137,7 +147,7 @@ func CreateSSAProjectDatabase(dialect, path string) (*gorm.DB, error) {
 			schema.AutoMigrate(db, schema.KEY_SCHEMA_SSA_DATABASE)
 		}
 		schema.ApplyPatches(db, schema.KEY_SCHEMA_SSA_DATABASE)
-		if dialect == damenggorm.Dialect && db.Error != nil {
+		if db.Error != nil {
 			_ = db.Close()
 			return nil, db.Error
 		}

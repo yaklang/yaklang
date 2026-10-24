@@ -4,6 +4,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -22,12 +23,8 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 	if rule == nil {
 		return nil, utils.Error("struct rule: nil rule")
 	}
-	units := programStructUnits(p)
-	if len(units) == 0 {
-		return nil, utils.Errorf(
-			"struct rule %s: program %s has no application/library unit",
-			ruleGetRuleName(rule), p.GetProgramName(),
-		)
+	if p.IsIncrementalCompile() && !p.IsBaseProgram() && p.GetOverlay() == nil {
+		return nil, utils.Error("incremental program overlay unavailable for struct review")
 	}
 	// A scan passes its preparation loader through base. Only a standalone
 	// struct query owns a private cache.
@@ -37,18 +34,25 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 	}
 	var accumulated *sfvm.SFFrameResult
 	var sharedConfig *ssaconfig.Config
-	for _, unit := range units {
-		if unit == nil {
-			continue
+	runUnit := func(source *Program, unit *ssa.CompileUnit, bound *structBound) error {
+		if base != nil && base.ctx != nil {
+			if err := base.ctx.Err(); err != nil {
+				return err
+			}
 		}
+		target := NewStructQueryTarget(source, unit, bound)
+		previousBound, previousActive := source.structBound, source.structScanActive
+		source.structBound, source.structScanActive = target.bound, true
+		defer func() { source.structBound, source.structScanActive = previousBound, previousActive }()
+
 		frame, _, err := loader.Load(sfvm.NewSyntaxFlowVirtualMachine(), rule)
 		if err != nil {
-			return nil, utils.Wrapf(err, "struct rule %s: load frame failed", ruleGetRuleName(rule))
+			return utils.Wrapf(err, "struct rule %s: load frame failed", ruleGetRuleName(rule))
 		}
 		unitOpts := []QueryOption{
-			QueryWithValue(NewStructQueryTarget(p, unit, nil)),
+			QueryWithValue(target),
 			QueryWithResultProgram(p),
-			QueryWithStruct(unit),
+			queryWithStructBound(target.bound),
 			QueryWithFrame(frame),
 			QueryWithRule(rule),
 			QueryWithNoFinalize(),
@@ -69,15 +73,37 @@ func (p *Program) queryProgramStructRule(base *queryConfig, rule *schema.SyntaxF
 		}
 		res, err := QuerySyntaxflow(unitOpts...)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if res == nil || res.memResult == nil {
-			continue
+			return nil
 		}
 		if accumulated == nil {
 			accumulated = sfvm.NewSFFrameResultAccumulator(res.memResult)
 		} else {
 			accumulated.MergeByResult(res.memResult)
+		}
+		return nil
+	}
+	if overlay := p.GetOverlay(); overlay != nil && overlay.IsTopLayerProgram(p) {
+		if err := walkOverlayStructUnits(overlay, runUnit); err != nil {
+			return nil, err
+		}
+	} else {
+		units, err := programStructUnits(p)
+		if err != nil {
+			return nil, err
+		}
+		if len(units) == 0 {
+			return nil, utils.Errorf("struct rule %s: program %s has no application/library unit", ruleGetRuleName(rule), p.GetProgramName())
+		}
+		for _, unit := range units {
+			if unit == nil {
+				continue
+			}
+			if err := runUnit(p, unit, nil); err != nil {
+				return nil, err
+			}
 		}
 	}
 	if accumulated == nil {

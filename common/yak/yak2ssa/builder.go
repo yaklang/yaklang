@@ -12,6 +12,7 @@ import (
 
 type SSABuilder struct {
 	*ssa.PreHandlerBase
+	fileBuilds map[*ssa.Program]map[string]*fileBuild
 }
 
 var _ ssa.Builder = (*SSABuilder)(nil)
@@ -47,13 +48,8 @@ func (s *SSABuilder) ParseAST(src string, cache *ssa.AntlrCache) (ssa.FrontAST, 
 	return FrontEnd(src, cache)
 }
 
-func (*SSABuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
-	b.SupportClosure = true
-	astBuilder := &astbuilder{
-		FunctionBuilder: b,
-	}
-	astBuilder.build(ast)
-	return nil
+func (s *SSABuilder) BuildFromAST(ast ssa.FrontAST, b *ssa.FunctionBuilder) error {
+	return s.buildFile(ast, b)
 }
 
 func (s *SSABuilder) WrapWithPreprocessedFS(fs fi.FileSystem, _ bool) fi.FileSystem {
@@ -75,6 +71,9 @@ func (*SSABuilder) GetLanguage() ssaconfig.Language {
 
 type astbuilder struct {
 	*ssa.FunctionBuilder
+	frontend *SSABuilder
+	file     *fileBuild
+	err      error
 }
 
 func FrontEnd(src string, cache *ssa.AntlrCache) (yak.IProgramContext, error) {

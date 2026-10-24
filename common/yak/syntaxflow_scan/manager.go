@@ -217,6 +217,9 @@ func (m *scanManager) captureTaskSnapshot(withLevelCounts bool) *schema.SyntaxFl
 
 	m.taskRecorder.Config, _ = json.Marshal(m.Config)
 	m.taskRecorder.ProjectId = m.Config.GetProjectID()
+	if m.Config.IsNoSaveTask() {
+		return nil
+	}
 	if withLevelCounts && (m.status == schema.SYNTAXFLOWSCAN_DONE || m.status == schema.SYNTAXFLOWSCAN_PAUSED) {
 		levelCounts, errLC := yakit.GetSSARiskLevelCount(ssadb.GetDB(), &ypb.SSARisksFilter{
 			RuntimeID: []string{m.TaskId()},
