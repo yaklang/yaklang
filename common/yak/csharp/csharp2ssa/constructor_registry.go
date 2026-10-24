@@ -1348,7 +1348,7 @@ func csharpMethodReceiverMemberKeys(alternatives []csharpMethodAlternative) map[
 		if functionType == nil {
 			continue
 		}
-		for _, member := range functionType.ParameterMember {
+		for _, member := range functionType.LiveParameterMembers() {
 			if member == nil || member.MemberCallKind != ssa.ParameterMemberCall || member.MemberCallObjectIndex != 0 {
 				continue
 			}
@@ -2369,7 +2369,7 @@ func constructorReceiverMemberKeys(selections []csharpConstructorSelection) map[
 		if functionType == nil {
 			continue
 		}
-		for _, member := range functionType.ParameterMember {
+		for _, member := range functionType.LiveParameterMembers() {
 			if member == nil || member.MemberCallKind != ssa.ParameterMemberCall || member.MemberCallObjectIndex != 0 {
 				continue
 			}

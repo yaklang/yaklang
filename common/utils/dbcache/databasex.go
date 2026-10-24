@@ -293,6 +293,14 @@ func (c *Cache[T, D]) GetResident(id int64) (T, bool) {
 	return c.resident.GetResident(id)
 }
 
+// PeekResident reads the resident value without cancelling a queued flush.
+func (c *Cache[T, D]) PeekResident(id int64) (T, bool) {
+	if c == nil || c.resident == nil {
+		return *new(T), false
+	}
+	return c.resident.PeekResident(id)
+}
+
 func (c *Cache[T, D]) Delete(id int64) {
 	if c == nil || c.resident == nil {
 		return

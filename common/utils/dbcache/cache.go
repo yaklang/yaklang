@@ -127,8 +127,10 @@ func (c *ResidencyCacheWithKey[K, T]) GetResident(key K) (T, bool) {
 	c.mu.RLock()
 	if item, exists := c.data[key]; exists {
 		if item.pending && !item.persisting {
-			// Needs mutation (cancel pending persist): drop the shared lock and
-			// redo under the exclusive lock.
+			// A lookup means the value is hot again. Cancel the queued eviction so
+			// FinishPersist does not drop it when the old save acks. Callers that
+			// only want to read a value already queued by this flush must use
+			// PeekResident, or the read would drop that flush's delete.
 			c.mu.RUnlock()
 			c.mu.Lock()
 			item2, exists2 := c.data[key]
@@ -157,6 +159,24 @@ func (c *ResidencyCacheWithKey[K, T]) GetResident(key K) (T, bool) {
 	}
 	c.mu.RUnlock()
 	return *new(T), false
+}
+
+// PeekResident reads a resident value without cancelling a queued save and
+// without refreshing the eviction TTL.
+func (c *ResidencyCacheWithKey[K, T]) PeekResident(key K) (T, bool) {
+	if c == nil {
+		var zero T
+		return zero, false
+	}
+	c.mu.RLock()
+	item, exists := c.data[key]
+	if !exists {
+		c.mu.RUnlock()
+		return *new(T), false
+	}
+	value := item.memoryItem
+	c.mu.RUnlock()
+	return value, true
 }
 
 func (c *ResidencyCacheWithKey[K, T]) Get(key K) (T, bool) {

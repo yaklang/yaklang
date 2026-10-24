@@ -1431,6 +1431,55 @@ func (f *FunctionType) SetIsMethod(isMethod bool, obj Type) {
 	f.setMethodBinding(isMethod, obj)
 }
 
+// ParameterValueAt returns one parameter object. After a finished function's
+// body is released, ParameterValue is nil and the object is reloaded by id.
+// The reloaded pointer is not stored back onto the type.
+func (f *FunctionType) ParameterValueAt(i int) *Parameter {
+	if f == nil || i < 0 {
+		return nil
+	}
+	if f.ParameterValue != nil {
+		if i < len(f.ParameterValue) {
+			return f.ParameterValue[i]
+		}
+		return nil
+	}
+	if f.This == nil || i >= len(f.This.Params) {
+		return nil
+	}
+	inst, ok := f.This.GetValueById(f.This.Params[i])
+	if !ok || utils.IsNil(inst) {
+		return nil
+	}
+	param, _ := ToParameter(inst)
+	return param
+}
+
+// LiveParameterMembers returns the parameter-member objects. A nil slice means
+// the body was released; the ids on This are loaded and not cached.
+func (f *FunctionType) LiveParameterMembers() []*ParameterMember {
+	if f == nil {
+		return nil
+	}
+	if f.ParameterMember != nil {
+		return f.ParameterMember
+	}
+	if f.This == nil || len(f.This.ParameterMembers) == 0 {
+		return nil
+	}
+	out := make([]*ParameterMember, 0, len(f.This.ParameterMembers))
+	for _, id := range f.This.ParameterMembers {
+		inst, ok := f.This.GetValueById(id)
+		if !ok || utils.IsNil(inst) {
+			continue
+		}
+		if member, ok := ToParameterMember(inst); ok && member != nil {
+			out = append(out, member)
+		}
+	}
+	return out
+}
+
 // setMethodBinding records whether the function is a method and, once, the
 // type that declares it. Lookup resolves one function through every type that
 // embeds or aliases it and reports that lookup type here, so a later caller in

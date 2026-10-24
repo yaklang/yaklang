@@ -261,3 +261,25 @@ func TestReleaseDropsScopeThatOnlyMentionsCapturedValue(t *testing.T) {
 	require.True(t, ownerVar.GetValue() == shared, "the function that captured the value keeps it")
 	require.Nil(t, otherB.CurrentBlock.ScopeTable, "loading a value captured elsewhere must not pin this scope")
 }
+
+// Package entry functions stay unfinished so a later batch can still emit.
+// Their saved ordinary values must still leave the scope.
+func TestReleaseDropsPersistedPackageEntryValues(t *testing.T) {
+	prog := newSplitWriteProgram(t)
+	fn := prog.NewFunction(string(MainFunctionName))
+	builder := fn.GetOrCreateBuilder()
+	value := builder.EmitConstInst(1)
+	variable := builder.CreateVariable("pkgConst")
+	builder.AssignVariable(variable, value)
+	prog.Cache.FlushCompileUnit("unit")
+	prog.Cache.FlushInstructionSaver()
+
+	released := prog.ReleasePersistedOrdinaryValues()
+	require.Greater(t, released, 0)
+	require.NotNil(t, fn.builder, "an unfinished package function keeps its builder")
+	require.Nil(t, variable.Value)
+	reloaded := variable.GetValue()
+	require.NotNil(t, reloaded)
+	require.Equal(t, value.GetId(), reloaded.GetId())
+	require.False(t, reloaded == value)
+}

@@ -414,11 +414,12 @@ func (c *Call) handleCalleeFunction() {
 		recoverBuilder()
 	}()
 
+	members := funcTyp.LiveParameterMembers()
 	for true {
-		if len(c.ArgMember) == len(funcTyp.ParameterMember) {
+		if len(c.ArgMember) == len(members) {
 			break
 		}
-		for _, p := range funcTyp.ParameterMember {
+		for _, p := range members {
 			wantFunction := false
 			if typ := p.GetType(); typ != nil {
 				if typ.GetTypeKind() == FunctionTypeKind {

@@ -132,23 +132,19 @@ func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStor
 	released := 0
 	visitedScopes := map[*ScopeInstance]struct{}{}
 	prog.forEachFunction(func(fn *Function) {
-		if fn == nil || !fn.finished || fn.IsExtern() {
+		if fn == nil || fn.IsExtern() {
 			return
 		}
-		if fn.builder != nil && fn.builder.CurrentBlock != nil && fn.builder.CurrentBlock.ScopeTable != nil {
-			released += releaseScopeOrdinaryValues(prog, fn.builder.CurrentBlock.ScopeTable, visitedScopes, reload)
-		}
-		for _, id := range fn.Blocks {
-			inst, ok := prog.Cache.instructions.residentInstruction(id)
-			if !ok || utils.IsNil(inst) {
-				continue
+		// A Go package function stays unfinished until the program closes, because
+		// a later batch may still emit into the same library. Its saved consts and
+		// makes do not. Drop those values only; the builder and scope stay.
+		if !fn.finished {
+			if isLongLivedPackageFunction(fn) {
+				released += releaseFunctionScopeOrdinaryValues(prog, fn, visitedScopes, reload)
 			}
-			block, ok := ToBasicBlock(inst)
-			if !ok || block == nil || block.ScopeTable == nil {
-				continue
-			}
-			released += releaseScopeOrdinaryValues(prog, block.ScopeTable, visitedScopes, reload)
+			return
 		}
+		released += releaseFunctionScopeOrdinaryValues(prog, fn, visitedScopes, reload)
 		// The id list has been walked. Dropping the builder of a private
 		// function is not enough: its BasicBlocks stay in the resident cache,
 		// and an exported function keeps both the builder and the blocks. The
@@ -256,6 +252,14 @@ func clearFunctionBodyScopes(prog *Program, fn *Function) {
 		detachScope(fn.builder.CurrentBlock.ScopeTable)
 		fn.builder.CurrentBlock.ScopeTable = nil
 	}
+	// ParameterValue / ParameterMember keep every parameter object of every
+	// finished function reachable from Program.Funcs. Call sites reload by id.
+	fn.typeMu.Lock()
+	if funType, ok := ToFunctionType(fn.Type); ok && funType != nil {
+		funType.ParameterValue = nil
+		funType.ParameterMember = nil
+	}
+	fn.typeMu.Unlock()
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
 		return
 	}
@@ -338,7 +342,48 @@ func dropFinishedBodyBlocks(store *instructionStore, ids []int64) {
 	}
 }
 
+func isLongLivedPackageFunction(fn *Function) bool {
+	if fn == nil {
+		return false
+	}
+	switch fn.GetName() {
+	case string(MainFunctionName), string(InitFunctionName), string(VirtualFunctionName):
+		return true
+	default:
+		return false
+	}
+}
+
+func releaseFunctionScopeOrdinaryValues(prog *Program, fn *Function, visited map[*ScopeInstance]struct{}, reload func(int64) (Value, bool)) int {
+	released := 0
+	if fn == nil {
+		return 0
+	}
+	if fn.builder != nil && fn.builder.CurrentBlock != nil && fn.builder.CurrentBlock.ScopeTable != nil {
+		released += releaseScopeOrdinaryValues(prog, fn, fn.builder.CurrentBlock.ScopeTable, visited, reload)
+	}
+	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return released
+	}
+	for _, id := range fn.Blocks {
+		inst, ok := prog.Cache.instructions.residentInstruction(id)
+		if !ok || utils.IsNil(inst) {
+			continue
+		}
+		block, ok := ToBasicBlock(inst)
+		if !ok || block == nil || block.ScopeTable == nil {
+			continue
+		}
+		released += releaseScopeOrdinaryValues(prog, fn, block.ScopeTable, visited, reload)
+	}
+	return released
+}
+
 func detachScope(scope ScopeIF) {
+	// Break this scope's own links only. Walking parents would clear the live
+	// package scope, which later batches still emit into. A kept variable must
+	// not follow captureVariable back to that parent, and this scope must not
+	// keep the parent alive after the block field is cleared.
 	current, ok := scope.(*ScopeInstance)
 	if !ok || current == nil {
 		return
@@ -348,14 +393,27 @@ func detachScope(scope ScopeIF) {
 			continue
 		}
 		for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
-			if versioned != nil {
-				versioned.SetScope(nil)
+			if versioned == nil {
+				continue
 			}
+			versioned.SetScope(nil)
+			versioned.SetCaptured(versioned)
 		}
 	}
+	current.SetParent(nil)
 }
 
-func releaseScopeOrdinaryValues(prog *Program, scope ScopeIF, visited map[*ScopeInstance]struct{}, reload func(int64) (Value, bool)) int {
+func functionCapturesVariable(fn *Function, name string, value Value) bool {
+	if !valueCapturedByClosure(value) {
+		return false
+	}
+	if fn == nil || fn.builder == nil || fn.builder.capturedNames == nil {
+		return false
+	}
+	return fn.builder.capturedNames.Have(name)
+}
+
+func releaseScopeOrdinaryValues(prog *Program, fn *Function, scope ScopeIF, visited map[*ScopeInstance]struct{}, reload func(int64) (Value, bool)) int {
 	released := 0
 	for scope != nil {
 		current, ok := scope.(*ScopeInstance)
@@ -376,10 +434,10 @@ func releaseScopeOrdinaryValues(prog *Program, scope ScopeIF, visited map[*Scope
 					continue
 				}
 				value := variable.Value
-				if utils.IsNil(value) || valueCapturedByClosure(value) {
+				if utils.IsNil(value) || functionCapturesVariable(fn, variable.GetName(), value) {
 					continue
 				}
-				if shouldKeepCompileUnitBoundaryResident(value) {
+				if shouldKeepCompileUnitBoundaryResident(value) && !canSpillFinishedFunctionMember(value) && !canSpillFinishedPrivateBlock(value) {
 					continue
 				}
 				id := value.GetId()
