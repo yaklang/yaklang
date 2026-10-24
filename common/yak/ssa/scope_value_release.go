@@ -230,7 +230,11 @@ func clearFunctionBodyScopes(prog *Program, fn *Function) {
 	if fn == nil {
 		return
 	}
+	// A kept parameter points at its variable, and that variable points at the
+	// whole scope. Nil-ing the block field alone leaves the version maps
+	// reachable for the rest of the compile. Detach the variables first.
 	if fn.builder != nil && fn.builder.CurrentBlock != nil {
+		detachScope(fn.builder.CurrentBlock.ScopeTable)
 		fn.builder.CurrentBlock.ScopeTable = nil
 	}
 	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
@@ -245,7 +249,25 @@ func clearFunctionBodyScopes(prog *Program, fn *Function) {
 		if !ok || block == nil {
 			continue
 		}
+		detachScope(block.ScopeTable)
 		block.ScopeTable = nil
+	}
+}
+
+func detachScope(scope ScopeIF) {
+	current, ok := scope.(*ScopeInstance)
+	if !ok || current == nil {
+		return
+	}
+	for _, latest := range current.GetAllVariables() {
+		if latest == nil {
+			continue
+		}
+		for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
+			if versioned != nil {
+				versioned.SetScope(nil)
+			}
+		}
 	}
 }
 
