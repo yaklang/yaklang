@@ -12,6 +12,7 @@ import (
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 func opaqueIPv6Packet() *capturedPacket {
@@ -23,6 +24,27 @@ func opaqueIPv6Packet() *capturedPacket {
 	copy(data[38:54], net.ParseIP("ff02::16").To16())
 	copy(data[54:], []byte{58, 0, 5, 2, 0, 0, 1, 0, 143, 0, 0x39, 0x18})
 	return &capturedPacket{number: 1, data: data, link: layers.LinkTypeEthernet, ci: gopacket.CaptureInfo{Length: len(data), CaptureLength: len(data)}}
+}
+
+func TestLoopbackFramePrecedesGeneratedProtocolEvents(t *testing.T) {
+	data := append([]byte{2, 0, 0, 0}, dnsPacket(t)[14:]...)
+	raw := &capturedPacket{number: 9, data: data, link: layers.LinkTypeNull, ci: gopacket.CaptureInfo{Length: len(data), CaptureLength: len(data)}}
+	raw.events = []*pcaputil.ProtocolEvent{{ID: 1, Protocol: "dns", Status: "decoded", Fields: map[string]any{"query": "example.com"}}}
+	d := detail(raw)
+	require.True(t, strings.HasPrefix(d.fields[0].text, "Frame 9:"))
+	require.True(t, d.fields[0].hasRange)
+	require.Zero(t, d.fields[0].start)
+	require.Equal(t, len(data), d.fields[0].end, "loopback offset must not be added to the whole frame")
+	version := findField(t, d, "Version")
+	require.Equal(t, 4, version.start)
+	require.True(t, version.hasRange)
+	generated := findField(t, d, "query")
+	require.False(t, generated.hasRange)
+	raw.events = nil
+	d = detail(raw)
+	for _, f := range d.fields {
+		require.NotContains(t, f.text, "detail unavailable", "missing events do not mean packet fields are unavailable")
+	}
 }
 
 func findField(t *testing.T, d packetDetail, name string) field {

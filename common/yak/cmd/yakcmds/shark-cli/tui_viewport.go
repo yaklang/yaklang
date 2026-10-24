@@ -40,9 +40,7 @@ func (u *tui) rowCount(pane int) int {
 	case 1:
 		return len(u.fieldIndices())
 	case 2:
-		if raw := u.inspectedPacket(); raw != nil {
-			return (len(raw.data) + u.hexPerRow() - 1) / u.hexPerRow()
-		}
+		return (len(u.byteData()) + u.hexPerRow() - 1) / u.hexPerRow()
 	case 3:
 		return len(u.streamLines())
 	}
@@ -209,10 +207,10 @@ func (u *tui) mouse(m mouseEvent) {
 			l := layoutDashboard(u.width-1, u.height)
 			if m.y == l.tabs {
 				if u.pane == 3 {
-					for i, x := range []int{54, 71, 85} {
-						length := []int{13, 10, 12}[i]
+					for i, x := range []int{54, 71, 85, 101} {
+						length := []int{13, 10, 12, 12}[i]
 						if x+length < u.width-1 && m.x >= x && m.x < x+length {
-							u.key([]string{"h", "l", "e"}[i], nil)
+							u.key([]string{"h", "l", "e", "a"}[i], nil)
 							return
 						}
 					}
@@ -352,6 +350,7 @@ func (u *tui) installDetail(detail packetDetail) {
 	u.fields = detail
 	u.fieldTop = 0
 	u.fieldSelection = 0
+	u.bytesSource, u.hexTop = 0, 0
 	u.hexStart, u.hexEnd = 0, 0
 	u.pendingDetail = nil
 	u.fieldsTouched = false

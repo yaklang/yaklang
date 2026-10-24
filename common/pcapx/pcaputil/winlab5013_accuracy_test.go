@@ -39,7 +39,7 @@ func TestWinlab5013AutomaticRecognitionMatrix(t *testing.T) {
 		"blue-01-stratum.pcapng":   {"stratum:decoded": 7, "dns:decoded": 2},
 		"blue-02-beacon.pcapng":    {"http:decoded": 2},
 		"ctf-01-dns.pcapng":        {"dns:decoded": 8},
-		"ctf-01-ftp.pcapng":        {"ftp:decoded": 14},
+		"ctf-01-ftp.pcapng":        {"ftp:decoded": 14, "ftp-data:decoded": 8},
 		"ics-01-modbus.pcapng":     {"modbus:decoded": 8},
 		"ics-02-bacnet.pcapng":     {"bacnet:decoded": 6},
 		"ics-03-enip-cip.pcapng":   {"enip:decoded": 6},

@@ -7,6 +7,10 @@
 endian: big
 unit: byte
 Package:
+  SSHPlaintextCurve25519:
+    operator: |
+      err = parseSSHPlaintextPacket("ecdh-curve25519")
+      if err != nil { panic(err) }
   SSHPlaintextPacket:
     operator: |
       err = parseSSHPlaintextPacket("transport")

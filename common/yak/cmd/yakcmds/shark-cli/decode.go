@@ -13,26 +13,39 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 type packetSummary struct {
-	PDUs             []map[string]any `json:"pdus,omitempty"`
-	packetProtocol   string
-	ProtocolScope    string    `json:"protocol_scope,omitempty"`
-	Transport        string    `json:"transport,omitempty"`
-	SourcePort       uint16    `json:"source_port,omitempty"`
-	DestinationPort  uint16    `json:"destination_port,omitempty"`
-	Layers           []string  `json:"layers,omitempty"`
-	StreamID         uint64    `json:"stream_id,omitempty"`
-	ProtocolEvidence string    `json:"protocol_evidence,omitempty"`
-	Number           uint64    `json:"number"`
-	Time             time.Time `json:"time"`
-	Source           string    `json:"source"`
-	Destination      string    `json:"destination"`
-	Protocol         string    `json:"protocol"`
-	Length           int       `json:"length"`
-	CapturedLength   int       `json:"captured_length"`
-	Info             string    `json:"info"`
+	PDUs                 []map[string]any `json:"pdus,omitempty"`
+	ProtocolStack        []string         `json:"protocol_stack,omitempty"`
+	ConnectionProtocol   string           `json:"connection_protocol,omitempty"`
+	ConnectionStack      []string         `json:"connection_stack,omitempty"`
+	ConnectionEvidence   string           `json:"connection_evidence,omitempty"`
+	ConnectionDiagnostic string           `json:"connection_diagnostic,omitempty"`
+	Visibility           string           `json:"visibility,omitempty"`
+	ProtocolStatus       string           `json:"protocol_status,omitempty"`
+	packetProtocol       string
+	packetInfo           string
+	connectionAnnotated  bool
+	payloadBytes         int
+	opaqueTransport      bool
+	ProtocolScope        string    `json:"protocol_scope,omitempty"`
+	Transport            string    `json:"transport,omitempty"`
+	SourcePort           uint16    `json:"source_port,omitempty"`
+	DestinationPort      uint16    `json:"destination_port,omitempty"`
+	Layers               []string  `json:"layers,omitempty"`
+	StreamID             uint64    `json:"stream_id,omitempty"`
+	ConversationID       uint64    `json:"conversation_id,omitempty"`
+	ProtocolEvidence     string    `json:"protocol_evidence,omitempty"`
+	Number               uint64    `json:"number"`
+	Time                 time.Time `json:"time"`
+	Source               string    `json:"source"`
+	Destination          string    `json:"destination"`
+	Protocol             string    `json:"protocol"`
+	Length               int       `json:"length"`
+	CapturedLength       int       `json:"captured_length"`
+	Info                 string    `json:"info"`
 }
 
 // The hot path never invokes the Yak VM. Deep dissectors run only for selected packets.
@@ -45,11 +58,16 @@ func summarize(raw *capturedPacket) packetSummary {
 	if l := p.NetworkLayer(); l != nil {
 		row.Source, row.Destination = l.NetworkFlow().Src().String(), l.NetworkFlow().Dst().String()
 	}
+	transportBoundary := false
 	for _, l := range p.Layers() {
+		if transportBoundary {
+			continue
+		}
 		if l.LayerType() != gopacket.LayerTypePayload && l.LayerType() != gopacket.LayerTypeDecodeFailure {
 			row.Protocol = l.LayerType().String()
 			row.Layers = append(row.Layers, row.Protocol)
 		}
+		transportBoundary = l.LayerType() == layers.LayerTypeTCP || l.LayerType() == layers.LayerTypeUDP
 	}
 	var srcPort, dstPort uint16
 	var payload []byte
@@ -74,13 +92,19 @@ func summarize(raw *capturedPacket) packetSummary {
 		payload = udp.Payload
 		row.Info = fmt.Sprintf("%d → %d Payload=%d", srcPort, dstPort, len(payload))
 	}
-	if dns, ok := p.Layer(layers.LayerTypeDNS).(*layers.DNS); ok {
+	dns, hasDNS := p.Layer(layers.LayerTypeDNS).(*layers.DNS)
+	validDNS := false
+	if hasDNS && raw.history == nil && p.ErrorLayer() == nil && int(dns.QDCount)+int(dns.ANCount)+int(dns.NSCount)+int(dns.ARCount) > 0 {
+		_, err := pcaputil.DecodeDNSMessage(dns.LayerContents(), 4096)
+		validDNS = err == nil
+	}
+	if validDNS {
 		row.Protocol = "DNS"
 		row.Info = fmt.Sprintf("ID=0x%04x Response=%t", dns.ID, dns.QR)
 		for _, q := range dns.Questions {
 			row.Info += " " + q.Type.String() + " " + safeText(string(q.Name))
 		}
-	} else if name := sniffPayload(payload); name != "" {
+	} else if name := sniffTCPPayload(transport, payload); name != "" && raw.history == nil && len(raw.events) == 0 && len(raw.connectionStack) == 0 && raw.evidence != "validated protocol events" && (raw.application == "" || strings.EqualFold(raw.application, name)) {
 		row.Protocol = name
 		if name == "HTTP" || name == "SSH" {
 			row.Info += " " + safeText(strings.SplitN(string(payload), "\n", 2)[0])
@@ -90,37 +114,66 @@ func summarize(raw *capturedPacket) packetSummary {
 			row.Info += " (port hint: " + name + ")"
 		}
 	}
+	row.Info = safeText(row.Info)
+	row.Transport, row.SourcePort, row.DestinationPort = transport, srcPort, dstPort
+	row.payloadBytes = len(payload)
+	row.opaqueTransport = raw.opaqueTransport
+	row.packetProtocol = row.Protocol
+	row.ProtocolScope = "packet"
+	presentation := raw.presentation
+	if presentation.protocol == "" && raw.history == nil {
+		presentation = presentEvents(raw.events)
+	}
+	row = presentation.apply(row)
+	row.ConnectionStack = append([]string(nil), raw.connectionStack...)
+	row.ConversationID = raw.conversationID
+	if row.Transport == "udp" && len(row.ConnectionStack) > 0 && row.ConversationID != 0 {
+		row.ConnectionProtocol, row.ConnectionEvidence = row.ConnectionStack[0], "protocol session association"
+	}
 	if p.ErrorLayer() != nil {
 		row.Info += " [incomplete/undecoded]"
 	}
 	if raw.ci.Length > len(raw.data) {
-		row.Info += " [truncated capture]"
+		row.Info += fmt.Sprintf(" [truncated capture: %d/%d bytes]", len(raw.data), raw.ci.Length)
+		row.ProtocolStatus = "incomplete"
 	}
-	row.Info = safeText(row.Info)
-	row.Transport, row.SourcePort, row.DestinationPort = transport, srcPort, dstPort
-	row.packetProtocol = row.Protocol
-	row.ProtocolScope = "packet"
+	if raw.connectionDiagnostic != "" && len(payload) > 0 && presentation.protocol == "" {
+		row.ConnectionDiagnostic = raw.connectionDiagnostic
+		row.Info += " [" + raw.connectionDiagnostic + "]"
+		if row.ProtocolStatus == "" {
+			row.ProtocolStatus = "context-required"
+		}
+	}
 	return applyApplication(row, raw.application, raw.evidence, raw.streamID)
+}
+
+func sniffTCPPayload(transport string, payload []byte) string {
+	if transport != "tcp" {
+		return ""
+	}
+	return sniffPayload(payload)
 }
 
 func sniffPayload(p []byte) string {
 	if inspectHTTP(p) != nil {
 		return "HTTP"
 	}
-	if bytes.HasPrefix(p, []byte("PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n")) {
-		return "HTTP2"
-	}
-	if bytes.HasPrefix(p, []byte("SSH-")) {
-		return "SSH"
-	}
-	if len(p) >= 5 && p[0] >= 20 && p[0] <= 24 && p[1] == 3 && p[2] <= 4 {
-		return "TLS"
-	}
-	if len(p) >= 4 && bytes.Equal(p[:4], []byte{0xfe, 'S', 'M', 'B'}) {
-		return "SMB2"
-	}
-	if len(p) >= 4 && bytes.Equal(p[:4], []byte{0xff, 'S', 'M', 'B'}) {
-		return "SMB"
+	// The capture engine owns binary admission and framing. A few magic bytes
+	// are insufficient evidence for TLS, SMB, MQTT, or any other binary PDU.
+	if end := bytes.Index(p, []byte("\r\n")); end > 8 && end+2 <= 255 {
+		line := string(p[:end])
+		if strings.HasPrefix(line, "SSH-2.0-") || strings.HasPrefix(line, "SSH-1.99-") {
+			software := strings.SplitN(line, "-", 3)[2]
+			if software != "" && software[0] != ' ' {
+				valid := true
+				for _, b := range []byte(line) {
+					valid = valid && b >= 32 && b <= 126
+				}
+				if valid {
+					return "SSH"
+				}
+			}
+		}
 	}
 	return ""
 }
@@ -154,24 +207,42 @@ type field struct {
 	branch     bool
 	start, end int // Byte offsets in the captured packet, end exclusive.
 	hasRange   bool
+	source     int // 0: captured frame; >0: packetDetail.sources index + 1.
+}
+
+type detailSource struct {
+	Name string
+	Data []byte
 }
 type packetDetail struct {
 	protocol string
 	number   uint64
 	fields   []field
 	hex      []string
+	sources  []detailSource
 }
 
 func detail(raw *capturedPacket) (d packetDetail) {
 	d.number = raw.number
-	d.fields = append(d.fields, protocolEventFields(raw.protocolEvents())...)
+	d.protocol = summarize(raw).Protocol
 	d.hex = strings.Split(strings.TrimSuffix(hex.Dump(raw.data), "\n"), "\n")
 	defer func() {
 		if r := recover(); r != nil {
 			d.fields = append(d.fields, field{text: fmt.Sprintf("Dissector failed: %v", r)})
 		}
+		// Inspect the frame's real byte-backed fields first. Generated event
+		// metadata has no packet offsets and must not displace the Frame entry
+		// at index zero, which is excluded from network-header offset rebasing.
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
+	if events := raw.protocolEvents(); len(events) > 0 {
+		fields, sources := protocolEventDetail(events)
+		d.fields = append(d.fields, fields...)
+		d.sources = sources
+		if d.protocol == "" {
+			d.protocol = presentEvents(events).protocol
+		}
+	}
 	rule := ""
 	data := raw.data
 	baseOffset := 0
@@ -212,14 +283,42 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		if err == nil {
 			value, resultErr := node.Result()
 			if resultErr == nil && value != nil {
+				wireStart := len(d.fields)
 				flattenFields(value, 0, &d.fields)
+				if summarize(raw).ProtocolScope == "connection-associated bytes" {
+					for i := wireStart; i < len(d.fields); i++ {
+						if d.fields[i].branch && applicationNodes[d.fields[i].text] != "" {
+							// Bytes inside an established stream are not a fresh PDU.
+							// A coincidental SSH/HTTP signature in a body or ciphertext
+							// must not create a contradictory raw-packet subtree.
+							d.fields = append(d.fields[:i], field{text: "Stream continuation: no complete decoded application message in this packet; inspect the reassembled PDU or conversation"})
+							break
+						}
+					}
+				}
+				if d.protocol == "TLS?" || !hasObservedTLS(raw) {
+					for i := range d.fields {
+						if d.fields[i].branch && (d.fields[i].text == "TLS" || d.fields[i].text == "Transport Layer Security") {
+							label := "TLS?"
+							if d.protocol == "TLS" {
+								label = "TLS"
+							}
+							d.fields[i].text = label + " · record envelope only; handshake not captured; negotiated version unknown"
+						}
+					}
+				}
 				for i := 1; i < len(d.fields); i++ {
 					f := &d.fields[i]
+					if f.source != 0 {
+						continue
+					}
 					f.start += baseOffset
 					f.end += baseOffset
 					f.hasRange = f.hasRange && f.start >= 0 && f.end > f.start && f.end <= len(raw.data)
 				}
-				d.protocol = applicationProtocol(value)
+				if d.protocol == "" {
+					d.protocol = applicationProtocol(value)
+				}
 				return d
 			}
 			err = resultErr
@@ -231,6 +330,20 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		d.fields = append(d.fields, field{text: safeText(gopacket.LayerString(layer))})
 	}
 	return d
+}
+
+func hasObservedTLS(raw *capturedPacket) bool {
+	for _, name := range raw.connectionStack {
+		if name == "TLS" || strings.HasPrefix(name, "TLSv") {
+			return true
+		}
+	}
+	for _, e := range raw.protocolEvents() {
+		if e.Protocol == "tls" && credibleTLSIdentity(e) {
+			return true
+		}
+	}
+	return false
 }
 
 func flattenFields(n *base.NodeValue, depth int, out *[]field) {
@@ -282,6 +395,12 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field) {
 func quickDetail(raw *capturedPacket) packetDetail {
 	d := packetDetail{number: raw.number, hex: strings.Split(strings.TrimSuffix(hex.Dump(raw.data), "\n"), "\n")}
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame #%d · %d bytes · %d captured", raw.number, raw.ci.Length, len(raw.data)), branch: true, hasRange: len(raw.data) > 0, end: len(raw.data)})
+	d.protocol = summarize(raw).Protocol
+	if events := raw.protocolEvents(); len(events) > 0 {
+		fields, sources := protocolEventDetail(events)
+		d.fields = append(d.fields, fields...)
+		d.sources = sources
+	}
 	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{NoCopy: true})
 	add := func(name string, value any) {
 		d.fields = append(d.fields, field{depth: 1, text: name + ": " + formatFieldValue(name, value)})

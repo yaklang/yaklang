@@ -199,7 +199,7 @@ func TestP1UDPApplications(t *testing.T) {
 	ssdp := []byte("M-SEARCH * HTTP/1.1\r\nHOST: 239.255.255.250:1900\r\nMAN: \"ssdp:discover\"\r\nMX: 1\r\nST: ssdp:all\r\n\r\n")
 	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, parseRule(t, ssdp, "application-layer.http", "HTTP"), "HTTP Request").Child("Method")))
 	eth = parseEthernet(t, ipv4UDPBytes(t, 1900, 1900, ssdp))
-	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, eth, "IP", "UDP", "SSDP", "HTTP Request").Child("Method")))
+	require.Equal(t, "M-SEARCH", strVal(t, mustChild(t, eth, "IP", "UDP", "SSDP").Child("Method")))
 
 	// RFC 951 BOOTREQUEST with an RFC 1497 vendor area.
 	bootp := mustHex(t, "010106001234567800000000"+

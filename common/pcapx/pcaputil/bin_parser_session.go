@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -36,6 +38,23 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if len(wire) >= 4 && bytes.Equal(wire[:4], []byte("FINS")) {
 		f.protocol, f.fins = "fins", &binFINS{clientKnown: f.tcpClientKnown, clientDir: f.tcpClientDir}
+		return
+	}
+	if len(wire) >= 4 && wire[0] == 0x81 {
+		if _, err := stream_parser.DecodeNetworkControl(wire, "nbss"); err == nil {
+			f.protocol, f.nbss = "nbss", true
+			return
+		}
+	}
+	if telnetNegotiationStart(wire) && (f.port(23) || telnetInitialEvidence(wire) || telnetMatchingNegotiation(wire, f.directions[1-dir].buffer)) {
+		f.protocol = "telnet"
+		return
+	}
+	// Complete MySQL protocol-41 evidence takes precedence over SLMP's weak
+	// 0x50 0x00 prefix. Otherwise a greeting of length 0x50 can be held as a
+	// huge SLMP candidate while the peer is misidentified as PostgreSQL.
+	if probeMySQL(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+		f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
 		return
 	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
@@ -94,7 +113,17 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	// A long MySQL greeting can begin with 'P\x00\x00\x00\x0a', which
+	// resembles a tiny PostgreSQL Parse frame. Check the numeric version,
+	// salt/filler and protocol-41 capabilities before weak typed messages.
+	if p := probeMySQL(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept || p.Verdict == ProbeNeedMore {
+		f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
+		return
+	}
 	f.detect(wire)
+	if f.protocol == "mqtt" && f.mqtt == nil {
+		f.mqtt = &binMQTT{client: dir, level: f.level, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+	}
 	if f.binding != nil || f.protocol != "" {
 		// The legacy detector recognizes MQTT 3.1.1 before generic native
 		// probing. Give that validated CONNECT the same bounded session path
@@ -276,6 +305,12 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "ldap":
 		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[ldapPendingKey]ldapRequest{}}
 	case "redis":
+		if f.transportFlow != nil && len(wire) > 0 && strings.ContainsRune("+-:_#,(", rune(wire[0])) {
+			// A standalone scalar (notably POP3's exact "+OK\r\n") cannot
+			// establish Redis on a midstream native capture. Once a structured
+			// RESP exchange admits the flow, normal framing accepts these replies.
+			return
+		}
 		f.protocol, f.redis = "redis", &binRedis{client: -1}
 	case "websocket":
 		client := dir
@@ -413,6 +448,12 @@ func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
 }
 
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
+	if e.Entry == "NBSSControl" {
+		e.Protocol = "nbss"
+		fields, err := stream_parser.DecodeNetworkControl(e.Raw, "nbss")
+		e.Session = fields
+		return err
+	}
 	var err error
 	switch f.protocol {
 	case "mms":
@@ -538,6 +579,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "http2":
 		var previous *binH2Stream
+		f.h2.peerCaptureGap = f.plaintextGap[1-dir]
+		if tf := f.transportFlow; tf != nil {
+			peer := tf.ServerConn
+			if dir == 1 {
+				peer = tf.ClientConn
+			}
+			f.h2.peerCaptureGap = f.h2.peerCaptureGap || tf.reassemblyIncomplete || peer.pendingBytes > 0
+		}
 		if len(e.Raw) >= 9 && !bytes.HasPrefix(e.Raw, []byte(binH2Preface)) {
 			previous = f.h2.streams[binary.BigEndian.Uint32(e.Raw[5:9])&0x7fffffff]
 		}
@@ -651,10 +700,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb2":
 		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil && f.nbss {
+			e.Session["Carrier"] = "NetBIOS Session Service"
+		}
 	case "dcerpc":
 		e.Session, err = f.dcerpc.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "ssh":
 		e.Session, err = f.ssh.consume(dir, e.Raw)
+	case "telnet":
+		e.Session, err = stream_parser.DecodeNetworkControl(e.Raw, "telnet")
 	case "nfs":
 		e.Session, err = f.nfs.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "snmp":
@@ -689,6 +743,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.pop3.consume(e.Raw)
 	case "ftp":
 		e.Session, err = f.ftp.consume(e.Raw)
+		if err == nil {
+			f.observeFTPDataControl(dir, e)
+		}
 	case "finger", "whois", "gopher", "dict":
 		if f.textInternet == nil {
 			err = sessionContext("text protocol state was not initialized")
@@ -1014,6 +1071,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	}
+	if err == nil && f.transportFlow != nil && e.Session != nil && e.Session["Encrypted"] == true {
+		switch e.Protocol {
+		case "smtp", "imap", "pop3", "ftp":
+			// The successful upgrade reply is observed wire evidence. Continue
+			// through TLS framing, including missing-key/negotiation metadata,
+			// instead of stopping the entire connection at the first ciphertext.
+			f.protocol = "tls"
+		}
+	}
 	if e.Session != nil {
 		// Carried HTTP/2 and MySQL messages inherit the actual byte source.
 		// Their protocol decoders cannot decide whether TLS decrypted the bytes.
@@ -1161,6 +1227,8 @@ func (f *binFlow) invalidateSession(dir int) {
 
 func (f *binFlow) closeSession() {
 	f.mms = nil
+	f.a.forgetFTPControl(f.id)
+	f.ftpData = nil
 	f.releaseDoH()
 	if f.protocol == "dns" || f.protocol == "dot" {
 		f.a.closeDNSFlow(f.id)

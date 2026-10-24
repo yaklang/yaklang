@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -38,11 +39,14 @@ var Command = &cli.Command{
 		cli.StringFlag{Name: "interface,i", Usage: "Capture interface (default: physical interface with router gateway; excludes VPN/TUN)"},
 		cli.StringFlag{Name: "pcap-file,r", Usage: "Read a pcap or pcapng capture instead of live traffic"},
 		cli.StringFlag{Name: "output-file,w", Usage: "Save captured packets as .pcap or .pcapng (new file only)"},
-		cli.StringFlag{Name: "tls-keylog", Usage: "Authorized NSS key log (bounded TLS AES-128-GCM profiles; never exported)"},
+		cli.StringFlag{Name: "tls-keylog", Usage: "Authorized NSS key log (bounded TLS AES-GCM/ChaCha20-Poly1305 profiles; never exported)"},
+		cli.StringSliceFlag{Name: "decode-as", Usage: "Explicit validated UDP profile, e.g. udp:55000:ike (repeatable; does not bypass grammar or authentication)"},
 		cli.StringFlag{Name: "bpf,f", Usage: "BPF capture filter, combined with --protocol using AND"},
 		cli.StringSliceFlag{Name: "protocol", Usage: "Quick protocol filter, comma-separated or repeatable (OR)"},
 		cli.BoolFlag{Name: "list-interfaces,D", Usage: "List capture interfaces and exit"},
 		cli.BoolFlag{Name: "list-protocols", Usage: "List protocol shortcuts and their BPF expressions"},
+		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types and scope; --json prints the versioned schema"},
+		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter, e.g. wg.type == 4 and wg.counter >= 2; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
 		cli.BoolFlag{Name: "json", Usage: "Print one JSON packet summary per line without the TUI"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
@@ -63,6 +67,26 @@ func run(c *cli.Context) error {
 	}
 	if c.NArg() != 0 {
 		return fmt.Errorf("unexpected argument %q; use --protocol dns or --bpf 'tcp port 80'", c.Args().First())
+	}
+	if c.Bool("list-fields") {
+		fields := pcaputil.RegisteredDisplayFields()
+		if c.Bool("json") {
+			return json.NewEncoder(out).Encode(struct {
+				SchemaVersion int                               `json:"schema_version"`
+				Fields        []pcaputil.DisplayFieldDescriptor `json:"fields"`
+			}{pcaputil.DisplayFieldSchemaVersion, fields})
+		}
+		for _, field := range fields {
+			typ := string(field.Type)
+			if field.Bits > 0 {
+				typ = fmt.Sprintf("uint%d", field.Bits)
+			}
+			if _, err := fmt.Fprintf(out, "%-38s %-9s %-8s %s\n", field.Name, typ, field.Origin, field.Label); err != nil {
+				return err
+			}
+		}
+		_, err := fmt.Fprintln(out, "Registered field projection only; PDU ranges refer to logical message bytes, and context fields have no invented frame offsets.")
+		return err
 	}
 	if c.Bool("list-protocols") {
 		for _, name := range protocolNames() {
@@ -109,7 +133,28 @@ func run(c *cli.Context) error {
 		return err
 	}
 	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc")}
+	cfg.initialDisplayFilter = c.String("display-filter")
+	displayFilter, err := pcaputil.CompileDisplayFilter(cfg.initialDisplayFilter)
+	if err != nil {
+		return fmt.Errorf("invalid display filter: %w", err)
+	}
 	cfg.maxStreams, cfg.streamBytes = c.Int("max-streams"), c.Int("stream-bytes")
+	validation := pcaputil.NewDefaultConfig()
+	for _, entry := range c.StringSlice("decode-as") {
+		parts := strings.Split(entry, ":")
+		if len(parts) != 3 || parts[0] != "udp" {
+			return fmt.Errorf("decode-as must be udp:PORT:PROFILE")
+		}
+		port, err := strconv.ParseUint(parts[1], 10, 16)
+		if err != nil || port == 0 {
+			return fmt.Errorf("decode-as requires port 1..65535")
+		}
+		opt := pcaputil.WithProtocolDecodeAs("udp", uint16(port), parts[2])
+		if err := opt(validation); err != nil {
+			return err
+		}
+		cfg.decodeAs = append(cfg.decodeAs, opt)
+	}
 	if path := c.String("tls-keylog"); path != "" {
 		f, err := os.Open(path)
 		if err != nil {
@@ -144,10 +189,14 @@ func run(c *cli.Context) error {
 		}
 		return session.result()
 	}
-	return runPlain(ctx, session, out, c.Bool("json"))
+	return runPlainDisplay(ctx, session, out, c.Bool("json"), displayFilter)
 }
 
 func runPlain(ctx context.Context, s *captureSession, out io.Writer, asJSON bool) error {
+	return runPlainDisplay(ctx, s, out, asJSON, nil)
+}
+
+func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJSON bool, filter *pcaputil.DisplayFilter) error {
 	encoder := json.NewEncoder(out)
 	for {
 		select {
@@ -156,10 +205,21 @@ func runPlain(ctx context.Context, s *captureSession, out io.Writer, asJSON bool
 				return s.result()
 			}
 			row := summarize(packet)
+			events := packet.protocolEvents()
+			if filter != nil {
+				result := filter.EvaluateEvents(events)
+				if !result.Complete {
+					return fmt.Errorf("display filter unavailable for frame %d: %s", row.Number, result.Reason)
+				}
+				if !result.Matched {
+					continue
+				}
+			}
 			var err error
 			if asJSON {
-				for _, e := range packet.protocolEvents() {
-					row.PDUs = append(row.PDUs, map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": e.SourceBytes, "fields": e.DisplayFields()})
+				for _, e := range events {
+					values := e.DisplayFieldValues()
+					row.PDUs = append(row.PDUs, map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": e.SourceBytes, "fields": values.FieldMap(), "field_values": values})
 				}
 				err = encoder.Encode(row)
 			} else {
