@@ -155,14 +155,18 @@ func releaseProgramOrdinaryValues(prog *Program, bodyBlocks map[*instructionStor
 		// scope tables on those blocks are the version maps that otherwise live
 		// until compile end. A scope that still holds a closure capture stays,
 		// and so does a blueprint container that later batches still emit into.
-		if !functionScopeRetainsCapture(prog, fn) && !isLiveContainerFunction(fn) {
+		retainsCapture := functionScopeRetainsCapture(prog, fn)
+		if !retainsCapture && !isLiveContainerFunction(fn) {
 			clearFunctionBodyScopes(prog, fn)
 			fn.builder = nil
 			// Flush keeps these blocks: a BasicBlock is a boundary instruction.
 			// The scope is already detached, so the object itself is only weight.
 			// Collect the ids and save-then-drop them once for the whole release.
 			collectFinishedBodyBlocks(bodyBlocks, prog, fn)
-		} else if !shouldKeepFunctionForCrossUnitReference(fn) {
+		} else if !retainsCapture && !shouldKeepFunctionForCrossUnitReference(fn) {
+			// A captured function must keep its builder: capturedNames is how the
+			// next batch tells this function's closure apart from a shared value
+			// that some other function captured.
 			fn.builder = nil
 		}
 		// An exported function keeps its block ids for cross-unit lookup.
@@ -194,6 +198,13 @@ func functionScopeRetainsCapture(prog *Program, fn *Function) bool {
 			for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
 				variable, ok := versioned.(*Variable)
 				if !ok || variable == nil || utils.IsNil(variable.Value) {
+					continue
+				}
+				// capturedByClosure lives on the value. A package-level value is
+				// shared, so one closure capturing it would otherwise pin every
+				// function that loaded that global. Only this function's own
+				// captured names keep its scope.
+				if fn.builder == nil || fn.builder.capturedNames == nil || !fn.builder.capturedNames.Have(variable.GetName()) {
 					continue
 				}
 				if valueCapturedByClosure(variable.Value) {

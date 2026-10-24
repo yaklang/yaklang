@@ -235,3 +235,29 @@ func TestReleaseKeepsExportedAndCapturedValues(t *testing.T) {
 	require.Equal(t, 0, draftFn.GetProgram().ReleasePersistedOrdinaryValues())
 	require.True(t, draftVar.GetValue() == draftValue)
 }
+
+// A captured bit lives on the value. Loading that same value into another
+// finished function must not keep the second function's scope.
+func TestReleaseDropsScopeThatOnlyMentionsCapturedValue(t *testing.T) {
+	prog := newSplitWriteProgram(t)
+	owner := prog.NewFunction("owner")
+	ownerB := owner.GetOrCreateBuilder()
+	shared := ownerB.EmitConstInst("shared")
+	ownerVar := ownerB.CreateVariable("shared")
+	ownerB.AssignVariable(ownerVar, shared)
+	noteCapturedByClosure(shared, "shared")
+
+	other := prog.NewFunction("other")
+	otherB := other.GetOrCreateBuilder()
+	otherVar := otherB.CreateVariable("shared")
+	otherB.AssignVariable(otherVar, shared)
+	local := otherB.EmitConstInst("local")
+	localVar := otherB.CreateVariable("local")
+	otherB.AssignVariable(localVar, local)
+
+	persistFinished(t, owner)
+	persistFinished(t, other)
+	require.Greater(t, prog.ReleasePersistedOrdinaryValues(), 0)
+	require.True(t, ownerVar.GetValue() == shared, "the function that captured the value keeps it")
+	require.Nil(t, otherB.CurrentBlock.ScopeTable, "loading a value captured elsewhere must not pin this scope")
+}
