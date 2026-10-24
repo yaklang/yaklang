@@ -468,6 +468,22 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
+	// These parsers validated a complete outer message before refusing inner
+	// decryption/extensions. A missing key/profile must not erase that proven
+	// identity, and it must not turn the inner payload into decoded fields.
+	if e.Status == "context-required" && e.Protocol == "snmp" && e.ExpertCode == string(pcaputil.ErrEncrypted) && e.Session["Encrypted"] == true && number(e.Session["Version"]) == 3 {
+		p.protocol, p.priority, p.status, p.visibility = "SNMP", 20, e.Status, "encrypted"
+		p.evidence, p.summary = "validated SNMPv3 USM envelope", "SNMPv3 · encrypted scoped PDU · decryption key unavailable; authentication not verified"
+		p.addLayer("SNMP")
+		return
+	}
+	if e.Status == "context-required" && e.Protocol == "ntp" && e.Completeness == "headers" && e.Session["Trailing Content"] == "extension-or-authentication-unparsed" {
+		p.protocol, p.priority, p.status, p.visibility = "NTP", 20, e.Status, "headers"
+		p.evidence = "validated NTP base header; trailing extensions/authentication unparsed"
+		p.summary = fmt.Sprintf("NTPv%d %s · stratum %d · %d trailing bytes; extensions/authentication unparsed", number(e.Session["Version"]), textValue(e.Session["Packet Name"]), number(e.Session["Stratum"]), number(e.Session["Trailing Bytes"]))
+		p.addLayer("NTP")
+		return
+	}
 	if protectedSSHEvent(e) {
 		p.protocol, p.status, p.visibility = "SSH", "encrypted", "encrypted"
 		p.evidence, p.summary = "observed SSH NEWKEYS", "SSH encrypted transport · NEWKEYS observed; plaintext unavailable"
@@ -505,7 +521,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			p.diagnostic = clipText(protocolName(e.Protocol)+" · "+e.ExpertCode+" · "+e.Error, 256)
-			p.status = e.Status
+			if p.protocol == "" {
+				p.status = e.Status
+			}
 			if e.Protocol == "tls" && e.ExpertCode == string(pcaputil.ErrAuthenticationFailed) && p.protocol == "" {
 				p.protocol, p.visibility = eventProtocolName(e), "encrypted"
 				p.addLayer(p.protocol)
@@ -518,6 +536,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				p.protocol, p.visibility, p.evidence = "QUIC", "encrypted", "observed connection CID; packet authentication failed"
 				p.addLayer("QUIC")
 				p.summary = "Packet authentication failed · plaintext unavailable"
+			}
+			if e.Protocol == "quic" && e.FlowID != 0 && e.Admission == "authenticated-wire-and-observed-CID" && p.protocol == "" {
+				p.protocol, p.visibility, p.evidence = "QUIC", "unavailable", "observed QUIC connection CID; protocol diagnostic"
+				p.addLayer("QUIC")
+				p.summary = clipText(e.Error, 256)
 			}
 		}
 		return
@@ -597,7 +620,24 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 		return row
 	}
 	row.Protocol = p.protocol
-	row.ProtocolStack = append(append([]string(nil), row.Layers...), p.stack...)
+	row.ProtocolStack = append([]string(nil), row.Layers...)
+	if row.MessageTransport != "" {
+		carrier := strings.ToUpper(row.MessageTransport)
+		present := false
+		for _, name := range row.Layers {
+			if name == carrier {
+				present = true
+			}
+		}
+		if !present {
+			network := "IPv4"
+			if strings.HasPrefix(row.MessageSource, "[") {
+				network = "IPv6"
+			}
+			row.ProtocolStack = append(row.ProtocolStack, network, carrier)
+		}
+	}
+	row.ProtocolStack = append(row.ProtocolStack, p.stack...)
 	row.ProtocolScope = "protocol message"
 	if row.Transport == "tcp" {
 		row.ProtocolScope = "reassembled message"

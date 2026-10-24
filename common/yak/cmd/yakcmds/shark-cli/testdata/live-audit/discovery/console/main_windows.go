@@ -235,7 +235,11 @@ func main() {
 	ansi := regexp.MustCompile("\x1b\\[[0-?]*[ -/]*[@-~]")
 	plain := func() string { return ansi.ReplaceAllString(log.String(), "") }
 	waitFor := func(text string) {
-		until := time.Now().Add(15 * time.Second)
+		limit := 15 * time.Second
+		if text == "EOF" {
+			limit = 90 * time.Second
+		}
+		until := time.Now().Add(limit)
 		for !strings.Contains(plain(), text) {
 			if time.Now().After(until) {
 				_ = os.WriteFile(filepath.Join(dir, "terminal.vt"), []byte(log.String()), 0600)

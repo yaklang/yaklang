@@ -50,6 +50,7 @@ type streamSide struct {
 	synSeq           uint32
 }
 type tcpStream struct {
+	nativeFlowID                                    uint64
 	protocolStack                                   []string
 	nativeIdentity                                  bool
 	firstReference, lastReference                   uint64
@@ -253,16 +254,33 @@ func (r *tcpStream) ReassemblyComplete(reassembly.AssemblerContext) bool {
 }
 
 func (s *streamStore) add(raw *capturedPacket) {
-	p := gopacket.NewPacket(raw.data, raw.link, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
-	network := p.NetworkLayer()
-	tcp, ok := p.TransportLayer().(*layers.TCP)
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	network, selectedTransport := pcaputil.CaptureTransport(p)
+	tcp, ok := selectedTransport.(*layers.TCP)
 	if network == nil || !ok {
+		return
+	}
+	// gopacket can publish a partially initialized TCP layer before reporting
+	// a short header. Such endpoints cannot enter the assembler (their port
+	// formatters require two captured bytes).
+	if p.ErrorLayer() != nil || len(tcp.LayerContents()) < 20 || tcp.DataOffset < 5 {
 		return
 	}
 	key := connectionKey(network.NetworkFlow(), tcp.TransportFlow())
 	key.domain = pcaputil.PacketDomain(raw.data, raw.ci, raw.link)
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if raw.tcpFlowID != 0 && !tcp.SYN && len(tcp.Payload) == 0 && s.active[key] == nil {
+		for e := s.lru.Back(); e != nil; e = e.Prev() {
+			r := e.Value.(*tcpStream)
+			if r.nativeFlowID == raw.tcpFlowID && r.key == key && r.closed != "" && !r.evicted {
+				r.packets++
+				r.version++
+				s.attachPacket(raw, r)
+				return
+			}
+		}
+	}
 	if r := s.active[key]; r != nil && r.closed == "RST" && !(tcp.SYN && !tcp.ACK) {
 		// Without a new SYN, late data and a new generation are ambiguous.
 		// Keep these packet rows unassociated instead of inheriting the old
@@ -292,6 +310,12 @@ func (s *streamStore) add(raw *capturedPacket) {
 		sender := net.JoinHostPort(network.NetworkFlow().Src().String(), fmt.Sprint(uint16(tcp.SrcPort)))
 		for _, side := range r.sides {
 			if side.endpoint == sender && (side.syn && side.synSeq != tcp.Seq || !side.syn && r.nativeIdentity) {
+				if raw.tcpFlowID != 0 && r.nativeFlowID == raw.tcpFlowID {
+					// The core rejected a conflicting SYN in this generation.
+					// Do not reset the preview or its unrelated connections.
+					s.attachPacket(raw, r)
+					return
+				}
 				reused = true
 			}
 		}
@@ -316,22 +340,27 @@ func (s *streamStore) add(raw *capturedPacket) {
 		}
 	}
 	if r != nil {
-		ref := raw.reference.Number
-		if ref == 0 {
-			ref = raw.number
-		}
-		if r.firstReference == 0 {
-			r.firstReference = ref
-		}
-		r.lastReference = ref
-		raw.streamID = r.id
-		raw.application, raw.evidence = r.protocol, r.evidence
-		if r.lru != nil {
-			s.lru.MoveToBack(r.lru)
-		}
+		r.nativeFlowID = raw.tcpFlowID
+		s.attachPacket(raw, r)
 	}
 	s.flushLocked(raw.ci.Timestamp)
 	s.trim()
+}
+
+func (s *streamStore) attachPacket(raw *capturedPacket, r *tcpStream) {
+	ref := raw.reference.Number
+	if ref == 0 {
+		ref = raw.number
+	}
+	if r.firstReference == 0 {
+		r.firstReference = ref
+	}
+	r.lastReference = ref
+	raw.streamID = r.id
+	raw.application, raw.evidence = r.protocol, r.evidence
+	if r.lru != nil {
+		s.lru.MoveToBack(r.lru)
+	}
 }
 
 func (s *streamStore) trim() {
