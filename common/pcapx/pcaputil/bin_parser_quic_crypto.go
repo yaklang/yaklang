@@ -4,6 +4,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -23,6 +24,7 @@ var quicInitialSalt = []byte{
 
 const (
 	quicAEADAES128GCM        = "aes-128-gcm"
+	quicAEADAES256GCM        = "aes-256-gcm"
 	quicAEADChaCha20Poly1305 = "chacha20-poly1305"
 )
 
@@ -52,7 +54,7 @@ func quicLoadKeys(km QUICKeyMaterial) (*quicKeyring, error) {
 	if aead == "" {
 		aead = quicAEADAES128GCM
 	}
-	if aead != quicAEADAES128GCM && aead != quicAEADChaCha20Poly1305 {
+	if aead != quicAEADAES128GCM && aead != quicAEADAES256GCM && aead != quicAEADChaCha20Poly1305 {
 		return nil, fmt.Errorf("quic: unsupported AEAD %q", aead)
 	}
 	r := &quicKeyring{aead: aead}
@@ -102,7 +104,7 @@ func quicLoadKeys(km QUICKeyMaterial) (*quicKeyring, error) {
 
 func quicDeriveTraffic(secret []byte, aead string) (*quicTrafficKeys, error) {
 	keyLen, hpLen := 16, 16
-	if aead == quicAEADChaCha20Poly1305 {
+	if aead == quicAEADChaCha20Poly1305 || aead == quicAEADAES256GCM {
 		keyLen, hpLen = 32, 32
 	}
 	key, err := quicHKDFExpandLabel(secret, "quic key", keyLen)
@@ -162,7 +164,11 @@ func quicHKDFExpandLabel(secret []byte, label string, length int) ([]byte, error
 	info = append(info, full...)
 	info = append(info, 0)
 	out := make([]byte, length)
-	n, err := hkdf.Expand(sha256.New, secret, info).Read(out)
+	hashFn := sha256.New
+	if len(secret) == 48 {
+		hashFn = sha512.New384
+	}
+	n, err := hkdf.Expand(hashFn, secret, info).Read(out)
 	if err != nil && err != io.EOF {
 		return nil, err
 	}
@@ -269,6 +275,27 @@ func quicUnprotect(raw []byte, h quicHdr, tk *quicTrafficKeys, phaseKeys [2]*qui
 	ct := pkt[h.payloadOff+pnLen : h.size]
 	plain, err = quicOpen(aeadKey, nonce, ct, aad)
 	if err != nil {
+		// A passive capture may miss more than half a truncated PN window.
+		// Try four neighboring windows on either side, committing nothing
+		// until the AEAD tag proves the reconstructed full packet number.
+		window := uint64(1) << uint(8*pnLen)
+		for n := uint64(1); n <= 4; n++ {
+			for _, forward := range []bool{true, false} {
+				candidate := pn + n*window
+				if !forward {
+					if pn < n*window {
+						continue
+					}
+					candidate = pn - n*window
+				}
+				if candidate >= 1<<62 {
+					continue
+				}
+				if p, e := quicOpen(aeadKey, quicNonce(aeadKey.iv, candidate), ct, aad); e == nil {
+					return p, candidate, pnLen, first, phase, nil
+				}
+			}
+		}
 		return nil, 0, 0, 0, 0, err
 	}
 	return plain, pn, pnLen, first, phase, nil

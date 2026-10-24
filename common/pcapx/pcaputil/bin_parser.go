@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -611,6 +612,9 @@ type binSpec struct {
 type binParser struct {
 	c37118Engineering                                                          bool
 	mavlinkSigning                                                             *mavlinkSigningState
+	ftpMu                                                                      sync.Mutex
+	ftpClock                                                                   time.Time
+	ftpEndpoints                                                               map[ftpDataKey]ftpDataBinding
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool                                       // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore                               // udpMu; token quarantine must survive unrelated UDP expiry
@@ -776,6 +780,7 @@ func (c *CaptureConfig) finishBinParser() error {
 	a.closeJ1939TP()
 	a.closeDroneCANStats()
 	a.closeUDPSessions()
+	a.closeFTPEndpoints()
 	a.closeDCPObservations()
 	a.closeMediaAssociations()
 	a.closeRTSPMedia()
@@ -840,6 +845,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
+	tlsPlaintextGap bool
 	contributions   []contribution
 	evidenceLimited bool
 	headerScan      int
@@ -855,6 +861,7 @@ type binDirection struct {
 }
 type binFlow struct {
 	mms               *binMMS
+	plaintextGap      [2]bool
 	domain            CaptureDomain
 	tls               *binTLS
 	dtls              *binDTLS
@@ -881,6 +888,8 @@ type binFlow struct {
 	smb2              *binSMB2
 	dcerpc            *binDCERPC
 	ssh               *binSSH
+	nbss              bool
+	control           *controlDatagramState
 	nfs               *binNFS
 	snmp              *binSNMP
 	rdp               *binRDP
@@ -893,6 +902,7 @@ type binFlow struct {
 	imap              *binIMAP
 	pop3              *binPOP3
 	ftp               *binFTP
+	ftpData           *ftpDataBinding
 	tns               *binTNS
 	socks5            *binSOCKS5
 	scgi              *binSCGI
@@ -950,6 +960,7 @@ type binFlow struct {
 	httpWSProtocols   []string
 	httpMethods       []string
 	a                 *binParser
+	transportFlow     *TrafficFlow // serialized native capture context; nil for explicit sessions
 	id                uint64
 	endpoints         [2]string
 	ports             [2]uint16
@@ -960,7 +971,7 @@ type binFlow struct {
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
-	return &binFlow{domain: t.key.domain, a: a, captureTCP: true, tcpClientKnown: !t.IsHalfOpen, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
+	return &binFlow{domain: t.key.domain, a: a, transportFlow: t, captureTCP: true, tcpClientKnown: !t.IsHalfOpen, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
 }
 
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
@@ -1240,7 +1251,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
 		// dictionaries/sequence state just as a malformed session message does.
-		if d.stopped && f.hasSession() && !d.sshOpaque {
+		if d.stopped && f.hasSession() && !d.sshOpaque && !d.tlsPlaintextGap {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
@@ -1254,6 +1265,20 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	if d.stopped {
 		a.unclassified.Add(uint64(len(data)))
 		d.offset += uint64(len(data))
+		return
+	}
+	if f.protocol == "" && f.ftpData == nil && len(data) > 0 && f.captureTCP {
+		f.ftpData = f.a.matchFTPData(f, ts)
+		if f.ftpData != nil {
+			if f.ftpData.protected {
+				f.protocol = "tls"
+			} else {
+				f.protocol = "ftp-data"
+			}
+		}
+	}
+	if f.protocol == "ftp-data" && f.ftpData != nil {
+		f.emitFTPData(dir, data, ts)
 		return
 	}
 	if len(d.buffer) == 0 {
@@ -1363,7 +1388,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}
-					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
+					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
@@ -1731,7 +1756,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			tlsParent = &owned
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
-		stopAfterFailure := failed && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
+		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
 		a.emit(e)
 		if !failed {
 			f.deliverTLS(dir, tlsParent)
@@ -1752,7 +1777,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// A peer SETTINGS already captured before a complete client preface
 		// must be applied before subsequent coalesced request header blocks.
 		// Never replay the peer after only a partial greeting/preface.
-		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
+		if detected || stateful && (strings.HasSuffix(fmt.Sprint(e.Session["Protocol Transition"]), "->tls") || e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
 			detected = false
 			other := &f.directions[1-dir]
 			if len(other.buffer) > 0 && !other.stopped {

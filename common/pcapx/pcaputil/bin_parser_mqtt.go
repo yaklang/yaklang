@@ -134,6 +134,8 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		"DUP":           flags&8 != 0,
 		"Context Level": "observed",
 	}
+	info["Protocol Level"] = m.level
+	info["Version Name"] = map[byte]string{3: "3.1", 4: "3.1.1", 5: "5.0"}[m.level]
 	if meta, ok := result["metadata"].(map[string]any); ok {
 		if v, ok := meta["Topic Alias"]; ok {
 			info["Topic Alias"] = v
@@ -207,7 +209,14 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			m.connack = body[1] == 0
 		}
 	case 3:
-		topic, pid, alias, err := mqttPublishView(body, qos, m.level)
+		var topic string
+		var pid, alias uint16
+		var err error
+		if m.level == 3 || m.level == 4 {
+			topic, pid, err = mqttLegacyPublishView(body, qos)
+		} else {
+			topic, pid, alias, err = mqttPublishView(body, qos, m.level)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -293,6 +302,19 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 			m.aliasBytes += aliasDelta
 		}
 		info["Topic Name"] = topic
+		payloadAt := 2 + int(binary.BigEndian.Uint16(body[:2]))
+		if qos > 0 {
+			payloadAt += 2
+		}
+		if m.level == 5 {
+			n, h, _ := mqtt5SkipVBI(body[payloadAt:])
+			payloadAt += n + h
+		}
+		if payloadAt <= len(body) {
+			info["Payload Bytes"] = len(body) - payloadAt
+			info["Payload"] = body[payloadAt:]
+			info["Payload Offset"] = header + payloadAt
+		}
 		if qos > 0 {
 			info["Packet Identifier"] = uint64(pid)
 			next := "PUBACK"
@@ -404,6 +426,28 @@ func (m *binMQTT) consume(dir int, raw []byte, result map[string]any, maxElement
 		m.pending[dir][pid] = mqttPending{next: want, digest: digest, items: items}
 	}
 	return info, nil
+}
+
+func mqttLegacyPublishView(body []byte, qos byte) (string, uint16, error) {
+	if len(body) < 2 {
+		return "", 0, fmt.Errorf("mqtt: truncated topic")
+	}
+	n := int(binary.BigEndian.Uint16(body[:2]))
+	at := 2 + n
+	if n == 0 || at > len(body) {
+		return "", 0, fmt.Errorf("mqtt: invalid topic length")
+	}
+	var id uint16
+	if qos > 0 {
+		if at+2 > len(body) {
+			return "", 0, fmt.Errorf("mqtt: truncated publish identifier")
+		}
+		id = binary.BigEndian.Uint16(body[at:])
+		if id == 0 {
+			return "", 0, fmt.Errorf("mqtt: zero publish identifier")
+		}
+	}
+	return string(body[2:at]), id, nil
 }
 
 func mqttSessionName(typ byte) string {

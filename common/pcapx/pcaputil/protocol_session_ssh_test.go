@@ -46,7 +46,12 @@ func sshKex(kex, host, enc, mac, comp string) []byte {
 }
 
 func sshKexDHInit() []byte {
+	// Historical M1 fixture: retain its invalid one-byte Curve25519 value.
 	return sshPkt(append([]byte{30}, sshStr([]byte{2})...))
+}
+
+func sshValidCurveInit() []byte {
+	return sshPkt(append([]byte{30}, sshStr(make([]byte, 32))...))
 }
 
 func sshHostKeyBlob() []byte {
@@ -101,13 +106,15 @@ func TestProtocolSessionSSHHandshakeAndNewkeys(t *testing.T) {
 	require.Equal(t, "aes128-ctr", r.Events[0].Session["Encryption C2S"])
 	require.Equal(t, "ECDH", r.Events[0].Session["Kex Family"])
 
-	r = s.Feed(0, ts, sshKexDHInit())
+	r = s.Feed(0, ts, sshValidCurveInit())
 	require.Nil(t, r.Err, "%v", r.Err)
-	require.Equal(t, "KEXDH_INIT", r.Events[0].Session["Packet Name"])
+	require.Equal(t, "curve25519-sha256", r.Events[0].Session["Kex Algorithm"])
+	require.Equal(t, "aes128-ctr", r.Events[0].Session["Encryption C2S"])
+	require.Equal(t, "KEX_ECDH_INIT", r.Events[0].Session["Packet Name"])
 
 	r = s.Feed(1, ts, sshKexDHReply())
 	require.Nil(t, r.Err, "%v", r.Err)
-	require.Equal(t, "KEXDH_REPLY", r.Events[0].Session["Packet Name"])
+	require.Equal(t, "KEX_ECDH_REPLY", r.Events[0].Session["Packet Name"])
 	require.Equal(t, "ssh-ed25519", r.Events[0].Session["Host Key Format"])
 	sum := sha256.Sum256(sshHostKeyBlob())
 	require.Equal(t, "SHA256:"+base64.RawStdEncoding.EncodeToString(sum[:]), r.Events[0].Session["Host Key Fingerprint"])
@@ -158,7 +165,7 @@ func TestProtocolSessionSSHFragmentation(t *testing.T) {
 		{1, sshIdent("SSH-2.0-sshd")},
 		{0, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
 		{1, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
-		{0, sshKexDHInit()},
+		{0, sshValidCurveInit()},
 		{1, sshKexDHReply()},
 		{0, sshNewKeys()},
 		{1, sshNewKeys()},

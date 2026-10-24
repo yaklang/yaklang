@@ -619,6 +619,18 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseGSSAPIToken(invocation.node, invocation.operator)
 		},
+		"parseSSDPMessage": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("ssdp: structured generation is not supported")
+			}
+			return parseSSDPMessage(invocation.node, invocation.operator)
+		},
+		"parseNetworkControl": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("network-control: generation unavailable")
+			}
+			return parseNetworkControl(invocation.node, invocation.operator, profile)
+		},
 		"inspectGSSAPIBase64":             inspectGSSAPIBase64,
 		"inspectACMEJWS":                  inspectACMEJWS,
 		"decodeRedfishServiceRootTarget":  decodeRedfishServiceRootTarget,

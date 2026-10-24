@@ -114,6 +114,29 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		a.finishProtocolDatagram(&e, wire, nil, protocolError(ErrContextRequired, "QUIC captured connection ID was retired"))
 		return []*ProtocolEvent{&e}, true
 	}
+	historical := false
+	if el == nil && !long {
+		for _, candidate := range s.entries {
+			v := candidate.Value.(*binUDPEntry)
+			q := v.flow.quic
+			if q == nil || q.retired || q.keys == nil || v.key.domain != base.Domain {
+				continue
+			}
+			for owner, retired := range q.cidRetired {
+				if q.keys.app[1-owner][q.keyPhase[1-owner]] == nil {
+					continue
+				}
+				for _, cid := range retired {
+					if len(wire) >= 1+len(cid) && string(wire[1:1+len(cid)]) == cid {
+						if el != nil && el != candidate {
+							return nil, false
+						}
+						el, dir, historical = candidate, 1-owner, true
+					}
+				}
+			}
+		}
+	}
 	var f *binFlow
 	key := binUDPKey{}
 	if el != nil {
@@ -174,6 +197,13 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		}
 		if err == nil {
 			e.Session, err = f.quic.consume(dir, raw, a.budget.MaxCollectionElements)
+		}
+		if historical && e.Session["Authentication Verified"] != true {
+			return nil, false
+		}
+		if historical {
+			e.Session["Retired Destination CID"] = true
+			e.Session["CID Association"] = "authenticated late packet on retired CID"
 		}
 		if err == nil {
 			err = f.reserveSession(f.quic.initialMemory())

@@ -97,6 +97,15 @@ func TestProtocolRoadmapIntegrity(t *testing.T) {
 		"IEEE C37.118 synchrophasor": "ndpi-c37118",
 	}
 	for _, item := range ProtocolCatalog {
+		if item.ProfileOf != "" {
+			_, exists := seen[item.ProfileOf]
+			require.True(t, exists, "bounded profile %s has no roadmap parent %s", item.Name, item.ProfileOf)
+			require.Equal(t, statusPartial, item.Status, "a specialized profile cannot promote its parent")
+			require.NotEmpty(t, item.EntryNode)
+			require.NotEmpty(t, item.RuleFile)
+			require.NotEmpty(t, item.Notes)
+			continue
+		}
 		_, ok := seen[item.Name]
 		if !ok {
 			if requireLiveSupplementalProfile(t, item.Name, item.RuleFile, item.EntryNode, item.Layer) {

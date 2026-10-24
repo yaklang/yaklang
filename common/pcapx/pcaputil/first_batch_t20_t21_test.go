@@ -286,7 +286,7 @@ func testT20UDPAdmission(t *testing.T) {
 	require.Equal(t, "channel binding was not observed", events[0].Session["Context Missing"])
 	require.EqualValues(t, 1, stats.ContextRequired)
 
-	coap := []byte{0x40, 0x01, 0x00, 0x01} // valid CoAP v1 GET, code and message id
+	coap := []byte{0x40, 0x01, 0x00, 0x01, 0xb1, 'a'} // GET /a; URI evidence for automatic discovery
 	coapCapture := t20UDPCapture(t, net.ParseIP("198.51.100.11"), net.ParseIP("203.0.113.19"), 41_707, port, coap)
 	coapEvents, _, err := binReplay(t, coapCapture, 1)
 	require.NoError(t, err)

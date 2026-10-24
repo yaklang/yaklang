@@ -26,6 +26,8 @@ type captureConfig struct {
 	promisc                       bool
 	maxStreams, streamBytes       int
 	tlsSecrets                    pcaputil.TLSSecretProvider
+	decodeAs                      []pcaputil.CaptureOption
+	initialDisplayFilter          string
 }
 
 type packetReader interface {
@@ -114,6 +116,11 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 }
 
 type capturedPacket struct {
+	conversationID        uint64
+	connectionStack       []string
+	connectionDiagnostic  string
+	opaqueTransport       bool
+	presentation          packetPresentation
 	reference             pcaputil.PacketReference
 	events                []*pcaputil.ProtocolEvent
 	eventIDs              []uint64
@@ -165,15 +172,33 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
-	analyzer, err := pcaputil.NewPacketAnalyzer(pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
+	// Inspection must retain useful packets from imperfect captures. The engine
+	// still reports gaps and never concatenates bytes across a missing range.
+	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
+	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		history.OnEvent(e)
+		if s.streams != nil {
+			s.streams.observeProtocol(e)
+		}
 		if current != nil {
 			current.history = history
-			if len(current.eventIDs) < 128 {
-				current.eventIDs = append(current.eventIDs, e.ID)
+			// Time-based flushing can emit events from another flow. Only an
+			// event with this packet among its contributors may label its row.
+			for _, ref := range e.SourceBytes.PacketRefs {
+				if ref == current.reference {
+					if e.Transport == "udp" && e.FlowID != 0 {
+						current.conversationID = e.FlowID
+					}
+					if len(current.eventIDs) < 128 {
+						current.eventIDs = append(current.eventIDs, e.ID)
+					}
+					current.presentation.add(e)
+					break
+				}
 			}
 		}
 	}))
+	analyzer, err := pcaputil.NewPacketAnalyzer(options...)
 	if err != nil {
 		return err
 	}
@@ -279,7 +304,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if err := analyzer.Feed(data, ci, src.link); err != nil {
 			return err
 		}
+		if s.streams != nil {
+			s.streams.annotate(packet)
+		}
 		current = nil
+		if packet.conversationID != 0 && len(packet.connectionStack) == 0 {
+			packet.connectionStack = append([]string(nil), packet.presentation.stack...)
+		}
 		if lossyDisplay && !src.offline {
 			s.enqueueLatest(packet)
 		} else {

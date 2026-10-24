@@ -220,6 +220,23 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 	}
 	defer p.retireFlows()
 	flow, ok := p.flowCache.Get(key)
+	if ok && flow.IsHalfOpen && tcp.SYN && !tcp.ACK && !flow.IsClosed() {
+		old := flow.ServerConn
+		if old == nil {
+			old = flow.ClientConn
+		}
+		if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
+			old = flow.ClientConn
+		}
+		if !old.synSeen && (!old.initialed || tcp.Seq+1 != old.isn) {
+			// A captured initial SYN after a midstream observation starts an
+			// isolated generation. It must not inherit the old application state.
+			// The exact delayed original SYN remains in its existing generation.
+			p.finishFlow(flow, TrafficFlowCloseReason("new SYN after midstream observation"))
+			p.flowCache.Remove(key)
+			ok = false
+		}
+	}
 	if ok && flow.IsClosed() {
 		p.drainHTTP(flow)
 		// A new SYN may immediately reuse a completed 4-tuple. Ignore late data.

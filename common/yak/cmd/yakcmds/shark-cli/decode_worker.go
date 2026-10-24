@@ -28,12 +28,16 @@ const decoderInputLimit = 2 << 20
 const decoderOutputLimit = 8 << 20
 
 type decodeRequest struct {
-	Events []*pcaputil.ProtocolEvent
-	Stream *streamDecodeRequest
-	Number uint64
-	Data   []byte
-	Length int
-	Link   layers.LinkType
+	ConnectionStack    []string `json:",omitempty"`
+	ConnectionProtocol string   `json:",omitempty"`
+	ConnectionEvidence string   `json:",omitempty"`
+	OpaqueTransport    bool     `json:",omitempty"`
+	Events             []*pcaputil.ProtocolEvent
+	Stream             *streamDecodeRequest
+	Number             uint64
+	Data               []byte
+	Length             int
+	Link               layers.LinkType
 }
 type streamDecodeRequest struct {
 	Events []*pcaputil.ProtocolEvent
@@ -47,11 +51,13 @@ type decodeField struct {
 	Branch     bool
 	Start, End int
 	HasRange   bool
+	Source     int
 }
 type decodeResponse struct {
 	Protocol string
 	Number   uint64
 	Fields   []decodeField
+	Sources  []detailSource
 }
 
 var WorkerCommand = &cli.Command{
@@ -69,7 +75,9 @@ var WorkerCommand = &cli.Command{
 
 func runDecodeWorker(input io.Reader, output io.Writer) error {
 	var req decodeRequest
-	if err := json.NewDecoder(io.LimitReader(input, decoderInputLimit)).Decode(&req); err != nil {
+	decoder := json.NewDecoder(io.LimitReader(input, decoderInputLimit))
+	decoder.UseNumber()
+	if err := decoder.Decode(&req); err != nil {
 		return err
 	}
 	if len(req.Data) > 262144 {
@@ -79,12 +87,12 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	if req.Stream != nil {
 		d = decodeStream(*req.Stream)
 	} else {
-		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
 		d = detail(raw)
 	}
-	response := decodeResponse{Number: d.number, Protocol: d.protocol}
+	response := decodeResponse{Number: d.number, Protocol: d.protocol, Sources: d.sources}
 	for _, f := range d.fields {
-		response.Fields = append(response.Fields, decodeField{Depth: f.depth, Text: f.text, Branch: f.branch, Start: f.start, End: f.end, HasRange: f.hasRange})
+		response.Fields = append(response.Fields, decodeField{Depth: f.depth, Text: f.text, Branch: f.branch, Start: f.start, End: f.end, HasRange: f.hasRange, Source: f.source})
 	}
 	payload, err := marshalDecodeResponse(response)
 	if err != nil {
@@ -106,7 +114,7 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 // Only pinned packets use the VM. A bounded child process keeps both parser
 // diagnostics and pathological input away from the capture/UI event loops.
 func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, error) {
-	output, err := runIsolated(parent, decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link})
+	output, err := runIsolated(parent, decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport})
 	if err != nil {
 		return packetDetail{}, err
 	}
@@ -266,8 +274,17 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 	d := quickDetail(raw)
 	d.protocol = response.Protocol
 	d.fields = nil
+	d.sources = response.Sources
+	for i := range d.sources {
+		d.sources[i].Name = safeText(d.sources[i].Name)
+	}
 	for _, f := range response.Fields {
-		d.fields = append(d.fields, field{depth: f.Depth, text: safeText(f.Text), branch: f.Branch, start: f.Start, end: f.End, hasRange: f.HasRange && f.Start >= 0 && f.End > f.Start && f.End <= len(raw.data)})
+		length := len(raw.data)
+		validSource := f.Source == 0
+		if f.Source > 0 && f.Source <= len(d.sources) {
+			length, validSource = len(d.sources[f.Source-1].Data), true
+		}
+		d.fields = append(d.fields, field{depth: f.Depth, text: safeText(f.Text), branch: f.Branch, start: f.Start, end: f.End, source: f.Source, hasRange: f.HasRange && validSource && f.Start >= 0 && f.End > f.Start && f.End <= length})
 	}
 	return d, nil
 }
@@ -277,7 +294,7 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
 	if req.Events != nil {
-		d.fields = protocolEventFields(req.Events)
+		d.fields, d.sources = protocolEventDetail(req.Events)
 		d.protocol = eventProtocols(req.Events)
 		return
 	}

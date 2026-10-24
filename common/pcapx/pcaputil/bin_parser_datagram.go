@@ -17,6 +17,8 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		return true
 	case a.decodeTFTPDatagram(e, wire):
 		return true
+	case a.decodeCoAPDatagram(e, wire):
+		return true
 	case len(wire) >= 240 && (wire[0] == 1 || wire[0] == 2) && binary.BigEndian.Uint32(wire[236:240]) == dhcpCookie:
 		e.Protocol, spec = "dhcp", a.specs["application-layer.dhcp/DHCP"]
 		session, err = decodeDHCP4(wire, a.budget.MaxCollectionElements)
@@ -29,9 +31,6 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		} else {
 			session, err = (&binNTP{}).consume(wire)
 		}
-	case probeCoAP(wire, len(wire)).Verdict == ProbeAccept:
-		e.Protocol, spec = "coap", a.specs["application-layer.extended_protocols/CoAP"]
-		session, err = (&binCoAP{maxPending: a.budget.MaxCollectionElements}).consume(0, wire)
 	default:
 		return false
 	}
@@ -48,6 +47,11 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 	if err == nil {
 		e.Session = session
 		e.Session["Observation Scope"] = "datagram"
+		if e.Protocol == "ntp" && e.Session["Role"] == "response" {
+			// This path is stateless. It cannot conclude a request was missing
+			// merely because a new local decoder has no stored timestamp.
+			e.Session["Association"] = "unavailable-stateless-datagram"
+		}
 		if e.Protocol == "dhcp" {
 			e.Completeness = "message"
 			a.dhcpObservation(e)

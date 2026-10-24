@@ -251,7 +251,8 @@ func TestBinParserHTTPUpgradeAndCloseBoundary(t *testing.T) {
 func TestBinParserCoalescedMessageLimitAndBindingIndex(t *testing.T) {
 	var events []*BinParserEvent
 	var stats BinParserStats
-	config := BinParserConfig{MaxMessageBytes: 64, MaxBufferedBytes: 128, OnEvent: func(e *BinParserEvent) { events = append(events, e) }, OnStats: func(s BinParserStats) { stats = s }}
+	// MQTT 3.x now accounts negotiated session state as well as wire buffers.
+	config := BinParserConfig{MaxMessageBytes: 64, MaxBufferedBytes: 1024, OnEvent: func(e *BinParserEvent) { events = append(events, e) }, OnStats: func(s BinParserStats) { stats = s }}
 	publish := binMQTTPublish(58)
 	wire := string(append(append([]byte{}, publish...), publish...))
 	steps := []tcpStep{{seq: 0, syn: true}, {seq: 1, data: string(binMQTTConnect)}, {seq: 17, data: wire[:50]}, {seq: 67, data: wire[50:]}}
@@ -278,7 +279,7 @@ func TestBinParserCoalescedMessageLimitAndBindingIndex(t *testing.T) {
 	require.Len(t, events, 3)
 	require.Equal(t, uint64(3), stats.Decoded)
 	require.Zero(t, stats.BufferedBytes)
-	require.LessOrEqual(t, stats.PeakBufferedBytes, int64(128))
+	require.LessOrEqual(t, stats.PeakBufferedBytes, int64(1024))
 	var probes int
 	config = BinParserConfig{OnEvent: func(*BinParserEvent) {}}
 	for port := 10000; port < 10600; port++ {

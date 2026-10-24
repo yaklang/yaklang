@@ -349,12 +349,15 @@ func streamContainsMatch(v *streamSnapshot, matcher *foldMatcher) bool {
 func (t searchTerm) matches(e *packetEntry, row packetSummary, c *packetSearchContext) bool {
 	switch t.kind {
 	case "proto":
-		for _, p := range row.Layers {
+		for _, p := range append(append(append([]string(nil), row.Layers...), row.ProtocolStack...), row.ConnectionStack...) {
 			if t.stringMatch(p) {
 				return true
 			}
+			if t.stringMatch(strings.ReplaceAll(p, "/", "")) {
+				return true
+			}
 		}
-		for _, p := range []string{row.Transport, row.packetProtocol, strings.TrimPrefix(row.Protocol, "TCP/")} {
+		for _, p := range []string{row.Transport, row.packetProtocol, row.Protocol, row.ConnectionProtocol} {
 			if p != "" && t.stringMatch(p) {
 				return true
 			}
@@ -396,18 +399,20 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 		return true
 	}
 	if u.search.fields != nil {
-		for _, event := range e.packet.protocolEvents() {
-			if u.search.fields.Match(event) {
-				return true
-			}
+		result := u.search.fields.EvaluateEvents(e.packet.protocolEvents())
+		if !result.Complete {
+			u.notice = "Field filter unavailable: " + result.Reason
 		}
-		return false
+		return result.Complete && result.Matched
 	}
 	version := uint64(0)
 	var stream *searchStream
 	if u.search.dynamic {
 		stream = c.stream(e.packet.streamID)
 		version = stream.version
+		if e.packet.conversationID != 0 && e.packet.streamID == 0 {
+			version = u.streams.datagramVersion(e.packet)
+		}
 	}
 	if e.searchGeneration != 0 && e.searchGeneration == u.searchGeneration && e.searchVersion == version {
 		return e.searchMatched
@@ -415,6 +420,11 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 	var row packetSummary
 	if u.search.metadata {
 		row = e.row()
+		if e.packet.conversationID != 0 && e.packet.streamID == 0 {
+			row = u.streams.projectDatagram(row, e.packet)
+		} else {
+			row = u.streams.projectConversation(row, e.packet.streamID)
+		}
 	}
 	if stream != nil && stream.protocol != "" {
 		row = applyApplication(row, stream.protocol, stream.evidence, e.packet.streamID)

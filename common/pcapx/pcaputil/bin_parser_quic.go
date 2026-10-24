@@ -25,6 +25,8 @@ type binQUIC struct {
 	alpn            string
 	cids            map[string]int
 	cidSequences    [2]map[uint64]string
+	cidRetired      [2]map[uint64]string
+	cidRetiredBelow [2]uint64
 	cryptoData      [2][3]quicAssembler
 	cryptoRead      [2][3]int
 	decryptedSource string
@@ -304,7 +306,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 			if q.cidSequences[dir] == nil {
 				q.cidSequences[dir] = map[uint64]string{0: string(h.scid)}
 			}
-			q.cids[string(h.scid)] = dir
+			if _, retired := q.cidRetired[dir][0]; !retired && q.cidRetiredBelow[dir] == 0 {
+				q.cids[string(h.scid)] = dir
+			}
 		}
 	}
 	q.observePN(q.space(dir, h.space), pn, info)
@@ -359,11 +363,20 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 				if old, ok := q.cidSequences[dir][seq]; ok && old != cid {
 					return protocolError(ErrMalformedMessage, "QUIC CID sequence changed")
 				}
+				if old, ok := q.cidRetired[dir][seq]; ok && old != cid {
+					return protocolError(ErrMalformedMessage, "QUIC retired CID sequence changed")
+				}
+				q.cidRetiredBelow[dir] = max64(q.cidRetiredBelow[dir], retire)
 				for n, old := range q.cidSequences[dir] {
-					if n < retire {
+					if n < q.cidRetiredBelow[dir] {
+						q.rememberRetiredCID(dir, n, old, max)
 						delete(q.cids, old)
 						delete(q.cidSequences[dir], n)
 					}
+				}
+				if _, retired := q.cidRetired[dir][seq]; retired || seq < q.cidRetiredBelow[dir] {
+					fr["Already Retired"] = true
+					continue
 				}
 				if _, ok := q.cids[cid]; !ok && len(q.cids) >= max {
 					return protocolError(ErrResourceExceeded, "QUIC CID budget")
@@ -374,7 +387,15 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 		case "RETIRE_CONNECTION_ID":
 			if q.native {
 				seq := fr["Sequence"].(uint64)
+				owner := 1 - dir
+				if _, retired := q.cidRetired[owner][seq]; retired || seq < q.cidRetiredBelow[owner] {
+					// A lost ACK can cause the same RETIRE frame in a new packet.
+					// It is idempotent, and must not discard later STREAM frames.
+					fr["Already Retired"] = true
+					continue
+				}
 				if cid, ok := q.cidSequences[1-dir][seq]; ok {
+					q.rememberRetiredCID(owner, seq, cid, max)
 					delete(q.cids, cid)
 					delete(q.cidSequences[1-dir], seq)
 				} else {
@@ -1207,6 +1228,7 @@ func (q *binQUIC) initialMemory() int64 {
 		n += int64(q.qpack.table[d].size)
 	}
 	n += int64(len(q.cids) * 128)
+	n += int64((len(q.cidRetired[0]) + len(q.cidRetired[1])) * 128)
 	for d := range q.spaces {
 		for s := range q.spaces[d] {
 			n += int64(cap(q.spaces[d][s].seen))*8 + int64(cap(q.crypto[d][s]))*16
