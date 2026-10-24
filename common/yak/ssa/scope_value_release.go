@@ -145,15 +145,108 @@ func releaseProgramOrdinaryValues(prog *Program) int {
 			}
 			released += releaseScopeOrdinaryValues(prog, block.ScopeTable, visitedScopes, reload)
 		}
-		// The id list has been walked. A non-exported finished body does not
-		// need it or its builder anymore; an exported function keeps the ids
-		// for cross-unit lookup. EnterBlock/ExitBlock stay set.
+		// The id list has been walked. Dropping the builder of a private
+		// function is not enough: its BasicBlocks stay in the resident cache,
+		// and an exported function keeps both the builder and the blocks. The
+		// scope tables on those blocks are the version maps that otherwise live
+		// until compile end. A scope that still holds a closure capture stays,
+		// and so does a blueprint container that later batches still emit into.
+		if !functionScopeRetainsCapture(prog, fn) && !isLiveContainerFunction(fn) {
+			clearFunctionBodyScopes(prog, fn)
+			fn.builder = nil
+		} else if !shouldKeepFunctionForCrossUnitReference(fn) {
+			fn.builder = nil
+		}
+		// An exported function keeps its block ids for cross-unit lookup.
+		// EnterBlock/ExitBlock stay set either way.
 		if !shouldKeepFunctionForCrossUnitReference(fn) {
 			fn.Blocks = nil
-			fn.builder = nil
 		}
 	})
 	return released
+}
+
+func functionScopeRetainsCapture(prog *Program, fn *Function) bool {
+	if fn == nil {
+		return false
+	}
+	found := false
+	visit := func(scope ScopeIF) {
+		if found || scope == nil {
+			return
+		}
+		current, ok := scope.(*ScopeInstance)
+		if !ok || current == nil {
+			return
+		}
+		for _, latest := range current.GetAllVariables() {
+			if latest == nil {
+				continue
+			}
+			for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
+				variable, ok := versioned.(*Variable)
+				if !ok || variable == nil || utils.IsNil(variable.Value) {
+					continue
+				}
+				if valueCapturedByClosure(variable.Value) {
+					found = true
+					return
+				}
+			}
+		}
+	}
+	if fn.builder != nil && fn.builder.CurrentBlock != nil {
+		visit(fn.builder.CurrentBlock.ScopeTable)
+	}
+	if prog != nil && prog.Cache != nil && prog.Cache.instructions != nil {
+		for _, id := range fn.Blocks {
+			inst, ok := prog.Cache.instructions.residentInstruction(id)
+			if !ok || utils.IsNil(inst) {
+				continue
+			}
+			block, ok := ToBasicBlock(inst)
+			if !ok || block == nil {
+				continue
+			}
+			visit(block.ScopeTable)
+		}
+	}
+	return found
+}
+
+func isLiveContainerFunction(fn *Function) bool {
+	if fn == nil {
+		return false
+	}
+	prog := fn.GetProgram()
+	if prog == nil || prog.GlobalVariablesBlueprint == nil {
+		return false
+	}
+	container := prog.GlobalVariablesBlueprint.Container()
+	return container != nil && container.GetFunc() == fn
+}
+
+func clearFunctionBodyScopes(prog *Program, fn *Function) {
+	if fn == nil {
+		return
+	}
+	if fn.builder != nil && fn.builder.CurrentBlock != nil {
+		fn.builder.CurrentBlock.ScopeTable = nil
+	}
+	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return
+	}
+	for _, id := range fn.Blocks {
+		inst, ok := prog.Cache.instructions.residentInstruction(id)
+		if !ok || utils.IsNil(inst) {
+			continue
+		}
+		block, ok := ToBasicBlock(inst)
+		if !ok || block == nil {
+			continue
+		}
+		block.ScopeTable = nil
+	}
 }
 
 func releaseScopeOrdinaryValues(prog *Program, scope ScopeIF, visited map[*ScopeInstance]struct{}, reload func(int64) (Value, bool)) int {

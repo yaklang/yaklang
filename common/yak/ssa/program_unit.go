@@ -54,14 +54,26 @@ func (prog *Program) BeginCompileUnit(unitKey string) {
 		prog.EndCompileUnit()
 		return
 	}
-	prog.compileUnitContexts.Store(currentGoroutineID(), unitKey)
+	gid := currentGoroutineID()
+	prog.compileUnitContexts.Store(gid, unitKey)
+	// A frontend may create another library Program inside PreHandlerProject
+	// (for example go2ssa switches from the directory library to the declared
+	// package library). Mirroring the goroutine's unit on the application lets
+	// that new library's CurrentCompileUnit find it instead of returning "".
+	if app := prog.GetApplication(); app != nil && app != prog {
+		app.compileUnitContexts.Store(gid, unitKey)
+	}
 }
 
 func (prog *Program) EndCompileUnit() {
 	if prog == nil {
 		return
 	}
-	prog.compileUnitContexts.Delete(currentGoroutineID())
+	gid := currentGoroutineID()
+	prog.compileUnitContexts.Delete(gid)
+	if app := prog.GetApplication(); app != nil && app != prog {
+		app.compileUnitContexts.Delete(gid)
+	}
 }
 
 func (prog *Program) CurrentCompileUnit() string {
