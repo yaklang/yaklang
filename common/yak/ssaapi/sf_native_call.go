@@ -745,6 +745,14 @@ func init() {
 				fn.GetVerboseName() == template2java.JAVA_TEMPLATE_SERVER_NAME {
 				return true
 			}
+			// A saved program can hand back a lazy function placeholder whose
+			// Params slice is not materialized yet. The generated callable is
+			// named "<class>_<method>_<hash>", so the marker still identifies
+			// the template service without forcing the body to load.
+			if strings.Contains(fn.GetName(), template2java.JAVA_TEMPLATE_SERVER_NAME) ||
+				strings.Contains(fn.GetVerboseName(), template2java.JAVA_TEMPLATE_SERVER_NAME) {
+				return true
+			}
 			for _, paramID := range fn.Params {
 				param, ok := fn.GetValueById(paramID)
 				if !ok || param == nil {
