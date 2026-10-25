@@ -125,6 +125,20 @@ def normalize(v, key):
     return str(v).replace(':', '').lower() if key.endswith(('.hw', '_digest')) else str(v)
 
 
+def unselected_carrier_group(protocols):
+    tokens = protocols.split(':')
+    # These are original reference-tree carriers, not proof of a validated
+    # native tunnel or of offsets in reconstructed TVBs being physical bytes.
+    for token, group in [('ppp_hdlc', 'GRE/PPP reference subtree'),
+                         ('mpls', 'UDP/MPLS pseudowire reference subtree'),
+                         ('etherip', 'EtherIP reference subtree'),
+                         ('msrcp', 'UDP/MSRCP reference subtree'),
+                         ('peekremote', 'Remote WLAN reference subtree')]:
+        if token in tokens:
+            return group
+    return 'Nested IP/Ethernet reference subtree' if tokens.count('eth') > 1 else 'Other reference carrier'
+
+
 checks = collections.Counter()
 views, matched, missing, refused, unselected, differences = [], [], [], [], [], []
 used = set()
@@ -141,7 +155,8 @@ for row in rows:
         views.append(record)
         selected = carrier(frame, d[1], eth_offsets)
         if not selected:
-            unselected.append({**record, 'reason': 'no exact supported Ethernet length/LLC/SNAP carrier'})
+            unselected.append({**record, 'reason': 'no exact supported physical Ethernet length/LLC/SNAP carrier at the reference span',
+                               'reference_carrier_group': unselected_carrier_group(ls['frame']['frame.protocols'])})
             continue
         _, wire, mode, complete = selected
         record.update(carrier=mode, carrier_complete=complete, observed_bytes=len(wire), sha256=hashlib.sha256(wire).hexdigest())
@@ -172,7 +187,7 @@ for row in rows:
         # Wireshark reuses stp.flags.* inside MSTI records; the native STP
         # flag fields describe the common BPDU. Keep that source scope exact.
         root = fields(tree, omit_mst=True)
-        for key in numeric | texts | seconds:
+        for key in sorted(numeric | texts | seconds):
             expected = root.get(key, []) if key.startswith('stp.flags.') else want.get(key, [])
             if not expected:
                 continue
@@ -189,10 +204,11 @@ result = {
     'events_sha256': hashlib.sha256(events_path.read_bytes()).hexdigest(),
     'reference_frames': len(rows), 'reference_views': len(views),
     'native_events': len(native), 'native_status': dict(collections.Counter(e['status'] for e in native)),
-    'native_variant_names': dict(collections.Counter(e.get('session', {}).get('Protocol Name', 'unconfirmed') for e in native)),
+    'native_variant_names': dict(collections.Counter((e.get('session') or {}).get('Protocol Name', 'unconfirmed') for e in native)),
     'matched_decoded_views': len(matched), 'checks': dict(checks), 'checks_total': sum(checks.values()),
     'selected_field_or_wire_differences': differences, 'missing_selected_carriers': missing,
     'refused_reference_views': refused, 'unselected_reference_views': unselected, 'additional_native_events': extras,
+    'unselected_reference_carriers': dict(collections.Counter(v['reference_carrier_group'] for v in unselected)),
     'scope': 'Original reference spans/typed selected fields and exact literal carrier boundaries; advertised BPDU state only, no elected topology/peer authentication/digest verification. Refusals and unsupported carriers remain separate; no label normalization.',
 }
 output.write_bytes((json.dumps(result, indent=2)+'\n').encode('utf-8'))

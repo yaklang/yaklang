@@ -28,27 +28,30 @@ func DecodeSTPWire(w []byte, pvst bool, budget int) (map[string]any, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	if v != 0 && v != 2 && v != 3 {
+	if typ != 0 && typ != 128 && v != 0 && v != 2 && v != 3 {
 		return nil, fmt.Errorf("%w: unselected STP version %d", ErrObservedWireContext, v)
 	}
 	if typ == 128 {
-		r.need(v == 0 && len(w) == 4, "TCN requires version0 and exact four-byte message")
+		r.need(len(w) == 4, "TCN requires exact four-byte message")
 		r.info["Packet Name"], r.info["Protocol Name"] = "Topology Change Notification", "STP"
+		if v != 0 {
+			r.info["Conformance Warning"] = "TCN layout is selected by Type128; literal wire version is not evidence of a rapid/multiple BPDU"
+		}
 		if pvst {
 			r.info["Protocol Name"] = "PVST+"
 		}
 		return stpFinish(r)
 	}
-	r.need((v == 0 && typ == 0) || ((v == 2 || v == 3) && typ == 2), "STP version/type combination")
+	r.need(typ == 0 || ((v == 2 || v == 3) && typ == 2), "unselected STP version/type combination")
 	if r.err != nil {
 		return nil, r.err
 	}
-	if v == 3 && pvst {
+	if v == 3 && typ == 2 && pvst {
 		return nil, fmt.Errorf("%w: MST over PVST SNAP is unselected", ErrObservedWireContext)
 	}
 	flags := r.num("Flags", 1, false)
 	r.info["Topology Change"], r.info["Topology Change Acknowledgement"] = flags&1 != 0, flags&128 != 0
-	if v != 0 {
+	if typ == 2 {
 		r.info["Proposal"], r.info["Port Role"] = flags&2 != 0, (flags>>2)&3
 		r.info["Learning"], r.info["Forwarding"], r.info["Agreement"] = flags&16 != 0, flags&32 != 0, flags&64 != 0
 		r.info["Port Role Name"] = []string{"Unknown", "Alternate/Backup", "Root", "Designated"}[(flags>>2)&3]
@@ -66,11 +69,14 @@ func DecodeSTPWire(w []byte, pvst bool, budget int) (map[string]any, error) {
 		return nil, r.err
 	}
 	r.info["Protocol Name"], r.info["Packet Name"] = "STP", "Configuration"
-	if v != 0 {
+	if typ == 0 && v != 0 {
+		r.info["Conformance Warning"] = "Configuration layout is selected by Type0; literal wire version is not evidence of an RSTP/MSTP message"
+	}
+	if typ == 2 {
 		r.need(r.num("Version 1 Length", 1, false) == 0, "selected rapid/multiple BPDU requires Version1Length0")
 		r.info["Protocol Name"], r.info["Packet Name"] = "RSTP", "Rapid Configuration"
 	}
-	if v == 3 {
+	if typ == 2 && v == 3 {
 		r.info["Protocol Name"], r.info["Packet Name"] = "MSTP", "Multiple Configuration"
 		stpMST(r, &budget)
 	}
@@ -78,11 +84,11 @@ func DecodeSTPWire(w []byte, pvst bool, budget int) (map[string]any, error) {
 		return nil, r.err
 	}
 	if pvst {
-		if v == 0 {
+		if typ == 0 {
 			r.take("PVST Alignment", 1)
 		}
 		stpPVST(r, &budget)
-		if v == 0 {
+		if typ == 0 {
 			r.info["Protocol Name"] = "PVST+"
 		} else {
 			r.info["Protocol Name"] = "RPVST+"

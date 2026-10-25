@@ -19,9 +19,7 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 	require.NotEmpty(t, inventories)
 	require.Equal(t, "2fb090d177c3bf52277f240b2dca05ea80216485", inventories[0].SourceSHA)
 	require.Len(t, inventories[0].Cases, 694)
-	// These counters describe the sealed answer kinds. A reviewed correction
-	// below is separately counted rather than rewriting that original answer.
-	parses, rejections, correctedRefusals := 0, 0, 0
+	parses, rejections := 0, 0
 	for _, answers := range inventories {
 		for _, c := range answers.Cases {
 			for i, e := range c.Expectations {
@@ -30,9 +28,6 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 				}
 				if e.Kind == "selected_input_parse" {
 					parses++
-					if c.ID == "pr5023-gen-rstp" {
-						correctedRefusals++
-					}
 				} else {
 					rejections++
 				}
@@ -68,11 +63,6 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 					capture := protocolCorpusCapture{ID: c.ID, CaptureFile: c.Input.OriginalPath, PacketCount: c.Facts.PacketCount, LinkType: c.Facts.LinkType, RepresentativeFrame: &protocolCorpusFrame{Number: e.Frame.Number, LengthBytes: e.Frame.LengthBytes, SHA256: e.Frame.SHA256}}
 					input := protocolCorpusParseInput(t, filepath.Join("..", ".."), capture, info, contract)
 					node, err := protocolCorpusParseRule(newProtocolCorpusBoundedReader(input), contract)
-					if c.ID == "pr5023-gen-rstp" && e.Kind == "selected_input_parse" {
-						require.Nil(t, node)
-						requireReviewedSTPOriginalPositiveRefusal(t, input, err)
-						return
-					}
 					if e.Kind == "selected_input_rejection" {
 						require.Error(t, err)
 						require.Nil(t, node)
@@ -110,8 +100,6 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 	}
 	require.GreaterOrEqual(t, parses, 434)
 	require.GreaterOrEqual(t, rejections, 102)
-	t.Logf("sealed parse expectations=%d rejection expectations=%d; reviewed original-positive refusals=%d", parses, rejections, correctedRefusals)
-	require.Equal(t, 1, correctedRefusals)
 }
 
 func frozenSelection(t *testing.T, raw json.RawMessage) []byte {

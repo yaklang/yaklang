@@ -628,11 +628,6 @@ var protocolCorpusClassifierSpecs = map[string]protocolCorpusClassifierSpec{
 // layer. A new negative fixture has no default: it needs an explicit rule and
 // extraction contract here before the corpus matrix accepts it.
 var protocolCorpusRejectionSpecs = map[string]protocolCorpusRejectionSpec{
-	"pr5023-gen-rstp": {
-		Name: "RSTP", Contract: protocolCorpusParseContract{RuleFile: "stp.yaml", EntryNode: "STP", Layer: "L2", FrameOffset: 17},
-		ControlCaptureID: "pr5023-gen-stp", ControlContract: protocolCorpusParseContract{RuleFile: "stp.yaml", EntryNode: "STP", Layer: "L2", FrameOffset: 17},
-		ExpectedFailureClass: protocolCorpusFailureInvalidValue, ExpectedErrorContains: "STP version/type combination",
-	},
 	"pr5023-gen-rmi": {
 		Name: "RMI", Contract: protocolCorpusParseContracts["RMI"],
 		ControlCaptureID: "gen-rmi-valid", ControlContract: protocolCorpusParseContracts["RMI"],
@@ -1834,16 +1829,10 @@ var protocolCorpusExactValues = map[string]map[string]any{
 }
 
 func protocolCorpusIsPositive(capture protocolCorpusCapture) bool {
-	if reviewedSTPInvalidPositive(capture) {
-		return false
-	}
 	return capture.EvidenceKind == "upstream-positive" || capture.EvidenceKind == "generated-positive"
 }
 
 func protocolCorpusIsNegative(capture protocolCorpusCapture) bool {
-	if reviewedSTPInvalidPositive(capture) {
-		return true
-	}
 	return capture.EvidenceKind == "upstream-negative" || capture.EvidenceKind == "generated-negative"
 }
 
@@ -2089,9 +2078,6 @@ func TestProtocolCorpusMalformedInputsAreRejected(t *testing.T) {
 			require.NotEmpty(t, input)
 			reader := newProtocolCorpusBoundedReader(input)
 			_, err = protocolCorpusParseRule(reader, spec.Contract)
-			if reviewedSTPInvalidPositive(capture) {
-				requireReviewedSTPOriginalPositiveRefusal(t, input, err)
-			}
 			protocolCorpusRequireExpectedFailure(t, id, spec, err)
 			t.Logf("capture=%s rule=%s input=%d rejected=%v", id, spec.Contract.RuleFile, len(input), err)
 		})
@@ -2255,9 +2241,9 @@ func TestProtocolCorpusValidationMatrix(t *testing.T) {
 	t.Logf("corpus capture dispositions JSON: %s", encoded)
 	t.Logf("matrix dispositions: total=%d registered-direct=%d classifier=%d rejected=%d structural=%d", len(manifest.Captures), counts["parsed"], counts["classifier"], counts["rejected"], counts["structural"])
 	require.Equal(t, len(manifest.Captures), counts["parsed"]+counts["classifier"]+counts["rejected"]+counts["structural"])
-	require.Equal(t, 433, counts["parsed"], "one hash-pinned archived RSTP positive is now a reviewed version/type refusal")
+	require.Equal(t, 434, counts["parsed"], "registered-direct category changed; review every added or reclassified capture")
 	require.Equal(t, 14, counts["classifier"], "classifier validation category changed; review every added or reclassified capture")
-	require.Equal(t, 103, counts["rejected"], "includes the reviewed invalid archived RSTP positive; original inventory is unchanged")
+	require.Equal(t, 102, counts["rejected"], "rejected-capture validation category changed; review every added or reclassified capture")
 	require.Equal(t, 2, counts["structural"], "structural validation category changed; review every added or reclassified capture")
 	t.Logf("validated matrix: total=%d parsed=%d classifier=%d rejected=%d structural=%d", len(manifest.Captures), counts["parsed"], counts["classifier"], counts["rejected"], counts["structural"])
 }
@@ -2330,12 +2316,6 @@ func TestProtocolCorpusRoadmapNameValidation(t *testing.T) {
 		}
 	}
 
-	// The one old RSTP positive is now a hash-pinned version/type refusal.
-	// Retain RSTP field coverage only after executing the independently authored
-	// complete version2/type2 canonical control, not from that archived label.
-	if t.Run("ReviewedRSTPCanonicalReplacement", TestSTPCanonicalWireEntries) {
-		semantic["RSTP"] = struct{}{}
-	}
 	// Prefer the stronger category when multiple captures exercise the same
 	// name; the weaker categories remain useful per-capture checks above.
 	for name := range semantic {

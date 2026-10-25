@@ -109,6 +109,26 @@ func TestSTPMSTAndPVSTBoundaryAndCollectionRefusals(t *testing.T) {
 	require.Error(t, err, "conflicting originating VLAN")
 }
 
+func TestSTPConfigurationAndTCNCompatibilityKeepsLiteralVersion(t *testing.T) {
+	for _, version := range []byte{0, 2, 3, 95} {
+		w := stpTestWire(0, false)
+		w[2] = version
+		m, err := DecodeSTPWire(w, false, 64)
+		require.NoError(t, err)
+		require.EqualValues(t, version, m["Version"])
+		require.Equal(t, "STP", m["Protocol Name"])
+		require.NotContains(t, m, "Port Role")
+		require.NotContains(t, m, "Version 1 Length")
+		if version != 0 {
+			require.NotEmpty(t, m["Conformance Warning"])
+		}
+		m, err = DecodeSTPWire([]byte{0, 0, version, 128}, false, 8)
+		require.NoError(t, err)
+		require.Equal(t, "STP", m["Protocol Name"])
+		require.NotContains(t, m, "Root MAC")
+	}
+}
+
 func FuzzSTPCompleteBoundedWire(f *testing.F) {
 	for _, v := range []byte{0, 2, 3} {
 		f.Add(stpTestWire(v, false), false)

@@ -49,7 +49,7 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types and scope; --json prints the versioned schema"},
 		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter, e.g. wg.type == 4 and wg.counter >= 2; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
-		cli.BoolFlag{Name: "json", Usage: "Print one JSON packet summary per line without the TUI"},
+		cli.BoolFlag{Name: "json", Usage: "Print one JSON summary per packet with fields observed at packet publication; later contributor annotations are available through TUI/SDK history"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
 		cli.DurationFlag{Name: "duration", Usage: "Stop capture after this duration, e.g. 30s (0: unlimited)"},
 		cli.IntFlag{Name: "max-packets", Value: defaultPacketCapacity, Usage: "Packets retained in the TUI (also editable with c); output file keeps all captured packets"},
@@ -181,6 +181,7 @@ func run(c *cli.Context) error {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 	interactive := !c.Bool("plain") && !c.Bool("json") && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
+	cfg.freezePacketFields = !interactive && (c.Bool("json") || displayFilter != nil)
 	session := startCapture(ctx, src, cfg, interactive)
 	defer session.Stop()
 	if interactive {
@@ -207,9 +208,19 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 				return s.result()
 			}
 			row := summarize(packet)
-			events := packet.protocolEvents()
+			var events []*pcaputil.ProtocolEvent
+			if packet.fieldsAtObservation {
+				row.PDUObservationScope = "observed_at_packet"
+			} else if asJSON || filter != nil {
+				events = packet.protocolEvents()
+			}
 			if filter != nil {
-				result := filter.EvaluateEvents(events)
+				var result pcaputil.DisplayFilterResult
+				if packet.fieldsAtObservation {
+					result = filter.EvaluateSnapshots(packet.observedFields)
+				} else {
+					result = filter.EvaluateEvents(events)
+				}
 				if !result.Complete {
 					return fmt.Errorf("display filter unavailable for frame %d: %s", row.Number, result.Reason)
 				}
@@ -219,6 +230,9 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 			}
 			var err error
 			if asJSON {
+				if packet.fieldsAtObservation {
+					row.PDUs = packet.observedPDUs
+				}
 				for _, e := range events {
 					values := e.DisplayFieldValues()
 					row.PDUs = append(row.PDUs, map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": e.SourceBytes, "fields": values.FieldMap(), "field_values": values})
