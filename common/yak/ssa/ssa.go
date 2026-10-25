@@ -1064,7 +1064,7 @@ func (p *Parameter) GetDefault() Value {
 }
 
 func (p *Parameter) SetDefault(v Value) {
-	if p == nil {
+	if p == nil || utils.IsNil(v) {
 		return
 	}
 	defer p.markPersistenceDirty()
