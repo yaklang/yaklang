@@ -114,6 +114,7 @@ func TestL2TPv3CarrierCutAndBudgetRefuseCompleteFields(t *testing.T) {
 	es, _ := l2tp3NativeReplay(t, frame, 0, true)
 	require.Equal(t, "incomplete", es[0].Status)
 	require.Empty(t, es[0].Session)
+	require.Equal(t, []any{uint64(len(w))}, es[0].DisplayFields()["pdu.length"], "retained refused wire bytes must not be reported as zero length")
 	es, a := l2tp3NativeReplay(t, frame, 8, false)
 	require.Equal(t, "limited", es[0].Status)
 	require.Empty(t, es[0].Raw)
