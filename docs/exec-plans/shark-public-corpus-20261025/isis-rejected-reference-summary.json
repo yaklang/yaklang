@@ -6,7 +6,8 @@
     "total_length_smaller_than_header": 677
   },
   "candidate_common_signatures": [],
-  "cli_sha256": "4b6303e21cb7949e8ce9d839c50b9f56634f9815e9cf983c274b3c2f98cb4484",
+  "cli_sha256": "b26085108e81a2d270ce16ffcf55e17275a4e686f6b4028a061f3773f47ac6e5",
+  "detailed_audit_sha256": "5a1223a7e73a0dc055bfe77328eefb69c99e3ac59c73b769abdc0e2d727fa7c0",
   "frame_numbers": [
     36473,
     36643,
@@ -2790,12 +2791,12 @@
   },
   "oracle_sha256": "ce8d5cda4569dca11ada793f528a834f6f035ca53c8f9fc96dfa21be16e1bd3f",
   "original_views": 5381,
-  "raw_rejection_audit_sha256": "43a37a7df23bbbdc24f4e6c63b22f1872f80cff137d332f2bb7484014690676c",
   "reference_frames": 2736,
-  "root_audit_sha256": "0bd5d435b01d7702927c94e483df963fad513df799d1d39a78899bc3138a173e",
-  "scope": "Necessary v1/six-octet common-header signature screening in all original unselected TVB views, with native fixed-header and CLI label refusal checks. Not a physical carrier decoder, full-body validation or certificate about future versions/other widths; original counts remain unchanged.",
+  "root_audit_sha256": "ef51308771e946a4a0cad33722883b218493901acdda0c05ffe83fe41db290f7",
+  "scope": "Account for every unselected original IS-IS reference view without relabeling.\n\nUsage: isis_rejected_reference_audit.py TSHARK_JSON ROOT_AUDIT SDK_JSONL CLI_JSONL OUT\nChecks a necessary v1/six-octet common-header signature in each original TVB,\nincluding multiple views per frame. This cannot certify physical carriers, body\nacceptance or future/other-ID-width implementations. Captures/raw exports stay\noutside Git; no Decode-As, view stripping or normalization is performed.\n",
   "script_sha256": "0b3b5dc374ff58490ca40630dcafa99624a1d3c09099bf18db0e9cc4cf6c07ac",
-  "sdk_sha256": "b9da3dfce424cb61229061dd79621fae212f408eeb5bae16636da67e6e764ef3",
+  "sdk_sha256": "cddbcd92aa54347a224a84713cce9f60b4738561537950c9b809fa53c272c966",
+  "source": "0208c1d1ff",
   "unexpected_confirmed_CLI": [],
   "unexpected_confirmed_native": []
 }

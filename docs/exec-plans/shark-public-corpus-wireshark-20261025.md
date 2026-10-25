@@ -1150,114 +1150,112 @@ response、条目数与首个前缀/metric。字段按条目类型、IPv6地址�
 做真实邻居/跳数验证、建立全局路由表或实现未来版本。IS-IS等原生入口、剩余载体/fuzz
 与字段历史体验继续处理；整体目标仍未完成。
 
-## 2026-10-26 后续：IS-IS 原生入口、字段关联和异常页面
+## 2026-10-26 后续：IS-IS 原生入口、字段关联和参考工具复核
 
-**ES TLV3 结论纠正中：** 后续对公开 ISO 格式（RFC1142 §9.8）和 Quagga 接收源码的
-独立检查证实，它是四字节共享 metric 加六字节 ID 列表，长度4的空列表合法。此前把
-frame24231 判为 malformed、并据此展示异常页的结论不准确；对应的677/1状态计数和
-“真实坏 ES TLV”描述暂不可作为验收结论。原生解析/空列表/共享范围测试已修正，正在重跑
-完整逐包证据并更新本节、聚合和页面。Wireshark/tcpdump 在该处采用每邻居十字节布局，
-不能作为这一语法的唯一标准。
+**已纠正 ES TLV3 的早期错误结论。** 真实 frame24231 的四字节空 ES 列表合法。先前
+跟随 Wireshark/tcpdump 的每邻居十字节布局，将它标成 malformed，判断不准确。此前
+677 decoded/1 malformed、57,550项检查、36组参考差异和“真实坏 ES TLV”页面证据已撤回，
+由下述重新执行的结果替代。原始抓包和 Wireshark 输出仍保留，没有修改参考值来制造一致。
 
-补齐原来已有 YAML、实际回放仍显示 LLC 的 IS-IS。历史 `ISIS` 叶树保持兼容，新增
-`ISISFields` 与原生入口共用 bounded codec。当前选择范围是六字节 System ID、完整
+补齐原来已有 YAML、回放仍显示 LLC 的 IS-IS。历史 `ISIS` 叶树保持兼容，新增
+`ISISFields` 与原生入口共用 bounded codec。当前范围为六字节 System ID、完整
 IEEE802.3 长度、FE/FE LLC UI 与 NLPID83，支持四层 VLAN 和已验证 express FCS 的
-mPacket；后者使用现有载体解码，不能任意去掉八字节前缀。STP/IS-IS 同时收紧为第一层
-Ethernet 的明确入口，不在未证明的 MPLS/pseudowire 内寻找另一个 Ethernet 特征。
-未接入的 IP/隧道载体继续保留原始差异。
+mPacket。沿用载体解码，不能任意去掉八字节前缀。STP/IS-IS 只选择第一层 Ethernet
+的明确入口，不在未证明的 MPLS/pseudowire 内寻找另一个 Ethernet 特征。
 
-LAN/P2P Hello、L1/L2 LSP、CSNP 和 PSNP 提供明确协议名称、固定头、重复 TLV、选定
-邻居/前缀条目和真实 PDU 字节范围。SNPA/MAC 与 System ID 分开；SNP 的 Source ID
-按六字节系统标识加一字节 circuit 分开，不能把 `.ab` 这一非零 circuit 并入系统身份。
-序列号、LSP fragment、P2P advertised Up/Initializing/Down 都是逐报文观察，不能升级为
-已建立邻接、已拼接 LSDB、已安装路由、DIS 选举或查询应答关联。FlowID/ResponseTo 为零。
-完整未知扩展保留原始字节和 partial 范围，残条目不生成假的邻居、前缀或跨包字段。
+LAN/P2P Hello、L1/L2 LSP、CSNP 和 PSNP 展示具体协议名称、固定头、重复 TLV、所选
+邻居/前缀条目和真实 PDU 字节范围。SNPA/MAC 与 System ID 分开；SNP Source ID 的
+六字节 System ID 和一字节 circuit 分开。序列号、LSP fragment、P2P advertised state
+是逐报文观察，不升级为邻接、LSDB、路由、DIS 选举或应答关联；FlowID/ResponseTo 为零。
+未知扩展保持原始字节和 partial 范围，残条目不生成假的邻居或跨包字段。
 
-按 [RFC3358](https://datatracker.ietf.org/doc/html/rfc3358) 分开处理校验和：活动 LSP
-Fletcher 检查排除可变 lifetime；purge/零校验和值不宣称验证成功，原始 Wire Checksum
-保留。可选 TLV12 只允许 IIH/CSNP/PSNP，重复或错误值拒绝，零值接受但没有完整性证据。
-“没有校验和”在页面明确显示未验证。完整字节的 Fletcher 成功与 TLV 语法失败可以同时
-存在，不代表报文被接收或发送者已认证。HMAC-MD5 只解析有界结构，未验证密钥；与非零
-可选 checksum 同时出现时保留 RFC3358 组合违规提示。
+按 [RFC3358](https://datatracker.ietf.org/doc/html/rfc3358) 分开完整性和语法：活动 LSP 的
+Fletcher 检查排除可变 lifetime；purge/零值保留 Wire Checksum、不宣称验证成功。
+可选 TLV12 只在 IIH/CSNP/PSNP 接受，重复/错误值拒绝，零值接受但未验证。
+无 checksum 明确显示未验证。Fletcher 成功和 TLV 失败可同时出现，不能据此认证发送者。
+HMAC-MD5 只解析有界结构；与非零可选 checksum 同时出现时保留组合违规提示。
 
-旧式 IPv4 default metric 的高位是 up/down 分发语义，不是 optional metric supported。
-Delay/Expense/Error 的原始 unsupported bit 与易读的 Supported 布尔值分开，过滤描述
-明确 true 的含义。区域地址同时保留带长度字节的 Wireshark 字段和易读地址；Hello 两处
-共用字段名的 reserved 位都按各自掩码值投影。扩展 IPv4/IPv6 前缀的编码字节、零扩展
-原值及 masked canonical prefix 分开，派生完整地址不伪造四/十六字节物理范围。依据
+旧式 IPv4 default metric 高位按 up/down 分发语义处理。可选 metric 原始 unsupported
+bit 与易读 Supported 布尔值分开。区域地址同时保留带长度字节的参考字段和易读地址。
+扩展 IPv4/IPv6 前缀保留编码字节、零扩展原值与 masked canonical prefix，派生完整
+地址不伪造四/十六字节物理范围。依据
 [RFC5305](https://www.rfc-editor.org/rfc/rfc5305.html)、
-[RFC5308](https://datatracker.ietf.org/doc/html/rfc5308) 与固定版本 tvbuff 的前缀处理核对。
+[RFC5308](https://datatracker.ietf.org/doc/html/rfc5308) 和固定版 tvbuff 核对。
 
-### 原始文件逐包、字段关联与参考工具差异
+### ES 邻居必须按共享 metric 分组
 
-| 捕获 | 原始含 IS-IS 的帧 | 匹配的 root 消息 | 所选 wire/字段/条目关联检查 | 未处置的所选差异 / 缺失 |
+[RFC1142 §9.8 的公开 ISO 草案格式](https://www.rfc-editor.org/rfc/rfc1142.html) 明确
+ES TLV3 为四字节 metric 加六字节 ID 列表；同一列表内邻居共享成本。该文现为历史文档，
+不把它称为现行互联网标准；另以
+[固定 Quagga 接收源码](https://github.com/Quagga/quagga/blob/4f593574c41deb598cbbefde5c6d938799e81d5a/isisd/isis_tlv.c)
+交叉检查：先推进一次四字节 metric，再按六字节 ID 推进。该接收实现的 ID 集合仍有 FIXME，
+这里只使用其布局证据，不据此宣称实际路由安装已验证。
+
+原生树现在按 `ES Neighbor Count → Shared Metrics → Neighbors[]` 递进。metric 只投影
+一次真实范围；每个 ID 有自己的六字节范围，不能复制 metric 制造多个物理字段。零 ID
+合法，count 为派生值、不伪造 byte range；不同成本用不同 TLV。三字节/非4+6n长度才是
+损坏结构。TLV3 仅按 L1 ES 上下文解释，L2 的不同上下文继续 opaque。
+
+### 完整原始文件逐包与关联核验
+
+| 捕获 | 原始含 IS-IS 的帧 | 匹配 root 消息 | wire/字段/条目关联检查 | 未处置所选差异 / 缺失 |
 | --- | ---: | ---: | ---: | ---: |
-| Weber 全部51,328帧 | 678 | 678 | 57,550 | 0 / 0 |
-| Sharon 全部328,127帧 | 3,414 | 678 | 57,550 | 0 / 0 |
+| Weber 全部51,328帧 | 678 | 678 | 57,577 | 0 / 0 |
+| Sharon 全部328,127帧 | 3,414 | 678 | 57,577 | 0 / 0 |
 | Wiki P2P adjacency sync 真实捕获 | 15 | 15 | 928 | 0 / 0 |
 
-每个大文件的678条为559 Hello、111 CSNP、7 LSP、1 PSNP；677条完整解析，1条保留明确
-malformed 状态。两份大文件共享同一组678个 root PDU，不能当成独立多样性。官网
+每份大文件678条均 decoded：559 Hello、111 CSNP、7 LSP、1 PSNP。两份文件共享同一组
+root PDU，不能当成独立多样性。官网
 [P2P 捕获](https://wiki.wireshark.org/uploads/cc35c2f0b03269774fb4dd501d510c55/isis_p2p_adjacency_sync.pcapng)
-为12,040字节，SHA256为d344b2aacf60c32731b9996f62c3430d6140456fac991f39f2c26fcef32027e0，
+12,040字节，SHA256 d344b2aacf60c32731b9996f62c3430d6140456fac991f39f2c26fcef32027e0；
 含7 P2P Hello、4 L2 CSNP、2 L2 LSP、2 L2 PSNP。
 
-检查保留每个重复字段的出现次数，并验证值与 byte range 成对对应。每个大文件还增加
-22,144项独立原始字节关联检查：metric/前缀/掩码、邻居 ID、SNPA、SNP 的 lifetime/
-sequence/checksum 必须属于同一条目，不能只靠字段多重集合相同通过。官网新增334项
-条目关联检查。没有 Decode-As、去帧或列标签归一化。
+检查每个重复字段的次数及值/范围成对关系。每份大文件含22,160项独立原始字节关联
+检查，官网含334项：metric/地址/掩码/邻居/共享成本/SNPA/SNP lifetime/sequence/checksum
+必须归属正确条目，不能靠字段多重集合相同通过。没有 Decode-As、去帧或标签归一化。
 
-原始比较保留每份大文件 **36组、60个字段出现位置** 的 Wireshark4.6.9 取值/范围差异。
-其旧式邻居解析把三种非 default metric 及 unsupported bit 都从 default 字节读出，
-部分取值恰好相同但字段范围仍错误；本实现使用各自的四个 metric 字节。使用
-[固定版 Wireshark 源码](https://github.com/wireshark/wireshark/blob/v4.6.9/epan/dissectors/packet-isis-lsp.c)
-及 [tcpdump 固定提交](https://github.com/the-tcpdump-group/tcpdump/blob/94a3708f00f658994293a440fbbb7e71e2047a0f/print-isoclns.c)
-交叉检查，并在聚合证据保留双方值、范围和独立 wire 布局。离线控制另证实 attached-default
-的 bit3 与 partition-repair 的 bit7 不能混用。以上不是把参考值改成一样后报零。
-另5组/10条 IPv4 前缀中，Wireshark 选择整个12字节记录，本实现选择实际4字节地址；
-两者分别记录，不把有效的范围粒度区别称为解析错误。
+每份大文件保留42组原始参考差异，涵盖旧式 metric 错偏移/unsupported bit、ES 共享范围
+和合法空列表被报 short_clv。Wireshark4.6.9 的非 default metric 及部分 supported 字段
+从 default 字节读取，范围亦错。核对
+[固定 Wireshark 源码](https://github.com/wireshark/wireshark/blob/v4.6.9/epan/dissectors/packet-isis-lsp.c)
+与独立 wire 布局；[tcpdump 固定提交](https://github.com/the-tcpdump-group/tcpdump/blob/94a3708f00f658994293a440fbbb7e71e2047a0f/print-isoclns.c)
+只用于独立 metric 偏移检查，它的 ES 每记录布局也不正确，不能作该语法的权威。
+聚合保留双方值和范围，不以“PK 全相同”掩盖参考工具错误。另5组/10条 IPv4 前缀为
+12字节记录与实际4字节地址的有效范围粒度区别，单独记录；不称为解析错误。
 
-Sharon 的2736个其余原始帧按参考载体分为 IP/OSI(proto80)1688、UDP/MPLS/OSI772、
-GRE/PPP262、EtherIP12、其他2。该批只认证 root LLC 范围，尚未认证这些载体，完整帧号和
-原始协议链保留在聚合记录/本地审计中。它们仍是整体覆盖缺口。数值 checksum-status
-别名、expert 字段与无 sub-TLV 时参考工具生成的零值也没有全部接入类型过滤；校验和
-实际验证结果与原始值已在原生字段/页面提供，不宣称所有 Wireshark 别名都完备。
+### 边界、Windows 与重新验证
 
-### 边界、Windows 与完整文件复验
+37组明确离线控制共58帧，192项直接验收和2762项 wire/字段/关联检查通过。覆盖重复、
+乱序、缺中间 LSP、同 MAC 不同 System ID、fragment/P2P state 不粘连、snaplen 后完整
+修复、坏 checksum/purge、真正损坏 ES TLV、合法空列表/共享多个 ID/不同成本分组、
+错误 LLC/NLPID、长度矛盾、未知上下文、可选 checksum 零/非零/错误/重复/错误 PDU、
+HMAC 结构和组合、非整字节 IPv4/IPv6 prefix、非零 circuit，拒绝拼接相邻残 datagram。
+原始参考拒绝/差异保留；附加控制证明 attached-default 的 bit3 与 partition-repair 的
+bit7 不能混用。非空 ES 列表、非零 optional checksum 和部分 sub-TLV 正例仍来自作者
+控制，不宣称新抓到真实路由器流量；没有在本机网络发送 IS-IS 通告或验证收敛。
 
-34组明确的离线控制共55帧，174项直接验收及2546项 wire/字段/关联检查通过：重复、乱序、
-缺中间 LSP、同 MAC 不同 System ID、LSP fragments、P2P state 不粘连、snaplen 后完整修复、
-坏校验和、purge、残 ES TLV、错误 LLC/NLPID、PDU 长度不一致、未知 TLV/上下文、可选
-checksum 的零/非零/错误/重复/错误 PDU、HMAC 结构/组合违规、非整字节 IPv4/IPv6 前缀、
-非零 SNP circuit，以及不能把相邻的残 datagram 拼接。原始参考拒绝/差异逐项保留。
-有效旧式 ES 邻居、非零 optional checksum、部分 sub-TLV 的正例仍来自明确的作者控制，
-不是这轮抓到的真实路由器流量；本轮没有在本机网络发送 IS-IS 通告或验证路由收敛。
+生产 ES 修正源码 **0208c1d1ff** 重新运行全部379,455帧，CLI/SDK 各自重复导出逐字节
+相同。相对 RIPng 阶段，每份文件只有678条 LLC 提升为具体 IS-IS 子类型；通用字段检查/
+缺失、原始90/35项差异、端点、TCP流824/840、预览808/735及分区指标不变。
 
-最终原生生产源码 **52385ae158** 的完整 bin-parser/子包、pcaputil 和 CLI 通过，主包
-136.741s、原生456.857s、CLI2.260s。新增 codec fuzz96,341次/46.536s通过，包含原始拒绝
-与只修复外层长度后深入 TLV 的两种输入。页面修正后的 **4c6f79f68e** 完整 CLI2.161s通过；
-该版 SDK PE 与52385ae158逐字节相同。规则归档匹配、新旧入口兼容、字段所有权、范围、
-负过滤保护和未证明 pseudowire 拒绝均有回归。冻结 capture/manifest/历史评分未修改。
-不据此宣称当前 PR head 的远程 CI 已通过。
+ES 修正后 bounded-wire fuzz11,425次/46.479s通过。最新统一源码 **778d338cdb** 完整
+bin-parser/子包、pcaputil 和 CLI 回归通过：主包 136.218s、原生 445.054s、CLI 2.137s。
+此前0208组合命令的 bin-parser 和 native 包虽通过，CLI因运行期间 API 编辑混用旧
+编译产物而失败；不把那条组合命令说成全通过。冻结 capture/manifest/历史评分未修改，
+不据此宣称远程 CI 已通过。
 
-最终版本重新运行全部379,455帧，两个文件的最终 CLI 各自重复导出逐字节相同，两个 SDK
-导出也逐字节相同。相对 RIPng 阶段，每个文件只有678条 LLC 列提升为 IS-IS 子类型；
-通用字段检查/缺失、原始90/35项字段集合差异、端点、TCP流824/840、预览808/735及分区
-指标不变。新增范围核验没有覆盖或消除其余协议的旧差异。
+Windows CP936 重新实测真实 frame24231：EOF/51,328包入满、正确查询和对应详情通过，
+现为合法 L1 LSP，明确 `ES Neighbor Count: 0`、共享 Default Metric0，并高亮实际0x41
+字节，无 Malformed 标记。同 LSP ID 的另一 L2 消息独立显示。真正的 length3 损坏 TLV
+另用声明的离线两帧控制检查：Malformed TLV 仍在摘要前部可见，不再冒充真实异常流量。
+字节源、80x30缩放/180x48恢复、退出和 code-page 恢复通过。此前 Hello 的281条 L1
+查询与 frame24184 Priority64/0x13证据保留。字段历史仍有界，这些页面不认证全局可查。
 
-Windows CP936 实际回放两次，均严格核对 EOF、51,328包全部入窗口、实际查询、所选协议
-及对应详情帧、字节源、缩放恢复和退出。L1 Hello 查询281条可证匹配，路径为
-`FPP › Ethernet › LLC › IS-IS Hello`，frame24184 Priority64 对应逻辑 PDU 的0x13字节。
-另检查真实坏 ES TLV 的 frame24231：固定头与 Fletcher 验证成功、Wire Grammar Complete
-为 false，完整错误与已成功解析字段并存。实测发现长摘要把错误截到末尾，已把
-`Malformed TLV`/`Invalid checksum` 前置到列表和详情开始位置，避免看见有效 checksum
-却看不见语法错误。相同 LSP ID 的另一 L2 消息单独显示。字段历史仍有界，页面保留原有
-partial 提示；281条本次查询正确不等于其他字段历史也全部可查。
-
-[本轮聚合证据](shark-public-corpus-20261025/isis-wire-summary.json) 保存源代码/二进制/
-原始审计哈希、重复结果、参考差异、未覆盖载体、控制和实际控制台记录哈希。捕获、
-派生 PCAP、keylog、可执行文件、控制台原始单元格和图片继续只在本地临时目录。IS-IS
-目录仍为 partial，整体协议、载体、字段历史与流/会话验收仍未完成，PR 继续 draft。
+[修正后聚合证据](shark-public-corpus-20261025/isis-wire-summary.json) 记录替代旧结论的
+原因、源码/二进制/原始审计哈希、重复结果、原始参考差异、控制与真实控制台记录哈希。
+捕获、派生 PCAP、keylog、可执行文件、控制台单元格和图片仅在本地临时目录。
+IS-IS 仍为 partial：其他 ID 宽度、合法隧道入口、部分别名和路由操作尚未认证。
+整体协议/字段/流/会话目标仍未全部完成，PR 保持 draft。
 
 ### 继续复核2736个载体/fuzz帧：不能仅凭 NLPID 确认协议
 
@@ -1285,3 +1283,22 @@ protocol80/NLPID83 或参考工具尝试拆解的字段，就把这些帧提升�
 保留每组原因计数、全部帧号、输入/原始详细结果哈希；完整逐视图表仍在本地临时目录。
 原始3414帧/5381个补充视图的数量没有归一化为678。这解决的是这些原始视图的确认边界，
 没有声称合法 IP/OSI、MPLS、GRE/PPP、EtherIP 的原生正例入口已经完成。
+
+## 2026-10-26 后续：部分字段的可证明过滤结果
+
+共享过滤器此前一见 limited/unknown extension/字段预算即拒绝整个包，连已经保留的正向
+字段也无法查询。源码 **778d338cdb** 改为三值判断：true、false、unknown。已观察到的
+值可以证明存在/等值/范围/contains/CIDR；未观察到的值在部分投影中保持 unknown。
+`!=` 保留既有“存在且所有值都不等”的语义，缺少重复值不能证明它为 true；发现一个
+相等值则能证明 false。NOT/AND/OR 按三值组合，不能把 unknown 取反后变成匹配。
+
+`DisplayFilterResult.Complete` 表示谓词结果已确定，新增 `Partial` 明确指出字段集合
+仍不完整。TUI 可以保留被真实字段证明的匹配行，同时继续显示 partial 原因。已淘汰的
+PDU不从占位字段制造证据；损坏/不可表示的快照值被跳过并保留未知。包级字段 union
+预算保持4096，正向证据无需抬高预算；缺失字段和超出128个PDU的范围仍不能证明不存在。
+精确64位还原失败不能回退成近似值。旧的私有 incomplete 标记、JSON导出和负过滤保护保留。
+
+定向原生/CLI测试以及上述完整统一回归通过。控制覆盖未知字段与确定字段的布尔组合、
+`!=`/NOT、重复值、精确数值失败、PDU顺序、淘汰/union预算、缓存失效和页面partial提示；
+每个确定结果还核对添加后来字段后不变。此变更改善保留证据的查询，不恢复已淘汰详情，
+也不把 parser namespace 提升为已认证的应用协议或宣称所有字段已解析。
