@@ -22,6 +22,9 @@ var controlDatagramProfiles = []controlDatagramProfile{
 	{"nbt-dg", "NBTDGMessage", []uint16{138}}, {"onc-rpc", "ONCRPCMessage", []uint16{111}},
 	{"l2tp", "L2TPMessage", []uint16{1701}}, {"openvpn", "OpenVPNMessage", []uint16{1194}},
 	{"ipmi", "IPMIMessage", []uint16{623}},
+	{"hsrp", "HSRPMessageFields", []uint16{1985, 2029}},
+	{"glbp", "GLBPMessageFields", []uint16{3222}},
+	{"bfd", "BFDMessageFields", []uint16{3784, 4784}},
 }
 
 func controlPort(ports []uint16, p uint16) bool {
@@ -38,7 +41,15 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 		if !selected && (explicit != "" || !controlPort(p.ports, src) && !controlPort(p.ports, dst)) {
 			continue
 		}
-		fields, err := stream_parser.DecodeNetworkControl(w, p.name)
+		var fields map[string]any
+		var err error
+		routing := p.name == "hsrp" || p.name == "glbp" || p.name == "bfd"
+		if routing {
+			fields, err = stream_parser.DecodeRoutingControl(w, p.name, a.budget.MaxCollectionElements)
+			err = observedWireError(err)
+		} else {
+			fields, err = stream_parser.DecodeNetworkControl(w, p.name)
+		}
 		if err != nil && !selected {
 			continue
 		}
@@ -47,7 +58,14 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 				continue
 			}
 		}
+		if routing && err == nil && !a.routingConversation(e, fields, p.name, selected) {
+			continue
+		}
 		e.Protocol, e.Rule, e.Entry = p.name, "network_control_fields", p.entry
+		if routing {
+			e.Rule = "routing_control"
+			e.nativeSessionMessage = true
+		}
 		if p.name == "ike-natt" {
 			e.Protocol = "ike"
 		}
@@ -58,6 +76,9 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 		if err == nil {
 			e.Session = fields
 			e.semanticFields = cloneSession(fields)
+			if routing {
+				e.semanticSession = cloneSession(fields)
+			}
 			e.Summary = fields["Packet Name"].(string)
 		}
 		a.finishProtocolDatagram(e, w, nil, err)

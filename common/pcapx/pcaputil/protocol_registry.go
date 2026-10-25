@@ -13,6 +13,9 @@ func NativeProtocolProfiles() []ProtocolProfile {
 	// Native ingress requires an observed wire grammar and directional state;
 	// legacy YAML availability alone does not imply a registered receiver.
 	return []ProtocolProfile{
+		{"hsrp", "udp", "complete HSRPv1 advertisement and bounded HSRPv2 TLV messages", "sender/interface observations; short interface-only TLVs require a previous complete sender identity; no router election, authentication or inherited group/VIP fields"},
+		{"glbp", "udp", "GLBPv1 header and complete Hello/forwarder/authentication TLVs", "bounded sender/owner/group observations; changed owner identity resets context; unknown TLVs stay raw; no inferred gateway health or authentication"},
+		{"bfd", "udp", "BFDv1 control header and complete optional authentication envelope", "observed discriminator pairs, one-sided bootstrap, reciprocal Poll/Final and tuple reuse; no cryptographic/TTL verification, link-health inference or port-only Echo classification"},
 		{"bgp", "tcp", "BGP4 marker, bounded OPEN/UPDATE/NOTIFICATION/KEEPALIVE/ROUTE-REFRESH", "observed TCP generation; AS4, extended-message and directional ADD-PATH negotiation; unknown width/family remains opaque; repeated OPEN quarantines negotiation; no routing-policy or peer authentication inference"},
 		{"ajp", "tcp", "AJP13 directional magic, complete typed messages and contextual untyped request body", "one observed Forward Request per reusable request cycle; exact strings, headers, attributes and Content-Length; pull/body/ping/reuse association; ambiguous reuse quarantined; incomplete Close"},
 		{"rtmp", "tcp", "complete version3 initial/echo handshake, directional chunk sizes and CSID fmt0/1/2/3", "bounded interleaved logical messages, extended timestamp/wrap, Abort and command transaction observation; separate payload byte source and parent chunks; AMF0, controls, selected audio/video headers and aggregates; public digest is not authentication; no RTMPE, AMF3 or shared-object event interpretation"},
@@ -136,6 +139,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
+		case "hsrp", "glbp", "bfd":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
