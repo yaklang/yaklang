@@ -24,6 +24,16 @@ type protocolConversationIdentity struct {
 	touched time.Time
 }
 
+type associationReference struct {
+	id   uint64
+	hash string
+}
+type associationObservation struct {
+	id         uint64
+	name, hash string
+	refs       []pcaputil.PacketReference
+}
+
 func conversationKey(raw *capturedPacket) protocolConversationKey {
 	domain := raw.reference.Domain
 	if raw.conversationDomainSet {
@@ -200,9 +210,17 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 	}
 	key := conversationKey(raw)
 	v := &streamSnapshot{id: raw.conversationID | uint64(1)<<63, transport: key.transport, closed: "retained message window", domain: key.domain}
-	remaining := 256 << 10
 	seen := map[pcaputil.PacketReference]bool{}
 	metadata := raw.history.Rows("", raw.conversationID)
+	proofBudget := 0
+	for _, m := range metadata {
+		if m.Protocol == "l2tp" && m.Domain == v.domain && m.Transport == v.transport {
+			proofBudget = 32 << 10
+			break
+		}
+	}
+	remaining := (256 << 10) - proofBudget
+	proofIDs := map[uint64]int{}
 	start := max(0, len(metadata)-128)
 	targets := map[uint64]bool{}
 	for _, id := range raw.eventIDs {
@@ -237,6 +255,7 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 		if peers, ok := eventValues(e)["Observed Control Peers"].([]string); ok && len(peers) == 2 {
 			v.endpoints = [2]string{peers[0], peers[1]}
 		}
+		collectAssociationReferences(v, e, proofIDs)
 		e = boundedEvent(e, &remaining)
 		v.events = append(v.events, e)
 		if len(v.events) == 1 {
@@ -270,52 +289,61 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 		v.protocol = p.stack[0]
 	}
 	v.evidence = "protocol session association; retained events only"
-	retainAssociationProofs(v, raw.history, &remaining)
+	retainAssociationProofs(v, raw.history, &proofBudget)
+	v.associationReferences = nil
 	return v
+}
+
+func collectAssociationReferences(v *streamSnapshot, e *pcaputil.ProtocolEvent, seen map[uint64]int) {
+	if e.Protocol != "l2tp" {
+		return
+	}
+	for _, key := range []string{"Control Context Proof", "Context Proof"} {
+		for _, p := range mapList(eventValues(e)[key]) {
+			id, hash := number(p["PDU"]), textValue(p["Wire SHA256"])
+			if id == 0 {
+				continue
+			}
+			if len(hash) != 64 {
+				hash = ""
+			}
+			if i, ok := seen[id]; ok {
+				if v.associationReferences[i].hash != hash {
+					v.associationReferences[i].hash = ""
+				}
+				continue
+			}
+			if len(v.associationReferences) >= 128 {
+				v.associationLimited = true
+				continue
+			}
+			seen[id] = len(v.associationReferences)
+			v.associationReferences = append(v.associationReferences, associationReference{id, hash})
+		}
+	}
 }
 
 // Setup observations are retained separately from this flow's messages. A
 // missing, foreign-domain or different-byte PDU never becomes setup evidence.
 func retainAssociationProofs(v *streamSnapshot, history *pcaputil.ProtocolInspector, remaining *int) {
-	seen := map[uint64]bool{}
-	messages := map[uint64]*pcaputil.ProtocolEvent{}
-	for _, e := range v.events {
-		messages[e.ID] = e
-	}
-	for _, e := range v.events {
-		if e.Protocol != "l2tp" {
+	for _, r := range v.associationReferences {
+		p := retainedProtocolDetail(history, r.id)
+		if p == nil || p.Domain != v.domain || p.Transport != v.transport || p.Protocol != "l2tp" || len(p.Raw) == 0 || fmt.Sprintf("%x", sha256.Sum256(p.Raw)) != r.hash {
+			v.associationUnavailable = append(v.associationUnavailable, r.id)
 			continue
 		}
-		for _, key := range []string{"Control Context Proof", "Context Proof"} {
-			for _, proof := range mapList(eventValues(e)[key]) {
-				id := number(proof["PDU"])
-				if id == 0 || seen[id] {
-					continue
-				}
-				if len(v.associationProofs)+len(v.associationUnavailable) >= 128 {
-					v.associationLimited = true
-					return
-				}
-				seen[id] = true
-				if p := messages[id]; p != nil {
-					if len(p.Raw) == 0 || fmt.Sprintf("%x", sha256.Sum256(p.Raw)) != textValue(proof["Wire SHA256"]) {
-						v.associationUnavailable = append(v.associationUnavailable, id)
-					}
-					continue
-				}
-				p := retainedProtocolDetail(history, id)
-				if p == nil || p.Domain != v.domain || p.Transport != v.transport || p.Protocol != "l2tp" || len(p.Raw) == 0 || fmt.Sprintf("%x", sha256.Sum256(p.Raw)) != textValue(proof["Wire SHA256"]) {
-					v.associationUnavailable = append(v.associationUnavailable, id)
-					continue
-				}
-				p = boundedEvent(p, remaining)
-				if len(p.Raw) == 0 {
-					v.associationUnavailable = append(v.associationUnavailable, id)
-					continue
-				}
-				v.associationProofs = append(v.associationProofs, p)
-			}
+		name := textValue(eventValues(p)["Packet Name"])
+		cost := 96 + len(name) + len(r.hash)
+		for _, ref := range p.SourceBytes.PacketRefs {
+			cost += 96 + len(ref.Domain.Encapsulation)
 		}
+		if cost > *remaining {
+			v.associationUnavailable = append(v.associationUnavailable, r.id)
+			v.associationLimited = true
+			continue
+		}
+		*remaining -= cost
+		v.associationProofs = append(v.associationProofs, associationObservation{id: r.id, name: name, hash: r.hash, refs: append([]pcaputil.PacketReference(nil), p.SourceBytes.PacketRefs...)})
 	}
 }
 
@@ -327,14 +355,18 @@ func datagramEvidenceRows(v *streamSnapshot) []streamLine {
 	if len(v.associationProofs) > 0 {
 		rows = append(rows, streamLine{"Retained setup observations · wire SHA256 matches the referenced PDU; peer/control authentication not verified", inkGold})
 		for _, e := range v.associationProofs {
-			rows = append(rows, streamLine{fmt.Sprintf("Setup PDU #%d · %s · %s → %s · SHA256 %x", e.ID, textValue(eventValues(e)["Packet Name"]), e.Source, e.Destination, sha256.Sum256(e.Raw)), inkCyan})
+			var frames []uint64
+			for _, ref := range e.refs {
+				frames = append(frames, ref.Number)
+			}
+			rows = append(rows, streamLine{fmt.Sprintf("Setup PDU #%d · %s · frames %v · SHA256 %s", e.id, e.name, frames, e.hash), inkCyan})
 		}
 	}
 	if len(v.associationUnavailable) > 0 {
 		rows = append(rows, streamLine{fmt.Sprintf("Setup observations unavailable/evicted or bytes do not match: %v", v.associationUnavailable), inkGold})
 	}
 	if v.associationLimited {
-		rows = append(rows, streamLine{"Setup reference limit reached; additional observations are unavailable in this view", inkGold})
+		rows = append(rows, streamLine{"Setup proof window limit reached; additional observations are unavailable in this view", inkGold})
 	}
 	for _, e := range v.events {
 		rows = append(rows, streamLine{fmt.Sprintf("PDU #%d · %s · %s · %s", e.ID, eventProtocolName(e), e.Status, e.Admission), inkText})
