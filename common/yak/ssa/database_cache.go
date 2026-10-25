@@ -557,6 +557,13 @@ func (c *ProgramCache) findByVariableEx(mod ssadb.MatchMode, checkValue func(str
 	return c.indexes.FindByVariableEx(mod, checkValue, c.GetInstruction)
 }
 
+func (c *ProgramCache) findByVariableName(mod ssadb.MatchMode, name string) []Instruction {
+	if c == nil || c.indexes == nil {
+		return nil
+	}
+	return c.indexes.FindByVariableName(mod, name, c.GetInstruction)
+}
+
 // setAtomicMaxIfGreater updates the atomic counter only when the new value is
 // larger than the current one.
 func setAtomicMaxIfGreater(counter *atomic.Int64, value int64) {

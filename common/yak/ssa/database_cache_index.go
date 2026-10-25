@@ -401,6 +401,53 @@ func (s *indexStore) appendIndex(index *utils.SafeMapWithKey[string, []int64], n
 // checkValue is a pure exact/glob/regexp predicate. Key filtering can run under
 // an index read lock, but resolve (which may populate indexes) always runs after
 // the matching snapshot has released that lock.
+// FindByVariableName resolves one exact variable, member, or class name.
+// Exact rules used to scan every index key. Hue's struct scan calls that
+// path once per rule while the index grows to hundreds of thousands of names.
+func (s *indexStore) FindByVariableName(mod ssadb.MatchMode, name string, resolve func(id int64) Instruction) []Instruction {
+	if s == nil || resolve == nil || name == "" {
+		return nil
+	}
+	var ins []Instruction
+	seen := make(map[int64]struct{})
+	resolveOnce := func(id int64) Instruction {
+		if id <= 0 {
+			return nil
+		}
+		if _, exists := seen[id]; exists {
+			return nil
+		}
+		seen[id] = struct{}{}
+		return resolve(id)
+	}
+	appendIDs := func(ids []int64) {
+		copied := append([]int64(nil), ids...)
+		for _, id := range copied {
+			if inst := resolveOnce(id); inst != nil {
+				ins = append(ins, inst)
+			}
+		}
+	}
+	if mod&ssadb.KeyMatch != 0 && s.member != nil {
+		if ids, ok := s.member.Get(name); ok {
+			appendIDs(ids)
+		}
+	}
+	if mod&ssadb.NameMatch != 0 {
+		if s.variable != nil {
+			if ids, ok := s.variable.Get(name); ok {
+				appendIDs(ids)
+			}
+		}
+		if s.class != nil {
+			if ids, ok := s.class.Get(name); ok {
+				appendIDs(ids)
+			}
+		}
+	}
+	return ins
+}
+
 func (s *indexStore) FindByVariableEx(mod ssadb.MatchMode, checkValue func(string) bool, resolve func(id int64) Instruction) []Instruction {
 	if s == nil || resolve == nil {
 		return nil

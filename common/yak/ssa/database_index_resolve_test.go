@@ -1,6 +1,7 @@
 package ssa
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -36,6 +37,27 @@ func TestVariableIndexResolvesEachInstructionOnce(t *testing.T) {
 		require.Equal(t, map[int64]int{1: 1, 2: 1, 3: 1}, calls)
 		require.Len(t, result, 2)
 	}
+}
+
+func TestVariableIndexExactNameMatchesOnlyThatKey(t *testing.T) {
+	s := &indexStore{
+		variable: utils.NewSafeMapWithKey[string, []int64](),
+		member:   utils.NewSafeMapWithKey[string, []int64](),
+		class:    utils.NewSafeMapWithKey[string, []int64](),
+	}
+	for i := 0; i < 1000; i++ {
+		s.variable.Set(fmt.Sprintf("other-%d", i), []int64{int64(1000 + i)})
+	}
+	s.variable.Set("keep", []int64{1, 1, 0})
+	s.member.Set("keep", []int64{4})
+	s.class.Set("keep", []int64{1})
+	var ids []int64
+	got := s.FindByVariableName(ssadb.NameMatch|ssadb.KeyMatch, "keep", func(id int64) Instruction {
+		ids = append(ids, id)
+		return NewConst(id)
+	})
+	require.ElementsMatch(t, []int64{1, 4}, ids)
+	require.Len(t, got, 2)
 }
 
 func TestVariableIndexFiltersBeforeResolvingOutsideLock(t *testing.T) {
