@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **204**，`partial` **21**，`todo` **393**。目录共 **502** 个入口：`stable` **15**，`partial` **314**，`new` **173**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **503** 个入口：`stable` **15**，`partial` **316**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -159,7 +159,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | NVMe-oF | todo | [partial / NVMeTCP](rules/application-layer/nvme_tcp.yaml) |
 | P2 | Nagios NRPE | todo | 需核对别名/Fields 入口 |
 | P2 | NetFlow v5 | todo | [partial / NetFlowV5](rules/application-layer/netflow_v5.yaml) |
-| P2 | NetFlow v9 | todo | [new / NetFlowV9](rules/application-layer/extended_protocols.yaml) |
+| P2 | NetFlow v9 | partial | [partial / NetFlowV9](rules/application-layer/extended_protocols.yaml) |
 | P2 | OAuth/OIDC wire | todo | 需核对别名/Fields 入口 |
 | P2 | OCI distribution | todo | 需核对别名/Fields 入口 |
 | P2 | OCSP | todo | [new / OCSPRequest](rules/application-layer/ocsp.yaml) |
@@ -496,7 +496,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/etcd.yaml](rules/application-layer/etcd.yaml) | ETCD (`EtcdVersionHTTP`, partial) |
 | [application-layer/ether_sbus.yaml](rules/application-layer/ether_sbus.yaml) | Ether-S-Bus (`EtherSBus`, partial) |
 | [application-layer/ether_sio.yaml](rules/application-layer/ether_sio.yaml) | Ether-S-I/O (`EtherSIO`, partial) |
-| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, partial)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, partial)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, partial)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, new)<br>OPC UA (`OPCUATCPMessage`, partial)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, partial)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
+| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, partial)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, partial)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, partial)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, partial)<br>OPC UA (`OPCUATCPMessage`, partial)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, partial)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
 | [application-layer/ftp.yaml](rules/application-layer/ftp.yaml) | FTP (``, new)<br>FTPS (`FTPAuthTLS`, new) |
 | [application-layer/gquic.yaml](rules/application-layer/gquic.yaml) | GQUIC Q035 (`GQUIC35ClientPacket`, partial) |
 | [application-layer/gssapi.yaml](rules/application-layer/gssapi.yaml) | GSS-API (`GSSAPIHTTP`, partial) |
@@ -657,6 +657,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [nbt_dg.yaml](rules/nbt_dg.yaml) | NBT DG (``, new) |
 | [net_remoting.yaml](rules/net_remoting.yaml) | .NET Remoting (``, new) |
 | [netbios_frame.yaml](rules/netbios_frame.yaml) | NetBEUI (`NetBIOSFrame`, partial) |
+| [netflow_v9.yaml](rules/netflow_v9.yaml) | NetFlow v9 Observed Message Fields (`NetFlowV9Fields`, partial) |
 | [network_control_fields.yaml](rules/network_control_fields.yaml) | IKE NAT-T Wire Message (`IKENATTMessage`, partial)<br>IKE Wire Message (`IKEMessage`, partial)<br>IPMI Wire Message (`IPMIMessage`, partial)<br>L2TP Wire Message (`L2TPMessage`, partial)<br>NetBIOS Datagram Wire Message (`NBTDGMessage`, partial)<br>NetBIOS Session Control (`NBSSControl`, partial)<br>ONC RPC Wire Message (`ONCRPCMessage`, partial)<br>OpenVPN Wire Message (`OpenVPNMessage`, partial)<br>RIP Wire Message (`RIPMessage`, partial)<br>Telnet Wire Message (`TelnetMessage`, partial)<br>WireGuard Wire Message (`WireGuardMessage`, partial) |
 | [network_samples.yaml](rules/network_samples.yaml) | IPcomp (`IPComp`, partial)<br>MPLS PW (`MPLSEthernetPW`, partial)<br>NVGRE (`NVGRE`, partial) |
 | [nhrp.yaml](rules/nhrp.yaml) | NHRP (`NHRP`, partial) |

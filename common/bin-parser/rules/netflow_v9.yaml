@@ -1,0 +1,9 @@
+# RFC3954 bounded UDP export. Native receiver supplies independently scoped
+# previous templates; this stateless entry accepts only self-contained messages.
+# Legacy NetFlowV9 in extended_protocols.yaml retains its original leaf tree.
+endian: big
+Package:
+  NetFlowV9Fields:
+    operator: |
+      err = parseObservedSession("netflow-v9")
+      if err != nil { panic(err) }
