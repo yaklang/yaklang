@@ -208,6 +208,9 @@ func (u *tui) mouse(m mouseEvent) {
 			if m.y == l.tabs {
 				if u.pane == 3 {
 					for i, x := range []int{54, 71, 85, 101} {
+						if i < 2 && u.stream != nil && u.stream.messageBoundaries() {
+							continue
+						}
 						length := []int{13, 10, 12, 12}[i]
 						if x+length < u.width-1 && m.x >= x && m.x < x+length {
 							u.key([]string{"h", "l", "e", "a"}[i], nil)
