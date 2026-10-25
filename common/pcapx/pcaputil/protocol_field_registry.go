@@ -39,6 +39,7 @@ type DisplayFieldDescriptor struct {
 	Origin      string             `json:"origin"`
 	Description string             `json:"description"`
 	Values      []DisplayFieldEnum `json:"values,omitempty"`
+	AllowEmpty  bool               `json:"allow_empty,omitempty"`
 }
 
 type DisplayFieldEnum struct {
@@ -174,6 +175,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, routingDisplayBindings()...)
 	out = append(out, pimDisplayBindings()...)
 	out = append(out, l2tp3DisplayBindings()...)
+	out = append(out, stpDisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
@@ -428,7 +430,7 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 				continue
 			}
 			emit := func(value any) {
-				if value == nil || value == "" {
+				if value == nil || value == "" && !b.descriptor.AllowEmpty {
 					return
 				}
 				if b.descriptor.Name == "tls.version" || b.descriptor.Name == "tls.handshake.ciphersuite" {
@@ -472,7 +474,7 @@ func normalizeDisplayValue(value any, d DisplayFieldDescriptor) (any, bool) {
 	switch d.Type {
 	case DisplayString:
 		v, ok := value.(string)
-		return v, ok && v != "" && utf8.ValidString(v)
+		return v, ok && (v != "" || d.AllowEmpty) && utf8.ValidString(v)
 	case DisplayBoolean:
 		v, ok := value.(bool)
 		return v, ok

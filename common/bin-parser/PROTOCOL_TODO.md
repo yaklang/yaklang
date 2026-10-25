@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **206**，`partial` **16**，`todo` **396**。目录共 **499** 个入口：`stable` **15**，`partial` **310**，`new` **174**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **204**，`partial` **19**，`todo` **395**。目录共 **502** 个入口：`stable` **15**，`partial` **314**，`new` **173**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -51,7 +51,9 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
 | P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
+| P1 | RSTP | partial | [partial / STPFields](rules/stp.yaml) |
 | P1 | RTMP | partial | [partial / ](rules/rtmp.yaml) |
+| P1 | STP | partial | [partial / STPFields](rules/stp.yaml) |
 | P2 | 3GPP NAS | todo | 需核对别名/Fields 入口 |
 | P2 | 3GPP NGAP | todo | 需核对别名/Fields 入口 |
 | P2 | 3GPP S1AP | todo | 需核对别名/Fields 入口 |
@@ -145,7 +147,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | MPEG-TS | todo | [new / MPEGTransportStream](rules/application-layer/extended_protocols.yaml) |
 | P2 | MPLS PW | todo | [partial / MPLSEthernetPW](rules/network_samples.yaml) |
 | P2 | MQTT-SN | todo | 需核对别名/Fields 入口 |
-| P2 | MSTP | todo | 需核对别名/Fields 入口 |
+| P2 | MSTP | partial | [partial / STPFields](rules/stp.yaml) |
 | P2 | Modbus RTU/ASCII | todo | 需核对别名/Fields 入口 |
 | P2 | Modbus TCP | todo | [new / ModbusTCP](rules/application-layer/extended_protocols.yaml) |
 | P2 | Mount | todo | [partial / ONCRPC](rules/onc_rpc.yaml) |
@@ -686,7 +688,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [sip.yaml](rules/sip.yaml) | SIP (``, new) |
 | [sna.yaml](rules/sna.yaml) | SNA (`SNAEthernet`, partial) |
 | [socks4.yaml](rules/socks4.yaml) | SOCKS4 (``, new) |
-| [stp.yaml](rules/stp.yaml) | RSTP (`STP`, partial)<br>STP (``, new) |
+| [stp.yaml](rules/stp.yaml) | MSTP (`STPFields`, partial)<br>PVST+ (`PVSTFields`, partial)<br>RPVST+ (`PVSTFields`, partial)<br>RSTP (`STPFields`, partial)<br>STP (`STPFields`, partial) |
 | [stun.yaml](rules/stun.yaml) | STUN (``, new) |
 | [swipe.yaml](rules/swipe.yaml) | swIPe (`SwIPe`, partial) |
 | [syslog.yaml](rules/syslog.yaml) | Syslog (``, new) |

@@ -46,6 +46,7 @@ type fragmentStore struct {
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
+	if a.observeSTP(p, e) { return nil, true }
 	if decoded := p.Layers(); len(decoded) != 0 {
 		if can, ok := decoded[0].(*socketCANLayer); ok {
 			a.decodeCANRecord(can.wire, e, ci)
@@ -457,12 +458,18 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if ci.Timestamp.After(s.clock) {
 		s.clock = ci.Timestamp
 	}
+	var expired []fragmentKey
 	for k, v := range s.sets {
 		if s.clock.Sub(v.last) > 30*time.Second {
-			a.buffered.Add(-v.cost)
-			delete(s.sets, k)
-			a.fragmentDiagnostic(v, "FragmentTimeout")
+			expired = append(expired, k)
 		}
+	}
+	sortFragmentKeys(expired)
+	for _, k := range expired {
+		v := s.sets[k]
+		a.buffered.Add(-v.cost)
+		delete(s.sets, k)
+		a.fragmentDiagnostic(v, "FragmentTimeout")
 	}
 	if s.clock.Before(s.blockedUntil) {
 		a.networkDiagnostic(e, ci, "limited", "FragmentQuarantineBudget")
@@ -734,12 +741,49 @@ func (a *binParser) closeFragments() {
 	s := &a.fragments
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	for _, v := range s.sets {
+	keys := make([]fragmentKey, 0, len(s.sets))
+	for k := range s.sets {
+		keys = append(keys, k)
+	}
+	sortFragmentKeys(keys)
+	for _, k := range keys {
+		v := s.sets[k]
 		a.buffered.Add(-v.cost)
 		a.fragmentDiagnostic(v, "FragmentCaptureEnded")
 	}
 	s.sets = nil
 	s.blockedUntil = time.Time{}
+}
+
+// Diagnostics allocate PDU IDs and compete for bounded history just like
+// decoded messages. A randomized map traversal must not decide which physical
+// frames still have details after EOF or a batch of simultaneous expirations.
+func sortFragmentKeys(keys []fragmentKey) {
+	sort.Slice(keys, func(i, j int) bool {
+		a, b := keys[i], keys[j]
+		if a.domain.Section != b.domain.Section {
+			return a.domain.Section < b.domain.Section
+		}
+		if a.domain.Interface != b.domain.Interface {
+			return a.domain.Interface < b.domain.Interface
+		}
+		if a.domain.Encapsulation != b.domain.Encapsulation {
+			return a.domain.Encapsulation < b.domain.Encapsulation
+		}
+		if a.src != b.src {
+			return a.src < b.src
+		}
+		if a.dst != b.dst {
+			return a.dst < b.dst
+		}
+		if a.id != b.id {
+			return a.id < b.id
+		}
+		if a.protocol != b.protocol {
+			return a.protocol < b.protocol
+		}
+		return !a.v6 && b.v6
+	})
 }
 func (a *binParser) fragmentDiagnostic(v *fragmentSet, code string) {
 	if len(v.parts) == 0 {

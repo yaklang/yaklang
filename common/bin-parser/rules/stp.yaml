@@ -2,24 +2,39 @@ endian: big
 Package:
   STP:
     operator: |
+      // Validate the entire selected message before publishing the historical
+      // leaf layout. Recovery keeps the original cursor and child names.
+      if this.HasMaxLength() {
+        staged, operation = this.TryProcessByType("STPValidation")
+        operation.Recovery()
+        if !operation.OK { panic("stp: complete selected BPDU grammar failed") }
+      }
       this.ProcessSubNode("Protocol ID")
       if getNodeResult("Protocol ID").Value != 0 {
         panic("stp: protocol id must be 0")
       }
       this.ProcessSubNode("Version")
+      version = getNodeResult("Version").Value
       this.ProcessSubNode("BPDU Type")
       btype = getNodeResult("BPDU Type").Value
       if btype == 0x80 {
+        if version != 0 { panic("stp: TCN requires version0") }
         return
       }
       if btype == 0x00 || btype == 0x02 {
+        if !((version == 0 && btype == 0) || ((version == 2 || version == 3) && btype == 2)) { panic("stp: unsupported version/type") }
         this.ProcessSubNode("Config")
+        if version == 3 {
+          this.GetSubNode("MST Extension").SetMaxLength(this.GetMaxLength() - this.Length())
+          this.ProcessSubNode("MST Extension")
+        }
         return
       }
       panic("stp: unknown bpdu type")
     Protocol ID: uint16
     Version: uint8
     BPDU Type: uint8
+    MST Extension: raw
     Config:
       operator: |
         this.ProcessSubNode("Flags")
@@ -58,3 +73,15 @@ Package:
       Hello Time: uint16
       Forward Delay: uint16
       Version 1 Length: uint8
+  STPFields:
+    operator: |
+      err = parseObservedSession("stp")
+      if err != nil { panic(err) }
+  PVSTFields:
+    operator: |
+      err = parseObservedSession("pvst")
+      if err != nil { panic(err) }
+STPValidation:
+  operator: |
+    err = parseObservedSession("stp")
+    if err != nil { panic(err) }
