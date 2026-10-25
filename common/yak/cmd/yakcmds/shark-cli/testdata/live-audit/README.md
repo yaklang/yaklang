@@ -224,3 +224,26 @@ independent key log to distinguish opaque record types from authenticated inner
 types. An independently known negative RIP prefix may expose a Wireshark field
 under explicit selection; that difference is retained with its frame number.
 Other query discrepancies fail. These are replays, not new live captures.
+
+`pim_control_audit.py ORACLE_JSON EVENTS_JSONL OUTPUT_JSON` checks original PIMv2
+wire occurrences, enclosing control endpoints, independent IPv4/IPv6 checksums,
+ordered typed fields, capture domains and the absence of invented transport
+flows. Use `-2 -n -Y pim -T json -x --no-duplicate-keys` for the oracle. Explicit
+encoded-address wrapper/leaf repetitions are reported separately. Refused
+messages and unselected versions remain in the result; zero decoded messages
+cannot establish positive coverage. The Sharon fuzz run deliberately retains
+its nonzero audit exit and unresolved views rather than declaring parity.
+
+`pim_fuzz_review.py ORACLE_JSON PIM_AUDIT_JSON OUTPUT_JSON` adds independent
+original IP-header length/fragment barriers to raw missing views without
+changing their count. It verifies header bytes against their original physical
+frame and excludes logical data-source offsets from physical bounds checks.
+Entries with no proved barrier remain unresolved carrier/extension work.
+
+`pim_fragment_faults.py SOURCE_CAP OUTPUT_DIRECTORY TSHARK EVENTS` accepts the
+real Wireshark `pim-reg.cap` loopback capture and makes seven explicitly offline
+IPv6 fragmentation/order/duplicate/loss/snaplen/retransmission controls. PIM
+bytes and endpoints remain original; each changed envelope and file is hashed
+in the external manifest. Missing data must produce no complete PIM, while a
+full retransmission can repair a proved capture cut. This is offline replay,
+not a new live router capture. All captures and raw output must stay outside Git.

@@ -39,7 +39,7 @@ func TestRoutingControlCanonicalEntries(t *testing.T) {
 func requireRoutingControlScopes(t *testing.T) map[string]bool {
 	t.Helper()
 	result := map[string]bool{}
-	for _, name := range []string{"HSRP", "GLBP", "BFD", "LDP"} {
+	for _, name := range []string{"HSRP", "GLBP", "BFD", "LDP", "PIM"} {
 		found := false
 		for _, row := range ProtocolRoadmap {
 			if row.Name == name {
@@ -58,7 +58,9 @@ func requireRoutingControlScopes(t *testing.T) map[string]bool {
 			}
 		}
 		require.True(t, found)
-		if name == "LDP" {
+		if name == "PIM" {
+			result[name] = t.Run("PIMBoundedControlScope", TestPIMCanonicalControlFields)
+		} else if name == "LDP" {
 			result[name] = t.Run("LDPBoundedDiscoveryScope", TestLDPDiscoveryCanonicalCompleteMessagesAndBoundaries)
 			result[name] = t.Run("LDPBoundedTCPScope", TestLDPTCPCanonicalCompleteMessages) && result[name]
 		} else {

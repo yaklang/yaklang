@@ -82,7 +82,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -247,7 +247,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -329,6 +329,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "pim" {
+			// Lead with the actual control message and advertised (S,G), not
+			// unrelated generic metadata or a large base64 copy of its body.
+			// The complete PDU remains selectable in the byte-source pane.
+			delete(values, "Encapsulated Bytes")
+			for _, key := range []string{"Packet Name", "Version", "Type", "Null Register", "Border", "Register IP Header", "Upstream Neighbor", "Group Count", "Hold Time", "Group", "Source", "Originator", "Groups", "Options", "Fragment Tag", "Hash Mask Length", "BSR Priority", "BSR", "Priority", "RP", "Prefix Count", "Advertised Groups", "RPT", "Metric Preference", "Metric", "Mask Length", "TTL", "Prune Indicator", "Prune Now", "Assert Override", "Interval", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope", "Bootstrap Reassembly"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "ldp" {
 			for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
 				if v, ok := values[key]; ok {

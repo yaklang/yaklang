@@ -119,6 +119,9 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "pim" && number(eventValues(e)["Version"]) == 2 {
+		return "PIMv2"
+	}
 	if e.Protocol == "hsrp" {
 		switch number(eventValues(e)["Protocol Version"]) {
 		case 1:
@@ -348,6 +351,56 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "pim" {
+		v := eventValues(e)
+		parts := []string{textValue(v["Packet Name"])}
+		address := func(key string) string {
+			m, _ := v[key].(map[string]any)
+			return textValue(m["Address"])
+		}
+		switch number(v["Type"]) {
+		case 0:
+			for _, o := range mapList(v["Options"]) {
+				if hold, ok := o["Hold Time"]; ok {
+					label := fmt.Sprintf("advertised hold=%d s", number(hold))
+					if number(hold) == 65535 {
+						label = "advertised hold=infinite"
+					}
+					if number(hold) == 0 {
+						label = "goodbye (hold=0)"
+					}
+					parts = append(parts, label)
+				}
+				if id, ok := o["Generation ID"]; ok {
+					parts = append(parts, fmt.Sprintf("GenID=0x%08x", number(id)))
+				}
+				if priority, ok := o["DR Priority"]; ok {
+					parts = append(parts, fmt.Sprintf("advertised DR priority=%d", number(priority)))
+				}
+			}
+		case 1:
+			m, _ := v["Register IP Header"].(map[string]any)
+			parts = append(parts, fmt.Sprintf("(S,G)=(%s,%s)", textValue(m["Source"]), textValue(m["Group"])))
+			if v["Null Register"] == true {
+				parts[0] = "Null-Register"
+				parts = append(parts, "dummy header; advertised addresses only")
+			}
+		case 3, 6, 7:
+			var joins, prunes uint64
+			for _, g := range mapList(v["Groups"]) {
+				joins += number(g["Join Count"])
+				prunes += number(g["Prune Count"])
+			}
+			parts = append(parts, fmt.Sprintf("upstream=%s · groups=%d · joins=%d prunes=%d", address("Upstream Neighbor"), number(v["Group Count"]), joins, prunes))
+		case 2, 5, 9:
+			parts = append(parts, fmt.Sprintf("(S,G)=(%s,%s)", address("Source"), address("Group")))
+		case 4:
+			parts = append(parts, fmt.Sprintf("BSR=%s · fragment=0x%04x · RP-set not assembled", address("BSR"), number(v["Fragment Tag"])))
+		case 8:
+			parts = append(parts, fmt.Sprintf("advertised RP=%s · groups=%d", address("RP"), number(v["Prefix Count"])))
+		}
+		return strings.Join(parts, " · ")
+	}
 	if e.Protocol == "ldp" {
 		v := eventValues(e)
 		parts := []string{fmt.Sprintf("LSR %s:%d", textValue(v["LSR ID"]), number(v["Label Space ID"]))}
@@ -562,6 +615,9 @@ func grpcMessageData(m map[string]any) ([]byte, string) {
 
 func eventPriority(e *pcaputil.ProtocolEvent) int {
 	p := 20
+	if e.Protocol == "pim" {
+		p = 5 // preserve the control layer without hiding admitted inner data
+	}
 	if e.Protocol == "tls" || e.Protocol == "quic" || e.Protocol == "dtls" {
 		p = 10
 	}
@@ -762,7 +818,21 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 			row.ProtocolStack = append(row.ProtocolStack, network, carrier)
 		}
 	}
-	row.ProtocolStack = append(row.ProtocolStack, p.stack...)
+	// A native control event can describe a layer already exposed by capture
+	// decoding (PIM, ARP, etc.). Do not append it a second time. Preserve the
+	// original chain itself: repeated IP headers are real tunnel layers.
+	for _, semantic := range p.stack {
+		present := false
+		for _, physical := range row.ProtocolStack {
+			if semantic == physical {
+				present = true
+				break
+			}
+		}
+		if !present {
+			row.ProtocolStack = append(row.ProtocolStack, semantic)
+		}
+	}
 	row.ProtocolScope = "protocol message"
 	if row.Transport == "tcp" {
 		row.ProtocolScope = "reassembled message"

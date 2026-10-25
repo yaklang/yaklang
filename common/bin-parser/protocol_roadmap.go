@@ -144,7 +144,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "HSRP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1, Notes: "Bounded native v1/v2 advertisements and sender context; authentication/router state unverified"},
 	{Name: "GLBP", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "Bounded native hello/forwarder/auth TLVs and owner/group isolation; election and authentication unverified"},
 	{Name: "CARP", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
-	{Name: "PIM", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
+	{Name: "PIM", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP2, Notes: "Bounded v2 control advertisements and Register carrier/dummy separation; checksum verified with enclosing IP context; v1/extensions, operational routing state and Bootstrap RP-set assembly excluded"},
 	{Name: "DVMRP", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
 	{Name: "MSDP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "LDP", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "Bounded UDP discovery and base TCP messages, prefix FEC/generic labels, observed Init/KeepAlive and generation isolation; no installed label database, ATM/FR/extended FEC semantics or authenticated LSR inference"},
