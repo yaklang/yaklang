@@ -45,7 +45,7 @@ func (a *binParser) observeISIS(p gopacket.Packet, evidence captureEvidence) boo
 		}
 		wire, selected, err := isisEthernetCarrier(eth)
 		if !selected {
-			continue
+			return false // first Ethernet is the root; an inner pseudowire needs its own admission proof
 		}
 		ci := p.Metadata().CaptureInfo
 		e := &ProtocolEvent{Protocol: "isis", Transport: "ethernet", Domain: evidence.Ref.Domain,

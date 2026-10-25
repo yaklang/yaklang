@@ -21,6 +21,8 @@ func DecodeISISWire(w []byte, limit int) (map[string]any, error) {
 		"Protocol Name":           "IS-IS",
 		"Observation Scope":       "independent link-state advertisement; no inherited fields, elected DIS, authenticated adjacency, assembled LSDB or installed routes",
 		"Authentication Verified": false,
+		"Checksum Verified":       false,
+		"Checksum Observation":    "no checksum observed; integrity not verified",
 		"Database Completeness":   "unavailable; LSP fragments and sequence-number reports are independent observations",
 	}}
 	r.need(r.num("Protocol Discriminator", 1, false) == 0x83, "IS-IS protocol discriminator")
@@ -181,7 +183,12 @@ func isisFieldRanges(fields []tlsCertificateField) map[string]any {
 			m["Attached "+name+" Metric"] = span
 		}
 		if span, ok := m[name+" Metric Octet"]; ok {
-			m[name+" Metric"], m[name+" Metric Supported"], m[name+" Metric External"] = span, span, span
+			m[name+" Metric"], m[name+" Metric External"] = span, span
+			if name != "Default" {
+				m[name+" Metric Supported"] = span
+			} else {
+				m["Up Down"], m["Default Metric Reserved Bit"] = span, span
+			}
 		}
 	}
 	if span, ok := m["Control Octet"]; ok {
