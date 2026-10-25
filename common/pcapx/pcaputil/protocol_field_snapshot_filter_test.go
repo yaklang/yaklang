@@ -38,16 +38,90 @@ func TestDisplayFilterOwnedSnapshotPreservesValuesAndCompleteness(t *testing.T) 
 	for _, state := range []string{"limited", "evicted"} {
 		s := snapshot
 		s.Completeness = state
-		require.False(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Complete)
+		result := filter.EvaluateSnapshots([]DisplayFieldSnapshot{s})
+		require.True(t, result.Partial)
+		require.Equal(t, state == "limited", result.Complete)
+		require.Equal(t, state == "limited", result.Matched)
 	}
 	s := snapshot
 	s.Truncated = true
-	require.False(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Complete)
+	require.True(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Matched)
+	require.True(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Partial)
 	s = snapshot
 	s.Incomplete = true
-	require.False(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Complete)
+	require.True(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Matched)
+	require.True(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{s}).Partial)
 	e.Completeness = "limited"
 	require.Equal(t, "limited", e.DisplayFieldValues().Completeness)
+}
+
+func TestDisplayFilterPartialWitnessesAndUnknownAbsence(t *testing.T) {
+	known := DisplayFieldSnapshot{Incomplete: true, Values: []DisplayFieldValue{{Name: "dns.qry.type", Value: uint64(1)}}}
+	for _, tc := range []struct {
+		expr              string
+		matched, complete bool
+	}{
+		{"dns.qry.type", true, true},
+		{"dns.qry.type == 1", true, true},
+		{"dns.qry.type > 0", true, true},
+		{"dns.qry.type <= 1", true, true},
+		{"dns.qry.type == 28", false, false},
+		{"dns.qry.type != 28", false, false},
+		{"dns.qry.type != 1", false, true},
+		{"not (dns.qry.type != 1)", true, true},
+		{"not dns.qry.type", false, true},
+		{"tls.version", false, false},
+		{"not tls.version", false, false},
+		{"dns.qry.type == 1 or tls.version", true, true},
+		{"dns.qry.type == 1 and tls.version", false, false},
+		{"not dns.qry.type and tls.version", false, true},
+		{"not dns.qry.type or tls.version", false, false},
+		{"not (dns.qry.type == 1 and tls.version)", false, false},
+	} {
+		t.Run(tc.expr, func(t *testing.T) {
+			f, err := CompileDisplayFilter(tc.expr)
+			require.NoError(t, err)
+			result := f.EvaluateSnapshots([]DisplayFieldSnapshot{known})
+			require.Equal(t, tc.matched, result.Matched)
+			require.Equal(t, tc.complete, result.Complete)
+			require.True(t, result.Partial)
+			require.NotEmpty(t, result.Reason)
+			// Every definite decision must survive adding later retained values.
+			for _, extra := range [][]DisplayFieldValue{
+				nil,
+				{{Name: "dns.qry.type", Value: uint64(28)}},
+				{{Name: "tls.version", Value: uint64(0x304)}},
+				{{Name: "dns.qry.type", Value: uint64(28)}, {Name: "tls.version", Value: uint64(0x304)}},
+			} {
+				full := DisplayFieldSnapshot{Values: append(append([]DisplayFieldValue(nil), known.Values...), extra...)}
+				if result.Complete {
+					require.Equal(t, result.Matched, f.EvaluateSnapshots([]DisplayFieldSnapshot{full}).Matched)
+				}
+			}
+		})
+	}
+}
+
+func TestDisplayFilterPartialUnionDoesNotDiscardOtherPDUWitnesses(t *testing.T) {
+	good := (&ProtocolEvent{Protocol: "bgp", Session: map[string]any{"Type": uint64(4)}}).DisplayFieldValues()
+	bad := DisplayFieldSnapshot{Incomplete: true, Values: []DisplayFieldValue{{Name: "wg.counter", Value: uint64(7), ExactValue: "invalid"}}}
+	f, err := CompileDisplayFilter("bgp.type == 4")
+	require.NoError(t, err)
+	for _, snapshots := range [][]DisplayFieldSnapshot{{bad, good}, {good, bad}, {{Completeness: "evicted"}, good}} {
+		result := f.EvaluateSnapshots(snapshots)
+		require.True(t, result.Complete)
+		require.True(t, result.Matched)
+		require.True(t, result.Partial)
+	}
+	for _, expr := range []string{"wg.counter", "wg.counter == 7", "not wg.counter"} {
+		f, err := CompileDisplayFilter(expr)
+		require.NoError(t, err)
+		require.False(t, f.EvaluateSnapshots([]DisplayFieldSnapshot{bad}).Complete, "invalid exact values are not witnesses")
+	}
+	invalid := DisplayFieldSnapshot{Values: []DisplayFieldValue{{Name: "bgp.type", Value: "not-an-integer"}}}
+	f, err = CompileDisplayFilter("bgp.type")
+	require.NoError(t, err)
+	require.False(t, f.EvaluateSnapshots([]DisplayFieldSnapshot{invalid}).Complete)
 }
 
 func TestExplicitPartialFieldScopeSurvivesEventNormalizationAndJSON(t *testing.T) {

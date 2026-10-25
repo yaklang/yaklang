@@ -433,7 +433,7 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 				e.fieldKnownIDs = known
 			}
 		}
-		if !result.Complete {
+		if result.Partial || !result.Complete {
 			u.notice = fieldFilterPartialNoticePrefix + result.Reason
 		}
 		return result.Complete && result.Matched
