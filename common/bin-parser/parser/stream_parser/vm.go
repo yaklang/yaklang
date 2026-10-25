@@ -631,6 +631,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseRDPUDPEnvelope(invocation.node, invocation.operator, profile)
 		},
+		"parseObservedSession": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("observed session: generation unavailable")
+			}
+			return parseObservedSession(invocation.node, invocation.operator, profile)
+		},
 		"parseNetworkControl": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("network-control: generation unavailable")

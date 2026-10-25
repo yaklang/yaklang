@@ -87,7 +87,7 @@ if derived_file.exists():
         'fuzz_execution_count':max(map(int,fuzz_runs)) if fuzz_runs else None,
         'limitations':['FEC erasure recovery and lossy DTLS not implemented',
                        'PEAP/TTLS inner authentication not implemented; authenticators and peer identity unverified',
-                       'BGP/AJP/RTMP and other native coverage gaps remain',
+                       'BGP/AJP/RTMP have bounded partial native profiles; other native coverage gaps remain',
                        'Raw frame field-set and fuzz differences remain reported; not full-protocol acceptance']}
     (out/'carrier-tls-summary.json').write_text(json.dumps(carrier_summary,indent=2)+'\n',encoding='utf8')
 

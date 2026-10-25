@@ -69,14 +69,15 @@ type tui struct {
 	fieldsTouched                                       bool
 	pendingDetail                                       *packetDetail
 
-	inspect           *capturedPacket
-	inspectionChanged time.Time
-	decodeStatus      string
-	visibleVersion    uint64
-	filterDirty       bool
-	rate              trafficRate
-	mix               []protocolShare
-	mixTotal          int
+	inspect              *capturedPacket
+	inspectionChanged    time.Time
+	decodeStatus         string
+	visibleVersion       uint64
+	visibleFieldsVersion uint64
+	filterDirty          bool
+	rate                 trafficRate
+	mix                  []protocolShare
+	mixTotal             int
 
 	ring                             packetRing
 	visible                          []*packetEntry
@@ -326,12 +327,21 @@ func (u *tui) syncInspection(now time.Time) {
 
 func (u *tui) refreshVisible() {
 	version := u.ring.version
+	fieldsVersion := uint64(0)
+	if u.search != nil && u.search.fields != nil && u.streams != nil {
+		u.streams.mu.Lock()
+		history := u.streams.history
+		u.streams.mu.Unlock()
+		if history != nil {
+			fieldsVersion = history.Revision()
+		}
+	}
 	if u.frozen != nil {
 		version = u.frozenAt
 	}
 	// A frozen list can acquire a verified protocol/stream payload later. Recheck
 	// dynamic predicates while packet-only predicates remain cached per entry.
-	if u.visibleVersion != version || u.filterDirty || u.search != nil && u.search.dynamic {
+	if u.visibleVersion != version || u.visibleFieldsVersion != fieldsVersion || u.filterDirty || u.search != nil && u.search.dynamic {
 		u.visible = u.visible[:0]
 		searchContext := newSearchContext(u.streams)
 		size := u.ring.size
@@ -350,6 +360,7 @@ func (u *tui) refreshVisible() {
 			}
 		}
 		u.visibleVersion = version
+		u.visibleFieldsVersion = fieldsVersion
 		u.filterDirty = false
 	}
 	if len(u.visible) == 0 {

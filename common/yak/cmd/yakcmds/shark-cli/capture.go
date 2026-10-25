@@ -29,6 +29,14 @@ type captureConfig struct {
 	tlsSecrets                    pcaputil.TLSSecretProvider
 	decodeAs                      []pcaputil.CaptureOption
 	initialDisplayFilter          string
+	retentionPackets              int
+}
+
+func protocolHistoryBudget(packets int) (int, int) {
+	// Size history with an explicitly enlarged offline packet window, with
+	// hard ceilings. Defaults remain 80k PDUs/64 MiB.
+	packets = max(20000, min(packets, 100000))
+	return min(256000, packets*4), int(min(int64(256<<20), int64(64<<20)*int64(packets)/20000))
 }
 
 type packetReader interface {
@@ -180,7 +188,8 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	// A retained physical packet can contribute multiple carrier/inner PDUs.
 	// Keep the default 20k packet window useful after a full-file replay while
 	// bounding both observation count and retained structured/raw bytes.
-	history, _ := pcaputil.NewProtocolInspector(80000, 64<<20)
+	messages, bytes := protocolHistoryBudget(cfg.retentionPackets)
+	history, _ := pcaputil.NewProtocolInspector(messages, bytes)
 	if s.streams != nil {
 		s.streams.mu.Lock()
 		s.streams.history = history

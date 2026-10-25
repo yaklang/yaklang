@@ -17,6 +17,8 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	nativeSessionMessage               bool
+	rtmpChildren                       []*ProtocolEvent
 	nativeCarrierObservation           bool
 	nativeOPCUAObservation             bool
 	nativeMMSObservation               bool
@@ -92,6 +94,9 @@ type BinParserEvent = ProtocolEvent
 func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	defer func() {
 		session := e.Session
+		if e.nativeSessionMessage && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if e.semanticSession != nil {
 			session = e.semanticSession
 		}
@@ -183,6 +188,15 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.sessionError != nil {
 			owned := *e.sessionError
 			return nil, &owned
+		}
+	}
+	if e.nativeSessionMessage {
+		if e.sessionError != nil {
+			v := *e.sessionError
+			return nil, &v
+		}
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
 	}
 	if e.nativeQUICObservation {
@@ -396,6 +410,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeSessionMessage {
+		return true
+	}
 	if e.nativeCarrierObservation {
 		return true
 	}
@@ -879,6 +896,9 @@ type binDirection struct {
 	sshOpaque bool
 }
 type binFlow struct {
+	ajp               *binAJP
+	bgp               *binBGP
+	rtmp              *binRTMP
 	mms               *binMMS
 	plaintextGap      [2]bool
 	domain            CaptureDomain
@@ -1532,7 +1552,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.protocol == "tls" {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil {
+				result = map[string]any{}
+			} else if f.protocol == "tls" {
 				if f.byteSource == "decrypted" {
 					err = protocolError(ErrUnsupportedFeature, "nested TLS carrier")
 				} else {
@@ -1561,6 +1583,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if e.nativeSessionMessage {
+					result = map[string]any{"fields": cloneSession(e.Session)}
+				}
 				if e.Profile == "rtsp-apple-control" {
 					result = map[string]any{"fields": cloneSession(e.Session)}
 				}
@@ -1777,7 +1802,29 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
 		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
+		if e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
+			stopAfterFailure = false
+		}
+		children := e.rtmpChildren
+		e.rtmpChildren = nil
 		a.emit(e)
+		for _, child := range children {
+			a.messages.Add(1)
+			a.messageBytes.Add(uint64(child.Length))
+			switch child.Status {
+			case "decoded":
+				a.decoded.Add(1)
+			case "incomplete":
+				a.incomplete.Add(1)
+			case "context-required":
+				a.contextRequired.Add(1)
+			case "limited":
+				a.limited.Add(uint64(child.Length))
+			default:
+				a.malformed.Add(1)
+			}
+			a.emit(child)
+		}
 		if !failed {
 			f.deliverTLS(dir, tlsParent)
 		}
@@ -2050,6 +2097,10 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 }
 
 func (v *BinParserInspector) Evicted() uint64 { v.mu.Lock(); defer v.mu.Unlock(); return v.evicted }
+
+// Revision includes arrivals that evict old entries or exceed retention limits.
+// A frozen packet list can gain contributor fields when a stream closes.
+func (v *BinParserInspector) Revision() uint64 { v.mu.Lock(); defer v.mu.Unlock(); return v.received }
 
 // RowsAfter returns at most limit newest matching arrivals after a viewer
 // cursor. The cursor follows arrival order, not concurrently assigned event IDs.

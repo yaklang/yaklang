@@ -535,6 +535,9 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
+	if f.bgp != nil || f.ajp != nil || f.rtmp != nil {
+		return true
+	}
 	if f.mms != nil || f.ftpData != nil {
 		return true
 	}
@@ -568,6 +571,11 @@ func probeWire(w []byte, limit int) ProbeResult {
 }
 
 func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
+	for _, probe := range []func([]byte, int) ProbeResult{probeBGP, probeAJP, probeRTMP} {
+		if p := probe(w, limit); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	memcached := probeMemcached(w, limit)
 	if memcached.Verdict == ProbeAccept {
 		return memcached

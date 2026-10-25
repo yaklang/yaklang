@@ -70,8 +70,8 @@
     "out_of_order_reassembly": true,
     "keylog_sha256": null
   },
-  "yak_sha256": "adf58fea34074d9ae4637fde0cee7339468981b99867edc22832ecda03bc8bc3",
-  "events_binary_sha256": "4b2549cadb43d185fcf68b82500aad444aab9a8dda535292784034b52959434a",
+  "yak_sha256": "a5924e2abbb48408c0f87b15880554d71d09b6c7210a505bb4ee7ac8d1ac2e91",
+  "events_binary_sha256": "d5a8520775327754fcd9109f590d786562152ca6eb4069451e8bc575ca0eada4",
   "audit_script_sha256": "adb82e02b6b171f56ffb5df482fd7fe50bb377eef2b82d561a28175c67bb08e6",
   "ws_labels": {
     "IPv4": 26586,
@@ -1913,8 +1913,8 @@
     "IPv6HopByHop": 17663,
     "Ethernet": 11103,
     "LLC": 6982,
-    "TCP": 6649,
     "RTP": 6462,
+    "TCP": 6404,
     "ICMPV6": 2985,
     "ICMP": 2501,
     "SNAP": 2279,
@@ -1930,6 +1930,7 @@
     "EthernetCTPReply": 339,
     "TLSv1.3": 302,
     "MPLS": 255,
+    "BGP": 245,
     "IKEv1": 239,
     "SNMP": 234,
     "ARP": 227,
@@ -2321,8 +2322,8 @@
     "lppe": 174,
     "sndcpxid": 172,
     "t125": 172,
-    "opa.mad": 170,
     "opa.fe": 170,
+    "opa.mad": 170,
     "lldp": 169,
     "acf": 169,
     "mq": 169,
@@ -2717,8 +2718,8 @@
     "hbbak": 17,
     "ipmi_session": 17,
     "pppmuxcp": 17,
-    "btbredr_rf": 17,
     "bluetooth": 17,
+    "btbredr_rf": 17,
     "msnms": 17,
     "zbee_beacon": 17,
     "dpnet": 17,
@@ -2871,8 +2872,8 @@
     "rtag": 5,
     "mplspmilmdm": 5,
     "tacacs": 5,
-    "rfc2190": 5,
     "h263": 5,
+    "rfc2190": 5,
     "zbee_zcl_se.sub_ghz": 5,
     "raw": 5,
     "dvb_tot": 5,
@@ -3003,6 +3004,7 @@
     "mdns": 396,
     "snmp": 392,
     "ike": 274,
+    "bgp": 241,
     "arp": 227,
     "dhcpv6": 198,
     "telnet": 129,
@@ -3028,11 +3030,11 @@
     "modbus": 1
   },
   "native_event_status": {
-    "/incomplete": 104957,
+    "/incomplete": 104947,
     "ip/unrecognized": 52900,
     "ip/limited": 44427,
     "ip/malformed": 15036,
-    "/unrecognized": 7343,
+    "/unrecognized": 7311,
     "rtp/decoded": 6462,
     "icmpv6/decoded": 2985,
     "icmp/decoded": 2501,
@@ -3041,6 +3043,7 @@
     "tls/decoded": 831,
     "ip/incomplete": 450,
     "mdns/decoded": 396,
+    "bgp/decoded": 315,
     "ike/decoded": 274,
     "snmp/decoded": 234,
     "arp/decoded": 227,
@@ -3163,12 +3166,12 @@
     "source_oracle_unavailable": 422,
     "destination_oracle_unavailable": 448
   },
-  "native_tcp_flow_count": 840,
+  "native_tcp_flow_count": 843,
   "native_tcp_preview_count": 1530,
   "scoped_session_partitions": {
     "tcp": {
       "oracle_stream_domain_pairs": 35105,
-      "missing_or_split_within_domain": 34315
+      "missing_or_split_within_domain": 34317
     },
     "udp": {
       "oracle_stream_domain_pairs": 10100,
@@ -3179,9 +3182,9 @@
   "acceptance": "pending: label, coverage, field, reassembly and session differences require investigation",
   "bidirectional_session_checks": {
     "tcp": {
-      "native_partitions_merging_oracle_streams": 6,
+      "native_partitions_merging_oracle_streams": 5,
       "payload_stream_domain_pairs": 7996,
-      "payload_pairs_missing_or_split": 7213
+      "payload_pairs_missing_or_split": 7215
     },
     "udp": {
       "native_partitions_merging_oracle_streams": 24,

@@ -135,6 +135,7 @@ func run(c *cli.Context) error {
 	}
 	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc"), ignoreEmbeddedSecrets: c.Bool("ignore-embedded-secrets")}
 	cfg.initialDisplayFilter = c.String("display-filter")
+	cfg.retentionPackets = c.Int("max-packets")
 	displayFilter, err := pcaputil.CompileDisplayFilter(cfg.initialDisplayFilter)
 	if err != nil {
 		return fmt.Errorf("invalid display filter: %w", err)

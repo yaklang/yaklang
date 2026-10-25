@@ -336,6 +336,20 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "bgp" || e.Protocol == "ajp" || e.Protocol == "rtmp" || e.Protocol == "amf0" {
+		v := eventValues(e)
+		parts := []string{safeText(e.Summary)}
+		keys := []string{"Method", "URI", "Status Code", "Reuse", "My AS", "BGP Identifier", "Hold Time", "Message Stream ID", "Chunk Stream ID", "Timestamp", "Observed Message Bytes", "Message Length"}
+		for _, key := range keys {
+			if value, ok := v[key]; ok {
+				parts = append(parts, fmt.Sprintf("%s=%v", key, value))
+			}
+			if len(parts) >= 6 {
+				break
+			}
+		}
+		return strings.Join(parts, " · ")
+	}
 	if e.Protocol == "tls" || e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" || e.Protocol == "ssdp" || e.Protocol == "ssh" {
 		return secureTransportSummary(e)
 	}
@@ -458,7 +472,7 @@ func eventPriority(e *pcaputil.ProtocolEvent) int {
 	if e.Protocol == "tls" || e.Protocol == "quic" || e.Protocol == "dtls" {
 		p = 10
 	}
-	if e.Protocol == "tls" && len(e.CarrierLayers) > 0 {
+	if len(e.CarrierLayers) > 0 {
 		p = 20 + 5*len(e.CarrierLayers)
 	}
 	if e.Protocol == "grpc" {

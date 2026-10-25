@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,9 @@ func TestFrozenCorpusReplay(t *testing.T) {
 						if e.FlowID != 0 {
 							// IDs may be reserved at HTTP headers before a late request body.
 							// Check stream byte order within each direction and protocol layer.
-							key := fmt.Sprintf("%d/%d/%s/%s", e.FlowID, e.Direction, e.Protocol, e.SourceBytes.Kind)
+							// Reassembled RTMP payload messages and their wire chunks
+							// share a protocol name but have distinct observed layers.
+							key := fmt.Sprintf("%d/%d/%s/%s/%s", e.FlowID, e.Direction, e.Protocol, e.SourceBytes.Kind, strings.Join(e.CarrierLayers, ">"))
 							require.GreaterOrEqual(t, e.Offset, order[key])
 							order[key] = e.Offset
 						}

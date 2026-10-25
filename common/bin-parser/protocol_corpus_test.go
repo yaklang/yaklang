@@ -106,6 +106,13 @@ type protocolCorpusPacketReader interface {
 
 func TestProtocolCorpusIntegrity(t *testing.T) {
 	const corpusDir = "testdata/protocol-corpus"
+	// The immutable corpus records its historical roadmap scores. These three
+	// rows now honestly advertise bounded partial native coverage; validate
+	// their executable scopes before accepting that exact historical transition.
+	observedScopes := requireObservedSessionScopes(t, priP0)
+	for name, passed := range requireObservedSessionScopes(t, priP1) {
+		observedScopes[name] = passed
+	}
 
 	for _, pair := range []struct {
 		schema   string
@@ -226,7 +233,8 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				if capture.RoadmapFamily == nil || capture.RoadmapPriority == nil || capture.RoadmapStatus == nil {
 					t.Fatalf("mapped capture has incomplete roadmap metadata")
 				}
-				if *capture.RoadmapFamily != item.Family || *capture.RoadmapPriority != item.Priority || *capture.RoadmapStatus != item.Status {
+				historicalPartial := observedScopes[item.Name] && item.Status == stPartial && *capture.RoadmapStatus == stDone
+				if *capture.RoadmapFamily != item.Family || *capture.RoadmapPriority != item.Priority || *capture.RoadmapStatus != item.Status && !historicalPartial {
 					t.Fatalf("stale roadmap metadata: got %s/%s/%s, want %s/%s/%s", *capture.RoadmapFamily, *capture.RoadmapPriority, *capture.RoadmapStatus, item.Family, item.Priority, item.Status)
 				}
 				mappedProtocols[*capture.RoadmapName] = struct{}{}

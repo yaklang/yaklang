@@ -14,9 +14,15 @@ func TestP0RoadmapCovered(t *testing.T) {
 	// changing its catalog status to "new" must not bypass the scope checks.
 	requireP0WPADRetrievalScope(t)
 	coveredScopes := requireP0MessageScopes(t)
+	for name, passed := range requireObservedSessionScopes(t, priP0) {
+		coveredScopes[name] = passed
+	}
 	var leftover []string
 	for _, item := range ProtocolRoadmap {
 		if item.Priority == priP0 && (item.Status == stTodo || item.Status == stPartial) {
+			if item.Status == stPartial && coveredScopes[item.Name] {
+				continue
+			}
 			leftover = append(leftover, item.Name+"="+item.Status)
 		}
 	}
