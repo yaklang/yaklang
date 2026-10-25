@@ -108,6 +108,21 @@ func TestFieldSnapshotRejectsForeignDuplicateIDAndTruncatedPDUUnion(t *testing.T
 	}
 	p = &capturedPacket{history: history, reference: a}
 	result = filter.EvaluateEvents(p.protocolEvents())
-	require.False(t, result.Complete, "more than 128 PDUs cannot become a complete field union")
-	require.False(t, result.Matched)
+	require.True(t, result.Complete, "a retained type4 witness decides this positive predicate")
+	require.True(t, result.Matched)
+	require.True(t, result.Partial, "the field union is still explicitly incomplete")
+	negative, err := pcaputil.CompileDisplayFilter("not tls.version")
+	require.NoError(t, err)
+	require.False(t, negative.EvaluateEvents(p.protocolEvents()).Complete, "unretained PDUs cannot prove absence")
+}
+
+func TestFieldFilterPartialPositiveShowsRowAndRetainsNotice(t *testing.T) {
+	u := &tui{ring: newPacketRing(2)}
+	event := &pcaputil.ProtocolEvent{Protocol: "bgp", Completeness: "limited", Session: map[string]any{"Type": uint64(4)}}
+	entry := &packetEntry{packet: &capturedPacket{events: []*pcaputil.ProtocolEvent{event}}}
+	require.NoError(t, u.applySearch("fields bgp.type == 4"))
+	require.True(t, u.matchesSearch(entry, newSearchContext(nil)))
+	require.Contains(t, u.notice, fieldFilterPartialNoticePrefix)
+	require.NoError(t, u.applySearch("fields not tls.version"))
+	require.False(t, u.matchesSearch(entry, newSearchContext(nil)))
 }

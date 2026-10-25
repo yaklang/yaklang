@@ -8,17 +8,20 @@ import (
 	"unicode"
 )
 
-type DisplayFilter struct{ match func(map[string][]any) bool }
+type DisplayFilter struct{ match fieldPredicate }
 
 type DisplayFilterResult struct {
-	Matched  bool   `json:"matched"`
+	Matched bool `json:"matched"`
+	// Complete certifies the predicate's outcome, not an exhaustive projection.
 	Complete bool   `json:"complete"`
+	Partial  bool   `json:"partial,omitempty"`
 	Reason   string `json:"reason,omitempty"`
 }
 
 // Match evaluates one PDU. MatchEvents evaluates the union of fields from a
 // caller-supplied packet's PDUs, never from unrelated connections or packets.
-// A truncated projection is indeterminate and must not produce a positive match.
+// Retained witnesses can decide a predicate on a partial projection. Missing
+// fields cannot prove absence, and universal comparisons require complete input.
 func (f *DisplayFilter) Match(e *ProtocolEvent) bool {
 	if f == nil {
 		return true
@@ -34,11 +37,8 @@ func (f *DisplayFilter) MatchEvents(events []*ProtocolEvent) bool {
 func (f *DisplayFilter) EvaluateEvents(events []*ProtocolEvent) DisplayFilterResult {
 	return f.evaluateSnapshots(len(events), func(i int) DisplayFieldSnapshot {
 		e := events[i]
-		if e != nil && (e.Completeness == "evicted" || e.Completeness == "limited") {
+		if e != nil && e.Completeness == "evicted" {
 			return DisplayFieldSnapshot{Completeness: e.Completeness}
-		}
-		if e != nil && e.nativeFieldsIncomplete {
-			return DisplayFieldSnapshot{Incomplete: true, Completeness: e.Completeness}
 		}
 		return e.DisplayFieldValues()
 	})
@@ -55,38 +55,62 @@ func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldS
 	if f == nil {
 		return DisplayFilterResult{Matched: true, Complete: true}
 	}
-	m := map[string][]any{}
+	m := fieldObservation{values: map[string][]any{}, exhaustive: true}
+	reason := ""
+	partial := func(s string) {
+		m.exhaustive = false
+		if reason == "" {
+			reason = s
+		}
+	}
 	count := 0
+snapshots:
 	for i := 0; i < length; i++ {
 		snapshot := at(i)
 		if snapshot.Completeness == "evicted" || snapshot.Completeness == "limited" {
-			return DisplayFilterResult{Reason: "protocol detail unavailable in retained history"}
+			partial("protocol detail unavailable in retained history")
+			if snapshot.Completeness == "evicted" {
+				continue
+			}
 		}
 		if snapshot.Truncated {
-			return DisplayFilterResult{Reason: "field projection budget exceeded"}
+			partial("field projection budget exceeded")
 		}
 		if snapshot.Incomplete {
-			return DisplayFilterResult{Reason: "field projection incomplete or value not representable by its registered type"}
+			partial("field projection incomplete or value not representable by its registered type")
 		}
 		for _, v := range snapshot.Values {
 			count++
 			if count > maxDisplayFieldValues {
-				return DisplayFilterResult{Reason: "packet field union budget exceeded"}
+				partial("packet field union budget exceeded")
+				break snapshots
+			}
+			d, ok := LookupDisplayField(v.Name)
+			if !ok {
+				partial("unregistered snapshot field")
+				continue
 			}
 			value := v.Value
 			if v.ExactValue != "" {
-				if d, ok := LookupDisplayField(v.Name); ok && d.Type == DisplayUnsigned && d.Bits > 53 {
+				if d.Type == DisplayUnsigned && d.Bits > 53 {
 					n, err := strconv.ParseUint(v.ExactValue, 10, d.Bits)
 					if err != nil {
-						return DisplayFilterResult{Reason: "invalid exact unsigned field value"}
+						partial("invalid exact unsigned field value")
+						continue
 					}
 					value = n
 				}
 			}
-			m[v.Name] = append(m[v.Name], value)
+			value, ok = normalizeDisplayValue(value, d)
+			if !ok {
+				partial("snapshot value not representable by its registered type")
+				continue
+			}
+			m.values[v.Name] = append(m.values[v.Name], value)
 		}
 	}
-	return DisplayFilterResult{Matched: f.match(m), Complete: true}
+	decision := f.match(m)
+	return DisplayFilterResult{Matched: decision == fieldTrue, Complete: decision != fieldUnknown, Partial: !m.exhaustive, Reason: reason}
 }
 
 type filterToken struct {
@@ -160,7 +184,50 @@ type filterParser struct {
 	tokens []filterToken
 	pos    int
 }
-type fieldPredicate func(map[string][]any) bool
+type fieldTruth uint8
+
+const (
+	fieldUnknown fieldTruth = iota
+	fieldFalse
+	fieldTrue
+)
+
+type fieldObservation struct {
+	values     map[string][]any
+	exhaustive bool
+}
+
+type fieldPredicate func(fieldObservation) fieldTruth
+
+func fieldNot(t fieldTruth) fieldTruth {
+	if t == fieldUnknown {
+		return t
+	}
+	if t == fieldTrue {
+		return fieldFalse
+	}
+	return fieldTrue
+}
+
+func fieldAnd(a, b fieldTruth) fieldTruth {
+	if a == fieldFalse || b == fieldFalse {
+		return fieldFalse
+	}
+	if a == fieldTrue && b == fieldTrue {
+		return fieldTrue
+	}
+	return fieldUnknown
+}
+
+func fieldOr(a, b fieldTruth) fieldTruth {
+	if a == fieldTrue || b == fieldTrue {
+		return fieldTrue
+	}
+	if a == fieldFalse && b == fieldFalse {
+		return fieldFalse
+	}
+	return fieldUnknown
+}
 
 func (p *filterParser) take(s string) bool {
 	if p.pos < len(p.tokens) && !p.tokens[p.pos].quoted && p.tokens[p.pos].s == s {
@@ -189,16 +256,16 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 			}
 			a, b := left, right
 			if op == "or" {
-				left = func(m map[string][]any) bool { return a(m) || b(m) }
+				left = func(m fieldObservation) fieldTruth { return fieldOr(a(m), b(m)) }
 			} else {
-				left = func(m map[string][]any) bool { return a(m) && b(m) }
+				left = func(m fieldObservation) fieldTruth { return fieldAnd(a(m), b(m)) }
 			}
 		}
 		return left, nil
 	}
 	if p.take("not") {
 		f, err := p.parse(2, depth+1)
-		return func(m map[string][]any) bool { return !f(m) }, err
+		return func(m fieldObservation) fieldTruth { return fieldNot(f(m)) }, err
 	}
 	if p.take("(") {
 		f, err := p.parse(0, depth+1)
@@ -228,7 +295,15 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 		}
 	}
 	if op == "" {
-		return func(m map[string][]any) bool { return len(m[name]) > 0 }, nil
+		return func(m fieldObservation) fieldTruth {
+			if len(m.values[name]) > 0 {
+				return fieldTrue
+			}
+			if m.exhaustive {
+				return fieldFalse
+			}
+			return fieldUnknown
+		}, nil
 	}
 	if p.pos >= len(p.tokens) {
 		return nil, fmt.Errorf("missing comparison value")
@@ -239,10 +314,13 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 	if err != nil {
 		return nil, err
 	}
-	return func(m map[string][]any) bool {
-		vals := m[name]
+	return func(m fieldObservation) fieldTruth {
+		vals := m.values[name]
 		if len(vals) == 0 {
-			return false
+			if m.exhaustive {
+				return fieldFalse
+			}
+			return fieldUnknown
 		}
 		equal := false
 		for _, v := range vals {
@@ -252,13 +330,13 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 					addr = addr.Unmap()
 				}
 				if err == nil && literal.(netip.Prefix).Contains(addr) {
-					return true
+					return fieldTrue
 				}
 				continue
 			}
 			if op == "contains" {
 				if text, ok := v.(string); ok && strings.Contains(text, literal.(string)) {
-					return true
+					return fieldTrue
 				}
 				continue
 			}
@@ -268,31 +346,40 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 			}
 			if cmp == 0 {
 				equal = true
+				if op == "!=" {
+					return fieldFalse
+				}
 			}
 			switch op {
 			case "==":
 				if cmp == 0 {
-					return true
+					return fieldTrue
 				}
 			case ">":
 				if cmp > 0 {
-					return true
+					return fieldTrue
 				}
 			case "<":
 				if cmp < 0 {
-					return true
+					return fieldTrue
 				}
 			case ">=":
 				if cmp >= 0 {
-					return true
+					return fieldTrue
 				}
 			case "<=":
 				if cmp <= 0 {
-					return true
+					return fieldTrue
 				}
 			}
 		}
-		return op == "!=" && !equal
+		if !m.exhaustive {
+			return fieldUnknown
+		}
+		if op == "!=" && !equal {
+			return fieldTrue
+		}
+		return fieldFalse
 	}, nil
 }
 
