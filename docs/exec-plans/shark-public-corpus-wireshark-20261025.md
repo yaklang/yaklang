@@ -885,3 +885,90 @@ decoder 错误；不同字节的事件不能覆盖，真实 snaplen 提示仍保
 extensions、其他原生协议和既有 fuzz 流/会话差异继续处理，未宣称核心协议完备。
 
 最终冻结二进制：CLI `6670c6efb2992963fecb42538a821d62cd3b0bce55481fc939fc22e5a4bb78fe`，SDK `3d84dad067bf255533a7fdb890a2f3b1e4b1f51b6ae4ded74b1717bf4faacf17`。两个完整大文件、七项离线分片控制与原生 Windows 数据/HELLO AVP 页面均使用此版本；汇总证据见 `shark-public-corpus-20261025/l2tp3-wire-summary.json`。控制页实际选中 Message Type6，定位本 PDU 的 offset22、2字节 `00 06`。
+
+## 2026-10-25 后续：L2TPv3 真实协商、接收方参数和内层分发
+
+前一阶段的 midstream wire-envelope 支持现在增加了有界的被动控制/会话观察；目录仍为
+partial。新增真实样本来自 [Wireshark issue7711](https://gitlab.com/wireshark/wireshark/-/issues/7711)
+的 9 个公开附件，共 285 帧，包含 IP115、多隧道、双方/单方动态 UDP 端口、不同长度
+cookie、会话结束和替换。原始 pcap、派生故障 pcap、TShark JSON、SDK JSONL、可执行文件
+和控制台截图均留在仓库外；提交的是审计代码、回归控制和聚合证据。
+
+### 本轮实际修复
+
+- 离线 plain-UDP 快速路径原先直接进入 datagramFields，绕过 L2TPv3 观察器。现在完整
+  控制语法或已观察到的接收方 ID 能进入同一原生路径；SCCRP 选择动态响应端口后，后续
+  控制/数据保持同一观察上下文。单凭端口、短头或不透明数据不自动创建会话。
+- 控制消息按双向 Ns 有界排队并处理依赖；缺 SCCCN/ICRP 时不从后续 Nr 推造参数。
+  完整重传可恢复，Nr/digest 改变的相同参数重传不重置状态；ACK/ZLB 不推进 Ns。
+  冲突的保留序号或无法区分的控制 ID 复用进入隔离。
+- 只有两组三报文的完整控制/会话建立证据，才选用接收方公布的 SID、cookie、子层和
+  sequencing 要求。每个数据观察保留 6 个建立 PDU 的 ID、原始 SHA256 和贡献帧。
+  cookie 校验遵循 [RFC3931](https://www.rfc-editor.org/info/rfc3931/) 的接收方向，四字节
+  全零 cookie 也不是缺省。保留已关闭接收方历史，允许可区分 cookie 的会话 ID 复用；
+  相同/前缀兼容 cookie 不据此猜代次。
+- Ethernet PW4/5 的完整帧交给既有内层网络/TCP/UDP 分发；逻辑域带控制/会话代次，
+  原始物理帧及接口不改写，内层消息保留父 PDU。内层 IP 分片也保留全部父 PDU。
+  24 位有意义序号支持回绕、缺口/乱序和相同重复观察；相同序号不同载荷会隔离，
+  sequence0 不声称序号有效。不把被动观察说成实际端点投递或认证成功。
+- 真实旧实现把 ICCN 的新电路状态位保留为 1；这违反
+  [RFC4719](https://www.rfc-editor.org/info/rfc4719/)，但不改变 cookie/子层字节边界。
+  现在保留实际位并给出规范警告，不因此丢掉后续完整帧。旧 Framing/Bearer 能力、
+  Bearer Type18、Framing Type19 和 ACCM 也有明确宽度及字段，未知 mandatory 参数仍拒绝
+  学习上下文。控制摘要不把观察到的 A 位说成电路已正常工作。
+- Windows 实际页面发现并修复了内层 ICMP/ARP 标签配外层 IPv4 地址、漏掉内层头路径的
+  不一致。列表现在使用内层地址，另保留 physical/message 端点，路径保留重复的实际头，
+  如 `Ethernet › IPv4 › UDP › L2TPv3 › Ethernet › IPv6 › IPv6HopByHop › ICMPv6`。
+  接收方上下文被拒绝仍显示已证明的 L2TPv3 外层、opaque 原因以及期望 cookie/实际前缀。
+- 新的边界测试复现了完整 Ethernet 封装中的 IPv4 TotalLength0、缺失尾部和版本错误仍
+  产生 ICMP 观察的问题；现在核对原始内层 IP 字节后才分发。外层 UDP 入口也核对原始
+  IPv4 长度，不能借底层库对零长度的替换建立 L2TP 上下文。
+
+### 逐包证据和保留的差异
+
+9 份样本的原始 TShark 与显式声明 UDP Decode-As 的补充视图分别保留。补充视图共
+**6,022** 项所选字段、完整 carrier、物理引用、六 PDU 建立证据和接收方布局检查，
+没有所选差异。原始结果仍有 **53** 个未提供的原生消息视图和 **28** 个 sublayer-S
+字段差异：原始动态端口接续失败使参考端丢失部分协商上下文。这些未归零，也没有把
+显式 Decode-As 的补充验收算成默认自动识别准确率。
+
+`lns-eth` 的 **20** 个和 `lns-eth-ip` 的 **12** 个 Ethernet 数据都有独立从原始控制
+AVP 重建的接收方 cookie、子层及内层字节证明。另 **36** 个真实数据包的实际 cookie
+与接收方公布值不符：参考端使用 cookie 长度继续解码，原生明确拒绝。没有为凑齐标签
+改用发送方 cookie，也没有把这些数据说成已认证或已解析的内层协议。PPP/PW7 的数据
+保持 context-required，不能把 Ethernet 的解法推广到全部 PW。
+
+从真实 `lns-eth` 完整前缀派生 **10** 个明确标记的离线故障控制，共 **48** 项直接验收：
+SCCRP 先到、重复建立、缺 SCCCN、补回缺口、数据先于修复、snaplen、完整重传、相同 UDP
+元组的新控制/会话 ID、相同控制 ID 的冲突 bootstrap。缺建立控制时原生零内层投递；
+补回后仅接收后续完整数据，新 ID 产生独立逻辑代次，歧义复用不继承旧参数。参考端在
+缺 SCCCN/snaplen/冲突复用时仍显示的内层计数和逆序 SCCRP 时的漏解码均原样保留。
+
+冻结生产源码 `b2a03407bc` 再跑完整 **51,328 / 328,127** 帧，通用字段集合差异仍为
+**90/35**，TCP 流 **824/840**、预览 **808/735**；既有标签、所选字段、端点和双向会话
+分区指标与上一版本一致。Weber 的完整 CLI/SDK 导出字节相同。Sharon 的原始导出保留
+**780** 个变化并逐项复核：**656** 个拒绝观察的 `pdu.length` 从错误的 0 改为实际保留的
+wire 字节数；**2** 个已有 incomplete UDP 现在有明确 L2TP 截断诊断，仍没有解码字段；
+**122** 行 IP 片段关闭诊断的遍历顺序变化，其源引用/域/原因多重集合完全相同。
+没有删除这些原始行来声称导出逐字节一致。
+
+### 回归和当前边界
+
+完整 bin-parser 及子包通过（主包 **171.594s**），完整 pcaputil **514.887s**、CLI
+**2.084s** 通过；末尾原生头/展示和 IP 边界修改后另跑完整 CLI **2.248s**、L2TP 原生
+回归 **0.963s**，冻结源码的末次完整 CLI **2.025s** 另行通过，并保留先失败后修复的内层长度测试。控制/会话恢复定向 fuzz
+**10,131** 次，bounded wire fuzz **41,654** 次通过。有真实快路径/公开回调一致性、
+内层 DNS/MQTT、内层乱序分片、物理帧数量、所有权、预算关闭释放、序号回绕、冲突和
+接收方向测试；不以测试自己拼的固定样本替代上述真实文件核验。末尾新增的拒绝观察 pdu.length 回归断言亦通过（0.354s）。
+
+当前生产二进制的原生 Windows QA 覆盖 20 个有接收方上下文的数据、cookie 拒绝页、
+实际字段/字节源、会话消息/证据、80 列缩放、恢复、CP936 和退出。图片在本地
+`C:/tmp/yak-shark-l2tp-session-20261025/windows-b2a03407-observed.png` 和
+`windows-b2a03407-refusal.png`，不是设计图。
+
+冻结 CLI `c6ed25121afd81f0bcccf54bdd301bc224b167ac5db251950c2413bd14e5f81b`，
+SDK `f9bbb9a48482f0cb0ad1ac515789b6742b94482e3d6713f522455249dd49a670`。
+聚合证据为 `shark-public-corpus-20261025/l2tp3-session-summary.json`。
+本轮没有证明控制消息认证、任意/厂商 AVP、PPP/全部伪线、无可区分 ID 的代次复用；
+IP115 的专用会话页面、PIMv1/extensions、其他原生入口和既有 fuzz 流/字段覆盖差异仍继续
+处理。PR 保持 draft，不能宣称核心协议已经完备，也没有把本地通过当成当前 head 的 CI。
