@@ -578,6 +578,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	if evidence.byteSourceKind != "" {
 		e.SourceBytes.Kind = evidence.byteSourceKind
 	}
+	a.observeNetFlowV9Boundary(e, wire, truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8)
 	if a.l2tp3RawDatagram(e, wire, truncated || ci.CaptureLength < ci.Length, udp.Length) {
 		return
 	}

@@ -42,6 +42,27 @@ type netflowV9Store struct {
 	lru     list.List
 }
 
+// Run before any UDP dissector can claim a message. An unrelated successful
+// codec or a bad carrier must not hide a tuple-reuse boundary from this cache.
+func (a *binParser) observeNetFlowV9Boundary(e *ProtocolEvent, w []byte, badCarrier bool) {
+	if !badCarrier && len(w) >= 20 && binary.BigEndian.Uint16(w) == 9 {
+		return
+	}
+	a.netflowV9Mu.Lock()
+	defer a.netflowV9Mu.Unlock()
+	if a.netflowV9 == nil {
+		return
+	}
+	for el := a.netflowV9.lru.Front(); el != nil; {
+		next := el.Next()
+		key := el.Value.(*netflowV9Exporter).key
+		if key.domain == e.Domain && key.source == e.Source && key.destination == e.Destination {
+			a.dropNetFlowV9Locked(el)
+		}
+		el = next
+	}
+}
+
 func (a *binParser) dropNetFlowV9Locked(el *list.Element) {
 	if el == nil || a.netflowV9 == nil {
 		return
@@ -66,6 +87,12 @@ func (a *binParser) closeNetFlowV9Locked() {
 	}
 }
 
+func (a *binParser) closeNetFlowV9() {
+	a.netflowV9Mu.Lock()
+	defer a.netflowV9Mu.Unlock()
+	a.closeNetFlowV9Locked()
+}
+
 func (a *binParser) refuseNetFlowV9Oversize(e *ProtocolEvent, w []byte, src, dst uint16) bool {
 	explicit := a.datagramDecodeAs[dst]
 	if explicit == "" {
@@ -73,7 +100,7 @@ func (a *binParser) refuseNetFlowV9Oversize(e *ProtocolEvent, w []byte, src, dst
 	}
 	selected := explicit == "netflow-v9"
 	matched := false
-	a.udpMu.Lock()
+	a.netflowV9Mu.Lock()
 	if a.netflowV9 != nil {
 		for el := a.netflowV9.lru.Front(); el != nil; {
 			next := el.Next()
@@ -85,7 +112,7 @@ func (a *binParser) refuseNetFlowV9Oversize(e *ProtocolEvent, w []byte, src, dst
 			el = next
 		}
 	}
-	a.udpMu.Unlock()
+	a.netflowV9Mu.Unlock()
 	if !selected && !matched {
 		return false
 	}
@@ -135,7 +162,7 @@ func (a *binParser) decodeNetFlowV9Datagram(e *ProtocolEvent, w []byte, src, dst
 	if !selected && (explicit != "" || !controlPort([]uint16{2055, 2056, 9995, 9996}, src) && !controlPort([]uint16{2055, 2056, 9995, 9996}, dst)) {
 		return false
 	}
-	a.udpMu.Lock()
+	a.netflowV9Mu.Lock()
 	// Callbacks and field projection happen after releasing receiver state.
 	if len(w) < 20 || binary.BigEndian.Uint16(w) != 9 {
 		if a.netflowV9 != nil {
@@ -148,7 +175,7 @@ func (a *binParser) decodeNetFlowV9Datagram(e *ProtocolEvent, w []byte, src, dst
 				el = next
 			}
 		}
-		a.udpMu.Unlock()
+		a.netflowV9Mu.Unlock()
 		if !selected {
 			return false
 		}
@@ -254,7 +281,7 @@ func (a *binParser) decodeNetFlowV9Datagram(e *ProtocolEvent, w []byte, src, dst
 	} else if wireErr == nil && e.Timestamp.IsZero() {
 		fields["Context Retention Warning"] = "capture clock unavailable; no cross-message template lease retained"
 	}
-	a.udpMu.Unlock()
+	a.netflowV9Mu.Unlock()
 	if !admit {
 		return false
 	}

@@ -64,6 +64,8 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 		{21, "cflow.observed.last_uptime_ms", "unsigned", 32}, {22, "cflow.observed.first_uptime_ms", "unsigned", 32},
 		{23, "cflow.post_octets", "unsigned", 64}, {24, "cflow.post_packets", "unsigned", 64},
 		{27, "cflow.srcaddrv6", "IPv6", 128}, {28, "cflow.dstaddrv6", "IPv6", 128},
+		{32, "cflow.icmp_type_code_ipv4", "unsigned", 16},
+		{61, "cflow.direction", "unsigned", 8}, {148, "cflow.flow_id", "unsigned", 64}, {233, "cflow.firewall_event", "unsigned", 8},
 	} {
 		spec := spec
 		typ := DisplayUnsigned
