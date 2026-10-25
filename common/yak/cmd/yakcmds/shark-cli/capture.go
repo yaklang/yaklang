@@ -30,6 +30,7 @@ type captureConfig struct {
 	decodeAs                      []pcaputil.CaptureOption
 	initialDisplayFilter          string
 	retentionPackets              int
+	freezePacketFields            bool
 }
 
 func protocolHistoryBudget(packets int) (int, int) {
@@ -147,6 +148,11 @@ type capturedPacket struct {
 	presentation          packetPresentation
 	reference             pcaputil.PacketReference
 	events                []*pcaputil.ProtocolEvent
+	observedPDUs          []map[string]any
+	observedFields        []pcaputil.DisplayFieldSnapshot
+	observedFieldBudget   int
+	observedFieldsLimited bool
+	fieldsAtObservation   bool
 	eventIDs              []uint64
 	history               *pcaputil.ProtocolInspector
 	streamID              uint64
@@ -176,7 +182,11 @@ type captureSession struct {
 
 func startCapture(parent context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) *captureSession {
 	ctx, cancel := context.WithCancel(parent)
-	s := &captureSession{packets: make(chan *capturedPacket, 2048), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
+	queue := 2048
+	if cfg.freezePacketFields {
+		queue = 64
+	} // bounded field snapshots backpressure plain/JSON output
+	s := &captureSession{packets: make(chan *capturedPacket, queue), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
 	s.streams.captureReplay = src.offline
 	go func() {
 		defer close(s.packets)
@@ -242,6 +252,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				// record; exact domain equality would hide its completed PDU.
 				if ref.Number == current.reference.Number {
 					recordProtocolConversation(current, e)
+					if current.fieldsAtObservation {
+						current.recordObservedPDU(e)
+					}
 					if e.Transport == "tcp" && len(currentProtocolEvents) < 128 {
 						currentProtocolEvents = append(currentProtocolEvents, e)
 					}
@@ -393,6 +406,10 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		}
 		ref.Domain = pcaputil.PacketDomain(data, ci, link)
 		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref}
+		if cfg.freezePacketFields {
+			packet.fieldsAtObservation = true
+			packet.observedFieldBudget = observedPacketFieldBytes - 1024
+		}
 		current = packet
 		normalizedPreview = nil
 		currentProtocolEvents = nil

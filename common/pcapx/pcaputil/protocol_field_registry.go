@@ -72,6 +72,7 @@ type DisplayFieldSnapshot struct {
 	Values        []DisplayFieldValue `json:"values"`
 	Truncated     bool                `json:"truncated,omitempty"`
 	Incomplete    bool                `json:"incomplete,omitempty"`
+	Completeness  string              `json:"completeness,omitempty"`
 }
 
 const maxDisplayFieldValues = 4096
@@ -412,7 +413,10 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 		owned.Session = e.semanticSession
 		e = &owned
 	}
-	s.PDU, s.Source = e.ID, e.SourceBytes
+	s.PDU, s.Source, s.Completeness = e.ID, e.SourceBytes, e.Completeness
+	if e.nativeFieldsIncomplete {
+		s.Incomplete = true
+	}
 	if e.SourceBytes.CompletedIn != nil {
 		owned := *e.SourceBytes.CompletedIn
 		s.Source.CompletedIn = &owned

@@ -38,7 +38,7 @@ func TestSTPCanonicalWireEntries(t *testing.T) {
 	w := stpConfigBPDU()
 	n := parseRule(t, w, "stp", "STP")
 	require.EqualValues(t, 8, uintVal(t, mustChild(t, n, "Config").Child("Root Priority")))
-	for _, bad := range [][]byte{append(bytes.Clone(w), 0), {0, 0, 2, 128}} {
+	for _, bad := range [][]byte{append(bytes.Clone(w), 0), {0, 0, 2, 128, 0}} {
 		_, err := ParseStructured(bad, "stp", "STP")
 		require.Error(t, err)
 	}

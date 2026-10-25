@@ -13,7 +13,7 @@ Package:
         failure = operation.Message
         prefix, peek = this.TryProcessByType("STPHeaderPrefix")
         peek.Recovery()
-        if peek.OK && ((prefix.Value >> 8) & 255) == 3 {
+        if peek.OK && ((prefix.Value >> 8) & 255) == 3 && (prefix.Value & 255) == 2 {
           this.ProcessByType("STPValidation")
           return
         }
@@ -27,14 +27,13 @@ Package:
       this.ProcessSubNode("BPDU Type")
       btype = getNodeResult("BPDU Type").Value
       if btype == 0x80 {
-        if version != 0 { panic("stp: TCN requires version0") }
         if !complete { panic(failure) }
         return
       }
       if btype == 0x00 || btype == 0x02 {
         this.ProcessSubNode("Config")
         if !complete { panic(failure) }
-        if !((version == 0 && btype == 0) || (version == 2 && btype == 2)) { panic("stp: unsupported version/type") }
+        if !(btype == 0 || (version == 2 && btype == 2)) { panic("stp: unsupported version/type") }
         return
       }
       panic("stp: unknown bpdu type")

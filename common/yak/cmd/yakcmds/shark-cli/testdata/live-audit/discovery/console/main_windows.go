@@ -266,16 +266,88 @@ func main() {
 			time.Sleep(50 * time.Millisecond)
 		}
 	}
+	// A protocol word in the chart or old VT output is not proof that the
+	// current query, selected row and detail pane agree. Strict checks inspect
+	// fresh native cell snapshots, after the actual packet window has drained.
+	strictProtocol := os.Getenv("SHARK_QA_EXPECT_PROTOCOL")
+	strictQuery := os.Getenv("SHARK_QA_EXPECT_QUERY")
+	if strictQuery == "" && os.Args[5] != "-" {
+		strictQuery = os.Args[5]
+	}
+	strictPackets := os.Getenv("SHARK_QA_EXPECT_PACKETS")
+	waitShot := func(name string, match func(snapshot) bool) {
+		until := time.Now().Add(45 * time.Second)
+		for i := 0; ; i++ {
+			candidate := fmt.Sprintf("%s-wait-%03d", name, i)
+			shot(candidate)
+			data, e := os.ReadFile(filepath.Join(dir, candidate+".json"))
+			fail(e)
+			var state snapshot
+			fail(json.Unmarshal(data, &state))
+			if match(state) {
+				fail(os.WriteFile(filepath.Join(dir, name+".json"), data, 0600))
+				return
+			}
+			if time.Now().After(until) {
+				panic("current console state did not satisfy " + name)
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
+	}
+	ready := func(s snapshot) bool {
+		if len(s.Rows) < 2 || !strings.Contains(s.Rows[0], " EOF ") {
+			return false
+		}
+		if strictPackets != "" && !regexp.MustCompile(`buffer\s+`+regexp.QuoteMeta(strictPackets)+`\s*/`).MatchString(strings.Join(s.Rows, "\n")) {
+			return false
+		}
+		return true
+	}
+	matching := func(s snapshot, detail bool) bool {
+		if !ready(s) || strictQuery != "" && (!strings.Contains(s.Rows[1], strictQuery) || strings.Contains(s.Rows[1], "▏")) {
+			return false
+		}
+		frame := ""
+		for _, row := range s.Rows {
+			f := strings.Fields(row)
+			if len(f) >= 4 && strings.HasPrefix(f[1], "›") && f[3] == strictProtocol {
+				frame = strings.TrimPrefix(f[1], "›")
+				break
+			}
+		}
+		if frame == "" {
+			return false
+		}
+		if !detail {
+			return true
+		}
+		for _, row := range s.Rows {
+			if strings.Contains(row, "2 "+strictProtocol+" FIELDS") && strings.Contains(row, "#"+frame) {
+				return true
+			}
+		}
+		return false
+	}
 	waitFor("Y A K  S H A R K")
 	waitFor("EOF")
+	if strictProtocol != "" {
+		waitShot("00-capture-ready", ready)
+	}
 	// Query '-' preserves the CLI's initial display-filter for native QA.
 	if os.Args[5] != "-" {
 		send("/" + os.Args[5] + "\r")
 	}
+	if strictProtocol != "" {
+		waitShot("00-filter-ready", func(s snapshot) bool { return matching(s, false) })
+	}
 	send("1g\r")
 	time.Sleep(time.Second)
 	send("d")
-	shot("01-protocol-fields")
+	if strictProtocol != "" {
+		waitShot("01-protocol-fields", func(s snapshot) bool { return matching(s, true) })
+	} else {
+		shot("01-protocol-fields")
+	}
 	// Opt-in navigation of the real field pane. Deep protocol trees must be
 	// checked where their fields actually render, not only in JSON exports.
 	if value := os.Getenv("SHARK_QA_FIELD_DOWN"); value != "" {

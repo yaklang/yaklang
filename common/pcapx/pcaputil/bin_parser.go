@@ -43,6 +43,7 @@ type ProtocolEvent struct {
 	nativeBACnetRoutedRead             bool
 	Admission                          string
 	nativeDiagnosticError              string // immutable query refusal; public caches are not authority
+	nativeFieldsIncomplete             bool   // explicit partial-field scope survives status normalization/public edits
 	semanticFields                     map[string]any
 	semanticSession                    map[string]any
 	semanticMetadata                   any
@@ -838,6 +839,9 @@ func (a *binParser) emit(e *BinParserEvent) {
 	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
+	}
+	if e.Completeness == "limited" || e.Completeness == "evicted" {
+		e.nativeFieldsIncomplete = true
 	}
 	// Capture diagnostics cannot become parsed messages through public cache,
 	// protocol or status edits. Manually constructed events retain legacy caches.
