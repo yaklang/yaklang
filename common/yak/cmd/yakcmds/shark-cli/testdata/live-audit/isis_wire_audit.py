@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 import sys
 import zlib
+from isis_wire_associations import verify as verify_associations
 
 oracle, events, output = map(Path, sys.argv[1:4])
 
@@ -87,6 +88,8 @@ def canon(k, x, typ):
     if typ == 'boolean':
         return x if isinstance(x, bool) else bool(int(str(x), 0))
     if typ == 'unsigned':
+        if isinstance(x, int):
+            return x
         return int(str(x), 16) if str(x).startswith('0x') or k.endswith('.source_circuit') else int(x)
     if typ == 'address':
         return str(ipaddress.ip_address(x))
@@ -182,6 +185,12 @@ for row in rows:
         if v['name'].startswith('isis.'):
             got[v['name']].append(v)
     proofs = metric_proofs(w, physical)
+    try:
+        association_checks, association_differences = verify_associations(w, e['session'])
+        checks.update(association_checks)
+        differences.extend({'frame': frame, **d} for d in association_differences)
+    except (IndexError, KeyError, TypeError, ValueError) as error:
+        differences.append({'frame': frame, 'association_error': repr(error)})
     for k in sorted(set(want) | set(got)):
         if k not in types:
             unprojected[k] += len(want[k])
@@ -197,7 +206,11 @@ for row in rows:
         ranges = [(physical+v['pdu_range']['offset'], v['pdu_range']['length']) for v in got[k] if 'pdu_range' in v]
         reference_ranges = [(x[1], x[2]) for x in spans[k] if len(x) >= 3]
         range_equal = not ranges or not reference_ranges or collections.Counter(ranges) == collections.Counter(reference_ranges)
-        if equal and not range_equal and k == 'isis.lsp.ip_reachability.ipv4_prefix' and collections.Counter(ranges) == collections.Counter((lo+4, 4) for lo, size in reference_ranges if size == 12):
+        if ranges and len(ranges) == len(observed) == len(expected) == len(reference_ranges):
+            native_pairs = collections.Counter((canon(k, v, types[k]), *span) for v, span in zip(observed, ranges))
+            reference_pairs = collections.Counter((canon(k, v, types[k]), *span) for v, span in zip(expected, reference_ranges))
+            range_equal = range_equal and native_pairs == reference_pairs
+        if equal and not range_equal and k == 'isis.lsp.ip_reachability.ipv4_prefix' and len(ranges) == len(observed) == len(expected) == len(reference_ranges) and native_pairs == collections.Counter((canon(k, v, types[k]), lo+4, 4) for v, (lo, size) in zip(expected, reference_ranges) if size == 12):
             broad_reference.append({'frame': frame, 'field': k, 'wireshark_record_ranges': reference_ranges, 'native_literal_address_ranges': ranges, 'reason': 'Wireshark highlights the entire metric/address/mask record; native highlights its actual four-octet address'})
             range_equal = True
         if not equal or not range_equal:
