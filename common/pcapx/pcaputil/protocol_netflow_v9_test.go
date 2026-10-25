@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
 	"net"
 	"testing"
@@ -271,4 +272,21 @@ func TestNetFlowV9ReportedFlowIDAndDirectionAreNotCapturedSessionFacts(t *testin
 			require.Equal(t, &DisplayFieldRange{Offset: 45, Length: 8}, v.Range)
 		}
 	}
+}
+
+func TestNetFlowV9RecordRichProjectionDoesNotRescanPerAlias(t *testing.T) {
+	a := nf9NativeParser(t)
+	data := nf9NativeSet(256, bytes.Repeat([]byte{192, 0, 2, 9, 0, 0, 0, 17}, 200))
+	e := nf9NativeObserve(t, a, nf9NativeMessage(201, 1, 1000, 19, nf9NativeTemplate(), data), 1, nil)
+	require.Equal(t, "decoded", e.Status)
+	s := e.DisplayFieldValues()
+	require.False(t, s.Truncated, "400 observed scalar fields fit the unchanged4096-value budget")
+	require.False(t, s.Incomplete)
+	values := s.FieldMap()
+	require.Equal(t, []any{uint64(9)}, values["cflow.version"], "late alphabetic header fields must not disappear")
+	require.Len(t, values["cflow.srcaddr"], 200)
+	require.Len(t, values["cflow.packets"], 200)
+	f, err := CompileDisplayFilter("cflow.version == 9 and cflow.packets == 17")
+	require.NoError(t, err)
+	require.True(t, f.Match(e))
 }
