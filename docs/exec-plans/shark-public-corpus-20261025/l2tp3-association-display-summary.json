@@ -1,0 +1,247 @@
+{
+  "source_commit": "d65f317aa9",
+  "windows": {
+    "backend": "Windows CP936 ConPTY native console cells and color attributes",
+    "capture": "lns-eth-ip.pcap",
+    "filter": "fields l2tp.sid == 1921849866",
+    "setup_observations_visible": 6,
+    "resize_restore_quit": true,
+    "compact_proof_byte_budget": 32768,
+    "proof_retention_authentication_claim": false
+  },
+  "official": {
+    "l2tp_multi_tunnel.pcap": {
+      "original": {
+        "checks": 981,
+        "differences": 18,
+        "missing": 0,
+        "unselected_reference_views": 26,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 1340,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "l2tp_traffic.pcap": {
+      "original": {
+        "checks": 217,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 4,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "l2tp_traffic_fixed_port.pcap": {
+      "original": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "l2tp_traffic_one_sided_ephemeral_port.pcap": {
+      "original": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "l2tp_traffic_two_tunnels_v2_v3.pcap": {
+      "original": {
+        "checks": 217,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 4,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "lns-eth.pcap": {
+      "original": {
+        "checks": 589,
+        "differences": 10,
+        "missing": 0,
+        "unselected_reference_views": 19,
+        "admitted_ethernet_context": 20
+      },
+      "scoped": {
+        "checks": 891,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 20
+      }
+    },
+    "lns-eth-ip.pcap": {
+      "original": {
+        "checks": 1592,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 12
+      },
+      "scoped": {
+        "checks": 1592,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 12
+      }
+    },
+    "ip_encap_cma.pcap": {
+      "original": {
+        "checks": 384,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 384,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    },
+    "ip_encap_md5.pcap": {
+      "original": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      },
+      "scoped": {
+        "checks": 363,
+        "differences": 0,
+        "missing": 0,
+        "unselected_reference_views": 0,
+        "admitted_ethernet_context": 0
+      }
+    }
+  },
+  "whole_captures": {
+    "weber": {
+      "frames": 51328,
+      "field_set_mismatches_retained": 90,
+      "tcp_flow_count": 824,
+      "tcp_preview_count": 808,
+      "compared_summary_keys": [
+        "frames",
+        "ws_labels",
+        "yak_labels",
+        "native_event_status",
+        "field_frames_checked",
+        "field_frames_missing",
+        "field_mismatch_count",
+        "packet_metadata_mismatches",
+        "native_tcp_flow_count",
+        "native_tcp_preview_count",
+        "scoped_session_partitions",
+        "bidirectional_session_checks",
+        "session_partitions"
+      ],
+      "changed_summary_keys": [],
+      "exports": {
+        "yak.jsonl": {
+          "previous_sha256": "d5aba8a6825eeab5b11a79d6b0bb5e04358724de9af7b3a3d48fe5614873e91f",
+          "current_sha256": "d5aba8a6825eeab5b11a79d6b0bb5e04358724de9af7b3a3d48fe5614873e91f"
+        },
+        "events.jsonl": {
+          "previous_sha256": "8e8374869295830e68f9dab05919605169032c1d0be08f09e39f65618ed7b74d",
+          "current_sha256": "8e8374869295830e68f9dab05919605169032c1d0be08f09e39f65618ed7b74d"
+        }
+      }
+    },
+    "sharon": {
+      "frames": 328127,
+      "field_set_mismatches_retained": 35,
+      "tcp_flow_count": 840,
+      "tcp_preview_count": 735,
+      "compared_summary_keys": [
+        "frames",
+        "ws_labels",
+        "yak_labels",
+        "native_event_status",
+        "field_frames_checked",
+        "field_frames_missing",
+        "field_mismatch_count",
+        "packet_metadata_mismatches",
+        "native_tcp_flow_count",
+        "native_tcp_preview_count",
+        "scoped_session_partitions",
+        "bidirectional_session_checks",
+        "session_partitions"
+      ],
+      "changed_summary_keys": [],
+      "exports": {
+        "yak.jsonl": {
+          "previous_sha256": "edeba3e2d3eee168363ab918ed4b5dc7d7ef8bc76fbfb67fdfcd7115288f07ad",
+          "current_sha256": "4c1a477d2e3cab5c9327abec8e7f5122d55b8a185b6d6c3a4ba420653317212b"
+        },
+        "events.jsonl": {
+          "previous_sha256": "f3ba8624aec1e9ceda3116f1947eb42888501f5af8eb7f71920c98058deb52e6",
+          "current_sha256": "1990c7f751a41ed3e8ab2bcb024dabf0f4b7ab5e7a5e913f964979cd36df5358"
+        }
+      },
+      "sdk_raw_row_review": {
+        "previous_sha256": "f3ba8624aec1e9ceda3116f1947eb42888501f5af8eb7f71920c98058deb52e6",
+        "current_sha256": "1990c7f751a41ed3e8ab2bcb024dabf0f4b7ab5e7a5e913f964979cd36df5358",
+        "changed_rows": 116,
+        "classifications": {
+          "fragment_close_order_changed_raw_rows_retained": 116
+        },
+        "fragment_diagnostic_multisets_equal": true,
+        "unexpected": [],
+        "observed_length_evidence": []
+      },
+      "cli_raw_row_review": {
+        "counts": [
+          {
+            "keys": [
+              "pdus"
+            ],
+            "rows": 17
+          }
+        ]
+      }
+    }
+  },
+  "sdk_sha256": "e97525da455d37a7a8b688a3fcd14c3c276d76389d9c00e80f150fe88ef72e3e",
+  "cli_sha256": "c58dc6b149f8d53b41174b2c57a73aa3f976d70e6f7400b8da779701fb6a761d"
+}
