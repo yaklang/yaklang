@@ -184,7 +184,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | RDPUDP | partial | [partial / RDPUDP](rules/application-layer/rdpudp.yaml) |
 | P2 | RDPUDP2 | partial | [partial / RDPUDP2](rules/application-layer/rdpudp.yaml) |
 | P2 | RESTCONF | todo | 需核对别名/Fields 入口 |
-| P2 | RIPng | partial | [partial / RIPngFields](rules/ripng.yaml) |
+| P2 | RIPng | partial | [partial / RIPng](rules/ripng.yaml) |
 | P2 | RPRN | todo | 需核对别名/Fields 入口 |
 | P2 | RSVP | todo | [partial / RSVP](rules/application-layer/observed_protocols.yaml) |
 | P2 | Redfish | todo | [partial / RedfishServiceRootRequest](rules/application-layer/redfish.yaml) |
@@ -675,7 +675,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ptp.yaml](rules/ptp.yaml) | PTP (`PTP`, new) |
 | [rarp.yaml](rules/rarp.yaml) | RARP (`RARPFrame`, partial) |
 | [rip.yaml](rules/rip.yaml) | RIP (``, new) |
-| [ripng.yaml](rules/ripng.yaml) | RIPng (`RIPngFields`, partial) |
+| [ripng.yaml](rules/ripng.yaml) | RIPng (`RIPng`, partial) |
 | [rmi.yaml](rules/rmi.yaml) | RMI (`RMIHeader`, partial)<br>RMI/JRMP (`RMIHeader`, partial) |
 | [routing_control.yaml](rules/routing_control.yaml) | BFD Observed Message Fields (`BFDMessageFields`, partial)<br>GLBP Observed Message Fields (`GLBPMessageFields`, partial)<br>HSRP Observed Message Fields (`HSRPMessageFields`, partial) |
 | [rsync.yaml](rules/rsync.yaml) | Rsync (`Rsync`, partial)<br>Rsync daemon (``, new) |
