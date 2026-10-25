@@ -46,7 +46,7 @@ var Command = &cli.Command{
 		cli.StringSliceFlag{Name: "protocol", Usage: "Quick protocol filter, comma-separated or repeatable (OR)"},
 		cli.BoolFlag{Name: "list-interfaces,D", Usage: "List capture interfaces and exit"},
 		cli.BoolFlag{Name: "list-protocols", Usage: "List protocol shortcuts and their BPF expressions"},
-		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types and scope; --json prints the versioned schema"},
+		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types, scope and supported protocols; --json prints the versioned schema"},
 		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter, e.g. wg.type == 4 and wg.counter >= 2; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
 		cli.BoolFlag{Name: "json", Usage: "Print one JSON summary per packet with fields observed at packet publication; later contributor annotations are available through TUI/SDK history"},
@@ -82,7 +82,14 @@ func run(c *cli.Context) error {
 			if field.Bits > 0 {
 				typ = fmt.Sprintf("uint%d", field.Bits)
 			}
-			if _, err := fmt.Fprintf(out, "%-38s %-9s %-8s %s\n", field.Name, typ, field.Origin, field.Label); err != nil {
+			protocols := field.Protocol
+			if len(field.Protocols) > 0 {
+				protocols = strings.Join(field.Protocols, "/")
+			}
+			if protocols == "" {
+				protocols = "-"
+			}
+			if _, err := fmt.Fprintf(out, "%-38s %-9s %-8s %-24s %s\n", field.Name, typ, field.Origin, protocols, field.Label); err != nil {
 				return err
 			}
 		}

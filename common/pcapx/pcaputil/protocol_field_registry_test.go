@@ -44,6 +44,23 @@ func TestDisplayFieldRegistryIsTypedSortedAndOwned(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestSharedDisplayFieldScopeListsEverySupportedProtocol(t *testing.T) {
+	d, ok := LookupDisplayField("cflow.version")
+	require.True(t, ok)
+	require.Equal(t, "netflow-v9", d.Protocol, "legacy primary label remains compatible")
+	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, d.Protocols)
+	d.Protocols[0] = "edited"
+	owned, _ := LookupDisplayField("cflow.version")
+	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, owned.Protocols)
+	for _, v := range RegisteredDisplayFields() {
+		if v.Name == "cflow.version" {
+			v.Protocols[0] = "edited again"
+		}
+	}
+	owned, _ = LookupDisplayField("cflow.version")
+	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, owned.Protocols)
+}
+
 func TestDisplayFieldProjectionHasProtocolScopeAndMissingValues(t *testing.T) {
 	e := &ProtocolEvent{Protocol: "wireguard", Session: map[string]any{"Message Type": uint64(4), "Receiver Index": uint64(7), "Counter": uint64(0), "Authentication Verified": false, "Negotiated Version": uint16(0x304), "SNI": "poison.example", "Stream ID": uint32(9), "GRPC Status": "0", "DNS": map[string]any{"ID": uint16(7)}}}
 	m := e.DisplayFields()
