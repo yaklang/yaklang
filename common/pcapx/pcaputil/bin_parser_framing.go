@@ -12,6 +12,12 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"rtmp", "RTMPInitialHandshakeFields"},
+	{"rtmp", "RTMPInitialChunkFields"},
+	{"rtmp", "AMF0MessageFields"},
+	{"bgp", "BGPMessageFields"},
+	{"application-layer.ajp", "AJPMessageFields"},
+	{"application-layer.ajp", "AJPRequestBodyFields"},
 	{"session_envelopes", "TPKT"},
 	{"session_envelopes", "UATCP"},
 	{"session_envelopes", "RFB"},

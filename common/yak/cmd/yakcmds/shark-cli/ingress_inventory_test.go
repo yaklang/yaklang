@@ -10,37 +10,35 @@ import (
 	"testing"
 )
 
-func TestCommonPortHintsDeclareNativeOrCatalogOnlyCoverage(t *testing.T) {
+func TestCommonPortHintsDeclareNativeCoverage(t *testing.T) {
 	profiles := map[string]bool{}
 	for _, p := range pcaputil.NativeProtocolProfiles() {
 		require.False(t, profiles[p.Protocol], "duplicate native profile %s", p.Protocol)
 		profiles[p.Protocol] = true
 	}
 	aliases := map[string]string{"TLS": "tls", "SMB": "smb2", "SOCKS": "socks5", "VNC": "rfb", "RTCP": "rtp", "STUN": "stun/turn", "NBT-DG": "nbt-dg", "ONC-RPC": "onc-rpc", "MDNS": "mdns", "FTP-DATA": "ftp-data"}
-	// Public-corpus replay exposed these false native capability declarations.
-	// Keep the legacy rules available, but do not turn a port hint into a claim
-	// that native capture/session dispatch exists. Remove an exception only when
-	// its real ingress and message/connection tests have been implemented.
-	catalogOnly := map[string]string{"ajp": "application-layer/ajp.yaml", "bgp": "bgp.yaml", "rtmp": "rtmp.yaml"}
-	seenCatalogOnly := map[string]bool{}
+	// These former catalog-only rules now have complete-message native ingress
+	// and separate connection/reassembly tests. Require both surfaces to exist.
+	canonical := map[string]string{"ajp": "application-layer/ajp.yaml", "bgp": "bgp.yaml", "rtmp": "rtmp.yaml"}
+	seenCanonical := map[string]bool{}
 	for _, ports := range []map[uint16]string{tcpPortProtocols, udpPortProtocols} {
 		for port, label := range ports {
 			name := strings.ToLower(label)
 			if a := aliases[label]; a != "" {
 				name = a
 			}
-			if rule := catalogOnly[name]; rule != "" {
-				require.False(t, profiles[name], "catalog-only protocol %s must not advertise native ingress", name)
+			if rule := canonical[name]; rule != "" {
+				require.True(t, profiles[name], "implemented protocol %s must declare native ingress", name)
 				data, err := rules.RuleFS.ReadFile(rule)
 				require.NoError(t, err)
 				require.NotEmpty(t, data)
-				seenCatalogOnly[name] = true
+				seenCanonical[name] = true
 				continue
 			}
 			require.True(t, profiles[name], "port %d hint %s has no declared native scope", port, label)
 		}
 	}
-	require.Len(t, seenCatalogOnly, len(catalogOnly))
+	require.Len(t, seenCanonical, len(canonical))
 }
 
 func TestExplicitUDPDecodeAsValidatesBeforeCaptureAndStillRejectsGarbage(t *testing.T) {

@@ -173,6 +173,9 @@ func main() {
 	binary, err := filepath.Abs(os.Args[2])
 	fail(err)
 	fail(os.MkdirAll(dir, 0700))
+	if _, err := os.Stat(filepath.Join(dir, "01-protocol-fields.json")); err == nil {
+		panic("native acceptance requires a fresh output directory")
+	}
 	server := &http.Server{Addr: "127.0.0.1:0", Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 		fmt.Fprintln(w, "yak shark Windows test · 中文 → response")
@@ -272,6 +275,15 @@ func main() {
 	time.Sleep(time.Second)
 	send("d")
 	shot("01-protocol-fields")
+	// A pinned pre-EOF detail must not make an empty filtered list pass.
+	// Other bounded/evicted packets may separately report an indeterminate
+	// predicate; that does not erase the proven matching rows being inspected.
+	firstScreen, err := os.ReadFile(filepath.Join(dir, "01-protocol-fields.json"))
+	fail(err)
+	visible := regexp.MustCompile(`· ([0-9]+(?:\.[0-9]+)?k?) visible`).FindStringSubmatch(string(firstScreen))
+	if len(visible) != 2 || visible[1] == "0" {
+		panic("no complete matching protocol rows after replay")
+	}
 	send("bb")
 	shot("02-byte-sources")
 	send("4x")

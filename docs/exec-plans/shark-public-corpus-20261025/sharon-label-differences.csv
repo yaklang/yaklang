@@ -213,7 +213,6 @@ PCEP -> Fragment,234
 HomePlug -> UDP,233
 NAN -> GRE,233
 SAP/SDP -> UDP,230
-BGP -> TCP,229
 S1AP/LPPa -> SCTP,227
 TDS -> Fragment,225
 ENIP -> Fragment,223
@@ -1119,6 +1118,7 @@ TSCF -> GRE,17
 TNS -> Fragment,17
 BSSAP+ -> Fragment,17
 FTP -> IPv6HopByHop,17
+TCP -> BGP,16
 LDP -> TCP,16
 OCSP -> HTTP/1.0,16
 SSLv2 -> UDP,16

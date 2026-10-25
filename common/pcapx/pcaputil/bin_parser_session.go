@@ -20,6 +20,24 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if p := probeRTMP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.rtmp = "rtmp", newBinRTMP()
+		return
+	} else if p.Verdict == ProbeNeedMore && f.port(1935) {
+		return
+	}
+	if p := probeAJP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.ajp = "ajp", &binAJP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	if p := probeBGP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.bgp = "bgp", &binBGP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	for _, port := range f.a.config.MMSISOPorts {
 		if f.port(port) {
 			f.protocol, f.mms = "mms", newBinMMS()
@@ -456,6 +474,12 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	}
 	var err error
 	switch f.protocol {
+	case "bgp":
+		err = f.consumeBGP(dir, e)
+	case "rtmp":
+		err = f.consumeRTMP(dir, e)
+	case "ajp":
+		err = f.consumeAJP(dir, e)
 	case "mms":
 		e.Session, err = f.consumeMMSISO(dir, e)
 		if err == nil {
@@ -1228,6 +1252,9 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.bgp = nil
+	f.rtmp = nil
+	f.ajp = nil
 	f.mms = nil
 	f.a.forgetFTPControl(f.id)
 	f.ftpData = nil
@@ -1286,6 +1313,17 @@ func (f *binFlow) closeSession() {
 }
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
+	f.finishRTMP(reason)
+	if s := f.ajp; s != nil && (s.active || s.expectBody || s.ping != 0) {
+		e := f.event(s.proxy, nil, "incomplete", string(reason)+": AJP observed request/body/ping unfinished")
+		e.Completeness = "incomplete"
+		e.Session = map[string]any{"Request Active": s.active, "Body Expected": s.expectBody, "Ping Pending": s.ping != 0}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error = e.sessionError.Error()
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
 	f.finishDNP3Transport(reason)
 	if p := f.hart; p != nil && len(p.pending) > 0 {
 		e := f.event(max(p.client, 0), nil, "incomplete", string(reason)+": HART-IP outstanding observed requests")

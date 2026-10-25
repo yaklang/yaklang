@@ -1,5 +1,5 @@
 ﻿column_label,wireshark_packets,yak_packets_same_label,yak_minus_wireshark
-TCP,8683,9439,756
+TCP,8683,9194,511
 RTP,6462,6462,0
 DNS,3384,3384,0
 ICMPv6,2967,0,-2967
@@ -29,7 +29,7 @@ LDAP,326,365,39
 LDP,306,0,-306
 SMB2,242,156,-86
 Chargen,233,0,-233
-BGP,229,0,-229
+BGP,229,245,16
 DHCPv6,226,226,0
 ARP,218,218,0
 CFLOW,196,0,-196

@@ -158,6 +158,27 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}{
 		{"tls", "tls.handshake.extensions_server_name", "TLS server name", "SNI", "context", DisplayString, 0},
 		{"rdpudp", "rdpudp.flags", "RDPUDP selected header flags", "Flags", "pdu", DisplayUnsigned, 16},
+		{"bgp", "bgp.length", "BGP message length", "Length", "pdu", DisplayUnsigned, 16},
+		{"bgp", "bgp.type", "BGP message type", "Type", "pdu", DisplayUnsigned, 8},
+		{"bgp", "bgp.open.version", "BGP version", "Version", "pdu", DisplayUnsigned, 8},
+		{"bgp", "bgp.open.myas", "BGP two-octet AS", "My AS", "pdu", DisplayUnsigned, 16},
+		{"bgp", "bgp.open.holdtime", "BGP hold time", "Hold Time", "pdu", DisplayUnsigned, 16},
+		{"bgp", "bgp.open.identifier", "BGP identifier", "BGP Identifier", "pdu", DisplayAddress, 0},
+		{"ajp", "ajp13.magic", "AJP directional magic", "Magic", "pdu", DisplayUnsigned, 16},
+		{"ajp", "ajp13.len", "AJP envelope payload length", "Length", "pdu", DisplayUnsigned, 16},
+		{"ajp", "ajp13.code", "AJP typed message code", "Code", "pdu", DisplayUnsigned, 8},
+		{"ajp", "ajp13.uri", "AJP request URI", "URI", "pdu", DisplayString, 0},
+		{"ajp", "ajp13.ver", "AJP forwarded HTTP version", "Protocol", "pdu", DisplayString, 0},
+		{"ajp", "ajp13.rstatus", "AJP response status", "Status Code", "pdu", DisplayUnsigned, 16},
+		{"ajp", "ajp13.reusep", "AJP response permits connection reuse", "Reuse", "pdu", DisplayBoolean, 0},
+		{"rtmp", "rtmp.chunk.csid", "RTMP chunk stream", "Chunk Stream ID", "pdu", DisplayUnsigned, 32},
+		{"rtmp", "rtmp.chunk.format", "RTMP header format", "Format", "pdu", DisplayUnsigned, 8},
+		{"rtmp", "rtmp.message.type", "RTMP message type", "Message Type", "pdu", DisplayUnsigned, 8},
+		{"rtmp", "rtmp.message.length", "RTMP logical message length", "Message Length", "pdu", DisplayUnsigned, 24},
+		{"rtmp", "rtmp.message.stream", "RTMP message stream", "Message Stream ID", "pdu", DisplayUnsigned, 32},
+		{"rtmp", "rtmp.timestamp", "RTMP timestamp milliseconds", "Timestamp", "pdu", DisplayUnsigned, 32},
+		{"rtmp", "rtmp.command", "RTMP AMF command", "Command", "pdu", DisplayString, 0},
+		{"amf0", "amf0.command", "AMF0 RTMP command", "Command", "pdu", DisplayString, 0},
 		{"rdpudp", "rdpudp.synex.version", "RDPUDP offered version", "Offered Version", "pdu", DisplayUnsigned, 16},
 		{"rdpudp", "rdpudp.data.seqnum", "RDPUDP2 transport data sequence", "Data Sequence", "pdu", DisplayUnsigned, 16},
 		{"rdpudp", "rdpudp.data.channelseqnumber", "RDPUDP2 reliable channel sequence", "Channel Sequence", "pdu", DisplayUnsigned, 16},
@@ -220,7 +241,11 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"nbss", "nbss.called_name", "NBSS called name", "Called Name", "pdu", DisplayString, 0},
 		{"nbss", "nbss.calling_name", "NBSS calling name", "Calling Name", "pdu", DisplayString, 0},
 	} {
-		out = append(out, displayRoot(f.protocol, f.name, f.label, f.typ, f.bits, f.origin, f.key))
+		binding := displayRoot(f.protocol, f.name, f.label, f.typ, f.bits, f.origin, f.key)
+		if f.protocol == "rtmp" {
+			binding.protocols = "|rtmp|amf0|"
+		}
+		out = append(out, binding)
 	}
 	b = displayCustom("tls", "tls.record.content_type", "TLS interpreted content type", DisplayUnsigned, 8, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 		version, _ := displayUint(e.Session["Negotiated Version"])
@@ -324,6 +349,11 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	s := DisplayFieldSnapshot{SchemaVersion: DisplayFieldSchemaVersion, Values: []DisplayFieldValue{}}
 	if e == nil {
 		return s
+	}
+	if e.nativeSessionMessage && e.semanticSession != nil {
+		owned := *e
+		owned.Session = e.semanticSession
+		e = &owned
 	}
 	s.PDU, s.Source = e.ID, e.SourceBytes
 	s.Source.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)

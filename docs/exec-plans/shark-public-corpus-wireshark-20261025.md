@@ -146,7 +146,7 @@ NEW_CONNECTION_ID、无 keylog 的短头，不能仅凭原端点就确认新的 
    和[接收可靠性控制](https://learn.microsoft.com/de-at/openspecs/windows_protocols/ms-rdpeudp2/a1d1f871-c282-4f97-8f51-f821aca00c8d)；
    EAP TLS 分片参考 [RFC 5216 §2.1.5](https://www.rfc-editor.org/rfc/rfc5216.html#section-2.1.5)
    和 [RFC 5281 §9.2.2](https://www.rfc-editor.org/rfc/rfc5281.html#section-9.2.2)。
-2. **真实未接入的协议。** BGP/AJP/RTMP、HSRP/GLBP、BFD、L2TPv3、IS-IS、
+2. **真实未接入的协议。** 本轮已为 BGP/AJP/RTMP 接入下述限定范围的原生解析；HSRP/GLBP、BFD、L2TPv3、IS-IS、
    以及部分路由/工业协议都有明确缺口。先按主文件数量与常用性补齐入口、完整消息校验、
    canonical 规则、字段注册和复用边界，逐项通过后才能加回能力清单。
 3. **字段、事务与分片展示覆盖。** ClientHello 提供的套件列表与已协商套件不能混为一个上下文字段；
@@ -216,3 +216,110 @@ RDPUDP SYN 线格式切换到 RDPUDP2 是同一载体的选版，不额外画成
 原生页面检查通过；CP936 在退出后恢复。总体仍未全部验收：主文件保留 94 项逐帧字段
 集合差异，fuzz 文件保留 39 项（35 项 TLS 长度归属、4 项 DNS 名字显示），大量畸形
 输入的流分区差异及前述未接入协议仍需继续逐类分析，没有把它们标为完成。
+
+## BGP / AJP / RTMP 原生接入与实际页面复核
+
+本次追加结果见 [消息与故障汇总](shark-public-corpus-20261025/bgp-ajp-rtmp-summary.json)。
+原始、派生捕获、密钥、TShark JSON、逐包导出、可执行文件、控制台快照均在
+`C:/tmp/yak-shark-bgp-ajp-rtmp-20261025`，没有加入 Git。以下均为限定范围的
+**partial** 能力，没有把这三个协议或 TOP30 整体宣称为完备。
+
+### 接收、字段与连接语义
+
+- **BGP4**：完整 16 字节 marker、消息类型与长度后才建立识别；支持 OPEN、UPDATE、
+  NOTIFICATION、KEEPALIVE、ROUTE-REFRESH。校验可选参数、能力 TLV、扩展属性长度、
+  AS_PATH 段、普通/扩展/大型 community、IPv4/IPv6 MP_REACH/MP_UNREACH 和 NLRI。
+  AS4、扩展消息接收能力、ADD-PATH 按捕获的两个方向协商；缺失 OPEN 时不猜 AS 宽度，
+  ADD-PATH 编码有歧义则保留原字节。同一 TCP 代际里重复 OPEN 会隔离协商状态。
+  保留未知地址族和属性原值，不能据此宣称任意 AFI/SAFI 或路由策略语义已实现。
+- **AJP13**：方向 magic、完整字符串及终止符、编码/文字 HTTP 头、属性、所有常见
+  请求/响应/控制消息共同校验。无类型请求正文只在已观察请求或 GetBodyChunk 上下文
+  中解释，正文长度开头 `0x0202` 不会误当 Forward Request。每条连接只有一个活动请求；
+  EndResponse reuse、Content-Length 余量、拉取正文和 CPing/CPong 参与关联。重叠请求、
+  提前正文 EOF 和禁止 reuse 后的新请求都不能借用旧事务。未知属性/编码不会盲猜。
+- **RTMP v3**：完整简单握手或可验证的公开 digest 初始块建立识别，回显对照已观察
+  的对端块；公开常量摘要不是对端身份认证。两个方向各自维护 chunk size，按 CSID
+  保留 fmt0/1/2/3、扩展时间戳、32 位回绕与分块状态，支持交错消息和 Abort。
+  完整控制消息后才改变后续分块大小。完整逻辑载荷具有独立的重组字节来源和贡献 PDU，
+  命令/响应关联限定在同一 TCP 代际、方向、消息流和非歧义 transaction number 内。
+  AMF0 对象/数组/引用/字符串/深度均有界，命令类型需完整解码后才显示 AMF0。
+  控制、音视频基本头和 aggregate tag 有独立校验；RTMPE、一般 AMF3、共享对象事件和
+  媒体编解码没有冒充完成。未知压缩头上下文不从端口推导。
+
+新增六个显式 canonical 入口与原生共用 codec；旧默认规则仍选择原来的 BGP/AJP/RTMP
+入口。完整回归确实发现了“新增 Package 子入口令旧 default 连续解析”的兼容问题，已
+给旧默认入口补明确分发。`ParseStructured` 现在实际返回已校验字段 map，而不是仅有
+原始字节；原始字段范围、连接观察与逻辑重组字节不混为原包偏移。
+
+### 对照范围与结果
+
+| 范围 | 对照结果 | 字节/字段检查项 | 未解释的字节/字段差异 |
+|---|---|---:|---:|
+| Weber 原文件 BGP | 原生 315；原始全文件 WS 302 条完整消息均匹配 | 3,242 | 0；另 13 条保留为跨接口重传视图差异 |
+| Weber 按原接口隔离的 BGP 补充验证 | 接口 1/60/258 分别 12/12/291，合计 315 对 315 | 3,281 | 0 |
+| Sharon 原文件 BGP | WS 303 条完整消息均匹配；原生另 12 条保留接口差异 | 3,245 | 0；另列 4 个无完整 envelope 的 fuzz 视图 |
+| nDPI 真实 AJP | 原生 12 条；WS 13 个视图含 1 个重复视图 | 82 | 0 |
+| Wiki 真实 RTMP | 4 段握手和 13 条完整逻辑消息逐一匹配 | 88 | 0 |
+
+“检查项”同时包含完整字节/出现次数检查和实际有值的字段观察，不是全部协议字段覆盖率。
+BGP 检查包括属性标志/类型/长度、OPEN/能力、AS4、ORIGIN、NEXT_HOP、MED、LOCAL_PREF、
+MP AFI/SAFI、IPv6 next hop 和 IPv4/IPv6 NLRI 前缀/长度。接口隔离捕获只用于明确标记的
+补充 oracle：原始完整 pcap 的逐帧统计始终保留，没有用分拆结果替换全文件差异。
+
+AJP 补充捕获来自 [nDPI 固定提交](https://github.com/ntop/nDPI/tree/a915c7bceb96a4fbd6331fdbecdb50aedc8fceef/tests/cfgs/default/pcap)，
+包含重传、乱序和 8009/8010 两个服务端口。WS 4.6.9 默认没有接入这个样本，因此只在
+该补充实验显式使用 `-d tcp.port==8009,ajp13 -d tcp.port==8010,ajp13`；两个大原文件
+没有使用 Decode As。AJP 的 wire null remote-host 保留为 null，WS 的空字符串显示单列，
+没有为了字符串相同丢失语义。重组完成帧/重复视图差异也单列，不伪装为丢包或字段错误。
+
+真实 RTMP 来自 [Wireshark Wiki 样本归档](https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/rtmp_sample.tgz)，
+解压为 8,808 字节、26 帧；nDPI 的 RTMP 文件含同一段交换及追加 fuzz，不能算第二条独立
+真实会话。Sharon 的 RTMP 视图从 frame 37,334 才开始，缺少完整握手，不能把端口和
+压缩头前缀视图算作已经验证的完整会话。对照使用完整 JSON 与 `--no-duplicate-keys`，
+否则多消息包的同名 RTMP JSON 键会被普通 JSON reader 静默丢弃。
+
+### 故障恢复、复用和拒绝
+
+`observed_fault_corpus.py` 从 Wiki 原始报文产生明确标记的离线派生捕获，不发网络流量，
+也不声称新抓到了五条独立真实流。新代际的 IP/TCP checksum 重新计算。
+
+| 派生故障 | 原生完整逻辑消息 | WS 对照项 | 结果 |
+|---|---:|---:|---|
+| 交换原始第 13/14 帧 | 13 | 88 | 恢复，完整字节与字段一致 |
+| 重复第 14 帧 | 13 | 88 | 无重复命令，完整字节与字段一致 |
+| 丢失第 13 帧 | 8 | 57 | 只保留可完整观察的方向，缺口显式 incomplete |
+| 截断第 14 帧，保留线上长度 | 8 | 58 | 不补造正文，缺口显式 incomplete |
+| 观察到 RST 后同五元组、新 ISN 再交换 | 26，分属 2 条连接 | 176 | 无跨代际响应关联，完整字节与字段一致 |
+
+独立 Go 测试还覆盖首消息各切分点、TCP 乱序/重复/RST 换代、方向性 ADD-PATH/AS4、
+AJP 正文碰撞/复用/提前 EOF、RTMP 交错 CSID/单方向 chunk-size/Abort/扩展时间戳与回绕、
+畸形控制后恢复、命令号复用、消息字节与返回字段所有权。状态化与 codec 联合 fuzz
+运行 **35,210 次**通过，关闭后保留字节归零；另一次纯 codec fuzz 为 23,717 次。
+
+### Windows 页面发现并修复的两个问题
+
+1. 同一包包含 RTMP 回显、chunk 和 AMF0 命令时，旧详情优先级相同，命令被早期握手
+   挤到下面。现在已重组应用消息优先，递进路径为 `Ethernet › IPv4 › TCP › RTMP › AMF0`，
+   字段首先显示 connect、消息流、分块流和 transaction，外层和父 PDU 仍可查询。
+2. 完整主文件的协议详情估算为 **121,847,203 字节**。60k 物理包窗口仍配固定 64 MiB
+   历史时会淘汰 13,026 个早期 PDU，BGP 全部离开历史，造成“详情固定在旧 OPEN，筛选列表
+   却为空”。现在启动窗口相应放大历史预算，60k 为 240k PDU/192 MiB，上限为
+   256k PDU/256 MiB，默认仍为 80k/64 MiB。冻结列表会随历史版本变化重查迟到的完整 PDU；
+   真正淘汰/超出快照预算时，字段筛选显式不可判定，不再显示确定的“无匹配”。
+
+原生控制台验收还增加了“EOF 后必须仍有匹配行”的断言，不能靠旧固定详情蒙混通过。
+最终实际页面为 BGP 20 行、AJP Forward Request 2 行、AMF0 connect 1 行；字段、字节来源、
+会话/证据、80×30 与 180×48 缩放、q 退出与 CP936 恢复均通过。其他超过快照预算的
+报文仍可使字段谓词部分不可判定，已知匹配行与该提示并列，不能宣称全局穷尽。
+测试不重写旧冻结捕获的 metadata：这三项历史 `done` 分数与当前明确的 `partial` 范围
+分别验证，限定范围必须有完整/畸形 wire 测试，其他状态、来源哈希和旧字段仍严格检查。
+
+本轮完整 pcaputil 包通过（509.305s）；规则核心包在保留旧捕获 metadata 的兼容检查
+修正后完整通过（137.509s），其余规则子包均通过。最终历史窗口/筛选修改后，完整 CLI
+回归通过（2.222s），新增原生协议、字段、过滤与历史索引专项通过（0.725s）。两份完整
+pcap 的最终回放都使用 JSON 汇总中相同哈希的实际 EXE/SDK；4,404 条 TLS 的 13,212 项
+头字段检查及独立 RDPUDP 派生记录对照也再次通过，没有用旧二进制结果替代最终版本。
+
+报告中的 94/39 逐帧字段集合差异、77 项主文件端点观察层差异、大量 fuzz 流分区差异及
+其他未接入协议仍未全部验收。以上新增消息校验通过不代表任意协议版本、所有字段或
+全部 Wireshark 行为已经一致；PR 继续保留草稿。
