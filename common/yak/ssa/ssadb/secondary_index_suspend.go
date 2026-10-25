@@ -110,10 +110,19 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 		return err
 	}
 	defer conn.Close()
-	if _, err := conn.ExecContext(ctx, "PRAGMA temp_store=FILE"); err != nil {
+	// Sorting an index build is small next to the database it indexes: the
+	// widest single index here is a few hundred megabytes. Spilling it to a
+	// temp file costs minutes of extra I/O. Keep it in memory when the host
+	// has room, and fall back to the file sorter when it does not.
+	tempStore := "FILE"
+	if memoryHeadroomForIndexSort() {
+		tempStore = "MEMORY"
+	}
+	if _, err := conn.ExecContext(ctx, "PRAGMA temp_store="+tempStore); err != nil {
 		return err
 	}
 	defer conn.ExecContext(ctx, "PRAGMA temp_store=MEMORY")
+	log.Infof("restoring %d secondary IR indexes with temp_store=%s", len(ddls), tempStore)
 
 	started := time.Now()
 	for _, ddl := range ddls {

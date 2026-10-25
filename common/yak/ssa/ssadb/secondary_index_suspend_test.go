@@ -50,6 +50,16 @@ func TestSuspendSecondaryIndexesRestoresDefinitions(t *testing.T) {
 	}
 }
 
+func TestMemoryHeadroomForIndexSortReadsHost(t *testing.T) {
+	available, ok := availableMemoryBytes()
+	if !ok {
+		require.False(t, memoryHeadroomForIndexSort(), "an unknown host must fall back to the file sorter")
+		return
+	}
+	require.Positive(t, available)
+	require.Equal(t, available >= indexSortMemoryFloorBytes, memoryHeadroomForIndexSort())
+}
+
 func TestSuspendSecondaryIndexesSkipsNonSQLite(t *testing.T) {
 	ddls, err := SuspendSecondaryIndexes(nil)
 	require.NoError(t, err)
