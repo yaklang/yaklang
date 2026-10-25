@@ -140,6 +140,12 @@ func TestL2TPv3InvalidIPZeroLengthCannotCreateDecodedData(t *testing.T) {
 	require.Equal(t, "malformed", es[0].Status)
 	require.Empty(t, es[0].Session)
 	require.Contains(t, es[0].Error, "IPv4 total length")
+	control := l2tp3TestControl(true, 100, 1, 1, 6)
+	frame = l2tp3NativeFrame(t, control, true, false)
+	frame[16], frame[17] = 0, 0
+	es, _ = l2tp3NativeReplay(t, frame, 0, false)
+	require.Equal(t, "malformed", es[0].Status, "the UDP entry must not bypass original IPv4 length validation")
+	require.Empty(t, es[0].Session)
 }
 
 func TestL2TPv2TypedSessionKeepsItsOriginalRange(t *testing.T) {

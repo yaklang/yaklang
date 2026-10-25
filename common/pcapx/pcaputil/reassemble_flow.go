@@ -189,6 +189,15 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 		} else {
 			t.binState.contribute(direction, len(frame.Payload), frame.evidence.Ref)
 		}
+		if frame.evidence.byteSourceKind != "" {
+			t.binState.byteSource = frame.evidence.byteSourceKind
+		}
+		if len(frame.evidence.carrierLayers) > 0 {
+			t.binState.captureCarriers = append([]string(nil), frame.evidence.carrierLayers...)
+		}
+		for _, parent := range frame.evidence.parents {
+			t.binState.contribute(direction, len(frame.Payload), PacketReference{}, parent)
+		}
 		t.binState.feed(direction, frame.Payload, frame.Timestamp)
 	}
 	// Arrived callbacks may retain frames. Do not give them packet-source storage

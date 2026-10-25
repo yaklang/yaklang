@@ -22,10 +22,11 @@ type fragmentKey struct {
 	v6       bool
 }
 type ipFragment struct {
-	start int
-	data  []byte
-	refs  []PacketReference
-	more  bool
+	parents []uint64
+	start   int
+	data    []byte
+	refs    []PacketReference
+	more    bool
 }
 type fragmentSet struct {
 	parts    []ipFragment
@@ -132,8 +133,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		// The inner carrier can become visible only after outer reassembly.
 		// Every contributing fragment belongs to that same reconstructed domain.
 		e.refs = append([]PacketReference(nil), e.refs...)
-		for i := range e.refs {
-			e.refs[i].Domain = e.Ref.Domain
+		if !e.carrierOwned {
+			for i := range e.refs {
+				e.refs[i].Domain = e.Ref.Domain
+			}
 		}
 		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
 			a.networkDiagnostic(e, ci, "limited", "EncapsulationDepthOrProfile")
@@ -187,7 +190,10 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		return q, consumed
 	}
-	if a.observeL2TPv3(p, e) {
+	if q, handled := a.observeL2TPv3(p, e); handled {
+		if q != nil {
+			return a.networkPacket(q)
+		}
 		return nil, true
 	}
 
@@ -206,6 +212,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		err := protocolError(ErrResourceExceeded, "native network frame exceeds parser message limit")
 		status, typed := classifySessionError(err)
 		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: nativeProtocol, Domain: e.Ref.Domain, Length: len(p.Data()), Status: status, Completeness: status, ExpertCode: string(typed.Kind), Error: err.Error(), sessionError: typed, SourceBytes: networkObservationSource(e)}
+		event.CarrierLayers = append([]string(nil), e.carrierLayers...)
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -294,7 +301,27 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if protocol != "" {
+		if e.carrierOwned {
+			// The logical native network PDU can consume the packet before the
+			// transport callback. Preserve its actual full header path for the
+			// UI instead of pairing an inner ICMP/ARP label with outer peers.
+			names := make([]string, 0, len(e.networkPrefix)+8)
+			for _, typ := range e.networkPrefix {
+				names = append(names, typ.String())
+			}
+			for _, layer := range p.Layers() {
+				if layer.LayerType() == gopacket.LayerTypePayload || layer.LayerType() == gopacket.LayerTypeDecodeFailure {
+					break
+				}
+				if len(names) >= maxCaptureTransportLayers {
+					break
+				}
+				names = append(names, layer.LayerType().String())
+			}
+			fields["Observed Header Layers"] = names
+		}
 		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
+		event.CarrierLayers = append([]string(nil), e.carrierLayers...)
 		if n := p.NetworkLayer(); n != nil {
 			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
 		}
@@ -386,6 +413,13 @@ func (a *binParser) decodeGOOSEEthernet(eth *layers.Ethernet, payload []byte, ev
 }
 
 func networkObservationSource(e captureEvidence) ByteSource {
+	if e.byteSourceKind != "" {
+		b := ByteSource{Kind: e.byteSourceKind, PacketRefs: append([]PacketReference(nil), e.refs...), ParentPDUs: append([]uint64(nil), e.parents...)}
+		if len(e.parents) > 0 {
+			b.ParentPDU = e.parents[len(e.parents)-1]
+		}
+		return b
+	}
 	if len(e.refs) != 0 {
 		return ByteSource{Kind: "reassembled", PacketRefs: append([]PacketReference(nil), e.refs...)}
 	}
@@ -525,7 +559,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	}
 	// Reconstructed fragments can themselves contain reconstructed carriers.
 	// Retain and charge every physical contributor, not only the final arrival.
-	cost := int64(len(payload) + 128*len(refs))
+	cost := int64(len(payload) + 128*len(refs) + 8*len(e.parents))
 	var header []byte
 	if off == 0 {
 		var err error
@@ -546,7 +580,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if header != nil {
 		v.header = header
 	}
-	v.parts = append(v.parts, ipFragment{start: off, data: bytes.Clone(payload), refs: append([]PacketReference(nil), refs...), more: more})
+	v.parts = append(v.parts, ipFragment{start: off, data: bytes.Clone(payload), refs: append([]PacketReference(nil), refs...), more: more, parents: append([]uint64(nil), e.parents...)})
 	sort.Slice(v.parts, func(i, j int) bool { return v.parts[i].start < v.parts[j].start })
 	cursor := 0
 	for _, part := range v.parts {
@@ -560,9 +594,15 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	}
 	raw := make([]byte, 0, cursor)
 	refs = make([]PacketReference, 0, contributors)
+	var parents []uint64
 	for _, part := range v.parts {
 		raw = append(raw, part.data...)
 		refs = append(refs, part.refs...)
+		for _, id := range part.parents {
+			if len(parents) == 0 || parents[len(parents)-1] != id {
+				parents = append(parents, id)
+			}
+		}
 	}
 	length := len(v.header) + len(raw)
 	if key.v6 {
@@ -575,6 +615,10 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	a.buffered.Add(-v.cost)
 	delete(s.sets, key)
 	e.refs = refs
+	e.parents = parents
+	if e.carrierOwned {
+		e.byteSourceKind = "reassembled"
+	}
 	return a.reassembledPacket(header, raw, e, ci, key.v6)
 }
 

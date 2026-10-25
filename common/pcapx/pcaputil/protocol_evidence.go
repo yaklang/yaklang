@@ -35,6 +35,10 @@ type ByteSource struct {
 	CompletedIn *PacketReference `json:",omitempty"`
 }
 type captureEvidence struct {
+	byteSourceKind string
+	carrierLayers  []string
+	parents        []uint64
+	carrierOwned   bool // refs retain physical domains after pseudowire normalization
 	// Header layers removed by validated tunnel normalization / IP reassembly.
 	// Names carry no synthetic byte offsets or application identity.
 	networkPrefix        []gopacket.LayerType
@@ -192,12 +196,12 @@ type contribution struct {
 	parent     uint64
 }
 
-func (f *binFlow) contribute(dir int, n int, ref PacketReference) {
+func (f *binFlow) contribute(dir int, n int, ref PacketReference, parent ...uint64) {
 	if n == 0 {
 		return
 	}
 	d := &f.directions[dir]
-	if ref.Number == 0 {
+	if ref.Number == 0 && (len(parent) == 0 || parent[0] == 0) {
 		d.evidenceLimited = true
 		return
 	}
@@ -212,9 +216,16 @@ func (f *binFlow) contribute(dir int, n int, ref PacketReference) {
 		f.a.buffered.Add(-80)
 		return
 	}
-	d.contributions = append(d.contributions, contribution{start: start, end: end, ref: ref})
+	item := contribution{start: start, end: end, ref: ref}
+	if len(parent) > 0 {
+		item.parent = parent[0]
+	}
+	d.contributions = append(d.contributions, item)
 }
 func (f *binFlow) eventEvidence(dir int, e *ProtocolEvent) {
+	if len(f.captureCarriers) > 0 {
+		e.CarrierLayers = append(append([]string(nil), f.captureCarriers...), e.CarrierLayers...)
+	}
 	e.Domain = f.domain
 	e.SourceBytes.Kind = f.byteSource
 	e.SourceBytes.ParentPDU = f.parentID

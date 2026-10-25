@@ -658,6 +658,9 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	for _, e := range a.closeL2TPv3() {
+		a.emit(e)
+	}
 	for _, e := range a.closeCarrierSessions() {
 		a.emit(e)
 	}
