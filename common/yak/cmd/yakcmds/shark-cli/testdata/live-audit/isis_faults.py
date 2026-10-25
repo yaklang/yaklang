@@ -107,6 +107,9 @@ add('P2P-advertised-state-does-not-stick', [body(sized(short_hello, b'\xf0\x01\0
 composition = sized(short_hello, b'\x0a\x11\x36'+b'X'*16+b'\x0c\x02\0\0')
 composition = fletcher(composition, 0, len(composition)-2)
 add('Fletcher-success-is-not-HMAC-composition-acceptance', [body(composition)], ['decoded'], composition=True)
+for typ in (25, 27):
+    circuit = bytearray(wires[typ]); circuit[16] = 0xab
+    add('SNP-type-%d-circuit-is-not-system-ID' % typ, [body(circuit)], ['decoded'], circuit=0xab, system=circuit[10:16].hex())
 
 results = []
 for case in cases:
@@ -156,6 +159,9 @@ for case in cases:
         assert [e['session']['TLVs'][0]['Adjacency State'] for e in es[:2]] == [0, 2] and es[2]['session'].get('TLVs') in (None, []); checks += 3
     if case.get('composition'):
         assert es[0]['session']['Checksum Verified'] is True and es[0]['session']['Authentication Verified'] is False and 'RFC3358' in es[0]['session']['Conformance Warning']; checks += 3
+    if 'circuit' in case:
+        m = es[0]['session']; text = m['Source System ID'].replace('.', '')
+        assert m['Source Circuit ID'] == case['circuit'] and text == case['system']; checks += 2
     with (d/'wire-audit.log').open('wb') as log:
         subprocess.run([sys.executable, '-X', 'utf8', str(Path(__file__).with_name('isis_wire_audit.py')), str(d/'oracle.json'), str(d/'events.jsonl'), str(d/'wire-audit.json')], stdout=log, stderr=subprocess.STDOUT, check=True)
     audit = json.loads((d/'wire-audit.json').read_text())
