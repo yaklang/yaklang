@@ -56,7 +56,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"rip", "udp", "RIPv1/v2 request/response entries", "complete entries, metric checks and v2 clear password; no routing or authentication success"},
 		{"nbt-dg", "udp", "RFC1002 datagram/query/error", "encoded source/destination names; fragments remain explicit without reassembly"},
 		{"onc-rpc", "udp", "RPCv2 CALL/REPLY and padded opaque_auth", "bounded XDR envelope; procedure arguments/results opaque and unassociated"},
-		{"l2tp", "udp", "L2TPv2 control AVPs and data envelope", "exact lengths, mandatory first message type; PPP/hidden values opaque"},
+		{"l2tp", "udp/network", "L2TPv2 UDP control/data envelope and complete IP115/service-hinted UDP L2TPv3 control AVPs; explicit IP115 v3 session envelope", "exact lengths and mandatory message AVPs, 32-bit v3 receiver-local IDs; no guessed cookie/sublayer/pseudowire for midstream data; hidden/vendor values opaque; no authenticated peer or operational tunnel claim"},
 		{"openvpn", "udp", "clear control and observed data envelope", "tls-auth/tls-crypt configuration unavailable; encrypted data opaque; no tunnel/authentication inference"},
 		{"ipmi", "udp", "RMCP IPMI1.5 and RMCP+ envelopes", "checksummed clear IPMI commands, open-session algorithm fields; session authentication/decryption unavailable"},
 		{"ssdp", "udp", "bodyless NOTIFY/M-SEARCH/200 search response", "complete per-datagram discovery headers and exact identity evidence; unverified announcements, no LOCATION fetch or fabricated transaction/device state"},

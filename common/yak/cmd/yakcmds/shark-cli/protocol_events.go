@@ -82,7 +82,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -247,7 +247,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -329,6 +329,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
+			delete(values, "Opaque Session Payload")
+			delete(values, "Ethernet Bytes")
+			for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Opaque Payload Bytes", "Payload Decoded", "AVPs", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "pim" {
 			// Lead with the actual control message and advertised (S,G), not
 			// unrelated generic metadata or a large base64 copy of its body.

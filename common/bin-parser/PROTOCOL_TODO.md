@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **211**，`partial` **7**，`todo` **400**。目录共 **485** 个入口：`stable` **15**，`partial` **287**，`new` **183**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **206**，`partial` **16**，`todo` **396**。目录共 **499** 个入口：`stable` **15**，`partial` **310**，`new` **174**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -47,6 +47,11 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 | 优先级 | 协议 | 路线图状态 | 同名目录入口 |
 |---|---|---|---|
+| P0 | AJP | partial | [partial / ](rules/application-layer/ajp.yaml) |
+| P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
+| P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
+| P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
+| P1 | RTMP | partial | [partial / ](rules/rtmp.yaml) |
 | P2 | 3GPP NAS | todo | 需核对别名/Fields 入口 |
 | P2 | 3GPP NGAP | todo | 需核对别名/Fields 入口 |
 | P2 | 3GPP S1AP | todo | 需核对别名/Fields 入口 |
@@ -57,7 +62,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | ActiveMQ OpenWire | todo | [new / ActiveMQOpenWire](rules/application-layer/extended_protocols.yaml) |
 | P2 | Ansible | todo | 需核对别名/Fields 入口 |
 | P2 | BACnet | todo | [new / BACnetIP](rules/application-layer/extended_protocols.yaml) |
-| P2 | BFD | todo | [new / BFD](rules/application-layer/extended_protocols.yaml) |
+| P2 | BFD | partial | [partial / BFD](rules/application-layer/extended_protocols.yaml) |
 | P2 | Beckhoff ADS | todo | [new / BeckhoffADS](rules/application-layer/extended_protocols.yaml) |
 | P2 | Bonjour | todo | [partial / DNS](rules/application-layer/dns.yaml) |
 | P2 | CAN/ISO-TP | todo | [new / CANEthernet](rules/application-layer/extended_protocols.yaml) |
@@ -91,7 +96,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | Fibre Channel | todo | [partial / FibreChannel](rules/fibre_channel.yaml) |
 | P2 | GB28181 | todo | 需核对别名/Fields 入口 |
 | P2 | GE SRTP | todo | 需核对别名/Fields 入口 |
-| P2 | GLBP | todo | [new / GLBP](rules/application-layer/extended_protocols.yaml) |
+| P2 | GLBP | partial | [partial / GLBP](rules/application-layer/extended_protocols.yaml) |
 | P2 | GTP-C | todo | [new / GTPv2](rules/application-layer/extended_protocols.yaml) |
 | P2 | GTP-U | todo | [new / GTPv1](rules/application-layer/extended_protocols.yaml) |
 | P2 | GTPv2 | todo | [partial / GTPv2](rules/application-layer/extended_protocols.yaml) |
@@ -129,7 +134,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | KNX/IP | todo | [new / KNXIP](rules/application-layer/extended_protocols.yaml) |
 | P2 | Kryo | todo | 需核对别名/Fields 入口 |
 | P2 | LACP | todo | [partial / LACP](rules/link_aggregation.yaml) |
-| P2 | LDP | todo | [new / LDP](rules/application-layer/extended_protocols.yaml) |
+| P2 | LDP | partial | [partial / LDP](rules/application-layer/extended_protocols.yaml) |
 | P2 | LLC | todo | [new / ](rules/llc.yaml) |
 | P2 | Libvirt | todo | 需核对别名/Fields 入口 |
 | P2 | Linux SLL2 | todo | [partial / LinuxSLL2](rules/linux_sll2.yaml) |
@@ -163,7 +168,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | OXABREF/NSPI | todo | 需核对别名/Fields 入口 |
 | P2 | Omron FINS | todo | [new / OmronFINS](rules/application-layer/extended_protocols.yaml) |
 | P2 | PFCP | todo | [new / PFCP](rules/application-layer/extended_protocols.yaml) |
-| P2 | PIM | todo | [new / PIM](rules/application-layer/extended_protocols.yaml) |
+| P2 | PIM | partial | [partial / PIM](rules/application-layer/extended_protocols.yaml) |
 | P2 | POP3S | todo | 需核对别名/Fields 入口 |
 | P2 | PPPoE+BRAS | todo | 需核对别名/Fields 入口 |
 | P2 | PROFIBUS | todo | 需核对别名/Fields 入口 |
@@ -466,7 +471,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [aoe.yaml](rules/aoe.yaml) | AoE (`AoE`, partial) |
 | [appletalk.yaml](rules/appletalk.yaml) | AppleTalk (`DDP`, partial) |
 | [application-layer/acme.yaml](rules/application-layer/acme.yaml) | ACMEv2 (`ACMEJWSRequest`, partial) |
-| [application-layer/ajp.yaml](rules/application-layer/ajp.yaml) | AJP (``, new) |
+| [application-layer/ajp.yaml](rules/application-layer/ajp.yaml) | AJP (``, partial)<br>AJP Observed Message Fields (`AJPMessageFields`, partial)<br>AJP Observed Request Body Fields (`AJPRequestBodyFields`, partial) |
 | [application-layer/alljoyn.yaml](rules/application-layer/alljoyn.yaml) | AllJoyn (`AllJoynNS`, partial) |
 | [application-layer/ber.yaml](rules/application-layer/ber.yaml) | BER (``, new) |
 | [application-layer/bootp.yaml](rules/application-layer/bootp.yaml) | BOOTP (`BOOTP`, new) |
@@ -489,7 +494,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/etcd.yaml](rules/application-layer/etcd.yaml) | ETCD (`EtcdVersionHTTP`, partial) |
 | [application-layer/ether_sbus.yaml](rules/application-layer/ether_sbus.yaml) | Ether-S-Bus (`EtherSBus`, partial) |
 | [application-layer/ether_sio.yaml](rules/application-layer/ether_sio.yaml) | Ether-S-I/O (`EtherSIO`, partial) |
-| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, new)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, new)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, new)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, new)<br>OPC UA (`OPCUATCPMessage`, partial)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, new)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
+| [application-layer/extended_protocols.yaml](rules/application-layer/extended_protocols.yaml) | AFP (`AFP`, new)<br>ANSI C12.22 (`C1222Message`, new)<br>ActiveMQ OpenWire (`ActiveMQOpenWire`, new)<br>BACnet (`BACnetIP`, new)<br>BFD (`BFD`, partial)<br>Beckhoff ADS (`BeckhoffADS`, new)<br>CAN/ISO-TP (`CANEthernet`, new)<br>Cassandra CQL (`CassandraCQL`, new)<br>Ceph (`CephConnect`, new)<br>Citrix ICA (`CitrixICA`, new)<br>CoAP (`CoAP`, new)<br>Collectd (`Collectd`, new)<br>DB2 DRDA (`DRDA`, new)<br>DLEP (`DLEPSignal`, new)<br>DLMS/COSEM (`DLMSHDLC`, new)<br>DNP3 (`DNP3`, new)<br>Diameter (`Diameter`, new)<br>EtherNet/IP CIP (`EtherNetIPCIPIO`, new)<br>FIX (`FIX`, new)<br>GLBP (`GLBP`, partial)<br>GTP Prime (`GTPPrime`, new)<br>GTP-C (`GTPv2`, new)<br>GTP-U (`GTPv1`, new)<br>GTPv2 (`GTPv2`, partial)<br>Git daemon (`GitDaemon`, new)<br>Gnutella (`Gnutella`, new)<br>Hart-IP (`HartIP`, new)<br>IEC 60870-5-104 (`IEC104`, new)<br>IEEE 802.11 Radiotap (`RadioTapHeader`, new)<br>IPP (`IPP`, new)<br>IRC (`IRC`, new)<br>KNX/IP (`KNXIP`, new)<br>LDP (`LDP`, partial)<br>MELSEC (`MELSEC`, new)<br>MGCP (`MGCP`, new)<br>MPEG-TS (`MPEGTransportStream`, new)<br>Modbus TCP (`ModbusTCP`, new)<br>NAT-PMP (`NATPMPPublicAddressRequest`, new)<br>NNTP (`NNTP`, new)<br>NetFlow v9 (`NetFlowV9`, new)<br>OPC UA (`OPCUATCPMessage`, partial)<br>Omron FINS (`OmronFINS`, new)<br>PFCP (`PFCP`, new)<br>PIM (`PIM`, partial)<br>RSH (`RSH`, new)<br>S7comm (`S7comm`, new)<br>S7comm-plus (`S7commPlus`, new)<br>SCCP/Skinny (`Skinny`, new)<br>SMPP (`SMPPBind`, new)<br>SOME/IP (`SOMEIP`, new)<br>SRVLOC/SLP (`SLPv2`, new)<br>STOMP (`STOMP`, new)<br>Teredo (`TeredoAuthentication`, new)<br>USB HID report (`USBHIDReport`, partial)<br>XDMCP (`XDMCP`, new)<br>sFlow (`SFlowV5`, new) |
 | [application-layer/ftp.yaml](rules/application-layer/ftp.yaml) | FTP (``, new)<br>FTPS (`FTPAuthTLS`, new) |
 | [application-layer/gquic.yaml](rules/application-layer/gquic.yaml) | GQUIC Q035 (`GQUIC35ClientPacket`, partial) |
 | [application-layer/gssapi.yaml](rules/application-layer/gssapi.yaml) | GSS-API (`GSSAPIHTTP`, partial) |
@@ -587,7 +592,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/xmlrpc.yaml](rules/application-layer/xmlrpc.yaml) | XML-RPC (`XMLRPC`, partial) |
 | [application-layer/xmpp.yaml](rules/application-layer/xmpp.yaml) | XMPP (`XMPP`, partial) |
 | [application-layer/zlib_json.yaml](rules/application-layer/zlib_json.yaml) | Length-prefixed zlib JSON (`ZlibJSONRecord`, partial) |
-| [bgp.yaml](rules/bgp.yaml) | BGP (``, new) |
+| [bgp.yaml](rules/bgp.yaml) | BGP (``, partial)<br>BGP Observed Message Fields (`BGPMessageFields`, partial) |
 | [bittorrent.yaml](rules/bittorrent.yaml) | BitTorrent (``, new) |
 | [cdp.yaml](rules/cdp.yaml) | CDP (``, new) |
 | [cfm.yaml](rules/cfm.yaml) | CFM (`CFM`, partial) |
@@ -606,7 +611,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ftp_data.yaml](rules/ftp_data.yaml) | FTP-DATA (``, new) |
 | [geneve.yaml](rules/geneve.yaml) | Geneve (`Geneve`, partial) |
 | [hessian.yaml](rules/hessian.yaml) | Hessian2 (``, new) |
-| [hsrp.yaml](rules/hsrp.yaml) | HSRP (``, new) |
+| [hsrp.yaml](rules/hsrp.yaml) | HSRP (``, partial) |
 | [iec61850.yaml](rules/iec61850.yaml) | IEC 61850 GOOSE (`GOOSE`, partial)<br>IEC 61850 SV (`SampledValues`, partial) |
 | [ieee_802_11.yaml](rules/ieee_802_11.yaml) | IEEE 802.11 (``, new) |
 | [ieee_802_1ad.yaml](rules/ieee_802_1ad.yaml) | IEEE 802.1ad QinQ (``, new) |
@@ -628,8 +633,11 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [jenkins.yaml](rules/jenkins.yaml) | Jenkins remoting (``, new) |
 | [jsonrpc.yaml](rules/jsonrpc.yaml) | JSON-RPC (``, partial) |
 | [kafka.yaml](rules/kafka.yaml) | Kafka (``, new) |
-| [l2tp.yaml](rules/l2tp.yaml) | L2TP (``, new) |
+| [l2tp.yaml](rules/l2tp.yaml) | L2TP (``, partial) |
+| [l2tp3.yaml](rules/l2tp3.yaml) | L2TPv3 IP Wire Message (`L2TPv3IPFields`, partial)<br>L2TPv3 UDP Wire Message (`L2TPv3UDPFields`, partial) |
 | [lat.yaml](rules/lat.yaml) | LAT (`LAT`, partial) |
+| [ldp_discovery.yaml](rules/ldp_discovery.yaml) | LDP Discovery Message Fields (`LDPDiscoveryFields`, partial) |
+| [ldp_session.yaml](rules/ldp_session.yaml) | LDP TCP Session Message Fields (`LDPSessionFields`, partial) |
 | [link_aggregation.yaml](rules/link_aggregation.yaml) | LACP (`LACP`, partial) |
 | [link_samples.yaml](rules/link_samples.yaml) | HomePlug AV (`HomePlugAV`, partial)<br>IEEE 802.1ah PBB (`ProviderBackboneBridge`, partial)<br>IEEE 802.3 Slow Protocols (`SlowProtocols`, partial)<br>LACP-marker (`LACPMarker`, partial)<br>VNTAG (`VNTag`, partial) |
 | [linux_sll.yaml](rules/linux_sll.yaml) | Linux SLL (``, new) |
@@ -656,6 +664,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ospfv3.yaml](rules/ospfv3.yaml) | OSPFv3 (`OSPFv3`, partial) |
 | [php_ser.yaml](rules/php_ser.yaml) | PHP serialize (``, new) |
 | [pickle.yaml](rules/pickle.yaml) | Python pickle (``, new) |
+| [pim_control.yaml](rules/pim_control.yaml) | PIMv2 Control Message Fields (`PIMControlFields`, partial) |
 | [pop3.yaml](rules/pop3.yaml) | POP3 (``, new) |
 | [powerlink.yaml](rules/powerlink.yaml) | Powerlink (`Powerlink`, partial) |
 | [pppoe.yaml](rules/pppoe.yaml) | PPPoE Discovery (``, new)<br>PPPoE Session (`PPPoE`, partial) |
@@ -666,8 +675,9 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [rip.yaml](rules/rip.yaml) | RIP (``, new) |
 | [ripng.yaml](rules/ripng.yaml) | RIPng (`RIPng`, partial) |
 | [rmi.yaml](rules/rmi.yaml) | RMI (`RMIHeader`, partial)<br>RMI/JRMP (`RMIHeader`, partial) |
+| [routing_control.yaml](rules/routing_control.yaml) | BFD Observed Message Fields (`BFDMessageFields`, partial)<br>GLBP Observed Message Fields (`GLBPMessageFields`, partial)<br>HSRP Observed Message Fields (`HSRPMessageFields`, partial) |
 | [rsync.yaml](rules/rsync.yaml) | Rsync (`Rsync`, partial)<br>Rsync daemon (``, new) |
-| [rtmp.yaml](rules/rtmp.yaml) | RTMP (``, new) |
+| [rtmp.yaml](rules/rtmp.yaml) | RTMP (``, partial)<br>RTMP AMF0 Message Fields (`AMF0MessageFields`, partial)<br>RTMP Initial Chunk Fields (`RTMPInitialChunkFields`, partial)<br>RTMP Initial Handshake Fields (`RTMPInitialHandshakeFields`, partial) |
 | [rtp.yaml](rules/rtp.yaml) | RTCP (`RTCP`, new)<br>RTP (``, new) |
 | [rtsp.yaml](rules/rtsp.yaml) | RTSP (``, new) |
 | [salt.yaml](rules/salt.yaml) | SaltStack (``, new) |

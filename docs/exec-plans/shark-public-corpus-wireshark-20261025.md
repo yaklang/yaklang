@@ -808,3 +808,80 @@ IP 层保留）；控制名称和通告地址优先展示，完整载荷可在�
 通过；末尾能力登记/预算检查 **0.341s**、筛选提示最终 CLI 全包 **2.968s** 另行通过。
 原始拒绝、未选编码、PIMv1、剩余封装、L2TPv3、IS-IS、RIPng、BFD Echo/MPLS 及既有
 流/会话 fuzz 差异继续开放。没有声称核心协议已全部完备或与 Wireshark 全功能等价。
+
+## L2TPv3 原生封装、控制字段和 Windows 实页
+
+本轮补齐此前只有旧版 UDP L2TPv2 入口、没有实际原生 IP115 接收器的缺口。
+共享 codec、`l2tp3.yaml` 的 IP/UDP 两个 canonical 入口、能力登记和字段展示已经对齐。
+完整控制消息检查 IP 零 Session ID 前缀、T/L/S、16 位序号、32 位接收方 Control
+Connection ID、精确 Length、每个 AVP 边界及基础消息所需的 AVP。未知、vendor、hidden
+值保留原字节；计数和字节均有上限。算法切换允许的两个相邻 Message Digest 不再被误当
+成重复冲突，摘要不冒称已验证；Physical Channel 是 AVP25，不能错用保留的 AVP67。
+
+数据提供独立的显式 receiver-context codec，校验 0/4/8 字节 cookie、default sublayer、
+24 位序号位、sequencing0/1/2 及选定 Ethernet4/5 布局，不搜索“像以太网”的字节来猜偏移。
+四字节全零 cookie 与没有 cookie 是两回事。原生自动 UDP 入口仍要求完整控制语法，
+只匹配端口或两三个头字段的数据包不能建连；显式 Decode-As 的依据单独标注。
+cookie 与内层字节保留自有副本，测试明确覆盖了输入缓冲区复用后解析结果不变。
+显式数据 codec 也检查完整 VLAN tag 和集合预算。hidden/unknown/vendor AVP 即使 M bit
+为零，或参数重复/消息语义未选定，字段集合仍标为 limited；不把“看不到”变成否定谓词
+命中。这里不限制 PW4 必须有 VLAN tag，RFC4719 允许接入侧先做 tag 适配。
+
+当前原生入口**尚未实现完整控制协商/会话状态机**，因此不会把手工 context codec 的能力
+冒称为自动协商或真实伪线交付。接下来仍需按接收方 CID/SID、双向 Ns/Nr、重传/缺口、
+SCCRQ/RP/CN 与 ICRQ/RP/CN（及 outgoing 对应交换）建立受限关联，隔离连接和 SID 复用，
+再将有根据的伪线交给内层解析器。没有这个证据，中途捕获的数据保持明确的封装层和未知
+载荷。L2TP roadmap/catalog 已从旧的笼统完成项改成 partial；冻结历史归档不改写，例外
+绑定可执行 canonical 完整/残包测试。
+
+### 原始大文件逐包核验
+
+Weber 的 **706/706** 个原始封装全部匹配，**4,556** 项完整 wire、字段、贡献帧、接口和
+端点检查零差异：666 数据、20 HELLO、20 ZLB 确认。这些流量确实没有控制/会话建立协商；
+Wireshark 默认也只展示数据的 Session ID 和 generated unknown pseudowire type0。
+原生同样没有猜 cookie/sublayer/Ethernet，更没有因此产生 TCP 或 L2TP 会话身份。
+合法 IP115 控制的零 Session ID 标记也保留，不能因它不是数据 SID 就删掉真实字段。
+v3 的 `l2tp.sid` 为 32 位，不借用 v2 的 16 位 `l2tp.session`；旧 v2 字段与字节范围仍有回归。
+
+Sharon 保留原始 **非零验收**：1,355 个精确 wire 匹配中，707 个有效封装、648 个明确拒绝，
+选定字段和端点零差异；**23** 个 raw missing、**8** 个额外原生拒绝诊断仍保留。
+另有 34 个 inner 视图位于不合法的父 UDP 长度下、17 个未建立所选原始 carrier 的视图。
+不能把这些计数归零来宣称总体协议一致。独立复核 23 个 raw missing：
+
+- 8 个没有完整重组的 IP 分片；首片上的 Wireshark 解码不等于完整消息交付。
+- 11 个 IPv4 option 的长度/边界不合法。
+- 4 个原始 Ethernet IPv4 EtherType 下实际 version6 的头；不做跨类型猜测。
+
+八个额外诊断全部有独立的原始 IP115 长度错误/截断证明，且没有 decoded 身份。
+本轮实际修掉了 **IPv4 TotalLength0** 的接收漏洞：底层库会把原始零长度替换为捕获剩余
+长度；原生现在查原始头字节，不能据此认定完整 L2TP。较早阶段有 8 个这类 fuzz 包曾被
+接收为 data envelope，最终全部移入明确拒绝，未删除原始证据。
+
+两个完整文件的列标签变化分别仅 **IPv4 -706 / L2TPv3 +706** 和
+**IPv4 -707 / L2TPv3 +707**。每个文件新增了此前缺失的 40 个 `l2tp.flags` 与 40 个
+`l2tp.length` 的真实字段值；Sharon 剩余 fuzz 字段缺失没有冒称已补完。
+原有通用字段集合差异仍为 **90/35**，TCP 流 **824/840**、预览 **808/735**，双向分区、
+已有 endpoint 指标均与上一完整 PIM 版本逐项相同。
+
+### 故障恢复、实际页面和验证范围
+
+从原始真实 router frame#9 保留完整 L2TP 字节及端点，明确派生 7 个离线 IPv4 控制。
+基线、分片、乱序、完全重复、snaplen 后完整重传双方均得到同一完整封装；缺中段和
+未修复截断双方均为零完整消息。五个正向控制共 20 项字节、SID、端点和不伪造会话检查，
+另有两个负向控制。这验证封装重组，不是控制协商/连接复用的替代验收。
+bounded codec 定向 fuzz 前阶段 **38,619** 次、最终 opaque/VLAN 边界版本 **26,953** 次通过。
+
+Windows 在完整 51,328 帧上实际运行，60,000 包缓存保证 EOF 后仍能查看前段的 706 个
+L2TPv3 包，首包 #9；另验证 20 个 HELLO 的字段与 AVP 字节。页面显示
+`Ethernet › MPLS › IPv4 › L2TPv3`，明确 receiver context unavailable 和 opaque payload
+长度，保留 PDU 字节，不让一大段 base64 挡住字段。
+发现并修复了通用解码器重复追加 `incomplete/undecoded` 的误导提示：只有原生已验证的
+实际 IP115 PDU、长度及 SHA256 与该网络载荷完全匹配，才能覆盖那个明确的 unsupported
+decoder 错误；不同字节的事件不能覆盖，真实 snaplen 提示仍保留。原生控制台颜色/字符
+缓冲、字段定位、字节源、缩放、CP936 恢复和退出均检查。
+
+完整 bin-parser 及子包通过（主包 **138.049s**），pcaputil **442.873s**、CLI **2.024s**
+通过；实际页面修复后的完整 CLI **2.020s** 另行通过，末尾原生准入/字段、hidden 可选 AVP、VLAN 和 v2 范围回归 **2.067s**，最终完整 CLI **3.101s** 另行通过。总体仍为 draft：自动 L2TPv3 协商/伪线复用及其故障矩阵、PIMv1/
+extensions、其他原生协议和既有 fuzz 流/会话差异继续处理，未宣称核心协议完备。
+
+最终冻结二进制：CLI `6670c6efb2992963fecb42538a821d62cd3b0bce55481fc939fc22e5a4bb78fe`，SDK `3d84dad067bf255533a7fdb890a2f3b1e4b1f51b6ae4ded74b1717bf4faacf17`。两个完整大文件、七项离线分片控制与原生 Windows 数据/HELLO AVP 页面均使用此版本；汇总证据见 `shark-public-corpus-20261025/l2tp3-wire-summary.json`。控制页实际选中 Message Type6，定位本 PDU 的 offset22、2字节 `00 06`。
