@@ -174,6 +174,7 @@ type captureSession struct {
 func startCapture(parent context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) *captureSession {
 	ctx, cancel := context.WithCancel(parent)
 	s := &captureSession{packets: make(chan *capturedPacket, 2048), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
+	s.streams.captureReplay = src.offline
 	go func() {
 		defer close(s.packets)
 		defer close(s.done)
@@ -202,6 +203,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	// Inspection must retain useful packets from imperfect captures. The engine
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
+	if src.offline {
+		options = append(options, pcaputil.WithCaptureReplayClock())
+	}
 	options = append(options, pcaputil.WithBeforeTransportPacket(func(packet gopacket.Packet) {
 		if current != nil {
 			current.observeTransportHeader(packet)

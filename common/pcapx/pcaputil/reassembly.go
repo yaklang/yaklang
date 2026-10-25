@@ -164,7 +164,7 @@ func (t *TrafficConnection) Release() {
 }
 
 func (t *TrafficConnection) Write(b []byte, seq int64, ts time.Time) (int, error) {
-	if ts.IsZero() {
+	if ts.IsZero() && !t.Flow.pool.options.captureReplay {
 		ts = time.Now()
 	}
 	frame := &TrafficFrame{evidence: t.evidence, ConnHash: t.hash, Seq: uint32(seq), Payload: b, Timestamp: ts, Connection: t}
@@ -513,6 +513,14 @@ func (p *TrafficPool) newFlow(netType string, srcAddr, dstAddr string) (*Traffic
 
 // Feed already has decoded endpoints. Resolve names only for public NewFlow.
 func (p *TrafficPool) newFlowWithAddrs(netType string, src, dst *net.TCPAddr, domains ...CaptureDomain) *TrafficFlow {
+	var domain CaptureDomain
+	if len(domains) > 0 {
+		domain = domains[0]
+	}
+	return p.newFlowWithAddrsAt(netType, src, dst, domain, time.Time{})
+}
+
+func (p *TrafficPool) newFlowWithAddrsAt(netType string, src, dst *net.TCPAddr, domain CaptureDomain, captured time.Time) *TrafficFlow {
 	srcAddr, dstAddr := src.String(), dst.String()
 	var clientReader, serverReader *tcpStreamBuffer
 	var clientWriter, serverWriter *tcpStreamBuffer
@@ -558,10 +566,8 @@ func (p *TrafficPool) newFlowWithAddrs(netType string, src, dst *net.TCPAddr, do
 	c2sConn.Flow = flow
 	s2cConn.Flow = flow
 	flow.key, _ = makeFlowKey(src.IP, dst.IP, uint16(src.Port), uint16(dst.Port), netType == "tcp6")
-	if len(domains) > 0 {
-		flow.key.domain = domains[0]
-	}
-	if !p.flowCache.Set(flow.key, flow) {
+	flow.key.domain = domain
+	if !p.flowCache.SetAt(flow.key, flow, captured) {
 		return nil
 	}
 	return flow
