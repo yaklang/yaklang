@@ -374,7 +374,7 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		c.text(health.x+health.w/2, health.y+i, health.w-health.w/2, row.v, row.style)
 	}
 	if l.mix.w > 0 {
-		r := c.box(l.mix, "protocols", fmt.Sprintf("sample %d", u.mixTotal), false)
+		r := c.box(l.mix, "capture protocols", fmt.Sprintf("last %d", u.mixTotal), false)
 		if len(u.mix) == 0 {
 			c.text(r.x, r.y+1, r.w, "Waiting for traffic…", inkMuted)
 		}

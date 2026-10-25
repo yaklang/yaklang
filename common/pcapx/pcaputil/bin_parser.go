@@ -898,6 +898,7 @@ type binDirection struct {
 type binFlow struct {
 	ajp               *binAJP
 	bgp               *binBGP
+	ldp               *binLDP
 	rtmp              *binRTMP
 	routing           *routingDatagramState
 	mms               *binMMS
@@ -1553,7 +1554,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.bgp != nil || f.ajp != nil || f.rtmp != nil {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil {
 				result = map[string]any{}
 			} else if f.protocol == "tls" {
 				if f.byteSource == "decrypted" {

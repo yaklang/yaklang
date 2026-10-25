@@ -20,6 +20,14 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if f.port(646) {
+		if p := probeLDP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+			f.protocol, f.ldp = "ldp", &binLDP{}
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
 	if p := probeRTMP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 		f.protocol, f.rtmp = "rtmp", newBinRTMP()
 		return
@@ -451,6 +459,12 @@ func (f *binFlow) needsMoreBoundedText(wire []byte) bool {
 }
 
 func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
+	// A service hint may extend bounded lookahead, never establish protocol
+	// identity. First LDP PDUs can exceed the generic 64-byte probe window;
+	// admission still waits for every message and mandatory TLV to validate.
+	if f.port(646) && probeLDP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeNeedMore {
+		return true
+	}
 	if !f.captureTCP {
 		return false
 	}
@@ -474,6 +488,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	}
 	var err error
 	switch f.protocol {
+	case "ldp":
+		err = f.consumeLDP(dir, e)
 	case "bgp":
 		err = f.consumeBGP(dir, e)
 	case "rtmp":
@@ -1252,6 +1268,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.ldp = nil
 	f.bgp = nil
 	f.rtmp = nil
 	f.ajp = nil

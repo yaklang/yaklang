@@ -38,6 +38,7 @@ func DecodeLDPDiscovery(w []byte, limit int) (map[string]any, error) {
 		end := m.at + int(n)
 		m.w = w[:end]
 		m.num("Message ID", 4, false)
+		m.info["Unknown Message"] = false
 		m.info["Packet Name"] = "Hello"
 		var tlvs []map[string]any
 		for m.err == nil && m.at < end {
@@ -116,7 +117,9 @@ func DecodeLDPDiscovery(w []byte, limit int) (map[string]any, error) {
 		if m.err != nil {
 			return nil, m.err
 		}
-		m.info["TLVs"], m.info["Wire Field Ranges"] = tlvs, routingFieldRanges(m.fields)
+		messageRanges := routingFieldRanges(m.fields)
+		messageRanges["Unknown Message"] = messageRanges["Message Type"]
+		m.info["TLVs"], m.info["Wire Field Ranges"] = tlvs, messageRanges
 		messages = append(messages, m.info)
 		r.at = end
 	}

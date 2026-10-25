@@ -222,9 +222,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				case "GTSM":
 					value += " (advertised capability; enforcement unverified)"
 				case "Message Type":
-					value = fmt.Sprintf("0x%04x (Hello)", number(x))
+					value = fmt.Sprintf("0x%04x", number(x))
 				case "TLV Type":
 					value = fmt.Sprintf("0x%04x", number(x))
+				case "Generic Label":
+					if label := map[uint64]string{0: "IPv4 Explicit NULL", 1: "Router Alert", 2: "IPv6 Explicit NULL", 3: "Implicit NULL"}[number(x)]; label != "" {
+						value = fmt.Sprintf("%d (%s; advertised)", number(x), label)
+					}
 				}
 			}
 			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" {
