@@ -700,10 +700,13 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	}
 	row.Protocol = p.protocol
 	row.ProtocolStack = append([]string(nil), row.Layers...)
+	if row.TransportView != nil {
+		row.ProtocolStack = append([]string(nil), row.TransportView.Layers...)
+	}
 	if row.MessageTransport != "" {
 		carrier := strings.ToUpper(row.MessageTransport)
 		present := false
-		for _, name := range row.Layers {
+		for _, name := range row.ProtocolStack {
 			if name == carrier {
 				present = true
 			}

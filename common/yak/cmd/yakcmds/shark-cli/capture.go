@@ -129,6 +129,7 @@ func openOffline(name, filter string, ignoreSecrets ...bool) (_ *captureSource, 
 }
 
 type capturedPacket struct {
+	transportView         *packetTransportView
 	physicalRecord        bool
 	tcpFlowID             uint64
 	tcpFlowDomain         pcaputil.CaptureDomain
@@ -196,9 +197,19 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
+	var normalizedPreview gopacket.Packet
+	var currentProtocolEvents []*pcaputil.ProtocolEvent
 	// Inspection must retain useful packets from imperfect captures. The engine
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
+	options = append(options, pcaputil.WithBeforeTransportPacket(func(packet gopacket.Packet) {
+		if current != nil {
+			current.observeTransportHeader(packet)
+			if current.transportView != nil && current.transportView.Protocol == "tcp" {
+				normalizedPreview = ownedNormalizedPreview(packet)
+			}
+		}
+	}))
 	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, _ *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, _ time.Time) {
 		if current != nil {
 			for _, ref := range refs {
@@ -225,6 +236,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				if ref.Number == current.reference.Number {
 					if e.Transport == "udp" && e.FlowID != 0 {
 						current.conversationID = e.FlowID
+					}
+					if e.Transport == "tcp" && len(currentProtocolEvents) < 128 {
+						currentProtocolEvents = append(currentProtocolEvents, e)
 					}
 					if len(current.eventIDs) < 128 {
 						current.eventIDs = append(current.eventIDs, e.ID)
@@ -374,16 +388,28 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		}
 		ref.Domain = pcaputil.PacketDomain(data, ci, link)
 		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref}
-		if s.streams != nil {
-			s.streams.add(packet)
-		}
 		current = packet
+		normalizedPreview = nil
+		currentProtocolEvents = nil
 		if err := analyzer.Feed(data, ci, link); err != nil {
 			return err
 		}
 		if s.streams != nil {
+			if normalizedPreview != nil && packet.transportView != nil {
+				s.streams.addDecoded(packet, normalizedPreview, packet.transportView.Domain)
+			} else {
+				s.streams.add(packet)
+			}
+			// The first PDU can be published before its preview record exists.
+			// Replay only retained TCP contributors after the core's generation ID
+			// is known; identity updates are idempotent, bytes are never fed twice.
+			for _, event := range currentProtocolEvents {
+				s.streams.observeProtocol(event)
+			}
 			s.streams.annotate(packet)
 		}
+		normalizedPreview = nil
+		currentProtocolEvents = nil
 		current = nil
 		if packet.conversationID != 0 && len(packet.connectionStack) == 0 {
 			packet.connectionStack = append([]string(nil), packet.presentation.stack...)

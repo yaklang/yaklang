@@ -136,6 +136,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			return nil, true
 		}
 		e.normalizedTunnels += tunnels
+		e.preserveNetworkPrefix(p, inner)
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
 		// Fragmentation of an outer carrier does not mean that the inner
 		// IPv6 ND message itself contained a Fragment header.
@@ -172,6 +173,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if off >= 0 {
+		e.preserveNetworkPrefix(p, p.NetworkLayer())
 		q, consumed := a.fragment(p, e, key, off, more, payload)
 		// fragment() releases its store mutex before this dispatch. A complete
 		// datagram must pass through tunnel normalization and native observation

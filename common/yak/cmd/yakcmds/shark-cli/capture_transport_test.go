@@ -1,9 +1,11 @@
 package sharkcli
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,9 +77,34 @@ func TestNativeTCPFlowIDsFollowCoreGenerations(t *testing.T) {
 	require.NotZero(t, rows[0].TCPFlowID)
 	require.Equal(t, rows[0].TCPFlowID, rows[1].TCPFlowID)
 	require.Equal(t, rows[0].TCPFlowID, rows[2].TCPFlowID, "conflicting SYN does not replace an active connection")
+	require.Equal(t, rows[0].StreamID, rows[2].StreamID, "a rejected conflicting SYN cannot reset the preview before native association")
 	require.NotZero(t, rows[4].TCPFlowID)
 	require.Equal(t, rows[4].TCPFlowID, rows[5].TCPFlowID)
 	require.NotEqual(t, rows[0].TCPFlowID, rows[4].TCPFlowID, "SYN after an accepted reset starts a new native generation")
+}
+
+func TestCaptureBackedPreviewRequiresNativeFlowAssociation(t *testing.T) {
+	packet := tcpPacket(t, 1, 100, "GET / HTTP/1.1\r\nHost: test\r\n\r\n", false, false, false, false)
+	var err error
+	packet.history, err = pcaputil.NewProtocolInspector(8, 4096)
+	require.NoError(t, err)
+	store := newStreamStore(8, 4096)
+	defer store.finish()
+	store.add(packet)
+	require.Zero(t, packet.streamID, "an observed header alone cannot create a capture-backed preview connection")
+	require.Empty(t, store.records)
+	packet.tcpFlowID = 17
+	store.add(packet)
+	require.NotZero(t, packet.streamID, "a native flow association permits an independent bounded byte preview")
+}
+
+func TestReassembledDatagramPresentationUsesObservedHeaderPathOnce(t *testing.T) {
+	row := packetSummary{Transport: "udp", MessageTransport: "udp", MessageSource: "192.0.2.1:53", Layers: []string{"Ethernet", "IPv4", "Fragment"},
+		TransportView: &packetTransportView{Layers: []string{"Ethernet", "IPv4", "UDP"}, LayersComplete: true}}
+	presentation := packetPresentation{protocol: "DNS", stack: []string{"DNS"}, status: "decoded"}
+	projected := presentation.apply(row)
+	require.Equal(t, []string{"Ethernet", "IPv4", "UDP", "DNS"}, projected.ProtocolStack)
+	require.Equal(t, row.TransportView.Layers, []string{"Ethernet", "IPv4", "UDP"}, "appending an application layer must not alter the owned network observation")
 }
 
 func TestFinalACKKeepsClosedNativeFlowAndPreview(t *testing.T) {
@@ -161,6 +188,7 @@ func TestOuterFragmentCompletesInnerMessageAndEarlierPacketFields(t *testing.T) 
 	require.NotZero(t, last.TCPFlowID)
 	require.Contains(t, last.ProtocolStack, "TCP")
 	require.Contains(t, last.ProtocolStack, "IPv4")
+	require.Equal(t, []string{"Ethernet", "IPv6", "GRE", "IPv4", "TCP", "HTTP/1.1"}, last.ProtocolStack, "the observed header path must not acquire a fabricated duplicate IP/TCP pair")
 	events := rows[1].protocolEvents()
 	require.NotEmpty(t, events, "an earlier physical fragment can inspect the completed PDU")
 	found := false
@@ -175,4 +203,99 @@ func TestOuterFragmentCompletesInnerMessageAndEarlierPacketFields(t *testing.T) 
 	require.True(t, found)
 	require.Contains(t, last.TCPFlowDomain.Encapsulation, "/gre:")
 	require.Equal(t, pcaputil.CaptureDomain{}, rows[1].reference.Domain, "raw fragment keeps its original capture domain")
+}
+
+func TestFragmentedUnknownApplicationRetainsObservedTransportEndpoints(t *testing.T) {
+	whole := fragmentedGRETCPFrame(t, false)
+	// Keep a valid full TCP header but remove the recognizable HTTP grammar.
+	decoded := gopacket.NewPacket(whole, pcaputil.CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+	inner, tr := pcaputil.CaptureTransport(decoded)
+	tcp := tr.(*layers.TCP)
+	start := len(whole) - len(tcp.Payload)
+	unknownPayload := bytes.Repeat([]byte{0x9b}, len(tcp.Payload))
+	copy(whole[start:], unknownPayload)
+	require.NoError(t, tcp.SetNetworkLayerForChecksum(inner))
+	buffer := gopacket.NewSerializeBuffer()
+	require.NoError(t, gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, tcp, gopacket.Payload(unknownPayload)))
+	copy(whole[start-len(tcp.LayerContents()):], buffer.Bytes())
+	body := whole[54:]
+	var packets [][]byte
+	for at := 0; at < len(body); {
+		n := min(48, len(body)-at)
+		header := append([]byte(nil), whole[:54]...)
+		header[20] = 44
+		binary.BigEndian.PutUint16(header[18:], uint16(8+n))
+		fh := make([]byte, 8)
+		fh[0] = 47
+		off := uint16(at/8) << 3
+		if at+n < len(body) {
+			off |= 1
+		}
+		binary.BigEndian.PutUint16(fh[2:], off)
+		binary.BigEndian.PutUint32(fh[4:], 75)
+		packets = append(packets, append(append(header, fh...), body[at:at+n]...))
+		at += n
+	}
+	src, err := openOffline(fixture(t, "unknown-fragment.pcap", packets...), "")
+	require.NoError(t, err)
+	defer src.Close()
+	s := startCapture(context.Background(), src, captureConfig{}, false)
+	var rows []*capturedPacket
+	for p := range s.packets {
+		rows = append(rows, p)
+	}
+	require.NoError(t, s.result())
+	last := summarize(rows[len(rows)-1])
+	require.Equal(t, "TCP", last.Protocol)
+	require.Equal(t, "192.0.2.1", last.Source)
+	require.Equal(t, "192.0.2.2", last.Destination)
+	require.Equal(t, "2001:db8:1::1", last.PhysicalSource)
+	require.Equal(t, "2001:db8:1::2", last.PhysicalDestination)
+	require.Equal(t, "observed transport header", last.ProtocolScope)
+	require.NotNil(t, last.TransportView)
+	require.Equal(t, "tcp", last.TransportView.Protocol)
+	require.Equal(t, []string{"Ethernet", "IPv6", "GRE", "IPv4", "TCP"}, last.ProtocolStack)
+	require.EqualValues(t, 12345, last.SourcePort)
+	require.Contains(t, last.Info, "sequence acceptance separate")
+	require.True(t, last.TransportView.LayersComplete)
+	require.NotZero(t, last.StreamID, "the real reassembled TCP header must also reach the stream page")
+	preview := s.streams.snapshot(last.StreamID)
+	require.NotNil(t, preview)
+	require.EqualValues(t, len(unknownPayload), preview.bytes[0])
+	require.Equal(t, unknownPayload, preview.prefix[0])
+	fields, sources := transportObservationDetail(last.TransportView)
+	require.Len(t, sources, 1)
+	found := false
+	for _, f := range fields {
+		if strings.HasPrefix(f.text, "Source Port:") {
+			found = true
+			require.True(t, f.hasRange)
+			require.Equal(t, []byte{0x30, 0x39}, sources[f.source-1].Data[f.start:f.end])
+		}
+	}
+	require.True(t, found)
+	// The Windows UI deep decoder crosses JSON IPC. Keeping this metadata only
+	// in the capture process would turn the field page back into Fragment.
+	wire, err := marshalDecodeRequest(packetDecodeRequest(rows[len(rows)-1]))
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, runDecodeWorker(bytes.NewReader(wire), &output))
+	deep, err := decodeWorkerOutput(output.Bytes(), rows[len(rows)-1])
+	require.NoError(t, err)
+	require.Equal(t, "TCP", deep.protocol)
+	require.Equal(t, "TCP", quickDetail(rows[len(rows)-1]).protocol)
+	workerHeader := false
+	for _, f := range deep.fields {
+		if f.text == "TCP · observed transport header" {
+			workerHeader = true
+			require.True(t, f.hasRange)
+			require.Positive(t, f.source)
+			require.Equal(t, last.TransportView.Header, deep.sources[f.source-1].Data[f.start:f.end])
+		}
+	}
+	require.True(t, workerHeader)
+	require.Nil(t, summarize(rows[0]).TransportView, "incomplete network data does not invent a transport view")
+	for _, event := range rows[len(rows)-1].protocolEvents() {
+		require.NotEqual(t, "http", event.Protocol, "a valid TCP header does not identify application bytes")
+	}
 }
