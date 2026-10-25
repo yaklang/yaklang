@@ -1,0 +1,78 @@
+{
+  "scope": "Bounded immutable field history/cache correctness and actual Windows typed-filter acceptance; entire protocol infrastructure remains incomplete",
+  "binary_sha256": {
+    "yak-cache-stage.exe": "f420860b55bbfbfdb6260eaeccf2d16a25b80eeeebf222af679cc5b9e7427d64",
+    "yak-source-check.exe": "f420860b55bbfbfdb6260eaeccf2d16a25b80eeeebf222af679cc5b9e7427d64",
+    "events-cache-stage.exe": "7b8d949ee149938e57c5c3dcfc95b4cc6c4358ef28e7c5d1c8313ecdb70e20e6"
+  },
+  "revision_policy": {
+    "stable_and_unrelated_arrival_redraw_allocations": 0,
+    "pre_evaluation_token": true,
+    "domain_isolated_contributor_index": true,
+    "global_eviction_invalidation": true,
+    "unindexed_global_revision_fallback": true,
+    "direct_mutable_events_cached": false,
+    "pdu_union_limit": 128,
+    "snapshot_byte_limit": 262144,
+    "evicted_foreign_or_truncated_union": "indeterminate; no fabricated field absence"
+  },
+  "tests": {
+    "complete_pcaputil_seconds": 443.276,
+    "complete_cli_seconds": 2.262,
+    "focused_final_cli_seconds": 2.13,
+    "revision_snapshot_fuzz_executions": 1579,
+    "revision_snapshot_fuzz_seconds": 21.39
+  },
+  "windows": {
+    "capture_frames": 51328,
+    "startup_filter": "bgp.type == 4",
+    "visible": 195,
+    "first_frame": 79,
+    "old_eof_deadline_seconds": 90,
+    "old_result": "failed",
+    "current_elapsed_ms": 18262,
+    "current_result": "passed entire harness, including EOF, fields, byte source, conversation, evidence, resizing, quit and CP936 restoration",
+    "buffered_frames": 51328,
+    "ui_skipped": 0
+  },
+  "public_corpora": {
+    "weber": {
+      "frames": 51328,
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "current_raw_field_mismatches": 90,
+      "native_tcp_flows": 824,
+      "preview_flows": 808,
+      "same_as_prior_final_for": [
+        "ws_labels",
+        "yak_labels",
+        "native_event_status",
+        "field_mismatch_count",
+        "packet_metadata_mismatches",
+        "endpoint_frames_checked",
+        "native_tcp_flow_count",
+        "native_tcp_preview_count",
+        "scoped_session_partitions"
+      ],
+      "raw_current_summary_sha256": "e45719a5f7fda5fa37d4e6d25ae71b198677e0f338fa4dbb66f76d276be7b3fb"
+    },
+    "sharon": {
+      "frames": 328127,
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "current_raw_field_mismatches": 35,
+      "native_tcp_flows": 840,
+      "preview_flows": 735,
+      "same_as_prior_final_for": [
+        "ws_labels",
+        "yak_labels",
+        "native_event_status",
+        "field_mismatch_count",
+        "packet_metadata_mismatches",
+        "endpoint_frames_checked",
+        "native_tcp_flow_count",
+        "native_tcp_preview_count",
+        "scoped_session_partitions"
+      ],
+      "raw_current_summary_sha256": "df5e071670f7fcfa4da4a6602234f32f3635691f998e1ac7103e20c836146c81"
+    }
+  }
+}

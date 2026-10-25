@@ -34,6 +34,11 @@ Each result includes `tshark.tsv`, `yak.jsonl`, native `events.jsonl`, a
 checks exact gRPC payload hashes against both Wireshark and the live application,
 no invented plaintext under faults, no CoAP admission of the protected QUIC
 controls, and no TLS identity inherited across a reset with an unseen handshake.
+Complete TLS records are also compared byte-for-byte by oracle TCP stream and
+directional endpoints; all native contributor frames must bind to that stream.
+The three typed record-header fields are checked against the same wire bytes.
+`tls-wire-oracle.json` preserves incomplete views separately; these checks do
+not treat equal record counts as proof of correct stream association or AEAD.
 
 Packet-column names need not be identical: an ACK retains TCP as its packet
 protocol, while its connection identity is separate. Reassembled message events
