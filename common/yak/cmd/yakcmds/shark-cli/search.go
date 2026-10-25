@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"net"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode"
@@ -399,7 +400,31 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 		return true
 	}
 	if u.search.fields != nil {
-		result := u.search.fields.EvaluateEvents(e.packet.protocolEvents())
+		p := e.packet
+		var revision pcaputil.ProtocolPacketRevision
+		cached := false
+		if p.history != nil {
+			revision = p.history.PacketQueryRevision(p.reference, p.eventIDs, p.physicalRecord)
+			cached = e.searchGeneration != 0 && e.searchGeneration == u.searchGeneration && e.fieldHistory == p.history && e.fieldRevision == revision && slices.Equal(e.fieldEventIDs, p.eventIDs)
+		}
+		result := e.fieldResult
+		if !cached {
+			if e.fieldHistory != p.history || !slices.Equal(e.fieldEventIDs, p.eventIDs) {
+				e.fieldKnownIDs = nil
+			}
+			events, known := p.protocolEventSnapshot(e.fieldKnownIDs)
+			result = u.search.fields.EvaluateEvents(events)
+			if p.history != nil {
+				// Use the pre-evaluation token. A concurrent arrival/eviction must
+				// invalidate this result on the next redraw, never be absorbed by it.
+				e.searchGeneration, e.fieldHistory, e.fieldRevision = u.searchGeneration, p.history, revision
+				if !slices.Equal(e.fieldEventIDs, p.eventIDs) {
+					e.fieldEventIDs = append([]uint64(nil), p.eventIDs...)
+				}
+				e.fieldResult = result
+				e.fieldKnownIDs = known
+			}
+		}
 		if !result.Complete {
 			u.notice = "Field filter unavailable: " + result.Reason
 		}

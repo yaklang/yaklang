@@ -9,6 +9,7 @@ import (
 	"unicode"
 
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"golang.org/x/term"
 )
 
@@ -17,6 +18,11 @@ type packetEntry struct {
 	summary                         packetSummary
 	searchGeneration, searchVersion uint64
 	searchMatched                   bool
+	fieldHistory                    *pcaputil.ProtocolInspector
+	fieldRevision                   pcaputil.ProtocolPacketRevision
+	fieldResult                     pcaputil.DisplayFilterResult
+	fieldEventIDs                   []uint64
+	fieldKnownIDs                   []uint64
 }
 type packetRing struct {
 	entries     []packetEntry
