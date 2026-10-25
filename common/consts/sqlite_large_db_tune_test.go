@@ -64,6 +64,33 @@ func TestTuneSQLiteByDatabaseFileSizeAboveThreshold(t *testing.T) {
 	require.False(t, result2, "same tier should not re-tune")
 }
 
+// TestTuneSQLiteBulkWriteAppliesLargeTier verifies that a fresh, empty
+// database still receives the large cache before a bulk compile. The
+// size-based tuner ignores it because the file is still near zero bytes.
+func TestTuneSQLiteBulkWriteAppliesLargeTier(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "fresh.db")
+	db, err := gorm.Open("sqlite3", dbPath)
+	require.NoError(t, err)
+	defer db.Close()
+
+	require.True(t, TuneSQLiteBulkWrite(db), "bulk write tuning must apply to an empty database")
+
+	var cacheSize int
+	require.NoError(t, db.Raw("PRAGMA cache_size").Row().Scan(&cacheSize))
+	require.Equal(t, -int(sqliteLargeDBTune256M), cacheSize, "cache_size must be the 256MB tier in KiB mode")
+
+	var mmapSize int64
+	require.NoError(t, db.Raw("PRAGMA mmap_size").Row().Scan(&mmapSize))
+	require.Equal(t, int64(512*1024*1024), mmapSize)
+
+	var walCheckpoint int
+	require.NoError(t, db.Raw("PRAGMA wal_autocheckpoint").Row().Scan(&walCheckpoint))
+	require.Equal(t, 20000, walCheckpoint)
+
+	require.False(t, TuneSQLiteBulkWrite(nil), "nil database must be a no-op")
+}
+
 // TestTuneSQLiteByDatabaseFileSizeNilDB verifies nil safety.
 func TestTuneSQLiteByDatabaseFileSizeNilDB(t *testing.T) {
 	require.False(t, TuneSQLiteByDatabaseFileSize(nil, "/tmp/test.db"))
