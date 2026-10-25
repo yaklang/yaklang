@@ -13,6 +13,20 @@ func isisTLVs(r *controlReader, pdu uint64, limit *int) {
 		delete(r.info, "TLV Type")
 		delete(r.info, "TLV Length")
 		r.info["TLVs"] = rows
+		md5, nonzeroOptional := false, false
+		for _, row := range rows {
+			md5 = md5 || row["Authentication Type"] == uint64(54)
+			if v, ok := row["Checksum Value"].(uint64); ok && v != 0 {
+				nonzeroOptional = true
+			}
+		}
+		if md5 && nonzeroOptional {
+			warning := "RFC3358 requires the optional checksum to be omitted or zero with HMAC-MD5; successful Fletcher arithmetic does not prove receiver acceptance or authentication"
+			if previous, ok := r.info["Conformance Warning"].(string); ok {
+				warning = previous + "; " + warning
+			}
+			r.info["Conformance Warning"] = warning
+		}
 	}()
 	optional := 0
 	for r.at < len(r.w) && r.err == nil {
@@ -56,6 +70,7 @@ func isisTLVs(r *controlReader, pdu uint64, limit *int) {
 			} else {
 				row["Checksum Observation"] = "complete PDU Fletcher check"
 			}
+			r.info["Checksum Observation"], r.info["Checksum Verified"] = row["Checksum Observation"], row["Checksum Verified"]
 			if !valid {
 				r.info["Optional Checksum Failure"] = true
 			}

@@ -71,6 +71,10 @@ func TestISISWireAllFixedHeadersAndBoundaries(t *testing.T) {
 		require.EqualValues(t, len(w), m["PDU Length"])
 		require.EqualValues(t, w[4]&31, m["PDU Type"])
 		require.Equal(t, false, m["Authentication Verified"])
+		if w[4]&31 != 18 && w[4]&31 != 20 {
+			require.Equal(t, false, m["Checksum Verified"])
+			require.Equal(t, "no checksum observed; integrity not verified", m["Checksum Observation"])
+		}
 		for cut := 0; cut < len(w); cut++ {
 			_, err := DecodeISISWire(w[:cut], 64)
 			require.Error(t, err)
@@ -102,10 +106,12 @@ func TestISISWireChecksumAndPurgeScopes(t *testing.T) {
 	row := m["TLVs"].([]map[string]any)[0]
 	require.Equal(t, true, row["Checksum Accepted"])
 	require.Equal(t, false, row["Checksum Verified"])
+	require.Equal(t, false, m["Checksum Verified"])
 	isisWireSetChecksum(hello, 0, len(hello)-2)
 	m, err = DecodeISISWire(hello, 64)
 	require.NoError(t, err)
 	require.Equal(t, true, m["TLVs"].([]map[string]any)[0]["Checksum Verified"])
+	require.Equal(t, true, m["Checksum Verified"])
 	hello[len(hello)-1] ^= 1
 	m, err = DecodeISISWire(hello, 64)
 	require.Error(t, err)
@@ -185,6 +191,27 @@ func TestISISWireAttachedDefaultBitIsNotPartitionRepair(t *testing.T) {
 		require.Equal(t, flags&8 != 0, m["Attached Default Metric"])
 		require.Equal(t, flags&128 != 0, m["Partition Repair"])
 	}
+}
+
+func TestISISWireLegacyIPDefaultHighBitMeansDistribution(t *testing.T) {
+	w := isisWireAdd(t, isisWireVector(t, 3), []byte{128, 12, 0x81, 0x80, 0x80, 0x80, 192, 0, 2, 0, 255, 255, 255, 0})
+	m, err := DecodeISISWire(w, 64)
+	require.NoError(t, err)
+	row := m["TLVs"].([]map[string]any)[0]["Reachability Entries"].([]map[string]any)[0]
+	require.Equal(t, true, row["Up Down"])
+	require.EqualValues(t, 1, row["Default Metric"])
+	require.NotContains(t, row, "Default Metric Supported", "default high bit is distribution, not optional metric support")
+}
+
+func TestISISWireFletcherSuccessDoesNotValidateHMACComposition(t *testing.T) {
+	auth := append([]byte{10, 17, 54}, bytes.Repeat([]byte{'X'}, 16)...)
+	w := isisWireAdd(t, isisWireVector(t, 2), auth, []byte{12, 2, 0, 0})
+	isisWireSetChecksum(w, 0, len(w)-2)
+	m, err := DecodeISISWire(w, 64)
+	require.NoError(t, err)
+	require.Equal(t, true, m["Checksum Verified"])
+	require.Equal(t, false, m["Authentication Verified"])
+	require.Contains(t, m["Conformance Warning"], "RFC3358")
 }
 
 func TestISISWirePrefixAndSubTLVNamespacesRemainDistinct(t *testing.T) {
