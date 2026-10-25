@@ -362,7 +362,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		delete(values, "Wire Field Ranges")
 		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
 		if e.Protocol == "isis" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
+			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
 				if v, ok := values[key]; ok {
 					walk(key, v, 0)
 					delete(values, key)

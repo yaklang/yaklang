@@ -107,17 +107,17 @@ func DecodeISISWire(w []byte, limit int) (map[string]any, error) {
 	}
 	r.info["Fixed Header Complete"] = true
 	isisTLVs(r, typ, &limit)
-	if r.err != nil {
+	decodeError := r.err
+	if decodeError != nil {
 		// A bounded complete common/fixed header remains observed evidence even
 		// when a later TLV is broken. Do not publish the failed TLV's children,
-		// infer absent fields, verify a checksum, or discard earlier valid TLVs.
-		r.info["Wire Grammar Complete"] = false
-		r.info["TLV Decode Failure"] = r.err.Error()
-		r.info["Wire Field Ranges"] = isisFieldRanges(r.fields)
-		return r.info, r.err
+		// infer absent fields or discard earlier valid TLVs. A checksum over
+		// this independently complete PDU remains a separate integrity fact;
+		// success cannot repair malformed grammar or authenticate its sender.
+		r.info["TLV Decode Failure"] = decodeError.Error()
 	}
 	r.info["Wire Field Ranges"] = isisFieldRanges(r.fields)
-	r.info["Wire Grammar Complete"] = true
+	r.info["Wire Grammar Complete"] = decodeError == nil
 	var integrityError error
 	if typ == 18 || typ == 20 {
 		// Remaining lifetime is mutable in transit and outside the Fletcher
@@ -128,8 +128,9 @@ func DecodeISISWire(w []byte, limit int) (map[string]any, error) {
 		if lifetime != 0 && checksum != 0 {
 			valid := isisFletcherValid(w[12:])
 			r.info["Checksum Verified"] = valid
-			r.info["Checksum Observation"] = "complete active LSP Fletcher check"
+			r.info["Checksum Observation"] = "valid active LSP Fletcher checksum; complete bounded PDU, no authentication"
 			if !valid {
+				r.info["Checksum Observation"] = "invalid active LSP Fletcher checksum; complete bounded PDU"
 				integrityError = fmt.Errorf("isis: invalid active LSP Fletcher checksum")
 			}
 		}
@@ -138,6 +139,9 @@ func DecodeISISWire(w []byte, limit int) (map[string]any, error) {
 		integrityError = fmt.Errorf("isis: invalid optional PDU Fletcher checksum")
 	}
 	r.info["Checksum Failure"] = integrityError != nil
+	if decodeError != nil {
+		return r.info, decodeError
+	}
 	return r.info, integrityError
 }
 

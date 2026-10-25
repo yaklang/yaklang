@@ -37,6 +37,16 @@ func isisDisplayBindings() []displayFieldBinding {
 				if !exists {
 					return
 				}
+				if spec.name == "type.reserved" {
+					if n, ok := displayUint(v); ok {
+						v = n >> 5
+					}
+				}
+				if spec.name == "hello.reserved" {
+					if n, ok := displayUint(v); ok {
+						v = n >> 2
+					}
+				}
 				if invert {
 					if x, ok := v.(bool); ok {
 						v = !x
@@ -62,6 +72,15 @@ func isisDisplayBindings() []displayFieldBinding {
 			}
 			if tlv < 0 {
 				project(e.Session)
+				if spec.name == "hello.reserved" {
+					if n, ok := displayUint(e.Session["Reserved Priority Bit"]); ok {
+						before := len(p.snapshot.Values)
+						emit(n >> 7)
+						if len(p.snapshot.Values) == before+1 {
+							p.snapshot.Values[before].Range = e.displayPDUFieldRange("Reserved Priority Bit")
+						}
+					}
+				}
 				return
 			}
 			p.maps(e.Session["TLVs"], func(row map[string]any) {
@@ -98,7 +117,8 @@ func isisDisplayBindings() []displayFieldBinding {
 		u(g, 0, nil, g+".clv.length", "Length", 8)
 	}
 	for _, g := range []string{"hello", "lsp"} {
-		s(g, 1, list("Area Addresses"), g+".area_address", "Address")
+		s(g, 1, list("Area Addresses"), g+".area_address", "Length-prefixed Address Octets")
+		s(g, 1, list("Area Addresses"), g+".observed.area_address", "Address")
 		u(g, 129, list("Protocols Supported"), g+".clv_nlpid.nlpid", "NLPID", 8)
 		for _, f := range []struct {
 			tlv, bits int
@@ -164,6 +184,8 @@ func isisDisplayBindings() []displayFieldBinding {
 			flag("lsp", tlv, path, prefix+"distribution", "Default Metric Supported", true)
 		}
 	}
+	add("lsp", isisLegacyIPReachabilityTLVs, list("Reachability Entries"), fieldSpec{"lsp.ip_reachability.ipv4_prefix", "IPv4 Prefix", DisplayAddress, 32}, false)
+	add("lsp", isisLegacyIPReachabilityTLVs, list("Reachability Entries"), fieldSpec{"lsp.ip_reachability.observed.ipv4_mask", "IPv4 Mask", DisplayAddress, 32}, false)
 	s("lsp", 22, list("Neighbors"), "lsp.ext_is_reachability.is_neighbor_id", "Neighbor Node ID")
 	u("lsp", 22, list("Neighbors"), "lsp.ext_is_reachability.metric", "Metric", 24)
 	u("lsp", 22, list("Neighbors"), "lsp.ext_is_reachability.subclvs_length", "Sub-TLV Length", 8)
@@ -178,7 +200,7 @@ func isisDisplayBindings() []displayFieldBinding {
 		flag("lsp", f.tlv, p, f.prefix+"subtlv", "Sub-TLVs Present", false)
 		// A variable-width prefix expanded with zero octets is derived. Never
 		// claim that a full 4/16-octet address exists in the captured PDU.
-		add("lsp", f.tlv, p, fieldSpec{f.prefix + f.addr, "Prefix Address", DisplayAddress, f.bits}, false)
+		add("lsp", f.tlv, p, fieldSpec{f.prefix + f.addr, "Canonical Prefix Address", DisplayAddress, f.bits}, false)
 		out[len(out)-1].descriptor.Origin = "derived"
 		if f.tlv == 236 {
 			flag("lsp", f.tlv, p, f.prefix+"distribution_internal", "External", false)
