@@ -9,10 +9,12 @@ import (
 )
 
 type flowEntry struct {
-	key        flowKey
-	flow       *TrafficFlow
-	seen       time.Time
-	prev, next *flowEntry
+	key           flowKey
+	flow          *TrafficFlow
+	seen          time.Time
+	prev, next    *flowEntry
+	captureDomain *flowCaptureClock
+	expiryIndex   int
 }
 
 type retiredFlow struct {
@@ -36,10 +38,13 @@ type trafficFlowCache struct {
 	closeOnce      sync.Once
 	budget         *reassemblyBudget
 	checkExpiry    bool
+	captureReplay  bool
+	disableIdle    bool
+	captureDomains map[CaptureDomain]*flowCaptureClock
 }
 
 func newTrafficFlowCache(options TCPReassemblyOptions) *trafficFlowCache {
-	return &trafficFlowCache{items: make(map[flowKey]*flowEntry), capacity: options.MaxFlows, ttl: options.IdleTimeout, stop: make(chan struct{}), done: make(chan struct{}), checkExpiry: true}
+	return &trafficFlowCache{items: make(map[flowKey]*flowEntry), capacity: options.MaxFlows, ttl: options.IdleTimeout, stop: make(chan struct{}), done: make(chan struct{}), checkExpiry: true, captureReplay: options.captureReplay, disableIdle: options.disableIdleExpiry}
 }
 
 func (c *trafficFlowCache) unlink(e *flowEntry) {
@@ -57,7 +62,11 @@ func (c *trafficFlowCache) unlink(e *flowEntry) {
 }
 
 func (c *trafficFlowCache) touch(e *flowEntry, now time.Time) {
-	e.seen = now
+	if c.captureReplay && !c.disableIdle {
+		c.touchCaptureEntry(e, now)
+	} else if !c.captureReplay || now.After(e.seen) {
+		e.seen = now
+	}
 	c.recent = e
 	if c.newest == e {
 		return
@@ -75,6 +84,7 @@ func (c *trafficFlowCache) touch(e *flowEntry, now time.Time) {
 }
 
 func (c *trafficFlowCache) retire(e *flowEntry, reason TrafficFlowCloseReason) {
+	c.removeCaptureEntry(e)
 	c.unlink(e)
 	delete(c.items, e.key)
 	if c.budget != nil {
@@ -88,8 +98,15 @@ func (c *trafficFlowCache) retire(e *flowEntry, reason TrafficFlowCloseReason) {
 }
 
 func (c *trafficFlowCache) Get(key flowKey) (*TrafficFlow, bool) {
+	return c.GetAt(key, time.Time{})
+}
+
+func (c *trafficFlowCache) GetAt(key flowKey, captured time.Time) (*TrafficFlow, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.captureReplay && !c.disableIdle {
+		c.expireCaptureDomain(key.domain, captured)
+	}
 	e := c.recent
 	if e == nil || e.key != key {
 		e = c.items[key]
@@ -97,8 +114,11 @@ func (c *trafficFlowCache) Get(key flowKey) (*TrafficFlow, bool) {
 	if e == nil {
 		return nil, false
 	}
-	now := time.Now()
-	if c.checkExpiry && now.Sub(e.seen) >= c.ttl {
+	now := captured
+	if !c.captureReplay {
+		now = time.Now()
+	}
+	if !c.captureReplay && !c.disableIdle && c.checkExpiry && now.Sub(e.seen) >= c.ttl {
 		c.retire(e, TrafficFlowCloseReason_INACTIVE)
 		return nil, false
 	}
@@ -107,11 +127,21 @@ func (c *trafficFlowCache) Get(key flowKey) (*TrafficFlow, bool) {
 }
 
 func (c *trafficFlowCache) Set(key flowKey, flow *TrafficFlow) bool {
+	return c.SetAt(key, flow, time.Time{})
+}
+
+func (c *trafficFlowCache) SetAt(key flowKey, flow *TrafficFlow, captured time.Time) bool {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	now := captured
+	if !c.captureReplay {
+		now = time.Now()
+	} else if !c.disableIdle {
+		c.expireCaptureDomain(key.domain, captured)
+	}
 	if old := c.items[key]; old != nil {
 		if old.flow == flow {
-			c.touch(old, time.Now())
+			c.touch(old, now)
 			return true
 		}
 		c.retire(old, TrafficFlowCloseReason_INACTIVE)
@@ -131,7 +161,7 @@ func (c *trafficFlowCache) Set(key flowKey, flow *TrafficFlow) bool {
 	}
 	e := &flowEntry{key: key, flow: flow}
 	c.items[key] = e
-	c.touch(e, time.Now())
+	c.touch(e, now)
 	return true
 }
 
@@ -139,6 +169,7 @@ func (c *trafficFlowCache) Remove(key flowKey) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if e := c.items[key]; e != nil {
+		c.removeCaptureEntry(e)
 		c.unlink(e)
 		delete(c.items, key)
 		if c.budget != nil {
@@ -174,6 +205,9 @@ func (c *trafficFlowCache) ForEach(h func(string, *TrafficFlow)) {
 func (c *trafficFlowCache) expire() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	if c.captureReplay || c.disableIdle {
+		return
+	}
 	now := time.Now()
 	for c.oldest != nil && now.Sub(c.oldest.seen) >= c.ttl {
 		c.retire(c.oldest, TrafficFlowCloseReason_INACTIVE)
@@ -201,6 +235,7 @@ func (c *trafficFlowCache) Close() {
 			c.budget.releaseFlows(len(c.items))
 		}
 		c.items = nil
+		c.captureDomains = nil
 		c.oldest, c.newest = nil, nil
 		c.recent = nil
 		c.retired = nil

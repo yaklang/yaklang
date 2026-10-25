@@ -150,7 +150,7 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	c.Context = ctx
-	p := newTrafficPool(ctx, c.reassemblyOptions)
+	p := newTrafficPool(ctx, c.tcpPoolOptions())
 	c.trafficPool, p.captureConf = p, c
 	p.captureAccountingAvailable = true
 	for _, init := range c.onPoolCreated {

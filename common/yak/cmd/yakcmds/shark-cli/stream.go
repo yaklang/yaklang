@@ -77,6 +77,7 @@ type tcpStream struct {
 // All assembly happens before the lossy display queue. The UI only reads copied
 // snapshots, so display skips and a pinned packet list cannot lose stream bytes.
 type streamStore struct {
+	captureReplay                   bool
 	udpConversations                map[udpConversationKey]*list.Element
 	udpLRU                          list.List
 	history                         *pcaputil.ProtocolInspector
@@ -396,6 +397,13 @@ func (s *streamStore) trim() {
 }
 
 func (s *streamStore) flushLocked(now time.Time) {
+	if s.captureReplay {
+		// A file's unrelated interfaces can have different capture epochs. Do
+		// not turn that clock jump or a processing pause into preview gaps or
+		// a peer close. EOF, actual controls and the existing page/stream/byte
+		// budgets bound replay; native protocol messages remain authoritative.
+		return
+	}
 	if now.After(s.clock) {
 		s.clock = now
 	}
