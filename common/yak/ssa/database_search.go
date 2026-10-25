@@ -202,6 +202,18 @@ func matchInstructionsByVariableWithFileFilter(
 			return
 		}
 
+		// Exact name and member lookup is a map read. Scanning every key
+		// repeats the whole index for each syntaxflow variable filter.
+		// Constant-type matches still compare instruction text.
+		if compareMode == ssadb.ExactCompare && matchMode&^ssadb.ConstType != 0 {
+			insts := prog.Cache.findByVariableName(matchMode&^ssadb.ConstType, name)
+			addRes(filterInstructionsByFiles(prog, insts, includeFiles, excludeFiles)...)
+			if matchMode&ssadb.ConstType == 0 {
+				return
+			}
+			matchMode = ssadb.ConstType
+		}
+
 		insts := prog.Cache.findByVariableEx(matchMode, check)
 		addRes(filterInstructionsByFiles(prog, insts, includeFiles, excludeFiles)...)
 	}
