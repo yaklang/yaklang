@@ -91,7 +91,9 @@ func (f *Function) AddSideEffect(variable *Variable, v Value) {
 	// lazy reload) or extern functions; the parent-scope walk is compiler-only
 	// bookkeeping, so just keep the original variable as bind.
 	if f.builder != nil {
-		for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+		// FunctionBuilder.parentBuilder stays valid after the parent's
+		// Function.builder is cleared by a release; follow that link.
+		for p := f.builder.parentBuilder; p != nil; p = p.parentBuilder {
 			parentScope := p.CurrentBlock.ScopeTable
 			if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
 				bind = find
@@ -122,7 +124,9 @@ func (f *FunctionBuilder) CheckMemberSideEffect(variable *Variable, v Value) {
 	if f.builder == nil {
 		return
 	}
-	for p := f.builder.parentBuilder; p != nil; p = p.builder.parentBuilder {
+	// FunctionBuilder.parentBuilder stays valid after this function's
+	// Function.builder is cleared by a release; follow that link.
+	for p := f.parentBuilder; p != nil; p = p.parentBuilder {
 		parentScope := p.CurrentBlock.ScopeTable
 		if find := ReadVariableFromScopeAndParent(parentScope, variable.GetName()); find != nil {
 			bind = find
