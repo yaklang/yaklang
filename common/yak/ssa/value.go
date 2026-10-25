@@ -699,7 +699,12 @@ func (b *FunctionBuilder) getParentFunctionVariable(name string) (Value, bool) {
 	parentScope := b.parentScope
 	for parentScope != nil {
 		if parentVariable := ReadVariableFromScopeAndParent(parentScope.scope, name); parentVariable != nil {
-			return parentVariable.Value, true
+			// A released value keeps its id and reloads through GetValue. The
+			// bare Value field is nil after release, so returning it as a found
+			// value handed a nil interface to SetDefault.
+			if value := parentVariable.GetValue(); !utils.IsNil(value) {
+				return value, true
+			}
 		}
 		parentScope = parentScope.next
 	}
