@@ -196,7 +196,15 @@ func (c *trafficFlowCache) ForEach(h func(string, *TrafficFlow)) {
 	c.mu.Unlock()
 	// Stable close order also makes the first reported trailing sequence gap
 	// deterministic when several captured flows end incomplete.
-	sort.Slice(flows, func(i, j int) bool { return flows[i].Hash < flows[j].Hash })
+	sort.Slice(flows, func(i, j int) bool {
+		if flows[i].Hash == flows[j].Hash {
+			// Endpoint hashes are deliberately independent of capture domains.
+			// Distinct interfaces/generations can therefore have the same hash;
+			// the capture-local allocation sequence supplies a stable tie break.
+			return flows[i].Index < flows[j].Index
+		}
+		return flows[i].Hash < flows[j].Hash
+	})
 	for _, f := range flows {
 		h(f.Hash, f)
 	}
