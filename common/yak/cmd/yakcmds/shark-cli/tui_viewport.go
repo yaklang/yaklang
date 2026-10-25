@@ -320,8 +320,14 @@ func (u *tui) applyDetail(result detailResult) {
 		if u.stream != nil && u.stream.id == result.streamID && u.stream.decodeVersion == result.streamVersion {
 			u.streamFields = result.detail
 			u.streamStatus = "Stream decode ready · d fields · t text · x hex · r refresh"
+			if u.stream.messageBoundaries() {
+				u.streamStatus = "Message fields ready · d fields · t text · x hex · r refresh"
+			}
 			if result.err != nil {
 				u.streamStatus = "Stream decoder unavailable; reassembled bytes remain available"
+				if u.stream.messageBoundaries() {
+					u.streamStatus = "Message details unavailable; retained wire bytes remain available"
+				}
 			}
 			if verified {
 				u.stream.protocol, u.stream.evidence = u.streams.label(result.streamID)

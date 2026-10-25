@@ -78,8 +78,8 @@ type tcpStream struct {
 // snapshots, so display skips and a pinned packet list cannot lose stream bytes.
 type streamStore struct {
 	captureReplay                   bool
-	udpConversations                map[udpConversationKey]*list.Element
-	udpLRU                          list.List
+	protocolConversations           map[protocolConversationKey]*list.Element
+	protocolConversationLRU         list.List
 	history                         *pcaputil.ProtocolInspector
 	mu                              sync.RWMutex
 	assembler                       *reassembly.Assembler
@@ -446,6 +446,9 @@ func (s *streamStore) label(id uint64) (string, string) {
 }
 
 type streamSnapshot struct {
+	associationProofs                               []*pcaputil.ProtocolEvent
+	associationUnavailable                          []uint64
+	associationLimited                              bool
 	retentionNotice                                 string
 	transport                                       string
 	protocolStack                                   []string
@@ -497,6 +500,9 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 	return v
 }
 func (v *streamSnapshot) description() string {
+	if v.transport == "network" {
+		return fmt.Sprintf("Association #%d · IP › %s · retained messages", v.id & ^(uint64(1)<<63), strings.Join(v.protocolStack, " › "))
+	}
 	if v.transport == "udp" {
 		return fmt.Sprintf("Conversation #%d · UDP › %s · retained datagrams", v.id & ^(uint64(1)<<63), strings.Join(v.protocolStack, " › "))
 	}
@@ -514,6 +520,10 @@ func (v *streamSnapshot) description() string {
 		return fmt.Sprintf("Stream #%d · TCP · unverified port hint: %s", v.id, protocol)
 	}
 	return fmt.Sprintf("Stream #%d · prefix protocol: %s · %s", v.id, protocol, v.evidence)
+}
+
+func (v *streamSnapshot) messageBoundaries() bool {
+	return v.transport == "udp" || v.transport == "network"
 }
 
 func (s *streamStore) version(id uint64) uint64 {

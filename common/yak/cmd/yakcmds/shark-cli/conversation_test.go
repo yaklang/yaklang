@@ -158,7 +158,7 @@ func TestQUICCIDEnvelopeAdmissionIsExplicitAndDomainBounded(t *testing.T) {
 		copyEvent.FlowID, copyEvent.ID = id, id
 		s.observeProtocol(&copyEvent)
 	}
-	require.Len(t, s.udpConversations, 2, "metadata remains bounded independently of payload retention")
+	require.Len(t, s.protocolConversations, 2, "metadata remains bounded independently of payload retention")
 }
 
 func TestTLSCiphertextHeaderAloneCannotLockAConnection(t *testing.T) {

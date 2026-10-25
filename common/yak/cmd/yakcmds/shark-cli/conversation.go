@@ -3,6 +3,7 @@ package sharkcli
 import (
 	"bytes"
 	"container/list"
+	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 	"strings"
@@ -11,15 +12,41 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
-type udpConversationKey struct {
-	domain pcaputil.CaptureDomain
-	id     uint64
+type protocolConversationKey struct {
+	domain    pcaputil.CaptureDomain
+	id        uint64
+	transport string
 }
-type udpConversationIdentity struct {
-	key     udpConversationKey
+type protocolConversationIdentity struct {
+	key     protocolConversationKey
 	stack   []string
 	version uint64
 	touched time.Time
+}
+
+func conversationKey(raw *capturedPacket) protocolConversationKey {
+	domain := raw.reference.Domain
+	if raw.conversationDomainSet {
+		domain = raw.conversationDomain
+	}
+	transport := raw.conversationTransport
+	if transport == "" {
+		transport = "udp"
+	} // historical packet snapshots
+	return protocolConversationKey{domain: domain, id: raw.conversationID, transport: transport}
+}
+
+func observedL2TPAssociation(e *pcaputil.ProtocolEvent) bool {
+	return e != nil && e.FlowID != 0 && e.Protocol == "l2tp" &&
+		e.Profile == "l2tp3-bounded-wire-envelope" && eventValues(e)["Envelope Verified"] == true
+}
+
+func recordProtocolConversation(raw *capturedPacket, e *pcaputil.ProtocolEvent) {
+	if e.FlowID == 0 || e.Transport != "udp" && !(e.Transport == "network" && observedL2TPAssociation(e)) {
+		return
+	}
+	raw.conversationID, raw.conversationTransport = e.FlowID, e.Transport
+	raw.conversationDomain, raw.conversationDomainSet = e.Domain, true
 }
 
 func identityProjection(e *pcaputil.ProtocolEvent) packetPresentation {
@@ -62,7 +89,7 @@ func strongTLSRecord(e *pcaputil.ProtocolEvent) bool {
 }
 
 func (s *streamStore) observeDatagram(e *pcaputil.ProtocolEvent) {
-	if e.FlowID == 0 || ((e.Status != "decoded" && e.Status != "deferred" || e.Error != "") && !protectedConversationEvent(e)) {
+	if e.FlowID == 0 || ((e.Status != "decoded" && e.Status != "deferred" || e.Error != "") && !protectedConversationEvent(e) && !observedL2TPAssociation(e)) {
 		return
 	}
 	p := identityProjection(e)
@@ -71,29 +98,29 @@ func (s *streamStore) observeDatagram(e *pcaputil.ProtocolEvent) {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.udpConversations == nil {
-		s.udpConversations = map[udpConversationKey]*list.Element{}
+	if s.protocolConversations == nil {
+		s.protocolConversations = map[protocolConversationKey]*list.Element{}
 	}
-	for el := s.udpLRU.Front(); el != nil; el = s.udpLRU.Front() {
-		v := el.Value.(*udpConversationIdentity)
+	for el := s.protocolConversationLRU.Front(); el != nil; el = s.protocolConversationLRU.Front() {
+		v := el.Value.(*protocolConversationIdentity)
 		if e.Timestamp.Sub(v.touched) < 10*time.Minute {
 			break
 		}
-		delete(s.udpConversations, v.key)
-		s.udpLRU.Remove(el)
+		delete(s.protocolConversations, v.key)
+		s.protocolConversationLRU.Remove(el)
 	}
-	key := udpConversationKey{e.Domain, e.FlowID}
-	el := s.udpConversations[key]
+	key := protocolConversationKey{domain: e.Domain, id: e.FlowID, transport: e.Transport}
+	el := s.protocolConversations[key]
 	if el == nil {
-		if s.udpLRU.Len() >= s.maxStreams {
-			old := s.udpLRU.Front()
-			delete(s.udpConversations, old.Value.(*udpConversationIdentity).key)
-			s.udpLRU.Remove(old)
+		if s.protocolConversationLRU.Len() >= s.maxStreams {
+			old := s.protocolConversationLRU.Front()
+			delete(s.protocolConversations, old.Value.(*protocolConversationIdentity).key)
+			s.protocolConversationLRU.Remove(old)
 		}
-		el = s.udpLRU.PushBack(&udpConversationIdentity{key: key})
-		s.udpConversations[key] = el
+		el = s.protocolConversationLRU.PushBack(&protocolConversationIdentity{key: key})
+		s.protocolConversations[key] = el
 	}
-	v := el.Value.(*udpConversationIdentity)
+	v := el.Value.(*protocolConversationIdentity)
 	layers := packetPresentation{stack: v.stack}
 	for _, name := range p.stack {
 		layers.addLayer(name)
@@ -102,7 +129,7 @@ func (s *streamStore) observeDatagram(e *pcaputil.ProtocolEvent) {
 	if e.Timestamp.After(v.touched) {
 		v.touched = e.Timestamp
 	}
-	s.udpLRU.MoveToBack(el)
+	s.protocolConversationLRU.MoveToBack(el)
 }
 
 func (s *streamStore) projectDatagram(row packetSummary, raw *capturedPacket) packetSummary {
@@ -111,11 +138,14 @@ func (s *streamStore) projectDatagram(row packetSummary, raw *capturedPacket) pa
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if el := s.udpConversations[udpConversationKey{raw.reference.Domain, raw.conversationID}]; el != nil {
-		v := el.Value.(*udpConversationIdentity)
+	if el := s.protocolConversations[conversationKey(raw)]; el != nil {
+		v := el.Value.(*protocolConversationIdentity)
 		row.ConnectionStack = append([]string(nil), v.stack...)
 		if len(v.stack) > 0 {
 			row.ConnectionProtocol, row.ConnectionEvidence = v.stack[0], "validated protocol session identity"
+			if conversationKey(raw).transport == "network" {
+				row.ConnectionEvidence = "observed protocol association; peer identity unverified"
+			}
 		}
 	}
 	return row
@@ -127,8 +157,8 @@ func (s *streamStore) datagramVersion(raw *capturedPacket) uint64 {
 	}
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	if el := s.udpConversations[udpConversationKey{raw.reference.Domain, raw.conversationID}]; el != nil {
-		return el.Value.(*udpConversationIdentity).version
+	if el := s.protocolConversations[conversationKey(raw)]; el != nil {
+		return el.Value.(*protocolConversationIdentity).version
 	}
 	return 0
 }
@@ -168,7 +198,8 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 	if raw == nil || raw.history == nil || raw.conversationID == 0 {
 		return nil
 	}
-	v := &streamSnapshot{id: raw.conversationID | uint64(1)<<63, transport: "udp", closed: "retained datagram window", domain: raw.reference.Domain}
+	key := conversationKey(raw)
+	v := &streamSnapshot{id: raw.conversationID | uint64(1)<<63, transport: key.transport, closed: "retained message window", domain: key.domain}
 	remaining := 256 << 10
 	seen := map[pcaputil.PacketReference]bool{}
 	metadata := raw.history.Rows("", raw.conversationID)
@@ -191,25 +222,31 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 		v.retentionNotice = fmt.Sprintf("Retained event window %d–%d / %d · message history is bounded", start+1, end, len(metadata))
 	}
 	for _, meta := range metadata[start:end] {
-		if meta.Transport != "udp" || meta.Domain != v.domain || len(v.events) >= 128 {
+		if meta.Transport != v.transport || meta.Domain != v.domain || len(v.events) >= 128 {
 			continue
 		}
-		e, err := raw.history.Details(meta.ID)
-		if err != nil {
+		e := retainedProtocolDetail(raw.history, meta.ID)
+		if e == nil {
 			continue
+		}
+		d := clamp(e.Direction, 0, 1)
+		v.endpoints[d], v.endpoints[1-d] = e.Source, e.Destination
+		// Preserve validated scalar peers before the detail byte budget can
+		// replace this event with a metadata-only row. A late bootstrap
+		// retransmission still targets the service port, not the selected peer.
+		if peers, ok := eventValues(e)["Observed Control Peers"].([]string); ok && len(peers) == 2 {
+			v.endpoints = [2]string{peers[0], peers[1]}
 		}
 		e = boundedEvent(e, &remaining)
 		v.events = append(v.events, e)
 		if len(v.events) == 1 {
-			v.endpoints = [2]string{e.Source, e.Destination}
 			v.first = e.Timestamp
 		}
 		v.last = e.Timestamp
 		v.version = e.ID
 		v.decodeVersion = e.ID
-		d := clamp(e.Direction, 0, 1)
 		if len(e.Raw) > 0 {
-			v.chunks = append(v.chunks, streamChunk{pdu: e.ID, direction: d, offset: v.bytes[d], data: bytes.Clone(e.Raw)})
+			v.chunks = append(v.chunks, streamChunk{pdu: e.ID, direction: d, data: bytes.Clone(e.Raw)})
 			v.bytes[d] += uint64(len(e.Raw))
 		}
 		for _, ref := range e.SourceBytes.PacketRefs {
@@ -233,11 +270,72 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 		v.protocol = p.stack[0]
 	}
 	v.evidence = "protocol session association; retained events only"
+	retainAssociationProofs(v, raw.history, &remaining)
 	return v
+}
+
+// Setup observations are retained separately from this flow's messages. A
+// missing, foreign-domain or different-byte PDU never becomes setup evidence.
+func retainAssociationProofs(v *streamSnapshot, history *pcaputil.ProtocolInspector, remaining *int) {
+	seen := map[uint64]bool{}
+	messages := map[uint64]*pcaputil.ProtocolEvent{}
+	for _, e := range v.events {
+		messages[e.ID] = e
+	}
+	for _, e := range v.events {
+		if e.Protocol != "l2tp" {
+			continue
+		}
+		for _, key := range []string{"Control Context Proof", "Context Proof"} {
+			for _, proof := range mapList(eventValues(e)[key]) {
+				id := number(proof["PDU"])
+				if id == 0 || seen[id] {
+					continue
+				}
+				if len(v.associationProofs)+len(v.associationUnavailable) >= 128 {
+					v.associationLimited = true
+					return
+				}
+				seen[id] = true
+				if p := messages[id]; p != nil {
+					if len(p.Raw) == 0 || fmt.Sprintf("%x", sha256.Sum256(p.Raw)) != textValue(proof["Wire SHA256"]) {
+						v.associationUnavailable = append(v.associationUnavailable, id)
+					}
+					continue
+				}
+				p := retainedProtocolDetail(history, id)
+				if p == nil || p.Domain != v.domain || p.Transport != v.transport || p.Protocol != "l2tp" || len(p.Raw) == 0 || fmt.Sprintf("%x", sha256.Sum256(p.Raw)) != textValue(proof["Wire SHA256"]) {
+					v.associationUnavailable = append(v.associationUnavailable, id)
+					continue
+				}
+				p = boundedEvent(p, remaining)
+				if len(p.Raw) == 0 {
+					v.associationUnavailable = append(v.associationUnavailable, id)
+					continue
+				}
+				v.associationProofs = append(v.associationProofs, p)
+			}
+		}
+	}
 }
 
 func datagramEvidenceRows(v *streamSnapshot) []streamLine {
 	rows := []streamLine{{"UDP datagram boundaries are preserved. Association uses the protocol engine's flow ID and capture domain, not a port guess.", inkCyan}}
+	if v.transport == "network" {
+		rows[0].text = "IP message boundaries are preserved. Association uses observed receiver parameters and capture domain; no TCP stream is inferred."
+	}
+	if len(v.associationProofs) > 0 {
+		rows = append(rows, streamLine{"Retained setup observations · wire SHA256 matches the referenced PDU; peer/control authentication not verified", inkGold})
+		for _, e := range v.associationProofs {
+			rows = append(rows, streamLine{fmt.Sprintf("Setup PDU #%d · %s · %s → %s · SHA256 %x", e.ID, textValue(eventValues(e)["Packet Name"]), e.Source, e.Destination, sha256.Sum256(e.Raw)), inkCyan})
+		}
+	}
+	if len(v.associationUnavailable) > 0 {
+		rows = append(rows, streamLine{fmt.Sprintf("Setup observations unavailable/evicted or bytes do not match: %v", v.associationUnavailable), inkGold})
+	}
+	if v.associationLimited {
+		rows = append(rows, streamLine{"Setup reference limit reached; additional observations are unavailable in this view", inkGold})
+	}
 	for _, e := range v.events {
 		rows = append(rows, streamLine{fmt.Sprintf("PDU #%d · %s · %s · %s", e.ID, eventProtocolName(e), e.Status, e.Admission), inkText})
 		if e.Error != "" {
@@ -288,7 +386,7 @@ func (s *streamStore) observeProtocol(e *pcaputil.ProtocolEvent) {
 	if s == nil || e == nil {
 		return
 	}
-	if e.Transport == "udp" {
+	if e.Transport == "udp" || e.Transport == "network" && observedL2TPAssociation(e) {
 		s.observeDatagram(e)
 		return
 	}
@@ -390,8 +488,8 @@ func (s *streamStore) annotate(raw *capturedPacket) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	if raw.conversationID != 0 && raw.streamID == 0 {
-		if el := s.udpConversations[udpConversationKey{raw.reference.Domain, raw.conversationID}]; el != nil {
-			raw.connectionStack = append([]string(nil), el.Value.(*udpConversationIdentity).stack...)
+		if el := s.protocolConversations[conversationKey(raw)]; el != nil {
+			raw.connectionStack = append([]string(nil), el.Value.(*protocolConversationIdentity).stack...)
 		}
 		return
 	}

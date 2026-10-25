@@ -233,6 +233,9 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 				decodeCancel = stop
 				requestedStream, requestedVersion = ui.stream.id, ui.stream.decodeVersion
 				ui.streamStatus = "Decoding contiguous stream prefixes…"
+				if ui.stream.messageBoundaries() {
+					ui.streamStatus = "Loading retained protocol message fields…"
+				}
 			default:
 				stop()
 			}

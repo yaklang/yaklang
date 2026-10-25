@@ -583,6 +583,7 @@ func l2tp3ConnectionValues(m map[string]any, c *l2tp3Connection) {
 	m["Control Setup Complete"] = c.phase == 3
 	m["Control Retired"] = c.closed
 	m["Control Receiver IDs"] = []any{uint64(c.cid[0]), uint64(c.cid[1])}
+	m["Observed Control Peers"] = []string{c.peers[0].String(), c.peers[1].String()}
 	m["Association Scope"] = "observed base exchanges; peer identity and control authentication not verified"
 	if c.refusal != "" {
 		m["Association Diagnostic"] = c.refusal

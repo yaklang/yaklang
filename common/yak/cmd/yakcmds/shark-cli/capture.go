@@ -138,6 +138,9 @@ type capturedPacket struct {
 	messageDestination    string
 	messageDomain         pcaputil.CaptureDomain
 	conversationID        uint64
+	conversationTransport string
+	conversationDomain    pcaputil.CaptureDomain
+	conversationDomainSet bool
 	connectionStack       []string
 	connectionDiagnostic  string
 	opaqueTransport       bool
@@ -238,9 +241,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				// fragment reassembly can add a proven tunnel domain to this same
 				// record; exact domain equality would hide its completed PDU.
 				if ref.Number == current.reference.Number {
-					if e.Transport == "udp" && e.FlowID != 0 {
-						current.conversationID = e.FlowID
-					}
+					recordProtocolConversation(current, e)
 					if e.Transport == "tcp" && len(currentProtocolEvents) < 128 {
 						currentProtocolEvents = append(currentProtocolEvents, e)
 					}
