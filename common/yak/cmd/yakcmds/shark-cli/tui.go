@@ -571,7 +571,7 @@ func (u *tui) key(key string, src *captureSource) bool {
 				u.streamMode = 3
 			} else {
 				u.streamApplication = false
-				u.streamBeginning = key == "h"
+				u.streamBeginning = key == "h" && (u.stream == nil || !u.stream.messageBoundaries())
 				u.streamMode = 0
 			}
 		}

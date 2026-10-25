@@ -29,8 +29,8 @@ var Command = &cli.Command{
 		"Arrows/j/k select, Tab switches panes, Enter pins flat fields, / searches, f edits BPF,\n" +
 		"p builds a protocol filter, Space freezes/resumes the list, g/G first/follow, q quits.\n" +
 		"Click a field to highlight its HEX/ASCII bytes; click bytes to locate their field.\n" +
-		"4 or s opens Stream: h beginning, l recent, e evidence, t text, x hex,\n" +
-		"d decoded fields, v direction, r refresh.\n" +
+		"4 or s opens a TCP stream or protocol association: e evidence, t text, x hex,\n" +
+		"d fields, v direction, r refresh. TCP streams also support h beginning / l recent.\n" +
 		"Click Search or press /: proto:http ip:10.223 content:hello hex:00ff stream:hello.\n" +
 		"c changes packet cache capacity (default 20000); --max-packets sets it at startup.\n" +
 		"Application protocol shortcuts use conventional ports. BPF is a capture filter;\n" +

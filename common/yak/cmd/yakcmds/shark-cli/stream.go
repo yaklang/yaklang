@@ -446,7 +446,8 @@ func (s *streamStore) label(id uint64) (string, string) {
 }
 
 type streamSnapshot struct {
-	associationProofs                               []*pcaputil.ProtocolEvent
+	associationProofs                               []associationObservation
+	associationReferences                           []associationReference
 	associationUnavailable                          []uint64
 	associationLimited                              bool
 	retentionNotice                                 string

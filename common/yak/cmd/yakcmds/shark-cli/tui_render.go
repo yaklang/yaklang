@@ -414,6 +414,9 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 	}
 	if u.pane == 3 {
 		for i, label := range []string{"[h Beginning]", "[l Recent]", "[e Evidence]"} {
+			if i < 2 && u.stream != nil && u.stream.messageBoundaries() {
+				continue
+			}
 			x := []int{54, 71, 85}[i]
 			if x+len(label) < width {
 				style := inkMuted
@@ -444,7 +447,17 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		} else if u.streamApplication {
 			rangeLabel = "decoded messages"
 		}
-		r := c.box(l.stream, "4 STREAM", rangeLabel+" · "+mode+" · "+direction, true)
+		title := "4 STREAM"
+		if u.stream != nil && u.stream.messageBoundaries() {
+			title = "4 ASSOCIATION"
+			if u.streamMode != 3 {
+				rangeLabel = "retained messages"
+				if u.streamApplication {
+					rangeLabel = "protocol messages"
+				}
+			}
+		}
+		r := c.box(l.stream, title, rangeLabel+" · "+mode+" · "+direction, true)
 		u.drawStream(c, r)
 	}
 	if u.pane != 3 && (l.split || u.pane != 2) {
@@ -495,6 +508,9 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 	help := "q quit  / search  f BPF  c cache  ↑↓ move  Tab pane  b bytes source  4 Stream  Space live  p protocol  d fields"
 	if u.pane == 3 {
 		help = "a messages/wire  h beginning  l recent  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  q quit"
+		if u.stream != nil && u.stream.messageBoundaries() {
+			help = "a messages/wire  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  q quit"
+		}
 	}
 	c.text(2, l.footer+2, width-4, help, inkCyan)
 	return c.render(u.color)

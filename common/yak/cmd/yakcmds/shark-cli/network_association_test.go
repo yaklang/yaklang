@@ -59,7 +59,7 @@ func associationExchanges(udp bool, base uint32) [][]byte {
 		associationControl(udp, 200+base, 3, 2, 12, associationNumber(63, 300+base, 4), associationNumber(64, 400+base, 4)),
 	}
 }
-func associationCapture(t *testing.T, udp, reuse bool) string {
+func associationCapture(t *testing.T, udp, reuse bool, dataCopies ...int) string {
 	t.Helper()
 	var wire bytes.Buffer
 	writer := pcapgo.NewWriter(&wire)
@@ -100,7 +100,13 @@ func associationCapture(t *testing.T, udp, reuse bool) string {
 		if udp {
 			data = append([]byte{0, 3, 0, 0}, data...)
 		}
-		write(append(data, []byte{0xc0, 0x21, 9, 1, 0, 4}...), 0, false)
+		copies := 1
+		if len(dataCopies) > 0 {
+			copies = dataCopies[0]
+		}
+		for i := 0; i < copies; i++ {
+			write(append(data, []byte{0xc0, 0x21, 9, 1, 0, 4}...), 0, false)
+		}
 		write(ws[0], 0, true) // a late SCCRQ retransmission must not undo the selected responder port
 		if !reuse {
 			break
@@ -110,9 +116,9 @@ func associationCapture(t *testing.T, udp, reuse bool) string {
 	require.NoError(t, os.WriteFile(p, wire.Bytes(), 0600))
 	return p
 }
-func replayAssociation(t *testing.T, udp, reuse bool) ([]*capturedPacket, *captureSession) {
+func replayAssociation(t *testing.T, udp, reuse bool, dataCopies ...int) ([]*capturedPacket, *captureSession) {
 	t.Helper()
-	cfg := captureConfig{input: associationCapture(t, udp, reuse), snaplen: 65535, count: 100, retentionPackets: 100}
+	cfg := captureConfig{input: associationCapture(t, udp, reuse, dataCopies...), snaplen: 65535, count: 100, retentionPackets: 100}
 	src, err := openCapture(cfg)
 	require.NoError(t, err)
 	defer src.Close()
@@ -259,5 +265,22 @@ func TestUnboundNetworkEnvelopeDoesNotCreateConversation(t *testing.T) {
 		p := &capturedPacket{}
 		recordProtocolConversation(p, e)
 		require.Zero(t, p.conversationID)
+	}
+}
+
+func TestAssociationSetupEvidenceSurvivesMessageDetailBudget(t *testing.T) {
+	packets, _ := replayAssociation(t, false, false, 64)
+	v := datagramConversation(packets[6])
+	require.Len(t, v.events, 64)
+	limited := false
+	for _, e := range v.events {
+		limited = limited || e.Status == "limited"
+	}
+	require.True(t, limited, "the test must exhaust retained message-detail bytes")
+	require.Len(t, v.associationProofs, 6)
+	require.Empty(t, v.associationUnavailable)
+	for _, p := range v.associationProofs {
+		require.Len(t, p.hash, 64)
+		require.NotEmpty(t, p.refs)
 	}
 }
