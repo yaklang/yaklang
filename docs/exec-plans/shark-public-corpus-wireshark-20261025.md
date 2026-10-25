@@ -1302,3 +1302,32 @@ PDU不从占位字段制造证据；损坏/不可表示的快照值被跳过并�
 `!=`/NOT、重复值、精确数值失败、PDU顺序、淘汰/union预算、缓存失效和页面partial提示；
 每个确定结果还核对添加后来字段后不变。此变更改善保留证据的查询，不恢复已淘汰详情，
 也不把 parser namespace 提升为已认证的应用协议或宣称所有字段已解析。
+
+## 2026-10-26 后续：跨协议 PDU 长度和 partial 页面纠错
+
+继续检查真实导出，发现共享 datagram 完成路径虽然保留了 Raw，却未给没有 UDP 构造器的
+L2/network 观察初始化 Length。导致 Weber 3623条、Sharon 3421条非空 PDU 的 `pdu.length`
+为0：各含2612 STP、678 IS-IS，另333/131 PIM。实际协议字节和原来的字节统计已存在，
+问题在事件元数据和由它驱动的过滤/导出。
+
+源码 **83e2a69e6b** 在共享完成路径仅补原来为0的观察长度，已有显式长度继续保留，
+包括资源受限、未保留 body 和短 preview；不能用 retained 字节覆盖原始记录长度。
+完整及 deferred 的实际 STP/VLAN、IS-IS 和 PIM 检查事件长度、逻辑字节与精确64位 JSON
+快照/过滤一致。定向原生0.978s、CLI0.310s通过。前一统一源码778d338cdb的完整回归证据
+仍保留，不把它重新命名成83e2的完整套件。
+
+新版重跑两个完整文件的379,455帧，新增逐条 SDK/CLI差分审计直接验证上述3623/3421个
+长度全部等于实际 Raw 字节数，两个出口完全一致。每一个其他 JSON 值、顺序、帧、PDU
+数、协议字段、原始字节、方向、来源和关联保持原样；不把长度之外的字段删掉来通过。
+物理帧数51328/328127、SDK事件39283/245615；通用字段、90/35原始差异、端点、824/840
+TCP流、808/735预览和分区指标不变。IS-IS的57577项核验仍通过，42组原始参考差异保留。
+
+Windows另检查明确的两帧离线控制：24字节 Hello 含未知 TLV，另一完整 Hello 为20字节。
+查询 `fields pdu.length == 24` 正确保留第一行，41字节物理帧与24字节逻辑PDU有明确
+载体区别。旧页面把所有 limited 都解释成历史不可用，并提示“some packets unavailable”，
+即使匹配行全部可见。现在改为 `incomplete field evidence · protocol field coverage limited`；
+真正 eviction 仍提示 retained history unavailable。实际 EOF/包数/查询/所选详情、字节源、
+缩放恢复、退出和 code-page 恢复通过；unknown TLV 没有被说成完整解析。
+
+[长度及页面聚合证据](shark-public-corpus-20261025/pdu-length-summary.json) 保存完整输入/
+脚本/二进制/原始审计哈希。PCAP、原始JSONL和原生控制台图片继续只在本地临时目录。
