@@ -23,7 +23,7 @@ def fields(v, result=None):
         result = collections.defaultdict(list)
     if isinstance(v, dict):
         for k, x in v.items():
-            if k.startswith('isis.') and not k.endswith('_raw') and not isinstance(x, dict):
+            if k.startswith('isis.') and not k.endswith('_raw') and not isinstance(x, dict) and not (isinstance(x, list) and any(isinstance(v, (dict, list)) for v in x)):
                 result[k].extend(x if isinstance(x, list) else [x])
             elif not k.endswith('_raw'):
                 fields(x, result)
@@ -100,6 +100,8 @@ def metric_proofs(w, physical):
     non-default values/unsupported bits from default's offset. Do not emulate.
     """
     result = collections.defaultdict(list)
+    if w[4] & 31 in (18, 20):
+        result['isis.lsp.default_metric'].append((bool(w[26] & 8), physical+26, 1))
     at = w[1]
     while at+2 <= len(w):
         t, n = w[at:at+2]
@@ -140,7 +142,7 @@ for line in events.open(encoding='utf-8-sig'):
             types[v['name']] = 'boolean' if isinstance(x, bool) else 'unsigned' if isinstance(x, int) else 'address' if 'ipv' in v['name'] and ('prefix' in v['name'] or 'addr' in v['name']) else 'string'
 
 checks = collections.Counter()
-missing, differences, known_reference, unselected, unprojected, additional_fields = [], [], [], [], collections.Counter(), collections.Counter()
+missing, differences, known_reference, broad_reference, unselected, unprojected, additional_fields = [], [], [], [], [], collections.Counter(), collections.Counter()
 used = set()
 rows = json.loads(oracle.read_text(encoding='utf-8-sig'))
 for row in rows:
@@ -151,6 +153,14 @@ for row in rows:
         unselected.append({'frame': frame, 'reason': reason, 'native_observations': len(by_frame[frame])})
         continue
     w, physical, kind = selected
+    fixed = {15: 27, 16: 27, 17: 20, 18: 27, 20: 27, 24: 33, 25: 33, 26: 17, 27: 17}
+    typ = w[4] & 31 if len(w) >= 8 else -1
+    length_at = 17 if typ in (15, 16, 17) else 8
+    if (len(w) < fixed.get(typ, 65536) or w[1] != fixed.get(typ) or w[2] != 1 or w[3] not in (0, 6) or w[5] != 1
+            or int.from_bytes(w[length_at:length_at+2], 'big') != len(w)
+            or int(ls['frame']['frame.cap_len']) < int(ls['frame']['frame.len'])):
+        unselected.append({'frame': frame, 'reason': 'complete selected fixed-header/PDU/capture grammar unavailable', 'native_statuses': [e['status'] for e in by_frame[frame]]})
+        continue
     candidates = [e for e in by_frame[frame] if base64.b64decode(e.get('raw') or '') == w]
     if not candidates:
         missing.append({'frame': frame, 'wire_sha256': hashlib.sha256(w).hexdigest()})
@@ -187,20 +197,24 @@ for row in rows:
         ranges = [(physical+v['pdu_range']['offset'], v['pdu_range']['length']) for v in got[k] if 'pdu_range' in v]
         reference_ranges = [(x[1], x[2]) for x in spans[k] if len(x) >= 3]
         range_equal = not ranges or not reference_ranges or collections.Counter(ranges) == collections.Counter(reference_ranges)
+        if equal and not range_equal and k == 'isis.lsp.ip_reachability.ipv4_prefix' and collections.Counter(ranges) == collections.Counter((lo+4, 4) for lo, size in reference_ranges if size == 12):
+            broad_reference.append({'frame': frame, 'field': k, 'wireshark_record_ranges': reference_ranges, 'native_literal_address_ranges': ranges, 'reason': 'Wireshark highlights the entire metric/address/mask record; native highlights its actual four-octet address'})
+            range_equal = True
         if not equal or not range_equal:
             detail = {'frame': frame, 'field': k, 'wireshark': expected, 'native': observed, 'wireshark_ranges': reference_ranges, 'native_ranges': ranges}
             if k in proofs and collections.Counter((v['value'], physical+v['pdu_range']['offset'], v['pdu_range']['length']) for v in got[k]) == collections.Counter(proofs[k]):
                 detail['independent_wire_layout'] = proofs[k]
-                detail['reason'] = 'Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset defect; native follows distinct metric octets'
+                detail['reason'] = 'Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout'
                 known_reference.append(detail)
             else:
                 differences.append(detail)
 
-extras = [{'id': e['id'], 'status': e['status'], 'refs': e['source_bytes'].get('PacketRefs')} for e in native if e['id'] not in used]
+refused = [{'id': e['id'], 'status': e['status'], 'refs': e['source_bytes'].get('PacketRefs')} for e in native if e['id'] not in used and not (e.get('session') or {}).get('Fixed Header Complete')]
+extras = [{'id': e['id'], 'status': e['status'], 'refs': e['source_bytes'].get('PacketRefs')} for e in native if e['id'] not in used and (e.get('session') or {}).get('Fixed Header Complete')]
 result = {'oracle_sha256': hashlib.sha256(oracle.read_bytes()).hexdigest(), 'events_sha256': hashlib.sha256(events.read_bytes()).hexdigest(),
           'reference_frames': len(rows), 'native_events': len(native), 'matched': len(used), 'checks': dict(checks), 'checks_total': sum(checks.values()),
-          'selected_differences': differences, 'wire_verified_reference_defects': known_reference, 'missing_selected': missing,
-          'unselected_reference': unselected, 'additional_native': extras, 'reference_fields_not_projected': dict(unprojected),
+          'selected_differences': differences, 'wire_verified_reference_defects': known_reference, 'broader_reference_container_ranges': broad_reference, 'missing_selected': missing,
+          'unselected_reference': unselected, 'additional_native': extras, 'refused_native_without_complete_header': refused, 'reference_fields_not_projected': dict(unprojected),
           'additional_native_fields_without_original_reference_values': dict(additional_fields),
           'native_statuses': dict(collections.Counter(e['status'] for e in native)),
           'scope': 'Original physical root PDUs, exact bytes, independent advertisement scope, repeated selected typed fields and real PDU-relative ranges. No elected DIS, authenticated adjacency, assembled LSDB, installed routes or automatic tunneling inference. Original reference defects, malformed extensions and unavailable fields remain explicit.'}

@@ -173,7 +173,11 @@ func isisExtendedIPReachability(r *controlReader, ipv6 bool, limit *int) {
 				copy(a[:], encoded)
 				address = netip.AddrFrom4(a)
 			}
-			c.info["Prefix Address"], c.info["Canonical Prefix"] = address.String(), netip.PrefixFrom(address, bits).Masked().String()
+			prefix := netip.PrefixFrom(address, bits).Masked()
+			c.info["Prefix Address"], c.info["Canonical Prefix"], c.info["Canonical Prefix Address"] = address.String(), prefix.String(), prefix.Addr().String()
+			if prefix.Addr() != address {
+				c.info["Conformance Warning"] = "nonzero unused prefix bits retained literally; canonical prefix masks them separately"
+			}
 			if control&subFlag != 0 {
 				n := c.num("Sub-TLV Length", 1, false)
 				isisSubTLVs(c, c.at+int(n), namespace, limit)

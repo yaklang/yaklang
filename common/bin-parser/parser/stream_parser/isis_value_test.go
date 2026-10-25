@@ -168,9 +168,23 @@ func TestISISWireMalformedTLVRetainsOnlyEarlierCompleteObservations(t *testing.T
 	require.Equal(t, true, m["Fixed Header Complete"])
 	require.Equal(t, false, m["Wire Grammar Complete"])
 	rows := m["TLVs"].([]map[string]any)
-	require.Len(t, rows, 1)
+	require.Len(t, rows, 2)
 	require.Equal(t, "r1", rows[0]["Hostname"])
-	require.NotContains(t, m, "Checksum Verified", "incomplete structural decoding cannot claim integrity success")
+	require.Equal(t, "Malformed TLV value", rows[1]["TLV Name"])
+	require.NotContains(t, rows[1], "Neighbors")
+	require.Equal(t, true, m["Checksum Verified"], "complete-PDU integrity is independent of malformed TLV semantics")
+}
+
+func TestISISWireAttachedDefaultBitIsNotPartitionRepair(t *testing.T) {
+	for _, flags := range []byte{0x0b, 0x83} {
+		w := isisWireVector(t, 3)
+		w[26] = flags
+		isisWireSetChecksum(w, 12, 24)
+		m, err := DecodeISISWire(w, 64)
+		require.NoError(t, err)
+		require.Equal(t, flags&8 != 0, m["Attached Default Metric"])
+		require.Equal(t, flags&128 != 0, m["Partition Repair"])
+	}
 }
 
 func TestISISWirePrefixAndSubTLVNamespacesRemainDistinct(t *testing.T) {
@@ -194,13 +208,61 @@ func FuzzISISBoundedWire(f *testing.F) {
 	for i := 0; i < 9; i++ {
 		f.Add(isisWireVector(f, i))
 	}
+	for _, tlv := range [][]byte{{1, 4, 3, 0x49, 0, 1}, {240, 15, 0, 0, 0, 0, 7, 1, 2, 3, 4, 5, 6, 0, 0, 0, 8}, {12, 2, 0, 0}, {8, 0, 129, 2, 0xcc, 0x8e}} {
+		f.Add(isisWireAdd(f, isisWireVector(f, 2), tlv))
+	}
+	for _, tlv := range [][]byte{{2, 12, 0, 1, 0x81, 0x42, 0xc3, 1, 2, 3, 4, 5, 6, 7}, {135, 7, 0, 0, 0, 9, 9, 192, 255}, {236, 11, 0, 0, 0, 9, 0, 33, 0x20, 1, 0x0d, 0xb8, 255}, {3, 4, 0, 128, 128, 128}} {
+		f.Add(isisWireAdd(f, isisWireVector(f, 3), tlv))
+	}
 	f.Fuzz(func(t *testing.T, w []byte) {
 		if len(w) > 4096 {
 			return
 		}
-		if m, err := DecodeISISWire(w, 64); err == nil {
-			require.EqualValues(t, len(w), m["PDU Length"])
-			require.Equal(t, false, m["Authentication Verified"])
+		check := func(w []byte) {
+			m, err := DecodeISISWire(w, 64)
+			if m != nil {
+				require.EqualValues(t, len(w), m["PDU Length"])
+				require.Equal(t, false, m["Authentication Verified"])
+				if err == nil {
+					require.Equal(t, true, m["Wire Grammar Complete"])
+				}
+				var spans func(any)
+				spans = func(v any) {
+					switch row := v.(type) {
+					case map[string]any:
+						for key, value := range row {
+							if key != "Wire Field Ranges" {
+								spans(value)
+								continue
+							}
+							for _, pair := range value.(map[string]any) {
+								p := pair.([]any)
+								lo, hi := p[0].(uint64), p[1].(uint64)
+								require.LessOrEqual(t, lo, hi)
+								require.LessOrEqual(t, hi, uint64(len(w)))
+							}
+						}
+					case []map[string]any:
+						for _, child := range row {
+							spans(child)
+						}
+					}
+				}
+				spans(m)
+			}
+		}
+		check(w)
+		// Preserve the original refusal test above, then repair only the outer
+		// PDU length so mutations can reach deep TLV/sub-TLV bounds as well.
+		if len(w) >= 20 {
+			repaired := bytes.Clone(w)
+			at := 8
+			typ := w[4] & 31
+			if typ == 15 || typ == 16 || typ == 17 {
+				at = 17
+			}
+			binary.BigEndian.PutUint16(repaired[at:], uint16(len(repaired)))
+			check(repaired)
 		}
 	})
 }

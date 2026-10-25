@@ -32,6 +32,11 @@ func isisTLVs(r *controlReader, pdu uint64, limit *int) {
 			c.info["Wire Field Ranges"] = isisFieldRanges(c.fields)
 		})
 		if r.err != nil {
+			// The envelope was bounded before child decoding. Its type, literal
+			// length and captured value are evidence; failed child fields are not.
+			rows = append(rows, map[string]any{"Type": typ, "Length": n, "TLV Name": "Malformed TLV value", "Decode Failure": r.err.Error(),
+				"Opaque Value":      append([]byte(nil), r.w[start+2:start+2+int(n)]...),
+				"Wire Field Ranges": map[string]any{"Type": []any{uint64(start), uint64(start + 1)}, "Length": []any{uint64(start + 1), uint64(start + 2)}, "Opaque Value": []any{uint64(start + 2), uint64(start + 2 + int(n))}}})
 			return
 		}
 		row["Type"], row["Length"] = typ, n
@@ -82,7 +87,12 @@ func isisTLVValue(r *controlReader, pdu, typ uint64, limit *int) bool {
 			r.need(n >= 1 && n <= 20, "IS-IS area address length1..20")
 			b := r.take("Area Address Bytes", int(n))
 			if r.err == nil {
-				addresses = append(addresses, map[string]any{"Address": isisAreaName(b), "Bytes": append([]byte(nil), b...), "Wire Field Ranges": map[string]any{"Bytes": []any{uint64(start + 1), uint64(r.at)}, "Address": []any{uint64(start + 1), uint64(r.at)}}})
+				encoded := fmt.Sprintf("%02x", n)
+				for _, v := range b {
+					encoded += fmt.Sprintf(":%02x", v)
+				}
+				addresses = append(addresses, map[string]any{"Address": isisAreaName(b), "Length": n, "Length-prefixed Address Octets": encoded, "Bytes": append([]byte(nil), b...), "Wire Field Ranges": map[string]any{
+					"Length": []any{uint64(start), uint64(start + 1)}, "Length-prefixed Address Octets": []any{uint64(start), uint64(r.at)}, "Bytes": []any{uint64(start + 1), uint64(r.at)}, "Address": []any{uint64(start + 1), uint64(r.at)}}})
 			}
 		}
 		r.info["Area Addresses"] = addresses
