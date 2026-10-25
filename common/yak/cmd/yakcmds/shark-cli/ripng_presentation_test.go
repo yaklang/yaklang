@@ -25,6 +25,8 @@ func TestRIPngProgressiveDetailsKeepMessageLocalByteRanges(t *testing.T) {
 	e := &pcaputil.ProtocolEvent{Protocol: "ripng", Transport: "udp", Status: "decoded", Raw: w, Session: m, Summary: "RIPng Response"}
 	r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "UDP", Layers: []string{"Ethernet", "IPv6", "UDP"}})
 	require.Equal(t, "RIPng", r.Protocol)
+	require.Contains(t, r.Info, "first=2001:db8::/64 metric=16")
+	require.NotContains(t, r.Info, "Packet Name=")
 	require.Equal(t, []string{"Ethernet", "IPv6", "UDP", "RIPng"}, r.ProtocolStack)
 	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	seen := map[string]bool{}
