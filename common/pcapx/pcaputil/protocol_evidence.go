@@ -35,9 +35,13 @@ type ByteSource struct {
 	CompletedIn *PacketReference `json:",omitempty"`
 }
 type captureEvidence struct {
-	tcpMissingTail uint32 // validated captured TCP payload suffix; no invented bytes
-	Ref            PacketReference
-	refs           []PacketReference
+	// Header layers removed by validated tunnel normalization / IP reassembly.
+	// Names carry no synthetic byte offsets or application identity.
+	networkPrefix        []gopacket.LayerType
+	networkPrefixLimited bool
+	tcpMissingTail       uint32 // validated captured TCP payload suffix; no invented bytes
+	Ref                  PacketReference
+	refs                 []PacketReference
 	// Applies to the current IP packet, not an outer tunnel carrier.
 	ipv6Fragment bool
 	// Count normalization across reconstructed outer/inner fragment layers.
@@ -352,4 +356,59 @@ func CapturePacketReferences(packet gopacket.Packet) []PacketReference {
 		return nil
 	}
 	return []PacketReference{e.Ref}
+}
+
+const maxCaptureTransportLayers = 128
+
+func (e *captureEvidence) preserveNetworkPrefix(packet gopacket.Packet, until gopacket.Layer) {
+	if e.networkPrefixLimited {
+		return
+	}
+	prefix := append([]gopacket.LayerType(nil), e.networkPrefix...)
+	for _, layer := range packet.Layers() {
+		if layer == until {
+			break
+		}
+		if layer.LayerType() == gopacket.LayerTypePayload || layer.LayerType() == gopacket.LayerTypeDecodeFailure {
+			continue
+		}
+		if len(prefix) >= maxCaptureTransportLayers {
+			e.networkPrefix = nil
+			e.networkPrefixLimited = true
+			return
+		}
+		prefix = append(prefix, layer.LayerType())
+	}
+	e.networkPrefix = prefix
+}
+
+// CaptureTransportLayers returns owned names of actual header layers through
+// the selected transport, including envelopes removed by network reassembly.
+// False completeness exposes the bounded name projection's limit; it neither
+// prevents native processing nor implies transport payload acceptance.
+func CaptureTransportLayers(packet gopacket.Packet) ([]string, bool) {
+	if packet == nil {
+		return nil, false
+	}
+	e := packetEvidence(packet)
+	_, transport := CaptureTransport(packet)
+	if transport == nil {
+		return nil, false
+	}
+	out := make([]string, 0, len(e.networkPrefix)+8)
+	for _, typ := range e.networkPrefix {
+		out = append(out, typ.String())
+	}
+	for _, layer := range packet.Layers() {
+		if layer.LayerType() != gopacket.LayerTypePayload && layer.LayerType() != gopacket.LayerTypeDecodeFailure {
+			if len(out) >= maxCaptureTransportLayers {
+				return out, false
+			}
+			out = append(out, layer.LayerType().String())
+		}
+		if layer == transport {
+			break
+		}
+	}
+	return out, !e.networkPrefixLimited
 }

@@ -2,6 +2,7 @@ package sharkcli
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
 	"net"
@@ -18,6 +19,9 @@ import (
 )
 
 type packetSummary struct {
+	TransportView        *packetTransportView    `json:"transport_view,omitempty"`
+	PhysicalSource       string                  `json:"physical_source,omitempty"`
+	PhysicalDestination  string                  `json:"physical_destination,omitempty"`
 	TCPFlowID            uint64                  `json:"tcp_flow_id,omitempty"`
 	TCPFlowDomain        *pcaputil.CaptureDomain `json:"tcp_flow_domain,omitempty"`
 	MessageSource        string                  `json:"message_source,omitempty"`
@@ -78,6 +82,7 @@ func summarize(raw *capturedPacket) packetSummary {
 	if l := network; l != nil {
 		row.Source, row.Destination = l.NetworkFlow().Src().String(), l.NetworkFlow().Dst().String()
 	}
+	physicalSource, physicalDestination := row.Source, row.Destination
 	transportBoundary := false
 	for _, l := range p.Layers() {
 		if transportBoundary {
@@ -111,6 +116,23 @@ func summarize(raw *capturedPacket) packetSummary {
 		srcPort, dstPort = uint16(udp.SrcPort), uint16(udp.DstPort)
 		payload = udp.Payload
 		row.Info = fmt.Sprintf("%d → %d Payload=%d", srcPort, dstPort, len(payload))
+	}
+	headerObservation := false
+	if view := raw.transportView; view != nil && (transport != view.Protocol || row.Source != view.Source || row.Destination != view.Destination || srcPort != view.SourcePort || dstPort != view.DestinationPort || len(payload) != view.PayloadLength) {
+		owned := *view
+		owned.Layers = append([]string(nil), view.Layers...)
+		owned.Header = bytes.Clone(view.Header)
+		owned.HeaderSHA256 = fmt.Sprintf("%x", sha256.Sum256(owned.Header))
+		owned.PacketRefs = append([]pcaputil.PacketReference(nil), view.PacketRefs...)
+		row.TransportView = &owned
+		row.Source, row.Destination = view.Source, view.Destination
+		srcPort, dstPort, transport = view.SourcePort, view.DestinationPort, view.Protocol
+		row.Protocol, row.Info = strings.ToUpper(view.Protocol), view.Info
+		if !view.LayersComplete {
+			row.Info += " · header layer projection incomplete"
+		}
+		row.ProtocolStack = append([]string(nil), view.Layers...)
+		headerObservation = true
 	}
 	if raw.messageTransport != "" && transport == "" {
 		// A validated reassembled message can reveal an inner TCP/UDP header
@@ -150,9 +172,23 @@ func summarize(raw *capturedPacket) packetSummary {
 	row.Info = safeText(row.Info)
 	row.Transport, row.SourcePort, row.DestinationPort = transport, srcPort, dstPort
 	row.payloadBytes = len(payload)
+	if headerObservation {
+		row.payloadBytes = raw.transportView.PayloadLength
+		if row.payloadBytes > 0 {
+			if hint := portProtocol(transport, srcPort, dstPort); hint != "" {
+				row.Info += " (port hint: " + hint + ")"
+			}
+		}
+	}
 	row.opaqueTransport = raw.opaqueTransport
 	row.packetProtocol = row.Protocol
 	row.ProtocolScope = "packet"
+	if headerObservation {
+		row.ProtocolScope = "observed transport header"
+	}
+	if row.Source != physicalSource || row.Destination != physicalDestination {
+		row.PhysicalSource, row.PhysicalDestination = physicalSource, physicalDestination
+	}
 	presentation := raw.presentation
 	if presentation.protocol == "" && raw.history == nil {
 		presentation = presentEvents(raw.events)
@@ -257,7 +293,8 @@ type packetDetail struct {
 
 func detail(raw *capturedPacket) (d packetDetail) {
 	d.number = raw.number
-	d.protocol = summarize(raw).Protocol
+	row := summarize(raw)
+	d.protocol = row.Protocol
 	d.hex = strings.Split(strings.TrimSuffix(hex.Dump(raw.data), "\n"), "\n")
 	defer func() {
 		if r := recover(); r != nil {
@@ -276,6 +313,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			d.protocol = presentEvents(events).protocol
 		}
 	}
+	appendTransportObservation(&d, row)
 	rule := ""
 	data := raw.data
 	baseOffset := 0
@@ -428,12 +466,14 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field) {
 func quickDetail(raw *capturedPacket) packetDetail {
 	d := packetDetail{number: raw.number, hex: strings.Split(strings.TrimSuffix(hex.Dump(raw.data), "\n"), "\n")}
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame #%d · %d bytes · %d captured", raw.number, raw.ci.Length, len(raw.data)), branch: true, hasRange: len(raw.data) > 0, end: len(raw.data)})
-	d.protocol = summarize(raw).Protocol
+	row := summarize(raw)
+	d.protocol = row.Protocol
 	if events := raw.protocolEvents(); len(events) > 0 {
 		fields, sources := protocolEventDetail(events)
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 	}
+	appendTransportObservation(&d, row)
 	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 	add := func(name string, value any) {
 		d.fields = append(d.fields, field{depth: 1, text: name + ": " + formatFieldValue(name, value)})

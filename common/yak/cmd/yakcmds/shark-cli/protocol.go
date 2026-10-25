@@ -39,7 +39,7 @@ func applyApplication(row packetSummary, protocol, evidence string, id uint64) p
 			row.ConnectionProtocol = label
 		}
 		row = resolveTLSCandidate(row)
-		if row.Protocol == "TCP" && row.payloadBytes > 0 && row.ConnectionProtocol != "" && (evidence == "validated protocol events" || strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport) {
+		if (row.Protocol == "TCP" || row.ProtocolScope == "connection-associated bytes" && row.packetProtocol == "TCP") && row.payloadBytes > 0 && row.ConnectionProtocol != "" && (evidence == "validated protocol events" || strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport) {
 			row.Protocol = row.ConnectionProtocol
 			row.ProtocolStatus, row.ProtocolScope, row.Visibility = "context-required", "connection-associated bytes", "unassembled-stream"
 			if strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport {
@@ -47,6 +47,9 @@ func applyApplication(row packetSummary, protocol, evidence string, id uint64) p
 			}
 			row.ProtocolEvidence = "observed connection; this segment has no complete decoded message"
 			row.ProtocolStack = append(append([]string(nil), row.Layers...), row.ConnectionProtocol)
+			if row.TransportView != nil {
+				row.ProtocolStack = append(append([]string(nil), row.TransportView.Layers...), row.ConnectionProtocol)
+			}
 			row.Info = row.ConnectionProtocol + " stream bytes · no complete decoded message in this packet · " + row.Info
 		}
 		if id != 0 {
