@@ -409,32 +409,82 @@ func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 
 // Packet cache retains IDs only; payload snapshots share the bounded history.
 func (p *capturedPacket) protocolEvents() []*pcaputil.ProtocolEvent {
+	events, _ := p.protocolEventSnapshot(nil)
+	return events
+}
+
+func (p *capturedPacket) protocolEventSnapshot(known []uint64) ([]*pcaputil.ProtocolEvent, []uint64) {
 	if p.history == nil {
-		return p.events
+		return p.events, nil
 	}
 	var events []*pcaputil.ProtocolEvent
 	remaining := 256 << 10
-	ids := append([]uint64(nil), p.eventIDs...)
-	for _, id := range p.historyPacketEventIDs() {
-		found := false
-		for _, old := range ids {
-			if old == id {
-				found = true
-				break
+	current, complete := p.history.PacketEventWindow(p.reference, p.physicalRecord)
+	var ids []uint64
+	for _, source := range [][]uint64{p.eventIDs, known, current} {
+		for _, id := range source {
+			found := false
+			for _, old := range ids {
+				if old == id {
+					found = true
+					break
+				}
+			}
+			if found {
+				continue
+			}
+			if len(ids) < 128 {
+				ids = append(ids, id)
+			} else {
+				complete = false
 			}
 		}
-		if !found && len(ids) < 128 {
-			ids = append(ids, id)
-		}
+	}
+	unavailable := func(id uint64, reason string) {
+		events = append(events, &pcaputil.ProtocolEvent{ID: id, Protocol: "message", Status: "limited", Completeness: "evicted", Summary: reason, Error: reason, ExpertCode: string(pcaputil.ErrResourceExceeded)})
 	}
 	for _, id := range ids {
 		if e := retainedProtocolDetail(p.history, id); e != nil {
-			events = append(events, boundedEvent(e, &remaining))
-		} else if p.history.Evicted() > 0 {
-			events = append(events, &pcaputil.ProtocolEvent{ID: id, Protocol: "message", Status: "limited", Completeness: "evicted", Summary: "Protocol detail evicted from bounded message history", Error: "Protocol detail evicted from bounded message history", ExpertCode: string(pcaputil.ErrResourceExceeded)})
+			if p.retainedEventContributes(e) {
+				events = append(events, boundedEvent(e, &remaining))
+			} else {
+				unavailable(id, "Retained message ID does not prove this packet's contributor identity")
+			}
+		} else if p.reference.Number != 0 || p.history.Evicted() > 0 {
+			unavailable(id, "Protocol detail absent or evicted from bounded message history")
 		}
 	}
-	return events
+	if !complete {
+		unavailable(0, "Packet PDU reference window exceeded; omitted fields are unavailable")
+	}
+	if len(ids) == 0 && p.history.Evicted() > 0 {
+		unavailable(0, "No retained contributor details; message history has evictions")
+	}
+	return events, ids
+}
+
+func (p *capturedPacket) retainedEventContributes(e *pcaputil.ProtocolEvent) bool {
+	if p.reference.Number == 0 {
+		return true
+	} // Legacy caller-supplied associations.
+	if len(e.SourceBytes.PacketRefs) == 0 {
+		for _, id := range p.eventIDs {
+			if id == e.ID {
+				return true
+			}
+		}
+		return false
+	}
+	for _, ref := range e.SourceBytes.PacketRefs {
+		want := p.reference
+		if p.physicalRecord {
+			ref.Domain.Encapsulation, want.Domain.Encapsulation = "", ""
+		}
+		if ref == want {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *capturedPacket) historyPacketEventIDs() []uint64 {

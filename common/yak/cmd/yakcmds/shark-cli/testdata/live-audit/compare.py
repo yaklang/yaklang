@@ -35,6 +35,55 @@ def tshark_args(cap):
     for f in fields:args+=['-e',f]
     return args
 def tokens(s):return [v for v in s.split(',') if v]
+
+def tls_wire_compare(cap,out,events,ws):
+    # This generator owns IPv4 loopback TCP endpoints. Scope repeated TLS bytes
+    # (including identical CCS records) by direction and the oracle TCP stream;
+    # record-count equality alone cannot establish correct connection binding.
+    args=tshark_args(cap)
+    args=args[:args.index('-T')]+['-Y','tls.record','-T','json','-x','--no-duplicate-keys']
+    oracle=json.loads(run(args,out/'tls-wire-oracle.json'))
+    def raw_values(v):
+        if isinstance(v,list) and v and isinstance(v[0],str):yield bytes.fromhex(v[0])
+        elif isinstance(v,list):
+            for x in v:yield from raw_values(x)
+    def records(v):
+        if isinstance(v,dict):
+            for k,x in v.items():
+                if k=='tls.record_raw':yield from raw_values(x)
+                elif not k.endswith('_raw'):yield from records(x)
+        elif isinstance(v,list):
+            for x in v:yield from records(x)
+    def valid(b):return len(b)>=5 and 20<=b[0]<=24 and b[1]==3 and int.from_bytes(b[3:5],'big')==len(b)-5
+    expected=collections.Counter();actual=collections.Counter();incomplete=0;checked=0
+    for p in oracle:
+        layers=p['_source']['layers'];tcp=layers.get('tcp')
+        if tcp is None:continue # QUIC's TLS handshake has no TLS record envelope.
+        assert isinstance(tcp,dict),'unexpected nested TCP in owned loopback capture'
+        for b in records(layers):
+            if not valid(b):incomplete+=1;continue
+            expected[(str(tcp['tcp.stream']),str(tcp['tcp.srcport']),str(tcp['tcp.dstport']),hashlib.sha256(b).hexdigest())]+=1
+    rows={int(w['frame.number']):w for w in ws}
+    for e in events:
+        if e['protocol']!='tls':continue
+        b=base64.b64decode(e.get('raw') or '')
+        if not valid(b):continue
+        sp,dp=e['source'].rsplit(':',1)[1],e['destination'].rsplit(':',1)[1]
+        streams=set()
+        for ref in e['source_bytes'].get('PacketRefs') or []:
+            w=rows[ref['Number']]
+            assert (w['tcp.srcport'],w['tcp.dstport'])==(sp,dp),'TLS contributor direction differs'
+            streams.add(w['tcp.stream'])
+        assert len(streams)==1,'TLS record spans missing or multiple oracle TCP generations'
+        actual[(streams.pop(),sp,dp,hashlib.sha256(b).hexdigest())]+=1
+        fields=e.get('field_values',{}).get('values',[])
+        for name,value in [('tls.record.wire_type',b[0]),('tls.record.version',int.from_bytes(b[1:3],'big')),('tls.record.length',len(b)-5)]:
+            assert [f['value'] for f in fields if f['name']==name]==[value],name
+            checked+=1
+    return {'wireshark':sum(expected.values()),'native':sum(actual.values()),'matching_occurrences':sum((expected&actual).values()),
+            'missing_occurrences':sum((expected-actual).values()),'extra_occurrences':sum((actual-expected).values()),
+            'native_header_checks':checked,'wireshark_incomplete_views':incomplete,
+            'scope':'Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate'}
 def analyze(cap,out):
     out.mkdir(exist_ok=True)
     ws=list(csv.DictReader(io.StringIO(run(tshark_args(cap),out/'tshark.tsv')),delimiter='\t',quoting=csv.QUOTE_NONE))
@@ -72,6 +121,7 @@ def analyze(cap,out):
              'h3_yak_application_replies_verified':bool(h3_oracle) and not h3_oracle-collections.Counter(h3_data_y),
              'h3_ws_application_replies_verified':bool(h3_oracle) and not h3_oracle-collections.Counter(h3_data_w),
              'tls_records':[sum(len(tokens(w['tls.record.length'])) for w in ws),sum(e['protocol']=='tls' for e in events)],
+             'tls_wire':tls_wire_compare(cap,out,events,ws),
              'http_summaries':http_y,'errors':errors,
              'authenticated_plaintext_without_verified_tag':[e['id'] for e in events if (e.get('session') or {}).get('Content Visibility')=='authenticated-plaintext' and (e.get('session') or {}).get('Authentication Verified') is not True]}
     # One comparison row for every captured frame. Event contributor references

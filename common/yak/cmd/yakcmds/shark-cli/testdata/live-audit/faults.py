@@ -67,6 +67,7 @@ if __name__=='__main__':
     aggregate={}
     baseline,_,_,_=compare.analyze(compare.capture/'live.pcap',root/'baseline')
     assert baseline['grpc_bytes_equal'] and baseline['h3_paths_equal'] and baseline['h3_yak_application_replies_verified']
+    assert not baseline['tls_wire']['missing_occurrences'] and not baseline['tls_wire']['extra_occurrences']
     # Some Wireshark builds omit DATA when a QUIC STREAM arrives out of order.
     # Check the independent live application's reply hashes as a third oracle;
     # preserve the discrepancy in summary.json instead of forcing a match.
@@ -78,6 +79,7 @@ if __name__=='__main__':
             s,ws,ys,events=compare.analyze(cap,out)
             assert len(ws)==len(ys),'capture inspection stopped early'
             assert not s['authenticated_plaintext_without_verified_tag']
+            assert not s['tls_wire']['missing_occurrences'] and not s['tls_wire']['extra_occurrences'],'complete scoped TLS wire records differ'
             # Missing evidence can reduce decoding, never create novel bytes.
             assert not collections.Counter(s['grpc_yak_hashes'])-collections.Counter(oracle)
             assert not collections.Counter(s['h3_yak_hashes'])-collections.Counter(baseline['h3_yak_hashes'])
