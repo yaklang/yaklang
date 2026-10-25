@@ -162,6 +162,9 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 			if udpEncapsulation(d.udp.NextLayerType()) {
 				return fallback()
 			}
+			if d.conf.binParser.l2tp3UDPNeedsPacket(network.(gopacket.NetworkLayer), &d.udp, evidence.Ref.Domain) {
+				return fallback()
+			}
 			feeding = true
 			d.conf.trafficPool.synchronizeProtocolContext()
 			d.conf.binParser.datagramFields(network.(gopacket.NetworkLayer), &d.udp, withEvidence(ci, evidence), d.truncated)

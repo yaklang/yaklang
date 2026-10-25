@@ -16,6 +16,9 @@ import (
 // It is built before publishing a packet, so UI rows need not decode messages
 // or copy history on every redraw. Connection attribution remains separate.
 type packetPresentation struct {
+	nativeHeaders                   []string
+	nativeSource, nativeDestination string
+	nativeDomain                    pcaputil.CaptureDomain
 	// A verified native IP115 PDU may cover gopacket's specific unsupported
 	// protocol error. Bind that proof to bytes, not merely a protocol label.
 	nativeIP115SHA                        [32]byte
@@ -362,7 +365,21 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 	if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 		v := eventValues(e)
 		if v["Control"] == true {
-			return fmt.Sprintf("%s · control=0x%08x · Ns=%d Nr=%d", textValue(v["Packet Name"]), number(v["Control Connection ID"]), number(v["Ns"]), number(v["Nr"]))
+			s := fmt.Sprintf("%s · control=0x%08x · Ns=%d Nr=%d", textValue(v["Packet Name"]), number(v["Control Connection ID"]), number(v["Ns"]), number(v["Nr"]))
+			if v["Conformance Warning"] != nil {
+				s += " · " + textValue(v["Conformance Warning"])
+			}
+			return s
+		}
+		if v["Payload Decoded"] == true {
+			s := fmt.Sprintf("Data · session=0x%08x · Ethernet pseudowire · observed receiver context", number(v["Session ID"]))
+			if v["Sequence Meaningful"] == true {
+				s += fmt.Sprintf(" · seq=%d · %s", number(v["Sequence Number"]), textValue(v["Sequence Observation"]))
+			}
+			return s
+		}
+		if why := textValue(v["Association Diagnostic"]); why != "" {
+			return fmt.Sprintf("Data · session=0x%08x · payload opaque · %s", number(v["Session ID"]), why)
 		}
 		return fmt.Sprintf("Data · session=0x%08x · %d opaque bytes · receiver context unavailable", number(v["Session ID"]), number(v["Opaque Payload Bytes"]))
 	}
@@ -652,9 +669,18 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
-	if e.Protocol == "l2tp" && e.Transport == "network" && e.Profile == "l2tp3-bounded-wire-envelope" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && e.Session["Envelope Verified"] == true {
+	verifiedL2TPv3 := e.Protocol == "l2tp" && e.Profile == "l2tp3-bounded-wire-envelope" && e.Session["Envelope Verified"] == true
+	if verifiedL2TPv3 && e.Transport == "network" {
 		p.nativeIP115Bytes = len(e.Raw)
 		p.nativeIP115SHA = sha256.Sum256(e.Raw)
+	}
+	if verifiedL2TPv3 && e.Error != "" {
+		p.addLayer("L2TPv3")
+		if p.priority <= 5 {
+			p.protocol, p.priority, p.status, p.visibility = "L2TPv3", 5, e.Status, "headers"
+			p.evidence, p.summary = "validated session envelope; receiver payload context refused", clipText(applicationEventSummary(e), 384)
+		}
+		return
 	}
 	// These parsers validated a complete outer message before refusing inner
 	// decryption/extensions. A missing key/profile must not erase that proven
@@ -755,6 +781,18 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		}
 	}
 	p.protocol, p.priority, p.status = label, rank, e.Status
+	p.nativeHeaders = nil
+	if e.Transport == "network" && len(e.CarrierLayers) > 0 {
+		if names, ok := eventValues(e)["Observed Header Layers"].([]string); ok && len(names) > 0 && len(names) <= 128 {
+			p.nativeHeaders = append([]string(nil), names...)
+			p.nativeSource, p.nativeDestination, p.nativeDomain = e.Source, e.Destination, e.Domain
+			for _, name := range names {
+				if strings.EqualFold(name, label) {
+					p.protocol = name
+				}
+			}
+		}
+	}
 	p.evidence = ""
 	p.visibility = e.SourceBytes.Kind
 	if v := textValue(eventValues(e)["Content Visibility"]); v != "" {
@@ -821,7 +859,18 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if row.TransportView != nil {
 		row.ProtocolStack = append([]string(nil), row.TransportView.Layers...)
 	}
-	if row.MessageTransport != "" {
+	if len(p.nativeHeaders) > 0 {
+		row.ProtocolStack = append([]string(nil), p.nativeHeaders...)
+		if row.PhysicalSource == "" {
+			row.PhysicalSource, row.PhysicalDestination = row.Source, row.Destination
+		}
+		row.Source, row.Destination = p.nativeSource, p.nativeDestination
+		row.SourcePort, row.DestinationPort, row.Transport = 0, 0, "network"
+		row.MessageSource, row.MessageDestination, row.MessageTransport = p.nativeSource, p.nativeDestination, "network"
+		d := p.nativeDomain
+		row.MessageDomain = &d
+	}
+	if row.MessageTransport != "" && row.MessageTransport != "network" {
 		carrier := strings.ToUpper(row.MessageTransport)
 		present := false
 		for _, name := range row.ProtocolStack {
@@ -843,7 +892,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for _, physical := range row.ProtocolStack {
-			if semantic == physical {
+			if semantic == physical || len(p.nativeHeaders) > 0 && strings.EqualFold(semantic, physical) {
 				present = true
 				break
 			}

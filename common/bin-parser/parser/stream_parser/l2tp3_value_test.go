@@ -57,6 +57,32 @@ func TestL2TPv3ControlWireBoundaries(t *testing.T) {
 	}
 }
 
+func TestL2TPv3LegacyControlParametersDoNotSwapBearerAndFraming(t *testing.T) {
+	for _, tt := range []struct {
+		typ  uint16
+		key  string
+		wire []byte
+	}{
+		{3, "Framing Capabilities", []byte{0, 0, 0, 3}}, {4, "Bearer Capabilities", []byte{0, 0, 0, 2}},
+		{18, "Bearer Type", []byte{0, 0, 0, 1}}, {19, "Framing Type", []byte{0, 0, 0, 2}},
+		{35, "Send ACCM", []byte{0, 0, 0, 0, 0, 3, 0, 0, 0, 4}},
+	} {
+		m, err := DecodeL2TPv3Wire(l2tp3TestControl(6, false, l2tp3TestAVP(tt.typ, tt.wire)), false, 32)
+		require.NoError(t, err)
+		require.NotContains(t, m, "Unparsed Mandatory Parameters")
+		a := m["AVPs"].([]map[string]any)[1]
+		require.Contains(t, a, tt.key)
+		for cut := 0; cut < len(tt.wire); cut++ {
+			_, err = DecodeL2TPv3Wire(l2tp3TestControl(6, false, l2tp3TestAVP(tt.typ, tt.wire[:cut])), false, 32)
+			require.Error(t, err)
+		}
+		if tt.typ == 35 {
+			require.Equal(t, uint64(3), a["Send ACCM"])
+			require.Equal(t, uint64(4), a["Receive ACCM"])
+		}
+	}
+}
+
 func TestL2TPv3ControlAuthenticationAndUnknowns(t *testing.T) {
 	digest := func(alg byte, n int) []byte { return l2tp3TestAVP(59, append([]byte{alg}, make([]byte, n)...)) }
 	_, err := DecodeL2TPv3Wire(l2tp3TestControl(6, false, digest(0, 16), digest(1, 20)), false, 64)

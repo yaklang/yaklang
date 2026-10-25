@@ -229,6 +229,10 @@ func decodeL2TPv3AVP(r *controlReader, typ uint64, budget *int) {
 	case 2:
 		r.num("Protocol Version", 1, false)
 		r.num("Protocol Revision", 1, false)
+	case 3:
+		r.num("Framing Capabilities", 4, false)
+	case 4:
+		r.num("Bearer Capabilities", 4, false)
 	case 5:
 		r.num("Tie Breaker", 8, false) // Same AVP serves control and session exchanges.
 	case 6:
@@ -241,12 +245,20 @@ func decodeL2TPv3AVP(r *controlReader, typ uint64, budget *int) {
 		r.need(r.num("Receive Window", 2, false) > 0, "L2TP receive window is zero")
 	case 15:
 		r.num("Serial Number", 4, false)
+	case 18:
+		r.num("Bearer Type", 4, false)
+	case 19:
+		r.num("Framing Type", 4, false)
 	case 24:
 		r.num("Tx Connect Speed", 4, false)
 	case 25:
 		r.num("Physical Channel ID", 4, false)
 	case 36:
 		r.rest("Random Vector")
+	case 35:
+		r.num("ACCM Reserved", 2, false)
+		r.num("Send ACCM", 4, false)
+		r.num("Receive ACCM", 4, false)
 	case 38:
 		r.num("Rx Connect Speed", 4, false)
 	case 58:

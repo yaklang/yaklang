@@ -643,6 +643,8 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	l2tp3Mu                                                                    sync.Mutex
+	l2tp3                                                                      *l2tp3Store
 	c37118Engineering                                                          bool
 	mavlinkSigning                                                             *mavlinkSigningState
 	ftpMu                                                                      sync.Mutex
@@ -907,6 +909,7 @@ type binFlow struct {
 	tls               *binTLS
 	dtls              *binDTLS
 	byteSource        string
+	captureCarriers   []string
 	parentID          uint64
 	captureTCP        bool
 	orderedTLSCarrier bool // separately validated reliable UDP carrier; never a TCP identity

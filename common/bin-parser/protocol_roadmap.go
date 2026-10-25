@@ -117,7 +117,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "GTPv2", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "Mobile IP", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "MIPv6", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
-	{Name: "L2TP", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1, Notes: "Bounded v2 UDP control/data and v3 IP115/UDP wire messages; receiver-local IDs and selected AVP fields, with midstream cookie/sublayer/pseudowire parameters unconfirmed; no complete tunnel/session/authentication or arbitrary pseudowire claim"},
+	{Name: "L2TP", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1, Notes: "Bounded v2 UDP wire fields and v3 IP115/UDP control/session observation with dynamic ports, ordered recovery, retained ID/cookie generations and selected Ethernet inner dispatch. Stateless canonical entries do not supply negotiation; midstream or ambiguous receiver parameters remain opaque. PPP, arbitrary pseudowires and control authentication remain incomplete"},
 	{Name: "L2F", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "PPTP", Family: "internet", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "SSTP", Family: "internet", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
