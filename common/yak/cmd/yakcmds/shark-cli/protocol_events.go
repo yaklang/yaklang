@@ -19,6 +19,12 @@ var semanticFieldPriority = map[string]int{
 	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
 }
 
+var ripngEntryPriority = map[string]int{
+	"Entry Type": 1, "IPv6 Prefix": 2, "Prefix Length": 3, "Route Tag": 4, "Metric": 5,
+	"Canonical Prefix": 6, "Effective Next Hop Advisory": 7, "Advertised Unreachable": 8,
+	"Ignored Next Hop Parameters": 9, "Conformance Warning": 10,
+}
+
 func fieldPriority(name string) int {
 	if rank, ok := semanticFieldPriority[name]; ok {
 		return rank
@@ -117,6 +123,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			sort.Slice(keys, func(i, j int) bool {
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
+				if protocol == "ripng" {
+					if rank, ok := ripngEntryPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := ripngEntryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if a != b {
 					return a < b
 				}
