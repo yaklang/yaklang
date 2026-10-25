@@ -12,6 +12,7 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"ldp_session", "LDPSessionFields"},
 	{"rtmp", "RTMPInitialHandshakeFields"},
 	{"rtmp", "RTMPInitialChunkFields"},
 	{"rtmp", "AMF0MessageFields"},

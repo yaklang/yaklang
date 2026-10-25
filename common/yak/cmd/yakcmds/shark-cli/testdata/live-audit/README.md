@@ -110,6 +110,28 @@ Export the oracle from the whole original file with `tshark -2 -n -r FILE -Y ldp
 malformed/incomplete discovery views and all non-UDP views as explicit gaps;
 neither TCP label-distribution coverage nor successful adjacency is inferred.
 
+`ldp_session_audit.py LDP_ORACLE_JSON FULL_NATIVE_JSONL SUMMARY` checks complete
+TCP PDU occurrences, ordered registered message/TLV/FEC fields and bidirectional
+oracle-stream/native-flow partitions within capture interfaces. It preserves
+malformed or unselected views, requires positive matched coverage, and reports
+extra native PDUs separately. When a whole-file oracle collapses interfaces,
+export each observed interface into a separate external PCAPNG and map every
+supplemental result back to original frame references; keep the original score.
+
+`ldp_fault_corpus.py SINGLE_INTERFACE_PCAPNG EXTERNAL_FAULT_DIR` selects an actual
+SYN-started IPv4 LDP connection and derives seven explicit offline controls:
+baseline, split/reordered PDU, duplicated range, missing range, snaplen, repaired
+snaplen, and same-tuple reuse with RST/new ISNs. Application bytes remain original;
+changed headers/checksums and the later second-generation clock are declared.
+`ldp_fault_compare.py EXTERNAL_FAULT_DIR TSHARK EVENTS` checks every complete PDU
+against Wireshark, exact original payload multiplicity, intact reverse direction
+under loss, and independent negotiation after reuse. These are supplemental
+derived controls, not fresh router traffic or a universal LDP conformance suite.
+
+Native Windows field-pane QA can set `SHARK_QA_FIELD_DOWN=65` (0..512) to navigate
+the real pane before saving `01-deep-protocol-fields.json`. This tests nested
+message/TLV fields where they render, without synthesizing a replacement page.
+
 `discovery/main.go` captures physical SSDP traffic for 20 seconds, sends one
 multicast M-SEARCH, and records independent loopback positive/negative controls.
 It never retrieves a discovered LOCATION URL. The shared bounded SSDP rule and

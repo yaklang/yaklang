@@ -60,6 +60,7 @@ func requireRoutingControlScopes(t *testing.T) map[string]bool {
 		require.True(t, found)
 		if name == "LDP" {
 			result[name] = t.Run("LDPBoundedDiscoveryScope", TestLDPDiscoveryCanonicalCompleteMessagesAndBoundaries)
+			result[name] = t.Run("LDPBoundedTCPScope", TestLDPTCPCanonicalCompleteMessages) && result[name]
 		} else {
 			result[name] = t.Run(name+"BoundedRoutingScope", TestRoutingControlCanonicalEntries)
 		}
