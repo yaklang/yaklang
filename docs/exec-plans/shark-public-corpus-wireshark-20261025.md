@@ -1078,3 +1078,74 @@ TCP 平局排序及快照/片段定向回归0.457s、最终 CLI 全套3.868s。S
 [本轮聚合证据](shark-public-corpus-20261025/stp-wire-summary.json) 保存二进制/原始审计
 哈希、逐协议计数、字段检查、重复稳定性和剩余载体边界。整体协议/字段验收仍未完成，
 目录保持 partial，PR 继续 draft。
+
+
+## 2026-10-26 后续：RIPng 原生入口和逐条下一跳作用域
+
+补齐已有 YAML 却没有原生接收入口的 RIPng。保留历史 `RIPng` 叶节点入口，另提供
+`RIPngFields`：它与原生 IPv6 UDP 入口使用同一 bounded codec，并注册全部原始 header/
+RTE 关键字段、地址类型过滤和递进页面。端口521只提供选择提示，自动识别还要求真实
+IPv6 UDP 载体、完整 Version1 Request/Response 及至少一个完整20字节条目。只有4字节
+header 不足以自动确定身份；显式 Decode-As 也不能把 IPv4 变成 IPv6 或绕过坏条目。
+完整未知版本、残条目、非法 metric/prefix length 不继承之前同元组的识别。
+
+按 [RFC2080](https://www.rfc-editor.org/rfc/rfc2080.html) 区分普通 route/query 和
+metric255 的 Next Hop 条目。advisory 只影响当前报文其后的条目，每个 datagram 重置为
+originator。Next Hop 的非零 tag/prefix-length 按接收规则忽略，原始值和说明都保留；
+非 link-local advisory 保留原地址，并明确回退 originator。请求中的 metric16 不冒充
+不可达通告，whole-table request 单独显示。保留原始 IPv6 前缀与派生 masked prefix 的
+区别；128位字段中的 IPv4-mapped IPv6 不会在类型导出或 CIDR 过滤中坍缩成 IPv4。
+multicast/link-local 路由目的保留明确接收警告，不宣称被路由器采纳。没有创建虚构
+FlowID、查询应答关联、跨包下一跳、已安装路由表或已验证邻居/跳数。
+
+### 原始比较、控制和回归
+
+| 捕获 | 原始 RIPng 视图 | 原生匹配 | 所选完整 wire/字段集合检查 | 所选差异/缺失 |
+| --- | ---: | ---: | ---: | ---: |
+| Weber 全部51,328帧 | 124 | 124 | 1,240 | 0 / 0 |
+| Sharon 全部328,127帧 | 137 | 124 | 1,240 | 0 / 0 |
+| Wiki ipv6-ripng 真实捕获 | 20 | 20 | 200 | 0 / 0 |
+
+Sharon 的额外13个原始视图均为 IPv4 载体，header 也不符合所选 v1 请求/响应；原始帧号、
+字节数、header/hash 与零原生 RIPng 观察单列保留，没有仅靠521端口补标签。两个大文件
+的124条共享原始内容，不能当成独立多样性。Wiki 文件只做无损 gzip 解压，原始压缩文件
+SHA为0339544cbf5491283f2e5c8c9f6d33830bd6c4a68416f26edcdaddef0a83610e，解压后
+20,264字节；包含5个请求、15个响应、930个完整RTE。上述字段集合检查保留每个重复字段
+的出现次数，并核对真实 UDP 长度、物理贡献帧与完整消息字节，不只比较协议计数。
+原始样本见 [Wireshark Wiki](https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/ipv6-ripng.gz)。
+
+15组明确声明的离线控制共26帧、47项直接验收和190项 wire/字段集合检查：真实字节、
+重复/乱序通告、缺中间通告、snaplen 后完整修复、坏 metric、完整载体内残条目、未知版本、
+四字节 header、逐报文 Next Hop 重置、被忽略参数保留、非 link-local advisory、whole-table
+query、mapped IPv6，以及不能把相邻两个 UDP datagram 拼成完整消息。全部通过。真实
+大包和 Wiki 样本都没有 Next Hop 特殊条目；该分支目前是离线控制与原始参考 dissector
+的独立对照，不能说已经抓到真实 Next Hop。此轮未在实际网络生成 RIPng 路由流量。
+
+完整回归初次发现两处兼容问题：目录改用全-map入口使冻结样本丢失历史 Command叶节点；
+旧归档 todo 元数据与现在 partial 状态冲突。已保留旧叶树，并在执行新旧入口边界测试后
+只允许 RIPng 这一项有依据的历史状态转换。冻结 manifest、捕获、哈希及历史评分没有修改。
+最终完整 bin-parser/子包通过（主包159.201s，1fc25a4a）；pcaputil483.297s通过（02d4fa39，
+原生 wire/filter 代码不再变化，最终 SDK PE 与该版逐字节相同）；最终 UI 摘要修正后完整
+CLI2.164s通过。定向 bounded wire fuzz21,434次/46.883s通过。首次组合回归命令因上述
+bin-parser问题失败，不能把其中原生包通过说成该整条命令通过；远程CI亦未作保证。
+
+### 页面与完整文件复验
+
+最终生产源码 e1cab606dc 重跑全部379,455帧，唯一原始列标签变化是每个文件124条
+UDP提升为RIPng：Weber UDP3724→3600，Sharon UDP109835→109711。已有通用字段检查和
+缺失、端点、90/35项原始字段集合差异、TCP流824/840、预览808/735及分区指标不变。
+两个完整文件的最终 CLI 重复导出逐字节一致；三次原生SDK导出亦逐字节一致，SDK二进制
+本身也相同。没有用新增字段掩盖旧协议的缺口。
+
+最终 Windows CP936 实测修掉摘要重复的 Packet Name/Command，列表直接显示 request/
+response、条目数与首个前缀/metric。字段按条目类型、IPv6地址、prefix length、tag、metric
+递进；frame4004所选 metric1 精确对应逻辑 captured-PDU 的0x17字节，派生 prefix/advisory
+不伪造 byte range。路径为 `Ethernet › Dot1Q › IPv6 › UDP › RIPng`；严格 EOF/窗口入满/
+实际查询/选中协议与对应详情帧、字节源、缩放恢复和退出通过。字段历史仍有界：查询
+`fields ripng.cmd == 2` 在SDK共123条响应，页面证明保留的61条，明确提示 partial，不能
+把61宣称全部匹配。截图只在本地临时目录。
+
+[本轮聚合证据](shark-public-corpus-20261025/ripng-wire-summary.json) 包含捕获/二进制哈希、
+重复结果、13条原始差异和15组控制范围。目录仍为partial：当前没有运行 RIPng路由器、
+做真实邻居/跳数验证、建立全局路由表或实现未来版本。IS-IS等原生入口、剩余载体/fuzz
+与字段历史体验继续处理；整体目标仍未完成。
