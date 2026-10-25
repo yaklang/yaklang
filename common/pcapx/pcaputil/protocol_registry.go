@@ -13,6 +13,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 	// Native ingress requires an observed wire grammar and directional state;
 	// legacy YAML availability alone does not imply a registered receiver.
 	return []ProtocolProfile{
+		{"ripng", "udp", "complete RFC2080 v1 request/response over observed IPv6; every bounded twenty-byte route or next-hop entry", "service hint plus complete grammar; explicit empty request inspection only; next-hop advisories reset every datagram, ignored nonzero advisory parameters remain literal, non-link-local advisories fall back to originator; no installed routing table, validated neighbor/hop-limit, response association or authenticated sender"},
 		{"stp", "l2", "complete bounded IEEE STP/RSTP/standard MSTP or observed Cisco SNAP PVST+/RPVST+ BPDU", "exact 802.3/SAP/UI/OUI/PID and complete type-selected layout/length admission; configuration/TCN wire versions stay literal and never imply a rapid/multiple format; independent advertisements with complete MSTI/PVST fields, no inherited root/port state, elected topology, digest verification or authenticated bridge; legacy MST encodings and SPT remain unselected"},
 		{"pim", "network", "complete selected PIMv2 control messages over observed IP protocol 103; IPv4/IPv6 encoded addresses, bounded options and exact message boundaries", "enclosing-address checksum verification and Register carrier/dummy distinction; advertised parameters only, no transport identity, authenticated neighbor, elected router, installed multicast route or Bootstrap RP-set assembly; v1 and extension encodings remain unselected"},
 		{"ldp", "udp/tcp", "complete v1 discovery or service-hinted ordered TCP PDU; every message and TLV boundary; base prefix FEC/address/generic-label advertisements", "TCP generation isolated Init/KeepAlive, identifier stability and conservative negotiated-length evidence; repeated Init/changed identity quarantined, fatal Notification closes context; unknown FEC/link label semantics stay opaque; UDP Hello never establishes TCP identity; no installed label database or authentication claim"},
@@ -142,7 +143,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "hsrp", "glbp", "bfd", "ldp":
+		case "hsrp", "glbp", "bfd", "ldp", "ripng":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")

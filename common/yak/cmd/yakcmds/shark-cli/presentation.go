@@ -34,7 +34,7 @@ type packetPresentation struct {
 
 var protocolDisplayNames = map[string]string{
 	"ldp":       "LDP",
-	"wireguard": "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
+	"wireguard": "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "ripng": "RIPng", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
 	"tlsv1.0": "TLSv1.0", "tlsv1.1": "TLSv1.1", "tlsv1.2": "TLSv1.2", "tlsv1.3": "TLSv1.3",
 	"http": "HTTP", "http2": "HTTP/2", "http3": "HTTP/3", "grpc": "gRPC",
 	"tls": "TLS", "dtls": "DTLS", "dns": "DNS", "dot": "DoT", "doh": "DoH", "doq": "DoQ",

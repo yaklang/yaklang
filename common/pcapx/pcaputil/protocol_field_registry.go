@@ -177,6 +177,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, pimDisplayBindings()...)
 	out = append(out, l2tp3DisplayBindings()...)
 	out = append(out, stpDisplayBindings()...)
+	out = append(out, ripngDisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
@@ -491,6 +492,11 @@ func normalizeDisplayValue(value any, d DisplayFieldDescriptor) (any, bool) {
 		if err != nil {
 			return nil, false
 		}
+		if d.Bits == 128 {
+			// A literal IPv6 wire field must retain all 128 bits, including
+			// mapped addresses; generic endpoint fields still use Unmap.
+			return a.String(), a.Is6()
+		}
 		return a.Unmap().String(), true
 	case DisplayUnsigned:
 		v, ok := displayUint(value)
@@ -666,7 +672,10 @@ func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filt
 		if err != nil {
 			return fail()
 		}
-		if p.Addr().Is4In6() && p.Bits() >= 96 {
+		if d.Bits == 128 && !p.Addr().Is6() {
+			return fail()
+		}
+		if d.Bits != 128 && p.Addr().Is4In6() && p.Bits() >= 96 {
 			p = netip.PrefixFrom(p.Addr().Unmap(), p.Bits()-96)
 		}
 		return p.Masked(), nil
@@ -704,6 +713,12 @@ func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filt
 		if err != nil {
 			return fail()
 		}
+		if d.Bits == 128 {
+			if !a.Is6() {
+				return fail()
+			}
+			return a, nil
+		}
 		return a.Unmap(), nil
 	case DisplayString:
 		return token.s, nil
@@ -721,7 +736,7 @@ func displayFieldEnums(name string) []DisplayFieldEnum {
 		return []DisplayFieldEnum{{23, "TLS 1.3 opaque encrypted record"}}
 	case "isakmp.exchangetype":
 		return []DisplayFieldEnum{{34, "IKE_SA_INIT"}, {35, "IKE_AUTH"}, {36, "CREATE_CHILD_SA"}, {37, "INFORMATIONAL"}}
-	case "rip.command":
+	case "rip.command", "ripng.cmd":
 		return []DisplayFieldEnum{{1, "Request"}, {2, "Response"}}
 	case "telnet.command":
 		return []DisplayFieldEnum{{250, "Subnegotiation"}, {251, "WILL"}, {252, "WONT"}, {253, "DO"}, {254, "DONT"}, {255, "Escaped IAC"}}
