@@ -33,44 +33,46 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
-	c37118Engineering     bool
-	mavlinkSigning        *mavlinkSigningOptions
-	tlsSecrets            TLSSecretProvider
-	datagramDecodeAs      map[uint16]string
-	rtpsShapeWriters      map[uint16]RTPSShapeWriter
-	canISOTransports      map[int][]CANISOTransport
-	canDecodeAs           map[int]string
-	binParserConfig       *BinParserConfig
-	binParser             *binParser
-	recorder              *captureWriter
-	outputFile            string
-	captureBuffer         int
-	normalizePcapLength   bool
-	ignoreEmbeddedSecrets bool
-	reassemblyOptions     TCPReassemblyOptions
-	requiresFullStream    bool
-	Context               context.Context
-	mock                  PcapHandleOperation // TEST MOCK
-	trafficPool           *TrafficPool
-	Output                *pcapgo.Writer // output debug info
-	onNetInterfaceCreated func(handle *PcapHandleWrapper)
-	onReassemblyStats     func(TCPReassemblyStats)
-	onFlowCreated         func(*TrafficFlow)
-	onFlowPacket          []func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)
-	wg                    *sync.WaitGroup
-	Filename              string
-	OverrideCacheId       string
-	BPFFilter             string
-	onPoolCreated         []func(*TrafficPool)
-	Device                []string
-	onEveryPacket         []func(packet gopacket.Packet)
-	beforeTransportPacket []func(gopacket.Packet)
-	Debug                 bool // output debug info
-	EnableCache           bool //  cache for handler cache
-	EmptyDeviceStop       bool
-	DisableAssembly       bool
-	deviceAdapter         *DeviceAdapter
-	DeviceAdapter         []*DeviceAdapter
+	c37118Engineering      bool
+	mavlinkSigning         *mavlinkSigningOptions
+	tlsSecrets             TLSSecretProvider
+	datagramDecodeAs       map[uint16]string
+	rtpsShapeWriters       map[uint16]RTPSShapeWriter
+	canISOTransports       map[int][]CANISOTransport
+	canDecodeAs            map[int]string
+	binParserConfig        *BinParserConfig
+	binParser              *binParser
+	recorder               *captureWriter
+	outputFile             string
+	captureBuffer          int
+	normalizePcapLength    bool
+	ignoreEmbeddedSecrets  bool
+	reassemblyOptions      TCPReassemblyOptions
+	reassemblyIdleExplicit bool
+	offlineReplayClock     bool
+	requiresFullStream     bool
+	Context                context.Context
+	mock                   PcapHandleOperation // TEST MOCK
+	trafficPool            *TrafficPool
+	Output                 *pcapgo.Writer // output debug info
+	onNetInterfaceCreated  func(handle *PcapHandleWrapper)
+	onReassemblyStats      func(TCPReassemblyStats)
+	onFlowCreated          func(*TrafficFlow)
+	onFlowPacket           []func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)
+	wg                     *sync.WaitGroup
+	Filename               string
+	OverrideCacheId        string
+	BPFFilter              string
+	onPoolCreated          []func(*TrafficPool)
+	Device                 []string
+	onEveryPacket          []func(packet gopacket.Packet)
+	beforeTransportPacket  []func(gopacket.Packet)
+	Debug                  bool // output debug info
+	EnableCache            bool //  cache for handler cache
+	EmptyDeviceStop        bool
+	DisableAssembly        bool
+	deviceAdapter          *DeviceAdapter
+	DeviceAdapter          []*DeviceAdapter
 }
 
 type CaptureOption func(*CaptureConfig) error

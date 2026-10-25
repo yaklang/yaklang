@@ -84,6 +84,9 @@ func newTrafficPoolWithExpiry(ctx context.Context, options TCPReassemblyOptions,
 		ctx = context.Background()
 	}
 	options, _ = options.normalized()
+	if options.captureReplay || options.disableIdleExpiry {
+		expiry = false
+	}
 	pool := &TrafficPool{ctx: ctx, done: ctx.Done(), options: options}
 	pool.flowCache = newTrafficFlowCache(options)
 	pool.flowCache.checkExpiry = expiry
@@ -203,7 +206,7 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 	if len(tss) > 0 {
 		ts = tss[0]
 	}
-	if ts.IsZero() {
+	if ts.IsZero() && !p.options.captureReplay {
 		ts = time.Now()
 	}
 	p.mu.Lock()
@@ -219,7 +222,7 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		return
 	}
 	defer p.retireFlows()
-	flow, ok := p.flowCache.Get(key)
+	flow, ok := p.flowCache.GetAt(key, ts)
 	if ok && tcp.SYN && !tcp.ACK && !flow.IsClosed() {
 		old := flow.ServerConn
 		if old == nil {
@@ -272,7 +275,7 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		// Packet-layer address slices may be overwritten by the next read.
 		src := &net.TCPAddr{IP: append(net.IP(nil), srcIP...), Port: int(tcp.SrcPort)}
 		dst := &net.TCPAddr{IP: append(net.IP(nil), dstIP...), Port: int(tcp.DstPort)}
-		flow = p.newFlowWithAddrs(network, src, dst, evidence.Ref.Domain)
+		flow = p.newFlowWithAddrsAt(network, src, dst, evidence.Ref.Domain, ts)
 		if flow == nil {
 			return
 		}

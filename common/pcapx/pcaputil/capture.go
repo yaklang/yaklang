@@ -211,7 +211,7 @@ func Start(opt ...CaptureOption) (resultErr error) {
 		conf.Context = context.Background()
 	}
 	ctx, cancel := context.WithCancel(conf.Context)
-	conf.trafficPool = newTrafficPool(ctx, conf.reassemblyOptions)
+	conf.trafficPool = newTrafficPool(ctx, conf.tcpPoolOptions())
 	conf.trafficPool.captureAccountingAvailable = !conf.EnableCache
 	defer func() {
 		conf.trafficPool.Close()
