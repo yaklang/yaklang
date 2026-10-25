@@ -12,7 +12,7 @@ import (
 	"unicode"
 )
 
-const fieldFilterPartialNoticePrefix = "Field filter partial: some packets unavailable · "
+const fieldFilterPartialNoticePrefix = "Field filter partial: incomplete field evidence · "
 
 type packetSearch struct {
 	fields   *pcaputil.DisplayFilter

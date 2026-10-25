@@ -68,10 +68,11 @@ snapshots:
 	for i := 0; i < length; i++ {
 		snapshot := at(i)
 		if snapshot.Completeness == "evicted" || snapshot.Completeness == "limited" {
-			partial("protocol detail unavailable in retained history")
 			if snapshot.Completeness == "evicted" {
+				partial("protocol detail unavailable in retained history")
 				continue
 			}
+			partial("protocol field coverage limited")
 		}
 		if snapshot.Truncated {
 			partial("field projection budget exceeded")
