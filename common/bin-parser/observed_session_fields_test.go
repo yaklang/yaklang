@@ -15,7 +15,7 @@ import (
 func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool {
 	t.Helper()
 	covered := map[string]bool{}
-	for name, pri := range map[string]string{"AJP": priP0, "BGP": priP1, "RTMP": priP1, "L2TP": priP1} {
+	for name, pri := range map[string]string{"AJP": priP0, "BGP": priP1, "RTMP": priP1, "L2TP": priP1, "STP": priP1, "RSTP": priP1} {
 		if pri != priority {
 			continue
 		}
@@ -37,7 +37,9 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 		}
 		require.True(t, catalog)
 		require.True(t, roadmap)
-		if name == "L2TP" {
+		if name == "STP" || name == "RSTP" {
+			covered[name] = t.Run(name+"CanonicalBoundedScope", TestSTPCanonicalWireEntries)
+		} else if name == "L2TP" {
 			covered[name] = t.Run("L2TPv3CanonicalBoundedScope", TestL2TPv3CanonicalWireEntries)
 		} else {
 			covered[name] = t.Run(name+"CanonicalBoundedScope", TestObservedSessionCanonicalEntries)

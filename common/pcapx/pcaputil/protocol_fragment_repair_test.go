@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 	"time"
 
@@ -9,6 +10,60 @@ import (
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 )
+
+func TestFragmentBatchDiagnosticsKeepStableIDsAndHistoryTail(t *testing.T) {
+	// Identical inputs and physical references, submitted in several orders.
+	// EOF/timeout diagnostics share a small consumer history window: changing
+	// their order must not change which physical frames still have details.
+	for _, timeout := range []bool{false, true} {
+		var expected []PacketReference
+		for permutation := 0; permutation < 12; permutation++ {
+			var events []*ProtocolEvent
+			a := coreFragmentParser(&events, 1<<20, 128)
+			original := coreIPPackets(t, "ipv6-in-order")[0]
+			makePacket := func(id int, stamp time.Time) gopacket.Packet {
+				raw := bytes.Clone(original.Data())
+				f := original.Layer(layers.LayerTypeIPv6Fragment)
+				at := len(raw) - len(f.LayerPayload()) - 8
+				binary.BigEndian.PutUint32(raw[at+4:at+8], uint32(id))
+				ci := original.Metadata().CaptureInfo
+				ci.Timestamp = stamp
+				ci = withEvidence(ci, captureEvidence{Ref: PacketReference{Number: uint64(id + 100), Domain: CaptureDomain{Interface: id % 4}}})
+				p := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+				p.Metadata().CaptureInfo = ci
+				return p
+			}
+			stamp := original.Metadata().CaptureInfo.Timestamp
+			for i := 0; i < 64; i++ {
+				id := (i*17 + permutation*7) % 64
+				_, consumed := a.networkPacket(makePacket(id, stamp))
+				require.True(t, consumed)
+			}
+			require.Empty(t, events)
+			if timeout {
+				_, consumed := a.networkPacket(makePacket(128, stamp.Add(31*time.Second)))
+				require.True(t, consumed)
+			} else {
+				a.closeFragments()
+			}
+			require.Len(t, events, 64)
+			var observed []PacketReference
+			for i, e := range events {
+				require.EqualValues(t, i+1, e.ID)
+				require.Len(t, e.SourceBytes.PacketRefs, 1)
+				observed = append(observed, e.SourceBytes.PacketRefs[0])
+			}
+			if permutation == 0 {
+				expected = observed
+			} else {
+				require.Equal(t, expected, observed)
+				require.Equal(t, expected[len(expected)-8:], observed[len(observed)-8:], "bounded history tail")
+			}
+			a.closeFragments()
+			require.Zero(t, a.buffered.Load())
+		}
+	}
+}
 
 func TestIPv6ExactDuplicateFragmentKeepsBoundedAssembly(t *testing.T) {
 	var events []*ProtocolEvent
