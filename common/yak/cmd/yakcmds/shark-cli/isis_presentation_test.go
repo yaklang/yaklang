@@ -47,6 +47,7 @@ func TestISISKeepsMalformedBodySeparateFromCompleteHeader(t *testing.T) {
 	r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "LLC", Layers: []string{"Ethernet", "LLC"}})
 	require.Equal(t, "IS-IS LSP", r.Protocol)
 	require.Contains(t, r.Info, "invalid checksum")
+	require.True(t, strings.HasPrefix(r.Info, "Invalid checksum · "))
 	require.Equal(t, "malformed", r.ProtocolStatus)
 	// A damaged declaration has no independently complete fixed header.
 	w[9]--
@@ -54,4 +55,26 @@ func TestISISKeepsMalformedBodySeparateFromCompleteHeader(t *testing.T) {
 	require.Error(t, err)
 	r = presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "LLC", Layers: []string{"Ethernet", "LLC"}})
 	require.NotEqual(t, "IS-IS LSP", r.Protocol)
+}
+
+func TestISISMalformedNoticeCannotBeClippedBehindValidHeaderSummary(t *testing.T) {
+	w, err := hex.DecodeString("831b010012010000001b04b0010001000100000000000001dd1d01")
+	require.NoError(t, err)
+	w = append(w, 3, 4, 0, 128, 128, 128)
+	w[9] = byte(len(w))
+	w[24], w[25] = 0, 0
+	m, err := stream_parser.DecodeISISWire(w, 64)
+	require.Error(t, err)
+	e := &pcaputil.ProtocolEvent{Protocol: "isis", Profile: "isis-six-octet-independent-advertisement", Status: "malformed", Raw: w, Session: m, Summary: strings.Repeat("long complete header context · ", 40)}
+	r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "LLC"})
+	require.True(t, strings.HasPrefix(r.Info, "Malformed TLV · "))
+	fs, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	found := false
+	for i, f := range fs {
+		if strings.HasPrefix(f.text, "Malformed TLV · ") {
+			require.Less(t, i, 4)
+			found = true
+		}
+	}
+	require.True(t, found)
 }

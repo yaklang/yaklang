@@ -697,13 +697,31 @@ func eventPriority(e *pcaputil.ProtocolEvent) int {
 	return p
 }
 
+func isisMalformedNotice(e *pcaputil.ProtocolEvent) string {
+	if e == nil || e.Protocol != "isis" || e.Profile != "isis-six-octet-independent-advertisement" || e.Status != "malformed" || e.Session["Fixed Header Complete"] != true {
+		return ""
+	}
+	notice := "Malformed message"
+	if e.Session["TLV Decode Failure"] != nil {
+		notice = "Malformed TLV"
+	}
+	if e.Session["Checksum Failure"] == true {
+		if notice == "Malformed TLV" {
+			notice += "; invalid checksum"
+		} else {
+			notice = "Invalid checksum"
+		}
+	}
+	return notice
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
-	if e.Protocol == "isis" && e.Profile == "isis-six-octet-independent-advertisement" && e.Status == "malformed" && e.Session["Fixed Header Complete"] == true {
+	if notice := isisMalformedNotice(e); notice != "" {
 		p.protocol, p.priority, p.status, p.visibility = eventProtocolName(e), 5, "malformed", "message"
-		p.evidence, p.summary = "complete bounded IS-IS fixed header; body/integrity rejected", clipText(applicationEventSummary(e), 384)
+		p.evidence, p.summary = "complete bounded IS-IS fixed header; body/integrity rejected", clipText(notice+" · "+applicationEventSummary(e), 384)
 		p.addLayer(p.protocol)
 		return
 	}
