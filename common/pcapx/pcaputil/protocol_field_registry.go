@@ -173,6 +173,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
 	out = append(out, routingDisplayBindings()...)
 	out = append(out, pimDisplayBindings()...)
+	out = append(out, l2tp3DisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
@@ -280,7 +281,6 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"l2tp", "l2tp.flags", "L2TP flags", "Flags", "pdu", DisplayUnsigned, 16},
 		{"l2tp", "l2tp.length", "L2TP length", "Length", "pdu", DisplayUnsigned, 16},
 		{"l2tp", "l2tp.tunnel", "L2TP tunnel ID", "Tunnel ID", "pdu", DisplayUnsigned, 16},
-		{"l2tp", "l2tp.session", "L2TP session ID", "Session ID", "pdu", DisplayUnsigned, 16},
 		{"l2tp", "l2tp.Ns", "L2TP sequence number", "Ns", "pdu", DisplayUnsigned, 16},
 		{"l2tp", "l2tp.Nr", "L2TP receive sequence", "Nr", "pdu", DisplayUnsigned, 16},
 		{"l2tp", "l2tp.avp.message_type", "L2TP message type", "Message Type", "pdu", DisplayUnsigned, 16},

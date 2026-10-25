@@ -31,7 +31,7 @@ var protocolFilters = map[string]string{
 	"nbns": "udp port 137", "nbss": "tcp port 139", "nbt-dg": "udp port 138",
 	"radius": "udp and (port 1812 or port 1813 or port 1645 or port 1646)", "tftp": "udp port 69",
 	"syslog": "port 514", "sip": "port 5060", "rtp": "udp port 5004", "rtcp": "udp port 5005",
-	"stun": "port 3478", "ssdp": "udp port 1900", "vxlan": "udp port 4789", "l2tp": "udp port 1701",
+	"stun": "port 3478", "ssdp": "udp port 1900", "vxlan": "udp port 4789", "l2tp": "udp port 1701 or ip proto 115 or ip6 proto 115",
 	"ike": "udp and (port 500 or port 4500)", "wireguard": "udp port 51820", "openvpn": "port 1194",
 	"bgp": "tcp port 179", "rip": "udp port 520", "vnc": "tcp port 5900", "socks": "tcp port 1080",
 	"rtsp": "port 554", "rtmp": "tcp port 1935", "ipmi": "udp port 623", "tacacs": "tcp port 49",
