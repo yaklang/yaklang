@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 // A VLAN tag's final two bytes can be an IEEE 802.3 length rather than an
@@ -57,6 +58,11 @@ func (captureLLCDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
 	// Generic decoders select STP from a masked DSAP alone. Keep it raw until
 	// native admission checks both SAPs, UI control and the complete BPDU.
 	if data[0]&0xfe == 0x42 {
+		if data[0] == 0x42 && data[1] == 0x42 && data[2] == 3 {
+			if _, err := stream_parser.DecodeSTPWire(l.Payload, false, 4096); err == nil {
+				return b.NextDecoder(layers.LayerTypeSTP)
+			}
+		}
 		return b.NextDecoder(gopacket.LayerTypePayload)
 	}
 	if data[0]&0xfe == 0xaa && (data[0] != 0xaa || data[1] != 0xaa || data[2] != 3) {
