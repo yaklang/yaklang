@@ -123,6 +123,9 @@ func TestFieldFilterPartialPositiveShowsRowAndRetainsNotice(t *testing.T) {
 	require.NoError(t, u.applySearch("fields bgp.type == 4"))
 	require.True(t, u.matchesSearch(entry, newSearchContext(nil)))
 	require.Contains(t, u.notice, fieldFilterPartialNoticePrefix)
+	require.Contains(t, u.notice, "field coverage limited")
+	require.NotContains(t, u.notice, "packets unavailable")
+	require.NotContains(t, u.notice, "retained history")
 	require.NoError(t, u.applySearch("fields not tls.version"))
 	require.False(t, u.matchesSearch(entry, newSearchContext(nil)))
 }
