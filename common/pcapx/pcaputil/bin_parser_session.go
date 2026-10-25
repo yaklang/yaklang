@@ -1255,6 +1255,7 @@ func (f *binFlow) closeSession() {
 	f.bgp = nil
 	f.rtmp = nil
 	f.ajp = nil
+	f.routing = nil
 	f.mms = nil
 	f.a.forgetFTPControl(f.id)
 	f.ftpData = nil
@@ -1998,6 +1999,9 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
 	n := len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	if e.SourceBytes.CompletedIn != nil {
+		n += 64
+	}
 	for _, layer := range e.CarrierLayers {
 		n += 16 + len(layer)
 	}

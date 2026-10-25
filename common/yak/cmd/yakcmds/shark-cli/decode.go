@@ -212,7 +212,7 @@ func sniffPayload(p []byte) string {
 }
 
 var tcpPortProtocols = map[uint16]string{20: "FTP-DATA", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 80: "HTTP", 110: "POP3", 135: "DCERPC", 139: "NBSS", 143: "IMAP", 179: "BGP", 389: "LDAP", 443: "TLS", 445: "SMB", 465: "TLS", 554: "RTSP", 587: "SMTP", 636: "TLS", 993: "TLS", 995: "TLS", 1080: "SOCKS", 1433: "TDS", 1883: "MQTT", 1935: "RTMP", 3306: "MySQL", 3389: "RDP", 5432: "PostgreSQL", 5672: "AMQP", 5900: "VNC", 6379: "Redis", 8009: "AJP", 8080: "HTTP", 8443: "TLS", 8883: "TLS", 9092: "Kafka", 11211: "Memcached", 27017: "MongoDB"}
-var udpPortProtocols = map[uint16]string{53: "DNS", 67: "DHCP", 68: "DHCP", 69: "TFTP", 88: "Kerberos", 111: "ONC-RPC", 123: "NTP", 137: "NBNS", 138: "NBT-DG", 161: "SNMP", 162: "SNMP", 443: "QUIC", 500: "IKE", 514: "Syslog", 520: "RIP", 546: "DHCPv6", 547: "DHCPv6", 623: "IPMI", 1194: "OpenVPN", 1701: "L2TP", 1812: "RADIUS", 1813: "RADIUS", 1900: "SSDP", 3478: "STUN", 4500: "IKE", 4789: "VXLAN", 5004: "RTP", 5005: "RTCP", 5060: "SIP", 5353: "MDNS", 5355: "LLMNR", 51820: "WireGuard"}
+var udpPortProtocols = map[uint16]string{53: "DNS", 67: "DHCP", 68: "DHCP", 69: "TFTP", 88: "Kerberos", 111: "ONC-RPC", 123: "NTP", 137: "NBNS", 138: "NBT-DG", 161: "SNMP", 162: "SNMP", 443: "QUIC", 500: "IKE", 514: "Syslog", 520: "RIP", 546: "DHCPv6", 547: "DHCPv6", 623: "IPMI", 1194: "OpenVPN", 1701: "L2TP", 1812: "RADIUS", 1813: "RADIUS", 1900: "SSDP", 1985: "HSRP", 2029: "HSRP", 3222: "GLBP", 3784: "BFD", 4784: "BFD", 3478: "STUN", 4500: "IKE", 4789: "VXLAN", 5004: "RTP", 5005: "RTCP", 5060: "SIP", 5353: "MDNS", 5355: "LLMNR", 51820: "WireGuard"}
 
 func portProtocol(transport string, src, dst uint16) string {
 	ports := tcpPortProtocols

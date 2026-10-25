@@ -1,0 +1,447 @@
+{
+  "weber": {
+    "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+    "oracle_sha256": "da0ea63d73175825871f234c97627ce6ecdeb94be3dce707cb4827b54996e07d",
+    "events_sha256": "720d58948c93da5efb80ddbf84c3536de80da2d636730aeff121d3dc245667b6",
+    "script_sha256": "1e72859554d6a3c1cd76b8d58912bde720f67e09a1f6f32f827c04f379aa8056",
+    "wireshark_messages": {
+      "hsrp": 945,
+      "bfd": 135,
+      "glbp": 777
+    },
+    "native_events": {
+      "hsrp/decoded": 941,
+      "bfd/decoded": 135,
+      "glbp/decoded": 777
+    },
+    "checks": {
+      "bfd.desired_min_tx_interval": 135,
+      "bfd.detect_time_multiplier": 135,
+      "bfd.diag": 135,
+      "bfd.flags.a": 135,
+      "bfd.flags.c": 135,
+      "bfd.flags.d": 135,
+      "bfd.flags.f": 135,
+      "bfd.flags.m": 135,
+      "bfd.flags.p": 135,
+      "bfd.message_length": 135,
+      "bfd.my_discriminator": 135,
+      "bfd.required_min_echo_interval": 135,
+      "bfd.required_min_rx_interval": 135,
+      "bfd.sta": 135,
+      "bfd.version": 135,
+      "bfd.wire": 135,
+      "bfd.your_discriminator": 135,
+      "glbp.auth.authlength": 389,
+      "glbp.auth.authtype": 389,
+      "glbp.group": 777,
+      "glbp.hello.addrlen": 771,
+      "glbp.hello.addrtype": 771,
+      "glbp.hello.helloint": 771,
+      "glbp.hello.holdint": 771,
+      "glbp.hello.priority": 771,
+      "glbp.hello.redirect": 771,
+      "glbp.hello.timeout": 771,
+      "glbp.hello.vgstate": 771,
+      "glbp.hello.virtualipv4": 385,
+      "glbp.hello.virtualipv6": 386,
+      "glbp.length": 777,
+      "glbp.ownerid": 777,
+      "glbp.reqresp.forwarder": 774,
+      "glbp.reqresp.priority": 774,
+      "glbp.reqresp.vfstate": 774,
+      "glbp.reqresp.virtualmac": 774,
+      "glbp.reqresp.weight": 774,
+      "glbp.type": 777,
+      "glbp.version": 777,
+      "glbp.wire": 777,
+      "hsrp.adv.activegrp": 10,
+      "hsrp.adv.passivegrp": 10,
+      "hsrp.adv.state": 10,
+      "hsrp.adv.tlvlength": 10,
+      "hsrp.adv.tlvtype": 10,
+      "hsrp.group": 167,
+      "hsrp.hellotime": 167,
+      "hsrp.holdtime": 167,
+      "hsrp.opcode": 177,
+      "hsrp.priority": 167,
+      "hsrp.state": 167,
+      "hsrp.version": 177,
+      "hsrp.virt_ip": 167,
+      "hsrp.wire": 941,
+      "hsrp2.active_groups": 25,
+      "hsrp2.group": 739,
+      "hsrp2.hellotime": 739,
+      "hsrp2.holdtime": 739,
+      "hsrp2.identifier": 739,
+      "hsrp2.ipversion": 739,
+      "hsrp2.md5_algorithm": 312,
+      "hsrp2.md5_flags": 312,
+      "hsrp2.md5_key_id": 312,
+      "hsrp2.md5_padding": 312,
+      "hsrp2.opcode": 739,
+      "hsrp2.passive_groups": 25,
+      "hsrp2.priority": 739,
+      "hsrp2.state": 739,
+      "hsrp2.version": 739,
+      "hsrp2.virt_ip": 156,
+      "hsrp2.virt_ip_v6": 583
+    },
+    "total_checks": 29579,
+    "strict_context_refusals": [
+      4925,
+      4926,
+      29892,
+      31208
+    ],
+    "incomplete_oracle_views": [],
+    "outside_udp_ingress": [],
+    "rejected_wire_views": [],
+    "mismatches": [],
+    "scope": "Complete original UDP PDUs and selected registered key fields; no authenticated identity, router election or link-health inference. Missing initial sender evidence and malformed inputs remain explicit refusals, not label parity; non-UDP transports remain uncovered.",
+    "message_proof_count": 1853
+  },
+  "sharon": {
+    "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "oracle_sha256": "717f88ee1daaf82a084bb124431d23faa901a43d4ac93d5bb3356b2e115830ec",
+    "events_sha256": "a916804352c26c95f56ef87dc18674e396c3eeab3e55094775dd8e3f8a1f5c0a",
+    "script_sha256": "1e72859554d6a3c1cd76b8d58912bde720f67e09a1f6f32f827c04f379aa8056",
+    "wireshark_messages": {
+      "hsrp": 768,
+      "bfd": 85,
+      "glbp": 777
+    },
+    "native_events": {
+      "hsrp/decoded": 764,
+      "bfd/decoded": 65,
+      "glbp/decoded": 777
+    },
+    "checks": {
+      "bfd.desired_min_tx_interval": 65,
+      "bfd.detect_time_multiplier": 65,
+      "bfd.diag": 65,
+      "bfd.flags.a": 65,
+      "bfd.flags.c": 65,
+      "bfd.flags.d": 65,
+      "bfd.flags.f": 65,
+      "bfd.flags.m": 65,
+      "bfd.flags.p": 65,
+      "bfd.message_length": 65,
+      "bfd.my_discriminator": 65,
+      "bfd.required_min_echo_interval": 65,
+      "bfd.required_min_rx_interval": 65,
+      "bfd.sta": 65,
+      "bfd.version": 65,
+      "bfd.wire": 65,
+      "bfd.your_discriminator": 65,
+      "glbp.auth.authlength": 389,
+      "glbp.auth.authtype": 389,
+      "glbp.group": 777,
+      "glbp.hello.addrlen": 771,
+      "glbp.hello.addrtype": 771,
+      "glbp.hello.helloint": 771,
+      "glbp.hello.holdint": 771,
+      "glbp.hello.priority": 771,
+      "glbp.hello.redirect": 771,
+      "glbp.hello.timeout": 771,
+      "glbp.hello.vgstate": 771,
+      "glbp.hello.virtualipv4": 385,
+      "glbp.hello.virtualipv6": 386,
+      "glbp.length": 777,
+      "glbp.ownerid": 777,
+      "glbp.reqresp.forwarder": 774,
+      "glbp.reqresp.priority": 774,
+      "glbp.reqresp.vfstate": 774,
+      "glbp.reqresp.virtualmac": 774,
+      "glbp.reqresp.weight": 774,
+      "glbp.type": 777,
+      "glbp.version": 777,
+      "glbp.wire": 777,
+      "hsrp.wire": 764,
+      "hsrp2.active_groups": 25,
+      "hsrp2.group": 739,
+      "hsrp2.hellotime": 739,
+      "hsrp2.holdtime": 739,
+      "hsrp2.identifier": 739,
+      "hsrp2.ipversion": 739,
+      "hsrp2.md5_algorithm": 312,
+      "hsrp2.md5_flags": 312,
+      "hsrp2.md5_key_id": 312,
+      "hsrp2.md5_padding": 312,
+      "hsrp2.opcode": 739,
+      "hsrp2.passive_groups": 25,
+      "hsrp2.priority": 739,
+      "hsrp2.state": 739,
+      "hsrp2.version": 739,
+      "hsrp2.virt_ip": 156,
+      "hsrp2.virt_ip_v6": 583
+    },
+    "total_checks": 26806,
+    "strict_context_refusals": [
+      4925,
+      4926,
+      32235,
+      33551
+    ],
+    "incomplete_oracle_views": [
+      {
+        "frame": 48970,
+        "protocol": "bfd",
+        "reason": "Wireshark exposes no complete protocol raw range; preserved as a diagnostic view"
+      },
+      {
+        "frame": 112857,
+        "protocol": "bfd",
+        "reason": "Wireshark exposes no complete protocol raw range; preserved as a diagnostic view"
+      }
+    ],
+    "outside_udp_ingress": [
+      {
+        "frame": 157580,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 157971,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 171245,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:ipv6:mpls:bfd"
+      },
+      {
+        "frame": 200615,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 202649,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 220068,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:ipv6:mpls:bfd"
+      },
+      {
+        "frame": 224233,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 230024,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 313446,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      },
+      {
+        "frame": 319746,
+        "protocol": "bfd",
+        "reason": "No UDP ingress; native routing profile covers UDP control only",
+        "wireshark_stack": "eth:ethertype:ip:mpls:bfd"
+      }
+    ],
+    "rejected_wire_views": [
+      {
+        "frame": 60326,
+        "protocol": "bfd",
+        "wire_sha256": "24aa9bb82889300fe985369d5f666898bc0a0c335667320ade585ed76c323a7f",
+        "reasons": [
+          "declared control length outside captured message",
+          "zero My Discriminator",
+          "simultaneous Poll and Final"
+        ]
+      },
+      {
+        "frame": 65803,
+        "protocol": "bfd",
+        "wire_sha256": "b57949a29e50f022b77ea82f86311583e37e3d229d2a40adfd03697c96429d18",
+        "reasons": [
+          "outside selected BFDv1 Control version",
+          "declared control length outside captured message",
+          "simultaneous Poll and Final"
+        ]
+      },
+      {
+        "frame": 99103,
+        "protocol": "bfd",
+        "wire_sha256": "409d4360d90508e93f43f6a159e779bc777186025a5013833e591e0e507075f8",
+        "reasons": [
+          "outside selected BFDv1 Control version",
+          "declared control length outside captured message"
+        ]
+      },
+      {
+        "frame": 99234,
+        "protocol": "bfd",
+        "wire_sha256": "b6c57ee5857842d88d1f971741cd645763582762936bdc52da5cc393ccda9a2c",
+        "reasons": [
+          "outside selected BFDv1 Control version"
+        ]
+      },
+      {
+        "frame": 113972,
+        "protocol": "bfd",
+        "wire_sha256": "9ac7679d63239690b2e9bec8ae92c7fdbe0ef40daef5212ac33a0412a2706e2d",
+        "reasons": [
+          "declared control length outside captured message",
+          "simultaneous Poll and Final"
+        ]
+      },
+      {
+        "frame": 124075,
+        "protocol": "bfd",
+        "wire_sha256": "2889044617cf5ae02c0d1737edf1ead9f76d61b219c8112aa71a7d2d08049019",
+        "reasons": [
+          "outside selected BFDv1 Control version",
+          "declared control length outside captured message",
+          "zero Detect Multiplier"
+        ]
+      },
+      {
+        "frame": 127788,
+        "protocol": "bfd",
+        "wire_sha256": "0d19edfde1dca8471926f64b67b0225feae9dc594f566db5d7af7dfbf719abff",
+        "reasons": [
+          "outside selected BFDv1 Control version",
+          "declared control length outside captured message",
+          "simultaneous Poll and Final"
+        ]
+      },
+      {
+        "frame": 136428,
+        "protocol": "bfd",
+        "wire_sha256": "6406b13bedf0c5ae80ea7cffcdd6c63d6c8d3a8d82ddd49c4157c7bfedccbb8e",
+        "reasons": [
+          "outside selected BFDv1 Control version",
+          "declared control length outside captured message"
+        ]
+      }
+    ],
+    "mismatches": [],
+    "scope": "Complete original UDP PDUs and selected registered key fields; no authenticated identity, router election or link-health inference. Missing initial sender evidence and malformed inputs remain explicit refusals, not label parity; non-UDP transports remain uncovered.",
+    "message_proof_count": 1606
+  },
+  "fuzz": {
+    "codec": 27095,
+    "session": 6851
+  },
+  "binaries": {
+    "events-final.exe": "f70e55a3406a431b17fb9e3c7f42a4c363864c4b0de6a660683388634ebee01d",
+    "yak-final.exe": "ff5728c534749e2b6b2ac4d4351fb12d90d3a4e430e28099270fca4b6276208c",
+    "yak-ui-final.exe": "379f782d328ceca370c3277498e596df74d8587bc44a92133190092f5986cdae"
+  },
+  "scope": "Exact original UDP message bytes and selected typed key fields; raw label/refusal/non-UDP differences retained. Authentication, elections, BFD Echo and MPLS transport are not implemented by these profiles.",
+  "windows": {
+    "hsrp": {
+      "passed": true,
+      "visible_matching_packets": "156",
+      "width": 180,
+      "height": 48,
+      "input_cp_restored": 936,
+      "output_cp_restored": 936,
+      "fields_snapshot_sha256": "75edd0809c948e2e0594add060c36e35f2f4bc8bfbfee08fa2b943fcfc541563",
+      "byte_sources_checked": true,
+      "conversation_and_evidence_checked": true,
+      "resize_80x30_then_180x48": true,
+      "binary_sha256": "379f782d328ceca370c3277498e596df74d8587bc44a92133190092f5986cdae"
+    },
+    "glbp": {
+      "passed": true,
+      "visible_matching_packets": "389",
+      "width": 180,
+      "height": 48,
+      "input_cp_restored": 936,
+      "output_cp_restored": 936,
+      "fields_snapshot_sha256": "3fe8739c290b44b8e8c39a4ff9eb09273ba14fce72e6c8c9a9b9b617716f06e7",
+      "byte_sources_checked": true,
+      "conversation_and_evidence_checked": true,
+      "resize_80x30_then_180x48": true,
+      "binary_sha256": "379f782d328ceca370c3277498e596df74d8587bc44a92133190092f5986cdae"
+    },
+    "bfd": {
+      "passed": true,
+      "visible_matching_packets": "130",
+      "width": 180,
+      "height": 48,
+      "input_cp_restored": 936,
+      "output_cp_restored": 936,
+      "fields_snapshot_sha256": "0cd16956d37b9782b1ba5aa9672e5833d95718226fb2f394bb7c045fb9c61585",
+      "byte_sources_checked": true,
+      "conversation_and_evidence_checked": true,
+      "resize_80x30_then_180x48": true,
+      "binary_sha256": "379f782d328ceca370c3277498e596df74d8587bc44a92133190092f5986cdae"
+    }
+  },
+  "package_regressions": {
+    "github.com/yaklang/yaklang/common/bin-parser": {
+      "elapsed_seconds": 171.068,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser": {
+      "elapsed_seconds": 7.156,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser/base": {
+      "elapsed_seconds": 0.645,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser": {
+      "elapsed_seconds": 5.308,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/protocol-impl": {
+      "elapsed_seconds": 0.703,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/protocol-impl/msrdp": {
+      "elapsed_seconds": 0.361,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/rules": {
+      "elapsed_seconds": 0.417,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/pcapx/pcaputil": {
+      "elapsed_seconds": 481.41,
+      "result": "pass",
+      "evidence_file": "full-tests.jsonl"
+    },
+    "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+      "elapsed_seconds": 2.544,
+      "result": "pass",
+      "evidence_file": "ui-final-full-tests.jsonl"
+    }
+  },
+  "superseded_build_failure": {
+    "command": "initial combined package run",
+    "package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+    "error": "undefined routingFieldText",
+    "cause": "Go enumerated package files before the new routing_presentation.go was added during the long run",
+    "resolution": "Final source standalone complete CLI test passes in 2.544 seconds; final CLI source rebuild is byte-identical to the tested Windows executable. Other package results remain separate, not a claim that the original combined command exited zero."
+  },
+  "final_ui_source_rebuild_matches_tested_executable": true
+}

@@ -118,6 +118,17 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "hsrp" {
+		switch number(eventValues(e)["Protocol Version"]) {
+		case 1:
+			return "HSRPv1"
+		case 2:
+			return "HSRPv2"
+		}
+	}
+	if e.Protocol == "bfd" && number(eventValues(e)["Version"]) == 1 {
+		return "BFDv1"
+	}
 	if e.Protocol == "rdpudp" && number(eventValues(e)["Protocol Version"]) == 0x101 {
 		return "RDPUDP2"
 	}
@@ -336,6 +347,45 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
+		v := eventValues(e)
+		parts := []string{eventProtocolName(e) + " " + textValue(v["Packet Name"])}
+		if state, exists := v["State"]; exists {
+			label := fmt.Sprint(state)
+			if e.Protocol == "bfd" {
+				label = map[uint64]string{0: "AdminDown", 1: "Down", 2: "Init", 3: "Up"}[number(state)]
+			} else if number(v["Protocol Version"]) == 2 {
+				label = map[uint64]string{0: "Disabled", 1: "Init", 2: "Learn", 3: "Listen", 4: "Speak", 5: "Standby", 6: "Active"}[number(state)]
+			} else {
+				label = map[uint64]string{0: "Initial", 1: "Learn", 2: "Listen", 4: "Speak", 8: "Standby", 16: "Active"}[number(state)]
+			}
+			parts = append(parts, "advertises "+label)
+		}
+		for _, key := range []string{"Group", "Virtual IP", "My Discriminator", "Your Discriminator", "Detect Multiplier", "Active Groups", "Passive Groups"} {
+			if value, exists := v[key]; exists {
+				parts = append(parts, fmt.Sprintf("%s=%v", key, value))
+			}
+		}
+		if v["Poll"] == true {
+			parts = append(parts, "Poll")
+		}
+		if v["Final"] == true {
+			parts = append(parts, "Final")
+		}
+		if e.Protocol == "glbp" {
+			if rows, ok := v["TLVs"].([]map[string]any); ok {
+				for _, row := range rows {
+					if number(row["Type"]) == 1 {
+						parts = append(parts, fmt.Sprintf("gateway state=%v · VIP=%v", row["Gateway State"], row["Virtual IP"]))
+					}
+					if number(row["Type"]) == 2 && len(parts) < 6 {
+						parts = append(parts, fmt.Sprintf("forwarder=%v · state=%v · weight=%v", row["Forwarder"], row["Forwarder State"], row["Weight"]))
+					}
+				}
+			}
+		}
+		return strings.Join(parts, " · ")
+	}
 	if e.Protocol == "bgp" || e.Protocol == "ajp" || e.Protocol == "rtmp" || e.Protocol == "amf0" {
 		v := eventValues(e)
 		parts := []string{safeText(e.Summary)}

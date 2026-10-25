@@ -51,6 +51,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 		var values []any
 		values, err = DecodeAMF0(wire, 4096)
 		fields = map[string]any{"Values": values}
+	case "hsrp", "glbp", "bfd":
+		fields, err = DecodeRoutingControl(wire, profile, 4096)
 	default:
 		return fmt.Errorf("unselected observed session profile")
 	}

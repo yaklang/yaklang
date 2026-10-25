@@ -899,6 +899,7 @@ type binFlow struct {
 	ajp               *binAJP
 	bgp               *binBGP
 	rtmp              *binRTMP
+	routing           *routingDatagramState
 	mms               *binMMS
 	plaintextGap      [2]bool
 	domain            CaptureDomain

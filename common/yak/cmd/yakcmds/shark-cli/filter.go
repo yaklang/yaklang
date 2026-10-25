@@ -9,7 +9,10 @@ import (
 // Application shortcuts are capture filters for conventional ports, not a
 // promise that every packet on those ports contains that application protocol.
 var protocolFilters = map[string]string{
-	"ip": "ip", "ipv4": "ip", "ipv6": "ip6", "arp": "arp",
+	"hsrp": "udp port 1985 or udp port 2029",
+	"glbp": "udp port 3222",
+	"bfd":  "udp port 3784 or udp port 4784",
+	"ip":   "ip", "ipv4": "ip", "ipv6": "ip6", "arp": "arp",
 	"tcp": "tcp", "udp": "udp", "icmp": "icmp", "icmpv6": "icmp6", "sctp": "sctp",
 	"vlan": "vlan", "gre": "ip proto 47 or ip6 proto 47", "esp": "ip proto 50 or ip6 proto 50",
 	"igmp": "igmp", "ospf": "ip proto 89 or ip6 proto 89", "eapol": "ether proto 0x888e",

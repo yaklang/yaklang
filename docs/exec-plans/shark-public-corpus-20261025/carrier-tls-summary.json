@@ -1,8 +1,8 @@
 {
   "scope": "Original full capture, independent derived TLS oracle and typed fields remain separate checks; no peer/cookie/RADIUS authentication or complete inner application claim.",
   "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
-  "yak_sha256": "a5924e2abbb48408c0f87b15880554d71d09b6c7210a505bb4ee7ac8d1ac2e91",
-  "events_binary_sha256": "d5a8520775327754fcd9109f590d786562152ca6eb4069451e8bc575ca0eada4",
+  "yak_sha256": "ff5728c534749e2b6b2ac4d4351fb12d90d3a4e430e28099270fca4b6276208c",
+  "events_binary_sha256": "f70e55a3406a431b17fb9e3c7f42a4c363864c4b0de6a660683388634ebee01d",
   "frames_completed": {
     "weber": 51328,
     "sharon": 328127
@@ -57,11 +57,16 @@
     "rdpudp.data.channelseqnumber": 1550
   },
   "RDPUDP_field_value_differences": 0,
-  "fuzz_execution_count": 23178,
+  "fuzz_execution_count": null,
   "limitations": [
     "FEC erasure recovery and lossy DTLS not implemented",
     "PEAP/TTLS inner authentication not implemented; authenticators and peer identity unverified",
     "BGP/AJP/RTMP have bounded partial native profiles; other native coverage gaps remain",
     "Raw frame field-set and fuzz differences remain reported; not full-protocol acceptance"
-  ]
+  ],
+  "historical_carrier_fuzz": {
+    "executions": 23178,
+    "commit": "886dc33c25",
+    "scope": "Previously verified carrier receiver fuzz; not rerun in this routing/field audit"
+  }
 }

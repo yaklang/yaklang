@@ -266,6 +266,9 @@ func p1InventoryMarkdown() string {
 
 func TestP1RoadmapCovered(t *testing.T) {
 	coveredScopes := requireObservedSessionScopes(t, priP1)
+	for name, passed := range requireRoutingControlScopes(t) {
+		coveredScopes[name] = passed
+	}
 	var leftover []string
 	for _, item := range ProtocolRoadmap {
 		if item.Priority == priP1 && (item.Status == stTodo || item.Status == stPartial) {

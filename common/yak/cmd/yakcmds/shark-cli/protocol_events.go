@@ -70,6 +70,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		add(fmt.Sprintf("TLS records: %d authenticated, %d rejected · verification is per record", verified, rejected), false)
 	}
 	var protocol string
+	var routingVersion uint64
 	var currentSource int
 	var wireRanges map[string][]int
 	var authenticatedQUIC bool
@@ -81,9 +82,37 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" {
+				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
+					previous := wireRanges
+					defer func() { wireRanges = previous }()
+					wireRanges = map[string][]int{}
+					for k, v := range local {
+						if a, ok := v.([]any); ok && len(a) == 2 {
+							wireRanges[k] = []int{int(number(a[0])), int(number(a[1]))}
+						}
+					}
+				}
+			}
+			if name, ok := x["Display Name"].(string); ok && strings.Contains("|dns|mdns|llmnr|dot|doh|doq|", "|"+protocol+"|") {
+				view := make(map[string]any, len(x))
+				for k, v := range x {
+					if k != "Display Name" {
+						view[k] = v
+					}
+				}
+				if escaped, exists := x["Name"].(string); exists && escaped != name {
+					view["Escaped Name"] = escaped
+				}
+				view["Name"] = name
+				x = view
+			}
 			add(name, true)
 			keys := make([]string, 0, len(x))
 			for k := range x {
+				if k == "Wire Field Ranges" {
+					continue
+				}
 				keys = append(keys, k)
 			}
 			sort.Slice(keys, func(i, j int) bool {
@@ -180,6 +209,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" {
+				value = routingFieldText(protocol, name, x, routingVersion, value)
+			}
 			label := name
 			if protocol == "tls" {
 				value = tlsDisplayValue(name, x)
@@ -193,7 +225,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; depth == 0 && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -210,6 +242,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			continue
 		}
 		protocol, currentSource = e.Protocol, 0
+		routingVersion = number(e.Session["Protocol Version"])
 		wireRanges = map[string][]int{}
 		switch ranges := e.Session["Wire Field Ranges"].(type) {
 		case map[string][]int:
@@ -258,6 +291,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
+		if e.SourceBytes.CompletedIn != nil {
+			add(fmt.Sprintf("Message bytes complete in frame #%d · %d contributing packet(s)", e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
+		}
 		if !credibleTLSIdentity(e) {
 			add("TLS session identity: unconfirmed · complete record header/body, handshake context not observed", false)
 			add("Negotiated TLS version: unavailable · record legacy version is not negotiation evidence", false)
@@ -271,6 +307,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
+			delete(values, "Strong Identity")
+			for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "ssh" {
 			for _, key := range []string{"Packet Name", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Encryption C2S", "Encryption S2C", "Signature Verified", "Peer Identity Verified", "Identification", "Version", "Kex Family", "Host Key Format", "First Kex Packet Follows", "Languages C2S", "Languages S2C"} {
 				if v, ok := values[key]; ok {
