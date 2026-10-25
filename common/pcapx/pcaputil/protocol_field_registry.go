@@ -31,9 +31,12 @@ const (
 // Origin distinguishes event metadata, logical PDU fields, observed connection
 // context and computed facts. A PDU range is never a captured-frame offset.
 type DisplayFieldDescriptor struct {
-	Name        string             `json:"name"`
-	Label       string             `json:"label"`
-	Protocol    string             `json:"protocol"`
+	Name     string `json:"name"`
+	Label    string `json:"label"`
+	Protocol string `json:"protocol"`
+	// Protocol preserves the historical primary owner. Protocols declares all
+	// supported event protocols when a field is shared across multiple codecs.
+	Protocols   []string           `json:"protocols,omitempty"`
 	Type        DisplayFieldType   `json:"type"`
 	Bits        int                `json:"bits,omitempty"`
 	Origin      string             `json:"origin"`
@@ -362,6 +365,9 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	seen := map[string]bool{}
 	for i, b := range out {
 		out[i].descriptor.Values = displayFieldEnums(b.descriptor.Name)
+		if scopes := strings.Split(strings.Trim(b.protocols, "|"), "|"); len(scopes) > 1 {
+			out[i].descriptor.Protocols = scopes
+		}
 		if b.descriptor.Name == "" || seen[b.descriptor.Name] {
 			panic("duplicate or empty display field registration")
 		}
@@ -372,6 +378,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 
 func cloneDisplayFieldDescriptor(d DisplayFieldDescriptor) DisplayFieldDescriptor {
 	d.Values = append([]DisplayFieldEnum(nil), d.Values...)
+	d.Protocols = append([]string(nil), d.Protocols...)
 	return d
 }
 

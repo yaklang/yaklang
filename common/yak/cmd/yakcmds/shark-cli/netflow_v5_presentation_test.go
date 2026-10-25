@@ -24,7 +24,14 @@ func TestNetFlowV5ProgressiveRecordsHaveCurrentPDUAddressRanges(t *testing.T) {
 	require.True(t, (searchTerm{kind: "proto", value: "netflow-v5"}).matches(nil, row, nil))
 	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	found := false
-	for _, f := range fs {
+	nanoseconds, firstRecord := -1, -1
+	for index, f := range fs {
+		if strings.HasPrefix(f.text, "Unix Nanoseconds:") {
+			nanoseconds = index
+		}
+		if strings.HasPrefix(f.text, "Records[0]") {
+			firstRecord = index
+		}
 		require.NotContains(t, f.text, "Wire Field Ranges")
 		if strings.HasPrefix(f.text, "Reported Source IPv4: 192.0.2.9") {
 			found = true
@@ -38,6 +45,8 @@ func TestNetFlowV5ProgressiveRecordsHaveCurrentPDUAddressRanges(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+	require.GreaterOrEqual(t, nanoseconds, 0)
+	require.Greater(t, firstRecord, nanoseconds, "every export-time header must precede the long record list")
 	fields := e.DisplayFieldValues()
 	require.False(t, fields.Incomplete)
 	require.False(t, fields.Truncated)

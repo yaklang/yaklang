@@ -30,6 +30,11 @@ func TestRegisteredFieldListingWithoutCapture(t *testing.T) {
 	require.Contains(t, out.String(), "wg.counter")
 	require.Contains(t, out.String(), "uint64")
 	require.Contains(t, out.String(), "context")
+	for _, line := range strings.Split(out.String(), "\n") {
+		if strings.HasPrefix(line, "cflow.version ") {
+			require.Contains(t, line, "netflow-v5/netflow-v9")
+		}
+	}
 }
 
 func TestDisplayFilterValidatedBeforeOpeningCaptureOrOutput(t *testing.T) {
