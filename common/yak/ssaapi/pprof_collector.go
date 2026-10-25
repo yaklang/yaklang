@@ -28,7 +28,8 @@ import (
 // and block profiles at regular intervals.
 //
 // Collection strategy:
-//   - Every minute, collect a 30-second CPU profile
+//   - Every 5 minutes, collect a 10-second CPU profile without overlapping
+//     non-CPU snapshots
 //   - Every 5 minutes, collect heap, goroutine (including debug=2 stacks), mutex,
 //     block, DB stats, and runtime stats; early snapshots also capture these during
 //     the first 4 minutes to preserve evidence for memory-guarded scans
@@ -198,7 +199,7 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 	defer allocsTicker.Stop()
 	cpuTicker := time.NewTicker(pprofCPUInterval)
 	defer cpuTicker.Stop()
-	c.startCPUProfile(ctx, "initial")
+	c.collectCPUSample(ctx, "initial")
 	c.collectSnapshot("initial")
 
 	earlyTicker := time.NewTicker(pprofEarlyInterval)
@@ -223,7 +224,7 @@ func (c *pprofCollector) collectLoop(ctx context.Context) {
 		case <-ticker.C:
 			c.collectSnapshot(time.Now().Format("150405"))
 		case <-cpuTicker.C:
-			c.startCPUProfile(ctx, time.Now().Format("150405"))
+			c.collectCPUSample(ctx, time.Now().Format("150405"))
 		case <-allocsTicker.C:
 			c.fetchNamedProfile(time.Now().Format("20060102-150405-allocs"), "allocs", "")
 		}
@@ -236,7 +237,7 @@ func (c *pprofCollector) collectSnapshot(tag string) {
 	ts := time.Now().Format("20060102-150405")
 	label := fmt.Sprintf("%s-%s", ts, tag)
 
-	// Memory, goroutine, mutex, and block snapshots are fast (non-blocking).
+	// Serialize snapshots on the collector loop, outside the CPU sample.
 	c.fetchHeap(label)
 	c.fetchGoroutine(label)
 	c.fetchGoroutineDebug2(label)
@@ -247,16 +248,12 @@ func (c *pprofCollector) collectSnapshot(tag string) {
 	c.fetchRuntimeStats(label)
 }
 
-// startCPUProfile collects a bounded CPU sample on its own cadence, independent
-// of the slower heap, goroutine, mutex, and block snapshots.
-func (c *pprofCollector) startCPUProfile(ctx context.Context, tag string) {
+// Collect on the same loop as snapshots: encoding their stacks and allocations
+// inside the CPU window would profile the collector rather than the workload.
+func (c *pprofCollector) collectCPUSample(ctx context.Context, tag string) {
 	ts := time.Now().Format("20060102-150405")
 	label := fmt.Sprintf("%s-%s", ts, tag)
-	c.wg.Add(1)
-	go func() {
-		defer c.wg.Done()
-		c.fetchCPU(ctx, label, pprofCPUDuration)
-	}()
+	c.fetchCPU(ctx, label, pprofCPUDuration)
 }
 
 // collectSnapshotFinal captures final retained state. CPU sampling has already
@@ -284,7 +281,7 @@ func (c *pprofCollector) fetchDBStats(label string) {
 	c.dbStatsMu.Lock()
 	delta := ssadb.DeltaDBOpStats(c.lastDBStats, current)
 	// DB counters accumulate across the full interval between snapshots, unlike
-	// CPU profiles, which sample for 30 seconds every minute. Record the actual
+	// CPU profiles, which sample for 10 seconds every 5 minutes. Record the actual
 	// wall window for UI share %.
 	if !c.lastDBStatsAt.IsZero() {
 		windowMs := now.Sub(c.lastDBStatsAt).Milliseconds()
