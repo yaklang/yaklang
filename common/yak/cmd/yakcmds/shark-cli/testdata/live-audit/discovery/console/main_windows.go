@@ -284,7 +284,16 @@ func main() {
 	if len(visible) != 2 || visible[1] == "0" {
 		panic("no complete matching protocol rows after replay")
 	}
-	send("bb")
+	send("b")
+	shot("02-first-byte-source")
+	if os.Args[6] == "observed transport header" {
+		firstSource, err := os.ReadFile(filepath.Join(dir, "02-first-byte-source.json"))
+		fail(err)
+		if !strings.Contains(string(firstSource), "header · network observation; logical offsets") {
+			panic("observed transport header did not reach a selectable logical byte source")
+		}
+	}
+	send("b")
 	shot("02-byte-sources")
 	send("4x")
 	shot("03-conversation-messages")

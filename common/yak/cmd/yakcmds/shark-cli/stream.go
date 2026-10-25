@@ -255,6 +255,15 @@ func (r *tcpStream) ReassemblyComplete(reassembly.AssemblerContext) bool {
 
 func (s *streamStore) add(raw *capturedPacket) {
 	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	s.addDecoded(raw, p, pcaputil.PacketDomain(raw.data, raw.ci, raw.link))
+}
+
+func (s *streamStore) addDecoded(raw *capturedPacket, p gopacket.Packet, domain pcaputil.CaptureDomain) {
+	// Capture-backed previews require an actual core flow association. A
+	// malformed or orphan segment must not allocate an independent app stream.
+	if raw.history != nil && raw.tcpFlowID == 0 {
+		return
+	}
 	network, selectedTransport := pcaputil.CaptureTransport(p)
 	tcp, ok := selectedTransport.(*layers.TCP)
 	if network == nil || !ok {
@@ -267,7 +276,7 @@ func (s *streamStore) add(raw *capturedPacket) {
 		return
 	}
 	key := connectionKey(network.NetworkFlow(), tcp.TransportFlow())
-	key.domain = pcaputil.PacketDomain(raw.data, raw.ci, raw.link)
+	key.domain = domain
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if raw.tcpFlowID != 0 && !tcp.SYN && len(tcp.Payload) == 0 && s.active[key] == nil {

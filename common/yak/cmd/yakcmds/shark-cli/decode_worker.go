@@ -28,10 +28,12 @@ const decoderInputLimit = 2 << 20
 const decoderOutputLimit = 8 << 20
 
 type decodeRequest struct {
-	ConnectionStack    []string `json:",omitempty"`
-	ConnectionProtocol string   `json:",omitempty"`
-	ConnectionEvidence string   `json:",omitempty"`
-	OpaqueTransport    bool     `json:",omitempty"`
+	TransportView      *packetTransportView `json:",omitempty"`
+	TransportHeader    []byte               `json:",omitempty"`
+	ConnectionStack    []string             `json:",omitempty"`
+	ConnectionProtocol string               `json:",omitempty"`
+	ConnectionEvidence string               `json:",omitempty"`
+	OpaqueTransport    bool                 `json:",omitempty"`
 	Events             []*pcaputil.ProtocolEvent
 	Stream             *streamDecodeRequest
 	Number             uint64
@@ -88,6 +90,14 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 		d = decodeStream(*req.Stream)
 	} else {
 		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		if req.TransportView != nil {
+			v := req.TransportView
+			if len(req.TransportHeader) != v.HeaderLength || v.Protocol == "tcp" && (v.HeaderLength < 20 || v.HeaderLength > 60 || int(req.TransportHeader[12]>>4)*4 != v.HeaderLength) || v.Protocol == "udp" && v.HeaderLength != 8 || v.Protocol != "tcp" && v.Protocol != "udp" {
+				return fmt.Errorf("invalid observed transport header in decoder request")
+			}
+			v.Header = req.TransportHeader // JSON decoding owns this logical byte source.
+			raw.transportView = v
+		}
 		d = detail(raw)
 	}
 	response := decodeResponse{Number: d.number, Protocol: d.protocol, Sources: d.sources}
@@ -114,11 +124,19 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 // Only pinned packets use the VM. A bounded child process keeps both parser
 // diagnostics and pathological input away from the capture/UI event loops.
 func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, error) {
-	output, err := runIsolated(parent, decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport})
+	output, err := runIsolated(parent, packetDecodeRequest(raw))
 	if err != nil {
 		return packetDetail{}, err
 	}
 	return decodeWorkerOutput(output, raw)
+}
+
+func packetDecodeRequest(raw *capturedPacket) decodeRequest {
+	req := decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport, TransportView: raw.transportView}
+	if raw.transportView != nil {
+		req.TransportHeader = raw.transportView.Header
+	}
+	return req
 }
 
 func decodeStreamIsolated(parent context.Context, stream *streamSnapshot) (packetDetail, error) {
