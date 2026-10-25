@@ -367,6 +367,24 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
+		v := eventValues(e)
+		parts := []string{textValue(v["Packet Name"])}
+		if v["Whole Table Request"] == true {
+			return strings.Join(append(parts, "whole table query"), " · ")
+		}
+		parts = append(parts, fmt.Sprintf("%d route(s), %d next-hop advisory(s)", number(v["Route Count"]), number(v["Next Hop Count"])))
+		for _, row := range mapList(v["Entries"]) {
+			if prefix := textValue(row["Canonical Prefix"]); prefix != "" {
+				parts = append(parts, fmt.Sprintf("first=%s metric=%d", prefix, number(row["Metric"])))
+				break
+			}
+		}
+		if v["Conformance Warning"] != nil {
+			parts = append(parts, "wire warning; see fields")
+		}
+		return strings.Join(parts, " · ")
+	}
 	if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 		v := eventValues(e)
 		if v["Control"] == true {
