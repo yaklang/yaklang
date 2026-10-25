@@ -15,6 +15,7 @@ from pathlib import Path
 import sys
 import zlib
 from isis_wire_associations import verify as verify_associations
+from isis_wire_associations import system_id
 
 oracle, events, output = map(Path, sys.argv[1:4])
 
@@ -112,19 +113,23 @@ def metric_proofs(w, physical):
         if stop > len(w):
             break
         if t in (2, 3):
-            step = 11 if t == 2 else 10
-            start = body+int(t == 2)
-            if (stop-start) % step:
-                at = stop
-                continue
-            for pos in range(start, stop, step):
-                for j, metric in enumerate(('delay', 'expense', 'error'), 1):
+            positions = []
+            if t == 2 and n >= 1 and (n-1) % 11 == 0:
+                positions = list(range(body+1, stop, 11))
+            elif t == 3 and w[4] & 31 == 18 and n >= 4 and (n-4) % 6 == 0:
+                positions = [body]
+                for pos in range(body+4, stop, 6):
+                    result['isis.lsp.eis_neighbors.es_neighbor_id'].append((system_id(w[pos:pos+6]), physical+pos, 6))
+            for pos in positions:
+                for j, metric in enumerate(('default', 'delay', 'expense', 'error')):
                     root = 'isis.lsp.eis_neighbors.'
                     supported = root+metric+'_metric_supported'
                     if metric == 'delay':
                         supported = 'isis.lsp.eis_neighbors_delay_metric.supported'
                     result[root+metric+'_metric'].append((w[pos+j] & 63, physical+pos+j, 1))
-                    result[supported].append((bool(w[pos+j] & 128), physical+pos+j, 1))
+                    result[root+metric+'_metric_ie'].append((bool(w[pos+j] & 64), physical+pos+j, 1))
+                    if j:
+                        result[supported].append((bool(w[pos+j] & 128), physical+pos+j, 1))
         at = stop
     return result
 
@@ -180,6 +185,12 @@ for row in rows:
     else:
         checks['fixed_header_and_unverified_authentication'] += 1
     want, spans = fields(ls), raw_fields(ls)
+    if want.get('isis.lsp.short_clv'):
+        for tlv in e['session'].get('TLVs') or []:
+            if tlv.get('Type') == 3 and tlv.get('Length') == 4 and tlv.get('ES Neighbor Count') == 0 and 'Shared Metrics' in tlv:
+                known_reference.append({'frame': frame, 'field': 'ES TLV3 shared-metric grammar', 'wireshark': ['short E/IS reachability'],
+                                        'native': ['complete four-byte shared metric block, zero ES IDs'], 'reason': 'RFC1142 section9.8 defines length4+6n; Wireshark4.6.9 incorrectly requires ten-byte per-ES records',
+                                        'wire_tlv_type_offset': physical+tlv['Wire Field Ranges']['Type'][0], 'wire_value_length': 4})
     got = collections.defaultdict(list)
     for v in e['field_values']['values']:
         if v['name'].startswith('isis.'):
@@ -217,7 +228,7 @@ for row in rows:
             detail = {'frame': frame, 'field': k, 'wireshark': expected, 'native': observed, 'wireshark_ranges': reference_ranges, 'native_ranges': ranges}
             if k in proofs and collections.Counter((v['value'], physical+v['pdu_range']['offset'], v['pdu_range']['length']) for v in got[k]) == collections.Counter(proofs[k]):
                 detail['independent_wire_layout'] = proofs[k]
-                detail['reason'] = 'Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout'
+                detail['reason'] = 'Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout'
                 known_reference.append(detail)
             else:
                 differences.append(detail)

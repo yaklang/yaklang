@@ -86,7 +86,13 @@ func isisDisplayBindings() []displayFieldBinding {
 			p.maps(e.Session["TLVs"], func(row map[string]any) {
 				t := routingNumber(row, "Type")
 				if tlv == 0 || t == uint64(tlv) || tlv == isisLegacyNeighborTLVs && (t == 2 || t == 3) || tlv == isisLegacyIPReachabilityTLVs && (t == 128 || t == 130) {
-					project(row)
+					if tlv == isisLegacyNeighborTLVs && t == 3 {
+						if shared, ok := row["Shared Metrics"].(map[string]any); ok {
+							rowValue(shared)
+						}
+					} else {
+						project(row)
+					}
 				}
 			})
 		})
@@ -161,6 +167,8 @@ func isisDisplayBindings() []displayFieldBinding {
 	u("lsp", 2, nil, "lsp.eis_neighbors_clv_inner.reserved", "Reserved Neighbor Octet", 8)
 	s("lsp", 2, list("Neighbors"), "lsp.eis_neighbors.is_neighbor", "Neighbor Node ID")
 	s("lsp", 3, list("Neighbors"), "lsp.eis_neighbors.es_neighbor_id", "System ID")
+	u("lsp", 3, nil, "lsp.es_neighbor_count", "ES Neighbor Count", 16)
+	out[len(out)-1].descriptor.Origin = "derived"
 	for _, tlv := range []int{isisLegacyNeighborTLVs, isisLegacyIPReachabilityTLVs} {
 		prefix, path := "lsp.eis_neighbors.", list("Neighbors")
 		if tlv == isisLegacyIPReachabilityTLVs {

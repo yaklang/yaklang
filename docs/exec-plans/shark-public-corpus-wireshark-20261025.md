@@ -1152,6 +1152,13 @@ response、条目数与首个前缀/metric。字段按条目类型、IPv6地址�
 
 ## 2026-10-26 后续：IS-IS 原生入口、字段关联和异常页面
 
+**ES TLV3 结论纠正中：** 后续对公开 ISO 格式（RFC1142 §9.8）和 Quagga 接收源码的
+独立检查证实，它是四字节共享 metric 加六字节 ID 列表，长度4的空列表合法。此前把
+frame24231 判为 malformed、并据此展示异常页的结论不准确；对应的677/1状态计数和
+“真实坏 ES TLV”描述暂不可作为验收结论。原生解析/空列表/共享范围测试已修正，正在重跑
+完整逐包证据并更新本节、聚合和页面。Wireshark/tcpdump 在该处采用每邻居十字节布局，
+不能作为这一语法的唯一标准。
+
 补齐原来已有 YAML、实际回放仍显示 LLC 的 IS-IS。历史 `ISIS` 叶树保持兼容，新增
 `ISISFields` 与原生入口共用 bounded codec。当前选择范围是六字节 System ID、完整
 IEEE802.3 长度、FE/FE LLC UI 与 NLPID83，支持四层 VLAN 和已验证 express FCS 的

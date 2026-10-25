@@ -45,13 +45,23 @@ func isisLegacyNeighbors(r *controlReader, typ, pdu uint64, limit *int) {
 		}
 	} else {
 		r.info["TLV Name"] = "Advertised Legacy ES Neighbors"
-		r.need((len(r.w)-r.at)%10 == 0, "legacy ES neighbors require complete metric-plus-six-octet-ID records")
+		// ISO10589 (public format in RFC1142 section9.8) uses ONE metric
+		// block followed by zero or more System IDs sharing that cost. This
+		// deliberately differs from Wireshark/tcpdump's per-neighbor layout.
+		r.need(len(r.w)-r.at >= 4 && (len(r.w)-r.at-4)%6 == 0, "legacy ES neighbors require one four-octet metric block and complete six-octet IDs")
+		if r.err != nil {
+			return
+		}
+		shared := r.child("Shared Metrics", r.at+4, func(c *controlReader) {
+			isisLegacyMetrics(c, false)
+			c.info["Wire Field Ranges"] = isisFieldRanges(c.fields)
+		})
+		r.info["Shared Metrics"] = shared
 		for r.at < len(r.w) && r.err == nil {
 			if !pimCharge(r, limit) {
 				return
 			}
-			row := r.child("ES Neighbor", r.at+10, func(c *controlReader) {
-				isisLegacyMetrics(c, false)
+			row := r.child("ES Neighbor", r.at+6, func(c *controlReader) {
 				isisID(c, "System ID", 6)
 				c.info["Wire Field Ranges"] = isisFieldRanges(c.fields)
 			})
@@ -59,6 +69,10 @@ func isisLegacyNeighbors(r *controlReader, typ, pdu uint64, limit *int) {
 		}
 	}
 	r.info["Neighbors"] = rows
+	if typ == 3 {
+		r.info["ES Neighbor Count"] = uint64(len(rows))
+		r.info["Metric Scope"] = "one shared metric block for every ES ID in this TLV; an empty list is valid"
+	}
 }
 
 func isisLegacyIPReachability(r *controlReader, typ uint64, limit *int) {
