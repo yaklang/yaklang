@@ -329,6 +329,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
 		if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 			delete(values, "Opaque Session Payload")
 			delete(values, "Ethernet Bytes")

@@ -19,7 +19,7 @@ func prefixOrigin(v *streamSnapshot, direction int) string {
 
 func (u *tui) streamEvidenceRows() []streamLine {
 	v := u.stream
-	if v.transport == "udp" {
+	if v.messageBoundaries() {
 		return datagramEvidenceRows(v)
 	}
 	var rows []streamLine

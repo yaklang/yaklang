@@ -55,6 +55,9 @@ func (u *tui) loadStream() {
 	}
 	u.streamApplication = u.stream != nil && len(u.stream.events) > 0
 	u.streamStatus = "a messages/wire · h beginning · l recent · e evidence · v direction · t/x/d view · r resume"
+	if u.stream != nil && u.stream.messageBoundaries() {
+		u.streamStatus = "a messages/wire · e association evidence · v direction · t/x/d view · r resume"
+	}
 }
 
 func textPayload(data []byte) bool {
@@ -81,7 +84,7 @@ func (u *tui) streamLines() []streamLine {
 	add := func(text string, style ink) { rows = append(rows, streamLine{safeText(text), style}) }
 	v := u.stream
 	if v == nil {
-		add("Select a TCP packet or a recognized UDP conversation to inspect its retained messages.", inkMuted)
+		add("Select a TCP packet or an observed protocol association to inspect its retained messages.", inkMuted)
 		if raw := u.inspectedPacket(); raw != nil && raw.streamID != 0 {
 			add("This stream was evicted from the bounded history; capture to a file to retain it.", inkGold)
 		}
@@ -139,6 +142,9 @@ func (u *tui) streamLines() []streamLine {
 	if v.transport == "udp" {
 		add("UDP conversation · retained datagrams only · CID/session association does not verify peer identity", inkGold)
 	}
+	if v.transport == "network" {
+		add("Observed IP association · receiver/session context only · peer/control authentication not verified", inkGold)
+	}
 	if v.protocol == "HTTP" && v.evidence != "port hint" {
 		add(httpConnectionContext(v.prefix), inkGold)
 	}
@@ -146,7 +152,11 @@ func (u *tui) streamLines() []streamLine {
 		rows = append(rows, u.streamEvidenceRows()...)
 	} else if u.streamMode == 2 {
 		if len(u.streamFields.fields) == 0 {
-			add("Application fields are being decoded from contiguous prefixes…", inkMuted)
+			if v.messageBoundaries() {
+				add("Retained message fields are unavailable in this bounded view. r refresh", inkMuted)
+			} else {
+				add("Application fields are being decoded from contiguous prefixes…", inkMuted)
+			}
 		}
 		for _, f := range u.streamFields.fields {
 			style := inkText
@@ -159,10 +169,14 @@ func (u *tui) streamLines() []streamLine {
 		rows = append(rows, applicationMessageRows(v, u.streamDirection, u.streamMode, width)...)
 	} else {
 		if len(v.chunks) == 0 {
-			add("No contiguous payload yet (ACK-only, or waiting up to 2s for earlier segments). r refresh", inkMuted)
+			if v.messageBoundaries() {
+				add("No retained message bytes are available. r refresh", inkMuted)
+			} else {
+				add("No contiguous payload yet (ACK-only, or waiting up to 2s for earlier segments). r refresh", inkMuted)
+			}
 		}
 		chunks := v.chunks
-		if u.streamBeginning && v.transport != "udp" {
+		if u.streamBeginning && !v.messageBoundaries() {
 			chunks = nil
 			add("BEGINNING · preserved independently of recent bytes · max 16 KiB per direction · l recent / e evidence", inkCyan)
 			for d, data := range v.prefix {
@@ -173,6 +187,8 @@ func (u *tui) streamLines() []streamLine {
 		} else {
 			if v.transport == "udp" {
 				add("RETAINED UDP DATAGRAMS · each PDU keeps its wire boundary · e association evidence", inkGold)
+			} else if v.transport == "network" {
+				add("RETAINED IP MESSAGES · each PDU keeps its wire boundary · e association evidence", inkGold)
 			} else {
 				add("RECENT WINDOW · this is not the beginning · h preserved beginning / e evidence", inkGold)
 			}
@@ -187,10 +203,12 @@ func (u *tui) streamLines() []streamLine {
 			}
 			if v.transport == "udp" {
 				add(fmt.Sprintf("── %s · datagram PDU #%d · %d bytes ──", direction, chunk.pdu, len(chunk.data)), style)
+			} else if v.transport == "network" {
+				add(fmt.Sprintf("── %s · IP PDU #%d · %d bytes ──", direction, chunk.pdu, len(chunk.data)), style)
 			} else {
 				add(fmt.Sprintf("── %s · offset %d · %d bytes ──", direction, chunk.offset, len(chunk.data)), style)
 			}
-			if u.streamBeginning && v.transport != "udp" {
+			if u.streamBeginning && !v.messageBoundaries() {
 				add(prefixOrigin(v, chunk.direction), style)
 				if v.prefixGap[chunk.direction] {
 					add("[Preserved prefix ends at a capture gap.]", inkGold)
@@ -201,7 +219,11 @@ func (u *tui) streamLines() []streamLine {
 			} else if chunk.gap > 0 {
 				add(fmt.Sprintf("[GAP: %d bytes missing before this point]", chunk.gap), inkRed)
 			}
-			appendStreamChunk(&rows, chunk, u.streamMode, width, style)
+			if v.messageBoundaries() {
+				appendStreamData(&rows, chunk.data, 0, u.streamMode, width, style)
+			} else {
+				appendStreamChunk(&rows, chunk, u.streamMode, width, style)
+			}
 			if len(rows) > 100000 {
 				add("[View row limit reached; use the saved capture for the full data.]", inkGold)
 				break
@@ -216,7 +238,11 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 	var rows []streamLine
 	add := func(text string, style ink) { rows = append(rows, streamLine{safeText(text), style}) }
 	presentation := presentEvents(v.events)
-	add("DECODED MESSAGES · "+strings.Join(presentation.stack, " › ")+" · a original wire", inkCyan)
+	title := "DECODED MESSAGES"
+	if v.messageBoundaries() {
+		title = "PROTOCOL MESSAGES"
+	}
+	add(title+" · "+strings.Join(presentation.stack, " › ")+" · a original wire", inkCyan)
 	hasApplication := false
 	for _, e := range v.events {
 		if e != nil && e.Protocol != "tls" && e.Protocol != "quic" && (e.Status == "decoded" || e.Status == "deferred") {
@@ -234,7 +260,7 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 		if e.Source == v.endpoints[1] {
 			d = 1
 		}
-		if v.transport == "udp" {
+		if v.messageBoundaries() {
 			d = clamp(e.Direction, 0, 1)
 		}
 		if direction != 0 && direction != d+1 {
