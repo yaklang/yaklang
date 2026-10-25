@@ -34,6 +34,17 @@ var isisEntryPriority = map[string]int{
 	"Observation Scope": 802, "Opaque Value": 900, "Padding Bytes": 901,
 }
 
+var netflowV9EntryPriority = map[string]int{
+	"Protocol Name": 0, "Version": 1, "Source ID": 2, "Sequence Number": 3, "System Uptime Milliseconds": 4, "Unix Seconds": 5,
+	"Header Record Count": 6, "Template Record Count": 7, "Data Record Count": 8, "Record Count Verified": 9,
+	"Data Decode Unavailable": 10, "Context Reset": 11, "Context Retention Warning": 12, "FlowSets": 20,
+	"FlowSet ID": 0, "FlowSet Length": 1, "Record Count": 2, "Template Scope": 3, "Template Packet References": 4,
+	"Templates": 5, "Records": 6, "Template ID": 0, "Field Count": 1, "Scope Length": 1, "Options Length": 2, "Fields": 4,
+	"Field Type": 0, "Field Length": 1, "Scope": 2, "Field Name": 3, "Value": 4, "Value Kind": 5,
+	"Template Definition SHA256": 800, "Template PDU SHA256": 801, "Template Definition Offset": 802, "Template Definition Length": 803,
+	"Opaque Data": 900, "Padding Bytes": 901, "Observation Scope": 950, "Template Lease Policy": 951,
+}
+
 func fieldPriority(name string) int {
 	if rank, ok := semanticFieldPriority[name]; ok {
 		return rank
@@ -90,14 +101,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var wireRanges map[string][]int
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
+	var fieldViewLimited bool
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
 		if len(out) >= 4096 || depth > 32 {
+			fieldViewLimited = true
 			return
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || protocol == "netflow-v9" {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -148,13 +161,30 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 						b = rank
 					}
 				}
+				if protocol == "netflow-v9" {
+					if rank, ok := netflowV9EntryPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := netflowV9EntryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if a != b {
 					return a < b
 				}
 				return keys[i] < keys[j]
 			})
 			for _, k := range keys {
-				walk(k, x[k], depth+1)
+				label := k
+				if protocol == "netflow-v9" && k == "Value" {
+					if name, ok := x["Field Name"].(string); ok && name != "" {
+						label = safeText(name)
+						if wireRanges != nil {
+							wireRanges[label] = wireRanges[k]
+						}
+					}
+				}
+				walk(label, x[k], depth+1)
 			}
 		case []map[string]any:
 			for i, r := range x {
@@ -278,7 +308,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || protocol == "netflow-v9") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -468,6 +498,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	}
 	if len(events) == 0 {
 		out = append(out, field{text: "No retained protocol events; detail unavailable for this retention window."})
+	}
+	if fieldViewLimited {
+		out = append([]field{{text: "Field view limited · retained protocol detail exceeds this view's node/depth budget"}}, out...)
 	}
 	return out, sources
 }

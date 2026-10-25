@@ -340,7 +340,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "SNMPv3", Family: "mgmt", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "Syslog", Family: "mgmt", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "NetFlow v5", Family: "mgmt", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
-	{Name: "NetFlow v9", Family: "mgmt", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
+	{Name: "NetFlow v9", Family: "mgmt", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "Shared bounded template/record codec and native directed UDP observer, explicit sequence/lease/schema provenance and unknown contexts; reported flows are not captured sessions, authentication or absolute flow times"},
 	{Name: "IPFIX", Family: "mgmt", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "sFlow", Family: "mgmt", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "ICMP Timestamp", Family: "mgmt", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
