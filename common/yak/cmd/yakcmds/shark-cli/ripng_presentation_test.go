@@ -28,7 +28,17 @@ func TestRIPngProgressiveDetailsKeepMessageLocalByteRanges(t *testing.T) {
 	require.Equal(t, []string{"Ethernet", "IPv6", "UDP", "RIPng"}, r.ProtocolStack)
 	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	seen := map[string]bool{}
-	for _, f := range fs {
+	firstType, firstPrefix, firstAdvisory := -1, -1, -1
+	for i, f := range fs {
+		if strings.HasPrefix(f.text, "Entry Type:") && firstType < 0 {
+			firstType = i
+		}
+		if strings.HasPrefix(f.text, "IPv6 Prefix:") && firstPrefix < 0 {
+			firstPrefix = i
+		}
+		if strings.HasPrefix(f.text, "Effective Next Hop Advisory:") && firstAdvisory < 0 {
+			firstAdvisory = i
+		}
 		require.NotContains(t, f.text, "Wire Field Ranges")
 		for name, value := range map[string][]byte{"IPv6 Prefix: fe80::9": net.ParseIP("fe80::9").To16(), "IPv6 Prefix: 2001:db8::": net.ParseIP("2001:db8::").To16(), "Route Tag: 7": {0, 7}, "Metric: 255": {255}} {
 			if strings.HasPrefix(f.text, name) {
@@ -42,4 +52,6 @@ func TestRIPngProgressiveDetailsKeepMessageLocalByteRanges(t *testing.T) {
 		}
 	}
 	require.Len(t, seen, 4)
+	require.Greater(t, firstPrefix, firstType)
+	require.Greater(t, firstAdvisory, firstPrefix)
 }
