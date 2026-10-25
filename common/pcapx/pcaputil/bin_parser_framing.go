@@ -563,12 +563,23 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	e := &BinParserEvent{Timestamp: ci.Timestamp, Transport: "udp", Source: net.JoinHostPort(src.String(), strconv.Itoa(int(udp.SrcPort))), Destination: net.JoinHostPort(dst.String(), strconv.Itoa(int(udp.DstPort))), Length: len(wire), Status: "unrecognized", Summary: "unrecognized UDP datagram"}
 	evidence := evidenceFrom(ci)
 	e.Domain = evidence.Ref.Domain
+	e.CarrierLayers = append([]string(nil), evidence.carrierLayers...)
+	e.SourceBytes.ParentPDUs = append([]uint64(nil), evidence.parents...)
+	if len(evidence.parents) > 0 {
+		e.SourceBytes.ParentPDU = evidence.parents[len(evidence.parents)-1]
+	}
 	if evidence.Ref.Number != 0 {
 		e.SourceBytes.PacketRefs = []PacketReference{evidence.Ref}
 		if len(evidence.refs) > 0 {
 			e.SourceBytes.Kind = "reassembled"
 			e.SourceBytes.PacketRefs = append([]PacketReference(nil), evidence.refs...)
 		}
+	}
+	if evidence.byteSourceKind != "" {
+		e.SourceBytes.Kind = evidence.byteSourceKind
+	}
+	if a.l2tp3RawDatagram(e, wire, truncated || ci.CaptureLength < ci.Length, udp.Length) {
+		return
 	}
 	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
 		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {

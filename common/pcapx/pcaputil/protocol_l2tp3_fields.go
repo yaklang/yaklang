@@ -21,6 +21,8 @@ func l2tp3DisplayBindings() []displayFieldBinding {
 		{"avp.assigned_control_conn_id", "Assigned Control Connection ID", 32, true}, {"avp.local_session_id", "Local Session ID", 32, true}, {"avp.remote_session_id", "Remote Session ID", 32, true},
 		{"avp.pseudowire_type", "Pseudowire Type", 16, true}, {"avp.layer2_specific_sublayer", "Sublayer Type", 16, true}, {"avp.data_sequencing", "Data Sequencing", 16, true},
 		{"avp.physical_channel", "Physical Channel ID", 32, true}, {"avp.call_serial_number", "Serial Number", 32, true},
+		{"avp.framing_capabilities", "Framing Capabilities", 32, true}, {"avp.bearer_capabilities", "Bearer Capabilities", 32, true}, {"avp.framing_type", "Framing Type", 32, true},
+		{"avp.bearer_type", "Bearer Type", 32, true}, {"avp.send_accm", "Send ACCM", 32, true}, {"avp.receive_accm", "Receive ACCM", 32, true},
 		{"l2_spec_sequence", "Sequence Number", 24, false},
 	} {
 		f := f
@@ -101,6 +103,27 @@ func l2tp3DisplayBindings() []displayFieldBinding {
 			b.rangeKey = f.key
 		}
 		out = append(out, b)
+	}
+	for _, f := range []struct {
+		name, key string
+		mask      uint64
+	}{
+		{"async_framing_supported", "Framing Capabilities", 2}, {"sync_framing_supported", "Framing Capabilities", 1},
+		{"analog_access_supported", "Bearer Capabilities", 2}, {"digital_access_supported", "Bearer Capabilities", 1},
+		{"analog_bearer_type", "Bearer Type", 2}, {"digital_bearer_type", "Bearer Type", 1},
+		{"async_framing_type", "Framing Type", 2}, {"sync_framing_type", "Framing Type", 1},
+	} {
+		f := f
+		out = append(out, displayCustom("l2tp", "l2tp.avp."+f.name, f.name, DisplayBoolean, 0, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if routingNumber(e.Session, "Version") != 3 {
+				return
+			}
+			for _, m := range pimFieldRows(e.Session) {
+				if _, ok := m[f.key]; ok {
+					emit(routingNumber(m, f.key)&f.mask != 0)
+				}
+			}
+		}))
 	}
 	return out
 }

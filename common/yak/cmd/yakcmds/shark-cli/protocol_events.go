@@ -332,7 +332,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 			delete(values, "Opaque Session Payload")
 			delete(values, "Ethernet Bytes")
-			for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Opaque Payload Bytes", "Payload Decoded", "AVPs", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
+			for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Control Setup Complete", "Session Setup Complete", "Observed Control Connection", "Observed Session", "Receiver Proposal Side", "Cookie Length", "Cookie", "Sublayer Type", "Data Sequencing", "Sequence Present", "Sequence Number", "Sequence Observation", "Unobserved Sequence Count", "Payload Decoded", "Payload Admission", "Opaque Payload Bytes", "Association Diagnostic", "Conformance Warning", "AVPs", "Control Context Proof", "Context Proof", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
 				if v, ok := values[key]; ok {
 					walk(key, v, 0)
 					delete(values, key)
