@@ -330,34 +330,52 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 
 // Source ranges distinguish anonymous functions without using their allocation
 // counters. Names order synthetic/range-less declarations; IDs are never keys.
-func sortLazyFunctionStack(functions []*Function) {
-	key := func(f *Function) (path string, start, end int, name string) {
-		if f == nil {
-			return
-		}
-		name = f.GetName()
-		if r := f.GetRange(); r != nil {
-			start, end = r.GetStartOffset(), r.GetEndOffset()
-			if editor := r.GetEditor(); editor != nil {
-				path = editor.GetUrl()
-			}
-		}
-		return
+// Keys are computed once: the comparison used to reload every function range.
+type lazyFunctionOrderKey struct {
+	path       string
+	start, end int
+	name       string
+}
+
+func lazyFunctionOrderKeyOf(f *Function) lazyFunctionOrderKey {
+	if f == nil {
+		return lazyFunctionOrderKey{}
 	}
-	sort.SliceStable(functions, func(i, j int) bool {
-		ap, as, ae, an := key(functions[i])
-		bp, bs, be, bn := key(functions[j])
-		if ap != bp {
-			return ap > bp
+	key := lazyFunctionOrderKey{name: f.GetName()}
+	if r := f.GetRange(); r != nil {
+		key.start, key.end = r.GetStartOffset(), r.GetEndOffset()
+		if editor := r.GetEditor(); editor != nil {
+			key.path = editor.GetUrl()
 		}
-		if as != bs {
-			return as > bs
+	}
+	return key
+}
+
+func sortLazyFunctionStack(functions []*Function) {
+	ordered := make([]struct {
+		function *Function
+		key      lazyFunctionOrderKey
+	}, len(functions))
+	for i, function := range functions {
+		ordered[i].function = function
+		ordered[i].key = lazyFunctionOrderKeyOf(function)
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		a, b := ordered[i].key, ordered[j].key
+		if a.path != b.path {
+			return a.path > b.path
 		}
-		if ae != be {
-			return ae > be
+		if a.start != b.start {
+			return a.start > b.start
 		}
-		return an > bn
+		if a.end != b.end {
+			return a.end > b.end
+		}
+		return a.name > b.name
 	})
+	for i := range ordered {
+		functions[i] = ordered[i].function
+	}
 }
 
 func lazyMethodNames(methods map[string]*Function) []string {
