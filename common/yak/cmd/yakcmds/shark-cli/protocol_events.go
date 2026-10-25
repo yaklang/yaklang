@@ -27,7 +27,7 @@ var ripngEntryPriority = map[string]int{
 
 var isisEntryPriority = map[string]int{
 	"TLV Name": 0, "Type": 1, "Length": 2, "Area Addresses": 3, "Protocols Supported": 3, "Interface Addresses": 3,
-	"IS Neighbors": 3, "Neighbors": 3, "LSP Entries": 3, "Reachability Entries": 3, "Hostname": 3, "Adjacency State Name": 3,
+	"IS Neighbors": 3, "ES Neighbor Count": 3, "Shared Metrics": 4, "Neighbors": 5, "LSP Entries": 3, "Reachability Entries": 3, "Hostname": 3, "Adjacency State Name": 3,
 	"Neighbor Node ID": 4, "System ID": 4, "SNPA": 4, "Address": 4, "LSP ID": 4, "Prefix Address": 4, "Prefix Length": 5,
 	"Canonical Prefix": 6, "Metric": 7, "Sequence Number": 7, "Remaining Lifetime Seconds": 8,
 	"Reported Checksum": 9, "Sub-TLVs": 20, "Unselected Extensions": 800, "Conformance Warning": 801,

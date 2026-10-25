@@ -194,6 +194,41 @@ func TestISISTypedAreaEnvelopeAndReservedBitValues(t *testing.T) {
 	}
 }
 
+func TestISISESSharedMetricBlockAndEmptyListAreComplete(t *testing.T) {
+	for _, ids := range [][]byte{nil, {1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1}} {
+		w := isisNativeWire(t, "831b010012010000001b04b0010001000100000000000001000001")
+		w = append(w, 3, byte(4+len(ids)), 1, 0x82, 0x83, 0x84)
+		w = append(w, ids...)
+		binary.BigEndian.PutUint16(w[8:], uint16(len(w)))
+		var es []*ProtocolEvent
+		a, err := NewPacketAnalyzer(WithOnProtocolMessage(func(e *ProtocolEvent) {
+			if e.Protocol == "isis" {
+				es = append(es, e)
+			}
+		}))
+		require.NoError(t, err)
+		raw := isisNativeEthernet(w, 0)
+		require.NoError(t, a.Feed(raw, gopacket.CaptureInfo{CaptureLength: len(raw), Length: len(raw)}, layers.LinkTypeEthernet))
+		require.NoError(t, a.Close())
+		require.Len(t, es, 1)
+		require.Equal(t, "decoded", es[0].Status)
+		snap := es[0].DisplayFieldValues()
+		values := snap.FieldMap()
+		require.False(t, snap.Incomplete)
+		require.Equal(t, []any{uint64(1)}, values["isis.lsp.eis_neighbors.default_metric"], "one physical metric block, independent of ID count")
+		require.Equal(t, []any{uint64(len(ids) / 6)}, values["isis.lsp.es_neighbor_count"])
+		require.Len(t, values["isis.lsp.eis_neighbors.es_neighbor_id"], len(ids)/6)
+		for _, f := range snap.Values {
+			if f.Name == "isis.lsp.eis_neighbors.delay_metric" {
+				require.Equal(t, &DisplayFieldRange{Offset: 30, Length: 1}, f.Range)
+			}
+			if f.Name == "isis.lsp.es_neighbor_count" {
+				require.Nil(t, f.Range)
+			}
+		}
+	}
+}
+
 func TestLinkStateNativeAdmissionDoesNotFishInsideUnprovedPseudowires(t *testing.T) {
 	isis := isisNativeWire(t, "831401001101000003010001000100001e001401")
 	stp := isisNativeWire(t, "000002023c800102000000000100000013900102000000000280030080140002000f0000")
