@@ -688,7 +688,8 @@ type binParser struct {
 	rdpUDP                                                                     *rdpUDPStore
 	eapTLS                                                                     *eapTLSStore
 	udpSessions                                                                *binUDPStore
-	netflowV9                                                                  *netflowV9Store // udpMu; directed exporter/domain template observations
+	netflowV9Mu                                                                sync.Mutex
+	netflowV9                                                                  *netflowV9Store // netflowV9Mu; independent pre-dispatch receiver observations
 	tftpUntrackedRefusal                                                       bool            // udpMu; unknown refused client/server identity
 	sipUntrackedRefusal                                                        bool            // udpMu; uncertainty for identities that could not be retained
 	stunUntrackedRefusal                                                       bool            // constant-size quarantine when an admitted UDP key cannot be retained
