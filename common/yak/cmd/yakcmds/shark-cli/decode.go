@@ -30,6 +30,7 @@ type packetSummary struct {
 	MessageDomain        *pcaputil.CaptureDomain `json:"message_domain,omitempty"`
 	CaptureDomain        pcaputil.CaptureDomain  `json:"capture_domain"`
 	PDUs                 []map[string]any        `json:"pdus,omitempty"`
+	PDUObservationScope  string                  `json:"pdu_scope,omitempty"`
 	ProtocolStack        []string                `json:"protocol_stack,omitempty"`
 	ConnectionProtocol   string                  `json:"connection_protocol,omitempty"`
 	ConnectionStack      []string                `json:"connection_stack,omitempty"`

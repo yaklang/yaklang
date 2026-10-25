@@ -93,13 +93,18 @@ func (a *binParser) observeSTP(p gopacket.Packet, evidence captureEvidence) bool
 			a.limited.Add(uint64(wireLength))
 		}
 		if err != nil {
-			e.Completeness = e.Status
+			// A rejected body did not produce an exhaustive field tree. A
+			// negative field predicate cannot turn that refusal into absence.
+			e.Completeness = "limited"
 		} else {
 			if fields["Unselected Extensions"] == true {
 				e.Completeness = "limited"
 			}
 			e.Admission += "-and-complete-BPDU-grammar"
 			e.Summary = fmt.Sprintf("%s %s", fields["Protocol Name"], fields["Packet Name"])
+			if fields["Conformance Warning"] != nil {
+				e.Summary += fmt.Sprintf(" · wire version=%v · compatibility layout", fields["Version"])
+			}
 			if root, ok := fields["Root MAC"]; ok {
 				e.Summary += fmt.Sprintf(" · advertised root %v/%v/%v · cost=%v port=0x%04x", fields["Root Priority"], fields["Root System ID Extension"], root, fields["Root Path Cost"], routingNumber(fields, "Port ID"))
 			}

@@ -341,7 +341,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 		}
 		if e.Protocol == "stp" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
+			for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
 				if v, ok := values[key]; ok {
 					walk(key, v, 0)
 					delete(values, key)

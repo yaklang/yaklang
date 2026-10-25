@@ -32,28 +32,58 @@ func (f *DisplayFilter) MatchEvents(events []*ProtocolEvent) bool {
 }
 
 func (f *DisplayFilter) EvaluateEvents(events []*ProtocolEvent) DisplayFilterResult {
+	return f.evaluateSnapshots(len(events), func(i int) DisplayFieldSnapshot {
+		e := events[i]
+		if e != nil && (e.Completeness == "evicted" || e.Completeness == "limited") {
+			return DisplayFieldSnapshot{Completeness: e.Completeness}
+		}
+		if e != nil && e.nativeFieldsIncomplete {
+			return DisplayFieldSnapshot{Incomplete: true, Completeness: e.Completeness}
+		}
+		return e.DisplayFieldValues()
+	})
+}
+
+// EvaluateSnapshots evaluates an owned packet observation without consulting
+// mutable history or reparsing a PDU. Snapshots must belong to the same packet;
+// completeness and projection limits remain part of the filtering contract.
+func (f *DisplayFilter) EvaluateSnapshots(snapshots []DisplayFieldSnapshot) DisplayFilterResult {
+	return f.evaluateSnapshots(len(snapshots), func(i int) DisplayFieldSnapshot { return snapshots[i] })
+}
+
+func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldSnapshot) DisplayFilterResult {
 	if f == nil {
 		return DisplayFilterResult{Matched: true, Complete: true}
 	}
 	m := map[string][]any{}
 	count := 0
-	for _, e := range events {
-		if e != nil && (e.Completeness == "evicted" || e.Completeness == "limited") {
+	for i := 0; i < length; i++ {
+		snapshot := at(i)
+		if snapshot.Completeness == "evicted" || snapshot.Completeness == "limited" {
 			return DisplayFilterResult{Reason: "protocol detail unavailable in retained history"}
 		}
-		snapshot := e.DisplayFieldValues()
 		if snapshot.Truncated {
 			return DisplayFilterResult{Reason: "field projection budget exceeded"}
 		}
 		if snapshot.Incomplete {
-			return DisplayFilterResult{Reason: "field value cannot be represented by its registered type"}
+			return DisplayFilterResult{Reason: "field projection incomplete or value not representable by its registered type"}
 		}
 		for _, v := range snapshot.Values {
 			count++
 			if count > maxDisplayFieldValues {
 				return DisplayFilterResult{Reason: "packet field union budget exceeded"}
 			}
-			m[v.Name] = append(m[v.Name], v.Value)
+			value := v.Value
+			if v.ExactValue != "" {
+				if d, ok := LookupDisplayField(v.Name); ok && d.Type == DisplayUnsigned && d.Bits > 53 {
+					n, err := strconv.ParseUint(v.ExactValue, 10, d.Bits)
+					if err != nil {
+						return DisplayFilterResult{Reason: "invalid exact unsigned field value"}
+					}
+					value = n
+				}
+			}
+			m[v.Name] = append(m[v.Name], value)
 		}
 	}
 	return DisplayFilterResult{Matched: f.match(m), Complete: true}

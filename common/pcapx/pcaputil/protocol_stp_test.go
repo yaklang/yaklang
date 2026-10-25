@@ -110,6 +110,12 @@ func TestSTPNativeCarrierFieldsAndNoAdvertisementInheritance(t *testing.T) {
 				require.True(t, decode(stpNativeFrame(wire[:5], pvst, vlan), false))
 				require.Equal(t, "malformed", events[2].Status)
 				require.Empty(t, events[2].Session)
+				negative, err := CompileDisplayFilter("not stp.root.hw")
+				require.NoError(t, err)
+				require.False(t, negative.EvaluateEvents([]*ProtocolEvent{events[2]}).Complete)
+				events[2].Completeness = "message"
+				events[2].Status = "decoded"
+				require.False(t, negative.EvaluateEvents([]*ProtocolEvent{events[2]}).Complete, "public edits cannot turn a private field refusal into absence")
 				require.True(t, decode(stpNativeFrame(wire, pvst, vlan), true))
 				require.Equal(t, "incomplete", events[3].Status)
 				require.Empty(t, events[3].Session)
