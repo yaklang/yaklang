@@ -45,6 +45,12 @@ var netflowV9EntryPriority = map[string]int{
 	"Opaque Data": 900, "Padding Bytes": 901, "Observation Scope": 950, "Template Lease Policy": 951,
 }
 
+// Detail snapshots include owned public and private parser evidence, unlike
+// the compact scalar observations used by streaming JSON. Keep a separate
+// bounded allowance for the selected packet's native protocol tree. Rendering
+// still enforces its 4096-node/32-depth limit and reports omitted content.
+const packetDetailSnapshotBytes = 4 << 20
+
 func fieldPriority(name string) int {
 	if rank, ok := semanticFieldPriority[name]; ok {
 		return rank
@@ -564,7 +570,7 @@ func (p *capturedPacket) protocolEventSnapshot(known []uint64) ([]*pcaputil.Prot
 		return p.events, nil
 	}
 	var events []*pcaputil.ProtocolEvent
-	remaining := 256 << 10
+	remaining := packetDetailSnapshotBytes
 	current, complete := p.history.PacketEventWindow(p.reference, p.physicalRecord)
 	var ids []uint64
 	for _, source := range [][]uint64{p.eventIDs, known, current} {

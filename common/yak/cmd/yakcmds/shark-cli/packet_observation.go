@@ -22,13 +22,16 @@ func (p *capturedPacket) recordObservedPDU(e *pcaputil.ProtocolEvent) {
 		p.observedFields = append(p.observedFields, snapshot)
 		p.observedPDUs = append(p.observedPDUs, map[string]any{"id": uint64(0), "protocol": "message", "status": "limited", "completeness": "limited", "summary": "Packet observation field snapshot budget exceeded", "field_values": snapshot})
 	}
-	if len(p.observedPDUs) >= 128 || e.RetainedBytes() > p.observedFieldBudget {
+	if len(p.observedPDUs) >= 128 {
 		limited()
 		return
 	}
 	values := e.DisplayFieldValues()
 	row := map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": values.Source, "fields": values.FieldMap(), "field_values": values}
 	wire, err := json.Marshal(row)
+	// This queue retains scalar occurrences, not Raw or the parser's private
+	// evidence trees. Charge what is actually frozen here; a normal exporter
+	// batch can have large private trees and still fit this bounded projection.
 	if err != nil || len(wire) > p.observedFieldBudget {
 		limited()
 		return
