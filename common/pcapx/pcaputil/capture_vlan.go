@@ -37,7 +37,46 @@ func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
 	if next == layers.LayerTypeDot1Q || next == layers.EthernetTypeDot1Q || next == layers.EthernetTypeQinQ {
 		next = captureVLANDecoder{}
 	}
+	if next == layers.LayerTypeLLC || next == layers.EthernetTypeLLC {
+		next = captureLLCDecoder{}
+	}
+	if next == layers.LayerTypeSNAP {
+		next = captureSNAPDecoder{}
+	}
 	return b.PacketBuilder.NextDecoder(captureCarrierDecoder{next})
+}
+
+type captureLLCDecoder struct{}
+
+func (captureLLCDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
+	l := &layers.LLC{}
+	if err := l.DecodeFromBytes(data, b); err != nil {
+		return err
+	}
+	b.AddLayer(l)
+	// Generic decoders select STP from a masked DSAP alone. Keep it raw until
+	// native admission checks both SAPs, UI control and the complete BPDU.
+	if data[0]&0xfe == 0x42 {
+		return b.NextDecoder(gopacket.LayerTypePayload)
+	}
+	if data[0]&0xfe == 0xaa && (data[0] != 0xaa || data[1] != 0xaa || data[2] != 3) {
+		return b.NextDecoder(gopacket.LayerTypePayload)
+	}
+	return b.NextDecoder(l.NextLayerType())
+}
+
+type captureSNAPDecoder struct{}
+
+func (captureSNAPDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
+	s := &layers.SNAP{}
+	if err := s.DecodeFromBytes(data, b); err != nil {
+		return err
+	}
+	b.AddLayer(s)
+	if data[0] == 0 && data[1] == 0 && data[2] == 12 && data[3] == 1 && data[4] == 11 {
+		return b.NextDecoder(gopacket.LayerTypePayload)
+	}
+	return b.NextDecoder(s.NextLayerType())
 }
 func (captureVLANDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
 	v := &layers.Dot1Q{}

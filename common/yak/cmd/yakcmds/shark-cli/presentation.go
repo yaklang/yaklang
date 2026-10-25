@@ -127,6 +127,11 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "stp" {
+		if name, ok := eventValues(e)["Protocol Name"].(string); ok && (name == "STP" || name == "RSTP" || name == "MSTP" || name == "PVST+" || name == "RPVST+") {
+			return name
+		}
+	}
 	if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 		return "L2TPv3"
 	}
