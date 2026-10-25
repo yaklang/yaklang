@@ -1003,3 +1003,78 @@ ICRP 未带 AVP69，接收方默认 sublayer0；线上包却在看似 Ethernet �
 本实现保留接收方声明，不复制反方向 sublayer1 或试探跳过四字节。12 条数据消息的
 接收方参数已验证，不等于 12 条内部 IPv6 字段都已一致；当前仅 6 条具有该内层结果。
 这项互通/诊断边界仍保留，需要独立检查并改善说明，不能通过猜测布局消除差额。
+
+
+## 2026-10-26 后续：STP 家族、严格载体与可复现导出
+
+本轮为 IEEE STP/RSTP/标准 MSTP 和 Cisco PVST+/RPVST+ 接通共享的 bounded wire
+codec、bin-parser 规范入口、原生入口、类型字段和递进页面。以原始 802.3 长度限制
+BPDU，分别核对 LLC SAP/UI 或 Cisco SNAP OUI/PID，排除 padding。修复快路径 VLAN
+长度头没有 LLC layer 时漏掉 2,037 个消息的问题；不再依赖底层是否恰好生成该 layer。
+单播/组播 MAC、端口提示和上一条通告都不能替代完整载体与消息检查。
+
+共同字段包含完整 root/bridge/port、flags 和精确 1/256 秒计时；保留原始 ticks，秒的
+类型导出为精确十进制字符串。标准 MST 明确解析配置名、revision、未验证 digest、
+CIST 和全部有界 MSTI；Cisco 通告解析 originating-VLAN TLV，冲突 VLAN、缺字段和
+不完整集合不被接受。未知有界 TLV 可以保留，但字段投影显式不完整。所有这些都是
+独立 BPDU 通告，没有虚构 TCP/UDP 会话、实际选举结果、安装端口状态或对端认证。
+丢失一条通告不影响后续完整通告，TCN 不继承之前的 root/flags/MSTI。
+
+特别修正了一次过严判断：冻结样本 `pr5023-gen-rstp` 的 Version2/Type0/35 字节
+不能被标为 RSTP，但也不能仅因版本不匹配就一律说非法。
+[Open vSwitch 接收实现](https://github.com/openvswitch/ovs/blob/main/lib/rstp-state-machines.c)
+的 validate_received_bpdu 按配置/TCN 的 type 和长度选择布局；
+[Wireshark4.6.9 BPDU 实现](https://github.com/wireshark/wireshark/blob/v4.6.9/epan/dissectors/packet-bpdu.c)
+也保留这种 STP 配置显示。当前保留 literal Version2，以 Type0 展示 **STP Configuration**
+并给出 compatibility warning，不产生 rapid/multiple 字段。冻结捕获和历史基线均未改写，
+另有 SHA 固定的回归证明原样本与独立 Type2/36 字节控制的区别。
+
+### 原始逐包比较
+
+| 原始捕获 | 原始 STP 视图 | 原生完整匹配 | 所选 wire/字段检查 | 所选差异/漏入 |
+| --- | ---: | ---: | ---: | ---: |
+| Weber 全部 51,328 帧 | 2,612 | 2,612：RPVST+ 2,205、RSTP 407 | 77,139 | 0 / 0 |
+| Sharon 全部 328,127 帧 | 3,079 | 2,612：RPVST+ 2,205、RSTP 407 | 77,139 | 0 / 0 |
+| Wireshark Wiki 真实 stp.pcap | 96 | 96 STP | 2,016 | 0 / 0 |
+
+两大捕获共享部分原始通告，不能把相同内容说成独立流量多样性。Sharon 额外 **467**
+个原始参考子视图仍保留：GRE/PPP 406、EtherIP 24、UDP/MPLS 22、IP/Ethernet 8、
+UDP/MSRCP 5、Remote WLAN 2。它们没有在原始帧对应偏移处提供本轮选择的完整 Ethernet
+长度/LLC/SNAP 载体；部分偏移来自重建数据源。不能直接用这些偏移扫描物理帧来补标签，
+也没有把这些子树全部判成合法或非法 BPDU。相关载体和 fuzz 边界仍需后续处理。
+
+17 组明确声明的离线控制共 **32** 物理帧、**72** 项直接验收和 **742** 项所选 wire/
+字段检查：真实字节、重复/乱序通告、缺通告、snaplen 后完整修复、短 body、TCN 不继承、
+错误 SSAP/OUI、未知 Type2 版本、Type0 兼容布局、缺/冲突/未知 VLAN TLV，以及独立构造的
+一/二 MSTI 和损坏后修复。未发现所选差异。尚未找到真实正向标准 MST 捕获；MST 正向控制
+明确为 authored，不能说真实 MST 已充分验证。legacy MST 编码和 SPTv4 仍未选择。
+
+### 稳定性和 Windows
+
+实际重复导出发现并修复三处时序差异：IP 分片超时/关闭诊断按完整 key 排序；TCP
+关闭时对相同 endpoint hash 的不同捕获域增加 capture-local Index 平局规则；流式 CLI
+的字段在物理包发布时冻结有界快照，增加 `pdu_scope=observed_at_packet`。后续重组带来的
+旧贡献帧注解仍通过 SDK/TUI 历史查询提供，流式行不再因消费者速度和详情回收而改变。
+每包 256 KiB/128 PDU、64 包输出队列以及显式 limit marker 限制快照；不完整投影、未知
+扩展和回收不能令负字段过滤误判为“字段不存在”。unsigned64 的序列化快照保留 exact_value。
+
+最终源码 **7d9fdba8c1** 再跑两份完整捕获，CLI/SDK 分别重复导出均 **逐字节一致**，
+SDK 额外重跑也与完整逐包检查的原始导出相同。通用字段检查/缺失、端点、原始 **90/35**
+字段集合差异、TCP 流 **824/840**、预览 **808/735** 和双向分区指标与上一批保持一致。
+没有把快照口径变化或新协议标签当成旧差异归零。
+
+完整 bin-parser/子包通过（主包136.388s），pcaputil532.940s（aff88c1833）；新增最终
+TCP 平局排序及快照/片段定向回归0.457s、最终 CLI 全套3.868s。STP codec 定向 fuzz
+**40,439** 次/47.067s 通过；该 codec 在最终排序提交中没有变化。不是当前 PR head 的
+远程 CI 通过声明。
+
+最终 Windows CP936 实际回放主文件，严格核对 EOF、51,328 包全部入窗口、实际查询、
+选中行的 RPVST+ 与对应帧字段标题；字段/字节源、缩放、恢复和退出通过。路径为
+`Ethernet › Dot1Q › LLC › SNAP › RPVST+`。另在最终版本实际验证 Version2/Type0 的 STP
+兼容页。字段历史有界：VLAN121 的 SDK 总匹配为169，页面有证据可查的80条，底部明确
+提示 partial；物理包保留数不等于完整字段历史。没有把80说成全部匹配，也没有默默提高
+内存上限掩盖回收。截图及所有捕获/原始导出仅在本地临时目录。
+
+[本轮聚合证据](shark-public-corpus-20261025/stp-wire-summary.json) 保存二进制/原始审计
+哈希、逐协议计数、字段检查、重复稳定性和剩余载体边界。整体协议/字段验收仍未完成，
+目录保持 partial，PR 继续 draft。

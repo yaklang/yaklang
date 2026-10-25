@@ -1,0 +1,1311 @@
+{
+  "source_commit": "7d9fdba8c1",
+  "scope": "Bounded physical IEEE/Cisco BPDU advertisements; original two-pass Wireshark4.6.9 fields and raw spans, no Decode-As or removed packets. Whole CLI fields are now packet-publication snapshots; SDK retains contributor-based complete observations. No topology, installed port state, digest verification or peer authentication claim.",
+  "binaries": {
+    "yak-7d9fdba8.exe": "28ed0499b4448a6dbad1454056231ceddc2c4d8122a3e750e5c854971d7ee335",
+    "events-7d9fdba8.exe": "85758a86ee2e75810d3003a07cb52f3094bd5edde0f01341b322849a4e67392f"
+  },
+  "corpora": {
+    "weber": {
+      "whole": {
+        "frames": 51328,
+        "manifest": {
+          "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+          "capture_bytes": 15602892,
+          "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+          "fields": [
+            "frame.number",
+            "frame.interface_id",
+            "frame.encap_type",
+            "frame.len",
+            "frame.cap_len",
+            "frame.protocols",
+            "_ws.col.Protocol",
+            "_ws.col.Info",
+            "ip.src",
+            "ip.dst",
+            "ipv6.src",
+            "ipv6.dst",
+            "tcp.srcport",
+            "tcp.dstport",
+            "udp.srcport",
+            "udp.dstport",
+            "tcp.stream",
+            "udp.stream",
+            "tcp.seq_raw",
+            "tcp.ack_raw",
+            "tcp.len",
+            "tcp.flags",
+            "tls.record.content_type",
+            "quic.dcid",
+            "quic.scid",
+            "quic.packet_number",
+            "_ws.expert.message",
+            "dns.id",
+            "dns.qry.name",
+            "dns.qry.type",
+            "tls.record.version",
+            "tls.record.length",
+            "tls.handshake.extensions_server_name",
+            "tls.handshake.ciphersuite",
+            "http.request.method",
+            "http.response.code",
+            "http2.streamid",
+            "ssh.protocol",
+            "ssh.message_code",
+            "isakmp.version",
+            "isakmp.exchangetype",
+            "isakmp.flags",
+            "isakmp.messageid",
+            "isakmp.length",
+            "rip.command",
+            "rip.version",
+            "rip.metric",
+            "nbss.type",
+            "nbss.length",
+            "l2tp.flags",
+            "l2tp.length",
+            "rpc.xid",
+            "rpc.msgtyp",
+            "rpc.program",
+            "rpc.procedure",
+            "rdpudp.flags",
+            "rdpudp.synex.version",
+            "rdpudp.data.seqnum",
+            "rdpudp.data.channelseqnumber",
+            "rdpudp.data.sourceStart"
+          ],
+          "two_pass": true,
+          "out_of_order_reassembly": true,
+          "keylog_sha256": "221a1806bd307e3d80d71419ffab5d30934b44afa4fd98e21f5c54e2f9b14975"
+        },
+        "field_mismatch_count": 90,
+        "field_frames_checked": {
+          "l2tp.flags": 40,
+          "l2tp.length": 40,
+          "http.request.method": 74,
+          "http.response.code": 60,
+          "dns.id": 3786,
+          "dns.qry.name": 3584,
+          "dns.qry.type": 3584,
+          "tls.record.version": 2189,
+          "tls.record.length": 2189,
+          "tls.handshake.ciphersuite": 90,
+          "rip.command": 68,
+          "rip.version": 68,
+          "rip.metric": 68,
+          "ssh.protocol": 7,
+          "isakmp.version": 719,
+          "isakmp.exchangetype": 719,
+          "isakmp.flags": 719,
+          "isakmp.messageid": 719,
+          "isakmp.length": 719,
+          "tls.handshake.extensions_server_name": 88,
+          "ssh.message_code": 15,
+          "rdpudp.flags": 2380,
+          "rdpudp.synex.version": 2,
+          "rdpudp.data.seqnum": 2045,
+          "rdpudp.data.channelseqnumber": 1550
+        },
+        "field_frames_missing": {
+          "tls.handshake.ciphersuite": 116,
+          "ssh.protocol": 1,
+          "ssh.message_code": 8,
+          "http.request.method": 115,
+          "http.response.code": 22,
+          "dns.id": 21,
+          "dns.qry.name": 21,
+          "dns.qry.type": 21,
+          "nbss.type": 281,
+          "nbss.length": 281,
+          "tls.record.version": 1,
+          "tls.record.length": 1,
+          "tls.handshake.extensions_server_name": 6
+        },
+        "native_tcp_flow_count": 824,
+        "native_tcp_preview_count": 808,
+        "packet_metadata_mismatches": {
+          "source": 13,
+          "destination": 13
+        },
+        "endpoint_frames_checked": {
+          "source": 44786,
+          "destination": 44786
+        },
+        "scoped_session_partitions": {
+          "tcp": {
+            "oracle_stream_domain_pairs": 824,
+            "missing_or_split_within_domain": 0
+          },
+          "udp": {
+            "oracle_stream_domain_pairs": 3367,
+            "missing_or_split_within_domain": 0
+          }
+        },
+        "bidirectional_session_checks": {
+          "tcp": {
+            "native_partitions_merging_oracle_streams": 0,
+            "merge_examples": [],
+            "payload_stream_domain_pairs": 722,
+            "payload_pairs_missing_or_split": 0
+          },
+          "udp": {
+            "native_partitions_merging_oracle_streams": 0,
+            "merge_examples": [],
+            "payload_stream_domain_pairs": 3367,
+            "payload_pairs_missing_or_split": 0
+          }
+        }
+      },
+      "stp": {
+        "oracle_sha256": "874cb3010f930b207e0c1140123d8ae09a720753604cec8c39f388fe3e93d547",
+        "events_sha256": "b4eb564de7b4112b4b5d5f32d0c37afe0acfe3417b24c6d763c04c31cbb680f5",
+        "reference_frames": 2612,
+        "reference_views": 2612,
+        "native_events": 2612,
+        "native_status": {
+          "decoded": 2612
+        },
+        "native_variant_names": {
+          "RPVST+": 2205,
+          "RSTP": 407
+        },
+        "matched_decoded_views": 2612,
+        "checks": {
+          "wire_bytes_and_physical_contributor": 2612,
+          "no_inferred_connection": 2612,
+          "original_oracle_wire_span": 2612,
+          "stp.bridge.ext": 2612,
+          "stp.bridge.hw": 2612,
+          "stp.bridge.prio": 2612,
+          "stp.flags": 2612,
+          "stp.flags.agreement": 2612,
+          "stp.flags.forwarding": 2612,
+          "stp.flags.learning": 2612,
+          "stp.flags.port_role": 2612,
+          "stp.flags.proposal": 2612,
+          "stp.flags.tc": 2612,
+          "stp.flags.tcack": 2612,
+          "stp.forward": 2612,
+          "stp.hello": 2612,
+          "stp.max_age": 2612,
+          "stp.msg_age": 2612,
+          "stp.port": 2612,
+          "stp.protocol": 2612,
+          "stp.pvst.origvlan": 2205,
+          "stp.pvst.tlvlen": 2205,
+          "stp.pvst.tlvtype": 2205,
+          "stp.root.cost": 2612,
+          "stp.root.ext": 2612,
+          "stp.root.hw": 2612,
+          "stp.root.prio": 2612,
+          "stp.type": 2612,
+          "stp.version": 2612,
+          "stp.version_1_length": 2612
+        },
+        "checks_total": 77139,
+        "selected_field_or_wire_differences": [],
+        "missing_selected_carriers": [],
+        "refused_reference_views": [],
+        "additional_native_events": [],
+        "unselected_reference_carriers": {}
+      },
+      "unselected_reference_views": 0,
+      "raw_stp_audit_sha256": "dc4bae9a5d17be258bb8b6419109ac7ca9a69fdf1a898d831157d6726465366b",
+      "repeated_exports": {
+        "sdk": [
+          "b4eb564de7b4112b4b5d5f32d0c37afe0acfe3417b24c6d763c04c31cbb680f5",
+          "b4eb564de7b4112b4b5d5f32d0c37afe0acfe3417b24c6d763c04c31cbb680f5"
+        ],
+        "sdk_byte_identical": true,
+        "cli": [
+          "8dcefc99729c48818b6c4d9e03bb51f3aa76ac513cfb44a207381a28f2b7245a",
+          "8dcefc99729c48818b6c4d9e03bb51f3aa76ac513cfb44a207381a28f2b7245a"
+        ],
+        "cli_byte_identical": true,
+        "sdk_whole_audit_same": true
+      },
+      "previous_compared_metrics_unchanged": true
+    },
+    "sharon": {
+      "whole": {
+        "frames": 328127,
+        "manifest": {
+          "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+          "capture_bytes": 86779688,
+          "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+          "fields": [
+            "frame.number",
+            "frame.interface_id",
+            "frame.encap_type",
+            "frame.len",
+            "frame.cap_len",
+            "frame.protocols",
+            "_ws.col.Protocol",
+            "_ws.col.Info",
+            "ip.src",
+            "ip.dst",
+            "ipv6.src",
+            "ipv6.dst",
+            "tcp.srcport",
+            "tcp.dstport",
+            "udp.srcport",
+            "udp.dstport",
+            "tcp.stream",
+            "udp.stream",
+            "tcp.seq_raw",
+            "tcp.ack_raw",
+            "tcp.len",
+            "tcp.flags",
+            "tls.record.content_type",
+            "quic.dcid",
+            "quic.scid",
+            "quic.packet_number",
+            "_ws.expert.message",
+            "dns.id",
+            "dns.qry.name",
+            "dns.qry.type",
+            "tls.record.version",
+            "tls.record.length",
+            "tls.handshake.extensions_server_name",
+            "tls.handshake.ciphersuite",
+            "http.request.method",
+            "http.response.code",
+            "http2.streamid",
+            "ssh.protocol",
+            "ssh.message_code",
+            "isakmp.version",
+            "isakmp.exchangetype",
+            "isakmp.flags",
+            "isakmp.messageid",
+            "isakmp.length",
+            "rip.command",
+            "rip.version",
+            "rip.metric",
+            "nbss.type",
+            "nbss.length",
+            "l2tp.flags",
+            "l2tp.length",
+            "rpc.xid",
+            "rpc.msgtyp",
+            "rpc.program",
+            "rpc.procedure",
+            "rdpudp.flags",
+            "rdpudp.synex.version",
+            "rdpudp.data.seqnum",
+            "rdpudp.data.channelseqnumber",
+            "rdpudp.data.sourceStart"
+          ],
+          "two_pass": true,
+          "out_of_order_reassembly": true,
+          "keylog_sha256": null
+        },
+        "field_mismatch_count": 35,
+        "field_frames_checked": {
+          "l2tp.flags": 40,
+          "l2tp.length": 40,
+          "http.request.method": 48,
+          "http.response.code": 52,
+          "dns.id": 1680,
+          "dns.qry.name": 1478,
+          "dns.qry.type": 1478,
+          "tls.record.version": 631,
+          "tls.record.length": 631,
+          "tls.handshake.ciphersuite": 33,
+          "rip.command": 68,
+          "rip.version": 68,
+          "rip.metric": 68,
+          "ssh.protocol": 5,
+          "isakmp.version": 274,
+          "isakmp.exchangetype": 274,
+          "isakmp.flags": 274,
+          "isakmp.messageid": 274,
+          "isakmp.length": 274,
+          "tls.handshake.extensions_server_name": 27,
+          "ssh.message_code": 10
+        },
+        "field_frames_missing": {
+          "tls.handshake.ciphersuite": 1209,
+          "ssh.protocol": 1,
+          "ssh.message_code": 8,
+          "http.request.method": 211,
+          "http.response.code": 35,
+          "nbss.type": 448,
+          "nbss.length": 448,
+          "dns.id": 1326,
+          "tls.record.version": 1545,
+          "tls.record.length": 1517,
+          "isakmp.version": 303,
+          "isakmp.flags": 303,
+          "isakmp.messageid": 303,
+          "isakmp.length": 296,
+          "dns.qry.name": 227,
+          "dns.qry.type": 227,
+          "l2tp.flags": 672,
+          "l2tp.length": 665,
+          "rdpudp.flags": 39,
+          "rdpudp.data.sourceStart": 15,
+          "rpc.xid": 39,
+          "rpc.msgtyp": 39,
+          "rpc.program": 39,
+          "rpc.procedure": 39,
+          "isakmp.exchangetype": 176,
+          "http2.streamid": 70,
+          "rip.command": 44,
+          "rip.version": 44,
+          "rip.metric": 30,
+          "rdpudp.synex.version": 4,
+          "rdpudp.data.seqnum": 7,
+          "rdpudp.data.channelseqnumber": 6
+        },
+        "native_tcp_flow_count": 840,
+        "native_tcp_preview_count": 735,
+        "packet_metadata_mismatches": {
+          "source": 46380,
+          "destination": 46309
+        },
+        "endpoint_frames_checked": {
+          "source": 322578,
+          "destination": 322522,
+          "source_oracle_unavailable": 422,
+          "destination_oracle_unavailable": 448
+        },
+        "scoped_session_partitions": {
+          "tcp": {
+            "oracle_stream_domain_pairs": 35105,
+            "missing_or_split_within_domain": 34315
+          },
+          "udp": {
+            "oracle_stream_domain_pairs": 10100,
+            "missing_or_split_within_domain": 13
+          }
+        },
+        "bidirectional_session_checks": {
+          "tcp": {
+            "native_partitions_merging_oracle_streams": 6,
+            "merge_examples": [
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "318",
+                "wireshark_streams": [
+                  "25660",
+                  "6022"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "320",
+                "wireshark_streams": [
+                  "32900",
+                  "6260"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "324",
+                "wireshark_streams": [
+                  "14869",
+                  "20735",
+                  "27168",
+                  "6606"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "461",
+                "wireshark_streams": [
+                  "15945",
+                  "28958"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "508",
+                "wireshark_streams": [
+                  "19025",
+                  "27835",
+                  "31294",
+                  "34465"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "551",
+                "wireshark_streams": [
+                  "21087",
+                  "32512"
+                ]
+              }
+            ],
+            "payload_stream_domain_pairs": 7996,
+            "payload_pairs_missing_or_split": 7213
+          },
+          "udp": {
+            "native_partitions_merging_oracle_streams": 24,
+            "merge_examples": [
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "7df17af45797d452",
+                "wireshark_streams": [
+                  "1383",
+                  "1619",
+                  "7746",
+                  "931"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c3636a8332c0765a",
+                "wireshark_streams": [
+                  "6663",
+                  "941"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "aaa2239b90d4400e",
+                "wireshark_streams": [
+                  "1182",
+                  "1322",
+                  "1368",
+                  "1709",
+                  "1807",
+                  "1846",
+                  "2157",
+                  "2372",
+                  "2480",
+                  "2584",
+                  "3178",
+                  "3211",
+                  "3259",
+                  "3283",
+                  "3289",
+                  "3666",
+                  "3856",
+                  "3906",
+                  "3934",
+                  "3935",
+                  "3966",
+                  "3981",
+                  "4095",
+                  "4153",
+                  "4303",
+                  "4345",
+                  "4394",
+                  "4586",
+                  "4803",
+                  "4959",
+                  "5067",
+                  "5199",
+                  "5230",
+                  "5312",
+                  "5449",
+                  "5573",
+                  "5648",
+                  "5666",
+                  "5764",
+                  "6055",
+                  "6138",
+                  "6162",
+                  "6295",
+                  "6297",
+                  "6322",
+                  "6349",
+                  "6380",
+                  "6405",
+                  "6482",
+                  "6836",
+                  "7066",
+                  "7153",
+                  "7187",
+                  "7291",
+                  "7320",
+                  "7328",
+                  "7455",
+                  "7487",
+                  "7667",
+                  "7769",
+                  "7788",
+                  "7852",
+                  "7890",
+                  "7922",
+                  "8014",
+                  "8148",
+                  "8188",
+                  "8196",
+                  "8198",
+                  "8217",
+                  "8277",
+                  "8303",
+                  "8404",
+                  "8411",
+                  "8437",
+                  "8460",
+                  "8703",
+                  "8717",
+                  "8727",
+                  "8907",
+                  "8943",
+                  "9073",
+                  "9107",
+                  "9214",
+                  "9239",
+                  "9242",
+                  "9354",
+                  "9404",
+                  "942",
+                  "9497",
+                  "9553",
+                  "9568",
+                  "9659",
+                  "9669",
+                  "9719",
+                  "9724",
+                  "9786",
+                  "9794",
+                  "9819",
+                  "993"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "39f9aa50254a3715",
+                "wireshark_streams": [
+                  "1667",
+                  "949"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "cc2c836b7360162e",
+                "wireshark_streams": [
+                  "8582",
+                  "956"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "9b28a4ccad824aac",
+                "wireshark_streams": [
+                  "7914",
+                  "9101",
+                  "962"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "79494495962ce0ef",
+                "wireshark_streams": [
+                  "1003",
+                  "1595",
+                  "7786"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "f79e0c7e3f2651cb",
+                "wireshark_streams": [
+                  "1095",
+                  "6746",
+                  "6892"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c652a9b398e53b26",
+                "wireshark_streams": [
+                  "1143",
+                  "8378"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "1870a1bd81bc15b0",
+                "wireshark_streams": [
+                  "1215",
+                  "4990"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "637755867e4c2c72",
+                "wireshark_streams": [
+                  "1182",
+                  "1335",
+                  "1336",
+                  "5351"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "4829823bbdc3e35b",
+                "wireshark_streams": [
+                  "1694",
+                  "2681",
+                  "8580"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "47d5c031561f8241",
+                "wireshark_streams": [
+                  "1182",
+                  "2333"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "e6ed4ff4cbb60146",
+                "wireshark_streams": [
+                  "2498",
+                  "4271",
+                  "6333"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "a098ff85d5c86872",
+                "wireshark_streams": [
+                  "2582",
+                  "2583"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "64516cf5bf6e4d23",
+                "wireshark_streams": [
+                  "2664",
+                  "7113"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "e6ce9b195d9b67b2",
+                "wireshark_streams": [
+                  "3018",
+                  "7011"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "bc0fc942b621edc1",
+                "wireshark_streams": [
+                  "3050",
+                  "4230",
+                  "5501",
+                  "6440",
+                  "8611",
+                  "9058"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "eabb07c7b3b09954",
+                "wireshark_streams": [
+                  "3296",
+                  "3297",
+                  "9125"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c09333aba9f23593",
+                "wireshark_streams": [
+                  "3343",
+                  "7631"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "1d3d6d7ffa728bb6",
+                "wireshark_streams": [
+                  "3480",
+                  "3481"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "3b5a3fdc1d1013a0",
+                "wireshark_streams": [
+                  "3979",
+                  "5687",
+                  "6471",
+                  "9089",
+                  "9480"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "f2e655f719774b48",
+                "wireshark_streams": [
+                  "5702",
+                  "5703"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "6a5a37c0948feb4d",
+                "wireshark_streams": [
+                  "6634",
+                  "9842"
+                ]
+              }
+            ],
+            "payload_stream_domain_pairs": 10100,
+            "payload_pairs_missing_or_split": 13
+          }
+        }
+      },
+      "stp": {
+        "oracle_sha256": "99ef7ee26f39c9262933b79a368d4c4e28e1035ed524a42b5a347d77880dec10",
+        "events_sha256": "ce55220ae4cafb338c61f9649a3c08fe905a5e8da299ee6fc9ed77616ee7a632",
+        "reference_frames": 2734,
+        "reference_views": 3079,
+        "native_events": 2612,
+        "native_status": {
+          "decoded": 2612
+        },
+        "native_variant_names": {
+          "RPVST+": 2205,
+          "RSTP": 407
+        },
+        "matched_decoded_views": 2612,
+        "checks": {
+          "wire_bytes_and_physical_contributor": 2612,
+          "no_inferred_connection": 2612,
+          "original_oracle_wire_span": 2612,
+          "stp.bridge.ext": 2612,
+          "stp.bridge.hw": 2612,
+          "stp.bridge.prio": 2612,
+          "stp.flags": 2612,
+          "stp.flags.agreement": 2612,
+          "stp.flags.forwarding": 2612,
+          "stp.flags.learning": 2612,
+          "stp.flags.port_role": 2612,
+          "stp.flags.proposal": 2612,
+          "stp.flags.tc": 2612,
+          "stp.flags.tcack": 2612,
+          "stp.forward": 2612,
+          "stp.hello": 2612,
+          "stp.max_age": 2612,
+          "stp.msg_age": 2612,
+          "stp.port": 2612,
+          "stp.protocol": 2612,
+          "stp.pvst.origvlan": 2205,
+          "stp.pvst.tlvlen": 2205,
+          "stp.pvst.tlvtype": 2205,
+          "stp.root.cost": 2612,
+          "stp.root.ext": 2612,
+          "stp.root.hw": 2612,
+          "stp.root.prio": 2612,
+          "stp.type": 2612,
+          "stp.version": 2612,
+          "stp.version_1_length": 2612
+        },
+        "checks_total": 77139,
+        "selected_field_or_wire_differences": [],
+        "missing_selected_carriers": [],
+        "refused_reference_views": [],
+        "additional_native_events": [],
+        "unselected_reference_carriers": {
+          "Remote WLAN reference subtree": 2,
+          "UDP/MPLS pseudowire reference subtree": 22,
+          "UDP/MSRCP reference subtree": 5,
+          "EtherIP reference subtree": 24,
+          "GRE/PPP reference subtree": 406,
+          "Nested IP/Ethernet reference subtree": 8
+        }
+      },
+      "unselected_reference_views": 467,
+      "raw_stp_audit_sha256": "285c37c3ec19081eaea85f3b9d62eaa62038d957c2218b26647d573836bed7fa",
+      "repeated_exports": {
+        "sdk": [
+          "ce55220ae4cafb338c61f9649a3c08fe905a5e8da299ee6fc9ed77616ee7a632",
+          "ce55220ae4cafb338c61f9649a3c08fe905a5e8da299ee6fc9ed77616ee7a632"
+        ],
+        "sdk_byte_identical": true,
+        "cli": [
+          "11b811c01a8953be32093f6c4e9bf07404c4d2052b0ee1d4712dc30ee9446646",
+          "11b811c01a8953be32093f6c4e9bf07404c4d2052b0ee1d4712dc30ee9446646"
+        ],
+        "cli_byte_identical": true,
+        "sdk_whole_audit_same": true
+      },
+      "previous_compared_metrics_unchanged": true
+    }
+  },
+  "sources": {
+    "reference_dissector": "https://github.com/wireshark/wireshark/blob/v4.6.9/epan/dissectors/packet-bpdu.c",
+    "receiver_compatibility": "https://github.com/openvswitch/ovs/blob/main/lib/rstp-state-machines.c",
+    "official_classic_capture": "https://wiki.wireshark.org/uploads/8d3d0627231ab1e2fa5d3fe8be2390a7/stp.pcap"
+  },
+  "acceptance": "partial; original generic field-set differences and unsupported carriers/variants remain open",
+  "offline_controls": {
+    "scope": "Declared offline controls; BPDU messages have independent state, not TCP-style recovery. No physical network replay, elected topology, delivery, digest or authentication claim.",
+    "real_source_frame": "2164",
+    "real_source_frame_sha256": "4b1de5e357378907b908794dd7cbfe839a9a528daafd385825fbf441463786c5",
+    "sdk_sha256": "a7c2fe06cb5f6710a3f582ede5cebb8745e998621c201e1b50ce2cad3a5670f7",
+    "files": [
+      {
+        "name": "real-base",
+        "authored": false,
+        "capture_sha256": "779ee7215b74b838a309d144b7c14b0c3dd5faffa70d6b19739947685607e425",
+        "physical_frames": 1,
+        "direct_checks": 3,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 30,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "duplicate-advertisements",
+        "authored": false,
+        "capture_sha256": "33108874224413cc839b1d6068171cd86c023991913f18adb147e17439a6d6e8",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "decoded",
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+",
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 60,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "same-sender-root-change-and-reorder",
+        "authored": false,
+        "capture_sha256": "160415081a15597e76f81c3d9b9881418a97767d9ae9963a7117e3000e970ea6",
+        "physical_frames": 3,
+        "direct_checks": 8,
+        "native_status": [
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+",
+          "RPVST+",
+          "RPVST+"
+        ],
+        "reference_frames": 3,
+        "reference_views": 3,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 90,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "lost-intermediate-advertisement",
+        "authored": false,
+        "capture_sha256": "92a0db10a6e1a105d138ad9b0af67c3a85279fe7a9a5c7b59adbdc9c0b6f2b6c",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "decoded",
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+",
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 60,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "snaplen-and-full-repair",
+        "authored": false,
+        "capture_sha256": "13141aa8412dfe6f52b720afd84dbb23b7aa83c0d7e9dc6503f5be3e2ae00405",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "incomplete",
+          "decoded"
+        ],
+        "native_names": [
+          null,
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 1,
+        "additional_native_events": 0,
+        "wire_field_checks": 32,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "complete-short-body-and-next-advertisement",
+        "authored": false,
+        "capture_sha256": "b8fb32732e06237ea185988e15b24a815bb35b27ec8ab08a8fbe525612d1f038",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "malformed",
+          "decoded"
+        ],
+        "native_names": [
+          null,
+          "RPVST+"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 1,
+        "wire_field_checks": 30,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "tcn-after-configuration-no-inheritance",
+        "authored": false,
+        "capture_sha256": "2214b902b6882a078d848527e93efed09c3d88530c40d25f35e1ca11f3d86ca7",
+        "physical_frames": 2,
+        "direct_checks": 8,
+        "native_status": [
+          "decoded",
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+",
+          "STP"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 36,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "wrong-ssap",
+        "authored": false,
+        "capture_sha256": "3ccb49f360d4c0dfb52ad74c9212055c63fd3332689c5595ac0f833e70806e7e",
+        "physical_frames": 2,
+        "direct_checks": 3,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 30,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "wrong-cisco-oui",
+        "authored": false,
+        "capture_sha256": "da7ea9b47cf634f9f8193d169496d3967e1a8604225a3e195f9e4274793518a1",
+        "physical_frames": 2,
+        "direct_checks": 3,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 30,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "unknown-version-does-not-stick",
+        "authored": false,
+        "capture_sha256": "fe775fd5b29d31ff311c458c4b8bea2d53fcda7838b3a919d98536149a51f583",
+        "physical_frames": 3,
+        "direct_checks": 5,
+        "native_status": [
+          "decoded",
+          "context-required",
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+",
+          null,
+          "RPVST+"
+        ],
+        "reference_frames": 3,
+        "reference_views": 3,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 1,
+        "additional_native_events": 0,
+        "wire_field_checks": 62,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "version2-type0-configuration-compatibility",
+        "authored": false,
+        "capture_sha256": "0c8400570e659e00833a76dbdedf5f137d641e8c7a62dde583c0875bf39e1ac1",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "decoded",
+          "decoded"
+        ],
+        "native_names": [
+          "STP",
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 51,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "pvst-origin-tlv-required",
+        "authored": false,
+        "capture_sha256": "b0913c2bace07fb0872217d8c248e6233127e392ca71a141a6e37fbecd7cffbd",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "malformed",
+          "decoded"
+        ],
+        "native_names": [
+          null,
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 1,
+        "additional_native_events": 0,
+        "wire_field_checks": 32,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "pvst-conflicting-origin-claims",
+        "authored": false,
+        "capture_sha256": "bdcd9a1219dbd7d85ddca536eeb1edf7119a9a0f81ffcf7aa2f40415e94a133f",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "malformed",
+          "decoded"
+        ],
+        "native_names": [
+          null,
+          "RPVST+"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 1,
+        "additional_native_events": 0,
+        "wire_field_checks": 32,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "pvst-unknown-bounded-tlv",
+        "authored": false,
+        "capture_sha256": "d636f5720c364b69221bd84b0ecbb0c66bb71c7945b870cab336ebb4377d6756",
+        "physical_frames": 1,
+        "direct_checks": 4,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "RPVST+"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 30,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "authored-standard-mst-one-instance",
+        "authored": true,
+        "capture_sha256": "17dc30ddf2ed444c13de83f94d79de76cecea462775b2cae9197fe09c97cf59f",
+        "physical_frames": 1,
+        "direct_checks": 3,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "MSTP"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 45,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "authored-standard-mst-two-instances",
+        "authored": true,
+        "capture_sha256": "49088d3eb742054aee5c0ba074d59605093c9bb0625d588e0c6ea52cb2d26932",
+        "physical_frames": 1,
+        "direct_checks": 3,
+        "native_status": [
+          "decoded"
+        ],
+        "native_names": [
+          "MSTP"
+        ],
+        "reference_frames": 1,
+        "reference_views": 1,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 0,
+        "additional_native_events": 0,
+        "wire_field_checks": 45,
+        "differences": [],
+        "missing": []
+      },
+      {
+        "name": "authored-mst-truncated-record-and-repair",
+        "authored": true,
+        "capture_sha256": "3292a6fe14f43808014781254c76f2e158efa87847c4847ba51fc7fda2a2001c",
+        "physical_frames": 2,
+        "direct_checks": 4,
+        "native_status": [
+          "malformed",
+          "decoded"
+        ],
+        "native_names": [
+          null,
+          "MSTP"
+        ],
+        "reference_frames": 2,
+        "reference_views": 2,
+        "unselected_reference_views": 0,
+        "refused_reference_views": 1,
+        "additional_native_events": 0,
+        "wire_field_checks": 47,
+        "differences": [],
+        "missing": []
+      }
+    ],
+    "direct_checks_total": 72,
+    "wire_field_checks_total": 742,
+    "physical_frames_total": 32
+  },
+  "official_classic": {
+    "capture_sha256": "8d3072b97b0abebdbf38dd4f97481859e9769a9262380e4bb3cec7f4b3784996",
+    "audit": {
+      "oracle_sha256": "fccabe78311253dd586fc3da8940a565fea9d247d1d80b333e7d7b145cfb6f92",
+      "events_sha256": "97a7b831669c6bc88324237c775bc207ec6f2d19444f785d00047cde4c5f2795",
+      "reference_frames": 96,
+      "reference_views": 96,
+      "native_events": 96,
+      "native_status": {
+        "decoded": 96
+      },
+      "native_variant_names": {
+        "STP": 96
+      },
+      "matched_decoded_views": 96,
+      "checks": {
+        "wire_bytes_and_physical_contributor": 96,
+        "no_inferred_connection": 96,
+        "original_oracle_wire_span": 96,
+        "stp.bridge.ext": 96,
+        "stp.bridge.hw": 96,
+        "stp.bridge.prio": 96,
+        "stp.flags": 96,
+        "stp.flags.tc": 96,
+        "stp.flags.tcack": 96,
+        "stp.forward": 96,
+        "stp.hello": 96,
+        "stp.max_age": 96,
+        "stp.msg_age": 96,
+        "stp.port": 96,
+        "stp.protocol": 96,
+        "stp.root.cost": 96,
+        "stp.root.ext": 96,
+        "stp.root.hw": 96,
+        "stp.root.prio": 96,
+        "stp.type": 96,
+        "stp.version": 96
+      },
+      "checks_total": 2016,
+      "selected_field_or_wire_differences": [],
+      "missing_selected_carriers": [],
+      "refused_reference_views": [],
+      "unselected_reference_views": [],
+      "additional_native_events": [],
+      "unselected_reference_carriers": {},
+      "scope": "Original reference spans/typed selected fields and exact literal carrier boundaries; advertised BPDU state only, no elected topology/peer authentication/digest verification. Refusals and unsupported carriers remain separate; no label normalization."
+    },
+    "codec_build": "aff88c1833 (same STP codec as final 7d9fdba8c1)"
+  },
+  "regressions": {
+    "bin_parser_and_children": "pass; main package136.388s",
+    "pcaputil": "pass532.940s on aff88c1833",
+    "cli_final": "pass3.868s on7d9fdba8c1",
+    "final_close_snapshot_fragment_targeted": "pass0.457s",
+    "stp_fuzz": "40439 executions /47.067s PASS; two workers; aff88c1833 codec unchanged by final tie-break fix"
+  },
+  "windows": {
+    "large_rpvst_query": "fields stp.pvst.origvlan == 121",
+    "large_capture_buffer": 51328,
+    "large_matching_rows_proved_in_retained_history": 80,
+    "large_expected_matches_in_sdk": 169,
+    "field_history_is_partial": true,
+    "compatibility_control": "wire Version2 Type0 is STP Configuration with an explicit warning; no rapid/multiple fields",
+    "helper": "strict fresh console cells: EOF plus drained packet buffer plus exact query plus selected protocol and matching detail frame",
+    "screenshots_external": true
+  },
+  "limitations": [
+    "No real positive standard-MST capture was found; positive MST/MSTI controls are explicitly authored and checked against the unmodified reference.",
+    "Legacy/alternative MST length encodings and SPT version4 remain unselected.",
+    "467 Sharon reference subviews lack a selected physical Ethernet length/LLC/SNAP carrier; their original carrier groups are preserved, including reconstructed GRE/PPP offsets. This does not certify their wire bodies or close those carriers.",
+    "Seconds fields use exact decimal strings and uint16 1/256-second tick companions; no floating-point filter-equivalence claim.",
+    "Default bounded TUI protocol history can be evicted even while physical packets are retained; field queries report incomplete rather than treating unavailable fields as absent.",
+    "New pdu_scope=observed_at_packet explicitly excludes later contributor annotations from earlier streaming CLI rows; SDK/TUI history remain the interfaces for those annotations."
+  ]
+}
