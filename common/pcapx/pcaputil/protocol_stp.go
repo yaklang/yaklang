@@ -46,14 +46,15 @@ func stpEthernetCarrier(eth *layers.Ethernet) (wire []byte, pvst, selected bool,
 }
 
 func (a *binParser) observeSTP(p gopacket.Packet, evidence captureEvidence) bool {
-	var eth *layers.Ethernet
-	// A tunnel may carry another Ethernet frame. Associate LLC with its
-	// immediately preceding Ethernet layer, never the outer tunnel's peers.
+	// Inspect the literal root Ethernet carrier even when a fast decoder
+	// stopped at a VLAN length-form header without adding an LLC layer.
+	// Do not promote an inner Ethernet view before its outer IP was validated.
 	for _, layer := range p.Layers() {
-		if v, ok := layer.(*layers.Ethernet); ok {
-			eth = v
+		if _, ok := layer.(gopacket.NetworkLayer); ok {
+			return false
 		}
-		if _, ok := layer.(*layers.LLC); !ok || eth == nil {
+		eth, ok := layer.(*layers.Ethernet)
+		if !ok {
 			continue
 		}
 		w, pvst, selected, err := stpEthernetCarrier(eth)

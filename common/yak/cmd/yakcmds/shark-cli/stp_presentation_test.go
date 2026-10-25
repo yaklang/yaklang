@@ -25,6 +25,14 @@ func TestSTPProgressiveVariantNamesAndActualByteRanges(t *testing.T) {
 		r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "LLC", Layers: path})
 		require.Equal(t, name, r.Protocol)
 		require.Equal(t, append(path, name), r.ProtocolStack)
+		legacy := append(append([]string(nil), path...), "STP")
+		r = presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "STP", Layers: legacy})
+		require.Equal(t, append(path, name), r.ProtocolStack, "generic observer STP and native variant are the same layer")
+		for _, query := range []string{"proto:stp", "proto:" + name} {
+			term, err := compileSearchTerm(query)
+			require.NoError(t, err)
+			require.True(t, term.matches(nil, r, nil), query)
+		}
 		fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 		seen := map[string]bool{}
 		want := map[string][]byte{"Root Priority: 32768": {0x80, 1}, "Root MAC: 02:00:00:00:00:01": {2, 0, 0, 0, 0, 1}, "Message Age Seconds: 0.5": {0, 128}}
