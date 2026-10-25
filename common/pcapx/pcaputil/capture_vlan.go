@@ -55,6 +55,11 @@ func (captureLLCDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
 		return err
 	}
 	b.AddLayer(l)
+	if data[0]&0xfe == 0xfe {
+		// ISO NLPIDs need their own complete native grammar. A masked DSAP
+		// must not turn a response/group SAP or another control into IS-IS.
+		return b.NextDecoder(gopacket.LayerTypePayload)
+	}
 	// Generic decoders select STP from a masked DSAP alone. Keep it raw until
 	// native admission checks both SAPs, UI control and the complete BPDU.
 	if data[0]&0xfe == 0x42 {
