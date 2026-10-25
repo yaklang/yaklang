@@ -1,0 +1,746 @@
+{
+  "scope": "Bounded partial native BGP/AJP/RTMP; exact observed message bytes and selected fields; original whole-file differences remain. No complete Wireshark or TOP30 equivalence claim.",
+  "tool": "TShark 4.6.9; two-pass, out-of-order TCP reassembly, full JSON with no duplicate keys",
+  "cli_sha256": "a5924e2abbb48408c0f87b15880554d71d09b6c7210a505bb4ee7ac8d1ac2e91",
+  "sdk_sha256": "d5a8520775327754fcd9109f590d786562152ca6eb4069451e8bc575ca0eada4",
+  "audit_script_sha256": "9c7f9c33ad3d10a4211b1528e62917c0e5fd737879abfe330da4aecfe8716abb",
+  "source_manifest": {
+    "commit": "a915c7bceb96a4fbd6331fdbecdb50aedc8fceef",
+    "captures": [
+      {
+        "path": "tests/cfgs/default/pcap/ajp.pcap",
+        "url": "https://raw.githubusercontent.com/ntop/nDPI/a915c7bceb96a4fbd6331fdbecdb50aedc8fceef/tests/cfgs/default/pcap/ajp.pcap",
+        "bytes": 7804,
+        "sha256": "23bd44126004b7c06443d08f1f8e80732813ff2bdbcd92f47ae08ef59ed0008b"
+      },
+      {
+        "path": "tests/cfgs/default/pcap/rtmp.pcap",
+        "url": "https://raw.githubusercontent.com/ntop/nDPI/a915c7bceb96a4fbd6331fdbecdb50aedc8fceef/tests/cfgs/default/pcap/rtmp.pcap",
+        "bytes": 27644,
+        "sha256": "85b3a545433aa39c19983e5c11a5b185d838c66d09c99d8617fa226b62a1c773"
+      }
+    ]
+  },
+  "wiki_capture": {
+    "url": "https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/rtmp_sample.tgz",
+    "archive_sha256": "2d5805c6ae59dafa54959d116c76db24010b7faee59008eafc9c7785255f67bb",
+    "capture_bytes": 8808,
+    "capture_sha256": "ca62e6cd5b7eb166773dc027de10fe53a013ce4165286b41d58e42571720a8eb",
+    "frames": 26
+  },
+  "original_weber_bgp": {
+    "protocol": "bgp",
+    "native_events": 315,
+    "wireshark_complete_views": 302,
+    "matched": 302,
+    "checks": {
+      "exact bytes and occurrence": 302,
+      "bgp.length": 302,
+      "bgp.type": 302,
+      "bgp.open.version": 20,
+      "bgp.open.myas": 20,
+      "bgp.open.holdtime": 20,
+      "bgp.open.identifier": 20,
+      "bgp.cap.type": 86,
+      "bgp.cap.length": 86,
+      "bgp.cap.4as": 16,
+      "bgp.update.withdrawn_routes.length": 100,
+      "bgp.update.path_attributes.length": 100,
+      "bgp.update.path_attribute.flags": 402,
+      "bgp.update.path_attribute.type_code": 402,
+      "bgp.update.path_attribute.length": 402,
+      "bgp.update.path_attribute.origin": 80,
+      "bgp.update.path_attribute.multi_exit_disc": 72,
+      "bgp.update.path_attribute.local_pref": 80,
+      "bgp.prefix_length": 128,
+      "bgp.mp_reach_nlri_ipv6_prefix": 60,
+      "bgp.update.path_attribute.mp_reach_nlri.afi": 36,
+      "bgp.update.path_attribute.mp_reach_nlri.safi": 36,
+      "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6": 36,
+      "bgp.update.path_attribute.mp_unreach_nlri.afi": 10,
+      "bgp.update.path_attribute.mp_unreach_nlri.safi": 10,
+      "bgp.update.path_attribute.next_hop": 44,
+      "bgp.nlri_prefix": 68,
+      "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6.link_local": 2
+    },
+    "oracle_sha256": "97cbc10456902e4072f73bf4259029b24e88658fe2d6e2191285e60cb6ceb1c9",
+    "events_sha256": "2da5b7aff4e64d7cbe53b3926a85e1b7bef1dbf1a68a79efc035e06bec26b7a3",
+    "attribution_differences": [],
+    "repeated_oracle_views": [],
+    "lossless_display_differences": [],
+    "oracle_prefix_views": [],
+    "native_without_oracle_view_count": 13
+  },
+  "original_sharon_bgp": {
+    "protocol": "bgp",
+    "native_events": 315,
+    "wireshark_complete_views": 303,
+    "matched": 303,
+    "checks": {
+      "exact bytes and occurrence": 303,
+      "bgp.length": 303,
+      "bgp.type": 303,
+      "bgp.open.version": 20,
+      "bgp.open.myas": 20,
+      "bgp.open.holdtime": 20,
+      "bgp.open.identifier": 20,
+      "bgp.cap.type": 86,
+      "bgp.cap.length": 86,
+      "bgp.cap.4as": 16,
+      "bgp.update.withdrawn_routes.length": 100,
+      "bgp.update.path_attributes.length": 100,
+      "bgp.update.path_attribute.flags": 402,
+      "bgp.update.path_attribute.type_code": 402,
+      "bgp.update.path_attribute.length": 402,
+      "bgp.update.path_attribute.origin": 80,
+      "bgp.update.path_attribute.multi_exit_disc": 72,
+      "bgp.update.path_attribute.local_pref": 80,
+      "bgp.prefix_length": 128,
+      "bgp.mp_reach_nlri_ipv6_prefix": 60,
+      "bgp.update.path_attribute.mp_reach_nlri.afi": 36,
+      "bgp.update.path_attribute.mp_reach_nlri.safi": 36,
+      "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6": 36,
+      "bgp.update.path_attribute.mp_unreach_nlri.afi": 10,
+      "bgp.update.path_attribute.mp_unreach_nlri.safi": 10,
+      "bgp.update.path_attribute.next_hop": 44,
+      "bgp.nlri_prefix": 68,
+      "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6.link_local": 2
+    },
+    "oracle_sha256": "11048b430006f7c9b29cdecd7b72b968aea317e7fd3aca2c04b7ae7d8e1c45d8",
+    "events_sha256": "48ecf78cdab5b0cae60c5a98ff091318373debd34ddd24f6de67dede863c53fe",
+    "attribution_differences": [],
+    "repeated_oracle_views": [],
+    "lossless_display_differences": [],
+    "oracle_prefix_views": [
+      {
+        "frame": 264719,
+        "bytes": 7,
+        "reason": "no complete supported BGP marker/length/type envelope"
+      },
+      {
+        "frame": 264719,
+        "bytes": 148,
+        "reason": "no complete supported BGP marker/length/type envelope"
+      },
+      {
+        "frame": 314570,
+        "bytes": 7,
+        "reason": "no complete supported BGP marker/length/type envelope"
+      },
+      {
+        "frame": 314570,
+        "bytes": 58,
+        "reason": "no complete supported BGP marker/length/type envelope"
+      }
+    ],
+    "native_without_oracle_view_count": 12
+  },
+  "scoped_bgp": [
+    {
+      "original_interface": 1,
+      "derivation_filter": "frame.interface_id == 1 and tcp.port == 179",
+      "audit": {
+        "protocol": "bgp",
+        "native_events": 12,
+        "wireshark_complete_views": 12,
+        "matched": 12,
+        "checks": {
+          "exact bytes and occurrence": 12,
+          "bgp.length": 12,
+          "bgp.type": 12
+        },
+        "oracle_sha256": "cf15674ce4bfc44132d5ad028369e07e910caae67c0c204dda7056576652083a",
+        "events_sha256": "7a912432aac62b7f9e831e3d92197e1b00451a7dff5e8dd1cd1e516475de9814",
+        "attribution_differences": [],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "original_interface": 60,
+      "derivation_filter": "frame.interface_id == 60 and tcp.port == 179",
+      "audit": {
+        "protocol": "bgp",
+        "native_events": 12,
+        "wireshark_complete_views": 12,
+        "matched": 12,
+        "checks": {
+          "exact bytes and occurrence": 12,
+          "bgp.length": 12,
+          "bgp.type": 12
+        },
+        "oracle_sha256": "2f3307ab049a674759013d2ca865aed3b548c8fb94ded441b1c586c7c179e985",
+        "events_sha256": "c1e97d69ce129a7fab5db9c5daca819158d23a37a5ac37e1728af26f22258529",
+        "attribution_differences": [],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "original_interface": 258,
+      "derivation_filter": "frame.interface_id == 258 and tcp.port == 179",
+      "audit": {
+        "protocol": "bgp",
+        "native_events": 291,
+        "wireshark_complete_views": 291,
+        "matched": 291,
+        "checks": {
+          "exact bytes and occurrence": 291,
+          "bgp.length": 291,
+          "bgp.type": 291,
+          "bgp.open.version": 20,
+          "bgp.open.myas": 20,
+          "bgp.open.holdtime": 20,
+          "bgp.open.identifier": 20,
+          "bgp.cap.type": 86,
+          "bgp.cap.length": 86,
+          "bgp.cap.4as": 16,
+          "bgp.update.withdrawn_routes.length": 100,
+          "bgp.update.path_attributes.length": 100,
+          "bgp.update.path_attribute.flags": 402,
+          "bgp.update.path_attribute.type_code": 402,
+          "bgp.update.path_attribute.length": 402,
+          "bgp.update.path_attribute.origin": 80,
+          "bgp.update.path_attribute.multi_exit_disc": 72,
+          "bgp.update.path_attribute.local_pref": 80,
+          "bgp.prefix_length": 128,
+          "bgp.mp_reach_nlri_ipv6_prefix": 60,
+          "bgp.update.path_attribute.mp_reach_nlri.afi": 36,
+          "bgp.update.path_attribute.mp_reach_nlri.safi": 36,
+          "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6": 36,
+          "bgp.update.path_attribute.mp_unreach_nlri.afi": 10,
+          "bgp.update.path_attribute.mp_unreach_nlri.safi": 10,
+          "bgp.update.path_attribute.next_hop": 44,
+          "bgp.nlri_prefix": 68,
+          "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6.link_local": 2
+        },
+        "oracle_sha256": "1c819a06cb9481977ebcaa77d43c4d9f7457b051d091f20741e11def8c305e92",
+        "events_sha256": "1e0834d5b447ed7a5522aa3a4db7849a577af9055f271990800e49170c59696c",
+        "attribution_differences": [],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    }
+  ],
+  "ajp_supplemental_decode_as": [
+    "tcp.port==8009,ajp13",
+    "tcp.port==8010,ajp13"
+  ],
+  "ajp": {
+    "protocol": "ajp",
+    "native_events": 12,
+    "wireshark_complete_views": 13,
+    "matched": 12,
+    "checks": {
+      "exact bytes and occurrence": 12,
+      "ajp13.len": 12,
+      "ajp13.code": 10,
+      "ajp13.method": 2,
+      "ajp13.ver": 2,
+      "ajp13.uri": 2,
+      "ajp13.raddr": 2,
+      "ajp13.rhost": 2,
+      "ajp13.srv": 2,
+      "ajp13.port": 2,
+      "ajp13.sslp": 2,
+      "ajp13.nhdr": 4,
+      "ajp13.accept": 2,
+      "ajp13.connection": 2,
+      "ajp13.content_length": 4,
+      "ajp13.content_type": 2,
+      "ajp13.cookie": 2,
+      "ajp13.host": 2,
+      "ajp13.referer": 2,
+      "ajp13.user_agent": 2,
+      "ajp13.route": 2,
+      "ajp13.rstatus": 2,
+      "ajp13.rsmsg": 2,
+      "ajp13.location": 2,
+      "ajp13.reusep": 2
+    },
+    "oracle_sha256": "3236eb6d6506b9031882558b943e6149afe12f71780b0c7b910eca7b21d5a2d8",
+    "events_sha256": "5b13e865dcb79ca3a6218dac595555046e9e45ab4f3da1e0ce05cb2c8dcead19",
+    "attribution_differences": [
+      {
+        "oracle_frame": 11,
+        "native_frames": [
+          13
+        ],
+        "kind": "ajp"
+      }
+    ],
+    "repeated_oracle_views": [
+      {
+        "frame": 30,
+        "kind": "ajp",
+        "native_pdu": 3
+      }
+    ],
+    "lossless_display_differences": [
+      {
+        "frame": 11,
+        "field": "ajp13.rhost",
+        "reason": "wire null string retained as null; Wireshark displays empty"
+      },
+      {
+        "frame": 32,
+        "field": "ajp13.rhost",
+        "reason": "wire null string retained as null; Wireshark displays empty"
+      }
+    ],
+    "oracle_prefix_views": [],
+    "native_without_oracle_view_count": 0
+  },
+  "rtmp": {
+    "protocol": "rtmp",
+    "native_events": 32,
+    "wireshark_complete_views": 17,
+    "matched": 17,
+    "checks": {
+      "exact bytes and occurrence": 17,
+      "rtmpt.header.csid": 13,
+      "rtmpt.header.timestamp": 13,
+      "rtmpt.header.bodysize": 13,
+      "rtmpt.header.typeid": 13,
+      "rtmpt.header.streamid": 11,
+      "rtmpt.scm.was": 3,
+      "rtmpt.scm.limittype": 1,
+      "rtmpt.ucm.eventtype": 4
+    },
+    "oracle_sha256": "a8aec75688713e234df7c537c1ff820e3f1db312156a6cff2d75e74a9934696f",
+    "events_sha256": "0bb41b885074682123ed6a92fa0b70443a26a24ca904792119b4e694c9003c9f",
+    "attribution_differences": [
+      {
+        "oracle_frame": 11,
+        "native_frames": [
+          8,
+          10
+        ],
+        "kind": "handshake"
+      }
+    ],
+    "repeated_oracle_views": [],
+    "lossless_display_differences": [],
+    "oracle_prefix_views": [],
+    "native_without_oracle_view_count": 0
+  },
+  "offline_derived_faults": [
+    {
+      "fixture": {
+        "name": "reordered-echo",
+        "file": "reordered-echo.pcap",
+        "sha256": "ae0d8fcae24cdcbe01b64eae8ac0762add75b7a13df5d7de9076d6c666db8e62",
+        "frames": 26,
+        "operation": "Original frames 13 and 14 arrive in reverse order; TCP must recover identical complete payloads"
+      },
+      "native": {
+        "name": "reordered-echo",
+        "logical": 13,
+        "decoded": 13,
+        "flows": 1,
+        "amf0": 6,
+        "cross_flow_associations": [],
+        "statuses": {
+          "decoded": 32
+        }
+      },
+      "audit": {
+        "protocol": "rtmp",
+        "native_events": 32,
+        "wireshark_complete_views": 17,
+        "matched": 17,
+        "checks": {
+          "exact bytes and occurrence": 17,
+          "rtmpt.header.csid": 13,
+          "rtmpt.header.timestamp": 13,
+          "rtmpt.header.bodysize": 13,
+          "rtmpt.header.typeid": 13,
+          "rtmpt.header.streamid": 11,
+          "rtmpt.scm.was": 3,
+          "rtmpt.scm.limittype": 1,
+          "rtmpt.ucm.eventtype": 4
+        },
+        "oracle_sha256": "85adb4bb67b004e683796df96f663db49a45408d38ce4327f5922f2067a5f46f",
+        "events_sha256": "95641e0e6d2462e6a3b332f076781145ed52e505a8e370c87c71f853fca103df",
+        "attribution_differences": [
+          {
+            "oracle_frame": 11,
+            "native_frames": [
+              8,
+              10
+            ],
+            "kind": "handshake"
+          },
+          {
+            "oracle_frame": 14,
+            "native_frames": [
+              13
+            ],
+            "kind": "logical message"
+          }
+        ],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "fixture": {
+        "name": "duplicate-data",
+        "file": "duplicate-data.pcap",
+        "sha256": "9daf788b98ade990657f08ccd9fbea41751e18ff8ad150bc6398535020e0fd9a",
+        "frames": 27,
+        "operation": "Duplicate original frame14 with unchanged TCP sequence; no duplicate logical command"
+      },
+      "native": {
+        "name": "duplicate-data",
+        "logical": 13,
+        "decoded": 13,
+        "flows": 1,
+        "amf0": 6,
+        "cross_flow_associations": [],
+        "statuses": {
+          "decoded": 32
+        }
+      },
+      "audit": {
+        "protocol": "rtmp",
+        "native_events": 32,
+        "wireshark_complete_views": 17,
+        "matched": 17,
+        "checks": {
+          "exact bytes and occurrence": 17,
+          "rtmpt.header.csid": 13,
+          "rtmpt.header.timestamp": 13,
+          "rtmpt.header.bodysize": 13,
+          "rtmpt.header.typeid": 13,
+          "rtmpt.header.streamid": 11,
+          "rtmpt.scm.was": 3,
+          "rtmpt.scm.limittype": 1,
+          "rtmpt.ucm.eventtype": 4
+        },
+        "oracle_sha256": "44d0f90feedb6b37974836ba3d06d8bbb7e67f0685132c617d1540418cc2981c",
+        "events_sha256": "3ae259933cc434c99fcc01c09e6765a9b66053ca7f923ec6f1bc6b554885f492",
+        "attribution_differences": [
+          {
+            "oracle_frame": 11,
+            "native_frames": [
+              8,
+              10
+            ],
+            "kind": "handshake"
+          }
+        ],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "fixture": {
+        "name": "lost-echo",
+        "file": "lost-echo.pcap",
+        "sha256": "f72e9c500e814d474515a40aa0c406c0af0f58f37d9d828f21f33a3014e58c39",
+        "frames": 25,
+        "operation": "Drop original frame13; missing handshake bytes must not be invented"
+      },
+      "native": {
+        "name": "lost-echo",
+        "logical": 8,
+        "decoded": 8,
+        "flows": 1,
+        "amf0": 3,
+        "cross_flow_associations": [],
+        "statuses": {
+          "decoded": 20,
+          "incomplete": 1
+        }
+      },
+      "audit": {
+        "protocol": "rtmp",
+        "native_events": 20,
+        "wireshark_complete_views": 11,
+        "matched": 11,
+        "checks": {
+          "exact bytes and occurrence": 11,
+          "rtmpt.header.csid": 8,
+          "rtmpt.header.timestamp": 8,
+          "rtmpt.header.bodysize": 8,
+          "rtmpt.header.typeid": 8,
+          "rtmpt.header.streamid": 8,
+          "rtmpt.scm.was": 2,
+          "rtmpt.scm.limittype": 1,
+          "rtmpt.ucm.eventtype": 3
+        },
+        "oracle_sha256": "4a8d09de2dc7dd84adc578c0ef558cb8f561e8c824026369451e463aaf0f9f66",
+        "events_sha256": "650640a00ff4d384067875e8c0581e835b8b9a50f804062fa06ceb458eb5ef98",
+        "attribution_differences": [
+          {
+            "oracle_frame": 11,
+            "native_frames": [
+              8,
+              10
+            ],
+            "kind": "handshake"
+          }
+        ],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "fixture": {
+        "name": "truncated-connect",
+        "file": "truncated-connect.pcap",
+        "sha256": "f26ba9e9751aa72856081eba56977f3bc6974ce1500016f6b241549476a152f4",
+        "frames": 26,
+        "operation": "Snaplen truncation of original frame14; retain original on-wire length"
+      },
+      "native": {
+        "name": "truncated-connect",
+        "logical": 8,
+        "decoded": 8,
+        "flows": 1,
+        "amf0": 3,
+        "cross_flow_associations": [],
+        "statuses": {
+          "decoded": 21,
+          "incomplete": 2
+        }
+      },
+      "audit": {
+        "protocol": "rtmp",
+        "native_events": 21,
+        "wireshark_complete_views": 12,
+        "matched": 12,
+        "checks": {
+          "exact bytes and occurrence": 12,
+          "rtmpt.header.csid": 8,
+          "rtmpt.header.timestamp": 8,
+          "rtmpt.header.bodysize": 8,
+          "rtmpt.header.typeid": 8,
+          "rtmpt.header.streamid": 8,
+          "rtmpt.scm.was": 2,
+          "rtmpt.scm.limittype": 1,
+          "rtmpt.ucm.eventtype": 3
+        },
+        "oracle_sha256": "439e997f6423c4f114f2215f6f0769fe87e0caa708e2a2a942d5d9fda41d1984",
+        "events_sha256": "97ace9e18e10096bb7f9ae5aef1fd8f03d7ff9acd5b99d6ec65c7fb2bcb66a3c",
+        "attribution_differences": [
+          {
+            "oracle_frame": 11,
+            "native_frames": [
+              8,
+              10
+            ],
+            "kind": "handshake"
+          }
+        ],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    },
+    {
+      "fixture": {
+        "name": "same-tuple-new-generation",
+        "file": "same-tuple-new-generation.pcap",
+        "sha256": "019904adfa861b30ba64470ff265c35cb4c9cf903139e09375a65adb435cd4f9",
+        "frames": 53,
+        "operation": "Observed RST then same endpoints/ports and new ISNs; checksums regenerated; no command association across generations"
+      },
+      "native": {
+        "name": "same-tuple-new-generation",
+        "logical": 26,
+        "decoded": 26,
+        "flows": 2,
+        "amf0": 12,
+        "cross_flow_associations": [],
+        "statuses": {
+          "decoded": 64
+        }
+      },
+      "audit": {
+        "protocol": "rtmp",
+        "native_events": 64,
+        "wireshark_complete_views": 34,
+        "matched": 34,
+        "checks": {
+          "exact bytes and occurrence": 34,
+          "rtmpt.header.csid": 26,
+          "rtmpt.header.timestamp": 26,
+          "rtmpt.header.bodysize": 26,
+          "rtmpt.header.typeid": 26,
+          "rtmpt.header.streamid": 22,
+          "rtmpt.scm.was": 6,
+          "rtmpt.scm.limittype": 2,
+          "rtmpt.ucm.eventtype": 8
+        },
+        "oracle_sha256": "42b428ecb2b71dc24e739522722a626f8c36e0b2bc7b470a1891ec55965cf50b",
+        "events_sha256": "291ebbad9dab750ab656992c808dc4f3b33498760d2a21d9cf7441437acf7649",
+        "attribution_differences": [
+          {
+            "oracle_frame": 11,
+            "native_frames": [
+              8,
+              10
+            ],
+            "kind": "handshake"
+          },
+          {
+            "oracle_frame": 38,
+            "native_frames": [
+              35,
+              37
+            ],
+            "kind": "handshake"
+          }
+        ],
+        "repeated_oracle_views": [],
+        "lossless_display_differences": [],
+        "oracle_prefix_views": [],
+        "native_without_oracle_view_count": 0
+      }
+    }
+  ],
+  "windows": {
+    "bgp": {
+      "status": "pass",
+      "protocol": "BGP",
+      "matching_rows": "20",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "fields_snapshot_sha256": "b423e57d679e3db270dedc32746ea152efe46f6d9d74d925d803dd6260e651ce",
+      "actual_console_buffer": true,
+      "checks": [
+        "complete replay",
+        "matching rows after EOF",
+        "fields",
+        "byte sources",
+        "conversation/evidence",
+        "80x30 and 180x48 resize",
+        "q and CP936 restoration"
+      ]
+    },
+    "ajp": {
+      "status": "pass",
+      "protocol": "AJP",
+      "matching_rows": "2",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "fields_snapshot_sha256": "5991b9da0e154b2a5e9e964d2d81cc8ed972204df1147d7d035cd9415acbd70d",
+      "actual_console_buffer": true,
+      "checks": [
+        "complete replay",
+        "matching rows after EOF",
+        "fields",
+        "byte sources",
+        "conversation/evidence",
+        "80x30 and 180x48 resize",
+        "q and CP936 restoration"
+      ]
+    },
+    "rtmp": {
+      "status": "pass",
+      "protocol": "AMF0",
+      "matching_rows": "1",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "fields_snapshot_sha256": "b50d71a00de2472dbf86342cd4ae31eb186626bf8d6e5e127f5503dcfe80e7d5",
+      "actual_console_buffer": true,
+      "checks": [
+        "complete replay",
+        "matching rows after EOF",
+        "fields",
+        "byte sources",
+        "conversation/evidence",
+        "80x30 and 180x48 resize",
+        "q and CP936 restoration"
+      ]
+    }
+  },
+  "stateful_fuzz_executions": 35210,
+  "codec_only_fuzz_executions": 23717,
+  "history": {
+    "original_full_capture_retained_cost": 121847203,
+    "old_limit_bytes": 67108864,
+    "old_evictions": 13026,
+    "default_message_limit": 80000,
+    "default_bytes": 67108864,
+    "window_60000_messages": 240000,
+    "window_60000_bytes": 201326592,
+    "hard_message_limit": 256000,
+    "hard_bytes": 268435456
+  },
+  "package_regressions": {
+    "github.com/yaklang/yaklang/common/pcapx/pcaputil": {
+      "status": "pass",
+      "elapsed_seconds": 509.305
+    },
+    "github.com/yaklang/yaklang/common/bin-parser": {
+      "status": "pass",
+      "elapsed_seconds": 137.509
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser": {
+      "status": "pass",
+      "elapsed_seconds": 8.227
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser/base": {
+      "status": "pass",
+      "elapsed_seconds": 0.642
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser": {
+      "status": "pass",
+      "elapsed_seconds": 5.699
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/protocol-impl": {
+      "status": "pass",
+      "elapsed_seconds": 0.593
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/protocol-impl/msrdp": {
+      "status": "pass",
+      "elapsed_seconds": 0.275
+    },
+    "github.com/yaklang/yaklang/common/bin-parser/rules": {
+      "status": "pass",
+      "elapsed_seconds": 0.421
+    },
+    "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+      "status": "pass",
+      "elapsed_seconds": 1.9729999999999999
+    }
+  },
+  "latest_cli_regression": "pass, 2.222s; includes sized history, frozen late fields and eviction indeterminacy",
+  "latest_native_filter_history_regression": "pass, 0.725s",
+  "remaining_field_set_differences": {
+    "weber": 94,
+    "sharon": 39
+  },
+  "limitations": [
+    "Other native protocol gaps and fuzz stream/endpoint differences remain",
+    "BGP unselected AFI/SAFI and unknown AS width remain opaque",
+    "RTMPE, general AMF3, RTMP shared-object events and media codec internals are not implemented",
+    "Large/evicted per-packet field snapshots can still make a field predicate indeterminate; known matches remain visible",
+    "Loss does not authorize invented missing handshake or payload bytes"
+  ]
+}

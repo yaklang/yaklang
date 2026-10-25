@@ -105,6 +105,46 @@ func TestFieldSearchUnitesPDUsWithinOnlyOnePacket(t *testing.T) {
 	require.Equal(t, []uint64{3}, visibleNumbers(u), "neighbouring packets cannot contribute facts to one match")
 }
 
+func TestFieldSearchRefreshesFrozenContributorsAndReportsEviction(t *testing.T) {
+	history, err := pcaputil.NewProtocolInspector(1, 1<<20)
+	require.NoError(t, err)
+	streams := newStreamStore(8, 4096)
+	streams.history = history
+	u := &tui{ring: newPacketRing(8), streams: streams, width: 180, height: 48}
+	p := &capturedPacket{number: 1, reference: pcaputil.PacketReference{Number: 1}, physicalRecord: true, history: history, data: udpPacket(t, 9000, []byte("test")), link: layers.LinkTypeEthernet}
+	u.ring.add(p)
+	u.frozen = []packetEntry{*u.ring.at(0)}
+	u.frozenAt = u.ring.version
+	require.NoError(t, u.applySearch("fields bgp.type == 1"))
+	u.refreshVisible()
+	require.Empty(t, u.visible)
+	e := &pcaputil.ProtocolEvent{ID: 1, Protocol: "bgp", Status: "decoded", Session: map[string]any{"Type": uint64(1)}, SourceBytes: pcaputil.ByteSource{PacketRefs: []pcaputil.PacketReference{{Number: 1}}}}
+	history.OnEvent(e)
+	u.refreshVisible()
+	require.Equal(t, []uint64{1}, visibleNumbers(u), "late completion must update a frozen packet list")
+	p.eventIDs = []uint64{1}
+	other := *e
+	other.ID = 2
+	other.SourceBytes.PacketRefs = []pcaputil.PacketReference{{Number: 2}}
+	history.OnEvent(&other)
+	u.refreshVisible()
+	require.Empty(t, u.visible)
+	require.Contains(t, u.notice, "Field filter unavailable:")
+	f, err := pcaputil.CompileDisplayFilter("bgp.type == 1")
+	require.NoError(t, err)
+	result := f.EvaluateEvents(p.protocolEvents())
+	require.False(t, result.Complete)
+	require.False(t, result.Matched)
+}
+
+func TestProtocolHistoryScalesWithRequestedPacketWindow(t *testing.T) {
+	for _, c := range []struct{ packets, messages, bytes int }{{0, 80000, 64 << 20}, {20000, 80000, 64 << 20}, {60000, 240000, 192 << 20}, {100000, 256000, 256 << 20}, {int(^uint(0) >> 1), 256000, 256 << 20}} {
+		messages, bytes := protocolHistoryBudget(c.packets)
+		require.Equal(t, c.messages, messages)
+		require.Equal(t, c.bytes, bytes)
+	}
+}
+
 func TestWorkerRetainsExactUint64InProtocolDetail(t *testing.T) {
 	w := make([]byte, 32)
 	w[0] = 4

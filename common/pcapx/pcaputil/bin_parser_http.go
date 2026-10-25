@@ -51,6 +51,12 @@ func (h *binHTTPState) config(bodyLimit int) map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "bgp":
+			return f.frameBGP(w)
+		case "rtmp":
+			return f.frameRTMP(dir, w)
+		case "ajp":
+			return f.frameAJP(dir, w)
 		case "mms":
 			return f.frameMMSISO(w)
 		case "fins":

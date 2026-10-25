@@ -38,6 +38,9 @@ func (f *DisplayFilter) EvaluateEvents(events []*ProtocolEvent) DisplayFilterRes
 	m := map[string][]any{}
 	count := 0
 	for _, e := range events {
+		if e != nil && (e.Completeness == "evicted" || e.Completeness == "limited") {
+			return DisplayFilterResult{Reason: "protocol detail unavailable in retained history"}
+		}
 		snapshot := e.DisplayFieldValues()
 		if snapshot.Truncated {
 			return DisplayFilterResult{Reason: "field projection budget exceeded"}

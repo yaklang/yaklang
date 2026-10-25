@@ -133,7 +133,7 @@ var ProtocolRoadmap = []RoadmapItem{
 
 	{Name: "OSPF", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "OSPFv3", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
-	{Name: "BGP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
+	{Name: "BGP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1, Notes: "Native bounded messages and observed negotiation; unselected AFI/SAFI and unavailable AS width remain opaque"},
 	{Name: "RIP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "RIPng", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "EIGRP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
@@ -378,7 +378,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "ICE", Family: "voip", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "SRTP", Family: "voip", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "HLS", Family: "voip", Sources: src(srcPrivate), Status: stTodo, Priority: priP4},
-	{Name: "RTMP", Family: "voip", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
+	{Name: "RTMP", Family: "voip", Sources: src(srcWireshark), Status: stPartial, Priority: priP1, Notes: "Native v3 handshake/chunk reassembly and AMF0; RTMPE, AMF3 and shared-object event codecs unselected"},
 	{Name: "RTMPE", Family: "voip", Sources: src(srcPrivate), Status: stTodo, Priority: priP3},
 	{Name: "MPEG-TS", Family: "voip", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 
@@ -590,7 +590,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "JMX", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
 	{Name: "JDWP", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
 	{Name: "FastCGI", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
-	{Name: "AJP", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "AJP13 CPING/CPONG/FORWARD/SEND_HEADERS"},
+	{Name: "AJP", Family: "service-tools", Sources: src(srcWireshark), Status: stPartial, Priority: priP0, Notes: "Native complete AJP13 messages, contextual body and reusable observed request cycles; unknown attributes refused"},
 	{Name: "IIOP Locate", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "Memcache binary", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "Docker API", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},

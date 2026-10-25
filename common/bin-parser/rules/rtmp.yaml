@@ -1,5 +1,19 @@
 endian: big
 Package:
+  operator: |
+    this.ProcessSubNode("RTMP")
+  RTMPInitialHandshakeFields:
+    operator: |
+      err = parseObservedSession("rtmp-handshake")
+      if err != nil { panic(err) }
+  RTMPInitialChunkFields:
+    operator: |
+      err = parseObservedSession("rtmp-initial-chunk")
+      if err != nil { panic(err) }
+  AMF0MessageFields:
+    operator: |
+      err = parseObservedSession("amf0")
+      if err != nil { panic(err) }
   RTMP:
     operator: |
       this.ProcessSubNode("Version")

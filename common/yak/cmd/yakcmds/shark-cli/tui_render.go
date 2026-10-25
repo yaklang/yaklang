@@ -582,7 +582,11 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 		c.text(x, r.y, r.x+r.w-x, "Info", inkHeader)
 	}
 	if len(u.visible) == 0 {
-		c.text(r.x+2, r.y+2, r.w-4, "No matching packets · / search · click Clear · f BPF", inkMuted)
+		message := "No matching packets · / search · click Clear · f BPF"
+		if u.search != nil && u.search.fields != nil && strings.HasPrefix(u.notice, "Field filter unavailable:") {
+			message = u.notice
+		}
+		c.text(r.x+2, r.y+2, r.w-4, message, inkMuted)
 		return
 	}
 	for i := 0; i < count; i++ {
