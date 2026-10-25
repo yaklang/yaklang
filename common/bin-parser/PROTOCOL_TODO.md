@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **503** 个入口：`stable` **15**，`partial` **316**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **504** 个入口：`stable` **15**，`partial` **317**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -657,6 +657,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [nbt_dg.yaml](rules/nbt_dg.yaml) | NBT DG (``, new) |
 | [net_remoting.yaml](rules/net_remoting.yaml) | .NET Remoting (``, new) |
 | [netbios_frame.yaml](rules/netbios_frame.yaml) | NetBEUI (`NetBIOSFrame`, partial) |
+| [netflow_v5.yaml](rules/netflow_v5.yaml) | NetFlow v5 Observed Message Fields (`NetFlowV5Fields`, partial) |
 | [netflow_v9.yaml](rules/netflow_v9.yaml) | NetFlow v9 Observed Message Fields (`NetFlowV9Fields`, partial) |
 | [network_control_fields.yaml](rules/network_control_fields.yaml) | IKE NAT-T Wire Message (`IKENATTMessage`, partial)<br>IKE Wire Message (`IKEMessage`, partial)<br>IPMI Wire Message (`IPMIMessage`, partial)<br>L2TP Wire Message (`L2TPMessage`, partial)<br>NetBIOS Datagram Wire Message (`NBTDGMessage`, partial)<br>NetBIOS Session Control (`NBSSControl`, partial)<br>ONC RPC Wire Message (`ONCRPCMessage`, partial)<br>OpenVPN Wire Message (`OpenVPNMessage`, partial)<br>RIP Wire Message (`RIPMessage`, partial)<br>Telnet Wire Message (`TelnetMessage`, partial)<br>WireGuard Wire Message (`WireGuardMessage`, partial) |
 | [network_samples.yaml](rules/network_samples.yaml) | IPcomp (`IPComp`, partial)<br>MPLS PW (`MPLSEthernetPW`, partial)<br>NVGRE (`NVGRE`, partial) |

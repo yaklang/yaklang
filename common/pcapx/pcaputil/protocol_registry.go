@@ -13,6 +13,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 	// Native ingress requires an observed wire grammar and directional state;
 	// legacy YAML availability alone does not imply a registered receiver.
 	return []ProtocolProfile{
+		{"netflow-v5", "udp", "complete 24-byte version-5 header and one to thirty fixed 48-byte records", "independent exports with no template or captured connection state; loss/reordering/reused engine cannot inherit fields; sequence counts reported flows, all captured endpoints and transport IDs remain separate; exact record bounds and residual nanoseconds, literal conformance warnings; no uptime-derived absolute time, delivery or authenticated sender claim"},
 		{"netflow-v9", "udp", "bounded v9 export header, Template/Options Template FlowSets and fixed-width template-driven records; same-PDU templates may follow data", "directed exporter/collector/capture-domain/SourceID isolation; local five-minute capture-time leases, consecutive sequence and uptime checks, exact adjacent duplicates without lease refresh; gaps/reuse/unknown/malformed context quarantined, complete templates recover; selected zero-to-three-byte padding and count constraints, opaque unknown fields; reported flows never become captured TCP connections, absolute times or authenticated exporter identity"},
 		{"isis", "l2", "bounded six-octet-System-ID LAN/P2P IIH, LSP, CSNP and PSNP over observed IEEE802.3 LLC", "complete literal carrier, PDU/header/TLV bounds, active LSP and optional PDU Fletcher checks, owned common advertised fields and reachability; unknown TLV/context stays partial, no inherited fields, elected DIS, authenticated adjacency, assembled LSDB or installed route; other ID widths and carriers remain unselected"},
 		{"ripng", "udp", "complete RFC2080 v1 request/response over observed IPv6; every bounded twenty-byte route or next-hop entry", "service hint plus complete grammar; explicit empty request inspection only; next-hop advisories reset every datagram, ignored nonzero advisory parameters remain literal, non-link-local advisories fall back to originator; no installed routing table, validated neighbor/hop-limit, response association or authenticated sender"},
@@ -145,7 +146,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9":
+		case "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")

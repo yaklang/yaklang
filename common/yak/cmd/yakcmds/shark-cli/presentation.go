@@ -34,6 +34,7 @@ type packetPresentation struct {
 
 var protocolDisplayNames = map[string]string{
 	"netflow-v9": "NetFlow v9",
+	"netflow-v5": "NetFlow v5",
 	"isis":       "IS-IS",
 	"ldp":        "LDP",
 	"wireguard":  "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "ripng": "RIPng", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
@@ -374,7 +375,7 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
-	if (e.Protocol == "isis" || e.Protocol == "netflow-v9") && e.Summary != "" && e.Summary != e.Protocol {
+	if (e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
