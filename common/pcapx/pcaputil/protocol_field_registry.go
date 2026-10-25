@@ -172,6 +172,37 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}
 	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
 	out = append(out, routingDisplayBindings()...)
+	for _, f := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"ldp.hdr.version", "Version", DisplayUnsigned, 16}, {"ldp.hdr.pdu_len", "PDU Length", DisplayUnsigned, 16},
+		{"ldp.hdr.ldpid.lsr", "LSR ID", DisplayAddress, 0}, {"ldp.hdr.ldpid.lsid", "Label Space ID", DisplayUnsigned, 16},
+	} {
+		path("ldp", "ldp", f.name, f.key, f.typ, f.bits, "pdu", f.key)
+	}
+	for _, f := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"ldp.msg.type", "Message Type", 16}, {"ldp.msg.len", "Message Length", 16}, {"ldp.msg.id", "Message ID", 32},
+	} {
+		path("ldp", "ldp", f.name, f.key, DisplayUnsigned, f.bits, "pdu", "Messages", "*", f.key)
+	}
+	for _, f := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"ldp.msg.tlv.type", "TLV Type", DisplayUnsigned, 16}, {"ldp.msg.tlv.len", "TLV Length", DisplayUnsigned, 16},
+		{"ldp.msg.tlv.hello.hold", "Hold Time", DisplayUnsigned, 16}, {"ldp.msg.tlv.hello.targeted", "Targeted", DisplayBoolean, 0},
+		{"ldp.msg.tlv.hello.requested", "Requested", DisplayBoolean, 0}, {"ldp.msg.tlv.hello.gtsm", "GTSM", DisplayBoolean, 0},
+		{"ldp.msg.tlv.hello.res", "Reserved", DisplayUnsigned, 13}, {"ldp.msg.tlv.hello.cnf_seqno", "Configuration Sequence Number", DisplayUnsigned, 32},
+		{"ldp.msg.tlv.ipv4.taddr", "IPv4 Transport Address", DisplayAddress, 0}, {"ldp.msg.tlv.ipv6.taddr", "IPv6 Transport Address", DisplayAddress, 0},
+	} {
+		path("ldp", "ldp", f.name, f.key, f.typ, f.bits, "pdu", "Messages", "*", "TLVs", "*", f.key)
+	}
 
 	for _, f := range []struct {
 		protocol, name, label, key, origin string

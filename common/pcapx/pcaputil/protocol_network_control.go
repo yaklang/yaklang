@@ -17,6 +17,7 @@ type controlDatagramProfile struct {
 }
 
 var controlDatagramProfiles = []controlDatagramProfile{
+	{"ldp", "LDPDiscoveryFields", []uint16{646}},
 	{"ike", "IKEMessage", []uint16{500}}, {"ike-natt", "IKENATTMessage", []uint16{4500}},
 	{"wireguard", "WireGuardMessage", []uint16{51820}}, {"rip", "RIPMessage", []uint16{520}},
 	{"nbt-dg", "NBTDGMessage", []uint16{138}}, {"onc-rpc", "ONCRPCMessage", []uint16{111}},
@@ -44,7 +45,10 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 		var fields map[string]any
 		var err error
 		routing := p.name == "hsrp" || p.name == "glbp" || p.name == "bfd"
-		if routing {
+		if p.name == "ldp" {
+			fields, err = stream_parser.DecodeLDPDiscovery(w, a.budget.MaxCollectionElements)
+			err = observedWireError(err)
+		} else if routing {
 			fields, err = stream_parser.DecodeRoutingControl(w, p.name, a.budget.MaxCollectionElements)
 			err = observedWireError(err)
 		} else {
@@ -62,6 +66,9 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 			continue
 		}
 		e.Protocol, e.Rule, e.Entry = p.name, "network_control_fields", p.entry
+		if p.name == "ldp" {
+			e.Rule, e.nativeSessionMessage = "ldp_discovery", true
+		}
 		if routing {
 			e.Rule = "routing_control"
 			e.nativeSessionMessage = true
@@ -76,12 +83,15 @@ func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst u
 		if err == nil {
 			e.Session = fields
 			e.semanticFields = cloneSession(fields)
-			if routing {
+			if routing || p.name == "ldp" {
 				e.semanticSession = cloneSession(fields)
 			}
 			e.Summary = fields["Packet Name"].(string)
 		}
 		a.finishProtocolDatagram(e, w, nil, err)
+		if err == nil && p.name == "ldp" {
+			e.Summary = fields["Packet Name"].(string)
+		}
 		return true
 	}
 	return false

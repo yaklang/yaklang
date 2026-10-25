@@ -25,6 +25,7 @@ type packetPresentation struct {
 }
 
 var protocolDisplayNames = map[string]string{
+	"ldp":       "LDP",
 	"wireguard": "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
 	"tlsv1.0": "TLSv1.0", "tlsv1.1": "TLSv1.1", "tlsv1.2": "TLSv1.2", "tlsv1.3": "TLSv1.3",
 	"http": "HTTP", "http2": "HTTP/2", "http3": "HTTP/3", "grpc": "gRPC",
@@ -347,6 +348,38 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ldp" {
+		v := eventValues(e)
+		parts := []string{fmt.Sprintf("LSR %s:%d", textValue(v["LSR ID"]), number(v["Label Space ID"]))}
+		messages := mapList(v["Messages"])
+		if len(messages) > 0 {
+			for _, tlv := range mapList(messages[0]["TLVs"]) {
+				if number(tlv["TLV Type"]) == 0x0400 {
+					kind := "Link Hello"
+					if tlv["Targeted"] == true {
+						kind = "Targeted Hello"
+					}
+					hold := fmt.Sprintf("%d s", number(tlv["Hold Time"]))
+					if number(tlv["Hold Time"]) == 0 {
+						hold = "default"
+					}
+					if number(tlv["Hold Time"]) == 65535 {
+						hold = "infinite"
+					}
+					parts = append(parts, kind, "advertised hold="+hold)
+				}
+				for _, key := range []string{"IPv4 Transport Address", "IPv6 Transport Address"} {
+					if addr := textValue(tlv[key]); addr != "" {
+						parts = append(parts, "transport="+addr)
+					}
+				}
+			}
+		}
+		if len(messages) > 1 {
+			parts = append(parts, fmt.Sprintf("%d Hello messages; first shown", len(messages)))
+		}
+		return strings.Join(parts, " · ")
+	}
 	if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
 		v := eventValues(e)
 		parts := []string{eventProtocolName(e) + " " + textValue(v["Packet Name"])}

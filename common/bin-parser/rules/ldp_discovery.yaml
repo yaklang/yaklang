@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("LDPDiscoveryFields")
+  LDPDiscoveryFields:
+    operator: |
+      err = parseObservedSession("ldp-discovery")
+      if err != nil { panic(err) }
