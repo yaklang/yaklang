@@ -353,6 +353,9 @@ func (t searchTerm) matches(e *packetEntry, row packetSummary, c *packetSearchCo
 	switch t.kind {
 	case "proto":
 		for _, p := range append(append(append([]string(nil), row.Layers...), row.ProtocolStack...), row.ConnectionStack...) {
+			if !t.exact && t.value == "stp" && (strings.EqualFold(p, "PVST+") || strings.EqualFold(p, "RPVST+")) {
+				return true
+			}
 			if t.stringMatch(p) {
 				return true
 			}

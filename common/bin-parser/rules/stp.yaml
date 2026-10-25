@@ -4,10 +4,19 @@ Package:
     operator: |
       // Validate the entire selected message before publishing the historical
       // leaf layout. Recovery keeps the original cursor and child names.
+      complete = true
+      failure = ""
       if this.HasMaxLength() {
         staged, operation = this.TryProcessByType("STPValidation")
         operation.Recovery()
-        if !operation.OK { panic("stp: complete selected BPDU grammar failed") }
+        complete = operation.OK
+        failure = operation.Message
+        prefix, peek = this.TryProcessByType("STPHeaderPrefix")
+        peek.Recovery()
+        if peek.OK && ((prefix.Value >> 8) & 255) == 3 {
+          this.ProcessByType("STPValidation")
+          return
+        }
       }
       this.ProcessSubNode("Protocol ID")
       if getNodeResult("Protocol ID").Value != 0 {
@@ -19,22 +28,19 @@ Package:
       btype = getNodeResult("BPDU Type").Value
       if btype == 0x80 {
         if version != 0 { panic("stp: TCN requires version0") }
+        if !complete { panic(failure) }
         return
       }
       if btype == 0x00 || btype == 0x02 {
-        if !((version == 0 && btype == 0) || ((version == 2 || version == 3) && btype == 2)) { panic("stp: unsupported version/type") }
         this.ProcessSubNode("Config")
-        if version == 3 {
-          this.GetSubNode("MST Extension").SetMaxLength(this.GetMaxLength() - this.Length())
-          this.ProcessSubNode("MST Extension")
-        }
+        if !complete { panic(failure) }
+        if !((version == 0 && btype == 0) || (version == 2 && btype == 2)) { panic("stp: unsupported version/type") }
         return
       }
       panic("stp: unknown bpdu type")
     Protocol ID: uint16
     Version: uint8
     BPDU Type: uint8
-    MST Extension: raw
     Config:
       operator: |
         this.ProcessSubNode("Flags")
@@ -85,3 +91,4 @@ STPValidation:
   operator: |
     err = parseObservedSession("stp")
     if err != nil { panic(err) }
+STPHeaderPrefix: uint32

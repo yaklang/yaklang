@@ -8,8 +8,37 @@ import (
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcapgo"
 	"github.com/stretchr/testify/require"
 )
+
+func TestSTPReplayAdmitsLengthFormVLANWithoutGenericLLCDecode(t *testing.T) {
+	w := append(stpNativeWire(), 0, 0, 0, 2, 0, 121)
+	valid := stpNativeFrame(w, true, true)
+	bad := bytes.Clone(valid)
+	bad[19] = 0x43
+	var capture bytes.Buffer
+	writer := pcapgo.NewWriter(&capture)
+	require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
+	for _, frame := range [][]byte{valid, bad, valid} {
+		require.NoError(t, writer.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(7, 0), CaptureLength: len(frame), Length: len(frame)}, frame))
+	}
+	events, stats, err := binReplay(t, capture.Bytes(), 1)
+	require.NoError(t, err)
+	var bpdu []*ProtocolEvent
+	for _, e := range events {
+		if e.Protocol == "stp" {
+			bpdu = append(bpdu, e)
+		}
+	}
+	require.Len(t, bpdu, 2, "fast VLAN length-form fallback must reach the literal root Ethernet carrier")
+	for _, e := range bpdu {
+		require.Equal(t, "decoded", e.Status, e.Error)
+		require.Equal(t, w, e.Raw)
+		require.Equal(t, "RPVST+", e.Session["Protocol Name"])
+	}
+	require.Zero(t, stats.CallbackPanics)
+}
 
 func stpNativeWire() []byte {
 	return []byte{0, 0, 2, 2, 0x3c, 0x80, 1, 2, 0, 0, 0, 0, 1, 0, 0, 0, 19, 0x90, 1, 2, 0, 0, 0, 0, 2, 0x80, 3, 0, 128, 20, 0, 2, 0, 15, 0, 0}

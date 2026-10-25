@@ -817,6 +817,13 @@ func (p *packetPresentation) addLayer(label string) {
 		if label == "TLS" && strings.HasPrefix(old, "TLSv") {
 			return
 		}
+		if old == "STP" && (label == "RSTP" || label == "MSTP" || label == "PVST+" || label == "RPVST+") {
+			p.stack[i] = label
+			return
+		}
+		if label == "STP" && (old == "RSTP" || old == "MSTP" || old == "PVST+" || old == "RPVST+") {
+			return
+		}
 		// SYN uses the legacy header before the selected RDPUDP2 wire format.
 		// This is one evolving carrier, not RDPUDP nested inside RDPUDP2.
 		if label == "RDPUDP2" && old == "RDPUDP" {
@@ -896,7 +903,16 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	// original chain itself: repeated IP headers are real tunnel layers.
 	for _, semantic := range p.stack {
 		present := false
-		for _, physical := range row.ProtocolStack {
+		for i, physical := range row.ProtocolStack {
+			if physical == "STP" && (semantic == "RSTP" || semantic == "MSTP" || semantic == "PVST+" || semantic == "RPVST+") {
+				row.ProtocolStack[i] = semantic
+				present = true
+				break
+			}
+			if semantic == "STP" && (physical == "RSTP" || physical == "MSTP" || physical == "PVST+" || physical == "RPVST+") {
+				present = true
+				break
+			}
 			if semantic == physical || len(p.nativeHeaders) > 0 && strings.EqualFold(semantic, physical) {
 				present = true
 				break
