@@ -73,17 +73,25 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 			typ = DisplayAddress
 		}
 		b := displayCustom("netflow-v9", spec.name, "Reported flow field; not a captured endpoint or transport fact", typ, spec.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
-			p.walk(e.Session, []string{"FlowSets", "*", "Records", "*", "Fields", "*"}, func(v any) {
-				field, ok := v.(map[string]any)
-				if !ok || routingNumber(field, "Field Type") != spec.id || field["Scope"] != false || field["Value Kind"] != spec.kind {
-					return
+			if p.netflowV9ByType == nil {
+				p.netflowV9ByType = map[uint64][]map[string]any{}
+				p.walk(e.Session, []string{"FlowSets", "*", "Records", "*", "Fields", "*"}, func(v any) {
+					if field, ok := v.(map[string]any); ok {
+						id := routingNumber(field, "Field Type")
+						p.netflowV9ByType[id] = append(p.netflowV9ByType[id], field)
+					}
+				})
+			}
+			for _, field := range p.netflowV9ByType[spec.id] {
+				if field["Scope"] != false || field["Value Kind"] != spec.kind {
+					continue
 				}
 				before := len(p.snapshot.Values)
 				emit(field["Value"])
 				if len(p.snapshot.Values) == before+1 {
 					p.snapshot.Values[before].Range = (&ProtocolEvent{Session: field, Raw: e.Raw}).displayPDUFieldRange("Value")
 				}
-			})
+			}
 		})
 		out = append(out, b)
 	}

@@ -549,6 +549,9 @@ func displayUint(value any) (uint64, bool) {
 type displayProjection struct {
 	snapshot  *DisplayFieldSnapshot
 	remaining int
+	// One bounded traversal per event, rather than spending the graph budget
+	// again for every registered information-element alias.
+	netflowV9ByType map[uint64][]map[string]any
 }
 
 func (p *displayProjection) spend() bool {
