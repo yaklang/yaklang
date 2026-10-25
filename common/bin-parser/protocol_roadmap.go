@@ -137,7 +137,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "RIP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "RIPng", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP2, Notes: "Bounded shared v1 wire and native IPv6 datagram entries; message-local next-hop advisories, no routing table/neighbor authentication or cross-message association"},
 	{Name: "EIGRP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
-	{Name: "IS-IS", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
+	{Name: "IS-IS", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP2, Notes: "Shared bounded six-octet ISISFields/native independent advertisements with selected reachability and checksum verification; unknown extensions, authentication, assembled database and actual adjacency/route state remain unproved"},
 	{Name: "IGRP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "EGP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "VRRP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},

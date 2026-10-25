@@ -39,7 +39,7 @@ func TestRoutingControlCanonicalEntries(t *testing.T) {
 func requireRoutingControlScopes(t *testing.T) map[string]bool {
 	t.Helper()
 	result := map[string]bool{}
-	for _, name := range []string{"HSRP", "GLBP", "BFD", "LDP", "PIM", "RIPng"} {
+	for _, name := range []string{"HSRP", "GLBP", "BFD", "LDP", "PIM", "RIPng", "IS-IS"} {
 		found := false
 		for _, row := range ProtocolRoadmap {
 			if row.Name == name {
@@ -58,7 +58,9 @@ func requireRoutingControlScopes(t *testing.T) map[string]bool {
 			}
 		}
 		require.True(t, found)
-		if name == "RIPng" {
+		if name == "IS-IS" {
+			result[name] = t.Run("ISISCanonicalAndLegacyBoundedScope", TestISISCanonicalAndLegacyBoundaries)
+		} else if name == "RIPng" {
 			result[name] = t.Run("RIPngCanonicalAndLegacyBoundedScope", TestRIPngCanonicalAndLegacyBoundaries)
 		} else if name == "PIM" {
 			result[name] = t.Run("PIMBoundedControlScope", TestPIMCanonicalControlFields)

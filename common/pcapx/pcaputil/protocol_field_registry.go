@@ -178,6 +178,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, l2tp3DisplayBindings()...)
 	out = append(out, stpDisplayBindings()...)
 	out = append(out, ripngDisplayBindings()...)
+	out = append(out, isisDisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
