@@ -60,7 +60,7 @@ func TestISISKeepsMalformedBodySeparateFromCompleteHeader(t *testing.T) {
 func TestISISMalformedNoticeCannotBeClippedBehindValidHeaderSummary(t *testing.T) {
 	w, err := hex.DecodeString("831b010012010000001b04b0010001000100000000000001dd1d01")
 	require.NoError(t, err)
-	w = append(w, 3, 4, 0, 128, 128, 128)
+	w = append(w, 3, 3, 0, 128, 128)
 	w[9] = byte(len(w))
 	w[24], w[25] = 0, 0
 	m, err := stream_parser.DecodeISISWire(w, 64)
@@ -77,4 +77,30 @@ func TestISISMalformedNoticeCannotBeClippedBehindValidHeaderSummary(t *testing.T
 		}
 	}
 	require.True(t, found)
+}
+
+func TestISISValidEmptyESListShowsSharedMetricsWithoutMalformedNotice(t *testing.T) {
+	w, err := hex.DecodeString("831b010012010000002104b0010001000100000000000001000001030400808080")
+	require.NoError(t, err)
+	m, err := stream_parser.DecodeISISWire(w, 64)
+	require.NoError(t, err)
+	e := &pcaputil.ProtocolEvent{Protocol: "isis", Profile: "isis-six-octet-independent-advertisement", Status: "decoded", Raw: w, Session: m, Summary: "IS-IS L1 Link State"}
+	r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "LLC"})
+	require.Equal(t, "IS-IS LSP", r.Protocol)
+	require.NotContains(t, r.Info, "Malformed")
+	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	count, metric := false, false
+	for _, f := range fs {
+		if f.text == "ES Neighbor Count: 0" {
+			count = true
+			require.False(t, f.hasRange)
+		}
+		if f.text == "Default Metric: 0" {
+			metric = true
+			require.True(t, f.hasRange)
+			require.Equal(t, []byte{0}, sources[f.source-1].Data[f.start:f.end])
+		}
+	}
+	require.True(t, count)
+	require.True(t, metric)
 }

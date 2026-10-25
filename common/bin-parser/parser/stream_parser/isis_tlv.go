@@ -287,7 +287,9 @@ func isisTLVContextSelected(pdu, typ uint64) bool {
 	switch typ {
 	case 1, 129, 132, 232:
 		return hello || lsp
-	case 2, 3, 14, 22, 128, 130, 134, 135, 137, 236:
+	case 3:
+		return pdu == 18
+	case 2, 14, 22, 128, 130, 134, 135, 137, 236:
 		return lsp
 	case 6:
 		return pdu == 15 || pdu == 16

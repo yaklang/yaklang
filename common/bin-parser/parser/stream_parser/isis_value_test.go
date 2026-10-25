@@ -142,20 +142,39 @@ func TestISISWireUnknownContextBudgetAndNoInheritance(t *testing.T) {
 	require.ErrorIs(t, err, ErrObservedWireBudget)
 }
 
-func TestISISWireLegacyESNeighborsKeepPerRecordMetricOctets(t *testing.T) {
-	w := isisWireAdd(t, isisWireVector(t, 3), []byte{3, 20, 1, 0x82, 0x83, 0x84, 1, 2, 3, 4, 5, 6, 5, 0x86, 7, 8, 6, 5, 4, 3, 2, 1})
+func TestISISWireESNeighborsShareOneMetricBlock(t *testing.T) {
+	w := isisWireAdd(t, isisWireVector(t, 3), []byte{3, 16, 1, 0x82, 0x83, 0x84, 1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1})
 	m, err := DecodeISISWire(w, 64)
 	require.NoError(t, err)
-	rows := m["TLVs"].([]map[string]any)[0]["Neighbors"].([]map[string]any)
+	tlv := m["TLVs"].([]map[string]any)[0]
+	rows := tlv["Neighbors"].([]map[string]any)
 	require.Len(t, rows, 2)
-	for i, values := range [][4]uint64{{1, 2, 3, 4}, {5, 6, 7, 8}} {
-		for j, name := range []string{"Default", "Delay", "Expense", "Error"} {
-			require.EqualValues(t, values[j], rows[i][name+" Metric"], "metrics use four distinct wire octets")
-		}
+	shared := tlv["Shared Metrics"].(map[string]any)
+	for j, name := range []string{"Default", "Delay", "Expense", "Error"} {
+		require.EqualValues(t, j+1, shared[name+" Metric"], "one cost block applies to every listed ES")
 	}
-	require.Equal(t, false, rows[0]["Delay Metric Supported"])
+	require.Equal(t, false, shared["Delay Metric Supported"])
+	for _, row := range rows {
+		require.NotContains(t, row, "Default Metric", "do not invent a metric block per ID")
+	}
 	require.Equal(t, "0102.0304.0506", rows[0]["System ID"])
 	require.Equal(t, "0605.0403.0201", rows[1]["System ID"])
+	require.Equal(t, []any{uint64(29), uint64(30)}, shared["Wire Field Ranges"].(map[string]any)["Default Metric"])
+	for _, values := range [][]byte{{3, 4, 0, 128, 128, 128}, {3, 3, 0, 128, 128}, {3, 5, 0, 128, 128, 128, 1}} {
+		m, err := DecodeISISWire(isisWireAdd(t, isisWireVector(t, 3), values), 64)
+		if values[1] == 4 {
+			require.NoError(t, err)
+			tlv := m["TLVs"].([]map[string]any)[0]
+			require.Empty(t, tlv["Neighbors"])
+			require.NotEmpty(t, tlv["Shared Metrics"])
+			require.Equal(t, true, m["Checksum Verified"])
+		} else {
+			require.Error(t, err)
+		}
+	}
+	m, err = DecodeISISWire(isisWireAdd(t, isisWireVector(t, 4), []byte{3, 4, 0, 128, 128, 128}), 64)
+	require.NoError(t, err)
+	require.Equal(t, true, m["Unselected Extensions"], "ES reachability is an L1 option, not L2 prefix reachability")
 }
 
 func TestISISWireLANNeighborSNPAIsNotSystemIdentity(t *testing.T) {
@@ -168,7 +187,7 @@ func TestISISWireLANNeighborSNPAIsNotSystemIdentity(t *testing.T) {
 }
 
 func TestISISWireMalformedTLVRetainsOnlyEarlierCompleteObservations(t *testing.T) {
-	w := isisWireAdd(t, isisWireVector(t, 3), []byte{137, 2, 'r', '1', 3, 4, 0, 128, 128, 128})
+	w := isisWireAdd(t, isisWireVector(t, 3), []byte{137, 2, 'r', '1', 3, 3, 0, 128, 128})
 	m, err := DecodeISISWire(w, 64)
 	require.Error(t, err)
 	require.Equal(t, true, m["Fixed Header Complete"])

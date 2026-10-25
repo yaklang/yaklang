@@ -70,18 +70,28 @@ def verify(w, session):
                     span(row, key, start+off, size)
                 equal('reported LSP identity', row.get('LSP ID'), system_id(w[start+2:start+10]))
                 span(row, 'LSP ID', start+2, 8)
-        elif t in (2, 3) and lsp:
-            if t == 2:
-                key = 'Virtual Flag' if pdu == 18 else 'Reserved Neighbor Octet'
-                equal('neighbor header meaning', tlv.get(key), bool(w[pos] & 1) if pdu == 18 else w[pos])
-                pos += 1
-            step, width, key = (11, 7, 'Neighbor Node ID') if t == 2 else (10, 6, 'System ID')
+        elif t == 2 and lsp:
+            key = 'Virtual Flag' if pdu == 18 else 'Reserved Neighbor Octet'
+            equal('neighbor header meaning', tlv.get(key), bool(w[pos] & 1) if pdu == 18 else w[pos])
+            pos += 1
+            step, width, key = 11, 7, 'Neighbor Node ID'
             rows = tlv.get('Neighbors') or []
             equal('legacy neighbor count', len(rows), (stop-pos)//step)
             for row, start in zip(rows, range(pos, stop, step)):
                 metrics(row, start, False)
                 equal('metric belongs to this neighbor', row.get(key), system_id(w[start+4:start+4+width]))
                 span(row, key, start+4, width)
+        elif t == 3 and pdu == 18:
+            shared = tlv['Shared Metrics']
+            metrics(shared, pos, False)
+            pos += 4
+            rows = tlv.get('Neighbors') or []
+            equal('ES IDs share one metric block', len(rows), (stop-pos)//6)
+            equal('derived ES count', tlv.get('ES Neighbor Count'), len(rows))
+            for row, start in zip(rows, range(pos, stop, 6)):
+                equal('shared-cost ES identity', row.get('System ID'), system_id(w[start:start+6]))
+                span(row, 'System ID', start, 6)
+                equal('no fabricated per-ES metric bytes', 'Default Metric' in row, False)
         elif t in (128, 130) and lsp:
             rows = tlv.get('Reachability Entries') or []
             equal('legacy IPv4 entry count', len(rows), n//12)

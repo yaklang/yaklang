@@ -72,8 +72,12 @@ bad = bytearray(lsp); bad[23] ^= 1
 add('invalid-active-checksum-and-full-repair', [body(bad), body(lsp)], ['malformed', 'decoded'], checksum_repair=True)
 purge = bytearray(bad); purge[10:12] = b'\0\0'
 add('purge-retains-literal-unverified-checksum', [body(purge)], ['decoded'], purge=True)
-broken = sized(short_lsp, b'\x89\x02r1\x03\x04\0\x80\x80\x80')
+es_lsp = bytearray(short_lsp); es_lsp[4] = 18; es_lsp = sized(es_lsp)
+broken = sized(es_lsp, b'\x89\x02r1\x03\x03\0\x80\x80')
 add('complete-header-and-broken-ES-TLV', [body(broken), body(lsp)], ['malformed', 'decoded'], broken_tlv=True)
+add('ES-shared-metrics-empty-ID-list', [body(sized(es_lsp, b'\x03\x04\0\x80\x80\x80'))], ['decoded'], es_counts=[0])
+add('ES-two-IDs-share-one-metric-block', [body(sized(es_lsp, bytes([3,16,1,0x82,0x83,0x84,1,2,3,4,5,6,6,5,4,3,2,1])))], ['decoded'], es_counts=[2])
+add('ES-different-costs-use-separate-TLVs', [body(sized(es_lsp, bytes([3,10,1,0x82,0x83,0x84,1,2,3,4,5,6,3,10,5,0x86,7,8,6,5,4,3,2,1])))], ['decoded'], es_counts=[1,1], es_costs=[1,5])
 raw = body(lsp)
 add('capture-cut-and-complete-repair', [(raw[:-1], len(raw)), raw], ['incomplete', 'decoded'])
 bad = bytearray(short_hello); bad[18] -= 1
@@ -162,6 +166,10 @@ for case in cases:
     if 'circuit' in case:
         m = es[0]['session']; text = m['Source System ID'].replace('.', '')
         assert m['Source Circuit ID'] == case['circuit'] and text == case['system']; checks += 2
+    if 'es_counts' in case:
+        rows = es[0]['session']['TLVs']; assert [v['ES Neighbor Count'] for v in rows] == case['es_counts']; checks += len(rows)
+        assert all('Default Metric' not in n for v in rows for n in v.get('Neighbors') or []); checks += 1
+        if 'es_costs' in case:assert [v['Shared Metrics']['Default Metric'] for v in rows] == case['es_costs']; checks += len(rows)
     with (d/'wire-audit.log').open('wb') as log:
         subprocess.run([sys.executable, '-X', 'utf8', str(Path(__file__).with_name('isis_wire_audit.py')), str(d/'oracle.json'), str(d/'events.jsonl'), str(d/'wire-audit.json')], stdout=log, stderr=subprocess.STDOUT, check=True)
     audit = json.loads((d/'wire-audit.json').read_text())
