@@ -11,7 +11,20 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 		if spec.name == "cflow.version" || spec.name == "cflow.count" {
 			bits = 16
 		}
-		out = append(out, displayRoot("netflow-v9", spec.name, spec.key, DisplayUnsigned, bits, "pdu", spec.key))
+		b := displayRoot("netflow-v9", spec.name, spec.key, DisplayUnsigned, bits, "pdu", spec.key)
+		if spec.name != "cflow.source_id" {
+			b.protocols = "|netflow-v5|netflow-v9|"
+		}
+		out = append(out, b)
+	}
+	for _, spec := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"cflow.unix_nsecs", "Unix Nanoseconds", 32}, {"cflow.engine_type", "Engine Type", 8}, {"cflow.engine_id", "Engine ID", 8},
+		{"cflow.samplingmode", "Sampling Mode", 2}, {"cflow.samplerate", "Sampling Interval", 14},
+	} {
+		out = append(out, displayRoot("netflow-v5", spec.name, spec.key, DisplayUnsigned, spec.bits, "pdu", spec.key))
 	}
 	add := func(name, key string, bits int, level string) {
 		b := displayCustom("netflow-v9", name, key, DisplayUnsigned, bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
@@ -75,7 +88,11 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 		b := displayCustom("netflow-v9", spec.name, "Reported flow field; not a captured endpoint or transport fact", typ, spec.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 			if p.netflowV9ByType == nil {
 				p.netflowV9ByType = map[uint64][]map[string]any{}
-				p.walk(e.Session, []string{"FlowSets", "*", "Records", "*", "Fields", "*"}, func(v any) {
+				path := []string{"FlowSets", "*", "Records", "*", "Fields", "*"}
+				if e.Protocol == "netflow-v5" {
+					path = []string{"Records", "*", "Fields", "*"}
+				}
+				p.walk(e.Session, path, func(v any) {
 					if field, ok := v.(map[string]any); ok {
 						id := routingNumber(field, "Field Type")
 						p.netflowV9ByType[id] = append(p.netflowV9ByType[id], field)
@@ -93,6 +110,7 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 				}
 			}
 		})
+		b.protocols = "|netflow-v5|netflow-v9|"
 		out = append(out, b)
 	}
 	return out

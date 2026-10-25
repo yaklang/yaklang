@@ -356,6 +356,9 @@ func (t searchTerm) matches(e *packetEntry, row packetSummary, c *packetSearchCo
 			if !t.exact && (t.value == "cflow" || t.value == "netflow-v9") && strings.EqualFold(p, "NetFlow v9") {
 				return true
 			}
+			if !t.exact && (t.value == "cflow" || t.value == "netflow-v5") && strings.EqualFold(p, "NetFlow v5") {
+				return true
+			}
 			if !t.exact && t.value == "isis" && (strings.EqualFold(p, "IS-IS") || strings.HasPrefix(strings.ToUpper(p), "IS-IS ")) {
 				return true
 			}
