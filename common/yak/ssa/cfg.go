@@ -521,7 +521,16 @@ func (t *TryBuilder) Finish() {
 
 	tryBuilder := ssautil.NewTryStmt(ssautil.ScopedVersionedTableIF[Value](scope), generatePhi(builder, nil, t.enter))
 
-	builder.CurrentBlock = t.enter
+	// An earlier return/raise may already terminate the source block. The
+	// try body and its catches still need SSA for analysis, but cannot attach
+	// an ErrorHandler to a finished block. Give that unreachable syntax an
+	// isolated entry block instead of emitting a nil handler.
+	entry := t.enter
+	if entry.finish {
+		entry = builder.NewBasicBlock("try.unreachable-entry")
+		entry.SetScope(scope)
+	}
+	builder.CurrentBlock = entry
 	tryBlock := builder.NewBasicBlock(TryStart)
 	enterTryBlock := tryBlock
 	errorHandler := builder.EmitErrorHandler(tryBlock)
