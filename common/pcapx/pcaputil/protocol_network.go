@@ -46,7 +46,12 @@ type fragmentStore struct {
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
-	if a.observeSTP(p, e) { return nil, true }
+	if a.observeSTP(p, e) {
+		return nil, true
+	}
+	if a.observeISIS(p, e) {
+		return nil, true
+	}
 	if decoded := p.Layers(); len(decoded) != 0 {
 		if can, ok := decoded[0].(*socketCANLayer); ok {
 			a.decodeCANRecord(can.wire, e, ci)

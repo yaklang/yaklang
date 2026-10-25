@@ -33,6 +33,7 @@ type packetPresentation struct {
 }
 
 var protocolDisplayNames = map[string]string{
+	"isis":      "IS-IS",
 	"ldp":       "LDP",
 	"wireguard": "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "ripng": "RIPng", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
 	"tlsv1.0": "TLSv1.0", "tlsv1.1": "TLSv1.1", "tlsv1.2": "TLSv1.2", "tlsv1.3": "TLSv1.3",
@@ -127,6 +128,11 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "isis" {
+		if name := textValue(eventValues(e)["Protocol Name"]); name == "IS-IS Hello" || name == "IS-IS LSP" || name == "IS-IS CSNP" || name == "IS-IS PSNP" {
+			return name
+		}
+	}
 	if e.Protocol == "stp" {
 		if name, ok := eventValues(e)["Protocol Name"].(string); ok && (name == "STP" || name == "RSTP" || name == "MSTP" || name == "PVST+" || name == "RPVST+") {
 			return name
@@ -367,6 +373,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "isis" && e.Summary != "" && e.Summary != e.Protocol {
+		return safeText(e.Summary)
+	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
 		v := eventValues(e)
 		parts := []string{textValue(v["Packet Name"])}
@@ -692,6 +701,12 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
+	if e.Protocol == "isis" && e.Profile == "isis-six-octet-independent-advertisement" && e.Status == "malformed" && e.Session["Fixed Header Complete"] == true {
+		p.protocol, p.priority, p.status, p.visibility = eventProtocolName(e), 5, "malformed", "message"
+		p.evidence, p.summary = "complete bounded IS-IS fixed header; body/integrity rejected", clipText(applicationEventSummary(e), 384)
+		p.addLayer(p.protocol)
+		return
+	}
 	verifiedL2TPv3 := e.Protocol == "l2tp" && e.Profile == "l2tp3-bounded-wire-envelope" && e.Session["Envelope Verified"] == true
 	if verifiedL2TPv3 && e.Transport == "network" {
 		p.nativeIP115Bytes = len(e.Raw)
@@ -828,6 +843,13 @@ func (p *packetPresentation) addLayer(label string) {
 		if old == label {
 			return
 		}
+		if old == "IS-IS" && strings.HasPrefix(label, "IS-IS ") {
+			p.stack[i] = label
+			return
+		}
+		if label == "IS-IS" && strings.HasPrefix(old, "IS-IS ") {
+			return
+		}
 		if strings.HasPrefix(label, "TLSv") && old == "TLS" {
 			p.stack[i] = label
 			return
@@ -922,6 +944,14 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
+			if physical == "IS-IS" && strings.HasPrefix(semantic, "IS-IS ") {
+				row.ProtocolStack[i], present = semantic, true
+				break
+			}
+			if semantic == "IS-IS" && strings.HasPrefix(physical, "IS-IS ") {
+				present = true
+				break
+			}
 			if physical == "STP" && (semantic == "RSTP" || semantic == "MSTP" || semantic == "PVST+" || semantic == "RPVST+") {
 				row.ProtocolStack[i] = semantic
 				present = true

@@ -25,6 +25,15 @@ var ripngEntryPriority = map[string]int{
 	"Ignored Next Hop Parameters": 9, "Conformance Warning": 10,
 }
 
+var isisEntryPriority = map[string]int{
+	"TLV Name": 0, "Type": 1, "Length": 2, "Area Addresses": 3, "Protocols Supported": 3, "Interface Addresses": 3,
+	"IS Neighbors": 3, "Neighbors": 3, "LSP Entries": 3, "Reachability Entries": 3, "Hostname": 3, "Adjacency State Name": 3,
+	"Neighbor Node ID": 4, "System ID": 4, "SNPA": 4, "Address": 4, "LSP ID": 4, "Prefix Address": 4, "Prefix Length": 5,
+	"Canonical Prefix": 6, "Metric": 7, "Sequence Number": 7, "Remaining Lifetime Seconds": 8,
+	"Reported Checksum": 9, "Sub-TLVs": 20, "Unselected Extensions": 800, "Conformance Warning": 801,
+	"Observation Scope": 802, "Opaque Value": 900, "Padding Bytes": 901,
+}
+
 func fieldPriority(name string) int {
 	if rank, ok := semanticFieldPriority[name]; ok {
 		return rank
@@ -88,7 +97,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -128,6 +137,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 						a = rank
 					}
 					if rank, ok := ripngEntryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "isis" {
+					if rank, ok := isisEntryPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := isisEntryPriority[keys[j]]; ok {
 						b = rank
 					}
 				}
@@ -261,7 +278,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -344,6 +361,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		delete(values, "Wire Field Ranges")
 		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
+		if e.Protocol == "isis" {
+			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "ripng" {
 			for _, key := range []string{"Packet Name", "Command", "Version", "Reserved", "Conformance Warning", "Whole Table Request", "Route Count", "Next Hop Count", "Entries", "Authentication Verified", "Observation Scope"} {
 				if v, ok := values[key]; ok {
