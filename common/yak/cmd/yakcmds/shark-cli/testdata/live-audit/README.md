@@ -102,6 +102,14 @@ packets and keys from one real IPv4 TLS record, tries port 443 and a nonstandard
 port, then removes the five-byte record header. It records Wireshark's actual
 labels. The record legacy version is never a negotiated TLS version oracle.
 
+`ldp_discovery_audit.py LDP_ORACLE_JSON FULL_NATIVE_JSONL ORIGINAL_CAPTURE SUMMARY
+[FULL_CLI_JSONL]` compares the original UDP discovery bytes, ordered typed
+header/message/TLV values, physical contributor interfaces and progressive paths.
+Export the oracle from the whole original file with `tshark -2 -n -r FILE -Y ldp
+-T json -x --no-duplicate-keys`, saving stdout and stderr separately. It records
+malformed/incomplete discovery views and all non-UDP views as explicit gaps;
+neither TCP label-distribution coverage nor successful adjacency is inferred.
+
 `discovery/main.go` captures physical SSDP traffic for 20 seconds, sends one
 multicast M-SEARCH, and records independent loopback positive/negative controls.
 It never retrieves a discovered LOCATION URL. The shared bounded SSDP rule and
