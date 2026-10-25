@@ -163,3 +163,29 @@ func TestISISTypedNeighborMetricsKeepDistinctWireRanges(t *testing.T) {
 	}
 	require.Equal(t, false, es[0].Session["Checksum Verified"])
 }
+
+func TestISISTypedAreaEnvelopeAndReservedBitValues(t *testing.T) {
+	w := isisNativeWire(t, "831b01008f01000083010001000100001e00218101000100010001010403490001")
+	var es []*ProtocolEvent
+	a, err := NewPacketAnalyzer(WithOnProtocolMessage(func(e *ProtocolEvent) {
+		if e.Protocol == "isis" {
+			es = append(es, e)
+		}
+	}))
+	require.NoError(t, err)
+	raw := isisNativeEthernet(w, 0)
+	require.NoError(t, a.Feed(raw, gopacket.CaptureInfo{CaptureLength: len(raw), Length: len(raw)}, layers.LinkTypeEthernet))
+	require.NoError(t, a.Close())
+	require.Len(t, es, 1)
+	snap := es[0].DisplayFieldValues()
+	values := snap.FieldMap()
+	require.Equal(t, []any{uint64(4)}, values["isis.type.reserved"])
+	require.Equal(t, []any{uint64(32), uint64(1)}, values["isis.hello.reserved"])
+	require.Equal(t, []any{"03:49:00:01"}, values["isis.hello.area_address"])
+	require.Equal(t, []any{"49.0001"}, values["isis.hello.observed.area_address"])
+	for _, f := range snap.Values {
+		if f.Name == "isis.hello.area_address" {
+			require.Equal(t, &DisplayFieldRange{Offset: 29, Length: 4}, f.Range)
+		}
+	}
+}

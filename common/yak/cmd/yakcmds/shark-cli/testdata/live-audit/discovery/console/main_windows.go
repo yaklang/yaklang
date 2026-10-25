@@ -308,9 +308,10 @@ func main() {
 			return false
 		}
 		frame := ""
+		protocolWords := strings.Fields(strictProtocol)
 		for _, row := range s.Rows {
 			f := strings.Fields(row)
-			if len(f) >= 4 && strings.HasPrefix(f[1], "›") && f[3] == strictProtocol {
+			if len(f) >= 3+len(protocolWords) && strings.HasPrefix(f[1], "›") && strings.Join(f[3:3+len(protocolWords)], " ") == strictProtocol {
 				frame = strings.TrimPrefix(f[1], "›")
 				break
 			}
