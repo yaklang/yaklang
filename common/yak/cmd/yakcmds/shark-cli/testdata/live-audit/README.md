@@ -247,3 +247,22 @@ bytes and endpoints remain original; each changed envelope and file is hashed
 in the external manifest. Missing data must produce no complete PIM, while a
 full retransmission can repair a proved capture cut. This is offline replay,
 not a new live router capture. All captures and raw output must stay outside Git.
+
+`l2tp3_wire_audit.py ORACLE_JSON NATIVE_JSONL OUTPUT_JSON` compares original
+IP115/UDP v3 envelopes, 32-bit receiver-local IDs, selected ordered AVP fields,
+whole-carrier byte identity, contributors and real endpoints. Derive data PDU
+length from the enclosing IP/UDP header: TShark's data `l2tp_raw` covers only
+the session header. Its generated pseudowire type0 means unknown, not a wire
+AVP or negotiated Ethernet. Keep raw missing/refused/unselected views visible.
+
+`l2tp3_fuzz_review.py ORACLE_JSON WIRE_AUDIT_JSON EXTRA_REFUSALS_JSON OUTPUT`
+checks exact missing IP option/fragment/version barriers and extra native
+refusal diagnostics independently. It does not turn the original audit's
+nonzero return or missing-view count into zero. Midstream data is never used
+to infer cookies, sublayers, a pseudowire type or a connection generation.
+
+`l2tp3_fragment_faults.py ORIGINAL_ORACLE_JSON DIRECTORY TSHARK EVENTS` derives
+seven declared offline IPv4 fragmentation/order/duplicate/loss/capture-cut/
+repair controls from a complete real router IP115 frame. Whole logical bytes,
+session ID and physical carrier peers must remain exact. This establishes wire
+reassembly only; full L2TP control/session negotiation is a separate scope.

@@ -200,7 +200,22 @@ func summarize(raw *capturedPacket) packetSummary {
 		row.ConnectionProtocol, row.ConnectionEvidence = row.ConnectionStack[0], "protocol session association"
 	}
 	if p.ErrorLayer() != nil {
-		row.Info += " [incomplete/undecoded]"
+		covered := false
+		actualIP115 := false
+		switch ip := network.(type) {
+		case *layers.IPv4:
+			actualIP115 = ip.Protocol == 115
+		case *layers.IPv6:
+			actualIP115 = ip.NextHeader == 115
+		}
+		why := p.ErrorLayer().Error().Error()
+		if presentation.nativeIP115Bytes > 0 && actualIP115 && (why == "Unable to decode IPProtocol 115" || why == "Layer type not currently supported") {
+			wire := network.LayerPayload()
+			covered = len(wire) == presentation.nativeIP115Bytes && sha256.Sum256(wire) == presentation.nativeIP115SHA
+		}
+		if !covered {
+			row.Info += " [incomplete/undecoded]"
+		}
 	}
 	if raw.ci.Length > len(raw.data) {
 		row.Info += fmt.Sprintf(" [truncated capture: %d/%d bytes]", len(raw.data), raw.ci.Length)

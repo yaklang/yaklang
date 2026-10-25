@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
@@ -15,6 +16,10 @@ import (
 // It is built before publishing a packet, so UI rows need not decode messages
 // or copy history on every redraw. Connection attribution remains separate.
 type packetPresentation struct {
+	// A verified native IP115 PDU may cover gopacket's specific unsupported
+	// protocol error. Bind that proof to bytes, not merely a protocol label.
+	nativeIP115SHA                        [32]byte
+	nativeIP115Bytes                      int
 	evidence                              string
 	protocol, summary, visibility, status string
 	diagnostic                            string
@@ -119,6 +124,9 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
+		return "L2TPv3"
+	}
 	if e.Protocol == "pim" && number(eventValues(e)["Version"]) == 2 {
 		return "PIMv2"
 	}
@@ -351,6 +359,13 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
+		v := eventValues(e)
+		if v["Control"] == true {
+			return fmt.Sprintf("%s · control=0x%08x · Ns=%d Nr=%d", textValue(v["Packet Name"]), number(v["Control Connection ID"]), number(v["Ns"]), number(v["Nr"]))
+		}
+		return fmt.Sprintf("Data · session=0x%08x · %d opaque bytes · receiver context unavailable", number(v["Session ID"]), number(v["Opaque Payload Bytes"]))
+	}
 	if e.Protocol == "pim" {
 		v := eventValues(e)
 		parts := []string{textValue(v["Packet Name"])}
@@ -615,7 +630,7 @@ func grpcMessageData(m map[string]any) ([]byte, string) {
 
 func eventPriority(e *pcaputil.ProtocolEvent) int {
 	p := 20
-	if e.Protocol == "pim" {
+	if e.Protocol == "pim" || e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
 		p = 5 // preserve the control layer without hiding admitted inner data
 	}
 	if e.Protocol == "tls" || e.Protocol == "quic" || e.Protocol == "dtls" {
@@ -636,6 +651,10 @@ func eventPriority(e *pcaputil.ProtocolEvent) int {
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
+	}
+	if e.Protocol == "l2tp" && e.Transport == "network" && e.Profile == "l2tp3-bounded-wire-envelope" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && e.Session["Envelope Verified"] == true {
+		p.nativeIP115Bytes = len(e.Raw)
+		p.nativeIP115SHA = sha256.Sum256(e.Raw)
 	}
 	// These parsers validated a complete outer message before refusing inner
 	// decryption/extensions. A missing key/profile must not erase that proven
