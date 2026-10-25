@@ -344,6 +344,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
+		if notice := isisMalformedNotice(e); notice != "" {
+			// A long otherwise valid header/checksum summary can hide the reason
+			// for rejection. Keep the diagnostic near the beginning of details.
+			add(notice+" · "+textValue(e.Session["TLV Decode Failure"]), false)
+		}
 		if e.SourceBytes.CompletedIn != nil {
 			add(fmt.Sprintf("Message bytes complete in frame #%d · %d contributing packet(s)", e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
 		}
