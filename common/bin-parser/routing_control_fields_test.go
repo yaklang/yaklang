@@ -34,12 +34,12 @@ func TestRoutingControlCanonicalEntries(t *testing.T) {
 }
 
 // Each exception is tied to an executable bounded codec. Historical HSRP
-// "done" and GLBP/BFD "todo" scores stay immutable, while today's coverage is
+// "done" and GLBP/BFD/LDP "todo" scores stay immutable, while today's coverage is
 // accurately partial. No unrelated partial protocol bypasses roadmap checks.
 func requireRoutingControlScopes(t *testing.T) map[string]bool {
 	t.Helper()
 	result := map[string]bool{}
-	for _, name := range []string{"HSRP", "GLBP", "BFD"} {
+	for _, name := range []string{"HSRP", "GLBP", "BFD", "LDP"} {
 		found := false
 		for _, row := range ProtocolRoadmap {
 			if row.Name == name {
@@ -58,7 +58,11 @@ func requireRoutingControlScopes(t *testing.T) map[string]bool {
 			}
 		}
 		require.True(t, found)
-		result[name] = t.Run(name+"BoundedRoutingScope", TestRoutingControlCanonicalEntries)
+		if name == "LDP" {
+			result[name] = t.Run("LDPBoundedDiscoveryScope", TestLDPDiscoveryCanonicalCompleteMessagesAndBoundaries)
+		} else {
+			result[name] = t.Run(name+"BoundedRoutingScope", TestRoutingControlCanonicalEntries)
+		}
 	}
 	return result
 }

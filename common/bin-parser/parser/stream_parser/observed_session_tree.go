@@ -39,6 +39,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	}
 	var fields map[string]any
 	switch profile {
+	case "ldp-discovery":
+		fields, err = DecodeLDPDiscovery(wire, 4096)
 	case "bgp":
 		fields, err = DecodeBGPMessage(wire, BGPWireContext{}, 4096)
 	case "ajp", "ajp-body":

@@ -82,7 +82,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -209,6 +209,24 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			if protocol == "ldp" {
+				switch name {
+				case "Hold Time":
+					value = fmt.Sprintf("%d s (advertised; negotiated unobserved)", number(x))
+					if number(x) == 0 {
+						value = "0 (advertised default; see Hold Time Meaning)"
+					}
+					if number(x) == 65535 {
+						value = "65535 (advertised infinite; negotiated unobserved)"
+					}
+				case "GTSM":
+					value += " (advertised capability; enforcement unverified)"
+				case "Message Type":
+					value = fmt.Sprintf("0x%04x (Hello)", number(x))
+				case "TLV Type":
+					value = fmt.Sprintf("0x%04x", number(x))
+				}
+			}
 			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" {
 				value = routingFieldText(protocol, name, x, routingVersion, value)
 			}
@@ -225,7 +243,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp") && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -307,6 +325,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "ldp" {
+			for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
 			delete(values, "Strong Identity")
 			for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {

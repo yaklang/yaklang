@@ -606,3 +606,49 @@ TShark 的随机端口 Decode-As 仅取自拥有服务的 manifest，明确是�
 本轮核对限定于上述消息字节、头字段、应用交付、归属和故障恢复，不能等同于所有
 TLS/QUIC 特性或全部协议完备。PIM、LDP、IS-IS、L2TPv3、UDP 会话模型和剩余 fuzz
 差异继续逐项处理，PR 保持草稿。
+
+## LDP 发现报文：原生分发、完整消息边界与递进字段
+
+[本项汇总](shark-public-corpus-20261025/ldp-discovery-summary.json)保存逐条拒绝/范围外视图、
+精确输入/输出/实际二进制哈希及未归一化差额。
+
+旧的 `extended_protocols.LDP` 只检查 PDU 外头，将消息体作为 raw，未接入原生 UDP。
+新增显式 `ldp_discovery.LDPDiscoveryFields`，和原生 646/UDP、显式 UDP Decode-As
+共用有界 codec；旧入口保持兼容。目录和 roadmap 都明确为 **partial**，没有改封存
+语料的历史 todo 评分。该历史差别只有在实际运行本项完整/恶意边界测试后才被允许。
+
+发现报文检查完整版本/长度、LSR/标签空间、每个 Hello 消息长度/ID、首个必选
+Common Hello Parameters 和每个 TLV 的边界/固定值长度。越界、残缺或重复必选参数
+不能凭端口或前两个字段识别；限制为初始化前 PDU 长度及集合预算。未知 TLV 保留
+U/F 和拥有的原始字节，不解释扩展内容或对端接受结果。支持通告的 IPv4/IPv6 传输
+地址、配置序列、保持时间、Targeted/Requested 以及 GTSM 位。
+
+保持时间明确是通告值，0 的缺省和 65535 的无限值分别解释；GTSM 通告位不等于
+已实施 TTL 防护，Targeted Hello 下该位的忽略语义保持可见。Hello 不创建 TCP 会话，
+相同 UDP tuple 换 LSR/标签空间或省略地址时不继承旧参数，残包也不借用先前身份。
+依据 [RFC 5036](https://www.rfc-editor.org/rfc/rfc5036.html) 和
+[RFC 6720](https://www.rfc-editor.org/rfc/rfc6720.html) 的发现报文定义；没有把此范围
+扩张为完整 LDP 邻接、标签库或路由器状态机。
+
+两份完整大文件分别匹配 **290/290** 条原始发现 PDU：每份 **4,930** 项完整字节、
+有序关键字段及贡献域检查，再加 **290** 项 CLI 原始帧和递进路径检查，合计每份
+**5,220** 项，额外原生 PDU 为 0。每份列标签只发生 `UDP -290 / LDP +290`；原有
+TCP/其他协议数量、824/840 原生 TCP 流及 90/35 通用字段集合差异保留。
+主文件另外 **16** 条、fuzz 文件另外 **615** 条 TCP LDP 视图仍是下一项原生缺口。
+fuzz 文件保留 **387** 条 UDP 拒绝：380 条 PDU 长度不完整/不一致、7 条超出所选
+发现字节边界。这些都没有算作成功匹配或静默删除。
+
+实际 Windows 完整主文件以 `ldp.msg.type == 0x0100` 启动，290 条可见、首帧 #5，
+列表显示 LSR、Link/Targeted Hello、通告保持时间和传输地址；层级为 Ethernet ›
+IPv4 › UDP › LDP。原生字符/颜色缓冲曾发现重复的 Packet Name 摘要，已修复并重跑。
+字段/字节源、会话/证据、缩放、退出及 CP936 恢复通过；嵌套消息和 TLV 的高亮范围
+使用各自的完整 PDU 坐标，有单独回归测试。认证和已建立会话没有从 Hello 推断。
+
+最终 Windows EXE `2bab63d8ec2ad3bdf05aca661585307e8f55ed49816ad4694beb6d92f4870c32`
+与源码重建一致。完整文件 SDK 的解析版本也与最终源码重建哈希一致；整文件列计数
+来自修摘要前的 CLI，最后这项摘要修复由最终 Windows 全帧页面和 CLI 测试验收，
+两种二进制的哈希均保留，未混写为同一次运行。完整 bin-parser **154.243s** 及全部
+子包、pcaputil **448.619s**、CLI **2.051s** 通过；最后新增的 IPv6/缺省/Targeted GTSM、
+显式选择及展示测试又分别在三个包 **0.661/0.605/0.620s** 通过。
+发现报文边界 fuzz **17,167** 次通过。TCP LDP 的完整消息重组、观察到的 Init/KeepAlive、
+连接复用隔离及 FEC/标签字段是下一项工作，不能用发现报文的验收替代。
