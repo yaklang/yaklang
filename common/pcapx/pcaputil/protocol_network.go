@@ -25,6 +25,7 @@ type ipFragment struct {
 	start int
 	data  []byte
 	refs  []PacketReference
+	more  bool
 }
 type fragmentSet struct {
 	parts    []ipFragment
@@ -86,6 +87,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			a.decodeIndustrialEthernet(eth, etherType, payload, e, ci)
 			return nil, true
 		}
+	}
+	if a.observePIM(p, e) {
+		return nil, true
 	}
 	// gopacket exposes the outer NetworkLayer and TransportLayer. Normalize a
 	// supported tunnel to its innermost IP before transport dispatch.
@@ -390,6 +394,13 @@ func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo
 }
 func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentKey, off int, more bool, payload []byte) (gopacket.Packet, bool) {
 	ci := p.Metadata().CaptureInfo
+	if ci.CaptureLength < ci.Length {
+		// A proved local capture cut is not evidence of malformed bytes on
+		// the network. Keep existing complete ranges and allow a later full
+		// retransmission to repair it; never retain the ambiguous prefix.
+		a.networkDiagnostic(e, ci, "incomplete", "FragmentCaptureTruncated")
+		return nil, true
+	}
 	// RFC 6946: atomic fragments neither join nor remove a matching pending
 	// datagram, including one quarantined after an overlap.
 	if key.v6 && off == 0 && !more {
@@ -462,7 +473,19 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		s.sets[key] = v
 	}
 	for _, part := range v.parts {
-		if !key.v6 && off == part.start && bytes.Equal(part.data, payload) {
+		if off == part.start && bytes.Equal(part.data, payload) {
+			if part.more != more {
+				return invalid("FragmentConflictingEnd")
+			}
+			if key.v6 && off == 0 {
+				header, err := fragmentHeader(p, true)
+				if err != nil || !bytes.Equal(v.header, header) {
+					return invalid("FragmentOverlapRejected")
+				}
+			}
+			// RFC8200 4.5 explicitly allows dropping exact duplicates while
+			// preserving other fragments. Neither evidence cost nor contributor
+			// references grow, and conflicting/partial overlaps still fail closed.
 			return nil, true
 		}
 		if off < part.start+len(part.data) && part.start < off+len(payload) {
@@ -520,7 +543,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if header != nil {
 		v.header = header
 	}
-	v.parts = append(v.parts, ipFragment{off, bytes.Clone(payload), append([]PacketReference(nil), refs...)})
+	v.parts = append(v.parts, ipFragment{start: off, data: bytes.Clone(payload), refs: append([]PacketReference(nil), refs...), more: more})
 	sort.Slice(v.parts, func(i, j int) bool { return v.parts[i].start < v.parts[j].start })
 	cursor := 0
 	for _, part := range v.parts {

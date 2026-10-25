@@ -39,6 +39,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	}
 	var fields map[string]any
 	switch profile {
+	case "pim-control":
+		fields, err = DecodePIMControl(wire, PIMWireContext{}, 4096)
 	case "ldp-session":
 		fields, err = DecodeLDPSessionPDU(wire, 4096)
 	case "ldp-discovery":

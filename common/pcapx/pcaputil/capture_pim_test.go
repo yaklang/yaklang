@@ -54,10 +54,12 @@ func TestPIMRegisterCarrierIPv4IPv6AndWholeChecksum(t *testing.T) {
 			domain := PacketDomain(wire, gopacket.CaptureInfo{}, layers.LinkTypeEthernet)
 			require.Contains(t, domain.Encapsulation, "/pim-register:")
 			events := tunnelAdmissionReplay(t, wire)
-			require.Len(t, events, 1)
-			require.Equal(t, "dns", events[0].Protocol)
+			require.Len(t, events, 2)
+			require.Equal(t, "pim", events[0].Protocol)
 			require.Equal(t, "decoded", events[0].Status, events[0].Error)
-			require.Equal(t, domain, events[0].Domain)
+			require.Equal(t, "dns", events[1].Protocol)
+			require.Equal(t, "decoded", events[1].Status, events[1].Error)
+			require.Equal(t, domain, events[1].Domain)
 		}
 	}
 }
