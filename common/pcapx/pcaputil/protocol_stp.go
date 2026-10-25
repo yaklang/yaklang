@@ -59,7 +59,7 @@ func (a *binParser) observeSTP(p gopacket.Packet, evidence captureEvidence) bool
 		}
 		w, pvst, selected, err := stpEthernetCarrier(eth)
 		if !selected {
-			continue
+			return false // do not search past an unsupported root for inner Ethernet signatures
 		}
 		ci := p.Metadata().CaptureInfo
 		e := &ProtocolEvent{Protocol: "stp", Transport: "ethernet", Domain: evidence.Ref.Domain,

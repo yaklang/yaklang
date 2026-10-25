@@ -91,6 +91,7 @@ func isisDisplayBindings() []displayFieldBinding {
 			})
 		})
 		if invert {
+			b.descriptor.Label = strings.TrimSuffix(spec.key, " Supported") + " Unsupported Bit"
 			b.descriptor.Description = "Literal unsupported bit (true means unsupported), not a negotiated capability"
 		}
 		out = append(out, b)
@@ -181,7 +182,7 @@ func isisDisplayBindings() []displayFieldBinding {
 			}
 		}
 		if prefix == "lsp.ip_reachability." {
-			flag("lsp", tlv, path, prefix+"distribution", "Default Metric Supported", true)
+			flag("lsp", tlv, path, prefix+"distribution", "Up Down", false)
 		}
 	}
 	add("lsp", isisLegacyIPReachabilityTLVs, list("Reachability Entries"), fieldSpec{"lsp.ip_reachability.ipv4_prefix", "IPv4 Prefix", DisplayAddress, 32}, false)

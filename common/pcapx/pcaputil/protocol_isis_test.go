@@ -150,6 +150,10 @@ func TestISISTypedNeighborMetricsKeepDistinctWireRanges(t *testing.T) {
 	require.Len(t, es, 1)
 	require.Equal(t, "decoded", es[0].Status)
 	snap := es[0].DisplayFieldValues()
+	require.Equal(t, []any{true}, snap.FieldMap()["isis.lsp.eis_neighbors_delay_metric.supported"], "legacy filter name carries the literal unsupported bit")
+	descriptor, ok := LookupDisplayField("isis.lsp.eis_neighbors_delay_metric.supported")
+	require.True(t, ok)
+	require.Contains(t, descriptor.Label, "Unsupported Bit")
 	for i, name := range []string{"default", "delay", "expense", "error"} {
 		found := false
 		for _, f := range snap.Values {
@@ -187,5 +191,46 @@ func TestISISTypedAreaEnvelopeAndReservedBitValues(t *testing.T) {
 		if f.Name == "isis.hello.area_address" {
 			require.Equal(t, &DisplayFieldRange{Offset: 29, Length: 4}, f.Range)
 		}
+	}
+}
+
+func TestLinkStateNativeAdmissionDoesNotFishInsideUnprovedPseudowires(t *testing.T) {
+	isis := isisNativeWire(t, "831401001101000003010001000100001e001401")
+	stp := isisNativeWire(t, "000002023c800102000000000100000013900102000000000280030080140002000f0000")
+	for _, tc := range []struct {
+		name string
+		wire []byte
+		llc  []byte
+	}{{"isis", isis, []byte{0xfe, 0xfe, 3}}, {"stp", stp, []byte{0x42, 0x42, 3}}} {
+		t.Run(tc.name, func(t *testing.T) {
+			inner := isisNativeEthernet(tc.wire, 0)
+			copy(inner[14:17], tc.llc)
+			// Simulate a lower decoder exposing an Ethernet pseudowire without
+			// native MPLS/PW setup proof. Decoded layers alone cannot authorize it.
+			outer := []byte{1, 2, 3, 4, 5, 6, 6, 5, 4, 3, 2, 1, 0x88, 0x47}
+			raw := append(append(append([]byte(nil), outer...), 0, 1, 1, 64), inner...)
+			decoder := gopacket.DecodeFunc(func(w []byte, b gopacket.PacketBuilder) error {
+				e := &layers.Ethernet{}
+				if err := e.DecodeFromBytes(w, gopacket.NilDecodeFeedback); err != nil {
+					return err
+				}
+				b.AddLayer(e)
+				b.SetLinkLayer(e)
+				b.AddLayer(&layers.MPLS{})
+				i := &layers.Ethernet{}
+				if err := i.DecodeFromBytes(w[18:], gopacket.NilDecodeFeedback); err != nil {
+					return err
+				}
+				b.AddLayer(i)
+				return nil
+			})
+			p := gopacket.NewPacket(raw, decoder, gopacket.Default)
+			p.Metadata().CaptureInfo = gopacket.CaptureInfo{CaptureLength: len(raw), Length: len(raw)}
+			// No parser resources are required: neither observer may admit this
+			// inner payload, read its fields, or allocate advertisement state.
+			var parser binParser
+			require.False(t, parser.observeISIS(p, captureEvidence{}))
+			require.False(t, parser.observeSTP(p, captureEvidence{}))
+		})
 	}
 }

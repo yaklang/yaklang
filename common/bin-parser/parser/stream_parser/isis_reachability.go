@@ -6,11 +6,18 @@ import (
 	"net/netip"
 )
 
-func isisLegacyMetrics(r *controlReader) {
+func isisLegacyMetrics(r *controlReader, ipReachability bool) {
 	for _, name := range []string{"Default", "Delay", "Expense", "Error"} {
 		v := r.num(name+" Metric Octet", 1, false)
-		r.info[name+" Metric"], r.info[name+" Metric Supported"] = v&63, v&128 == 0
+		r.info[name+" Metric"] = v & 63
 		r.info[name+" Metric External"] = v&64 != 0
+		if name != "Default" {
+			r.info[name+" Metric Supported"] = v&128 == 0
+		} else if ipReachability {
+			r.info["Up Down"] = v&128 != 0
+		} else {
+			r.info["Default Metric Reserved Bit"] = v&128 != 0
+		}
 	}
 }
 
@@ -30,7 +37,7 @@ func isisLegacyNeighbors(r *controlReader, typ, pdu uint64, limit *int) {
 				return
 			}
 			row := r.child("IS Reachability", r.at+11, func(c *controlReader) {
-				isisLegacyMetrics(c)
+				isisLegacyMetrics(c, false)
 				isisID(c, "Neighbor Node ID", 7)
 				c.info["Wire Field Ranges"] = isisFieldRanges(c.fields)
 			})
@@ -44,7 +51,7 @@ func isisLegacyNeighbors(r *controlReader, typ, pdu uint64, limit *int) {
 				return
 			}
 			row := r.child("ES Neighbor", r.at+10, func(c *controlReader) {
-				isisLegacyMetrics(c)
+				isisLegacyMetrics(c, false)
 				isisID(c, "System ID", 6)
 				c.info["Wire Field Ranges"] = isisFieldRanges(c.fields)
 			})
@@ -66,7 +73,7 @@ func isisLegacyIPReachability(r *controlReader, typ uint64, limit *int) {
 			return
 		}
 		row := r.child("IPv4 Reachability", r.at+12, func(c *controlReader) {
-			isisLegacyMetrics(c)
+			isisLegacyMetrics(c, true)
 			address := c.take("IPv4 Prefix", 4)
 			mask := c.take("IPv4 Mask", 4)
 			if c.err == nil {

@@ -65,7 +65,9 @@ changed = bytearray(lsp); changed[20:24] = (0x12345678).to_bytes(4, 'big'); chan
 add('reordered-sequence-numbers-remain-literal', [body(changed), body(lsp), body(changed)], ['decoded']*3, sequences=[0x12345678, int.from_bytes(lsp[20:24], 'big'), 0x12345678])
 add('missing-intermediate-LSP-does-not-invent-LSDB', [body(lsp), body(changed)], ['decoded']*2)
 changed = bytearray(short_hello); changed[9:15] = b'\1\2\3\4\5\6'
-add('same-MAC-different-SystemID-and-repair', [body(changed), body(short_hello)], ['decoded']*2, identities=['0102.0304.0506', '0000.0000.0001'])
+original_id = short_hello[9:15].hex()
+original_id = '.'.join(original_id[i:i+4] for i in range(0, 12, 4))
+add('same-MAC-different-SystemID-and-repair', [body(changed), body(short_hello)], ['decoded']*2, identities=['0102.0304.0506', original_id])
 bad = bytearray(lsp); bad[23] ^= 1
 add('invalid-active-checksum-and-full-repair', [body(bad), body(lsp)], ['malformed', 'decoded'], checksum_repair=True)
 purge = bytearray(bad); purge[10:12] = b'\0\0'
@@ -98,6 +100,13 @@ for flags in (0x0b, 0x83):
     add('attached-default-and-partition-flag-%02x' % flags, [body(sized(w))], ['decoded'], attached=bool(flags & 8), partition=bool(flags & 128))
 add('IPv4-unused-prefix-bits-remain-literal', [body(sized(short_lsp, bytes([135, 7, 0, 0, 0, 9, 9, 192, 255])))], ['decoded'], prefix='192.128.0.0/9', literal='192.255.0.0')
 add('IPv6-unused-prefix-bits-remain-literal', [body(sized(short_lsp, bytes([236, 11, 0, 0, 0, 9, 0, 33, 0x20, 1, 0x0d, 0xb8, 255])))], ['decoded'], prefix='2001:db8:8000::/33', literal='2001:db8:ff00::')
+add('legacy-IPv4-default-high-bit-is-distribution', [body(sized(short_lsp, bytes([128, 12, 0x81, 0x80, 0x80, 0x80, 192, 0, 2, 0, 255, 255, 255, 0])))], ['decoded'], legacy_down=True)
+fragment = bytearray(lsp); fragment[19] ^= 1; fragment = sized(fragment)
+add('LSP-fragments-are-not-concatenated', [body(fragment), body(lsp)], ['decoded']*2, fragments=[fragment[19], lsp[19]])
+add('P2P-advertised-state-does-not-stick', [body(sized(short_hello, b'\xf0\x01\0')), body(sized(short_hello, b'\xf0\x01\2')), body(short_hello)], ['decoded']*3, adjacency=True)
+composition = sized(short_hello, b'\x0a\x11\x36'+b'X'*16+b'\x0c\x02\0\0')
+composition = fletcher(composition, 0, len(composition)-2)
+add('Fletcher-success-is-not-HMAC-composition-acceptance', [body(composition)], ['decoded'], composition=True)
 
 results = []
 for case in cases:
@@ -138,6 +147,15 @@ for case in cases:
     if 'prefix' in case:
         entry = es[0]['session']['TLVs'][0]['Reachability Entries'][0]
         assert entry['Canonical Prefix'] == case['prefix'] and entry['Prefix Address'] == case['literal']; checks += 2
+    if case.get('legacy_down'):
+        entry = es[0]['session']['TLVs'][0]['Reachability Entries'][0]
+        assert entry['Up Down'] is True and 'Default Metric Supported' not in entry; checks += 2
+    if case.get('fragments'):
+        assert [int(e['session']['LSP ID'].split('-')[-1], 16) for e in es] == case['fragments']; checks += len(es)
+    if case.get('adjacency'):
+        assert [e['session']['TLVs'][0]['Adjacency State'] for e in es[:2]] == [0, 2] and es[2]['session'].get('TLVs') in (None, []); checks += 3
+    if case.get('composition'):
+        assert es[0]['session']['Checksum Verified'] is True and es[0]['session']['Authentication Verified'] is False and 'RFC3358' in es[0]['session']['Conformance Warning']; checks += 3
     with (d/'wire-audit.log').open('wb') as log:
         subprocess.run([sys.executable, '-X', 'utf8', str(Path(__file__).with_name('isis_wire_audit.py')), str(d/'oracle.json'), str(d/'events.jsonl'), str(d/'wire-audit.json')], stdout=log, stderr=subprocess.STDOUT, check=True)
     audit = json.loads((d/'wire-audit.json').read_text())
