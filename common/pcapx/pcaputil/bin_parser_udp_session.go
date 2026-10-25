@@ -618,6 +618,12 @@ func validTURNChannelDataDatagram(w []byte) bool {
 }
 func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *binSpec, err error) {
 	e.Raw = append([]byte(nil), w...)
+	// L2 and raw network observers share this completion path with UDP. They
+	// may not have a transport constructor to initialize the observed length.
+	// Preserve an explicit length for a limited/omitted body or retained preview.
+	if e.Length == 0 {
+		e.Length = len(w)
+	}
 	e.Status, e.Summary = "deferred", e.Protocol
 	if spec != nil {
 		e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
