@@ -33,9 +33,10 @@ type packetPresentation struct {
 }
 
 var protocolDisplayNames = map[string]string{
-	"isis":      "IS-IS",
-	"ldp":       "LDP",
-	"wireguard": "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "ripng": "RIPng", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
+	"netflow-v9": "NetFlow v9",
+	"isis":       "IS-IS",
+	"ldp":        "LDP",
+	"wireguard":  "WireGuard", "openvpn": "OpenVPN", "ike": "IKE", "l2tp": "L2TP", "rip": "RIP", "ripng": "RIPng", "nbt-dg": "NBT-DG", "onc-rpc": "ONC-RPC", "ipmi": "IPMI", "telnet": "Telnet",
 	"tlsv1.0": "TLSv1.0", "tlsv1.1": "TLSv1.1", "tlsv1.2": "TLSv1.2", "tlsv1.3": "TLSv1.3",
 	"http": "HTTP", "http2": "HTTP/2", "http3": "HTTP/3", "grpc": "gRPC",
 	"tls": "TLS", "dtls": "DTLS", "dns": "DNS", "dot": "DoT", "doh": "DoH", "doq": "DoQ",
@@ -373,7 +374,7 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
-	if e.Protocol == "isis" && e.Summary != "" && e.Summary != e.Protocol {
+	if (e.Protocol == "isis" || e.Protocol == "netflow-v9") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
@@ -717,6 +718,18 @@ func isisMalformedNotice(e *pcaputil.ProtocolEvent) string {
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
+		return
+	}
+	if e.Protocol == "netflow-v9" && e.Profile == "netflow-v9-directed-UDP-template-observer" &&
+		e.Session["Fixed Header Complete"] == true && e.Status != "decoded" && e.Status != "deferred" &&
+		(e.Session["Wire Framing Complete"] == true || e.Admission == "observed-directed-exporter-context") {
+		p.protocol, p.priority, p.status, p.visibility = "NetFlow v9", 20, e.Status, "headers"
+		p.evidence = "complete export header and FlowSet framing; data schema/count unavailable"
+		if e.Session["Wire Framing Complete"] != true {
+			p.evidence = "observed directed exporter context; rejected body, no inherited data fields"
+		}
+		p.summary = clipText(applicationEventSummary(e), 384)
+		p.addLayer("NetFlow v9")
 		return
 	}
 	if notice := isisMalformedNotice(e); notice != "" {

@@ -114,6 +114,7 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 		observedScopes[name] = passed
 	}
 	routingScopes := requireRoutingControlScopes(t)
+	netflowV9Scope := requireNetFlowV9Scopes(t)
 
 	for _, pair := range []struct {
 		schema   string
@@ -237,6 +238,9 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				historicalPartial := observedScopes[item.Name] && item.Status == stPartial && *capture.RoadmapStatus == stDone
 				if routingScopes[item.Name] && item.Status == stPartial {
 					historicalPartial = item.Name == "HSRP" && *capture.RoadmapStatus == stDone || (item.Name == "GLBP" || item.Name == "BFD" || item.Name == "LDP" || item.Name == "PIM" || item.Name == "RIPng" || item.Name == "IS-IS") && *capture.RoadmapStatus == stTodo
+				}
+				if netflowV9Scope && item.Name == "NetFlow v9" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
+					historicalPartial = true
 				}
 				if *capture.RoadmapFamily != item.Family || *capture.RoadmapPriority != item.Priority || *capture.RoadmapStatus != item.Status && !historicalPartial {
 					t.Fatalf("stale roadmap metadata: got %s/%s/%s, want %s/%s/%s", *capture.RoadmapFamily, *capture.RoadmapPriority, *capture.RoadmapStatus, item.Family, item.Priority, item.Status)

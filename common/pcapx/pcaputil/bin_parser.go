@@ -18,6 +18,7 @@ import (
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
 	nativeSessionMessage               bool
+	nativeNetFlowObservation           bool
 	rtmpChildren                       []*ProtocolEvent
 	nativeCarrierObservation           bool
 	nativeOPCUAObservation             bool
@@ -128,7 +129,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedContext := e.nativeCarrierObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedContext := e.nativeNetFlowObservation || e.nativeCarrierObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedContext && e.semanticFields != nil {
 			session = e.semanticFields
@@ -182,7 +183,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	// Native QUIC identity survives edits to all public labels and caches.
 	// A refused packet cannot become a successful rule decode, and accepted
 	// wire fields keep their legacy metadata envelope and private context.
-	if e.nativeCarrierObservation {
+	if e.nativeCarrierObservation || e.nativeNetFlowObservation {
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
@@ -687,17 +688,18 @@ type binParser struct {
 	rdpUDP                                                                     *rdpUDPStore
 	eapTLS                                                                     *eapTLSStore
 	udpSessions                                                                *binUDPStore
-	tftpUntrackedRefusal                                                       bool // udpMu; unknown refused client/server identity
-	sipUntrackedRefusal                                                        bool // udpMu; uncertainty for identities that could not be retained
-	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
-	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
-	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
-	hartUntrackedRefusal                                                       bool // udpMu; unidentified refusals cannot start a fresh association
-	radiusUntrackedRefusal                                                     bool // udpMu; unretained RADIUS history
-	snmpUntrackedRefusal                                                       bool // udpMu; only newly untrackable SNMP conversations are conservative
-	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
-	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation
-	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
+	netflowV9                                                                  *netflowV9Store // udpMu; directed exporter/domain template observations
+	tftpUntrackedRefusal                                                       bool            // udpMu; unknown refused client/server identity
+	sipUntrackedRefusal                                                        bool            // udpMu; uncertainty for identities that could not be retained
+	stunUntrackedRefusal                                                       bool            // constant-size quarantine when an admitted UDP key cannot be retained
+	pfcpUntrackedRefusal                                                       bool            // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
+	dlmsUntrackedRefusal                                                       bool            // udpMu; no fresh HDLC association after an unretained admitted refusal
+	hartUntrackedRefusal                                                       bool            // udpMu; unidentified refusals cannot start a fresh association
+	radiusUntrackedRefusal                                                     bool            // udpMu; unretained RADIUS history
+	snmpUntrackedRefusal                                                       bool            // udpMu; only newly untrackable SNMP conversations are conservative
+	finsUntrackedRefusal                                                       bool            // udpMu; unretained identity cannot become a fresh generation
+	slmpUntrackedRefusal                                                       bool            // udpMu; refused unretained SLMP identity has no verified generation
+	wrapperUntrackedRefusal                                                    bool            // udpMu; missing Wrapper history cannot prove a fresh invoke generation
 	dcpMu                                                                      sync.Mutex
 	dcpClock                                                                   time.Time
 	dcpObservations                                                            map[dcpKey]*dcpObservation
