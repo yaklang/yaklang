@@ -37,6 +37,9 @@ func controlPort(ports []uint16, p uint16) bool {
 	return false
 }
 func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst uint16, explicit string) bool {
+	if a.decodeRIPngDatagram(e, w, src, dst, explicit) {
+		return true
+	}
 	for _, p := range controlDatagramProfiles {
 		selected := explicit == p.name
 		if !selected && (explicit != "" || !controlPort(p.ports, src) && !controlPort(p.ports, dst)) {
