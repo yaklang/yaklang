@@ -12,6 +12,8 @@ import (
 	"unicode"
 )
 
+const fieldFilterPartialNoticePrefix = "Field filter partial: some packets unavailable · "
+
 type packetSearch struct {
 	fields   *pcaputil.DisplayFilter
 	groups   [][]searchTerm // OR of AND groups.
@@ -426,7 +428,7 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 			}
 		}
 		if !result.Complete {
-			u.notice = "Field filter unavailable: " + result.Reason
+			u.notice = fieldFilterPartialNoticePrefix + result.Reason
 		}
 		return result.Complete && result.Matched
 	}
