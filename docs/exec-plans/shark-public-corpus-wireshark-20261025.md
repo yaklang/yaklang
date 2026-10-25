@@ -80,7 +80,7 @@ Linux SLL、Ethernet mPacket 和 Raw IP；时间跨多年且不单调，存在�
 8. **Windows 查询卡顿及分片详情缺失。** 报文/PDU 历史查询加有界索引；索引不足回退
    完整查询，不能漏结果。物理帧查询可找到后续完成重组的 PDU，SDK 精确捕获域查询
    仍保持隔离。内层 IP 必须配内层端口；分片完成消息的逻辑端点和物理来源分别保留。
-9. **能力清单虚报。** AJP/BGP/RTMP 目前只有 legacy YAML，没有原生会话入口，已从
+9. **能力清单虚报（历史问题，现已接入）。** 初轮 AJP/BGP/RTMP 只有 legacy YAML；后续已补原生入口、字段和连接状态，详见下文。初轮曾从
    `NativeProtocolProfiles` 的已实现列表移除。规则目录存在不再被拿来证明抓包入口已支持。
 
 ## TLS 与 QUIC 的核验边界
@@ -146,7 +146,7 @@ NEW_CONNECTION_ID、无 keylog 的短头，不能仅凭原端点就确认新的 
    和[接收可靠性控制](https://learn.microsoft.com/de-at/openspecs/windows_protocols/ms-rdpeudp2/a1d1f871-c282-4f97-8f51-f821aca00c8d)；
    EAP TLS 分片参考 [RFC 5216 §2.1.5](https://www.rfc-editor.org/rfc/rfc5216.html#section-2.1.5)
    和 [RFC 5281 §9.2.2](https://www.rfc-editor.org/rfc/rfc5281.html#section-9.2.2)。
-2. **真实未接入的协议。** 本轮已为 BGP/AJP/RTMP 接入下述限定范围的原生解析；HSRP/GLBP、BFD、L2TPv3、IS-IS、
+2. **真实未接入的协议。** 本轮已为 BGP/AJP/RTMP 接入下述限定范围的原生解析；HSRP/GLBP 和 BFD Control 已在后续接入限定范围；BFD Echo/MPLS、L2TPv3、IS-IS、
    以及部分路由/工业协议都有明确缺口。先按主文件数量与常用性补齐入口、完整消息校验、
    canonical 规则、字段注册和复用边界，逐项通过后才能加回能力清单。
 3. **字段、事务与分片展示覆盖。** ClientHello 提供的套件列表与已协商套件不能混为一个上下文字段；
@@ -320,6 +320,100 @@ AJP 正文碰撞/复用/提前 EOF、RTMP 交错 CSID/单方向 chunk-size/Abort
 pcap 的最终回放都使用 JSON 汇总中相同哈希的实际 EXE/SDK；4,404 条 TLS 的 13,212 项
 头字段检查及独立 RDPUDP 派生记录对照也再次通过，没有用旧二进制结果替代最终版本。
 
-报告中的 94/39 逐帧字段集合差异、77 项主文件端点观察层差异、大量 fuzz 流分区差异及
+原始 94/39 逐帧字段集合差异已在下节逐条复核；77 项主文件端点观察层差异、大量 fuzz 流分区差异及
 其他未接入协议仍未全部验收。以上新增消息校验通过不代表任意协议版本、所有字段或
 全部 Wireshark 行为已经一致；PR 继续保留草稿。
+
+
+## 字段差异逐条复核与路由控制原生接入
+
+本次继续使用同一份 51,328 帧主文件和 328,127 帧 fuzz 文件，没有裁掉困难报文，
+也没有把 Decode As 加到主对照。完整 CLI/SDK 均退出 0。
+复现目录为 `C:/tmp/yak-shark-field-routing-20261025`；所有捕获、密钥、二进制、原始
+JSONL、派生材料及控制台 PNG 留在该外部目录。
+
+### 原始 94 / 39 项字段差异
+
+[逐行证据](shark-public-corpus-20261025/field-differences-reviewed.json)保留每项原始帧号、
+记录 SHA256、长度、贡献帧、字节收齐帧和核验方式，133 项均已复核，没有删除原始差异。
+
+- 8 项 DNS 可读性错误已修复：空格和合法 UTF-8 在界面/`dns.qry.name` 可读显示。
+  原 `Name` 与新增 `dns.qry.name.escaped` 保留转义；事务仍按展开后的原始名称字节关联。
+  非法单字节 `e4` 不与合法 UTF-8 替换字符合并。主文件另 2 项非法 UTF-8 显示差异有意保留，
+  避免为了文字一致丢失原始字节。点号、反斜杠、控制字符与 bidi 控制仍无损转义。
+- 123 项 TLS `record.length` 差异均有完整记录字节证明，并非把长度改成 oracle 的帧集合。
+  普通归属差异按方向、原生流、捕获域、实际贡献帧约束；36724、36744、36764 三帧的
+  延迟批量视图还要求一个同向、同流、共享早期贡献帧且跨至目标帧的精确 sibling 记录。
+  其中 1 项原始 RDPUDP oracle 中途失去 TLS 解码，用独立派生接收器的字节结果补充证明。
+- 新增 `ByteSource.CompletedIn` / `pdu.completed_in`，页面显示消息字节收齐的帧与贡献包数。
+  这不是“Wireshark 展示帧”或“后续上下文才可解码的时间”。克隆与 IPC 快照独立拥有引用；
+  不完整、受限和无原始消息字节的事件不会声称已收齐。
+
+修复后通用逐帧集合差异为主文件 **90**、fuzz **35**：88/35 项仍是上述 TLS 归属集合，
+主文件另 2 项是非法 UTF-8 的无损显示。没有把这些原始数字归零或改写为标签一致率。
+TLS 全量复核仍有 4,404 条原生记录、13,212 项 typed 头字段零值差异；TCP 2,639 条原始
+完整记录一致。独立 RDPUDP 派生 oracle 仍为 1,718/1,718，缺失/额外均为 0，
+105 条相同载体重传未重复送入 TLS。原始 oracle 的 49 条 RDPUDP 视图及其中重复视图仍保留。
+
+### HSRP / GLBP / BFD Control
+
+新增 `routing_control.yaml` 三个显式 canonical 入口，和原生 UDP 接收共用有界 codec。
+旧规则入口保持其原有语义。目录、原生清单、端口提示、typed 字段与过滤器均已接通；
+三个总体条目明确为 partial。历史 corpus 的 HSRP done、GLBP/BFD todo 评分保持冻结，
+仅在独立正/反例验证限定入口之后接受这三个精确状态迁移，没有通用的 partial 豁免。
+
+| 原始文件 | HSRP | GLBP | BFD Control | 字节及已登记字段检查 | 未解释的已选字段/字节错误 |
+|---|---:|---:|---:|---:|---:|
+| Weber | 941 原生 / 945 WS | 777 / 777 | 135 / 135 | 29,579 | 0 |
+| Sharon | 764 原生 / 768 WS | 777 / 777 | 65 / 85 | 26,806 | 0；下列拒绝与未接入载体另列 |
+
+[汇总](shark-public-corpus-20261025/routing-control-summary.json)包含逐字段次数、二进制和
+输入哈希及原始例外帧清单。重复 TLV 字段按顺序和次数比较，不能用 set 消掉重复或错序。
+
+- HSRPv1 校验完整 Hello/Coup/Resign，以及 opcode 3 的 Interface State Advertisement：
+  其 length=14 包含四字节 TLV 头，保留真实样本的非零 reserved tail。HSRPv2 分别解析
+  group/interface/text-auth/MD5 TLV、IPv4/IPv6、不同于 v1 的状态值与毫秒计时器。
+  每份文件各 4 条六字节 interface-only 报文缺少先前完整发送者证据，严格拒绝建立新身份；
+  已观察发送者后可识别该短报文，但不会继承组号或 VIP。捕获域、发送者、Identifier 和
+  两分钟超时隔离，其他接口的未来时间戳不影响当前观察。
+- GLBP 校验 owner/group、Hello、forwarder 和认证 TLV 的完整边界，IPv4/IPv6 地址长度、
+  权重、虚拟 MAC、MD5/chain 长度；未知 TLV 原样保留。不同组或新 owner 使用独立上下文，
+  未知 TLV 不能凭端口建立新身份；forwarder priority 不投影成 gateway priority。
+- BFDv1 Control 校验长度、非零 My Discriminator/Detect Multiplier、状态和认证结构。
+  反向源端口可以不同，通过端点/捕获域/观察到的 discriminator 对保守关联；Down bootstrap、
+  discriminator 改变和超时产生独立代际。只有唯一已观察 Poll 才能关联 Final；中间丢失 Final
+  导致重复 Poll 时保留歧义，不强行制造 response-to。历史乱序报文不消费未来 pending 状态。
+- Sharon 的 20 条 BFD 差额逐一保留：8 条完整字节视图违反版本、长度、零 discriminator/
+  multiplier 或同时 Poll+Final 的约束；2 条 oracle 没有完整协议 raw range；10 条不是 UDP
+  接收路径，涉及 MPLS 等未接入载体。这些没有算作成功协议对齐。
+  BFD Echo 载荷由实现定义，3785 端口没有冒充已解析的 BFD Control。
+
+状态仅为对方报文中的 advertised 值；没有据此推断路由器选举结果、转发表、链路健康、
+TTL 合规、密码校验或认证身份。协议依据：[RFC 2281](https://www.rfc-editor.org/rfc/rfc2281.html)、
+[RFC 5880](https://www.rfc-editor.org/rfc/rfc5880.html)及
+[Wireshark v4.6.9 官方 dissector](https://gitlab.com/wireshark/wireshark/-/tree/v4.6.9/epan/dissectors)。
+
+### 页面、故障与剩余范围
+
+Windows 用实际 EXE、CP936 和浅色初始控制台回放完整主文件，检查 HSRPv2、GLBP、BFDv1
+的 typed 过滤、非空列表、字段/字节来源、会话/证据、80×30→180×48 缩放和退出后恢复 CP936。
+递进路径保留真实 VLAN、IPv6、UDP 层。字段先显示状态、组号/VIP、discriminator 和计时器；
+状态显示名称和原值，计时器区分秒、毫秒、微秒。重复 TLV 的 Priority/Weight 点击高亮各自
+实际字节，内部范围索引不再显示成字段内容。
+
+有界 codec fuzz **27,095** 次、关联隔离 fuzz **6,851** 次通过；另有每字节截断、认证长度、
+错误控制头不污染状态、域隔离、标识复用、Poll/Final 丢失/乱序、资源容量和关闭归零测试。
+完整包回归结果与本轮实际二进制哈希见汇总，不能把专项通过称为全仓库 CI 通过。
+
+整体仍未全部验收。主文件 77 项端点观察层差异和 fuzz 的 6 组 TCP / 24 组 UDP stream
+分区差异仍需独立证明；当前 UDP tuple 统计本来就不等于 Wireshark 的会话超时模型。
+fuzz 中无效 SYN+RST 等报文的 flow ID 统计与实际被接收的会话字节也需区分，不能因为
+计数相同就允许其改变已识别连接。MPLS/BFD Echo、L2TPv3、IS-IS、LDP 等尚未接入的
+范围和既有字段缺失保留在后续工作中，本次没有宣称 TOP30 或所有核心协议完备。
+
+
+本批完整回归：bin-parser 核心 171.068s、全部子包通过；pcaputil 完整包 481.410s 通过；
+最终 CLI 完整包独立重跑 2.544s 通过。长命令开始后新增了页面格式化源文件，Go 最初
+枚举的 CLI 文件清单不含它，导致该命令 CLI 构建出现 `undefined routingFieldText`；
+最终源码独立重跑已解决，该失败和重跑分别保留在汇总，未宣称原长命令退出 0。
+最终 Windows EXE 按相同源码重建，SHA256 与实际页面验收二进制完全一致。

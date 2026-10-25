@@ -61,12 +61,10 @@ MIH -> UDP,868
 SMB -> UDP,825
 TDLS -> GRE,824
 E1AP -> SCTP,778
-GLBP -> UDP,777
 GTP -> IPv6HopByHop,776
 SCTP -> IPv4,773
 GEONW -> IPv4,771
 ieee1905 -> Ethernet,769
-HSRPv2 -> UDP,768
 MMSE -> UDP,764
 Kafka -> IPv4,760
 DHCPv6 -> UDP,758
@@ -501,7 +499,6 @@ BZR -> IPv6HopByHop,78
 ARP -> GRE,78
 DEC DNA -> Ethernet,78
 V5UA (draft) -> SCTP,77
-BFD Control -> UDP,76
 ieee1905 -> MPLS,76
 MEGACO -> IPv4,76
 GDS DB -> Fragment,75
@@ -548,6 +545,7 @@ BATADV_BATMAN -> UDP,66
 802.11 -> Ethernet,66
 IGMPv3 -> IGMP,65
 TCP -> IPP,65
+BFD Control -> BFDv1,65
 MQTT -> UDP,65
 H.248 -> SCTP,65
 SMTP -> UDP,64
@@ -1314,6 +1312,7 @@ SMUX -> UDP,11
 KRB4 -> UDP,11
 EXEC -> UDP,11
 Modbus/TCP -> UDP,11
+BFD Control -> UDP,11
 MSMMS -> UDP,11
 LBT-TCP -> GRE,11
 Couchbase -> IPv6HopByHop,11
@@ -1890,6 +1889,7 @@ LLC -> MPLS,5
 SSLv3 -> IPv6HopByHop,5
 RARP -> Ethernet,4
 HTTP -> HTTP/1.0,4
+HSRPv2 -> UDP,4
 HTTP/XML -> TCP,4
 PPP IPV6CP -> PPP,4
 OSPF -> IPSecAH,4

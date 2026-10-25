@@ -113,6 +113,7 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 	for name, passed := range requireObservedSessionScopes(t, priP1) {
 		observedScopes[name] = passed
 	}
+	routingScopes := requireRoutingControlScopes(t)
 
 	for _, pair := range []struct {
 		schema   string
@@ -234,6 +235,9 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 					t.Fatalf("mapped capture has incomplete roadmap metadata")
 				}
 				historicalPartial := observedScopes[item.Name] && item.Status == stPartial && *capture.RoadmapStatus == stDone
+				if routingScopes[item.Name] && item.Status == stPartial {
+					historicalPartial = item.Name == "HSRP" && *capture.RoadmapStatus == stDone || (item.Name == "GLBP" || item.Name == "BFD") && *capture.RoadmapStatus == stTodo
+				}
 				if *capture.RoadmapFamily != item.Family || *capture.RoadmapPriority != item.Priority || *capture.RoadmapStatus != item.Status && !historicalPartial {
 					t.Fatalf("stale roadmap metadata: got %s/%s/%s, want %s/%s/%s", *capture.RoadmapFamily, *capture.RoadmapPriority, *capture.RoadmapStatus, item.Family, item.Priority, item.Status)
 				}

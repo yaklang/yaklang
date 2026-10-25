@@ -29,6 +29,10 @@ type ByteSource struct {
 	ParentPDU  uint64
 	ParentPDUs []uint64
 	PacketRefs []PacketReference
+	// CompletedIn is the latest numbered byte contributor of a complete
+	// decoded observation, not necessarily the frame where another dissector
+	// chooses to display it or the later time when context became available.
+	CompletedIn *PacketReference `json:",omitempty"`
 }
 type captureEvidence struct {
 	tcpMissingTail uint32 // validated captured TCP payload suffix; no invented bytes
@@ -122,6 +126,15 @@ func ipEncapsulation(protocol layers.IPProtocol, outer string) string {
 	}
 }
 func (e *ProtocolEvent) finalizeEvidence() {
+	e.SourceBytes.CompletedIn = nil
+	if (e.Status == "decoded" || e.Status == "deferred") && len(e.Raw) > 0 {
+		for _, ref := range e.SourceBytes.PacketRefs {
+			if ref.Number != 0 && (e.SourceBytes.CompletedIn == nil || ref.Number > e.SourceBytes.CompletedIn.Number) {
+				owned := ref
+				e.SourceBytes.CompletedIn = &owned
+			}
+		}
+	}
 	if e.Profile == "" {
 		e.Profile = e.Protocol
 	}
@@ -160,6 +173,10 @@ func (e *ProtocolEvent) finalizeEvidence() {
 	}
 }
 func cloneEvidence(e *ProtocolEvent) {
+	if e.SourceBytes.CompletedIn != nil {
+		owned := *e.SourceBytes.CompletedIn
+		e.SourceBytes.CompletedIn = &owned
+	}
 	e.CarrierLayers = append([]string(nil), e.CarrierLayers...)
 	e.SourceBytes.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)
 	e.SourceBytes.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)

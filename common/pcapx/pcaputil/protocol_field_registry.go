@@ -109,6 +109,12 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	meta("status", "Decode status", DisplayString, 0, func(e *ProtocolEvent) any { return e.Status })
 	meta("pdu.id", "PDU identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.ID })
 	meta("pdu.length", "PDU length", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.Length })
+	meta("pdu.completed_in", "Complete message byte contributor", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
+		if e.SourceBytes.CompletedIn != nil {
+			return e.SourceBytes.CompletedIn.Number
+		}
+		return nil
+	})
 	meta("source", "Source endpoint", DisplayString, 0, func(e *ProtocolEvent) any { return e.Source })
 	meta("destination", "Destination endpoint", DisplayString, 0, func(e *ProtocolEvent) any { return e.Destination })
 	meta("flow.id", "Observed flow identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.FlowID })
@@ -150,7 +156,23 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			keys = []string{"DNS", "ID"}
 		}
 		path("dns|mdns|llmnr|dot|doh|doq", "dns", f.name, f.label, f.typ, f.bits, "pdu", keys...)
+		if f.key == "Name" {
+			out[len(out)-1].custom = func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+				p.walk(e.Session, []string{"DNS", "Questions", "*"}, func(v any) {
+					if q, ok := v.(map[string]any); ok {
+						if name, exists := q["Display Name"]; exists {
+							emit(name)
+						} else {
+							emit(q["Name"])
+						}
+					}
+				})
+			}
+		}
 	}
+	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
+	out = append(out, routingDisplayBindings()...)
+
 	for _, f := range []struct {
 		protocol, name, label, key, origin string
 		typ                                DisplayFieldType
@@ -356,6 +378,10 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 		e = &owned
 	}
 	s.PDU, s.Source = e.ID, e.SourceBytes
+	if e.SourceBytes.CompletedIn != nil {
+		owned := *e.SourceBytes.CompletedIn
+		s.Source.CompletedIn = &owned
+	}
 	s.Source.ParentPDUs = append([]uint64(nil), e.SourceBytes.ParentPDUs...)
 	s.Source.PacketRefs = append([]PacketReference(nil), e.SourceBytes.PacketRefs...)
 	p := &displayProjection{snapshot: &s, remaining: maxDisplayFieldValues * 4}

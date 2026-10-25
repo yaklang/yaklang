@@ -70,8 +70,8 @@
     "out_of_order_reassembly": true,
     "keylog_sha256": null
   },
-  "yak_sha256": "a5924e2abbb48408c0f87b15880554d71d09b6c7210a505bb4ee7ac8d1ac2e91",
-  "events_binary_sha256": "d5a8520775327754fcd9109f590d786562152ca6eb4069451e8bc575ca0eada4",
+  "yak_sha256": "ff5728c534749e2b6b2ac4d4351fb12d90d3a4e430e28099270fca4b6276208c",
+  "events_binary_sha256": "f70e55a3406a431b17fb9e3c7f42a4c363864c4b0de6a660683388634ebee01d",
   "audit_script_sha256": "adb82e02b6b171f56ffb5df482fd7fe50bb377eef2b82d561a28175c67bb08e6",
   "ws_labels": {
     "IPv4": 26586,
@@ -1905,7 +1905,7 @@
     "0x82fe": 1
   },
   "yak_labels": {
-    "UDP": 111731,
+    "UDP": 110125,
     "IPv4": 54346,
     "Fragment": 51897,
     "SCTP": 25412,
@@ -1922,6 +1922,8 @@
     "NTP": 1071,
     "IPSecESP": 1005,
     "VRRP": 818,
+    "GLBP": 777,
+    "HSRPv2": 764,
     "OSPF": 647,
     "TLSv1.2": 452,
     "STP": 407,
@@ -1947,6 +1949,7 @@
     "SSDP": 73,
     "LLDP": 71,
     "RIP": 68,
+    "BFDv1": 65,
     "HTTP/1.1": 54,
     "EAPOL": 53,
     "ICMPv6": 51,
@@ -2450,15 +2453,15 @@
     "nsh": 84,
     "etch": 84,
     "zbee_zcl_general.alarms": 82,
-    "lapb": 82,
     "lapbether": 82,
+    "lapb": 82,
     "mip": 81,
     "cops": 81,
     "elasticsearch": 80,
     "mpeg-pes": 79,
     "dvb_ipdc": 79,
-    "alc": 78,
     "rmt-lct": 78,
+    "alc": 78,
     "crtp": 78,
     "imf": 77,
     "netsync": 77,
@@ -2711,8 +2714,8 @@
     "epmd": 18,
     "pmproxy": 18,
     "mtp2": 18,
-    "pkix1explicit": 17,
     "pkix1implicit": 17,
+    "pkix1explicit": 17,
     "clique-rm": 17,
     "hicp": 17,
     "hbbak": 17,
@@ -2872,8 +2875,8 @@
     "rtag": 5,
     "mplspmilmdm": 5,
     "tacacs": 5,
-    "h263": 5,
     "rfc2190": 5,
+    "h263": 5,
     "zbee_zcl_se.sub_ghz": 5,
     "raw": 5,
     "dvb_tot": 5,
@@ -2956,8 +2959,8 @@
     "gsm_a.sacch": 2,
     "smp": 2,
     "h460": 2,
-    "gbcs_tunnel": 1,
     "gbcs_message": 1,
+    "gbcs_tunnel": 1,
     "prism": 1,
     "lls": 1,
     "cippccc": 1,
@@ -3001,6 +3004,8 @@
     "dns": 1300,
     "ntp": 925,
     "tls": 795,
+    "glbp": 777,
+    "hsrp": 764,
     "mdns": 396,
     "snmp": 392,
     "ike": 274,
@@ -3015,6 +3020,7 @@
     "http": 72,
     "lldp": 71,
     "rip": 68,
+    "bfd": 65,
     "ftp-data": 46,
     "sip": 23,
     "tftp": 22,
@@ -3034,13 +3040,15 @@
     "ip/unrecognized": 52900,
     "ip/limited": 44427,
     "ip/malformed": 15036,
-    "/unrecognized": 7311,
     "rtp/decoded": 6462,
+    "/unrecognized": 5780,
     "icmpv6/decoded": 2985,
     "icmp/decoded": 2501,
     "dns/decoded": 1284,
     "ntp/decoded": 925,
     "tls/decoded": 831,
+    "glbp/decoded": 777,
+    "hsrp/decoded": 764,
     "ip/incomplete": 450,
     "mdns/decoded": 396,
     "bgp/decoded": 315,
@@ -3052,10 +3060,10 @@
     "telnet/decoded": 136,
     "syslog/decoded": 119,
     "ftp/decoded": 96,
-    "radius/malformed": 75,
     "ssdp/decoded": 73,
     "lldp/decoded": 71,
     "rip/decoded": 68,
+    "bfd/decoded": 65,
     "http/decoded": 57,
     "ftp-data/decoded": 46,
     "http/context-required": 25,
@@ -3155,7 +3163,7 @@
     "rdpudp.data.seqnum": 7,
     "rdpudp.data.channelseqnumber": 6
   },
-  "field_mismatch_count": 39,
+  "field_mismatch_count": 35,
   "packet_metadata_mismatches": {
     "source": 46656,
     "destination": 46585
@@ -3166,12 +3174,12 @@
     "source_oracle_unavailable": 422,
     "destination_oracle_unavailable": 448
   },
-  "native_tcp_flow_count": 843,
+  "native_tcp_flow_count": 840,
   "native_tcp_preview_count": 1530,
   "scoped_session_partitions": {
     "tcp": {
       "oracle_stream_domain_pairs": 35105,
-      "missing_or_split_within_domain": 34317
+      "missing_or_split_within_domain": 34315
     },
     "udp": {
       "oracle_stream_domain_pairs": 10100,
@@ -3182,9 +3190,9 @@
   "acceptance": "pending: label, coverage, field, reassembly and session differences require investigation",
   "bidirectional_session_checks": {
     "tcp": {
-      "native_partitions_merging_oracle_streams": 5,
+      "native_partitions_merging_oracle_streams": 6,
       "payload_stream_domain_pairs": 7996,
-      "payload_pairs_missing_or_split": 7215
+      "payload_pairs_missing_or_split": 7213
     },
     "udp": {
       "native_partitions_merging_oracle_streams": 24,
@@ -3193,7 +3201,6 @@
     }
   },
   "field_difference_counts": {
-    "tls.record.length": 35,
-    "dns.qry.name": 4
+    "tls.record.length": 35
   }
 }

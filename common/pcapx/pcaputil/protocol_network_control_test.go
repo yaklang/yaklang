@@ -13,7 +13,7 @@ func TestControlIngressCatalogRulesAndWireFields(t *testing.T) {
 	for _, profile := range controlDatagramProfiles {
 		found := false
 		for _, p := range binparser.ProtocolCatalog {
-			if p.RuleFile == "network_control_fields.yaml" && p.EntryNode == profile.entry {
+			if (p.RuleFile == "network_control_fields.yaml" || p.RuleFile == "routing_control.yaml") && p.EntryNode == profile.entry {
 				require.NotEmpty(t, p.ProfileOf, profile.name)
 				require.Equal(t, "partial", p.Status)
 				found = true
