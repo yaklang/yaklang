@@ -295,8 +295,14 @@ func DecodeNetFlowV9Wire(w []byte, previous map[uint16]NetFlowV9Template, limit 
 				if end > at {
 					ranges["Value"] = []any{uint64(at), uint64(end)}
 				}
-				fields = append(fields, map[string]any{"Field Type": uint64(f.Type), "Field Length": uint64(f.Length), "Scope": f.Scope,
-					"Field Name": name, "Value Kind": kind, "Value": value, "Wire Field Ranges": ranges})
+				field := map[string]any{"Field Type": uint64(f.Type), "Field Length": uint64(f.Length), "Scope": f.Scope,
+					"Field Name": name, "Value Kind": kind, "Value": value, "Wire Field Ranges": ranges}
+				if kind == "unsigned" {
+					if meaning := netflowV9Meaning(f.Type, value.(uint64)); meaning != "" {
+						field["Value Meaning"] = meaning
+					}
+				}
+				fields = append(fields, field)
 				if kind == "opaque" {
 					r.info["Unselected Field Semantics"] = true
 				}
@@ -381,7 +387,7 @@ func netflowV9RecordCounts(choices [][]int, target, limit int) ([]int, error) {
 
 type netflowV9ValueSpec struct {
 	name, kind string
-	width      int // zero denotes a variable-width unsigned counter, up to64 bits
+	width      int // zero denotes a variable-width unsigned field, up to64 bits
 }
 
 var netflowV9Values = map[uint16]netflowV9ValueSpec{
@@ -400,6 +406,31 @@ var netflowV9Values = map[uint16]netflowV9ValueSpec{
 	34: {"Reported Sampling Interval", "unsigned", 4}, 35: {"Reported Sampling Algorithm", "unsigned", 1},
 	36: {"Reported Active Timeout Seconds", "unsigned", 2}, 37: {"Reported Inactive Timeout Seconds", "unsigned", 2},
 	38: {"Reported Engine Type", "unsigned", 1}, 39: {"Reported Engine ID", "unsigned", 1},
+	61: {"Reported Observation Direction", "unsigned", 1},
+	// Selected de-facto v9 extensions match the pinned Wireshark dissector and
+	// IANA IE definitions. They do not change captured flow/stream identity.
+	148: {"Reported Flow ID", "unsigned", 0}, 233: {"Reported Firewall Event", "unsigned", 1},
+}
+
+func netflowV9Meaning(typ uint16, value uint64) string {
+	switch typ {
+	case 61:
+		if value == 0 {
+			return "ingress at the exporter observation point; not captured connection direction"
+		}
+		if value == 1 {
+			return "egress at the exporter observation point; not captured connection direction"
+		}
+		return "unassigned observation direction retained literally"
+	case 148:
+		return "exporter-assigned identifier in the reported observation domain; not a captured TCP flow or stream ID"
+	case 233:
+		if value <= 5 {
+			return []string{"Ignore (invalid)", "Flow Created (reported)", "Flow Deleted (reported)", "Flow Denied (reported)", "Flow Alert (reported)", "Flow Update (reported)"}[value]
+		}
+		return "unassigned firewall-event value retained literally"
+	}
+	return ""
 }
 
 func netflowV9Value(f NetFlowV9Field, b []byte) (any, string, string) {

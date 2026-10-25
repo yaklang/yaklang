@@ -2,9 +2,12 @@ package pcaputil
 
 import (
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 )
 
@@ -12,6 +15,30 @@ func nf9NativeSet(id uint16, w []byte) []byte {
 	header := binary.BigEndian.AppendUint16(nil, id)
 	header = binary.BigEndian.AppendUint16(header, uint16(4+len(w)))
 	return append(header, w...)
+}
+
+func TestNetFlowV9EarlierDatagramDecoderCannotHideTupleReuse(t *testing.T) {
+	var events []*ProtocolEvent
+	a, err := NewPacketAnalyzer(WithCaptureReplayClock(), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }))
+	require.NoError(t, err)
+	defer a.Close()
+	feed := func(payload []byte, second int64) {
+		eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
+		ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolUDP, SrcIP: net.ParseIP("192.0.2.1"), DstIP: net.ParseIP("198.51.100.2")}
+		udp := &layers.UDP{SrcPort: 52000, DstPort: 2055}
+		require.NoError(t, udp.SetNetworkLayerForChecksum(ip))
+		buffer := gopacket.NewSerializeBuffer()
+		require.NoError(t, gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, udp, gopacket.Payload(payload)))
+		frame := buffer.Bytes()
+		require.NoError(t, a.Feed(frame, gopacket.CaptureInfo{Timestamp: time.Unix(second, 0), CaptureLength: len(frame), Length: len(frame)}, layers.LinkTypeEthernet))
+	}
+	feed(nf9NativeMessage(1, 1, 1000, 19, nf9NativeTemplate()), 1)
+	feed(mavlinkTestFrame(1, 0, []byte{0, 0, 0, 0, 2, 3, 0, 4, 3}, 0, 50), 2)
+	feed(nf9NativeMessage(1, 2, 1001, 19, nf9NativeData()), 3)
+	require.Len(t, events, 3)
+	require.Equal(t, "mavlink", events[1].Protocol, "an earlier successful decoder must be exercised")
+	require.Equal(t, "netflow-v9", events[2].Protocol)
+	require.Equal(t, "context-required", events[2].Status, "a codec switch on the same UDP tuple retires old templates before dispatch")
 }
 
 func nf9NativeMessage(count uint16, seq, uptime, domain uint32, sets ...[]byte) []byte {
@@ -219,4 +246,29 @@ func TestNetFlowV9NativeClockAndOptionsScopeRemainExplicit(t *testing.T) {
 	require.Equal(t, []any{uint64(0), uint64(4)}, values["cflow.template_field_length"])
 	require.NotContains(t, values, "cflow.octets", "scope type1 is not ordinary information element1")
 	require.Equal(t, []any{uint64(43)}, values["cflow.packets"])
+}
+
+func TestNetFlowV9ReportedFlowIDAndDirectionAreNotCapturedSessionFacts(t *testing.T) {
+	a := nf9NativeParser(t)
+	template := nf9NativeSet(0, []byte{1, 0, 0, 3, 0, 61, 0, 1, 0, 148, 0, 8, 0, 233, 0, 1})
+	data := nf9NativeSet(256, []byte{1, 0x10, 0, 0, 0, 0, 0, 0, 3, 3})
+	e := nf9NativeObserve(t, a, nf9NativeMessage(2, 1, 1000, 19, template, data), 1, nil)
+	require.Equal(t, "decoded", e.Status)
+	require.False(t, e.DisplayFieldValues().Incomplete)
+	values := e.DisplayFields()
+	require.Equal(t, []any{uint64(1)}, values["cflow.direction"])
+	require.Equal(t, []any{uint64(1)<<60 | 3}, values["cflow.flow_id"])
+	require.Equal(t, []any{uint64(3)}, values["cflow.firewall_event"])
+	require.Equal(t, []any{uint64(0)}, values["flow.id"])
+	require.Zero(t, e.Direction)
+	fields := netflowV9Rows(netflowV9Rows(e.Session["FlowSets"])[1]["Records"])[0]["Fields"].([]map[string]any)
+	require.Contains(t, fields[0]["Value Meaning"], "not captured connection direction")
+	require.Contains(t, fields[1]["Value Meaning"], "not a captured TCP flow")
+	require.Equal(t, "Flow Denied (reported)", fields[2]["Value Meaning"])
+	for _, v := range e.DisplayFieldValues().Values {
+		if v.Name == "cflow.flow_id" {
+			require.Equal(t, "1152921504606846979", v.ExactValue)
+			require.Equal(t, &DisplayFieldRange{Offset: 45, Length: 8}, v.Range)
+		}
+	}
 }
