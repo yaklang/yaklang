@@ -39,3 +39,43 @@ func TestLDPDiscoveryProgressionAndNestedByteCoordinates(t *testing.T) {
 	r = presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "UDP"})
 	require.Equal(t, "UDP", r.Protocol, "partial header cannot establish LDP")
 }
+
+func TestLDPTCPSummaryDoesNotCallSessionMessagesHello(t *testing.T) {
+	w := []byte{0, 1, 0, 14, 192, 0, 2, 1, 0, 0, 2, 1, 0, 4, 0, 0, 0, 9}
+	m, err := stream_parser.DecodeLDPSessionPDU(w, 32)
+	require.NoError(t, err)
+	e := &pcaputil.ProtocolEvent{Protocol: "ldp", Status: "decoded", Raw: w, Session: m}
+	r := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Layers: []string{"Ethernet", "IPv4", "TCP"}})
+	require.Equal(t, []string{"Ethernet", "IPv4", "TCP", "LDP"}, r.ProtocolStack)
+	require.Contains(t, r.Info, "KeepAlive")
+	require.NotContains(t, r.Info, "Hello")
+	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	for _, f := range fields {
+		require.NotContains(t, f.text, "(Hello)")
+	}
+}
+
+func TestLDPMappingFieldsHighlightTheirOwnPDUBytes(t *testing.T) {
+	w := []byte{0, 1, 0, 33, 192, 0, 2, 1, 0, 0, 4, 0, 0, 23, 0, 0, 0, 1, 1, 0, 0, 7, 2, 0, 1, 24, 192, 0, 2, 2, 0, 0, 4, 0, 0, 0, 3}
+	m, err := stream_parser.DecodeLDPSessionPDU(w, 32)
+	require.NoError(t, err)
+	e := &pcaputil.ProtocolEvent{Protocol: "ldp", Transport: "tcp", Status: "decoded", Raw: w, Session: m}
+	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	want := map[string][]byte{"Generic Label:": {0, 0, 0, 3}, "Prefix:": {192, 0, 2}, "Prefix Address:": {192, 0, 2}}
+	seen := map[string]bool{}
+	for _, f := range fs {
+		for prefix, b := range want {
+			if !strings.HasPrefix(f.text, prefix) {
+				continue
+			}
+			require.True(t, f.hasRange, f.text)
+			require.Equal(t, b, sources[f.source-1].Data[f.start:f.end], f.text)
+			if prefix == "Generic Label:" {
+				require.Contains(t, f.text, "Implicit NULL")
+				require.Contains(t, f.text, "advertised")
+			}
+			seen[prefix] = true
+		}
+	}
+	require.Len(t, seen, len(want))
+}

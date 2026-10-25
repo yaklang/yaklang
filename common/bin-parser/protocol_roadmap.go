@@ -147,7 +147,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "PIM", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "DVMRP", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
 	{Name: "MSDP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
-	{Name: "LDP", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "Bounded native/canonical UDP discovery Hello and TLV fields; TCP session and label distribution receiver pending; no adjacency, negotiated timer or authenticated LSR inference"},
+	{Name: "LDP", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "Bounded UDP discovery and base TCP messages, prefix FEC/generic labels, observed Init/KeepAlive and generation isolation; no installed label database, ATM/FR/extended FEC semantics or authenticated LSR inference"},
 	{Name: "RSVP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP2},
 	{Name: "BFD", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "BFDv1 Control discriminator generations and conservative Poll/Final; Echo/multipoint receiver selection excluded"},
 	{Name: "LACP-marker", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},

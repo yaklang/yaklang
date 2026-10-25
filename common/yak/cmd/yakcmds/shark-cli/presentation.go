@@ -352,6 +352,16 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 		v := eventValues(e)
 		parts := []string{fmt.Sprintf("LSR %s:%d", textValue(v["LSR ID"]), number(v["Label Space ID"]))}
 		messages := mapList(v["Messages"])
+		if len(messages) > 0 && number(messages[0]["Message Type"]) != 0x100 {
+			for i, m := range messages {
+				if i == 3 {
+					parts = append(parts, fmt.Sprintf("%d more messages", len(messages)-i))
+					break
+				}
+				parts = append(parts, textValue(m["Packet Name"]))
+			}
+			return strings.Join(parts, " · ")
+		}
 		if len(messages) > 0 {
 			for _, tlv := range mapList(messages[0]["TLVs"]) {
 				if number(tlv["TLV Type"]) == 0x0400 {

@@ -12,6 +12,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -275,6 +276,18 @@ func main() {
 	time.Sleep(time.Second)
 	send("d")
 	shot("01-protocol-fields")
+	// Opt-in navigation of the real field pane. Deep protocol trees must be
+	// checked where their fields actually render, not only in JSON exports.
+	if value := os.Getenv("SHARK_QA_FIELD_DOWN"); value != "" {
+		n, err := strconv.Atoi(value)
+		fail(err)
+		if n < 0 || n > 512 {
+			panic("field QA navigation outside bounded range")
+		}
+		send("2")
+		send(strings.Repeat("\x1b[B", n))
+		shot("01-deep-protocol-fields")
+	}
 	// A pinned pre-EOF detail must not make an empty filtered list pass.
 	// Other bounded/evicted packets may separately report an indeterminate
 	// predicate; that does not erase the proven matching rows being inspected.
