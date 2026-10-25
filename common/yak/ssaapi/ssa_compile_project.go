@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	javaclassparser "github.com/yaklang/javajive/classparser"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -304,6 +305,10 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	}
 
 	var suspendErr error
+	// Raise the SQLite page cache before the bulk inserts. The size-based tuner
+	// below only sees the file as it is now, which is near zero for a fresh
+	// project database that is about to receive millions of IR rows.
+	consts.TuneSQLiteBulkWrite(ssadb.GetDB())
 	suspendedIndexes, suspendErr = ssadb.SuspendSecondaryIndexes(ssadb.GetDB())
 	if suspendErr != nil {
 		log.Warnf("suspend secondary indexes: %v", suspendErr)

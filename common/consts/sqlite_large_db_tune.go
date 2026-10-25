@@ -86,6 +86,28 @@ func applySQLiteLargeDBTune(db *gorm.DB, level sqliteLargeDBTuneLevel) {
 	db.Exec("PRAGMA journal_size_limit = 67108864;")
 }
 
+// TuneSQLiteBulkWrite raises the page cache and WAL profile before a compile
+// streams millions of IR rows into a fresh database.
+//
+// TuneSQLiteByDatabaseFileSize only looks at the file size that exists now, so
+// a brand new ssadb.db (0 bytes) keeps the default 32MB cache while the compile
+// writes several gigabytes into it. Every dirty page then has to leave the
+// cache, which turns the per-batch flush into random writes.
+func TuneSQLiteBulkWrite(db *gorm.DB) bool {
+	if db == nil {
+		return false
+	}
+	applySQLiteLargeDBTune(db, sqliteLargeDBTune256M)
+	mmapSize, walCheckpoint := sqliteLargeDBTune256M.mmapAndWAL()
+	log.Infof(
+		"sqlite tuned for bulk IR write: cache=%s mmap=%s wal_autocheckpoint=%d",
+		utils.ByteSize(uint64(int64(sqliteLargeDBTune256M)*1024)),
+		utils.ByteSize(uint64(mmapSize)),
+		walCheckpoint,
+	)
+	return true
+}
+
 // TuneSQLiteByDatabaseFileSize raises cache/mmap for large project databases to reduce slow inserts.
 // Returns true when PRAGMAs were applied and logged; false when skipped (below threshold or same tier as last time).
 func TuneSQLiteByDatabaseFileSize(db *gorm.DB, pureDBPath string) bool {
