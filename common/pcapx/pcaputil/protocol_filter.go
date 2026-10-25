@@ -248,7 +248,10 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 		for _, v := range vals {
 			if op == "in" {
 				addr, err := netip.ParseAddr(fmt.Sprint(v))
-				if err == nil && literal.(netip.Prefix).Contains(addr.Unmap()) {
+				if descriptor.Bits != 128 {
+					addr = addr.Unmap()
+				}
+				if err == nil && literal.(netip.Prefix).Contains(addr) {
 					return true
 				}
 				continue
@@ -320,7 +323,10 @@ func compareDisplayValue(actual, literal any, descriptor DisplayFieldDescriptor)
 		if err != nil {
 			return 0, false
 		}
-		return a.Unmap().Compare(literal.(netip.Addr)), true
+		if descriptor.Bits != 128 {
+			a = a.Unmap()
+		}
+		return a.Compare(literal.(netip.Addr)), true
 	}
 	return 0, false
 }

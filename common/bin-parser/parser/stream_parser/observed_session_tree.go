@@ -39,6 +39,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	}
 	var fields map[string]any
 	switch profile {
+	case "ripng":
+		fields, err = DecodeRIPngWire(wire, 4096)
 	case "stp", "pvst":
 		fields, err = DecodeSTPWire(wire, profile == "pvst", 4096)
 	case "l2tp3-ip", "l2tp3-udp":

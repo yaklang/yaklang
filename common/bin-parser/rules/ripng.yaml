@@ -1,6 +1,10 @@
 # RFC 2080 request/response and every 20-octet route/next-hop entry.
 endian: big
 Package:
+  RIPngFields:
+    operator: |
+      err = parseObservedSession("ripng")
+      if err != nil { panic(err) }
   RIPng:
     operator: |
       if !this.HasMaxLength() { panic("ripng: a datagram boundary is required") }
