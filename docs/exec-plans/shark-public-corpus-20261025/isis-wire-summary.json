@@ -1,15 +1,28 @@
 {
-  "audit_source": "3e1cadc2f2",
+  "ES_layout_sources": [
+    {
+      "scope": "Public historic ISO draft republication, section9.8: length4+6n, one set of costs for each listed ID; not claimed to be a current Internet Standard",
+      "url": "https://www.rfc-editor.org/rfc/rfc1142.html"
+    },
+    {
+      "scope": "Independent receiver layout: advance four metric octets once, then six per ES ID; ID-list implementation contains a FIXME, not a routing-operation certificate",
+      "url": "https://github.com/Quagga/quagga/blob/4f593574c41deb598cbbefde5c6d938799e81d5a/isisd/isis_tlv.c"
+    },
+    {
+      "scope": "Independent metric-offset cross-check only; its per-record ES layout is also wrong and is not used as the ES grammar authority",
+      "url": "https://github.com/the-tcpdump-group/tcpdump/blob/94a3708f00f658994293a440fbbb7e71e2047a0f/print-isoclns.c"
+    }
+  ],
   "binaries": {
-    "events-4c6f79f6.exe": "adabfeba31152edea51d831cebafb8fd1b76278c7e86078f6c0f503007400fa6",
-    "events-52385ae1.exe": "adabfeba31152edea51d831cebafb8fd1b76278c7e86078f6c0f503007400fa6",
+    "events-0208c1d1.exe": "59aefdccbf538460d1c4e9b71665f94253162af5a0b49f74e1c7729c4285c342",
     "native-console-9a1fe924.exe": "a3ee435e63ad124adcd973e4af1bdd452e1e599a49636ce87ddb12f79189308f",
-    "yak-4c6f79f6.exe": "723ca072c07a9326cbd62b527cc8520cdd695654331807f0211571c570c6a7c3"
+    "yak-0208c1d1.exe": "7ee1107c066a75ed55ea3c8d5f354af09b7cfd0fa3f02240b0180a91969288fc"
   },
   "captures": {
     "sharon": {
       "additional_native_fields": {
         "isis.hello.observed.area_address": 559,
+        "isis.lsp.es_neighbor_count": 1,
         "isis.lsp.ip_reachability.observed.ipv4_mask": 10,
         "isis.lsp.ipv6_reachability.reserved_bits": 10,
         "isis.lsp.observed.area_address": 5,
@@ -187,19 +200,19 @@
         "isis.lsp.clv_nlpid.nlpid": 10,
         "isis.lsp.default_metric": 7,
         "isis.lsp.delay_metric": 7,
-        "isis.lsp.eis_neighbors.default_metric": 10,
-        "isis.lsp.eis_neighbors.default_metric_ie": 10,
-        "isis.lsp.eis_neighbors.delay_metric": 10,
-        "isis.lsp.eis_neighbors.delay_metric_ie": 10,
-        "isis.lsp.eis_neighbors.error_metric": 10,
-        "isis.lsp.eis_neighbors.error_metric_ie": 10,
-        "isis.lsp.eis_neighbors.error_metric_supported": 10,
-        "isis.lsp.eis_neighbors.expense_metric": 10,
-        "isis.lsp.eis_neighbors.expense_metric_ie": 10,
-        "isis.lsp.eis_neighbors.expense_metric_supported": 10,
+        "isis.lsp.eis_neighbors.default_metric": 11,
+        "isis.lsp.eis_neighbors.default_metric_ie": 11,
+        "isis.lsp.eis_neighbors.delay_metric": 11,
+        "isis.lsp.eis_neighbors.delay_metric_ie": 11,
+        "isis.lsp.eis_neighbors.error_metric": 11,
+        "isis.lsp.eis_neighbors.error_metric_ie": 11,
+        "isis.lsp.eis_neighbors.error_metric_supported": 11,
+        "isis.lsp.eis_neighbors.expense_metric": 11,
+        "isis.lsp.eis_neighbors.expense_metric_ie": 11,
+        "isis.lsp.eis_neighbors.expense_metric_supported": 11,
         "isis.lsp.eis_neighbors.is_neighbor": 10,
         "isis.lsp.eis_neighbors_clv_inner.reserved": 3,
-        "isis.lsp.eis_neighbors_delay_metric.supported": 10,
+        "isis.lsp.eis_neighbors_delay_metric.supported": 11,
         "isis.lsp.error_metric": 7,
         "isis.lsp.expense_metric": 7,
         "isis.lsp.hostname": 5,
@@ -243,10 +256,10 @@
         "isis.version": 678,
         "isis.version2": 678,
         "no_inferred_connection_or_response": 678,
-        "wire_entry_association": 22144
+        "wire_entry_association": 22160
       },
-      "checks_total": 57550,
-      "full_generic_summary_sha256": "6359dfdb82d17a06a17baf7c77fd1561ae8d37e5cf54f6df28a61621fc97087a",
+      "checks_total": 57577,
+      "full_generic_summary_sha256": "78236f4732ec315ca2dce73ebbe94781d3d3fad31798266729743435b2488403",
       "label_delta_from_RIPng_phase": {
         "IS-IS CSNP": 111,
         "IS-IS Hello": 559,
@@ -257,8 +270,7 @@
       "matched_root_messages": 678,
       "missing_selected": [],
       "native_statuses": {
-        "decoded": 677,
-        "malformed": 1
+        "decoded": 678
       },
       "native_tcp_flow_count": 840,
       "native_tcp_preview_count": 735,
@@ -282,7 +294,7 @@
         "IS-IS LSP": 7,
         "IS-IS PSNP": 1
       },
-      "raw_field_audit_sha256": "0bd5d435b01d7702927c94e483df963fad513df799d1d39a78899bc3138a173e",
+      "raw_field_audit_sha256": "ef51308771e946a4a0cad33722883b218493901acdda0c05ffe83fe41db290f7",
       "raw_original_oracle_sha256": "ce8d5cda4569dca11ada793f528a834f6f035ca53c8f9fc96dfa21be16e1bd3f",
       "reference_fields_not_projected": {
         "isis.lsp.checksum.status": 7,
@@ -291,13 +303,6 @@
       },
       "retained_original_field_mismatch_count": 35,
       "unresolved_selected_differences": [],
-      "unselected_reference_carrier_groups": {
-        "EtherIP": 12,
-        "GRE/PPP": 262,
-        "IP/OSI (reference ip.proto=80)": 1688,
-        "UDP/MPLS/OSI": 772,
-        "other": 2
-      },
       "unselected_reference_frame_count": 2736,
       "unselected_reference_frames": [
         36473,
@@ -3037,223 +3042,161 @@
         328008,
         328035
       ],
-      "unselected_reference_protocol_chains": {
-        "eth:ethertype:ip:etherip:eth:llc:osi:isis:isis.csnp": 3,
-        "eth:ethertype:ip:etherip:eth:llc:osi:isis:isis.hello": 2,
-        "eth:ethertype:ip:etherip:eth:llc:osi:isis:isis.lsp": 6,
-        "eth:ethertype:ip:etherip:eth:llc:osi:isis:isis.psnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:bcp_bpdu:eth:ethertype:brdwlk:fc:data:data:llc:3comxns:wlan_centrino:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:3comxns:wlan_centrino:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:llc:3comxns:wlan_centrino:data:data:data:llc:3comxns:wlan_centrino:data:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.csnp:llc:3comxns:wlan_centrino:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:llc:3comxns:wlan_centrino": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:bcp_bpdu:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:clnp:data:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:data:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:clnp:cotp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:ppp:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:ppp:osi:ppp:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:data:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:data:data:dec_dna:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:ddp:atp:asp:afp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:3comxns:data:llc:data:llc:3comxns:csm_encaps:eap:eap:tls:eap:vjc:ip:data:vsnp:vjc:ip:data:vsnp:data:llc:3comxns:wlan:llc:3comxns:data:llc:3comxns:wlan:llc:3comxns:wlan:vjc:llc:3comxns:wlan:vjc:llc:3comxns:wlan:vjc:llc:3comxns:wlan:vjc:llc:3comxns:hbbak:llc:3comxns:wlan:llc:3comxns:data:llc:3comxns:wlan:vjc:llc:3comxns:wlan:vjc:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:3comxns:nwp:data:llc:3comxns:nwp:data:llc:3comxns:nwp:data:llc:3comxns:nwp:llc:3comxns:nwp:data:llc:3comxns:nwp:data:llc:3comxns:nwp:llc:3comxns:nwp:data:llc:3comxns:nwp:osi:isis:isis.hello": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:isis:isis.csnp:llc:3comxns:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:isis:isis.csnp:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:isis:isis.csnp:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:data:llc:3comxns:rohc:data:llc:3comxns:data:data:llc:3comxns:rohc:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:llc:3comxns:rohc:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:llc:3comxns:rohc:llc:3comxns:rohc:data:llc:3comxns:rohc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:wpan:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:bacnet:bacapp:llc:data:llc:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:wpan:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:data:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data:llc:data:llc:3comxns:wpan:data:llc:3comxns:wpan:data:llc:3comxns:wpan:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:data:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:data:llc:data:llc:data:llc:data:llc:data:llc:data:data:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:bcp_bpdu:osi:isis:bcp_bpdu:eth:ethertype:data:osi:isis:isis.hello:osi:isis:isis.hello:ip:bcp_bpdu:eth:ethertype:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:bcp_bpdu:eth:ethertype:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:data:llc:data:llc:data:llc:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:cotp:data:osi:clnp:cotp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:clnp:cotp:data:data:osi:clnp:cotp:t125:osi:clnp:cotp:data:osi:data:osi:clnp:cotp:t125:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:clnp:cotp:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:cotp:data:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:data:osi:clnp:cotp:t125:osi:clnp:cotp:t125:osi:clnp:cotp:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:cotp:data:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:data:osi:clnp:cotp:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:data:osi:clnp:cotp:data:osi:clnp:cotp:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:data:osi:clnp:cotp:data:osi:clnp:cotp:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:clnp:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:clnp:cotp:data:osi:clnp:cotp:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:data:osi:isis:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:data:data:llc:3comxns:wlan:llc:3comxns:data:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:data:data:llc:3comxns:wlan:data:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:data:data:llc:3comxns:wlan:llc:3comxns:data:llc:3comxns:wlan:llc:3comxns:data:data:llc:3comxns:wlan:data:data:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:data:osi:isis:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:llc:ip:bcp_bpdu:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:ethertype:data:data:bcp_bpdu:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:llc:ip:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 4,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:llc:ip:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 3,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:llc:data:llc:3comxns:llc:3comxns:epl:data:llc:3comxns:epl:llc:3comxns:llc:3comxns:epl:llc:3comxns:epl:llc:data:llc:data:llc:3comxns:llc:3comxns:epl:data:llc:3comxns:data:llc:3comxns:llc:data:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:data:bcp_bpdu:eth:ethertype:hpna:bcp_bpdu:eth:ethertype:data:bcp_bpdu:data:bcp_bpdu:eth:llc:ip:llc:data:data:llc:3comxns:llc:3comxns:data:llc:data:llc:3comxns:llc:3comxns:epl:data:llc:3comxns:epl:llc:3comxns:llc:data:llc:3comxns:epl:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:clnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 3,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:isis.csnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:isis.csnp:vjc:ip:data:vjc:ip:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:llc:bacnet:bacapp:llc:data:llc:bacnet:bacapp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:osi:isis:isis.csnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.csnp:osi:isis:vjc:ip:data:vjc:ip:data:vjc:ip:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:data:llc:bacnet:bacapp:llc:data:llc:bacnet:bacapp:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:data:llc:bacnet:bacapp:llc:data:llc:bacnet:bacapp:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:data:data:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:llc:bacnet:bacapp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:osi:data:vjc:ip:tcp:vjc:ip:tcp:pop:vjc:ip:tcp:pop:vjc:ip:tcp:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:osi:data:vjc:ip:tcp:vjc:ip:tcp:data:vjc:ip:tcp:data:vjc:ip:tcp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:data:vjc:ip:tcp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:osi:isis:llc:data:llc:3comxns:flip:data:llc:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:osi:isis:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:osi:isis:isis.hello:bcp_bpdu:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 7,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:clnp:data:data:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:vjc:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:vjc:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:data:osi:data:osi:data:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:data:osi:clnp:cotp:data:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:vjc:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:vjc:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:vjc:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:clnp:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:osi:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 6,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:esis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:esis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 8,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 5,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:vsnp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:data:osi:isis:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.csnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 9,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp": 7,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 4,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 6,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.hello:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:vines_ip:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:data:llc:3comxns:macc:data:llc:3comxns:macc:data:llc:3comxns:macc:data:data:data:data:ip:data:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.psnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:osi:data:llc:netbios:data:llc:netbios:data:llc:data:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:osi:isis:llc:data:llc:netbios:data:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:data:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.lsp:osi:isis:osi:isis:osi:isis:isis.lsp:llc:netbios:data:llc:netbios:data:osi:isis:llc:netbios:data:llc:netbios:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:data:data:osi:isis:isis.psnp:data:data:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:osi:isis:isis.psnp:data:osi:isis:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:osi:isis:isis.psnp:data:osi:isis:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 3,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 3,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:data:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:data:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:clnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:vjc:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:vjc:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:clnp:cotp:data:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:isis.hello:osi:isis:isis.hello:osi:clnp:cotp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis:osi:isis": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis:osi:isis:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:vjc:ip:data:vjc:ip:data:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:data:osi:isis:isis.hello:data:data:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:vjc:ip:data:data:osi:isis:isis.hello:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:vjc:ip:data:vjc:ip:tcp:smpp:data:llc:3comxns:gnw:osi:clnp:data:osi:clnp:data:osi:clnp:data:osi:clnp:data:mp:ip:data:llc:3comxns:slow:oampdu:llc:3comxns:slow:oampdu:data:dec_dna:dec_dna:dec_dna:dec_dna:dec_dna:dec_dna:dec_dna:data:data:osi:clnp:data:osi:clnp:data:osi:clnp:data:osi:clnp:data:mp:dec_dna:dec_dna:dec_dna:dec_dna:dec_dna:ip:dec_dna:data:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:data:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:vjc:ip:tcp:data:bcp_bpdu:eth:ethertype:pppoes:ppp:bcp_bpdu:eth:ethertype:pppoes:ppp:data:bcp_bpdu:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data:llc:3comxns:arp:llc:3comxns:arp:data:llc:3comxns:arp:llc:3comxns:arp:data:llc:3comxns:macc:osi:isis:data:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:macc:vjc:ip:tcp:vjc:ip:tcp:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:ddp:data:llc:rpl:data:data:data:llc:rpl:data:data:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:chap:chap:data:chap:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:isis:osi:isis:isis.csnp:osi:isis:isis.csnp:osi:isis:data:osi:clnp:cotp:s7comm:data:osi:clnp:cotp:s7comm:osi:clnp:cotp:s7comm:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:llc:3comxns:batadv:data:osi:clnp:cotp:mms:osi:clnp:cotp:mms:osi:data:llc:3comxns:wlan:llc:data:osi:isis:osi:clnp:cotp:mms:osi:clnp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:data:llc:3comxns:wlan:llc:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:data:llc:3comxns:wlan:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:data:data:llc:3comxns:wlan:data:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:llc:bacnet:bacapp:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:data:llc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:llc:3comxns:rohc:data:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:clnp:cotp:data:data:osi:isis:isis.psnp:data:osi:isis:bcp_ncp:bcp_ncp:bcp_ncp:bcp_ncp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:clnp:osi:isis:isis.psnp:ip:osi:data:osi:clnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:bcp_bpdu:eth:ethertype:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:data:bcp_bpdu:bcp_bpdu:eth:tte:ethertype:data:bcp_bpdu:bcp_bpdu:eth:ethertype:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:data:bcp_bpdu:bcp_bpdu:eth:tte:ethertype:data:bcp_bpdu:bcp_bpdu:eth:tte:ethertype:data:bcp_bpdu:data:data:llc:3comxns:macc:osi:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data:llc:3comxns:macc:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:data:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:sna:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:sna:data:sna:data:data:sna:data:data:sna:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:osi:isis:osi:isis:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:sna:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:sna:data:data:sna:data:sna:data:data:sna:data:data:sna:data:data:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.hello:data:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:osi:isis:isis.hello:vjc:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:clnp:data:osi:isis:isis.hello:data:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:vjc:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:data:osi:isis:isis.hello:osi:isis:isis.hello:data:osi:isis:isis.hello:osi:isis:isis.hello:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.psnp:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:data:osi:isis:isis.psnp:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:isis.psnp:osi:isis:isis.psnp:osi:isis:isis.psnp:osi": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:macc:osi:isis:llc:3comxns:macc:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:macc:llc:data:llc:3comxns:macc:llc:3comxns:data:llc:3comxns:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:osi:isis:osi:isis:osi:isis:data": 2,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:data:osi:isis:osi:isis:osi:isis:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:ppp:vsnp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:llc:3comxns:wlan_centrino:llc:3comxns:wlan_centrino": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:ppp:vsnp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data:osi:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data:osi:ppp:osi:ppp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:ppp:vsnp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:ppp:vsnp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data:osi:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data:osi:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data:osi:ppp:osi:ppp:data:data": 1,
-        "eth:ethertype:ip:gre:ppp_hdlc:osi:ppp:vsnp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:ppp:data:osi:ppp:osi:ppp:ipx:data:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:osi:clnp:osi:isis:isis.lsp:osi:isis:isis.lsp:osi:isis:isis.lsp:data:osi:isis:isis.lsp:data:osi:ppp:data": 1,
-        "eth:ethertype:ip:ipv6:osi:isis:isis.lsp": 1,
-        "eth:ethertype:ip:osi:isis": 3,
-        "eth:ethertype:ip:osi:isis:isis.csnp": 58,
-        "eth:ethertype:ip:osi:isis:isis.hello": 331,
-        "eth:ethertype:ip:osi:isis:isis.lsp": 1250,
-        "eth:ethertype:ip:osi:isis:isis.psnp": 46,
-        "eth:ethertype:ip:udp:mpls:osi:isis": 2,
-        "eth:ethertype:ip:udp:mpls:osi:isis:isis.csnp": 21,
-        "eth:ethertype:ip:udp:mpls:osi:isis:isis.hello": 143,
-        "eth:ethertype:ip:udp:mpls:osi:isis:isis.lsp": 572,
-        "eth:ethertype:ip:udp:mpls:osi:isis:isis.psnp": 34,
-        "eth:ethertype:ip:udp:peekremote:wlan_radio:wlan:llc:osi:isis:isis.hello": 1
-      },
       "wire_verified_reference_defects": [
         {
+          "field": "ES TLV3 shared-metric grammar",
+          "frame": 26574,
+          "native": [
+            "complete four-byte shared metric block, zero ES IDs"
+          ],
+          "reason": "RFC1142 section9.8 defines length4+6n; Wireshark4.6.9 incorrectly requires ten-byte per-ES records",
+          "wire_tlv_type_offset": 88,
+          "wire_value_length": 4,
+          "wireshark": [
+            "short E/IS reachability"
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.default_metric",
+          "frame": 26574,
+          "independent_wire_layout": [
+            [
+              0,
+              55,
+              1
+            ],
+            [
+              0,
+              66,
+              1
+            ],
+            [
+              0,
+              77,
+              1
+            ],
+            [
+              0,
+              90,
+              1
+            ]
+          ],
+          "native": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "native_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ],
+            [
+              90,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.default_metric_ie",
+          "frame": 26574,
+          "independent_wire_layout": [
+            [
+              false,
+              55,
+              1
+            ],
+            [
+              false,
+              66,
+              1
+            ],
+            [
+              false,
+              77,
+              1
+            ],
+            [
+              false,
+              90,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ],
+            [
+              90,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ]
+          ]
+        },
+        {
           "field": "isis.lsp.eis_neighbors.delay_metric",
           "frame": 26574,
           "independent_wire_layout": [
@@ -3271,9 +3214,15 @@
               0,
               78,
               1
+            ],
+            [
+              0,
+              91,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -3290,9 +3239,13 @@
             [
               78,
               1
+            ],
+            [
+              91,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3309,6 +3262,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.delay_metric_ie",
+          "frame": 26574,
+          "independent_wire_layout": [
+            [
+              false,
+              56,
+              1
+            ],
+            [
+              false,
+              67,
+              1
+            ],
+            [
+              false,
+              78,
+              1
+            ],
+            [
+              false,
+              91,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              56,
+              1
+            ],
+            [
+              67,
+              1
+            ],
+            [
+              78,
+              1
+            ],
+            [
+              91,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              56,
+              1
+            ],
+            [
+              67,
+              1
+            ],
+            [
+              78,
               1
             ]
           ]
@@ -3331,9 +3354,15 @@
               0,
               80,
               1
+            ],
+            [
+              0,
+              93,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -3350,9 +3379,13 @@
             [
               80,
               1
+            ],
+            [
+              93,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3369,6 +3402,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.error_metric_ie",
+          "frame": 26574,
+          "independent_wire_layout": [
+            [
+              false,
+              58,
+              1
+            ],
+            [
+              false,
+              69,
+              1
+            ],
+            [
+              false,
+              80,
+              1
+            ],
+            [
+              false,
+              93,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              58,
+              1
+            ],
+            [
+              69,
+              1
+            ],
+            [
+              80,
+              1
+            ],
+            [
+              93,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              58,
+              1
+            ],
+            [
+              69,
+              1
+            ],
+            [
+              80,
               1
             ]
           ]
@@ -3391,9 +3494,15 @@
               true,
               80,
               1
+            ],
+            [
+              true,
+              93,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -3410,9 +3519,13 @@
             [
               80,
               1
+            ],
+            [
+              93,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3451,9 +3564,15 @@
               0,
               79,
               1
+            ],
+            [
+              0,
+              92,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -3470,9 +3589,13 @@
             [
               79,
               1
+            ],
+            [
+              92,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3489,6 +3612,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.expense_metric_ie",
+          "frame": 26574,
+          "independent_wire_layout": [
+            [
+              false,
+              57,
+              1
+            ],
+            [
+              false,
+              68,
+              1
+            ],
+            [
+              false,
+              79,
+              1
+            ],
+            [
+              false,
+              92,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              57,
+              1
+            ],
+            [
+              68,
+              1
+            ],
+            [
+              79,
+              1
+            ],
+            [
+              92,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              57,
+              1
+            ],
+            [
+              68,
+              1
+            ],
+            [
+              79,
               1
             ]
           ]
@@ -3511,9 +3704,15 @@
               true,
               79,
               1
+            ],
+            [
+              true,
+              92,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -3530,9 +3729,13 @@
             [
               79,
               1
+            ],
+            [
+              92,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3571,9 +3774,15 @@
               true,
               78,
               1
+            ],
+            [
+              true,
+              91,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -3590,9 +3799,13 @@
             [
               78,
               1
+            ],
+            [
+              91,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -3632,7 +3845,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3662,7 +3875,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3692,7 +3905,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -3722,7 +3935,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3752,7 +3965,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -3782,7 +3995,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -3812,7 +4025,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3842,7 +4055,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3872,7 +4085,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -3902,7 +4115,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -3932,7 +4145,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -3962,7 +4175,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4012,7 +4225,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4072,7 +4285,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4132,7 +4345,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4192,7 +4405,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4252,7 +4465,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4312,7 +4525,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -4352,7 +4565,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4382,7 +4595,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4412,7 +4625,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4442,7 +4655,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4472,7 +4685,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4502,7 +4715,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4532,7 +4745,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4562,7 +4775,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4592,7 +4805,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4622,7 +4835,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -4652,7 +4865,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4682,7 +4895,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -4698,6 +4911,7 @@
     "weber": {
       "additional_native_fields": {
         "isis.hello.observed.area_address": 559,
+        "isis.lsp.es_neighbor_count": 1,
         "isis.lsp.ip_reachability.observed.ipv4_mask": 10,
         "isis.lsp.ipv6_reachability.reserved_bits": 10,
         "isis.lsp.observed.area_address": 5,
@@ -4875,19 +5089,19 @@
         "isis.lsp.clv_nlpid.nlpid": 10,
         "isis.lsp.default_metric": 7,
         "isis.lsp.delay_metric": 7,
-        "isis.lsp.eis_neighbors.default_metric": 10,
-        "isis.lsp.eis_neighbors.default_metric_ie": 10,
-        "isis.lsp.eis_neighbors.delay_metric": 10,
-        "isis.lsp.eis_neighbors.delay_metric_ie": 10,
-        "isis.lsp.eis_neighbors.error_metric": 10,
-        "isis.lsp.eis_neighbors.error_metric_ie": 10,
-        "isis.lsp.eis_neighbors.error_metric_supported": 10,
-        "isis.lsp.eis_neighbors.expense_metric": 10,
-        "isis.lsp.eis_neighbors.expense_metric_ie": 10,
-        "isis.lsp.eis_neighbors.expense_metric_supported": 10,
+        "isis.lsp.eis_neighbors.default_metric": 11,
+        "isis.lsp.eis_neighbors.default_metric_ie": 11,
+        "isis.lsp.eis_neighbors.delay_metric": 11,
+        "isis.lsp.eis_neighbors.delay_metric_ie": 11,
+        "isis.lsp.eis_neighbors.error_metric": 11,
+        "isis.lsp.eis_neighbors.error_metric_ie": 11,
+        "isis.lsp.eis_neighbors.error_metric_supported": 11,
+        "isis.lsp.eis_neighbors.expense_metric": 11,
+        "isis.lsp.eis_neighbors.expense_metric_ie": 11,
+        "isis.lsp.eis_neighbors.expense_metric_supported": 11,
         "isis.lsp.eis_neighbors.is_neighbor": 10,
         "isis.lsp.eis_neighbors_clv_inner.reserved": 3,
-        "isis.lsp.eis_neighbors_delay_metric.supported": 10,
+        "isis.lsp.eis_neighbors_delay_metric.supported": 11,
         "isis.lsp.error_metric": 7,
         "isis.lsp.expense_metric": 7,
         "isis.lsp.hostname": 5,
@@ -4931,10 +5145,10 @@
         "isis.version": 678,
         "isis.version2": 678,
         "no_inferred_connection_or_response": 678,
-        "wire_entry_association": 22144
+        "wire_entry_association": 22160
       },
-      "checks_total": 57550,
-      "full_generic_summary_sha256": "920fd41d7b5261476e0267fb5b3c561b8bd1286ca39f5f388ccabc68194b846c",
+      "checks_total": 57577,
+      "full_generic_summary_sha256": "cb3fec9b15df0a5fc33a1336829ed1eb884bb746eec0b8b33d843d9aa1bd5832",
       "label_delta_from_RIPng_phase": {
         "IS-IS CSNP": 111,
         "IS-IS Hello": 559,
@@ -4945,8 +5159,7 @@
       "matched_root_messages": 678,
       "missing_selected": [],
       "native_statuses": {
-        "decoded": 677,
-        "malformed": 1
+        "decoded": 678
       },
       "native_tcp_flow_count": 824,
       "native_tcp_preview_count": 808,
@@ -4970,7 +5183,7 @@
         "IS-IS LSP": 7,
         "IS-IS PSNP": 1
       },
-      "raw_field_audit_sha256": "2943135a40ae3dac1f165d2c2d2622389353a41cba590013c45622b193f93264",
+      "raw_field_audit_sha256": "8aac48f8dae87b3eb1cb7a3d63dd4c4eca73b7746cbab3de175443a10a3175c8",
       "raw_original_oracle_sha256": "01110f0754bfca5cbc4c2b2f25fbab1e6732ec909b52962ddc5627d15ece42ec",
       "reference_fields_not_projected": {
         "isis.lsp.checksum.status": 7,
@@ -4979,12 +5192,163 @@
       },
       "retained_original_field_mismatch_count": 90,
       "unresolved_selected_differences": [],
-      "unselected_reference_carrier_groups": {},
       "unselected_reference_frame_count": 0,
       "unselected_reference_frames": [],
-      "unselected_reference_protocol_chains": {},
       "wire_verified_reference_defects": [
         {
+          "field": "ES TLV3 shared-metric grammar",
+          "frame": 24231,
+          "native": [
+            "complete four-byte shared metric block, zero ES IDs"
+          ],
+          "reason": "RFC1142 section9.8 defines length4+6n; Wireshark4.6.9 incorrectly requires ten-byte per-ES records",
+          "wire_tlv_type_offset": 88,
+          "wire_value_length": 4,
+          "wireshark": [
+            "short E/IS reachability"
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.default_metric",
+          "frame": 24231,
+          "independent_wire_layout": [
+            [
+              0,
+              55,
+              1
+            ],
+            [
+              0,
+              66,
+              1
+            ],
+            [
+              0,
+              77,
+              1
+            ],
+            [
+              0,
+              90,
+              1
+            ]
+          ],
+          "native": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "native_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ],
+            [
+              90,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.default_metric_ie",
+          "frame": 24231,
+          "independent_wire_layout": [
+            [
+              false,
+              55,
+              1
+            ],
+            [
+              false,
+              66,
+              1
+            ],
+            [
+              false,
+              77,
+              1
+            ],
+            [
+              false,
+              90,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ],
+            [
+              90,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              55,
+              1
+            ],
+            [
+              66,
+              1
+            ],
+            [
+              77,
+              1
+            ]
+          ]
+        },
+        {
           "field": "isis.lsp.eis_neighbors.delay_metric",
           "frame": 24231,
           "independent_wire_layout": [
@@ -5002,9 +5366,15 @@
               0,
               78,
               1
+            ],
+            [
+              0,
+              91,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -5021,9 +5391,13 @@
             [
               78,
               1
+            ],
+            [
+              91,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5040,6 +5414,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.delay_metric_ie",
+          "frame": 24231,
+          "independent_wire_layout": [
+            [
+              false,
+              56,
+              1
+            ],
+            [
+              false,
+              67,
+              1
+            ],
+            [
+              false,
+              78,
+              1
+            ],
+            [
+              false,
+              91,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              56,
+              1
+            ],
+            [
+              67,
+              1
+            ],
+            [
+              78,
+              1
+            ],
+            [
+              91,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              56,
+              1
+            ],
+            [
+              67,
+              1
+            ],
+            [
+              78,
               1
             ]
           ]
@@ -5062,9 +5506,15 @@
               0,
               80,
               1
+            ],
+            [
+              0,
+              93,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -5081,9 +5531,13 @@
             [
               80,
               1
+            ],
+            [
+              93,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5100,6 +5554,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.error_metric_ie",
+          "frame": 24231,
+          "independent_wire_layout": [
+            [
+              false,
+              58,
+              1
+            ],
+            [
+              false,
+              69,
+              1
+            ],
+            [
+              false,
+              80,
+              1
+            ],
+            [
+              false,
+              93,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              58,
+              1
+            ],
+            [
+              69,
+              1
+            ],
+            [
+              80,
+              1
+            ],
+            [
+              93,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              58,
+              1
+            ],
+            [
+              69,
+              1
+            ],
+            [
+              80,
               1
             ]
           ]
@@ -5122,9 +5646,15 @@
               true,
               80,
               1
+            ],
+            [
+              true,
+              93,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -5141,9 +5671,13 @@
             [
               80,
               1
+            ],
+            [
+              93,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5182,9 +5716,15 @@
               0,
               79,
               1
+            ],
+            [
+              0,
+              92,
+              1
             ]
           ],
           "native": [
+            0,
             0,
             0,
             0
@@ -5201,9 +5741,13 @@
             [
               79,
               1
+            ],
+            [
+              92,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5220,6 +5764,76 @@
             ],
             [
               77,
+              1
+            ]
+          ]
+        },
+        {
+          "field": "isis.lsp.eis_neighbors.expense_metric_ie",
+          "frame": 24231,
+          "independent_wire_layout": [
+            [
+              false,
+              57,
+              1
+            ],
+            [
+              false,
+              68,
+              1
+            ],
+            [
+              false,
+              79,
+              1
+            ],
+            [
+              false,
+              92,
+              1
+            ]
+          ],
+          "native": [
+            false,
+            false,
+            false,
+            false
+          ],
+          "native_ranges": [
+            [
+              57,
+              1
+            ],
+            [
+              68,
+              1
+            ],
+            [
+              79,
+              1
+            ],
+            [
+              92,
+              1
+            ]
+          ],
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+          "wireshark": [
+            "0",
+            "0",
+            "0"
+          ],
+          "wireshark_ranges": [
+            [
+              57,
+              1
+            ],
+            [
+              68,
+              1
+            ],
+            [
+              79,
               1
             ]
           ]
@@ -5242,9 +5856,15 @@
               true,
               79,
               1
+            ],
+            [
+              true,
+              92,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -5261,9 +5881,13 @@
             [
               79,
               1
+            ],
+            [
+              92,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5302,9 +5926,15 @@
               true,
               78,
               1
+            ],
+            [
+              true,
+              91,
+              1
             ]
           ],
           "native": [
+            true,
             true,
             true,
             true
@@ -5321,9 +5951,13 @@
             [
               78,
               1
+            ],
+            [
+              91,
+              1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5363,7 +5997,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5393,7 +6027,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5423,7 +6057,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5453,7 +6087,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5483,7 +6117,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5513,7 +6147,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5543,7 +6177,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5573,7 +6207,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5603,7 +6237,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5633,7 +6267,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -5663,7 +6297,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5693,7 +6327,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -5743,7 +6377,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5803,7 +6437,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5863,7 +6497,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5923,7 +6557,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -5983,7 +6617,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -6043,7 +6677,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0",
             "0",
@@ -6083,7 +6717,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6113,7 +6747,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6143,7 +6777,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6173,7 +6807,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6203,7 +6837,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6233,7 +6867,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6263,7 +6897,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6293,7 +6927,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6323,7 +6957,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6353,7 +6987,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "10"
           ],
@@ -6383,7 +7017,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6413,7 +7047,7 @@
               1
             ]
           ],
-          "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+          "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
           "wireshark": [
             "0"
           ],
@@ -6427,10 +7061,9 @@
       ]
     }
   },
-  "final_UI_source": "4c6f79f68e",
-  "native_production_source": "52385ae158",
+  "native_ES_correction_source": "0208c1d1ff",
   "offline_controls": {
-    "case_count": 34,
+    "case_count": 37,
     "cases": [
       {
         "capture_sha256": "87ca18a56a4177cefcec8724460e1f475f2ff98ccdbc89586b85873da70fa355",
@@ -6539,7 +7172,7 @@
         "wire_verified_reference_defects": []
       },
       {
-        "capture_sha256": "3fbac950bc488b29a3bb922666b1ab2d4c2b94f7ad6305816646b28fd246371a",
+        "capture_sha256": "ec3a10eaea72c2c838248bbaca8d6a2f4b32cc0784edb03389e6392e985a5c6c",
         "direct_checks": 8,
         "name": "complete-header-and-broken-ES-TLV",
         "native_statuses": {
@@ -6547,12 +7180,563 @@
           "malformed": 1
         },
         "original_reference_frames": 2,
-        "original_reference_sha256": "fde5e1aa1bf6405ebd1e59e3760234348814a79291567e19755df355ca9055b1",
+        "original_reference_sha256": "842b9522ebd7ad899d08f1c02124183e6c014d487536b0efb436d4bba3363544",
         "physical_frames": 2,
         "selected_differences": [],
         "unselected_reference": [],
         "wire_field_checks": 132,
         "wire_verified_reference_defects": []
+      },
+      {
+        "capture_sha256": "94e7253b8e71db3394c5e7b1c4a5d18631aa3fbb0c21b583136e7e2598865fe7",
+        "direct_checks": 5,
+        "name": "ES-shared-metrics-empty-ID-list",
+        "native_statuses": {
+          "decoded": 1
+        },
+        "original_reference_frames": 1,
+        "original_reference_sha256": "295cf4fa15b3ced7fa40ac69d8741dfeb754993d90f7ddcb696d2bbb7d00f98f",
+        "physical_frames": 1,
+        "selected_differences": [],
+        "unselected_reference": [],
+        "wire_field_checks": 48,
+        "wire_verified_reference_defects": [
+          {
+            "field": "ES TLV3 shared-metric grammar",
+            "frame": 1,
+            "native": [
+              "complete four-byte shared metric block, zero ES IDs"
+            ],
+            "reason": "RFC1142 section9.8 defines length4+6n; Wireshark4.6.9 incorrectly requires ten-byte per-ES records",
+            "wire_tlv_type_offset": 44,
+            "wire_value_length": 4,
+            "wireshark": [
+              "short E/IS reachability"
+            ]
+          }
+        ]
+      },
+      {
+        "capture_sha256": "80dc93f7d2c06cef8f42d1db0b43ec32198114e7a16e4150da9d876741b91e53",
+        "direct_checks": 5,
+        "name": "ES-two-IDs-share-one-metric-block",
+        "native_statuses": {
+          "decoded": 1
+        },
+        "original_reference_frames": 1,
+        "original_reference_sha256": "59609307b790f981a0707dfd71969cdcc6614e894aabd53f58834222c2ecfaf9",
+        "physical_frames": 1,
+        "selected_differences": [],
+        "unselected_reference": [],
+        "wire_field_checks": 67,
+        "wire_verified_reference_defects": [
+          {
+            "field": "isis.lsp.eis_neighbors.delay_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                2,
+                47,
+                1
+              ]
+            ],
+            "native": [
+              2
+            ],
+            "native_ranges": [
+              [
+                47,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.error_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                4,
+                49,
+                1
+              ]
+            ],
+            "native": [
+              4
+            ],
+            "native_ranges": [
+              [
+                49,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.error_metric_supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                49,
+                1
+              ]
+            ],
+            "native": [
+              true
+            ],
+            "native_ranges": [
+              [
+                49,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.es_neighbor_id",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                "0102.0304.0506",
+                50,
+                6
+              ],
+              [
+                "0605.0403.0201",
+                56,
+                6
+              ]
+            ],
+            "native": [
+              "0102.0304.0506",
+              "0605.0403.0201"
+            ],
+            "native_ranges": [
+              [
+                50,
+                6
+              ],
+              [
+                56,
+                6
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0102.0304.0506"
+            ],
+            "wireshark_ranges": [
+              [
+                50,
+                6
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.expense_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                3,
+                48,
+                1
+              ]
+            ],
+            "native": [
+              3
+            ],
+            "native_ranges": [
+              [
+                48,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.expense_metric_supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                48,
+                1
+              ]
+            ],
+            "native": [
+              true
+            ],
+            "native_ranges": [
+              [
+                48,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors_delay_metric.supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                47,
+                1
+              ]
+            ],
+            "native": [
+              true
+            ],
+            "native_ranges": [
+              [
+                47,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ]
+            ]
+          }
+        ]
+      },
+      {
+        "capture_sha256": "177233171804d486e005cab7751e734e0661ce74318b55ac3e86fbb87481e608",
+        "direct_checks": 8,
+        "name": "ES-different-costs-use-separate-TLVs",
+        "native_statuses": {
+          "decoded": 1
+        },
+        "original_reference_frames": 1,
+        "original_reference_sha256": "ad87ef5289978a979f3c772990504056e3bd809b5c02361f76a903ca37c3eeb9",
+        "physical_frames": 1,
+        "selected_differences": [],
+        "unselected_reference": [],
+        "wire_field_checks": 101,
+        "wire_verified_reference_defects": [
+          {
+            "field": "isis.lsp.eis_neighbors.delay_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                2,
+                47,
+                1
+              ],
+              [
+                6,
+                59,
+                1
+              ]
+            ],
+            "native": [
+              2,
+              6
+            ],
+            "native_ranges": [
+              [
+                47,
+                1
+              ],
+              [
+                59,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1",
+              "5"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.error_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                4,
+                49,
+                1
+              ],
+              [
+                8,
+                61,
+                1
+              ]
+            ],
+            "native": [
+              4,
+              8
+            ],
+            "native_ranges": [
+              [
+                49,
+                1
+              ],
+              [
+                61,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1",
+              "5"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.error_metric_supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                49,
+                1
+              ],
+              [
+                false,
+                61,
+                1
+              ]
+            ],
+            "native": [
+              true,
+              false
+            ],
+            "native_ranges": [
+              [
+                49,
+                1
+              ],
+              [
+                61,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0",
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.expense_metric",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                3,
+                48,
+                1
+              ],
+              [
+                7,
+                60,
+                1
+              ]
+            ],
+            "native": [
+              3,
+              7
+            ],
+            "native_ranges": [
+              [
+                48,
+                1
+              ],
+              [
+                60,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "1",
+              "5"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors.expense_metric_supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                48,
+                1
+              ],
+              [
+                false,
+                60,
+                1
+              ]
+            ],
+            "native": [
+              true,
+              false
+            ],
+            "native_ranges": [
+              [
+                48,
+                1
+              ],
+              [
+                60,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0",
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          },
+          {
+            "field": "isis.lsp.eis_neighbors_delay_metric.supported",
+            "frame": 1,
+            "independent_wire_layout": [
+              [
+                true,
+                47,
+                1
+              ],
+              [
+                true,
+                59,
+                1
+              ]
+            ],
+            "native": [
+              true,
+              true
+            ],
+            "native_ranges": [
+              [
+                47,
+                1
+              ],
+              [
+                59,
+                1
+              ]
+            ],
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
+            "wireshark": [
+              "0",
+              "0"
+            ],
+            "wireshark_ranges": [
+              [
+                46,
+                1
+              ],
+              [
+                58,
+                1
+              ]
+            ]
+          }
+        ]
       },
       {
         "capture_sha256": "1b1e6343451093a4b170ea092f04241e84f9331914eeddaff9261a17cb67a684",
@@ -6859,7 +8043,7 @@
                 1
               ]
             ],
-            "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
             "wireshark": [
               "0"
             ],
@@ -6905,7 +8089,7 @@
                 1
               ]
             ],
-            "reason": "Wireshark4.6.9 legacy neighbor metric/unsupported-bit offset or attached-default mask defect; native follows independent wire layout",
+            "reason": "Wireshark4.6.9 legacy metric offset, ES shared-block layout or attached-default mask defect; native follows independent wire layout",
             "wireshark": [
               "1"
             ],
@@ -7039,62 +8223,104 @@
         "wire_verified_reference_defects": []
       }
     ],
-    "direct_checks": 174,
-    "physical_frames": 55,
+    "direct_checks": 192,
+    "physical_frames": 58,
     "scope": "Declared offline controls derived from original real P2P advertisements. Independent isolation, malformed/checksum evidence and later complete observations; no live network, transport/session recovery or routing convergence claims.",
-    "sdk_sha256": "adabfeba31152edea51d831cebafb8fd1b76278c7e86078f6c0f503007400fa6",
+    "sdk_sha256": "59aefdccbf538460d1c4e9b71665f94253162af5a0b49f74e1c7729c4285c342",
     "source_oracle_sha256": "aa14a6034662fe1e07d91848701b52e399002dffc422dc079782fdcd717ec6ec",
-    "wire_checks": 2546
+    "wire_field_checks": 2762
   },
+  "partial_filter": {
+    "CLI_binary_sha256": "997dd67404ea46dbd7bb4ebeceeed783a5efcfaf1527b090d442148c23c8a5dc",
+    "full_exports_unchanged_from_ES_correction": {
+      "sharon": {
+        "CLI": true,
+        "SDK": true
+      },
+      "weber": {
+        "CLI": true,
+        "SDK": true
+      }
+    },
+    "sdk_binary_sha256": "0d6f5ca1869c91dc3ba373b3a2ce0b31777bc57a4ce1c2bc1ba13aa4f56594e7",
+    "source": "778d338cdb",
+    "windows_offline_unknown_extension": {
+      "image_sha256": "1a9d48427aa7b33be7fe34032154fbaf6776419425c5f9edf6720f52cf2e4426",
+      "physical_frames": 2,
+      "proven_positive_matches": 2,
+      "query": "fields isis.type == 17",
+      "scope": "Declared offline unknown-extension then complete Hello. Both retained header witnesses match; partial notice stays. Its older history-specific wording is tracked for correction.",
+      "screen_sha256": "c0aad43f26bcd95ac9235e6fc58b522964049a66942f19e0352d47970282f080"
+    }
+  },
+  "partial_filter_source": "778d338cdb",
   "remaining": [
-    "IS-IS over IP/OSI protocol80, MPLS/UDP, GRE/PPP, EtherIP and other original carrier views remain unselected in this root-only phase",
-    "No authenticated adjacency, elected DIS, assembled LSDB, installed route or real network convergence validation",
-    "Typed numeric Wireshark checksum-status enum, generated absent sub-TLV zero values and expert diagnostic fields are not all registered aliases",
-    "Valid legacy ES-neighbor records, nonzero optional checksums and selected sub-TLV namespaces rely on authored/offline controls rather than real positive captures",
-    "Overall acceptance remains incomplete; raw generic field mismatches remain 90/35 and field-history usability remains bounded"
+    "Other carriers and ID widths remain unselected; rejected fuzz TVBs do not certify valid carrier ingress",
+    "No authenticated adjacency, elected DIS, assembled LSDB, installed route or real convergence validation",
+    "Numeric reference checksum-status and expert aliases and generated zero sub-TLV fields are not all registered",
+    "Nonempty ES lists, nonzero optional checksums and selected sub-TLV namespaces rely on authored/offline positives; the empty ES list has a real positive",
+    "Overall acceptance remains incomplete; raw generic field mismatches remain90/35 and field history remains bounded"
   ],
   "repeat": {
     "sharon": {
-      "cli_original_sha256": "4b6303e21cb7949e8ce9d839c50b9f56634f9815e9cf983c274b3c2f98cb4484",
-      "cli_repeat_identical": true,
-      "cli_repeat_sha256": "4b6303e21cb7949e8ce9d839c50b9f56634f9815e9cf983c274b3c2f98cb4484",
-      "sdk_4c6f79f6_sha256": "b9da3dfce424cb61229061dd79621fae212f408eeb5bae16636da67e6e764ef3",
-      "sdk_52385ae1_sha256": "b9da3dfce424cb61229061dd79621fae212f408eeb5bae16636da67e6e764ef3",
-      "sdk_repeat_identical": true
+      "CLI": {
+        "first_sha256": "b26085108e81a2d270ce16ffcf55e17275a4e686f6b4028a061f3773f47ac6e5",
+        "identical": true,
+        "repeat_sha256": "b26085108e81a2d270ce16ffcf55e17275a4e686f6b4028a061f3773f47ac6e5"
+      },
+      "SDK": {
+        "first_sha256": "cddbcd92aa54347a224a84713cce9f60b4738561537950c9b809fa53c272c966",
+        "identical": true,
+        "repeat_sha256": "cddbcd92aa54347a224a84713cce9f60b4738561537950c9b809fa53c272c966"
+      }
     },
     "weber": {
-      "cli_original_sha256": "af48142c6d63f959708e572a1c248f57ef52f80de51d47a1030cb1d8786a7cc0",
-      "cli_repeat_identical": true,
-      "cli_repeat_sha256": "af48142c6d63f959708e572a1c248f57ef52f80de51d47a1030cb1d8786a7cc0",
-      "sdk_4c6f79f6_sha256": "fa9d476de50950f60c02b2f3620dbb02e0166c6decfaf039c818c6cb0ea698bb",
-      "sdk_52385ae1_sha256": "fa9d476de50950f60c02b2f3620dbb02e0166c6decfaf039c818c6cb0ea698bb",
-      "sdk_repeat_identical": true
+      "CLI": {
+        "first_sha256": "8bed512b7fe844d87c61d17ae966dc9d6c68a2319e14d7159a888fbd5c3bba13",
+        "identical": true,
+        "repeat_sha256": "8bed512b7fe844d87c61d17ae966dc9d6c68a2319e14d7159a888fbd5c3bba13"
+      },
+      "SDK": {
+        "first_sha256": "8875f3affbcf38df5794818b0e9094a80d3bed586fb68397f0cf1babcb01306e",
+        "identical": true,
+        "repeat_sha256": "8875f3affbcf38df5794818b0e9094a80d3bed586fb68397f0cf1babcb01306e"
+      }
     }
   },
-  "scope": "Bounded six-octet IS-IS root IEEE802.3/LLC advertisements, including CRC-verified mPacket express. Independent packets, selected TLVs and grouped wire/typed-field associations; no elected DIS, authenticated adjacency, assembled LSDB, installed route or inferred response/session.",
+  "scope": "Bounded six-octet IS-IS root IEEE802.3/LLC independent advertisements, including CRC-verified mPacket express; selected owned fields and grouped wire associations. No authenticated adjacency, elected DIS, assembled LSDB, installed route or inferred response/session.",
   "shared_root_PDU_multiset_across_corpora": true,
   "sources": {
-    "isis_faults.py": "dfb735127a23cd480e6fbd5d10f04ac3c2b757d0b28db75a93c30c1300092e7b",
-    "isis_wire_associations.py": "0b7d6ffb86d718bf8f9bf852fada5370df099561af0768238ee3da0ef68363c2",
-    "isis_wire_audit.py": "0e58d786c64da45ab7b314275a74cab4e82fea2e9db228b3cfea0785020e4de4",
+    "isis_faults.py": "f4832fe0abc45a36dc3ec4689bd2fed64089d5b527c7f38e65bcf4e3da80996c",
+    "isis_rejected_reference_audit.py": "0b3b5dc374ff58490ca40630dcafa99624a1d3c09099bf18db0e9cc4cf6c07ac",
+    "isis_wire_associations.py": "5fb2b2a5d5413e8646ef432e04a500a969268e958e766bbad371f28f710b93aa",
+    "isis_wire_audit.py": "aa027311e0518fc6e72b500d3f60a6adbfcd38ef3f8aa6eab56209573b3292bb",
     "packet-isis-hello-v4.6.9.c": "fe9a37d8ee1bfc85aff1135f3903376ca4f024178bb513a7a180fccba66efc3f",
     "packet-isis-lsp-v4.6.9.c": "d719580a738bc0dbaf8f7abfaea039b43b7c4208ad45e003a19924747376b7e9",
     "packet-isis-v4.6.9.c": "4f43a76b80863baaa3e552442709743a44c37dfb6151c4c6544d171b4727387a",
+    "quagga-isis-tlv-4f593574.c": "ec61d1bc03791a8ec58cb22120011cb7fc4601e7591e138d4f5a2630d3b9b831",
     "tcpdump-print-isoclns-94a3708f.c": "0a140edb67fe494f5c1f8c63adf9802be210eaddfafb60e3869a460fab3813be",
     "tvbuff-v4.6.9.c": "c3b2441c104858c31106fb9e07c87ae512050da87ecb792eb8a2b05c4807c5ce"
   },
+  "supersedes": "The earlier 677 decoded / 1 malformed interpretation and real malformed-ES page were incorrect. ES TLV3 uses four shared metric octets plus six-octet IDs; a length4 empty list is valid. Earlier 57550-check/36-reference-group certificates are superseded by this revalidation.",
   "tests": {
-    "bin_parser_main_seconds": 136.741,
-    "cli_seconds_in_full_suite": 2.26,
-    "final_UI_full_package_seconds": 2.161,
-    "final_UI_test_log_sha256": "9b6d0271e11e1f721133915a1634665a7873502423e7050893f6c07b5c45460d",
-    "full_suite_log_sha256": "823a5fcd1232c711c08d25e84eee3484edea290494c6e1945ded72f4175078e9",
-    "full_suite_source": "52385ae158",
-    "fuzz_execs": 96341,
-    "fuzz_log_sha256": "f50d18f85a578bebee392c80c0268d41572fa5aa9ca6002b3635ce67e567941b",
-    "fuzz_seconds": 46.536,
-    "fuzz_source": "52385ae158",
-    "native_pcaputil_seconds": 456.857
+    "earlier_combined_run": "0208c1d1 bin-parser and native packages passed, but concurrent later filter API edits caused CLI to use mixed old/new compiled artifacts and fail. That entire command is not claimed as passing.",
+    "full_suite_log_sha256": "0e0fe5ed633955ea0413eac548beafafa06dfbd3fb19b8b056d64d8126651fcd",
+    "fuzz_execs": 11425,
+    "fuzz_log_sha256": "326e18699260e9efd57539b3530f27de797dc407688efd48d2217ca7db424ac2",
+    "fuzz_seconds": 46.479,
+    "fuzz_source": "0208c1d1ff",
+    "package_seconds": {
+      "common/bin-parser": "136.218",
+      "common/bin-parser/parser": "9.802",
+      "common/bin-parser/parser/base": "2.119",
+      "common/bin-parser/parser/stream_parser": "7.407",
+      "common/bin-parser/protocol-impl": "1.692",
+      "common/bin-parser/protocol-impl/msrdp": "0.748",
+      "common/bin-parser/rules": "0.454",
+      "common/pcapx/pcaputil": "445.054",
+      "common/yak/cmd/yakcmds/shark-cli": "2.137"
+    },
+    "source": "778d338cdb"
   },
   "wiki": {
     "capture_bytes": 12040,
@@ -7185,25 +8411,23 @@
     "url": "https://wiki.wireshark.org/uploads/cc35c2f0b03269774fb4dd501d510c55/isis_p2p_adjacency_sync.pcapng"
   },
   "windows": {
-    "hello": {
-      "image_sha256": "4f94543a0bc3696a1ff74abe212f9be935a83de3f5502277a17a1ff7dae06530",
-      "native_screen_sha256": "e3c4e692dac0d7e0c4e9d1caaef735807f83acbbfc2fdde45a6d8bd2a93aad15",
-      "physical_packets_drained": 51328,
-      "protocol": "IS-IS Hello",
-      "query": "fields isis.type == 15",
-      "scope": "Fresh CP936 native console cells, actual EOF/query/selected protocol and detail frame, fields/bytes, 80x30 resize/180x48 restore, q and code-page restore. Retained field history remains bounded.",
-      "selected_frame": 24184,
-      "visible_matches": 281
+    "declared-malformed-offline": {
+      "image_sha256": "e0cb8ce5132ba236611403767121becf59a3326f9310807dbfcf7e6846ca5338",
+      "native_screen_sha256": "3f94b731efecbcd0817057c50795cfc5b16b7c3835acf197b9c9d630b8ffa9e4",
+      "physical_packets_drained": 2,
+      "query": "proto:isis",
+      "scope": "Fresh CP936 native console cells, actual drained EOF/query/selected detail, byte selection, resize/restore, quit and code-page restore; offline malformed case is not a real network capture",
+      "selected_frame": 1,
+      "source": "0208c1d1ff"
     },
-    "malformed": {
-      "image_sha256": "968c7e98cea0579a096da068580db57496a2d6bdf4fde2e5bbbe69ee6732ee01",
-      "native_screen_sha256": "2a7694f98257fda2dea04fa5ebfac400f8df709c6bcbd45060bc7ec477828e04",
+    "valid-empty-ES": {
+      "image_sha256": "ef7acca85c5aec1ab27eb0c20cefafb7fef5e1c42b9b6e43121a2a148aaf92db",
+      "native_screen_sha256": "052c14f30986ce9b4c644ba0a2dc8aaff9dace4a33aaf52d976287019001bbab",
       "physical_packets_drained": 51328,
-      "protocol": "IS-IS LSP",
       "query": "proto:isis 0000.0000.0005.01-00",
-      "scope": "Fresh CP936 native console cells, actual EOF/query/selected protocol and detail frame, fields/bytes, 80x30 resize/180x48 restore, q and code-page restore. Retained field history remains bounded.",
+      "scope": "Fresh CP936 native console cells, actual drained EOF/query/selected detail, byte selection, resize/restore, quit and code-page restore; offline malformed case is not a real network capture",
       "selected_frame": 24231,
-      "visible_matches": 2
+      "source": "0208c1d1ff"
     }
   }
 }
