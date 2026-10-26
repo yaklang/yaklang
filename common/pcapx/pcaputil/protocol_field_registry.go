@@ -392,6 +392,36 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	})
 	b.protocols = "|quic|http3|doq|"
 	out = append(out, b)
+	for _, spec := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"quic.dcid", "DCID", DisplayString, 0},
+		{"quic.scid", "SCID", DisplayString, 0},
+		{"quic.dcil", "DCID Length", DisplayUnsigned, 8},
+		{"quic.scil", "SCID Length", DisplayUnsigned, 8},
+		{"quic.version", "Version", DisplayUnsigned, 32},
+		{"quic.long.packet_type", "Long Packet Type", DisplayUnsigned, 2},
+	} {
+		spec := spec
+		b := displayCustom("quic", spec.name, "QUIC observed wire "+spec.key, spec.typ, spec.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if value, ok := e.ownedQUICHeaderField(spec.key); ok {
+				emit(value)
+			}
+		})
+		b.protocols, b.rangeKey = "|quic|http3|doq|", spec.key
+		b.descriptor.AllowEmpty = spec.typ == DisplayString
+		b.descriptor.Description = "Private native header observation bound to literal logical PDU bytes; CID strings are lowercase hexadecimal octets. Header fields do not prove peer identity or authentication."
+		out = append(out, b)
+	}
+	b = displayCustom("quic", "quic.packet_number", "QUIC authenticated decoded packet number", DisplayUnsigned, 62, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		if e.nativeQUICObservation && e.semanticSession["Authentication Verified"] == true {
+			emit(e.semanticSession["Packet Number"])
+		}
+	})
+	b.protocols = "|quic|http3|doq|"
+	out = append(out, b)
 	b = displayCustom("http3", "http3.streamid", "HTTP/3 stream ID", DisplayUnsigned, 62, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 		p.maps(e.Session["Frames"], func(fr map[string]any) {
 			if fr["HTTP3"] == true {
@@ -763,7 +793,11 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 	if key == "" {
 		return nil
 	}
-	ranges, _ := e.Session["Wire Field Ranges"].(map[string]any)
+	m := e.Session
+	if e.nativeQUICObservation {
+		m = e.semanticSession
+	}
+	ranges, _ := m["Wire Field Ranges"].(map[string]any)
 	span, _ := ranges[key].([]any)
 	if len(span) != 2 {
 		return nil

@@ -138,6 +138,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 	}
 	var protocol string
+	var quicHeaderForm string
 	var routingVersion uint64
 	var currentSource int
 	var wireRanges map[string][]int
@@ -375,6 +376,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				walk(fmt.Sprintf("%s[%d]", name, i), r, depth)
 			}
 		default:
+			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
+				switch name {
+				case "DCID", "SCID", "CID", "Token", "Retry Token", "Reset Token":
+					if octets := bytesValue(x); octets != nil {
+						x = octets
+					}
+				}
+			}
 			if name == "Frame Header Bytes" && http3HeaderSource > 0 {
 				v = sources[http3HeaderSource-1].Data
 				x = v
@@ -431,6 +440,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			emptyCID := x == nil
+			if b, ok := x.([]byte); ok {
+				emptyCID = len(b) == 0
+			}
+			if depth == 0 && quicHeaderForm == "short" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "Version" || name == "SCID") {
+				value = "not carried in short header"
+			}
+			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "DCID" || name == "SCID") && emptyCID {
+				if span := wireRanges[name]; len(span) == 2 && span[0] == span[1] && span[0] >= 0 && currentSource > 0 && span[1] <= len(sources[currentSource-1].Data) {
+					value = "0 bytes (empty connection ID)"
+				}
+			}
 			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
 				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
 			}
@@ -502,6 +523,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			continue
 		}
 		protocol, currentSource = e.Protocol, 0
+		quicHeaderForm = textValue(e.Session["Header Form"])
 		routingVersion = number(e.Session["Protocol Version"])
 		wireRanges = map[string][]int{}
 		switch ranges := e.Session["Wire Field Ranges"].(type) {

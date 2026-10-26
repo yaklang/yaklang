@@ -270,6 +270,12 @@ func quicCoalescingBudgetInitial(t *testing.T) ([]byte, map[string]any, map[stri
 			require.NoError(t, err)
 			require.Len(t, wire, 1200)
 			require.Equal(t, "9fbed178f0b40ec7ad6c3bc36a22639fbfb80db1b021280cbc05d07270cd5a56", fmt.Sprintf("%x", sha256.Sum256(wire)))
+			// Keep the immutable fixture/hash and original session facts. Review
+			// the added clear-header provenance and byte-vs-text correction here.
+			require.Equal(t, []byte{1, 2, 3, 4, 5, 6, 7, 8}, wire[6:14])
+			require.Equal(t, string(wire[6:14]), e.Fields["DCID"])
+			e.Fields["DCID"] = bytes.Clone(wire[6:14])
+			e.Session["Wire Field Ranges"] = map[string]any{"Version": []any{1, 5}, "DCID Length": []any{5, 6}, "DCID": []any{6, 14}, "SCID Length": []any{14, 15}, "SCID": []any{15, 15}, "Long Packet Type": []any{0, 1}}
 			return wire, e.Session, e.Fields
 		}
 	}
