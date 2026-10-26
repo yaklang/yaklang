@@ -35,6 +35,7 @@ var isisEntryPriority = map[string]int{
 }
 
 var netflowV9EntryPriority = map[string]int{
+	"Message Length": 1, "Observation Domain ID": 2, "Export Time": 5, "Scope Field Count": 2, "Enterprise": 1, "Enterprise Number": 2,
 	"Protocol Name": 0, "Version": 1, "Source ID": 2, "Sequence Number": 3, "System Uptime Milliseconds": 4, "Unix Seconds": 5, "Unix Nanoseconds": 5,
 	"Export Timestamp Valid": 5, "Export Timestamp Failure": 5,
 	"Engine Type": 5, "Engine ID": 5, "Sampling Mode": 6, "Sampling Interval": 6, "Sequence Scope": 7, "Header Record Count": 6, "Template Record Count": 7, "Data Record Count": 8, "Record Count Verified": 9,
@@ -117,7 +118,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5") {
+			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -168,7 +169,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 						b = rank
 					}
 				}
-				if protocol == "netflow-v9" || protocol == "netflow-v5" {
+				if protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix" {
 					if rank, ok := netflowV9EntryPriority[keys[i]]; ok {
 						a = rank
 					}
@@ -191,7 +192,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			})
 			for _, k := range keys {
 				label := k
-				if (protocol == "netflow-v9" || protocol == "netflow-v5") && k == "Value" {
+				if (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") && k == "Value" {
 					if name, ok := x["Field Name"].(string); ok && name != "" {
 						label = safeText(name)
 						if wireRanges != nil {
@@ -333,7 +334,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}

@@ -51,6 +51,8 @@ func (h *binHTTPState) config(bodyLimit int) map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "ipfix":
+			return f.frameIPFIX(w)
 		case "ldp":
 			return f.frameLDP(w)
 		case "bgp":

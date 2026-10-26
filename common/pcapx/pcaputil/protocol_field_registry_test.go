@@ -48,17 +48,17 @@ func TestSharedDisplayFieldScopeListsEverySupportedProtocol(t *testing.T) {
 	d, ok := LookupDisplayField("cflow.version")
 	require.True(t, ok)
 	require.Equal(t, "netflow-v9", d.Protocol, "legacy primary label remains compatible")
-	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, d.Protocols)
+	require.Equal(t, []string{"netflow-v5", "netflow-v9", "ipfix"}, d.Protocols)
 	d.Protocols[0] = "edited"
 	owned, _ := LookupDisplayField("cflow.version")
-	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, owned.Protocols)
+	require.Equal(t, []string{"netflow-v5", "netflow-v9", "ipfix"}, owned.Protocols)
 	for _, v := range RegisteredDisplayFields() {
 		if v.Name == "cflow.version" {
 			v.Protocols[0] = "edited again"
 		}
 	}
 	owned, _ = LookupDisplayField("cflow.version")
-	require.Equal(t, []string{"netflow-v5", "netflow-v9"}, owned.Protocols)
+	require.Equal(t, []string{"netflow-v5", "netflow-v9", "ipfix"}, owned.Protocols)
 }
 
 func TestDisplayFieldProjectionHasProtocolScopeAndMissingValues(t *testing.T) {
