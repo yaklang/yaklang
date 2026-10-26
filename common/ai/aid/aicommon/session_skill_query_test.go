@@ -225,6 +225,26 @@ func TestBuildSessionSkillSearchCoversLocalDatabaseAndLoadedState(t *testing.T) 
 	require.Zero(t, empty.Total)
 }
 
+func TestBuildSessionSkillSearchFallsBackToGenericLoaderMetadata(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("archive-only/SKILL.md", buildSkillMD(
+		"archive-only",
+		"Archived security guide",
+		"ARCHIVE_ONLY",
+	))
+	loader, err := aiskillloader.NewFSSkillLoader(vfs)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
+
+	result, err := BuildSessionSkillSearch(mgr, "archived security", 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, result.Total)
+	require.Len(t, result.Skills, 1)
+	require.Equal(t, "archive-only", result.Skills[0].Name)
+	require.Equal(t, CapabilityInventoryStageMetadata, result.Skills[0].Stage)
+}
+
 func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
 	cfg := newSessionSkillQueryConfig(t)
 	detail, err := BuildSessionSkillDetail(cfg.GetSkillsContextManager(), "available")
