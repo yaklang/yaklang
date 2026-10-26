@@ -43,7 +43,7 @@ def covered(spans,lo,hi):
   if x>at:return False
   at=max(at,y)
  return at>=hi
-streams={};packet_conn={};packet_endpoints={};physical=collections.defaultdict(list);coalesced_bindings=0
+streams={};packet_conn={};packet_endpoints={};physical=collections.defaultdict(list);coalesced_bindings=0;expert_only_blocks=0
 for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
  l=packet['_source']['layers'];number=int(l['frame']['frame.number']);sp,dp=vals(l.get('udp',{}),'udp.srcport'),vals(l.get('udp',{}),'udp.dstport');eq(len(sp),1,'single reference UDP source');eq(len(dp),1,'single reference UDP destination')
  eq(bytes.fromhex(l['frame_raw'][0]),captured[number],'oracle bytes are literal physical capture record');packet_endpoints[number]=endpoints(captured[number]);eq(tuple(x.rsplit(':',1)[1] for x in packet_endpoints[number]),(sp[0],dp[0]),'oracle ports equal capture bytes')
@@ -52,6 +52,9 @@ for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
  if not packet_connections:continue
  eq(len(packet_connections),1,'one reference connection per UDP datagram')
  for q in qs:
+  # TShark's JSON array can contain a separate expert-only annotation rather
+  # than another QUIC packet. It has no wire fields or STREAM bytes to bind.
+  if set(q)=={'_ws.expert'}:expert_only_blocks+=1;continue
   cs=vals(q,'quic.connection.number')
   if not cs:
    # TShark prints connection metadata on only the first coalesced packet.
@@ -127,5 +130,5 @@ for e in events:
   proof(h['Byte Source'],key,start,r['end'],e);proof(h['Payload Byte Source'],key,start+len(header),r['end'],e)
   metadata.append({'completed_physical_frame':refs[-1]['Number'],'parent_PDU':e['id'],'stream_id':key[3],'stream_offset':start,'type':r['type'],'payload_length':r['length'],'source_PDUs':h['Byte Source']['Parent PDUs'],'physical_source_packets':[x['Packet'] for x in h['Byte Source']['Packet References']]})
 eq(set(actual),set(expected),'all independently reconstructed selected HTTP3 frames')
-out={'scope':__doc__,'capture_sha256':digest(wire),'checks':checks,'connections':len(flow_conn),'reference_coalesced_bindings':coalesced_bindings,'application_frames':len(actual),'types':dict(collections.Counter(str(expected[k]['type']) for k in actual)),'source_ranges':ranges_checked,'unselected_instruction_streams':skipped,'selected_differences':[],'frames':metadata}
+out={'scope':__doc__,'capture_sha256':digest(wire),'checks':checks,'connections':len(flow_conn),'reference_coalesced_bindings':coalesced_bindings,'reference_expert_only_blocks':expert_only_blocks,'application_frames':len(actual),'types':dict(collections.Counter(str(expected[k]['type']) for k in actual)),'source_ranges':ranges_checked,'unselected_instruction_streams':skipped,'selected_differences':[],'frames':metadata}
 a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps({k:v for k,v in out.items() if k not in ['frames','unselected_instruction_streams']}))
