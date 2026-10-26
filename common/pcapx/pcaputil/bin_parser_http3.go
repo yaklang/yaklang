@@ -1,6 +1,8 @@
 package pcaputil
 
 import (
+	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sort"
@@ -102,6 +104,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			return err
 		}
 		h3.parsed[dir] += n
+		if q.native {
+			st.sources[dir].prune(uint64(h3.parsed[dir]))
+		}
 		info["HTTP3"] = true
 		info["Protocol Transition"] = "quic->http3"
 		info["HTTP3 Stream Kind"] = "encoder"
@@ -150,6 +155,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			return err
 		}
 		h3.parsed[dir] += n
+		if q.native {
+			st.sources[dir].prune(uint64(h3.parsed[dir]))
+		}
 		info["HTTP3"] = true
 		info["Protocol Transition"] = "quic->http3"
 		info["HTTP3 Stream Kind"] = "decoder"
@@ -286,8 +294,25 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			h3.dataBytes += uint64(len(payload))
 			hf["DATA Length"] = uint64(len(payload))
 		}
+		// Literal application framing has its own byte arena and stream ranges.
+		// Buffered bytes can originate in older packets than this QUIC PDU.
+		start := uint64(h3.parsed[dir])
+		payloadStart := start + uint64(n1+n2)
+		end := start + uint64(need)
+		hf["Stream ID"], hf["Stream Offset"], hf["Direction"] = sid, start, uint64(dir)
+		hf["Frame Type Value"], hf["Payload Length"], hf["Frame Wire Length"] = ft, ln, uint64(need)
+		hf["Frame Header Bytes"] = bytes.Clone(buf[:n1+n2])
+		hf["Frame Header Ranges"] = map[string]any{"Frame Type Value": []any{uint64(0), uint64(n1)}, "Frame Type": []any{uint64(0), uint64(n1)}, "Payload Length": []any{uint64(n1), uint64(n1 + n2)}}
+		hf["Frame SHA256"] = fmt.Sprintf("%x", sha256.Sum256(buf[:need]))
+		if q.native {
+			hf["Byte Source"] = st.sources[dir].describe(sid, dir, start, end)
+			hf["Payload Byte Source"] = st.sources[dir].describe(sid, dir, payloadStart, end)
+		}
 		frames = append(frames, hf)
 		h3.parsed[dir] += need
+		if q.native {
+			st.sources[dir].prune(uint64(h3.parsed[dir]))
+		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
 		if len(frames) >= max {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame budget exceeded")
