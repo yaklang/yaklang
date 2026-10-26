@@ -52,6 +52,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 
 	var el, retired *list.Element
+	type closedZeroRoute struct {
+		element *list.Element
+		dir     int
+	}
+	var closedZero []closedZeroRoute
 	dir, retiredDir := 0, 0
 	retiredCID, retiredAmbiguous := false, false
 	selectRetired := func(candidate *list.Element, d int, byCID bool) {
@@ -72,6 +77,12 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			if q.zeroCID[1-d] && (!long || len(first.dcid) == 0) && base.Source == v.flow.endpoints[d] && base.Destination == v.flow.endpoints[1-d] {
 				if q.retired {
 					selectRetired(candidate, d, false)
+					continue
+				}
+				if q.closed {
+					// An endpoint tuple is not an epoch identifier. A new Initial
+					// can already have established a fresh zero-CID generation.
+					closedZero = append(closedZero, closedZeroRoute{candidate, d})
 					continue
 				}
 				if el != nil && el != candidate {
@@ -137,6 +148,42 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 				}
 			}
 		}
+	}
+	if len(closedZero) > 0 {
+		// Old zero-CID packets can be reordered past both CONNECTION_CLOSE and
+		// a new handshake on the same tuple. Probe protection without changing
+		// PN/key/stream state or leases, then deliver to exactly one owner.
+		var owner *list.Element
+		ownerDir, matches := 0, 0
+		selectOwner := func(candidate *list.Element, d int) {
+			if candidate.Value.(*binUDPEntry).flow.quic.authenticatesExistingWire(d, wire) {
+				if owner == candidate && ownerDir == d {
+					return
+				}
+				owner, ownerDir, matches = candidate, d, matches+1
+			}
+		}
+		if el != nil {
+			selectOwner(el, dir)
+		}
+		for _, route := range closedZero {
+			selectOwner(route.element, route.dir)
+		}
+		if matches != 1 {
+			e := *base
+			e.Protocol, e.Profile = "quic", "quic-v1-native"
+			e.nativeQUICObservation = true
+			e.Admission, e.Completeness = "unresolved-zero-CID-generation", "datagram"
+			e.ID, e.Direction, e.FlowID = a.ids.Add(1), 0, 0
+			e.ResponseTo, e.TransactionID, e.Session = 0, 0, nil
+			e.Length = len(wire)
+			a.finishProtocolDatagram(&e, wire, nil, protocolError(ErrContextRequired, "QUIC reused zero-CID tuple has no unique authenticated captured generation"))
+			return []*ProtocolEvent{&e}, true
+		}
+		if el != owner {
+			historical = false
+		}
+		el, dir = owner, ownerDir
 	}
 	var f *binFlow
 	key := binUDPKey{}
@@ -221,8 +268,12 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		}
 		if el != nil && !rejectedCID {
 			v := el.Value.(*binUDPEntry)
-			v.touched = s.clock
-			s.lru.MoveToBack(el)
+			// Closed-generation evidence may be inspected, but must not keep
+			// obsolete keys alive indefinitely through late packets.
+			if !f.quic.closed {
+				v.touched = s.clock
+				s.lru.MoveToBack(el)
+			}
 			e.FlowID = f.id
 		}
 		if e.Session != nil {
@@ -334,6 +385,34 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		f.closeSession()
 	}
 	return events, true
+}
+
+// This is an ownership probe, not frame delivery. In particular it never loads
+// application secrets, advances a packet-number/key epoch, or accepts a Retry.
+func (q *binQUIC) authenticatesExistingWire(dir int, wire []byte) bool {
+	if q == nil || q.retired || q.keys == nil || dir < 0 || dir > 1 {
+		return false
+	}
+	h, err := q.wireHeader(wire, dir)
+	if err != nil || h.retry || h.vn || h.size <= 0 || h.size > len(wire) {
+		return false
+	}
+	probe := *q
+	probe.keys = cloneQUICKeyring(q.keys)
+	tk, _ := probe.keysFor(dir, h)
+	if tk == nil {
+		return false
+	}
+	var phases [2]*quicTrafficKeys
+	if !h.long {
+		phases = probe.keys.app[dir]
+	}
+	_, _, _, first, _, err := quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
+	if err != nil && !h.long && q.previousKey[dir] != nil {
+		phases[1-q.keyPhase[dir]] = q.previousKey[dir]
+		_, _, _, first, _, err = quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
+	}
+	return err == nil && (h.long && first&0x0c == 0 || !h.long && first&0x18 == 0)
 }
 
 // quicWireEnvelope preserves the QUIC YAML field shape and scalar types. Binary
