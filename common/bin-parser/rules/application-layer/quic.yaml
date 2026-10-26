@@ -40,7 +40,7 @@ Package:
         this.ProcessSubNode("SCID")
       }
       pktType = (first >> 4) & 0x03
-      if ver != 0 && pktType == 0 {
+      if (ver == 1 && pktType == 0) || (ver == 0x6b3343cf && pktType == 1) {
         res,op = this.TryProcessByType("QUICToken")
         if op.OK {
           err = op.Save()
@@ -62,9 +62,9 @@ Package:
     First Byte: uint8
     Version: uint32
     DCID Length: uint8
-    DCID: string
+    DCID: raw
     SCID Length: uint8
-    SCID: string
+    SCID: raw
     Protected Payload:
       list: true
       Octet: uint8
@@ -90,6 +90,6 @@ QUICToken:
       this.ProcessSubNode("Token")
     }
   Token Length: uint8
-  Token: string
+  Token: raw
 
 QUICPeekByte: uint8

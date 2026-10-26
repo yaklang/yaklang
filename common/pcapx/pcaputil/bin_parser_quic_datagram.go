@@ -305,6 +305,15 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// The authenticated session already parsed this header. Preserve the wire
 		// field view without executing a YAML operator for every ciphertext octet.
 		e.nativeQUICWire = err == nil
+		if bounded && size == h.size && e.Session != nil {
+			observed := h
+			if !h.long {
+				// The session resolves a short header's CID size from observed
+				// receiver context; the stateless outer header has no size byte.
+				observed.dcid, _ = e.Session["DCID"].([]byte)
+			}
+			e.Session["Wire Field Ranges"] = quicHeaderWireRanges(observed, raw)
+		}
 		// Query identity and passive context are private even on a refused
 		// native event; mutable public labels/caches cannot grant success.
 		e.semanticSession = cloneSession(e.Session)
@@ -327,7 +336,8 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	return events, true
 }
 
-// quicWireEnvelope preserves the existing QUIC YAML field shape and scalar types.
+// quicWireEnvelope preserves the QUIC YAML field shape and scalar types. Binary
+// identifiers/tokens own raw bytes; strings would lose invalid UTF-8 in JSON IPC.
 // It is only selected after native wire authentication, never as a plaintext probe.
 func quicWireEnvelope(w []byte) (map[string]any, error) {
 	h, err := quicParseHeader(w, true)
@@ -343,10 +353,10 @@ func quicWireEnvelope(w []byte) (map[string]any, error) {
 		fields["Version"] = h.version
 		fields["DCID Length"], fields["SCID Length"] = uint8(len(h.dcid)), uint8(len(h.scid))
 		if len(h.dcid) > 0 {
-			fields["DCID"] = string(h.dcid)
+			fields["DCID"] = bytes.Clone(h.dcid)
 		}
 		if len(h.scid) > 0 {
-			fields["SCID"] = string(h.scid)
+			fields["SCID"] = bytes.Clone(h.scid)
 		}
 		off = 7 + len(h.dcid) + len(h.scid)
 		// The legacy envelope exposes QUICToken only for its one-byte length
@@ -355,7 +365,7 @@ func quicWireEnvelope(w []byte) (map[string]any, error) {
 			token := map[string]any{"Token Length": w[off]}
 			off++
 			if len(h.token) > 0 {
-				token["Token"] = string(h.token)
+				token["Token"] = bytes.Clone(h.token)
 				off += len(h.token)
 			}
 			fields["QUICToken"] = token
