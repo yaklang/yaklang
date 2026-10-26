@@ -973,6 +973,22 @@ func presentEvents(events []*pcaputil.ProtocolEvent) packetPresentation {
 	for _, e := range events {
 		p.add(e)
 	}
+	for _, e := range events {
+		if e == nil {
+			continue
+		}
+		fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any)
+		if !ok || fault["Error Name"] != "H3_FRAME_ERROR" {
+			continue
+		}
+		p.summary = fmt.Sprintf("H3_FRAME_ERROR · connection · first PDU #%d · %s", number(fault["First PDU ID"]), p.summary)
+		p.scope = "connection protocol violation observed"
+		p.evidence = "HTTP3 connection protocol violation observed; peer closure not inferred"
+		if p.status == "decoded" || p.status == "deferred" {
+			p.status = "connection-violation-observed"
+		}
+		break
+	}
 	return p
 }
 

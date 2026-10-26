@@ -209,7 +209,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			e.Session["Retired Destination CID"] = true
 			e.Session["CID Association"] = "authenticated late packet on retired CID"
 		}
-		if err == nil || isH3FieldStreamError(err) {
+		if err == nil || isRecoverableH3ObservationError(err) {
 			if budgetError := f.reserveSession(f.quic.initialMemory()); budgetError != nil {
 				err = budgetError
 			}
@@ -230,6 +230,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			e.Session["Datagram Offset"] = off
 			e.Session["Native Carrier"] = true
 			e.Session["ALPN"] = f.quic.alpn
+			// Duplicate/protected packets can return before finishFrames. Their
+			// connection context still includes an earlier observed HTTP3 fault.
+			f.quic.annotateH3ConnectionFault(e.Session)
 		}
 		if e.Session != nil {
 			var transaction uint64
@@ -271,7 +274,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// Other failures, notably resource refusal, stop processing and retain
 		// the entire unprocessed remainder in one bounded diagnostic.
 		_, typed := classifySessionError(err)
-		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isH3FieldStreamError(err))
+		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isRecoverableH3ObservationError(err))
 		if err != nil && !recoverable {
 			// Keep an existing single-packet error envelope. It cannot describe
 			// an aggregated remainder or a refused resource reservation.

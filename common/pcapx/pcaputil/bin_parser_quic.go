@@ -18,6 +18,7 @@ type binQUIC struct {
 	previousKey     [2]*quicTrafficKeys
 	controlSeen     [2]bool
 	qpackSeen       [2][2]bool
+	h3Fault         *h3ConnectionFault
 	native          bool
 	retired         bool // capture history, not an authenticated new connection
 	zeroCID         [2]bool
@@ -387,7 +388,8 @@ func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) 
 func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
 	info["Frames"] = frames
 	err := q.applyFrames(dir, space, frames, info, max)
-	if err != nil && !isH3FieldStreamError(err) {
+	q.annotateH3ConnectionFault(info)
+	if err != nil && !isRecoverableH3ObservationError(err) {
 		return info, err
 	}
 	q.advanceState(space, frames)
@@ -532,13 +534,15 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			}
 			if !q.native || q.alpn == "h3" {
 				if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
-					if !isH3FieldStreamError(err) {
+					if !isRecoverableH3ObservationError(err) {
 						return err
 					}
 					if applicationError == nil {
 						applicationError = err
 					}
-					recordH3FieldStreamError(info, fr, sid, dir, err)
+					if isH3FieldStreamError(err) {
+						recordH3FieldStreamError(info, fr, sid, dir, err)
+					}
 					continue
 				}
 			}
@@ -1276,6 +1280,9 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 // (including slice capacities). STREAM admission requires application keys.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
+	if q.h3Fault != nil {
+		n += 128
+	}
 	n += int64(cap(q.originalDCID) + cap(q.initialSCID) + cap(q.retrySCID))
 	for d := range q.cryptoData {
 		for sp := range q.cryptoData[d] {

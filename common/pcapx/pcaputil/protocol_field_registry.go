@@ -367,6 +367,28 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			displayHTTP3FrameValues(e, p, func(frame map[string]any) { emit(frame[spec.key]) })
 		}))
 	}
+	for _, spec := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"http3.connection.error_code", "Error Code", 62},
+		{"http3.connection.error_pdu", "First PDU ID", 64},
+		{"http3.connection.error_streamid", "Stream ID", 62},
+		{"http3.connection.error_direction", "Direction", 1},
+	} {
+		spec := spec
+		b := displayCustom("http3", spec.name, "Observed connection violation; not current packet validity or inferred peer closure", DisplayUnsigned, spec.bits, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			m := e.Session
+			if e.nativeQUICObservation {
+				m = e.semanticSession
+			}
+			if fault, ok := m["HTTP3 Connection Error"].(map[string]any); ok {
+				emit(fault[spec.key])
+			}
+		})
+		b.protocols = "|quic|http3|"
+		out = append(out, b)
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].descriptor.Name < out[j].descriptor.Name })
 	seen := map[string]bool{}
 	for i, b := range out {
