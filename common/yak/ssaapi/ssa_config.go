@@ -74,6 +74,15 @@ type Config struct {
 	// 通过 GetEnableIncrementalCompile() 和 GetBaseProgramName() 方法访问
 	fileHashMap map[string]int // 文件哈希映射（运行时计算，不在 ssaconfig 中）
 	// baseFS 已移除：现在从 baseProgramName 自动构建文件系统，不再需要显式提供
+
+	// disableArchiveExpansion forbids archive expansion (jar/zip/war/...)
+	// in this compile's language preprocessing (swapLanguageFs). Set for
+	// every compile participating in an incremental sequence (the base
+	// full compile and each diff): expanded archive entries would flood the
+	// diff as thousands of additions/deletions and degrade the increment
+	// back into a full recompile. Non-incremental compiles keep the user's
+	// jar_recursive_parse setting.
+	disableArchiveExpansion bool
 }
 
 func (c *Config) CalcHash() string {
