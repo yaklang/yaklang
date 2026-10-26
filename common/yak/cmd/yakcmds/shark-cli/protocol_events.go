@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
@@ -45,6 +46,11 @@ var netflowV9EntryPriority = map[string]int{
 	"Field Type": 0, "Field Length": 1, "Scope": 2, "Field Name": 3, "Value": 4, "Value Kind": 5,
 	"Template Definition SHA256": 800, "Template PDU SHA256": 801, "Template Definition Offset": 802, "Template Definition Length": 803,
 	"Opaque Data": 900, "Padding Bytes": 901, "Observation Scope": 950, "Template Lease Policy": 951,
+}
+
+var ipfixHeaderPriority = map[string]int{
+	"Protocol Name": 0, "Version": 1, "Message Length": 2, "Export Time": 3,
+	"Sequence Number": 4, "Observation Domain ID": 5,
 }
 
 // Detail snapshots include owned public and private parser evidence, unlike
@@ -149,6 +155,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				if k == "Wire Field Ranges" {
 					continue
 				}
+				if protocol == "ipfix" && k == "Enterprise Number" && x["Enterprise"] == false {
+					continue // the standard IE does not carry a PEN, including PEN0
+				}
 				keys = append(keys, k)
 			}
 			sort.Slice(keys, func(i, j int) bool {
@@ -175,6 +184,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 					}
 					if rank, ok := netflowV9EntryPriority[keys[j]]; ok {
 						b = rank
+					}
+					if protocol == "ipfix" {
+						if rank, ok := ipfixHeaderPriority[keys[i]]; ok {
+							a = rank
+						}
+						if rank, ok := ipfixHeaderPriority[keys[j]]; ok {
+							b = rank
+						}
 					}
 					if protocol == "netflow-v5" {
 						if keys[i] == "Records" {
@@ -293,6 +310,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
+				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
+			}
 			if protocol == "syslog" && x == nil && (name == "App Name" || name == "Hostname" || name == "Proc ID" || name == "Message ID") {
 				value = "not provided"
 			}
