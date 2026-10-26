@@ -2,7 +2,7 @@
 The raw QUIC peers intentionally do not enforce HTTP semantics. Transport receipt
 and exact byte hashes are the oracle, not claims of a conforming HTTP server.
 Uses no Yak parser. PCAP, certificates, keys and full manifests stay outside Git.
-Usage: http3_field_live.py OUT TSHARK AIOQUIC_LIBS
+Usage: http3_field_live.py OUT TSHARK AIOQUIC_LIBS [DECLARED_SCENARIOS_JSON]
 """
 import collections,datetime,hashlib,importlib.metadata,json,queue,secrets,select,socket,subprocess,sys,threading,time
 from pathlib import Path
@@ -56,6 +56,10 @@ def headers(hs):
 
 base=[(':method','GET'),(':scheme','https'),(':path','/'),(':authority','field-audit.invalid')]
 cases=[('valid-GET',base,'base'),('missing-path',[h for h in base if h[0]!=':path'],'malformed'),('missing-method',base[1:],'malformed'),('duplicate-method',base+[base[0]],'malformed'),('request-status',base+[(':status','200')],'malformed'),('pseudo-after-field',[('x-test','ok')]+base,'malformed'),('unknown-pseudo',base+[(':unknown','x')],'unsupported'),('uppercase',base+[('X-Test','ok')],'malformed'),('invalid-token',base+[('x(test','ok')],'malformed'),('control-value',base+[('x-test','a\x01b')],'malformed'),('edge-whitespace',base+[('x-test',' leading')],'malformed'),('connection',base+[('connection','close')],'malformed'),('TE-gzip',base+[('te','gzip')],'malformed'),('CONNECT-with-path',[(':method','CONNECT'),(':authority','example.com:443'),(':path','')],'malformed'),('CONNECT-without-port',[(':method','CONNECT'),(':authority','example.com')],'malformed'),('valid-CONNECT',[(':method','CONNECT'),(':authority','example.com:443')],'base'),('valid-OPTIONS',[(':method','OPTIONS'),(':scheme','https'),(':path','*'),(':authority','field-audit.invalid')],'base'),('missing-path-large',[h for h in base if h[0]!=':path']+[('x-pad','p'*18000)],'malformed')]
+plans={}
+if len(sys.argv)>4:
+ selected=json.loads(Path(sys.argv[4]).read_text(encoding='utf-8-sig'));plans={p['name']:p for p in selected['cases']};assert len(plans)==len(selected['cases'])
+ cases=[(p['name'],p['request_headers'],p['request_expect']) for p in selected['cases']]
 try:
  # A fixed startup sleep can silently miss the first complete connection.
  # Wait until TShark actually observes our nonce before sending any QUIC.
@@ -84,7 +88,7 @@ try:
       ended[side].add(e.stream_id)
       if side==1:
        assert bytes(received[1][e.stream_id])==expected[e.stream_id]['wire']
-       reply=headers([(':status','200')])+frame(0,expected[e.stream_id]['name'].encode())
+       reply=expected[e.stream_id].get('reply_wire',headers([(':status','200')])+frame(0,expected[e.stream_id]['name'].encode()))
        expected[e.stream_id]['reply']=reply;q.send_stream_data(e.stream_id,reply,end_stream=True)
   def send(q,sock,direction):
    for data,address in q.datagrams_to_send(now=time.monotonic()):
@@ -120,19 +124,33 @@ try:
   client.send_stream_data(client.get_next_available_stream_id(is_unidirectional=True),b'\0'+frame(4,b''))
   server.send_stream_data(server.get_next_available_stream_id(is_unidirectional=True),b'\0'+frame(4,b''))
   def queue(name,hs,status,extra=b''):
+   plan=plans.get(name)
+   if plan:
+    if plan.get('request_data')is not None:extra+=frame(0,plan['request_data'].encode('ascii'))
+    if plan.get('request_trailers')is not None:extra+=headers(plan['request_trailers'])
    sid=client.get_next_available_stream_id();w=headers(hs)+extra
-   expected[sid]={'name':name,'wire':w,'status':status};client.send_stream_data(sid,w,end_stream=True);return sid
-  for name,hs,status in cases:
-   sid=queue(name,hs,status);pump(lambda:sid in ended[0])
-  for name,extra in [('pseudo-in-trailers',headers([(':path','/another-request')])),('third-header-section',headers([('x-trailer','ok')])+headers([('x-trailer','extra')]))]:
-   sid=queue(name,base,'malformed',extra);pump(lambda:sid in ended[0])
-  # Queue two STREAMs before one packetization pass to exercise a stream-local
-  # failure alongside a valid request in the same authenticated QUIC packet.
-  bad=queue('batched-bad',[h for h in base if h[0]!=':path'],'malformed');good=queue('batched-good',base,'base');pump(lambda:bad in ended[0] and good in ended[0])
-  sid=queue('valid-after-all-failures',base,'base');pump(lambda:sid in ended[0])
+   expected[sid]={'name':name,'wire':w,'status':status}
+   if plan:
+    reply=b''.join(headers(h) for h in plan.get('reply_interim_headers',[]))+headers(plan['reply_headers'])
+    if plan.get('reply_data')is not None:reply+=frame(0,plan['reply_data'].encode('ascii'))
+    expected[sid]['reply_wire']=reply;expected[sid]['plan']=plan
+   client.send_stream_data(sid,w,end_stream=True);return sid
+  if plans:
+   # Deliberately batch the declared scenarios: multiple independent streams
+   # can share one protected QUIC packet, including message-error controls.
+   pending={queue(name,hs,status) for name,hs,status in cases};pump(lambda:pending<=ended[0])
+  else:
+   for name,hs,status in cases:
+    sid=queue(name,hs,status);pump(lambda:sid in ended[0])
+   for name,extra in [('pseudo-in-trailers',headers([(':path','/another-request')])),('third-header-section',headers([('x-trailer','ok')])+headers([('x-trailer','extra')]))]:
+    sid=queue(name,base,'malformed',extra);pump(lambda:sid in ended[0])
+   # Queue two STREAMs before one packetization pass to exercise a stream-local
+   # failure alongside a valid request in the same authenticated QUIC packet.
+   bad=queue('batched-bad',[h for h in base if h[0]!=':path'],'malformed');good=queue('batched-good',base,'base');pump(lambda:bad in ended[0] and good in ended[0])
+   sid=queue('valid-after-all-failures',base,'base');pump(lambda:sid in ended[0])
   for sid,m in expected.items():
    assert bytes(received[0][sid])==m['reply']
-   operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest()})
+   operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest(),'declared_scenario':m.get('plan')})
   profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected)})
   client.close();send(client,client_socket,0);time.sleep(.08)
   for sock in [client_socket,server_socket]:
@@ -145,4 +163,4 @@ finally:
  for reader in readers:reader.join(timeout=2)
  (out/'capture.stderr').write_bytes(b''.join(capture_errors));(out/'capture-observed.txt').write_bytes(b''.join(capture_lines))
  (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'operations':operations},indent=2)+'\n',encoding='utf8')
-assert len(operations)==69
+assert len(operations)==(len(cases)*3 if plans else 69)
