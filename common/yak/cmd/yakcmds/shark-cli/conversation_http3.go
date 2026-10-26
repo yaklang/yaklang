@@ -59,7 +59,11 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 			groups = append(groups, map[string]any{"Stream ID": sid, "Header Kind": h["Header Kind"], "Headers": headers, "Header Conformance Status": h["Header Conformance Status"], "Header Conformance Error": h["Header Conformance Error"]})
 		}
 	}
+	var frameErrors []map[string]any
 	for _, fr := range mapList(e.Session["Frames"]) {
+		if fault, ok := fr["HTTP3 Frame Error"]; ok {
+			frameErrors = append(frameErrors, copyConformance(fault))
+		}
 		for _, h := range mapList(fr["HTTP3 Frames"]) {
 			addFrame(h, number(fr["Stream ID"]))
 		}
@@ -79,6 +83,12 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		groups = append(groups, map[string]any{"Stream ID": number(e.Session["HTTP3 Stream ID"]), "Headers": m["Headers"]})
 	}
 	m["HTTP3 Message Headers"] = groups
+	if c, ok := e.Session["HTTP3 Connection Error"]; ok {
+		m["HTTP3 Connection Error"] = copyConformance(c)
+	}
+	if len(frameErrors) > 0 {
+		m["HTTP3 Frame Errors"] = frameErrors
+	}
 	if c, ok := e.Session["HTTP3 Message Conformance"]; ok {
 		m["HTTP3 Message Conformance"] = copyConformance(c)
 	}

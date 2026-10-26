@@ -37,3 +37,23 @@ func TestHTTP3ConversationShowsOtherStreamHeadersAlongsideFieldError(t *testing.
 	require.Contains(t, text, "HTTP/3 stream 4 · request")
 	require.Contains(t, text, ":path: /still-visible")
 }
+
+func TestHTTP3ConversationRetainsConnectionFaultWithoutPartialByteArena(t *testing.T) {
+	fault := map[string]any{"Error Name": "H3_FRAME_ERROR", "Error Code": uint64(0x106), "Error Scope": "connection", "First PDU ID": uint64(7), "Stream ID": uint64(4), "Frame Offset": uint64(70), "Incomplete Component": "payload", "Available Wire Bytes": uint64(18000), "Partial Frame Bytes": make([]byte, 18000), "Byte Source": map[string]any{"Ranges": make([]any, 1000)}}
+	e := &pcaputil.ProtocolEvent{ID: 8, Protocol: "http3", Transport: "udp", Status: "decoded", Session: map[string]any{"HTTP3 Connection Error": fault, "Frames": []map[string]any{{"HTTP3 Frame Error": fault}}}}
+	projected := http3ConversationEvent(e)
+	m := projected.Session["HTTP3 Connection Error"].(map[string]any)
+	require.Equal(t, "H3_FRAME_ERROR", m["Error Name"])
+	require.Nil(t, m["Partial Frame Bytes"])
+	require.Nil(t, m["Byte Source"])
+	require.Less(t, projected.RetainedBytes(), 10000)
+	v := &streamSnapshot{transport: "udp", events: []*pcaputil.ProtocolEvent{projected}}
+	var rows []string
+	for _, row := range applicationMessageRows(v, 0, 0, 180) {
+		rows = append(rows, row.text)
+	}
+	require.Contains(t, rows[1], "H3_FRAME_ERROR · connection")
+	require.Contains(t, strings.Join(rows, "\n"), "stream 4 · offset 70 · payload")
+	m["Error Name"] = "edited"
+	require.Equal(t, "H3_FRAME_ERROR", fault["Error Name"], "compact summaries own their values")
+}

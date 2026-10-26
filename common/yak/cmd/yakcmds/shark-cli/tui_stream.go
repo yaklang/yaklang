@@ -243,6 +243,10 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 		title = "PROTOCOL MESSAGES"
 	}
 	add(title+" · "+strings.Join(presentation.stack, " › ")+" · a original wire", inkCyan)
+	if presentation.h3ConnectionFaultPDU != 0 {
+		add(fmt.Sprintf("HTTP/3 H3_FRAME_ERROR · connection · first PDU #%d", presentation.h3ConnectionFaultPDU), inkRed)
+		add("Later frames remain inspectable; connection conformance failed", inkMuted)
+	}
 	hasApplication := false
 	var viewScope string
 	for _, e := range v.events {
@@ -279,6 +283,9 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 		}
 		add(fmt.Sprintf("── %s · %s · PDU #%d · %s ──", eventProtocolName(e), label, e.ID, e.SourceBytes.Kind), style)
 		add(applicationEventSummary(e), inkText)
+		for _, fault := range mapList(eventValues(e)["HTTP3 Frame Errors"]) {
+			add(fmt.Sprintf("H3_FRAME_ERROR · connection · stream %d · offset %d · %s · %d partial bytes", number(fault["Stream ID"]), number(fault["Frame Offset"]), textValue(fault["Incomplete Component"]), number(fault["Available Wire Bytes"])), inkRed)
+		}
 		if c, ok := eventValues(e)["HTTP3 Message Conformance"].(map[string]any); ok {
 			line := fmt.Sprintf("HTTP/3 stream %d · DATA %d bytes · %s", number(c["Stream ID"]), number(c["Observed DATA Bytes"]), textValue(c["Length Check"]))
 			if declared, exists := c["Declared Content-Length"]; exists {
