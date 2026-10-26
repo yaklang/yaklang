@@ -31,6 +31,7 @@ type packetPresentation struct {
 	priority                              int
 	count                                 int
 	rejectedTLS                           bool
+	h3ConnectionFaultPDU                  uint64
 }
 
 var protocolDisplayNames = map[string]string{
@@ -726,6 +727,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
+	defer p.observeHTTP3ConnectionFault(e)
 	if e.AuthenticatedQUICApplicationProtocol() == "http3" && (e.Error != "" || e.Status != "decoded" && e.Status != "deferred") {
 		p.addLayer("QUIC")
 		p.addLayer("HTTP/3")
@@ -973,23 +975,28 @@ func presentEvents(events []*pcaputil.ProtocolEvent) packetPresentation {
 	for _, e := range events {
 		p.add(e)
 	}
-	for _, e := range events {
-		if e == nil {
-			continue
-		}
-		fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any)
-		if !ok || fault["Error Name"] != "H3_FRAME_ERROR" {
-			continue
-		}
-		p.summary = fmt.Sprintf("H3_FRAME_ERROR · connection · first PDU #%d · %s", number(fault["First PDU ID"]), p.summary)
-		p.scope = "connection protocol violation observed"
-		p.evidence = "HTTP3 connection protocol violation observed; peer closure not inferred"
-		if p.status == "decoded" || p.status == "deferred" {
-			p.status = "connection-violation-observed"
-		}
-		break
-	}
 	return p
+}
+
+// Both streaming publication and batch/IPC views call add. Reapply the retained
+// connection warning after any later PDU updates this packet's summary/status.
+func (p *packetPresentation) observeHTTP3ConnectionFault(e *pcaputil.ProtocolEvent) {
+	if e.Protocol == "http3" || e.Protocol == "quic" {
+		if fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any); ok && fault["Error Name"] == "H3_FRAME_ERROR" && fault["Error Scope"] == "connection" {
+			p.h3ConnectionFaultPDU = number(fault["First PDU ID"])
+		}
+	}
+	if p.h3ConnectionFaultPDU == 0 {
+		return
+	}
+	if !strings.HasPrefix(p.summary, "H3_FRAME_ERROR · connection") {
+		p.summary = fmt.Sprintf("H3_FRAME_ERROR · connection · first PDU #%d · %s", p.h3ConnectionFaultPDU, p.summary)
+	}
+	p.scope = "connection protocol violation observed"
+	p.evidence = "HTTP3 connection protocol violation observed; peer closure not inferred"
+	if p.status == "decoded" || p.status == "deferred" {
+		p.status = "connection-violation-observed"
+	}
 }
 
 func clipText(s string, limit int) string {
