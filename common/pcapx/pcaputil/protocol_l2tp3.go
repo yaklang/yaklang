@@ -185,7 +185,7 @@ func (a *binParser) observeL2TPv3(p gopacket.Packet, evidence captureEvidence) (
 	evidence.normalizedTunnels++
 	evidence.ipv6Fragment = false
 	ci.CaptureLength, ci.Length = len(inner), len(inner)
-	q := gopacket.NewPacket(inner, protocolPacketDecoder{decoder: layers.LayerTypeEthernet}, gopacket.DecodeOptions{NoCopy: true})
+	q := gopacket.NewPacket(inner, protocolPacketDecoder{decoder: layers.LayerTypeEthernet, datagramDecodeAs: a.datagramDecodeAs}, gopacket.DecodeOptions{NoCopy: true})
 	q.Metadata().CaptureInfo = withEvidence(ci, evidence)
 	if status, code := l2tp3InnerIPDiagnostic(q); code != "" {
 		a.networkDiagnostic(evidence, ci, status, code)

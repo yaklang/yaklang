@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -257,6 +258,128 @@ func TestUDPInvalidCarrierCannotEnterTunnelDissectors(t *testing.T) {
 						require.Equal(t, "dns", e.Protocol)
 						require.Equal(t, "decoded", e.Status)
 						require.Equal(t, "198.51.100.1:40000", e.Source)
+					}
+				})
+			}
+		}
+	}
+}
+
+func TestExplicitUDPSelectionPrecedesLegacyTunnelPort(t *testing.T) {
+	for _, v6 := range []bool{false, true} {
+		for _, port := range []uint16{4789, 6081, 2152} {
+			for _, observer := range []bool{false, true} {
+				for _, complete := range []bool{false, true} {
+					t.Run(fmt.Sprintf("IPv6%t/port%d/observer%t/complete%t", v6, port, observer, complete), func(t *testing.T) {
+						body := dnsQuery(91, "selected.example", 1)[2:]
+						if !complete {
+							body = body[:2]
+						}
+						u := carrierTestUDP(body, 8+len(body))
+						binary.BigEndian.PutUint16(u[2:4], port)
+						raw := carrierTestIPv4(u)
+						if v6 {
+							raw = carrierTestIPv6(17, u, true, 0)
+						}
+						var capture bytes.Buffer
+						w := pcapgo.NewWriter(&capture)
+						require.NoError(t, w.WriteFileHeader(65535, layers.LinkTypeRaw))
+						require.NoError(t, w.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(1, 0), CaptureLength: len(raw), Length: len(raw)}, raw))
+						var events []*ProtocolEvent
+						opts := []CaptureOption{WithProtocolDecodeAs("udp", port, "dns"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })}
+						if observer {
+							opts = append(opts, WithEveryPacket(func(gopacket.Packet) {}))
+						}
+						require.NoError(t, ReplayPcap(bytes.NewReader(capture.Bytes()), opts...))
+						require.Len(t, events, 1)
+						e := events[0]
+						if complete {
+							require.Equal(t, "dns", e.Protocol)
+							require.Equal(t, "decoded", e.Status)
+							require.Equal(t, body, e.Raw)
+						} else {
+							require.NotContains(t, []string{"decoded", "deferred"}, e.Status, "selection cannot validate a two-byte prefix")
+							fields, err := e.GetFields()
+							require.Nil(t, fields)
+							require.Error(t, err)
+						}
+					})
+				}
+			}
+		}
+	}
+}
+
+func TestExplicitSyslogUDPSelectionCannotBecomeNestedDNS(t *testing.T) {
+	query := dnsQuery(92, "inner.example", 1)[2:]
+	inner := carrierTestIPv4(carrierTestUDP(query, 8+len(query)))
+	copy(inner[12:16], []byte{198, 51, 100, 1})
+	copy(inner[16:20], []byte{198, 51, 100, 2})
+	// RFC5424 MSG-ANY may contain arbitrary octets. Starting at offset eight,
+	// this valid message also resembles a legacy VXLAN Ethernet/IP payload.
+	body := append([]byte("<0>1 - - - - - - "), 1, 2, 3, 8, 0)
+	require.Equal(t, 22, len(body))
+	body = append(body, inner...)
+	for _, v6 := range []bool{false, true} {
+		for _, observer := range []bool{false, true} {
+			for _, mode := range []string{"whole", "fragments", "reversed"} {
+				t.Run(fmt.Sprintf("IPv6%t/observer%t/%s", v6, observer, mode), func(t *testing.T) {
+					u := carrierTestUDP(body, 8+len(body))
+					binary.BigEndian.PutUint16(u[2:4], 4789)
+					raw := carrierTestIPv4(u)
+					if v6 {
+						raw = carrierTestIPv6(17, u, true, 0)
+					}
+					frames := [][]byte{raw}
+					if mode != "whole" {
+						fragment := func(start, end int, more bool) []byte {
+							if v6 {
+								f := make([]byte, 8+end-start)
+								f[0] = 17
+								bits := start
+								if more {
+									bits |= 1
+								}
+								binary.BigEndian.PutUint16(f[2:4], uint16(bits))
+								binary.BigEndian.PutUint32(f[4:8], 93)
+								copy(f[8:], u[start:end])
+								return carrierTestIPv6(44, f, true, 0)
+							}
+							f := carrierTestIPv4(u[start:end])
+							binary.BigEndian.PutUint16(f[4:6], 93)
+							bits := start / 8
+							if more {
+								bits |= 0x2000
+							}
+							binary.BigEndian.PutUint16(f[6:8], uint16(bits))
+							return f
+						}
+						frames = [][]byte{fragment(0, 16, true), fragment(16, len(u), false)}
+						if mode == "reversed" {
+							frames[0], frames[1] = frames[1], frames[0]
+						}
+					}
+					var capture bytes.Buffer
+					w := pcapgo.NewWriter(&capture)
+					require.NoError(t, w.WriteFileHeader(65535, layers.LinkTypeRaw))
+					for i, f := range frames {
+						require.NoError(t, w.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(int64(i+1), 0), CaptureLength: len(f), Length: len(f)}, f))
+					}
+					var events []*ProtocolEvent
+					opts := []CaptureOption{WithProtocolDecodeAs("udp", 4789, "syslog"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })}
+					if observer {
+						opts = append(opts, WithEveryPacket(func(gopacket.Packet) {}))
+					}
+					require.NoError(t, ReplayPcap(bytes.NewReader(capture.Bytes()), opts...))
+					require.Len(t, events, 1)
+					e := events[0]
+					require.Equal(t, "syslog", e.Protocol, "an explicit UDP selector precedes a legacy port's guessed inner transport")
+					require.Equal(t, "decoded", e.Status, e.Error)
+					require.Equal(t, body, e.Raw)
+					require.Equal(t, "explicit-decode-as", e.Admission)
+					if mode != "whole" {
+						require.Equal(t, "reassembled", e.SourceBytes.Kind)
+						require.Len(t, e.SourceBytes.PacketRefs, 2)
 					}
 				})
 			}
