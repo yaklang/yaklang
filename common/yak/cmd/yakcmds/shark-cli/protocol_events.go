@@ -447,6 +447,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			if depth == 0 && quicHeaderForm == "short" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "Version" || name == "SCID") {
 				value = "not carried in short header"
 			}
+			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && name == "Version" {
+				value = quicWireVersionText(x)
+			}
 			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "DCID" || name == "SCID") && emptyCID {
 				if span := wireRanges[name]; len(span) == 2 && span[0] == span[1] && span[0] >= 0 && currentSource > 0 && span[1] <= len(sources[currentSource-1].Data) {
 					value = "0 bytes (empty connection ID)"

@@ -403,9 +403,17 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"quic.scil", "SCID Length", DisplayUnsigned, 8},
 		{"quic.version", "Version", DisplayUnsigned, 32},
 		{"quic.long.packet_type", "Long Packet Type", DisplayUnsigned, 2},
+		{"quic.long.packet_type_v2", "Long Packet Type", DisplayUnsigned, 2},
 	} {
 		spec := spec
 		b := displayCustom("quic", spec.name, "QUIC observed wire "+spec.key, spec.typ, spec.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if spec.key == "Long Packet Type" {
+				version, ok := e.ownedQUICHeaderField("Version")
+				v, valid := displayUint(version)
+				if !ok || !valid || spec.name == "quic.long.packet_type" && v != uint64(quicVersion1) || spec.name == "quic.long.packet_type_v2" && v != uint64(quicVersion2) {
+					return
+				}
+			}
 			if value, ok := e.ownedQUICHeaderField(spec.key); ok {
 				emit(value)
 			}
