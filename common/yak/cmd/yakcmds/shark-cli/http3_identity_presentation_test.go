@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,6 +31,36 @@ func TestHTTP3MessageErrorKeepsSealedNativeIdentityInPacketList(t *testing.T) {
 	require.Contains(t, row.ProtocolStack, "QUIC")
 	require.Contains(t, row.ProtocolStack, "HTTP/3")
 	require.Contains(t, row.Info, "invalid field section")
+}
+
+func TestHTTP3DiagnosticDetailTitleSurvivesPublicWorkerSnapshot(t *testing.T) {
+	packets, _ := top30Replay(t, top30Cases()[7])
+	for _, p := range packets {
+		for _, e := range p.protocolEvents() {
+			if e.AuthenticatedQUICApplicationProtocol() != "http3" {
+				continue
+			}
+			e.Status, e.Error = "malformed", "HTTP3 invalid field section"
+			raw := &capturedPacket{number: p.number, data: p.data, ci: p.ci, link: p.link, events: []*pcaputil.ProtocolEvent{e}, presentation: presentEvents([]*pcaputil.ProtocolEvent{e})}
+			wire, err := marshalDecodeRequest(packetDecodeRequest(raw))
+			require.NoError(t, err)
+			var output bytes.Buffer
+			require.NoError(t, runDecodeWorker(bytes.NewReader(wire), &output))
+			d, err := decodeWorkerOutput(output.Bytes(), raw)
+			require.NoError(t, err)
+			require.Equal(t, "HTTP/3", d.protocol)
+			found := false
+			for i, f := range d.fields {
+				if f.text == "HTTP message diagnostic: HTTP3 invalid field section" {
+					found = true
+					require.Less(t, i, 8, "the rejection must precede normal headers and large source trees")
+				}
+			}
+			require.True(t, found)
+			return
+		}
+	}
+	t.Fatal("no sealed native HTTP3 event")
 }
 
 func TestPublicHTTP3FlagsCannotUpgradeUDPDiagnostic(t *testing.T) {
