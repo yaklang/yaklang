@@ -1,7 +1,9 @@
 package sharkcli
 
 import (
+	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -9,6 +11,46 @@ import (
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
+
+// Parser leaf bytes may cross worker JSON as an octet list instead of Base64.
+// Reject lossy conversions, including fractional, negative or oversized values.
+func fieldOctetList(v any) ([]byte, bool) {
+	items, ok := v.([]any)
+	if !ok {
+		return nil, false
+	}
+	out := make([]byte, len(items))
+	for i, x := range items {
+		switch n := x.(type) {
+		case uint8:
+			out[i] = n
+		case int:
+			if n < 0 || n > 255 {
+				return nil, false
+			}
+			out[i] = byte(n)
+		case uint64:
+			if n > 255 {
+				return nil, false
+			}
+			out[i] = byte(n)
+		case float64:
+			if !(n >= 0 && n <= 255 && float64(byte(n)) == n) {
+				return nil, false
+			}
+			out[i] = byte(n)
+		case json.Number:
+			u, err := strconv.ParseUint(string(n), 10, 8)
+			if err != nil {
+				return nil, false
+			}
+			out[i] = byte(u)
+		default:
+			return nil, false
+		}
+	}
+	return out, true
+}
 
 func formatFieldValue(name string, value any) string {
 	var data []byte
