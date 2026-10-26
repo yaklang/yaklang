@@ -12,6 +12,17 @@ import (
 // suffix. Absence alone proves only incompleteness. Never infer an application
 // identity from the bytes left behind by either kind of carrier failure.
 func udpCarrierError(network gopacket.NetworkLayer, udp *layers.UDP, ci gopacket.CaptureInfo, truncated bool) *ProtocolError {
+	if _, ok := network.(*layers.IPv4); ok {
+		b := network.LayerContents()
+		if len(b) >= 20 {
+			h, n := int(b[0]&15)*4, int(binary.BigEndian.Uint16(b[2:4]))
+			// The dependency substitutes captured size for TotalLength0. That
+			// convenience is not literal evidence of a valid UDP carrier.
+			if b[0]>>4 != 4 || h < 20 || h > len(b) || n < h {
+				return &ProtocolError{Kind: ErrMalformedMessage, Message: "UDP IPv4 carrier has an invalid literal header/total length"}
+			}
+		}
+	}
 	if udp.Length < 8 {
 		return &ProtocolError{Kind: ErrMalformedMessage, Message: fmt.Sprintf("UDP length %d is smaller than the 8-byte header", udp.Length)}
 	}

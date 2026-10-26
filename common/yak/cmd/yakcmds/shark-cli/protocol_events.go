@@ -378,6 +378,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		add(fmt.Sprintf("%s · PDU #%d · %s", label, e.ID, kind), true)
 		if len(e.Raw) > 0 {
 			name := eventProtocolName(e)
+			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
+				name = "Unadmitted UDP payload"
+			}
 			if e.Protocol == "grpc" {
 				name = "HTTP/2 frame (gRPC)"
 			}
@@ -393,8 +396,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		add(applicationEventSummary(e), false)
 		if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
-			add("Carrier failure: "+e.ExpertCode+" · "+e.Error, false)
-			add("Application identity unavailable: UDP payload was not admitted for protocol decoding", false)
+			add("Carrier failure: "+e.Error, false)
+			add("Application identity unavailable: UDP payload not decoded", false)
 		}
 		if notice := isisMalformedNotice(e); notice != "" {
 			// A long otherwise valid header/checksum summary can hide the reason
@@ -510,7 +513,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			walk("Other decoded fields", values, depth)
 		}
-		add(fmt.Sprintf("Status: %s · %s · source %s → %s", e.Status, e.Completeness, e.Source, e.Destination), false)
+		state := e.Status
+		if e.Completeness != "" && e.Completeness != state {
+			state += " · " + e.Completeness
+		}
+		add(fmt.Sprintf("Status: %s · source %s → %s", state, e.Source, e.Destination), false)
 		if e.Error != "" {
 			add("Error: "+e.Error, false)
 		}

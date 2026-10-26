@@ -814,9 +814,13 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)
 			if e.Protocol == "" && e.Transport != "" {
-				label = strings.ToUpper(e.Transport) + " carrier"
+				label = strings.ToUpper(e.Transport)
 			}
-			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+e.Error, 256)
+			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
+			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if e.Protocol == "" && e.Transport == "udp" && e.Summary != "" {
+				p.diagnostic = clipText("UDP carrier · "+e.Status+" · "+e.Summary, 256)
+			}
 			if p.protocol == "" {
 				p.status = e.Status
 			}
