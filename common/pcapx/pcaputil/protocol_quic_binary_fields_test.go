@@ -85,10 +85,8 @@ func TestNativeQUICEnvelopeBinaryFieldsRemainLosslessAcrossJSON(t *testing.T) {
 			copy(w[:5], []byte{0xd0, 0x6b, 0x33, 0x43, 0xcf})
 		}
 		f, err := quicWireEnvelope(w)
-		if v2 {
-			require.ErrorContains(t, err, "UnsupportedVersion", "native v2 remains explicitly unselected; a valid common layout is not authenticated v2 support")
-			continue
-		}
+		// This tests the bounded layout/ownership only; authenticated v2 wire
+		// ingress is separately covered by RFC9369 and actual peer captures.
 		require.NoError(t, err)
 		require.Equal(t, []byte{0xff, 0, 0xc3}, f["DCID"])
 		require.Equal(t, []byte{0xfe, 0x80}, f["SCID"])
