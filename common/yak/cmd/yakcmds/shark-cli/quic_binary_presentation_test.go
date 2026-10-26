@@ -50,3 +50,27 @@ func TestQUICLongHeaderEmptyCIDIsPresentRatherThanUnknown(t *testing.T) {
 	}
 	require.Equal(t, 2, seen)
 }
+
+func TestQUICWireVersionDetailsStayLiteralAcrossWorkerIPC(t *testing.T) {
+	for _, tc := range []struct {
+		version uint32
+		text    string
+	}{{1, "QUIC v1 (0x00000001)"}, {0x6b3343cf, "QUIC v2 (0x6b3343cf)"}, {0, "Version Negotiation (0x00000000)"}, {2, "Unknown QUIC version (0x00000002)"}} {
+		e := &pcaputil.ProtocolEvent{Protocol: "quic", Raw: []byte{0xc0, byte(tc.version >> 24), byte(tc.version >> 16), byte(tc.version >> 8), byte(tc.version), 0, 0}, Session: map[string]any{"Header Form": "long", "Version": tc.version, "Wire Field Ranges": map[string]any{"Version": []any{1, 5}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		seen := false
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "Version:") {
+				require.Equal(t, "Version: "+tc.text, f.text)
+				require.True(t, f.hasRange)
+				require.Equal(t, e.Raw[1:5], sources[f.source-1].Data[f.start:f.end])
+				seen = true
+			}
+		}
+		require.True(t, seen)
+	}
+}

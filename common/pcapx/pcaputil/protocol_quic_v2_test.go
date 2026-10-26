@@ -46,6 +46,14 @@ func TestQUICV2RFC9369NativeInitialIngressAndLiteralFields(t *testing.T) {
 		v, ok = e.ownedQUICHeaderField("Long Packet Type")
 		require.True(t, ok)
 		require.EqualValues(t, 1, v, "raw v2 Initial type, not the v1 type0")
+		aliases := e.DisplayFieldValues()
+		require.Equal(t, []any{uint64(1)}, aliases.FieldMap()["quic.long.packet_type_v2"])
+		require.Empty(t, aliases.FieldMap()["quic.long.packet_type"], "Wireshark uses separate v1/v2 type fields")
+		for _, f := range aliases.Values {
+			if f.Name == "quic.long.packet_type_v2" {
+				require.Equal(t, &DisplayFieldRange{Offset: 0, Length: 1}, f.Range)
+			}
+		}
 	}
 	require.Zero(t, stats.BufferedBytes)
 }
