@@ -17,7 +17,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	long := wire[0]&0x80 != 0
 	var first quicHdr
 	if long {
-		if len(wire) < 7 || binary.BigEndian.Uint32(wire[1:5]) != 1 {
+		if len(wire) < 7 || !quicSupportedVersion(binary.BigEndian.Uint32(wire[1:5])) {
 			return nil, false
 		}
 		var err error
@@ -59,7 +59,14 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	var zeroTuples []zeroTupleRoute
 	dir, retiredDir := 0, 0
 	retiredCID, retiredAmbiguous := false, false
+	retiredProfile := ""
 	selectRetired := func(candidate *list.Element, d int, byCID bool) {
+		profile := quicNativeProfile(candidate.Value.(*binUDPEntry).flow.quic.effectiveVersion())
+		if retiredProfile == "" {
+			retiredProfile = profile
+		} else if retiredProfile != profile {
+			retiredProfile = "quic-native"
+		}
 		if retired != nil && retired != candidate {
 			retiredAmbiguous = true
 		}
@@ -109,7 +116,10 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// establish a fresh captured generation. Preserve the entire refused
 		// datagram without pretending its coalesced packets were decoded.
 		e := *base
-		e.Protocol, e.Profile = "quic", "quic-v1-native"
+		e.Protocol, e.Profile = "quic", retiredProfile
+		if long {
+			e.Profile = quicNativeProfile(first.version)
+		}
 		e.nativeQUICObservation = true
 		e.Admission, e.Completeness = "observed-retired-CID", "datagram"
 		e.ID, e.Direction, e.FlowID = a.ids.Add(1), retiredDir, 0
@@ -154,7 +164,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		var owner *list.Element
 		ownerDir, matches := 0, 0
 		selectOwner := func(candidate *list.Element, d int) {
-			if candidate.Value.(*binUDPEntry).flow.quic.authenticatesExistingWire(d, wire) {
+			if candidate.Value.(*binUDPEntry).flow.quic.matchesExistingWireContext(d, wire) {
 				if owner == candidate && ownerDir == d {
 					return
 				}
@@ -169,7 +179,24 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		}
 		if matches != 1 {
 			e := *base
-			e.Protocol, e.Profile = "quic", "quic-v1-native"
+			e.Protocol, e.Profile = "quic", ""
+			mergeProfile := func(candidate *list.Element) {
+				profile := quicNativeProfile(candidate.Value.(*binUDPEntry).flow.quic.effectiveVersion())
+				if e.Profile == "" {
+					e.Profile = profile
+				} else if e.Profile != profile {
+					e.Profile = "quic-native"
+				}
+			}
+			if el != nil {
+				mergeProfile(el)
+			}
+			for _, route := range zeroTuples {
+				mergeProfile(route.element)
+			}
+			if long {
+				e.Profile = quicNativeProfile(first.version)
+			}
 			e.nativeQUICObservation = true
 			e.Admission, e.Completeness = "unresolved-zero-CID-generation", "datagram"
 			e.ID, e.Direction, e.FlowID = a.ids.Add(1), 0, 0
@@ -199,7 +226,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	for off := 0; off < len(wire); {
 		e := *base
 		e.Protocol = "quic"
-		e.Profile = "quic-v1-native"
+		e.Profile = quicNativeProfile(f.quic.effectiveVersion())
 		e.nativeQUICObservation = true
 		e.Admission = "unverified-QUIC-candidate"
 		// Native CID selection owns the association; a refused new candidate
@@ -210,6 +237,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		f.quic.eventRefs = e.SourceBytes.PacketRefs
 		e.Direction = dir
 		h, err := f.quic.wireHeader(wire[off:], dir)
+		if err == nil && h.long {
+			e.Profile = quicNativeProfile(h.version)
+		}
 		if err != nil {
 			if _, typed := classifySessionError(err); typed == nil {
 				err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC header: %v", err)
@@ -395,8 +425,10 @@ func (q *binQUIC) authenticatesExistingWire(dir int, wire []byte) bool {
 	if err != nil || h.retry || h.vn || h.size <= 0 || h.size > len(wire) {
 		return false
 	}
-	probe := *q
-	probe.keys = cloneQUICKeyring(q.keys)
+	probe, _, err := q.protectionCandidate(dir, h)
+	if err != nil {
+		return false
+	}
 	tk, _ := probe.keysFor(dir, h)
 	if tk == nil {
 		return false
@@ -466,10 +498,10 @@ func (f *binFlow) retireQUICUDP() {
 	if q == nil || q.retired {
 		return
 	}
-	history, zero := q.cids, q.zeroCID
+	history, zero, version := q.cids, q.zeroCID, q.effectiveVersion()
 	// Keep the already allocated base structure and its existing base charge.
 	// Moving the bounded CID map needs no second allocation or reservation.
-	*q = binQUIC{native: true, retired: true, cids: history, zeroCID: zero}
+	*q = binQUIC{native: true, retired: true, cids: history, zeroCID: zero, version: version}
 	retained := q.initialMemory()
 	if f.sessionBytes > retained {
 		f.a.buffered.Add(retained - f.sessionBytes)

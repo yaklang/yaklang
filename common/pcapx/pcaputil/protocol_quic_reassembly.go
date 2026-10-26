@@ -216,7 +216,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 				secrets[label] = v
 			}
 		}
-		ring, err := quicLoadKeys(QUICKeyMaterial{Secrets: secrets, AEAD: aead})
+		ring, err := quicLoadKeys(QUICKeyMaterial{Secrets: secrets, AEAD: aead, Version: q.effectiveVersion()})
 		if err != nil {
 			return err
 		}

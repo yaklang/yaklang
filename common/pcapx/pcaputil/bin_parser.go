@@ -491,7 +491,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	if e.Transport == "udp" && (e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") && e.Profile == e.Protocol+"-native" {
 		return true
 	}
-	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
+	if e.Profile == "quic-v1-native" || e.Profile == "quic-v2-native" || e.Profile == "quic-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
 		return true
 	}
 	if e.Protocol == "semtech-udp" && (e.Profile == semtechDownlinkProfile || e.Profile == semtechCorrelationProfile) {

@@ -22,6 +22,12 @@ var quicInitialSalt = []byte{
 	0x9a, 0xe6, 0xa4, 0xc8, 0x0c, 0xad, 0xcc, 0xbb, 0x7f, 0x0a,
 }
 
+// RFC9369 section3.3.1, distinct from the version1 Initial salt.
+var quicInitialSaltV2 = []byte{
+	0x0d, 0xed, 0xe3, 0xde, 0xf7, 0x00, 0xa6, 0xdb, 0x81, 0x93,
+	0x81, 0xbe, 0x6e, 0x26, 0x9d, 0xcb, 0xf9, 0xbd, 0x2e, 0xd9,
+}
+
 const (
 	quicAEADAES128GCM        = "aes-128-gcm"
 	quicAEADAES256GCM        = "aes-256-gcm"
@@ -34,14 +40,17 @@ type QUICKeyMaterial struct {
 	KeyLog  string
 	Secrets map[string][]byte
 	AEAD    string
+	Version uint32 // wire version; zero preserves the existing v1 key-source API
 }
 
 type quicTrafficKeys struct {
 	key, iv, hp, secret []byte
 	aead                string
+	version             uint32
 }
 
 type quicKeyring struct {
+	version   uint32
 	aead      string
 	initial   [2]*quicTrafficKeys
 	handshake [2]*quicTrafficKeys
@@ -50,6 +59,10 @@ type quicKeyring struct {
 }
 
 func quicLoadKeys(km QUICKeyMaterial) (*quicKeyring, error) {
+	version := quicDefaultVersion(km.Version)
+	if !quicSupportedVersion(version) {
+		return nil, protocolError(ErrUnsupportedVersion, "QUIC key material version 0x%08x", version)
+	}
 	aead := km.AEAD
 	if aead == "" {
 		aead = quicAEADAES128GCM
@@ -57,9 +70,9 @@ func quicLoadKeys(km QUICKeyMaterial) (*quicKeyring, error) {
 	if aead != quicAEADAES128GCM && aead != quicAEADAES256GCM && aead != quicAEADChaCha20Poly1305 {
 		return nil, fmt.Errorf("quic: unsupported AEAD %q", aead)
 	}
-	r := &quicKeyring{aead: aead}
+	r := &quicKeyring{aead: aead, version: version}
 	put := func(label string, secret []byte) error {
-		tk, err := quicDeriveTraffic(secret, aead)
+		tk, err := quicDeriveTrafficVersion(secret, aead, version)
 		if err != nil {
 			return err
 		}
@@ -103,34 +116,50 @@ func quicLoadKeys(km QUICKeyMaterial) (*quicKeyring, error) {
 }
 
 func quicDeriveTraffic(secret []byte, aead string) (*quicTrafficKeys, error) {
+	return quicDeriveTrafficVersion(secret, aead, quicVersion1)
+}
+
+func quicDeriveTrafficVersion(secret []byte, aead string, version uint32) (*quicTrafficKeys, error) {
+	version = quicDefaultVersion(version)
+	if !quicSupportedVersion(version) {
+		return nil, protocolError(ErrUnsupportedVersion, "QUIC traffic version 0x%08x", version)
+	}
+	label := "quic "
+	if version == quicVersion2 {
+		label = "quicv2 "
+	}
 	keyLen, hpLen := 16, 16
 	if aead == quicAEADChaCha20Poly1305 || aead == quicAEADAES256GCM {
 		keyLen, hpLen = 32, 32
 	}
-	key, err := quicHKDFExpandLabel(secret, "quic key", keyLen)
+	key, err := quicHKDFExpandLabel(secret, label+"key", keyLen)
 	if err != nil {
 		return nil, err
 	}
-	iv, err := quicHKDFExpandLabel(secret, "quic iv", 12)
+	iv, err := quicHKDFExpandLabel(secret, label+"iv", 12)
 	if err != nil {
 		return nil, err
 	}
-	hp, err := quicHKDFExpandLabel(secret, "quic hp", hpLen)
+	hp, err := quicHKDFExpandLabel(secret, label+"hp", hpLen)
 	if err != nil {
 		return nil, err
 	}
-	return &quicTrafficKeys{key: key, iv: iv, hp: hp, secret: append([]byte(nil), secret...), aead: aead}, nil
+	return &quicTrafficKeys{key: key, iv: iv, hp: hp, secret: append([]byte(nil), secret...), aead: aead, version: version}, nil
 }
 
 func quicNextPhase(tk *quicTrafficKeys) (*quicTrafficKeys, error) {
 	if tk == nil {
 		return nil, nil
 	}
-	next, err := quicHKDFExpandLabel(tk.secret, "quic ku", len(tk.secret))
+	label := "quic ku"
+	if tk.version == quicVersion2 {
+		label = "quicv2 ku"
+	}
+	next, err := quicHKDFExpandLabel(tk.secret, label, len(tk.secret))
 	if err != nil {
 		return nil, err
 	}
-	out, err := quicDeriveTraffic(next, tk.aead)
+	out, err := quicDeriveTrafficVersion(next, tk.aead, quicDefaultVersion(tk.version))
 	if err == nil {
 		out.hp = append([]byte(nil), tk.hp...)
 	} // Header protection keys never update.
@@ -138,8 +167,20 @@ func quicNextPhase(tk *quicTrafficKeys) (*quicTrafficKeys, error) {
 }
 
 func quicInitialKeys(dcid []byte) ([2]*quicTrafficKeys, error) {
+	return quicInitialKeysVersion(dcid, quicVersion1)
+}
+
+func quicInitialKeysVersion(dcid []byte, version uint32) ([2]*quicTrafficKeys, error) {
 	var out [2]*quicTrafficKeys
-	prk := hkdf.Extract(sha256.New, dcid, quicInitialSalt)
+	version = quicDefaultVersion(version)
+	if !quicSupportedVersion(version) {
+		return out, protocolError(ErrUnsupportedVersion, "QUIC Initial version 0x%08x", version)
+	}
+	salt := quicInitialSalt
+	if version == quicVersion2 {
+		salt = quicInitialSaltV2
+	}
+	prk := hkdf.Extract(sha256.New, dcid, salt)
 	client, err := quicHKDFExpandLabel(prk, "client in", 32)
 	if err != nil {
 		return out, err
@@ -148,11 +189,11 @@ func quicInitialKeys(dcid []byte) ([2]*quicTrafficKeys, error) {
 	if err != nil {
 		return out, err
 	}
-	out[0], err = quicDeriveTraffic(client, quicAEADAES128GCM)
+	out[0], err = quicDeriveTrafficVersion(client, quicAEADAES128GCM, version)
 	if err != nil {
 		return out, err
 	}
-	out[1], err = quicDeriveTraffic(server, quicAEADAES128GCM)
+	out[1], err = quicDeriveTrafficVersion(server, quicAEADAES128GCM, version)
 	return out, err
 }
 
@@ -180,7 +221,7 @@ func quicHKDFExpandLabel(secret []byte, label string, length int) ([]byte, error
 
 func (q *binQUIC) ensureInitialKeys(dcid []byte) error {
 	if q.keys == nil {
-		q.keys = &quicKeyring{aead: quicAEADAES128GCM}
+		q.keys = &quicKeyring{aead: quicAEADAES128GCM, version: q.effectiveVersion()}
 	}
 	if q.keys.initial[0] != nil {
 		return nil
@@ -191,7 +232,7 @@ func (q *binQUIC) ensureInitialKeys(dcid []byte) error {
 	if len(q.initialDCID) == 0 {
 		return fmt.Errorf("quic: no Initial DCID")
 	}
-	keys, err := quicInitialKeys(q.initialDCID)
+	keys, err := quicInitialKeysVersion(q.initialDCID, q.effectiveVersion())
 	if err != nil {
 		return err
 	}

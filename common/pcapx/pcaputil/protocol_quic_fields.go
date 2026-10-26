@@ -29,7 +29,7 @@ func quicHeaderWireRanges(h quicHdr, raw []byte) map[string]any {
 	span("DCID", 6, 6+len(h.dcid))
 	span("SCID Length", 6+len(h.dcid), 7+len(h.dcid))
 	span("SCID", 7+len(h.dcid), 7+len(h.dcid)+len(h.scid))
-	if h.version == 1 {
+	if quicSupportedVersion(h.version) {
 		span("Long Packet Type", 0, 1)
 	}
 	return r
@@ -73,7 +73,8 @@ func (e *ProtocolEvent) ownedQUICHeaderField(key string) (any, bool) {
 			return uint64(w[0]), true
 		}
 	case "Long Packet Type":
-		if m["Header Form"] == "long" && len(w) == 1 && m["Version"] == uint32(1) {
+		version, ok := displayUint(m["Version"])
+		if m["Header Form"] == "long" && len(w) == 1 && ok && (version == uint64(quicVersion1) || version == uint64(quicVersion2)) {
 			return uint64(w[0] >> 4 & 3), true
 		}
 	}
