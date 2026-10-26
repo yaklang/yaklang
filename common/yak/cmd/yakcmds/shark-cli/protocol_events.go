@@ -448,6 +448,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			if b, ok := x.([]byte); ok {
 				emptyCID = len(b) == 0
 			}
+			if s, ok := x.(string); ok && s == "" {
+				emptyCID = true
+			}
 			if depth == 0 && quicHeaderForm == "short" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "Version" || name == "SCID") {
 				value = "not carried in short header"
 			}
@@ -457,10 +460,17 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "Initial Token" || name == "Retry Token") && emptyCID {
 				value = "0 bytes (empty opaque token)"
 			}
-			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "DCID" || name == "SCID") && emptyCID {
+			if depth == 0 && (quicHeaderForm == "long" || quicHeaderForm == "short" && name == "DCID") && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "DCID" || name == "SCID") && emptyCID {
+				value = "unavailable (connection ID length context missing)"
 				if span := wireRanges[name]; len(span) == 2 && span[0] == span[1] && span[0] >= 0 && currentSource > 0 && span[1] <= len(sources[currentSource-1].Data) {
 					value = "0 bytes (empty connection ID)"
+					if quicHeaderForm == "short" {
+						value = "0 bytes (length from observed connection)"
+					}
 				}
+			}
+			if name == "Rejected Packet Payload" && authenticatedQUIC && emptyCID {
+				value = "0 bytes (empty authenticated payload; not delivered)"
 			}
 			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
 				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
@@ -591,6 +601,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
+		earlyQUICDiagnostic := e.Protocol == "quic" && e.Error != "" && e.Session["Authentication Verified"] == true
+		if earlyQUICDiagnostic {
+			add("Packet diagnostic: "+e.Error, false)
+		}
 		if e.Protocol == "http3" && e.Error != "" {
 			add("HTTP message diagnostic: "+e.Error, false)
 			if rows, ok := e.Session["HTTP3 Stream Errors"]; ok {
@@ -744,7 +758,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			state += " · " + e.Completeness
 		}
 		add(fmt.Sprintf("Status: %s · source %s → %s", state, e.Source, e.Destination), false)
-		if e.Error != "" {
+		if e.Error != "" && !earlyQUICDiagnostic {
 			add("Error: "+e.Error, false)
 		}
 		if e.SourceBytes.ParentPDU != 0 {

@@ -905,7 +905,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			if e.Protocol == "quic" && e.FlowID != 0 && (e.Admission == "authenticated-wire-and-observed-CID" || e.Admission == "observed-CID-unverified-payload") && p.protocol == "" {
 				p.protocol, p.visibility, p.evidence = "QUIC", "unavailable", "observed QUIC connection CID; protocol diagnostic"
 				p.addLayer("QUIC")
-				p.summary = clipText(e.Error, 256)
+				p.summary = p.diagnostic
+				if _, retained := e.Session["Rejected Packet Payload"]; retained && e.Session["Authentication Verified"] == true {
+					p.visibility, p.scope = "authenticated-plaintext", "authenticated packet diagnostic"
+					p.evidence = "packet AEAD verified; payload not delivered"
+				}
 			}
 		}
 		return
