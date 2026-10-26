@@ -254,7 +254,6 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"tls", "tls.record.version", "TLS legacy record version", "Record Version", "pdu", DisplayUnsigned, 16},
 		{"tls", "tls.record.length", "TLS record payload length", "Record Length", "pdu", DisplayUnsigned, 16},
 		{"tls", "tls.handshake.ciphersuite", "Negotiated TLS cipher suite", "Cipher Suite", "context", DisplayUnsigned, 16},
-		{"quic", "quic.packet.authenticated", "QUIC packet authentication verified", "Authentication Verified", "derived", DisplayBoolean, 0},
 		{"ssh", "ssh.protocol", "SSH identification", "Identification", "context", DisplayString, 0},
 		{"ssh", "ssh.message_code", "SSH message code", "Message Number", "pdu", DisplayUnsigned, 8},
 		{"ssh", "ssh.kex_algorithms", "SSH advertised key exchanges", "Kex Algorithms", "pdu", DisplayString, 0},
@@ -353,6 +352,15 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		b.protocols = "|http|ipp|http2|grpc|doh|http3|"
 		out = append(out, b)
 	}
+	b = displayCustom("quic", "quic.packet.authenticated", "QUIC packet authentication verified", DisplayBoolean, 0, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		m := e.Session
+		if e.nativeQUICObservation {
+			m = e.semanticSession
+		}
+		emit(m["Authentication Verified"])
+	})
+	b.protocols = "|quic|http3|doq|"
+	out = append(out, b)
 	b = displayCustom("http3", "http3.streamid", "HTTP/3 stream ID", DisplayUnsigned, 62, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 		p.maps(e.Session["Frames"], func(fr map[string]any) {
 			if fr["HTTP3"] == true {

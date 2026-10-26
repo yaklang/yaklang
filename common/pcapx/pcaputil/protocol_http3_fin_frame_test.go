@@ -87,6 +87,20 @@ func TestHTTP3ConnectionErrorFieldProjectionUsesOwnedObservation(t *testing.T) {
 	require.Nil(t, e.DisplayFields()["http3.connection.error_code"], "public native flags cannot manufacture private observed context")
 }
 
+func TestQUICAuthenticationFieldSurvivesApplicationLayerAndPublicEdits(t *testing.T) {
+	for _, protocol := range []string{"quic", "http3", "doq"} {
+		e := &ProtocolEvent{Protocol: protocol, nativeQUICObservation: true, semanticSession: map[string]any{"Authentication Verified": true}, Session: map[string]any{"Authentication Verified": false}}
+		require.Equal(t, []any{true}, e.DisplayFields()["quic.packet.authenticated"], protocol)
+		e.semanticSession = map[string]any{"Authentication Verified": false}
+		e.Session["Authentication Verified"] = true
+		require.Equal(t, []any{false}, e.DisplayFields()["quic.packet.authenticated"], protocol)
+		e.semanticSession = nil
+		require.Nil(t, e.DisplayFields()["quic.packet.authenticated"], "public flags cannot manufacture native packet authentication")
+	}
+	e := &ProtocolEvent{Protocol: "tls", Session: map[string]any{"Authentication Verified": true}}
+	require.Nil(t, e.DisplayFields()["quic.packet.authenticated"], "TLS record authentication is a different carrier")
+}
+
 func FuzzHTTP3CleanFINLayoutAndCaptureGaps(f *testing.F) {
 	f.Add(uint8(0), uint8(5), true, true)
 	f.Add(uint8(1), uint8(0), false, true)
