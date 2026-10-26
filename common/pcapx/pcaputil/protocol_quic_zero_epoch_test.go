@@ -47,8 +47,10 @@ func TestQUICZeroCIDNewInitialAndServerResponse(t *testing.T) {
 		require.Equal(t, flow.id, events[0].FlowID, "closed zero-CID tuple cannot steal the new server Initial")
 		require.Equal(t, true, events[0].Session["Authentication Verified"])
 		require.Equal(t, [2]bool{true, true}, flow.quic.zeroCID)
-		require.NoError(t, flow.quic.applyFrames(1, quicSpaceApplication, []map[string]any{{"Frame Type": "CONNECTION_CLOSE_APP"}}, map[string]any{}, 64))
-		require.True(t, flow.quic.closed)
+		if epoch != 2 { // The second connection's close is lost in the capture.
+			require.NoError(t, flow.quic.applyFrames(1, quicSpaceApplication, []map[string]any{{"Frame Type": "CONNECTION_CLOSE_APP"}}, map[string]any{}, 64))
+			require.True(t, flow.quic.closed)
+		}
 	}
 	// A late old server Initial remains inspectable in the old epoch, even
 	// after two newer epochs. Public Initial protection is not peer identity.
@@ -122,6 +124,7 @@ func TestQUICZeroCIDClosedEpochRequiresUniquePacketProtection(t *testing.T) {
 			require.Nil(t, events[0].Session)
 			require.Equal(t, before, flows[2].quic.spaces, "failed ownership probe never changes PN history")
 			cid := bytes.Repeat([]byte{0xa5}, 20)
+			flows[1].quic.closed = false // Missing old close must not block a new explicit CID.
 			flows[2].quic.zeroCID = [2]bool{}
 			flows[2].quic.cids = map[string]int{string(cid): 1}
 			base.Source, base.Destination = "client", "server"

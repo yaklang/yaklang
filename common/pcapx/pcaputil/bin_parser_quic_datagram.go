@@ -52,11 +52,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 
 	var el, retired *list.Element
-	type closedZeroRoute struct {
+	type zeroTupleRoute struct {
 		element *list.Element
 		dir     int
 	}
-	var closedZero []closedZeroRoute
+	var zeroTuples []zeroTupleRoute
 	dir, retiredDir := 0, 0
 	retiredCID, retiredAmbiguous := false, false
 	selectRetired := func(candidate *list.Element, d int, byCID bool) {
@@ -79,17 +79,10 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 					selectRetired(candidate, d, false)
 					continue
 				}
-				if q.closed {
-					// An endpoint tuple is not an epoch identifier. A new Initial
-					// can already have established a fresh zero-CID generation.
-					closedZero = append(closedZero, closedZeroRoute{candidate, d})
-					continue
-				}
-				if el != nil && el != candidate {
-					return nil, false
-				}
-				el = candidate
-				dir = d
+				// An endpoint tuple is not an epoch identifier, even when the
+				// old close packet was lost. Resolve competing tuple/CID routes
+				// by packet protection after collecting all candidates.
+				zeroTuples = append(zeroTuples, zeroTupleRoute{candidate, d})
 			}
 		}
 		for cid, owner := range q.cids {
@@ -107,7 +100,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			}
 		}
 	}
-	if retired != nil && (retiredCID || el == nil) {
+	if len(zeroTuples) == 1 && el == nil && !zeroTuples[0].element.Value.(*binUDPEntry).flow.quic.closed {
+		el, dir = zeroTuples[0].element, zeroTuples[0].dir
+		zeroTuples = nil // One active captured tuple has no competing epoch.
+	}
+	if retired != nil && (retiredCID || el == nil && len(zeroTuples) == 0) {
 		// After retirement, packet protection with public Initial keys cannot
 		// establish a fresh captured generation. Preserve the entire refused
 		// datagram without pretending its coalesced packets were decoded.
@@ -149,10 +146,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			}
 		}
 	}
-	if len(closedZero) > 0 {
+	if len(zeroTuples) > 0 {
 		// Old zero-CID packets can be reordered past both CONNECTION_CLOSE and
-		// a new handshake on the same tuple. Probe protection without changing
-		// PN/key/stream state or leases, then deliver to exactly one owner.
+		// a new handshake on the same tuple, or the close can be lost entirely.
+		// Probe protection without changing PN/key/stream state or leases,
+		// then deliver to exactly one owner.
 		var owner *list.Element
 		ownerDir, matches := 0, 0
 		selectOwner := func(candidate *list.Element, d int) {
@@ -166,7 +164,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if el != nil {
 			selectOwner(el, dir)
 		}
-		for _, route := range closedZero {
+		for _, route := range zeroTuples {
 			selectOwner(route.element, route.dir)
 		}
 		if matches != 1 {
