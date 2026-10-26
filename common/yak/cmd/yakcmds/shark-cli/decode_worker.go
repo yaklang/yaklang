@@ -291,6 +291,12 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 	}
 	d := quickDetail(raw)
 	d.protocol = response.Protocol
+	// Native packet identity is frozen before IPC. The child receives public
+	// field snapshots, not the private authentication/ALPN proof; its raw UDP
+	// fallback must not overwrite that observed HTTP3 identity on a diagnostic.
+	if raw.presentation.protocol == "HTTP/3" && raw.presentation.scope == "authenticated application bytes" {
+		d.protocol = raw.presentation.protocol
+	}
 	d.fields = nil
 	d.sources = response.Sources
 	for i := range d.sources {

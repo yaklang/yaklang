@@ -522,6 +522,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
+		if e.Protocol == "http3" && e.Error != "" {
+			add("HTTP message diagnostic: "+e.Error, false)
+			if rows, ok := e.Session["HTTP3 Stream Errors"]; ok {
+				walk("HTTP3 Stream Errors", rows, 0)
+			}
+		}
 		if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
 			add("Carrier failure: "+e.Error, false)
 			add("Application identity unavailable: UDP payload not decoded", false)
@@ -552,6 +558,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		delete(values, "Wire Field Ranges")
 		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
+		if e.Protocol == "http3" && e.Error != "" {
+			delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
+		}
 		if e.Protocol == "isis" {
 			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
 				if v, ok := values[key]; ok {
