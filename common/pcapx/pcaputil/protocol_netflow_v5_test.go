@@ -67,3 +67,21 @@ func TestNetFlowV5HintsAndExplicitSelectorNeverBypassWireGrammar(t *testing.T) {
 	c := NewDefaultConfig()
 	require.NoError(t, WithProtocolDecodeAs("udp", 9990, "netflow-v5")(c))
 }
+
+func TestNetFlowV5BadTimestampKeepsCompleteLiteralEvidence(t *testing.T) {
+	a := nf9NativeParser(t)
+	w := nf5NativeWire(1)
+	binary.BigEndian.PutUint32(w[12:], 1000000000)
+	e := &ProtocolEvent{Transport: "udp"}
+	require.True(t, a.decodeControlDatagram(e, w, 53000, 2055, ""))
+	a.emit(e)
+	require.Equal(t, "netflow-v5", e.Protocol)
+	require.Equal(t, "malformed", e.Status)
+	require.Equal(t, false, e.Session["Export Timestamp Valid"])
+	require.Equal(t, true, e.Session["Record Count Verified"])
+	require.Contains(t, e.Error, "nanoseconds")
+	require.Equal(t, "malformed", e.Completeness)
+	require.Equal(t, []any{uint64(1000000000)}, e.DisplayFields()["cflow.unix_nsecs"])
+	require.Equal(t, []any{"192.0.2.9"}, e.DisplayFields()["cflow.srcaddr"])
+	require.True(t, e.DisplayFieldValues().Incomplete)
+}

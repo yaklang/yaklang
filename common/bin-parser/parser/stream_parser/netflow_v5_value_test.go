@@ -69,7 +69,6 @@ func TestNetFlowV5CompleteBoundsAndConformanceWarnings(t *testing.T) {
 	}
 	for _, change := range []func([]byte){
 		func(b []byte) { b[1] = 9 }, func(b []byte) { b[3] = 0 }, func(b []byte) { b[3] = 31 },
-		func(b []byte) { binary.BigEndian.PutUint32(b[12:], 1000000000) },
 	} {
 		bad := append([]byte(nil), w...)
 		change(bad)
@@ -98,6 +97,12 @@ func TestNetFlowV5CompleteBoundsAndConformanceWarnings(t *testing.T) {
 	f := row["Fields"].([]map[string]any)[16]
 	require.Equal(t, uint64(255), f["Value"])
 	require.Contains(t, f["Conformance Warning"], "no prefix")
+	binary.BigEndian.PutUint32(w[12:], 1000000000)
+	m, err = DecodeNetFlowV5Wire(w, 4096)
+	require.ErrorContains(t, err, "nanoseconds")
+	require.Equal(t, false, m["Export Timestamp Valid"])
+	require.Equal(t, true, m["Wire Grammar Complete"])
+	require.Len(t, m["Records"].([]map[string]any), 2)
 }
 
 func FuzzNetFlowV5FixedBounds(f *testing.F) {
@@ -107,8 +112,11 @@ func FuzzNetFlowV5FixedBounds(f *testing.F) {
 	f.Fuzz(func(t *testing.T, w []byte) {
 		m, err := DecodeNetFlowV5Wire(w, 4096)
 		if err != nil {
-			require.Nil(t, m)
-			return
+			if m == nil {
+				return
+			}
+			require.Equal(t, false, m["Export Timestamp Valid"])
+			require.GreaterOrEqual(t, binary.BigEndian.Uint32(w[12:16]), uint32(1000000000))
 		}
 		count := int(binary.BigEndian.Uint16(w[2:]))
 		require.Equal(t, 24+48*count, len(w))

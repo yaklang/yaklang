@@ -15,7 +15,7 @@ func (a *binParser) decodeNetFlowV5Datagram(e *ProtocolEvent, w []byte, src, dst
 	}
 	fields, err := stream_parser.DecodeNetFlowV5Wire(w, a.budget.MaxCollectionElements)
 	err = observedWireError(err)
-	if err != nil && !selected {
+	if err != nil && !selected && (fields == nil || fields["Wire Grammar Complete"] != true) {
 		return false
 	}
 	e.Protocol, e.Rule, e.Entry = "netflow-v5", "netflow_v5", "NetFlowV5Fields"
