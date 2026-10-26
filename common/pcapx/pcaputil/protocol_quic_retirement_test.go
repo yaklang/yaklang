@@ -212,6 +212,7 @@ func testQUICRetirementMatrix(t *testing.T) {
 						status = "deferred"
 					}
 					require.Equal(t, status, e.Status)
+					w.Session, w.Fields = quicReviewedLegacyExpectations(t, e, w.Session, w.Fields)
 					rocEqualFields(t, w.Fields, f)
 					rocEqualFields(t, w.Session, e.Session)
 					f["First Byte"] = byte(255)

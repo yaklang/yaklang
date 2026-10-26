@@ -10,6 +10,19 @@ import (
 )
 
 func TestQUICBinaryHeaderFieldsSurviveJSONAndVersionSpecificTokenSelection(t *testing.T) {
+	requireP0QUICWireEnvelopeScope(t)
+}
+
+func requireP0QUICWireEnvelopeScope(t *testing.T) {
+	t.Helper()
+	found := false
+	for _, item := range ProtocolCatalog {
+		if item.Name == "QUIC" {
+			require.Equal(t, statusPartial, item.Status, "header layout coverage must not certify every version, token or native cryptographic ingress")
+			found = true
+		}
+	}
+	require.True(t, found)
 	for _, v2 := range []bool{false, true} {
 		w := []byte{0xc0, 0, 0, 0, 1, 3, 0xff, 0, 0xc3, 2, 0xfe, 0x80, 2, 0xff, 0xfe, 2, 0, 0}
 		if v2 {
