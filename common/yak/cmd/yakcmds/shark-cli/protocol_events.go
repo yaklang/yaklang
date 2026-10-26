@@ -407,6 +407,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				generated = bytesValue(x)
 				sourceName = "QUIC STREAM · authenticated plaintext"
 			}
+			if name == "Rejected Packet Payload" && authenticatedQUIC {
+				generated = bytesValue(x)
+				sourceName = "QUIC packet payload · AEAD verified · not delivered"
+			}
 			if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
 				generated = bytesValue(x)
 				sourceName = "QUIC wire remainder · extracted octets"
@@ -624,7 +628,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		delete(values, "Wire Field Ranges")
 		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 			add("QUIC wire header and observed context", true)
-			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)

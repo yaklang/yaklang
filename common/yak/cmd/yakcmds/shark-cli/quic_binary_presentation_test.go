@@ -68,6 +68,29 @@ func TestQUICOpaqueTokensKeepWireRangesThroughWorkerIPC(t *testing.T) {
 	}
 }
 
+func TestQUICRefusedPayloadIsInspectableWithoutApplicationDelivery(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "quic", Status: "malformed", ExpertCode: "MalformedMessage", Error: "QUIC HANDSHAKE_DONE frame cannot be sent by the observed client", Raw: []byte{0x40, 0xff, 0xc3}, Session: map[string]any{"Authentication Verified": true, "Peer Identity Verified": false, "Rejected Packet Payload": []byte{0x1e}, "Payload Delivery": "not delivered to protocol state; packet AEAD verified"}}
+	encoded, err := json.Marshal(e)
+	require.NoError(t, err)
+	var ipc pcaputil.ProtocolEvent
+	require.NoError(t, json.Unmarshal(encoded, &ipc))
+	fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+	seen := false
+	for _, f := range fields {
+		if strings.HasPrefix(f.text, "Rejected Packet Payload:") {
+			require.True(t, f.hasRange)
+			require.Equal(t, []byte{0x1e}, sources[f.source-1].Data[f.start:f.end])
+			require.Equal(t, "QUIC packet payload · AEAD verified · not delivered", sources[f.source-1].Name)
+			seen = true
+		}
+	}
+	require.True(t, seen)
+	var presentation packetPresentation
+	presentation.add(&ipc)
+	require.NotContains(t, presentation.protocol, "HTTP")
+	require.NotContains(t, presentation.stack, "HTTP/3")
+}
+
 func TestQUICLongHeaderEmptyCIDIsPresentRatherThanUnknown(t *testing.T) {
 	e := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", Status: "context-required", Raw: []byte{0xc0, 0, 0, 0, 1, 0, 0}, Session: map[string]any{"Header Form": "long", "Version": uint32(1), "DCID": []byte(nil), "SCID": []byte(nil), "Wire Field Ranges": map[string]any{"DCID": []any{6, 6}, "SCID": []any{7, 7}}}}
 	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})

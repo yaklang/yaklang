@@ -275,9 +275,6 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Authentication Failure"] = "packet-protection-failed"
 		return info, protocolError(ErrAuthenticationFailed, "QUIC packet protection authentication failed")
 	}
-	if h.long && first&0x0c != 0 || !h.long && first&0x18 != 0 {
-		return info, protocolError(ErrMalformedMessage, "QUIC nonzero reserved bits")
-	}
 	info["Decrypted"] = true
 	info["Authentication Verified"] = true
 	info["Peer Identity Verified"] = false
@@ -290,12 +287,26 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Key Phase"] = phase
 		_ = first
 	}
+	if h.long && first&0x0c != 0 || !h.long && first&0x18 != 0 {
+		return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, protocolError(ErrMalformedMessage, "QUIC nonzero reserved bits"))
+	}
 	frames, ferr := quicParseFrames(plain, max)
 	if ferr != nil {
-		return info, protocolError(ErrMalformedMessage, "QUIC authenticated payload is not a valid frame sequence")
+		if _, typed := classifySessionError(ferr); typed != nil && (typed.Kind == ErrResourceExceeded || typed.Kind == ErrUnsupportedFeature) {
+			if q.native && typed.Kind == ErrUnsupportedFeature {
+				quicRetainUndeliveredPayload(info, plain)
+			}
+			return info, ferr
+		}
+		return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, protocolError(ErrMalformedMessage, "QUIC authenticated payload is not a valid frame sequence: %v", ferr))
 	}
 	if err := quicValidateProtectedFrames(h.space, frames); err != nil {
-		return info, err
+		return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, err)
+	}
+	if q.native {
+		if err := quicValidateNativePacketFrames(h, dir, frames); err != nil {
+			return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, err)
+		}
 	}
 	if quicSeen(q.space(dir, h.space), pn) {
 		info["Duplicate"] = true
@@ -753,7 +764,7 @@ func quicParseHeader(w []byte, forFrame bool) (quicHdr, error) {
 		}
 		off += n
 		if tlen > 20<<10 {
-			return h, fmt.Errorf("quic: token too large")
+			return h, protocolError(ErrResourceExceeded, "QUIC Initial token exceeds selected 20 KiB resource bound")
 		}
 		if uint64(len(w)-off) < tlen {
 			h.size = off + int(tlen)
@@ -903,6 +914,9 @@ func quicParseFrames(payload []byte, max int) ([]map[string]any, error) {
 	var frames []map[string]any
 	off := 0
 	for off < len(payload) {
+		if len(frames) >= max {
+			return nil, protocolError(ErrResourceExceeded, "QUIC frame budget exceeded")
+		}
 		if payload[off] == 0x00 {
 			start := off
 			for off < len(payload) && payload[off] == 0x00 {
@@ -910,9 +924,6 @@ func quicParseFrames(payload []byte, max int) ([]map[string]any, error) {
 			}
 			frames = append(frames, map[string]any{"Frame Type": "PADDING", "Length": off - start})
 			continue
-		}
-		if len(frames) >= max {
-			return nil, protocolError(ErrResourceExceeded, "QUIC frame budget exceeded")
 		}
 		fr, n, err := quicParseFrame(payload[off:])
 		if err != nil {
@@ -928,8 +939,26 @@ func quicParseFrame(b []byte) (map[string]any, int, error) {
 	if len(b) == 0 {
 		return nil, 0, fmt.Errorf("quic: truncated frame")
 	}
-	t := b[0]
-	off := 1
+	typeValue, typeBytes, err := quicVarint(b)
+	if err != nil {
+		return nil, 0, fmt.Errorf("quic: truncated frame type")
+	}
+	if typeBytes > 1 {
+		minimum := 2
+		if typeValue < 64 {
+			minimum = 1
+		} else if typeValue >= 1<<30 {
+			minimum = 8
+		} else if typeValue >= 1<<14 {
+			minimum = 4
+		}
+		if typeBytes != minimum {
+			return nil, 0, protocolError(ErrMalformedMessage, "QUIC frame type uses non-minimal encoding")
+		}
+		return nil, 0, protocolError(ErrUnsupportedFeature, "QUIC frame type 0x%x is not selected; extension context unavailable", typeValue)
+	}
+	t := byte(typeValue)
+	off := typeBytes
 	take := func() (uint64, error) {
 		v, n, err := quicVarint(b[off:])
 		if err != nil {
@@ -1164,7 +1193,7 @@ func quicParseFrame(b []byte) (map[string]any, int, error) {
 	case t == 0x1e:
 		return map[string]any{"Frame Type": "HANDSHAKE_DONE"}, 1, nil
 	default:
-		return nil, 0, fmt.Errorf("quic: unknown frame type 0x%02x", t)
+		return nil, 0, protocolError(ErrUnsupportedFeature, "QUIC frame type 0x%02x is not selected; extension context unavailable", t)
 	}
 }
 
