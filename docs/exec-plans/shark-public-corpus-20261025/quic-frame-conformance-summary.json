@@ -1075,6 +1075,36 @@
         "01-deep-protocol-fields.png": "6392ea61f3f0546d8c6e1f5121f792ab175c4fee5f22c35c2fe66508e065cbac",
         "05-narrow.png": "1eb8f66e3700db2d631ec6149f005195c73b5b2e733ab0574f95feed9070143c"
       }
+    },
+    {
+      "case": "public-weber-final",
+      "PDU": 37387,
+      "physical_frame": 48062,
+      "physical_capture_packets": 51328,
+      "protocol": "QUIC",
+      "field_down": 0,
+      "label": "authentication not verified",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "1e8be09b831efc3deaa9a67996c69dc1b42d6bc8b1cc9cf2841ffd0fc270571a",
+        "01-protocol-fields.json": "b9c0e4d639af11b636b7a5adefecba006ccae895c551834e3d69b07c72891961",
+        "01-deep-protocol-fields.json": "b9c0e4d639af11b636b7a5adefecba006ccae895c551834e3d69b07c72891961",
+        "02-byte-sources.json": "c777826b3af40bdb72cec5a638f5c795bae16a62d240aafe7c36c542447f8df4",
+        "03-conversation-messages.json": "027644c5a2c5b7f02f31ec503a6bdab6587b67cce6c0eda5f793827243b61d3f",
+        "04-association-evidence.json": "320cb85ca44337515e1a0900685cccc00640283899325f9ec18ab821d781cc42",
+        "05-narrow.json": "7307f4f34d1951a0070c3c0acc641a0089807e1ae02f96e016153a40fe27a8f9",
+        "06-restored.json": "320cb85ca44337515e1a0900685cccc00640283899325f9ec18ab821d781cc42",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "d73966b9c9b99bf8a9c63475398de1b194bf5a23af0b05c167780d9e617cbf23",
+        "01-deep-protocol-fields.png": "d73966b9c9b99bf8a9c63475398de1b194bf5a23af0b05c167780d9e617cbf23",
+        "05-narrow.png": "079d5eab3d9d1f2690a33fae3711f81a4da7c1bc00e7c9aec84febd2e29c127e"
+      }
     }
   ],
   "remaining": [
