@@ -11,13 +11,14 @@ import (
 // h3StreamState tracks RFC 9114 framing and QPACK field sections on a QUIC stream.
 // Native admission requires authenticated ALPN; port 443 is never consulted.
 type h3StreamState struct {
-	blocked       [2]bool
-	blockedPDU    [2]uint64
-	seenSettings  bool
-	headers       [2]int
-	fieldFailure  [2]ProtocolErrorKind
-	body          [2]h3MessageBody
-	requestMethod int
+	blocked        [2]bool
+	blockedPDU     [2]uint64
+	seenSettings   bool
+	headers        [2]int
+	fieldFailure   [2]ProtocolErrorKind
+	framingFailure [2]bool
+	body           [2]h3MessageBody
+	requestMethod  int
 
 	kind                  string
 	seenType              bool
@@ -39,6 +40,12 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 	h3 := st.h3
 	if dir != 0 && dir != 1 {
 		dir = 0
+	}
+	if q.native && h3.framingFailure[dir] {
+		fr["HTTP3"], info["HTTP3"] = true, true
+		fr["HTTP3 Stream State"] = "prior-frame-layout-violation"
+		q.annotateH3ConnectionFault(info)
+		return &h3ConnectionObservationError{protocolError(ErrMalformedMessage, "HTTP3 prior H3_FRAME_ERROR on this stream; layout parsing quarantined")}
 	}
 	if q.native && h3.fieldFailure[dir] != "" {
 		h3RejectedFieldStream(fr, info, sid, nil)
@@ -314,7 +321,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			} else {
 				h3.respHeads++
 				hf["Header Kind"] = "response"
-				if h3.reqHeaders > 0 && h3.fieldFailure[0] == "" {
+				if h3.reqHeaders > 0 && h3.fieldFailure[0] == "" && !h3.framingFailure[0] {
 					hf["Associated Request"] = true
 				}
 			}
@@ -363,7 +370,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 	}
 	if q.native && fin && h3.parsed[dir] != len(h3.buf[dir]) {
-		return protocolError(ErrNeedMore, "HTTP3 FIN with incomplete frame")
+		return q.rejectH3FINFrame(st, dir, sid, fr, info, frames)
 	}
 	if q.native && !uni && !h3.blocked[dir] {
 		conformance, err := h3.checkBody(dir, sid, fin)

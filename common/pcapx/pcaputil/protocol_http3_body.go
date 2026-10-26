@@ -125,7 +125,7 @@ func (h3 *h3StreamState) checkBody(dir int, sid uint64, fin bool) (map[string]an
 		return m, nil
 	}
 	method := h3.requestMethod
-	if h3.fieldFailure[0] != "" {
+	if h3.fieldFailure[0] != "" || h3.framingFailure[0] {
 		method = h3MethodUnknown
 	}
 	if dir == 1 && (b.status == 204 || b.status == 304 || method == h3MethodHEAD) {
