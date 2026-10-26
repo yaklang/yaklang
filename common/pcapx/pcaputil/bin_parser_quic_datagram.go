@@ -437,12 +437,16 @@ func (q *binQUIC) authenticatesExistingWire(dir int, wire []byte) bool {
 	if !h.long {
 		phases = probe.keys.app[dir]
 	}
-	_, _, _, first, _, err := quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
+	_, _, _, _, _, err = quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
 	if err != nil && !h.long && q.previousKey[dir] != nil {
 		phases[1-q.keyPhase[dir]] = q.previousKey[dir]
-		_, _, _, first, _, err = quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
+		_, _, _, _, _, err = quicUnprotect(wire, h, tk, phases, q.spaces[dir][h.space].largest)
 	}
-	return err == nil && (h.long && first&0x0c == 0 || !h.long && first&0x18 == 0)
+	// Authenticated reserved-bit or frame violations still identify the captured
+	// key epoch. The delivery path reports those violations without committing
+	// their frames. Refusing them here would lose the correct connection and its
+	// inspectable plaintext whenever a reused tuple has zero-length CIDs.
+	return err == nil
 }
 
 // quicWireEnvelope preserves the QUIC YAML field shape and scalar types. Binary
