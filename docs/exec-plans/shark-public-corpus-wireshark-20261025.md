@@ -1448,3 +1448,99 @@ CLI2.220s；后续6992aa1700仅改页面与冻结输出，完整CLI回归2.119s�
 oracle、脚本、二进制、重复输出、字段/来源、拒绝、故障控制和实际页面的哈希与数量。
 PCAP、派生PCAP、密钥、二进制、完整JSONL、原生console buffers和PNG继续留在本地临时
 目录；仓库只增加实现、作者编写的回归/审计源代码和聚合结果。整体目标未完成，PR仍草稿。
+## 2026-10-26 后续：NetFlow v5 原生入口、完整固定记录与畸形时间展示
+
+发现目录中的 NetFlow v5 已有完整静态 bin-parser 规则，但没有原生 UDP 分发。本轮新增
+共享 `NetFlowV5Fields`、原生入口、所有固定记录/采样参数/unused padding 的字节范围、
+`cflow.*`字段与递进页；旧 `application-layer.NetFlowV5` 叶子、边界和错误行为保留。
+目录仍为 Partial，选定24字节头、1–30条48字节记录；没有把v5功能扩展成所有版本。
+
+v5不依赖模板，每个完整datagram独立解析全部记录。丢包、乱序、回绕、重复和引擎复用
+都不能借用另一报文的值，报告流量不创建本地TCP流、transaction或响应关联。序号累计
+的是**已报告流记录数**，不能套用v9“导出包序号连续+1”的规则。IPv4地址、接口、AS、
+端口、计数和TCP flags均标为Reported，与当前导出器/收集器的真实捕获端点分开。
+
+主要依据：[Cisco v5记录/序号说明](https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/15-s/nf-15-s-book/cfg-nflow-data-expt.html)
+及 [Wireshark4.6.9实现/采样位域](https://raw.githubusercontent.com/wireshark/wireshark/v4.6.9/epan/dissectors/packet-netflow.c)。
+两个采样位域共用实际16位storage范围，值分别为高2位/低14位。未分配采样模式、非零
+unused padding和大于32的掩码保留原值及warning，不把255推导成合法IPv4 prefix。
+自动识别仍需完整语法和服务提示；只有version/count前缀或端口不确认协议。
+
+### 公开正例、原始坏包与独立差分
+
+使用 Akvorado 固定提交 `ac68c5970e2c8eb1444483814e6a7b1f5c1956e3` 的
+[nfv5.pcap](https://raw.githubusercontent.com/akvorado/akvorado/ac68c5970e2c8eb1444483814e6a7b1f5c1956e3/outlet/flow/decoder/netflow/testdata/nfv5.pcap)：
+1498字节，SHA256 `6ae061846c7d85120215a140072f259726bd823d7852b72c08a370b503b47307`。
+这是项目公开抓包样本，未把它说成本机新抓流量或独立证明原始生成方式。它使用UDP9990，
+原始默认Wireshark和本系统都不认领；两边显式Decode-As后，1个完整报文的29条记录通过
+**1832项**原始字段、精确范围、reported/captured区分、采样、时间与PDU元数据检查。
+原始默认参考0条的事实保留，没有改端口或改原始参考来充当默认识别成功。
+
+Sharon原始41个v5视图保持20个UDP、21个TCP。17个UDP的count/body不符合选定布局，
+另2个同时有坏nanoseconds，1个看似完整72字节/单记录但有坏nanoseconds；21个TCP
+不在本轮UDP入口范围，且count/body也不满足完整布局。**这些20个UDP的实际载体也
+未通过独立完整性复核**，不能只检查被参考工具截出的应用TVB后就确认协议。
+
+特别保留原始 **#89636**：114字节捕获/线上帧，IPv4总长100，实际UDP可用80字节，
+UDP头却声明24593；其中CFLOW TVB为72字节，count1，nanoseconds1182905864。
+它不仅时间坏，UDP载体也不可能完整。此前处理中先看应用TVB，误以为只坏时间，复核
+原始物理字节后撤回该判断；原始帧继续拒绝v5确认。没有通过重写UDP长度来让它通过。
+聚合保留全部原始版本数量、未选帧号、载体/布局原因与该纠正。当前共享诊断仍将此类
+矛盾写成incomplete，页面原因也不够直接；这项共享UDP诊断工作留在下一步。
+
+### 完整载体的畸形字段与页面
+
+在独立完整UDP载体的控制中，若全部头和48字节记录完整、仅残余纳秒越界，过去直接
+丢掉所有已知字段。源码 **4642c38bd7** 保留已知字段并返回时间错误；原生事件标为
+`malformed`，`Export Timestamp Valid:false`及明确failure，仍可检查每一条记录和
+原始纳秒；不推导或悄悄归一化绝对时间。旧静态规则/新的无状态规则仍返回错误。
+自动确认该畸形观察需要真实完整UDP外框，不能绕过上面的坏载体拒绝。
+
+Windows实际CP936程序检查公开单帧样本：`fields cflow.version == 5`，显式UDP9990
+selector，实际EOF/所选行/详情#1一致。NetFlow v5面包屑为Ethernet›IPv4›UDP›NetFlow v5；
+首条 `Reported Source IPv4:161.202.212.212`选择PDU逻辑0x18–0x1b四字节，捕获源端点
+则为10.19.144.41，二者不混用。纳秒等头字段已放在长记录列表前。
+
+另用明确标注的离线nanoseconds-overflow控制验证畸形页：表格仍显示NetFlow v5，
+Info首先给出Malformed export timestamp，详情显示时间有效性false，选择原始
+1000000000的0xc–0xf四字节，29条已知记录保留。该控制不是原始#89636。
+字段/字节源、80×30及180×48缩放恢复、退出与code-page恢复均通过。控制台PNG和cells
+留在本地，未用设计图代替真实程序。
+
+共享字段帮助原本仍把 `cflow.version`等只归到v9。源码 **ba674b4c65** 新增可选、独立
+所有权的 `Protocols`列出实际共享协议，同时保留兼容的 `Protocol`主标签；JSON schema
+版本保持1的追加字段，text listing同时显示v5/v9。对原始返回slice的修改不能污染注册表。
+该修复也使原本共享的HTTP/gRPC等binding如实列出支持事件名，未新增其协议解析声明。
+
+### 故障、分片与验收范围
+
+18组明确的离线控制共 **24帧 / 29379项** 检查，选定差异0：完整固定记录、非默认端口
+显式选择、序号跳跃/乱序/回绕、完全重复、引擎复用、30记录边界、无效采样模式/掩码/
+padding警告、空记录头、两字段前缀、0/31/count-body矛盾、纳秒越界、末记录截断、
+多余尾字节和实际snaplen截断。共436条decoded报告记录，另29条畸形时间记录保留，
+二者分开计数。坏/短包和端口提示不能变成decoded；显式selector不绕过语法。
+
+另外5组IPv4分片控制共 **11帧**：按序、倒序、完全重复首片均只重组出1条完整消息、
+29条报告记录，共 **5514项** 字段/原始来源检查；来源包号、完成包号和原始fragment bytes
+均独立核验。完全重复首片不制造第二份导出记录。缺尾片只有ip/incomplete，冲突重叠
+只有ip/malformed，不确认应用。重组字段对应实际UDP TVB的逻辑范围，不冒充某个物理
+帧的连续字节；独立重组会检查同key捕获区间内被参考工具丢弃的重复/重叠片。
+
+冲突重叠的原始Wireshark仍以尽力策略解出29条记录，本系统拒绝这些不确定字节。这
+**29条参考记录差异保留**，没有因选定字段检查为0差异就声称冲突包全部对齐。
+8个审计反向控制故意破坏地址、值范围、source hash、类型化别名、纳秒、record index、
+字段/别名存在性，全部被独立审计拒绝；不能从程序恰好输出哪些字段反推验收契约。
+
+统一源码4642c38bd7完整回归通过：bin-parser主包125.621s及子包、原生427.231s、
+CLI2.213s；最新相同源码 **15866次 / 46.339s** wire fuzz通过（2 workers，1GiB）。
+两个完整大文件379455帧重放，当前CLI和SDK各再独立重复，byte-identical；并且全量
+输出与此前v9阶段逐字节相同。原始41个v5坏/未选视图没有为了数量一致被认领。
+
+既有v9每份544027项检查仍通过；通用90/35原始字段差异、检查/缺失、端点、TCP流
+824/840、预览808/735和会话分区指标保持原样。这里没有宣称这些既有差异已全部解决。
+IPFIXv10、v1/v7/v8、v5 TCP、全部扩展/时间推导/flags bit别名及共享UDP诊断仍未完成。
+
+[v5聚合证据](shark-public-corpus-20261025/netflow-v5-summary.json) 绑定固定来源、真实默认
+遗漏、补充参考、全部重复输出、原始拒绝、故障与分片差异、测试、脚本/二进制和真实
+Windows页哈希。只提交实现、作者编写的审计/测试及聚合；抓包、派生抓包、密钥、二进制、
+完整JSONL和原生页面图继续放在仓库外。整体目标未完成，PR仍草稿。

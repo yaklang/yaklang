@@ -1,0 +1,3155 @@
+{
+  "source": "4642c38bd7",
+  "scope": "Selected bounded complete fixed-record NetFlow v5 UDP observations and explicit partial malformed-clock views. Static legacy leaf preserved, catalog partial. No complete NetFlow/IPFIX or global protocol acceptance claim.",
+  "binaries": {
+    "yak-clock.exe": "f285777f74fe4ae2d262b360f415db39cd1c48b9e83ba796201e69900837c0fa",
+    "events-clock.exe": "f8f59da929a3a959d0a763affaafb497f17bcb11a5ff276eb4532f58d2a51212"
+  },
+  "audit_sources": {
+    "netflow5_wire_audit.py": "740c0c1d7eb647d0c227d94b3e6eb68304e0fb42a60d186a43787ffae1c78639",
+    "netflow5_fault_audit.py": "e22242e00b6abcf84bf1fa7c96b4e8ac368e6b6541d582d727ea6098a3fb9e32",
+    "netflow5_fragment_audit.py": "95bbb0e2561ff5acffbf14bfa5bcf51fb398534011c5fa202c93b25de8ceee60",
+    "netflow5_audit_negative_controls.py": "a4cb605bfa14bb505c73c779f9662917eac644ce3e04d433603bfcc09f00e002"
+  },
+  "policy": {
+    "automatic": "Complete v5 fixed-record grammar plus UDP2055/2056/9995/9996 service hint; a port or two-field prefix alone never confirms the message. Nondefault profiles require explicit Decode-As.",
+    "structure": "24-byte header; selected1..30 records of exactly48 bytes each; all scalar/address/padding fields retained with exact logical PDU spans; no trailing bytes.",
+    "collection_limit": "19 collection units per record, maximum570 for selected30-record profile; no unbounded list or zero-width state.",
+    "context": "Each message is independent. Packet loss/reorder, sequence wrapping, exact duplicates and engine reuse never inherit another export record or allocate captured TCP flows/transactions. V5 sequence counts reported flows, unlike v9 export packets.",
+    "clock": "Residual nanoseconds>=1000000000 on an otherwise complete carrier/layout yields retained literal fields with malformed status, Export Timestamp Valid=false and explicit failure; no normalized absolute timestamp. Stateless canonical and legacy rule entry still return an error. Bad carriers never reach this confirmation path.",
+    "scope": "Reported IPv4 addresses, ports, AS/interfaces, flow counters and TCP flags describe exported observations. They do not replace the captured collector endpoints or imply authenticated exporters, delivery, active connections or absolute uptime-derived timestamps.",
+    "conformance": "Unassigned sampling mode, unused nonzero padding and masks>32 retain literal values and warnings; no invented prefix.",
+    "field_registry": "Additive owned Protocols metadata enumerates actual shared bindings while legacy Protocol primary remains compatible; text listing includes both v5/v9. Private scalar values and namespaces remain scoped."
+  },
+  "primary_sources": [
+    "https://www.cisco.com/c/en/us/td/docs/ios-xml/ios/iproute_pi/configuration/15-s/nf-15-s-book/cfg-nflow-data-expt.html",
+    "https://raw.githubusercontent.com/wireshark/wireshark/v4.6.9/epan/dissectors/packet-netflow.c"
+  ],
+  "upstream_positive": {
+    "url": "https://raw.githubusercontent.com/akvorado/akvorado/ac68c5970e2c8eb1444483814e6a7b1f5c1956e3/outlet/flow/decoder/netflow/testdata/nfv5.pcap",
+    "capture_bytes": 1498,
+    "capture_sha256": "6ae061846c7d85120215a140072f259726bd823d7852b72c08a370b503b47307",
+    "provenance": "Pinned upstream project capture; not a new live capture or independent guarantee of the original traffic generator.",
+    "frames": 1,
+    "reported_records": 29,
+    "default_reference_cflow_frames": 0,
+    "default_native_v5_messages": 0,
+    "supplementary_selection": "Both implementations explicitly decode UDP port9990 as NetFlow/cflow v5. The original default omission remains visible.",
+    "supplementary_oracle_sha256": "e002160a636f6edc0a12f6abae06768fa30cbc645e349fb89cb1c317f663840e",
+    "audit": {
+      "scope": "Independent fixed-record NetFlow v5 wire/reference audit.\nInputs: original/supplemental TShark JSON -x, native SDK JSONL, output aggregate.\nUDP service selection/Decode-As and original reference omissions stay separate.\nReported records never become captured connections. Complete fixed layouts with invalid residual nanoseconds retain malformed\nstatus and literal fields. Carrier lengths are independently checked.\nTime-derived aliases are unselected; literal first/last uptime, export seconds/nanoseconds remain exact.\n",
+      "oracle_sha256": "e002160a636f6edc0a12f6abae06768fa30cbc645e349fb89cb1c317f663840e",
+      "events_sha256": "8d1d248d7673fbbd7300ce5b7b4ab3815ae30121acf9aa7f72177a8e7fac8081",
+      "original_reference_frames": 1,
+      "original_versions": {
+        "5": 1
+      },
+      "selected_complete_UDP_layout_frames": 1,
+      "unselected_carrier_assessments": {},
+      "matched_frames": 1,
+      "native_statuses": {
+        "decoded": 1
+      },
+      "native_records": 29,
+      "original_reference_v5_record_views": 29,
+      "checks": {
+        "source view kind": 1,
+        "clock-sensitive status": 1,
+        "export timestamp validity": 1,
+        "current PDU source hash": 1,
+        "actual UDP transport": 1,
+        "captured endpoint is not a reported record": 2,
+        "reported records do not allocate captured flow": 1,
+        "export counts do not allocate transaction": 1,
+        "export report has no response association": 1,
+        "reported direction is not captured direction": 1,
+        "stateless receiver has no synthetic FlowSets": 1,
+        "literal header value": 8,
+        "literal header range": 8,
+        "sampling mode two bits": 1,
+        "sampling interval fourteen bits": 1,
+        "shared sampling storage range": 2,
+        "record array length": 1,
+        "record count metadata": 1,
+        "complete record count evidence": 1,
+        "record index": 29,
+        "every field present": 29,
+        "field IE-width-scope association": 522,
+        "field literal range": 522,
+        "reported IPv4 literal": 87,
+        "reported unsigned literal": 435,
+        "literal unused padding": 58,
+        "unused padding range": 58,
+        "literal typed metadata cflow.observed.sysuptime_ms": 1,
+        "literal typed metadata range cflow.observed.sysuptime_ms": 1,
+        "literal typed metadata cflow.observed.first_uptime_ms": 1,
+        "literal typed metadata range cflow.observed.first_uptime_ms": 1,
+        "literal typed metadata cflow.observed.last_uptime_ms": 1,
+        "literal typed metadata range cflow.observed.last_uptime_ms": 1,
+        "literal typed metadata pdu.length": 1,
+        "typed alias exact occurrences cflow.count": 1,
+        "typed alias exact source-TVB range cflow.count": 1,
+        "typed alias exact occurrences cflow.dstaddr": 1,
+        "typed alias exact source-TVB range cflow.dstaddr": 1,
+        "typed alias exact occurrences cflow.dstas": 1,
+        "typed alias exact source-TVB range cflow.dstas": 1,
+        "typed alias exact occurrences cflow.dstmask": 1,
+        "typed alias exact source-TVB range cflow.dstmask": 1,
+        "typed alias exact occurrences cflow.dstport": 1,
+        "typed alias exact source-TVB range cflow.dstport": 1,
+        "typed alias exact occurrences cflow.engine_id": 1,
+        "typed alias exact source-TVB range cflow.engine_id": 1,
+        "typed alias exact occurrences cflow.engine_type": 1,
+        "typed alias exact source-TVB range cflow.engine_type": 1,
+        "typed alias exact occurrences cflow.inputint": 1,
+        "typed alias exact source-TVB range cflow.inputint": 1,
+        "typed alias exact occurrences cflow.nexthop": 1,
+        "typed alias exact source-TVB range cflow.nexthop": 1,
+        "typed alias exact occurrences cflow.octets": 1,
+        "typed alias exact source-TVB range cflow.octets": 1,
+        "typed alias exact occurrences cflow.outputint": 1,
+        "typed alias exact source-TVB range cflow.outputint": 1,
+        "typed alias exact occurrences cflow.packets": 1,
+        "typed alias exact source-TVB range cflow.packets": 1,
+        "typed alias exact occurrences cflow.protocol": 1,
+        "typed alias exact source-TVB range cflow.protocol": 1,
+        "typed alias exact occurrences cflow.samplerate": 1,
+        "typed alias exact source-TVB range cflow.samplerate": 1,
+        "typed alias exact occurrences cflow.samplingmode": 1,
+        "typed alias exact source-TVB range cflow.samplingmode": 1,
+        "typed alias exact occurrences cflow.sequence": 1,
+        "typed alias exact source-TVB range cflow.sequence": 1,
+        "typed alias exact occurrences cflow.srcaddr": 1,
+        "typed alias exact source-TVB range cflow.srcaddr": 1,
+        "typed alias exact occurrences cflow.srcas": 1,
+        "typed alias exact source-TVB range cflow.srcas": 1,
+        "typed alias exact occurrences cflow.srcmask": 1,
+        "typed alias exact source-TVB range cflow.srcmask": 1,
+        "typed alias exact occurrences cflow.srcport": 1,
+        "typed alias exact source-TVB range cflow.srcport": 1,
+        "typed alias exact occurrences cflow.tcpflags": 1,
+        "typed alias exact source-TVB range cflow.tcpflags": 1,
+        "typed alias exact occurrences cflow.tos": 1,
+        "typed alias exact source-TVB range cflow.tos": 1,
+        "typed alias exact occurrences cflow.unix_nsecs": 1,
+        "typed alias exact source-TVB range cflow.unix_nsecs": 1,
+        "typed alias exact occurrences cflow.unix_secs": 1,
+        "typed alias exact source-TVB range cflow.unix_secs": 1,
+        "typed alias exact occurrences cflow.version": 1,
+        "typed alias exact source-TVB range cflow.version": 1
+      },
+      "checks_total": 1832,
+      "selected_differences": [],
+      "additional_native": [],
+      "unmatched_valid_reference": [],
+      "unselected_reference_frames": [],
+      "reference_fields_not_projected": {
+        "cflow.sysuptime": 1,
+        "cflow.timestamp": 1,
+        "cflow.timedelta": 29,
+        "cflow.timestart": 29,
+        "cflow.timeend": 29,
+        "cflow.padding": 58
+      },
+      "source_range_views": {
+        "captured physical UDP": 1
+      },
+      "fragment_capture_sha256": null
+    }
+  },
+  "whole_corpora": {
+    "weber": {
+      "capture_manifest": {
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "capture_bytes": 15602892,
+        "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+        "fields": [
+          "frame.number",
+          "frame.interface_id",
+          "frame.encap_type",
+          "frame.len",
+          "frame.cap_len",
+          "frame.protocols",
+          "_ws.col.Protocol",
+          "_ws.col.Info",
+          "ip.src",
+          "ip.dst",
+          "ipv6.src",
+          "ipv6.dst",
+          "tcp.srcport",
+          "tcp.dstport",
+          "udp.srcport",
+          "udp.dstport",
+          "tcp.stream",
+          "udp.stream",
+          "tcp.seq_raw",
+          "tcp.ack_raw",
+          "tcp.len",
+          "tcp.flags",
+          "tls.record.content_type",
+          "quic.dcid",
+          "quic.scid",
+          "quic.packet_number",
+          "_ws.expert.message",
+          "dns.id",
+          "dns.qry.name",
+          "dns.qry.type",
+          "tls.record.version",
+          "tls.record.length",
+          "tls.handshake.extensions_server_name",
+          "tls.handshake.ciphersuite",
+          "http.request.method",
+          "http.response.code",
+          "http2.streamid",
+          "ssh.protocol",
+          "ssh.message_code",
+          "isakmp.version",
+          "isakmp.exchangetype",
+          "isakmp.flags",
+          "isakmp.messageid",
+          "isakmp.length",
+          "rip.command",
+          "rip.version",
+          "rip.metric",
+          "nbss.type",
+          "nbss.length",
+          "l2tp.flags",
+          "l2tp.length",
+          "rpc.xid",
+          "rpc.msgtyp",
+          "rpc.program",
+          "rpc.procedure",
+          "rdpudp.flags",
+          "rdpudp.synex.version",
+          "rdpudp.data.seqnum",
+          "rdpudp.data.channelseqnumber",
+          "rdpudp.data.sourceStart"
+        ],
+        "two_pass": true,
+        "out_of_order_reassembly": true,
+        "keylog_sha256": "221a1806bd307e3d80d71419ffab5d30934b44afa4fd98e21f5c54e2f9b14975"
+      },
+      "frames": 51328,
+      "generic_metrics_unchanged": {
+        "frames": true,
+        "field_mismatch_count": true,
+        "field_frames_checked": true,
+        "field_frames_missing": true,
+        "packet_metadata_mismatches": true,
+        "endpoint_frames_checked": true,
+        "native_tcp_flow_count": true,
+        "native_tcp_preview_count": true,
+        "session_partitions": true,
+        "scoped_session_partitions": true,
+        "bidirectional_session_checks": true
+      },
+      "raw_generic_field_mismatches": 90,
+      "native_tcp_flows": 824,
+      "native_tcp_previews": 808,
+      "full_exports_identical_to_previous_v9_scope": {
+        "events.jsonl": true,
+        "yak.jsonl": true
+      },
+      "full_export_sha256": {
+        "events.jsonl": "59829ae38c564b527ac1434316204bf01acae528f295c81086385a486ef82dc3",
+        "yak.jsonl": "95a423e6c5aa7e81896c2a40b95b5744c6148d786d444b74a56f666ef488d4f8"
+      },
+      "generic_summary_sha256": "0fc3a6dddaad5346ac719c41e031e17dee57aecb82121b109ed1de7e463e5cd9",
+      "v9_selected_checks": 544027,
+      "v9_original_contextual_refusals": [
+        {
+          "frame": 20545,
+          "status": "context-required",
+          "declared_records": 20,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 20,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        },
+        {
+          "frame": 20546,
+          "status": "context-required",
+          "declared_records": 21,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 21,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        },
+        {
+          "frame": 20547,
+          "status": "context-required",
+          "declared_records": 20,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 20,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        }
+      ],
+      "original_v5_reference_audit": {
+        "scope": "Independent fixed-record NetFlow v5 wire/reference audit.\nInputs: original/supplemental TShark JSON -x, native SDK JSONL, output aggregate.\nUDP service selection/Decode-As and original reference omissions stay separate.\nReported records never become captured connections. Complete fixed layouts with invalid residual nanoseconds retain malformed\nstatus and literal fields. Carrier lengths are independently checked.\nTime-derived aliases are unselected; literal first/last uptime, export seconds/nanoseconds remain exact.\n",
+        "oracle_sha256": "c43cd69a33896e95ce96969a9cff395dba36f534e8d32f8e7c3800ef9b92d9c7",
+        "events_sha256": "59829ae38c564b527ac1434316204bf01acae528f295c81086385a486ef82dc3",
+        "original_reference_frames": 196,
+        "original_versions": {
+          "9": 196
+        },
+        "selected_complete_UDP_layout_frames": 0,
+        "unselected_carrier_assessments": {},
+        "matched_frames": 0,
+        "native_statuses": {},
+        "native_records": 0,
+        "original_reference_v5_record_views": 0,
+        "checks": {},
+        "checks_total": 0,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "unselected_reference_frames": [
+          20545,
+          20546,
+          20547,
+          20548,
+          20549,
+          20550,
+          20551,
+          20552,
+          20553,
+          20554,
+          20555,
+          20556,
+          20557,
+          20558,
+          20559,
+          20560,
+          20561,
+          20562,
+          20563,
+          20564,
+          20565,
+          20566,
+          20567,
+          20568,
+          20569,
+          20570,
+          20571,
+          20572,
+          20573,
+          20574,
+          20575,
+          20576,
+          20577,
+          20578,
+          20579,
+          20580,
+          20581,
+          20582,
+          20583,
+          20584,
+          20585,
+          20586,
+          20587,
+          20588,
+          20589,
+          20590,
+          20591,
+          20592,
+          20593,
+          20594,
+          20595,
+          20596,
+          20597,
+          20598,
+          20599,
+          20600,
+          20601,
+          20602,
+          20603,
+          20604,
+          20605,
+          20606,
+          20607,
+          20608,
+          20609,
+          20610,
+          20611,
+          20612,
+          20613,
+          20614,
+          20615,
+          20616,
+          20617,
+          20618,
+          20619,
+          20620,
+          20621,
+          20622,
+          20623,
+          20624,
+          20625,
+          20626,
+          20627,
+          20628,
+          20629,
+          20630,
+          20631,
+          20632,
+          20633,
+          20634,
+          20635,
+          20636,
+          20637,
+          20638,
+          20639,
+          20640,
+          20641,
+          20642,
+          20643,
+          20644,
+          20645,
+          20646,
+          20647,
+          20648,
+          20649,
+          20650,
+          20651,
+          20652,
+          20653,
+          20654,
+          20655,
+          20656,
+          20657,
+          20658,
+          20659,
+          20660,
+          20661,
+          20662,
+          20663,
+          20664,
+          20665,
+          20666,
+          20667,
+          20668,
+          20669,
+          20670,
+          20671,
+          20672,
+          20673,
+          20674,
+          20675,
+          20676,
+          20677,
+          20678,
+          20679,
+          20680,
+          20681,
+          20682,
+          20683,
+          20684,
+          20685,
+          20686,
+          20687,
+          20688,
+          20689,
+          20690,
+          20691,
+          20692,
+          20693,
+          20694,
+          20695,
+          20696,
+          20697,
+          20698,
+          20699,
+          20700,
+          20701,
+          20702,
+          20703,
+          20704,
+          20705,
+          20706,
+          20707,
+          20708,
+          20709,
+          20710,
+          20711,
+          20712,
+          20713,
+          20714,
+          20715,
+          20716,
+          20717,
+          20718,
+          20719,
+          20720,
+          20721,
+          20722,
+          20723,
+          20724,
+          20725,
+          20726,
+          20727,
+          20728,
+          20729,
+          20730,
+          20731,
+          20732,
+          20733,
+          20734,
+          20735,
+          20736,
+          20737,
+          20738,
+          20739,
+          20740
+        ],
+        "reference_fields_not_projected": {},
+        "source_range_views": {},
+        "fragment_capture_sha256": null
+      }
+    },
+    "sharon": {
+      "capture_manifest": {
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "capture_bytes": 86779688,
+        "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+        "fields": [
+          "frame.number",
+          "frame.interface_id",
+          "frame.encap_type",
+          "frame.len",
+          "frame.cap_len",
+          "frame.protocols",
+          "_ws.col.Protocol",
+          "_ws.col.Info",
+          "ip.src",
+          "ip.dst",
+          "ipv6.src",
+          "ipv6.dst",
+          "tcp.srcport",
+          "tcp.dstport",
+          "udp.srcport",
+          "udp.dstport",
+          "tcp.stream",
+          "udp.stream",
+          "tcp.seq_raw",
+          "tcp.ack_raw",
+          "tcp.len",
+          "tcp.flags",
+          "tls.record.content_type",
+          "quic.dcid",
+          "quic.scid",
+          "quic.packet_number",
+          "_ws.expert.message",
+          "dns.id",
+          "dns.qry.name",
+          "dns.qry.type",
+          "tls.record.version",
+          "tls.record.length",
+          "tls.handshake.extensions_server_name",
+          "tls.handshake.ciphersuite",
+          "http.request.method",
+          "http.response.code",
+          "http2.streamid",
+          "ssh.protocol",
+          "ssh.message_code",
+          "isakmp.version",
+          "isakmp.exchangetype",
+          "isakmp.flags",
+          "isakmp.messageid",
+          "isakmp.length",
+          "rip.command",
+          "rip.version",
+          "rip.metric",
+          "nbss.type",
+          "nbss.length",
+          "l2tp.flags",
+          "l2tp.length",
+          "rpc.xid",
+          "rpc.msgtyp",
+          "rpc.program",
+          "rpc.procedure",
+          "rdpudp.flags",
+          "rdpudp.synex.version",
+          "rdpudp.data.seqnum",
+          "rdpudp.data.channelseqnumber",
+          "rdpudp.data.sourceStart"
+        ],
+        "two_pass": true,
+        "out_of_order_reassembly": true,
+        "keylog_sha256": null
+      },
+      "frames": 328127,
+      "generic_metrics_unchanged": {
+        "frames": true,
+        "field_mismatch_count": true,
+        "field_frames_checked": true,
+        "field_frames_missing": true,
+        "packet_metadata_mismatches": true,
+        "endpoint_frames_checked": true,
+        "native_tcp_flow_count": true,
+        "native_tcp_preview_count": true,
+        "session_partitions": true,
+        "scoped_session_partitions": true,
+        "bidirectional_session_checks": true
+      },
+      "raw_generic_field_mismatches": 35,
+      "native_tcp_flows": 840,
+      "native_tcp_previews": 735,
+      "full_exports_identical_to_previous_v9_scope": {
+        "events.jsonl": true,
+        "yak.jsonl": true
+      },
+      "full_export_sha256": {
+        "events.jsonl": "971a6050235de4e38c3570ea4fe6861bb08a1053e807f8b19b5998e1e1974190",
+        "yak.jsonl": "f8558e9311ae97a642092f2f1f198c8ed60939b9467a06ccb5429495a536d13b"
+      },
+      "generic_summary_sha256": "dc6d801d603b88a46f0b2e4d898db5cc4207005c324fba78c2f2f391d1831c97",
+      "v9_selected_checks": 544027,
+      "v9_original_contextual_refusals": [
+        {
+          "frame": 22888,
+          "status": "context-required",
+          "declared_records": 20,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 20,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        },
+        {
+          "frame": 22889,
+          "status": "context-required",
+          "declared_records": 21,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 21,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        },
+        {
+          "frame": 22890,
+          "status": "context-required",
+          "declared_records": 20,
+          "templates": 0,
+          "native_data_records": 0,
+          "reference_data_records": 20,
+          "reason": "ContextRequired: observed wire context required: NetFlow v9 template context unavailable"
+        }
+      ],
+      "original_v5_reference_audit": {
+        "scope": "Independent fixed-record NetFlow v5 wire/reference audit.\nInputs: original/supplemental TShark JSON -x, native SDK JSONL, output aggregate.\nUDP service selection/Decode-As and original reference omissions stay separate.\nReported records never become captured connections. Complete fixed layouts with invalid residual nanoseconds retain malformed\nstatus and literal fields. Carrier lengths are independently checked.\nTime-derived aliases are unselected; literal first/last uptime, export seconds/nanoseconds remain exact.\n",
+        "oracle_sha256": "e2268f637bcaf5d3e3488166e3abf9f3877606c77402524fb9041b02e0c1bc8d",
+        "events_sha256": "971a6050235de4e38c3570ea4fe6861bb08a1053e807f8b19b5998e1e1974190",
+        "original_reference_frames": 743,
+        "original_versions": {
+          "9": 305,
+          "10": 159,
+          "8": 198,
+          "5": 41,
+          "7": 24,
+          "1": 16
+        },
+        "selected_complete_UDP_layout_frames": 0,
+        "unselected_carrier_assessments": {
+          "44330": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "52810": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "68486": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "70506": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "72333": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "75988": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "85869": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "88949": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "89636": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "89988": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "91548": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "96889": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "106203": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "106621": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "114248": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "115099": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "116123": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "117814": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "121608": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "135400": [
+            "UDP declared length exceeds complete captured bytes"
+          ],
+          "142286": [
+            "no direct captured UDP wire"
+          ],
+          "167956": [
+            "no direct captured UDP wire"
+          ],
+          "177268": [
+            "no direct captured UDP wire"
+          ],
+          "184382": [
+            "no direct captured UDP wire"
+          ],
+          "187552": [
+            "no direct captured UDP wire"
+          ],
+          "192835": [
+            "no direct captured UDP wire"
+          ],
+          "197019": [
+            "no direct captured UDP wire"
+          ],
+          "225418": [
+            "no direct captured UDP wire"
+          ],
+          "247829": [
+            "no direct captured UDP wire"
+          ],
+          "248899": [
+            "no direct captured UDP wire"
+          ],
+          "258190": [
+            "no direct captured UDP wire"
+          ],
+          "268360": [
+            "no direct captured UDP wire"
+          ],
+          "276323": [
+            "no direct captured UDP wire"
+          ],
+          "307734": [
+            "no direct captured UDP wire"
+          ],
+          "310068": [
+            "no direct captured UDP wire"
+          ],
+          "314063": [
+            "no direct captured UDP wire"
+          ],
+          "314788": [
+            "no direct captured UDP wire"
+          ],
+          "316972": [
+            "no direct captured UDP wire"
+          ],
+          "317084": [
+            "no direct captured UDP wire"
+          ],
+          "319279": [
+            "no direct captured UDP wire"
+          ],
+          "325195": [
+            "no direct captured UDP wire"
+          ]
+        },
+        "matched_frames": 0,
+        "native_statuses": {},
+        "native_records": 0,
+        "original_reference_v5_record_views": 690,
+        "checks": {},
+        "checks_total": 0,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "unselected_reference_frames": [
+          22888,
+          22889,
+          22890,
+          22891,
+          22892,
+          22893,
+          22894,
+          22895,
+          22896,
+          22897,
+          22898,
+          22899,
+          22900,
+          22901,
+          22902,
+          22903,
+          22904,
+          22905,
+          22906,
+          22907,
+          22908,
+          22909,
+          22910,
+          22911,
+          22912,
+          22913,
+          22914,
+          22915,
+          22916,
+          22917,
+          22918,
+          22919,
+          22920,
+          22921,
+          22922,
+          22923,
+          22924,
+          22925,
+          22926,
+          22927,
+          22928,
+          22929,
+          22930,
+          22931,
+          22932,
+          22933,
+          22934,
+          22935,
+          22936,
+          22937,
+          22938,
+          22939,
+          22940,
+          22941,
+          22942,
+          22943,
+          22944,
+          22945,
+          22946,
+          22947,
+          22948,
+          22949,
+          22950,
+          22951,
+          22952,
+          22953,
+          22954,
+          22955,
+          22956,
+          22957,
+          22958,
+          22959,
+          22960,
+          22961,
+          22962,
+          22963,
+          22964,
+          22965,
+          22966,
+          22967,
+          22968,
+          22969,
+          22970,
+          22971,
+          22972,
+          22973,
+          22974,
+          22975,
+          22976,
+          22977,
+          22978,
+          22979,
+          22980,
+          22981,
+          22982,
+          22983,
+          22984,
+          22985,
+          22986,
+          22987,
+          22988,
+          22989,
+          22990,
+          22991,
+          22992,
+          22993,
+          22994,
+          22995,
+          22996,
+          22997,
+          22998,
+          22999,
+          23000,
+          23001,
+          23002,
+          23003,
+          23004,
+          23005,
+          23006,
+          23007,
+          23008,
+          23009,
+          23010,
+          23011,
+          23012,
+          23013,
+          23014,
+          23015,
+          23016,
+          23017,
+          23018,
+          23019,
+          23020,
+          23021,
+          23022,
+          23023,
+          23024,
+          23025,
+          23026,
+          23027,
+          23028,
+          23029,
+          23030,
+          23031,
+          23032,
+          23033,
+          23034,
+          23035,
+          23036,
+          23037,
+          23038,
+          23039,
+          23040,
+          23041,
+          23042,
+          23043,
+          23044,
+          23045,
+          23046,
+          23047,
+          23048,
+          23049,
+          23050,
+          23051,
+          23052,
+          23053,
+          23054,
+          23055,
+          23056,
+          23057,
+          23058,
+          23059,
+          23060,
+          23061,
+          23062,
+          23063,
+          23064,
+          23065,
+          23066,
+          23067,
+          23068,
+          23069,
+          23070,
+          23071,
+          23072,
+          23073,
+          23074,
+          23075,
+          23076,
+          23077,
+          23078,
+          23079,
+          23080,
+          23081,
+          23082,
+          23083,
+          36482,
+          37013,
+          37652,
+          38020,
+          38295,
+          38751,
+          39500,
+          39791,
+          40276,
+          40527,
+          40764,
+          41024,
+          41153,
+          41227,
+          41343,
+          42497,
+          42653,
+          43738,
+          44176,
+          44330,
+          44447,
+          44917,
+          45121,
+          45477,
+          46233,
+          46786,
+          47282,
+          47536,
+          47558,
+          47559,
+          47675,
+          48935,
+          49501,
+          49516,
+          50061,
+          51191,
+          51260,
+          51737,
+          52257,
+          52273,
+          52343,
+          52352,
+          52583,
+          52810,
+          52812,
+          53294,
+          53654,
+          55014,
+          55737,
+          56104,
+          56651,
+          56754,
+          57412,
+          58016,
+          58339,
+          58850,
+          58881,
+          59209,
+          59541,
+          59662,
+          60046,
+          60283,
+          60974,
+          61194,
+          61349,
+          61703,
+          62173,
+          63041,
+          63242,
+          63537,
+          63907,
+          64553,
+          65149,
+          65833,
+          66064,
+          66236,
+          66596,
+          67016,
+          67486,
+          68460,
+          68486,
+          69432,
+          70506,
+          70632,
+          70696,
+          71152,
+          71665,
+          72148,
+          72227,
+          72333,
+          73612,
+          74740,
+          75287,
+          75308,
+          75450,
+          75474,
+          75988,
+          76059,
+          76495,
+          76537,
+          77016,
+          77052,
+          77409,
+          77441,
+          77702,
+          77919,
+          78151,
+          78196,
+          79525,
+          79679,
+          80920,
+          81040,
+          81059,
+          81856,
+          81974,
+          82119,
+          82141,
+          82881,
+          82907,
+          83252,
+          83435,
+          84443,
+          84477,
+          85343,
+          85869,
+          85895,
+          86006,
+          86399,
+          86419,
+          87294,
+          87297,
+          88353,
+          88449,
+          88724,
+          88930,
+          88949,
+          89196,
+          89284,
+          89636,
+          89987,
+          89988,
+          90168,
+          90434,
+          91518,
+          91548,
+          91830,
+          91912,
+          91927,
+          92662,
+          92767,
+          92906,
+          93431,
+          93710,
+          93725,
+          94236,
+          95499,
+          96851,
+          96889,
+          97110,
+          98553,
+          99051,
+          99821,
+          99952,
+          100218,
+          100625,
+          101770,
+          103088,
+          104020,
+          104189,
+          104417,
+          105359,
+          106040,
+          106057,
+          106203,
+          106621,
+          107091,
+          107678,
+          108002,
+          108920,
+          109862,
+          110065,
+          110079,
+          110214,
+          110577,
+          110977,
+          111669,
+          111993,
+          112083,
+          112538,
+          112581,
+          113362,
+          113750,
+          113753,
+          114171,
+          114248,
+          114576,
+          114803,
+          115099,
+          115435,
+          115503,
+          115519,
+          116109,
+          116123,
+          117814,
+          117989,
+          118213,
+          118324,
+          118546,
+          118836,
+          119059,
+          119521,
+          119740,
+          119826,
+          119965,
+          120118,
+          120184,
+          120321,
+          120401,
+          120944,
+          121159,
+          121608,
+          121667,
+          121956,
+          122084,
+          122165,
+          123458,
+          124714,
+          125127,
+          125211,
+          125390,
+          125655,
+          125757,
+          127092,
+          127451,
+          128199,
+          128258,
+          128546,
+          128964,
+          129338,
+          129369,
+          129561,
+          129576,
+          129723,
+          129867,
+          129943,
+          131118,
+          131195,
+          131380,
+          131705,
+          131918,
+          132896,
+          133151,
+          134209,
+          134300,
+          134517,
+          134868,
+          135400,
+          135709,
+          135731,
+          136260,
+          136405,
+          136530,
+          136974,
+          137049,
+          137413,
+          137742,
+          137960,
+          138265,
+          138405,
+          138602,
+          139555,
+          139561,
+          139880,
+          139987,
+          140068,
+          140967,
+          140977,
+          141064,
+          141258,
+          141339,
+          141587,
+          141633,
+          141677,
+          142286,
+          142324,
+          142949,
+          143578,
+          144352,
+          145144,
+          149207,
+          149447,
+          150150,
+          150367,
+          150686,
+          150837,
+          151234,
+          151423,
+          151748,
+          151848,
+          151881,
+          151884,
+          152633,
+          152933,
+          153466,
+          154056,
+          155061,
+          155161,
+          155910,
+          156375,
+          161340,
+          161569,
+          162281,
+          162662,
+          162904,
+          164075,
+          164083,
+          164137,
+          165066,
+          167948,
+          167956,
+          168022,
+          168979,
+          170452,
+          170736,
+          172351,
+          173338,
+          174296,
+          174352,
+          174972,
+          175027,
+          175063,
+          175099,
+          175416,
+          175437,
+          175589,
+          175897,
+          176119,
+          176276,
+          177268,
+          177686,
+          179705,
+          181209,
+          181726,
+          182452,
+          182711,
+          182962,
+          183421,
+          183629,
+          184382,
+          185200,
+          185201,
+          186358,
+          187481,
+          187552,
+          188291,
+          189381,
+          189504,
+          189514,
+          191486,
+          192143,
+          192835,
+          195610,
+          195823,
+          195907,
+          196326,
+          196940,
+          197019,
+          197945,
+          200428,
+          202685,
+          205072,
+          205200,
+          205264,
+          205271,
+          205983,
+          207753,
+          207993,
+          208259,
+          208437,
+          209255,
+          209719,
+          210667,
+          212544,
+          212593,
+          214279,
+          214536,
+          214626,
+          216069,
+          216537,
+          219019,
+          219053,
+          219087,
+          219162,
+          219926,
+          219960,
+          220438,
+          220637,
+          221840,
+          225418,
+          226423,
+          227560,
+          228251,
+          228445,
+          228469,
+          229010,
+          229513,
+          229596,
+          230706,
+          230776,
+          231713,
+          231776,
+          231886,
+          232479,
+          234310,
+          238483,
+          239300,
+          240148,
+          240561,
+          240591,
+          240945,
+          241094,
+          241387,
+          241854,
+          241970,
+          243167,
+          245340,
+          245802,
+          246223,
+          246396,
+          246845,
+          246868,
+          247449,
+          247829,
+          248899,
+          249272,
+          251034,
+          251383,
+          252421,
+          252458,
+          253169,
+          253598,
+          254000,
+          254015,
+          254748,
+          256204,
+          256901,
+          257023,
+          257307,
+          257461,
+          258190,
+          258554,
+          258621,
+          259498,
+          262499,
+          262662,
+          265171,
+          265952,
+          265999,
+          266485,
+          266876,
+          266998,
+          268088,
+          268357,
+          268360,
+          269279,
+          269285,
+          270095,
+          270116,
+          270241,
+          270357,
+          270521,
+          270580,
+          274613,
+          274685,
+          274718,
+          276166,
+          276323,
+          278182,
+          278436,
+          279531,
+          280163,
+          280498,
+          280545,
+          281135,
+          283148,
+          283673,
+          283912,
+          286486,
+          286969,
+          288985,
+          291174,
+          292814,
+          293639,
+          294769,
+          297690,
+          297707,
+          298092,
+          298722,
+          298737,
+          299370,
+          300521,
+          300784,
+          301204,
+          301489,
+          301692,
+          303277,
+          303336,
+          304244,
+          304719,
+          305550,
+          306392,
+          306495,
+          306614,
+          307734,
+          307751,
+          309061,
+          309106,
+          310068,
+          310270,
+          310355,
+          310897,
+          313683,
+          314063,
+          314293,
+          314788,
+          314953,
+          316972,
+          317084,
+          317370,
+          318074,
+          318557,
+          319054,
+          319279,
+          319537,
+          319832,
+          320148,
+          321238,
+          322193,
+          322903,
+          323273,
+          324959,
+          325195,
+          325376,
+          325734,
+          325777,
+          326209,
+          327311
+        ],
+        "reference_fields_not_projected": {},
+        "source_range_views": {},
+        "fragment_capture_sha256": null
+      }
+    }
+  },
+  "repeat_current_binaries": [
+    {
+      "capture": "weber",
+      "kind": "CLI",
+      "binary_sha256": "f285777f74fe4ae2d262b360f415db39cd1c48b9e83ba796201e69900837c0fa",
+      "exit": 0,
+      "bytes": 138045284,
+      "lines": 51328,
+      "repeat_sha256": "95a423e6c5aa7e81896c2a40b95b5744c6148d786d444b74a56f666ef488d4f8",
+      "first_sha256": "95a423e6c5aa7e81896c2a40b95b5744c6148d786d444b74a56f666ef488d4f8",
+      "byte_identical": true
+    },
+    {
+      "capture": "weber",
+      "kind": "SDK",
+      "binary_sha256": "f8f59da929a3a959d0a763affaafb497f17bcb11a5ff276eb4532f58d2a51212",
+      "exit": 0,
+      "bytes": 203119858,
+      "lines": 39283,
+      "repeat_sha256": "59829ae38c564b527ac1434316204bf01acae528f295c81086385a486ef82dc3",
+      "first_sha256": "59829ae38c564b527ac1434316204bf01acae528f295c81086385a486ef82dc3",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "CLI",
+      "binary_sha256": "f285777f74fe4ae2d262b360f415db39cd1c48b9e83ba796201e69900837c0fa",
+      "exit": 0,
+      "bytes": 470383271,
+      "lines": 328127,
+      "repeat_sha256": "f8558e9311ae97a642092f2f1f198c8ed60939b9467a06ccb5429495a536d13b",
+      "first_sha256": "f8558e9311ae97a642092f2f1f198c8ed60939b9467a06ccb5429495a536d13b",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "SDK",
+      "binary_sha256": "f8f59da929a3a959d0a763affaafb497f17bcb11a5ff276eb4532f58d2a51212",
+      "exit": 0,
+      "bytes": 473010269,
+      "lines": 245615,
+      "repeat_sha256": "971a6050235de4e38c3570ea4fe6861bb08a1053e807f8b19b5998e1e1974190",
+      "first_sha256": "971a6050235de4e38c3570ea4fe6861bb08a1053e807f8b19b5998e1e1974190",
+      "byte_identical": true
+    }
+  ],
+  "offline_controls": {
+    "kind": "Declared modifications/repetitions of the upstream packet, never represented as fresh traffic",
+    "cases": 18,
+    "frames": 24,
+    "checks": 29379,
+    "decoded_reported_records": 436,
+    "retained_malformed_clock_records": 29,
+    "selected_differences": 0,
+    "details": [
+      {
+        "case": "baseline-standard",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "7d67b851fa24c1b918f0540338458511ec9d8f61e161591ded2b2a59876b263f",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 29,
+        "malformed_retained_records": 0,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "nondefault-explicit",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "4c061b87b8323d423bf6963f55a39b2f0fc878df2d82556223d2b4db11037ba6",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 29,
+        "malformed_retained_records": 0,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "sequence-gap-reorder-wrap",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 5,
+        "sha256": "78520c156691fcf6a91cb7ef490d2152069e39718d305a959fe01c92168b9d11",
+        "explicit_statuses": [
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 5,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 5
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 5
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 145,
+        "malformed_retained_records": 0,
+        "records": 145,
+        "audit_exit": 0,
+        "checks_total": 9160,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 5,
+          "cflow.timestamp": 5,
+          "cflow.timedelta": 145,
+          "cflow.timestart": 145,
+          "cflow.timeend": 145,
+          "cflow.padding": 290
+        }
+      },
+      {
+        "case": "exact-duplicate",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 2,
+        "sha256": "988190fc82cc8f0cb98bea139438965c5b6ac5bb4498cb6d07e261c22c3e55eb",
+        "explicit_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 2,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 2
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 2
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 58,
+        "malformed_retained_records": 0,
+        "records": 58,
+        "audit_exit": 0,
+        "checks_total": 3664,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 2,
+          "cflow.timestamp": 2,
+          "cflow.timedelta": 58,
+          "cflow.timestart": 58,
+          "cflow.timeend": 58,
+          "cflow.padding": 116
+        }
+      },
+      {
+        "case": "engine-reuse",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 2,
+        "sha256": "64841ca390b59243af57d6bea13ad8112bc81e8959b85d4a8b9d9aef294b8c6e",
+        "explicit_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 2,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 2
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 2
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 58,
+        "malformed_retained_records": 0,
+        "records": 58,
+        "audit_exit": 0,
+        "checks_total": 3664,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 2,
+          "cflow.timestamp": 2,
+          "cflow.timedelta": 58,
+          "cflow.timestart": 58,
+          "cflow.timeend": 58,
+          "cflow.padding": 116
+        }
+      },
+      {
+        "case": "thirty-records",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "d7ef6fef9cdaa9515c3c2eb9ca40038ae65dec7b83913d9d43b593b5ef770ebe",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 30,
+        "malformed_retained_records": 0,
+        "records": 30,
+        "audit_exit": 0,
+        "checks_total": 1892,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 30,
+          "cflow.timestart": 30,
+          "cflow.timeend": 30,
+          "cflow.padding": 60
+        }
+      },
+      {
+        "case": "mask-warning",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "49efb2eac5fd65c97c46c55777220ac0dd9c1626922a9508c950707602328f7e",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 29,
+        "malformed_retained_records": 0,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "unused-padding-warning",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "af38ee438bf2edd71e810ab6e19247a9b9eafa5b3bbfaf0e01ae4661ec5f8430",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 29,
+        "malformed_retained_records": 0,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "sampling-mode-warning",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "4e98f31acc31e03faa0c41fafc82b7329a94267f7fee31eb6fa0bec57599ca56",
+        "explicit_statuses": [
+          "decoded"
+        ],
+        "expected_explicit_statuses": [
+          "decoded"
+        ],
+        "default_statuses": [
+          "decoded"
+        ],
+        "expected_default_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/decoded": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 29,
+        "malformed_retained_records": 0,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "no-record-header",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "933bebf25153d03d637105546686da508a0b8f734e720440c61047ebdb45404e",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "two-field-prefix",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "d689c917632b24fd72cc8a7f7276c2b27a05e18f186a868e1e8aeaed55f93aea",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "count-zero",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "0964b9bf384194b3ef91ae5ca37929b7710c0ee21de2f7ea153310990814af2b",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "count-thirty-one",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "10479c257b3d5bf21343e9a7ee5c55bf19971dabcda024ddaad4b88537f5d766",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "count-body-disagree",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "2ea32b21fc77285404a8affaf6509e78a708d1ea698b30249a4574fdee6d50f6",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "nanoseconds-overflow",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "db6913fa28c32201b2ba598e2f99d4346fc563f6fe3d2384e2d9f813729f7ffc",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [
+          "malformed"
+        ],
+        "expected_default_statuses": [
+          "malformed"
+        ],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 29,
+        "records": 29,
+        "audit_exit": 0,
+        "checks_total": 1832,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {
+          "cflow.sysuptime": 1,
+          "cflow.timestamp": 1,
+          "cflow.timedelta": 29,
+          "cflow.timestart": 29,
+          "cflow.timeend": 29,
+          "cflow.padding": 58
+        }
+      },
+      {
+        "case": "last-record-truncated",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "2f7323d9da6e0dea582c01bec80119c6a6e24a2ed8964fc1dac7a518741714de",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "extra-trailing-byte",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "08ecc8cbc136697455901b4e44a547750cc19bd876e958fe44e5d9254a434662",
+        "explicit_statuses": [
+          "malformed"
+        ],
+        "expected_explicit_statuses": [
+          "malformed"
+        ],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/unrecognized": 1
+        },
+        "explicit_all_statuses": {
+          "netflow-v5/malformed": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 1,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      },
+      {
+        "case": "capture-truncation",
+        "kind": "declared offline modification/repetition of pinned Akvorado project packet, not fresh live traffic",
+        "frames": 1,
+        "sha256": "bb4ede2062d23f5965eb1f9e13709709c122be83c610b83b76e31837f73bc68f",
+        "explicit_statuses": [],
+        "expected_explicit_statuses": [],
+        "default_statuses": [],
+        "expected_default_statuses": [],
+        "matches_expected": true,
+        "reference_frames": 1,
+        "default_all_statuses": {
+          "/incomplete": 1
+        },
+        "explicit_all_statuses": {
+          "/incomplete": 1
+        },
+        "no_other_automatic_decoded_protocols": true,
+        "decoded_records": 0,
+        "malformed_retained_records": 0,
+        "records": 0,
+        "audit_exit": 0,
+        "checks_total": 0,
+        "selected_differences": [],
+        "additional_native": [],
+        "unmatched_valid_reference": [],
+        "reference_fields_not_projected": {}
+      }
+    ]
+  },
+  "fragment_controls": {
+    "kind": "Declared Ethernet/IPv4 fragmentation, reorder, duplicate, missing-tail and conflicting-overlap controls from the same sample",
+    "cases": 5,
+    "frames": 11,
+    "checks": 5514,
+    "matched_complete_messages": 3,
+    "decoded_reported_records": 87,
+    "retained_reference_overlap_records_not_accepted": 29,
+    "policy_difference": "Native quarantines observed conflicting overlap; the original reference still decodes29 records with its best-effort selection. Independent reassembly includes same-key observed fragments omitted from the reference contributor list. This difference is not normalized away.",
+    "range_scope": "Direct packets compare actual physical UDP field offsets; reassembled fields compare the actual UDP source TVB and independently reconstructed physical contributors, never a fabricated physical frame span.",
+    "details": [
+      {
+        "case": "ordered",
+        "kind": "declared offline IPv4 fragmentation/reorder/overlap of project sample, not live capture",
+        "frames": 2,
+        "sha256": "4879a6fc41e29e1d49319d5703aff2ac03059cc7778679276e2d909ada1d240f",
+        "native_statuses": [
+          "decoded"
+        ],
+        "native_refs": [
+          {
+            "Kind": "reassembled",
+            "SHA256": "d8abfb1b76e8a5f439690131f1218064c7a5b3bab66d4c3c32ecd0c4f859b67a",
+            "ParentPDU": 0,
+            "ParentPDUs": null,
+            "PacketRefs": [
+              {
+                "Number": 1,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              },
+              {
+                "Number": 2,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              }
+            ],
+            "CompletedIn": {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          }
+        ],
+        "native_records": [
+          29
+        ],
+        "all_native_counts": {
+          "netflow-v5/decoded": 1
+        },
+        "reference_cflow_frames": 1,
+        "expected_native_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "audit_exit": 0,
+        "checks_total": 1838,
+        "selected_differences": [],
+        "original_reference_v5_record_views": 29,
+        "unmatched_valid_reference": [],
+        "unselected_carrier_assessments": {},
+        "source_range_views": {
+          "reassembled UDP TVB": 1
+        }
+      },
+      {
+        "case": "reversed",
+        "kind": "declared offline IPv4 fragmentation/reorder/overlap of project sample, not live capture",
+        "frames": 2,
+        "sha256": "b486659d1ba3c88f6e3529764540340c055780a1ef2ae0c49135b7a844897b3e",
+        "native_statuses": [
+          "decoded"
+        ],
+        "native_refs": [
+          {
+            "Kind": "reassembled",
+            "SHA256": "d8abfb1b76e8a5f439690131f1218064c7a5b3bab66d4c3c32ecd0c4f859b67a",
+            "ParentPDU": 0,
+            "ParentPDUs": null,
+            "PacketRefs": [
+              {
+                "Number": 2,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              },
+              {
+                "Number": 1,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              }
+            ],
+            "CompletedIn": {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          }
+        ],
+        "native_records": [
+          29
+        ],
+        "all_native_counts": {
+          "netflow-v5/decoded": 1
+        },
+        "reference_cflow_frames": 1,
+        "expected_native_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "audit_exit": 0,
+        "checks_total": 1838,
+        "selected_differences": [],
+        "original_reference_v5_record_views": 29,
+        "unmatched_valid_reference": [],
+        "unselected_carrier_assessments": {},
+        "source_range_views": {
+          "reassembled UDP TVB": 1
+        }
+      },
+      {
+        "case": "duplicate-first",
+        "kind": "declared offline IPv4 fragmentation/reorder/overlap of project sample, not live capture",
+        "frames": 3,
+        "sha256": "c122db308f05422296055165172378faa22d2357815ec2c3d601ff5a349012f5",
+        "native_statuses": [
+          "decoded"
+        ],
+        "native_refs": [
+          {
+            "Kind": "reassembled",
+            "SHA256": "d8abfb1b76e8a5f439690131f1218064c7a5b3bab66d4c3c32ecd0c4f859b67a",
+            "ParentPDU": 0,
+            "ParentPDUs": null,
+            "PacketRefs": [
+              {
+                "Number": 1,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              },
+              {
+                "Number": 3,
+                "Domain": {
+                  "Section": 0,
+                  "Interface": 0,
+                  "Encapsulation": ""
+                }
+              }
+            ],
+            "CompletedIn": {
+              "Number": 3,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          }
+        ],
+        "native_records": [
+          29
+        ],
+        "all_native_counts": {
+          "netflow-v5/decoded": 1
+        },
+        "reference_cflow_frames": 1,
+        "expected_native_statuses": [
+          "decoded"
+        ],
+        "matches_expected": true,
+        "audit_exit": 0,
+        "checks_total": 1838,
+        "selected_differences": [],
+        "original_reference_v5_record_views": 29,
+        "unmatched_valid_reference": [],
+        "unselected_carrier_assessments": {},
+        "source_range_views": {
+          "reassembled UDP TVB": 1
+        }
+      },
+      {
+        "case": "missing-tail",
+        "kind": "declared offline IPv4 fragmentation/reorder/overlap of project sample, not live capture",
+        "frames": 1,
+        "sha256": "2cad11a61cd413094689a274889ce031bc87167919b5a60f29f4d933c66f8b88",
+        "native_statuses": [],
+        "native_refs": [],
+        "native_records": [],
+        "all_native_counts": {
+          "ip/incomplete": 1
+        },
+        "reference_cflow_frames": 0,
+        "expected_native_statuses": [],
+        "matches_expected": true,
+        "audit_exit": 0,
+        "checks_total": 0,
+        "selected_differences": [],
+        "original_reference_v5_record_views": 0,
+        "unmatched_valid_reference": [],
+        "unselected_carrier_assessments": {},
+        "source_range_views": {}
+      },
+      {
+        "case": "conflicting-overlap",
+        "kind": "declared offline IPv4 fragmentation/reorder/overlap of project sample, not live capture",
+        "frames": 3,
+        "sha256": "300897f0e6943cad709366e5189deeb0888fe47f35a937663d09cf9a3ba2620b",
+        "native_statuses": [],
+        "native_refs": [],
+        "native_records": [],
+        "all_native_counts": {
+          "ip/malformed": 1
+        },
+        "reference_cflow_frames": 1,
+        "expected_native_statuses": [],
+        "matches_expected": true,
+        "audit_exit": 0,
+        "checks_total": 0,
+        "selected_differences": [],
+        "original_reference_v5_record_views": 29,
+        "unmatched_valid_reference": [],
+        "unselected_carrier_assessments": {
+          "3": [
+            "conflicting fragment overlap; receiver quarantined"
+          ]
+        },
+        "source_range_views": {}
+      }
+    ]
+  },
+  "audit_negative_controls": [
+    {
+      "case": "address",
+      "audit_exit": 1,
+      "detected_checks": [
+        "reported IPv4 literal"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "value-range",
+      "audit_exit": 1,
+      "detected_checks": [
+        "field literal range"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "source-hash",
+      "audit_exit": 1,
+      "detected_checks": [
+        "current PDU source hash"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "typed-alias",
+      "audit_exit": 1,
+      "detected_checks": [
+        "typed alias exact occurrences cflow.nexthop",
+        "typed alias exact source-TVB range cflow.nexthop"
+      ],
+      "differences": 2
+    },
+    {
+      "case": "nanoseconds",
+      "audit_exit": 1,
+      "detected_checks": [
+        "literal header value"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "record-order",
+      "audit_exit": 1,
+      "detected_checks": [
+        "record index"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "omit-field",
+      "audit_exit": 1,
+      "detected_checks": [
+        "every field present"
+      ],
+      "differences": 1
+    },
+    {
+      "case": "omit-alias",
+      "audit_exit": 1,
+      "detected_checks": [
+        "typed alias exact occurrences cflow.srcaddr",
+        "typed alias exact source-TVB range cflow.srcaddr"
+      ],
+      "differences": 2
+    }
+  ],
+  "validation": {
+    "unified_source": "4642c38bd7",
+    "bin_parser_seconds": 125.621,
+    "native_seconds": 427.231,
+    "CLI_seconds": 2.213,
+    "full_log_sha256": "9c6a52981ce8622fdb055a4955f0879f2fb96b1c4eca0fb009c8aa7df7eaa94f",
+    "targeted_tests": {
+      "log_sha256": "cad641c9577a2e0c98ad26772a31e3df2ddab884799b2545eeea4c4c3fe4bea6",
+      "codec_seconds": 0.231,
+      "bin_parser_seconds": 0.693,
+      "native_seconds": 0.342,
+      "CLI_seconds": 0.325
+    },
+    "fuzz": {
+      "executions": 15866,
+      "seconds": 46.339,
+      "workers": 2,
+      "memory_limit": "1GiB",
+      "log_sha256": "24a0eae600890cb1122441b62cdafe1bbc07aa2de06cbd1adcbf6937aec6b136"
+    }
+  },
+  "remaining": [
+    "IPFIX v10 and legacy v1/v7/v8 native ingress, v5 TCP transport and all enterprise/derived-time/flag-bit aliases remain unselected.",
+    "Original malformed/unsupported v5 views remain counted; no PCAP was modified to make the original count align.",
+    "Generic90/35 field differences and old endpoint/session scopes remain as previously reported.",
+    "Shared UDP diagnostic and partial-filter wording need further work; the original incomplete carrier classification is explicitly retained below."
+  ],
+  "queued_shared_carrier_issue": {
+    "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "frame": 89636,
+    "facts": {
+      "capture_and_wire_bytes": 114,
+      "IPv4_total_length": 100,
+      "UDP_enclosed_available_bytes": 80,
+      "UDP_declared_length": 24593,
+      "CFLOW_TVB_bytes": 72,
+      "CFLOW_version": 5,
+      "CFLOW_declared_records": 1,
+      "CFLOW_residual_nanoseconds": 1182905864
+    },
+    "corrected_assessment": "The application TVB resembles a complete fixed record but the UDP carrier is impossible within the complete IPv4 packet. No v5 confirmation may bypass that refusal. The existing generic diagnostic labels it incomplete rather than malformed, and the packet summary does not surface the cause clearly. Review shared UDP carrier diagnostics and partial field reason consistency next.",
+    "current_native_status": "incomplete",
+    "current_column": "UDP",
+    "resolved": "v5 malformed-clock support verified only on separate complete-carrier declared controls; original carrier rejection remains"
+  },
+  "original_v5_literal_assessment": {
+    "original_frames": 41,
+    "groups": [
+      {
+        "carrier": "udp",
+        "reason": "record count outside selected profile; count and literal message length disagree",
+        "frames": 17
+      },
+      {
+        "carrier": "udp",
+        "reason": "record count outside selected profile; count and literal message length disagree; invalid residual nanoseconds",
+        "frames": 2
+      },
+      {
+        "carrier": "udp",
+        "reason": "invalid residual nanoseconds",
+        "frames": 1
+      },
+      {
+        "carrier": "tcp",
+        "reason": "record count outside selected profile; count and literal message length disagree; invalid residual nanoseconds; nonselected carrier",
+        "frames": 13
+      },
+      {
+        "carrier": "tcp",
+        "reason": "record count outside selected profile; count and literal message length disagree; nonselected carrier",
+        "frames": 8
+      }
+    ],
+    "frames": [
+      {
+        "frame": 44330,
+        "carrier": "udp",
+        "literal_bytes": 3765,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 52810,
+        "carrier": "udp",
+        "literal_bytes": 142,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 68486,
+        "carrier": "udp",
+        "literal_bytes": 232,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 70506,
+        "carrier": "udp",
+        "literal_bytes": 120,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 72333,
+        "carrier": "udp",
+        "literal_bytes": 79,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 75988,
+        "carrier": "udp",
+        "literal_bytes": 415,
+        "declared_records": 3328,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 85869,
+        "carrier": "udp",
+        "literal_bytes": 233,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds"
+        ]
+      },
+      {
+        "frame": 88949,
+        "carrier": "udp",
+        "literal_bytes": 3180,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 89636,
+        "carrier": "udp",
+        "literal_bytes": 72,
+        "declared_records": 1,
+        "reasons": [
+          "invalid residual nanoseconds"
+        ]
+      },
+      {
+        "frame": 89988,
+        "carrier": "udp",
+        "literal_bytes": 222,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds"
+        ]
+      },
+      {
+        "frame": 91548,
+        "carrier": "udp",
+        "literal_bytes": 1294,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 96889,
+        "carrier": "udp",
+        "literal_bytes": 126,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 106203,
+        "carrier": "udp",
+        "literal_bytes": 234,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 106621,
+        "carrier": "udp",
+        "literal_bytes": 79,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 114248,
+        "carrier": "udp",
+        "literal_bytes": 2333,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 115099,
+        "carrier": "udp",
+        "literal_bytes": 203,
+        "declared_records": 13429,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 116123,
+        "carrier": "udp",
+        "literal_bytes": 172,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 117814,
+        "carrier": "udp",
+        "literal_bytes": 4008,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 121608,
+        "carrier": "udp",
+        "literal_bytes": 131,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 135400,
+        "carrier": "udp",
+        "literal_bytes": 1695,
+        "declared_records": 1285,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree"
+        ]
+      },
+      {
+        "frame": 142286,
+        "carrier": "tcp",
+        "literal_bytes": 425,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 167956,
+        "carrier": "tcp",
+        "literal_bytes": 120,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 177268,
+        "carrier": "tcp",
+        "literal_bytes": 179,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 184382,
+        "carrier": "tcp",
+        "literal_bytes": 218,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 187552,
+        "carrier": "tcp",
+        "literal_bytes": 24,
+        "declared_records": 54015,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 192835,
+        "carrier": "tcp",
+        "literal_bytes": 126,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 197019,
+        "carrier": "tcp",
+        "literal_bytes": 1596,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 225418,
+        "carrier": "tcp",
+        "literal_bytes": 77,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 247829,
+        "carrier": "tcp",
+        "literal_bytes": 72,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 248899,
+        "carrier": "tcp",
+        "literal_bytes": 217,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 258190,
+        "carrier": "tcp",
+        "literal_bytes": 80,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 268360,
+        "carrier": "tcp",
+        "literal_bytes": 4048,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 276323,
+        "carrier": "tcp",
+        "literal_bytes": 3097,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 307734,
+        "carrier": "tcp",
+        "literal_bytes": 1944,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 310068,
+        "carrier": "tcp",
+        "literal_bytes": 120,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 314063,
+        "carrier": "tcp",
+        "literal_bytes": 1753,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 314788,
+        "carrier": "tcp",
+        "literal_bytes": 222,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 316972,
+        "carrier": "tcp",
+        "literal_bytes": 169,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 317084,
+        "carrier": "tcp",
+        "literal_bytes": 72,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 319279,
+        "carrier": "tcp",
+        "literal_bytes": 290,
+        "declared_records": 260,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "invalid residual nanoseconds",
+          "nonselected carrier"
+        ]
+      },
+      {
+        "frame": 325195,
+        "carrier": "tcp",
+        "literal_bytes": 992,
+        "declared_records": 12800,
+        "reasons": [
+          "record count outside selected profile",
+          "count and literal message length disagree",
+          "nonselected carrier"
+        ]
+      }
+    ]
+  },
+  "windows": {
+    "kind": "Actual native Windows CP936 console cells, not a mockup; source4642c38bd7",
+    "normal": "Pinned upstream project capture, explicit UDP9990 Decode-As;1 capture frame,29 records. Fields/header order includes nanoseconds before records; reported source161.202.212.212 highlights logical PDU[24,28), distinct from actual collector source10.19.144.41.",
+    "malformed": "Declared complete-carrier nanoseconds-overflow control, not original frame89636; malformed NetFlow v5 row, Export Timestamp Valid=false, literal1000000000 in logical[12,16),29 retained records.",
+    "checks": [
+      "fresh EOF/query/selected-row/detail-frame checks",
+      "actual protocol breadcrumb",
+      "field and byte sources",
+      "80x30 then180x48 resize",
+      "quit and original code-page restoration"
+    ],
+    "artifacts_sha256": {
+      "windows-v5-source-final.log": "58d26c7e590b151ba623a804ca3d2cc13704bfac8fafe97ad42e4ed5b595d648",
+      "windows-v5-nanoseconds-final.log": "58d26c7e590b151ba623a804ca3d2cc13704bfac8fafe97ad42e4ed5b595d648",
+      "windows-v5-source-final.png": "8aa1dc43ca272550cdda7adf86b3508695f10e316fbc61ab824f71f0189bc3f1",
+      "windows-v5-nanoseconds-final.png": "0c72e7b489684b58afbd14f830d748c40a2238bd32b47ecd3d9ce8fe1c64d9c0",
+      "windows-v5-source-final\\01-deep-protocol-fields.json": "237f9c4fabbc20ac21e690359056dc5007302a62961a5ef66083aeafdd423f3f",
+      "windows-v5-nanoseconds-final\\01-deep-protocol-fields.json": "9d06352285e5e9f248639145bdddc1e228bb861d540012587187da4d1f61efe0"
+    }
+  }
+}
