@@ -13,6 +13,7 @@ from aioquic.quic.connection import QuicConnection
 from aioquic.quic.events import HandshakeCompleted,StreamDataReceived,ConnectionTerminated
 from aioquic.quic.packet import pull_quic_header,encode_quic_retry,QuicProtocolVersion
 from aioquic.quic.retry import QuicRetryTokenHandler
+from aioquic.quic import crypto as peer_crypto
 from aioquic.tls import CipherSuite,Epoch
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes,serialization
@@ -63,6 +64,19 @@ if len(sys.argv)>4:
  cases=[(p['name'],p['request_headers'],p['request_expect']) for p in selected['cases']]
  transport_controls=selected.get('transport_controls',{})
 cid_lengths=transport_controls.get('connection_id_lengths',[8,8,8]);assert len(cid_lengths)==3 and all(type(n)is int and 0<=n<=20 for n in cid_lengths)
+wire_versions=transport_controls.get('wire_versions',[1,1,1]);assert len(wire_versions)==3 and all(v in[1,0x6b3343cf]for v in wire_versions)
+suite_ids=transport_controls.get('cipher_suites',[0x1301,0x1301,0x1301]);assert len(suite_ids)==3 and all(v in[0x1301,0x1302,0x1303]for v in suite_ids)
+key_followup=transport_controls.get('client_key_update_followup',False);assert type(key_followup)is bool
+if transport_controls.get('v2_key_update_policy')=='rfc9369-label':
+ original_next_key_phase=peer_crypto.next_key_phase
+ def declared_v2_next_key_phase(context):
+  if context.version!=QuicProtocolVersion.VERSION_2:return original_next_key_phase(context)
+  algorithm=peer_crypto.cipher_suite_hash(context.cipher_suite);crypto=peer_crypto.CryptoContext(key_phase=int(not context.key_phase))
+  crypto.setup(cipher_suite=context.cipher_suite,secret=peer_crypto.hkdf_expand_label(algorithm,context.secret,b'quicv2 ku',b'',algorithm.digest_size),version=context.version)
+  return crypto
+ # aioquic1.7 uses the v1 ku label for v2. This explicitly declared peer
+ # control changes only the update label; the installed package is untouched.
+ peer_crypto.next_key_phase=declared_v2_next_key_phase
 generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 class ZeroCIDControlConnection(QuicConnection):
  # aioquic1.7 replenishes zero-byte IDs into illegal NEW_CONNECTION_ID frames.
@@ -106,8 +120,8 @@ try:
   try:server_socket.recvfrom(65535)
   except BlockingIOError:break
  for epoch in range(3):
-  cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
-  scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
+  cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
+  scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
   client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0}
   def events(q,side):
    while True:
@@ -196,10 +210,13 @@ try:
    # failure alongside a valid request in the same authenticated QUIC packet.
    bad=queue('batched-bad',[h for h in base if h[0]!=':path'],'malformed');good=queue('batched-good',base,'base');pump(lambda:bad in ended[0] and good in ended[0])
    sid=queue('valid-after-all-failures',base,'base');pump(lambda:sid in ended[0])
+  if key_followup:
+   client.request_key_update();sid=queue('after-client-key-update',[(k,'/after-client-key-update'if k==':path'else v)for k,v in base],'base');pump(lambda:sid in ended[0])
+   assert client._cryptos[Epoch.ONE_RTT].key_phase==1 and server._cryptos[Epoch.ONE_RTT].key_phase==1
   for sid,m in expected.items():
    assert bytes(received[0][sid])==m['reply']
    operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest(),'declared_scenario':m.get('plan')})
-  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected),'connection_id_length':cid_lengths[epoch],'retry_packets_sent':retry_state['sent']})
+  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected),'connection_id_length':cid_lengths[epoch],'retry_packets_sent':retry_state['sent'],'wire_version':wire_versions[epoch],'cipher_suite':suite_ids[epoch],'final_key_phases':[client._cryptos[Epoch.ONE_RTT].key_phase,server._cryptos[Epoch.ONE_RTT].key_phase]})
   client.close();send(client,client_socket,0);time.sleep(.08)
   for sock in [client_socket,server_socket]:
    while True:
@@ -211,4 +228,4 @@ finally:
  for reader in readers:reader.join(timeout=2)
  (out/'capture.stderr').write_bytes(b''.join(capture_errors));(out/'capture-observed.txt').write_bytes(b''.join(capture_lines))
  (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'generator_sha256':generator_sha256,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'transport_controls':transport_controls,'operations':operations},indent=2)+'\n',encoding='utf8')
-assert len(operations)==(len(cases)*3 if plans else 69)
+assert len(operations)==(len(cases)*3 if plans else 69)+(3 if key_followup else 0)

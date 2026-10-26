@@ -43,8 +43,13 @@ def missing_alias(es):
  e=long(es);e['field_values']['values'].remove(alias(e,'quic.dcid'))
 def duplicate_alias(es):
  e=long(es);e['field_values']['values'].append(copy.deepcopy(alias(e,'quic.dcid')))
+
+def wrong_type_alias(es,rename):
+ e=long(es);vs=e['field_values']['values'];v=next(v for v in vs if v['name']in['quic.long.packet_type','quic.long.packet_type_v2'])
+ if rename:v['name']='quic.long.packet_type'if v['name'].endswith('_v2')else'quic.long.packet_type_v2'
+ else:v['value']^=1
 def wrong_token(es):
- e=empty(es);e['fields']['QUICToken']['Token']=base64.b64encode(b'not-a-token').decode()
+ e=pick(es,lambda e:isinstance((e.get('fields')or{}).get('QUICToken'),dict));e['fields']['QUICToken']['Token']=base64.b64encode(b'not-a-token').decode()
 def wrong_reference(oracle,key,range_offset=False):
  for r in oracle:
   vs=r['_source']['layers'].get('quic',[]);vs=vs if isinstance(vs,list)else[vs]
@@ -67,6 +72,7 @@ controls=[
  ('CID-value-span',lambda es:alias(long(es),'quic.dcid')['pdu_range'].__setitem__('offset',0)),
  ('version-alias',lambda es:set_alias(es,'quic.version','value',0)),('empty-CID-not-zero-octet',lambda es:alias(empty(es),'quic.dcid').__setitem__('value','00')),
  ('short-version',lambda es:extra_short(es,'quic.version')),('short-SCID',lambda es:extra_short(es,'quic.scid')),('short-CID-length',lambda es:extra_short(es,'quic.dcil')),('short-long-type',lambda es:extra_short(es,'quic.long.packet_type')),('short-forged-range',extra_range),
+ ('short-long-type-v2',lambda es:extra_short(es,'quic.long.packet_type_v2')),('version-type-alias',lambda es:wrong_type_alias(es,True)),('long-type-value',lambda es:wrong_type_alias(es,False)),
  ('unverified-PN',lambda es:verified(es)['session'].__setitem__('Authentication Verified',False)),
  ('decoded-PN-value',lambda es:alias(verified(es),'quic.packet_number').__setitem__('value',1<<40)),('decoded-PN-exact',lambda es:alias(verified(es),'quic.packet_number').__setitem__('exact_value','999999')),
  ('decoded-PN-not-ciphertext-span',lambda es:alias(verified(es),'quic.packet_number').__setitem__('pdu_range',{'offset':1,'length':2})),

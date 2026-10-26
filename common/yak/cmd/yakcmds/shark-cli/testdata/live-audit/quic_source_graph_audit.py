@@ -43,7 +43,7 @@ def covered(spans,lo,hi):
   if x>at:return False
   at=max(at,y)
  return at>=hi
-streams={};packet_conn={};packet_endpoints={};physical=collections.defaultdict(list);coalesced_bindings=0;expert_only_blocks=0
+streams={};packet_conn={};packet_endpoints={};physical=collections.defaultdict(list);coalesced_bindings=0;expert_only_blocks=0;unprotected_zero_tails=[]
 for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
  l=packet['_source']['layers'];number=int(l['frame']['frame.number']);sp,dp=vals(l.get('udp',{}),'udp.srcport'),vals(l.get('udp',{}),'udp.dstport');eq(len(sp),1,'single reference UDP source');eq(len(dp),1,'single reference UDP destination')
  eq(bytes.fromhex(l['frame_raw'][0]),captured[number],'oracle bytes are literal physical capture record');packet_endpoints[number]=endpoints(captured[number]);eq(tuple(x.rsplit(':',1)[1] for x in packet_endpoints[number]),(sp[0],dp[0]),'oracle ports equal capture bytes')
@@ -52,18 +52,26 @@ for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
  packet_connections=set(vals(qs,'quic.connection.number'));dcids=set(vals(qs,'quic.dcid'))
  if not packet_connections:continue
  eq(len(packet_connections),1,'one reference connection per UDP datagram')
+ literal=[]
+ for r in raw_packets:
+  raw=bytes.fromhex(r[0]);start=int(r[1]);eq(captured[number][start:start+len(raw)],raw,'literal coalesced QUIC packet span');literal.append(raw)
  for qi,q in enumerate(qs):
   # TShark's JSON array can contain a separate expert-only annotation rather
   # than another QUIC packet. It has no wire fields or STREAM bytes to bind.
   if set(q)=={'_ws.expert'}:expert_only_blocks+=1;continue
   cs=vals(q,'quic.connection.number')
   if not cs:
+   # Some peers append unprotected zero octets after a long packet. The
+   # reference emits a malformed short-header subtree for that tail. It has
+   # no STREAM bytes or decoded PN and must not acquire connection identity.
+   if qi<len(literal)and literal[qi]and not any(literal[qi])and'_ws.expert'in q and not vals(q,'quic.packet_number')and not vals(q,'quic.stream.stream_id'):
+    unprotected_zero_tails.append({'frame':number,'bytes':len(literal[qi]),'sha256':digest(literal[qi])});continue
    # TShark prints connection metadata on only the first coalesced packet.
    # Bind the remaining packet only when all dissected DCIDs agree too.
    explicit_zero=False
    if not dcids and vals(q,'quic.dcil')==['0']:
     check(qi<len(raw_packets),'coalesced zero-CID packet has a literal raw view');r=raw_packets[qi];raw=bytes.fromhex(r[0]);start=int(r[1]);eq(captured[number][start:start+len(raw)],raw,'coalesced zero-CID raw span')
-    check(len(raw)>=7 and raw[0]&0xc0==0xc0 and raw[1:5]==b'\0\0\0\1'and raw[5]==0,'literal v1 long header carries zero DCID length');explicit_zero=True
+    check(len(raw)>=7 and raw[0]&0xc0==0xc0 and raw[1:5]in[b'\0\0\0\1',bytes.fromhex('6b3343cf')]and raw[5]==0,'literal selected v1/v2 long header carries zero DCID length');explicit_zero=True
    check(len(qs)>1 and (len(dcids)==1 and bool(vals(q,'quic.dcid'))or explicit_zero),'unambiguous coalesced reference connection/DCID')
    cs=list(packet_connections);coalesced_bindings+=1
   eq(len(set(cs)),1,'reference connection');conn=cs[0];check(number not in packet_conn or packet_conn[number]==conn,'single connection datagram');packet_conn[number]=conn
@@ -135,5 +143,5 @@ for e in events:
   proof(h['Byte Source'],key,start,r['end'],e);proof(h['Payload Byte Source'],key,start+len(header),r['end'],e)
   metadata.append({'completed_physical_frame':refs[-1]['Number'],'parent_PDU':e['id'],'stream_id':key[3],'stream_offset':start,'type':r['type'],'payload_length':r['length'],'source_PDUs':h['Byte Source']['Parent PDUs'],'physical_source_packets':[x['Packet'] for x in h['Byte Source']['Packet References']]})
 eq(set(actual),set(expected),'all independently reconstructed selected HTTP3 frames')
-out={'scope':__doc__,'capture_sha256':digest(wire),'checks':checks,'connections':len(flow_conn),'reference_coalesced_bindings':coalesced_bindings,'reference_expert_only_blocks':expert_only_blocks,'application_frames':len(actual),'types':dict(collections.Counter(str(expected[k]['type']) for k in actual)),'source_ranges':ranges_checked,'unselected_instruction_streams':skipped,'selected_differences':[],'frames':metadata}
+out={'scope':__doc__,'capture_sha256':digest(wire),'checks':checks,'connections':len(flow_conn),'reference_coalesced_bindings':coalesced_bindings,'reference_expert_only_blocks':expert_only_blocks,'unprotected_zero_tails':unprotected_zero_tails,'application_frames':len(actual),'types':dict(collections.Counter(str(expected[k]['type']) for k in actual)),'source_ranges':ranges_checked,'unselected_instruction_streams':skipped,'selected_differences':[],'frames':metadata}
 a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps({k:v for k,v in out.items() if k not in ['frames','unselected_instruction_streams']}))

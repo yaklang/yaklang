@@ -1,5 +1,5 @@
-"""Independently decrypt selected v1 Initials and check Retry transcript continuity.
-Uses RFC9001 HKDF/AES-GCM/header protection, never the Yak decoder. A prior header
+"""Independently decrypt selected v1/v2 Initials and check Retry transcript continuity.
+Uses RFC9001/9369 HKDF/AES-GCM/header protection, never the Yak decoder. A prior header
 certificate binds input/oracle/native bytes; Initial protection and the public
 Retry integrity tag do not authenticate a peer. Selected observed PNs are below
 128, complete client CRYPTO handshakes start at offset zero, and transports are UDP.
@@ -26,11 +26,12 @@ def expand(secret,label,length):
  for index in range(1,(length+31)//32+1):block=hmac.new(secret,block+info+bytes([index]),hashlib.sha256).digest();out+=block
  return out[:length]
 def long_header(w):
- check(len(w)>=7 and w[0]&0xc0==0xc0 and w[1:5]==b'\0\0\0\1','selected v1 long header');dl=w[5];check(dl<=20 and 7+dl<=len(w),'DCID extent');sl=w[6+dl];check(sl<=20 and 7+dl+sl<=len(w),'SCID extent');at=7+dl+sl
- return w[6:6+dl],w[7+dl:at],at,(w[0]>>4)&3
+ check(len(w)>=7 and w[0]&0xc0==0xc0,'selected long header');version=int.from_bytes(w[1:5],'big');check(version in[1,0x6b3343cf],'selected wire version');dl=w[5];check(dl<=20 and 7+dl<=len(w),'DCID extent');sl=w[6+dl];check(sl<=20 and 7+dl+sl<=len(w),'SCID extent');at=7+dl+sl;typ=(w[0]>>4)&3
+ return w[6:6+dl],w[7+dl:at],at,(typ+3)&3 if version==0x6b3343cf else typ,version
 def initial(w,seed,direction):
- dcid,scid,at,typ=long_header(w);eq(typ,0,'selected Initial');n,at=varint(w,at);check(at+n<=len(w),'token extent');token=w[at:at+n];at+=n;n,pn_at=varint(w,at);eq(pn_at+n,len(w),'literal complete Initial packet');check(pn_at+20<=len(w),'HP sample extent')
- initial=hmac.new(bytes.fromhex('38762cf7f55934b34d179ae6a4c80cadccbb7f0a'),seed,hashlib.sha256).digest();secret=expand(initial,b'client in'if direction==0 else b'server in',32);key=expand(secret,b'quic key',16);iv=expand(secret,b'quic iv',12);hp=expand(secret,b'quic hp',16)
+ dcid,scid,at,typ,version=long_header(w);eq(typ,0,'selected Initial');n,at=varint(w,at);check(at+n<=len(w),'token extent');token=w[at:at+n];at+=n;n,pn_at=varint(w,at);eq(pn_at+n,len(w),'literal complete Initial packet');check(pn_at+20<=len(w),'HP sample extent')
+ salt='0dede3def700a6db819381be6e269dcbf9bd2ed9'if version==0x6b3343cf else'38762cf7f55934b34d179ae6a4c80cadccbb7f0a';prefix=b'quicv2 'if version==0x6b3343cf else b'quic '
+ initial=hmac.new(bytes.fromhex(salt),seed,hashlib.sha256).digest();secret=expand(initial,b'client in'if direction==0 else b'server in',32);key=expand(secret,prefix+b'key',16);iv=expand(secret,prefix+b'iv',12);hp=expand(secret,prefix+b'hp',16)
  enc=Cipher(algorithms.AES(hp),modes.ECB()).encryptor();mask=enc.update(w[pn_at+4:pn_at+20])+enc.finalize();header=bytearray(w[:pn_at+4]);header[0]^=mask[0]&15;plen=(header[0]&3)+1
  for i in range(plen):header[pn_at+i]^=mask[1+i]
  pn=int.from_bytes(header[pn_at:pn_at+plen],'big');check(pn<128,'selected unambiguous small packet-number scope');aad=bytes(header[:pn_at+plen]);nonce=bytearray(iv)
@@ -62,17 +63,23 @@ for row in load(a.oracle):
  eq(len(cs),1,'single observed reference connection per datagram');conn=next(iter(cs));udp=l['udp'];ports=(str(udp['udp.srcport']),str(udp['udp.dstport']))
  for view,raw in zip(vs,raws):
   w=bytes.fromhex(raw[0])
-  if len(w)<7 or w[0]&0xc0!=0xc0 or w[1:5]!=b'\0\0\0\1':continue
-  dcid,scid,at,typ=long_header(w)
+  if len(w)<7 or w[0]&0xc0!=0xc0 or int.from_bytes(w[1:5],'big')not in[1,0x6b3343cf]:continue
+  dcid,scid,at,typ,version=long_header(w)
   if typ not in[0,3]:continue
   if conn not in connections:
-   eq(typ,0,'observed connection begins with an Initial');connections[conn]={'original_dcid':dcid,'initial_scid':scid,'ports':ports,'first':None,'retry':None}
+   eq(typ,0,'observed connection begins with an Initial');connections[conn]={'original_dcid':dcid,'initial_scid':scid,'ports':ports,'first':None,'retry':None,'version':version,'cipher_suite':None,'receiver_CID_lengths':[len(scid),None]}
   c=connections[conn];direction=0 if ports==c['ports']else 1;eq(ports,c['ports']if direction==0 else c['ports'][::-1],'observed UDP direction')
+  eq(version,c['version'],'selected fixed-version experiment; compatible negotiation is outside this certificate')
   if typ==3:
-   eq(direction,1,'server Retry direction');eq(dcid,c['initial_scid'],'Retry destination CID');check(scid and scid!=c['original_dcid'],'Retry source CID differs from original DCID');check(at+16<len(w),'nonempty Retry token');pseudo=bytes([len(c['original_dcid'])])+c['original_dcid']+w[:-16];tag=AESGCM(bytes.fromhex('be0c690b9f66575a1d766b54e368c84e')).encrypt(bytes.fromhex('461599d35d632bf2239825bb'),b'',pseudo);eq(tag,w[-16:],'independent public Retry tag');c['retry']=(scid,w[at:-16]);retry_tags+=1;continue
+   eq(direction,1,'server Retry direction');eq(dcid,c['initial_scid'],'Retry destination CID');check(scid and scid!=c['original_dcid'],'Retry source CID differs from original DCID');check(at+16<len(w),'nonempty Retry token');pseudo=bytes([len(c['original_dcid'])])+c['original_dcid']+w[:-16];rk,rn=('8fb4b01b56ac48e260fbcbcead7ccc92','d86969bc2d7c6d9990efb04a')if version==0x6b3343cf else('be0c690b9f66575a1d766b54e368c84e','461599d35d632bf2239825bb');tag=AESGCM(bytes.fromhex(rk)).encrypt(bytes.fromhex(rn),b'',pseudo);eq(tag,w[-16:],'independent public Retry tag');c['retry']=(scid,w[at:-16]);retry_tags+=1;continue
   seed=c['retry'][0]if c['retry']and not(direction==0 and dcid==c['original_dcid'])else c['original_dcid'];pn,token,crypto=initial(w,seed,direction);packets+=1;eq(pn,int(view['quic.packet_number']),'independently decoded/reference PN')
   fs=view.get('quic.frame')or[];fs=fs if isinstance(fs,list)else[fs];expected=[(int(f['quic.crypto.offset']),bytes.fromhex(f['quic.crypto.crypto_data_raw'][0]))for f in fs if int(f.get('quic.frame_type','0'),0)==6];eq(crypto,expected,'independent/reference CRYPTO octets')
-  if direction!=0:continue
+  c['receiver_CID_lengths'][direction]=len(scid)
+  if direction!=0:
+   for off,data in crypto:
+    if off==0 and len(data)>=41 and data[0]==2:
+     sid=data[38];check(41+sid<=len(data),'ServerHello cipher extent');c['cipher_suite']=int.from_bytes(data[39+sid:41+sid],'big')
+   continue
   if c['retry']:
    eq(scid,c['initial_scid'],'client source CID unchanged after Retry');eq(token,c['retry'][1],'client carries observed Retry token')
   for off,data in crypto:
@@ -85,4 +92,5 @@ for row in load(a.oracle):
    pairs.append({'connection':conn,'before_frame':before,'after_frame':number,'before_SHA256':sha(old),'after_SHA256':sha(data),'bytes_before':len(old),'bytes_after':len(data),'same_ClientHello':same,'same_random':old[6:38]==data[6:38],'different_octets':len(different),'native_conflict_diagnosed':rejected})
 if a.expect_retries is not None:eq(retry_tags,a.expect_retries,'all explicitly expected Retry packets certified')
 eq({v['connection']for v in pairs},{k for k,v in connections.items()if v['retry']},'every observed Retry has a checked post-Retry ClientHello')
-out={'scope':__doc__,'checks':checks,'connections':len(connections),'independently_decrypted_Initial_packets':packets,'verified_public_Retry_tags':retry_tags,'post_Retry_ClientHello_pairs':pairs,'nonconforming_pairs':sum(not v['same_ClientHello']for v in pairs),'oracle_sha256':sha(a.oracle.read_bytes()),'events_sha256':sha(a.events.read_bytes()),'header_certificate_sha256':sha(a.header_audit.read_bytes())};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps(out))
+facts=[{'reference_connection':k,'wire_version':v['version'],'client_ports':list(v['ports']),'first_ClientHello_frame':v['first'][0]if v['first']else None,'client_random_sha256':sha(v['first'][1][6:38])if v['first']else None,'cipher_suite':v['cipher_suite'],'receiver_CID_lengths':v['receiver_CID_lengths']}for k,v in connections.items()]
+out={'scope':__doc__,'checks':checks,'connections':len(connections),'observed_connections':facts,'independently_decrypted_Initial_packets':packets,'verified_public_Retry_tags':retry_tags,'post_Retry_ClientHello_pairs':pairs,'nonconforming_pairs':sum(not v['same_ClientHello']for v in pairs),'oracle_sha256':sha(a.oracle.read_bytes()),'events_sha256':sha(a.events.read_bytes()),'header_certificate_sha256':sha(a.header_audit.read_bytes())};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps(out))

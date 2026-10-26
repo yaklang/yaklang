@@ -10,7 +10,7 @@ ap.add_argument('--kind',choices=['SDK','CLI'],required=True)
 for n in ['before','after','out']:ap.add_argument('--'+n,type=Path,required=True)
 a=ap.parse_args();checks=0;changed=0;added=collections.Counter();binary=collections.Counter();counts=[collections.Counter(),collections.Counter()]
 for p in [a.before,a.after,a.out]:assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.packet_number'}
+names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2','quic.packet_number'}
 def check(ok,why):
  global checks
  checks+=1;assert ok,why
