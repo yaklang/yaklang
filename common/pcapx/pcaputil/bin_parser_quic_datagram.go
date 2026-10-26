@@ -468,11 +468,16 @@ func quicWireEnvelope(w []byte) (map[string]any, error) {
 			fields["SCID"] = bytes.Clone(h.scid)
 		}
 		off = 7 + len(h.dcid) + len(h.scid)
-		// The legacy envelope exposes QUICToken only for its one-byte length
-		// profile. Full varint token semantics remain in the authenticated session.
-		if h.typeName == "Initial" && off < len(w) && w[off] < 64 {
-			token := map[string]any{"Token Length": w[off]}
-			off++
+		if h.typeName == "Initial" {
+			length, width, err := quicVarint(w[off:])
+			if err != nil {
+				return nil, err
+			}
+			token := map[string]any{"Token Length": uint8(length)}
+			if width > 1 {
+				token["Token Length"], token["Length Encoding"] = length, uint8(w[off]>>6)
+			}
+			off += width
 			if len(h.token) > 0 {
 				token["Token"] = bytes.Clone(h.token)
 				off += len(h.token)

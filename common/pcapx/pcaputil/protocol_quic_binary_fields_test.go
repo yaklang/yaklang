@@ -66,6 +66,33 @@ func quicReviewedLegacyExpectations(t *testing.T, e *ProtocolEvent, session, fie
 			require.LessOrEqual(t, off+1+n, len(w))
 			reviewOctets(token, "Token", w[off+1:off+1+n])
 		}
+		version, kind := binary.BigEndian.Uint32(w[1:5]), w[0]>>4&3
+		off := 7 + dl + sl
+		if version == 1 && kind == 0 || version == 0x6b3343cf && kind == 1 {
+			require.Less(t, off, len(w))
+			width := 1 << (w[off] >> 6)
+			require.LessOrEqual(t, off+width, len(w))
+			length := uint64(w[off] & 63)
+			for _, b := range w[off+1 : off+width] {
+				length = length<<8 | uint64(b)
+			}
+			require.LessOrEqual(t, length, uint64(len(w)-off-width))
+			end := off + width + int(length)
+			for key, value := range map[string]any{"Initial Token Length": length, "Initial Token Length Encoding Bytes": width, "Initial Token": bytes.Clone(w[off+width : end])} {
+				require.NotContains(t, session, key, "these are newly reviewed literal header facts, never old expected values")
+				session[key] = value
+			}
+			span("Initial Token Length", off, off+width)
+			span("Initial Token", off+width, end)
+		} else if version == 1 && kind == 3 || version == 0x6b3343cf && kind == 0 {
+			require.LessOrEqual(t, off+16, len(w))
+			for key, value := range map[string]any{"Retry Token": bytes.Clone(w[off : len(w)-16]), "Retry Integrity Tag": bytes.Clone(w[len(w)-16:])} {
+				require.NotContains(t, session, key)
+				session[key] = value
+			}
+			span("Retry Token", off, len(w)-16)
+			span("Retry Integrity Tag", len(w)-16, len(w))
+		}
 	} else {
 		cid, ok := e.Session["DCID"].([]byte)
 		require.True(t, ok)

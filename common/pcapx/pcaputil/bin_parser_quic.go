@@ -191,6 +191,11 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		"Connection State":    q.state,
 		"Header Form":         "long",
 	}
+	if values, _ := quicHeaderTokenFacts(h, raw); values != nil {
+		for key, value := range values {
+			info[key] = value
+		}
+	}
 	if !h.long {
 		info["Header Form"] = "short"
 	}

@@ -378,7 +378,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		default:
 			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
 				switch name {
-				case "DCID", "SCID", "CID", "Token", "Retry Token", "Reset Token":
+				case "DCID", "SCID", "CID", "Token", "Initial Token", "Retry Token", "Retry Integrity Tag", "Reset Token":
 					if octets := bytesValue(x); octets != nil {
 						x = octets
 					}
@@ -449,6 +449,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && name == "Version" {
 				value = quicWireVersionText(x)
+			}
+			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "Initial Token" || name == "Retry Token") && emptyCID {
+				value = "0 bytes (empty opaque token)"
 			}
 			if depth == 0 && quicHeaderForm == "long" && (protocol == "quic" || protocol == "http3" || protocol == "doq") && (name == "DCID" || name == "SCID") && emptyCID {
 				if span := wireRanges[name]; len(span) == 2 && span[0] == span[1] && span[0] >= 0 && currentSource > 0 && span[1] <= len(sources[currentSource-1].Data) {
@@ -621,7 +624,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		delete(values, "Wire Field Ranges")
 		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 			add("QUIC wire header and observed context", true)
-			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)
