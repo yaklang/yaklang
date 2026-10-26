@@ -56,7 +56,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"ssh", "tcp", "identification and initial plaintext binary packets", "observed direction/KEXINIT/NEWKEYS; encrypted suffix opaque; host key signature and identity not verified"},
 		{"tftp", "udp", "request and observed transfer-ID datagrams", "RRQ/WRQ, options, block sequence and bounded conversation"},
 		{"radius", "udp", "complete RADIUS header and attributes", "service routing plus exact length/type/attribute validation; authenticators unverified"},
-		{"ntp", "udp", "48-byte NTPv1-v4 client/server wire", "timestamps are observed; extension/authentication profiles unavailable"},
+		{"ntp", "udp", "complete NTPv1-v4 time headers, modes1..5; service-hinted v2..4 mode6 control headers and bounded response fragments", "literal seconds/fraction without era inference; capture-domain/endpoints/version/sequence request ownership, reorder/overlap/final-size checks and capture-lifetime reuse quarantine; timestamps/status are observations, optional authenticator is never verified; time extensions and private mode7 remain unselected"},
 		{"ike", "udp", "IKEv1/v2 payload chain, NAT-T non-ESP marker", "exact length, payload boundaries; encrypted bodies opaque; no SA/authentication success inference"},
 		{"wireguard", "udp", "exact initiation/response/cookie/transport envelope", "observed endpoint/domain/receiver-index association; no crypto or peer identity verification"},
 		{"rip", "udp", "RIPv1/v2 request/response entries", "complete entries, metric checks and v2 clear password; no routing or authentication success"},
@@ -147,7 +147,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix":
+		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
@@ -370,8 +370,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			return a.decodeRTPDatagram(e, w, false, false, match)
 		}
 	}
-	if explicit == "" && len(w) == 48 && probeNTP(w, len(w)).Verdict == ProbeAccept {
-		return a.decodeSessionDatagram(e, w)
+	if (explicit == "" || explicit == "ntp") && a.decodeNTPDatagram(e, w, src, dst, explicit == "ntp") {
+		return true
 	}
 	for _, p := range nativeDatagrams {
 		if (p.name == "rtps-control" || p.name == "rtps-wire") && explicit != p.name {

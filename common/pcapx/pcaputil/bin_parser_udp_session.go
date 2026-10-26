@@ -691,6 +691,10 @@ func (a *binParser) closeUDPSessions() {
 	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
+	if a.ntpControl != nil {
+		a.buffered.Add(-a.ntpControl.bytes)
+		a.ntpControl = nil
+	}
 	incomplete = append(incomplete, a.closeSomeIPTPLocked()...)
 	a.closeNetFlowV9()
 	a.closeIPFIX()
