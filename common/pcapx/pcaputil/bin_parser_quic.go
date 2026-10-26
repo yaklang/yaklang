@@ -1285,7 +1285,7 @@ func (q *binQUIC) initialMemory() int64 {
 	for _, st := range q.streams {
 		n += 512
 		if st.h3 != nil {
-			n += 256
+			n += 384
 		}
 		if st.doq != nil {
 			n += 128
@@ -1295,6 +1295,7 @@ func (q *binQUIC) initialMemory() int64 {
 			n += st.sources[d].memory()
 			if st.h3 != nil {
 				n += int64(cap(st.h3.buf[d]))
+				n += int64(len(st.h3.body[d].length))
 			}
 			if st.doq != nil {
 				n += int64(cap(st.doq.buf[d]))

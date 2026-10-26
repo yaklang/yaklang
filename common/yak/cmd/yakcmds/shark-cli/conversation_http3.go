@@ -28,6 +28,18 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		}
 		return out
 	}
+	copyConformance := func(v any) map[string]any {
+		out := map[string]any{}
+		if source, ok := v.(map[string]any); ok {
+			for k, value := range source {
+				switch value.(type) {
+				case string, bool, uint64, int, json.Number:
+					out[k] = value
+				}
+			}
+		}
+		return out
+	}
 	var groups, frames []map[string]any
 	addFrame := func(h map[string]any, sid uint64) {
 		if v, ok := h["Stream ID"]; ok {
@@ -40,6 +52,9 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 			}
 		}
 		frames = append(frames, row)
+		if c, ok := h["Message Conformance"]; ok {
+			row["Message Conformance"] = copyConformance(c)
+		}
 		if headers := copyHeaders(h["Headers"]); len(headers) > 0 {
 			groups = append(groups, map[string]any{"Stream ID": sid, "Header Kind": h["Header Kind"], "Headers": headers, "Header Conformance Status": h["Header Conformance Status"], "Header Conformance Error": h["Header Conformance Error"]})
 		}
@@ -64,6 +79,9 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		groups = append(groups, map[string]any{"Stream ID": number(e.Session["HTTP3 Stream ID"]), "Headers": m["Headers"]})
 	}
 	m["HTTP3 Message Headers"] = groups
+	if c, ok := e.Session["HTTP3 Message Conformance"]; ok {
+		m["HTTP3 Message Conformance"] = copyConformance(c)
+	}
 	m["Conversation View Scope"] = "message headers and frame summaries; full payload and byte provenance remain in packet fields"
 	source := e.SourceBytes
 	source.PacketRefs = append([]pcaputil.PacketReference(nil), source.PacketRefs...)
