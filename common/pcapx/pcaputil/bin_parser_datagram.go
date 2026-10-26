@@ -3,7 +3,6 @@ package pcaputil
 import (
 	"encoding/binary"
 	"fmt"
-	"strings"
 )
 
 // UDP already supplies message boundaries. Do not feed these bytes through TCP
@@ -25,22 +24,6 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		session, err = decodeDHCP4(wire, a.budget.MaxCollectionElements)
 	case a.decodeRADIUSDatagram(e, wire):
 		return true
-	case probeNTP(wire, len(wire)).Verdict == ProbeAccept:
-		e.Protocol, spec = "ntp", a.specs["application-layer.ntp/NTP"]
-		if len(wire) != 48 {
-			// A complete base header remains observable even when its trailing
-			// extensions/MAC need an unsupported profile. Never claim that the
-			// extension or its authentication was verified.
-			if strings.HasSuffix(e.Source, ":123") || strings.HasSuffix(e.Destination, ":123") {
-				session, _ = (&binNTP{}).consume(wire[:48])
-				session["Trailing Bytes"] = len(wire) - 48
-				session["Trailing Content"] = "extension-or-authentication-unparsed"
-				e.Session, e.Completeness = session, "headers"
-			}
-			err = protocolError(ErrUnsupportedFeature, "NTP extensions/authentication require an unsupported profile")
-		} else {
-			session, err = (&binNTP{}).consume(wire)
-		}
 	default:
 		return false
 	}
@@ -57,11 +40,6 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 	if err == nil {
 		e.Session = session
 		e.Session["Observation Scope"] = "datagram"
-		if e.Protocol == "ntp" && e.Session["Role"] == "response" {
-			// This path is stateless. It cannot conclude a request was missing
-			// merely because a new local decoder has no stored timestamp.
-			e.Session["Association"] = "unavailable-stateless-datagram"
-		}
 		if e.Protocol == "dhcp" {
 			e.Completeness = "message"
 			a.dhcpObservation(e)
