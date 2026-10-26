@@ -55,7 +55,7 @@ packageDeclaration
     ;
 packageName
     : qualifiedName
-    | Dollar '{' (PACKAGE | identifier) '}' ('.' identifier)*
+    | Dollar (PACKAGE | identifier) '}' ('.' identifier)*
     ;
 
 importDeclaration
