@@ -237,7 +237,11 @@ func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 
 func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 	if c.LanguageBuilder != nil {
-		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, c.GetCodeSourceJarRecursiveParse())
+		// jar/zip 等归档展开由语言预处理负责；参与增量序列的编译
+		// （基础全量 + 差量）禁止展开（disableArchiveExpansion），普通
+		// 全量编译遵循用户的 jar_recursive_parse 设置。
+		jarRecursiveParse := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
+		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
 	}
 	return fs
 }
