@@ -30,12 +30,15 @@ const (
 	TableIrTypePayloads = "ir_type_payloads_v1"
 )
 
-// IrTypeID maps one type id to its shared payload.
+// IrTypeID maps one type id to its shared payload. It deliberately carries no
+// gorm.Model: three extra columns (id, created_at, updated_at) made each row
+// ~185 bytes, wider than the ir_types row it replaces. The payload is
+// referenced by its integer primary key, so the row is only the program, the
+// type id and the reference.
 type IrTypeID struct {
-	gorm.Model
 	ProgramName string `json:"program_name" gorm:"not null"`
 	TypeID      uint64 `json:"type_id" gorm:"not null"`
-	TypeHash    string `json:"type_hash" gorm:"type:varchar(64);not null"`
+	PayloadID   int64  `json:"payload_id" gorm:"not null"`
 }
 
 func (*IrTypeID) TableName() string { return TableIrTypeIDs }
@@ -152,12 +155,12 @@ func ensureIrTypeDedupeIndexes(db *gorm.DB) error {
 }
 
 // saveIrTypeRowsDeduped writes the payloads that are new and every id row.
-// Payload equality is a hash over the body, so the statement re-sent for a
-// revisited type conflicts and does nothing instead of rewriting its text.
+// The id row holds an integer payload reference, so a revisited type only
+// rewrites three narrow columns instead of its whole body.
 func saveIrTypeRowsDeduped(db *gorm.DB, items []*IrType) error {
 	payloads := make([]*IrTypePayload, 0, len(items))
 	seenPayload := make(map[typePayloadKey]*IrTypePayload, len(items))
-	idsByKey := make(map[typeIDKey]*IrTypeID, len(items))
+	payloadHashByID := make(map[typeIDKey]string, len(items))
 	for _, item := range items {
 		if item == nil {
 			continue
@@ -182,21 +185,25 @@ func saveIrTypeRowsDeduped(db *gorm.DB, items []*IrType) error {
 		// A batch may contain repeated IDs. Keep the last body, matching SQLite's
 		// historical ordered-upsert behavior and avoiding PostgreSQL's duplicate
 		// conflict-target error for one multi-row statement.
-		idsByKey[typeIDKey{program: item.ProgramName, id: item.TypeId}] = &IrTypeID{
-			ProgramName: item.ProgramName,
-			TypeID:      item.TypeId,
-			TypeHash:    hash,
-		}
+		payloadHashByID[typeIDKey{program: item.ProgramName, id: item.TypeId}] = hash
 	}
-	if len(idsByKey) == 0 {
+	if len(payloadHashByID) == 0 {
 		return nil
-	}
-	ids := make([]*IrTypeID, 0, len(idsByKey))
-	for _, item := range idsByKey {
-		ids = append(ids, item)
 	}
 	if err := insertTypePayloads(db, payloads); err != nil {
 		return err
+	}
+	payloadIDs, err := lookupTypePayloadIDs(db, payloads)
+	if err != nil {
+		return err
+	}
+	ids := make([]*IrTypeID, 0, len(payloadHashByID))
+	for key, hash := range payloadHashByID {
+		payloadID, ok := payloadIDs[typePayloadKey{program: key.program, hash: hash}]
+		if !ok || payloadID <= 0 {
+			return fmt.Errorf("IR type payload for program %q hash %s has no row id", key.program, hash)
+		}
+		ids = append(ids, &IrTypeID{ProgramName: key.program, TypeID: key.id, PayloadID: payloadID})
 	}
 	started := time.Now()
 	result := db.New().SaveInBatches(ids, irTypeBatchChunk, "program_name", "type_id")
@@ -205,6 +212,38 @@ func saveIrTypeRowsDeduped(db *gorm.DB, items []*IrType) error {
 		return fmt.Errorf("upsert IR type ids: %w", err)
 	}
 	return nil
+}
+
+// lookupTypePayloadIDs resolves the primary key of each payload just written or
+// already stored. One narrow read per batch replaces the previous per-row
+// 64-character hash column.
+func lookupTypePayloadIDs(db *gorm.DB, payloads []*IrTypePayload) (map[typePayloadKey]int64, error) {
+	out := make(map[typePayloadKey]int64, len(payloads))
+	if len(payloads) == 0 {
+		return out, nil
+	}
+	byProgram := make(map[string][]string)
+	for _, payload := range payloads {
+		byProgram[payload.ProgramName] = append(byProgram[payload.ProgramName], payload.TypeHash)
+	}
+	for program, hashes := range byProgram {
+		for start := 0; start < len(hashes); start += irTypeBatchChunk {
+			end := start + irTypeBatchChunk
+			if end > len(hashes) {
+				end = len(hashes)
+			}
+			var rows []IrTypePayload
+			if err := db.Select("id, type_hash").Model(&IrTypePayload{}).
+				Where("program_name = ? AND type_hash IN (?)", program, hashes[start:end]).
+				Find(&rows).Error; err != nil {
+				return nil, fmt.Errorf("look up IR type payload ids: %w", err)
+			}
+			for _, row := range rows {
+				out[typePayloadKey{program: program, hash: row.TypeHash}] = int64(row.ID)
+			}
+		}
+	}
+	return out, nil
 }
 
 type typeIDKey struct {
@@ -330,8 +369,8 @@ func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error
 		`SELECT p.kind, p."string", p.extra_information`+
 			` FROM `+TableIrTypeIDs+` AS t`+
 			` JOIN `+TableIrTypePayloads+` AS p`+
-			` ON p.program_name = t.program_name AND p.type_hash = t.type_hash`+
-			` WHERE t.program_name = ? AND t.type_id = ? AND t.deleted_at IS NULL AND p.deleted_at IS NULL`)
+			` ON p.id = t.payload_id AND p.program_name = t.program_name`+
+			` WHERE t.program_name = ? AND t.type_id = ? AND p.deleted_at IS NULL`)
 	err := nativeQueryRowContext(db, ctx, query, progName, id).Scan(&kind, &text, &extra)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil

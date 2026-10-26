@@ -289,7 +289,7 @@ func TestTypeFlushUpsertsExistingTypeIDs(t *testing.T) {
 	require.NoError(t, prog.Cache.types.flush())
 	var unchanged ssadb.IrTypeID
 	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
-	require.Equal(t, first.ID, unchanged.ID, "an unchanged type id must keep its row")
+	require.Equal(t, first.PayloadID, unchanged.PayloadID, "an unchanged type id must keep its payload")
 	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, storeDB, programName))
 	require.Zero(t, countIrTypesForProgram(t, storeDB, programName))
 

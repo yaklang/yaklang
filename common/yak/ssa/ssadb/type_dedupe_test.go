@@ -120,15 +120,19 @@ func TestIrTypeDedupeWorksInsideTransaction(t *testing.T) {
 	require.Equal(t, "inside", GetIrTypeItemById(db, "p", 21).String)
 }
 
-// DeleteIrType removes a row by the public GORM id in either layout.
-func TestDeleteIrTypeRemovesDedupeRowsAndOrphanPayloads(t *testing.T) {
+// Payload rows are shared, so DeleteIrType must not remove a payload another
+// id still references.
+func TestDeleteIrTypeKeepsReferencedPayloads(t *testing.T) {
 	db := setupDedupeDB(t)
-	require.NoError(t, SaveIrTypeBatch(db, []*IrType{dedupeItem("p", 31, "solo")}))
-	var row IrTypeID
-	require.NoError(t, db.Where("program_name = ? AND type_id = ?", "p", 31).First(&row).Error)
-	require.NoError(t, DeleteIrType(db, []int64{int64(row.ID)}))
-	require.Zero(t, countRows(t, db, &IrTypeID{}, "program_name = ?", "p"))
-	require.Zero(t, countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"))
+	require.NoError(t, SaveIrTypeBatch(db, []*IrType{
+		dedupeItem("p", 31, "shared"),
+		dedupeItem("p", 32, "shared"),
+	}))
+	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"))
+	require.NoError(t, DeleteIrType(db, []int64{1}))
+	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"),
+		"a payload still referenced by type 32 must survive")
+	require.NotNil(t, GetIrTypeItemById(db, "p", 32))
 }
 
 // A payload that is not stored yet must be added, and an id that changes
