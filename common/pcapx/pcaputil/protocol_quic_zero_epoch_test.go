@@ -112,6 +112,24 @@ func TestQUICZeroCIDClosedEpochRequiresUniquePacketProtection(t *testing.T) {
 					require.Equal(t, time.Unix(1, 0), entry.touched, "late closed packets do not renew a key lease")
 				}
 			}
+			for epoch := range flows {
+				for d := 0; d < 2; d++ {
+					for phase := 0; phase < 2; phase++ {
+						base.Source, base.Destination = flows[epoch].endpoints[d], flows[epoch].endpoints[1-d]
+						q := flows[epoch].quic
+						wire := quicConformancePacket(t, q.keys.app[d][phase], "1-RTT", uint64(100+epoch*8+d*2+phase), byte(8|phase<<2), []byte{1})
+						events, ok := a.decodeQUICDatagram(base, wire)
+						require.True(t, ok)
+						require.Len(t, events, 1)
+						require.Equal(t, flows[epoch].id, events[0].FlowID, "authenticated protocol violation retains its unique captured epoch")
+						require.Equal(t, true, events[0].Session["Authentication Verified"])
+						require.Equal(t, []byte{1}, events[0].Session["Rejected Packet Payload"])
+						require.Contains(t, events[0].Error, "nonzero reserved bits")
+						require.NotContains(t, events[0].Session, "Frames")
+						require.Zero(t, q.keyPhase[d], "refused key update cannot promote the connection")
+					}
+				}
+			}
 			before := flows[2].quic.spaces
 			wire := epochQUICPacket(t, keys[2], nil, 30, 0, 2)
 			wire[len(wire)-1] ^= 1
