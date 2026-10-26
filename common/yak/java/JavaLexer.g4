@@ -176,7 +176,10 @@ BITOR    : '|';
 CARET    : '^';
 MOD      : '%';
 
-Dollar             : '$';
+// Only `${` is the package macro. Java itself allows a lone '$' as an
+// identifier (JLS 3.8), so a bare '$' must lex as IDENTIFIER. Two rules of equal
+// length would otherwise give the earlier one the win and break `ByteVector $`.
+Dollar             : '$' '{';
 
 ADD_ASSIGN     : '+=';
 SUB_ASSIGN     : '-=';

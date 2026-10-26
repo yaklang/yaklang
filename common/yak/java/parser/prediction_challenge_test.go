@@ -185,7 +185,9 @@ func TestPredictionParserResetClearsCancellation(t *testing.T) {
 }
 
 func TestPredictionUnknownPrimaryPrefixesStayWithATN(t *testing.T) {
-	for _, source := range []string{"?", "$", "@", "{", "*"} {
+	// `$` is absent: JLS 3.8 makes a lone `$` an identifier, so it is a known
+	// primary prefix. Only `${` is the package macro token now.
+	for _, source := range []string{"?", "@", "{", "*"} {
 		stream := predictionTokens(source)
 		index := stream.Index()
 		if primaryPrefix(stream) != 0 {
