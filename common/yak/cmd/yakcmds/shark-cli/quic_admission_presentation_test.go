@@ -1,0 +1,23 @@
+package sharkcli
+
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+)
+
+func TestQUICDatagramTailIsPartialAndNeverPresentedAsAuthenticated(t *testing.T) {
+	good := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", FlowID: 1, Status: "decoded", Session: map[string]any{"Authentication Verified": true, "Packet Name": "Initial"}}
+	tail := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", FlowID: 1, Status: "malformed", ExpertCode: "MalformedMessage", Error: "MalformedMessage: invalid coalesced QUIC header", Admission: "unparsed-datagram-remainder", Summary: "Unparsed QUIC datagram remainder · offset=1200 · 3 bytes · authentication not verified"}
+	row := presentEvents([]*pcaputil.ProtocolEvent{good, tail}).apply(packetSummary{Protocol: "UDP", Transport: "udp"})
+	require.Equal(t, "QUIC", row.Protocol)
+	require.Equal(t, "partial", row.ProtocolStatus)
+	require.Contains(t, row.Info, "offset=1200")
+	require.Contains(t, row.Info, "authentication not verified")
+	row = presentEvents([]*pcaputil.ProtocolEvent{tail}).apply(packetSummary{Protocol: "UDP", Transport: "udp"})
+	require.Equal(t, "QUIC", row.Protocol)
+	require.Equal(t, "malformed", row.ProtocolStatus)
+	require.NotEqual(t, "authenticated application bytes", row.ProtocolScope)
+	require.Contains(t, row.Info, "3 bytes")
+}
