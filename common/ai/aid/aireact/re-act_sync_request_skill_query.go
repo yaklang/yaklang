@@ -15,12 +15,6 @@ type skillDetailRequest struct {
 }
 
 type skillInventoryRequest struct {
-	Page     int `json:"page"`
-	PageSize int `json:"page_size"`
-	Limit    int `json:"limit"`
-}
-
-type skillSearchRequest struct {
 	Query    string `json:"query"`
 	Keyword  string `json:"keyword"`
 	Q        string `json:"q"`
@@ -29,40 +23,11 @@ type skillSearchRequest struct {
 	Limit    int    `json:"limit"`
 }
 
-func parseSkillInventoryRequest(event *ypb.AIInputEvent) (page, pageSize int) {
-	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
-		return 0, 0
-	}
-	var req skillInventoryRequest
-	if err := json.Unmarshal([]byte(event.SyncJsonInput), &req); err != nil {
-		return 0, 0
-	}
-	pageSize = req.PageSize
-	if pageSize <= 0 {
-		pageSize = req.Limit
-	}
-	return req.Page, pageSize
-}
-
-func parseSkillDetailRequest(event *ypb.AIInputEvent) string {
-	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
-		return ""
-	}
-	var req skillDetailRequest
-	if err := json.Unmarshal([]byte(event.SyncJsonInput), &req); err != nil {
-		return ""
-	}
-	if name := strings.TrimSpace(req.SkillName); name != "" {
-		return name
-	}
-	return strings.TrimSpace(req.Name)
-}
-
-func parseSkillSearchRequest(event *ypb.AIInputEvent) (query string, page, pageSize int) {
+func parseSkillInventoryRequest(event *ypb.AIInputEvent) (query string, page, pageSize int) {
 	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
 		return "", 0, 0
 	}
-	var req skillSearchRequest
+	var req skillInventoryRequest
 	if err := json.Unmarshal([]byte(event.SyncJsonInput), &req); err != nil {
 		return "", 0, 0
 	}
@@ -80,6 +45,20 @@ func parseSkillSearchRequest(event *ypb.AIInputEvent) (query string, page, pageS
 	return query, req.Page, pageSize
 }
 
+func parseSkillDetailRequest(event *ypb.AIInputEvent) string {
+	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
+		return ""
+	}
+	var req skillDetailRequest
+	if err := json.Unmarshal([]byte(event.SyncJsonInput), &req); err != nil {
+		return ""
+	}
+	if name := strings.TrimSpace(req.SkillName); name != "" {
+		return name
+	}
+	return strings.TrimSpace(req.Name)
+}
+
 // HandleSyncTypeSkillLoadedEvent 返回全部已加载 SKILL，不占用可加载清单分页。
 func (r *ReAct) HandleSyncTypeSkillLoadedEvent(event *ypb.AIInputEvent) error {
 	inventory := aicommon.BuildSessionLoadedSkillInventory(r.skillManagerForSessionInput())
@@ -87,34 +66,20 @@ func (r *ReAct) HandleSyncTypeSkillLoadedEvent(event *ypb.AIInputEvent) error {
 	return nil
 }
 
-// HandleSyncTypeSkillAvailableEvent 只分页返回可加载且未加载的 SKILL。
+// HandleSyncTypeSkillAvailableEvent 分页返回可加载且未加载的 SKILL。
+// query、keyword、q 任一非空时，只返回名称或描述匹配的未加载技能。
 func (r *ReAct) HandleSyncTypeSkillAvailableEvent(event *ypb.AIInputEvent) error {
-	page, pageSize := parseSkillInventoryRequest(event)
-	inventory, err := aicommon.BuildSessionAvailableSkillInventory(r.skillManagerForSessionInput(), page, pageSize)
+	query, page, pageSize := parseSkillInventoryRequest(event)
+	inventory, err := aicommon.BuildSessionAvailableSkillInventory(r.skillManagerForSessionInput(), query, page, pageSize)
 	if err != nil {
 		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", map[string]any{
-			"skills": []any{},
-			"error":  err.Error(),
-		}, event.SyncID)
-		return nil
-	}
-	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", inventory, event.SyncID)
-	return nil
-}
-
-// HandleSyncTypeSkillSearchEvent 模糊搜索已加载和可加载 SKILL，并分页返回。
-func (r *ReAct) HandleSyncTypeSkillSearchEvent(event *ypb.AIInputEvent) error {
-	query, page, pageSize := parseSkillSearchRequest(event)
-	result, err := aicommon.BuildSessionSkillSearch(r.skillManagerForSessionInput(), query, page, pageSize)
-	if err != nil {
-		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_search", map[string]any{
 			"skills": []any{},
 			"query":  query,
 			"error":  err.Error(),
 		}, event.SyncID)
 		return nil
 	}
-	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_search", result, event.SyncID)
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", inventory, event.SyncID)
 	return nil
 }
 

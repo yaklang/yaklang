@@ -37,8 +37,8 @@ func SearchSkillMetasByStructure(query string, metas []*SkillMeta, limit int) []
 }
 
 // SkillMetaMatchesQuery applies the loader's structural fuzzy matching rule to
-// one metadata record. It is shared by loader search and session-level search
-// so loaded-only skills follow the same name/description semantics.
+// one metadata record. Session available search uses the same name and
+// description rule, so filesystem and database skills match the same way.
 func SkillMetaMatchesQuery(meta *SkillMeta, query string) bool {
 	query = strings.TrimSpace(query)
 	if meta == nil || query == "" || strings.TrimSpace(meta.Name) == "" {
