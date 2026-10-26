@@ -107,6 +107,8 @@ func (a *binParser) observeL2TPv3(p gopacket.Packet, evidence captureEvidence) (
 	if network == nil {
 		return nil, false
 	}
+	ci := p.Metadata().CaptureInfo
+	truncated := ci.CaptureLength < ci.Length || p.Metadata().Truncated
 	udp, selected := false, false
 	var carrierErr error
 	switch ip := network.(type) {
@@ -139,20 +141,27 @@ func (a *binParser) observeL2TPv3(p gopacket.Packet, evidence captureEvidence) (
 		wire, udp, selected = u.Payload, true, true
 		source = net.JoinHostPort(source, strconv.Itoa(int(u.SrcPort)))
 		destination = net.JoinHostPort(destination, strconv.Itoa(int(u.DstPort)))
-		if u.Length < 8 || int(u.Length) != len(wire)+8 {
-			carrierErr = protocolError(ErrMalformedMessage, "L2TPv3 UDP length mismatch")
+		// A UDP length exceeding the literal IP capacity can itself set the
+		// dependency's truncated flag. Classify that contradiction before the
+		// capture-suffix case, just like ordinary native UDP dispatch.
+		if err := udpCarrierError(network, u, ci, truncated); err != nil {
+			carrierErr = err
 		}
+		truncated = false // the typed UDP carrier result includes real capture cuts
 	}
 	if !selected {
 		return nil, false
 	}
-	ci := p.Metadata().CaptureInfo
 	e := &ProtocolEvent{Transport: "network", Domain: evidence.Ref.Domain, Timestamp: ci.Timestamp, Source: source, Destination: destination, Admission: admission, SourceBytes: networkObservationSource(evidence)}
 	e.CarrierLayers = append([]string(nil), evidence.carrierLayers...)
 	if udp {
 		e.Transport = "udp"
+		// This early tunnel ingress consumes the packet before datagramFields.
+		// Its successful codec switch and rejected carriers are still exporter
+		// tuple-reuse boundaries, not permission to keep the old v9 schema.
+		a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
 	}
-	inner, suffix, parent := a.decodeL2TPv3Event(e, wire, udp, ci.CaptureLength < ci.Length || p.Metadata().Truncated, carrierErr)
+	inner, suffix, parent := a.decodeL2TPv3Event(e, wire, udp, truncated, carrierErr)
 	if len(inner) == 0 {
 		return nil, true
 	}

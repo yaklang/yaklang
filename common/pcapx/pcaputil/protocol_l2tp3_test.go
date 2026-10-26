@@ -60,6 +60,61 @@ func l2tp3NativeReplay(t *testing.T, w []byte, limit int, truncated bool) ([]*Pr
 	return events, a
 }
 
+func TestL2TPv3EarlyUDPIngressUsesLiteralCarrierFailure(t *testing.T) {
+	hello := []byte{0xc8, 3, 0, 20, 0x12, 0x34, 0x56, 0x78, 0xff, 0xfe, 0, 5, 0x80, 8, 0, 0, 0, 0, 0, 6}
+	for _, v6 := range []bool{false, true} {
+		for _, contradiction := range []bool{false, true} {
+			frame := l2tp3NativeFrame(t, hello, true, v6)
+			if contradiction {
+				offset := 14 + 20 + 4
+				if v6 {
+					offset = 14 + 40 + 4
+				}
+				binary.BigEndian.PutUint16(frame[offset:offset+2], 2000)
+			}
+			events, _ := l2tp3NativeReplay(t, frame, 0, !contradiction)
+			require.Len(t, events, 1)
+			e := events[0]
+			if contradiction {
+				require.Equal(t, "malformed", e.Status)
+				require.Equal(t, string(ErrMalformedMessage), e.ExpertCode)
+				require.Contains(t, e.Error, "IP payload available to UDP (28 bytes)")
+			} else {
+				require.Equal(t, "incomplete", e.Status)
+				require.Equal(t, string(ErrNeedMore), e.ExpertCode)
+			}
+			f, err := e.GetFields()
+			require.Error(t, err)
+			require.Nil(t, f)
+			require.Empty(t, e.Session)
+			require.Zero(t, e.FlowID)
+		}
+	}
+}
+
+func TestL2TPv3EarlyUDPIngressCannotHideExporterTupleReuse(t *testing.T) {
+	var events []*ProtocolEvent
+	a, err := NewPacketAnalyzer(WithCaptureReplayClock(), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }))
+	require.NoError(t, err)
+	defer a.Close()
+	feed := func(w []byte, second int64) {
+		u := carrierTestUDP(w, 8+len(w))
+		binary.BigEndian.PutUint16(u[:2], 9996)
+		binary.BigEndian.PutUint16(u[2:4], 1701)
+		frame := carrierTestIPv4(u)
+		require.NoError(t, a.Feed(frame, gopacket.CaptureInfo{Timestamp: time.Unix(second, 0), CaptureLength: len(frame), Length: len(frame)}, layers.LinkTypeRaw))
+	}
+	feed(nf9NativeMessage(1, 1, 1000, 19, nf9NativeTemplate()), 1)
+	feed([]byte{0xc8, 3, 0, 20, 0x12, 0x34, 0x56, 0x78, 0xff, 0xfe, 0, 5, 0x80, 8, 0, 0, 0, 0, 0, 6}, 2)
+	feed(nf9NativeMessage(1, 2, 1001, 19, nf9NativeData()), 3)
+	require.Len(t, events, 3)
+	require.Equal(t, "decoded", events[0].Status)
+	require.Equal(t, "l2tp", events[1].Protocol)
+	require.Equal(t, "decoded", events[1].Status)
+	require.Equal(t, "netflow-v9", events[2].Protocol)
+	require.Equal(t, "context-required", events[2].Status, "early tunnel observation must retire the previous exporter schema")
+}
+
 func TestL2TPv3NativeIPUDPControlAndTypedIdentity(t *testing.T) {
 	for _, udp := range []bool{false, true} {
 		for _, v6 := range []bool{false, true} {
