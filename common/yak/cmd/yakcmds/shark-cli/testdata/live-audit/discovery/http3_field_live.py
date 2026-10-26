@@ -11,8 +11,9 @@ from aioquic.buffer import Buffer
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.connection import QuicConnection
 from aioquic.quic.events import HandshakeCompleted,StreamDataReceived,ConnectionTerminated
-from aioquic.quic.packet import pull_quic_header,QuicProtocolVersion
-from aioquic.tls import CipherSuite
+from aioquic.quic.packet import pull_quic_header,encode_quic_retry,QuicProtocolVersion
+from aioquic.quic.retry import QuicRetryTokenHandler
+from aioquic.tls import CipherSuite,Epoch
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes,serialization
 from cryptography.hazmat.primitives.asymmetric import ec
@@ -78,6 +79,20 @@ class ZeroCIDControlConnection(QuicConnection):
   if self._configuration.connection_id_length==0:return
   return super()._replenish_connection_ids()
 PeerConnection=ZeroCIDControlConnection if transport_controls.get('zero_cid_policy')=='omit-new-connection-id'else QuicConnection
+if transport_controls.get('retry_client_policy')=='preserve-first-client-hello':
+ class RetryTranscriptControlConnection(PeerConnection):
+  # aioquic1.7 restarts TLS on Retry, generating a different ClientHello.
+  # This declared positive control preserves the first transcript/private
+  # TLS state, while resetting QUIC protection and resending the same bytes.
+  def _connect(self,now):
+   if not self._retry_count:return super()._connect(now)
+   initial=self._crypto_streams[Epoch.INITIAL].sender
+   assert initial._buffer_start==0 and len(initial._buffer)>=4
+   first_tls,first_hello=self.tls,bytes(initial._buffer)
+   self._close_at=now+self._idle_timeout();self._initialize(self._peer_cid.cid)
+   self.tls=first_tls;self._crypto_buffers[Epoch.INITIAL].push_bytes(first_hello);self._push_crypto_data()
+ PeerConnection=RetryTranscriptControlConnection
+retry_handler=QuicRetryTokenHandler()if transport_controls.get('server_retry')else None
 try:
  # A fixed startup sleep can silently miss the first complete connection.
  # Wait until TShark actually observes our nonce before sending any QUIC.
@@ -93,7 +108,7 @@ try:
  for epoch in range(3):
   cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
   scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
-  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={}
+  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0}
   def events(q,side):
    while True:
     e=q.next_event()
@@ -135,7 +150,13 @@ try:
      data,address=sock.recvfrom(65535)
      if sock is server_socket:
       if server is None:
-       h=pull_quic_header(Buffer(data=data),host_cid_length=cid_lengths[epoch]);server=PeerConnection(configuration=scfg,original_destination_connection_id=h.destination_cid)
+       h=pull_quic_header(Buffer(data=data),host_cid_length=cid_lengths[epoch]);original,retry_cid=h.destination_cid,None
+       if retry_handler is not None:
+        if not h.token:
+         retry_cid=secrets.token_bytes(8);token=retry_handler.create_token(address=address,original_destination_connection_id=h.destination_cid,retry_source_connection_id=retry_cid,now=time.monotonic())
+         server_socket.sendto(encode_quic_retry(version=h.version,source_cid=retry_cid,destination_cid=h.source_cid,original_destination_cid=h.destination_cid,retry_token=token),address);retry_state['sent']+=1;network['retry_packets']+=1;continue
+        original=retry_handler.validate_token(address=address,destination_cid=h.destination_cid,token=h.token,now=time.monotonic());retry_cid=h.destination_cid
+       server=PeerConnection(configuration=scfg,original_destination_connection_id=original,retry_source_connection_id=retry_cid)
       server.receive_datagram(data,address,now=time.monotonic());events(server,1)
      else:client.receive_datagram(data,address,now=time.monotonic());events(client,0)
   pump(lambda:all(handshake))
@@ -178,7 +199,7 @@ try:
   for sid,m in expected.items():
    assert bytes(received[0][sid])==m['reply']
    operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest(),'declared_scenario':m.get('plan')})
-  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected),'connection_id_length':cid_lengths[epoch]})
+  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected),'connection_id_length':cid_lengths[epoch],'retry_packets_sent':retry_state['sent']})
   client.close();send(client,client_socket,0);time.sleep(.08)
   for sock in [client_socket,server_socket]:
    while True:
