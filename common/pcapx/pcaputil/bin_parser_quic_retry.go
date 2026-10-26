@@ -26,7 +26,7 @@ func (q *binQUIC) consumeRetry(dir int, raw []byte, h quicHdr, info map[string]a
 		return info, protocolError(ErrUnsupportedFeature, "QUIC Retry requires original-DCID integrity context")
 	}
 	info["Peer Identity Verified"] = false
-	if dir != 1 || !bytes.Equal(h.dcid, q.initialSCID) || len(h.scid) == 0 || len(raw)-h.payloadOff <= 16 {
+	if dir != 1 || !bytes.Equal(h.dcid, q.initialSCID) || len(h.scid) == 0 || bytes.Equal(h.scid, q.originalDCID) || len(raw)-h.payloadOff <= 16 {
 		return info, protocolError(ErrMalformedMessage, "QUIC Retry endpoint/CID/token does not match the observed Initial")
 	}
 	if q.retrySeen || q.spaces[1][quicSpaceInitial].init {
