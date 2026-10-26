@@ -59,7 +59,7 @@ for row in rows:
   if not isinstance(view,dict):untyped.append({'frame':no,'reference_occurrence':i,'JSON_type':type(view).__name__})
   ref[no].append((w,view,at,i));reference_versions['0x'+w[1:5].hex()if len(w)>=5 and w[0]&0x80 else'short-or-diagnostic']+=1
 native=0;matched=set();seen_ids=set();missing_reference=[];differences=[];counts=collections.Counter();alias_counts=collections.Counter();zero_omissions=collections.Counter();logical=0;unmatched=[]
-header_names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.packet_number'}
+header_names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2','quic.packet_number'}
 flow_connections={};connection_flows={};association_checks=0
 for line in a.events.open(encoding='utf-8-sig'):
  e=json.loads(line)
@@ -79,10 +79,11 @@ for line in a.events.open(encoding='utf-8-sig'):
   form=m.get('Header Form');check(form in['long','short'],'explicit native header form');eq(bool(w[0]&128),form=='long','wire header form');dcid=base64.b64decode(m.get('DCID')or'');scid=base64.b64decode(m.get('SCID')or'');counts[(form,len(dcid),len(scid))]+=1
   if form=='long':
    check(len(w)>=7,'long fixed header');dl=w[5];check(dl<=20 and 7+dl<=len(w),'long DCID bound');sl=w[6+dl];check(sl<=20 and 7+dl+sl<=len(w),'long SCID bound');eq(dcid,w[6:6+dl],'literal DCID');eq(scid,w[7+dl:7+dl+sl],'literal SCID');version=int.from_bytes(w[1:5],'big');expected={'quic.version':(version,1,5,'Version'),'quic.dcil':(dl,5,6,'DCID Length'),'quic.dcid':(dcid.hex(),6,6+dl,'DCID'),'quic.scil':(sl,6+dl,7+dl,'SCID Length'),'quic.scid':(scid.hex(),7+dl,7+dl+sl,'SCID')}
-   if version==1:expected['quic.long.packet_type']=(w[0]>>4&3,0,1,'Long Packet Type')
+   if version in[1,0x6b3343cf]:expected['quic.long.packet_type_v2'if version==0x6b3343cf else'quic.long.packet_type']=(w[0]>>4&3,0,1,'Long Packet Type')
+   for name in{'quic.long.packet_type','quic.long.packet_type_v2'}-set(expected):check(name not in aliases,'version-specific packet type cannot borrow another version alias')
   else:
    check(len(dcid)<=20 and 1+len(dcid)<=len(w),'observed short CID size');eq(dcid,w[1:1+len(dcid)],'literal known-context short CID');expected={'quic.dcid':(dcid.hex(),1,1+len(dcid),'DCID')}
-   for name in['quic.version','quic.scid','quic.scil','quic.dcil','quic.long.packet_type']:check(name not in aliases,'short header cannot invent '+name)
+   for name in['quic.version','quic.scid','quic.scil','quic.dcil','quic.long.packet_type','quic.long.packet_type_v2']:check(name not in aliases,'short header cannot invent '+name)
   eq(set(ranges),{v[3]for v in expected.values()},'only literal fields carried by this header have ranges')
   for key,(value,lo,hi,name)in expected.items():
    eq(ranges[name],[lo,hi],'owned clear-header range');eq(aliases[key]['value'],value,'typed '+key);eq(aliases[key]['origin'],'pdu','literal origin');eq(aliases[key]['pdu_range'],{'offset':lo,'length':hi-lo},'logical PDU span');alias_counts[key]+=1
@@ -104,7 +105,7 @@ for line in a.events.open(encoding='utf-8-sig'):
   if'Token'in(fields.get('QUICToken')or{}):
    off=7+len(dcid)+len(scid);n=w[off];check(n<64 and off+1+n<=len(w),'selected one-byte token envelope');eq(base64.b64decode(fields['QUICToken']['Token']),w[off+1:off+1+n],'literal binary token')
  else:
-  for key in['quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type']:check(key not in aliases,'unparsed remainder cannot inherit a header field')
+  for key in['quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2']:check(key not in aliases,'unparsed remainder cannot inherit a header field')
  if m.get('Authentication Verified')and'Packet Number'in m:
   pn=m['Packet Number'];eq(aliases['quic.packet_number']['value'],pn,'authenticated decoded number');eq(aliases['quic.packet_number']['exact_value'],str(pn),'lossless decoded number');check('pdu_range'not in aliases['quic.packet_number'],'decoded number is not a literal ciphertext value span');logical+=1
   if'quic.packet_number'in view and int(view['quic.packet_number'])!=pn:differences.append({'PDU':e['id'],'frame':no,'field':'quic.packet_number','native':pn,'reference':int(view['quic.packet_number'])})
