@@ -1,0 +1,86 @@
+{
+  "source_UI": "67d2bc463de2bf57286ee679aa30e598a3ef9bef",
+  "source_native": "63c9b3c71c474fb618adf021cc01667d20200ae8",
+  "CLI_full_seconds": 1.923,
+  "complete_default_CLI_replays": [
+    {
+      "capture": "weber",
+      "kind": "CLI",
+      "rows": 51328,
+      "bytes": 138408755,
+      "exit": 0,
+      "sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "previous_verified_sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "CLI",
+      "rows": 328127,
+      "bytes": 513403474,
+      "exit": 0,
+      "sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "previous_verified_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "byte_identical": true
+    }
+  ],
+  "fresh747_frame_SDK": {
+    "sha256": "0be78bed3d36aa2aba91bbc184e93a98767aad7e5a67e591dbf949ca79859baa",
+    "byte_identical_to_previously_independently_audited_B924": true,
+    "scope": "same27 DATA payloads /150 STREAM views /10398 checks established previously; byte identity is checked here, not a new independent audit run"
+  },
+  "actual_windows": {
+    "query": "proto:http3 info:5776",
+    "packet_count": 747,
+    "selected_frame": 492,
+    "stream": 8,
+    "physical_frame_bytes": 823,
+    "QUIC_wire_PDU_bytes": 791,
+    "last_delivered_STREAM_offset": 5096,
+    "last_delivered_STREAM_bytes": 764,
+    "complete_DATA_payload_bytes": 5776,
+    "old_wrong_Base64_display_bytes": 7704,
+    "payload_source": "HTTP/3 DATA \u00b7 reassembled \u00b7 stream 8",
+    "virtual_byte_range": [
+      0,
+      5776
+    ],
+    "visible_hex_range": "0x0\u20130x168f",
+    "wire_packet_completion_explicit": true,
+    "resize_and_quit": true,
+    "restored": {
+      "error": "<nil>",
+      "input_cp": 936,
+      "output_cp": 936
+    },
+    "before_cells_sha256": "118a86bc737aab99bf7142ca12f72d6b64917e60d4f0b12d9701e801fb03c846",
+    "after_cells_sha256": "6dcd0c2a597f45430fa05a6e3b63f39f5965f8427833b3d62e026be6cd3fa9fa",
+    "after_PNG_sha256": "1ef9a22451edc5fcf9347e6571e9fa3e9ebb855bd665d8e8c281bab304892644"
+  },
+  "tests": [
+    "direct and worker-JSON paths",
+    "DATA length5776 remains exact and owned",
+    "nested STREAM8/12 sources override unrelated root99",
+    "QPACK block has distinct source",
+    "no unauthenticated plaintext source",
+    "CANCEL_PUSH payload does not acquire DATA source",
+    "4096 opaque wire octets remain one field",
+    "negative/fractional/oversized/non-numeric octets not coerced"
+  ],
+  "raw_HTTP3_DATA_count_difference_retained": {
+    "native": 27,
+    "reference": 24
+  },
+  "remaining": [
+    "complete per-application-frame contributor PDU list / offset provenance",
+    "QPACK broader field semantics",
+    "generic field differences90/35",
+    "all protocol completeness"
+  ],
+  "hashes": {
+    "yak-http3-final.exe": "02606296487d606c3a388b71fc1a0632fc5f2360e6597c36654c70c4214fe533",
+    "http3-view-final-tests.log": "e16016588b5c34b7a8872edb508dbbc6e9ae7d3c27a495033f35dfe250f11e3f",
+    "http3-final-defaults.log": "21a43c054c6d854021229db1be8274c80ecebf59c65d2ac0695422540a8c36a3",
+    "windows-http3-final.log": "bb42ddb41c5e5a5309bafb1e75a21846222706b717d70d88b279c4ee4057d059"
+  }
+}
