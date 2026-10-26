@@ -479,7 +479,7 @@ func (c *ProgramCache) FlushAuxSavers() {
 	}
 	if c.indexes != nil {
 		started := time.Now()
-		if _, err := c.indexes.Flush(); err != nil {
+		if err := c.indexes.Flush(); err != nil {
 			log.Errorf("FlushAuxSavers: index store flush failed: %v", err)
 		}
 		indexMs = time.Since(started).Milliseconds()

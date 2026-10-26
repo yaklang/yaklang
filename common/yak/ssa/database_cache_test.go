@@ -1504,7 +1504,7 @@ func TestIndexStore_FlushPropagatesSaverError(t *testing.T) {
 	// Wait for the timer-triggered save to record the error before flushing,
 	// so the test is not racy under load.
 	time.Sleep(50 * time.Millisecond)
-	_, err := store.Flush()
+	err := store.Flush()
 	require.Error(t, err)
 	require.ErrorIs(t, err, wantErr)
 	_ = store.Close()

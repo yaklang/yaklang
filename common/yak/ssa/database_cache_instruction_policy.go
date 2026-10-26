@@ -83,12 +83,42 @@ func canSpillFinishedPrivateBlock(inst Instruction) bool {
 		return false
 	}
 	fn := cachedFinishedFunction(inst)
-	if fn == nil || fn.IsExtern() || isLiveContainerFunction(fn) || !fn.bodyScopesDetached {
+	if fn == nil || fn.IsExtern() || isLiveContainerFunction(fn) {
 		return false
 	}
-	// Exported functions keep their block ids. The object can reload.
-	// Spill only after DetachFinishedFunctionBodyScopes has nil'd ScopeTable,
-	// or Parameter.block keeps the whole version map alive.
+	// A block whose scope was detached is pure weight: the function keeps the
+	// block id and reloads the object by id.
+	if fn.bodyScopesDetached {
+		return true
+	}
+	// An empty scope pins nothing either, so a private block that still points
+	// at one can leave the resident cache before the scope pass runs. A kept
+	// cross-unit symbol is exempt: a later unit still enters its body, so its
+	// block must stay resident until that unit detaches the scope.
+	if shouldKeepFunctionForCrossUnitReference(fn) {
+		return false
+	}
+	block, ok := ToBasicBlock(inst)
+	if !ok || block == nil || block.ScopeTable == nil {
+		return true
+	}
+	return blockScopeIsEmpty(block.ScopeTable)
+}
+
+// blockScopeIsEmpty reports whether every scope in the chain holds no
+// variable. Reading it is a pure map inspection: the caller decides who owns
+// the block, it does not build or mutate one.
+func blockScopeIsEmpty(scope ScopeIF) bool {
+	for scope != nil {
+		current, ok := scope.(*ScopeInstance)
+		if !ok || current == nil {
+			return false
+		}
+		if len(current.GetAllVariables()) != 0 {
+			return false
+		}
+		scope = current.GetParent()
+	}
 	return true
 }
 

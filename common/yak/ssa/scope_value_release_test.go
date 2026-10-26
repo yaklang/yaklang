@@ -125,8 +125,10 @@ func TestReleaseTrimsSettledOrdinaryVersionChain(t *testing.T) {
 
 	require.Equal(t, len(variables), prog.ReleasePersistedOrdinaryValues())
 	remaining := builder.CurrentBlock.ScopeTable.GetAllVariablesByName("local", true)
-	require.Len(t, remaining, 1, "persisted ordinary history must leave the scope chain")
-	require.Same(t, variables[len(variables)-1], remaining[0], "the lexical head stays reachable")
+	// The whole settled chain leaves the scope: every version was detached and
+	// is reloadable by id. Keeping the lexical head would pin one versioned
+	// entry per name of every finished capturing function until compile end.
+	require.Empty(t, remaining, "persisted ordinary history must leave the scope chain")
 	for i, variable := range variables {
 		reloaded := variable.GetValue()
 		require.NotNil(t, reloaded)

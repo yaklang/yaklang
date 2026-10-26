@@ -19,14 +19,14 @@ func TestIndexRelationshipsDeduplicateAcrossFlushes(t *testing.T) {
 		s.AddVariable("object.field", v)
 		s.AddClassInstance("Class", v)
 	}
-	_, err := s.Flush()
+	err := s.Flush()
 	require.NoError(t, err)
 	for i := 0; i < 10; i++ {
 		s.AddVariable("value", v)
 		s.AddVariable("object.field", v)
 		s.AddClassInstance("Class", v)
 	}
-	_, err = s.Flush()
+	err = s.Flush()
 	require.NoError(t, err)
 	var rows []ssadb.IrIndex
 	require.NoError(t, ssadb.GetDB().Where("program_name = ?", p.Name).Find(&rows).Error)
@@ -67,7 +67,7 @@ func TestIndexReusePreservesEveryRelationshipField(t *testing.T) {
 		}()
 	}
 	wg.Wait()
-	_, err := s.Flush()
+	err := s.Flush()
 	require.NoError(t, err)
 	var got []ssadb.IrIndex
 	require.NoError(t, ssadb.GetDB().Where("program_name = ?", p.Name).Find(&got).Error)
@@ -88,6 +88,6 @@ func TestIndexSaverPropagatesWriteFailure(t *testing.T) {
 	require.NoError(t, db.Exec("CREATE TRIGGER "+trigger+" BEFORE INSERT ON ir_indices_v1 BEGIN SELECT RAISE(ABORT, 'index write rejected'); END").Error)
 	t.Cleanup(func() { require.NoError(t, db.Exec("DROP TRIGGER IF EXISTS "+trigger).Error) })
 	p.Cache.indexes.saveIndexDedup(&ssadb.IrIndex{ProgramName: p.Name, ValueID: 10})
-	_, err := p.Cache.indexes.Flush()
+	err := p.Cache.indexes.Flush()
 	require.Error(t, err, "the saver must report failed SQL instead of marking the run successful")
 }
