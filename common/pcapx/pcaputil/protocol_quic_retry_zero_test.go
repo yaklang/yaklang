@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func versionedTestInitial(t *testing.T, version uint32, seed, dcid, scid, token []byte, pn byte, dir int) []byte {
+func versionedTestInitial(t *testing.T, version uint32, seed, dcid, scid, token []byte, pn byte, dir int, tokenWidths ...int) []byte {
 	t.Helper()
 	keys, err := quicInitialKeysVersion(seed, version)
 	require.NoError(t, err)
@@ -24,7 +24,16 @@ func versionedTestInitial(t *testing.T, version uint32, seed, dcid, scid, token 
 	header = append(header, dcid...)
 	header = append(header, byte(len(scid)))
 	header = append(header, scid...)
-	header = append(header, quicPutVarint(uint64(len(token)))...)
+	lengthWire := quicPutVarint(uint64(len(token)))
+	if len(tokenWidths) > 0 {
+		width := tokenWidths[0]
+		prefix, ok := map[int]byte{1: 0, 2: 1, 4: 2, 8: 3}[width]
+		require.True(t, ok)
+		require.GreaterOrEqual(t, width, len(lengthWire))
+		lengthWire = binary.BigEndian.AppendUint64(nil, uint64(len(token)))[8-width:]
+		lengthWire[0] |= prefix << 6
+	}
+	header = append(header, lengthWire...)
 	header = append(header, token...)
 	header = append(header, 41)
 	pnAt := len(header)

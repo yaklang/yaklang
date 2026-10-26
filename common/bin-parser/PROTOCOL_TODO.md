@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **505** 个入口：`stable` **15**，`partial` **318**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **203**，`partial` **23**，`todo` **392**。目录共 **506** 个入口：`stable` **15**，`partial` **321**，`new` **170**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -48,6 +48,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | 优先级 | 协议 | 路线图状态 | 同名目录入口 |
 |---|---|---|---|
 | P0 | AJP | partial | [partial / ](rules/application-layer/ajp.yaml) |
+| P0 | QUIC | partial | [partial / ](rules/application-layer/quic.yaml) |
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
 | P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
@@ -536,7 +537,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/ncp.yaml](rules/application-layer/ncp.yaml) | NCP (`NCP`, partial) |
 | [application-layer/netflow_v5.yaml](rules/application-layer/netflow_v5.yaml) | NetFlow v5 (`NetFlowV5`, partial) |
 | [application-layer/ntlm.yaml](rules/application-layer/ntlm.yaml) | NTLM (``, new)<br>NTLM v1/v2 (`NTLMSSP`, new)<br>NTLMSSP (`NTLMSSP`, new)<br>NetNTLMv2 (``, new) |
-| [application-layer/ntp.yaml](rules/application-layer/ntp.yaml) | NTP (``, new)<br>SNTP (`NTP`, partial) |
+| [application-layer/ntp.yaml](rules/application-layer/ntp.yaml) | NTP (``, partial)<br>SNTP (`NTP`, partial) |
 | [application-layer/nvme_tcp.yaml](rules/application-layer/nvme_tcp.yaml) | NVMe-oF (`NVMeTCP`, partial) |
 | [application-layer/observed_protocols.yaml](rules/application-layer/observed_protocols.yaml) | RSVP (`RSVP`, partial) |
 | [application-layer/ocsp.yaml](rules/application-layer/ocsp.yaml) | OCSP (`OCSPRequest`, new) |
@@ -546,7 +547,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/pptp.yaml](rules/application-layer/pptp.yaml) | PPTP (``, new) |
 | [application-layer/profinet_io.yaml](rules/application-layer/profinet_io.yaml) | Profinet IO (`ProfinetIOReadImplicit`, new) |
 | [application-layer/prometheus.yaml](rules/application-layer/prometheus.yaml) | Prometheus exposition (`PrometheusExposition`, partial) |
-| [application-layer/quic.yaml](rules/application-layer/quic.yaml) | QUIC (``, new) |
+| [application-layer/quic.yaml](rules/application-layer/quic.yaml) | QUIC (``, partial)<br>QUIC Initial Token Fields (`QUICInitialTokenFields`, partial) |
 | [application-layer/radius.yaml](rules/application-layer/radius.yaml) | RADIUS (``, new) |
 | [application-layer/rdpudp.yaml](rules/application-layer/rdpudp.yaml) | RDPUDP (`RDPUDP`, partial)<br>RDPUDP2 (`RDPUDP2`, partial) |
 | [application-layer/redfish.yaml](rules/application-layer/redfish.yaml) | Redfish (`RedfishServiceRootRequest`, partial) |
