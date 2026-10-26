@@ -840,6 +840,18 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			}
 			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
 			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
+				p.diagnostic = clipText(e.Summary, 256)
+				if p.protocol == "" && e.FlowID != 0 {
+					p.protocol, p.visibility, p.evidence = "QUIC", "unavailable", "unparsed bytes after observed QUIC packet; authentication not verified"
+					p.status = e.Status
+					p.addLayer("QUIC")
+					p.summary = p.diagnostic
+				}
+				if p.status == "decoded" || p.status == "deferred" {
+					p.status = "partial"
+				}
+			}
 			if e.Protocol == "" && e.Transport == "udp" && e.Summary != "" {
 				p.diagnostic = clipText("UDP carrier · "+e.Status+" · "+e.Summary, 256)
 			}
@@ -859,7 +871,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				p.addLayer("QUIC")
 				p.summary = "Packet authentication failed · plaintext unavailable"
 			}
-			if e.Protocol == "quic" && e.FlowID != 0 && e.Admission == "authenticated-wire-and-observed-CID" && p.protocol == "" {
+			if e.Protocol == "quic" && e.FlowID != 0 && (e.Admission == "authenticated-wire-and-observed-CID" || e.Admission == "observed-CID-unverified-payload") && p.protocol == "" {
 				p.protocol, p.visibility, p.evidence = "QUIC", "unavailable", "observed QUIC connection CID; protocol diagnostic"
 				p.addLayer("QUIC")
 				p.summary = clipText(e.Error, 256)
