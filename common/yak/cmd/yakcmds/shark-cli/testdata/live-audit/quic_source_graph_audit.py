@@ -48,10 +48,11 @@ for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
  l=packet['_source']['layers'];number=int(l['frame']['frame.number']);sp,dp=vals(l.get('udp',{}),'udp.srcport'),vals(l.get('udp',{}),'udp.dstport');eq(len(sp),1,'single reference UDP source');eq(len(dp),1,'single reference UDP destination')
  eq(bytes.fromhex(l['frame_raw'][0]),captured[number],'oracle bytes are literal physical capture record');packet_endpoints[number]=endpoints(captured[number]);eq(tuple(x.rsplit(':',1)[1] for x in packet_endpoints[number]),(sp[0],dp[0]),'oracle ports equal capture bytes')
  qs=l.get('quic',[]);qs=qs if isinstance(qs,list) else [qs]
+ raw_packets=l.get('quic_raw',[]);raw_packets=[raw_packets]if raw_packets and isinstance(raw_packets[0],str)else raw_packets
  packet_connections=set(vals(qs,'quic.connection.number'));dcids=set(vals(qs,'quic.dcid'))
  if not packet_connections:continue
  eq(len(packet_connections),1,'one reference connection per UDP datagram')
- for q in qs:
+ for qi,q in enumerate(qs):
   # TShark's JSON array can contain a separate expert-only annotation rather
   # than another QUIC packet. It has no wire fields or STREAM bytes to bind.
   if set(q)=={'_ws.expert'}:expert_only_blocks+=1;continue
@@ -59,7 +60,11 @@ for packet in json.loads(a.oracle.read_text(encoding='utf-8-sig')):
   if not cs:
    # TShark prints connection metadata on only the first coalesced packet.
    # Bind the remaining packet only when all dissected DCIDs agree too.
-   check(len(qs)>1 and len(dcids)==1 and bool(vals(q,'quic.dcid')),'unambiguous coalesced reference connection/DCID')
+   explicit_zero=False
+   if not dcids and vals(q,'quic.dcil')==['0']:
+    check(qi<len(raw_packets),'coalesced zero-CID packet has a literal raw view');r=raw_packets[qi];raw=bytes.fromhex(r[0]);start=int(r[1]);eq(captured[number][start:start+len(raw)],raw,'coalesced zero-CID raw span')
+    check(len(raw)>=7 and raw[0]&0xc0==0xc0 and raw[1:5]==b'\0\0\0\1'and raw[5]==0,'literal v1 long header carries zero DCID length');explicit_zero=True
+   check(len(qs)>1 and (len(dcids)==1 and bool(vals(q,'quic.dcid'))or explicit_zero),'unambiguous coalesced reference connection/DCID')
    cs=list(packet_connections);coalesced_bindings+=1
   eq(len(set(cs)),1,'reference connection');conn=cs[0];check(number not in packet_conn or packet_conn[number]==conn,'single connection datagram');packet_conn[number]=conn
   frames=q.get('quic.frame',[]);frames=frames if isinstance(frames,list) else [frames]
