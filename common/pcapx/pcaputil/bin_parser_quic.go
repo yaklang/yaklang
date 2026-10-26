@@ -13,6 +13,7 @@ import (
 // declared decrypted-stream API.
 type binQUIC struct {
 	eventID         uint64
+	eventRefs       []PacketReference
 	keyPhase        [2]int
 	previousKey     [2]*quicTrafficKeys
 	controlSeen     [2]bool
@@ -57,6 +58,7 @@ type quicPNSpace struct {
 
 type quicStream struct {
 	reassembly     [2]quicAssembler
+	sources        [2]quicStreamSources
 	resetDirection [2]bool
 	requestPDU     uint64
 	id             uint64
@@ -497,14 +499,23 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 				if sid&2 != 0 && int(sid&1) != dir {
 					return protocolError(ErrMalformedMessage, "QUIC unidirectional stream wrong sender")
 				}
+				originalOffset, originalLength := off, len(data)
 				var err error
 				data, off, fin, err = st.reassembly[dir].feed(off, data, fin, q.byteLimit, max)
 				if err != nil {
 					return err
 				}
+				start, end := originalOffset, originalOffset+uint64(originalLength)
+				if st.h3 != nil {
+					start = max64(start, uint64(st.h3.parsed[dir]))
+				}
+				st.sources[dir].remember(q.eventID, start, end, q.eventRefs, max)
 				fr["Contiguous Offset"] = off
 				fr["Delivered Bytes"] = len(data)
-				fr["Byte Source"] = map[string]any{"Kind": "quic-authenticated-plaintext", "Parent PDU": q.eventID, "Stream ID": sid, "Offset": off}
+				fr["Byte Source"] = map[string]any{"Kind": "quic-authenticated-plaintext", "Parent PDU": q.eventID, "Stream ID": sid, "Offset": originalOffset, "Length": uint64(originalLength)}
+				if len(data) > 0 {
+					fr["Delivered Byte Source"] = st.sources[dir].describe(sid, dir, off, off+uint64(len(data)))
+				}
 				fr["Stream Complete"] = st.reassembly[dir].deliveredFIN
 				if st.resetDirection[dir] || len(data) == 0 && !fin {
 					continue
@@ -1252,8 +1263,8 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 	return nil
 }
 
-// UDP currently retains Initial metadata only; no stream payload is admitted
-// without Handshake/Application keys. Include slice capacity in its reservation.
+// Include retained cryptographic/application bytes and stream source witnesses
+// (including slice capacities). STREAM admission requires application keys.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
 	n += int64(cap(q.originalDCID) + cap(q.initialSCID) + cap(q.retrySCID))
@@ -1272,6 +1283,7 @@ func (q *binQUIC) initialMemory() int64 {
 		}
 		for d := 0; d < 2; d++ {
 			n += st.reassembly[d].memory()
+			n += st.sources[d].memory()
 			if st.h3 != nil {
 				n += int64(cap(st.h3.buf[d]))
 			}

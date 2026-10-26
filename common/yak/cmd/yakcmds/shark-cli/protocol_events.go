@@ -53,6 +53,8 @@ var ipfixHeaderPriority = map[string]int{
 	"Sequence Number": 4, "Observation Domain ID": 5,
 }
 
+var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, "Payload Length": 2, "Frame Wire Length": 3, "Stream ID": 4, "Stream Offset": 5, "Direction": 6, "Frame Header Bytes": 7, "Headers": 8, "DATA Length": 9, "Payload": 10, "QPACK Block": 10, "Byte Source": 50, "Payload Byte Source": 51, "Frame SHA256": 52}
+
 // Detail snapshots include owned public and private parser evidence, unlike
 // the compact scalar observations used by streaming JSON. Keep a separate
 // bounded allowance for the selected packet's native protocol tree. Rendering
@@ -117,6 +119,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var authenticatedTLS bool
 	var http3FrameKind string
 	var http3StreamID uint64
+	var http3HeaderSource int
+	var http3HeaderRanges map[string][]int
 	var fieldViewLimited bool
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
@@ -139,8 +143,33 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				}
 				if strings.HasPrefix(name, "HTTP3 Frames[") {
 					previous := http3FrameKind
-					defer func() { http3FrameKind = previous }()
+					previousID, previousHeader, previousRanges := http3StreamID, http3HeaderSource, http3HeaderRanges
+					defer func() {
+						http3FrameKind = previous
+						http3StreamID = previousID
+						http3HeaderSource = previousHeader
+						http3HeaderRanges = previousRanges
+					}()
 					http3FrameKind = textValue(x["Frame Type"])
+					if id, ok := x["Stream ID"]; ok {
+						http3StreamID = number(id)
+					}
+					http3HeaderSource, http3HeaderRanges = 0, nil
+					if header := bytesValue(x["Frame Header Bytes"]); authenticatedQUIC && len(header) >= 2 && len(header) <= 16 {
+						sources = append(sources, detailSource{Name: fmt.Sprintf("HTTP/3 header · stream %d", http3StreamID), Data: bytes.Clone(header)})
+						http3HeaderSource = len(sources)
+						http3HeaderRanges = map[string][]int{}
+						if ranges, ok := x["Frame Header Ranges"].(map[string]any); ok {
+							for key, value := range ranges {
+								if pair, ok := value.([]any); ok && len(pair) == 2 {
+									a, b := int(number(pair[0])), int(number(pair[1]))
+									if a >= 0 && b > a && b <= len(header) {
+										http3HeaderRanges[key] = []int{a, b}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
@@ -171,7 +200,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			add(name, true)
 			keys := make([]string, 0, len(x))
 			for k := range x {
-				if k == "Wire Field Ranges" {
+				if k == "Wire Field Ranges" || protocol == "http3" && k == "Frame Header Ranges" {
 					continue
 				}
 				if protocol == "ipfix" && k == "Enterprise Number" && x["Enterprise"] == false {
@@ -194,6 +223,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 						a = rank
 					}
 					if rank, ok := isisEntryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "http3" && http3FrameKind != "" {
+					if rank, ok := http3FramePriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := http3FramePriority[keys[j]]; ok {
 						b = rank
 					}
 				}
@@ -304,6 +341,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				walk(fmt.Sprintf("%s[%d]", name, i), r, depth)
 			}
 		default:
+			if name == "Frame Header Bytes" && http3HeaderSource > 0 {
+				v = sources[http3HeaderSource-1].Data
+				x = v
+			}
 			var generated []byte
 			sourceName := ""
 			if name == "Decoded Bytes" || name == "Mechanism Token" {
@@ -387,6 +428,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = len(sources), 0, len(generated), true
 			}
+			if http3HeaderSource > 0 {
+				span := http3HeaderRanges[name]
+				if name == "Frame Header Bytes" {
+					span = []int{0, len(sources[http3HeaderSource-1].Data)}
+				}
+				if len(span) == 2 {
+					f := &out[len(out)-1]
+					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
+				}
+			}
 			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
@@ -419,6 +470,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
+		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind
 		if kind == "" {
 			kind = "message"
