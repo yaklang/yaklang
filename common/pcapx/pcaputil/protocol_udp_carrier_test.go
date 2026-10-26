@@ -203,6 +203,67 @@ func TestUDPIPv4ZeroTotalLengthIsNotApplicationEvidence(t *testing.T) {
 	}
 }
 
+func TestUDPInvalidCarrierCannotEnterTunnelDissectors(t *testing.T) {
+	query := dnsQuery(77, "inner.example", 1)[2:]
+	inner := carrierTestIPv4(carrierTestUDP(query, 8+len(query)))
+	copy(inner[12:16], []byte{198, 51, 100, 1})
+	copy(inner[16:20], []byte{198, 51, 100, 2})
+	ethernet := append([]byte{2, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 1, 8, 0}, inner...)
+	gtp := append([]byte{0x30, 0xff, 0, 0, 0, 0, 0, 1}, inner...)
+	binary.BigEndian.PutUint16(gtp[2:4], uint16(len(inner)))
+	for _, tc := range []struct {
+		name string
+		port uint16
+		body []byte
+	}{
+		{"VXLAN", 4789, append([]byte{8, 0, 0, 0, 0, 0, 1, 0}, ethernet...)},
+		{"Geneve", 6081, append([]byte{0, 0, 0x65, 0x58, 0, 0, 1, 0}, ethernet...)},
+		{"GTP", 2152, gtp},
+	} {
+		for _, mode := range []string{"valid", "bad", "capture-cut"} {
+			for _, observer := range []bool{false, true} {
+				t.Run(tc.name+"/"+mode+map[bool]string{false: "/fast", true: "/observer"}[observer], func(t *testing.T) {
+					u := carrierTestUDP(tc.body, 8+len(tc.body))
+					binary.BigEndian.PutUint16(u[2:4], tc.port)
+					if mode == "bad" {
+						binary.BigEndian.PutUint16(u[4:6], 2000)
+					}
+					raw := carrierTestIPv4(u)
+					wireLength := len(raw)
+					if mode == "capture-cut" {
+						wireLength += 4
+					}
+					es := carrierTestReplay(t, raw, wireLength, observer)
+					require.Len(t, es, 1)
+					e := es[0]
+					if mode != "valid" {
+						require.Empty(t, e.Protocol, "invalid outer UDP cannot identify an inner application")
+						require.Equal(t, map[bool]string{true: "malformed", false: "incomplete"}[mode == "bad"], e.Status)
+						require.Equal(t, "udp", e.Transport)
+						if mode == "bad" {
+							require.Contains(t, e.Error, "2000")
+						} else {
+							require.Contains(t, e.Error, "NeedMore:")
+						}
+						require.Equal(t, "192.0.2.1:40000", e.Source)
+					} else if tc.name == "GTP" {
+						// GTP payload normalization is outside the existing selected
+						// native tunnel profile. A valid carrier keeps that explicit
+						// limit; a malformed one must be diagnosed before it.
+						require.Equal(t, "ip", e.Protocol)
+						require.Equal(t, "limited", e.Status)
+						require.Equal(t, "EncapsulationDepthOrProfile", e.ExpertCode)
+					} else {
+						require.Equal(t, "dns", e.Protocol)
+						require.Equal(t, "decoded", e.Status)
+						require.Equal(t, "198.51.100.1:40000", e.Source)
+					}
+				})
+			}
+		}
+	}
+}
+
 func FuzzNativeIPv6CarrierEnvelope(f *testing.F) {
 	for _, hop := range []bool{false, true} {
 		f.Add(carrierTestIPv6(17, carrierTestUDP([]byte("opaque"), 14), hop, 16))
