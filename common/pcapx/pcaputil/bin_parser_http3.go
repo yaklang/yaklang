@@ -15,6 +15,7 @@ type h3StreamState struct {
 	blockedPDU   [2]uint64
 	seenSettings bool
 	headers      [2]int
+	fieldFailure [2]ProtocolErrorKind
 
 	kind                  string
 	seenType              bool
@@ -36,6 +37,16 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 	h3 := st.h3
 	if dir != 0 && dir != 1 {
 		dir = 0
+	}
+	if q.native && h3.fieldFailure[dir] != "" {
+		h3RejectedFieldStream(fr, info, sid, nil)
+		if dir == 0 {
+			st.requestPDU = 0
+			delete(fr, "Request PDU ID")
+			delete(fr, "Transaction ID")
+		}
+		st.sources[dir].prune(^uint64(0))
+		return &h3FieldStreamError{protocolError(h3.fieldFailure[dir], "HTTP3 prior field-section rejection; stream message state quarantined")}
 	}
 	if q.native && fin {
 		h3.fin[dir] = true
@@ -259,7 +270,20 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 		h3.blocked[dir] = false
 		informational := false
-		if ft == 1 && dir == 1 {
+		var fieldError error
+		if q.native && ft == 1 && !uni {
+			headers, _ := hf["Headers"].([]map[string]any)
+			kind, err := h3ValidateFieldSection(headers, dir, h3.headers[dir])
+			hf["Header Conformance Scope"] = h3FieldConformanceScope
+			hf["Header Conformance Status"] = "base-shape-valid"
+			if err != nil {
+				fieldError = err
+				hf["Header Conformance Status"], hf["Header Conformance Error"] = kind, err.Error()
+				hf["Header Kind"] = kind
+			}
+			informational = kind == "informational"
+		}
+		if !q.native && ft == 1 && dir == 1 {
 			if headers, ok := hf["Headers"].([]map[string]any); ok {
 				for _, header := range headers {
 					status, _ := header["Value"].(string)
@@ -274,7 +298,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 		if informational {
 			hf["Header Kind"] = "informational"
-		} else if ft == 0x01 {
+		} else if ft == 0x01 && fieldError == nil {
 			h3.headers[dir]++
 			if dir == 0 {
 				h3.reqHeaders++
@@ -282,12 +306,12 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			} else {
 				h3.respHeads++
 				hf["Header Kind"] = "response"
-				if h3.reqHeaders > 0 {
+				if h3.reqHeaders > 0 && h3.fieldFailure[0] == "" {
 					hf["Associated Request"] = true
 				}
 			}
 		}
-		if ft == 1 && h3.headers[dir] > 1 {
+		if ft == 1 && h3.headers[dir] > 1 && fieldError == nil {
 			hf["Header Kind"] = "trailers"
 		}
 		if ft == 0x00 {
@@ -314,6 +338,21 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			st.sources[dir].prune(uint64(h3.parsed[dir]))
 		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
+		if fieldError != nil {
+			var pe *ProtocolError
+			h3.fieldFailure[dir] = ErrMalformedMessage
+			if errors.As(fieldError, &pe) {
+				h3.fieldFailure[dir] = pe.Kind
+			}
+			h3RejectedFieldStream(fr, info, sid, frames)
+			if dir == 0 {
+				st.requestPDU = 0
+				delete(fr, "Request PDU ID")
+				delete(fr, "Transaction ID")
+			}
+			st.sources[dir].prune(^uint64(0))
+			return &h3FieldStreamError{fieldError}
+		}
 		if len(frames) >= max {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame budget exceeded")
 		}
@@ -365,6 +404,34 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 	}
 	return nil
+}
+
+// A field-section error invalidates one HTTP message stream, not every QUIC
+// STREAM frame sharing its protected packet or a later coalesced wire packet.
+type h3FieldStreamError struct{ cause error }
+
+func (e *h3FieldStreamError) Error() string { return e.cause.Error() }
+func (e *h3FieldStreamError) Unwrap() error { return e.cause }
+func isH3FieldStreamError(err error) bool {
+	var e *h3FieldStreamError
+	return errors.As(err, &e)
+}
+
+func recordH3FieldStreamError(info, fr map[string]any, sid uint64, dir int, err error) {
+	fr["HTTP3 Stream Error"] = err.Error()
+	rows, _ := info["HTTP3 Stream Errors"].([]map[string]any)
+	info["HTTP3 Stream Errors"] = append(rows, map[string]any{"Stream ID": sid, "Direction": uint64(dir), "Error": err.Error()})
+}
+
+func h3RejectedFieldStream(fr, info map[string]any, sid uint64, frames []map[string]any) {
+	for _, m := range []map[string]any{fr, info} {
+		m["HTTP3"] = true
+		m["HTTP3 Stream ID"] = sid
+		m["HTTP3 Stream State"] = "field-section quarantined"
+		if len(frames) > 0 {
+			m["HTTP3 Frames"] = frames
+		}
+	}
 }
 
 func (q *binQUIC) h3DecodeFrame(dir int, ft uint64, payload []byte, h3 *h3StreamState, uni bool) (map[string]any, error) {

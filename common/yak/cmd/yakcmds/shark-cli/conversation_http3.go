@@ -41,7 +41,7 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		}
 		frames = append(frames, row)
 		if headers := copyHeaders(h["Headers"]); len(headers) > 0 {
-			groups = append(groups, map[string]any{"Stream ID": sid, "Header Kind": h["Header Kind"], "Headers": headers})
+			groups = append(groups, map[string]any{"Stream ID": sid, "Header Kind": h["Header Kind"], "Headers": headers, "Header Conformance Status": h["Header Conformance Status"], "Header Conformance Error": h["Header Conformance Error"]})
 		}
 	}
 	for _, fr := range mapList(e.Session["Frames"]) {
