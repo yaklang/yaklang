@@ -1833,3 +1833,47 @@ unsupported。父进程保留发布时的身份供详情标题使用，不从wor
 HTTP3仍有边界：完整URI/authority语义、Content-Length与DATA一致性、扩展CONNECT
 协商、informational FIN、更多帧放置与QPACK动态依赖尚待覆盖。整体协议/流/会话/关键
 字段一致性目标未完成，PR保持draft；pcap、密钥、EXE、原始导出和页面图不入库。
+
+
+## HTTP3正文长度、FIN与实际双向丢包重组（2026-10-26）
+
+原生d24e490d07新增按方向的正文状态：声明长度保留任意精度十进制，不经浮点或
+uint64截断；等价重复值采用明确的接收端归一策略，原始字段照常保留。DATA超过声明
+立即拒绝；不足只能在FIN最终位置和所有缺口排空后拒绝，相等前缀仍是pending-FIN。
+HEAD/304表示长度、204、1xx、CONNECT隧道/失败响应和trailer分别判断；未观察请求
+方法时，不凭空判定空HEAD响应长度错误。错误只隔离所属方向，同包其他流继续解析。
+规则依据[RFC9110 §8.6](https://www.rfc-editor.org/rfc/rfc9110.html#section-8.6)与
+[RFC9114 §4.1.2](https://www.rfc-editor.org/rfc/rfc9114.html#section-4.1.2)。
+
+独立aioquic原始双方通过实际UDP捕获188帧，28种声明场景×3代同端点连接，84对请求/
+响应、168方向；实际丢8/延迟20个报文，启动nonce观测屏障通过。双方刻意不执行HTTP
+服务器合法性策略，畸形报文是声明控制。参考STREAM重组、实际收发字节、原生逐帧
+类型/varint/字段/DATA/完整哈希和物理来源完成43720项检查：117个有效方向与51个
+畸形方向按声明处理，3代连接互不污染。26种长度、FIN、归一、身份、头PDU、域、方向、
+连接、字段、帧与参考原包篡改全部拒绝。此范围无所选原生差异，不代表全协议正确。
+
+| 原始视图/逻辑帧 | SETTINGS | HEADERS | DATA | 其他 |
+|---|---:|---:|---:|---:|
+| Wireshark原始视图 | 6 | 202 | 173 | 2个type13921 |
+| 原生交付逻辑帧 | 6 | 174 | 141 | 0 |
+
+计数不强行归零。6个畸形请求的DATA尾帧在显式拒绝后不再做应用语义解析，原始
+STREAM字节完整保留。参考#80/#147的type13921/length11369字节头76616c69实际为
+"vali"，独立收发定位到stream104 offset69，位于完整HEADERS[0,96)内部；参考深层
+视图错位，不能复制成原生未知帧。其余参考额外视图尚未全部逐一分类，原始数量保留。
+另6条QUIC诊断是aioquic包后追加的未保护零字节，不能称已认证PADDING。
+[RFC9000 §14.1](https://www.rfc-editor.org/rfc/rfc9000.html#section-14.1)允许Initial与
+无效包合并后丢弃无效部分；当前拒绝尾部正确，但Admission文字仍过宽，另行修复。
+
+完整原生392.905s/CLI2.007s和111962次正文隔离fuzz/40.437s通过；fuzz是认证后算法
+测试。原747帧实际捕获重新执行，57应用帧/24736项来源和27 DATA/10398项继续通过。
+两份原始大pcap四份完整CLI/SDK输出与b924逐字节相同，90/35等历史指标保持。
+
+Windows实际CP936程序读完188帧，fields pdu.id ==58选择原包#53：HTTP/3身份、
+UDP→QUIC→HTTP/3路径、声明18000/观测18000、Drained FIN=true、matched直接位于
+详情开头；包/详情对应、字节源、会话、resize、退出/codepage恢复通过。
+[聚合证据](shark-public-corpus-20261025/http3-body-conformance-summary.json)绑定源、
+原始结果及实页哈希。pcap、密钥、EXE、原始导出与页面图留本地。
+
+尚未完成：晚到请求方法对先前未验证响应的回溯、完整URI/authority、扩展协商、
+更多帧放置与QPACK依赖。所有协议/流/会话一致性目标仍未完成，PR保持draft。
