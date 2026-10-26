@@ -31,7 +31,7 @@ func TestHTTP3ReassembledPayloadOwnsBytesAcrossWorkerJSON(t *testing.T) {
 				require.NotContains(t, f.text, "7704 bytes")
 				require.True(t, f.hasRange)
 				s := sources[f.source-1]
-				require.Equal(t, "HTTP/3 DATA · reassembled authenticated payload · stream 8", s.Name)
+				require.Equal(t, "HTTP/3 DATA · reassembled · stream 8", s.Name)
 				require.Equal(t, payload, s.Data)
 				require.Equal(t, 0, f.start)
 				require.Equal(t, 5776, f.end)
@@ -42,7 +42,7 @@ func TestHTTP3ReassembledPayloadOwnsBytesAcrossWorkerJSON(t *testing.T) {
 				headers = true
 				require.True(t, f.hasRange)
 				s := sources[f.source-1]
-				require.Equal(t, "HTTP/3 HEADERS · authenticated QPACK block · stream 12", s.Name)
+				require.Equal(t, "HTTP/3 HEADERS · QPACK · stream 12", s.Name)
 				require.Equal(t, []byte{0, 0, 0xd9}, s.Data)
 			}
 		}
@@ -59,7 +59,7 @@ func TestHTTP3ByteSourcesRequireAuthenticatedAndCorrectFrameContext(t *testing.T
 		for _, f := range fs {
 			if strings.HasPrefix(f.text, "Payload:") && f.hasRange {
 				n++
-				require.Equal(t, "HTTP/3 DATA · reassembled authenticated payload · stream 7", sources[f.source-1].Name)
+				require.Equal(t, "HTTP/3 DATA · reassembled · stream 7", sources[f.source-1].Name)
 				require.Equal(t, []byte{4, 5, 6}, sources[f.source-1].Data)
 			}
 		}

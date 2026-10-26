@@ -321,11 +321,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			if protocol == "http3" && authenticatedQUIC {
 				if name == "Payload" && http3FrameKind == "DATA" {
 					generated = bytesValue(x)
-					sourceName = fmt.Sprintf("HTTP/3 DATA · reassembled authenticated payload · stream %d", http3StreamID)
+					sourceName = fmt.Sprintf("HTTP/3 DATA · reassembled · stream %d", http3StreamID)
 				}
 				if name == "QPACK Block" && http3FrameKind == "HEADERS" {
 					generated = bytesValue(x)
-					sourceName = fmt.Sprintf("HTTP/3 HEADERS · authenticated QPACK block · stream %d", http3StreamID)
+					sourceName = fmt.Sprintf("HTTP/3 HEADERS · QPACK · stream %d", http3StreamID)
 				}
 			}
 			if name == "Authenticated Plaintext" && authenticatedTLS {
