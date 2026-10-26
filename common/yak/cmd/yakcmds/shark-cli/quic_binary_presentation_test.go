@@ -91,6 +91,58 @@ func TestQUICRefusedPayloadIsInspectableWithoutApplicationDelivery(t *testing.T)
 	require.NotContains(t, presentation.stack, "HTTP/3")
 }
 
+func TestQUICRefusalSummaryAndEmptyPayloadAgreeAcrossWorkerIPC(t *testing.T) {
+	for _, payload := range [][]byte{{0x1e}, {}} {
+		e := &pcaputil.ProtocolEvent{ID: 9, FlowID: 3, Protocol: "quic", Transport: "udp", Status: "malformed", ExpertCode: "MalformedMessage", Admission: "authenticated-wire-and-observed-CID", Error: "MalformedMessage: QUIC protected packet contains no frames", Raw: []byte{0x43, 0, 1, 2, 3}, Session: map[string]any{"Authentication Verified": true, "Peer Identity Verified": false, "Header Form": "short", "DCID": []byte{}, "Version": uint32(0), "SCID": []byte(nil), "Rejected Packet Payload": payload, "Payload Delivery": "not delivered to protocol state; packet AEAD verified", "Wire Field Ranges": map[string]any{"DCID": []any{1, 1}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		row := presentEvents([]*pcaputil.ProtocolEvent{&ipc}).apply(packetSummary{Protocol: "UDP", Transport: "udp", Layers: []string{"Loopback", "IPv4", "UDP"}})
+		require.Equal(t, "QUIC", row.Protocol)
+		require.Equal(t, "malformed", row.ProtocolStatus)
+		require.Equal(t, "authenticated-plaintext", row.Visibility)
+		require.Equal(t, "authenticated packet diagnostic", row.ProtocolScope)
+		require.Equal(t, "QUIC · MalformedMessage · QUIC protected packet contains no frames", row.Info)
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		diagnostic, cid, body := -1, false, false
+		for i, f := range fields {
+			if strings.HasPrefix(f.text, "Packet diagnostic:") {
+				require.Equal(t, -1, diagnostic, "one early diagnostic")
+				diagnostic = i
+			}
+			if strings.HasPrefix(f.text, "DCID:") {
+				require.Equal(t, "DCID: 0 bytes (length from observed connection)", f.text)
+				require.False(t, f.hasRange)
+				cid = true
+			}
+			if strings.HasPrefix(f.text, "Rejected Packet Payload:") {
+				body = true
+				if len(payload) == 0 {
+					require.Equal(t, "Rejected Packet Payload: 0 bytes (empty authenticated payload; not delivered)", f.text)
+					require.False(t, f.hasRange)
+				} else {
+					require.True(t, f.hasRange)
+					require.Equal(t, payload, sources[f.source-1].Data[f.start:f.end])
+				}
+			}
+			require.False(t, strings.HasPrefix(f.text, "Error:"), "frontloaded packet error must not repeat below the tree")
+		}
+		require.GreaterOrEqual(t, diagnostic, 0)
+		require.Less(t, diagnostic, 4, "packet diagnostic is visible before the wire tree")
+		require.True(t, cid)
+		require.True(t, body)
+		delete(ipc.Session, "Wire Field Ranges")
+		fields, _ = protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "DCID:") {
+				require.Contains(t, f.text, "unavailable")
+				require.NotContains(t, f.text, "0 bytes", "an empty public value alone cannot invent CID length context")
+			}
+		}
+	}
+}
+
 func TestQUICLongHeaderEmptyCIDIsPresentRatherThanUnknown(t *testing.T) {
 	e := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", Status: "context-required", Raw: []byte{0xc0, 0, 0, 0, 1, 0, 0}, Session: map[string]any{"Header Form": "long", "Version": uint32(1), "DCID": []byte(nil), "SCID": []byte(nil), "Wire Field Ranges": map[string]any{"DCID": []any{6, 6}, "SCID": []any{7, 7}}}}
 	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
