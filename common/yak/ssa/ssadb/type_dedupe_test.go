@@ -50,6 +50,25 @@ func dedupeItem(program string, id int64, text string) *IrType {
 	}
 }
 
+// A read must survive a handle that already carries model scopes. GORM's Raw
+// path on such a handle rewrites FROM into "FROM <model>, <query>", which is a
+// syntax error; that turned every type read into nil (and the ARTEX scan lost
+// 97 reflected-XSS risks) before the read used database/sql directly.
+func TestIrTypeDedupeReadPathSurvivesScopedHandle(t *testing.T) {
+	db := setupDedupeDB(t)
+	require.NoError(t, SaveIrTypeBatch(db, []*IrType{dedupeItem("scoped", 7, "number")}))
+
+	scoped := db.Model(&IrType{}).Where("program_name = ?", "scoped")
+	loaded := GetIrTypeItemById(scoped, "scoped", 7)
+	require.NotNil(t, loaded, "a scoped handle must still resolve the deduped type")
+	require.Equal(t, uint64(7), loaded.TypeId)
+	require.Equal(t, "number", loaded.String)
+
+	var count int64
+	require.NoError(t, scoped.Count(&count).Error)
+	require.Equal(t, int64(0), count, "the caller's scope must not be consumed by the read")
+}
+
 // The point of the layout: 500 ids that share a payload store one payload.
 func TestIrTypeDedupeStoresPayloadOnce(t *testing.T) {
 	db := setupDedupeDB(t)
