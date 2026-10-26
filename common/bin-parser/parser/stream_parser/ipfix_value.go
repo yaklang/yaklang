@@ -106,6 +106,9 @@ func DecodeIPFIXWire(w []byte, previous map[uint16]IPFIXTemplate, transport stri
 		return out, ErrObservedWireBudget
 	}
 	for id, t := range previous {
+		if !charge(len(t.Fields) + 1) {
+			return out, r.err
+		}
 		minimum := 0
 		valid := id >= 256 && t.ID == id && len(t.Fields) > 0
 		normal := false
@@ -120,9 +123,6 @@ func DecodeIPFIXWire(w []byte, previous map[uint16]IPFIXTemplate, transport stri
 		}
 		if !valid || minimum != t.MinimumLength || minimum == 0 {
 			return out, fmt.Errorf("%w: invalid caller IPFIX schema", ErrObservedWireContext)
-		}
-		if !charge(len(t.Fields) + 1) {
-			return out, r.err
 		}
 	}
 	working := CloneIPFIXTemplates(previous)
@@ -140,6 +140,7 @@ func DecodeIPFIXWire(w []byte, previous map[uint16]IPFIXTemplate, transport stri
 			id := uint16(c.num("FlowSet ID", 2, false))
 			c.num("FlowSet Length", 2, false)
 			if id == 2 || id == 3 {
+				c.need(len(c.w)-c.at >= 4, "IPFIX Template Set requires at least one record")
 				var templates []map[string]any
 				for c.at < len(c.w) && c.err == nil {
 					if len(c.w)-c.at < 4 {
@@ -229,6 +230,7 @@ func DecodeIPFIXWire(w []byte, previous map[uint16]IPFIXTemplate, transport stri
 				}
 				c.info["Templates"] = templates
 			} else if id >= 256 {
+				c.need(c.at < len(c.w), "IPFIX Data Set requires at least one record")
 				t, ok := working[id]
 				if !ok || t.Quarantined || export < t.ExportTime {
 					contextErr = fmt.Errorf("%w: IPFIX template %d unavailable at this export time", ErrObservedWireContext, id)
@@ -285,6 +287,7 @@ func DecodeIPFIXWire(w []byte, previous map[uint16]IPFIXTemplate, transport stri
 						}
 					}
 					c.info["Records"] = records
+					c.need(len(records) > 0, "IPFIX Data Set contains padding but no complete record")
 				}
 			} else {
 				r.info["Known Set Namespace"] = false
