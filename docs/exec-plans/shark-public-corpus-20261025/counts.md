@@ -1,5 +1,7 @@
 <!-- Generated aggregate evidence; no packet bytes or secrets. -->
 
+以下是初始基线。当前源码的完整重放计数见 [当前计数](current-counts.md)，原始标签和历史差异保留在本页，不作为新版漏识别清单。
+
 | 统计口径 | Weber | Sharon fuzz |
 |---|---:|---:|
 | 输入帧数 | 51,328 | 328,127 |
