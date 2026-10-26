@@ -5,6 +5,7 @@ explicit differences; they are not substituted with native labels or zero counts
 import argparse,base64,collections,hashlib,ipaddress,json,struct
 from pathlib import Path
 ap=argparse.ArgumentParser(description=__doc__)
+ap.add_argument('--require-unverified-tail',action='store_true')
 for n in ['capture','manifest','oracle','events','out']:ap.add_argument('--'+n,required=True,type=Path)
 a=ap.parse_args();checks=0
 for p in [a.capture,a.out]:assert not any((q/'.git').exists() for q in [p.resolve(),*p.resolve().parents])
@@ -79,12 +80,29 @@ for key,cells in reference.items():
  for f in fs:f['offset']+=n;eq(f['type'],4,'declared SETTINGS control')
  framing[key]=fs
 
+# Compare raw reference application views with independently reconstructed peer
+# frames. Retransmission views stay in the counts, and missing deep views stay
+# explicit even when the reference QUIC STREAM bytes reconstruct the frame.
+reference_app_views=collections.defaultdict(list);reference_unmatched_views=[]
+for row in load(a.oracle):
+ l=row['_source']['layers'];no=int(l['frame']['frame.number'])
+ for node in nodes(l.get('http3',{}),'http3.frame_type'):
+  typ=int(node['http3.frame_type'],0);n=int(node['http3.frame_length']);body=bytes.fromhex((node.get('http3.frame_payload_raw')or[''])[0]);eq(len(body),n,'complete literal reference application payload');raw=bytes.fromhex(node['http3.frame_type_raw'][0]+node['http3.frame_length_raw'][0])+body;direction=0 if packet_endpoints[no][0].endswith(':'+ports[0])else 1;key=(packet_conn[no],direction,int(node['http3.frame_streamid']));digest=sha(raw);matching=[f for f in framing.get(key,[])if f['type']==typ and f['sha256']==digest]
+  if matching:
+   eq(len(matching),1,'one observed peer-frame position per selected reference view');reference_app_views[(key,matching[0]['offset'])].append(no)
+  else:reference_unmatched_views.append({'physical_frame':no,'connection':key[0],'direction':key[1],'stream':key[2],'type':typ,'length':n,'sha256':digest})
+eq([(v['physical_frame'],v['type'])for v in reference_unmatched_views],[(v['physical_frame'],v['raw_type'])for v in reference_midframe_views],'all unmatched raw views explained by independently located interior HEADERS bytes')
+reference_missing_views=[{'connection':key[0],'direction':key[1],'stream':key[2],'offset':f['offset'],'type':f['type'],'payload_bytes':len(f['payload']),'sha256':f['sha256']}for key,fs in framing.items()for f in fs if(key,f['offset'])not in reference_app_views]
+reference_repeated_views=[{'connection':key[0],'direction':key[1],'stream':key[2],'offset':offset,'type':next(f['type']for f in framing[key]if f['offset']==offset),'frames':nos}for(key,offset),nos in reference_app_views.items()if len(nos)>1]
+
 events=[json.loads(s) for s in a.events.read_text(encoding='utf-8-sig').splitlines()];by_id={e['id']:e for e in events};eq(len(by_id),len(events),'unique native PDU IDs');native_input={};application=collections.defaultdict(dict);contexts=collections.defaultdict(list);errors=collections.defaultdict(list);flow_bind={};diagnostics=[];app_delivery={}
 for e in events:
  session=e.get('session')or{};streams=[fr for fr in session.get('Frames',[]) if fr.get('Frame Type')=='STREAM']
  if not streams:
   if e['protocol']=='quic' and e['status'] not in ['decoded','deferred']:
-   raw=base64.b64decode(e['raw']);refs=e['source_bytes'].get('PacketRefs')or[];check(bool(raw)and not any(raw),'selected unprotected datagram tail is literal zero bytes');check(all(physical[r['Number']].endswith(raw)for r in refs),'diagnostic retains actual datagram tail');diagnostics.append({'PDU':e['id'],'status':e['status'],'frames':[r['Number']for r in refs],'error':e['error'],'raw_tail_bytes':len(raw),'raw_tail_sha256':sha(raw),'admission_before_followup_fix':e['admission'],'scope':'unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames'})
+   raw=base64.b64decode(e['raw']);refs=e['source_bytes'].get('PacketRefs')or[];check(bool(raw)and not any(raw),'selected unprotected datagram tail is literal zero bytes');check(all(physical[r['Number']].endswith(raw)for r in refs),'diagnostic retains actual datagram tail')
+   if a.require_unverified_tail:eq(e['admission'],'unparsed-datagram-remainder','tail never inherits neighbouring packet authentication');check('authentication not verified'in e['summary'],'unverified scope explicit in summary')
+   diagnostics.append({'PDU':e['id'],'status':e['status'],'frames':[r['Number']for r in refs],'error':e['error'],'raw_tail_bytes':len(raw),'raw_tail_sha256':sha(raw),'admission':e['admission'],'scope':'unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames'})
   continue
  eq(session.get('Authentication Verified'),True,'native application bytes authenticated');eq(session.get('Native Carrier'),True,'native carrier');eq(session.get('ALPN'),'h3','observed ALPN');eq(e['transport'],'udp','native transport');eq(e['protocol'],'http3'if session.get('HTTP3')else'quic','identity follows observed application progress, including message errors');refs=e['source_bytes']['PacketRefs'];conns={packet_conn[r['Number']] for r in refs};eq(len(conns),1,'native/reference connection');conn=next(iter(conns));flow_bind.setdefault(e['flow'],conn);eq(flow_bind[e['flow']],conn,'stable native generation');eq(e['domain'],{'Section':0,'Interface':0,'Encapsulation':''},'literal capture domain')
  for r in refs:eq(r['Domain'],e['domain'],'reference domain');eq((e['source'],e['destination']),packet_endpoints[r['Number']],'literal native endpoints')
@@ -131,4 +149,5 @@ for key,frames in expected.items():
   for f in frames[len(offsets):]:tails.append({'connection':key[0],'direction':key[1],'stream':key[2],'case':plan['name'],'offset':f['offset'],'type':f['type'],'payload_bytes':len(f['payload']),'reason':'unparsed suffix after explicit stream-local message rejection'})
  verdicts[want]+=1
 out={'scope':__doc__,'checks':checks,'connections':len(flow_bind),'operations':len(m['operations']),'checked_directions':len(expected),'direction_verdicts':dict(verdicts),'native_selected_differences':[],'native_unparsed_rejected_message_tail_frames':tails,'raw_reference_HTTP3_views':dict(ws_counts),'reference_midframe_views':reference_midframe_views,'native_selected_app_frames':sum(len(v)for v in application.values()),'native_selected_app_types':dict(collections.Counter(str(h['Frame Type Value'])for fs in application.values()for h in fs.values())),'nonapplication_QUIC_diagnostics':diagnostics,'network':m['network'],'completed_body_summaries':body_summaries,'capture_sha256':sha(capture),'events_sha256':sha(a.events.read_bytes()),'reference_sha256':sha(a.oracle.read_bytes())}
-a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps({k:v for k,v in out.items()if k not in ['scope','completed_body_summaries','native_unparsed_rejected_message_tail_frames','nonapplication_QUIC_diagnostics']}));print('Retained unparsed tail frames',len(tails),'and nonapplication diagnostics',len(diagnostics))
+out['reference_view_classification']={'unique_exact_peer_frame_views':len(reference_app_views),'repeated_extra_views':sum(len(nos)-1 for nos in reference_app_views.values()),'repeated_extra_types':dict(collections.Counter(str(v['type'])for v in reference_repeated_views for _ in v['frames'][1:])),'repeated_views':reference_repeated_views,'missing_deep_reference_views':reference_missing_views,'unmatched_raw_views':reference_unmatched_views,'scope':'raw counts preserved; exact complete frame bytes bound to connection/direction/stream/position; missing deep application views do not mean missing QUIC STREAM bytes'}
+a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps({k:v for k,v in out.items()if k not in ['scope','completed_body_summaries','native_unparsed_rejected_message_tail_frames','nonapplication_QUIC_diagnostics','reference_view_classification']}));print('Retained unparsed tail frames',len(tails),'and nonapplication diagnostics',len(diagnostics));print('Reference exact/repeated-extra/missing-deep/unmatched views',len(reference_app_views),out['reference_view_classification']['repeated_extra_views'],len(reference_missing_views),len(reference_unmatched_views))
