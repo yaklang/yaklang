@@ -194,6 +194,11 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if !h.long {
 		info["Header Form"] = "short"
 	}
+	if h.vn || h.retry {
+		// These unnumbered packet types carry no PN and belong to no PN space.
+		// The zero value of the internal header's space is not an Initial fact.
+		delete(info, "Packet Number Space")
+	}
 	if h.vn {
 		info["Supported Versions"] = h.versions
 		info["Connection State"] = "version-negotiation-observed"

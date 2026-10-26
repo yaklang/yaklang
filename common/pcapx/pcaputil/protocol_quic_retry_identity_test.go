@@ -116,3 +116,49 @@ func FuzzQUICRetryCryptoRefusalSurvivesDuplicate(f *testing.F) {
 		require.Equal(t, random, q.tls.random)
 	})
 }
+
+func TestQUICRetryRejectedNativePacketDuplicateIsNotSuccess(t *testing.T) {
+	q := &binQUIC{native: true, byteLimit: 1 << 20}
+	first := rfc9001ClientInitial()
+	_, err := q.consume(0, first, 4096)
+	require.NoError(t, err)
+	retryCID, token := []byte("retry-id"), []byte("token")
+	retry := retryIdentityPacket(q.originalDCID, q.initialSCID, retryCID, token)
+	changed := bytes.Clone(q.cryptoData[0][quicSpaceInitial].data)
+	changed[6] ^= 1
+	plain := append([]byte{6, 0}, quicPutVarint(uint64(len(changed)))...)
+	plain = append(plain, changed...)
+	bad := retryTestInitialFrames(t, retryCID, retryCID, q.initialSCID, token, 3, 0, plain)
+	es, stats := discoveryReplay(t, sessionDatagramPCAP(t, []sessionStep{{0, first}, {1, retry}, {0, bad}, {0, bad}}, 14443), 1, false, false)
+	require.Len(t, es, 4)
+	require.Equal(t, es[0].FlowID, es[3].FlowID)
+	for _, e := range es[2:] {
+		require.Equal(t, "malformed", e.Status)
+		require.Equal(t, string(ErrMalformedMessage), e.ExpertCode)
+		require.Contains(t, e.Error, "conflicting retransmission")
+		require.Equal(t, true, e.Session["Authentication Verified"], "packet protection is separate from CRYPTO consistency")
+		require.Equal(t, "authenticated-wire-and-observed-CID", e.Admission)
+	}
+	require.Equal(t, true, es[3].Session["Duplicate"])
+	require.Zero(t, stats.BufferedBytes)
+}
+
+func TestQUICUnnumberedHeadersDoNotInventPacketNumberSpace(t *testing.T) {
+	q := &binQUIC{native: true, byteLimit: 1 << 20}
+	_, err := q.consume(0, rfc9001ClientInitial(), 4096)
+	require.NoError(t, err)
+	versionNegotiation := rfcHex("c0000000000008f067a5502a4262b50000000100000002")
+	info, err := q.consume(1, versionNegotiation, 4096)
+	require.NoError(t, err)
+	require.Equal(t, "Version Negotiation", info["Packet Name"])
+	for _, key := range []string{"Packet Number Space", "Packet Number", "Packet Number Length"} {
+		require.NotContains(t, info, key)
+	}
+	info, err = q.consume(1, retryIdentityPacket(q.originalDCID, q.initialSCID, []byte("retry-id"), []byte("token")), 4096)
+	require.NoError(t, err)
+	require.Equal(t, true, info["Retry Integrity Verified"])
+	for _, key := range []string{"Packet Number Space", "Packet Number", "Packet Number Length"} {
+		require.NotContains(t, info, key)
+	}
+	require.Equal(t, false, info["Authentication Verified"])
+}
