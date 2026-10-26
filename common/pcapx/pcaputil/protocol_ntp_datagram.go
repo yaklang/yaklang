@@ -13,10 +13,10 @@ func (a *binParser) decodeNTPDatagram(e *ProtocolEvent, w []byte, src, dst uint1
 			return false
 		}
 		if mode == 6 {
-			if !hint || v < 2 || w[0]>>6 != 0 || len(w) < 12 {
+			if !hint || v < 2 || w[0]>>6 != 0 || len(w) < 12 || w[2] == 0 && w[3] == 0 || ntpControlOpcode(w[1]&31) == "Reserved" {
 				return false
 			}
-		} else if len(w) < 48 || !hint && (len(w) != 48 || probeNTP(w, len(w)).Verdict != ProbeAccept) {
+		} else if len(w) < 48 || w[1] > 16 || !hint && (len(w) != 48 || probeNTP(w, len(w)).Verdict != ProbeAccept) {
 			return false
 		}
 	}
@@ -28,6 +28,11 @@ func (a *binParser) decodeNTPDatagram(e *ProtocolEvent, w []byte, src, dst uint1
 		e.Admission = "complete-client-server-wire"
 	}
 	e.nativeSessionMessage = true
+	// UDP events normally receive IDs at emit time. Passive ownership and
+	// byte-source witnesses need the final nonzero ID before state advances.
+	if e.ID == 0 {
+		e.ID = a.ids.Add(1)
+	}
 	var fields map[string]any
 	var err error
 	if a.config.MaxMessageBytes > 0 && len(w) > a.config.MaxMessageBytes {

@@ -204,7 +204,14 @@ func runIncrementalMVPSealedReplay(t *testing.T, prefix string, groups []string)
 							case "dns-pointer":
 								assertDNSPointerMVPEvents(t, answer, normalized)
 							case "signature":
-								assertSignatureMVPEvents(t, answer, normalized)
+								if c.ID == "ntpv2-negative" {
+									// This frozen negative described the former v3/v4-only
+									// discovery profile. Preserve its capture and answer;
+									// independently check the newly supported v2 header.
+									assertNativeNTPLegacyVersionReview(t, events)
+								} else {
+									assertSignatureMVPEvents(t, answer, normalized)
+								}
 								incrementalMVPRawOracle(t, answer, normalized)
 							case "tunnel":
 								incrementalMVPTunnel(t, a, normalized)
