@@ -14,6 +14,8 @@ func TestP0RoadmapCovered(t *testing.T) {
 	// changing its catalog status to "new" must not bypass the scope checks.
 	requireP0WPADRetrievalScope(t)
 	coveredScopes := requireP0MessageScopes(t)
+	requireP0QUICWireEnvelopeScope(t)
+	coveredScopes["QUIC"] = true // Explicit bounded header scope, not full version/native coverage.
 	for name, passed := range requireObservedSessionScopes(t, priP0) {
 		coveredScopes[name] = passed
 	}
