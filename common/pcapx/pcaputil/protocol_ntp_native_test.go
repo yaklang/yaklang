@@ -67,6 +67,28 @@ func TestNativeNTPControlRealIngressOwnsIDsBeforePublication(t *testing.T) {
 	}
 }
 
+func TestNativeNTPRejectedDatagramCannotFallBackToLegacyProbe(t *testing.T) {
+	// A large unrelated UDP message can share the old probe's leading version,
+	// mode and stratum. The native admission decision must survive dispatch.
+	w := make([]byte, 780)
+	w[0], w[2], w[3] = 0x63, 0x2d, 0x97
+	for _, deferred := range []bool{false, true} {
+		var es []*ProtocolEvent
+		capture := t20UDPCapture(t, net.IPv4(192, 0, 2, 1), net.IPv4(192, 0, 2, 2), 13416, 6635, w)
+		require.NoError(t, ReplayPcap(bytes.NewReader(capture), WithProtocolDeferred(deferred), WithOnProtocolMessage(func(e *ProtocolEvent) { es = append(es, e) })))
+		require.Len(t, es, 1)
+		require.Empty(t, es[0].Protocol, "unselected extended NTP-like prefix must remain unknown UDP")
+		require.Zero(t, es[0].ResponseTo)
+		capture = t20UDPCapture(t, net.IPv4(192, 0, 2, 1), net.IPv4(192, 0, 2, 2), 13416, 123, w)
+		es = nil
+		require.NoError(t, ReplayPcap(bytes.NewReader(capture), WithProtocolDeferred(deferred), WithOnProtocolMessage(func(e *ProtocolEvent) { es = append(es, e) })))
+		require.Len(t, es, 1)
+		require.Equal(t, "ntp", es[0].Protocol)
+		require.Equal(t, "ntp-native", es[0].Profile)
+		require.Equal(t, "context-required", es[0].Status, "service selection can expose a partial header without inventing extension semantics")
+	}
+}
+
 func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
 	for version := byte(2); version <= 4; version++ {
 		for mode := byte(1); mode <= 5; mode++ {
