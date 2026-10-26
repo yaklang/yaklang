@@ -14,10 +14,10 @@ import (
 
 type IrCode struct {
 	gorm.Model
-	CodeID int64 `json:"code_id" gorm:"index:idx_ircode_program_codeid;index"`
+	CodeID int64 `json:"code_id"`
 
-	ProgramName string `json:"program_name" gorm:"index:idx_ircode_program_codeid;index:idx_ircode_program_opcode;index"`
-	Version     string `json:"package_version" gorm:"index"`
+	ProgramName string `json:"program_name"`
+	Version     string `json:"package_version"`
 
 	// source code
 	SourceCodeStartOffset int64  `json:"source_code_start_offset"`
@@ -25,7 +25,7 @@ type IrCode struct {
 	SourceCodeHash        string `json:"source_code_hash"` // default md5
 
 	// opcode
-	Opcode     int64  `json:"opcode" gorm:"index:idx_ircode_program_opcode"`
+	Opcode     int64  `json:"opcode"`
 	OpcodeName string `json:"opcode_name"`
 
 	// just for binary and unary operator
@@ -90,7 +90,7 @@ type IrCode struct {
 	Variable StringSlice `json:"variable" gorm:"type:text"`
 
 	// compile hash means: hash[ (file-content)+(program-name)+(package-name)+(program-index) ]
-	ProgramCompileHash string `json:"program_compile_hash" gorm:"index"`
+	ProgramCompileHash string `json:"program_compile_hash"`
 
 	// type
 	TypeID int64 `json:"type_id"`
@@ -102,7 +102,7 @@ type IrCode struct {
 	// not important information
 	ExtraInformation string `json:"extra_information" gorm:"type:text"`
 
-	ConstType string `json:"const_type" gorm:"index"`
+	ConstType string `json:"const_type"`
 }
 
 func (*IrCode) TableName() string {

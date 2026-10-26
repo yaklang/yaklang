@@ -114,7 +114,34 @@ func InsertIrCodes(db *gorm.DB, items []*IrCode, batchSize int) error {
 	if batchSize < 1 {
 		batchSize = len(items)
 	}
-	return db.CreateInBatches(items, batchSize).Error
+	// The batched insert bypasses the GORM create callbacks, so record it
+	// here or db-stats silently loses every bulk IR write.
+	started := time.Now()
+	err := db.CreateInBatches(items, batchSize).Error
+	RecordDBOp(DBOpCreate, time.Since(started), err != nil)
+	return err
+}
+
+// irCodeWriteCounters splits IR code writes into fresh rows and rewrites of
+// rows the identity rowid table already knows. A compile that rewrites a
+// large share of its instructions is paying for repeated saves, not new IR.
+var (
+	irCodeInsertRows       atomic.Int64
+	irCodeUpdateRows       atomic.Int64
+	irCodeUpdateStatements atomic.Int64
+)
+
+// IrCodeWriteBreakdown reports the IR code write mix since process start.
+func IrCodeWriteBreakdown() (insertRows, updateRows, updateStatements int64) {
+	return irCodeInsertRows.Load(), irCodeUpdateRows.Load(), irCodeUpdateStatements.Load()
+}
+
+// ResetIrCodeWriteBreakdown clears the counters; used by tests and runs that
+// want a per-compile breakdown.
+func ResetIrCodeWriteBreakdown() {
+	irCodeInsertRows.Store(0)
+	irCodeUpdateRows.Store(0)
+	irCodeUpdateStatements.Store(0)
 }
 
 func saveIrCodesWithoutIdentityIndex(db *gorm.DB, items []*IrCode) error {
@@ -135,16 +162,65 @@ func saveIrCodesWithoutIdentityIndex(db *gorm.DB, items []*IrCode) error {
 		if err := InsertIrCodes(db, inserts, irCodeBatchChunk); err != nil {
 			return err
 		}
+		irCodeInsertRows.Add(int64(len(inserts)))
 	}
-	for _, item := range updates {
-		if err := db.Save(item).Error; err != nil {
-			return fmt.Errorf("update ir code %d by rowid: %w", item.CodeID, err)
+	if len(updates) > 0 {
+		if err := saveIrCodeUpdatesByRowID(db, updates); err != nil {
+			return err
 		}
 	}
 	if _, inTx := db.CommonDB().(*sql.Tx); inTx {
 		return nil
 	}
 	return NoteIrCodeRowIDs(items)
+}
+
+// saveIrCodeUpdatesByRowID rewrites rows the rowid table already knows, keyed
+// by primary key. The old path issued one db.Save per row, so every revisited
+// instruction paid its own transaction; on Hue that was 1.7ms per row. The
+// identity index is suspended here, which makes the primary key the conflict
+// target, so a chunk of rows travels in one upsert statement.
+func saveIrCodeUpdatesByRowID(db *gorm.DB, updates []*IrCode) error {
+	for start := 0; start < len(updates); start += irCodeBatchChunk {
+		end := start + irCodeBatchChunk
+		if end > len(updates) {
+			end = len(updates)
+		}
+		chunk := dedupeIrCodeRowIDs(updates[start:end])
+		if len(chunk) == 0 {
+			continue
+		}
+		started := time.Now()
+		err := db.SaveInBatches(chunk, irCodeBatchChunk).Error
+		RecordDBOp(DBOpUpdate, time.Since(started), err != nil)
+		irCodeUpdateStatements.Add(1)
+		irCodeUpdateRows.Add(int64(len(chunk)))
+		if err != nil {
+			return fmt.Errorf("update ir code batch by rowid: %w", err)
+		}
+	}
+	return nil
+}
+
+// dedupeIrCodeRowIDs keeps the last row for a repeated rowid. A chunk that
+// names the same conflict key twice is rejected by PostgreSQL, and SQLite
+// applies the later row anyway, so dropping the earlier one preserves the
+// sequential-save result.
+func dedupeIrCodeRowIDs(items []*IrCode) []*IrCode {
+	seen := make(map[uint]int, len(items))
+	out := items[:0]
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		if index, ok := seen[item.ID]; ok {
+			out[index] = item
+			continue
+		}
+		seen[item.ID] = len(out)
+		out = append(out, item)
+	}
+	return out
 }
 
 func rememberIrCodeRowID(program string, codeID, rowID int64) error {

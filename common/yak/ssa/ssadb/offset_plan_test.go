@@ -43,8 +43,11 @@ func TestOffsetVariableLookupKeepsFilteredIDOrder(t *testing.T) {
 	ordered := sqliteQueryPlan(t, db, query+" ORDER BY id", args...)
 	t.Logf("sqlite %s\nno-order:\n%sorder-by-id:\n%s", sqliteVersion(t, db), plan, ordered)
 	require.Contains(t, plan, "ux_ir_offsets_program_value_file_range")
-	require.NotContains(t, plan, "idx_ir_offsets_value_id")
-	require.Contains(t, ordered, "idx_ir_offsets_value_id")
+	// ORDER BY id makes SQLite abandon the (program_name, value_id) prefix and
+	// seek by variable_name instead; either way it must not scan the table.
+	require.NotContains(t, ordered, "ux_ir_offsets_program_value_file_range")
+	require.Contains(t, ordered, "idx_ir_offsets_variable_name")
+	require.NotContains(t, ordered, "SCAN "+TableIrOffsets)
 }
 
 func sqliteVersion(t *testing.T, db *gorm.DB) string {

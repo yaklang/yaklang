@@ -1,6 +1,7 @@
 package ssadb
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -50,12 +51,17 @@ func TestConstLookupIndexServesExactAndRegexp(t *testing.T) {
 	require.Contains(t, regexpPlan, irCodeConstLookupIndex)
 	require.NotContains(t, regexpPlan, "SCAN")
 
-	// A bound opcode cannot prove the partial-index predicate, so this shape
-	// must stay out of the production query.
+	// The production SQL carries the literal predicate and the INDEXED BY hint:
+	// that is what lets SQLite prove the partial index applies. A bound opcode
+	// cannot prove it, so production must never send this shape.
+	production := constLookupSQL("=", irCodeConstLookupIndex)
+	require.Contains(t, production, fmt.Sprintf("opcode = %d", irCodeConstOpcode))
+	require.Contains(t, production, "'"+irCodeConstTypeNormal+"'")
+	require.Contains(t, production, `INDEXED BY "`+irCodeConstLookupIndex+`"`)
 	boundPlan := sqliteQueryPlan(t, db,
 		`SELECT code_id FROM `+TableIrCodes+` WHERE program_name = ? AND opcode = ? AND const_type = ? AND "string" = ? AND deleted_at IS NULL`,
 		prog, irCodeConstOpcode, irCodeConstTypeNormal, "renamed")
-	require.NotContains(t, boundPlan, irCodeConstLookupIndex)
+	require.NotContains(t, boundPlan, "SCAN "+TableIrCodes)
 }
 
 func sqliteQueryPlan(t *testing.T, db *gorm.DB, query string, args ...interface{}) string {

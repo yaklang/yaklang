@@ -8,14 +8,13 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// irTypeBatchChunk bounds rows per SaveInBatches chunk under SQLite's
-// MAX_VARIABLE_NUMBER=250000 ceiling; 1000 rows is safe for the wide IrType
-// model and reduces the number of multi-row INSERT statements per flush.
+// irTypeBatchChunk bounds rows per SaveInBatches chunk. The dedupe layout uses
+// it for narrow type-ID rows; legacy databases use it for full IrType rows.
 const irTypeBatchChunk = 1000
 
 type IrType struct {
 	gorm.Model
-	TypeId           uint64 `json:"type_id" gorm:"index"`
+	TypeId           uint64 `json:"type_id"`
 	Kind             int    `json:"kind"`
 	ProgramName      string `json:"program_name"`
 	String           string `json:"string" gorm:"type:text"`
@@ -47,6 +46,15 @@ func UpsertIrType(db *gorm.DB, ir *IrType) error {
 	if db == nil || ir == nil {
 		return nil
 	}
+	if IrTypeDedupeAvailable(db) {
+		if err := saveIrTypeRowsDeduped(db, []*IrType{ir}); err != nil {
+			return err
+		}
+		if cache := GetIrTypeCache(ir.ProgramName); cache != nil {
+			cache.Set(int64(ir.TypeId), ir)
+		}
+		return nil
+	}
 	record := &IrType{
 		ProgramName: ir.ProgramName,
 		TypeId:      ir.TypeId,
@@ -62,19 +70,24 @@ func UpsertIrType(db *gorm.DB, ir *IrType) error {
 	return nil
 }
 
-// SaveIrTypeBatch writes types as in-place upserts on (program_name, type_id).
-// ux_ir_types_program_type is created with the schema, so the row id stays
-// stable across flushes. SaveInBatches skips nil elements. The in-process
-// GetIrTypeCache is warmed after a successful write. GORM selects the native
-// upsert or DM MERGE and owns a transaction unless a caller supplied one.
-// With a caller-owned transaction, the caller also owns commit/rollback and
-// must discard the program cache if it rolls back after this function succeeds.
+// SaveIrTypeBatch persists a batch in the dedupe layout when the additive
+// tables exist. It stores each body once and upserts one narrow ID row for
+// every TypeId. Databases without those tables retain the legacy ir_types
+// upsert path. New and legacy readers are supported in the same process.
+// The in-process GetIrTypeCache is warmed after a successful write. A caller
+// that owns a transaction also owns commit/rollback.
 func SaveIrTypeBatch(db *gorm.DB, items []*IrType) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	if err := db.New().SaveInBatches(items, irTypeBatchChunk, "program_name", "type_id").Error; err != nil {
-		return fmt.Errorf("upsert IR type: %w", err)
+	if IrTypeDedupeAvailable(db) {
+		if err := saveIrTypeRowsDeduped(db, items); err != nil {
+			return err
+		}
+	} else {
+		if err := db.New().SaveInBatches(items, irTypeBatchChunk, "program_name", "type_id").Error; err != nil {
+			return fmt.Errorf("upsert IR type: %w", err)
+		}
 	}
 	// keep the in-process type cache warm (same side effect as UpsertIrType)
 	for _, it := range items {
@@ -97,6 +110,17 @@ func EmptyIrType(progName string, id uint64) *IrType {
 
 func GetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
 	if id < 0 {
+		return nil
+	}
+	// Deduped databases have no ir_types row for this id; the join returns the
+	// shared payload. A database compiled by an older binary answers nil here
+	// and falls through to the ir_types read below.
+	if deduped, err := getIrTypeFromDedupe(db, progName, id); err == nil && deduped != nil {
+		return deduped
+	} else if err != nil {
+		// A real read error must not be reported as a missing type; the
+		// caller would cache a nil and emit a different IR for this id.
+		log.Warnf("read deduped IR type %s/%d: %v", progName, id, err)
 		return nil
 	}
 	// Native-SQL fast path (see GetIrCodeItemById comment). Same result as the
@@ -126,13 +150,31 @@ func DeleteIrType(db *gorm.DB, id []int64) error {
 		return utils.Errorf("delete type from database id is empty")
 	}
 	return utils.GormTransaction(db, func(tx *gorm.DB) error {
-		// split each 999
+		// Split below SQLite's traditional bind-variable limit.
 		for i := 0; i < len(id); i += 999 {
 			end := i + 999
 			if end > len(id) {
 				end = len(id)
 			}
-			tx.Where("id IN (?)", id[i:end]).Unscoped().Delete(&IrType{})
+			chunk := id[i:end]
+			legacyDelete := tx.Where("id IN (?)", chunk).Unscoped().Delete(&IrType{})
+			if legacyDelete.Error != nil {
+				return legacyDelete.Error
+			}
+			if IrTypeDedupeAvailable(tx) {
+				dedupeDelete := tx.Where("id IN (?)", chunk).Unscoped().Delete(&IrTypeID{})
+				if dedupeDelete.Error != nil {
+					return dedupeDelete.Error
+				}
+			}
+		}
+		if IrTypeDedupeAvailable(tx) {
+			cleanup := tx.Exec(`DELETE FROM ` + TableIrTypePayloads + ` WHERE NOT EXISTS (` +
+				`SELECT 1 FROM ` + TableIrTypeIDs + ` AS i WHERE i.program_name = ` + TableIrTypePayloads + `.program_name ` +
+				`AND i.type_hash = ` + TableIrTypePayloads + `.type_hash)`)
+			if cleanup.Error != nil {
+				return cleanup.Error
+			}
 		}
 		return nil
 	})

@@ -16,8 +16,8 @@ const irIndexBatchChunk = 1000
 type IrIndex struct {
 	gorm.Model
 
-	ProgramName string `json:"program_name" gorm:"index;not null"`
-	ValueID     int64  `json:"value_id" gorm:"index;not null"`
+	ProgramName string `json:"program_name" gorm:"not null"`
+	ValueID     int64  `json:"value_id" gorm:"not null"`
 
 	VariableID *int64 `json:"variable_id" gorm:"index"`
 	ClassID    *int64 `json:"class_id" gorm:"index"`
@@ -28,9 +28,9 @@ type IrIndex struct {
 
 	// for object-key-member search
 	// owner id + field id -> member
-	OwnerValueID *int64 `json:"owner_value_id" gorm:"index"`
+	OwnerValueID *int64 `json:"owner_value_id"`
 
-	VersionID int64 `json:"version_id" gorm:"index"`
+	VersionID int64 `json:"version_id"`
 }
 
 func (i *IrIndex) TableName() string {

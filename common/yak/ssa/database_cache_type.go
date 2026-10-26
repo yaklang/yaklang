@@ -140,33 +140,79 @@ func (s *typeStore) flush() error {
 	fingerprints := make([][sha256.Size]byte, 0, batchSize)
 	batchIdentity := make([]typePersistIdentity, 0, batchSize)
 	batchStable := make([]bool, 0, batchSize)
+	type writeRequest struct {
+		rows         []*ssadb.IrType
+		fingerprints [][sha256.Size]byte
+		identities   []typePersistIdentity
+		stable       []bool
+		ids          []int64
+	}
+	type writeResult struct {
+		request writeRequest
+		err     error
+	}
+	requests := make(chan writeRequest, 1)
+	results := make(chan writeResult, 1)
+	workerDone := make(chan struct{})
+	workerStarted := false
+	startWorker := func() {
+		if workerStarted {
+			return
+		}
+		workerStarted = true
+		go func() {
+			defer close(workerDone)
+			for request := range requests {
+				err := saveBatch(request.rows)
+				results <- writeResult{request: request, err: err}
+			}
+		}()
+	}
+	pending := 0
 	var firstErr error
+	collect := func() {
+		result := <-results
+		pending--
+		if result.err != nil {
+			log.Errorf("save ir type batch failed: %v", result.err)
+			if firstErr == nil {
+				firstErr = result.err
+			}
+			return
+		}
+		for i, id := range result.request.ids {
+			s.persisted.set(id, result.request.fingerprints[i])
+			if result.request.stable[i] && id > 0 {
+				s.rememberIdentity(id, result.request.identities[i])
+			}
+		}
+	}
 	flush := func() {
 		if len(batch) == 0 {
 			return
 		}
-		// Snapshot String()/type metadata on this goroutine: some type
-		// String methods update recursion guards and caches. Only encoding
-		// these stable snapshots is safe to parallelize.
+		// Snapshots are complete before they cross the goroutine boundary.
+		// Marshal and batch-write this immutable chunk while the compile thread
+		// prepares the next chunk. The one-item queue bounds retained memory.
 		rows := marshalTypeSnapshots(s.programName, batch, fingerprints, s.concurrency)
-		if err := saveBatch(rows); err != nil {
-			log.Errorf("save ir type batch failed: %v", err)
-			if firstErr == nil {
-				firstErr = err
-			}
-		} else {
-			for i, typ := range batch {
-				s.persisted.set(typ.id, fingerprints[i])
-				if batchStable[i] && typ.id > 0 {
-					s.rememberIdentity(typ.id, batchIdentity[i])
-				}
-			}
+		ids := make([]int64, len(batch))
+		for i := range batch {
+			ids[i] = batch[i].id
 		}
-		clear(batch)
-		batch = batch[:0]
-		fingerprints = fingerprints[:0]
-		batchIdentity = batchIdentity[:0]
-		batchStable = batchStable[:0]
+		request := writeRequest{
+			rows: rows, fingerprints: fingerprints, identities: batchIdentity,
+			stable: batchStable, ids: ids,
+		}
+		startWorker()
+		requests <- request
+		pending++
+		batch = make([]typePersistenceSnapshot, 0, batchSize)
+		fingerprints = make([][sha256.Size]byte, 0, batchSize)
+		batchIdentity = make([]typePersistIdentity, 0, batchSize)
+		batchStable = make([]bool, 0, batchSize)
+		if pending >= 2 {
+			collect()
+		}
 	}
 
 	for _, typ := range types {
@@ -201,6 +247,13 @@ func (s *typeStore) flush() error {
 		}
 	}
 	flush()
+	if workerStarted {
+		close(requests)
+		for pending > 0 {
+			collect()
+		}
+		<-workerDone
+	}
 	return firstErr
 }
 
