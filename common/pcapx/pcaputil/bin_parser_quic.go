@@ -2,7 +2,6 @@ package pcaputil
 
 import (
 	"bytes"
-	"crypto/sha256"
 	"encoding/binary"
 	"fmt"
 )
@@ -12,6 +11,7 @@ import (
 // are parsed only after packet protection succeeds or through the explicitly
 // declared decrypted-stream API.
 type binQUIC struct {
+	version         uint32 // observed packet-protection version; zero is unbound
 	eventID         uint64
 	eventRefs       []PacketReference
 	keyPhase        [2]int
@@ -199,6 +199,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		// The zero value of the internal header's space is not an Initial fact.
 		delete(info, "Packet Number Space")
 	}
+	if h.long && !h.vn && q.version != 0 && h.version != q.version {
+		return info, protocolError(ErrContextRequired, "QUIC version changed from 0x%08x to 0x%08x; compatible negotiation is not selected", q.version, h.version)
+	}
 	if h.vn {
 		info["Supported Versions"] = h.versions
 		info["Connection State"] = "version-negotiation-observed"
@@ -235,54 +238,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if q.decryptedSource != "" {
 		return info, protocolError(ErrMalformedMessage, "invalid explicit decrypted QUIC frame input")
 	}
-	candidate := *q
-	candidate.keys = cloneQUICKeyring(q.keys)
-	oldInitial := false
-	if q.native && q.retrySeen && h.typeName == "Initial" && dir == 1 && !bytes.Equal(candidate.initialDCID, q.retrySCID) {
-		// The client Initial after Retry can be lost/reordered in a capture.
-		// Verified Retry context already supplies the server's Initial salt
-		// input. Commit these candidate keys only after packet protection passes.
-		candidate.initialDCID = bytes.Clone(q.retrySCID)
-		if candidate.keys != nil {
-			candidate.keys.initial = [2]*quicTrafficKeys{}
-		}
-	}
-	if q.native && q.retrySeen && h.typeName == "Initial" && dir == 0 {
-		if !bytes.Equal(h.scid, q.initialSCID) {
-			return info, protocolError(ErrMalformedMessage, "QUIC client Initial changed source CID after Retry")
-		}
-		switch {
-		case bytes.Equal(h.dcid, q.retrySCID):
-			if len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
-				return info, protocolError(ErrContextRequired, "QUIC Initial does not carry the observed Retry token")
-			}
-			if !bytes.Equal(candidate.initialDCID, h.dcid) {
-				candidate.initialDCID = bytes.Clone(h.dcid)
-				if candidate.keys != nil {
-					candidate.keys.initial = [2]*quicTrafficKeys{}
-				}
-			}
-		case bytes.Equal(h.dcid, q.originalDCID):
-			// A reordered duplicate of the old Initial can still be verified.
-			// It must never roll the active key generation back.
-			oldInitial = true
-			candidate.initialDCID = bytes.Clone(q.originalDCID)
-			if candidate.keys != nil {
-				candidate.keys.initial = [2]*quicTrafficKeys{}
-			}
-		case q.spaces[1][quicSpaceInitial].init:
-			// After an authenticated server Initial the client uses that new
-			// server SCID, while the Initial keys still derive from Retry SCID.
-			owner, observed := q.cids[string(h.dcid)]
-			if !observed || owner != 1 || len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
-				return info, protocolError(ErrContextRequired, "QUIC Initial does not match the post-Retry server CID/token")
-			}
-		default:
-			return info, protocolError(ErrContextRequired, "QUIC Initial DCID differs from observed Retry context")
-		}
-	}
-	if h.space == quicSpaceInitial && dir == 0 && len(candidate.initialDCID) == 0 {
-		candidate.initialDCID = append([]byte(nil), h.dcid...)
+	candidate, oldInitial, candidateError := q.protectionCandidate(dir, h)
+	if candidateError != nil {
+		return info, candidateError
 	}
 	tk, reason := candidate.keysFor(dir, h)
 	if tk == nil {
@@ -356,7 +314,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		candidate.keys.app[dir][1-phase] = next
 		q.keyPhase[dir] = phase
 	}
-	q.keys, q.initialDCID = candidate.keys, candidate.initialDCID
+	q.keys, q.initialDCID, q.version = candidate.keys, candidate.initialDCID, candidate.version
 	if q.native && h.typeName == "Initial" && dir == 0 && len(q.originalDCID) == 0 {
 		q.originalDCID, q.initialSCID = bytes.Clone(h.dcid), bytes.Clone(h.scid)
 	}
@@ -726,7 +684,7 @@ func quicParseHeader(w []byte, forFrame bool) (quicHdr, error) {
 		return h, quicMoreError{6}
 	}
 	h.version = binary.BigEndian.Uint32(w[1:5])
-	if h.version == 1 && h.first&0x40 == 0 {
+	if quicSupportedVersion(h.version) && h.first&0x40 == 0 {
 		return h, fmt.Errorf("quic: long header missing fixed bit")
 	}
 	off := 5
@@ -772,10 +730,13 @@ func quicParseHeader(w []byte, forFrame bool) (quicHdr, error) {
 		h.payloadOff = off
 		return h, nil
 	}
-	if h.version != 1 {
-		return h, protocolError(ErrUnsupportedVersion, "QUIC version 0x%08x is not v1", h.version)
+	if !quicSupportedVersion(h.version) {
+		return h, protocolError(ErrUnsupportedVersion, "QUIC version 0x%08x is not selected", h.version)
 	}
 	pktType := int((h.first >> 4) & 0x03)
+	if h.version == quicVersion2 {
+		pktType = (pktType + 3) & 3 // RFC9369: Retry, Initial, 0-RTT, Handshake.
+	}
 	h.pnLen = int(h.first&0x03) + 1
 	switch pktType {
 	case 0:
