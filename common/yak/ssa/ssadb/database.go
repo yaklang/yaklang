@@ -22,6 +22,8 @@ var SSAProjectTables = []any{
 	&IrSource{},
 	// type
 	&IrType{},
+	&IrTypeID{},
+	&IrTypePayload{},
 	// program
 	&IrProgram{},
 	&IrOffset{},
@@ -50,6 +52,7 @@ func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrTypeDedupe)
 	// gorm.Open copies gorm.DefaultCallback exactly once and never re-reads
 	// it, so the timing callbacks have to be on the default before the SSA
 	// database opens. Importing ssadb is what triggers the open.
@@ -136,10 +139,13 @@ func patchIrCodeIndex(db *gorm.DB) {
 	ensureUniqueIrOffsetsIndex(db)
 	ensureConstLookupIndex(db)
 
-	// The canonical UNIQUE keys already provide these exact lookup orders.
-	// New databases must not maintain a second B-tree per row for the same
-	// columns. This is format-compatible: no table/column/IR ID changes and
-	// no DROP against existing databases, so storage versions stay unchanged.
+	// Supported SQLite and PostgreSQL databases shed these redundant indexes
+	// without rewriting rows. Other dialects keep their legacy indexes until a
+	// dialect-specific drop path is available.
+	pruneRedundantIRIndexes(db)
+
+	// The canonical UNIQUE keys already provide these lookup orders. Removing
+	// redundant indexes keeps writes small on both fresh and reused databases.
 	// If a legacy database cannot establish the UNIQUE key, retain its old
 	// non-unique lookup coverage while batch writes use the existing fallback.
 	for _, lookup := range []struct {
@@ -438,6 +444,8 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "folder_path = ? AND file_name = ?", "/", program),
 		deleteProgramRows(db, TableIrTypes, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrTypeIDs, "program_name = ?", program),
+		deleteOptionalProgramRows(db, TableIrTypePayloads, "program_name = ?", program),
 		deleteProgramRows(db, TableIrOffsets, "program_name = ?", program),
 	)
 }
@@ -473,6 +481,15 @@ func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error 
 	})
 }
 
+// Dedupe tables are additive, so a legacy project database may not have them.
+// Deleting the owning program must remain safe on those older schemas.
+func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
+	if db == nil || !IrTypeDedupeAvailable(db) {
+		return nil
+	}
+	return deleteProgramRows(db, table, condition, args...)
+}
+
 const programDeleteAttempts = 3
 
 func retryProgramDelete(name string, deleteFn func() error) error {
@@ -486,4 +503,72 @@ func retryProgramDelete(name string, deleteFn func() error) error {
 		}
 	}
 	return fmt.Errorf("%s: delete failed after %d attempts: %w", name, programDeleteAttempts, err)
+}
+
+// redundantIRIndexes are single-column B-trees that a composite index already
+// answers, or that no IR query filters on. They cost a B-tree build on every
+// compile and, on a Hue-sized database, about 860MB of the file. The model
+// tags no longer create them; this list prunes databases created by older
+// binaries. Removing a redundant index preserves every row and also improves
+// writes when a populated database is recompiled.
+var redundantIRIndexes = []struct{ table, index string }{
+	{TableIrCodes, "idx_ir_codes_program_name"},           // ux_ir_codes_program_code is (program_name, code_id)
+	{TableIrCodes, "idx_ir_codes_code_id"},                // every lookup also binds program_name
+	{TableIrCodes, "idx_ircode_program_opcode"},           // idx_ir_codes_program_opcode is (program_name, opcode)
+	{TableIrCodes, "idx_ir_codes_version"},                // version lives on ir_programs
+	{TableIrCodes, "idx_ir_codes_program_compile_hash"},   // never a predicate
+	{TableIrCodes, "idx_ir_codes_const_type"},             // const lookups use idx_ir_codes_const_lookup
+	{TableIrTypes, "idx_ir_types_type_id"},                // lookups bind program_name too
+	{TableIrOffsets, "idx_ir_offsets_program_name"},       // ux_ir_offsets_program_value_file_range prefix
+	{TableIrOffsets, "idx_ir_offsets_value_id"},           // the same UNIQUE index covers (program_name, value_id)
+	{TableIrOffsets, "idx_ir_offsets_start_offset"},       // never a predicate
+	{TableIrIndices, "idx_ir_indices_v1_program_name"},    // idx_ir_indices_program_value is (program_name, value_id)
+	{TableIrIndices, "idx_ir_indices_v1_value_id"},        // the composite covers it
+	{TableIrIndices, "idx_ir_indices_v1_owner_value_id"},  // never a predicate
+	{TableIrIndices, "idx_ir_indices_v1_version_id"},      // read, never filtered
+	{TableIrNamePool, "idx_ir_name_pool_v1_program_name"}, // idx_ir_name_pool_program_name_name prefix
+	{TableIrNamePool, "idx_ir_name_pool_v1_name"},         // name lookups bind program_name too
+}
+
+func pruneRedundantIRIndexes(db *gorm.DB) {
+	if db == nil || db.Dialect() == nil {
+		return
+	}
+	dialect := db.Dialect().GetName()
+	if dialect != "sqlite3" && dialect != "sqlite" && dialect != "postgres" && dialect != "postgresql" {
+		return
+	}
+	dropped := 0
+	for _, redundant := range redundantIRIndexes {
+		if !hasNamedIndex(db, redundant.table, redundant.index) {
+			continue
+		}
+		if err := db.Exec(`DROP INDEX IF EXISTS ` + quoteSQLIdent(redundant.index)).Error; err != nil {
+			log.Warnf("[ir-index-prune] drop %s: %v", redundant.index, err)
+			continue
+		}
+		dropped++
+	}
+	if dropped > 0 {
+		log.Infof("[ir-index-prune] removed %d redundant IR indexes", dropped)
+	}
+}
+
+// patchIrTypeDedupe installs the two UNIQUE keys the dedupe writes conflict
+// on. Additive: databases that already have ir_types rows keep them.
+func patchIrTypeDedupe(db *gorm.DB) {
+	if db == nil || db.Dialect() == nil {
+		return
+	}
+	if !db.HasTable(TableIrTypeIDs) || !db.HasTable(TableIrTypePayloads) {
+		return
+	}
+	invalidateIrTypeDedupeAvailability(db)
+	if damenggorm.IsDM(db) {
+		// installDMIRIndexes creates these keys for the DM dialect.
+		return
+	}
+	if err := ensureIrTypeDedupeIndexes(db); err != nil {
+		log.Warnf("[ir-type-dedupe] index patch: %v", err)
+	}
 }

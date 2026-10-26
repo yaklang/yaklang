@@ -20,15 +20,15 @@ var ErrSourceRangeAbsent = errors.New("source range is absent")
 type IrOffset struct {
 	gorm.Model
 
-	ProgramName string `json:"program_name" gorm:"index"`
+	ProgramName string `json:"program_name"`
 	// offset
 	FileHash    string `json:"file_hash" gorm:"index"`
-	StartOffset int64  `json:"start_offset" gorm:"index"`
+	StartOffset int64  `json:"start_offset"`
 	EndOffset   int64  `json:"end_offset" gorm:"index"`
 	//variable
 	VariableName string `json:"variable_name" gorm:"index"` // this id set when have variable
 	// value
-	ValueID int64 `json:"value_id" gorm:"index"` // this id will set
+	ValueID int64 `json:"value_id"` // this id will set
 }
 
 func (*IrOffset) TableName() string {

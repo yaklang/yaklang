@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/dbcache"
 	"github.com/yaklang/yaklang/common/utils/filesys"
@@ -233,7 +234,41 @@ func TestFinalFlushAfterFinishEvictsDeferredTail(t *testing.T) {
 	require.NoError(t, prog.Cache.SaveToDatabase())
 	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, second.GetId()))
 }
-func TestTypeFlushUpsertsExistingTypeRows(t *testing.T) {
+func TestTypeStoreUsesDedupeSchemaFromSSADatabase(t *testing.T) {
+	db := ssadb.GetDB()
+	programName := uuid.NewString()
+	defer ssadb.DeleteProgram(db, programName)
+	cfg, err := ssaconfig.New(ssaconfig.ModeSSACompile, ssaconfig.WithSetProgramName(programName))
+	require.NoError(t, err)
+	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	require.NotNil(t, prog.Cache.types.db)
+	require.True(t, ssadb.IrTypeDedupeAvailable(prog.Cache.types.db), "ProgramCache must use the migrated SSA database")
+	typ := CreateStringType()
+	typ.AddFullTypeName("dedupe.integration")
+	prog.Cache.rememberType(typ)
+	require.NoError(t, prog.Cache.types.flush())
+	require.Equal(t, int64(0), countIrTypesForProgram(t, db, programName))
+	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, db, programName))
+	loaded := ssadb.GetIrTypeItemById(db, programName, typ.GetId())
+	require.NotNil(t, loaded)
+	require.Contains(t, loaded.ExtraInformation, "dedupe.integration")
+}
+
+func countIrTypesForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name = ?", programName).Count(&count).Error)
+	return count
+}
+
+func countIrTypeIDsForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
+	t.Helper()
+	var count int64
+	require.NoError(t, db.Model(&ssadb.IrTypeID{}).Where("program_name = ?", programName).Count(&count).Error)
+	return count
+}
+
+func TestTypeFlushUpsertsExistingTypeIDs(t *testing.T) {
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(ssadb.GetDB(), programName)
 
@@ -242,29 +277,30 @@ func TestTypeFlushUpsertsExistingTypeRows(t *testing.T) {
 	cfg.SetCompileUnitSplit(true)
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
+	storeDB := ssadb.GetDB()
+	require.True(t, ssadb.IrTypeDedupeAvailable(storeDB))
 	typ := CreateStringType()
 	typ.AddFullTypeName("string")
 	prog.Cache.rememberType(typ)
 	require.NoError(t, prog.Cache.types.flush())
-	var first ssadb.IrType
-	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&first).Error)
+
+	var first ssadb.IrTypeID
+	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&first).Error)
 	require.NoError(t, prog.Cache.types.flush())
-	var unchanged ssadb.IrType
-	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
-	require.Equal(t, first.ID, unchanged.ID, "an unchanged type must not be deleted and reinserted at each batch")
+	var unchanged ssadb.IrTypeID
+	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
+	require.Equal(t, first.ID, unchanged.ID, "an unchanged type id must keep its row")
+	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, storeDB, programName))
+	require.Zero(t, countIrTypesForProgram(t, storeDB, programName))
 
 	typ.AddFullTypeName("java.lang.String")
 	require.NoError(t, prog.Cache.types.flush())
+	var count int64
+	require.NoError(t, storeDB.Model(&ssadb.IrTypeID{}).
+		Where("program_name = ? AND type_id = ?", programName, typ.GetId()).Count(&count).Error)
+	require.Equal(t, int64(1), count)
 
-	var count int
-	err = ssadb.GetDB().
-		Model(&ssadb.IrType{}).
-		Where("program_name = ? AND type_id = ?", programName, typ.GetId()).
-		Count(&count).Error
-	require.NoError(t, err)
-	require.Equal(t, 1, count)
-
-	loaded := ssadb.GetIrTypeItemById(ssadb.GetDB(), programName, typ.GetId())
+	loaded := ssadb.GetIrTypeItemById(storeDB, programName, typ.GetId())
 	require.NotNil(t, loaded)
 	require.Contains(t, loaded.ExtraInformation, "string")
 	require.Contains(t, loaded.ExtraInformation, "java.lang.String")

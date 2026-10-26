@@ -320,6 +320,9 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 					persistStats.WriteOperations, persistStats.UniquePersisted, persistStats.Resident,
 					persistStats.Pending, persistStats.WriteOperations, persistStats.BatchCount, avgBatch,
 					persistStats.Resident, persistStats.Pending, persistStats.UnchangedSkipped, persistStats.ResidentReleased)
+				insertRows, updateRows, updateStatements := ssadb.IrCodeWriteBreakdown()
+				log.Infof("[ssa-ir-code-writes] program=%s insert_rows=%d update_rows=%d update_statements=%d",
+					progName, insertRows, updateRows, updateStatements)
 			}
 			return nil
 		},
@@ -463,27 +466,37 @@ func (c *ProgramCache) FlushAuxSavers() {
 	if c == nil || !c.HaveDatabaseBackend() {
 		return
 	}
+	var nameMs, indexMs, typeMs, sourceMs int64
 	// Name ids are referenced by index rows. Persist the batch assigned in
 	// memory before those rows, and never while holding the name-cache lock
 	// across the instruction writer's transaction.
 	if c.program != nil && c.program.NameCache != nil {
+		started := time.Now()
 		if err := c.program.NameCache.Flush(); err != nil {
 			log.Errorf("FlushAuxSavers: name cache flush failed: %v", err)
 		}
+		nameMs = time.Since(started).Milliseconds()
 	}
 	if c.indexes != nil {
+		started := time.Now()
 		if _, err := c.indexes.Flush(); err != nil {
 			log.Errorf("FlushAuxSavers: index store flush failed: %v", err)
 		}
+		indexMs = time.Since(started).Milliseconds()
 	}
 	if c.types != nil {
+		started := time.Now()
 		if err := c.types.flush(); err != nil {
 			log.Errorf("FlushAuxSavers: type store flush failed: %v", err)
 		}
+		typeMs = time.Since(started).Milliseconds()
 	}
 	if c.sources != nil {
+		started := time.Now()
 		c.sources.FlushAsync()
+		sourceMs = time.Since(started).Milliseconds()
 	}
+	log.Infof("[ssa-flush-aux] names=%dms indexes=%dms types=%dms sources=%dms", nameMs, indexMs, typeMs, sourceMs)
 }
 
 func (c *ProgramCache) CountInstruction() int {
