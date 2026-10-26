@@ -366,6 +366,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 		}
 		label := eventProtocolName(e)
+		if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
+			label = "UDP carrier diagnostic"
+		}
 		if !credibleTLSIdentity(e) {
 			label = "TLS?"
 			if strongTLSRecord(e) {
@@ -389,6 +392,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
+		if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
+			add("Carrier failure: "+e.ExpertCode+" · "+e.Error, false)
+			add("Application identity unavailable: UDP payload was not admitted for protocol decoding", false)
+		}
 		if notice := isisMalformedNotice(e); notice != "" {
 			// A long otherwise valid header/checksum summary can hide the reason
 			// for rejection. Keep the diagnostic near the beginning of details.
