@@ -20,7 +20,10 @@ func TestIPFIXProgressiveFieldsAndPDUByteRanges(t *testing.T) {
 	require.Equal(t, []string{"IPv4", "UDP", "IPFIX"}, row.ProtocolStack)
 	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	found := false
+	var labels []string
 	for _, f := range fs {
+		labels = append(labels, f.text)
+		require.NotEqual(t, "Enterprise Number: 0", f.text, "standard namespace has no on-wire PEN")
 		if strings.HasPrefix(f.text, "Reported Source IPv4: 192.0.2.9") {
 			found = true
 			require.True(t, f.hasRange)
@@ -33,6 +36,19 @@ func TestIPFIXProgressiveFieldsAndPDUByteRanges(t *testing.T) {
 		}
 	}
 	require.True(t, found)
+	require.Contains(t, labels, "Export Time: 2023-11-14T22:13:20Z · Unix seconds 1700000000")
+	var previous = -1
+	for _, prefix := range []string{"Version:", "Message Length:", "Export Time:", "Sequence Number:", "Observation Domain ID:"} {
+		index := -1
+		for i, label := range labels {
+			if strings.HasPrefix(label, prefix) {
+				index = i
+				break
+			}
+		}
+		require.Greater(t, index, previous, "wire header order: %s", prefix)
+		previous = index
+	}
 	unknown := append([]byte(nil), w[:16]...)
 	unknown = append(unknown, w[28:]...)
 	unknown[3] = byte(len(unknown))
