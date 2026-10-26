@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"encoding/binary"
 	"strings"
 	"testing"
 
@@ -56,4 +57,18 @@ func TestNetFlowV5ProgressiveRecordsHaveCurrentPDUAddressRanges(t *testing.T) {
 			require.Equal(t, 4, f.Range.Length)
 		}
 	}
+}
+
+func TestNetFlowV5MalformedClockDoesNotEraseTheCompleteRecordLayer(t *testing.T) {
+	w := make([]byte, 72)
+	w[1], w[3] = 5, 1
+	binary.BigEndian.PutUint32(w[12:], 1000000000)
+	d, err := stream_parser.DecodeNetFlowV5Wire(w, 4096)
+	require.Error(t, err)
+	e := &pcaputil.ProtocolEvent{Protocol: "netflow-v5", Profile: "netflow-v5-independent-UDP-export", Status: "malformed", Completeness: "limited", Raw: w, Session: d, Error: err.Error()}
+	row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "UDP", Layers: []string{"Ethernet", "IPv4", "UDP"}})
+	require.Equal(t, "NetFlow v5", row.Protocol)
+	require.Equal(t, "malformed", row.ProtocolStatus)
+	require.Contains(t, row.Info, "Malformed export timestamp")
+	require.Contains(t, row.Info, "no absolute export time")
 }
