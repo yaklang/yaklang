@@ -816,6 +816,15 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("NTP")
 		return
 	}
+	if e.Protocol == "ntp" && e.Profile == "ntp-native" && e.Status == "context-required" && e.Completeness == "headers" &&
+		e.ExpertCode == string(pcaputil.ErrUnsupportedFeature) && e.Session["Packet Name"] == "Control" &&
+		e.Session["Control Summary"] != nil && e.Session["Status Word Type"] != nil && e.Session["Unselected Trailer Bytes"] != nil {
+		p.protocol, p.priority, p.status, p.visibility = "NTP", 20, e.Status, "headers"
+		p.evidence = "complete counted NTP control header/data; trailing profile unselected; sender unverified"
+		p.scope, p.summary = "control header; trailer profile unavailable", clipText("NTP control header · "+applicationEventSummary(e), 384)
+		p.addLayer("NTP")
+		return
+	}
 	if protectedSSHEvent(e) {
 		p.protocol, p.status, p.visibility = "SSH", "encrypted", "encrypted"
 		p.evidence, p.summary = "observed SSH NEWKEYS", "SSH encrypted transport · NEWKEYS observed; plaintext unavailable"
