@@ -12,7 +12,7 @@ import (
 // Packet observers keep gopacket's original application view. Native protocol
 // parsing uses a separate network/transport view: a legacy UDP application
 // decoder must not mark a valid datagram truncated before our codec sees it.
-func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
+func protocolAnalysisPacket(packet gopacket.Packet, selections map[uint16]string) gopacket.Packet {
 	decoded := packet.Layers()
 	if len(decoded) == 0 || decoded[0].LayerType() == gopacket.LayerTypeDecodeFailure {
 		return packet
@@ -30,7 +30,7 @@ func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
 		decoder = captureMPacketDecoder{}
 	}
 	ci := packet.Metadata().CaptureInfo
-	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder, captureTruncated: ci.CaptureLength < ci.Length}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder, captureTruncated: ci.CaptureLength < ci.Length, datagramDecodeAs: selections}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
 	p.Metadata().CaptureInfo = ci
 	return p
 }
@@ -39,10 +39,11 @@ type protocolPacketDecoder struct {
 	decoder          gopacket.Decoder
 	network          gopacket.NetworkLayer
 	captureTruncated bool
+	datagramDecodeAs map[uint16]string
 }
 
 func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilder) error {
-	b := &protocolPacketBuilder{PacketBuilder: builder, network: d.network, captureTruncated: d.captureTruncated}
+	b := &protocolPacketBuilder{PacketBuilder: builder, network: d.network, captureTruncated: d.captureTruncated, datagramDecodeAs: d.datagramDecodeAs}
 	decoder := d.decoder
 	if decoder == layers.LayerTypeGRE {
 		decoder = captureGREDecoder{}
@@ -98,6 +99,7 @@ type protocolPacketBuilder struct {
 	udp              *layers.UDP
 	network          gopacket.NetworkLayer
 	captureTruncated bool
+	datagramDecodeAs map[uint16]string
 	pim              gopacket.NetworkLayer
 }
 
@@ -139,7 +141,11 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 	}
 	if b.udp != nil {
 		layer, ok := next.(gopacket.LayerType)
-		if !ok || !udpEncapsulation(layer) || b.network != nil && udpCarrierError(b.network, b.udp, gopacket.CaptureInfo{}, b.captureTruncated) != nil {
+		selected := b.datagramDecodeAs[uint16(b.udp.DstPort)] != "" || b.datagramDecodeAs[uint16(b.udp.SrcPort)] != ""
+		if selected || !ok || !udpEncapsulation(layer) || b.network != nil && udpCarrierError(b.network, b.udp, gopacket.CaptureInfo{}, b.captureTruncated) != nil {
+			// A user-selected native codec owns the complete UDP payload before
+			// a legacy tunnel port can substitute an inner network/transport.
+			// Its own grammar and carrier checks still decide acceptance.
 			// Do not let a service-selected tunnel expose an inner IP/transport
 			// before its literal outer UDP bounds are known. Keep the outer UDP
 			// layer so normal dispatch can publish its precise typed refusal and
@@ -147,7 +153,7 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 			next = gopacket.LayerTypePayload
 		}
 	}
-	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated})
+	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated, datagramDecodeAs: b.datagramDecodeAs})
 }
 
 // gopacket 1.3.1 returns at the IPv4 end-of-options marker before assigning
