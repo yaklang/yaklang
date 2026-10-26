@@ -13,5 +13,6 @@ for direction in['request','reply']:
  for name,suffix in[('truncated-type','40'),('truncated-length','0040'),('truncated-payload','000361')]:case(direction+'-'+name,direction,**{direction+'_append_hex':suffix})
  case(direction+'-first-HEADERS-truncated',direction,**{direction+'_wire_prefix_bytes':4})
  case(direction+'-large-DATA-truncated',direction,**{direction+'_data':'x'*18000,direction+'_trim_bytes':1})
+ case(direction+'-huge-DATA-length',direction,**{direction+'_append_hex':'00d000000000000007'})
 case('valid-after',request_data='abc',reply_data='def')
 out.parent.mkdir(parents=True,exist_ok=True);out.write_text(json.dumps({'scope':__doc__,'cases':cases},indent=2)+'\n',encoding='utf8');print('Declared',len(cases),'framing/FIN scenarios')
