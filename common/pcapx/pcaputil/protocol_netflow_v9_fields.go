@@ -13,7 +13,13 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 		}
 		b := displayRoot("netflow-v9", spec.name, spec.key, DisplayUnsigned, bits, "pdu", spec.key)
 		if spec.name != "cflow.source_id" {
+			b.protocols = "|netflow-v5|netflow-v9|ipfix|"
+		}
+		if spec.name != "cflow.version" && spec.name != "cflow.sequence" {
 			b.protocols = "|netflow-v5|netflow-v9|"
+			if spec.name == "cflow.source_id" {
+				b.protocols = ""
+			}
 		}
 		out = append(out, b)
 	}
@@ -50,6 +56,9 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 				}
 			})
 		})
+		if key != "Scope Length" && key != "Options Length" && key != "Field Type" {
+			b.protocols = "|netflow-v9|ipfix|"
+		}
 		out = append(out, b)
 	}
 	add("cflow.flowset_id", "FlowSet ID", 16, "set")
@@ -61,13 +70,16 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 	add("cflow.scope_field_type", "Field Type", 16, "scope-specifier")
 	add("cflow.option_scope_length", "Scope Length", 16, "template")
 	add("cflow.option_length", "Options Length", 16, "template")
+	add("cflow.template_ipfix_field_type", "Field Type", 15, "specifier")
+	out[len(out)-1].protocols = "|ipfix|"
+	out[len(out)-1].descriptor.Protocol = "ipfix"
 	for _, spec := range []struct {
 		id         uint64
 		name, kind string
 		bits       int
 	}{
 		{1, "cflow.octets", "unsigned", 64}, {2, "cflow.packets", "unsigned", 64},
-		{4, "cflow.protocol", "unsigned", 8}, {5, "cflow.tos", "unsigned", 8}, {6, "cflow.tcpflags", "unsigned", 8},
+		{4, "cflow.protocol", "unsigned", 8}, {5, "cflow.tos", "unsigned", 8}, {6, "cflow.tcpflags", "unsigned", 16},
 		{7, "cflow.srcport", "unsigned", 16}, {8, "cflow.srcaddr", "IPv4", 32},
 		{9, "cflow.srcmask", "unsigned", 8}, {10, "cflow.inputint", "unsigned", 32},
 		{11, "cflow.dstport", "unsigned", 16}, {12, "cflow.dstaddr", "IPv4", 32},
@@ -93,7 +105,7 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 					path = []string{"Records", "*", "Fields", "*"}
 				}
 				p.walk(e.Session, path, func(v any) {
-					if field, ok := v.(map[string]any); ok {
+					if field, ok := v.(map[string]any); ok && !(e.Protocol == "ipfix" && field["Enterprise"] == true) {
 						id := routingNumber(field, "Field Type")
 						p.netflowV9ByType[id] = append(p.netflowV9ByType[id], field)
 					}
@@ -110,8 +122,14 @@ func netflowV9DisplayBindings() []displayFieldBinding {
 				}
 			}
 		})
-		b.protocols = "|netflow-v5|netflow-v9|"
+		b.protocols = "|netflow-v5|netflow-v9|ipfix|"
 		out = append(out, b)
+	}
+	for _, spec := range []struct {
+		name, key string
+		bits      int
+	}{{"cflow.len", "Message Length", 16}, {"cflow.exporttime", "Export Time", 32}, {"cflow.od_id", "Observation Domain ID", 32}} {
+		out = append(out, displayRoot("ipfix", spec.name, spec.key, DisplayUnsigned, spec.bits, "pdu", spec.key))
 	}
 	return out
 }

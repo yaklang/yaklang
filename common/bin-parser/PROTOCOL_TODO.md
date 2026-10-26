@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **504** 个入口：`stable` **15**，`partial` **317**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **618** 项：限定范围 `done` **204**，`partial` **22**，`todo` **392**。目录共 **505** 个入口：`stable` **15**，`partial` **318**，`new` **172**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -626,6 +626,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [internet_control_message_protocol_v6.yaml](rules/internet_control_message_protocol_v6.yaml) | ICMPv6 (``, new)<br>ICMPv6 MLD (`ICMPV6`, partial)<br>ICMPv6 NDP (`ICMPV6`, partial)<br>IPv6 RA (`ICMPV6`, partial) |
 | [internet_protocol.yaml](rules/internet_protocol.yaml) | 6in4 (`Internet Protocol`, new)<br>6to4 (`Internet Protocol`, partial)<br>IPIP (`Internet Protocol`, partial)<br>UDP-Lite (`Internet Protocol`, partial) |
 | [internet_protocol_version_6.yaml](rules/internet_protocol_version_6.yaml) | IPv6 Destination Options (`Internet Protocol Version 6`, partial)<br>IPv6 Fragment (`Internet Protocol Version 6`, partial)<br>IPv6 Hop-by-Hop (`Internet Protocol Version 6`, partial)<br>IPv6 Routing Header (`Internet Protocol Version 6`, partial) |
+| [ipfix.yaml](rules/ipfix.yaml) | IPFIX Observed Message Fields (`IPFIXFields`, partial) |
 | [ipmi.yaml](rules/ipmi.yaml) | IPMI (``, new)<br>IPMI RMCP+ (`IPMI`, partial) |
 | [ipsec.yaml](rules/ipsec.yaml) | IPsec AH (``, new) |
 | [ipx.yaml](rules/ipx.yaml) | IPX (`IPX`, partial) |

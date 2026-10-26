@@ -535,7 +535,7 @@ func sessionErrorFromEvents(events []*ProtocolEvent) *ProtocolError {
 }
 
 func (f *binFlow) hasSession() bool {
-	if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil {
+	if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" {
 		return true
 	}
 	if f.mms != nil || f.ftpData != nil {

@@ -12,6 +12,7 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"ipfix", "IPFIXFields"},
 	{"ldp_session", "LDPSessionFields"},
 	{"rtmp", "RTMPInitialHandshakeFields"},
 	{"rtmp", "RTMPInitialChunkFields"},
@@ -580,6 +581,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	}
 	carrierErr := udpCarrierError(network, udp, ci, truncated)
 	a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
+	a.observeIPFIXBoundary(e, wire, carrierErr != nil)
 	if a.l2tp3RawDatagram(e, wire, carrierErr) {
 		return
 	}

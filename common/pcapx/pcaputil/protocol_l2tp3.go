@@ -160,6 +160,7 @@ func (a *binParser) observeL2TPv3(p gopacket.Packet, evidence captureEvidence) (
 		// Its successful codec switch and rejected carriers are still exporter
 		// tuple-reuse boundaries, not permission to keep the old v9 schema.
 		a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
+		a.observeIPFIXBoundary(e, wire, carrierErr != nil)
 	}
 	inner, suffix, parent := a.decodeL2TPv3Event(e, wire, udp, truncated, carrierErr)
 	if len(inner) == 0 {

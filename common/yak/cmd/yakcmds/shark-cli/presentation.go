@@ -34,6 +34,7 @@ type packetPresentation struct {
 
 var protocolDisplayNames = map[string]string{
 	"netflow-v9": "NetFlow v9",
+	"ipfix":      "IPFIX",
 	"netflow-v5": "NetFlow v5",
 	"isis":       "IS-IS",
 	"ldp":        "LDP",
@@ -375,7 +376,7 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
-	if (e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5") && e.Summary != "" && e.Summary != e.Protocol {
+	if (e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
@@ -727,6 +728,13 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.evidence = "complete fixed-record wire layout; invalid export timestamp retained literally"
 		p.summary = clipText("Malformed export timestamp · "+textValue(e.Session["Export Timestamp Failure"])+" · "+applicationEventSummary(e), 384)
 		p.addLayer("NetFlow v5")
+		return
+	}
+	if e.Protocol == "ipfix" && (e.Profile == "ipfix-directed-UDP-template-observer" || e.Profile == "ipfix-observed-TCP-template-receiver") && e.Session["Fixed Header Complete"] == true && e.Status != "decoded" && e.Status != "deferred" && (e.Session["Wire Framing Complete"] == true || e.Admission == "observed-directed-exporter-context") {
+		p.protocol, p.priority, p.status, p.visibility = "IPFIX", 20, e.Status, "headers"
+		p.evidence = "complete IPFIX header/Set framing; data schema unavailable or rejected"
+		p.summary = clipText(applicationEventSummary(e), 384)
+		p.addLayer("IPFIX")
 		return
 	}
 	if e.Protocol == "netflow-v9" && e.Profile == "netflow-v9-directed-UDP-template-observer" &&

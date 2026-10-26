@@ -41,6 +41,10 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	switch profile {
 	case "netflow-v5":
 		fields, err = DecodeNetFlowV5Wire(wire, 4096)
+	case "ipfix":
+		var decoded IPFIXResult
+		decoded, err = DecodeIPFIXWire(wire, nil, "udp", 4096)
+		fields = decoded.Fields
 	case "netflow-v9":
 		var decoded NetFlowV9Result
 		decoded, err = DecodeNetFlowV9Wire(wire, nil, 4096)
