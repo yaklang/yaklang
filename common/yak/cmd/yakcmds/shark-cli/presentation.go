@@ -1138,7 +1138,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.count > 3 {
 		row.Info += fmt.Sprintf(" (+%d further PDUs)", p.count-3)
 	}
-	if p.diagnostic != "" {
+	if p.diagnostic != "" && p.diagnostic != p.summary {
 		row.Info += " · " + p.diagnostic
 	}
 	if row.Info == "" {
