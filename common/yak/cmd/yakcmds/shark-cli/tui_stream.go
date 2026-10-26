@@ -281,11 +281,20 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 		add(applicationEventSummary(e), inkText)
 		if e.Error != "" || e.ExpertCode != "" {
 			add(e.Status+": "+e.ExpertCode+" · "+e.Error, inkRed)
-			continue
+			if e.Protocol != "http3" || len(mapList(eventValues(e)["HTTP3 Message Headers"])) == 0 {
+				continue
+			}
 		}
 		if groups := mapList(eventValues(e)["HTTP3 Message Headers"]); len(groups) > 0 {
 			for _, group := range groups {
-				add(fmt.Sprintf("HTTP/3 stream %d · header section", number(group["Stream ID"])), style)
+				kind := textValue(group["Header Kind"])
+				if kind == "" {
+					kind = "header section"
+				}
+				add(fmt.Sprintf("HTTP/3 stream %d · %s", number(group["Stream ID"]), kind), style)
+				if err := textValue(group["Header Conformance Error"]); err != "" {
+					add(err, inkRed)
+				}
 				for _, header := range mapList(group["Headers"]) {
 					add(textValue(header["Name"])+": "+textValue(header["Value"]), inkText)
 				}

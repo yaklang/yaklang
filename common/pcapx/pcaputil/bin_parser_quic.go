@@ -386,7 +386,8 @@ func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) 
 
 func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
 	info["Frames"] = frames
-	if err := q.applyFrames(dir, space, frames, info, max); err != nil {
+	err := q.applyFrames(dir, space, frames, info, max)
+	if err != nil && !isH3FieldStreamError(err) {
 		return info, err
 	}
 	q.advanceState(space, frames)
@@ -394,7 +395,7 @@ func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map
 	if q.closed {
 		info["Connection Closed"] = true
 	}
-	return info, nil
+	return info, err
 }
 
 func (q *binQUIC) space(dir, id int) *quicPNSpace {
@@ -405,6 +406,7 @@ func (q *binQUIC) space(dir, id int) *quicPNSpace {
 }
 
 func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[string]any, max int) error {
+	var applicationError error
 	for _, fr := range frames {
 		name, _ := fr["Frame Type"].(string)
 		switch name {
@@ -530,7 +532,14 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			}
 			if !q.native || q.alpn == "h3" {
 				if err := q.feedHTTP3(dir, sid, off, data, fin, max, fr, info); err != nil {
-					return err
+					if !isH3FieldStreamError(err) {
+						return err
+					}
+					if applicationError == nil {
+						applicationError = err
+					}
+					recordH3FieldStreamError(info, fr, sid, dir, err)
+					continue
 				}
 			}
 			if info["HTTP3"] != true && (!q.native || q.alpn == "doq") {
@@ -586,7 +595,7 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 			_ = largest
 		}
 	}
-	return nil
+	return applicationError
 }
 
 func (q *binQUIC) stream(id uint64, max int) *quicStream {
