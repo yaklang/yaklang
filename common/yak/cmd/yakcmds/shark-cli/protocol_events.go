@@ -117,7 +117,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	// this range warning before possibly large authenticated CRYPTO/STREAM trees.
 	for _, e := range ordered {
 		if e != nil && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
-			add(fmt.Sprintf("QUIC datagram diagnostic · PDU #%d · %s", e.ID, e.Summary), false)
+			add(fmt.Sprintf("QUIC remainder #%d: %d bytes · authentication not verified", e.ID, e.Length), false)
+			add(e.Summary, false)
 		}
 	}
 	var protocol string
