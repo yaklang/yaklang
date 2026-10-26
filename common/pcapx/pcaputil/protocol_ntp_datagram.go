@@ -9,14 +9,14 @@ func (a *binParser) decodeNTPDatagram(e *ProtocolEvent, w []byte, src, dst uint1
 	v, mode := w[0]>>3&7, w[0]&7
 	hint := src == 123 || dst == 123
 	if !explicit {
-		if v < 1 || v > 4 || mode < 1 || mode > 6 {
+		if v < 1 || v > 4 || v != 1 && (mode < 1 || mode > 6) || v == 1 && (mode != 0 || !hint) {
 			return false
 		}
-		if mode == 6 {
+		if v != 1 && mode == 6 {
 			if !hint || v < 2 || w[0]>>6 != 0 || len(w) < 12 || w[2] == 0 && w[3] == 0 || ntpControlOpcode(w[1]&31) == "Reserved" {
 				return false
 			}
-		} else if len(w) < 48 || w[1] > 16 || !hint && (len(w) != 48 || probeNTP(w, len(w)).Verdict != ProbeAccept) {
+		} else if len(w) < 48 || w[1] > 16 || v == 2 && w[1] > 15 || !hint && (len(w) != 48 || probeNTP(w, len(w)).Verdict != ProbeAccept) {
 			return false
 		}
 	}
@@ -40,6 +40,9 @@ func (a *binParser) decodeNTPDatagram(e *ProtocolEvent, w []byte, src, dst uint1
 	} else {
 		fields, err = decodeNTPDatagramWire(w)
 	}
+	if err != nil && mode == 6 {
+		a.recordNTPControlRefusal(e, w, fields)
+	}
 	if fields != nil {
 		fields["Observation Scope"] = "literal UDP datagram and capture domain; sender authentication is not verified"
 		if err == nil && mode == 6 {
@@ -55,10 +58,17 @@ func (a *binParser) decodeNTPDatagram(e *ProtocolEvent, w []byte, src, dst uint1
 	}
 	a.finishProtocolDatagram(e, w, nil, err)
 	if fields != nil {
-		e.Summary = fmt.Sprintf("NTPv%v · %v", fields["Version"], fields["Packet Name"])
+		e.Summary = fmt.Sprintf("NTPv%v", fields["Version"])
+		if name, ok := fields["Packet Name"].(string); ok {
+			e.Summary += " · " + name
+		}
 		if mode == 6 {
-			e.Summary += fmt.Sprintf(" · %v · %v · %v", fields["Control Summary"], fields["Association"], fields["Control Reassembly"])
-		} else {
+			for _, key := range []string{"Control Summary", "Association", "Control Reassembly"} {
+				if text, ok := fields[key].(string); ok {
+					e.Summary += " · " + text
+				}
+			}
+		} else if fields["Stratum"] != nil {
 			e.Summary += fmt.Sprintf(" · stratum=%v", fields["Stratum"])
 		}
 	}

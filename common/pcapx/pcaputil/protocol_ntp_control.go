@@ -23,19 +23,20 @@ type ntpControlPart struct {
 	refs           []PacketReference
 }
 type ntpControlObservation struct {
-	request          uint64
-	requestHash      [32]byte
-	requestTime      time.Time
-	opcode           byte
-	association      uint16
-	orphan, complete bool
-	refused          string
-	status           uint16
-	errorFlag        bool
-	responseSeen     bool
-	final            int
-	data, seen       []byte
-	parts            []ntpControlPart
+	request             uint64
+	requestHash         [32]byte
+	requestTime         time.Time
+	opcode              byte
+	association         uint16
+	orphan, complete    bool
+	refused             string
+	status              uint16
+	errorFlag           bool
+	responseSeen        bool
+	responseAssociation uint16
+	final               int
+	data, seen          []byte
+	parts               []ntpControlPart
 }
 type ntpControlStore struct {
 	entries  map[ntpControlKey]*ntpControlObservation
@@ -93,7 +94,8 @@ func (a *binParser) observeNTPControl(e *ProtocolEvent, w []byte, m map[string]a
 		m["Association"] = "response-before-request-history"
 		return
 	}
-	if o.opcode != op || o.association != assoc {
+	selectedPeer := response && w[1]&64 == 0 && o.association == 0 && (op == 2 || op == 3)
+	if o.opcode != op || o.association != assoc && !selectedPeer {
 		refuse("sequence reused with a different opcode or association")
 		return
 	}
@@ -115,6 +117,7 @@ func (a *binParser) observeNTPControl(e *ProtocolEvent, w []byte, m map[string]a
 		}
 		e.TransactionID = o.request
 		m["Request PDU ID"] = o.request
+		m["Requested Association ID"] = o.association
 		return
 	}
 	if o.request == 0 {
@@ -132,11 +135,11 @@ func (a *binParser) observeNTPControl(e *ProtocolEvent, w []byte, m map[string]a
 		return
 	}
 	status, errorFlag := binary.BigEndian.Uint16(w[4:6]), w[1]&64 != 0
-	if o.responseSeen && (o.status != status || o.errorFlag != errorFlag) {
-		refuse("inconsistent response status across fragments")
+	if o.responseSeen && (o.status != status || o.errorFlag != errorFlag || o.responseAssociation != assoc) {
+		refuse("inconsistent response status or association across fragments")
 		return
 	}
-	o.status, o.errorFlag, o.responseSeen = status, errorFlag, true
+	o.status, o.errorFlag, o.responseSeen, o.responseAssociation = status, errorFlag, true, assoc
 	off, n, more := int(binary.BigEndian.Uint16(w[8:10])), int(binary.BigEndian.Uint16(w[10:12])), w[1]&32 != 0
 	end := off + n
 	if more && n == 0 {
@@ -203,6 +206,10 @@ func (a *binParser) observeNTPControl(e *ProtocolEvent, w []byte, m map[string]a
 	}
 	e.ResponseTo, e.TransactionID = o.request, o.request
 	m["Association"], m["Request PDU ID"], m["Control Reassembly"] = "observed-request-key", o.request, "pending-gap-or-final"
+	m["Requested Association ID"] = o.association
+	if o.association != assoc {
+		m["Response Association Observation"] = "selected peer reported for system variable query"
+	}
 	m["Association Scope"] = "observed endpoint/domain/version/sequence/opcode/association within local30-second capture-time lease; not authenticated invocation or peer delivery"
 	if o.final < 0 {
 		return
@@ -225,12 +232,67 @@ func (a *binParser) observeNTPControl(e *ProtocolEvent, w []byte, m map[string]a
 		e.ResponseTo, e.TransactionID = 0, 0
 		return
 	}
-	if op == 1 && assoc == 0 && !errorFlag && o.final%4 == 0 && o.final/4 <= sessionCollectionLimit(a.budget.MaxCollectionElements) {
+	if op == 1 && assoc == 0 && !errorFlag && o.final%4 == 0 {
+		m["Reported Association Count"] = o.final / 4
+		if o.final/4 > sessionCollectionLimit(a.budget.MaxCollectionElements) {
+			m["Reported Association List Decode"] = "limited by collection budget; complete octets retained"
+			e.Completeness, e.nativeFieldsIncomplete = "limited", true
+			return
+		}
+		m["Reported Association List Decode"] = "complete"
 		rows := make([]map[string]any, 0, o.final/4)
 		for i := 0; i < o.final; i += 4 {
 			rows = append(rows, map[string]any{"Association ID": binary.BigEndian.Uint16(o.data[i : i+2]), "Reported Status Word": binary.BigEndian.Uint16(o.data[i+2 : i+4])})
 		}
 		m["Reported Associations"] = rows
+	}
+}
+
+// A refused request can still be followed by an error response with the same
+// sequence. It must not borrow an older valid request, or become fresh after
+// an untracked refusal. A damaged response to an existing request is allowed
+// to recover through a later well-formed datagram.
+func (a *binParser) recordNTPControlRefusal(e *ProtocolEvent, w []byte, m map[string]any) {
+	if len(w) < 12 || w[0]&7 != 6 || w[0]>>3&7 < 2 || w[0]>>3&7 > 4 || w[0]>>6 != 0 || ntpControlOpcode(w[1]&31) == "Reserved" {
+		return
+	}
+	seq := binary.BigEndian.Uint16(w[2:4])
+	if seq == 0 {
+		return
+	}
+	key := ntpControlKey{e.Source, e.Destination, e.Domain, w[0] >> 3 & 7, seq}
+	response := w[1]&128 != 0
+	if response {
+		key.requester, key.server = key.server, key.requester
+	}
+	a.udpMu.Lock()
+	defer a.udpMu.Unlock()
+	if a.ntpControl == nil {
+		a.ntpControl = &ntpControlStore{entries: map[ntpControlKey]*ntpControlObservation{}}
+	}
+	s := a.ntpControl
+	o := s.entries[key]
+	if o != nil && response {
+		return
+	}
+	if o == nil {
+		cost := 512 + int64(len(key.requester)+len(key.server)+len(key.domain.Encapsulation))
+		if s.disabled || len(s.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) || !a.reserveEvidence(cost) {
+			s.disabled = true
+			if m != nil {
+				m["Context Retention Warning"] = "untracked refused control identity; new ownership disabled"
+			}
+			return
+		}
+		s.bytes += cost
+		o = &ntpControlObservation{final: -1}
+		s.entries[key] = o
+	}
+	if o.refused == "" {
+		o.refused = "admitted invalid control request/prior orphan; same sequence cannot establish a new owner"
+	}
+	if m != nil {
+		m["Association"], m["Control Reassembly"], m["Reassembly Complete"], m["Context Retention Warning"] = "refused-control-history", "refused", false, o.refused
 	}
 }
 
