@@ -43,12 +43,18 @@ func TestQUICCoalescingExistingAPI(t *testing.T) {
 				require.Zero(t, e.ResponseTo)
 				require.Zero(t, e.TransactionID)
 				if tc.errors[i] != "" {
+					require.NotEqual(t, "authenticated-wire-and-observed-CID", e.Admission)
+					if tc.name == "different-CID" {
+						require.Equal(t, "rejected-coalesced-CID", e.Admission)
+						require.Zero(t, e.FlowID)
+					}
 					_, err := e.GetFields()
 					rocTypedError(t, tc.errors[i], err)
 					require.Nil(t, e.Session["Frames"])
 					continue
 				}
 				require.Empty(t, e.Error)
+				require.Equal(t, "authenticated-wire-and-observed-CID", e.Admission)
 				require.Equal(t, true, e.Session["Authentication Verified"])
 				require.Equal(t, uint64(2), e.Session["Packet Number"])
 				if flow == 0 {
@@ -75,6 +81,8 @@ func TestQUICCoalescingExistingAPI(t *testing.T) {
 		rocTypedError(t, "ResourceExceeded", err)
 		require.Equal(t, rest, es[1].Raw, "a bounded refusal must preserve the unprocessed remainder")
 		require.Nil(t, es[1].Session)
+		require.Equal(t, "unparsed-datagram-remainder", es[1].Admission)
+		require.Contains(t, es[1].Summary, "authentication not verified")
 		require.Zero(t, stats.BufferedBytes)
 	})
 }

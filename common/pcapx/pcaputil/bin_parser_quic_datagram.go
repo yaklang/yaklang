@@ -5,6 +5,7 @@ import (
 	"container/list"
 	"encoding/binary"
 	"encoding/hex"
+	"fmt"
 	"time"
 )
 
@@ -155,7 +156,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		e.Protocol = "quic"
 		e.Profile = "quic-v1-native"
 		e.nativeQUICObservation = true
-		e.Admission = "authenticated-wire-and-observed-CID"
+		e.Admission = "unverified-QUIC-candidate"
 		// Native CID selection owns the association; a refused new candidate
 		// cannot inherit a carrier projection's unrelated flow identifier.
 		e.ID, e.FlowID, e.ResponseTo, e.TransactionID = a.ids.Add(1), 0, 0, 0
@@ -281,6 +282,23 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			raw = wire[off:]
 			size, e.Length = len(raw), len(raw)
 		}
+		// Admission describes these retained bytes, not the earlier packet that
+		// selected this connection. In particular, an invalid trailing header or
+		// an aggregated refusal is not authenticated by its datagram neighbour.
+		switch {
+		case !bounded || size != h.size:
+			e.Admission = "unparsed-datagram-remainder"
+		case rejectedCID:
+			e.Admission = "rejected-coalesced-CID"
+		case e.Session["Authentication Verified"] == true:
+			e.Admission = "authenticated-wire-and-observed-CID"
+		case e.FlowID != 0 && e.Session["Encrypted"] == true:
+			e.Admission = "observed-CID-protected-payload"
+		case e.FlowID != 0:
+			e.Admission = "observed-CID-unverified-payload"
+		default:
+			e.Admission = "unverified-QUIC-candidate"
+		}
 		// The authenticated session already parsed this header. Preserve the wire
 		// field view without executing a YAML operator for every ciphertext octet.
 		e.nativeQUICWire = err == nil
@@ -288,6 +306,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// native event; mutable public labels/caches cannot grant success.
 		e.semanticSession = cloneSession(e.Session)
 		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
+		if e.Admission == "unparsed-datagram-remainder" {
+			e.Summary = fmt.Sprintf("Unparsed QUIC datagram remainder · offset=%d · %d bytes · authentication not verified", off, size)
+		}
 		events = append(events, &e)
 		if e.sessionError != nil && e.sessionError.Kind == ErrResourceExceeded && el != nil {
 			f.retireQUICUDP()
