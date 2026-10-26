@@ -1877,3 +1877,49 @@ UDP→QUIC→HTTP/3路径、声明18000/观测18000、Drained FIN=true、matched
 
 尚未完成：晚到请求方法对先前未验证响应的回溯、完整URI/authority、扩展协商、
 更多帧放置与QPACK依赖。所有协议/流/会话一致性目标仍未完成，PR保持draft。
+
+
+## QUIC未验证字节范围与完整大样本Windows复核（2026-10-26）
+
+承接前节发现，原生982b02dcc9修正Admission提前设为已认证的问题：只有对应完整
+包边界且Session明确通过认证的字节才保留authenticated-wire-and-observed-CID。
+无法解析的范围、CID不一致、未认证候选和已观察的保护载荷分别标注。原始错误、
+字节、来源与连接状态不丢弃；后续有效包仍沿原连接正常识别。Retry完整性通过仍不
+等同包AEAD/对端身份认证，其独立Retry Integrity Verified字段保持。
+
+| 完整输入 | SDK事件 | 实际变化 | 其余输出 |
+|---|---:|---|---|
+| 新抓188帧 | 203 | 6个包后零字节范围的Admission/摘要 | 逐字段完全相同 |
+| 新抓747帧 | 636 | 0 | 完整SDK和CLI哈希均相同 |
+| Weber原始51328帧 | 39283 | 10个未解析范围摘要/Admission，4个Retry的Admission | 字段、流、会话、端点和来源逐字段相同 |
+| Sharon原始328127帧 | 245615 | 0 | 完整SDK和CLI哈希均相同 |
+
+Weber的10个范围包括6个有效包后的尾部、4个offset0整份拒绝报文，不能全部称尾帧。
+其PCAPNG原始块、接口26、IPv6/UDP字节范围完成415167项断言；此数字包含容器
+断言，不是415167个协议字段。完整CLI只改变10行相应PDU摘要/Info/证据，其中
+6行decoded改为partial/mixed datagram outcomes，4行继续malformed。其余379445行
+与两套SDK的非Admission/摘要字段保持原值，原90/35、824/840 TCP流、808/735预览
+未变。原生403.744s、最终CLI2.060s完整回归通过。两个范围审计分别9种篡改全拒绝，
+HTTP3正文审计26种仍全拒绝。
+
+HTTP3参考视图进一步全部分类：原始6 SETTINGS/202 HEADERS/173 DATA/2未知仍保留；
+323个视图对应唯一真实应用帧，另58个重复视图（30 HEADERS/28 DATA），4个真实大帧
+缺少深层参考视图（2 HEADERS/2 DATA，3代中的后2代stream104请求）。另外2个
+未知视图仍精确定位到HEADERS内部的"vali"，不是真帧头。独立STREAM重组/实际收发
+仍完整；原生6个显式拒绝后的DATA后缀保持未做语义解析，不混入零差异口径。新正文
+审计44497项通过，原生321逻辑帧与参考原始383视图不是同一计量。
+
+Windows实跑又修复诊断裁切：长摘要里的未验证尾缀会被详情栏裁掉；现在短提示
+"QUIC remainder #…: … bytes · authentication not verified"放在字段树开头，Info
+也以未验证范围开头。有效Initial自身仍明确AEAD通过，整份报文不再说全部验证。
+最终4ff1100050在CP936下完整读51328帧，query fields pdu.id ==37385选#48060，
+显示657字节未验证范围/offset543；188帧控制显示680字节/offset520。另选#53/PDU58
+仍显示HTTP/3、18000声明/观测字节和完整FIN/matched。新EOF、查询、包/详情对应、
+字节源、会话、resize、退出与codepage恢复均通过。大文件明确显示全局字段历史
+partial提示，不能把已淘汰证据当成字段不存在。
+
+[聚合证据](shark-public-corpus-20261025/quic-admission-scope-summary.json)绑定各源、
+完整输出、范围/反向控制、程序与实页cells/PNG哈希。所有pcap、密钥、EXE、原始导出
+和页面图继续只在本地。下一项已核实的边界是：FIN完全排空且末HTTP3帧被截断时，
+应按[RFC9114 §7.1](https://www.rfc-editor.org/rfc/rfc9114.html#section-7.1)报告
+H3_FRAME_ERROR连接级协议问题，当前仍返回NeedMore；尚未修复，不能宣布完备。
