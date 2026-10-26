@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-const h3FieldConformanceScope = "field syntax and base pseudo-header/message shape; extension negotiation, authority normalization and Content-Length/body agreement are not certified"
+const h3FieldConformanceScope = "field syntax and base pseudo-header/message shape; extension negotiation and authority normalization are not certified; DATA/FIN length checks are separate"
 
 func h3Token(s string, lower bool) bool {
 	if s == "" {

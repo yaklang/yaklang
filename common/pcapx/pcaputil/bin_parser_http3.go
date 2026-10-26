@@ -11,11 +11,13 @@ import (
 // h3StreamState tracks RFC 9114 framing and QPACK field sections on a QUIC stream.
 // Native admission requires authenticated ALPN; port 443 is never consulted.
 type h3StreamState struct {
-	blocked      [2]bool
-	blockedPDU   [2]uint64
-	seenSettings bool
-	headers      [2]int
-	fieldFailure [2]ProtocolErrorKind
+	blocked       [2]bool
+	blockedPDU    [2]uint64
+	seenSettings  bool
+	headers       [2]int
+	fieldFailure  [2]ProtocolErrorKind
+	body          [2]h3MessageBody
+	requestMethod int
 
 	kind                  string
 	seenType              bool
@@ -274,6 +276,12 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if q.native && ft == 1 && !uni {
 			headers, _ := hf["Headers"].([]map[string]any)
 			kind, err := h3ValidateFieldSection(headers, dir, h3.headers[dir])
+			if err == nil {
+				err = h3.configureBody(dir, kind, headers, q.eventID)
+				if err != nil {
+					kind = "malformed"
+				}
+			}
 			hf["Header Conformance Scope"] = h3FieldConformanceScope
 			hf["Header Conformance Status"] = "base-shape-valid"
 			if err != nil {
@@ -317,6 +325,15 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if ft == 0x00 {
 			h3.dataBytes += uint64(len(payload))
 			hf["DATA Length"] = uint64(len(payload))
+			if q.native && !uni {
+				h3.body[dir].observed += uint64(len(payload))
+			}
+		}
+		if q.native && !uni && fieldError == nil {
+			conformance, err := h3.checkBody(dir, sid, false)
+			hf["Message Conformance"] = conformance
+			fr["HTTP3 Message Conformance"], info["HTTP3 Message Conformance"] = conformance, conformance
+			fieldError = err
 		}
 		// Literal application framing has its own byte arena and stream ranges.
 		// Buffered bytes can originate in older packets than this QUIC PDU.
@@ -339,29 +356,24 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
 		if fieldError != nil {
-			var pe *ProtocolError
-			h3.fieldFailure[dir] = ErrMalformedMessage
-			if errors.As(fieldError, &pe) {
-				h3.fieldFailure[dir] = pe.Kind
-			}
-			h3RejectedFieldStream(fr, info, sid, frames)
-			if dir == 0 {
-				st.requestPDU = 0
-				delete(fr, "Request PDU ID")
-				delete(fr, "Transaction ID")
-			}
-			st.sources[dir].prune(^uint64(0))
-			return &h3FieldStreamError{fieldError}
+			return q.rejectH3Message(st, dir, sid, fr, info, frames, fieldError)
 		}
 		if len(frames) >= max {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame budget exceeded")
 		}
 	}
-	if q.native && fin && !uni && dir == 1 && h3.headers[dir] == 0 && !h3.blocked[dir] {
-		return protocolError(ErrMalformedMessage, "HTTP3 FIN before final response headers")
-	}
 	if q.native && fin && h3.parsed[dir] != len(h3.buf[dir]) {
 		return protocolError(ErrNeedMore, "HTTP3 FIN with incomplete frame")
+	}
+	if q.native && !uni && !h3.blocked[dir] {
+		conformance, err := h3.checkBody(dir, sid, fin)
+		fr["HTTP3 Message Conformance"], info["HTTP3 Message Conformance"] = conformance, conformance
+		if len(frames) > 0 {
+			frames[len(frames)-1]["Message Conformance"] = conformance
+		}
+		if err != nil {
+			return q.rejectH3Message(st, dir, sid, fr, info, frames, err)
+		}
 	}
 	if h3.kind == "" || h3.kind == "unknown" {
 		if len(frames) == 0 {
