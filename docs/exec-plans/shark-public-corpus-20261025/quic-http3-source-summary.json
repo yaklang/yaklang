@@ -1,0 +1,274 @@
+{
+  "source_UI_and_tests": "d148a3c18ddff008495aafd1f3354b78bd5e8a1c",
+  "source_native": "5f18dcd9bdc30eeeed43f1f74864f645b01a88ab",
+  "scope": "Owned, literal classic-PCAP NULL capture; authenticated QUIC raw/delivered STREAM provenance and HTTP3 frame/header/payload origins. Sufficient retained byte witnesses, not every retransmission or decoded QPACK dependency.",
+  "fresh_capture": {
+    "frames": 747,
+    "capture_sha256": "be3ba23140b3df81252f3b0a4d450b99007051626f86c8d1f33e3060a9ffbab7",
+    "native_events_sha256": "09dd822c3885012da8f08dca5d3020a4eb14a3b0cff24f0b8701d34504400233",
+    "reference_SHA256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06",
+    "source_graph": {
+      "checks": 24736,
+      "connections": 3,
+      "reference_coalesced_bindings": 13,
+      "application_frames": 57,
+      "types": {
+        "4": 6,
+        "1": 24,
+        "0": 27
+      },
+      "source_ranges": 406,
+      "unselected_instruction_streams": [],
+      "selected_differences": []
+    },
+    "independent_DATA_recheck": {
+      "oracle_sha256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06",
+      "events_sha256": "09dd822c3885012da8f08dca5d3020a4eb14a3b0cff24f0b8701d34504400233",
+      "checks": 10398,
+      "QUIC_STREAM_views": 150,
+      "native_QUIC_STREAM_views": 150,
+      "identical_overlap_bytes": 8454,
+      "bidirectional_stream_directions": 24,
+      "connections": 3,
+      "reference_stream_reconstructed_DATA": 27,
+      "native_DATA": 27,
+      "selected_differences": [],
+      "scope": "Owned HTTP/3 bidirectional streams only. Physical STREAM source, connection/endpoints, stream ID, offset, length, bytes and FIN verified against reference. Independently reconstructed from original TShark authenticated QUIC STREAM bytes, including gaps/overlap/FIN and ordered DATA by capture connection/direction/stream. This certifies observed payload reconstruction, not QPACK, packet-column agreement, stream-field highlight ranges or general QUIC completeness."
+    },
+    "raw_HTTP3_DATA_display_difference_retained": {
+      "native": 27,
+      "reference": 24
+    },
+    "audit_corruption_controls": {
+      "positive_checks": 24736,
+      "controls": 29,
+      "results": [
+        {
+          "corruption": "source-offset",
+          "detected": true
+        },
+        {
+          "corruption": "source-length",
+          "detected": true
+        },
+        {
+          "corruption": "source-kind",
+          "detected": true
+        },
+        {
+          "corruption": "source-direction",
+          "detected": true
+        },
+        {
+          "corruption": "range-offset",
+          "detected": true
+        },
+        {
+          "corruption": "range-length",
+          "detected": true
+        },
+        {
+          "corruption": "range-parent",
+          "detected": true
+        },
+        {
+          "corruption": "range-packet",
+          "detected": true
+        },
+        {
+          "corruption": "range-domain",
+          "detected": true
+        },
+        {
+          "corruption": "event-domain",
+          "detected": true
+        },
+        {
+          "corruption": "event-endpoint",
+          "detected": true
+        },
+        {
+          "corruption": "authentication",
+          "detected": true
+        },
+        {
+          "corruption": "coverage-flag",
+          "detected": true
+        },
+        {
+          "corruption": "parent-set",
+          "detected": true
+        },
+        {
+          "corruption": "packet-set",
+          "detected": true
+        },
+        {
+          "corruption": "frame-type",
+          "detected": true
+        },
+        {
+          "corruption": "frame-length",
+          "detected": true
+        },
+        {
+          "corruption": "frame-header",
+          "detected": true
+        },
+        {
+          "corruption": "header-selection",
+          "detected": true
+        },
+        {
+          "corruption": "frame-hash",
+          "detected": true
+        },
+        {
+          "corruption": "wire-length",
+          "detected": true
+        },
+        {
+          "corruption": "duplicate-frame",
+          "detected": true
+        },
+        {
+          "corruption": "missing-frame",
+          "detected": true
+        },
+        {
+          "corruption": "typed-type",
+          "detected": true
+        },
+        {
+          "corruption": "typed-length",
+          "detected": true
+        },
+        {
+          "corruption": "delivered-offset",
+          "detected": true
+        },
+        {
+          "corruption": "raw-stream-offset",
+          "detected": true
+        },
+        {
+          "corruption": "oracle-physical-bytes",
+          "detected": true
+        },
+        {
+          "corruption": "coalesced-DCID-ambiguity",
+          "detected": true
+        }
+      ]
+    }
+  },
+  "native_full_seconds": 404.539,
+  "CLI_full_seconds": 2.154,
+  "post_QPACK_origin_regression_seconds": 0.363,
+  "post_authentication_STREAM_fuzz": {
+    "executions": 38424,
+    "seconds": 41.347,
+    "workers": 2,
+    "GOMEMLIMIT": "1GiB",
+    "scope": "byte-presence reference model, arbitrary ordering/loss/overlap, three bidirectional streams; does not certify wire AEAD"
+  },
+  "actual_Windows": {
+    "protocol": "HTTP/3",
+    "query": "proto:http3 info:5776",
+    "selected_frame": 492,
+    "stream": 8,
+    "frames": 747,
+    "physical_frame_bytes": 823,
+    "QUIC_PDU_bytes": 791,
+    "complete_HTTP3_frame_bytes": 5779,
+    "complete_DATA_bytes": 5776,
+    "last_STREAM_offset": 5096,
+    "last_STREAM_bytes": 764,
+    "own_frame_header_hex": "005690",
+    "application_frame_stream_offset": 81,
+    "views": {
+      "type": {
+        "field": "Frame Type Value: 0",
+        "visible_selection": "0x0\u20130x0 \u00b7 1 bytes",
+        "cells_sha256": "7b831386e934ebd34df0ae4be93078573b5f2300ecb4054541ffee409b058f51",
+        "PNG_sha256": "bdc0f12b382f9ad3961eb35ef5e2cdd2bfb92dc15745fab39f24b32fcada6e82",
+        "restored": {
+          "error": "<nil>",
+          "input_cp": 936,
+          "output_cp": 936
+        }
+      },
+      "length": {
+        "field": "Payload Length: 5776",
+        "visible_selection": "0x1\u20130x2 \u00b7 2 bytes",
+        "cells_sha256": "fc2cac4f72f1f98bdb8d9b08ed60dd5e204066a66ef5f2633bbb6ea71310a131",
+        "PNG_sha256": "907d5241c63e68663e1a6c36cadfd1715577a6f82ff647185d066d67b3a03caa",
+        "restored": {
+          "error": "<nil>",
+          "input_cp": 936,
+          "output_cp": 936
+        }
+      },
+      "payload": {
+        "field": "Payload: 5776 bytes",
+        "visible_selection": "0x0\u20130x168f \u00b7 5776 bytes",
+        "cells_sha256": "12ea59965f13a6e401dbc388e8bc4ae7d3b590838cda3c0b51a5dc45323109c1",
+        "PNG_sha256": "9d9eeedf877b761684b7bfd07f9702dee92791395f2a51e7011081db993162b7",
+        "restored": {
+          "error": "<nil>",
+          "input_cp": 936,
+          "output_cp": 936
+        }
+      }
+    },
+    "resize_quit_codepage_checks": true
+  },
+  "complete_original_corpora": [
+    {
+      "capture": "weber",
+      "frames": 51328,
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "CLI_sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "SDK_sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770",
+      "all_outputs_byte_identical_to_verified_B924": true,
+      "raw_generic_field_differences": 90,
+      "TCP_flow_count": 824,
+      "TCP_preview_count": 808,
+      "all_other_summary_metrics_unchanged": true
+    },
+    {
+      "capture": "sharon",
+      "frames": 328127,
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "CLI_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "SDK_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "all_outputs_byte_identical_to_verified_B924": true,
+      "raw_generic_field_differences": 35,
+      "TCP_flow_count": 840,
+      "TCP_preview_count": 735,
+      "all_other_summary_metrics_unchanged": true
+    }
+  ],
+  "limits": [
+    "Witness ranges capped at min(maxElements,1024), at most64 physical references per range; missing proof reported limited.",
+    "Completed application prefixes are pruned; rejected overlapping bytes do not become witnesses.",
+    "QPACK instruction and dynamic-table semantic contributor provenance not certified.",
+    "Remaining generic field90/35, nested carrier coverage, all protocol/session completeness and remote current-head CI remain unverified."
+  ],
+  "hashes": {
+    "events.exe": "018f90417808ed7ce2ce9178aead88304ac9f340312e041f991fefc47c0ea5b2",
+    "yak-final.exe": "da71bd4e24c4eb51b45681365567dd9373ad7084c97e8fb9c53aed267d7db2db",
+    "full-tests.log": "f551563286b978d44701d369d0083df5b67eabade2a8212641da8010c42d8d58",
+    "CLI-final-tests.log": "87557973bc41e46dcc8ac19e094c96529b7a2d3502e17b365e06584abd2bd86e",
+    "source-fuzz.log": "e5c0a8bac61911e02ac74760f3691e914c1446c4a841c9c5044583a5debbf057",
+    "source-targeted-final.log": "7cd50232b6dfa013187f26629185e4928a29aa4a025bd407b2515e5442fbb2c2",
+    "fresh-source-audit.json": "9d97a2e69459375562cfff7c8c0f31781afc2e4c4bd1daa89b141094f11592ff",
+    "fresh-data-audit.json": "7f374d9b9d94f10b258c21072081cd8175b28ba96173ee9d4e7297653d2d1625",
+    "negative-source\\summary.json": "bb19e81a8c3a20da07da8eed4379a1681107d68353a2329464010e3f473d2fec"
+  },
+  "authored_audit_sha256": {
+    "quic_source_graph_audit.py": "2d27d547b01eeacd238f5fa59358652b953fd6682e160a8ba83692f6175a61e6",
+    "quic_source_graph_negative_controls.py": "5ffa7f77b5b76c0526fd87a12b76502a90000d2b93cb8bce84d5e76864c4aecd",
+    "quic_http3_data_audit.py": "bcf0f216de36a129ae295b02c9ae982be141743f3d5b28de99a844f6cad401b9"
+  }
+}
