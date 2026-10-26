@@ -25,6 +25,7 @@ type packetPresentation struct {
 	nativeIP115Bytes                      int
 	evidence                              string
 	protocol, summary, visibility, status string
+	scope                                 string
 	diagnostic                            string
 	stack                                 []string
 	priority                              int
@@ -722,6 +723,19 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
+	if e.AuthenticatedQUICApplicationProtocol() == "http3" && (e.Error != "" || e.Status != "decoded" && e.Status != "deferred") {
+		p.addLayer("QUIC")
+		p.addLayer("HTTP/3")
+		notice := clipText("HTTP/3 · "+e.Status+" · "+e.Error, 384)
+		if p.priority > 20 {
+			p.diagnostic = notice
+			return
+		}
+		p.protocol, p.priority, p.status, p.visibility = "HTTP/3", 20, e.Status, "authenticated-plaintext"
+		p.evidence = "native packet AEAD and observed h3 ALPN; HTTP message diagnostic"
+		p.scope, p.summary = "authenticated application bytes", notice
+		return
+	}
 	if e.Protocol == "netflow-v5" && e.Profile == "netflow-v5-independent-UDP-export" && e.Status == "malformed" &&
 		e.Session["Wire Grammar Complete"] == true && e.Session["Export Timestamp Valid"] == false {
 		p.protocol, p.priority, p.status, p.visibility = "NetFlow v5", 20, e.Status, "message"
@@ -888,6 +902,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		}
 	}
 	p.evidence = ""
+	p.scope = ""
 	p.visibility = e.SourceBytes.Kind
 	if v := textValue(eventValues(e)["Content Visibility"]); v != "" {
 		p.visibility = v
@@ -1046,6 +1061,9 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 				row.ProtocolScope = "record envelope"
 			}
 		}
+	}
+	if p.scope != "" {
+		row.ProtocolScope = p.scope
 	}
 	row.Visibility, row.ProtocolStatus = p.visibility, p.status
 	row.Info = p.summary
