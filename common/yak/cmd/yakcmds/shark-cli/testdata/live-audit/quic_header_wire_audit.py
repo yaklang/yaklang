@@ -59,7 +59,8 @@ for row in rows:
   if not isinstance(view,dict):untyped.append({'frame':no,'reference_occurrence':i,'JSON_type':type(view).__name__})
   ref[no].append((w,view,at,i));reference_versions['0x'+w[1:5].hex()if len(w)>=5 and w[0]&0x80 else'short-or-diagnostic']+=1
 native=0;matched=set();seen_ids=set();missing_reference=[];differences=[];counts=collections.Counter();alias_counts=collections.Counter();zero_omissions=collections.Counter();logical=0;unmatched=[]
-header_names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2','quic.packet_number'}
+token_names={'quic.token_length','quic.token','quic.retry_token','quic.retry_integrity_tag'}
+header_names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2','quic.packet_number'}|token_names
 flow_connections={};connection_flows={};association_checks=0
 for line in a.events.open(encoding='utf-8-sig'):
  e=json.loads(line)
@@ -81,14 +82,21 @@ for line in a.events.open(encoding='utf-8-sig'):
    check(len(w)>=7,'long fixed header');dl=w[5];check(dl<=20 and 7+dl<=len(w),'long DCID bound');sl=w[6+dl];check(sl<=20 and 7+dl+sl<=len(w),'long SCID bound');eq(dcid,w[6:6+dl],'literal DCID');eq(scid,w[7+dl:7+dl+sl],'literal SCID');version=int.from_bytes(w[1:5],'big');expected={'quic.version':(version,1,5,'Version'),'quic.dcil':(dl,5,6,'DCID Length'),'quic.dcid':(dcid.hex(),6,6+dl,'DCID'),'quic.scil':(sl,6+dl,7+dl,'SCID Length'),'quic.scid':(scid.hex(),7+dl,7+dl+sl,'SCID')}
    if version in[1,0x6b3343cf]:expected['quic.long.packet_type_v2'if version==0x6b3343cf else'quic.long.packet_type']=(w[0]>>4&3,0,1,'Long Packet Type')
    for name in{'quic.long.packet_type','quic.long.packet_type_v2'}-set(expected):check(name not in aliases,'version-specific packet type cannot borrow another version alias')
+   kind=w[0]>>4&3;kind=(kind+3)&3 if version==0x6b3343cf else kind;off=7+dl+sl
+   if version in[1,0x6b3343cf]and kind==0:
+    check(off<len(w),'Initial token-length prefix');width=1<<(w[off]>>6);check(off+width<=len(w),'complete Initial token length');n=int.from_bytes(w[off:off+width],'big')&((1<<(width*8-2))-1);check(n<=20480 and off+width+n<=len(w),'complete selected Initial token');expected['quic.token_length']=(n,off,off+width,'Initial Token Length');expected['quic.token']=(w[off+width:off+width+n].hex(),off+width,off+width+n,'Initial Token');eq(m.get('Initial Token Length'),n,'retained literal token length');eq(m.get('Initial Token Length Encoding Bytes'),width,'retained literal token encoding width');eq(base64.b64decode(m.get('Initial Token')or''),w[off+width:off+width+n],'retained literal Initial token')
+   elif version in[1,0x6b3343cf]and kind==3:
+    check(off+16<=len(w),'complete Retry integrity field');expected['quic.retry_token']=(w[off:-16].hex(),off,len(w)-16,'Retry Token');expected['quic.retry_integrity_tag']=(w[-16:].hex(),len(w)-16,len(w),'Retry Integrity Tag');eq(base64.b64decode(m.get('Retry Token')or''),w[off:-16],'retained literal Retry token');eq(base64.b64decode(m.get('Retry Integrity Tag')or''),w[-16:],'retained literal public Retry integrity tag')
+   for name in token_names-set(expected):check(name not in aliases,'packet type cannot borrow another token field')
   else:
    check(len(dcid)<=20 and 1+len(dcid)<=len(w),'observed short CID size');eq(dcid,w[1:1+len(dcid)],'literal known-context short CID');expected={'quic.dcid':(dcid.hex(),1,1+len(dcid),'DCID')}
-   for name in['quic.version','quic.scid','quic.scil','quic.dcil','quic.long.packet_type','quic.long.packet_type_v2']:check(name not in aliases,'short header cannot invent '+name)
+   for name in{'quic.version','quic.scid','quic.scil','quic.dcil','quic.long.packet_type','quic.long.packet_type_v2'}|token_names:check(name not in aliases,'short header cannot invent '+name)
   eq(set(ranges),{v[3]for v in expected.values()},'only literal fields carried by this header have ranges')
   for key,(value,lo,hi,name)in expected.items():
    eq(ranges[name],[lo,hi],'owned clear-header range');eq(aliases[key]['value'],value,'typed '+key);eq(aliases[key]['origin'],'pdu','literal origin');eq(aliases[key]['pdu_range'],{'offset':lo,'length':hi-lo},'logical PDU span');alias_counts[key]+=1
+   if key=='quic.token_length':eq(aliases[key]['exact_value'],str(value),'lossless 62-bit token length projection')
    if view and key in view:
-    rv=view[key];check(not isinstance(rv,list),'one value per QUIC header instance');rv=bytes.fromhex(rv.replace(':','')).hex()if key in['quic.dcid','quic.scid']else int(rv,0)
+    rv=view[key];check(not isinstance(rv,list),'one value per QUIC header instance');rv=bytes.fromhex(rv.replace(':','')).hex()if key in['quic.dcid','quic.scid','quic.token','quic.retry_token','quic.retry_integrity_tag']else int(rv,0)
     if rv!=value:differences.append({'PDU':e['id'],'frame':no,'field':key,'native':value,'reference':rv})
     rr=view.get(key+'_raw')
     if rr and not isinstance(rr[0],list)and int(rr[5])==0:eq((int(rr[1]),int(rr[2])),(start+lo,hi-lo),'reference field span')
@@ -102,10 +110,13 @@ for line in a.events.open(encoding='utf-8-sig'):
      if name in fields:eq(fields[name],value,'legacy envelope literal '+name)
   for name in['DCID','SCID']:
    if name in fields:eq(base64.b64decode(fields[name]),dcid if name=='DCID'else scid,'binary legacy-shaped field survives JSON')
-  if'Token'in(fields.get('QUICToken')or{}):
-   off=7+len(dcid)+len(scid);n=w[off];check(n<64 and off+1+n<=len(w),'selected one-byte token envelope');eq(base64.b64decode(fields['QUICToken']['Token']),w[off+1:off+1+n],'literal binary token')
+  if'QUICToken'in fields:
+   check(form=='long'and'quic.token_length'in expected,'Initial token envelope belongs to Initial');off=7+len(dcid)+len(scid);width=1<<(w[off]>>6);n=int.from_bytes(w[off:off+width],'big')&((1<<(width*8-2))-1);check(off+width+n<=len(w),'bounded full-varint token envelope');tf=fields['QUICToken'];eq(tf['Token Length'],n,'legacy-shaped decoded token length');eq(base64.b64decode(tf.get('Token')or''),w[off+width:off+width+n],'literal binary token');eq('Token'in tf,n>0,'empty token does not invent a legacy leaf')
+   if width>1:eq(tf['Length Encoding'],w[off]>>6,'wide length encoding prefix')
+   else:check('Length Encoding'not in tf,'one-byte legacy shape preserved')
+   eq(set(tf),{'Token Length'}|({'Length Encoding'}if width>1 else set())|({'Token'}if n else set()),'only literal token envelope fields');eq(fields.get('Protected Payload'),list(w[off+width+n:]),'opaque legacy body starts after complete token')
  else:
-  for key in['quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2']:check(key not in aliases,'unparsed remainder cannot inherit a header field')
+  for key in{'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2'}|token_names:check(key not in aliases,'unparsed remainder cannot inherit a header field')
  if m.get('Authentication Verified')and'Packet Number'in m:
   pn=m['Packet Number'];eq(aliases['quic.packet_number']['value'],pn,'authenticated decoded number');eq(aliases['quic.packet_number']['exact_value'],str(pn),'lossless decoded number');check('pdu_range'not in aliases['quic.packet_number'],'decoded number is not a literal ciphertext value span');logical+=1
   if'quic.packet_number'in view and int(view['quic.packet_number'])!=pn:differences.append({'PDU':e['id'],'frame':no,'field':'quic.packet_number','native':pn,'reference':int(view['quic.packet_number'])})

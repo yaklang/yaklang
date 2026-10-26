@@ -67,6 +67,7 @@ cid_lengths=transport_controls.get('connection_id_lengths',[8,8,8]);assert len(c
 wire_versions=transport_controls.get('wire_versions',[1,1,1]);assert len(wire_versions)==3 and all(v in[1,0x6b3343cf]for v in wire_versions)
 suite_ids=transport_controls.get('cipher_suites',[0x1301,0x1301,0x1301]);assert len(suite_ids)==3 and all(v in[0x1301,0x1302,0x1303]for v in suite_ids)
 key_followup=transport_controls.get('client_key_update_followup',False);assert type(key_followup)is bool
+retry_padding=transport_controls.get('retry_token_padding_bytes',[0,0,0]);assert len(retry_padding)==3 and all(type(n)is int and 0<=n<=512 for n in retry_padding)
 if transport_controls.get('v2_key_update_policy')=='rfc9369-label':
  original_next_key_phase=peer_crypto.next_key_phase
  def declared_v2_next_key_phase(context):
@@ -122,7 +123,7 @@ try:
  for epoch in range(3):
   cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
   scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
-  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0}
+  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0,'token_envelopes':{}}
   def events(q,side):
    while True:
     e=q.next_event()
@@ -168,8 +169,14 @@ try:
        if retry_handler is not None:
         if not h.token:
          retry_cid=secrets.token_bytes(8);token=retry_handler.create_token(address=address,original_destination_connection_id=h.destination_cid,retry_source_connection_id=retry_cid,now=time.monotonic())
+         if retry_padding[epoch]:
+          # Declared opaque-token envelope. Only an exactly issued envelope
+          # maps back to the original token, which still passes the real
+          # handler's address/CID validation; arbitrary suffixes are rejected.
+          inner=token;token+=secrets.token_bytes(retry_padding[epoch]);retry_state['token_envelopes'][token]=inner
          server_socket.sendto(encode_quic_retry(version=h.version,source_cid=retry_cid,destination_cid=h.source_cid,original_destination_cid=h.destination_cid,retry_token=token),address);retry_state['sent']+=1;network['retry_packets']+=1;continue
-        original=retry_handler.validate_token(address=address,destination_cid=h.destination_cid,token=h.token,now=time.monotonic());retry_cid=h.destination_cid
+        inner=retry_state['token_envelopes'][h.token]if retry_padding[epoch]else h.token
+        original=retry_handler.validate_token(address=address,destination_cid=h.destination_cid,token=inner,now=time.monotonic());retry_cid=h.destination_cid
        server=PeerConnection(configuration=scfg,original_destination_connection_id=original,retry_source_connection_id=retry_cid)
       server.receive_datagram(data,address,now=time.monotonic());events(server,1)
      else:client.receive_datagram(data,address,now=time.monotonic());events(client,0)
