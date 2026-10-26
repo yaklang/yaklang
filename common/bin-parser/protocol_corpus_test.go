@@ -236,6 +236,13 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 					t.Fatalf("mapped capture has incomplete roadmap metadata")
 				}
 				historicalPartial := observedScopes[item.Name] && item.Status == stPartial && *capture.RoadmapStatus == stDone
+				if capture.ID == "ndpi-quic-length-boundary" && item.Name == "QUIC" && item.Status == stPartial && *capture.RoadmapStatus == stDone {
+					// Preserve this hash-pinned manifest's old score while checking
+					// the executable bounded scope behind the current partial row.
+					// No capture, mapping, historical answer or inventory floor changes.
+					requireP0QUICWireEnvelopeScope(t)
+					historicalPartial = true
+				}
 				if routingScopes[item.Name] && item.Status == stPartial {
 					historicalPartial = item.Name == "HSRP" && *capture.RoadmapStatus == stDone || (item.Name == "GLBP" || item.Name == "BFD" || item.Name == "LDP" || item.Name == "PIM" || item.Name == "RIPng" || item.Name == "IS-IS") && *capture.RoadmapStatus == stTodo
 				}
