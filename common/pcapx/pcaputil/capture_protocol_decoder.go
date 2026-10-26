@@ -29,15 +29,20 @@ func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
 	if _, ok := decoded[0].(*captureMPacket); ok {
 		decoder = captureMPacketDecoder{}
 	}
-	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
-	p.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
+	ci := packet.Metadata().CaptureInfo
+	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder, captureTruncated: ci.CaptureLength < ci.Length}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	p.Metadata().CaptureInfo = ci
 	return p
 }
 
-type protocolPacketDecoder struct{ decoder gopacket.Decoder }
+type protocolPacketDecoder struct {
+	decoder          gopacket.Decoder
+	network          gopacket.NetworkLayer
+	captureTruncated bool
+}
 
 func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilder) error {
-	b := &protocolPacketBuilder{PacketBuilder: builder}
+	b := &protocolPacketBuilder{PacketBuilder: builder, network: d.network, captureTruncated: d.captureTruncated}
 	decoder := d.decoder
 	if decoder == layers.LayerTypeGRE {
 		decoder = captureGREDecoder{}
@@ -90,18 +95,21 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 
 type protocolPacketBuilder struct {
 	gopacket.PacketBuilder
-	udp bool
-	pim gopacket.NetworkLayer
+	udp              *layers.UDP
+	network          gopacket.NetworkLayer
+	captureTruncated bool
+	pim              gopacket.NetworkLayer
 }
 
 func (b *protocolPacketBuilder) SetNetworkLayer(n gopacket.NetworkLayer) {
 	b.PacketBuilder.SetNetworkLayer(n)
+	b.network = n
 	b.pim = pimNetwork(n)
 }
 
 func (b *protocolPacketBuilder) SetTransportLayer(layer gopacket.TransportLayer) {
 	b.PacketBuilder.SetTransportLayer(layer)
-	_, b.udp = layer.(*layers.UDP)
+	b.udp, _ = layer.(*layers.UDP)
 }
 
 func udpEncapsulation(next gopacket.LayerType) bool {
@@ -129,13 +137,17 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 	if layer, ok := next.(gopacket.LayerType); ok && layer == layers.LayerTypeLinkLayerDiscovery {
 		next = gopacket.LayerTypePayload
 	}
-	if b.udp {
+	if b.udp != nil {
 		layer, ok := next.(gopacket.LayerType)
-		if !ok || !udpEncapsulation(layer) {
+		if !ok || !udpEncapsulation(layer) || b.network != nil && udpCarrierError(b.network, b.udp, gopacket.CaptureInfo{}, b.captureTruncated) != nil {
+			// Do not let a service-selected tunnel expose an inner IP/transport
+			// before its literal outer UDP bounds are known. Keep the outer UDP
+			// layer so normal dispatch can publish its precise typed refusal and
+			// invalidate owned protocol state. Observer packets stay unchanged.
 			next = gopacket.LayerTypePayload
 		}
 	}
-	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next})
+	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated})
 }
 
 // gopacket 1.3.1 returns at the IPv4 end-of-options marker before assigning
