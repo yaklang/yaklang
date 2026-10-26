@@ -6,6 +6,7 @@ import argparse,base64,collections,hashlib,json
 from pathlib import Path
 ap=argparse.ArgumentParser(description=__doc__)
 for n in ['manifest','oracle','events','out']:ap.add_argument('--'+n,required=True,type=Path)
+ap.add_argument('--profile',choices=['malformed69','declared-valid'],default='malformed69')
 a=ap.parse_args();checks=0
 assert not any((p/'.git').exists() for p in [a.out.resolve(),*a.out.resolve().parents])
 def load(p):return json.loads(p.read_text(encoding='utf-8-sig'))
@@ -57,7 +58,11 @@ def reference_frames(node):
   for k,v in node.items():
    if k not in ['http3.frame','http3.frame_raw']:yield from reference_frames(v)
 
-m=load(a.manifest);eq(m['capture_ready_observed'],True,'capture readiness observed');eq(len(m['operations']),69,'all declared operations');cp,sp=str(m['client_port']),str(m['server_port'])
+m=load(a.manifest);eq(m['capture_ready_observed'],True,'capture readiness observed')
+if a.profile=='malformed69':eq(len(m['operations']),69,'all declared malformed-matrix operations')
+else:
+ eq(len(m['profiles']),3,'three declared reused endpoint epochs');eq(sum(p['requests']for p in m['profiles']),len(m['operations']),'every declared peer request has a receipt');check(bool(m['operations'])and all(o['expected_base_scope']=='base'for o in m['operations']),'declared-valid profile cannot skip malformed cases')
+cp,sp=str(m['client_port']),str(m['server_port'])
 streams={};packet_connection={};first={};ws_headers={};ws_frame_count=collections.Counter();ws_frame_keys=collections.defaultdict(list)
 for p in load(a.oracle):
  l=p['_source']['layers'];no=int(l['frame']['frame.number']);cs=set(vals(l.get('quic',{}),'quic.connection.number'))
@@ -115,6 +120,7 @@ for e in events:
    if not options:ws_missing.append({'connection':conn,'direction':key[1],'stream':key[2],'case':x['case']})
    elif hs not in options:ws_differences.append({'connection':conn,'direction':key[1],'stream':key[2],'case':x['case'],'reason':'ordered decompressed raw fields differ'})
  if len(statuses)>1:mixed.append({'PDU':e['id'],'frames':[r['Number'] for r in refs],'statuses':sorted(statuses)})
-eq(set(actual),set(expected),'all original field sections delivered');eq(len(bindings),3,'three independent native connections');eq(len(set(bindings.values())),3,'one native generation per reference connection');check(bool(mixed),'actual mixed valid/error header packet observed')
-out={'scope':__doc__,'checks':checks,'peer_operations':69,'native_connections':len(bindings),'header_sections':len(actual),'native_conformance':dict(counts),'reference_frame_views':dict(ws_frame_count),'reference_repeated_frame_views':[{'connection':k[0],'direction':k[1],'stream':k[2],'type':k[3],'sha256':k[4],'frames':v} for k,v in sorted(ws_frame_keys.items()) if len(v)>1],'reference_header_views_unavailable':ws_missing,'reference_raw_field_differences':ws_differences,'mixed_status_packets':mixed,'network':m['network'],'native_selected_differences':[],'manifest_sha256':sha(a.manifest.read_bytes()),'oracle_sha256':sha(a.oracle.read_bytes()),'events_sha256':sha(a.events.read_bytes())}
+eq(set(actual),set(expected),'all original field sections delivered');eq(len(bindings),3,'three independent native connections');eq(len(set(bindings.values())),3,'one native generation per reference connection')
+if a.profile=='malformed69':check(bool(mixed),'actual mixed valid/error header packet observed')
+out={'scope':__doc__,'profile':a.profile,'checks':checks,'peer_operations':len(m['operations']),'native_connections':len(bindings),'header_sections':len(actual),'native_conformance':dict(counts),'reference_frame_views':dict(ws_frame_count),'reference_repeated_frame_views':[{'connection':k[0],'direction':k[1],'stream':k[2],'type':k[3],'sha256':k[4],'frames':v} for k,v in sorted(ws_frame_keys.items()) if len(v)>1],'reference_header_views_unavailable':ws_missing,'reference_raw_field_differences':ws_differences,'mixed_status_packets':mixed,'network':m['network'],'native_selected_differences':[],'manifest_sha256':sha(a.manifest.read_bytes()),'oracle_sha256':sha(a.oracle.read_bytes()),'events_sha256':sha(a.events.read_bytes())}
 a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps({k:v for k,v in out.items() if k not in ['scope','mixed_status_packets','reference_header_views_unavailable','reference_raw_field_differences']}))
