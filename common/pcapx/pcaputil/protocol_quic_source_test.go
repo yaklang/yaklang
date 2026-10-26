@@ -102,3 +102,36 @@ func TestQUICStreamDeliverySourceIncludesEarlierOutOfOrderPDU(t *testing.T) {
 	require.Equal(t, uint64(0), source["Offset"])
 	require.Equal(t, uint64(8), source["Length"])
 }
+
+func TestHTTP3BlockedHeaderKeepsOriginalWireSourceAfterQPACKRecovery(t *testing.T) {
+	q := &binQUIC{native: true, byteLimit: 65536, alpn: "h3"}
+	feed := func(pdu uint64, dir int, sid, off uint64, data []byte, fin bool) map[string]any {
+		q.eventID, q.eventRefs = pdu, []PacketReference{{Number: pdu}}
+		info := map[string]any{}
+		fr := map[string]any{"Frame Type": "STREAM", "Stream ID": sid, "Offset": off, "Stream Data": data, "FIN": fin}
+		require.NoError(t, q.applyFrames(dir, quicSpaceApplication, []map[string]any{fr}, info, 1024))
+		return info
+	}
+	feed(10, 1, 3, 0, h3ControlSETTINGS(1, 220, 7, 1), false)
+	// RFC QPACK dynamic authority/path references, followed by static GET and
+	// https pseudo-fields. The block waits for two encoder insertions.
+	block := h3Frame(1, rfcHex("03811011d1d7"))
+	info := feed(11, 0, 0, 0, block, true)
+	require.Equal(t, true, info["QPACK Blocked"])
+	require.NotEmpty(t, q.streams[0].sources[0].ranges)
+	encoder := h3EncoderStream(rfcHex("3fbd01c00f7777772e6578616d706c652e636f6dc10c2f73616d706c652f70617468"))
+	feed(12, 0, 6, 8, encoder[8:], false)
+	info = feed(13, 0, 6, 0, encoder[:8], false)
+	resumed := info["QPACK Resumed Streams"].([]map[string]any)
+	require.Len(t, resumed, 1)
+	require.Equal(t, uint64(11), resumed[0]["Blocked PDU ID"])
+	hf := resumed[0]["HTTP3 Frames"].([]map[string]any)[0]
+	require.Equal(t, uint64(0), hf["Stream ID"], "encoder stream 6 must not own the resumed application frame")
+	source := hf["Byte Source"].(map[string]any)
+	require.Equal(t, "complete", source["Coverage"])
+	require.Equal(t, []uint64{11}, source["Parent PDUs"], "wire block origin is distinct from later QPACK decoding dependencies")
+	require.Equal(t, []byte{1, 6}, hf["Frame Header Bytes"])
+	require.Equal(t, block[2:], hf["QPACK Block"])
+	require.Empty(t, q.streams[0].sources[0].ranges)
+	require.Empty(t, q.streams[6].sources[0].ranges)
+}

@@ -2,6 +2,7 @@ package sharkcli
 
 import (
 	"bytes"
+	"encoding/json"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
@@ -16,7 +17,7 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 	m := map[string]any{}
 	for k, v := range e.Session {
 		switch v.(type) {
-		case string, bool, uint8, uint16, uint32, uint64, int, int64, float64:
+		case string, bool, uint8, uint16, uint32, uint64, int, int64, float64, json.Number:
 			m[k] = v
 		}
 	}
@@ -32,7 +33,7 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		if v, ok := h["Stream ID"]; ok {
 			sid = number(v)
 		}
-		row := map[string]any{}
+		row := map[string]any{"Stream ID": sid}
 		for _, k := range []string{"Frame Type", "Frame Type Value", "Payload Length", "DATA Length", "Header Kind"} {
 			if v, ok := h[k]; ok {
 				row[k] = v
