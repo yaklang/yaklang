@@ -36,6 +36,7 @@ var isisEntryPriority = map[string]int{
 
 var netflowV9EntryPriority = map[string]int{
 	"Protocol Name": 0, "Version": 1, "Source ID": 2, "Sequence Number": 3, "System Uptime Milliseconds": 4, "Unix Seconds": 5, "Unix Nanoseconds": 5,
+	"Export Timestamp Valid": 5, "Export Timestamp Failure": 5,
 	"Engine Type": 5, "Engine ID": 5, "Sampling Mode": 6, "Sampling Interval": 6, "Sequence Scope": 7, "Header Record Count": 6, "Template Record Count": 7, "Data Record Count": 8, "Record Count Verified": 9,
 	"Data Decode Unavailable": 10, "Context Reset": 11, "Context Retention Warning": 12, "FlowSets": 20,
 	"FlowSet ID": 0, "FlowSet Length": 1, "Record Count": 2, "Template Scope": 3, "Template Packet References": 4,

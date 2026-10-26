@@ -721,6 +721,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil {
 		return
 	}
+	if e.Protocol == "netflow-v5" && e.Profile == "netflow-v5-independent-UDP-export" && e.Status == "malformed" &&
+		e.Session["Wire Grammar Complete"] == true && e.Session["Export Timestamp Valid"] == false {
+		p.protocol, p.priority, p.status, p.visibility = "NetFlow v5", 20, e.Status, "message"
+		p.evidence = "complete fixed-record wire layout; invalid export timestamp retained literally"
+		p.summary = clipText("Malformed export timestamp · "+textValue(e.Session["Export Timestamp Failure"])+" · "+applicationEventSummary(e), 384)
+		p.addLayer("NetFlow v5")
+		return
+	}
 	if e.Protocol == "netflow-v9" && e.Profile == "netflow-v9-directed-UDP-template-observer" &&
 		e.Session["Fixed Header Complete"] == true && e.Status != "decoded" && e.Status != "deferred" &&
 		(e.Session["Wire Framing Complete"] == true || e.Admission == "observed-directed-exporter-context") {

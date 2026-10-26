@@ -16,9 +16,6 @@ func DecodeNetFlowV5Wire(w []byte, limit int) (map[string]any, error) {
 	if count < 1 || count > 30 || len(w) != 24+48*count {
 		return nil, fmt.Errorf("NetFlow v5: record count or complete datagram length mismatch")
 	}
-	if binary.BigEndian.Uint32(w[12:16]) >= 1000000000 {
-		return nil, fmt.Errorf("NetFlow v5: invalid residual nanoseconds")
-	}
 	if limit <= 0 || count*19 > limit {
 		return nil, ErrObservedWireBudget
 	}
@@ -79,5 +76,13 @@ func DecodeNetFlowV5Wire(w []byte, limit int) (map[string]any, error) {
 		records = append(records, row)
 	}
 	m["Records"], m["Data Record Count"] = records, uint64(count)
+	m["Export Timestamp Valid"] = binary.BigEndian.Uint32(w[12:16]) < 1000000000
+	if m["Export Timestamp Valid"] == false {
+		// The fixed header and every complete record remain useful evidence.
+		// Never turn a bad clock component into an inferred absolute time, or
+		// erase all known fields merely because this semantic check failed.
+		m["Export Timestamp Failure"] = "residual nanoseconds must be below 1000000000; no absolute export time inferred"
+		return m, fmt.Errorf("NetFlow v5: invalid residual nanoseconds")
+	}
 	return m, nil
 }
