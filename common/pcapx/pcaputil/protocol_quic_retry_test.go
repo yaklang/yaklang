@@ -19,6 +19,9 @@ func retryTestInitial(t *testing.T, dcid, token []byte, pn byte) []byte {
 	return retryTestProtectedInitial(t, dcid, dcid, nil, token, pn, 0)
 }
 func retryTestProtectedInitial(t *testing.T, seed, dcid, scid, token []byte, pn byte, dir int) []byte {
+	return retryTestInitialFrames(t, seed, dcid, scid, token, pn, dir, append([]byte{1}, make([]byte, 23)...))
+}
+func retryTestInitialFrames(t *testing.T, seed, dcid, scid, token []byte, pn byte, dir int, plain []byte) []byte {
 	t.Helper()
 	keys, err := quicInitialKeys(seed)
 	require.NoError(t, err)
@@ -28,14 +31,14 @@ func retryTestProtectedInitial(t *testing.T, seed, dcid, scid, token []byte, pn 
 	head = append(head, scid...)
 	head = append(head, quicPutVarint(uint64(len(token)))...)
 	head = append(head, token...)
-	head = append(head, 41) // one PN byte, 24 plaintext bytes, 16-byte tag
+	head = append(head, quicPutVarint(uint64(1+len(plain)+16))...)
 	pnAt := len(head)
 	head = append(head, pn)
 	block, err := aes.NewCipher(k.key)
 	require.NoError(t, err)
 	aead, err := cipher.NewGCM(block)
 	require.NoError(t, err)
-	wire := append(bytes.Clone(head), aead.Seal(nil, quicNonce(k.iv, uint64(pn)), append([]byte{1}, make([]byte, 23)...), head)...)
+	wire := append(bytes.Clone(head), aead.Seal(nil, quicNonce(k.iv, uint64(pn)), plain, head)...)
 	mask, err := quicHeaderMask(k, wire[pnAt+4:pnAt+20])
 	require.NoError(t, err)
 	wire[0] ^= mask[0] & 15
