@@ -69,3 +69,28 @@ func TestPublicHTTP3FlagsCannotUpgradeUDPDiagnostic(t *testing.T) {
 	require.Equal(t, "UDP", row.Protocol)
 	require.NotContains(t, row.ProtocolStack, "HTTP/3")
 }
+
+func TestHTTP3ConnectionFaultTitleSurvivesWorkerScopeProjection(t *testing.T) {
+	packets, _ := top30Replay(t, top30Cases()[7])
+	for _, p := range packets {
+		for _, e := range p.protocolEvents() {
+			if e.AuthenticatedQUICApplicationProtocol() != "http3" {
+				continue
+			}
+			e.Status, e.Error = "malformed", "HTTP3 H3_FRAME_ERROR"
+			e.Session["HTTP3 Connection Error"] = map[string]any{"Error Name": "H3_FRAME_ERROR", "Error Scope": "connection", "Error Code": uint64(0x106), "First PDU ID": e.ID}
+			raw := &capturedPacket{number: p.number, data: p.data, ci: p.ci, link: p.link, events: []*pcaputil.ProtocolEvent{e}, presentation: presentEvents([]*pcaputil.ProtocolEvent{e})}
+			require.Equal(t, "connection protocol violation observed", raw.presentation.scope)
+			wire, err := marshalDecodeRequest(packetDecodeRequest(raw))
+			require.NoError(t, err)
+			var output bytes.Buffer
+			require.NoError(t, runDecodeWorker(bytes.NewReader(wire), &output))
+			d, err := decodeWorkerOutput(output.Bytes(), raw)
+			require.NoError(t, err)
+			require.Equal(t, "HTTP/3", d.protocol)
+			require.Contains(t, d.fields[1].text, "H3_FRAME_ERROR")
+			return
+		}
+	}
+	t.Fatal("no native HTTP3 observation")
+}
