@@ -394,6 +394,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				sourceName = "QUIC wire remainder · extracted octets"
 			}
 			if protocol == "http3" && authenticatedQUIC {
+				if name == "Partial Frame Bytes" {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 partial frame · stream %d · layout error", http3StreamID)
+				}
 				if name == "Payload" && http3FrameKind == "DATA" {
 					generated = bytesValue(x)
 					sourceName = fmt.Sprintf("HTTP/3 DATA · reassembled · stream %d", http3StreamID)
