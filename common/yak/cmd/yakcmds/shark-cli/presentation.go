@@ -855,6 +855,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 					p.status = "partial"
 					p.scope = "mixed datagram outcomes"
 					p.evidence = "packet authentication is per packet; unparsed remainder is not verified"
+					p.summary = fmt.Sprintf("Unverified QUIC remainder (%d bytes) · %s", e.Length, p.summary)
 				}
 			}
 			if e.Protocol == "" && e.Transport == "udp" && e.Summary != "" {
