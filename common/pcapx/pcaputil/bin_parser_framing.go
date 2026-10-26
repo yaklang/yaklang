@@ -578,57 +578,65 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	if evidence.byteSourceKind != "" {
 		e.SourceBytes.Kind = evidence.byteSourceKind
 	}
-	a.observeNetFlowV9Boundary(e, wire, truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8)
-	if a.l2tp3RawDatagram(e, wire, truncated || ci.CaptureLength < ci.Length, udp.Length) {
+	carrierErr := udpCarrierError(network, udp, ci, truncated)
+	a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
+	if a.l2tp3RawDatagram(e, wire, carrierErr) {
 		return
 	}
-	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+	if carrierErr != nil {
 		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
-			a.decodeHARTIPDatagram(e, wire, protocolError(ErrNeedMore, "HART-IP truncated or invalid UDP carrier"))
+			a.decodeHARTIPDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeFINSDatagram(e, wire, protocolError(ErrNeedMore, "FINS truncated or invalid UDP carrier"))
+			a.decodeFINSDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrNeedMore, "SD carrier truncated or invalid UDP length"))
+			a.decodeSomeIPSDDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrNeedMore, "SOME/IP carrier truncated or invalid UDP length"))
+			a.decodeSomeIPTPDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrNeedMore, "RTI filter carrier is truncated or has invalid UDP length"))
+			a.decodeRTPS20RTIFilterInput(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrNeedMore, "legacy RTPS carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.decodeRTPS13SelectedInput(e, wire, carrierErr, uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
 		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, carrierErr, uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
 		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrNeedMore, "AIS fragment carrier is truncated or has invalid UDP length"))
+			a.decodeAISMultipartDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
-		if a.refuseBACnetReadTruncated(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.refuseBACnetReadCarrier(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort), carrierErr) {
 			a.emit(e)
 			return
 		}
-		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
-		a.incomplete.Add(1)
+		e.Status, e.sessionError = classifySessionError(carrierErr)
+		e.Error, e.Summary = carrierErr.Error(), carrierErr.Message
+		e.nativeDiagnosticError = carrierErr.Error()
+		e.Completeness = "limited"
+		if carrierErr.Kind == ErrNeedMore {
+			a.incomplete.Add(1)
+		} else {
+			a.malformed.Add(1)
+		}
 	} else if len(wire) > a.config.MaxMessageBytes {
 		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
 			a.decodeHARTIPDatagram(e, wire, protocolError(ErrResourceExceeded, "HART-IP UDP byte budget"))

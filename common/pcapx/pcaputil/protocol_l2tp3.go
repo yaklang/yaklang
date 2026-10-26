@@ -226,7 +226,7 @@ func l2tp3InnerIPDiagnostic(q gopacket.Packet) (string, string) {
 // Raw UDP byte-sessions have no capture transport pipeline. They expose the
 // same observed association and selected pseudowire fields, without inventing
 // TCP delivery from caller-supplied datagrams.
-func (a *binParser) l2tp3RawDatagram(e *ProtocolEvent, wire []byte, truncated bool, udpLength uint16) bool {
+func (a *binParser) l2tp3RawDatagram(e *ProtocolEvent, wire []byte, carrierErr *ProtocolError) bool {
 	a.l2tp3Mu.Lock()
 	admission := a.l2tp3UDPAdmission(e.Domain, l2tp3EndpointOf(e.Source), l2tp3EndpointOf(e.Destination), wire)
 	a.l2tp3Mu.Unlock()
@@ -235,9 +235,9 @@ func (a *binParser) l2tp3RawDatagram(e *ProtocolEvent, wire []byte, truncated bo
 	}
 	e.Admission = admission
 	var err error
-	if udpLength < 8 || int(udpLength) != len(wire)+8 {
-		err = protocolError(ErrMalformedMessage, "L2TPv3 UDP length mismatch")
+	if carrierErr != nil {
+		err = carrierErr
 	}
-	a.decodeL2TPv3Event(e, wire, true, truncated, err)
+	a.decodeL2TPv3Event(e, wire, true, false, err)
 	return true
 }
