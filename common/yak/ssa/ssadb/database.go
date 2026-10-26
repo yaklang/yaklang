@@ -571,4 +571,29 @@ func patchIrTypeDedupe(db *gorm.DB) {
 	if err := ensureIrTypeDedupeIndexes(db); err != nil {
 		log.Warnf("[ir-type-dedupe] index patch: %v", err)
 	}
+	backfillIrTypePayloadIDs(db)
+}
+
+// backfillIrTypePayloadIDs upgrades a database written by the first revision
+// of the dedupe layout, whose id rows stored the 64-character payload hash
+// instead of the payload row id. The payload rows are still there, so the
+// reference is resolved in place; rows that cannot be resolved are left for a
+// recompile rather than deleted.
+func backfillIrTypePayloadIDs(db *gorm.DB) {
+	if db == nil || db.Dialect() == nil || !db.Dialect().HasColumn(TableIrTypeIDs, "type_hash") {
+		return
+	}
+	if !db.Dialect().HasColumn(TableIrTypeIDs, "payload_id") {
+		return
+	}
+	result := db.Exec(`UPDATE ` + TableIrTypeIDs + ` SET payload_id = (SELECT p.id FROM ` +
+		TableIrTypePayloads + ` AS p WHERE p.program_name = ` + TableIrTypeIDs + `.program_name` +
+		` AND p.type_hash = ` + TableIrTypeIDs + `.type_hash) WHERE payload_id = 0`)
+	if result.Error != nil {
+		log.Warnf("[ir-type-dedupe] backfill payload ids: %v", result.Error)
+		return
+	}
+	if result.RowsAffected > 0 {
+		log.Infof("[ir-type-dedupe] resolved %d legacy type id rows to payload ids", result.RowsAffected)
+	}
 }

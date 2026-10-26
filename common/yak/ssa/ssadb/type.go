@@ -157,21 +157,17 @@ func DeleteIrType(db *gorm.DB, id []int64) error {
 				end = len(id)
 			}
 			chunk := id[i:end]
-			legacyDelete := tx.Where("id IN (?)", chunk).Unscoped().Delete(&IrType{})
-			if legacyDelete.Error != nil {
-				return legacyDelete.Error
-			}
-			if IrTypeDedupeAvailable(tx) {
-				dedupeDelete := tx.Where("id IN (?)", chunk).Unscoped().Delete(&IrTypeID{})
-				if dedupeDelete.Error != nil {
-					return dedupeDelete.Error
-				}
+			if err := tx.Where("id IN (?)", chunk).Unscoped().Delete(&IrType{}).Error; err != nil {
+				return err
 			}
 		}
+		// Dedupe tables are keyed by type_id, not by the legacy ir_types
+		// primary key, so this call cannot name one of their rows. Drop only
+		// payloads that no id row references any more.
 		if IrTypeDedupeAvailable(tx) {
-			cleanup := tx.Exec(`DELETE FROM ` + TableIrTypePayloads + ` WHERE NOT EXISTS (` +
-				`SELECT 1 FROM ` + TableIrTypeIDs + ` AS i WHERE i.program_name = ` + TableIrTypePayloads + `.program_name ` +
-				`AND i.type_hash = ` + TableIrTypePayloads + `.type_hash)`)
+			cleanup := tx.Exec(`DELETE FROM ` + TableIrTypePayloads + ` AS p WHERE NOT EXISTS (` +
+				`SELECT 1 FROM ` + TableIrTypeIDs + ` AS i WHERE i.program_name = p.program_name ` +
+				`AND i.payload_id = p.id)`)
 			if cleanup.Error != nil {
 				return cleanup.Error
 			}
