@@ -129,10 +129,19 @@ try:
     if plan.get('request_data')is not None:extra+=frame(0,plan['request_data'].encode('ascii'))
     if plan.get('request_trailers')is not None:extra+=headers(plan['request_trailers'])
    sid=client.get_next_available_stream_id();w=headers(hs)+extra
+   if plan:
+    trim=plan.get('request_trim_bytes',0);assert 0<=trim<=len(w)
+    if trim:w=w[:-trim]
+    if 'request_wire_prefix_bytes'in plan:w=w[:plan['request_wire_prefix_bytes']]
+    w+=bytes.fromhex(plan.get('request_append_hex',''))
    expected[sid]={'name':name,'wire':w,'status':status}
    if plan:
     reply=b''.join(headers(h) for h in plan.get('reply_interim_headers',[]))+headers(plan['reply_headers'])
     if plan.get('reply_data')is not None:reply+=frame(0,plan['reply_data'].encode('ascii'))
+    trim=plan.get('reply_trim_bytes',0);assert 0<=trim<=len(reply)
+    if trim:reply=reply[:-trim]
+    if 'reply_wire_prefix_bytes'in plan:reply=reply[:plan['reply_wire_prefix_bytes']]
+    reply+=bytes.fromhex(plan.get('reply_append_hex',''))
     expected[sid]['reply_wire']=reply;expected[sid]['plan']=plan
    client.send_stream_data(sid,w,end_stream=True);return sid
   if plans:
