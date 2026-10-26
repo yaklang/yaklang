@@ -119,6 +119,8 @@ func TestNativeQUICHeaderAliasesOwnPrivateLiteralFields(t *testing.T) {
 	require.Equal(t, []any{"8394c8f03e515708"}, want.FieldMap()["quic.dcid"])
 	require.Equal(t, []any{""}, want.FieldMap()["quic.scid"], "zero-length SCID is present in a long header")
 	require.Equal(t, []any{uint64(1)}, want.FieldMap()["quic.version"])
+	require.Equal(t, []any{uint64(0)}, want.FieldMap()["quic.long.packet_type"])
+	require.Empty(t, want.FieldMap()["quic.long.packet_type_v2"])
 	require.Equal(t, []any{uint64(2)}, want.FieldMap()["quic.packet_number"])
 	for _, v := range want.Values {
 		switch v.Name {
