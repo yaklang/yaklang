@@ -157,6 +157,8 @@ func TestQUICNativeProtectedFrameRoleAndLevelConformance(t *testing.T) {
 		{"Handshake-stream", "Handshake", 1, 0, []byte{0x0a, 0, 0}, ErrMalformedMessage},
 		{"empty-packet", "1-RTT", 0, 0, nil, ErrMalformedMessage},
 		{"short-reserved-bits", "1-RTT", 0, 8, []byte{1}, ErrMalformedMessage},
+		{"Initial-reserved-bits", "Initial", 0, 4, []byte{1}, ErrMalformedMessage},
+		{"Handshake-reserved-bits", "Handshake", 1, 8, []byte{1}, ErrMalformedMessage},
 		{"nonminimal-ping", "1-RTT", 0, 0, []byte{0x40, 1}, ErrMalformedMessage},
 		{"unselected-extension", "1-RTT", 0, 0, []byte{0x1f}, ErrUnsupportedFeature},
 		{"wide-unselected-extension", "1-RTT", 0, 0, []byte{0x40, 0x40}, ErrUnsupportedFeature},
@@ -170,6 +172,11 @@ func TestQUICNativeProtectedFrameRoleAndLevelConformance(t *testing.T) {
 						key = q.keys.initial[tc.direction]
 					}
 					wire := quicConformancePacket(t, key, tc.kind, 1, tc.reserved, tc.plain)
+					spaces, phases, keys := q.spaces, q.keyPhase, cloneQUICKeyring(q.keys)
+					require.True(t, q.authenticatesExistingWire(tc.direction, wire), "AEAD ownership is independent of frame or reserved-bit validity")
+					require.Equal(t, spaces, q.spaces, "ownership probe cannot observe a packet number")
+					require.Equal(t, phases, q.keyPhase, "ownership probe cannot promote keys")
+					require.Equal(t, keys, q.keys, "ownership probe cannot change key material")
 					info, err := q.consume(tc.direction, wire, 128)
 					require.Error(t, err)
 					_, typed := classifySessionError(err)
