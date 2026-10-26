@@ -388,6 +388,7 @@ func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) 
 func (q *binQUIC) finishFrames(dir, space int, frames []map[string]any, info map[string]any, max int) (map[string]any, error) {
 	info["Frames"] = frames
 	err := q.applyFrames(dir, space, frames, info, max)
+	markHTTP3WireOnly(frames, info)
 	q.annotateH3ConnectionFault(info)
 	if err != nil && !isRecoverableH3ObservationError(err) {
 		return info, err
@@ -521,7 +522,11 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 					fr["Delivered Byte Source"] = st.sources[dir].describe(sid, dir, off, off+uint64(len(data)))
 				}
 				fr["Stream Complete"] = st.reassembly[dir].deliveredFIN
-				if st.resetDirection[dir] || len(data) == 0 && !fin {
+				if st.resetDirection[dir] {
+					continue
+				}
+				if len(data) == 0 && !fin {
+					q.observeKnownHTTP3Wire(st, dir, sid, originalOffset, originalLength, fr, info)
 					continue
 				}
 			}

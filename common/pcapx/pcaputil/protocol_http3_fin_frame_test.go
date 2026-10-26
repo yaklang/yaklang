@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -169,4 +170,116 @@ func TestHTTP3IncompleteOpenFrameAndAbruptResetAreNotCleanFINLayoutErrors(t *tes
 	info, err = h3FINFrameFeed(q, 0, map[string]any{"Frame Type": "RESET_STREAM", "Stream ID": uint64(0), "Final Size": uint64(len(wire)), "Application Error Code": uint64(0x10c)})
 	require.NoError(t, err)
 	require.Nil(t, info["HTTP3 Connection Error"], "RFC9114 permits an abrupt reset inside a frame")
+}
+
+func TestHTTP3HugeFinalFrameLengthIsLayoutErrorWithoutPayloadAllocation(t *testing.T) {
+	q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	// DATA length = (1<<60)+7, encoded in eight bytes; no payload was sent.
+	wire := append(h3RequestHeaders(), 0, 0xd0, 0, 0, 0, 0, 0, 0, 7)
+	bad := h3FINStream(0, 0, wire, true)
+	_, err := h3FINFrameFeed(q, 0, bad)
+	var pe *ProtocolError
+	require.ErrorAs(t, err, &pe)
+	require.Equal(t, ErrMalformedMessage, pe.Kind, "a known clean final extent is not a request to allocate the declared body")
+	fault := bad["HTTP3 Frame Error"].(map[string]any)
+	require.Equal(t, uint64(1<<60)+7, fault["Declared Payload Length"])
+	require.Equal(t, uint64(0), fault["Available Payload Bytes"])
+	require.Less(t, q.initialMemory(), int64(20000))
+}
+
+func TestHTTP3KnownStreamRetransmissionKeepsIdentityWithoutReplayingFrames(t *testing.T) {
+	q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	wire := append(h3BodyRequest("POST", "3"), h3Data([]byte("abc"))...)
+	_, err := h3FINFrameFeed(q, 0, h3FINStream(0, 0, bytes.Clone(wire), true))
+	require.NoError(t, err)
+	fr := h3FINStream(0, 0, bytes.Clone(wire), true)
+	info, err := h3FINFrameFeed(q, 0, fr)
+	require.NoError(t, err)
+	require.Equal(t, true, info["HTTP3"], "known authenticated stream identity must survive a no-new-bytes delivery")
+	require.Equal(t, true, info["HTTP3 Wire Only"])
+	require.Equal(t, "retransmission", fr["HTTP3 Wire Observation"])
+	require.Empty(t, fr["HTTP3 Frames"], "do not fabricate another logical frame")
+	require.Equal(t, uint64(3), q.streams[0].h3.body[0].observed)
+	require.Equal(t, 1, q.streams[0].h3.reqHeaders)
+	info, err = h3FINFrameFeed(q, 0, h3FINStream(0, 0, bytes.Clone(wire), true), h3FINStream(8, 0, h3RequestHeaders(), true))
+	require.NoError(t, err)
+	require.Equal(t, false, info["HTTP3 Wire Only"], "another stream in the packet can supply a genuinely new application frame")
+	unknown := h3FINStream(4, 10, []byte("unseen-prefix"), false)
+	info, err = h3FINFrameFeed(q, 0, unknown)
+	require.NoError(t, err)
+	require.Nil(t, info["HTTP3"], "another stream has not supplied its own application prefix")
+	fresh := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	info, err = h3FINFrameFeed(fresh, 0, h3FINStream(0, 10, []byte("new-generation"), false))
+	require.NoError(t, err)
+	require.Nil(t, info["HTTP3"], "a different connection generation does not inherit stream identity")
+}
+
+func TestHTTP3BufferedRangeIdentityRequiresItsOwnKnownPrefixAndRejectsConflict(t *testing.T) {
+	q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	wire := h3RequestHeaders()
+	_, err := h3FINFrameFeed(q, 0, h3FINStream(0, 0, bytes.Clone(wire), false))
+	require.NoError(t, err)
+	future := h3FINStream(0, uint64(len(wire)+100), []byte("x"), false)
+	info, err := h3FINFrameFeed(q, 0, future)
+	require.NoError(t, err)
+	require.Equal(t, true, info["HTTP3 Wire Only"])
+	require.Equal(t, "buffered-range", future["HTTP3 Wire Observation"])
+	require.Nil(t, future["HTTP3 Frames"])
+	conflict := bytes.Clone(wire)
+	conflict[0] ^= 1
+	info, err = h3FINFrameFeed(q, 0, h3FINStream(0, 0, conflict, false))
+	require.Error(t, err)
+	require.Nil(t, info["HTTP3 Wire Observation"], "conflicting bytes are rejected before any read-only application classification")
+}
+
+func FuzzHTTP3FinalDeclaredLengthIsBoundedAndExact(f *testing.F) {
+	f.Add(uint64(1<<60) + 7)
+	f.Add(uint64(0))
+	f.Add(^uint64(0))
+	f.Fuzz(func(t *testing.T, input uint64) {
+		length := input & ((uint64(1) << 62) - 1)
+		header := make([]byte, 9)
+		binary.BigEndian.PutUint64(header[1:], length|3<<62)
+		q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		fr := h3FINStream(0, 0, append(h3RequestHeaders(), header...), true)
+		_, err := h3FINFrameFeed(q, 0, fr)
+		if length == 0 {
+			if err != nil {
+				t.Fatal(err)
+			}
+		} else {
+			if !isH3ConnectionObservationError(err) {
+				t.Fatal("clean final extent lost frame-layout classification", err)
+			}
+			if fr["HTTP3 Frame Error"].(map[string]any)["Declared Payload Length"] != length {
+				t.Fatal("62-bit declared length was rounded or narrowed")
+			}
+		}
+		if q.initialMemory() > 20000 {
+			t.Fatal("declared length caused payload allocation")
+		}
+	})
+}
+
+func FuzzHTTP3RetransmissionDoesNotReplayApplication(f *testing.F) {
+	f.Add(uint8(5), uint8(2))
+	f.Add(uint8(0), uint8(0))
+	f.Fuzz(func(t *testing.T, n, seed uint8) {
+		q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		wire := append(h3BodyRequest("POST", "-"), h3Data(make([]byte, int(n%96)))...)
+		if _, err := h3FINFrameFeed(q, 0, h3FINStream(0, 0, bytes.Clone(wire), true)); err != nil {
+			t.Fatal(err)
+		}
+		off := 1 + int(seed)%(len(wire)-1)
+		fr := h3FINStream(0, uint64(off), bytes.Clone(wire[off:]), false)
+		info, err := h3FINFrameFeed(q, 0, fr)
+		if err != nil || info["HTTP3 Wire Only"] != true || fr["HTTP3 Frames"] != nil || q.streams[0].h3.body[0].observed != uint64(n%96) {
+			t.Fatal("retransmission changed semantic delivery", err)
+		}
+		fresh := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		info, err = h3FINFrameFeed(fresh, 0, h3FINStream(0, uint64(off), bytes.Clone(wire[off:]), false))
+		if err != nil || info["HTTP3"] != nil {
+			t.Fatal("new generation borrowed a missing application prefix", err)
+		}
+	})
 }
