@@ -2267,3 +2267,65 @@ Windows 实际 CP936 检查包括 Retry 的 false 包保护/false 对端身份�
 [Retry 聚合证据](shark-public-corpus-20261025/quic-retry-summary.json) 绑定各源码版本、
 输入/导出/审计器/Windows 快照哈希及未选范围。原生 v2、兼容 VN、一般包号复用/
 stateless reset、缺失 CID/密钥上下文、其他载体/fuzz 和整体协议完备性仍需后续工作。
+
+## 2026-10-27：原生 QUIC v2、跨版本代际和独立密钥更新验算
+
+`5be60cad5e` 增加固定版本 QUIC v2 原生入口：按
+[RFC9369 §3](https://www.rfc-editor.org/rfc/rfc9369.html#section-3)
+使用真实版本字 `0x6b3343cf`、v2 长头类型、Initial salt、HKDF 标签和 Retry
+完整性参数，三个 AEAD 套件及密钥更新均保留版本边界。整数 `2` 不是该线上的
+版本值。公开 RFC Initial、服务器 Initial、Retry、ChaCha20 包及下一代 secret
+向量直接通过原生入口；同一 TLS secret 不能借用另一版本的包保护状态。
+兼容版本协商尚未实现，已建立代际中的版本变化明确拒绝，不能宣称 RFC9369
+端点或 `version_information` 全面合规。
+
+同时修复 Retry 的归属探针与实际解包路径不一致：缺失客户端 post-Retry Initial
+时，服务器 Initial 可以在不改变活连接的探针中使用已观测 Retry 密钥；随后真正
+消费时再提交状态。post-Retry 服务器采用零 CID 时，后续客户端 Initial 也能验证
+已观测的服务器 CID 和 token。同一 tuple 上竞争的旧零 CID 代际不会吞掉新 Retry；
+公开 Retry 标签仅选择已观测上下文，不被标作包保护或对端身份认证。
+这些场景有原生 UDP 入口、旧代际仍活跃、客户端 Initial 丢失、双版本和零 CID 测试。
+
+新增三轮 Windows 实际 UDP 捕获；均有三次 Retry、三代相同端口、12 组逐字节
+请求/响应收包记录、三种 AEAD 和实际 key phase 变化。零 CID、保留首个 ClientHello
+及 v2 更新标签的对端适配均在 manifest 中声明，没有修改安装的 aioquic 库。
+
+| 实际捕获 | 帧数 | 实际丢包 / 延迟 | 独立 1-RTT 解密 | 结果 |
+| --- | ---: | ---: | ---: | --- |
+| v2，测试端保留原始更新标签 | 107 | 6 / 12 | 91 | 7 个包仅错误的 v1 KU 标签可解密，原生保持拒绝 |
+| v2，声明使用 RFC9369 更新标签 | 123 | 6 / 14 | 107 | 全部按 RFC 解密，125 个保护包号与参考一致 |
+| 同一 tuple 依次 v1 / v2 / v1 | 122 | 7 / 14 | 106 | 三代独立，124 个保护包号与参考一致 |
+
+新增独立 Python 1-RTT 校验器只使用已绑定的物理包、独立 Initial 解密得到的
+ClientHello random/ServerHello suite、观察到的 CID 和 TLS keylog，独立完成
+HKDF、AES/ChaCha20 头保护及 AEAD。负例中的 7 包确实使用 `quic ku` 而非
+`quicv2 ku`；收到响应不能证明这种密钥更新符合 RFC。原生没有增加错误标签回退。
+10 个特意损坏 tag、HP、AAD/CID、包号、原生保护标记、版本、CID 长度或 secret
+的独立控制全部拒绝。v1/v2 头字段控制分别拒绝 37 个损坏项。
+
+两个正例分别验证全部 42 个 HTTP3 帧（6 SETTINGS、24 HEADERS、12 DATA）、
+246 段字节来源及 24 组有序字段，连接、来源、请求关联与真实收包字节一致。
+参考原始 HTTP3 仍有重传视图和两个 12400 类型视图；两个正例各有 2 组参考
+头字段视图不可用，其余可比的有序原始字段差异为 0。未用原生结果补成参考成功。
+强制 DecodeAs 的三个
+就绪 nonce 保留为未选 UDP；未保护的零尾部仍为诊断，不能归入已认证 STREAM。
+
+`d608c424c8` 对齐参考的版本专用字段：v1 的 `quic.long.packet_type` 与 v2 的
+`quic.long.packet_type_v2` 分开，二者均绑定真实首字节。短头不凭连接记忆制造
+`Version`/SCID 字段。Windows 详情显示 `QUIC v2 (0x6b3343cf)`；实际 CP936 检查
+空长 CID 和更新密钥后的 HTTP3，请求递进路径、当前行/详情、字节源、会话、
+缩放、退出与码页恢复均通过。页面图片来自未经改写的实际控制台字符/属性缓冲区。
+
+两个原始大包完整重跑 379,455 帧，SDK 的 39,283 / 245,615 条记录及 CLI 的
+51,328 / 328,127 行与已推送 Retry 基线逐字节一致，包含流、事务、字节和字段。
+这证明此次 v2 扩展未引入现有输出回归，不等于剩余差异全部解决。Weber 的四个
+真实 CRYPTO 冲突和其他未选参考包、Sharon 的 1,027 个未选/10 个派生参考视图、
+原有 90/35 项逐帧归属/字段范围差异仍如实保留。
+
+原生完整测试 400.229s、CLI 1.985s；版本隔离 fuzz 101,789 次/40.461s；
+字段别名后的全部 QUIC/FirstBatchT03 测试 1.468s、最终完整 CLI 1.971s 通过。
+新增独立校验器另对既有 v1 正例验证 122 个 1-RTT 包及原有 33 帧来源图。
+[QUIC v2 聚合证据](shark-public-corpus-20261025/quic-v2-summary.json) 绑定源码、
+抓包/导出/审计器及 Windows 缓冲区哈希。pcap、keylog、证书、原始导出和图片均
+只存本地。greased fixed bit、票据/0-RTT 上下文、一般包号复用/stateless reset、
+兼容协商、完整帧角色规则、宽 token varint 规则投影、其他载体和协议仍未全部覆盖。
