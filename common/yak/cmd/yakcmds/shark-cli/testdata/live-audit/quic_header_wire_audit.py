@@ -61,7 +61,7 @@ for row in rows:
 native=0;matched=set();seen_ids=set();missing_reference=[];differences=[];counts=collections.Counter();alias_counts=collections.Counter();zero_omissions=collections.Counter();logical=0;unmatched=[]
 token_names={'quic.token_length','quic.token','quic.retry_token','quic.retry_integrity_tag'}
 header_names={'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2','quic.packet_number'}|token_names
-flow_connections={};connection_flows={};association_checks=0
+flow_connections={};connection_flows={};association_checks=0;pn_reference_comparisons=0;pn_reference_omissions=[]
 for line in a.events.open(encoding='utf-8-sig'):
  e=json.loads(line)
  if e['protocol']not in['quic','http3','doq']:continue
@@ -119,7 +119,10 @@ for line in a.events.open(encoding='utf-8-sig'):
   for key in{'quic.version','quic.dcid','quic.scid','quic.dcil','quic.scil','quic.long.packet_type','quic.long.packet_type_v2'}|token_names:check(key not in aliases,'unparsed remainder cannot inherit a header field')
  if m.get('Authentication Verified')and'Packet Number'in m:
   pn=m['Packet Number'];eq(aliases['quic.packet_number']['value'],pn,'authenticated decoded number');eq(aliases['quic.packet_number']['exact_value'],str(pn),'lossless decoded number');check('pdu_range'not in aliases['quic.packet_number'],'decoded number is not a literal ciphertext value span');logical+=1
-  if'quic.packet_number'in view and int(view['quic.packet_number'])!=pn:differences.append({'PDU':e['id'],'frame':no,'field':'quic.packet_number','native':pn,'reference':int(view['quic.packet_number'])})
+  if'quic.packet_number'in view:
+   pn_reference_comparisons+=1
+   if int(view['quic.packet_number'])!=pn:differences.append({'PDU':e['id'],'frame':no,'field':'quic.packet_number','native':pn,'reference':int(view['quic.packet_number'])})
+  elif view:pn_reference_omissions.append({'PDU':e['id'],'frame':no,'native_authenticated_PN':pn})
   if candidates and no in reference_connections and e['flow']:
    domain=json.dumps(e['domain'],sort_keys=True);fk=(domain,e['flow']);ck=(domain,reference_connections[no]);flow_connections.setdefault(fk,ck);connection_flows.setdefault(ck,fk);eq(flow_connections[fk],ck,'one authenticated reference connection per native flow/domain');eq(connection_flows[ck],fk,'one native generation per reference connection/domain');association_checks+=1
  else:check('quic.packet_number'not in aliases,'unverified payload cannot publish a decoded number')
@@ -133,6 +136,7 @@ out={
  'native_QUIC_carrier_PDUs':native,'matched_reference_views':len(matched),
  'header_CID_profiles':{str(k):v for k,v in counts.items()},'typed_header_occurrences':dict(alias_counts),
  'authenticated_packet_numbers':logical,'authenticated_flow_association_checks':association_checks,
+ 'authenticated_packet_number_reference_comparisons':pn_reference_comparisons,'authenticated_packet_number_reference_omissions':pn_reference_omissions,
  'reference_zero_length_omissions':dict(zero_omissions),'reference_value_differences':differences,
  'reference_field_omissions':missing_reference,'unmatched_native_views':unmatched,'unmatched_reference_views':missing,
  'capture_sha256':sha(a.capture.read_bytes()),'oracle_sha256':sha(a.oracle.read_bytes()),'events_sha256':sha(a.events.read_bytes())
