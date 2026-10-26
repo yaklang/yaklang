@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"net"
 	"testing"
 	"time"
 
@@ -24,15 +25,46 @@ func ntpNativeParser() *binParser {
 	return &binParser{budget: DefaultParserBudget(), config: BinParserConfig{MaxMessageBytes: 1 << 20, MaxBufferedBytes: 1 << 20}}
 }
 func ntpNativeFeed(t *testing.T, a *binParser, response bool, domain CaptureDomain, w []byte) *ProtocolEvent {
-	e := &ProtocolEvent{ID: a.ids.Add(1), Transport: "udp", Domain: domain, Source: "127.0.0.1:20000", Destination: "127.0.0.1:123"}
-	e.Timestamp = time.Unix(1600000000, int64(e.ID)*int64(time.Millisecond))
+	physical := a.ids.Load() + 1
+	e := &ProtocolEvent{Transport: "udp", Domain: domain, Source: "127.0.0.1:20000", Destination: "127.0.0.1:123"}
+	e.Timestamp = time.Unix(1600000000, int64(physical)*int64(time.Millisecond))
 	src, dst := uint16(20000), uint16(123)
 	if response {
 		e.Source, e.Destination, src, dst = e.Destination, e.Source, dst, src
 	}
-	e.SourceBytes = ByteSource{Kind: "captured", PacketRefs: []PacketReference{{Number: e.ID, Domain: domain}}}
+	e.SourceBytes = ByteSource{Kind: "captured", PacketRefs: []PacketReference{{Number: physical, Domain: domain}}}
 	require.True(t, a.decodeNTPDatagram(e, w, src, dst, false))
 	return e
+}
+
+func TestNativeNTPControlRealIngressOwnsIDsBeforePublication(t *testing.T) {
+	one, two := net.IPv4(192, 0, 2, 1), net.IPv4(192, 0, 2, 2)
+	wires := [][]byte{ntpControlWire(37, 2, 0, nil), ntpControlWire(37, 128|2, 3, []byte("def")), ntpControlWire(37, 128|32|2, 0, []byte("abc")), ntpControlWire(37, 128|2, 3, []byte("def"))}
+	var capture []byte
+	for i, w := range wires {
+		src, dst, sp, dp := one, two, uint16(20000), uint16(123)
+		if i > 0 {
+			src, dst, sp, dp = dst, src, dp, sp
+		}
+		part := t20UDPCapture(t, src, dst, sp, dp, w)
+		if i == 0 {
+			capture = part
+		} else {
+			capture = append(capture, part[24:]...)
+		}
+	}
+	for _, deferred := range []bool{false, true} {
+		var es []*ProtocolEvent
+		require.NoError(t, ReplayPcap(bytes.NewReader(capture), WithProtocolDeferred(deferred), WithOnProtocolMessage(func(e *ProtocolEvent) { es = append(es, e) })))
+		require.Len(t, es, 4)
+		require.Positive(t, es[0].ID)
+		require.Equal(t, es[0].ID, es[0].TransactionID)
+		require.Equal(t, es[0].ID, es[1].ResponseTo)
+		require.Equal(t, es[0].ID, es[2].ResponseTo)
+		require.Equal(t, []byte("abcdef"), es[2].Session["Reassembled Control Data"])
+		require.Nil(t, es[3].Session["Reassembled Control Data"])
+		require.Equal(t, []uint64{es[1].ID, es[2].ID}, es[2].Session["Reassembled Byte Source"].(map[string]any)["Parent PDUs"])
+	}
 }
 
 func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
@@ -59,6 +91,29 @@ func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
 	w[0] = 4<<3 | 1
 	require.False(t, a.decodeNTPDatagram(&ProtocolEvent{}, w, 20000, 20001, false), "symmetric mode requires full grammar plus service selection")
 	require.False(t, a.decodeNTPDatagram(&ProtocolEvent{}, ntpControlWire(1, 2, 0, nil), 20000, 20001, false), "no port-only/control-prefix discovery on arbitrary UDP")
+}
+
+func assertNativeNTPLegacyVersionReview(t testing.TB, events []*ProtocolEvent) {
+	t.Helper()
+	require.Len(t, events, 1)
+	e := events[0]
+	require.Equal(t, "ntp", e.Protocol)
+	require.Equal(t, "ntp-native", e.Profile)
+	require.Empty(t, e.Error)
+	require.Equal(t, 2, e.Session["Version"])
+	require.Equal(t, 3, e.Session["Mode"])
+	require.Len(t, e.Raw, 48)
+	require.Equal(t, byte(0x13), e.Raw[0])
+	require.LessOrEqual(t, e.Raw[1], byte(16))
+	fields, err := e.GetFields()
+	require.NoError(t, err)
+	for i, name := range []string{"Reference", "Origin", "Receive", "Transmit"} {
+		at := 16 + 8*i
+		require.Equal(t, e.Raw[at:at+8], fields[name+" Timestamp"])
+		require.Equal(t, binary.BigEndian.Uint32(e.Raw[at:at+4]), fields[name+" Timestamp Seconds"])
+		require.Equal(t, binary.BigEndian.Uint32(e.Raw[at+4:at+8]), fields[name+" Timestamp Fraction"])
+	}
+	require.Zero(t, e.ResponseTo, "v2 wire support does not fabricate a time exchange")
 }
 
 func TestNativeNTPControlOutOfOrderRecoveryDuplicateAndSequenceReuse(t *testing.T) {
