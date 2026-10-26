@@ -37,6 +37,37 @@ func TestQUICCIDDetailsKeepBinaryOctetsAndShortHeaderAbsence(t *testing.T) {
 	}
 }
 
+func TestQUICOpaqueTokensKeepWireRangesThroughWorkerIPC(t *testing.T) {
+	for _, empty := range []bool{false, true} {
+		token := []byte{0xff, 0, 0xc3}
+		if empty {
+			token = []byte{}
+		}
+		raw := append([]byte{0xd0, 0x6b, 0x33, 0x43, 0xcf, 0, 0, byte(len(token))}, token...)
+		e := &pcaputil.ProtocolEvent{Protocol: "quic", Raw: raw, Session: map[string]any{"Header Form": "long", "Initial Token Length": uint64(len(token)), "Initial Token Length Encoding Bytes": 1, "Initial Token": token, "Wire Field Ranges": map[string]any{"Initial Token Length": []any{7, 8}, "Initial Token": []any{8, 8 + len(token)}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		seen := 0
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "Initial Token:") {
+				seen++
+				if empty {
+					require.Contains(t, f.text, "0 bytes (empty opaque token)")
+					require.False(t, f.hasRange)
+				} else {
+					require.Contains(t, f.text, "ff 00 c3")
+					require.True(t, f.hasRange)
+					require.Equal(t, token, sources[f.source-1].Data[f.start:f.end])
+				}
+			}
+		}
+		require.Equal(t, 1, seen)
+	}
+}
+
 func TestQUICLongHeaderEmptyCIDIsPresentRatherThanUnknown(t *testing.T) {
 	e := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", Status: "context-required", Raw: []byte{0xc0, 0, 0, 0, 1, 0, 0}, Session: map[string]any{"Header Form": "long", "Version": uint32(1), "DCID": []byte(nil), "SCID": []byte(nil), "Wire Field Ranges": map[string]any{"DCID": []any{6, 6}, "SCID": []any{7, 7}}}}
 	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})

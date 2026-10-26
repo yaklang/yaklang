@@ -78,17 +78,27 @@ Package:
           }
           this.NewElement().Process()
         }
+  QUICInitialTokenFields: QUICToken
+
 QUICToken:
   operator: |
+    first, probe = this.TryProcessByType("QUICPeekByte")
+    probe.Recovery()
+    if !probe.OK { panic("quic: missing token length") }
+    prefix = first.Value >> 6
+    if prefix != 0 {
+      this.ProcessSubNode("Length Encoding")
+      this.GetSubNode("Token Length").SetCfg("type", "uint64")
+      this.GetSubNode("Token Length").SetMaxLength((1 << prefix)*8-2, "bit")
+    }
     this.ProcessSubNode("Token Length")
     tlen = getNodeResult("Token Length").Value
-    if tlen >= 64 {
-      panic("quic: token length varint longer than 1 byte")
-    }
+    if tlen > 20480 { panic("quic: token exceeds selected 20 KiB resource bound") }
     if tlen > 0 {
       this.GetSubNode("Token").SetMaxLength(tlen)
       this.ProcessSubNode("Token")
     }
+  Length Encoding: uint8,2bit
   Token Length: uint8
   Token: raw
 

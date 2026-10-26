@@ -162,7 +162,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "SCTP", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "DCCP", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
 	{Name: "UDP-Lite", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stTodo, Priority: priP4},
-	{Name: "QUIC", Family: "transport", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "long/short header + CID + Initial token"},
+	{Name: "QUIC", Family: "transport", Sources: src(srcWireshark), Status: stPartial, Priority: priP0, Notes: "Selected native v1/v2 packet protection, CID generations, Retry and bounded 1/2/4/8-byte Initial token fields; compatible VN, early-data context and complete endpoint conformance remain unselected"},
 	{Name: "NetBIOS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "NBSS + NBNS"},
 	{Name: "NBT NS", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "NBNS questions/answers"},
 	{Name: "NBT DG", Family: "transport", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},

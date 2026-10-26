@@ -404,6 +404,10 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"quic.version", "Version", DisplayUnsigned, 32},
 		{"quic.long.packet_type", "Long Packet Type", DisplayUnsigned, 2},
 		{"quic.long.packet_type_v2", "Long Packet Type", DisplayUnsigned, 2},
+		{"quic.token_length", "Initial Token Length", DisplayUnsigned, 62},
+		{"quic.token", "Initial Token", DisplayString, 0},
+		{"quic.retry_token", "Retry Token", DisplayString, 0},
+		{"quic.retry_integrity_tag", "Retry Integrity Tag", DisplayString, 0},
 	} {
 		spec := spec
 		b := displayCustom("quic", spec.name, "QUIC observed wire "+spec.key, spec.typ, spec.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
@@ -420,7 +424,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		})
 		b.protocols, b.rangeKey = "|quic|http3|doq|", spec.key
 		b.descriptor.AllowEmpty = spec.typ == DisplayString
-		b.descriptor.Description = "Private native header observation bound to literal logical PDU bytes; CID strings are lowercase hexadecimal octets. Header fields do not prove peer identity or authentication."
+		b.descriptor.Description = "Private native header observation bound to literal logical PDU bytes; CID/token/tag strings are lowercase hexadecimal octets. Header fields do not prove peer identity, token validity or packet authentication."
 		out = append(out, b)
 	}
 	b = displayCustom("quic", "quic.packet_number", "QUIC authenticated decoded packet number", DisplayUnsigned, 62, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {

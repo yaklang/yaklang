@@ -32,6 +32,10 @@ func quicHeaderWireRanges(h quicHdr, raw []byte) map[string]any {
 	if quicSupportedVersion(h.version) {
 		span("Long Packet Type", 0, 1)
 	}
+	_, tokenRanges := quicHeaderTokenFacts(h, raw)
+	for key, value := range tokenRanges {
+		r[key] = value
+	}
 	return r
 }
 
@@ -76,6 +80,21 @@ func (e *ProtocolEvent) ownedQUICHeaderField(key string) (any, bool) {
 		version, ok := displayUint(m["Version"])
 		if m["Header Form"] == "long" && len(w) == 1 && ok && (version == uint64(quicVersion1) || version == uint64(quicVersion2)) {
 			return uint64(w[0] >> 4 & 3), true
+		}
+	case "Initial Token Length":
+		value, width, err := quicVarint(w)
+		observed, ok := displayUint(m[key])
+		if m["Header Form"] == "long" && m["Packet Name"] == "Initial" && err == nil && width == len(w) && ok && value == observed {
+			return value, true
+		}
+	case "Initial Token", "Retry Token", "Retry Integrity Tag":
+		observed, ok := m[key].([]byte)
+		packet := "Retry"
+		if key == "Initial Token" {
+			packet = "Initial"
+		}
+		if m["Header Form"] == "long" && m["Packet Name"] == packet && ok && bytes.Equal(w, observed) && (key != "Retry Integrity Tag" || len(w) == 16) {
+			return hex.EncodeToString(observed), true
 		}
 	}
 	return nil, false
