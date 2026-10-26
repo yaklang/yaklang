@@ -228,6 +228,33 @@ func TestHTTP3KnownStreamRetransmissionKeepsIdentityWithoutReplayingFrames(t *te
 	require.Nil(t, info["HTTP3"], "a different connection generation does not inherit stream identity")
 }
 
+func TestHTTP3MixedPacketWireObservationCannotReplaceApplicationMetadata(t *testing.T) {
+	for _, control := range []bool{false, true} {
+		for _, replayFirst := range []bool{false, true} {
+			q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+			wire, sid := h3RequestHeaders(), uint64(0)
+			if control {
+				wire, sid = []byte{0, 4, 0}, 2 // Control stream and empty SETTINGS.
+			}
+			_, err := h3FINFrameFeed(q, 0, h3FINStream(sid, 0, bytes.Clone(wire), false))
+			require.NoError(t, err)
+			replay := h3FINStream(sid, 0, bytes.Clone(wire), false)
+			fresh := h3FINStream(8, 0, h3RequestHeaders(), true)
+			frames := []map[string]any{fresh, replay}
+			if replayFirst {
+				frames[0], frames[1] = frames[1], frames[0]
+			}
+			info, err := h3FINFrameFeed(q, 0, frames...)
+			require.NoError(t, err)
+			require.Equal(t, uint64(8), info["HTTP3 Stream ID"], "replay must not replace the newly decoded application's stream")
+			require.Equal(t, "request", info["HTTP3 Stream Kind"])
+			require.Equal(t, uint64(8), info["HTTP3 Message Conformance"].(map[string]any)["Stream ID"])
+			require.Equal(t, false, info["HTTP3 Wire Only"])
+			require.Empty(t, replay["HTTP3 Frames"])
+		}
+	}
+}
+
 func TestHTTP3BufferedRangeIdentityRequiresItsOwnKnownPrefixAndRejectsConflict(t *testing.T) {
 	q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
 	wire := h3RequestHeaders()
