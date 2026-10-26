@@ -8,6 +8,23 @@ Package:
       if v > 4 {
         panic("ntp: version must be 0-4")
       }
+      if v == 1 {
+        this.ProcessSubNode("Legacy Reserved")
+        if getNodeResult("Legacy Reserved").Value != 0 {
+          panic("ntp: v1 low three bits are reserved")
+        }
+        this.ProcessSubNode("Stratum")
+        this.ProcessSubNode("Poll")
+        this.ProcessSubNode("Precision")
+        this.ProcessSubNode("Synchronizing Distance")
+        this.ProcessSubNode("Estimated Drift Rate")
+        this.ProcessSubNode("Reference ID")
+        this.ProcessSubNode("Reference Timestamp")
+        this.ProcessSubNode("Origin Timestamp")
+        this.ProcessSubNode("Receive Timestamp")
+        this.ProcessSubNode("Transmit Timestamp")
+        return
+      }
       this.ProcessSubNode("Mode")
       m = getNodeResult("Mode").Value
       if m > 7 {
@@ -24,6 +41,19 @@ Package:
         this.ProcessSubNode("Private")
         return
       }
+      if v == 2 {
+        this.ProcessSubNode("Stratum")
+        this.ProcessSubNode("Poll")
+        this.ProcessSubNode("Precision")
+        this.ProcessSubNode("Synchronizing Distance")
+        this.ProcessSubNode("Synchronizing Dispersion")
+        this.ProcessSubNode("Reference ID")
+        this.ProcessSubNode("Reference Timestamp")
+        this.ProcessSubNode("Origin Timestamp")
+        this.ProcessSubNode("Receive Timestamp")
+        this.ProcessSubNode("Transmit Timestamp")
+        return
+      }
       this.ProcessSubNode("Stratum")
       this.ProcessSubNode("Poll")
       this.ProcessSubNode("Precision")
@@ -37,6 +67,10 @@ Package:
     Leap Indicator: uint8,2bit
     Version: uint8,3bit
     Mode: uint8,3bit
+    Legacy Reserved: uint8,3bit
+    Synchronizing Distance: uint32
+    Estimated Drift Rate: uint32
+    Synchronizing Dispersion: uint32
     Stratum: uint8
     Poll: int8
     Precision: int8
@@ -63,6 +97,9 @@ Package:
         if count > 468 || count > remaining {
           panic("ntp: control data count exceeds captured extent")
         }
+        if getNodeResult("Response").Value == 0 && (getNodeResult("Error").Value != 0 || getNodeResult("More").Value != 0 || getNodeResult("Status").Value != 0 || getNodeResult("Offset").Value != 0) {
+          panic("ntp: request contains response/error/fragment/status state")
+        }
         if count > 0 {
           this.GetSubNode("Data").SetMaxLength(count)
           this.ProcessSubNode("Data")
@@ -82,8 +119,13 @@ Package:
           }
           rest = this.GetMaxLength() - this.Length()
           if rest > 0 {
-            this.GetSubNode("Authenticator").SetMaxLength(rest)
-            this.ProcessSubNode("Authenticator")
+            if rest == 20 || rest == 24 {
+              this.GetSubNode("Authenticator").SetMaxLength(rest)
+              this.ProcessSubNode("Authenticator")
+            } else {
+              this.GetSubNode("Unselected Trailer").SetMaxLength(rest)
+              this.ProcessSubNode("Unselected Trailer")
+            }
           }
         }
       Response: uint8,1bit
@@ -98,6 +140,7 @@ Package:
       Data: raw
       Padding: raw
       Authenticator: raw
+      Unselected Trailer: raw
     Private:
       operator: |
         this.ProcessSubNode("Authenticated")
