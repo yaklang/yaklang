@@ -281,10 +281,20 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				generated = bytesValue(x)
 				sourceName = "TLS record · authenticated plaintext · application gap"
 			}
+			if protocol == "syslog" && name == "Message Bytes" {
+				// Worker JSON encodes this native []byte field as Base64. Its
+				// owned extracted payload is useful for binary MSG-ANY inspection;
+				// it is not a fabricated contiguous range in the physical frame.
+				generated = bytesValue(x)
+				sourceName = "Syslog MSG · extracted payload"
+			}
 			if generated != nil {
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			if protocol == "syslog" && x == nil && (name == "App Name" || name == "Hostname" || name == "Proc ID" || name == "Message ID") {
+				value = "not provided"
+			}
 			if protocol == "ldp" {
 				switch name {
 				case "Hold Time":
