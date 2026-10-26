@@ -24,7 +24,7 @@ out=Path(sys.argv[1]);assert not any((p/'.git').exists() for p in [out.resolve()
 key=ec.generate_private_key(ec.SECP256R1());name=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME,'field-audit.invalid')]);now=datetime.datetime.now(datetime.timezone.utc)
 cert=x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=1)).not_valid_after(now+datetime.timedelta(days=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName('field-audit.invalid')]),False).sign(key,hashes.SHA256())
 (out/'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM));(out/'key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
-keys=(out/'session.keys').open('w',encoding='ascii');network=collections.Counter();operations=[];profiles=[]
+keys=(out/'session.keys').open('w',encoding='ascii');network=collections.Counter();operations=[];profiles=[];transport_faults=[]
 server_socket=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);server_socket.bind(('127.0.0.1',0));server_socket.setblocking(False)
 client_socket=socket.socket(socket.AF_INET,socket.SOCK_DGRAM);client_socket.bind(('127.0.0.1',0));client_socket.setblocking(False)
 server_address=server_socket.getsockname();client_address=client_socket.getsockname()
@@ -68,6 +68,7 @@ wire_versions=transport_controls.get('wire_versions',[1,1,1]);assert len(wire_ve
 suite_ids=transport_controls.get('cipher_suites',[0x1301,0x1301,0x1301]);assert len(suite_ids)==3 and all(v in[0x1301,0x1302,0x1303]for v in suite_ids)
 key_followup=transport_controls.get('client_key_update_followup',False);assert type(key_followup)is bool
 retry_padding=transport_controls.get('retry_token_padding_bytes',[0,0,0]);assert len(retry_padding)==3 and all(type(n)is int and 0<=n<=512 for n in retry_padding)
+inject_transport_faults=transport_controls.get('inject_transport_faults',False);assert type(inject_transport_faults)is bool
 if transport_controls.get('v2_key_update_policy')=='rfc9369-label':
  original_next_key_phase=peer_crypto.next_key_phase
  def declared_v2_next_key_phase(context):
@@ -123,7 +124,7 @@ try:
  for epoch in range(3):
   cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
   scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite(suite_ids[epoch])],secrets_log_file=keys,supported_versions=[QuicProtocolVersion(wire_versions[epoch])],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
-  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0,'token_envelopes':{}}
+  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={};retry_state={'sent':0,'token_envelopes':{}};injected_wire={}
   def events(q,side):
    while True:
     e=q.next_event()
@@ -163,6 +164,13 @@ try:
     ready,_,_=select.select([client_socket,server_socket],[],[],.001)
     for sock in ready:
      data,address=sock.recvfrom(65535)
+     digest=hashlib.sha256(data).hexdigest()
+     if digest in injected_wire:
+      # The negative packet really crossed this UDP socket/capture, but this
+      # declared network control drains it before the live peer processes it.
+      # This preserves a live connection for the subsequent recovery request;
+      # it is not evidence that an endpoint accepts these invalid frames.
+      injected_wire[digest]['receiver_observed_and_drained']=True;network['controlled_injected_drains']+=1;continue
      if sock is server_socket:
       if server is None:
        h=pull_quic_header(Buffer(data=data),host_cid_length=cid_lengths[epoch]);original,retry_cid=h.destination_cid,None
@@ -220,6 +228,11 @@ try:
   if key_followup:
    client.request_key_update();sid=queue('after-client-key-update',[(k,'/after-client-key-update'if k==':path'else v)for k,v in base],'base');pump(lambda:sid in ended[0])
    assert client._cryptos[Epoch.ONE_RTT].key_phase==1 and server._cryptos[Epoch.ONE_RTT].key_phase==1
+  if inject_transport_faults:
+   controls=[('client-handshake-done',0,b'\x1e',0,'MalformedMessage'),('client-new-token',0,b'\x07\x01x',0,'MalformedMessage'),('server-empty-new-token',1,b'\x07\0',0,'MalformedMessage'),('reserved-bits',0,b'\x01',8,'MalformedMessage'),('nonminimal-ping',0,b'\x40\x01',0,'MalformedMessage'),('unselected-frame',0,b'\x1f',0,'UnsupportedFeature'),('wide-unselected-frame',0,b'\x40\x40',0,'UnsupportedFeature'),('empty-payload',0,b'',0,'MalformedMessage'),('allowed-server-token',1,b'\x07\x01v',0,None)]
+   for name,direction,plain,reserved,error in controls:
+    peer,sock,address=(client,client_socket,server_address)if direction==0 else(server,server_socket,client_address);crypto=peer._cryptos[Epoch.ONE_RTT];pn=peer._packet_number;peer._packet_number+=1;phase=crypto.send.key_phase;cid=peer._peer_cid.cid;header=bytes([0x43|phase<<2|reserved])+cid+pn.to_bytes(4,'big');wire=crypto.encrypt_packet(header,plain,pn);digest=hashlib.sha256(wire).hexdigest();record={'epoch':epoch,'case':name,'direction':direction,'packet_number':pn,'key_phase':phase,'wire_sha256':digest,'wire_bytes':len(wire),'plaintext_hex':plain.hex(),'plaintext_sha256':hashlib.sha256(plain).hexdigest(),'reserved_bits':reserved,'expected_native_error':error,'receiver_observed_and_drained':False};injected_wire[digest]=record;transport_faults.append(record);sock.sendto(wire,address)
+   sid=queue('after-transport-faults',[(k,'/after-transport-faults'if k==':path'else v)for k,v in base],'base');pump(lambda:sid in ended[0]);assert all(r['receiver_observed_and_drained']for r in injected_wire.values())
   for sid,m in expected.items():
    assert bytes(received[0][sid])==m['reply']
    operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest(),'declared_scenario':m.get('plan')})
@@ -234,5 +247,5 @@ finally:
  keys.close();client_socket.close();server_socket.close();capture.wait(timeout=25)
  for reader in readers:reader.join(timeout=2)
  (out/'capture.stderr').write_bytes(b''.join(capture_errors));(out/'capture-observed.txt').write_bytes(b''.join(capture_lines))
- (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'generator_sha256':generator_sha256,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'transport_controls':transport_controls,'operations':operations},indent=2)+'\n',encoding='utf8')
-assert len(operations)==(len(cases)*3 if plans else 69)+(3 if key_followup else 0)
+ (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'generator_sha256':generator_sha256,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'transport_controls':transport_controls,'operations':operations,'transport_faults':transport_faults},indent=2)+'\n',encoding='utf8')
+assert len(operations)==(len(cases)*3 if plans else 69)+(3 if key_followup else 0)+(3 if inject_transport_faults else 0)
