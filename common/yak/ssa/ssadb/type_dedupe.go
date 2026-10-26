@@ -321,13 +321,18 @@ func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error
 	}
 	var kind int
 	var text, extra string
-	err := db.Raw(
-		`SELECT p.kind AS kind, p.string AS string, p.extra_information AS extra_information`+
+	// Bind the query through database/sql. GORM's Raw query on a handle that
+	// already carries model scopes rewrites FROM into "FROM <model>, <query>",
+	// which is a syntax error and silently turned every type read into nil.
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	query := bindSQLPlaceholdersDB(db,
+		`SELECT p.kind, p."string", p.extra_information`+
 			` FROM `+TableIrTypeIDs+` AS t`+
 			` JOIN `+TableIrTypePayloads+` AS p`+
 			` ON p.program_name = t.program_name AND p.type_hash = t.type_hash`+
-			` WHERE t.program_name = ? AND t.type_id = ? AND t.deleted_at IS NULL AND p.deleted_at IS NULL`,
-		progName, id).Row().Scan(&kind, &text, &extra)
+			` WHERE t.program_name = ? AND t.type_id = ? AND t.deleted_at IS NULL AND p.deleted_at IS NULL`)
+	err := nativeQueryRowContext(db, ctx, query, progName, id).Scan(&kind, &text, &extra)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -348,11 +353,15 @@ func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error
 
 // HasIrTypeDedupeRows reports whether a program uses the dedupe layout. Callers
 // that need a count of persisted types use it instead of counting ir_types.
+// It reads through database/sql for the same reason as getIrTypeFromDedupe: a
+// caller may pass a handle that still carries model scopes.
 func HasIrTypeDedupeRows(db *gorm.DB, program string) bool {
 	if db == nil || !IrTypeDedupeAvailable(db) {
 		return false
 	}
+	ctx, cancel := nativeQueryContext(context.Background())
+	defer cancel()
+	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+TableIrTypeIDs+` WHERE program_name = ? LIMIT 1`)
 	var one int
-	err := db.Raw(`SELECT 1 FROM `+TableIrTypeIDs+` WHERE program_name = ? LIMIT 1`, program).Row().Scan(&one)
-	return err == nil
+	return nativeQueryRowContext(db, ctx, query, program).Scan(&one) == nil
 }
