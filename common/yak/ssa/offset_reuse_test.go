@@ -33,7 +33,7 @@ func TestOffsetDedupPreservesVariableAliases(t *testing.T) {
 			p.Cache.indexes.saveOffsetDedup(row)
 		}
 	}
-	_, err := p.Cache.indexes.Flush()
+	err := p.Cache.indexes.Flush()
 	require.NoError(t, err)
 	var rows []ssadb.IrOffset
 	require.NoError(t, ssadb.GetDB().Where("program_name = ? AND value_id = ?", p.Name, 10).Find(&rows).Error)

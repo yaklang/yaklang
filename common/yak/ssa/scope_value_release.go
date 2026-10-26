@@ -120,6 +120,10 @@ func releasePersistedOffsetValues(prog *Program) int {
 // the live blueprint container stay. The flag lets the flush spill the
 // block objects afterwards, including exported functions.
 func (prog *Program) DetachFinishedFunctionBodyScopes() {
+	prog.detachFinishedBodyScopes()
+}
+
+func (prog *Program) detachFinishedBodyScopes() {
 	if prog == nil {
 		return
 	}
@@ -141,7 +145,14 @@ func (prog *Program) DetachFinishedFunctionBodyScopes() {
 			if fn == nil || !fn.finished || fn.IsExtern() || fn.bodyScopesDetached {
 				return
 			}
-			if functionScopeRetainsCapture(p, fn) || isLiveContainerFunction(fn) {
+			if functionScopeRetainsCapture(p, fn) {
+				// A capture keeps the scope, but not every local in it. One
+				// captured name used to pin all sibling versions of the unit
+				// until compile end.
+				dropUncapturedScopeNames(p, fn)
+				return
+			}
+			if isLiveContainerFunction(fn) {
 				return
 			}
 			clearFunctionBodyScopes(p, fn)
@@ -280,42 +291,40 @@ func functionScopeRetainsCapture(prog *Program, fn *Function) bool {
 	return found
 }
 
+// dropUncapturedScopeNames releases the sibling locals of a scope that a real
+// closure capture keeps alive. It detaches their saved values first and only
+// then drops the name, so every version stays reloadable by id.
 func dropUncapturedScopeNames(prog *Program, fn *Function) {
 	if fn == nil || fn.builder == nil || fn.builder.capturedNames == nil {
 		return
 	}
-	captured := map[string]struct{}{}
-	fn.builder.capturedNames.ForEach(func(name string, _ struct{}) bool {
-		if name != "" {
-			captured[name] = struct{}{}
+	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
+		return
+	}
+	reload := func(id int64) (Value, bool) {
+		inst := prog.Cache.instructions.reloadPersistedInstruction(id)
+		if utils.IsNil(inst) {
+			return nil, false
 		}
-		return true
-	})
+		value, ok := ToValue(inst)
+		return value, ok && !utils.IsNil(value)
+	}
+	visited := map[*ScopeInstance]struct{}{}
+	// Only this function's own block scopes. Walking parents would release the
+	// live package scope that later batches still emit into.
 	visit := func(scope ScopeIF) {
 		current, ok := scope.(*ScopeInstance)
-		if !ok || current == nil || current.ScopedVersionedTable == nil {
+		if !ok || current == nil {
 			return
 		}
-		var drop []string
-		for _, latest := range current.GetAllVariables() {
-			if latest == nil {
-				continue
-			}
-			name := latest.GetName()
-			if _, keep := captured[name]; keep || name == "" {
-				continue
-			}
-			drop = append(drop, name)
+		if _, seen := visited[current]; seen {
+			return
 		}
-		for _, name := range drop {
-			current.ScopedVersionedTable.DropName(name)
-		}
+		visited[current] = struct{}{}
+		releaseUncapturedScopeValues(prog, fn, current, reload)
 	}
 	if fn.builder.CurrentBlock != nil {
 		visit(fn.builder.CurrentBlock.ScopeTable)
-	}
-	if prog == nil || prog.Cache == nil || prog.Cache.instructions == nil {
-		return
 	}
 	for _, id := range fn.Blocks {
 		inst, ok := prog.Cache.instructions.residentInstruction(id)
@@ -328,6 +337,78 @@ func dropUncapturedScopeNames(prog *Program, fn *Function) {
 		}
 		visit(block.ScopeTable)
 	}
+}
+
+// releaseUncapturedScopeValues detaches every saved value of a non-captured
+// name. The captured names keep their concrete value; a name that is not
+// captured releases only the versions this function did not capture.
+func releaseUncapturedScopeValues(prog *Program, fn *Function, scope *ScopeInstance, reload func(int64) (Value, bool)) int {
+	if scope == nil || scope.ScopedVersionedTable == nil {
+		return 0
+	}
+	captured := map[string]struct{}{}
+	fn.builder.capturedNames.ForEach(func(name string, _ struct{}) bool {
+		if name != "" {
+			captured[name] = struct{}{}
+		}
+		return true
+	})
+	released := 0
+	for _, latest := range scope.GetAllVariables() {
+		if latest == nil {
+			continue
+		}
+		name := latest.GetName()
+		if name == "" {
+			continue
+		}
+		if _, keep := captured[name]; keep {
+			continue
+		}
+		versions := scope.GetAllVariablesByName(name, true)
+		dropped := len(versions) > 0
+		for _, versioned := range versions {
+			variable, ok := versioned.(*Variable)
+			if !ok || variable == nil || variable.Versioned == nil {
+				continue
+			}
+			value := variable.Value
+			if utils.IsNil(value) {
+				continue
+			}
+			if functionCapturesVariable(fn, name, value) {
+				dropped = false
+				continue
+			}
+			if shouldKeepCompileUnitBoundaryResident(value) && !canSpillFinishedFunctionMember(value) && !canSpillFinishedPrivateBlock(value) {
+				dropped = false
+				continue
+			}
+			id := value.GetId()
+			if id <= 0 || !prog.Cache.instructions.isPersisted(id) {
+				dropped = false
+				continue
+			}
+			scope.UnlinkValue(value)
+			variable.DetachRetained(id, reload)
+			switch {
+			case prog.Cache.instructions.writer != nil:
+				prog.Cache.instructions.writer.DeleteIfSettled(id)
+			case prog.Cache.instructions.residentCache != nil:
+				prog.Cache.instructions.residentCache.DeleteClean(id)
+			}
+			if versioned != latest {
+				scope.TrimSettledVersion(versioned)
+			}
+			released++
+		}
+		// Every version was detached, so the lexical name is pure weight. A name
+		// that still holds a kept value stays readable.
+		if dropped {
+			scope.DropName(name)
+		}
+	}
+	return released
 }
 
 func isLiveContainerFunction(fn *Function) bool {
