@@ -23,8 +23,13 @@ func (q *binQUIC) observeKnownHTTP3Wire(st *quicStream, dir int, sid, off uint64
 	} else {
 		info["HTTP3 Wire Observation"] = kind
 	}
-	fr["HTTP3 Stream Kind"], info["HTTP3 Stream Kind"] = h3.kind, h3.kind
-	info["HTTP3 Stream ID"], info["Protocol Transition"] = sid, "quic->http3"
+	fr["HTTP3 Stream Kind"] = h3.kind
+	// A later duplicate or buffered range must not replace metadata belonging
+	// to a newly decoded application frame elsewhere in this packet.
+	if _, exists := info["HTTP3 Stream ID"]; !exists {
+		info["HTTP3 Stream ID"], info["HTTP3 Stream Kind"] = sid, h3.kind
+	}
+	info["Protocol Transition"] = "quic->http3"
 }
 
 func markHTTP3WireOnly(frames []map[string]any, info map[string]any) {
