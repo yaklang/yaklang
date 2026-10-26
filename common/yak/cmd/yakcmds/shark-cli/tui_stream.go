@@ -244,10 +244,17 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 	}
 	add(title+" · "+strings.Join(presentation.stack, " › ")+" · a original wire", inkCyan)
 	hasApplication := false
+	var viewScope string
 	for _, e := range v.events {
+		if e != nil && viewScope == "" {
+			viewScope = textValue(eventValues(e)["Conversation View Scope"])
+		}
 		if e != nil && e.Protocol != "tls" && e.Protocol != "quic" && (e.Status == "decoded" || e.Status == "deferred") {
 			hasApplication = true
 		}
+	}
+	if viewScope != "" {
+		add(viewScope, inkMuted)
 	}
 	for _, e := range v.events {
 		if e == nil {
@@ -287,9 +294,6 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 			for _, header := range mapList(eventValues(e)["Headers"]) {
 				add(textValue(header["Name"])+": "+textValue(header["Value"]), inkText)
 			}
-		}
-		if scope := textValue(eventValues(e)["Conversation View Scope"]); scope != "" {
-			add(scope, inkMuted)
 		}
 		messages := mapList(eventValues(e)["GRPC Messages"])
 		for i, message := range messages {
