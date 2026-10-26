@@ -13,6 +13,13 @@ Package:
       if m > 7 {
         panic("ntp: mode must be 0-7")
       }
+      if m == 6 {
+        if v < 2 || getNodeResult("Leap Indicator").Value != 0 {
+          panic("ntp: control version must be 2-4 and LI zero")
+        }
+        this.ProcessSubNode("Control")
+        return
+      }
       if m == 7 {
         this.ProcessSubNode("Private")
         return
@@ -40,6 +47,57 @@ Package:
     Origin Timestamp: raw,8
     Receive Timestamp: raw,8
     Transmit Timestamp: raw,8
+    Control:
+      operator: |
+        this.ProcessSubNode("Response")
+        this.ProcessSubNode("Error")
+        this.ProcessSubNode("More")
+        this.ProcessSubNode("Opcode")
+        this.ProcessSubNode("Sequence")
+        this.ProcessSubNode("Status")
+        this.ProcessSubNode("Association ID")
+        this.ProcessSubNode("Offset")
+        this.ProcessSubNode("Count")
+        count = getNodeResult("Count").Value
+        remaining = this.GetMaxLength() - this.Length()
+        if count > 468 || count > remaining {
+          panic("ntp: control data count exceeds captured extent")
+        }
+        if count > 0 {
+          this.GetSubNode("Data").SetMaxLength(count)
+          this.ProcessSubNode("Data")
+        }
+        rest = this.GetMaxLength() - this.Length()
+        pad = (4 - count % 4) % 4
+        if rest > 0 {
+          if rest < pad {
+            panic("ntp: truncated control padding")
+          }
+          if pad > 0 {
+            this.GetSubNode("Padding").SetMaxLength(pad)
+            this.ProcessSubNode("Padding")
+            for _, octet = range getNodeResult("Padding").Value {
+              if octet != 0 { panic("ntp: nonzero control padding") }
+            }
+          }
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            this.GetSubNode("Authenticator").SetMaxLength(rest)
+            this.ProcessSubNode("Authenticator")
+          }
+        }
+      Response: uint8,1bit
+      Error: uint8,1bit
+      More: uint8,1bit
+      Opcode: uint8,5bit
+      Sequence: uint16
+      Status: uint16
+      Association ID: uint16
+      Offset: uint16
+      Count: uint16
+      Data: raw
+      Padding: raw
+      Authenticator: raw
     Private:
       operator: |
         this.ProcessSubNode("Authenticated")

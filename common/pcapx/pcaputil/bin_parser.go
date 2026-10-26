@@ -684,6 +684,7 @@ type binParser struct {
 	lan                                                                        dnsCorrelation
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
+	ntpControl                                                                 *ntpControlStore // udpMu; capture-lifetime sequence ownership
 	carrierMu                                                                  sync.Mutex
 	rdpUDP                                                                     *rdpUDPStore
 	eapTLS                                                                     *eapTLSStore

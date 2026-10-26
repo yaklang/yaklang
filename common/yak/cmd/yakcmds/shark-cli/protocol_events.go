@@ -198,7 +198,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 					}
 				}
 			}
-			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
+			if protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -381,6 +381,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			var generated []byte
 			sourceName := ""
+			if protocol == "ntp" {
+				if name == "Control Data" || name == "Padding Bytes" || name == "Authenticator Bytes" || strings.HasSuffix(name, " Timestamp") {
+					x = bytesValue(x)
+				}
+				if name == "Reassembled Control Data" {
+					generated = bytesValue(x)
+					sourceName = "NTP control response · reassembled data · sender unverified"
+				}
+			}
 			if name == "Decoded Bytes" || name == "Mechanism Token" {
 				generated = bytesValue(x)
 				sourceName = "Authentication token · decoded bytes"
@@ -585,6 +594,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "ntp" {
+			for _, key := range []string{"Packet Name", "Version", "Mode", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Reported Associations"} {
+				if value, ok := values[key]; ok {
+					walk(key, value, 0)
+					delete(values, key)
+				}
+			}
+		}
 		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
 		if e.Protocol == "http3" && e.Error != "" {
 			delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
