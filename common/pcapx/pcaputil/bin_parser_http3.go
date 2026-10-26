@@ -216,10 +216,15 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			}
 			break
 		}
-		need := n1 + n2 + int(ln)
+		// A fully drained final extent proves truncation without allocating or
+		// narrowing the declared (up to 62-bit) length to an int.
+		if q.native && fin && ln > uint64(len(buf)-n1-n2) {
+			break
+		}
 		if ln > 1<<20 {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame exceeds 1 MiB")
 		}
+		need := n1 + n2 + int(ln)
 		if len(buf) < need {
 			break
 		}

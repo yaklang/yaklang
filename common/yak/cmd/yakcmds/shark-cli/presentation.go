@@ -301,7 +301,9 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 				parts = append(parts, name)
 			}
 		}
-		if len(frames) == 0 && textValue(v["HTTP3 Stream Kind"]) == "request" {
+		if v["HTTP3 Wire Only"] == true {
+			parts = append(parts, "HTTP/3 "+textValue(v["HTTP3 Wire Observation"])+" · no application frames replayed")
+		} else if len(frames) == 0 && textValue(v["HTTP3 Stream Kind"]) == "request" {
 			parts = append(parts, "HTTP/3 frame reassembly")
 		}
 		for _, h := range mapList(v["Headers"]) {
@@ -728,6 +730,17 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	defer p.observeHTTP3ConnectionFault(e)
+	if e.AuthenticatedQUICApplicationProtocol() == "http3" && e.Session["HTTP3 Wire Only"] == true && e.Error == "" {
+		p.addLayer("QUIC")
+		p.addLayer("HTTP/3")
+		if p.priority <= 20 {
+			p.protocol, p.priority, p.status, p.visibility = "HTTP/3", 20, e.Status, "authenticated-plaintext"
+			p.scope = "authenticated STREAM observation"
+			p.evidence = "selected h3 ALPN and known stream; no application frame replayed"
+			p.summary = clipText(applicationEventSummary(e), 384)
+		}
+		return
+	}
 	if e.AuthenticatedQUICApplicationProtocol() == "http3" && (e.Error != "" || e.Status != "decoded" && e.Status != "deferred") {
 		p.addLayer("QUIC")
 		p.addLayer("HTTP/3")

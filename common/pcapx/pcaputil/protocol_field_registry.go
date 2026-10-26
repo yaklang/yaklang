@@ -389,6 +389,22 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		b.protocols = "|quic|http3|"
 		out = append(out, b)
 	}
+	for _, spec := range []struct {
+		name, key string
+		typ       DisplayFieldType
+	}{
+		{"http3.wire_only", "HTTP3 Wire Only", DisplayBoolean},
+		{"http3.wire_observation", "HTTP3 Wire Observation", DisplayString},
+	} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Known stream byte observation; does not certify message validity or replay application frames", spec.typ, 0, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			m := e.Session
+			if e.nativeQUICObservation {
+				m = e.semanticSession
+			}
+			emit(m[spec.key])
+		}))
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].descriptor.Name < out[j].descriptor.Name })
 	seen := map[string]bool{}
 	for i, b := range out {
