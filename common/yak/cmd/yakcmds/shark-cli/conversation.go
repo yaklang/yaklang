@@ -256,6 +256,7 @@ func datagramConversation(raw *capturedPacket) *streamSnapshot {
 			v.endpoints = [2]string{peers[0], peers[1]}
 		}
 		collectAssociationReferences(v, e, proofIDs)
+		e = http3ConversationEvent(e)
 		e = boundedEvent(e, &remaining)
 		v.events = append(v.events, e)
 		if len(v.events) == 1 {

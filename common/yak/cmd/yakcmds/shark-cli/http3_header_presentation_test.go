@@ -42,3 +42,23 @@ func TestHTTP3LiteralHeaderHasIndependentByteArenaAndExactStreamID(t *testing.T)
 		require.Len(t, found, 2)
 	}
 }
+
+func TestHTTP3ApplicationFieldsPrecedeLargeStreamWitnessTree(t *testing.T) {
+	proof := make([]map[string]any, 2000)
+	for i := range proof {
+		proof[i] = map[string]any{"Offset": uint64(i), "Parent PDU": uint64(i + 1)}
+	}
+	e := &pcaputil.ProtocolEvent{Protocol: "http3", Status: "decoded", Session: map[string]any{"Authentication Verified": true, "Frames": []map[string]any{{"Frame Type": "STREAM", "Stream ID": uint64(8), "Offset": uint64(16), "Delivered Bytes": uint64(10), "Delivered Byte Source": map[string]any{"Ranges": proof}, "HTTP3 Frames": []map[string]any{{"Frame Type": "DATA", "Frame Type Value": uint64(0), "Payload Length": uint64(8), "Stream ID": uint64(8), "Frame Header Bytes": []byte{0, 8}, "Payload": []byte("abcdefgh")}}}}}}
+	fs, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	payload, witness := -1, -1
+	for i, f := range fs {
+		if strings.HasPrefix(f.text, "Payload:") {
+			payload = i
+		}
+		if f.text == "Delivered Byte Source" {
+			witness = i
+		}
+	}
+	require.GreaterOrEqual(t, payload, 0, "application content must survive the bounded detail tree")
+	require.Greater(t, witness, payload, "evidence follows the application frame")
+}

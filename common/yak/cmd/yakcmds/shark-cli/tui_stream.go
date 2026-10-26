@@ -276,8 +276,20 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 			add(e.Status+": "+e.ExpertCode+" · "+e.Error, inkRed)
 			continue
 		}
-		for _, header := range mapList(eventValues(e)["Headers"]) {
-			add(textValue(header["Name"])+": "+textValue(header["Value"]), inkText)
+		if groups := mapList(eventValues(e)["HTTP3 Message Headers"]); len(groups) > 0 {
+			for _, group := range groups {
+				add(fmt.Sprintf("HTTP/3 stream %d · header section", number(group["Stream ID"])), style)
+				for _, header := range mapList(group["Headers"]) {
+					add(textValue(header["Name"])+": "+textValue(header["Value"]), inkText)
+				}
+			}
+		} else {
+			for _, header := range mapList(eventValues(e)["Headers"]) {
+				add(textValue(header["Name"])+": "+textValue(header["Value"]), inkText)
+			}
+		}
+		if scope := textValue(eventValues(e)["Conversation View Scope"]); scope != "" {
+			add(scope, inkMuted)
 		}
 		messages := mapList(eventValues(e)["GRPC Messages"])
 		for i, message := range messages {
