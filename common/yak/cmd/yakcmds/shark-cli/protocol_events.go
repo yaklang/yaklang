@@ -53,7 +53,7 @@ var ipfixHeaderPriority = map[string]int{
 	"Sequence Number": 4, "Observation Domain ID": 5,
 }
 
-var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, "Payload Length": 2, "Frame Wire Length": 3, "Stream ID": 4, "Stream Offset": 5, "Direction": 6, "Frame Header Bytes": 7, "Headers": 8, "DATA Length": 9, "Payload": 10, "QPACK Block": 10, "Byte Source": 50, "Payload Byte Source": 51, "Frame SHA256": 52}
+var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, "Payload Length": 2, "Frame Wire Length": 3, "Stream ID": 4, "Stream Offset": 5, "Direction": 6, "Frame Header Bytes": 7, "Headers": 8, "DATA Length": 9, "Payload": 10, "QPACK Block": 10, "Header Conformance Status": 11, "Header Conformance Error": 12, "Header Conformance Scope": 13, "Byte Source": 50, "Payload Byte Source": 51, "Frame SHA256": 52}
 
 var http3StreamPriority = map[string]int{"Frame Type": 0, "Stream ID": 1, "Offset": 2, "Length": 3, "FIN": 4, "Contiguous Offset": 5, "Delivered Bytes": 6, "Stream Data": 7, "HTTP3 Frames": 8, "Byte Source": 50, "Delivered Byte Source": 51}
 

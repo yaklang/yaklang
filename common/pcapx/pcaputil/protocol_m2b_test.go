@@ -380,7 +380,9 @@ func TestFirstBatchT13(t *testing.T) {
 			return info
 		}
 		feed(1, 3, 0, h3ControlSETTINGS(1, 220, 7, 1), false)
-		info := feed(0, 0, 0, h3Frame(1, rfcHex("03811011")), true)
+		// Complete the RFC QPACK authority/path example with mandatory request
+		// method/scheme fields before testing native HTTP message recovery.
+		info := feed(0, 0, 0, h3Frame(1, rfcHex("03811011d1d7")), true)
 		require.Equal(t, true, info["QPACK Blocked"])
 		info = feed(0, 6, 0, h3EncoderStream(rfcHex("3fbd01c00f7777772e6578616d706c652e636f6dc10c2f73616d706c652f70617468")), false)
 		resumed := info["QPACK Resumed Streams"].([]map[string]any)
