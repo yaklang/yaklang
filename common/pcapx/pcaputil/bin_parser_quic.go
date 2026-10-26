@@ -52,9 +52,10 @@ type binQUIC struct {
 }
 
 type quicPNSpace struct {
-	largest uint64
-	seen    []uint64
-	init    bool
+	largest  uint64
+	seen     []uint64
+	init     bool
+	rejected map[uint64]ProtocolError
 }
 
 type quicStream struct {
@@ -242,6 +243,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		}
 	}
 	if q.native && q.retrySeen && h.typeName == "Initial" && dir == 0 {
+		if !bytes.Equal(h.scid, q.initialSCID) {
+			return info, protocolError(ErrMalformedMessage, "QUIC client Initial changed source CID after Retry")
+		}
 		switch {
 		case bytes.Equal(h.dcid, q.retrySCID):
 			if len(h.token) != q.retryTokenLen || sha256.Sum256(h.token) != q.retryTokenHash {
@@ -328,6 +332,11 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if quicSeen(q.space(dir, h.space), pn) {
 		info["Duplicate"] = true
 		info["Frames"] = frames // Retain authenticated wire evidence without delivering it twice.
+		if rejected, ok := q.space(dir, h.space).rejected[pn]; ok {
+			// A verified retransmission of a refused packet is not a successful
+			// frame delivery. Return an owned copy, not the retained error object.
+			return info, &rejected
+		}
 		return info, nil
 	}
 	if oldInitial {
@@ -370,7 +379,17 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		}
 	}
 	q.observePN(q.space(dir, h.space), pn, info)
-	return q.finishFrames(dir, h.space, frames, info, max)
+	info, err = q.finishFrames(dir, h.space, frames, info, max)
+	if err != nil && !isRecoverableH3ObservationError(err) {
+		if _, rejected := classifySessionError(err); rejected != nil {
+			space := q.space(dir, h.space)
+			if space.rejected == nil {
+				space.rejected = map[uint64]ProtocolError{}
+			}
+			space.rejected[pn] = *rejected
+		}
+	}
+	return info, err
 }
 
 func (q *binQUIC) observePN(space *quicPNSpace, pn uint64, info map[string]any) {
@@ -882,6 +901,9 @@ func quicRemember(s *quicPNSpace, pn uint64) {
 	s.init = true
 	s.seen = append(s.seen, pn)
 	if len(s.seen) > 128 {
+		for _, old := range s.seen[:len(s.seen)-128] {
+			delete(s.rejected, old)
+		}
 		s.seen = s.seen[len(s.seen)-128:]
 	}
 }
@@ -1322,6 +1344,9 @@ func (q *binQUIC) initialMemory() int64 {
 	for d := range q.spaces {
 		for s := range q.spaces[d] {
 			n += int64(cap(q.spaces[d][s].seen))*8 + int64(cap(q.crypto[d][s]))*16
+			for _, rejected := range q.spaces[d][s].rejected {
+				n += 96 + int64(len(rejected.Message))
+			}
 		}
 	}
 	return n
