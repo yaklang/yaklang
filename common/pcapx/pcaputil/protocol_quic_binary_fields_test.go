@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"net"
@@ -10,6 +11,72 @@ import (
 
 	"github.com/stretchr/testify/require"
 )
+
+// Frozen JSON used text for binary header fields. Keep its inputs and answers
+// intact, bind the historical lossy spelling to the literal old wire value,
+// and separately review only the new byte type and clear-header provenance.
+func quicReviewedLegacyExpectations(t *testing.T, e *ProtocolEvent, session, fields map[string]any) (map[string]any, map[string]any) {
+	t.Helper()
+	session, fields = cloneSession(session), cloneSession(fields)
+	w := e.Raw
+	if e.Session["Wire Field Ranges"] == nil {
+		return session, fields
+	}
+	require.NotNil(t, session, "new metadata cannot invent an absent historical session")
+	require.NotEmpty(t, w)
+	ranges := map[string]any{}
+	span := func(name string, lo, hi int) { ranges[name] = []any{lo, hi} }
+	reviewOctets := func(m map[string]any, name string, octets []byte) {
+		old, present := m[name]
+		if !present {
+			return
+		}
+		if b, ok := old.([]byte); ok {
+			require.Equal(t, octets, b)
+		} else {
+			encoded, err := json.Marshal(string(octets))
+			require.NoError(t, err)
+			var historical string
+			require.NoError(t, json.Unmarshal(encoded, &historical))
+			require.Equal(t, historical, old, "immutable legacy spelling must still match that exact captured byte sequence")
+		}
+		m[name] = bytes.Clone(octets)
+	}
+	if w[0]&128 != 0 {
+		require.GreaterOrEqual(t, len(w), 7)
+		dl := int(w[5])
+		require.LessOrEqual(t, 7+dl, len(w))
+		sl := int(w[6+dl])
+		require.LessOrEqual(t, 7+dl+sl, len(w))
+		span("Version", 1, 5)
+		span("DCID Length", 5, 6)
+		span("DCID", 6, 6+dl)
+		span("SCID Length", 6+dl, 7+dl)
+		span("SCID", 7+dl, 7+dl+sl)
+		if binary.BigEndian.Uint32(w[1:5]) == 1 {
+			span("Long Packet Type", 0, 1)
+		}
+		reviewOctets(fields, "DCID", w[6:6+dl])
+		reviewOctets(fields, "SCID", w[7+dl:7+dl+sl])
+		if token, ok := fields["QUICToken"].(map[string]any); ok {
+			off := 7 + dl + sl
+			require.Less(t, off, len(w))
+			n := int(w[off])
+			require.Less(t, n, 64)
+			require.LessOrEqual(t, off+1+n, len(w))
+			reviewOctets(token, "Token", w[off+1:off+1+n])
+		}
+	} else {
+		cid, ok := e.Session["DCID"].([]byte)
+		require.True(t, ok)
+		require.LessOrEqual(t, 1+len(cid), len(w))
+		require.Equal(t, cid, w[1:1+len(cid)])
+		span("DCID", 1, 1+len(cid))
+	}
+	rocEqualFields(t, ranges, e.Session["Wire Field Ranges"].(map[string]any))
+	session["Wire Field Ranges"] = ranges
+	return session, fields
+}
 
 func TestNativeQUICEnvelopeBinaryFieldsRemainLosslessAcrossJSON(t *testing.T) {
 	for _, v2 := range []bool{false, true} {

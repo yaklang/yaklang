@@ -616,6 +616,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
+			add("QUIC wire header and observed context", true)
+			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+				if value, ok := values[key]; ok {
+					walk(key, value, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "ntp" {
 			for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
 				if value, ok := values[key]; ok {

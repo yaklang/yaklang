@@ -187,6 +187,7 @@ func testQUICCoalescingMatrix(t *testing.T) {
 						require.Equal(t, w.Refs[j], ref.Number)
 						require.Equal(t, e.Domain, ref.Domain)
 					}
+					w.Session, w.Fields = quicReviewedLegacyExpectations(t, e, w.Session, w.Fields)
 					rocEqualFields(t, w.Session, e.Session)
 					fields, err := e.GetFields()
 					if w.Error != "" {
@@ -353,6 +354,7 @@ func testQUICCoalescingCallbackOwnership(t *testing.T) {
 				w := want.Events[count]
 				count++
 				require.Equal(t, w.Raw, hex.EncodeToString(e.Raw))
+				w.Session, w.Fields = quicReviewedLegacyExpectations(t, e, w.Session, w.Fields)
 				rocEqualFields(t, w.Session, e.Session)
 				if flow == 0 {
 					flow = e.FlowID

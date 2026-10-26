@@ -56,10 +56,28 @@ def headers(hs):
 
 base=[(':method','GET'),(':scheme','https'),(':path','/'),(':authority','field-audit.invalid')]
 cases=[('valid-GET',base,'base'),('missing-path',[h for h in base if h[0]!=':path'],'malformed'),('missing-method',base[1:],'malformed'),('duplicate-method',base+[base[0]],'malformed'),('request-status',base+[(':status','200')],'malformed'),('pseudo-after-field',[('x-test','ok')]+base,'malformed'),('unknown-pseudo',base+[(':unknown','x')],'unsupported'),('uppercase',base+[('X-Test','ok')],'malformed'),('invalid-token',base+[('x(test','ok')],'malformed'),('control-value',base+[('x-test','a\x01b')],'malformed'),('edge-whitespace',base+[('x-test',' leading')],'malformed'),('connection',base+[('connection','close')],'malformed'),('TE-gzip',base+[('te','gzip')],'malformed'),('CONNECT-with-path',[(':method','CONNECT'),(':authority','example.com:443'),(':path','')],'malformed'),('CONNECT-without-port',[(':method','CONNECT'),(':authority','example.com')],'malformed'),('valid-CONNECT',[(':method','CONNECT'),(':authority','example.com:443')],'base'),('valid-OPTIONS',[(':method','OPTIONS'),(':scheme','https'),(':path','*'),(':authority','field-audit.invalid')],'base'),('missing-path-large',[h for h in base if h[0]!=':path']+[('x-pad','p'*18000)],'malformed')]
-plans={}
+plans={};transport_controls={}
 if len(sys.argv)>4:
  selected=json.loads(Path(sys.argv[4]).read_text(encoding='utf-8-sig'));plans={p['name']:p for p in selected['cases']};assert len(plans)==len(selected['cases'])
  cases=[(p['name'],p['request_headers'],p['request_expect']) for p in selected['cases']]
+ transport_controls=selected.get('transport_controls',{})
+cid_lengths=transport_controls.get('connection_id_lengths',[8,8,8]);assert len(cid_lengths)==3 and all(type(n)is int and 0<=n<=20 for n in cid_lengths)
+generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+class ZeroCIDControlConnection(QuicConnection):
+ # aioquic1.7 replenishes zero-byte IDs into illegal NEW_CONNECTION_ID frames.
+ # An explicitly declared test peer may suppress issuance; its zero-length
+ # header CID remains valid. This is not an unmodified production-server claim.
+ def __init__(self,*args,**kwargs):
+  super().__init__(*args,**kwargs)
+  if self._is_client and self._configuration.connection_id_length==0:
+   # RFC9000 client Initial DCID still needs at least8 octets, independently
+   # of a zero-length local/source CID. aioquic1.7 otherwise generates0 here.
+   self._peer_cid.cid=secrets.token_bytes(8)
+   self._original_destination_connection_id=self._peer_cid.cid
+ def _replenish_connection_ids(self):
+  if self._configuration.connection_id_length==0:return
+  return super()._replenish_connection_ids()
+PeerConnection=ZeroCIDControlConnection if transport_controls.get('zero_cid_policy')=='omit-new-connection-id'else QuicConnection
 try:
  # A fixed startup sleep can silently miss the first complete connection.
  # Wait until TShark actually observes our nonce before sending any QUIC.
@@ -73,9 +91,9 @@ try:
   try:server_socket.recvfrom(65535)
   except BlockingIOError:break
  for epoch in range(3):
-  cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
-  scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
-  client=QuicConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={}
+  cfg=QuicConfiguration(is_client=True,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],server_name='field-audit.invalid',secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);cfg.load_verify_locations(cafile=str(out/'cert.pem'))
+  scfg=QuicConfiguration(is_client=False,alpn_protocols=['h3'],cipher_suites=[CipherSuite.AES_128_GCM_SHA256],secrets_log_file=keys,supported_versions=[QuicProtocolVersion.VERSION_1],connection_id_length=cid_lengths[epoch]);scfg.load_cert_chain(str(out/'cert.pem'),str(out/'key.pem'))
+  client=PeerConnection(configuration=cfg);client.connect(server_address,now=time.monotonic());server=None;handshake=[False,False];delayed=[];packets=[0,0];dropped=[0,0];received=[collections.defaultdict(bytearray),collections.defaultdict(bytearray)];ended=[set(),set()];expected={}
   def events(q,side):
    while True:
     e=q.next_event()
@@ -117,7 +135,7 @@ try:
      data,address=sock.recvfrom(65535)
      if sock is server_socket:
       if server is None:
-       h=pull_quic_header(Buffer(data=data),host_cid_length=8);server=QuicConnection(configuration=scfg,original_destination_connection_id=h.destination_cid)
+       h=pull_quic_header(Buffer(data=data),host_cid_length=cid_lengths[epoch]);server=PeerConnection(configuration=scfg,original_destination_connection_id=h.destination_cid)
       server.receive_datagram(data,address,now=time.monotonic());events(server,1)
      else:client.receive_datagram(data,address,now=time.monotonic());events(client,0)
   pump(lambda:all(handshake))
@@ -160,7 +178,7 @@ try:
   for sid,m in expected.items():
    assert bytes(received[0][sid])==m['reply']
    operations.append({'epoch':epoch,'stream_id':sid,'case':m['name'],'expected_base_scope':m['status'],'request_bytes':len(m['wire']),'request_hex':m['wire'].hex(),'request_sha256':hashlib.sha256(m['wire']).hexdigest(),'reply_hex':m['reply'].hex(),'reply_sha256':hashlib.sha256(m['reply']).hexdigest(),'declared_scenario':m.get('plan')})
-  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected)})
+  profiles.append({'epoch':epoch,'client_port':client_address[1],'server_port':server_address[1],'packets':packets,'dropped':dropped,'requests':len(expected),'connection_id_length':cid_lengths[epoch]})
   client.close();send(client,client_socket,0);time.sleep(.08)
   for sock in [client_socket,server_socket]:
    while True:
@@ -171,5 +189,5 @@ finally:
  keys.close();client_socket.close();server_socket.close();capture.wait(timeout=25)
  for reader in readers:reader.join(timeout=2)
  (out/'capture.stderr').write_bytes(b''.join(capture_errors));(out/'capture-observed.txt').write_bytes(b''.join(capture_lines))
- (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'operations':operations},indent=2)+'\n',encoding='utf8')
+ (out/'manifest.json').write_text(json.dumps({'scope':__doc__,'generator_sha256':generator_sha256,'capture_ready_observed':ready,'aioquic':importlib.metadata.version('aioquic'),'server_port':server_address[1],'client_port':client_address[1],'network':dict(network),'profiles':profiles,'transport_controls':transport_controls,'operations':operations},indent=2)+'\n',encoding='utf8')
 assert len(operations)==(len(cases)*3 if plans else 69)
