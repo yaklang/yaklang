@@ -119,7 +119,7 @@ func TestQUICRefusalSummaryAndEmptyPayloadAgreeAcrossWorkerIPC(t *testing.T) {
 			if strings.HasPrefix(f.text, "Rejected Packet Payload:") {
 				body = true
 				if len(payload) == 0 {
-					require.Equal(t, "Rejected Packet Payload: 0 bytes (empty authenticated payload; not delivered)", f.text)
+					require.Equal(t, "Rejected Packet Payload: 0 bytes (AEAD verified; not delivered)", f.text)
 					require.False(t, f.hasRange)
 				} else {
 					require.True(t, f.hasRange)

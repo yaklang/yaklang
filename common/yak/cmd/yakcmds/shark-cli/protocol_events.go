@@ -470,7 +470,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				}
 			}
 			if name == "Rejected Packet Payload" && authenticatedQUIC && emptyCID {
-				value = "0 bytes (empty authenticated payload; not delivered)"
+				value = "0 bytes (AEAD verified; not delivered)"
 			}
 			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
 				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
