@@ -76,3 +76,39 @@ func TestStreamingPacketFieldBudgetIsExplicitAndCannotProveAbsence(t *testing.T)
 	_, err = observedJSON(t, p, filter)
 	require.ErrorContains(t, err, "display filter unavailable")
 }
+
+func TestStreamingRefusalReasonsSurviveEveryCarrierAndStatus(t *testing.T) {
+	for _, transport := range []string{"tcp", "udp", "network"} {
+		for _, status := range []string{"malformed", "incomplete", "context-required", "limited"} {
+			t.Run(transport+"/"+status, func(t *testing.T) {
+				p := &capturedPacket{observedFieldBudget: observedPacketFieldBytes}
+				e := &pcaputil.ProtocolEvent{ID: 7, Protocol: "quic", Transport: transport, Status: status, Summary: "selected wire observation", Error: "selected profile unavailable", ExpertCode: string(pcaputil.ErrUnsupportedFeature), Raw: []byte("private raw bytes")}
+				p.recordObservedPDU(e)
+				require.Len(t, p.observedPDUs, 1)
+				row := p.observedPDUs[0]
+				require.Equal(t, status, row["status"])
+				require.Equal(t, e.Error, row["error"])
+				require.Equal(t, e.ExpertCode, row["expert"])
+				require.Equal(t, e.Summary, row["summary"])
+				require.NotContains(t, row, "raw")
+				e.Error, e.ExpertCode, e.Summary = "changed", "changed", "changed"
+				require.Equal(t, "selected profile unavailable", row["error"], "later edits cannot rewrite observed diagnostics")
+				require.Less(t, p.observedFieldBudget, observedPacketFieldBytes, "diagnostics are charged to the same bounded observation budget")
+			})
+		}
+	}
+	for _, expertOnly := range []bool{false, true} {
+		p := &capturedPacket{observedFieldBudget: observedPacketFieldBytes}
+		e := &pcaputil.ProtocolEvent{ID: 8, Protocol: "quic", Status: "decoded"}
+		if expertOnly {
+			e.ExpertCode = string(pcaputil.ErrContextRequired)
+		}
+		p.recordObservedPDU(e)
+		if expertOnly {
+			require.Equal(t, e.ExpertCode, p.observedPDUs[0]["expert"])
+		} else {
+			require.NotContains(t, p.observedPDUs[0], "error", "ordinary decoded observations retain the compact contract")
+			require.NotContains(t, p.observedPDUs[0], "expert")
+		}
+	}
+}

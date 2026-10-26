@@ -28,7 +28,10 @@ func (p *capturedPacket) recordObservedPDU(e *pcaputil.ProtocolEvent) {
 	}
 	values := e.DisplayFieldValues()
 	row := map[string]any{"id": e.ID, "protocol": e.Protocol, "status": e.Status, "completeness": e.Completeness, "response_to": e.ResponseTo, "byte_source": values.Source, "fields": values.FieldMap(), "field_values": values}
-	if e.Transport == "udp" && e.Error != "" && (e.Status == "malformed" || e.Status == "incomplete") {
+	// Missing context, unsupported profiles and resource refusal are meaningful
+	// outcomes on every carrier. Retain their reason just like a malformed UDP
+	// packet; omitting it makes a compact row disagree with the owned detail.
+	if e.Error != "" || e.ExpertCode != "" {
 		row["summary"], row["error"], row["expert"] = e.Summary, e.Error, e.ExpertCode
 	}
 	wire, err := json.Marshal(row)
