@@ -1,0 +1,2096 @@
+{
+  "scope": "QUIC v1 binary header fields, independently owned ranges, real zero-CID tuple reuse, public full-export invariants and actual Windows console pages. No claim of complete QUIC/TLS/HTTP3 coverage or authenticated peers.",
+  "functional_source": "a035f1101d",
+  "prior_header_UI_source": "79b390b1e1",
+  "public_inputs_remain_outside_Git": true,
+  "unmodified_immutable_fixture_inputs": true,
+  "implementation": [
+    "raw owned binary DCID/SCID/token instead of lossy UTF8 strings",
+    "literal long-header/known-context short-header typed fields with PDU spans",
+    "decoded packet numbers require private authenticated native evidence and have no literal ciphertext value span",
+    "empty long CID is present and distinct from absent short Version/SCID/lengths",
+    "uniquely protected packet selects competing zero-CID tuple generations even if close is lost",
+    "failed/ambiguous ownership does not borrow a flow or transaction; late closed packets do not renew key leases"
+  ],
+  "catalog_scope": "partial: v1 native transport; v2 selected bin-parser layout only, no v2 native authentication/ingress; wider token-varint rule profile and remaining protocol conformance unselected",
+  "tests": {
+    "final_full_native_seconds": 439.8,
+    "final_full_CLI_seconds": 1.966,
+    "ownership_probe_fuzz_executions": 108838,
+    "ownership_probe_fuzz_seconds": 40.421,
+    "prior_header_source_full_native_seconds": 399.901,
+    "prior_header_source_full_CLI_seconds": 2.061,
+    "prior_header_source_full_bin_parser_seconds": 120.055,
+    "prior_header_source_full_parser_seconds": 6.091,
+    "prior_header_source_full_base_seconds": 0.552,
+    "prior_header_source_full_stream_parser_seconds": 4.913,
+    "header_range_fuzz_executions": 85678,
+    "header_range_fuzz_seconds": 40.369
+  },
+  "auditor_source_sha256": {
+    "quic_header_wire_audit.py": "9c4bd5b8e8ab7201d529f17d4a6cf49703bca653ef7d3088d898afd3f32b73eb",
+    "quic_header_negative_controls.py": "8d4ed0b0a4b755f1ef87cabad822410120cdf8dd9826e8758ab746fb02df9b19",
+    "quic_header_export_invariants.py": "2213dcfe8378dd5512e5cfc04fe4a868cfe4e5cf6bbe3962cf7987996e8f7b30",
+    "quic_source_graph_audit.py": "83bd1682ba5a91d5096d7fe9833a274d013f601159b60ad3d45fc21ad9ba2382",
+    "discovery/http3_field_live.py": "96f19f9415eb41571ffcf5b552c737cac2fccefb736b45c3c9212f8097ef824f"
+  },
+  "public": {
+    "weber": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 262588,
+        "physical_frames": 51328,
+        "reference_filter_rows": 71,
+        "reference_raw_views": 105,
+        "reference_long_candidate_version_words": {
+          "0x00000001": 50,
+          "short-or-diagnostic": 55
+        },
+        "native_QUIC_carrier_PDUs": 88,
+        "matched_reference_views": 84,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 6,
+          "('long', 8, 4)": 28,
+          "('short', 8, 0)": 8,
+          "('long', 4, 8)": 12,
+          "('short', 4, 0)": 24
+        },
+        "typed_header_occurrences": {
+          "quic.version": 46,
+          "quic.dcil": 46,
+          "quic.dcid": 78,
+          "quic.scil": 46,
+          "quic.scid": 46,
+          "quic.long.packet_type": 46
+        },
+        "authenticated_packet_numbers": 18,
+        "authenticated_flow_association_checks": 18,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+        "events_sha256": "437c0c781524a23be2f15c5b5c9b5aa9d6701129bf03aca5bfd2a6df78e22cdf",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 4,
+        "unmatched_reference_views_count": 21,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "SDK_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "SDK",
+        "checks": 40009,
+        "records": 39283,
+        "changed_records": 78,
+        "added_header_aliases": {
+          "quic.packet_number": 18,
+          "quic.dcil": 46,
+          "quic.scid": 46,
+          "quic.long.packet_type": 46,
+          "quic.scil": 46,
+          "quic.dcid": 78,
+          "quic.version": 46
+        },
+        "binary_representation_changes": {
+          "DCID": 22,
+          "SCID": 22
+        },
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "before_sha256": "5027b918519caebc25618d327807c6c63dce9bb35c97bf95dac6441283319654",
+        "after_sha256": "437c0c781524a23be2f15c5b5c9b5aa9d6701129bf03aca5bfd2a6df78e22cdf",
+        "other_export_differences": []
+      },
+      "CLI_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "CLI",
+        "checks": 51996,
+        "records": 51328,
+        "changed_records": 54,
+        "added_header_aliases": {
+          "quic.long.packet_type": 46,
+          "quic.version": 46,
+          "quic.dcil": 46,
+          "quic.scid": 46,
+          "quic.scil": 46,
+          "quic.dcid": 78,
+          "quic.packet_number": 18
+        },
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "after_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "before_sha256": "52d37db71a24b211fc6d4a8ee4b9238873821e47df3614a9c2173e2d92265ec8",
+        "after_sha256": "c0652813758b1929a80491a0e74fe260bf62ad931152036516f3adbc4c4f4b6c",
+        "other_export_differences": []
+      },
+      "unmatched_decoded_reference_packets": 4
+    },
+    "sharon": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 1651072,
+        "physical_frames": 328127,
+        "reference_filter_rows": 989,
+        "reference_raw_views": 1037,
+        "reference_long_candidate_version_words": {
+          "short-or-diagnostic": 871,
+          "0x8a8a8a8a": 27,
+          "0xcdff0022": 1,
+          "0xffffffff": 5,
+          "0x02028a49": 1,
+          "0x10000000": 12,
+          "0x00000001": 11,
+          "0x88888888": 1,
+          "0xfaceb001": 2,
+          "0xca410000": 1,
+          "0x8a8c8a8a": 1,
+          "0x8a8a8a21": 1,
+          "0xfaceb002": 4,
+          "0xff000000": 2,
+          "0xcacacada": 2,
+          "0x00000000": 11,
+          "0xd7002700": 1,
+          "0xb6000000": 2,
+          "0x00010101": 2,
+          "0x0a0a0a0a": 4,
+          "0x2f000109": 1,
+          "0xcacacaca": 2,
+          "0x21163a05": 1,
+          "0xfc00002d": 2,
+          "0x24000100": 1,
+          "0xffffff13": 1,
+          "0xff000021": 2,
+          "0xc0460100": 1,
+          "0xff000016": 1,
+          "0x54303531": 3,
+          "0xffff1531": 1,
+          "0x2e000000": 2,
+          "0xff004514": 2,
+          "0xff00001a": 11,
+          "0xff000020": 1,
+          "0xffff0302": 1,
+          "0x21040073": 1,
+          "0x21212121": 1,
+          "0xffabcd22": 1,
+          "0xf7f7f898": 2,
+          "0xff000011": 1,
+          "0x08002101": 1,
+          "0xff494e49": 1,
+          "0x00010000": 1,
+          "0xcaca0000": 1,
+          "0x00140100": 1,
+          "0x06000000": 1,
+          "0x54303530": 2,
+          "0x87870828": 1,
+          "0xfdfdfdfb": 1,
+          "0x87870868": 3,
+          "0xe3137102": 1,
+          "0xfaceb00e": 1,
+          "0x0b005052": 1,
+          "0xff00000d": 1,
+          "0xcd00f300": 1,
+          "0xfa8a8a8a": 1,
+          "0x87872419": 1,
+          "0xff0045c2": 1,
+          "0x0a2a0a0a": 1,
+          "0xa7870868": 1,
+          "0x87870819": 1,
+          "0x210000d9": 1,
+          "0xc540c54f": 1
+        },
+        "native_QUIC_carrier_PDUs": 1,
+        "matched_reference_views": 0,
+        "header_CID_profiles": {},
+        "typed_header_occurrences": {},
+        "authenticated_packet_numbers": 0,
+        "authenticated_flow_association_checks": 0,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "oracle_sha256": "7cc7781a97eb803043dedd7e89122955cdd7fb455f3c8bd4315c96c2f31dc926",
+        "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "reference_nonroot_frames_count": 1,
+        "reference_derived_views_count": 10,
+        "reference_untyped_views_count": 10,
+        "unmatched_native_views_count": 1,
+        "unmatched_reference_views_count": 1027,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "SDK_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "SDK",
+        "checks": 245615,
+        "records": 245615,
+        "changed_records": 0,
+        "added_header_aliases": {},
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "before_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "other_export_differences": []
+      },
+      "CLI_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "CLI",
+        "checks": 328127,
+        "records": 328127,
+        "changed_records": 0,
+        "added_header_aliases": {},
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "after_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "other_export_differences": []
+      },
+      "unmatched_decoded_reference_packets": 1
+    }
+  },
+  "prior_real_captures": {
+    "new161": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 10080,
+        "physical_frames": 161,
+        "reference_filter_rows": 161,
+        "reference_raw_views": 176,
+        "reference_long_candidate_version_words": {
+          "short-or-diagnostic": 161,
+          "0x00000001": 15
+        },
+        "native_QUIC_carrier_PDUs": 174,
+        "matched_reference_views": 174,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 15,
+          "('short', 8, 0)": 153
+        },
+        "typed_header_occurrences": {
+          "quic.version": 15,
+          "quic.dcil": 15,
+          "quic.dcid": 168,
+          "quic.scil": 15,
+          "quic.scid": 15,
+          "quic.long.packet_type": 15
+        },
+        "authenticated_packet_numbers": 168,
+        "authenticated_flow_association_checks": 168,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "d1437772e6a8d3b5512ba920494e6e02fc758c9f308cacfeb39bbc7904a943d2",
+        "oracle_sha256": "45043027e1639aad772a64b6598a722afc55a5052542b203b01b57693da97aad",
+        "events_sha256": "0580ca3f1db6d9d161a33ed3ec356374983365a81ab5b07e6f867d6b6e4ee101",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 0,
+        "unmatched_reference_views_count": 2,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "SDK_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "SDK",
+        "checks": 1319,
+        "records": 176,
+        "changed_records": 168,
+        "added_header_aliases": {
+          "quic.long.packet_type": 15,
+          "quic.dcid": 168,
+          "quic.packet_number": 168,
+          "quic.version": 15,
+          "quic.dcil": 15,
+          "quic.scid": 15,
+          "quic.scil": 15
+        },
+        "binary_representation_changes": {
+          "DCID": 15,
+          "SCID": 15
+        },
+        "before_protocol_counts": {
+          "": 2,
+          "quic": 41,
+          "http3": 133
+        },
+        "after_protocol_counts": {
+          "": 2,
+          "quic": 41,
+          "http3": 133
+        },
+        "before_sha256": "20e69f9ac4ebde983bf272b2cfc7a2386b22063f2a85be032bfe2179b92ba860",
+        "after_sha256": "0580ca3f1db6d9d161a33ed3ec356374983365a81ab5b07e6f867d6b6e4ee101",
+        "other_export_differences": []
+      },
+      "CLI_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "CLI",
+        "checks": 1394,
+        "records": 161,
+        "changed_records": 159,
+        "added_header_aliases": {
+          "quic.scil": 15,
+          "quic.packet_number": 168,
+          "quic.scid": 15,
+          "quic.dcil": 15,
+          "quic.long.packet_type": 15,
+          "quic.dcid": 168,
+          "quic.version": 15
+        },
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "UDP": 2,
+          "QUIC": 26,
+          "HTTP/3": 133
+        },
+        "after_protocol_counts": {
+          "UDP": 2,
+          "QUIC": 26,
+          "HTTP/3": 133
+        },
+        "before_sha256": "6f9cc5068e2be65d35bc555526ae9a8279bcb7570f09594066bdd8710c0dc7f0",
+        "after_sha256": "afc83091a2cecb65b8b847db691a58c700dcf79214b9b74a66b4e83ffb0f379a",
+        "other_export_differences": []
+      }
+    },
+    "prior747": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 17069,
+        "physical_frames": 747,
+        "reference_filter_rows": 260,
+        "reference_raw_views": 273,
+        "reference_long_candidate_version_words": {
+          "0x00000001": 20,
+          "short-or-diagnostic": 253
+        },
+        "native_QUIC_carrier_PDUs": 273,
+        "matched_reference_views": 273,
+        "header_CID_profiles": {
+          "('long', 16, 4)": 1,
+          "('long', 4, 4)": 17,
+          "('short', 4, 0)": 253,
+          "('long', 9, 4)": 1,
+          "('long', 11, 4)": 1
+        },
+        "typed_header_occurrences": {
+          "quic.version": 20,
+          "quic.dcil": 20,
+          "quic.dcid": 273,
+          "quic.scil": 20,
+          "quic.scid": 20,
+          "quic.long.packet_type": 20
+        },
+        "authenticated_packet_numbers": 273,
+        "authenticated_flow_association_checks": 273,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "be3ba23140b3df81252f3b0a4d450b99007051626f86c8d1f33e3060a9ffbab7",
+        "oracle_sha256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06",
+        "events_sha256": "52089cb2496965aac1e4422593b6b3f88cdcf8bfd5bf776b6045c38c3db6db3c",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 0,
+        "unmatched_reference_views_count": 0,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "SDK_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "SDK",
+        "checks": 2454,
+        "records": 636,
+        "changed_records": 273,
+        "added_header_aliases": {
+          "quic.dcid": 273,
+          "quic.scid": 20,
+          "quic.packet_number": 273,
+          "quic.scil": 20,
+          "quic.version": 20,
+          "quic.long.packet_type": 20,
+          "quic.dcil": 20
+        },
+        "binary_representation_changes": {
+          "DCID": 20,
+          "SCID": 20
+        },
+        "before_protocol_counts": {
+          "http": 26,
+          "tls": 239,
+          "http2": 52,
+          "grpc": 32,
+          "dns": 12,
+          "quic": 122,
+          "http3": 151,
+          "redis": 2
+        },
+        "after_protocol_counts": {
+          "http": 26,
+          "tls": 239,
+          "http2": 52,
+          "grpc": 32,
+          "dns": 12,
+          "quic": 122,
+          "http3": 151,
+          "redis": 2
+        },
+        "before_sha256": "c9e7e5f15cc64425cebab16964958d2096f68a31e7e1eb4491b6bb2be85ad8c3",
+        "after_sha256": "52089cb2496965aac1e4422593b6b3f88cdcf8bfd5bf776b6045c38c3db6db3c",
+        "other_export_differences": []
+      },
+      "CLI_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "CLI",
+        "checks": 2732,
+        "records": 747,
+        "changed_records": 260,
+        "added_header_aliases": {
+          "quic.version": 20,
+          "quic.long.packet_type": 20,
+          "quic.dcid": 273,
+          "quic.packet_number": 273,
+          "quic.scid": 20,
+          "quic.dcil": 20,
+          "quic.scil": 20
+        },
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "TCP": 265,
+          "HTTP/1.1": 26,
+          "TLS": 6,
+          "TLSv1.2": 57,
+          "TLSv1.3": 62,
+          "HTTP/2": 30,
+          "gRPC": 27,
+          "DNS": 12,
+          "QUIC": 109,
+          "HTTP/3": 151,
+          "Redis": 2
+        },
+        "after_protocol_counts": {
+          "TCP": 265,
+          "HTTP/1.1": 26,
+          "TLS": 6,
+          "TLSv1.2": 57,
+          "TLSv1.3": 62,
+          "HTTP/2": 30,
+          "gRPC": 27,
+          "DNS": 12,
+          "QUIC": 109,
+          "HTTP/3": 151,
+          "Redis": 2
+        },
+        "before_sha256": "dfb76962b117cbda8d57ee79c3e3196c945eea41dcaa0514439b1e03b9909424",
+        "after_sha256": "f0de561298cb2e6bf86f463bdf0d183f6fe53df105d7cc58b5e70fa4c2312b83",
+        "other_export_differences": []
+      }
+    },
+    "prior188": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 11603,
+        "physical_frames": 188,
+        "reference_filter_rows": 188,
+        "reference_raw_views": 203,
+        "reference_long_candidate_version_words": {
+          "short-or-diagnostic": 188,
+          "0x00000001": 15
+        },
+        "native_QUIC_carrier_PDUs": 200,
+        "matched_reference_views": 200,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 15,
+          "('short', 8, 0)": 179
+        },
+        "typed_header_occurrences": {
+          "quic.version": 15,
+          "quic.dcil": 15,
+          "quic.dcid": 194,
+          "quic.scil": 15,
+          "quic.scid": 15,
+          "quic.long.packet_type": 15
+        },
+        "authenticated_packet_numbers": 194,
+        "authenticated_flow_association_checks": 194,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "19ff0cd330c991d0234dc2ca404dd6a0b44e2287b45d0d50e1572258b8af4071",
+        "oracle_sha256": "47c4e0b0b8297ff03aaa02775eaf2ddc50134ff4df5c5395c6fc8c4abe7429a6",
+        "events_sha256": "eb120979ce42554e6aea33957333e8e9752d51d27df20fcbef7029a54ab840f8",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 0,
+        "unmatched_reference_views_count": 3,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "SDK_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "SDK",
+        "checks": 1502,
+        "records": 203,
+        "changed_records": 194,
+        "added_header_aliases": {
+          "quic.packet_number": 194,
+          "quic.version": 15,
+          "quic.dcid": 194,
+          "quic.long.packet_type": 15,
+          "quic.scid": 15,
+          "quic.scil": 15,
+          "quic.dcil": 15
+        },
+        "binary_representation_changes": {
+          "DCID": 15,
+          "SCID": 15
+        },
+        "before_protocol_counts": {
+          "": 3,
+          "quic": 82,
+          "http3": 118
+        },
+        "after_protocol_counts": {
+          "": 3,
+          "quic": 82,
+          "http3": 118
+        },
+        "before_sha256": "e085913fe0ca48ca831e60680a39f01bb18c1e80f7e6694c50e0a2f979707820",
+        "after_sha256": "eb120979ce42554e6aea33957333e8e9752d51d27df20fcbef7029a54ab840f8",
+        "other_export_differences": []
+      },
+      "CLI_invariants": {
+        "scope": "Constrain complete exports to the reviewed QUIC binary/header projection.\nEvery raw PDU, packet, flow, transaction, application frame and byte source must\nstay identical. Exact header values/ranges are separately checked on wire by\nquic_header_wire_audit.py; this comparison never declares field parity itself.\n",
+        "kind": "CLI",
+        "checks": 1603,
+        "records": 188,
+        "changed_records": 185,
+        "added_header_aliases": {
+          "quic.packet_number": 194,
+          "quic.scil": 15,
+          "quic.dcil": 15,
+          "quic.scid": 15,
+          "quic.long.packet_type": 15,
+          "quic.dcid": 194,
+          "quic.version": 15
+        },
+        "binary_representation_changes": {},
+        "before_protocol_counts": {
+          "UDP": 3,
+          "QUIC": 67,
+          "HTTP/3": 118
+        },
+        "after_protocol_counts": {
+          "UDP": 3,
+          "QUIC": 67,
+          "HTTP/3": 118
+        },
+        "before_sha256": "4b49780aa80acfb70140ee5e91d87f6375bb8c8c9609b0d1e906b236b9b524b2",
+        "after_sha256": "9c840e5186df6b96d050cff68e49e4f799bfc82108f90db3979cba1ad5191b1d",
+        "other_export_differences": []
+      }
+    }
+  },
+  "new_real_zero_CID": {
+    "capture_sha256": "288e1b46b7c65820d05c808768804ebd5e9d94c93f9274916b28becb0c6806ef",
+    "manifest_sha256": "2d827d5570b312a924f5e575ae895dd09fe5e80b944f271692464bf0a43bab93",
+    "generator_sha256": "96f19f9415eb41571ffcf5b552c737cac2fccefb736b45c3c9212f8097ef824f",
+    "declared_peer_transport_adaptations": {
+      "connection_id_lengths": [
+        0,
+        0,
+        20
+      ],
+      "zero_cid_policy": "omit-new-connection-id"
+    },
+    "aioquic": "1.7.0",
+    "capture_ready_observed": true,
+    "network": {
+      "delayed": 12,
+      "dropped": 6
+    },
+    "epochs": [
+      {
+        "epoch": 0,
+        "CID_length": 0,
+        "requests": 3,
+        "same_client_server_ports": true
+      },
+      {
+        "epoch": 1,
+        "CID_length": 0,
+        "requests": 3,
+        "same_client_server_ports": true
+      },
+      {
+        "epoch": 2,
+        "CID_length": 20,
+        "requests": 3,
+        "same_client_server_ports": true
+      }
+    ],
+    "actual_peer_request_reply_operations": 9,
+    "before": {
+      "sha256": "9e4948813908b16e70ae72554a58ad6c840398423b399388da5480fe8c9afe9b",
+      "records": 114,
+      "protocols": {
+        "": 48,
+        "quic": 59,
+        "http3": 7
+      },
+      "errors": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 7,
+        "AuthenticationFailed: QUIC packet protection authentication failed": 22
+      },
+      "QUIC_carrier_flows": {
+        "1": 56,
+        "2": 2,
+        "3": 8
+      },
+      "authenticated_packets": 37
+    },
+    "close_only_intermediate": {
+      "sha256": "5fefd5f9cca66099f27c6685a1a4c95d2aa9064185d2c05c7182a0903acde761",
+      "records": 116,
+      "protocols": {
+        "": 35,
+        "quic": 66,
+        "http3": 15
+      },
+      "errors": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 8
+      },
+      "QUIC_carrier_flows": {
+        "1": 33,
+        "2": 40,
+        "3": 8
+      },
+      "authenticated_packets": 73
+    },
+    "after": {
+      "sha256": "8307c2afd405e60a1c099c1aeeac5776627673d1b0785f9b1bf286d684d95d52",
+      "records": 116,
+      "protocols": {
+        "": 2,
+        "quic": 89,
+        "http3": 25
+      },
+      "errors": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 8
+      },
+      "QUIC_carrier_flows": {
+        "1": 33,
+        "2": 40,
+        "3": 41
+      },
+      "authenticated_packets": 106
+    },
+    "header_audit": {
+      "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+      "checks": 6270,
+      "physical_frames": 101,
+      "reference_filter_rows": 101,
+      "reference_raw_views": 116,
+      "reference_wire_versions": {
+        "short-or-diagnostic": 101,
+        "0x00000001": 15
+      },
+      "native_QUIC_carrier_PDUs": 114,
+      "matched_reference_views": 114,
+      "header_CID_profiles": {
+        "('long', 8, 0)": 2,
+        "('long', 0, 0)": 8,
+        "('short', 0, 0)": 57,
+        "('long', 20, 20)": 5,
+        "('short', 20, 0)": 34
+      },
+      "typed_header_occurrences": {
+        "quic.version": 15,
+        "quic.dcil": 15,
+        "quic.dcid": 106,
+        "quic.scil": 15,
+        "quic.scid": 15,
+        "quic.long.packet_type": 15
+      },
+      "authenticated_packet_numbers": 106,
+      "authenticated_flow_association_checks": 106,
+      "reference_zero_length_omissions": {
+        "quic.scid": 10,
+        "quic.dcid": 65
+      },
+      "capture_sha256": "288e1b46b7c65820d05c808768804ebd5e9d94c93f9274916b28becb0c6806ef",
+      "oracle_sha256": "c144c65606a5b61591df15c0f477ec9aa7f5460ed9961ce321cf421ba2c59144",
+      "events_sha256": "8307c2afd405e60a1c099c1aeeac5776627673d1b0785f9b1bf286d684d95d52",
+      "reference_nonroot_frames_count": 0,
+      "reference_derived_views_count": 0,
+      "unmatched_native_views_count": 0,
+      "unmatched_reference_views_count": 2,
+      "reference_field_omissions_count": 0,
+      "reference_value_differences_count": 0
+    },
+    "source_graph_audit": {
+      "scope": "Independently verify native HTTP/3 byte witnesses against reference STREAMs.\nScope: owned, single-UDP-view capture; complete bidi HTTP streams and uni control\nstreams. Encoder/decoder instruction semantics and peer identity are not certified.\n",
+      "capture_sha256": "288e1b46b7c65820d05c808768804ebd5e9d94c93f9274916b28becb0c6806ef",
+      "checks": 14445,
+      "connections": 3,
+      "reference_coalesced_bindings": 7,
+      "reference_expert_only_blocks": 8,
+      "application_frames": 33,
+      "types": {
+        "4": 6,
+        "1": 18,
+        "0": 9
+      },
+      "source_ranges": 216,
+      "unselected_instruction_streams": [],
+      "selected_differences": [],
+      "frames": [
+        {
+          "completed_physical_frame": 6,
+          "parent_PDU": 11,
+          "stream_id": 2,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            11
+          ],
+          "physical_source_packets": [
+            6
+          ]
+        },
+        {
+          "completed_physical_frame": 6,
+          "parent_PDU": 11,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 101,
+          "source_PDUs": [
+            11
+          ],
+          "physical_source_packets": [
+            6
+          ]
+        },
+        {
+          "completed_physical_frame": 7,
+          "parent_PDU": 12,
+          "stream_id": 3,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            12
+          ],
+          "physical_source_packets": [
+            7
+          ]
+        },
+        {
+          "completed_physical_frame": 8,
+          "parent_PDU": 13,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            13
+          ],
+          "physical_source_packets": [
+            8
+          ]
+        },
+        {
+          "completed_physical_frame": 8,
+          "parent_PDU": 13,
+          "stream_id": 0,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 7,
+          "source_PDUs": [
+            13
+          ],
+          "physical_source_packets": [
+            8
+          ]
+        },
+        {
+          "completed_physical_frame": 9,
+          "parent_PDU": 14,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 115,
+          "source_PDUs": [
+            14
+          ],
+          "physical_source_packets": [
+            9
+          ]
+        },
+        {
+          "completed_physical_frame": 11,
+          "parent_PDU": 16,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            16
+          ],
+          "physical_source_packets": [
+            11
+          ]
+        },
+        {
+          "completed_physical_frame": 11,
+          "parent_PDU": 16,
+          "stream_id": 8,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            16
+          ],
+          "physical_source_packets": [
+            11
+          ]
+        },
+        {
+          "completed_physical_frame": 27,
+          "parent_PDU": 32,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 17125,
+          "source_PDUs": [
+            11,
+            14,
+            17,
+            18,
+            19,
+            21,
+            22,
+            23,
+            24,
+            26,
+            27,
+            28,
+            29,
+            31,
+            32
+          ],
+          "physical_source_packets": [
+            6,
+            9,
+            12,
+            13,
+            14,
+            16,
+            17,
+            18,
+            19,
+            21,
+            22,
+            23,
+            24,
+            26,
+            27
+          ]
+        },
+        {
+          "completed_physical_frame": 29,
+          "parent_PDU": 34,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            34
+          ],
+          "physical_source_packets": [
+            29
+          ]
+        },
+        {
+          "completed_physical_frame": 29,
+          "parent_PDU": 34,
+          "stream_id": 4,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            34
+          ],
+          "physical_source_packets": [
+            29
+          ]
+        },
+        {
+          "completed_physical_frame": 34,
+          "parent_PDU": 44,
+          "stream_id": 2,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            44
+          ],
+          "physical_source_packets": [
+            34
+          ]
+        },
+        {
+          "completed_physical_frame": 34,
+          "parent_PDU": 44,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 101,
+          "source_PDUs": [
+            44
+          ],
+          "physical_source_packets": [
+            34
+          ]
+        },
+        {
+          "completed_physical_frame": 36,
+          "parent_PDU": 46,
+          "stream_id": 3,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            46
+          ],
+          "physical_source_packets": [
+            36
+          ]
+        },
+        {
+          "completed_physical_frame": 37,
+          "parent_PDU": 47,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            47
+          ],
+          "physical_source_packets": [
+            37
+          ]
+        },
+        {
+          "completed_physical_frame": 37,
+          "parent_PDU": 47,
+          "stream_id": 0,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 7,
+          "source_PDUs": [
+            47
+          ],
+          "physical_source_packets": [
+            37
+          ]
+        },
+        {
+          "completed_physical_frame": 43,
+          "parent_PDU": 53,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 115,
+          "source_PDUs": [
+            53
+          ],
+          "physical_source_packets": [
+            43
+          ]
+        },
+        {
+          "completed_physical_frame": 44,
+          "parent_PDU": 54,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            54
+          ],
+          "physical_source_packets": [
+            44
+          ]
+        },
+        {
+          "completed_physical_frame": 44,
+          "parent_PDU": 54,
+          "stream_id": 8,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            54
+          ],
+          "physical_source_packets": [
+            44
+          ]
+        },
+        {
+          "completed_physical_frame": 62,
+          "parent_PDU": 72,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 17125,
+          "source_PDUs": [
+            44,
+            45,
+            48,
+            49,
+            50,
+            51,
+            53,
+            58,
+            59,
+            61,
+            65,
+            67,
+            68,
+            70,
+            72
+          ],
+          "physical_source_packets": [
+            34,
+            35,
+            38,
+            39,
+            40,
+            41,
+            43,
+            48,
+            49,
+            51,
+            55,
+            57,
+            58,
+            60,
+            62
+          ]
+        },
+        {
+          "completed_physical_frame": 65,
+          "parent_PDU": 75,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            75
+          ],
+          "physical_source_packets": [
+            65
+          ]
+        },
+        {
+          "completed_physical_frame": 65,
+          "parent_PDU": 75,
+          "stream_id": 4,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            75
+          ],
+          "physical_source_packets": [
+            65
+          ]
+        },
+        {
+          "completed_physical_frame": 69,
+          "parent_PDU": 84,
+          "stream_id": 3,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            84
+          ],
+          "physical_source_packets": [
+            69
+          ]
+        },
+        {
+          "completed_physical_frame": 70,
+          "parent_PDU": 85,
+          "stream_id": 2,
+          "stream_offset": 1,
+          "type": 4,
+          "payload_length": 0,
+          "source_PDUs": [
+            85
+          ],
+          "physical_source_packets": [
+            70
+          ]
+        },
+        {
+          "completed_physical_frame": 70,
+          "parent_PDU": 85,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 101,
+          "source_PDUs": [
+            85
+          ],
+          "physical_source_packets": [
+            70
+          ]
+        },
+        {
+          "completed_physical_frame": 79,
+          "parent_PDU": 94,
+          "stream_id": 0,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            94
+          ],
+          "physical_source_packets": [
+            79
+          ]
+        },
+        {
+          "completed_physical_frame": 79,
+          "parent_PDU": 94,
+          "stream_id": 0,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 7,
+          "source_PDUs": [
+            94
+          ],
+          "physical_source_packets": [
+            79
+          ]
+        },
+        {
+          "completed_physical_frame": 81,
+          "parent_PDU": 96,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 115,
+          "source_PDUs": [
+            96
+          ],
+          "physical_source_packets": [
+            81
+          ]
+        },
+        {
+          "completed_physical_frame": 82,
+          "parent_PDU": 97,
+          "stream_id": 8,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            97
+          ],
+          "physical_source_packets": [
+            82
+          ]
+        },
+        {
+          "completed_physical_frame": 82,
+          "parent_PDU": 97,
+          "stream_id": 8,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            97
+          ],
+          "physical_source_packets": [
+            82
+          ]
+        },
+        {
+          "completed_physical_frame": 100,
+          "parent_PDU": 115,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 17125,
+          "source_PDUs": [
+            85,
+            87,
+            88,
+            90,
+            91,
+            92,
+            95,
+            96,
+            98,
+            99,
+            102,
+            105,
+            106,
+            108,
+            109,
+            111,
+            115
+          ],
+          "physical_source_packets": [
+            70,
+            72,
+            73,
+            75,
+            76,
+            77,
+            80,
+            81,
+            83,
+            84,
+            87,
+            90,
+            91,
+            93,
+            94,
+            96,
+            100
+          ]
+        },
+        {
+          "completed_physical_frame": 101,
+          "parent_PDU": 116,
+          "stream_id": 4,
+          "stream_offset": 0,
+          "type": 1,
+          "payload_length": 15,
+          "source_PDUs": [
+            116
+          ],
+          "physical_source_packets": [
+            101
+          ]
+        },
+        {
+          "completed_physical_frame": 101,
+          "parent_PDU": 116,
+          "stream_id": 4,
+          "stream_offset": 17,
+          "type": 0,
+          "payload_length": 21,
+          "source_PDUs": [
+            116
+          ],
+          "physical_source_packets": [
+            101
+          ]
+        }
+      ]
+    },
+    "negative_controls": {
+      "scope": "Require QUIC header/epoch audit to reject deliberately corrupted exports.\nUses the original real capture and reference, then mutates one evidence item.\nFull captures, manifests, oracle output and mutated JSONL stay outside Git.\n",
+      "baseline_passed": true,
+      "corruptions_rejected": 34,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "raw-octet",
+          "accepted": false
+        },
+        {
+          "control": "raw-digest",
+          "accepted": false
+        },
+        {
+          "control": "physical-domain",
+          "accepted": false
+        },
+        {
+          "control": "physical-witness",
+          "accepted": false
+        },
+        {
+          "control": "missing-actual-pdu",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-event-id",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-native-occurrence",
+          "accepted": false
+        },
+        {
+          "control": "wrong-generation",
+          "accepted": false
+        },
+        {
+          "control": "DCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "SCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-token-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "legacy-first-byte",
+          "accepted": false
+        },
+        {
+          "control": "owned-range",
+          "accepted": false
+        },
+        {
+          "control": "missing-alias",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-alias",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-value",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-origin",
+          "accepted": false
+        },
+        {
+          "control": "CID-value-span",
+          "accepted": false
+        },
+        {
+          "control": "version-alias",
+          "accepted": false
+        },
+        {
+          "control": "empty-CID-not-zero-octet",
+          "accepted": false
+        },
+        {
+          "control": "short-version",
+          "accepted": false
+        },
+        {
+          "control": "short-SCID",
+          "accepted": false
+        },
+        {
+          "control": "short-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type",
+          "accepted": false
+        },
+        {
+          "control": "short-forged-range",
+          "accepted": false
+        },
+        {
+          "control": "unverified-PN",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-exact",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-not-ciphertext-span",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-range",
+          "accepted": false
+        }
+      ]
+    },
+    "CLI_sha256": "72e78f23ef259d446a800521c3a52173142b88e504c0cf0052d995a651fa8c2a",
+    "reference_unmatched_probe_frames": [
+      1,
+      2
+    ],
+    "reference_probe_policy": "TShark DecodeAs classifies capture-ready nonce datagrams as QUIC candidates without a decoded number; native keeps them unknown UDP. All 106 reference-decoded packets covered, plus eight separately diagnosed unprotected zero tails.",
+    "invalid_peer_controls": [
+      {
+        "capture": "01",
+        "role": "unmodified aioquic zero-CID frame issuance",
+        "result": "illegal zero-length NEW_CONNECTION_ID prevented application receipt; not a positive transport case"
+      },
+      {
+        "capture": "02",
+        "role": "omitted illegal NEW_CONNECTION_ID but zero first client Initial DCID",
+        "result": "nine actual receipts do not make the first Initial RFC9000 conforming; not a positive native admission case"
+      }
+    ]
+  },
+  "remaining_followups": [
+    {
+      "case": "Weber four CRYPTO-conflict aggregates",
+      "frames": [
+        48062,
+        48074,
+        48096,
+        48109
+      ],
+      "native_whole_datagram_diagnostics": 4,
+      "reference_split_views": 8,
+      "reference_decoded_Initials": 4,
+      "state": "open, do not normalize into field success"
+    },
+    {
+      "case": "Weber additional unmatched protected/header views",
+      "reference_occurrences": 13,
+      "state": "open context/admission review"
+    },
+    {
+      "case": "Sharon unselected/malformed/fuzz/older candidate reference views",
+      "reference_occurrences": 1027,
+      "native_unmatched_diagnostic": 1,
+      "derived_reference_views": 10,
+      "state": "open per-case review; the raw version-word histogram includes mutated data and does not certify valid versions"
+    },
+    {
+      "case": "Native QUIC v2 transport",
+      "state": "unsupported; layout tests explicitly refuse native v2 and do not claim crypto conformance"
+    }
+  ],
+  "Windows": {
+    "zero-cid": {
+      "snapshot_sha256": "c38f7874c27ef3ab66feb046a2199e6898714d1233118910209351fb54eeb9d6",
+      "rendered_actual_cells_sha256": "1924425e81f2ba0779cf13678f0b7cceafe6717961dc28cc2c250ffd6857f5b6",
+      "log_sha256": "2d68cbbf102cd87df3a938588f7beb210c1048767b3129415775a24d4d69fcb2",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "checks": [
+        "EOF and real predicate/row/detail",
+        "native fields and byte selection",
+        "source switching",
+        "conversation and evidence",
+        "80x30/180x48 resize",
+        "q and CP936 restore"
+      ]
+    },
+    "short-20-cid": {
+      "snapshot_sha256": "48c92d506ce58d4f9877bde26ce35f5f3cb806eda836077f81988f4ebef452eb",
+      "rendered_actual_cells_sha256": "bef6fd1da3f703514325fc16af36a37779b4a4a4825d2c4221810462657dce3e",
+      "log_sha256": "5574b9a3d9878ad8a54744abca4618a0ce57619f660e2e2495669e0aea67f6be",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "checks": [
+        "EOF and real predicate/row/detail",
+        "native fields and byte selection",
+        "source switching",
+        "conversation and evidence",
+        "80x30/180x48 resize",
+        "q and CP936 restore"
+      ]
+    }
+  }
+}
