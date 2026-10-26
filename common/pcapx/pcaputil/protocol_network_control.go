@@ -37,6 +37,9 @@ func controlPort(ports []uint16, p uint16) bool {
 	return false
 }
 func (a *binParser) decodeControlDatagram(e *ProtocolEvent, w []byte, src, dst uint16, explicit string) bool {
+	if a.decodeIPFIXDatagram(e, w, src, dst, explicit) {
+		return true
+	}
 	if a.decodeNetFlowV5Datagram(e, w, src, dst, explicit) {
 		return true
 	}

@@ -688,6 +688,8 @@ type binParser struct {
 	rdpUDP                                                                     *rdpUDPStore
 	eapTLS                                                                     *eapTLSStore
 	udpSessions                                                                *binUDPStore
+	ipfixMu                                                                    sync.Mutex
+	ipfix                                                                      *ipfixStore
 	netflowV9Mu                                                                sync.Mutex
 	netflowV9                                                                  *netflowV9Store // netflowV9Mu; independent pre-dispatch receiver observations
 	tftpUntrackedRefusal                                                       bool            // udpMu; unknown refused client/server identity
@@ -907,6 +909,7 @@ type binDirection struct {
 type binFlow struct {
 	ajp               *binAJP
 	bgp               *binBGP
+	ipfixTCP          *binIPFIX
 	ldp               *binLDP
 	rtmp              *binRTMP
 	routing           *routingDatagramState
@@ -1564,7 +1567,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" {
 				result = map[string]any{}
 			} else if f.protocol == "tls" {
 				if f.byteSource == "decrypted" {

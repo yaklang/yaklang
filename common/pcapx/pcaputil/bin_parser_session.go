@@ -20,6 +20,14 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if f.port(4739) {
+		if p := probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+			f.protocol = "ipfix"
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
 	if f.port(646) {
 		if p := probeLDP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 			f.protocol, f.ldp = "ldp", &binLDP{}
@@ -459,6 +467,9 @@ func (f *binFlow) needsMoreBoundedText(wire []byte) bool {
 }
 
 func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
+	if f.port(4739) && probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeNeedMore {
+		return true
+	}
 	// A service hint may extend bounded lookahead, never establish protocol
 	// identity. First LDP PDUs can exceed the generic 64-byte probe window;
 	// admission still waits for every message and mandatory TLV to validate.
@@ -488,6 +499,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	}
 	var err error
 	switch f.protocol {
+	case "ipfix":
+		err = f.consumeIPFIX(dir, e)
 	case "ldp":
 		err = f.consumeLDP(dir, e)
 	case "bgp":
@@ -1268,6 +1281,7 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.ipfixTCP = nil
 	f.ldp = nil
 	f.bgp = nil
 	f.rtmp = nil
