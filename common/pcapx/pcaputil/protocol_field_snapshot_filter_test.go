@@ -131,11 +131,13 @@ func TestExplicitPartialFieldScopeSurvivesEventNormalizationAndJSON(t *testing.T
 		a.emit(e)
 		require.Equal(t, "malformed", e.Completeness, "wire outcome remains a malformed observation")
 		require.True(t, e.DisplayFieldValues().Incomplete, "explicit field refusal survives normalization")
+		require.Equal(t, "limited", e.DisplayFieldValues().Completeness)
 		e.Status, e.Completeness = "decoded", "message"
 		wire, err := json.Marshal(e.DisplayFieldValues())
 		require.NoError(t, err)
 		var snapshot DisplayFieldSnapshot
 		require.NoError(t, json.Unmarshal(wire, &snapshot))
+		require.Equal(t, "limited", snapshot.Completeness)
 		filter, err := CompileDisplayFilter("not stp.root.hw")
 		require.NoError(t, err)
 		require.False(t, filter.EvaluateSnapshots([]DisplayFieldSnapshot{snapshot}).Complete, "public edits and serialization cannot certify absent fields")

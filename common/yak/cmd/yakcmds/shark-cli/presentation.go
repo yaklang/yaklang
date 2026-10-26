@@ -812,7 +812,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
-			p.diagnostic = clipText(protocolName(e.Protocol)+" · "+e.ExpertCode+" · "+e.Error, 256)
+			label := protocolName(e.Protocol)
+			if e.Protocol == "" && e.Transport != "" {
+				label = strings.ToUpper(e.Transport) + " carrier"
+			}
+			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+e.Error, 256)
 			if p.protocol == "" {
 				p.status = e.Status
 			}

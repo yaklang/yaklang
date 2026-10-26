@@ -140,13 +140,22 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 			transport = d.ipv4.Protocol
 		}
 	case layers.LayerTypeIPv6:
-		if err := d.ipv6.DecodeFromBytes(ipBytes, d); err != nil {
+		var err error
+		if d.conf.binParser != nil {
+			err = decodeProtocolIPv6(&d.ipv6, ipBytes, d)
+		} else {
+			err = d.ipv6.DecodeFromBytes(ipBytes, d)
+		}
+		if err != nil {
 			return fallback()
 		}
 		if d.ipv6.Version != 6 || d.truncated {
 			return fallback()
 		}
 		network, transport = &d.ipv6, d.ipv6.NextHeader
+		if d.ipv6.HopByHop != nil {
+			transport = d.ipv6.HopByHop.NextHeader
+		}
 	}
 	if network != nil && transport == layers.IPProtocolTCP {
 		if err := d.tcp.DecodeFromBytes(network.(gopacket.NetworkLayer).LayerPayload(), d); err != nil {

@@ -50,18 +50,36 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 	}
 	if link, ok := decoder.(layers.LinkType); ok {
 		decoder = captureLinkDecoder(link)
-		if link == layers.LinkTypeRaw && len(data) > 0 && data[0]>>4 == 4 {
-			decoder = layers.LayerTypeIPv4
+		if link == layers.LinkTypeRaw && len(data) > 0 {
+			switch data[0] >> 4 {
+			case 4:
+				decoder = layers.LayerTypeIPv4
+			case 6:
+				decoder = layers.LayerTypeIPv6
+			}
 		}
 	}
-	if typed, ok := decoder.(interface{ LayerType() gopacket.LayerType }); ok && typed.LayerType() == layers.LayerTypeIPv4 {
-		decoder = layers.LayerTypeIPv4
+	if typed, ok := decoder.(interface{ LayerType() gopacket.LayerType }); ok && (typed.LayerType() == layers.LayerTypeIPv4 || typed.LayerType() == layers.LayerTypeIPv6) {
+		decoder = typed.LayerType()
 	}
 	if layer, ok := decoder.(gopacket.LayerType); ok && layer == layers.LayerTypeIPv4 {
 		ip := &layers.IPv4{}
 		err := decodeProtocolIPv4(ip, data, b)
 		b.AddLayer(ip)
 		b.SetNetworkLayer(ip)
+		if err != nil {
+			return err
+		}
+		return b.NextDecoder(ip.NextLayerType())
+	}
+	if layer, ok := decoder.(gopacket.LayerType); ok && layer == layers.LayerTypeIPv6 {
+		ip := &layers.IPv6{}
+		err := decodeProtocolIPv6(ip, data, b)
+		b.AddLayer(ip)
+		b.SetNetworkLayer(ip)
+		if ip.HopByHop != nil {
+			b.AddLayer(ip.HopByHop)
+		}
 		if err != nil {
 			return err
 		}
@@ -144,6 +162,55 @@ func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFe
 	return nil
 }
 
+type protocolDecodeFeedback struct{ truncated bool }
+
+func (f *protocolDecodeFeedback) SetTruncated() { f.truncated = true }
+
+// RFC 8200 Payload Length includes the Hop-by-Hop header. gopacket 1.3.1
+// removes that header, then applies the original length to the remaining bytes.
+// Bound its input to the literal IP envelope and repair only this proven offset;
+// observers keep the dependency's original view and malformed options still fail.
+func decodeProtocolIPv6(ip *layers.IPv6, data []byte, feedback gopacket.DecodeFeedback) error {
+	*ip = layers.IPv6{}
+	if len(data) < 40 {
+		feedback.SetTruncated()
+		return fmt.Errorf("IPv6 header truncated: %d of 40 bytes", len(data))
+	}
+	if data[0]>>4 != 6 {
+		return fmt.Errorf("invalid IPv6 version %d", data[0]>>4)
+	}
+	declared := int(binary.BigEndian.Uint16(data[4:6]))
+	if declared == 0 {
+		// The native path has no selected jumbogram profile. In particular do
+		// not pass the dependency's HBH-prefixed jumbo payload to a UDP decoder.
+		return fmt.Errorf("IPv6 zero payload length/jumbogram requires an unsupported native carrier profile")
+	}
+	end := 40 + declared
+	if end > len(data) {
+		feedback.SetTruncated()
+		end = len(data)
+	}
+	bounded := data[:end]
+	var local protocolDecodeFeedback
+	if err := ip.DecodeFromBytes(bounded, &local); err != nil {
+		if local.truncated {
+			feedback.SetTruncated()
+		}
+		return err
+	}
+	if ip.HopByHop != nil {
+		n := ip.HopByHop.ActualLength
+		if n > declared || 40+n > end {
+			return fmt.Errorf("IPv6 Hop-by-Hop header exceeds declared payload length")
+		}
+		ip.Payload = bounded[40+n:]
+		ip.HopByHop.Payload = ip.Payload
+	} else if local.truncated {
+		feedback.SetTruncated()
+	}
+	return nil
+}
+
 // capturedTCPPayloadMissing admits only a reader-proven capture suffix after
 // complete IP/TCP headers. Wire-invalid lengths, truncated options and fragments
 // remain rejected. Missing bytes are never manufactured or reserved as payload.
@@ -166,6 +233,9 @@ func capturedTCPPayloadMissing(packet gopacket.Packet, tcp *layers.TCP) (uint32,
 		}
 		declared = 40 + int(ip.Length)
 		captured = len(ip.LayerContents()) + len(ip.LayerPayload())
+		if ip.HopByHop != nil {
+			captured += ip.HopByHop.ActualLength
+		}
 	default:
 		return 0, false
 	}

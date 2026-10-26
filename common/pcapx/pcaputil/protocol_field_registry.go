@@ -426,6 +426,12 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	s.PDU, s.Source, s.Completeness = e.ID, e.SourceBytes, e.Completeness
 	if e.nativeFieldsIncomplete {
 		s.Incomplete = true
+		// Field coverage and the wire outcome are different facts. Preserve the
+		// former after finalizeEvidence changes event completeness to malformed
+		// or context-required; do not misreport it as a projection/type failure.
+		if s.Completeness != "evicted" {
+			s.Completeness = "limited"
+		}
 	}
 	if e.SourceBytes.CompletedIn != nil {
 		owned := *e.SourceBytes.CompletedIn
