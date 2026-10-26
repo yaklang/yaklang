@@ -1,0 +1,6844 @@
+{
+  "source_native_and_UI": "0f40769b3b3cdf23ba9b013aac64a26ea8310f9c",
+  "source_first_wire_fix": "03b3a81a7a4bd7ca6c19996ef6a4002de880e331",
+  "source_auth_field": "d746610ae59feeb7cb9cf2e9ae17454fcf73c947",
+  "scope": "Observed HTTP3 stream wire identity and drained-FIN bounds; complete exports, public-corpus replay, independent reference STREAM and actual peer bytes, mixed-packet metadata and progressive Windows UI. Does not certify every HTTP3 or QUIC category.",
+  "final_full_tests_seconds": {
+    "native": 419.292,
+    "CLI": 1.972
+  },
+  "earlier_wire_source_full_seconds": {
+    "native": 461.414,
+    "CLI": 1.956
+  },
+  "fuzz_at_first_wire_source": [
+    {
+      "name": "FuzzHTTP3FinalDeclaredLengthIsBoundedAndExact",
+      "executions": 110459,
+      "seconds": 40.481
+    },
+    {
+      "name": "FuzzHTTP3RetransmissionDoesNotReplayApplication",
+      "executions": 110347,
+      "seconds": 40.39
+    }
+  ],
+  "new_14_scenario_capture": {
+    "scope": "Independently audit clean-FIN frame faults, complete frames and connection scope.\nThe reference QUIC STREAM bytes and actual raw-peer receipts determine wire\nlayout; reference application/expert views remain separate, without normalizing\ncounts or treating absent reference diagnostics as a conformity certificate.\n",
+    "checks": 35203,
+    "physical_frames": 161,
+    "connections": 3,
+    "operations": 42,
+    "directions": 84,
+    "direction_verdicts": {
+      "base": 48,
+      "frame-error": 36
+    },
+    "faults": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 24,
+        "PDU": 15,
+        "frame_refs": [
+          10
+        ],
+        "case": "request-huge-DATA-length",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 48,
+        "PDU": 24,
+        "frame_refs": [
+          19
+        ],
+        "case": "reply-huge-DATA-length",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 38,
+        "frame_refs": [
+          33
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 44,
+        "PDU": 48,
+        "frame_refs": [
+          43
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 59,
+        "frame_refs": [
+          49
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 59,
+        "frame_refs": [
+          49
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 59,
+        "frame_refs": [
+          49
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 59,
+        "frame_refs": [
+          49
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "PDU": 70,
+        "frame_refs": [
+          60
+        ],
+        "case": "request-huge-DATA-length",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 71,
+        "frame_refs": [
+          61
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 71,
+        "frame_refs": [
+          61
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 71,
+        "frame_refs": [
+          61
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 71,
+        "frame_refs": [
+          61
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 48,
+        "PDU": 72,
+        "frame_refs": [
+          62
+        ],
+        "case": "reply-huge-DATA-length",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 106,
+        "frame_refs": [
+          96
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "PDU": 112,
+        "frame_refs": [
+          102
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "PDU": 131,
+        "frame_refs": [
+          116
+        ],
+        "case": "request-huge-DATA-length",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 132,
+        "frame_refs": [
+          117
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 132,
+        "frame_refs": [
+          117
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 132,
+        "frame_refs": [
+          117
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 132,
+        "frame_refs": [
+          117
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 48,
+        "PDU": 144,
+        "frame_refs": [
+          129
+        ],
+        "case": "reply-huge-DATA-length",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 9
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "PDU": 170,
+        "frame_refs": [
+          155
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 173,
+        "frame_refs": [
+          158
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      }
+    ],
+    "same_PDU_new_fault_and_other_decoded_streams": [
+      12,
+      15,
+      19,
+      24,
+      59,
+      70,
+      71,
+      72,
+      122,
+      131,
+      132,
+      144
+    ],
+    "first_fault_PDU_by_connection": {
+      "0": 12,
+      "1": 59,
+      "2": 122
+    },
+    "complete_peer_application_frames": 90,
+    "wire_observations_checked": true,
+    "wire_observation_counts": {
+      "buffered-range": 39,
+      "retransmission": 54
+    },
+    "wire_observations": [
+      {
+        "PDU": 61,
+        "frame": 51,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1354,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 62,
+        "frame": 52,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 2521,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 64,
+        "frame": 54,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 4855,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 65,
+        "frame": 55,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 6022,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 66,
+        "frame": 56,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 7189,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 69,
+        "frame": 59,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1348,
+        "bytes": 6,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 73,
+        "frame": 63,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 8356,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 74,
+        "frame": 64,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 9515,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 76,
+        "frame": 66,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 4506,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 83,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 48,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 52,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 825,
+        "bytes": 518,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 78,
+        "frame": 68,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1343,
+        "bytes": 5,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 16,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 0,
+        "offset": 0,
+        "bytes": 22,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 12,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 8,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 4,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 79,
+        "frame": 69,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 5673,
+        "bytes": 1049,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 80,
+        "frame": 70,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 6722,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 83,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 48,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 52,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 81,
+        "frame": 71,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 825,
+        "bytes": 523,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 85,
+        "frame": 75,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 3339,
+        "bytes": 1167,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 86,
+        "frame": 76,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 10682,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 88,
+        "frame": 78,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 13008,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 89,
+        "frame": 79,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 14169,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 90,
+        "frame": 80,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 10217,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 92,
+        "frame": 82,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 4847,
+        "bytes": 8,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 93,
+        "frame": 83,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 15336,
+        "bytes": 612,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 94,
+        "frame": 84,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 12543,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 95,
+        "frame": 85,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 13702,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 97,
+        "frame": 87,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 13000,
+        "bytes": 8,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 98,
+        "frame": 88,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 9050,
+        "bytes": 224,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 99,
+        "frame": 89,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 15948,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 100,
+        "frame": 90,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 17109,
+        "bytes": 969,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 107,
+        "frame": 97,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 12343,
+        "bytes": 657,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 109,
+        "frame": 99,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 9274,
+        "bytes": 69,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 110,
+        "frame": 100,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 9274,
+        "bytes": 943,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 111,
+        "frame": 101,
+        "connection": "1",
+        "direction": 1,
+        "stream": 44,
+        "offset": 9343,
+        "bytes": 874,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 125,
+        "frame": 110,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1360,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 126,
+        "frame": 111,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 2521,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 127,
+        "frame": 112,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 4855,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 128,
+        "frame": 113,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 6022,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 129,
+        "frame": 114,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 7189,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 133,
+        "frame": 118,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1354,
+        "bytes": 6,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 134,
+        "frame": 119,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 2182,
+        "bytes": 1158,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 135,
+        "frame": 120,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 3340,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 136,
+        "frame": 121,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 4507,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 6831,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 141,
+        "frame": 126,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 7998,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 83,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 48,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 52,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 146,
+        "frame": 131,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 831,
+        "bytes": 523,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 83,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 48,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 52,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 147,
+        "frame": 132,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 831,
+        "bytes": 523,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 150,
+        "frame": 135,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 5674,
+        "bytes": 1157,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 151,
+        "frame": 136,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 11341,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 152,
+        "frame": 137,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 11493,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 154,
+        "frame": 139,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 13819,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 159,
+        "frame": 144,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 10332,
+        "bytes": 1161,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 163,
+        "frame": 148,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 15140,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 164,
+        "frame": 149,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 14986,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 165,
+        "frame": 150,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 16147,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 166,
+        "frame": 151,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 16301,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 168,
+        "frame": 153,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 17314,
+        "bytes": 707,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 171,
+        "frame": 156,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 14826,
+        "bytes": 314,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 172,
+        "frame": 157,
+        "connection": "2",
+        "direction": 1,
+        "stream": 44,
+        "offset": 13818,
+        "bytes": 1,
+        "kind": "retransmission"
+      }
+    ],
+    "raw_STREAM_occurrences": 247,
+    "raw_reference_application_views": {
+      "4": 6,
+      "1": 115,
+      "0": 17
+    },
+    "raw_reference_expert_messages": {
+      "Unknown QUIC connection. Missing Initial Packet or migrated connection?": 2,
+      "This legacy_version field MUST be ignored. The supported_versions extension is present and MUST be used instead.": 6,
+      "(Random) padding data appended to the datagram": 6
+    },
+    "network": {
+      "delayed": 17,
+      "dropped": 8
+    },
+    "native_selected_differences": [],
+    "capture_sha256": "d1437772e6a8d3b5512ba920494e6e02fc758c9f308cacfeb39bbc7904a943d2",
+    "reference_sha256": "45043027e1639aad772a64b6598a722afc55a5052542b203b01b57693da97aad",
+    "events_sha256": "20e69f9ac4ebde983bf272b2cfc7a2386b22063f2a85be032bfe2179b92ba860"
+  },
+  "prior_12_scenario_capture": {
+    "scope": "Independently audit clean-FIN frame faults, complete frames and connection scope.\nThe reference QUIC STREAM bytes and actual raw-peer receipts determine wire\nlayout; reference application/expert views remain separate, without normalizing\ncounts or treating absent reference diagnostics as a conformity certificate.\n",
+    "checks": 34653,
+    "physical_frames": 161,
+    "connections": 3,
+    "operations": 36,
+    "directions": 72,
+    "direction_verdicts": {
+      "base": 42,
+      "frame-error": 30
+    },
+    "faults": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 38,
+        "frame_refs": [
+          33
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 48,
+        "frame_refs": [
+          43
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 106,
+        "frame_refs": [
+          96
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 109,
+        "frame_refs": [
+          99
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 169,
+        "frame_refs": [
+          154
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 175,
+        "frame_refs": [
+          160
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      }
+    ],
+    "same_PDU_new_fault_and_other_decoded_streams": [
+      12,
+      19,
+      58,
+      68,
+      122,
+      134
+    ],
+    "first_fault_PDU_by_connection": {
+      "0": 12,
+      "1": 58,
+      "2": 122
+    },
+    "complete_peer_application_frames": 78,
+    "wire_observations_checked": true,
+    "wire_observation_counts": {
+      "buffered-range": 39,
+      "retransmission": 46
+    },
+    "wire_observations": [
+      {
+        "PDU": 61,
+        "frame": 51,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1525,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 62,
+        "frame": 52,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 2686,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 63,
+        "frame": 53,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 5020,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 64,
+        "frame": 54,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 6187,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 65,
+        "frame": 55,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 7354,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 69,
+        "frame": 59,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1519,
+        "bytes": 6,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 70,
+        "frame": 60,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 2233,
+        "bytes": 1158,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 71,
+        "frame": 61,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 3391,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 72,
+        "frame": 62,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 4558,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 76,
+        "frame": 66,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 6882,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 77,
+        "frame": 67,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 8049,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 82,
+        "frame": 72,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 831,
+        "bytes": 688,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 83,
+        "frame": 73,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 831,
+        "bytes": 688,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 86,
+        "frame": 76,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 5725,
+        "bytes": 1157,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 87,
+        "frame": 77,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 11506,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 88,
+        "frame": 78,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 11544,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 90,
+        "frame": 80,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 13870,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 95,
+        "frame": 85,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 10383,
+        "bytes": 1161,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 99,
+        "frame": 89,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 15305,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 100,
+        "frame": 90,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 15037,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 101,
+        "frame": 91,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 16198,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 102,
+        "frame": 92,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 16466,
+        "bytes": 1165,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 104,
+        "frame": 94,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 17365,
+        "bytes": 656,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 107,
+        "frame": 97,
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "offset": 14991,
+        "bytes": 314,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 108,
+        "frame": 98,
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "offset": 13869,
+        "bytes": 1,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 124,
+        "frame": 109,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1519,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 125,
+        "frame": 110,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 2686,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 127,
+        "frame": 112,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 5020,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 128,
+        "frame": 113,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 6187,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 129,
+        "frame": 114,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 7354,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 132,
+        "frame": 117,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1513,
+        "bytes": 6,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 136,
+        "frame": 121,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 8521,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 137,
+        "frame": 122,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 9680,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 139,
+        "frame": 124,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 4557,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 140,
+        "frame": 125,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 825,
+        "bytes": 683,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 141,
+        "frame": 126,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 1508,
+        "bytes": 5,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 0,
+        "offset": 0,
+        "bytes": 22,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 12,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 8,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 4,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 16,
+        "offset": 0,
+        "bytes": 17,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 142,
+        "frame": 127,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 5724,
+        "bytes": 1049,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 143,
+        "frame": 128,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 6773,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 40,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 36,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 32,
+        "offset": 0,
+        "bytes": 74,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 44,
+        "offset": 0,
+        "bytes": 79,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 144,
+        "frame": 129,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 825,
+        "bytes": 688,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 148,
+        "frame": 133,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 3390,
+        "bytes": 1167,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 149,
+        "frame": 134,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 10847,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 151,
+        "frame": 136,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 13173,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 152,
+        "frame": 137,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 14334,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 153,
+        "frame": 138,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 10268,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 155,
+        "frame": 140,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 5012,
+        "bytes": 8,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 156,
+        "frame": 141,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 15501,
+        "bytes": 612,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 157,
+        "frame": 142,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 12594,
+        "bytes": 1159,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 158,
+        "frame": 143,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 13753,
+        "bytes": 1167,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 160,
+        "frame": 145,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 13165,
+        "bytes": 8,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 161,
+        "frame": 146,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 9101,
+        "bytes": 224,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 162,
+        "frame": 147,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 16113,
+        "bytes": 1161,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 163,
+        "frame": 148,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 17274,
+        "bytes": 804,
+        "kind": "buffered-range"
+      },
+      {
+        "PDU": 170,
+        "frame": 155,
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "offset": 12673,
+        "bytes": 492,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 172,
+        "frame": 157,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 9325,
+        "bytes": 69,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 173,
+        "frame": 158,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 9325,
+        "bytes": 943,
+        "kind": "retransmission"
+      },
+      {
+        "PDU": 174,
+        "frame": 159,
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "offset": 9394,
+        "bytes": 874,
+        "kind": "retransmission"
+      }
+    ],
+    "raw_STREAM_occurrences": 227,
+    "raw_reference_application_views": {
+      "4": 6,
+      "1": 95,
+      "0": 17
+    },
+    "raw_reference_expert_messages": {
+      "Unknown QUIC connection. Missing Initial Packet or migrated connection?": 2,
+      "This legacy_version field MUST be ignored. The supported_versions extension is present and MUST be used instead.": 6,
+      "(Random) padding data appended to the datagram": 6
+    },
+    "network": {
+      "delayed": 17,
+      "dropped": 8
+    },
+    "native_selected_differences": [],
+    "capture_sha256": "ce66fabf700784ca19e55498c944145323e3bb1803bb9e672e0ffedd056d7384",
+    "reference_sha256": "f009ff2e1ea4d01f149ca8cd721d30e2cd2f18bcecfac5ec4c3efec140428d10",
+    "events_sha256": "2a98ab5e34a391d4389d73cdd05183fffd78bbe1ae92c9a2461a7b506b3341d1"
+  },
+  "corruption_controls": {
+    "controls": 33,
+    "results": [
+      {
+        "corruption": "code",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "scope",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "fault-PDU",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "direction",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "offset",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "component",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "partial-bytes",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "partial-digest",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-parent",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-domain",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-hole",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "sticky-erased",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "sticky-generation",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "field-alias",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "protocol",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "NeedMore",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-FIN",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "missing-frame",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "duplicate-frame",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "request-association",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-root-stream",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-marker-erased",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-marker-class",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-root-class",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-only-flag",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-alias",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-protocol",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-new-data",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-new-stream",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-replay",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "raw-STREAM-duplicate",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "QUIC-auth-alias",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "summary-stream",
+        "detected": "rejected"
+      }
+    ]
+  },
+  "new_capture_before": {
+    "events": 176,
+    "protocol_status_expert": [
+      {
+        "protocol": "",
+        "status": "unrecognized",
+        "expert": "ProtocolNotRecognized",
+        "events": 2
+      },
+      {
+        "protocol": "quic",
+        "status": "decoded",
+        "expert": "",
+        "events": 34
+      },
+      {
+        "protocol": "quic",
+        "status": "malformed",
+        "expert": "MalformedMessage",
+        "events": 6
+      },
+      {
+        "protocol": "http3",
+        "status": "decoded",
+        "expert": "",
+        "events": 6
+      },
+      {
+        "protocol": "http3",
+        "status": "malformed",
+        "expert": "MalformedMessage",
+        "events": 3
+      },
+      {
+        "protocol": "quic",
+        "status": "limited",
+        "expert": "ResourceExceeded",
+        "events": 3
+      },
+      {
+        "protocol": "quic",
+        "status": "context-required",
+        "expert": "ContextRequired",
+        "events": 122
+      }
+    ],
+    "logical_frames": {
+      "SETTINGS": 6,
+      "HEADERS": 30,
+      "DATA": 6
+    }
+  },
+  "new_capture_after": {
+    "events": 176,
+    "protocol_status_expert": [
+      {
+        "protocol": "",
+        "status": "unrecognized",
+        "expert": "ProtocolNotRecognized",
+        "events": 2
+      },
+      {
+        "protocol": "quic",
+        "status": "decoded",
+        "expert": "",
+        "events": 35
+      },
+      {
+        "protocol": "quic",
+        "status": "malformed",
+        "expert": "MalformedMessage",
+        "events": 6
+      },
+      {
+        "protocol": "http3",
+        "status": "decoded",
+        "expert": "",
+        "events": 115
+      },
+      {
+        "protocol": "http3",
+        "status": "malformed",
+        "expert": "MalformedMessage",
+        "events": 18
+      }
+    ],
+    "logical_frames": {
+      "SETTINGS": 6,
+      "HEADERS": 78,
+      "DATA": 12
+    }
+  },
+  "previous_capture_export_invariants": {
+    "prior161": {
+      "SDK": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "SDK",
+        "checks": 1443,
+        "records": 176,
+        "changed_records": 133,
+        "refined_PDUs": 55,
+        "added_authentication_aliases": 78,
+        "before_protocol_counts": {
+          "": 2,
+          "quic": 96,
+          "http3": 78
+        },
+        "after_protocol_counts": {
+          "": 2,
+          "quic": 41,
+          "http3": 133
+        },
+        "before_sha256": "33c3a9c413109fa3f87a82ef9eb2de173bdf66b308d3550df938ce8930b5feb2",
+        "after_sha256": "2a98ab5e34a391d4389d73cdd05183fffd78bbe1ae92c9a2461a7b506b3341d1",
+        "other_export_differences": []
+      },
+      "CLI": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "CLI",
+        "checks": 1656,
+        "records": 161,
+        "changed_records": 133,
+        "refined_PDUs": 55,
+        "added_authentication_aliases": 78,
+        "before_protocol_counts": {
+          "UDP": 2,
+          "QUIC": 81,
+          "HTTP/3": 78
+        },
+        "after_protocol_counts": {
+          "UDP": 2,
+          "QUIC": 26,
+          "HTTP/3": 133
+        },
+        "before_sha256": "2213672330d41fdf55da8560f6a32f70b7b513e854042e41293ab6f84b07b7ac",
+        "after_sha256": "b0147eb28a5d726d4359578c1bb2c8abb9be34c6ced99d11147497a924f633a4",
+        "other_export_differences": []
+      }
+    },
+    "body188": {
+      "SDK": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "SDK",
+        "checks": 1301,
+        "records": 203,
+        "changed_records": 118,
+        "refined_PDUs": 42,
+        "added_authentication_aliases": 76,
+        "before_protocol_counts": {
+          "": 3,
+          "quic": 124,
+          "http3": 76
+        },
+        "after_protocol_counts": {
+          "": 3,
+          "quic": 82,
+          "http3": 118
+        },
+        "before_sha256": "96d6ba5655a94781214966b8debe5e41a3b83f4e03fd179ad2d17cc54ea49642",
+        "after_sha256": "e085913fe0ca48ca831e60680a39f01bb18c1e80f7e6694c50e0a2f979707820",
+        "other_export_differences": []
+      },
+      "CLI": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "CLI",
+        "checks": 1536,
+        "records": 188,
+        "changed_records": 118,
+        "refined_PDUs": 42,
+        "added_authentication_aliases": 76,
+        "before_protocol_counts": {
+          "UDP": 3,
+          "QUIC": 109,
+          "HTTP/3": 76
+        },
+        "after_protocol_counts": {
+          "UDP": 3,
+          "QUIC": 67,
+          "HTTP/3": 118
+        },
+        "before_sha256": "0ec574d757ba0f46a591e9f325c52353eb840788194ab7397bfa7e5575ee8ac7",
+        "after_sha256": "4b49780aa80acfb70140ee5e91d87f6375bb8c8c9609b0d1e906b236b9b524b2",
+        "other_export_differences": []
+      }
+    },
+    "fresh747": {
+      "SDK": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "SDK",
+        "checks": 1913,
+        "records": 636,
+        "changed_records": 151,
+        "refined_PDUs": 23,
+        "added_authentication_aliases": 128,
+        "before_protocol_counts": {
+          "http": 26,
+          "tls": 239,
+          "http2": 52,
+          "grpc": 32,
+          "dns": 12,
+          "quic": 145,
+          "http3": 128,
+          "redis": 2
+        },
+        "after_protocol_counts": {
+          "http": 26,
+          "tls": 239,
+          "http2": 52,
+          "grpc": 32,
+          "dns": 12,
+          "quic": 122,
+          "http3": 151,
+          "redis": 2
+        },
+        "before_sha256": "b1500ce1da2b3d02b4da9820385b7529ff0a94faf3fe76f4dce58345c5d76380",
+        "after_sha256": "c9e7e5f15cc64425cebab16964958d2096f68a31e7e1eb4491b6bb2be85ad8c3",
+        "other_export_differences": []
+      },
+      "CLI": {
+        "scope": "Compare complete exports while checking the bounded HTTP3 wire-only changes.\nNo raw bytes, stream reassembly, application frame, source, body counter or\nassociation may change. This complements the independent reference wire audit;\nit does not itself establish application identity from the public snapshot.\n",
+        "kind": "CLI",
+        "checks": 2351,
+        "records": 747,
+        "changed_records": 151,
+        "refined_PDUs": 23,
+        "added_authentication_aliases": 128,
+        "before_protocol_counts": {
+          "TCP": 265,
+          "HTTP/1.1": 26,
+          "TLS": 6,
+          "TLSv1.2": 57,
+          "TLSv1.3": 62,
+          "HTTP/2": 30,
+          "gRPC": 27,
+          "DNS": 12,
+          "QUIC": 132,
+          "HTTP/3": 128,
+          "Redis": 2
+        },
+        "after_protocol_counts": {
+          "TCP": 265,
+          "HTTP/1.1": 26,
+          "TLS": 6,
+          "TLSv1.2": 57,
+          "TLSv1.3": 62,
+          "HTTP/2": 30,
+          "gRPC": 27,
+          "DNS": 12,
+          "QUIC": 109,
+          "HTTP/3": 151,
+          "Redis": 2
+        },
+        "before_sha256": "46c1922a819fb83dd2fd23d83b8c2dcf89fd476d1c9b9eae6f0ceb18e7a2c081",
+        "after_sha256": "dfb76962b117cbda8d57ee79c3e3196c945eea41dcaa0514439b1e03b9909424",
+        "other_export_differences": []
+      }
+    }
+  },
+  "previous_body_reference_audit": {
+    "scope": "Literal capture, peer receipt and reference-STREAM audit of HTTP3 body controls.\nAll declared directions are checked. Rejected-message unparsed frame tails remain\nexplicit differences; they are not substituted with native labels or zero counts.\n",
+    "checks": 44497,
+    "connections": 3,
+    "operations": 84,
+    "checked_directions": 168,
+    "direction_verdicts": {
+      "base": 117,
+      "malformed": 51
+    },
+    "native_selected_differences": [],
+    "native_unparsed_rejected_message_tail_frames": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      }
+    ],
+    "raw_reference_HTTP3_views": {
+      "4": 6,
+      "1": 202,
+      "0": 173,
+      "13921": 2
+    },
+    "reference_midframe_views": [
+      {
+        "physical_frame": 80,
+        "connection": "1",
+        "direction": 0,
+        "stream": 104,
+        "raw_type": 13921,
+        "raw_length": 11369,
+        "raw_header_hex": "76616c69",
+        "peer_stream_offset": 69,
+        "actual_enclosing_type": 1,
+        "actual_enclosing_offset": 0,
+        "actual_frame_end": 96,
+        "scope": "raw reference view retained; independently received stream locates it inside HEADERS, not at an application-frame boundary"
+      },
+      {
+        "physical_frame": 147,
+        "connection": "2",
+        "direction": 0,
+        "stream": 104,
+        "raw_type": 13921,
+        "raw_length": 11369,
+        "raw_header_hex": "76616c69",
+        "peer_stream_offset": 69,
+        "actual_enclosing_type": 1,
+        "actual_enclosing_offset": 0,
+        "actual_frame_end": 96,
+        "scope": "raw reference view retained; independently received stream locates it inside HEADERS, not at an application-frame boundary"
+      }
+    ],
+    "native_selected_app_frames": 321,
+    "native_selected_app_types": {
+      "4": 6,
+      "1": 174,
+      "0": 141
+    },
+    "nonapplication_QUIC_diagnostics": [
+      {
+        "PDU": 5,
+        "status": "malformed",
+        "frames": [
+          4
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 8,
+        "status": "malformed",
+        "frames": [
+          5
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 378,
+        "raw_tail_sha256": "8d8c294831ae2b1dd67f6a4903ae6eb38cdaede56707bf6508e70b1e4acbb43e",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 61,
+        "status": "malformed",
+        "frames": [
+          55
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 64,
+        "status": "malformed",
+        "frames": [
+          56
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 379,
+        "raw_tail_sha256": "2eb01848e9217256a0a1af528eb4b2d6d89a1f77c97a8aa2b8fb98a66b2f0e6f",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 133,
+        "status": "malformed",
+        "frames": [
+          122
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 136,
+        "status": "malformed",
+        "frames": [
+          123
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 377,
+        "raw_tail_sha256": "43c2ae1019ad57912662c9bd170d8d6986299bad4ec76811e70c98c4a1ffe3b6",
+        "admission": "unparsed-datagram-remainder",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      }
+    ],
+    "network": {
+      "delayed": 20,
+      "dropped": 8
+    },
+    "completed_body_summaries": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 4,
+        "case": "request-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 8,
+        "case": "request-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 12,
+        "case": "request-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 16,
+        "case": "request-huge-decimal",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 36,
+        "case": "response-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 40,
+        "case": "response-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 44,
+        "case": "response-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 52,
+        "case": "HEAD-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 60,
+        "case": "304-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 68,
+        "case": "204-forbidden-length-zero",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 72,
+        "case": "204-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 76,
+        "case": "103-FIN-without-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 80,
+        "case": "103-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 88,
+        "case": "CONNECT-success-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 13,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 100,
+        "case": "length-in-trailers",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 4,
+        "case": "request-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 8,
+        "case": "request-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 12,
+        "case": "request-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 16,
+        "case": "request-huge-decimal",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 36,
+        "case": "response-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 40,
+        "case": "response-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 44,
+        "case": "response-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 52,
+        "case": "HEAD-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 60,
+        "case": "304-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 68,
+        "case": "204-forbidden-length-zero",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 72,
+        "case": "204-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 76,
+        "case": "103-FIN-without-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 80,
+        "case": "103-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 88,
+        "case": "CONNECT-success-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 13,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 100,
+        "case": "length-in-trailers",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 0,
+        "case": "request-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 4,
+        "case": "request-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 8,
+        "case": "request-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 12,
+        "case": "request-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 16,
+        "case": "request-huge-decimal",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 20,
+        "case": "request-equivalent-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 32,
+        "case": "response-exact",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 36,
+        "case": "response-short-at-FIN",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 40,
+        "case": "response-overrun",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 44,
+        "case": "response-zero-with-data",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 48,
+        "case": "HEAD-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 52,
+        "case": "HEAD-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 56,
+        "case": "304-representation-length",
+        "data_bytes": 0,
+        "declared_length": "17",
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 60,
+        "case": "304-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 64,
+        "case": "204-empty",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "exempt-no-content"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 68,
+        "case": "204-forbidden-length-zero",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 72,
+        "case": "204-with-content",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 76,
+        "case": "103-FIN-without-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 80,
+        "case": "103-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 84,
+        "case": "103-then-final",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 88,
+        "case": "CONNECT-success-forbidden-length",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 92,
+        "case": "CONNECT-tunnel",
+        "data_bytes": 13,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "CONNECT-stream; tunnel bytes are not HTTP content length"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 96,
+        "case": "CONNECT-rejection-body",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 100,
+        "case": "length-in-trailers",
+        "data_bytes": 0,
+        "declared_length": null,
+        "length_check": "not-declared"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 104,
+        "case": "large-body",
+        "data_bytes": 18000,
+        "declared_length": "18000",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 108,
+        "case": "valid-after-errors",
+        "data_bytes": 4,
+        "declared_length": "4",
+        "length_check": "matched"
+      }
+    ],
+    "capture_sha256": "19ff0cd330c991d0234dc2ca404dd6a0b44e2287b45d0d50e1572258b8af4071",
+    "events_sha256": "e085913fe0ca48ca831e60680a39f01bb18c1e80f7e6694c50e0a2f979707820",
+    "reference_sha256": "47c4e0b0b8297ff03aaa02775eaf2ddc50134ff4df5c5395c6fc8c4abe7429a6",
+    "reference_view_classification": {
+      "unique_exact_peer_frame_views": 323,
+      "repeated_extra_views": 58,
+      "repeated_extra_types": {
+        "1": 30,
+        "0": 28
+      },
+      "repeated_views": [
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 48,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 48,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 52,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 52,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 56,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 56,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 60,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 60,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 64,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 64,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 68,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 68,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 72,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 72,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 76,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 76,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 80,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 80,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 84,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 84,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 88,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 88,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 92,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 92,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 96,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 96,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 100,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 100,
+          "offset": 92,
+          "type": 0,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 100,
+          "offset": 98,
+          "type": 1,
+          "frames": [
+            73,
+            75
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 48,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 48,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 52,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 52,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 56,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 56,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 60,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 60,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 64,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 64,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 68,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 68,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 72,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 72,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 76,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 76,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 80,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 80,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 84,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 84,
+          "offset": 74,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 88,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 88,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 92,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 92,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 96,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 96,
+          "offset": 49,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 100,
+          "offset": 0,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 100,
+          "offset": 92,
+          "type": 0,
+          "frames": [
+            140,
+            142
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 100,
+          "offset": 98,
+          "type": 1,
+          "frames": [
+            140,
+            142
+          ]
+        }
+      ],
+      "missing_deep_reference_views": [
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 104,
+          "offset": 0,
+          "type": 1,
+          "payload_bytes": 93,
+          "sha256": "d10191be7ba1d7a2c9aad717875ae3f87819d28152fc14289e40e34a4ff8e7d2"
+        },
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 104,
+          "offset": 96,
+          "type": 0,
+          "payload_bytes": 18000,
+          "sha256": "ec2cbccfd78c30b4aedadacb9e6126650f80d11578e096e980a7472079ab733d"
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 104,
+          "offset": 0,
+          "type": 1,
+          "payload_bytes": 93,
+          "sha256": "d10191be7ba1d7a2c9aad717875ae3f87819d28152fc14289e40e34a4ff8e7d2"
+        },
+        {
+          "connection": "2",
+          "direction": 0,
+          "stream": 104,
+          "offset": 96,
+          "type": 0,
+          "payload_bytes": 18000,
+          "sha256": "ec2cbccfd78c30b4aedadacb9e6126650f80d11578e096e980a7472079ab733d"
+        }
+      ],
+      "unmatched_raw_views": [
+        {
+          "physical_frame": 80,
+          "connection": "1",
+          "direction": 0,
+          "stream": 104,
+          "type": 13921,
+          "length": 11369,
+          "sha256": "d70efd46758a29d1f61294741c52185cc7a639181251c957c75394f4699a34bc"
+        },
+        {
+          "physical_frame": 147,
+          "connection": "2",
+          "direction": 0,
+          "stream": 104,
+          "type": 13921,
+          "length": 11369,
+          "sha256": "d70efd46758a29d1f61294741c52185cc7a639181251c957c75394f4699a34bc"
+        }
+      ],
+      "scope": "raw counts preserved; exact complete frame bytes bound to connection/direction/stream/position; missing deep application views do not mean missing QUIC STREAM bytes"
+    }
+  },
+  "previous_747_source_reference_audit": {
+    "scope": "Independently verify native HTTP/3 byte witnesses against reference STREAMs.\nScope: owned, single-UDP-view capture; complete bidi HTTP streams and uni control\nstreams. Encoder/decoder instruction semantics and peer identity are not certified.\n",
+    "capture_sha256": "be3ba23140b3df81252f3b0a4d450b99007051626f86c8d1f33e3060a9ffbab7",
+    "checks": 24736,
+    "connections": 3,
+    "reference_coalesced_bindings": 13,
+    "reference_expert_only_blocks": 0,
+    "application_frames": 57,
+    "types": {
+      "4": 6,
+      "1": 24,
+      "0": 27
+    },
+    "source_ranges": 406,
+    "unselected_instruction_streams": [],
+    "selected_differences": [],
+    "frames": [
+      {
+        "completed_physical_frame": 464,
+        "parent_PDU": 351,
+        "stream_id": 3,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 2,
+        "source_PDUs": [
+          351
+        ],
+        "physical_source_packets": [
+          464
+        ]
+      },
+      {
+        "completed_physical_frame": 467,
+        "parent_PDU": 356,
+        "stream_id": 2,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 0,
+        "source_PDUs": [
+          356
+        ],
+        "physical_source_packets": [
+          467
+        ]
+      },
+      {
+        "completed_physical_frame": 468,
+        "parent_PDU": 357,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 77,
+        "source_PDUs": [
+          357
+        ],
+        "physical_source_packets": [
+          468
+        ]
+      },
+      {
+        "completed_physical_frame": 468,
+        "parent_PDU": 357,
+        "stream_id": 0,
+        "stream_offset": 80,
+        "type": 0,
+        "payload_length": 16,
+        "source_PDUs": [
+          357
+        ],
+        "physical_source_packets": [
+          468
+        ]
+      },
+      {
+        "completed_physical_frame": 470,
+        "parent_PDU": 359,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 71,
+        "source_PDUs": [
+          359
+        ],
+        "physical_source_packets": [
+          470
+        ]
+      },
+      {
+        "completed_physical_frame": 470,
+        "parent_PDU": 359,
+        "stream_id": 0,
+        "stream_offset": 74,
+        "type": 0,
+        "payload_length": 56,
+        "source_PDUs": [
+          359
+        ],
+        "physical_source_packets": [
+          470
+        ]
+      },
+      {
+        "completed_physical_frame": 473,
+        "parent_PDU": 362,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          362
+        ],
+        "physical_source_packets": [
+          473
+        ]
+      },
+      {
+        "completed_physical_frame": 476,
+        "parent_PDU": 365,
+        "stream_id": 4,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 2896,
+        "source_PDUs": [
+          362,
+          363,
+          364,
+          365
+        ],
+        "physical_source_packets": [
+          473,
+          474,
+          475,
+          476
+        ]
+      },
+      {
+        "completed_physical_frame": 478,
+        "parent_PDU": 367,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 72,
+        "source_PDUs": [
+          367
+        ],
+        "physical_source_packets": [
+          478
+        ]
+      },
+      {
+        "completed_physical_frame": 481,
+        "parent_PDU": 370,
+        "stream_id": 4,
+        "stream_offset": 75,
+        "type": 0,
+        "payload_length": 2936,
+        "source_PDUs": [
+          367,
+          368,
+          369,
+          370
+        ],
+        "physical_source_packets": [
+          478,
+          479,
+          480,
+          481
+        ]
+      },
+      {
+        "completed_physical_frame": 485,
+        "parent_PDU": 374,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          374
+        ],
+        "physical_source_packets": [
+          485
+        ]
+      },
+      {
+        "completed_physical_frame": 492,
+        "parent_PDU": 381,
+        "stream_id": 8,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 5776,
+        "source_PDUs": [
+          375,
+          376,
+          378,
+          379,
+          380,
+          381
+        ],
+        "physical_source_packets": [
+          486,
+          487,
+          489,
+          490,
+          491,
+          492
+        ]
+      },
+      {
+        "completed_physical_frame": 496,
+        "parent_PDU": 385,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          385
+        ],
+        "physical_source_packets": [
+          496
+        ]
+      },
+      {
+        "completed_physical_frame": 503,
+        "parent_PDU": 392,
+        "stream_id": 8,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 5816,
+        "source_PDUs": [
+          385,
+          386,
+          388,
+          389,
+          390,
+          392
+        ],
+        "physical_source_packets": [
+          496,
+          497,
+          499,
+          500,
+          501,
+          503
+        ]
+      },
+      {
+        "completed_physical_frame": 507,
+        "parent_PDU": 396,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          396
+        ],
+        "physical_source_packets": [
+          507
+        ]
+      },
+      {
+        "completed_physical_frame": 516,
+        "parent_PDU": 405,
+        "stream_id": 12,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 8192,
+        "source_PDUs": [
+          398,
+          399,
+          400,
+          401,
+          402,
+          403,
+          404,
+          405
+        ],
+        "physical_source_packets": [
+          509,
+          510,
+          511,
+          512,
+          513,
+          514,
+          515,
+          516
+        ]
+      },
+      {
+        "completed_physical_frame": 517,
+        "parent_PDU": 406,
+        "stream_id": 12,
+        "stream_offset": 8276,
+        "type": 0,
+        "payload_length": 464,
+        "source_PDUs": [
+          406
+        ],
+        "physical_source_packets": [
+          517
+        ]
+      },
+      {
+        "completed_physical_frame": 520,
+        "parent_PDU": 409,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          409
+        ],
+        "physical_source_packets": [
+          520
+        ]
+      },
+      {
+        "completed_physical_frame": 528,
+        "parent_PDU": 417,
+        "stream_id": 12,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 8696,
+        "source_PDUs": [
+          409,
+          410,
+          411,
+          413,
+          414,
+          415,
+          416,
+          417
+        ],
+        "physical_source_packets": [
+          520,
+          521,
+          522,
+          524,
+          525,
+          526,
+          527,
+          528
+        ]
+      },
+      {
+        "completed_physical_frame": 537,
+        "parent_PDU": 428,
+        "stream_id": 3,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 2,
+        "source_PDUs": [
+          428
+        ],
+        "physical_source_packets": [
+          537
+        ]
+      },
+      {
+        "completed_physical_frame": 541,
+        "parent_PDU": 434,
+        "stream_id": 2,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 0,
+        "source_PDUs": [
+          434
+        ],
+        "physical_source_packets": [
+          541
+        ]
+      },
+      {
+        "completed_physical_frame": 542,
+        "parent_PDU": 435,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 77,
+        "source_PDUs": [
+          435
+        ],
+        "physical_source_packets": [
+          542
+        ]
+      },
+      {
+        "completed_physical_frame": 542,
+        "parent_PDU": 435,
+        "stream_id": 0,
+        "stream_offset": 80,
+        "type": 0,
+        "payload_length": 16,
+        "source_PDUs": [
+          435
+        ],
+        "physical_source_packets": [
+          542
+        ]
+      },
+      {
+        "completed_physical_frame": 547,
+        "parent_PDU": 440,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 71,
+        "source_PDUs": [
+          440
+        ],
+        "physical_source_packets": [
+          547
+        ]
+      },
+      {
+        "completed_physical_frame": 547,
+        "parent_PDU": 440,
+        "stream_id": 0,
+        "stream_offset": 74,
+        "type": 0,
+        "payload_length": 56,
+        "source_PDUs": [
+          440
+        ],
+        "physical_source_packets": [
+          547
+        ]
+      },
+      {
+        "completed_physical_frame": 549,
+        "parent_PDU": 442,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          442
+        ],
+        "physical_source_packets": [
+          549
+        ]
+      },
+      {
+        "completed_physical_frame": 553,
+        "parent_PDU": 446,
+        "stream_id": 4,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 2896,
+        "source_PDUs": [
+          443,
+          444,
+          445,
+          446
+        ],
+        "physical_source_packets": [
+          550,
+          551,
+          552,
+          553
+        ]
+      },
+      {
+        "completed_physical_frame": 575,
+        "parent_PDU": 468,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 72,
+        "source_PDUs": [
+          468
+        ],
+        "physical_source_packets": [
+          575
+        ]
+      },
+      {
+        "completed_physical_frame": 575,
+        "parent_PDU": 468,
+        "stream_id": 4,
+        "stream_offset": 75,
+        "type": 0,
+        "payload_length": 2936,
+        "source_PDUs": [
+          457,
+          458,
+          459,
+          468
+        ],
+        "physical_source_packets": [
+          564,
+          565,
+          566,
+          575
+        ]
+      },
+      {
+        "completed_physical_frame": 578,
+        "parent_PDU": 471,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          471
+        ],
+        "physical_source_packets": [
+          578
+        ]
+      },
+      {
+        "completed_physical_frame": 584,
+        "parent_PDU": 477,
+        "stream_id": 8,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 5776,
+        "source_PDUs": [
+          471,
+          472,
+          473,
+          475,
+          476,
+          477
+        ],
+        "physical_source_packets": [
+          578,
+          579,
+          580,
+          582,
+          583,
+          584
+        ]
+      },
+      {
+        "completed_physical_frame": 598,
+        "parent_PDU": 491,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          491
+        ],
+        "physical_source_packets": [
+          598
+        ]
+      },
+      {
+        "completed_physical_frame": 607,
+        "parent_PDU": 500,
+        "stream_id": 8,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 5816,
+        "source_PDUs": [
+          491,
+          492,
+          494,
+          495,
+          496,
+          500
+        ],
+        "physical_source_packets": [
+          598,
+          599,
+          601,
+          602,
+          603,
+          607
+        ]
+      },
+      {
+        "completed_physical_frame": 608,
+        "parent_PDU": 501,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          501
+        ],
+        "physical_source_packets": [
+          608
+        ]
+      },
+      {
+        "completed_physical_frame": 618,
+        "parent_PDU": 511,
+        "stream_id": 12,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 8192,
+        "source_PDUs": [
+          502,
+          503,
+          504,
+          505,
+          506,
+          507,
+          511
+        ],
+        "physical_source_packets": [
+          609,
+          610,
+          611,
+          612,
+          613,
+          614,
+          618
+        ]
+      },
+      {
+        "completed_physical_frame": 619,
+        "parent_PDU": 512,
+        "stream_id": 12,
+        "stream_offset": 8276,
+        "type": 0,
+        "payload_length": 464,
+        "source_PDUs": [
+          511,
+          512
+        ],
+        "physical_source_packets": [
+          618,
+          619
+        ]
+      },
+      {
+        "completed_physical_frame": 634,
+        "parent_PDU": 527,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          527
+        ],
+        "physical_source_packets": [
+          634
+        ]
+      },
+      {
+        "completed_physical_frame": 637,
+        "parent_PDU": 530,
+        "stream_id": 12,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 8696,
+        "source_PDUs": [
+          518,
+          519,
+          521,
+          522,
+          523,
+          527,
+          528,
+          530
+        ],
+        "physical_source_packets": [
+          625,
+          626,
+          628,
+          629,
+          630,
+          634,
+          635,
+          637
+        ]
+      },
+      {
+        "completed_physical_frame": 650,
+        "parent_PDU": 545,
+        "stream_id": 3,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 2,
+        "source_PDUs": [
+          545
+        ],
+        "physical_source_packets": [
+          650
+        ]
+      },
+      {
+        "completed_physical_frame": 652,
+        "parent_PDU": 550,
+        "stream_id": 2,
+        "stream_offset": 1,
+        "type": 4,
+        "payload_length": 0,
+        "source_PDUs": [
+          550
+        ],
+        "physical_source_packets": [
+          652
+        ]
+      },
+      {
+        "completed_physical_frame": 654,
+        "parent_PDU": 552,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 77,
+        "source_PDUs": [
+          552
+        ],
+        "physical_source_packets": [
+          654
+        ]
+      },
+      {
+        "completed_physical_frame": 655,
+        "parent_PDU": 553,
+        "stream_id": 0,
+        "stream_offset": 80,
+        "type": 0,
+        "payload_length": 16,
+        "source_PDUs": [
+          553
+        ],
+        "physical_source_packets": [
+          655
+        ]
+      },
+      {
+        "completed_physical_frame": 657,
+        "parent_PDU": 555,
+        "stream_id": 0,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 71,
+        "source_PDUs": [
+          555
+        ],
+        "physical_source_packets": [
+          657
+        ]
+      },
+      {
+        "completed_physical_frame": 657,
+        "parent_PDU": 555,
+        "stream_id": 0,
+        "stream_offset": 74,
+        "type": 0,
+        "payload_length": 56,
+        "source_PDUs": [
+          555
+        ],
+        "physical_source_packets": [
+          657
+        ]
+      },
+      {
+        "completed_physical_frame": 659,
+        "parent_PDU": 557,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          557
+        ],
+        "physical_source_packets": [
+          659
+        ]
+      },
+      {
+        "completed_physical_frame": 664,
+        "parent_PDU": 562,
+        "stream_id": 4,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 2896,
+        "source_PDUs": [
+          559,
+          560,
+          561,
+          562
+        ],
+        "physical_source_packets": [
+          661,
+          662,
+          663,
+          664
+        ]
+      },
+      {
+        "completed_physical_frame": 668,
+        "parent_PDU": 566,
+        "stream_id": 4,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 72,
+        "source_PDUs": [
+          566
+        ],
+        "physical_source_packets": [
+          668
+        ]
+      },
+      {
+        "completed_physical_frame": 672,
+        "parent_PDU": 570,
+        "stream_id": 4,
+        "stream_offset": 75,
+        "type": 0,
+        "payload_length": 2936,
+        "source_PDUs": [
+          566,
+          567,
+          569,
+          570
+        ],
+        "physical_source_packets": [
+          668,
+          669,
+          671,
+          672
+        ]
+      },
+      {
+        "completed_physical_frame": 676,
+        "parent_PDU": 574,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          574
+        ],
+        "physical_source_packets": [
+          676
+        ]
+      },
+      {
+        "completed_physical_frame": 682,
+        "parent_PDU": 580,
+        "stream_id": 8,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 5776,
+        "source_PDUs": [
+          574,
+          576,
+          577,
+          578,
+          579,
+          580
+        ],
+        "physical_source_packets": [
+          676,
+          678,
+          679,
+          680,
+          681,
+          682
+        ]
+      },
+      {
+        "completed_physical_frame": 686,
+        "parent_PDU": 584,
+        "stream_id": 8,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          584
+        ],
+        "physical_source_packets": [
+          686
+        ]
+      },
+      {
+        "completed_physical_frame": 691,
+        "parent_PDU": 589,
+        "stream_id": 8,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 5816,
+        "source_PDUs": [
+          584,
+          585,
+          586,
+          587,
+          588,
+          589
+        ],
+        "physical_source_packets": [
+          686,
+          687,
+          688,
+          689,
+          690,
+          691
+        ]
+      },
+      {
+        "completed_physical_frame": 696,
+        "parent_PDU": 594,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 78,
+        "source_PDUs": [
+          594
+        ],
+        "physical_source_packets": [
+          696
+        ]
+      },
+      {
+        "completed_physical_frame": 703,
+        "parent_PDU": 601,
+        "stream_id": 12,
+        "stream_offset": 81,
+        "type": 0,
+        "payload_length": 8192,
+        "source_PDUs": [
+          594,
+          595,
+          596,
+          597,
+          598,
+          599,
+          600,
+          601
+        ],
+        "physical_source_packets": [
+          696,
+          697,
+          698,
+          699,
+          700,
+          701,
+          702,
+          703
+        ]
+      },
+      {
+        "completed_physical_frame": 704,
+        "parent_PDU": 602,
+        "stream_id": 12,
+        "stream_offset": 8276,
+        "type": 0,
+        "payload_length": 464,
+        "source_PDUs": [
+          602
+        ],
+        "physical_source_packets": [
+          704
+        ]
+      },
+      {
+        "completed_physical_frame": 707,
+        "parent_PDU": 605,
+        "stream_id": 12,
+        "stream_offset": 0,
+        "type": 1,
+        "payload_length": 67,
+        "source_PDUs": [
+          605
+        ],
+        "physical_source_packets": [
+          707
+        ]
+      },
+      {
+        "completed_physical_frame": 716,
+        "parent_PDU": 614,
+        "stream_id": 12,
+        "stream_offset": 70,
+        "type": 0,
+        "payload_length": 8696,
+        "source_PDUs": [
+          605,
+          606,
+          607,
+          608,
+          609,
+          611,
+          612,
+          614
+        ],
+        "physical_source_packets": [
+          707,
+          708,
+          709,
+          710,
+          711,
+          713,
+          714,
+          716
+        ]
+      }
+    ]
+  },
+  "previous_747_DATA_reference_audit": {
+    "oracle_sha256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06",
+    "events_sha256": "c9e7e5f15cc64425cebab16964958d2096f68a31e7e1eb4491b6bb2be85ad8c3",
+    "checks": 10398,
+    "QUIC_STREAM_views": 150,
+    "native_QUIC_STREAM_views": 150,
+    "identical_overlap_bytes": 8454,
+    "bidirectional_stream_directions": 24,
+    "connections": 3,
+    "reference_stream_reconstructed_DATA": 27,
+    "native_DATA": 27,
+    "selected_differences": [],
+    "streams": [
+      {
+        "connection": "0",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 0,
+        "bytes": 98,
+        "FIN_observed": true,
+        "contributing_frames": [
+          468
+        ],
+        "DATA": [
+          {
+            "frame_offset": 80,
+            "payload_offset": 82,
+            "length": 16,
+            "sha256": "81a2bb1896caa660ea949f8a759ecb364376c6ca8afd15328ecaa9f848ce2362"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 0,
+        "bytes": 132,
+        "FIN_observed": true,
+        "contributing_frames": [
+          470
+        ],
+        "DATA": [
+          {
+            "frame_offset": 74,
+            "payload_offset": 76,
+            "length": 56,
+            "sha256": "15ff5d4342a670adceef33bc9f4b36a77bc02c7faca990e5a5037312250aa552"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 4,
+        "bytes": 2980,
+        "FIN_observed": true,
+        "contributing_frames": [
+          473,
+          474,
+          475,
+          476
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 2896,
+            "sha256": "44a4962164b42cab9bdfaf37dd258775e686210224e4dc5d8220907f861be76b"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 4,
+        "bytes": 3014,
+        "FIN_observed": true,
+        "contributing_frames": [
+          478,
+          479,
+          480,
+          481,
+          482
+        ],
+        "DATA": [
+          {
+            "frame_offset": 75,
+            "payload_offset": 78,
+            "length": 2936,
+            "sha256": "2dae79807329d975e2476eadabd861945e0e8b6f5ea705e056c8e630cfdf82b7"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 8,
+        "bytes": 5860,
+        "FIN_observed": true,
+        "contributing_frames": [
+          485,
+          486,
+          487,
+          489,
+          490,
+          491,
+          492,
+          493
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 5776,
+            "sha256": "083c074901c75df1d74e37ebf036735bf35bf91740ea52ae0d180e83b7d5e5e6"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 8,
+        "bytes": 5889,
+        "FIN_observed": true,
+        "contributing_frames": [
+          496,
+          497,
+          499,
+          500,
+          501,
+          503,
+          504
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 5816,
+            "sha256": "79d89d9d8b3b31d1122df18230bf331d935e4b6c61bd425d588131919c790a45"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 12,
+        "bytes": 8743,
+        "FIN_observed": true,
+        "contributing_frames": [
+          507,
+          509,
+          510,
+          511,
+          512,
+          513,
+          514,
+          515,
+          516,
+          517
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 8192,
+            "sha256": "1fb35adb11b197535a58ebdbf549f58630fbecdb55440299dda7aa21f1ead4f4"
+          },
+          {
+            "frame_offset": 8276,
+            "payload_offset": 8279,
+            "length": 464,
+            "sha256": "1f0fac265571f62fd53c5f7b51479513fac3e34e039b62cbf2e60786670ab0f8"
+          }
+        ]
+      },
+      {
+        "connection": "0",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 12,
+        "bytes": 8769,
+        "FIN_observed": true,
+        "contributing_frames": [
+          520,
+          521,
+          522,
+          524,
+          525,
+          526,
+          527,
+          528,
+          529
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 8696,
+            "sha256": "e7c04cff3ac823211ce0cbe4bc02d8aaae22b08c6c1d84d1c77ffdf56ea31a3f"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 0,
+        "bytes": 98,
+        "FIN_observed": true,
+        "contributing_frames": [
+          542
+        ],
+        "DATA": [
+          {
+            "frame_offset": 80,
+            "payload_offset": 82,
+            "length": 16,
+            "sha256": "81a2bb1896caa660ea949f8a759ecb364376c6ca8afd15328ecaa9f848ce2362"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 0,
+        "bytes": 132,
+        "FIN_observed": true,
+        "contributing_frames": [
+          547
+        ],
+        "DATA": [
+          {
+            "frame_offset": 74,
+            "payload_offset": 76,
+            "length": 56,
+            "sha256": "00a85bf5fef6821cb8e30cf71df13e0a8a541dd35c7af2211572f2ae01634111"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 4,
+        "bytes": 2980,
+        "FIN_observed": true,
+        "contributing_frames": [
+          549,
+          550,
+          551,
+          552,
+          553,
+          554,
+          558,
+          559,
+          562
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 2896,
+            "sha256": "44a4962164b42cab9bdfaf37dd258775e686210224e4dc5d8220907f861be76b"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 4,
+        "bytes": 3014,
+        "FIN_observed": true,
+        "contributing_frames": [
+          564,
+          565,
+          566,
+          567,
+          575,
+          576,
+          590
+        ],
+        "DATA": [
+          {
+            "frame_offset": 75,
+            "payload_offset": 78,
+            "length": 2936,
+            "sha256": "b55319af7d971c5418c77ac3e3c6e376510687e6b9fbba2d7e5a164c87620046"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 8,
+        "bytes": 5860,
+        "FIN_observed": true,
+        "contributing_frames": [
+          578,
+          579,
+          580,
+          582,
+          583,
+          584,
+          585,
+          589,
+          592,
+          596
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 5776,
+            "sha256": "083c074901c75df1d74e37ebf036735bf35bf91740ea52ae0d180e83b7d5e5e6"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 8,
+        "bytes": 5889,
+        "FIN_observed": true,
+        "contributing_frames": [
+          598,
+          599,
+          601,
+          602,
+          603,
+          605,
+          607,
+          645
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 5816,
+            "sha256": "b04dd85c574aef8260bc606223055df467c6dd780abaeb8cb026b96fbc57cc4d"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 12,
+        "bytes": 8743,
+        "FIN_observed": true,
+        "contributing_frames": [
+          608,
+          609,
+          610,
+          611,
+          612,
+          613,
+          614,
+          618,
+          619,
+          620,
+          622,
+          623
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 8192,
+            "sha256": "1fb35adb11b197535a58ebdbf549f58630fbecdb55440299dda7aa21f1ead4f4"
+          },
+          {
+            "frame_offset": 8276,
+            "payload_offset": 8279,
+            "length": 464,
+            "sha256": "1f0fac265571f62fd53c5f7b51479513fac3e34e039b62cbf2e60786670ab0f8"
+          }
+        ]
+      },
+      {
+        "connection": "1",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 12,
+        "bytes": 8769,
+        "FIN_observed": true,
+        "contributing_frames": [
+          625,
+          626,
+          628,
+          629,
+          630,
+          632,
+          634,
+          635,
+          637,
+          642,
+          646
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 8696,
+            "sha256": "9faae17c7f2301e2f7e8886fa80883317c4f29d2365622b0ac87fb4b48e3ea8e"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 0,
+        "bytes": 98,
+        "FIN_observed": true,
+        "contributing_frames": [
+          654,
+          655
+        ],
+        "DATA": [
+          {
+            "frame_offset": 80,
+            "payload_offset": 82,
+            "length": 16,
+            "sha256": "81a2bb1896caa660ea949f8a759ecb364376c6ca8afd15328ecaa9f848ce2362"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 0,
+        "bytes": 132,
+        "FIN_observed": true,
+        "contributing_frames": [
+          657
+        ],
+        "DATA": [
+          {
+            "frame_offset": 74,
+            "payload_offset": 76,
+            "length": 56,
+            "sha256": "9e01f7a210b38c89107e4eaed1faf49dd02e2e822eb57db81795bcd3991a1e66"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 4,
+        "bytes": 2980,
+        "FIN_observed": true,
+        "contributing_frames": [
+          659,
+          661,
+          662,
+          663,
+          664,
+          665
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 2896,
+            "sha256": "44a4962164b42cab9bdfaf37dd258775e686210224e4dc5d8220907f861be76b"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 4,
+        "bytes": 3014,
+        "FIN_observed": true,
+        "contributing_frames": [
+          668,
+          669,
+          671,
+          672,
+          673
+        ],
+        "DATA": [
+          {
+            "frame_offset": 75,
+            "payload_offset": 78,
+            "length": 2936,
+            "sha256": "75faeaf72ca37ab39bb0e8a6d12fd953337631c5e315c3da74ee12ac5a030df5"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 8,
+        "bytes": 5860,
+        "FIN_observed": true,
+        "contributing_frames": [
+          676,
+          678,
+          679,
+          680,
+          681,
+          682,
+          683
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 5776,
+            "sha256": "083c074901c75df1d74e37ebf036735bf35bf91740ea52ae0d180e83b7d5e5e6"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 8,
+        "bytes": 5889,
+        "FIN_observed": true,
+        "contributing_frames": [
+          686,
+          687,
+          688,
+          689,
+          690,
+          691,
+          692
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 5816,
+            "sha256": "164297e6fb28a194c42423b50d32750694739bf547b536802045a5c26fd6b085"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55363",
+        "destination_port": "55365",
+        "stream_id": 12,
+        "bytes": 8743,
+        "FIN_observed": true,
+        "contributing_frames": [
+          696,
+          697,
+          698,
+          699,
+          700,
+          701,
+          702,
+          703,
+          704
+        ],
+        "DATA": [
+          {
+            "frame_offset": 81,
+            "payload_offset": 84,
+            "length": 8192,
+            "sha256": "1fb35adb11b197535a58ebdbf549f58630fbecdb55440299dda7aa21f1ead4f4"
+          },
+          {
+            "frame_offset": 8276,
+            "payload_offset": 8279,
+            "length": 464,
+            "sha256": "1f0fac265571f62fd53c5f7b51479513fac3e34e039b62cbf2e60786670ab0f8"
+          }
+        ]
+      },
+      {
+        "connection": "2",
+        "source_port": "55365",
+        "destination_port": "55363",
+        "stream_id": 12,
+        "bytes": 8769,
+        "FIN_observed": true,
+        "contributing_frames": [
+          707,
+          708,
+          709,
+          710,
+          711,
+          713,
+          714,
+          716,
+          717
+        ],
+        "DATA": [
+          {
+            "frame_offset": 70,
+            "payload_offset": 73,
+            "length": 8696,
+            "sha256": "f5aa2a56d6e59879b33a1bd7edebe271eebb5e6a6051a6f7d22b9538facf0fa1"
+          }
+        ]
+      }
+    ],
+    "scope": "Owned HTTP/3 bidirectional streams only. Physical STREAM source, connection/endpoints, stream ID, offset, length, bytes and FIN verified against reference. Independently reconstructed from original TShark authenticated QUIC STREAM bytes, including gaps/overlap/FIN and ordered DATA by capture connection/direction/stream. This certifies observed payload reconstruction, not QPACK, packet-column agreement, stream-field highlight ranges or general QUIC completeness."
+  },
+  "original_public_corpus_exports": {
+    "weber": {
+      "SDK": {
+        "sha256": "d580a578ade850eca3d2161d93c6b9ff963bc795f29786b4c5258914e1e49c5b",
+        "bytes": 203120555
+      },
+      "CLI": {
+        "sha256": "39678bedd7d92809af03c5f4e6b4bf9b4046e66cc1cc009cfe68f73a2427ff38",
+        "bytes": 138410509
+      }
+    },
+    "sharon": {
+      "SDK": {
+        "sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+        "bytes": 493759102
+      },
+      "CLI": {
+        "sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+        "bytes": 513403474
+      }
+    }
+  },
+  "all_four_original_full_outputs_byte_identical_to_previous_FIN_phase": true,
+  "raw_generic_field_differences": [
+    90,
+    35
+  ],
+  "TCP_flows": [
+    824,
+    840
+  ],
+  "TCP_previews": [
+    808,
+    735
+  ],
+  "Windows": {
+    "mode": "actual fresh CP936 console cells, unmodified cell/attribute rendering",
+    "cases": [
+      {
+        "directory": "windows-retransmission-final",
+        "capture_frames": 747,
+        "query": "fields pdu.id == 451",
+        "selected_frame": 558,
+        "protocol": "HTTP/3",
+        "scope": "authenticated STREAM observation",
+        "logical_frames_replayed": 0
+      },
+      {
+        "directory": "windows-huge-final",
+        "capture_frames": 161,
+        "query": "fields pdu.id == 15",
+        "selected_frame": 10,
+        "independent_partial_bytes_hex": "00d000000000000007"
+      },
+      {
+        "directory": "windows-mixed-final",
+        "capture_frames": 161,
+        "query": "fields pdu.id == 109",
+        "selected_frame": 99,
+        "new_application_stream": 20,
+        "later_retransmission_stream": 44,
+        "summary_and_message_conformance_stream": 20
+      }
+    ],
+    "fresh_EOF_actual_query_selected_row_detail_byte_sources_conversation_resize_quit_codepage": "PASS"
+  },
+  "limits": [
+    "Raw reference packet columns and repeated/partial application views remain separate from logical application frames; no normalization or blanket parity claim.",
+    "Wire-only flags certify observed known STREAM bytes, not another decoded application message or peer delivery.",
+    "Arbitrary undecryptable packets, unobserved new STREAM prefixes and new connection generations do not borrow HTTP3 identity.",
+    "Other frame-placement/stream-creation errors, late request-method response reevaluation, full authority/URI/extension and QPACK dependency semantics, and overall protocol/field/fuzz completeness remain unfinished.",
+    "Windows still exposes some QUIC CID octets as IPC Base64; this newly observed display defect remains a separate follow-up."
+  ],
+  "local_evidence_sha256": {
+    "native_final_full": "e4d62cd0eb26ae8102cfdb92540481f323603a469b800996506bdbdd46f179f8",
+    "native_wire_full": "d42252f5118b56bf262c3d95a8dfcee96b1b7a1cd42df764303dafbe3e9343e7",
+    "length_fuzz": "6ec4b9b4ceef9f8e73c099b9001c32b678182b47f365d5390e80c9eb5170c77f",
+    "retransmission_fuzz": "259bcfe79427fa9833ed65bbc78bb9150f9a2850fae918aa7366a953da825584",
+    "mixed_metadata_RED": "4dbc4c5fef3ce537e6549ef9925dabf68d6a7a7b68bf9df8f694ece0c4a47047",
+    "mixed_metadata_GREEN": "6b1f1ce973a991eede8ea6a24da2aa00583777a0b2e75d9c8076a7fe52440f95",
+    "auth_projection_RED": "d1a468acac0f124188e49518fa37f96f52a4eb90ea521a69129a260242f46c3f",
+    "auth_projection_GREEN": "cf5ef1bbe29bfb665fbf82e450909f285964ff290e25ad05cc094533085f87bb",
+    "native_binary": "bd68ee9cfed222ff18808eecad4abc5d8a9376356fa542f252bb98f6a6593375",
+    "CLI_binary": "0d675361ef2c56dd0ab2d8f3e86f36bf4cd6af3db68349a812b66807ae9c1a08",
+    "windows-retransmission-final/01-protocol-fields.json": "d3507c7da7dd83c44305760777ae9941bce2431168e1f1e6b741e99041f38c04",
+    "windows-retransmission-final/02-first-byte-source.json": "295f1c2f1a9949992bd86f18e039176991144b7642b3afd5491f308ca33c0282",
+    "windows-retransmission-final/03-conversation-messages.json": "89a63b0a213b94057cfa2bd52413dca13c7087ab24a548f4f2cafd5e00b6593a",
+    "windows-retransmission-final/restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8",
+    "windows-huge-final/01-protocol-fields.json": "02770821d6702fc09cb7dce0b5515cdc8df595f2d0205b843f0389872912a22f",
+    "windows-huge-final/02-first-byte-source.json": "346b0ab4599d5244c91059456ca1294e37747dc72974cfb55587c4f1cbd6402a",
+    "windows-huge-final/03-conversation-messages.json": "70e19543e0e85319ec5d2205b727d2f80377bfcf4c231db19f1f92d547d2ca83",
+    "windows-huge-final/restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8",
+    "windows-huge-final/01-deep-protocol-fields.json": "9e1bd141be4f0bcebcb6b67f19def627c5ab35aab800ef9b5e12e693cd3be49d",
+    "windows-mixed-final/01-protocol-fields.json": "553fec6a83ba3669df1233c6b3f49c44635e2bf6911e65bfe71945ef569fd72e",
+    "windows-mixed-final/02-first-byte-source.json": "eae5c004e1bb21b75c11b33ad3119460612e3303f0cf2bdc1347e3b06583b90c",
+    "windows-mixed-final/03-conversation-messages.json": "8d4f9ba4746b0c8a36dc35a74b59556ac1cc9151223aa2dc610b9c6e172886f6",
+    "windows-mixed-final/restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8",
+    "windows-mixed-final/01-deep-protocol-fields.json": "513ea6c7b819de8749c17b68efabc5fe2c3a65320b5c6bb2f18c264660af6741"
+  }
+}
