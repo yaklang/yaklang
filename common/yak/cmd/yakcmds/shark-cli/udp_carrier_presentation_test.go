@@ -17,6 +17,8 @@ func TestUDPCarrierFailureIsVisibleWithoutInventingAnApplication(t *testing.T) {
 	require.Contains(t, row.Info, "UDP carrier")
 	require.Contains(t, row.Info, "24593")
 	require.Contains(t, row.Info, "80 bytes")
+	require.Less(t, len(row.Info)-len(" · 9996 → 1 Payload=72"), 110, "both compared lengths fit an ordinary wide packet list")
+	require.NotContains(t, row.Info, "MalformedMessage · MalformedMessage:")
 	require.NotContains(t, row.ProtocolStack, "NetFlow v5")
 	fs, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	var labels []string
@@ -27,6 +29,7 @@ func TestUDPCarrierFailureIsVisibleWithoutInventingAnApplication(t *testing.T) {
 	require.Contains(t, detail, "UDP carrier diagnostic")
 	require.Contains(t, detail, "Carrier failure: MalformedMessage")
 	require.Contains(t, detail, "Application identity unavailable")
+	require.NotContains(t, detail, "malformed · malformed")
 	p := &capturedPacket{observedFieldBudget: observedPacketFieldBytes}
 	p.recordObservedPDU(e)
 	b, err := json.Marshal(p.observedPDUs)

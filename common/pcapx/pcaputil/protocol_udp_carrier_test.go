@@ -186,6 +186,23 @@ func TestUDPCarrierRefusalCannotBeReplacedByPublicCaches(t *testing.T) {
 	require.Equal(t, "limited", e.DisplayFieldValues().Completeness)
 }
 
+func TestUDPIPv4ZeroTotalLengthIsNotApplicationEvidence(t *testing.T) {
+	for _, observer := range []bool{false, true} {
+		query := dnsQuery(7, "carrier.example", 1)[2:]
+		raw := carrierTestIPv4(carrierTestUDP(query, 8+len(query)))
+		raw[2], raw[3] = 0, 0
+		events := carrierTestReplay(t, raw, len(raw), observer)
+		require.Len(t, events, 1)
+		e := events[0]
+		require.Empty(t, e.Protocol)
+		require.Equal(t, "malformed", e.Status)
+		require.Contains(t, e.Error, "invalid literal header/total length")
+		fields, err := e.GetFields()
+		require.Nil(t, fields)
+		require.Error(t, err)
+	}
+}
+
 func FuzzNativeIPv6CarrierEnvelope(f *testing.F) {
 	for _, hop := range []bool{false, true} {
 		f.Add(carrierTestIPv6(17, carrierTestUDP([]byte("opaque"), 14), hop, 16))
