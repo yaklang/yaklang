@@ -279,6 +279,13 @@ func applicationMessageRows(v *streamSnapshot, direction, mode, width int) []str
 		}
 		add(fmt.Sprintf("── %s · %s · PDU #%d · %s ──", eventProtocolName(e), label, e.ID, e.SourceBytes.Kind), style)
 		add(applicationEventSummary(e), inkText)
+		if c, ok := eventValues(e)["HTTP3 Message Conformance"].(map[string]any); ok {
+			line := fmt.Sprintf("HTTP/3 stream %d · DATA %d bytes · %s", number(c["Stream ID"]), number(c["Observed DATA Bytes"]), textValue(c["Length Check"]))
+			if declared, exists := c["Declared Content-Length"]; exists {
+				line += " · declared " + clipText(textValue(declared), 64)
+			}
+			add(line, inkMuted)
+		}
 		if e.Error != "" || e.ExpertCode != "" {
 			add(e.Status+": "+e.ExpertCode+" · "+e.Error, inkRed)
 			if e.Protocol != "http3" || len(mapList(eventValues(e)["HTTP3 Message Headers"])) == 0 {
