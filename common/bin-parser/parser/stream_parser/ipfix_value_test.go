@@ -112,6 +112,25 @@ func TestIPFIXMalformedBoundsAndStandardTypes(t *testing.T) {
 		require.Equal(t, tt.kind, kind)
 	}
 }
+
+func TestIPFIXEmptyMessageAndEmptySetsAreDifferent(t *testing.T) {
+	// RFC7011 permits zero Sets after a message header, but defines each
+	// individual Template/Options/Data Set as containing one or more records.
+	out, err := DecodeIPFIXWire(ipfixTestMessage(0), nil, "udp", 4096)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), out.Fields["Data Record Count"])
+	for _, id := range []uint16{2, 3, 256} {
+		out, err = DecodeIPFIXWire(ipfixTestMessage(0, ipfixTestSet(id)), nil, "udp", 4096)
+		require.Error(t, err)
+		require.Nil(t, out.Templates)
+	}
+	template := ipfixTestSet(2, 1, 0, 0, 1, 0, 8, 0, 4)
+	out, err = DecodeIPFIXWire(ipfixTestMessage(0, template, ipfixTestSet(256, 0, 0, 0)), nil, "udp", 4096)
+	require.Error(t, err)
+	require.Nil(t, out.Templates)
+	_, err = DecodeIPFIXWire(ipfixTestMessage(0), map[uint16]IPFIXTemplate{256: {Fields: make([]IPFIXField, 4096)}}, "udp", 4096)
+	require.ErrorIs(t, err, ErrObservedWireBudget, "caller schema is charged before walking or cloning its fields")
+}
 func FuzzIPFIXWire(f *testing.F) {
 	f.Add(ipfixTestMessage(603, ipfixTestSet(2, 1, 0, 0, 1, 0, 8, 0, 4), ipfixTestSet(256, 192, 0, 2, 9)))
 	f.Fuzz(func(t *testing.T, w []byte) {
