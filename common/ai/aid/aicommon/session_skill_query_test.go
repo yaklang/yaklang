@@ -177,6 +177,54 @@ func TestBuildSessionAvailableSkillInventoryMergesLocalAndDatabaseSources(t *tes
 	require.Equal(t, "local-mid", loaded.Skills[0].Name)
 }
 
+func TestBuildSessionSkillSearchCoversLocalDatabaseAndLoadedState(t *testing.T) {
+	db := newAutoloadTestDB(t)
+	defer db.Close()
+	dbVFS := filesys.NewVirtualFs()
+	dbVFS.AddFile("db-scan/SKILL.md", buildSkillMD("db-scan", "Database vulnerability scan", "DB_SCAN"))
+	dbSource, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(dbVFS))
+	require.NoError(t, err)
+	_, err = aiskillloader.ImportAISkillsToDB(db, dbSource)
+	require.NoError(t, err)
+
+	localVFS := filesys.NewVirtualFs()
+	localVFS.AddFile("local-scan/SKILL.md", buildSkillMD("local-scan", "Local vulnerability scan", "LOCAL_SCAN"))
+	localVFS.AddFile("local-other/SKILL.md", buildSkillMD("local-other", "Unrelated guide", "LOCAL_OTHER"))
+	loader, err := aiskillloader.NewAutoSkillLoader(
+		aiskillloader.WithAutoLoad_FileSystem(localVFS),
+		aiskillloader.WithAutoLoad_Database(db),
+	)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
+	require.NoError(t, mgr.LoadSkill("local-scan"))
+
+	first, err := BuildSessionSkillSearch(mgr, "scan", 1, 1)
+	require.NoError(t, err)
+	require.Equal(t, "scan", first.Query)
+	require.Equal(t, 2, first.Total)
+	require.True(t, first.HasMore)
+	require.Equal(t, "db-scan", first.Skills[0].Name)
+	require.Equal(t, CapabilityInventoryStageMetadata, first.Skills[0].Stage)
+
+	second, err := BuildSessionSkillSearch(mgr, "scan", 2, 1)
+	require.NoError(t, err)
+	require.Equal(t, 2, second.Total)
+	require.False(t, second.HasMore)
+	require.Equal(t, "local-scan", second.Skills[0].Name)
+	require.Equal(t, CapabilityInventoryStageLoaded, second.Skills[0].Stage)
+
+	databaseOnly, err := BuildSessionSkillSearch(mgr, "database", 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, databaseOnly.Total)
+	require.Equal(t, "db-scan", databaseOnly.Skills[0].Name)
+
+	empty, err := BuildSessionSkillSearch(mgr, "  ", 1, 100)
+	require.NoError(t, err)
+	require.Empty(t, empty.Skills)
+	require.Zero(t, empty.Total)
+}
+
 func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
 	cfg := newSessionSkillQueryConfig(t)
 	detail, err := BuildSessionSkillDetail(cfg.GetSkillsContextManager(), "available")

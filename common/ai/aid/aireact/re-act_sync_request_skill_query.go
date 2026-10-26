@@ -20,6 +20,15 @@ type skillInventoryRequest struct {
 	Limit    int `json:"limit"`
 }
 
+type skillSearchRequest struct {
+	Query    string `json:"query"`
+	Keyword  string `json:"keyword"`
+	Q        string `json:"q"`
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	Limit    int    `json:"limit"`
+}
+
 func parseSkillInventoryRequest(event *ypb.AIInputEvent) (page, pageSize int) {
 	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
 		return 0, 0
@@ -49,6 +58,28 @@ func parseSkillDetailRequest(event *ypb.AIInputEvent) string {
 	return strings.TrimSpace(req.Name)
 }
 
+func parseSkillSearchRequest(event *ypb.AIInputEvent) (query string, page, pageSize int) {
+	if event == nil || strings.TrimSpace(event.SyncJsonInput) == "" {
+		return "", 0, 0
+	}
+	var req skillSearchRequest
+	if err := json.Unmarshal([]byte(event.SyncJsonInput), &req); err != nil {
+		return "", 0, 0
+	}
+	query = strings.TrimSpace(req.Query)
+	if query == "" {
+		query = strings.TrimSpace(req.Keyword)
+	}
+	if query == "" {
+		query = strings.TrimSpace(req.Q)
+	}
+	pageSize = req.PageSize
+	if pageSize <= 0 {
+		pageSize = req.Limit
+	}
+	return query, req.Page, pageSize
+}
+
 // HandleSyncTypeSkillLoadedEvent 返回全部已加载 SKILL，不占用可加载清单分页。
 func (r *ReAct) HandleSyncTypeSkillLoadedEvent(event *ypb.AIInputEvent) error {
 	inventory := aicommon.BuildSessionLoadedSkillInventory(r.skillManagerForSessionInput())
@@ -68,6 +99,22 @@ func (r *ReAct) HandleSyncTypeSkillAvailableEvent(event *ypb.AIInputEvent) error
 		return nil
 	}
 	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_available", inventory, event.SyncID)
+	return nil
+}
+
+// HandleSyncTypeSkillSearchEvent 模糊搜索已加载和可加载 SKILL，并分页返回。
+func (r *ReAct) HandleSyncTypeSkillSearchEvent(event *ypb.AIInputEvent) error {
+	query, page, pageSize := parseSkillSearchRequest(event)
+	result, err := aicommon.BuildSessionSkillSearch(r.skillManagerForSessionInput(), query, page, pageSize)
+	if err != nil {
+		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_search", map[string]any{
+			"skills": []any{},
+			"query":  query,
+			"error":  err.Error(),
+		}, event.SyncID)
+		return nil
+	}
+	_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "skill_search", result, event.SyncID)
 	return nil
 }
 

@@ -47,6 +47,17 @@ type SessionSkillAvailablePage struct {
 	HasMore  bool                      `json:"has_more"`
 }
 
+// SessionSkillSearchPage 是 session 技能模糊搜索结果。结果同时包含已加载和
+// 可加载技能，并通过 Stage 区分。
+type SessionSkillSearchPage struct {
+	Skills   []CapabilityInventoryItem `json:"skills"`
+	Query    string                    `json:"query"`
+	Page     int                       `json:"page"`
+	PageSize int                       `json:"page_size"`
+	Total    int                       `json:"total"`
+	HasMore  bool                      `json:"has_more"`
+}
+
 // BuildSessionLoadedSkillInventory 返回 Timeline 中全部已加载技能，不分页。
 func BuildSessionLoadedSkillInventory(mgr *aiskillloader.SkillsContextManager) *SessionSkillList {
 	result := &SessionSkillList{Skills: []CapabilityInventoryItem{}}
@@ -117,6 +128,79 @@ func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager
 	result.Skills = make([]CapabilityInventoryItem, 0, end-start)
 	for _, name := range names[start:end] {
 		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{available[name]})...)
+	}
+	result.HasMore = end < result.Total
+	return result, nil
+}
+
+// BuildSessionSkillSearch 搜索当前 session 的已加载和可加载技能。本地技能使用
+// 结构匹配，数据库技能复用 BM25 搜索；最终按名称排序后分页，保证翻页稳定。
+func BuildSessionSkillSearch(mgr *aiskillloader.SkillsContextManager, query string, page, pageSize int) (*SessionSkillSearchPage, error) {
+	query = strings.TrimSpace(query)
+	if page <= 0 {
+		page = 1
+	}
+	if pageSize <= 0 {
+		pageSize = DefaultSessionSkillAvailablePageSize
+	}
+	if pageSize > MaxSessionSkillAvailablePageSize {
+		pageSize = MaxSessionSkillAvailablePageSize
+	}
+	result := &SessionSkillSearchPage{
+		Skills: []CapabilityInventoryItem{}, Query: query, Page: page, PageSize: pageSize,
+	}
+	if mgr == nil || query == "" {
+		return result, nil
+	}
+
+	loaded := loadedSkillInventory(mgr)
+	matched := make(map[string]CapabilityInventoryNamedItem)
+	for _, skill := range mgr.GetCurrentSelectedSkills() {
+		if skill == nil || skill.SkillMeta == nil ||
+			!aiskillloader.SkillMetaMatchesQuery(skill.SkillMeta, query) {
+			continue
+		}
+		item := loaded[skill.Name]
+		matched[skill.Name] = item
+	}
+
+	if loader := mgr.GetLoader(); loader != nil {
+		metas, err := aiskillloader.SearchSkillMetas(loader, query, 0)
+		if err != nil {
+			return nil, err
+		}
+		for _, meta := range metas {
+			if meta == nil || strings.TrimSpace(meta.Name) == "" {
+				continue
+			}
+			if item, isLoaded := loaded[meta.Name]; isLoaded {
+				matched[meta.Name] = item
+				continue
+			}
+			if _, exists := matched[meta.Name]; exists {
+				continue
+			}
+			matched[meta.Name] = skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadMetadata)
+		}
+	}
+
+	names := make([]string, 0, len(matched))
+	for name := range matched {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	result.Total = len(names)
+	start := (page - 1) * pageSize
+	if start >= result.Total {
+		return result, nil
+	}
+	end := start + pageSize
+	if end > result.Total {
+		end = result.Total
+	}
+	result.Skills = make([]CapabilityInventoryItem, 0, end-start)
+	for _, name := range names[start:end] {
+		result.Skills = append(result.Skills, BuildCapabilityInventorySkillItems([]CapabilityInventoryNamedItem{matched[name]})...)
 	}
 	result.HasMore = end < result.Total
 	return result, nil

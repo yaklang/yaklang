@@ -47,6 +47,9 @@ const (
 	// SYNC_TYPE_SKILL_AVAILABLE 只分页返回可加载且未加载的 SKILL。
 	SYNC_TYPE_SKILL_AVAILABLE = "skill_available_sync"
 
+	// SYNC_TYPE_SKILL_SEARCH 模糊搜索 session 中已加载和可加载的 SKILL。
+	SYNC_TYPE_SKILL_SEARCH = "skill_search_sync"
+
 	// SYNC_TYPE_SKILL_DETAIL 按名称返回 SKILL 详情。输入支持 skill_name 或 name。
 	SYNC_TYPE_SKILL_DETAIL = "skill_detail_sync"
 

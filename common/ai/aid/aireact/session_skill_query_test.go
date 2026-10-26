@@ -73,6 +73,22 @@ func TestSessionSkillLoadedSyncReturnsAllWithoutPagination(t *testing.T) {
 	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, inventory.Skills[0].Stage)
 }
 
+func TestSessionSkillSearchSyncPagination(t *testing.T) {
+	react, events := newSessionSkillTestRuntime(t, false)
+	require.NoError(t, react.HandleSyncTypeSkillSearchEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_SEARCH, SyncID: "search-1",
+		SyncJsonInput: `{"query":"guide","page":1,"page_size":1}`,
+	}))
+	var page aicommon.SessionSkillSearchPage
+	events.read(t, "skill_search", &page)
+	require.Equal(t, "guide", page.Query)
+	require.Equal(t, 2, page.Total)
+	require.Equal(t, 1, page.Page)
+	require.Equal(t, 1, page.PageSize)
+	require.Len(t, page.Skills, 1)
+	require.True(t, page.HasMore)
+}
+
 func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
 	react, events := newSessionSkillTestRuntime(t, false)
 	request := func(syncID, body string) aicommon.SessionSkillDetail {
