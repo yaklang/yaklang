@@ -115,6 +115,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var wireRanges map[string][]int
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
+	var http3FrameKind string
+	var http3StreamID uint64
 	var fieldViewLimited bool
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
@@ -122,8 +124,25 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			fieldViewLimited = true
 			return
 		}
+		if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
+			if octets, ok := fieldOctetList(v); ok {
+				v = octets
+			}
+		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "http3" {
+				if x["Frame Type"] == "STREAM" {
+					previous := http3StreamID
+					defer func() { http3StreamID = previous }()
+					http3StreamID = number(x["Stream ID"])
+				}
+				if strings.HasPrefix(name, "HTTP3 Frames[") {
+					previous := http3FrameKind
+					defer func() { http3FrameKind = previous }()
+					http3FrameKind = textValue(x["Frame Type"])
+				}
+			}
 			if protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
 				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
 					previous := wireRanges
@@ -295,6 +314,20 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				generated = bytesValue(x)
 				sourceName = "QUIC STREAM · authenticated plaintext"
 			}
+			if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
+				generated = bytesValue(x)
+				sourceName = "QUIC wire remainder · extracted octets"
+			}
+			if protocol == "http3" && authenticatedQUIC {
+				if name == "Payload" && http3FrameKind == "DATA" {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 DATA · reassembled authenticated payload · stream %d", http3StreamID)
+				}
+				if name == "QPACK Block" && http3FrameKind == "HEADERS" {
+					generated = bytesValue(x)
+					sourceName = fmt.Sprintf("HTTP/3 HEADERS · authenticated QPACK block · stream %d", http3StreamID)
+				}
+			}
 			if name == "Authenticated Plaintext" && authenticatedTLS {
 				generated = bytesValue(x)
 				sourceName = "TLS record · authenticated plaintext · application gap"
@@ -385,6 +418,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
+		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		kind := e.SourceBytes.Kind
 		if kind == "" {
 			kind = "message"
@@ -436,7 +470,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			add(notice+" · "+textValue(e.Session["TLV Decode Failure"]), false)
 		}
 		if e.SourceBytes.CompletedIn != nil {
-			add(fmt.Sprintf("Message bytes complete in frame #%d · %d contributing packet(s)", e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
+			kind := "Message"
+			if e.Session["Native Carrier"] == true && (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") {
+				kind = "QUIC wire packet"
+			}
+			add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
 		}
 		if !credibleTLSIdentity(e) {
 			add("TLS session identity: unconfirmed · complete record header/body, handshake context not observed", false)
