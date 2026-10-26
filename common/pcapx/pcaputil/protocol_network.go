@@ -156,7 +156,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		e.ipv6Fragment = false
 		ci.CaptureLength, ci.Length = len(raw), len(raw)
 		ci = withEvidence(ci, e)
-		p = gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+		p = gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw, datagramDecodeAs: a.datagramDecodeAs}, gopacket.Default)
 		p.Metadata().CaptureInfo = ci
 	}
 	var key fragmentKey
@@ -732,7 +732,7 @@ func (a *binParser) reassembledPacket(header, payload []byte, e captureEvidence,
 		}
 		binary.BigEndian.PutUint16(raw[10:12], ^uint16(sum))
 	}
-	q := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw}, gopacket.Default)
+	q := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeRaw, datagramDecodeAs: a.datagramDecodeAs}, gopacket.Default)
 	e.ipv6Fragment = v6
 	if len(e.refs) == 0 {
 		e.refs = []PacketReference{e.Ref}

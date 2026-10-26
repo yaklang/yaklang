@@ -579,7 +579,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		return
 	}
 	if c.binParser != nil {
-		packet = protocolAnalysisPacket(packet)
+		packet = protocolAnalysisPacket(packet, c.binParser.datagramDecodeAs)
 		var consumed bool
 		packet, consumed = c.binParser.networkPacket(packet)
 		if consumed {

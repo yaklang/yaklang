@@ -168,7 +168,8 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 	}
 	if network != nil && transport == layers.IPProtocolUDP && d.conf.binParser != nil {
 		if err := d.udp.DecodeFromBytes(network.(gopacket.NetworkLayer).LayerPayload(), d); err == nil {
-			if udpEncapsulation(d.udp.NextLayerType()) {
+			selected := d.conf.binParser.datagramDecodeAs[uint16(d.udp.DstPort)] != "" || d.conf.binParser.datagramDecodeAs[uint16(d.udp.SrcPort)] != ""
+			if !selected && udpEncapsulation(d.udp.NextLayerType()) {
 				return fallback()
 			}
 			if d.conf.binParser.l2tp3UDPNeedsPacket(network.(gopacket.NetworkLayer), &d.udp, evidence.Ref.Domain) {
