@@ -377,6 +377,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" && e.Summary != "" {
+		return safeText(e.Summary)
+	}
 	if (e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
@@ -850,6 +853,8 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				}
 				if p.status == "decoded" || p.status == "deferred" {
 					p.status = "partial"
+					p.scope = "mixed datagram outcomes"
+					p.evidence = "packet authentication is per packet; unparsed remainder is not verified"
 				}
 			}
 			if e.Protocol == "" && e.Transport == "udp" && e.Summary != "" {

@@ -113,6 +113,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	if verified > 0 && rejected > 0 {
 		add(fmt.Sprintf("TLS records: %d authenticated, %d rejected · verification is per record", verified, rejected), false)
 	}
+	// Packet authentication never covers an unparsed datagram neighbour. Put
+	// this range warning before possibly large authenticated CRYPTO/STREAM trees.
+	for _, e := range ordered {
+		if e != nil && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
+			add(fmt.Sprintf("QUIC datagram diagnostic · PDU #%d · %s", e.ID, e.Summary), false)
+		}
+	}
 	var protocol string
 	var routingVersion uint64
 	var currentSource int
