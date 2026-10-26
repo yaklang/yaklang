@@ -821,7 +821,8 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		e.Session["Control Summary"] != nil && e.Session["Status Word Type"] != nil && e.Session["Unselected Trailer Bytes"] != nil {
 		p.protocol, p.priority, p.status, p.visibility = "NTP", 20, e.Status, "headers"
 		p.evidence = "complete counted NTP control header/data; trailing profile unselected; sender unverified"
-		p.scope, p.summary = "control header; trailer profile unavailable", clipText("NTP control header · "+applicationEventSummary(e), 384)
+		p.scope = "control header; trailer profile unavailable"
+		p.summary = fmt.Sprintf("NTPv%d Control · %s · trailer profile unavailable; sender unverified", number(e.Session["Version"]), textValue(e.Session["Control Summary"]))
 		p.addLayer("NTP")
 		return
 	}

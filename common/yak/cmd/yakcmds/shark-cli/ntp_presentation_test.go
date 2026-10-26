@@ -37,6 +37,7 @@ func TestNTPControlUnknownTrailerKeepsValidatedHeaderButMalformedCountDoesNot(t 
 	require.Equal(t, "context-required", r.ProtocolStatus)
 	require.Contains(t, r.ProtocolEvidence, "sender unverified")
 	require.Contains(t, r.Info, "trailer")
+	require.True(t, strings.HasPrefix(r.Info, "NTPv2 Control · Read variables seq=1"), "the row exposes protocol/action/identity before the trailer limitation")
 	fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	seen := false
 	for _, f := range fields {
