@@ -361,6 +361,12 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		})
 	})
 	out = append(out, b)
+	for _, spec := range []struct{ name, key string }{{"http3.frame_type", "Frame Type Value"}, {"http3.frame_length", "Payload Length"}} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Literal application frame header; separate authenticated STREAM arena, never ciphertext PDU offsets", DisplayUnsigned, 62, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			displayHTTP3FrameValues(e, p, func(frame map[string]any) { emit(frame[spec.key]) })
+		}))
+	}
 	sort.Slice(out, func(i, j int) bool { return out[i].descriptor.Name < out[j].descriptor.Name })
 	seen := map[string]bool{}
 	for i, b := range out {
@@ -374,6 +380,21 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		seen[b.descriptor.Name] = true
 	}
 	return out
+}
+
+// Prefer transport-attached application frames over their duplicated root
+// summary; QPACK-resumed sections retain their original application stream.
+func displayHTTP3FrameValues(e *ProtocolEvent, p *displayProjection, visit func(map[string]any)) {
+	found := false
+	p.maps(e.Session["Frames"], func(fr map[string]any) {
+		p.maps(fr["HTTP3 Frames"], func(app map[string]any) { found = true; visit(app) })
+	})
+	p.maps(e.Session["QPACK Resumed Streams"], func(resumed map[string]any) {
+		p.maps(resumed["HTTP3 Frames"], func(app map[string]any) { found = true; visit(app) })
+	})
+	if !found {
+		p.maps(e.Session["HTTP3 Frames"], visit)
+	}
 }
 
 func cloneDisplayFieldDescriptor(d DisplayFieldDescriptor) DisplayFieldDescriptor {

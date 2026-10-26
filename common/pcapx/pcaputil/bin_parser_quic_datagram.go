@@ -160,6 +160,8 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// cannot inherit a carrier projection's unrelated flow identifier.
 		e.ID, e.FlowID, e.ResponseTo, e.TransactionID = a.ids.Add(1), 0, 0, 0
 		f.quic.eventID = e.ID
+		// Temporary immutable input; retained ranges clone their bounded refs.
+		f.quic.eventRefs = e.SourceBytes.PacketRefs
 		e.Direction = dir
 		h, err := f.quic.wireHeader(wire[off:], dir)
 		if err != nil {
@@ -198,6 +200,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil {
 			e.Session, err = f.quic.consume(dir, raw, a.budget.MaxCollectionElements)
 		}
+		f.quic.eventRefs = nil
 		if historical && e.Session["Authentication Verified"] != true {
 			return nil, false
 		}
