@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -20,6 +21,12 @@ func TestHTTP3ConnectionLayoutFaultRemainsVisibleAfterAnIndividuallyDecodedFrame
 	require.Contains(t, fields[0].text, "H3_FRAME_ERROR")
 	require.LessOrEqual(t, len(fields[0].text), 76)
 	require.Contains(t, fields[1].text, "do not certify")
+	var live packetPresentation
+	live.add(e)
+	live.add(&pcaputil.ProtocolEvent{Protocol: "http3", Transport: "udp", Status: "decoded"})
+	row = live.apply(packetSummary{Protocol: "UDP", Transport: "udp"})
+	require.Equal(t, "connection-violation-observed", row.ProtocolStatus, "incremental publication uses the same scope as batch rendering")
+	require.Equal(t, 1, strings.Count(row.Info, "H3_FRAME_ERROR · connection"))
 	e.Status, e.Error = "malformed", "HTTP3 H3_FRAME_ERROR"
 	row = presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "UDP", Transport: "udp"})
 	require.Equal(t, "malformed", row.ProtocolStatus, "a new connection violation is not normalized to decoded")
