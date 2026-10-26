@@ -473,7 +473,16 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
 			title = "3 " + u.fields.sources[u.bytesSource-1].Name
 		}
-		r := c.box(l.bytes, title, u.bytesLabel(), u.pane == 2)
+		right := u.bytesLabel()
+		if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
+			// The title names the source. Avoid repeating it and suppressing
+			// the selected byte range on ordinary terminal widths.
+			right = "b source · click bytes"
+			if u.hexEnd > u.hexStart {
+				right = fmt.Sprintf("0x%x–0x%x · %d bytes", u.hexStart, u.hexEnd-1, u.hexEnd-u.hexStart)
+			}
+		}
+		r := c.box(l.bytes, title, right, u.pane == 2)
 		u.drawBytes(c, r)
 	}
 	capture := cfg.filter
