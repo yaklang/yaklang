@@ -382,7 +382,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			var generated []byte
 			sourceName := ""
 			if protocol == "ntp" {
-				if name == "Control Data" || name == "Padding Bytes" || name == "Authenticator Bytes" || strings.HasSuffix(name, " Timestamp") {
+				if name == "Control Data" || name == "Padding Bytes" || name == "Authenticator Bytes" || name == "Unselected Trailer Bytes" || strings.HasSuffix(name, " Timestamp") {
 					x = bytesValue(x)
 				}
 				if name == "Reassembled Control Data" {
@@ -595,7 +595,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		delete(values, "Wire Field Ranges")
 		if e.Protocol == "ntp" {
-			for _, key := range []string{"Packet Name", "Version", "Mode", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Reported Associations"} {
+			for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)

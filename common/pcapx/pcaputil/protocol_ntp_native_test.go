@@ -68,7 +68,7 @@ func TestNativeNTPControlRealIngressOwnsIDsBeforePublication(t *testing.T) {
 }
 
 func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
-	for version := byte(1); version <= 4; version++ {
+	for version := byte(2); version <= 4; version++ {
 		for mode := byte(1); mode <= 5; mode++ {
 			w := make([]byte, 48)
 			w[0], w[1], w[2], w[3] = version<<3|mode, 1, 255, 128
@@ -79,7 +79,12 @@ func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
 			require.Equal(t, "decoded", e.Status, e.Error)
 			require.Equal(t, -1, e.Session["Poll"])
 			require.Equal(t, -128, e.Session["Precision"])
-			require.Equal(t, float64(-0.5), e.Session["Root Delay Seconds"])
+			if version == 2 {
+				require.Equal(t, float64(65535.5), e.Session["Synchronizing Distance Seconds"])
+				require.Nil(t, e.Session["Root Delay Seconds"])
+			} else {
+				require.Equal(t, float64(-0.5), e.Session["Root Delay Seconds"])
+			}
 			require.Equal(t, uint32(0xffffffff), e.Session["Transmit Timestamp Seconds"])
 			require.Equal(t, uint32(0xfffffff1), e.Session["Transmit Timestamp Fraction"])
 			require.Contains(t, e.Session["Timestamp Scope"], "era")
@@ -91,6 +96,129 @@ func TestNativeNTPModesAndLiteralTimeFields(t *testing.T) {
 	w[0] = 4<<3 | 1
 	require.False(t, a.decodeNTPDatagram(&ProtocolEvent{}, w, 20000, 20001, false), "symmetric mode requires full grammar plus service selection")
 	require.False(t, a.decodeNTPDatagram(&ProtocolEvent{}, ntpControlWire(1, 2, 0, nil), 20000, 20001, false), "no port-only/control-prefix discovery on arbitrary UDP")
+}
+
+func TestNativeNTPv1UsesReservedBitsDistanceAndDrift(t *testing.T) {
+	w := make([]byte, 48)
+	w[0], w[1] = 8, 1
+	binary.BigEndian.PutUint32(w[4:8], 0x80000000)
+	binary.BigEndian.PutUint32(w[8:12], 0x80000000)
+	e := ntpNativeFeed(t, ntpNativeParser(), false, CaptureDomain{}, w)
+	require.Equal(t, "decoded", e.Status, e.Error)
+	require.Nil(t, e.Session["Mode"])
+	require.Nil(t, e.Session["Root Dispersion Raw"])
+	require.Equal(t, float64(32768), e.Session["Synchronizing Distance Seconds"])
+	require.Equal(t, float64(.5), e.Session["Estimated Drift Rate"])
+	require.Nil(t, e.DisplayFields()["ntp.flags.mode"])
+	require.Equal(t, []any{uint64(0)}, e.DisplayFields()["ntp.v1.reserved"])
+	_, err := binparser.ParseBinary(&liveBoundedReader{bytes.NewReader(w), uint64(len(w)) * 8}, "application-layer.ntp", "NTP")
+	require.NoError(t, err)
+	w[0] = 0x0b
+	_, err = decodeNTPDatagramWire(w)
+	require.Error(t, err)
+	_, err = binparser.ParseBinary(&liveBoundedReader{bytes.NewReader(w), uint64(len(w)) * 8}, "application-layer.ntp", "NTP")
+	require.Error(t, err)
+}
+
+func TestNativeNTPControlSelectedPeerAndStatusMeaning(t *testing.T) {
+	a := ntpNativeParser()
+	r := ntpNativeFeed(t, a, false, CaptureDomain{}, ntpControlWire(4, 2, 0, nil))
+	require.Equal(t, "request-reserved", r.Session["Status Word Type"])
+	require.Nil(t, r.Session["Reported Clock Source"])
+	head := ntpControlWire(4, 128|32|2, 0, []byte("abc"))
+	binary.BigEndian.PutUint16(head[6:8], 7)
+	one := ntpNativeFeed(t, a, true, CaptureDomain{}, head)
+	require.Equal(t, r.ID, one.ResponseTo)
+	tail := ntpControlWire(4, 128|2, 3, []byte("def"))
+	binary.BigEndian.PutUint16(tail[6:8], 7)
+	e := ntpNativeFeed(t, a, true, CaptureDomain{}, tail)
+	require.Equal(t, []byte("abcdef"), e.Session["Reassembled Control Data"])
+	require.Equal(t, uint16(0), e.Session["Requested Association ID"])
+	require.Equal(t, uint16(7), e.Session["Association ID"])
+	a = ntpNativeParser()
+	ntpNativeFeed(t, a, false, CaptureDomain{}, ntpControlWire(4, 2, 0, nil))
+	ntpNativeFeed(t, a, true, CaptureDomain{}, head)
+	binary.BigEndian.PutUint16(tail[6:8], 9)
+	e = ntpNativeFeed(t, a, true, CaptureDomain{}, tail)
+	require.Zero(t, e.ResponseTo, "selected peer cannot change between response fragments")
+	require.Equal(t, "refused", e.Session["Control Reassembly"])
+	clock := ntpControlWire(5, 128|4, 0, nil)
+	binary.BigEndian.PutUint16(clock[4:6], 0x0102)
+	m, err := decodeNTPDatagramWire(clock)
+	require.NoError(t, err)
+	require.Equal(t, 1, m["Clock Status High Byte"])
+	require.Nil(t, m["Reported Clock Status"], "no guessed hardware state from a status-word variant")
+	trap := ntpControlWire(6, 128|6, 0, nil)
+	m, err = decodeNTPDatagramWire(trap)
+	require.NoError(t, err)
+	require.Equal(t, "insignificant-set-trap-response", m["Status Word Type"])
+}
+
+func TestNativeNTPRefusedRequestCannotOwnLaterErrorAndFieldsAreExplicitlyPartial(t *testing.T) {
+	for _, pending := range []bool{false, true} {
+		a := ntpNativeParser()
+		d := CaptureDomain{}
+		if pending {
+			ntpNativeFeed(t, a, false, d, ntpControlWire(8, 2, 0, nil))
+		}
+		bad := ntpControlWire(8, 2, 0, nil)
+		binary.BigEndian.PutUint16(bad[10:12], 469)
+		_, err := binparser.ParseBinary(&liveBoundedReader{bytes.NewReader(bad), uint64(len(bad)) * 8}, "application-layer.ntp", "NTP")
+		require.Error(t, err)
+		require.Equal(t, "malformed", ntpNativeFeed(t, a, false, d, bad).Status)
+		r := ntpNativeFeed(t, a, false, d, ntpControlWire(8, 2, 0, nil))
+		require.Zero(t, r.TransactionID)
+		e := ntpNativeFeed(t, a, true, d, ntpControlWire(8, 128|64|2, 0, nil))
+		require.Zero(t, e.ResponseTo)
+	}
+	a := ntpNativeParser()
+	a.budget.MaxCollectionElements = 1
+	ntpNativeFeed(t, a, false, CaptureDomain{}, ntpControlWire(9, 1, 0, nil))
+	e := ntpNativeFeed(t, a, true, CaptureDomain{}, ntpControlWire(9, 128|1, 0, make([]byte, 8)))
+	require.Equal(t, "limited", e.Completeness)
+	require.Equal(t, 2, e.Session["Reported Association Count"])
+	require.Nil(t, e.Session["Reported Associations"])
+	require.True(t, e.DisplayFieldValues().Incomplete)
+	for _, w := range [][]byte{{0x23}, {0x16, 2, 0, 1}} {
+		r := &ProtocolEvent{Transport: "udp"}
+		require.True(t, a.decodeNTPDatagram(r, w, 20000, 123, true))
+		require.NotContains(t, r.Summary, "<nil>")
+	}
+}
+
+func FuzzNTPWireBoundsAndSemanticIsolation(f *testing.F) {
+	f.Add(ntpControlWire(1, 2, 0, nil))
+	f.Add(ntpControlWire(1, 128|2, 0, []byte("abc")))
+	f.Add(append([]byte{0x23}, make([]byte, 47)...))
+	f.Add([]byte{0x16})
+	f.Fuzz(func(t *testing.T, w []byte) {
+		if len(w) > 2048 {
+			return
+		}
+		m, err := decodeNTPDatagramWire(w)
+		if m == nil {
+			require.Error(t, err)
+			return
+		}
+		for _, raw := range m["Wire Field Ranges"].(map[string]any) {
+			span := raw.([]any)
+			lo, hi := span[0].(int), span[1].(int)
+			require.True(t, 0 <= lo && lo <= hi && hi <= len(w))
+		}
+		if err != nil {
+			return
+		}
+		if w[0]>>3&7 != 1 && w[0]&7 == 6 {
+			require.GreaterOrEqual(t, len(w), 12)
+			n := int(binary.BigEndian.Uint16(w[10:12]))
+			require.LessOrEqual(t, n, 468)
+			require.Equal(t, w[12:12+n], m["Control Data"])
+			require.Nil(t, m["Transmit Timestamp"])
+		} else {
+			require.Len(t, w, 48)
+			require.Nil(t, m["Control Data"])
+		}
+	})
 }
 
 func assertNativeNTPLegacyVersionReview(t testing.TB, events []*ProtocolEvent) {

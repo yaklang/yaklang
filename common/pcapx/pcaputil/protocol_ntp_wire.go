@@ -14,32 +14,67 @@ func decodeNTPDatagramWire(w []byte) (map[string]any, error) {
 		return nil, protocolError(ErrMalformedMessage, "NTP empty datagram")
 	}
 	v, mode := int(w[0]>>3&7), int(w[0]&7)
-	if v < 1 || v > 4 || mode < 1 || mode > 6 {
+	if v < 1 || v > 4 || v != 1 && (mode < 1 || mode > 6) {
 		return nil, protocolError(ErrUnsupportedFeature, "NTP version/mode is outside the selected UDP profile")
 	}
 	ranges := map[string]any{}
-	m := map[string]any{"Version": v, "Mode": mode, "Leap Indicator": int(w[0] >> 6), "Wire Field Ranges": ranges}
+	m := map[string]any{"Version": v, "Leap Indicator": int(w[0] >> 6), "Wire Field Ranges": ranges}
 	span := func(k string, a, b int) { ranges[k] = []any{a, b} }
-	for _, k := range []string{"Version", "Mode", "Leap Indicator"} {
+	for _, k := range []string{"Version", "Leap Indicator"} {
 		span(k, 0, 1)
 	}
-	if mode == 6 {
+	if v == 1 {
+		m["Legacy Reserved"] = mode
+		span("Legacy Reserved", 0, 1)
+		if mode != 0 {
+			return m, protocolError(ErrMalformedMessage, "NTPv1 low three bits are reserved, not a modern mode")
+		}
+	} else {
+		m["Mode"] = mode
+		span("Mode", 0, 1)
+	}
+	if v != 1 && mode == 6 {
 		return decodeNTPControlWire(w, m, span)
 	}
 	if len(w) < 48 {
 		return m, protocolError(ErrMalformedMessage, "NTP time header requires48 bytes, got%d", len(w))
 	}
 	names := [...]string{"", "Symmetric active", "Symmetric passive", "Client", "Server", "Broadcast"}
-	m["Packet Name"], m["Stratum"] = names[mode], int(w[1])
+	m["Stratum"] = int(w[1])
 	m["Poll"], m["Precision"] = int(int8(w[2])), int(int8(w[3]))
-	m["Root Delay Raw"], m["Root Dispersion Raw"] = binary.BigEndian.Uint32(w[4:8]), binary.BigEndian.Uint32(w[8:12])
-	m["Root Delay Seconds"] = float64(int32(binary.BigEndian.Uint32(w[4:8]))) / 65536
-	m["Root Dispersion Seconds"] = float64(binary.BigEndian.Uint32(w[8:12])) / 65536
+	if v <= 2 {
+		if v == 1 {
+			m["Packet Name"] = "Legacy time header"
+		} else {
+			m["Packet Name"] = names[mode]
+		}
+		m["Synchronizing Distance Raw"] = binary.BigEndian.Uint32(w[4:8])
+		m["Synchronizing Distance Seconds"] = float64(binary.BigEndian.Uint32(w[4:8])) / 65536
+		span("Synchronizing Distance Raw", 4, 8)
+		if v == 1 {
+			m["Estimated Drift Rate Raw"] = binary.BigEndian.Uint32(w[8:12])
+			m["Estimated Drift Rate"] = float64(binary.BigEndian.Uint32(w[8:12])) / 4294967296
+			span("Estimated Drift Rate Raw", 8, 12)
+			m["Legacy Format Scope"] = "RFC1059: reserved low bits, unsigned16.16 distance and unsigned0.32 drift; no modern mode or dispersion inference"
+		} else {
+			m["Synchronizing Dispersion Raw"] = binary.BigEndian.Uint32(w[8:12])
+			m["Synchronizing Dispersion Seconds"] = float64(binary.BigEndian.Uint32(w[8:12])) / 65536
+			span("Synchronizing Dispersion Raw", 8, 12)
+			m["Legacy Format Scope"] = "RFC1119: unsigned16.16 synchronizing distance and dispersion; not a signed modern root-delay value"
+		}
+	} else {
+		m["Packet Name"] = names[mode]
+		m["Root Delay Raw"], m["Root Dispersion Raw"] = binary.BigEndian.Uint32(w[4:8]), binary.BigEndian.Uint32(w[8:12])
+		m["Root Delay Seconds"] = float64(int32(binary.BigEndian.Uint32(w[4:8]))) / 65536
+		m["Root Dispersion Seconds"] = float64(binary.BigEndian.Uint32(w[8:12])) / 65536
+		span("Root Delay Raw", 4, 8)
+		span("Root Dispersion Raw", 8, 12)
+	}
 	m["Reference ID"] = hex.EncodeToString(w[12:16])
 	for _, f := range []struct {
 		key  string
 		a, b int
-	}{{"Stratum", 1, 2}, {"Poll", 2, 3}, {"Precision", 3, 4}, {"Root Delay Raw", 4, 8}, {"Root Dispersion Raw", 8, 12}, {"Reference ID", 12, 16}} {
+	}{{"Stratum", 1, 2}, {"Poll", 2, 3}, {"Precision", 3, 4}, {"Reference ID", 12, 16}} {
 		span(f.key, f.a, f.b)
 	}
 	for i, name := range []string{"Reference", "Origin", "Receive", "Transmit"} {
@@ -52,14 +87,18 @@ func decodeNTPDatagramWire(w []byte) (map[string]any, error) {
 		span(name+" Timestamp Fraction", at+4, at+8)
 	}
 	m["Timestamp Scope"] = "literal seconds/fraction; era, absolute UTC and synchronized clock state are not inferred"
-	if mode == 3 {
+	if v != 1 && mode == 3 {
 		m["Role"] = "request"
 	}
-	if mode == 4 {
+	if v != 1 && mode == 4 {
 		m["Role"], m["Association"] = "response", "unavailable-stateless-datagram"
 	}
-	if w[1] > 16 {
-		return m, protocolError(ErrMalformedMessage, "NTP stratum%d is outside0..16", w[1])
+	stratumLimit := byte(16)
+	if v == 2 {
+		stratumLimit = 15
+	}
+	if v != 1 && w[1] > stratumLimit {
+		return m, protocolError(ErrMalformedMessage, "NTPv%d stratum%d is outside0..%d", v, w[1], stratumLimit)
 	}
 	if len(w) != 48 {
 		m["Trailing Bytes"], m["Trailing Content"] = len(w)-48, "extension-or-authentication-unparsed"
@@ -113,10 +152,16 @@ func decodeNTPControlWire(w []byte, m map[string]any, span func(string, int, int
 		m["Padding Bytes"] = bytes.Clone(tail[:pad])
 		span("Padding Bytes", 12+n, 12+n+pad)
 		if len(tail) > pad {
-			m["Authenticator Bytes"] = bytes.Clone(tail[pad:])
-			m["Authentication Verified"] = false
-			m["Authenticator Scope"] = "uninterpreted trailer; no algorithm, MAC or sender verification"
 			unknownTrailer = len(tail)-pad != 20 && len(tail)-pad != 24
+			if unknownTrailer {
+				m["Unselected Trailer Bytes"] = bytes.Clone(tail[pad:])
+				span("Unselected Trailer Bytes", 12+n+pad, len(w))
+			} else {
+				m["Authenticator Bytes"] = bytes.Clone(tail[pad:])
+				span("Authenticator Bytes", 12+n+pad, len(w))
+				m["Authentication Verified"] = false
+				m["Authenticator Scope"] = "uninterpreted trailer; no algorithm, MAC or sender verification"
+			}
 		}
 	} else {
 		return m, protocolError(ErrMalformedMessage, "NTP control padding must be zero and bounded by the data count")
@@ -131,16 +176,23 @@ func decodeNTPControlWire(w []byte, m map[string]any, span func(string, int, int
 	}
 	status, assoc := binary.BigEndian.Uint16(w[4:6]), binary.BigEndian.Uint16(w[6:8])
 	switch {
+	case !r:
+		m["Status Word Type"] = "request-reserved"
 	case e:
 		m["Reported Error Code"], m["Status Word Type"] = int(status>>8), "error"
+	case op == 6:
+		m["Status Word Type"] = "insignificant-set-trap-response"
+	case ntpControlOpcode(op) == "Reserved":
+		m["Status Word Type"] = "unselected-opcode"
 	case op == 4 || op == 5:
-		m["Reported Clock Status"], m["Reported Clock Code"], m["Status Word Type"] = int(status>>8), int(status&255), "clock"
+		m["Clock Status High Byte"], m["Clock Status Low Byte"], m["Status Word Type"] = int(status>>8), int(status&255), "clock"
+		m["Clock Status Scope"] = "literal high/low bytes; clock-word variants are not negotiated, no hardware state inferred"
 	case assoc == 0:
 		m["Reported Leap Indicator"], m["Reported Clock Source"], m["Status Word Type"] = int(status>>14), int(status>>8&63), "system"
 	default:
 		m["Reported Peer Flags"], m["Reported Peer Selection"], m["Status Word Type"] = int(status>>11), int(status>>8&7), "peer"
 	}
-	if !e && op != 4 && op != 5 {
+	if r && !e && op != 4 && op != 5 && op != 6 && ntpControlOpcode(op) != "Reserved" {
 		m["Reported Event Count"], m["Reported Event Code"] = int(status>>4&15), int(status&15)
 	}
 	m["Status Scope"] = "reported control status; no local authentication, reachability or synchronization verification"
