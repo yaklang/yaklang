@@ -64,6 +64,39 @@ keep them outside the repository. No browser/production key discovery is used.
 The native event helper deliberately allows incomplete capture reassembly, as
 Shark does; the default low-level replay API remains strict for existing callers.
 
+## Direct RPC tuples and incomplete messages
+
+`discovery/dcerpc_windows_tuple_reuse_live.py OUTPUT TSHARK` captures four actual
+Windows TCP/135 connections reusing one local client port. It uses only bounded
+read-only EPM lookups: an unfinished request, an unbound request rejected by the
+server, a context-1 lookup, then a context-0 lookup. Abortive close supplies real
+RST boundaries. Captures, exact receipts and the executed generator snapshot
+must remain outside Git. A failed run remains failed; a new attempt uses a new
+directory. It does not supply credentials, modify endpoints or invoke services.
+
+`dcerpc_wire_audit.py --tcp-generations` adds an opt-in original SYN/SYN-ACK
+epoch certificate. It requires complete two-way handshakes, partitions original
+tuples without changing bytes/domains and binds every native flow and contributor
+to exactly one epoch. The default public-capture observed-origin profile stays
+separate. Missing FIN/RST can be tested by removing only those original capture
+records; loss/reorder controls retain all other bytes, timestamps and a source
+frame map. They are observation controls, not network fault injection.
+
+`dcerpc_fragment_messages.py --allow-open-tcp-epochs` requires that certificate
+before permitting incomplete logical messages and outstanding calls. Complete
+stubs still bind every byte to its exact original parent PDU interval, and every
+available normal reply request reference is compared literally to Wireshark.
+An unbound-operation Bind NAK cannot consume a pending operation as a matched
+Bind. The selected clear Bind NAK profile accepts the exact version list with
+optional terminal four-byte alignment; optional extended-error signatures are
+outside this profile. NDR service bodies remain opaque.
+
+`dcerpc_tcp_epoch_negative_controls.py` corrupts contributor epochs, native flow
+ownership, Bind NAK fields/ranges, accepted contexts and logical message parents.
+Physical controls use the original capture. Temporary logical-control input
+hashes are explicitly re-sealed to reach semantic guards; these temporary inputs
+are never certificates. Keep all exports and control results outside Git.
+
 ## Remaining protocol peers and midstream TLS
 
 `remaining/run.py` adds fresh SSH, compressed WebSocket, FTP/explicit FTPS,
