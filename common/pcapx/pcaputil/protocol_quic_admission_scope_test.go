@@ -9,7 +9,7 @@ import (
 
 func TestQUICUnparsedTailCannotInheritPacketAuthentication(t *testing.T) {
 	initial := rfc9001ClientInitial()
-	for _, tail := range [][]byte{{0, 0, 0}, {0x80, 1, 2}, {0x40}} {
+	for _, tail := range [][]byte{{0, 0, 1}, {0x80, 1, 2}, {0x40}} {
 		raw := sessionDatagramPCAP(t, []sessionStep{{0, append(bytes.Clone(initial), tail...)}, {0, initial}}, 14443)
 		es, stats := discoveryReplay(t, raw, 1, false, false)
 		require.Len(t, es, 3)

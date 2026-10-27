@@ -386,7 +386,7 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 	if summary, ok := mailRTSPEventSummary(e); ok {
 		return summary
 	}
-	if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" && e.Summary != "" {
+	if e.Protocol == "quic" && (e.Admission == "unparsed-datagram-remainder" || e.Admission == "observed-datagram-padding") && e.Summary != "" {
 		return safeText(e.Summary)
 	}
 	if (e.Protocol == "ntp" || e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix") && e.Summary != "" && e.Summary != e.Protocol {
@@ -883,6 +883,18 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.evidence = "RTSP start line, CSeq and body boundary observed; method semantics unavailable"
 		p.summary = fmt.Sprintf("RTSP unsupported method %s · CSeq=%d", textValue(e.Session["Packet Name"]), number(e.Session["CSeq"]))
 		p.addLayer("RTSP")
+		return
+	}
+	if e.Protocol == "quic" && e.Admission == "observed-datagram-padding" && e.Completeness == "datagram-padding" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") {
+		p.addLayer("QUIC")
+		info := applicationEventSummary(e)
+		if p.protocol == "" {
+			p.protocol, p.priority, p.status, p.summary = "QUIC", 1, e.Status, info
+		} else if !strings.Contains(p.summary, info) {
+			p.summary = clipText(p.summary+" · "+info, 384)
+		}
+		p.visibility, p.scope = "mixed packet protection", "QUIC packet plus unprotected UDP datagram padding"
+		p.evidence = "packet authentication is per packet; datagram padding is unprotected"
 		return
 	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
