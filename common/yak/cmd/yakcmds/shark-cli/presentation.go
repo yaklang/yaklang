@@ -32,6 +32,7 @@ type packetPresentation struct {
 	count                                 int
 	rejectedTLS                           bool
 	h3ConnectionFaultPDU                  uint64
+	networkRefused                        bool
 }
 
 var protocolDisplayNames = map[string]string{
@@ -732,8 +733,20 @@ func isisMalformedNotice(e *pcaputil.ProtocolEvent) string {
 }
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
-	if e == nil {
+	if e == nil || p.networkRefused {
 		return
+	}
+	if e.Protocol == "ip" && e.Status == "malformed" && e.ExpertCode == "IPVersionMismatch" {
+		expected, observed := number(e.Session["Expected IP Version"]), number(e.Session["Observed IP Version"])
+		if (expected == 4 || expected == 6) && expected != observed {
+			names, _ := e.Session["Observed Header Layers"].([]string)
+			label := fmt.Sprintf("IPv%d", expected)
+			if len(names) == 0 || len(names) > 128 || names[len(names)-1] != label {
+				names = []string{label}
+			}
+			*p = packetPresentation{networkRefused: true, protocol: label, summary: safeText(e.Summary), status: "malformed", visibility: "invalid-network-header", scope: "invalid network header; transport not admitted", evidence: "carrier IP version mismatch; no fragment or application state admitted", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
+			return
+		}
 	}
 	defer p.observeHTTP3ConnectionFault(e)
 	if e.AuthenticatedQUICApplicationProtocol() == "http3" && e.Session["HTTP3 Wire Only"] == true && e.Error == "" {
@@ -1097,6 +1110,11 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 		row.MessageSource, row.MessageDestination, row.MessageTransport = p.nativeSource, p.nativeDestination, "network"
 		d := p.nativeDomain
 		row.MessageDomain = &d
+	}
+	if p.networkRefused {
+		row.ConnectionProtocol, row.ConnectionEvidence = "", ""
+		row.ConnectionStack = nil
+		row.StreamID = 0
 	}
 	if row.MessageTransport != "" && row.MessageTransport != "network" {
 		carrier := strings.ToUpper(row.MessageTransport)
