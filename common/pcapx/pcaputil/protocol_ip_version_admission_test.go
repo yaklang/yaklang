@@ -49,7 +49,14 @@ func TestInvalidIPVersionCannotAdmitDatagramsOrTunnelContext(t *testing.T) {
 					raw = tunnelAdmissionWire(t, tc.profile, 5013, "198.51.100.1", false, tc.depth, false)
 				}
 				raw[tc.at] = byte(version<<4) | raw[tc.at]&15
-				events := tunnelAdmissionReplay(t, raw)
+				var events []*ProtocolEvent
+				var mu sync.Mutex
+				err := ReplayPcap(bytes.NewReader(icmpFragmentCapture(t, [][]byte{raw})), WithOnProtocolMessage(func(e *ProtocolEvent) {
+					mu.Lock()
+					defer mu.Unlock()
+					events = append(events, e)
+				}))
+				require.ErrorContains(t, err, fmt.Sprintf("invalid IPv%d version %d", tc.family, version), "the existing capture decoder error contract stays observable")
 				require.Len(t, events, 1)
 				e := events[0]
 				require.Equal(t, "ip", e.Protocol)
@@ -112,11 +119,13 @@ func TestInvalidIPVersionCannotCreateTCPOnlyTunnelFlow(t *testing.T) {
 				raw[at] = raw[at]&15 | 0x60
 				var mu sync.Mutex
 				flows, observations := 0, 0
-				opts := []CaptureOption{WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), WithOnTrafficFlowCreated(func(*TrafficFlow) { mu.Lock(); defer mu.Unlock(); flows++ }), WithEveryPacket(func(gopacket.Packet) { mu.Lock(); defer mu.Unlock(); observations++ })}
+				var stats TCPReassemblyStats
+				opts := []CaptureOption{WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s }), WithOnTrafficFlowCreated(func(*TrafficFlow) { mu.Lock(); defer mu.Unlock(); flows++ }), WithEveryPacket(func(gopacket.Packet) { mu.Lock(); defer mu.Unlock(); observations++ })}
 				if protocols {
 					opts = append(opts, WithOnProtocolMessage(func(*ProtocolEvent) {}))
 				}
-				require.NoError(t, ReplayPcap(bytes.NewReader(icmpFragmentCapture(t, [][]byte{raw})), opts...))
+				require.NoError(t, ReplayPcap(bytes.NewReader(icmpFragmentCapture(t, [][]byte{raw})), opts...), "AllowIncomplete preserves its nonfatal capture policy")
+				require.EqualValues(t, 1, stats.DecodeErrors)
 				require.Equal(t, 1, observations, "the invalid original frame remains observable")
 				require.Zero(t, flows, "tunnel normalization cannot hide an invalid outer version from TCP admission")
 			})

@@ -55,6 +55,27 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			// message, advance clocks, or create an application connection.
 			// Keep only the validated outer domain and literal physical source.
 			fields := map[string]any{"Observed IP Version": version.observed, "Expected IP Version": version.expected}
+			if e.networkPrefixLimited {
+				fields["Header Layer Projection Limited"] = true
+			}
+			names := make([]string, 0, len(e.networkPrefix)+8)
+			for _, typ := range e.networkPrefix {
+				names = append(names, typ.String())
+			}
+			for _, layer := range p.Layers() {
+				if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == gopacket.LayerTypePayload {
+					break
+				}
+				if len(names) >= maxCaptureTransportLayers {
+					names = nil
+					fields["Header Layer Projection Limited"] = true
+					break
+				}
+				names = append(names, layer.LayerType().String())
+			}
+			if len(names) > 0 {
+				fields["Observed Header Layers"] = names
+			}
 			a.malformed.Add(1)
 			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: "malformed", Completeness: "malformed", ExpertCode: "IPVersionMismatch", Error: version.Error(), Summary: version.Error(), Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
 			return nil, true
