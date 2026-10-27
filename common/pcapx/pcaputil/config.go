@@ -585,9 +585,19 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	}
 	if normalizer != nil {
 		packet = protocolAnalysisPacket(packet, normalizer.datagramDecodeAs)
+		var rejectedVersion *ipVersionError
+		if failure := packet.ErrorLayer(); failure != nil {
+			errors.As(failure.Error(), &rejectedVersion)
+		}
 		var consumed bool
 		packet, consumed = normalizer.networkPacket(packet)
 		if consumed {
+			if rejectedVersion != nil {
+				// Publish the precise diagnostic while preserving the capture API's
+				// existing decoder-error accounting and final error result. Later
+				// valid packets still drain normally; invalid bytes enter no state.
+				c.trafficPool.malformedPacket(rejectedVersion.Error())
+			}
 			return
 		}
 	}
