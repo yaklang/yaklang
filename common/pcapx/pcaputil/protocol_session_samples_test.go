@@ -114,7 +114,7 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
 			{1, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
 			{0, sshKexDHInit()},
-			{1, sshValidCurveReply()},
+			{1, sshKexDHReply()},
 			{0, sshNewKeys()},
 			{1, sshNewKeys()},
 		}},
@@ -419,8 +419,9 @@ func TestProtocolSessionM1PCAP(t *testing.T) {
 			require.Equal(t, uint64(1), stats.Malformed, sample.name)
 		} else if sample.name == "ssh-kex-newkeys" {
 			// Preserve the original bytes and hash. The old helper encodes an
-			// impossible one-byte Curve25519 public value; strict exchange-layout
-			// validation must reject it instead of calling it a decoded DH packet.
+			// impossible one-byte Curve25519 public value and four-byte Ed25519
+			// signature. The first invalid method stops this connection; independent
+			// selected-context tests reject each fault without rewriting this PCAP.
 			require.Equal(t, uint64(1), stats.Malformed, sample.name)
 		} else if !negativeWS {
 			require.Zero(t, stats.Malformed, sample.name)
