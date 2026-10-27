@@ -5,7 +5,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"sync/atomic"
 
@@ -66,10 +65,11 @@ func m2bReplay(t testing.TB, name string, deferred bool, workers int, secrets TL
 
 // Fixed historical DLT_NULL capture contains zero bytes outside the QUIC
 // long-header Length at these four packet boundaries (RFC9000 12.2/17.2).
-// These are distinct diagnostics, not authenticated PADDING frames.
+// These are distinct unprotected padding observations, not authenticated
+// PADDING frames. The source capture, lengths and packet ownership stay sealed.
 func m2bAssertQUICZeroTail(t testing.TB, e *ProtocolEvent) bool {
 	t.Helper()
-	if e.Error == "" {
+	if e.Error == "" && e.Completeness != "datagram-padding" {
 		return false
 	}
 	lengths := map[uint64]int{1: 686, 4: 1103, 17: 685, 20: 1103}
@@ -79,12 +79,17 @@ func m2bAssertQUICZeroTail(t testing.TB, e *ProtocolEvent) bool {
 	require.True(t, ok, "unexpected error %s", e.Error)
 	require.Equal(t, "quic", e.Protocol)
 	require.Equal(t, "quic-v1-native", e.Profile)
-	require.Equal(t, "malformed", e.Status)
-	require.Equal(t, "MalformedMessage", e.ExpertCode)
-	require.Contains(t, e.Error, "invalid coalesced QUIC header")
+	require.Contains(t, []string{"decoded", "deferred"}, e.Status)
+	require.Empty(t, e.ExpertCode)
+	require.Empty(t, e.Error)
+	require.Equal(t, "observed-datagram-padding", e.Admission)
+	require.Equal(t, "datagram-padding", e.Completeness)
 	require.Equal(t, bytes.Repeat([]byte{0}, n), e.Raw)
 	require.Equal(t, n, e.Length)
-	require.Nil(t, e.Session)
+	require.Equal(t, false, e.Session["Authentication Verified"])
+	require.Equal(t, uint64(n), e.Session["Datagram Padding Length"])
+	require.Equal(t, 1200-n, e.Session["Datagram Offset"])
+	require.Nil(t, e.Session["Frames"])
 	require.NotZero(t, e.FlowID)
 	require.Zero(t, e.Direction)
 	require.Zero(t, e.ResponseTo)
@@ -92,11 +97,9 @@ func m2bAssertQUICZeroTail(t testing.TB, e *ProtocolEvent) bool {
 	require.Equal(t, e.Domain, ref.Domain)
 	require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(e.Raw)), e.SourceBytes.SHA256)
 	fields, err := e.GetFields()
-	var typed *ProtocolError
-	require.Error(t, err)
-	require.True(t, errors.As(err, &typed))
-	require.Equal(t, ErrMalformedMessage, typed.Kind)
-	require.Nil(t, fields)
+	require.NoError(t, err)
+	require.Equal(t, map[string]any{"Datagram Padding": bytes.Repeat([]byte{0}, n)}, fields)
+	require.Empty(t, e.AuthenticatedQUICApplicationProtocol())
 	return true
 }
 
