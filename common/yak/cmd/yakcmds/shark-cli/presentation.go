@@ -866,6 +866,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.summary = textValue(e.Session["Packet Name"]) + " · protected payload · " + textValue(e.Session["Key Reason"])
 		return
 	}
+	if e.Protocol == "rtsp" && e.Profile == "rtsp-extension-semantics-unsupported" && e.Session["Control Header Observed"] == true && e.Session["Method Semantics Validated"] == false && e.ExpertCode == string(pcaputil.ErrUnsupportedFeature) {
+		p.protocol, p.priority, p.status = "RTSP", eventPriority(e), e.Status
+		p.scope = "RTSP control header; extension semantics unavailable"
+		p.evidence = "RTSP start line, CSeq and body boundary observed; method semantics unavailable"
+		p.summary = fmt.Sprintf("RTSP unsupported method %s · CSeq=%d", textValue(e.Session["Packet Name"]), number(e.Session["CSeq"]))
+		p.addLayer("RTSP")
+		return
+	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)

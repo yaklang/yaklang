@@ -1620,7 +1620,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
-			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
+			} else if e.Protocol == "rtsp" && rtspNativeControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
 			} else if e.Protocol == "websocket" && e.Entry == "WebSocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}

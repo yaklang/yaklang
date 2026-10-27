@@ -618,6 +618,21 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
+		if err != nil {
+			e.nativeSessionMessage = true
+			if e.Session["Profile"] == "extension-semantics-unsupported" {
+				e.Profile = "rtsp-extension-semantics-unsupported"
+			}
+			status, typed := classifySessionError(err)
+			if typed == nil {
+				kind := ErrMalformedMessage
+				if status == "context-required" {
+					kind = ErrContextRequired
+				}
+				err = protocolError(kind, "%s", err)
+			}
+			e.semanticSession = cloneSession(e.Session)
+		}
 		if err == nil && e.Session["Profile"] == "extension-envelope" {
 			e.nativeSessionMessage = true
 			e.Profile, e.Completeness = "rtsp-extension-envelope", "message"
