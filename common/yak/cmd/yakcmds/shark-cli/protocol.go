@@ -39,18 +39,24 @@ func applyApplication(row packetSummary, protocol, evidence string, id uint64) p
 			row.ConnectionProtocol = label
 		}
 		row = resolveTLSCandidate(row)
-		if (row.Protocol == "TCP" || row.ProtocolScope == "connection-associated bytes" && row.packetProtocol == "TCP") && row.payloadBytes > 0 && row.ConnectionProtocol != "" && (evidence == "validated protocol events" || strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport) {
+		if (row.Protocol == "TCP" || (row.ProtocolScope == "connection-associated bytes" || row.ProtocolScope == "connection-associated diagnostic") && row.packetProtocol == "TCP") && row.payloadBytes > 0 && row.ConnectionProtocol != "" && (evidence == "validated protocol events" || strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport) {
 			row.Protocol = row.ConnectionProtocol
-			row.ProtocolStatus, row.ProtocolScope, row.Visibility = "context-required", "connection-associated bytes", "unassembled-stream"
-			if strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport {
-				row.Visibility = "encrypted"
+			if row.ProtocolEvidence == "protocol parser diagnostic" && (row.ProtocolStatus == "malformed" || row.ProtocolStatus == "limited") {
+				// Connection identity cannot downgrade this packet's observed
+				// failure to missing reassembly/context, including on redraw.
+				row.ProtocolScope = "connection-associated diagnostic"
+			} else {
+				row.ProtocolStatus, row.ProtocolScope, row.Visibility = "context-required", "connection-associated bytes", "unassembled-stream"
+				if strings.HasPrefix(row.ConnectionProtocol, "TLS") || row.opaqueTransport {
+					row.Visibility = "encrypted"
+				}
+				row.ProtocolEvidence = "observed connection; this segment has no complete decoded message"
+				row.Info = row.ConnectionProtocol + " stream bytes · no complete decoded message in this packet · " + row.Info
 			}
-			row.ProtocolEvidence = "observed connection; this segment has no complete decoded message"
 			row.ProtocolStack = append(append([]string(nil), row.Layers...), row.ConnectionProtocol)
 			if row.TransportView != nil {
 				row.ProtocolStack = append(append([]string(nil), row.TransportView.Layers...), row.ConnectionProtocol)
 			}
-			row.Info = row.ConnectionProtocol + " stream bytes · no complete decoded message in this packet · " + row.Info
 		}
 		if id != 0 {
 			if len(row.ConnectionStack) > 0 && evidence != "port hint" {
