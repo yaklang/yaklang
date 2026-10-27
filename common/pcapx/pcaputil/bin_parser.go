@@ -944,6 +944,9 @@ type binFlow struct {
 	smb2              *binSMB2
 	dcerpc            *binDCERPC
 	ssh               *binSSH
+	// Reassembly can publish its final gap diagnostic after closeSession frees
+	// SSH negotiation state. Retain only the bounded identification warnings.
+	closedSSHWarnings [2]string
 	nbss              bool
 	control           *controlDatagramState
 	nfs               *binNFS
@@ -1033,9 +1036,13 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
-	if f.protocol == "ssh" && f.ssh != nil && status != "decoded" && status != "deferred" {
+	if f.protocol == "ssh" && status != "decoded" && status != "deferred" {
 		info := map[string]any{}
-		f.ssh.identificationWarningFields(info)
+		if f.ssh != nil {
+			f.ssh.identificationWarningFields(info)
+		} else {
+			(&binSSH{identWarning: f.closedSSHWarnings}).identificationWarningFields(info)
+		}
 		if len(info) > 0 {
 			e.Session, e.semanticSession = info, cloneSession(info)
 		}
@@ -1900,6 +1907,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 }
 
 func (f *binFlow) close(reason TrafficFlowCloseReason) {
+	if f.ssh != nil {
+		f.closedSSHWarnings = f.ssh.identWarning
+	}
 	if f.dlms != nil && f.binding == nil {
 		for i := range f.directions {
 			d := &f.directions[i]
