@@ -92,6 +92,59 @@ func TestSSHNativeRefusalCannotBeReinterpretedAsGenericFields(t *testing.T) {
 	}
 }
 
+func FuzzSSHNativeRefusalFieldIsolation(f *testing.F) {
+	for _, size := range []uint8{0, 1, 4, 32, 63, 65, 114, 255} {
+		f.Add(size, uint16(7), "tls", true)
+		f.Add(size, uint16(1), "ssh", false)
+	}
+	f.Fuzz(func(t *testing.T, size uint8, cut uint16, label string, deferred bool) {
+		if size == 64 || len(label) > 128 {
+			t.Skip()
+		}
+		s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"), WithSessionClientDirection(0))
+		require.NoError(t, err)
+		defer s.Close("fuzz SSH refusal ownership")
+		s.(*captureSession).f.a.config.Deferred = deferred
+		ts := time.Unix(1, 0)
+		for dir := 0; dir < 2; dir++ {
+			require.Nil(t, s.Feed(dir, ts, sshIdent("SSH-2.0-RefusalFuzz")).Err)
+			require.Nil(t, s.Feed(dir, ts, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")).Err)
+		}
+		signature := append(sshStr([]byte("ssh-ed25519")), sshStr(bytes.Repeat([]byte{0x81}, int(size)))...)
+		payload := append([]byte{31}, sshStr(sshHostKeyBlob())...)
+		payload = append(payload, sshStr(make([]byte, 32))...)
+		wire := sshPkt(append(payload, sshStr(signature)...))
+		at := 1 + int(cut)%(len(wire)-1)
+		require.True(t, s.Feed(1, ts, wire[:at]).NeedMore, "selected malformed inner value needs the entire enclosing packet first")
+		r := s.Feed(1, ts, wire[at:])
+		require.NotNil(t, r.Err)
+		require.Equal(t, ErrMalformedMessage, r.Err.Kind)
+		require.Len(t, r.Events, 1)
+		e := r.Events[0]
+		e.Protocol, e.Status, e.Entry, e.Error = label, "decoded", label, ""
+		e.Raw = []byte(label)
+		e.Fields = map[string]any{"forged": label}
+		e.Structured = map[string]any{"fields": e.Fields}
+		e.Session = map[string]any{"Kex Algorithm": label}
+		for i := 0; i < 2; i++ {
+			fields, err := e.GetFields()
+			require.Nil(t, fields)
+			var typed *ProtocolError
+			require.ErrorAs(t, err, &typed)
+			require.Equal(t, ErrMalformedMessage, typed.Kind)
+			typed.Kind = ErrAuthenticationFailed // returned errors are owned too
+			result, err := e.Decode()
+			require.Nil(t, result)
+			require.ErrorAs(t, err, &typed)
+			require.Equal(t, ErrMalformedMessage, typed.Kind)
+			aliases := e.DisplayFieldValues().FieldMap()
+			require.Equal(t, []any{"ssh"}, aliases["protocol"])
+			require.Equal(t, []any{"malformed"}, aliases["status"])
+			require.Empty(t, aliases["ssh.kex.selected"])
+		}
+	})
+}
+
 func TestSSHInitialFieldsUseObservedExchangeWithoutLegacyDHReinterpretation(t *testing.T) {
 	for _, deferred := range []bool{false, true} {
 		for _, known := range []bool{false, true} {
