@@ -50,7 +50,7 @@ var Command = &cli.Command{
 		cli.BoolFlag{Name: "list-fields", Usage: "List registered display/export field names, types, scope and supported protocols; --json prints the versioned schema"},
 		cli.StringFlag{Name: "display-filter,Y", Usage: "Typed packet display filter, e.g. wg.type == 4 and wg.counter >= 2; saved capture remains complete"},
 		cli.BoolFlag{Name: "plain", Usage: "Print packet summaries without the TUI"},
-		cli.BoolFlag{Name: "json", Usage: "Print one JSON summary per packet with fields observed at packet publication; later contributor annotations are available through TUI/SDK history"},
+		cli.BoolFlag{Name: "json", Usage: "Print JSONL packet snapshots plus nonphysical record_type=protocol_publication records for capture-close diagnostics; byte_source defines original contributors"},
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
 		cli.DurationFlag{Name: "duration", Usage: "Stop capture after this duration, e.g. 30s (0: unlimited)"},
 		cli.IntFlag{Name: "max-packets", Value: defaultPacketCapacity, Usage: "Packets retained in the TUI (also editable with c); output file keeps all captured packets"},
@@ -195,6 +195,7 @@ func run(c *cli.Context) error {
 	defer cancel()
 	interactive := !c.Bool("plain") && !c.Bool("json") && term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) && os.Getenv("TERM") != "dumb"
 	cfg.freezePacketFields = !interactive && (c.Bool("json") || displayFilter != nil)
+	cfg.exportProtocolPublications = c.Bool("json")
 	session := startCapture(ctx, src, cfg, interactive)
 	defer session.Stop()
 	if interactive {
@@ -219,6 +220,24 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 		case packet, ok := <-s.packets:
 			if !ok {
 				return s.result()
+			}
+			if packet.publicationPhase != "" {
+				if !asJSON {
+					continue
+				}
+				if filter != nil {
+					result := filter.EvaluateSnapshots(packet.observedFields)
+					if !result.Complete {
+						return fmt.Errorf("display filter unavailable for %s protocol publication: %s", packet.publicationPhase, result.Reason)
+					}
+					if !result.Matched {
+						continue
+					}
+				}
+				if err := encoder.Encode(protocolPublication{RecordType: "protocol_publication", PublicationPhase: packet.publicationPhase, PublishedPDUs: packet.observedPDUs, PublishedPDUScope: "analysis_publication_only; byte_contribution_is_defined_by_byte_source"}); err != nil {
+					return err
+				}
+				continue
 			}
 			row := summarize(packet)
 			var events []*pcaputil.ProtocolEvent

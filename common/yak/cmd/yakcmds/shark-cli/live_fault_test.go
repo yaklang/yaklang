@@ -41,7 +41,21 @@ func TestInspectionContinuesAfterSnaplenAndTCPGap(t *testing.T) {
 	path = fixture(t, "gap.pcap", packets[0].data, packets[1].data, packets[2].data, full)
 	out.Reset()
 	require.NoError(t, invoke(&out, "-r", path, "--json"))
-	require.Len(t, bytes.Split(bytes.TrimSpace(out.Bytes()), []byte{'\n'}), 4)
+	physical, publications := 0, 0
+	for _, line := range bytes.Split(bytes.TrimSpace(out.Bytes()), []byte{'\n'}) {
+		var row map[string]any
+		require.NoError(t, json.Unmarshal(line, &row))
+		if row["record_type"] == "protocol_publication" {
+			publications++
+			require.Equal(t, "capture_close", row["publication_phase"])
+			require.NotContains(t, row, "number")
+		} else {
+			physical++
+			require.EqualValues(t, physical, row["number"])
+		}
+	}
+	require.Equal(t, 4, physical)
+	require.NotZero(t, publications, "unfilled TCP gaps remain available after the final DNS packet")
 	require.Contains(t, out.String(), `"protocol":"DNS"`)
 }
 
