@@ -33,6 +33,7 @@ var Command = &cli.Command{
 		"d fields, v direction, r refresh. TCP streams also support h beginning / l recent.\n" +
 		"Click Search or press /: proto:http ip:10.223 content:hello hex:00ff stream:hello.\n" +
 		"c changes packet cache capacity (default 20000); --max-packets sets it at startup.\n" +
+		"--protocol-history-mib enlarges the separate protocol-detail history for long file replays.\n" +
 		"Application protocol shortcuts use conventional ports. BPF is a capture filter;\n" +
 		"interactive filters affect the display only. TCP streams are reassembled; TLS decryption requires an authorized --tls-keylog file. Search: fields dns.qry.name contains \"example\".",
 	Flags: []cli.Flag{
@@ -53,6 +54,7 @@ var Command = &cli.Command{
 		cli.IntFlag{Name: "count,c", Usage: "Stop capture after this many matching packets (0: unlimited)"},
 		cli.DurationFlag{Name: "duration", Usage: "Stop capture after this duration, e.g. 30s (0: unlimited)"},
 		cli.IntFlag{Name: "max-packets", Value: defaultPacketCapacity, Usage: "Packets retained in the TUI (also editable with c); output file keeps all captured packets"},
+		cli.IntFlag{Name: "protocol-history-mib", Usage: "Protocol detail history budget in MiB (0: automatic from packet cache; maximum 1024)"},
 		cli.IntFlag{Name: "max-streams", Value: 256, Usage: "Maximum TCP streams retained for inspection"},
 		cli.IntFlag{Name: "stream-bytes", Value: defaultStreamBytes, Usage: "Recent reassembled bytes retained per TCP stream (global history limit: 32 MiB)"},
 		cli.IntFlag{Name: "snaplen,s", Value: 65535, Usage: "Maximum bytes captured per packet"},
@@ -127,6 +129,9 @@ func run(c *cli.Context) error {
 	if c.Int("max-packets") < 1 || c.Int("max-packets") > 100000 {
 		return fmt.Errorf("max-packets must be between 1 and 100000")
 	}
+	if c.Int("protocol-history-mib") < 0 || c.Int("protocol-history-mib") > 1024 {
+		return fmt.Errorf("protocol-history-mib must be between 0 (automatic) and 1024")
+	}
 	if c.Int("snaplen") < 64 || c.Int("snaplen") > 262144 {
 		return fmt.Errorf("snaplen must be between 64 and 262144")
 	}
@@ -143,6 +148,7 @@ func run(c *cli.Context) error {
 	cfg := captureConfig{device: c.String("interface"), input: c.String("pcap-file"), output: c.String("output-file"), filter: filter, snaplen: c.Int("snaplen"), count: c.Int("count"), duration: c.Duration("duration"), promisc: c.Bool("promisc"), ignoreEmbeddedSecrets: c.Bool("ignore-embedded-secrets")}
 	cfg.initialDisplayFilter = c.String("display-filter")
 	cfg.retentionPackets = c.Int("max-packets")
+	cfg.protocolHistoryMiB = c.Int("protocol-history-mib")
 	displayFilter, err := pcaputil.CompileDisplayFilter(cfg.initialDisplayFilter)
 	if err != nil {
 		return fmt.Errorf("invalid display filter: %w", err)
