@@ -76,3 +76,12 @@ func TestRTSPUnsupportedHeaderShowsSpecificIdentityWithoutSuccess(t *testing.T) 
 	e.Profile = "port-hint"
 	require.Equal(t, "TCP", presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Transport: "tcp"}).Protocol)
 }
+
+func TestDCERPCSecurityEnvelopeDoesNotClaimBodyOrAuthentication(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "dcerpc", Profile: "dcerpc-security-envelope", Completeness: "envelope", Status: "decoded", Summary: "DCE/RPC Bind call 2 · security envelope · authentication unverified", Session: map[string]any{"Authentication Verified": false, "Stub Decoded": false}}
+	row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Transport: "tcp"})
+	require.Equal(t, "DCE/RPC", row.Protocol)
+	require.Contains(t, row.ProtocolScope, "body semantics and authentication unverified")
+	require.Contains(t, row.Info, "authentication unverified")
+	require.Contains(t, row.ProtocolEvidence, "security context not established")
+}

@@ -866,6 +866,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.summary = textValue(e.Session["Packet Name"]) + " · protected payload · " + textValue(e.Session["Key Reason"])
 		return
 	}
+	if e.Protocol == "dcerpc" && e.Profile == "dcerpc-security-envelope" && e.Completeness == "envelope" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && e.Session["Authentication Verified"] == false && e.Session["Stub Decoded"] == false {
+		p.protocol, p.priority, p.status = "DCE/RPC", eventPriority(e), e.Status
+		p.scope = "DCE/RPC security envelope; body semantics and authentication unverified"
+		p.evidence = "bounded header, trailer and token observed; security context not established"
+		p.summary = applicationEventSummary(e)
+		p.addLayer("DCE/RPC")
+		return
+	}
 	if e.Protocol == "rtsp" && e.Profile == "rtsp-extension-semantics-unsupported" && e.Session["Control Header Observed"] == true && e.Session["Method Semantics Validated"] == false && e.ExpertCode == string(pcaputil.ErrUnsupportedFeature) {
 		p.protocol, p.priority, p.status = "RTSP", eventPriority(e), e.Status
 		p.scope = "RTSP control header; extension semantics unavailable"
