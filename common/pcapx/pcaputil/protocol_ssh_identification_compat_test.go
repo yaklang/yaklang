@@ -138,6 +138,12 @@ func TestSSHIdentificationWarningSurvivesIncompleteClose(t *testing.T) {
 			} else {
 				require.NotContains(t, es[0].Session, "Identification Warning")
 			}
+			state := s.(*captureSession)
+			require.Nil(t, state.f.ssh, "initial negotiation state is released at close")
+			late := state.f.event(0, nil, "incomplete", "TCP stream closed with an unfilled sequence gap")
+			require.Equal(t, es[0].Session, late.Session, "late reassembly diagnostics retain only the same bounded identification evidence")
+			require.Empty(t, late.Raw, "no missing wire bytes are manufactured")
+			require.NotContains(t, late.Session, "Kex Algorithm")
 		})
 	}
 }
