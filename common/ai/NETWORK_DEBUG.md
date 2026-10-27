@@ -8,7 +8,7 @@
 
 需要整个会话的主、辅助模型调用都记录时：gRPC `AIStartParams.NetworkDebug`（optional bool）或 Go `aicommon.WithNetworkDebug(true)` / Yak `aiagent.networkDebug(true)`。该选项只在模型 callback 中启用，Agent 工具的业务 HTTP 请求不会自动被抓入模型日志。子 Agent 继承会话选项。缓存会话参数支持显式 false 关闭，省略则保留缓存值。桌面提供上述全局开关；这里的会话参数仅用于单独指定会话的 API 调用。
 
-单独调用模型也支持 `aispec.WithNetworkDebug(true)` / `ai.networkDebug(true)`；模型与 Provider 的 `ExtraParams[network_debug]` 也支持 true/false。没有会话的测试调用按 runtime/call 隔离，不会混入其他会话导出。
+单独调用模型也支持 `aispec.WithNetworkDebug(true)` / `ai.networkDebug(true)`；普通模型与 Provider 的 `ExtraParams[network_debug]` 也支持 true/false；yak-script 配置只读取 Script，不读取这些扩展项。没有会话的测试调用按 runtime/call 隔离，不会混入其他会话导出。
 
 ## 数据与导出
 

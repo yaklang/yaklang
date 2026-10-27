@@ -14,11 +14,21 @@
 
 ## 模型配置
 
-选择 Provider `yak-script`，填写源码 `ExtraParams[script]` 和单次超时 `ExtraParams[script_timeout_seconds]`。连接配置使用 BaseURL / Endpoint / APIKey / Headers / Proxy。业务选项直接定义在源码中，没有独立脚本参数 JSON。
+选择 Provider `yak-script`，运行配置只保存一个专用字段 `Provider.Script`。不从 Provider 或 Model 的 ExtraParams 读取源码，不设覆盖优先级或旧配置转换。地址、凭据、上游模型 ID、Headers、代理、超时、采样参数以及业务选项全部定义在脚本源码中。
 
-[内置通用示例](example.yak) 演示文本 Chat Completions：BaseURL 包含 API 前缀（例如 `https://model.example/v1`），脚本追加 `/chat/completions`；启用 Endpoint 时直接使用完整 URL。模型名称填上游模型 ID。源码中的 `mode = "json"` 可改为 `"sse"`，两种模式均完整验证后返回正文。标准接口通常直接使用内置普通 Provider；此示例用于说明如何编写适配。
+`AIModelConfig.ModelName` 只用作配置显示名称和路由标识，主/辅助类型仍用于模型选择；这两项不传入脚本，不决定上游请求。普通 Provider 的连接配置不适用于脚本模型。
 
-界面的“载入通用 Provider 示例”只填写源码和默认超时，不覆盖地址、模型名或凭据。仅更新客户端或引擎不会改写已保存的用户脚本。
+```text
+AIModelConfig
+  ModelName: 显示与选择用的配置名称
+  Provider:
+    Type: yak-script
+    Script: 完整 Yak 源码
+```
+
+[内置通用示例](example.yak) 演示文本 Chat Completions，在 `chat` 开头修改 endpoint、model、apiKey、timeoutSeconds、proxy 和 headers。`mode = "json"` 可改为 `"sse"`，两种模式均完整验证后返回正文。新建时 Monaco 直接填入该模板；没有模板载入按钮或单独连接/超时表单。标准接口通常直接使用普通 Provider；此示例用于说明如何编写适配。
+
+脚本中的 HTTP 超时在实际发起请求时生效，不受普通模型的默认 `AIConfig.Timeout` 截断。宿主仍传递调用方取消与总 deadline；需要约束脚本整体执行时，可以在脚本内从 req.Context 派生有期限的 Context。源码错误或无限循环仍可通过停止任务取消。
 
 ## 宿主注入的接口
 
@@ -26,13 +36,9 @@
 
 | req 字段 | 含义 |
 | --- | --- |
-| Context | 本次尝试的取消 / 超时上下文，HTTP 调用必须传 `poc.context(req.Context)` |
+| Context | 本次尝试的取消上下文，继承调用方总 deadline；HTTP 调用必须传 `poc.context(req.Context)` |
 | RequestID | 逻辑模型调用 ID，宿主重试复用，新模型调用重新生成；不代表上游自动去重 |
 | Prompt | 上层构造的完整提示词，可能包含历史、动作规范和工具结果，不要仅截取最后一句 |
-| Model | 模型名称 |
-| BaseURL / Endpoint / EnableEndpoint | 连接配置；路径拼接规则由脚本决定 |
-| APIKey / Proxy / Headers | 凭据、代理、附加请求头 |
-| Timeout | 单次尝试秒数，从获准请求后开始；排队不消耗此期限 |
 | RawMessages | 显式消息列表；内置示例明确拒绝它，避免无声丢失角色 / 多模态信息 |
 
 | 注入函数 | 用法和边界 |

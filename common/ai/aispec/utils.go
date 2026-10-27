@@ -248,6 +248,11 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	if provider == nil {
 		return opts
 	}
+	if provider.GetType() == "yak-script" {
+		// A script provider has one configuration source. ModelName is only its
+		// routing/display label; connection settings and ExtraParams do not apply.
+		return []AIConfigOption{WithType(provider.GetType()), WithModel(modelName), WithScript(provider.GetScript())}
+	}
 	for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
 		for _, param := range params {
 			if param.GetKey() == "network_debug" {
@@ -256,23 +261,6 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 			}
 		}
 	}
-	if provider.GetType() == "yak-script" {
-		// Model parameters override provider parameters, matching model selection.
-		for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
-			for _, param := range params {
-				switch param.GetKey() {
-				case "script":
-					opts = append(opts, WithScript(param.GetValue()))
-				case "script_timeout_seconds":
-					timeout, err := strconv.ParseFloat(param.GetValue(), 64)
-					if err == nil && timeout > 0 {
-						opts = append(opts, WithTimeout(timeout))
-					}
-				}
-			}
-		}
-	}
-
 	// Set API key
 	if provider.APIKey != "" {
 		opts = append(opts, WithAPIKey(provider.APIKey))

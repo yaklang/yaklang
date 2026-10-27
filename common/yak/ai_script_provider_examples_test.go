@@ -77,6 +77,9 @@ func TestYakScriptProviderChatCompletionsExample(t *testing.T) {
 			var requests atomic.Int32
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests.Add(1)
+				if tc.name == "JSON default" {
+					time.Sleep(20 * time.Millisecond)
+				}
 				wantPath := "/v1/chat/completions"
 				if tc.endpoint {
 					wantPath = "/custom-model"
@@ -110,11 +113,19 @@ func TestYakScriptProviderChatCompletionsExample(t *testing.T) {
 				mode = "json"
 			}
 			script := strings.Replace(source, `mode = "json"`, fmt.Sprintf("mode = %q", mode), 1)
+			endpoint := server.URL + "/v1/chat/completions"
+			if tc.endpoint {
+				endpoint = server.URL + "/custom-model"
+			}
+			script = strings.NewReplacer(
+				`https://model.example/v1/chat/completions`, endpoint,
+				`model = "your-model-id"`, `model = "upstream-model-id"`,
+				`apiKey = ""`, `apiKey = "fixture-token"`,
+				`headers = {}`, `headers = {"X-Adapter-Test": "contract"}`,
+			).Replace(script)
 			chat, err := ai.LoadChater(yakscript.ProviderType, aispec.WithScript(script),
-				aispec.WithBaseURL(server.URL+"/v1/"),
-				aispec.WithEndpoint(server.URL+"/custom-model"), aispec.WithEnableEndpoint(tc.endpoint),
-				aispec.WithModel("upstream-model-id"), aispec.WithAPIKey("fixture-token"),
-				aispec.WithExtraHeaderString("X-Adapter-Test", "contract"))
+				aispec.WithModel("display-label"), aispec.WithBaseURL("https://ignored.invalid"),
+				aispec.WithAPIKey("ignored-key"), aispec.WithTimeout(.001))
 			require.NoError(t, err)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()

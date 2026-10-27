@@ -15,6 +15,7 @@ import (
 var thirdPartyConfig = new(sync.Map)
 
 type thirdPartyApplicationConfig struct {
+	Script         string
 	Type           string
 	APIKey         string `app:"name:api_key"`
 	UserIdentifier string `app:"name:user_identifier"`
@@ -34,6 +35,9 @@ type thirdPartyApplicationConfig struct {
 }
 
 func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
+	if config.GetType() == "yak-script" {
+		return // Script is self-contained; do not flatten connection fields into ExtraParams.
+	}
 	c := &thirdPartyApplicationConfig{
 		Type:           config.Type,
 		APIKey:         config.APIKey,
@@ -117,6 +121,7 @@ func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationC
 		rawCfg := v.(*thirdPartyApplicationConfig)
 		utils.ImportAppConfigToStruct(rawCfg, rawCfg.ToMap())
 		config := &ypb.ThirdPartyApplicationConfig{}
+		config.Script = rawCfg.Script
 		config.APIKey = rawCfg.APIKey
 		config.UserIdentifier = rawCfg.UserIdentifier
 		config.UserSecret = rawCfg.UserSecret
@@ -166,6 +171,7 @@ func AllThirdPartyApplicationConfig() []*ypb.ThirdPartyApplicationConfig {
 	thirdPartyConfig.Range(func(key, value interface{}) bool {
 		rawConfig := value.(*thirdPartyApplicationConfig)
 		config := &ypb.ThirdPartyApplicationConfig{
+			Script:         rawConfig.Script,
 			Type:           rawConfig.Type,
 			APIKey:         rawConfig.APIKey,
 			UserIdentifier: rawConfig.UserIdentifier,
@@ -206,6 +212,7 @@ func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) 
 	}
 	ConvertCompatibleConfig(config)
 	c := &thirdPartyApplicationConfig{
+		Script:         config.GetScript(),
 		Type:           config.Type,
 		APIKey:         config.APIKey,
 		UserIdentifier: config.UserIdentifier,
@@ -259,7 +266,11 @@ func applyThirdPartyNonAppFields(target any, source *thirdPartyApplicationConfig
 	if elem.Kind() != reflect.Struct {
 		return nil
 	}
-	field := elem.FieldByName("Headers")
+	field := elem.FieldByName("Script")
+	if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
+		field.SetString(source.Script)
+	}
+	field = elem.FieldByName("Headers")
 	if field.IsValid() && field.CanSet() && field.Type() == reflect.TypeOf([]*ypb.KVPair(nil)) {
 		field.Set(reflect.ValueOf(cloneHTTPHeaders(source.Headers)))
 	}

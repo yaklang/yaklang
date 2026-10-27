@@ -25,20 +25,12 @@ const ProviderType = "yak-script"
 // Request is a per-invocation snapshot. Adapters must pass Context to network
 // calls. RequestID can be used as an isolated upstream conversation ID.
 type Request struct {
-	Context        context.Context
-	RequestID      string
-	Prompt         string
-	Model          string
-	BaseURL        string
-	Endpoint       string
-	EnableEndpoint bool
-	APIKey         string
-	Proxy          string
-	Timeout        float64
-	Headers        map[string]string
-	RawMessages    []aispec.ChatDetail
-	retryMu        sync.Mutex
-	retry          *retryDecision
+	Context     context.Context
+	RequestID   string
+	Prompt      string
+	RawMessages []aispec.ChatDetail
+	retryMu     sync.Mutex
+	retry       *retryDecision
 }
 
 // Executor runs chat(request, emit). A script either returns a complete string,
@@ -96,10 +88,7 @@ func (g *GatewayClient) Chat(prompt string, functions ...any) (string, error) {
 	}
 	requestID := uuid.NewString()
 	newRequest := func() *Request {
-		return &Request{RequestID: requestID, Prompt: prompt, Model: c.Model,
-			BaseURL: c.BaseURL, Endpoint: c.Endpoint, EnableEndpoint: c.EnableEndpoint,
-			APIKey: c.APIKey, Proxy: c.Proxy, Timeout: c.Timeout,
-			Headers: aispec.ExtraHeadersToMap(c.Headers), RawMessages: c.RawMessages}
+		return &Request{RequestID: requestID, Prompt: prompt, RawMessages: c.RawMessages}
 	}
 	retried := false
 	attempt := 0
@@ -160,18 +149,12 @@ func (g *GatewayClient) notify(message string) {
 	}
 }
 
-// The per-attempt timeout starts after admission, so queueing and recovery do
-// not consume it. Caller cancellation/deadlines still cover the whole operation.
+// The script owns HTTP timeouts. The attempt inherits caller cancellation and
+// deadlines; ordinary provider timeout defaults must not override script policy.
 func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForever bool) (result string, resultErr error, resultDecision *retryDecision) {
 	c := g.config
-	bufferOutput := consts.IsAIRetryForeverEnabled()
-	var ctx context.Context
-	var cancel context.CancelFunc
-	if c.Timeout > 0 {
-		ctx, cancel = context.WithTimeout(parent, time.Duration(c.Timeout*float64(time.Second)))
-	} else {
-		ctx, cancel = context.WithCancel(parent)
-	}
+	bufferOutput := retryForever
+	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	req.Context = ctx
 	var mu sync.Mutex
@@ -223,9 +206,6 @@ func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForev
 		err = errors.New(decision.reason)
 	}
 	if ctx.Err() != nil {
-		if parent.Err() == nil && errors.Is(ctx.Err(), context.DeadlineExceeded) && text == "" {
-			return "", ctx.Err(), &retryDecision{reason: "单次模型请求超时"}
-		}
 		if text != "" && !bufferOutput {
 			decision = nil
 		}

@@ -19887,8 +19887,10 @@ type ThirdPartyApplicationConfig struct {
 	FrequencyPenalty  *float64 `protobuf:"fixed64,22,opt,name=FrequencyPenalty,proto3,oneof" json:"FrequencyPenalty,omitempty"`
 	ReasoningEffort   *string  `protobuf:"bytes,23,opt,name=ReasoningEffort,proto3,oneof" json:"ReasoningEffort,omitempty"`
 	EnableThinkingOpt *bool    `protobuf:"varint,24,opt,name=EnableThinkingOpt,proto3,oneof" json:"EnableThinkingOpt,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// yak-script: the complete provider implementation; connection and model options live in the source.
+	Script        string `protobuf:"bytes,25,opt,name=Script,proto3" json:"Script,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ThirdPartyApplicationConfig) Reset() {
@@ -20087,6 +20089,13 @@ func (x *ThirdPartyApplicationConfig) GetEnableThinkingOpt() bool {
 		return *x.EnableThinkingOpt
 	}
 	return false
+}
+
+func (x *ThirdPartyApplicationConfig) GetScript() string {
+	if x != nil {
+		return x.Script
+	}
+	return ""
 }
 
 type DiagnoseNetworkRequest struct {
@@ -80643,7 +80652,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fAuthPassword\x18\x02 \x01(\tR\fAuthPassword\x12\x1a\n" +
 	"\bAuthType\x18\x03 \x01(\tR\bAuthType\x12\x12\n" +
 	"\x04Host\x18\x04 \x01(\tR\x04Host\x12\x1c\n" +
-	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xa7\a\n" +
+	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xbf\a\n" +
 	"\x1bThirdPartyApplicationConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x16\n" +
 	"\x06APIKey\x18\x02 \x01(\tR\x06APIKey\x12&\n" +
@@ -80673,7 +80682,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x04TopK\x18\x15 \x01(\x03H\x03R\x04TopK\x88\x01\x01\x12/\n" +
 	"\x10FrequencyPenalty\x18\x16 \x01(\x01H\x04R\x10FrequencyPenalty\x88\x01\x01\x12-\n" +
 	"\x0fReasoningEffort\x18\x17 \x01(\tH\x05R\x0fReasoningEffort\x88\x01\x01\x121\n" +
-	"\x11EnableThinkingOpt\x18\x18 \x01(\bH\x06R\x11EnableThinkingOpt\x88\x01\x01B\f\n" +
+	"\x11EnableThinkingOpt\x18\x18 \x01(\bH\x06R\x11EnableThinkingOpt\x88\x01\x01\x12\x16\n" +
+	"\x06Script\x18\x19 \x01(\tR\x06ScriptB\f\n" +
 	"\n" +
 	"_MaxTokensB\x0e\n" +
 	"\f_TemperatureB\a\n" +

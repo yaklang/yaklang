@@ -366,6 +366,9 @@ func modelNeedsLegacyRecovery(model *ypb.AIModelConfig) bool {
 	if provider == nil {
 		return true
 	}
+	if provider.GetType() == "yak-script" {
+		return false // Script providers do not use API keys or legacy provider recovery.
+	}
 	if strings.TrimSpace(provider.GetType()) == "" {
 		return true
 	}
@@ -490,7 +493,7 @@ func migrateAIGlobalConfigBaseURLs(cfg *ypb.AIGlobalConfig) bool {
 }
 
 func migrateThirdPartyConfigBaseURL(cfg *ypb.ThirdPartyApplicationConfig) bool {
-	if cfg == nil || strings.TrimSpace(cfg.GetBaseURL()) != "" {
+	if cfg == nil || cfg.GetType() == "yak-script" || strings.TrimSpace(cfg.GetBaseURL()) != "" {
 		return false
 	}
 	rootURL, defaultURI := aiProviderDefaultEndpoint(cfg.GetType())

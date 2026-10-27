@@ -42,3 +42,23 @@ func TestGlobalNetworkDebugPersistenceAndRuntime(t *testing.T) {
 		require.Equal(t, enabled, GetCachedAIGlobalConfig().GetNetworkDebug())
 	}
 }
+
+func TestScriptProviderGlobalConfigPersistence(t *testing.T) {
+	db := setupAIGlobalConfigTestDB(t)
+	source := `chat = func(req, emit) { return req.Prompt }`
+	config := &ypb.AIGlobalConfig{IntelligentModels: []*ypb.AIModelConfig{{
+		ModelName: "script-label", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script", Script: source},
+	}}}
+	_, err := SetAIGlobalConfig(db, config)
+	require.NoError(t, err)
+	saved, err := GetAIGlobalConfig(db)
+	require.NoError(t, err)
+	require.Equal(t, source, saved.IntelligentModels[0].Provider.Script)
+	require.Empty(t, saved.IntelligentModels[0].Provider.ExtraParams)
+	require.Empty(t, saved.IntelligentModels[0].Provider.BaseURL, "ordinary provider defaults must not populate script configuration")
+	require.False(t, migrateThirdPartyConfigBaseURL(saved.IntelligentModels[0].Provider))
+	require.False(t, modelNeedsLegacyRecovery(saved.IntelligentModels[0]))
+	require.NoError(t, ApplyAIGlobalConfig(db, saved))
+	require.Equal(t, source, GetCachedAIGlobalConfig().IntelligentModels[0].Provider.Script)
+	require.Equal(t, source, consts.GetTieredAIConfig().IntelligentConfigs[0].Provider.Script)
+}

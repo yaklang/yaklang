@@ -209,6 +209,7 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 	}
 
 	provider := &ypb.ThirdPartyApplicationConfig{
+		Script:         cfg.GetScript(),
 		Type:           cfg.GetType(),
 		APIKey:         cfg.GetAPIKey(),
 		UserIdentifier: cfg.GetUserIdentifier(),

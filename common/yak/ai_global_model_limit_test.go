@@ -54,7 +54,7 @@ func TestGlobalModelLimitMixedProvidersAndRetries(t *testing.T) {
 			defer wg.Done()
 			opts := []aispec.AIConfigOption{aispec.WithContext(ctx), aispec.WithTimeout(.1), aispec.WithBaseURL(server.URL), aispec.WithModel(fmt.Sprint(i)), aispec.WithAPIKey("fixture"), aispec.WithDisableProviderFallback(true)}
 			if i%2 == 0 {
-				opts = append(opts, aispec.WithType("yak-script"), aispec.WithScript(strings.Replace(yakscript.ExampleScript, `mode = "json"`, `mode = "sse"`, 1)))
+				opts = append(opts, aispec.WithType("yak-script"), aispec.WithScript(strings.NewReplacer(`mode = "json"`, `mode = "sse"`, "https://model.example/v1/chat/completions", server.URL, "timeoutSeconds = 240", "timeoutSeconds = 0.1").Replace(yakscript.ExampleScript)))
 			} else {
 				opts = append(opts, aispec.WithType("openai"))
 			}
