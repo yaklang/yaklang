@@ -11,6 +11,7 @@ type imapIdle struct {
 	tag                          string
 	client                       int
 	continued, done, quarantined bool
+	doneWithoutContinuation      bool
 	commandID, continuationID    uint64
 }
 type imapNamespaceRequest struct {
@@ -20,6 +21,10 @@ type imapNamespaceRequest struct {
 
 func imapExtensionError(profile, reason string) (map[string]any, bool, error) {
 	return map[string]any{"Profile": profile, "Packet Name": "Refused extension message", "Error Scope": "message"}, true, protocolError(ErrMalformedMessage, "IMAP: %s", reason)
+}
+
+func imapExtensionContext(profile, reason string) (map[string]any, bool, error) {
+	return map[string]any{"Profile": profile, "Packet Name": "Extension context unavailable", "Error Scope": "message", "Context Missing": reason}, true, protocolError(ErrContextRequired, "IMAP: %s", reason)
 }
 
 func (s *binIMAP) addExtensionCommand(tag, command string) error {
@@ -93,6 +98,12 @@ func (s *binIMAP) consumeIdle(dir int, raw []byte, words []string) (map[string]a
 	if owner := s.idle; owner != nil {
 		out := map[string]any{"Profile": profile, "Tag": owner.tag, "Command": "IDLE", "Session State Validated": false, "Capability Authorization Verified": false}
 		if dir == owner.client {
+			if s.peerCaptureGap && (!owner.continued || owner.done || owner.quarantined) {
+				if !owner.continued && bytes.EqualFold(raw, []byte("DONE\r\n")) {
+					owner.done, owner.doneWithoutContinuation = true, true
+				}
+				return imapExtensionContext(profile, "IDLE continuation/completion is behind an observed peer TCP delivery gap")
+			}
 			if !owner.continued || owner.done || owner.quarantined || !bytes.EqualFold(raw, []byte("DONE\r\n")) {
 				owner.quarantined = true
 				return imapExtensionError(profile, "IDLE client data has no valid outstanding DONE continuation")
@@ -102,7 +113,7 @@ func (s *binIMAP) consumeIdle(dir int, raw []byte, words []string) (map[string]a
 			return out, true, nil
 		}
 		if bytes.HasPrefix(raw, []byte("+")) {
-			if owner.continued || owner.done || owner.quarantined || !bytes.HasPrefix(raw, []byte("+ ")) || !bytes.HasSuffix(raw, []byte("\r\n")) {
+			if owner.continued || owner.done && !owner.doneWithoutContinuation || owner.quarantined || !bytes.HasPrefix(raw, []byte("+ ")) || !bytes.HasSuffix(raw, []byte("\r\n")) {
 				owner.quarantined = true
 				return imapExtensionError(profile, "IDLE server continuation overlaps or has invalid syntax")
 			}
