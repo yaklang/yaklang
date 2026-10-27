@@ -80,10 +80,21 @@ func TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t *testing.T
 	require.Nil(t, protocolCorpusFindNode(root, "BindAck"))
 }
 
+func TestDCERPCSecurityRuleInvalidBoundsPrecedeUnsupportedProfile(t *testing.T) {
+	wire := dcerpcSecurityRuleTestWire()
+	wire[32], wire[33], wire[34] = 0xeb, 0xeb, 0xeb
+	_, err := parser.ParseBinary(bytes.NewReader(wire), "application-layer.dcerpc", "DCERPC")
+	require.ErrorContains(t, err, "authentication padding overlaps")
+	wire[34] = 0
+	_, err = parser.ParseBinary(bytes.NewReader(wire), "application-layer.dcerpc", "DCERPC")
+	require.ErrorContains(t, err, "unsupported authentication type or level")
+}
+
 func requireP0DCERPCWireEnvelopeScope(t *testing.T) {
 	t.Helper()
 	TestDCERPCSecurityRuleWireBoundariesAndOpaqueBody(t)
 	TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t)
+	TestDCERPCSecurityRuleInvalidBoundsPrecedeUnsupportedProfile(t)
 	catalog, roadmap, aliasCatalog, aliasRoadmap := false, false, false, false
 	for _, entry := range ProtocolCatalog {
 		if entry.Name == "DCE/RPC" {
