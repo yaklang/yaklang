@@ -1,7 +1,7 @@
-# RFC 4251/4253/4419/5656/8332. One initial plaintext binary packet,
+# RFC 4251/4253/4419/5656/8332/8709. One initial plaintext binary packet,
 # including padding, excluding any MAC. Explicit caller boundary and exchange
 # layout required. No automatic TCP, negotiation, compression or cipher state.
-# RSA host/signature fields and P-256 encoded coordinates only; no mathematics,
+# RSA and Ed25519/Ed448 host/signature fields, P-256 encoded coordinates; no mathematics,
 # signature checks, identity or session outcome. Other formats remain opaque.
 # ssh.yaml supplies length-prefixed generic framing without a method guess.
 # Total 35000-byte local cap.
