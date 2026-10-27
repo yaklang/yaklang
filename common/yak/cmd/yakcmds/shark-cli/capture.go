@@ -32,6 +32,7 @@ type captureConfig struct {
 	retentionPackets              int
 	protocolHistoryMiB            int
 	freezePacketFields            bool
+	exportProtocolPublications    bool
 }
 
 func protocolHistoryBudget(packets int) (int, int) {
@@ -131,6 +132,7 @@ func openOffline(name, filter string, ignoreSecrets ...bool) (_ *captureSource, 
 }
 
 type capturedPacket struct {
+	publicationPhase      string // Nonphysical, bounded JSON analysis record; never a captured frame.
 	transportView         *packetTransportView
 	physicalRecord        bool
 	tcpFlowID             uint64
@@ -186,7 +188,7 @@ type captureSession struct {
 func startCapture(parent context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) *captureSession {
 	ctx, cancel := context.WithCancel(parent)
 	queue := 2048
-	if cfg.freezePacketFields {
+	if cfg.freezePacketFields || cfg.exportProtocolPublications {
 		queue = 64
 	} // bounded field snapshots backpressure plain/JSON output
 	s := &captureSession{packets: make(chan *capturedPacket, queue), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
@@ -217,6 +219,10 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
+	publishingClose := false
+	// Duration expiry ends input, but the consumer still needs close diagnostics.
+	// Explicit parent cancellation also cancels publication backpressure.
+	publicationContext := ctx
 	// Inspection must retain useful packets from imperfect captures. The engine
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
@@ -291,6 +297,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				// this packet or inventing it as one of their byte contributors.
 				current.recordPublishedPDU(e)
 			}
+		} else if publishingClose && cfg.exportProtocolPublications {
+			publication := &capturedPacket{publicationPhase: "capture_close", fieldsAtObservation: true, observedFieldBudget: observedPacketFieldBytes - 1024}
+			publication.recordObservedPDU(e)
+			select {
+			case s.packets <- publication:
+			case <-publicationContext.Done():
+			}
 		}
 	}))
 	analyzer, err := pcaputil.NewPacketAnalyzer(options...)
@@ -298,6 +311,8 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		return err
 	}
 	defer func() {
+		current = nil
+		publishingClose = true
 		result = errors.Join(result, analyzer.Close())
 		if s.streams != nil {
 			s.streams.finish()

@@ -22,9 +22,22 @@ yak shark --pcap-file traffic.pcap --json --count 100
 ```
 
 Without an interactive terminal, summaries are printed automatically. `--plain`
-forces text output; `--json` emits one packet summary per line. `--count` and
+forces text output; `--json` emits JSONL packet snapshots and separate protocol
+publications produced when capture analysis closes. `--count` and
 `--duration` stop capture; the TUI stays open for inspection until `q` is pressed.
 An offline capture also remains browsable after EOF.
+
+Physical JSON rows retain `number`, `time`, `length` and `capture_domain`.
+Additional `record_type: "protocol_publication"` rows have
+`publication_phase: "capture_close"` and `published_pdus`, with no fabricated
+packet number, time, endpoint or length. Count physical packets separately from
+these analysis records. Both ordinary `pdus` and `published_pdus` preserve
+`byte_source` contributors; publication time does not make the last physical
+packet a contributor. Close records use the same bounded output queue, with an
+independent 256 KiB field budget per publication. Refusal is an explicit
+`limited` PDU. `--display-filter` evaluates each close record's own fields;
+plain text packet output excludes these records. Cancellation can stop final
+publication, so a cancelled export is not a complete audit.
 
 ## Filtering
 
