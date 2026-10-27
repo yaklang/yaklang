@@ -13,16 +13,31 @@ const observedPacketFieldBytes = 256 << 10
 // global history eviction or EOF diagnostic changes an earlier JSON row.
 // The TUI retains its separate revision-aware historical contributor queries.
 func (p *capturedPacket) recordObservedPDU(e *pcaputil.ProtocolEvent) {
+	p.recordPDUAtObservation(e, false)
+}
+
+func (p *capturedPacket) recordPublishedPDU(e *pcaputil.ProtocolEvent) {
+	p.recordPDUAtObservation(e, true)
+}
+
+func (p *capturedPacket) recordPDUAtObservation(e *pcaputil.ProtocolEvent, publication bool) {
 	if p.observedFieldsLimited {
 		return
+	}
+	appendPDU := func(row map[string]any) {
+		if publication {
+			p.publishedPDUs = append(p.publishedPDUs, row)
+		} else {
+			p.observedPDUs = append(p.observedPDUs, row)
+		}
 	}
 	limited := func() {
 		p.observedFieldsLimited = true
 		snapshot := pcaputil.DisplayFieldSnapshot{SchemaVersion: pcaputil.DisplayFieldSchemaVersion, Completeness: "limited"}
 		p.observedFields = append(p.observedFields, snapshot)
-		p.observedPDUs = append(p.observedPDUs, map[string]any{"id": uint64(0), "protocol": "message", "status": "limited", "completeness": "limited", "summary": "Packet observation field snapshot budget exceeded", "field_values": snapshot})
+		appendPDU(map[string]any{"id": uint64(0), "protocol": "message", "status": "limited", "completeness": "limited", "summary": "Packet observation field snapshot budget exceeded", "field_values": snapshot})
 	}
-	if len(p.observedPDUs) >= 128 {
+	if len(p.observedPDUs)+len(p.publishedPDUs) >= 128 {
 		limited()
 		return
 	}
@@ -43,6 +58,10 @@ func (p *capturedPacket) recordObservedPDU(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	p.observedFieldBudget -= len(wire)
-	p.observedPDUs = append(p.observedPDUs, row)
-	p.observedFields = append(p.observedFields, values)
+	appendPDU(row)
+	if !publication {
+		// Availability during processing is separate from a physical packet's
+		// field union. Foreign/late publications must not match its filter.
+		p.observedFields = append(p.observedFields, values)
+	}
 }

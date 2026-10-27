@@ -150,6 +150,7 @@ type capturedPacket struct {
 	reference             pcaputil.PacketReference
 	events                []*pcaputil.ProtocolEvent
 	observedPDUs          []map[string]any
+	publishedPDUs         []map[string]any
 	observedFields        []pcaputil.DisplayFieldSnapshot
 	observedFieldBudget   int
 	observedFieldsLimited bool
@@ -248,6 +249,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		}
 		if current != nil {
 			current.history = history
+			contributes := false
 			// Time-based flushing can emit events from another flow. Only an
 			// event with this packet among its contributors may label its row.
 			for _, ref := range e.SourceBytes.PacketRefs {
@@ -255,6 +257,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				// fragment reassembly can add a proven tunnel domain to this same
 				// record; exact domain equality would hide its completed PDU.
 				if ref.Number == current.reference.Number {
+					contributes = true
 					recordProtocolConversation(current, e)
 					if current.fieldsAtObservation {
 						current.recordObservedPDU(e)
@@ -272,6 +275,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 					}
 					break
 				}
+			}
+			if current.fieldsAtObservation && !contributes {
+				// Filling a TCP hole may release complete PDUs whose bytes all
+				// belong to previously exported rows. Time-based flushes can also
+				// publish another flow. Preserve these separately without labeling
+				// this packet or inventing it as one of their byte contributors.
+				current.recordPublishedPDU(e)
 			}
 		}
 	}))
