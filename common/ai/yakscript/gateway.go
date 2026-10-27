@@ -29,12 +29,15 @@ type Request struct {
 	RequestID   string
 	Prompt      string
 	RawMessages []aispec.ChatDetail
+	Tools       []aispec.Tool
+	ToolChoice  any
 	retryMu     sync.Mutex
 	retry       *retryDecision
 }
 
 // Executor runs chat(request, emit). A script either returns a complete string,
-// or emits text fragments and returns nil. Returning an error fails the attempt;
+// or emits text fragments and returns nil. With native calling enabled it can
+// return a normalized {content, tool_calls, finish_reason} object. Returning an error fails the attempt;
 // errors must not become model text.
 // Both return and emit carry normalized content, never an HTTP/SSE envelope or
 // reasoning text. The current script ABI has no separate reasoning emitter.
@@ -53,8 +56,7 @@ func (g *GatewayClient) LoadOption(opts ...aispec.AIConfigOption) {
 }
 func (g *GatewayClient) GetConfig() *aispec.AIConfig { return g.config }
 
-func (*GatewayClient) SupportsNativeToolCalling() bool { return false }
-func (*GatewayClient) ManagesModelRetries() bool       { return true }
+func (*GatewayClient) ManagesModelRetries() bool { return true }
 
 func (g *GatewayClient) CheckValid() error {
 	if g.config == nil || strings.TrimSpace(g.config.Script) == "" {
@@ -71,8 +73,11 @@ func (g *GatewayClient) Chat(prompt string, functions ...any) (string, error) {
 		return "", err
 	}
 	c := g.config
-	if len(functions) > 0 || len(c.Tools) > 0 {
-		return "", errors.New("yak-script currently supports text action/JSON output, not native tool calling")
+	if len(functions) > 0 {
+		return "", errors.New("yak-script does not accept legacy functions; use tools")
+	}
+	if len(c.Tools) > 0 && !c.EnableNativeToolCalling {
+		return "", errors.New("yak-script native tool calling is disabled in provider configuration")
 	}
 	if len(c.Images) > 0 || len(c.Videos) > 0 {
 		return "", errors.New("yak-script currently supports text input only")
@@ -88,7 +93,7 @@ func (g *GatewayClient) Chat(prompt string, functions ...any) (string, error) {
 	}
 	requestID := uuid.NewString()
 	newRequest := func() *Request {
-		return &Request{RequestID: requestID, Prompt: prompt, RawMessages: c.RawMessages}
+		return &Request{RequestID: requestID, Prompt: prompt, RawMessages: c.RawMessages, Tools: c.Tools, ToolChoice: c.ToolChoice}
 	}
 	retried := false
 	attempt := 0
@@ -124,9 +129,6 @@ func (g *GatewayClient) Chat(prompt string, functions ...any) (string, error) {
 				if retried {
 					g.notify("模型接口已恢复，继续执行任务")
 				}
-				if c.FinishReasonCallback != nil {
-					c.FinishReasonCallback("stop", nil)
-				}
 			}
 			return text, err
 		}
@@ -153,7 +155,7 @@ func (g *GatewayClient) notify(message string) {
 // deadlines; ordinary provider timeout defaults must not override script policy.
 func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForever bool) (result string, resultErr error, resultDecision *retryDecision) {
 	c := g.config
-	bufferOutput := retryForever
+	bufferOutput := retryForever || len(req.Tools) > 0
 	ctx, cancel := context.WithCancel(parent)
 	defer cancel()
 	req.Context = ctx
@@ -221,21 +223,47 @@ func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForev
 		}
 		return "", fmt.Errorf("yak-script execution failed: %w", err), nil
 	}
+	finishReason := "stop"
+	var calls []*aispec.ToolCall
 	if value != nil {
-		returned, ok := value.(string)
-		if !ok {
-			return "", fmt.Errorf("yak-script chat must return a string or nil, got %T", value), nil
-		}
 		if text != "" {
-			return "", errors.New("yak-script chat must either emit text or return text, not both"), nil
+			return "", errors.New("yak-script chat must either emit text or return a result, not both"), nil
 		}
-		text = returned
+		if returned, ok := value.(string); ok {
+			text = returned
+		} else {
+			if !c.EnableNativeToolCalling {
+				return "", errors.New("yak-script structured results require native tool calling to be enabled"), nil
+			}
+			result, err := normalizeNativeResult(value, req.Tools)
+			if err != nil {
+				return "", err, nil
+			}
+			text, calls, finishReason = result.Content, result.ToolCalls, result.FinishReason
+		}
 	}
-	if strings.TrimSpace(text) == "" {
+	if strings.TrimSpace(text) == "" && len(calls) == 0 {
 		return "", errors.New("yak-script returned an empty model response"), nil
 	}
-	if (value != nil || bufferOutput) && c.StreamHandler != nil {
+	if ctx.Err() != nil {
+		return "", ctx.Err(), nil
+	}
+	// Native results are committed only after every call has been validated.
+	if (value != nil || bufferOutput) && c.StreamHandler != nil && text != "" {
 		c.StreamHandler(strings.NewReader(text))
+	}
+	if len(calls) > 0 {
+		if c.ToolCallArgumentsStreamHandler != nil {
+			for _, call := range calls {
+				c.ToolCallArgumentsStreamHandler(strings.NewReader(call.Function.Arguments))
+			}
+		}
+		if c.ToolCallCallback != nil {
+			c.ToolCallCallback(calls)
+		}
+	}
+	if c.FinishReasonCallback != nil {
+		c.FinishReasonCallback(finishReason, nil)
 	}
 	return text, nil, nil
 }

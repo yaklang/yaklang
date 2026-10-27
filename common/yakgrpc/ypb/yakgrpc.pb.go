@@ -19888,9 +19888,11 @@ type ThirdPartyApplicationConfig struct {
 	ReasoningEffort   *string  `protobuf:"bytes,23,opt,name=ReasoningEffort,proto3,oneof" json:"ReasoningEffort,omitempty"`
 	EnableThinkingOpt *bool    `protobuf:"varint,24,opt,name=EnableThinkingOpt,proto3,oneof" json:"EnableThinkingOpt,omitempty"`
 	// yak-script: the complete provider implementation; connection and model options live in the source.
-	Script        string `protobuf:"bytes,25,opt,name=Script,proto3" json:"Script,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Script string `protobuf:"bytes,25,opt,name=Script,proto3" json:"Script,omitempty"`
+	// yak-script: opt into native tool_calls; false uses text actions.
+	EnableNativeToolCalling bool `protobuf:"varint,26,opt,name=EnableNativeToolCalling,proto3" json:"EnableNativeToolCalling,omitempty"`
+	unknownFields           protoimpl.UnknownFields
+	sizeCache               protoimpl.SizeCache
 }
 
 func (x *ThirdPartyApplicationConfig) Reset() {
@@ -20096,6 +20098,13 @@ func (x *ThirdPartyApplicationConfig) GetScript() string {
 		return x.Script
 	}
 	return ""
+}
+
+func (x *ThirdPartyApplicationConfig) GetEnableNativeToolCalling() bool {
+	if x != nil {
+		return x.EnableNativeToolCalling
+	}
+	return false
 }
 
 type DiagnoseNetworkRequest struct {
@@ -39444,13 +39453,13 @@ type StartBruteParams struct {
 	Concurrent int64 `protobuf:"varint,8,opt,name=Concurrent,proto3" json:"Concurrent,omitempty"`
 	Retry      int64 `protobuf:"varint,9,opt,name=Retry,proto3" json:"Retry,omitempty"`
 	// 目标任务内并发
-	TargetTaskConcurrent int64 `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
-	OkToStop         bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
-	DelayMin         int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
-	DelayMax         int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
-	PluginScriptName string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	TargetTaskConcurrent int64  `protobuf:"varint,10,opt,name=TargetTaskConcurrent,proto3" json:"TargetTaskConcurrent,omitempty"`
+	OkToStop             bool   `protobuf:"varint,11,opt,name=OkToStop,proto3" json:"OkToStop,omitempty"`
+	DelayMin             int64  `protobuf:"varint,12,opt,name=DelayMin,proto3" json:"DelayMin,omitempty"`
+	DelayMax             int64  `protobuf:"varint,13,opt,name=DelayMax,proto3" json:"DelayMax,omitempty"`
+	PluginScriptName     string `protobuf:"bytes,14,opt,name=PluginScriptName,proto3" json:"PluginScriptName,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
 }
 
 func (x *StartBruteParams) Reset() {
@@ -49084,8 +49093,8 @@ type ExecHistoryRecord struct {
 	// Uid
 	Id string `protobuf:"bytes,9,opt,name=Id,proto3" json:"Id,omitempty"`
 	// 展示界面内容
-	Stdout []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
-	Stderr []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
+	Stdout        []byte `protobuf:"bytes,10,opt,name=Stdout,proto3" json:"Stdout,omitempty"`
+	Stderr        []byte `protobuf:"bytes,11,opt,name=Stderr,proto3" json:"Stderr,omitempty"`
 	RuntimeId     string `protobuf:"bytes,12,opt,name=RuntimeId,proto3" json:"RuntimeId,omitempty"`
 	FromYakModule string `protobuf:"bytes,13,opt,name=FromYakModule,proto3" json:"FromYakModule,omitempty"`
 	StdoutLen     int64  `protobuf:"varint,14,opt,name=StdoutLen,proto3" json:"StdoutLen,omitempty"`
@@ -80652,7 +80661,7 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\fAuthPassword\x18\x02 \x01(\tR\fAuthPassword\x12\x1a\n" +
 	"\bAuthType\x18\x03 \x01(\tR\bAuthType\x12\x12\n" +
 	"\x04Host\x18\x04 \x01(\tR\x04Host\x12\x1c\n" +
-	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xbf\a\n" +
+	"\tForbidden\x18\x05 \x01(\bR\tForbidden\"\xf9\a\n" +
 	"\x1bThirdPartyApplicationConfig\x12\x12\n" +
 	"\x04Type\x18\x01 \x01(\tR\x04Type\x12\x16\n" +
 	"\x06APIKey\x18\x02 \x01(\tR\x06APIKey\x12&\n" +
@@ -80683,7 +80692,8 @@ const file_yakgrpc_proto_rawDesc = "" +
 	"\x10FrequencyPenalty\x18\x16 \x01(\x01H\x04R\x10FrequencyPenalty\x88\x01\x01\x12-\n" +
 	"\x0fReasoningEffort\x18\x17 \x01(\tH\x05R\x0fReasoningEffort\x88\x01\x01\x121\n" +
 	"\x11EnableThinkingOpt\x18\x18 \x01(\bH\x06R\x11EnableThinkingOpt\x88\x01\x01\x12\x16\n" +
-	"\x06Script\x18\x19 \x01(\tR\x06ScriptB\f\n" +
+	"\x06Script\x18\x19 \x01(\tR\x06Script\x128\n" +
+	"\x17EnableNativeToolCalling\x18\x1a \x01(\bR\x17EnableNativeToolCallingB\f\n" +
 	"\n" +
 	"_MaxTokensB\x0e\n" +
 	"\f_TemperatureB\a\n" +

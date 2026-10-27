@@ -47,13 +47,14 @@ func TestScriptProviderGlobalConfigPersistence(t *testing.T) {
 	db := setupAIGlobalConfigTestDB(t)
 	source := `chat = func(req, emit) { return req.Prompt }`
 	config := &ypb.AIGlobalConfig{IntelligentModels: []*ypb.AIModelConfig{{
-		ModelName: "script-label", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script", Script: source},
+		ModelName: "script-label", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script", Script: source, EnableNativeToolCalling: true},
 	}}}
 	_, err := SetAIGlobalConfig(db, config)
 	require.NoError(t, err)
 	saved, err := GetAIGlobalConfig(db)
 	require.NoError(t, err)
 	require.Equal(t, source, saved.IntelligentModels[0].Provider.Script)
+	require.True(t, saved.IntelligentModels[0].Provider.EnableNativeToolCalling)
 	require.Empty(t, saved.IntelligentModels[0].Provider.ExtraParams)
 	require.Empty(t, saved.IntelligentModels[0].Provider.BaseURL, "ordinary provider defaults must not populate script configuration")
 	require.False(t, migrateThirdPartyConfigBaseURL(saved.IntelligentModels[0].Provider))

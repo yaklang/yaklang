@@ -20,8 +20,11 @@ func TestProviderFunctionCallDefault(t *testing.T) {
 		name, provider string
 		opts           []ConfigOption
 		want           bool
+		enableNative   bool
 	}{
 		{name: "script default", provider: "yak-script"},
+		{name: "script enabled", provider: "yak-script", enableNative: true, want: true},
+		{name: "explicit text overrides enabled provider", provider: "yak-script", enableNative: true, opts: []ConfigOption{WithEnableFunctionCallMode(false)}},
 		{name: "standard provider", provider: "openai", want: true},
 		{name: "unknown provider keeps default", provider: "unregistered-test-provider", want: true},
 		{name: "explicit native remains explicit", provider: "yak-script", opts: []ConfigOption{WithEnableFunctionCallMode(true)}, want: true},
@@ -29,7 +32,7 @@ func TestProviderFunctionCallDefault(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			consts.SetTieredAIConfig(&consts.TieredAIConfig{Enabled: true, SingleModelMode: true,
-				IntelligentConfigs: []*ypb.AIModelConfig{{ModelName: "protocol-test", Provider: &ypb.ThirdPartyApplicationConfig{Type: tc.provider}}}})
+				IntelligentConfigs: []*ypb.AIModelConfig{{ModelName: "protocol-test", Provider: &ypb.ThirdPartyApplicationConfig{Type: tc.provider, EnableNativeToolCalling: tc.enableNative}}}})
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			opts := append([]ConfigOption{WithDisableAutoSkills(true), WithDisableCreateDBRuntime(true)}, tc.opts...)
@@ -56,13 +59,24 @@ func TestProviderFunctionCallDefaultModelSelection(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	cfg := newConfig(ctx)
-	for _, provider := range []string{"yak-script", "openai"} {
+	aiconfig.EnsureConfigLoaded()
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{Enabled: true, IntelligentConfigs: []*ypb.AIModelConfig{
+		{ModelName: "text", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script"}},
+		{ModelName: "native", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script", EnableNativeToolCalling: true}},
+		{ModelName: "ordinary", Provider: &ypb.ThirdPartyApplicationConfig{Type: "openai"}},
+	}})
+	for _, tc := range []struct {
+		provider, model string
+		want            bool
+	}{
+		{"yak-script", "native", true}, {"yak-script", "text", false}, {"openai", "ordinary", true}, {"yak-script", "text", false},
+	} {
 		options := cfg.ProcessHotPatchMessage(&ypb.AIInputEvent{IsConfigHotpatch: true, HotpatchType: HotPatchType_AIService,
-			Params: &ypb.AIStartParams{AIService: provider, AIModelName: "selected-model"}})
+			Params: &ypb.AIStartParams{AIService: tc.provider, AIModelName: tc.model}})
 		for _, option := range options {
 			require.NoError(t, option(cfg))
 		}
-		require.Equal(t, provider != "yak-script", cfg.EnableFunctionCallMode)
-		require.Equal(t, provider != "yak-script", cfg.GetConfigBool("EnableFunctionCallMode"))
+		require.Equal(t, tc.want, cfg.EnableFunctionCallMode)
+		require.Equal(t, tc.want, cfg.GetConfigBool("EnableFunctionCallMode"))
 	}
 }

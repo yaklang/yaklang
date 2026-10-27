@@ -43,6 +43,8 @@ type AIConfig struct {
 	// Script is trusted Yak source executed by the yak-script provider. It is
 	// stored with the model configuration, not fetched from a remote URL.
 	Script string `json:"script"`
+	// EnableNativeToolCalling is a script provider capability, not a per-call request mode.
+	EnableNativeToolCalling bool `json:"enable_native_tool_calling"`
 	// gateway network config
 	BaseURL        string `json:"base_url" app:"name:base_url,verbose:BaseURL,desc:BaseURL,id:3"`
 	Endpoint       string `json:"endpoint" app:"name:endpoint,verbose:Endpoint,desc:Endpoint,id:4"`
@@ -497,6 +499,10 @@ type AIConfigOption func(*AIConfig)
 // WithScript selects the source implementing chat(request, emit) for yak-script.
 func WithScript(source string) AIConfigOption {
 	return func(c *AIConfig) { c.Script = source }
+}
+
+func WithNativeToolCalling(enabled bool) AIConfigOption {
+	return func(c *AIConfig) { c.EnableNativeToolCalling = enabled }
 }
 
 func WithContext(ctx context.Context) AIConfigOption {

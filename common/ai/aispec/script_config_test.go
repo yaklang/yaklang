@@ -11,7 +11,7 @@ import (
 
 func TestScriptModelConfigOptions(t *testing.T) {
 	model := &ypb.AIModelConfig{ModelName: "display-label", Provider: &ypb.ThirdPartyApplicationConfig{
-		Type: "yak-script", Script: "chat = func(req, emit) { return req.Prompt }",
+		Type: "yak-script", EnableNativeToolCalling: true, Script: "chat = func(req, emit) { return req.Prompt }",
 		BaseURL: "https://ignored.invalid", APIKey: "ignored-key", Proxy: "ignored-proxy",
 		Endpoint: "https://ignored.invalid/chat", EnableEndpoint: true,
 		Headers:     []*ypb.KVPair{{Key: "X-Ignored", Value: "ignored"}},
@@ -33,6 +33,8 @@ func TestScriptModelConfigOptions(t *testing.T) {
 		option(config)
 	}
 	require.Equal(t, model.Provider.Script, config.Script)
+	require.True(t, config.EnableNativeToolCalling)
+	require.True(t, decoded.Provider.EnableNativeToolCalling)
 	require.Equal(t, "display-label", config.Model)
 	require.Empty(t, config.BaseURL)
 	require.Empty(t, config.Endpoint)

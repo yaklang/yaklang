@@ -34,9 +34,11 @@ func TestYakScriptModelGRPC(t *testing.T) {
 		if template.Name != "yak-script" {
 			continue
 		}
-		require.Len(t, template.Items, 1, "script providers must not advertise connection or timeout fields")
-		require.Equal(t, "script", template.Items[0].Name)
-		require.True(t, template.Items[0].Required)
+		require.Len(t, template.Items, 2, "script providers must not advertise connection or timeout fields")
+		require.Equal(t, "enable_native_tool_calling", template.Items[0].Name)
+		require.Equal(t, "false", template.Items[0].DefaultValue)
+		require.Equal(t, "script", template.Items[1].Name)
+		require.True(t, template.Items[1].Required)
 		return
 	}
 	t.Fatal("missing required script configuration field")

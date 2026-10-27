@@ -1,35 +1,23 @@
 package aispec
 
 import (
-	"testing"
-
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
+	"testing"
 )
 
-type capabilityTestClient struct {
-	AIClient
-	native bool
-}
-
-func (c *capabilityTestClient) SupportsNativeToolCalling() bool { return c.native }
-
-func TestProviderSupportsNativeToolCalling(t *testing.T) {
+func TestProviderFunctionCallDefault(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		client AIClient
-		want   bool
+		name     string
+		provider *ypb.ThirdPartyApplicationConfig
+		want     bool
 	}{
-		{"native", &capabilityTestClient{native: true}, true},
-		{"text", &capabilityTestClient{}, false},
-		{"legacy", struct{ AIClient }{}, true},
-		{"nil", nil, true},
+		{"script default off", &ypb.ThirdPartyApplicationConfig{Type: "yak-script"}, false},
+		{"script opt in", &ypb.ThirdPartyApplicationConfig{Type: "yak-script", EnableNativeToolCalling: true}, true},
+		{"ordinary provider unchanged", &ypb.ThirdPartyApplicationConfig{Type: "openai"}, true},
+		{"unknown provider unchanged", &ypb.ThirdPartyApplicationConfig{Type: "unknown"}, true},
+		{"unset", nil, true},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			name := "capability-test-" + tc.name
-			Register(name, func() AIClient { return tc.client })
-			t.Cleanup(func() { Unregister(name) })
-			require.Equal(t, tc.want, ProviderSupportsNativeToolCalling(name))
-		})
+		t.Run(tc.name, func(t *testing.T) { require.Equal(t, tc.want, ProviderFunctionCallDefault(tc.provider)) })
 	}
-	require.True(t, ProviderSupportsNativeToolCalling("unregistered-capability-test"))
 }

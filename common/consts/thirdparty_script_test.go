@@ -17,12 +17,13 @@ func TestScriptProviderConfigurationRoundTrip(t *testing.T) {
 		}
 	})
 	const source = `chat = func(req, emit) { return req.Prompt }`
-	config := &ypb.ThirdPartyApplicationConfig{Type: "yak-script", Script: source}
+	config := &ypb.ThirdPartyApplicationConfig{Type: "yak-script", Script: source, EnableNativeToolCalling: true}
 	UpdateThirdPartyApplicationConfig(config)
 	require.Empty(t, config.ExtraParams, "script config must not gain flattened connection options")
 	got, err := GetCommonThirdPartyApplicationConfig("yak-script")
 	require.NoError(t, err)
 	require.Equal(t, source, got.Script)
+	require.True(t, got.EnableNativeToolCalling)
 	all := AllThirdPartyApplicationConfig()
 	found := false
 	for _, item := range all {
@@ -32,9 +33,14 @@ func TestScriptProviderConfigurationRoundTrip(t *testing.T) {
 		}
 	}
 	require.True(t, found)
-	var defaults struct{ Script string }
+	var defaults struct {
+		Script                  string
+		EnableNativeToolCalling bool
+	}
 	require.NoError(t, GetThirdPartyApplicationConfig("yak-script", &defaults))
 	require.Equal(t, source, defaults.Script)
+	require.True(t, defaults.EnableNativeToolCalling)
 	model := thirdPartyConfigToModelConfig(got)
 	require.Equal(t, source, model.Provider.Script)
+	require.True(t, model.Provider.EnableNativeToolCalling)
 }

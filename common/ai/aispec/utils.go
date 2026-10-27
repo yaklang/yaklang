@@ -251,7 +251,7 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	if provider.GetType() == "yak-script" {
 		// A script provider has one configuration source. ModelName is only its
 		// routing/display label; connection settings and ExtraParams do not apply.
-		return []AIConfigOption{WithType(provider.GetType()), WithModel(modelName), WithScript(provider.GetScript())}
+		return []AIConfigOption{WithType(provider.GetType()), WithModel(modelName), WithScript(provider.GetScript()), WithNativeToolCalling(provider.GetEnableNativeToolCalling())}
 	}
 	for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
 		for _, param := range params {
@@ -379,4 +379,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	}
 
 	return opts
+}
+
+// ProviderFunctionCallDefault selects the Agent protocol for a configured provider.
+// Existing providers keep their native default; script providers explicitly opt in.
+func ProviderFunctionCallDefault(provider *ypb.ThirdPartyApplicationConfig) bool {
+	return provider.GetType() != "yak-script" || provider.GetEnableNativeToolCalling()
 }

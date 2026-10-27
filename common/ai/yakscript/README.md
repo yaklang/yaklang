@@ -6,15 +6,15 @@
 
 | 层 | 职责 |
 | --- | --- |
-| Go 宿主 | 创建 VM、注入接口、传递取消与超时、管理全局请求频率和恢复、把正文接入 StreamHandler / AIResponse |
-| Yak 脚本 | HTTP 请求映射、状态码与媒体类型检查、JSON / SSE 内部业务字段解析、完整性验证，交付正文或错误 |
-| Agent | 解析正文中的 `@action` / answer_payload、纠正格式并执行工具 |
+| Go 宿主 | 创建 VM、注入接口、传递取消与超时、管理全局请求频率和恢复、把正文接入 StreamHandler / AIResponse，校验并交付原生工具调用 |
+| Yak 脚本 | HTTP 请求映射、状态码与媒体类型检查、JSON / SSE 内部业务字段解析、完整性验证，交付正文、归一化工具调用或错误 |
+| Agent | 解析文本 `@action` / answer_payload 或原生工具调用、纠正格式并执行工具 |
 
 `data:` 和空行是 SSE 格式；`choices[].delta.content` 是模型接口格式；正文中的 `@action` 是 Agent 协议。HTTP 200、合法 SSE 或遇到 `[DONE]` 都不能单独证明业务成功。
 
 ## 模型配置
 
-选择 Provider `yak-script`，运行配置只保存一个专用字段 `Provider.Script`。不从 Provider 或 Model 的 ExtraParams 读取源码，不设覆盖优先级或旧配置转换。地址、凭据、上游模型 ID、Headers、代理、超时、采样参数以及业务选项全部定义在脚本源码中。
+选择 Provider `yak-script`，运行配置保存 `Provider.Script` 和协议开关 `Provider.EnableNativeToolCalling`（默认 false）。不从 Provider 或 Model 的 ExtraParams 读取源码，不设覆盖优先级或旧配置转换。地址、凭据、上游模型 ID、Headers、代理、超时、采样参数以及业务选项全部定义在脚本源码中。
 
 `AIModelConfig.ModelName` 只用作配置显示名称和路由标识，主/辅助类型仍用于模型选择；这两项不传入脚本，不决定上游请求。普通 Provider 的连接配置不适用于脚本模型。
 
@@ -24,9 +24,10 @@ AIModelConfig
   Provider:
     Type: yak-script
     Script: 完整 Yak 源码
+    EnableNativeToolCalling: false # 原生工具调用；按每条配置单独保存
 ```
 
-[内置通用示例](example.yak) 演示文本 Chat Completions，在 `chat` 开头修改 endpoint、model、apiKey、timeoutSeconds、proxy 和 headers。`mode = "json"` 可改为 `"sse"`，两种模式均完整验证后返回正文。新建时 Monaco 直接填入该模板；没有模板载入按钮或单独连接/超时表单。标准接口通常直接使用普通 Provider；此示例用于说明如何编写适配。
+[内置通用示例](example.yak) 演示 Chat Completions，在 `chat` 开头修改 endpoint、model、apiKey、timeoutSeconds、proxy 和 headers。`mode = "json"` 可改为 `"sse"`，两种模式均完整验证后返回正文。新建时 Monaco 直接填入该模板；没有模板载入按钮或单独连接/超时表单。原生工具调用打开且本次请求包含工具定义时，示例使用非流式 JSON，解析完成后返回归一化工具调用。标准接口通常直接使用普通 Provider；此示例用于说明如何编写适配。
 
 脚本中的 HTTP 超时在实际发起请求时生效，不受普通模型的默认 `AIConfig.Timeout` 截断。宿主仍传递调用方取消与总 deadline；需要约束脚本整体执行时，可以在脚本内从 req.Context 派生有期限的 Context。源码错误或无限循环仍可通过停止任务取消。
 
@@ -40,6 +41,8 @@ AIModelConfig
 | RequestID | 逻辑模型调用 ID，宿主重试复用，新模型调用重新生成；不代表上游自动去重 |
 | Prompt | 上层构造的完整提示词，可能包含历史、动作规范和工具结果，不要仅截取最后一句 |
 | RawMessages | 显式消息列表；内置示例明确拒绝它，避免无声丢失角色 / 多模态信息 |
+| Tools | 本次原生工具定义（name、description、parameters），文本模式为空 |
+| ToolChoice | 本次原生工具选择约束；脚本应映射给上游 |
 
 | 注入函数 | 用法和边界 |
 | --- | --- |
@@ -56,9 +59,36 @@ AIModelConfig
 
 只交付模型正文：不返回完整 HTTP / SSE 信封、choices 包装、进度或错误页；不在脚本里补造 `@action`。动作格式校验留在 Agent。
 
-目前脚本没有单独的思考 emitter，也没有 usage / native tool calls / 多模态输出 ABI。通用示例忽略 reasoning_content，不把思考拼入正文。标准 Provider 的独立 ReasonStreamHandler 不等于脚本自动获得这一能力。
+目前脚本没有单独的思考 emitter，也没有 usage / 多模态输出 ABI。通用示例忽略 reasoning_content，不把思考拼入正文。标准 Provider 的独立 ReasonStreamHandler 不等于脚本自动获得这一能力。
 
 开启全局无限重试时，宿主先缓冲 emit，只有尝试成功才提交，失败尝试的残缺正文被丢弃。关闭时，emit 按到达顺序交付；已交付文本无法撤回，宿主不重放已经输出部分正文的失败尝试。需要严格完整性的适配优先采用“校验后 return”。
+
+### 原生工具调用开关
+
+界面位于脚本模型的 Monaco 编辑器上方，默认关闭。关闭时 Agent 在正文中使用 `@action`；开启后 Agent 使用原生工具调用协议，将定义通过 `req.Tools` / `req.ToolChoice` 传入脚本。选择另一条模型配置时重新读取该配置的开关；显式的 Agent 协议选项仍优先。普通 Provider 的默认行为不变。
+
+开启开关不替脚本猜测上游格式。脚本负责解析其 HTTP / SSE 格式，然后返回如下对象（不是完整的 Chat Completions 响应）：
+
+```yak
+return {
+    "content": "", // 可选的模型正文
+    "tool_calls": [{
+        "id": "call_1",
+        "type": "function",
+        "function": {
+            "name": "directly_answer", // 必须是 req.Tools 中声明的名字
+            "arguments": `{"answer_payload":"42"}`, // 完整 JSON 对象的字符串
+        },
+    }],
+    "finish_reason": "tool_calls",
+}
+```
+
+宿主先验证所有调用的唯一非空 ID、类型、已声明的名称、完整 JSON 对象参数以及 `finish_reason=tool_calls`，成功后才交付 `ToolCallCallback` 和 `FinishReasonCallback`。Agent 再验证具体动作参数并执行。工具参数不会作为正文传入 `emit`。原生请求始终缓冲到验证结束，避免失败重试时重复提交部分调用。
+
+无工具调用的完成对象使用非空 `content`、空 `tool_calls`、`finish_reason="stop"`。字符串正文和辅助文本调用仍可使用原契约。不能同时 emit 和返回对象；关闭开关时返回对象会报错。自定义 SSE 适配需要在脚本中组装增量调用，完整验证后一次性返回对象；当前不提供原生工具参数增量 emitter。
+
+`applyProviderFunctionCallDefault()` 只根据选中的 Provider 配置确定 Agent 默认协议，不再从 `yak-script` 类型硬编码推断能力。单独的模型健康检查仍是文本连通性检查，不代替原生工具调用测试。
 
 ### SSE 解析
 

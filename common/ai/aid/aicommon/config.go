@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiconfig"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
@@ -2719,7 +2720,11 @@ func (c *Config) applyProviderFunctionCallDefault() {
 	if c.functionCallModeExplicit || c.legacyAICallbackConfigured {
 		return
 	}
-	c.EnableFunctionCallMode = aispec.ProviderSupportsNativeToolCalling(c.AiServerName)
+	provider := &ypb.ThirdPartyApplicationConfig{Type: c.AiServerName}
+	if model := aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, c.AiServerName, c.AiModelName); model != nil {
+		provider = model.GetProvider()
+	}
+	c.EnableFunctionCallMode = aispec.ProviderFunctionCallDefault(provider)
 	c.SetConfig("EnableFunctionCallMode", c.EnableFunctionCallMode)
 }
 
