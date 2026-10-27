@@ -258,6 +258,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"ssh", "ssh.message_code", "SSH message code", "Message Number", "pdu", DisplayUnsigned, 8},
 		{"ssh", "ssh.kex_algorithms", "SSH advertised key exchanges", "Kex Algorithms", "pdu", DisplayString, 0},
 		{"ssh", "ssh.server_host_key_algorithms", "SSH advertised host keys", "Host Key Algorithms", "pdu", DisplayString, 0},
+		{"ssh", "ssh.negotiation.context", "SSH negotiation evidence limitation", "Negotiation Context", "context", DisplayString, 0},
 		{"ssh", "ssh.kex.selected", "Observed SSH key exchange", "Kex Algorithm", "context", DisplayString, 0},
 		{"ssh", "ssh.host_key.selected", "Observed SSH host-key algorithm", "Host Key Algorithm", "context", DisplayString, 0},
 		{"ssh", "ssh.host_key.sha256", "SSH public-key fingerprint", "Host Key Fingerprint", "derived", DisplayString, 0},

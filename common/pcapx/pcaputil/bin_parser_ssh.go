@@ -299,7 +299,7 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 	}
 	ignoredGuess := false
 	if msg != 20 && s.guessPending[dir] {
-		if s.haveKEX[0] && s.haveKEX[1] {
+		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
 			own := s.kex[dir]
 			ignoredGuess = strings.Split(own.Kex, ",")[0] != kex || strings.Split(own.HostKey, ",")[0] != s.selected["Host Key Algorithm"]
 			if ignoredGuess {
@@ -322,6 +322,10 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 			info[key] = value
 		}
 	}
+	if !s.clientKnown && (msg == 20 || s.haveKEX[0] && s.haveKEX[1]) {
+		info["Negotiation Context"] = "client/server role not observed"
+		info["Context Level"] = "partial"
+	}
 	if msg != 20 && s.guessPending[dir] {
 		s.guessPending[dir] = false
 		if ignoredGuess {
@@ -332,6 +336,9 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 	}
 	switch msg {
 	case 20:
+		if s.haveKEX[dir] {
+			return nil, protocolError(ErrMalformedMessage, "SSH repeated KEXINIT before NEWKEYS")
+		}
 		lists, err := sshParseKexInit(payload[1:])
 		if err != nil {
 			return nil, err
@@ -340,12 +347,14 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		s.haveKEX[dir] = true
 		info["Kex Algorithms"] = lists.Kex
 		info["Host Key Algorithms"] = lists.HostKey
-		info["Encryption C2S"] = lists.EncC2S
-		info["Encryption S2C"] = lists.EncS2C
-		info["MAC C2S"] = lists.MACC2S
-		info["MAC S2C"] = lists.MACS2C
-		info["Compression C2S"] = lists.CompC2S
-		info["Compression S2C"] = lists.CompS2C
+		// KEXINIT contains sender offers. Client-preference negotiation below
+		// is a different observation and must not overwrite those wire lists.
+		info["Offered Encryption C2S"] = lists.EncC2S
+		info["Offered Encryption S2C"] = lists.EncS2C
+		info["Offered MAC C2S"] = lists.MACC2S
+		info["Offered MAC S2C"] = lists.MACS2C
+		info["Offered Compression C2S"] = lists.CompC2S
+		info["Offered Compression S2C"] = lists.CompS2C
 		if wf, ok := initial["Wire Fields"].(map[string]any); ok {
 			if p, ok := wf["Payload"].(map[string]any); ok {
 				for _, key := range []string{"Languages C2S", "Languages S2C", "First Kex Packet Follows", "Reserved"} {
@@ -355,7 +364,7 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 				s.guessPending[dir] = follows != 0
 			}
 		}
-		if s.haveKEX[0] && s.haveKEX[1] {
+		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
 			s.selected = sshNegotiate(s.kex[s.client], s.kex[1-s.client])
 			for k, v := range s.selected {
 				info[k] = v
