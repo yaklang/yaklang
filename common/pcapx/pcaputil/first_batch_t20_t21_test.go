@@ -1829,7 +1829,8 @@ func testT21DCERPC(t *testing.T) {
 	require.Nil(t, r.Err)
 	require.Equal(t, "matched", r.Events[0].Session["Association Status"])
 	first := dcerpcPDU(0, dcerpcFirst, 102, append([]byte{0, 0, 0, 0, 0, 0, 3, 0}, []byte("first-")...))
-	last := dcerpcPDU(0, dcerpcLast, 102, []byte("last"))
+	// A continuation repeats its own complete call header before its stub.
+	last := dcerpcPDU(0, dcerpcLast, 102, append([]byte{0, 0, 0, 0, 0, 0, 3, 0}, []byte("last")...))
 	r = s.Feed(0, ts, first)
 	require.Nil(t, r.Err)
 	require.Equal(t, true, r.Events[0].Session["Fragment"])

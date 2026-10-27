@@ -36,6 +36,9 @@ type dcerpcFragment struct {
 	ptype      byte
 	firstFlags byte
 	body       []byte
+	header     int
+	count      int
+	pieces     []dcerpcFragmentPiece
 }
 
 type dcerpcProposal struct {
@@ -161,9 +164,9 @@ func (d *binDCERPC) consume(raw []byte, max int) (map[string]any, error) {
 }
 
 // Wire Call IDs are scoped to this connection and remain separate from generated
-// PDU identities. Only a successfully admitted, complete clear request may own
-// a numeric reply link. Opaque and logical RPC fragment views do not establish
-// that contract, even if their common headers contain the same Call ID.
+// PDU identities. A clear request owns a numeric reply link only after its
+// complete message has been validated. Fragmented messages identify their first
+// PDU and retain every exact stub interval; opaque security bodies never own it.
 func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
 	e.ResponseTo = 0
 	var call uint32
@@ -172,11 +175,12 @@ func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
 	}
 	owner := d.pendingPDU[call]
 	var err error
-	e.Session, err = d.consumeFrom(dir, e.Raw, max)
+	e.Session, err = d.consumePDU(dir, e.Raw, max, e.ID)
 	if err != nil {
 		return err
 	}
-	if e.Session["First Frag"] != true || e.Session["Last Frag"] != true || e.Session["Reassembled"] == true || dcerpcHasSecurityTrailer(e.Raw) {
+	complete := e.Session["First Frag"] == true && e.Session["Last Frag"] == true || e.Session["Reassembled"] == true
+	if !complete || dcerpcHasSecurityTrailer(e.Raw) {
 		return nil
 	}
 	if e.Session["Outstanding"] == true && e.ID != 0 {
@@ -185,7 +189,13 @@ func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
 		if d.pendingPDU == nil {
 			d.pendingPDU = make(map[uint32]uint64)
 		}
-		d.pendingPDU[call] = e.ID
+		identifier := e.ID
+		if message, ok := e.Session["Reassembled Message"].(map[string]any); ok {
+			identifier, _ = message["Message ID"].(uint64)
+		}
+		if identifier != 0 {
+			d.pendingPDU[call] = identifier
+		}
 	}
 	if e.Session["Association Status"] == "matched" {
 		e.ResponseTo = owner
@@ -194,6 +204,10 @@ func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
 }
 
 func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, error) {
+	return d.consumePDU(dir, raw, max, 0)
+}
+
+func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[string]any, error) {
 	if dir < 0 || dir > 1 {
 		return nil, protocolError(ErrMalformedMessage, "DCE/RPC direction is outside the observed connection")
 	}
@@ -246,72 +260,13 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 			return nil, protocolError(ErrDesynchronized, "DCE/RPC duplicate first fragment for call")
 		}
 	}
-	if flags&dcerpcFirst == 0 {
-		previous, exists := d.frags[fragmentKey]
-		if !exists {
-			return nil, sessionContext("DCE/RPC continuation has no first fragment in this direction")
+	if flags&(dcerpcFirst|dcerpcLast) != dcerpcFirst|dcerpcLast {
+		var complete bool
+		var err error
+		body, parseFlags, complete, err = d.consumeMessageFragment(fragmentKey, ptype, flags, body, info, max, pduID)
+		if err != nil || !complete {
+			return info, err
 		}
-		if previous.ptype != ptype {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrDesynchronized, "DCE/RPC fragment PType changed within call")
-		}
-		parseFlags = previous.firstFlags
-		need := len(previous.body) + len(body)
-		if need+16 > d.messageLimit() {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC reassembled message exceeds budget")
-		}
-		newCap := cap(previous.body)
-		if newCap < need {
-			newCap = need
-		}
-		if err := d.reserveFragmentGrowth(previous.body, newCap, flags&dcerpcLast != 0, true); err != nil {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, err
-		}
-		var assembled []byte
-		if newCap == cap(previous.body) {
-			assembled = append(previous.body, body...)
-		} else {
-			assembled = make([]byte, need, newCap)
-			copy(assembled, previous.body)
-			copy(assembled[len(previous.body):], body)
-		}
-		info["Fragment"] = true
-		if flags&dcerpcLast == 0 {
-			d.frags[fragmentKey] = dcerpcFragment{ptype: previous.ptype, firstFlags: previous.firstFlags, body: assembled}
-			info["Outstanding"] = true
-			return info, nil
-		}
-		body = assembled
-		delete(d.frags, fragmentKey)
-		if err := d.reserveMemory(d.retainedBytes()); err != nil {
-			return nil, err
-		}
-		info["Reassembled"] = true
-	} else if flags&dcerpcLast == 0 {
-		if len(body)+16 > d.messageLimit() {
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC fragment exceeds message budget")
-		}
-		if d.stateElements() >= sessionCollectionLimit(max) {
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC retained fragment count exceeds budget")
-		}
-		if err := d.reserveFragmentGrowth(nil, len(body), false, false); err != nil {
-			return nil, err
-		}
-		fragment := make([]byte, len(body), len(body))
-		copy(fragment, body)
-		d.frags[fragmentKey] = dcerpcFragment{ptype: ptype, firstFlags: flags, body: fragment}
-		info["Fragment"] = true
-		info["Outstanding"] = true
-		if ptype == 0 && len(body) >= 8 {
-			info["Context ID"] = binary.LittleEndian.Uint16(body[4:6])
-			info["OpNum"] = binary.LittleEndian.Uint16(body[6:8])
-		}
-		return info, nil
 	}
 	switch ptype {
 	case 11, 14:
@@ -743,8 +698,8 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	return nil
 }
 
-// Assembled RPC body offsets do not belong to the final wire fragment. Until
-// that logical body has its own owned source, retain values without fake ranges.
+// Assembled RPC body offsets do not belong to the final wire fragment. Logical
+// stubs carry their own source; these ranges describe only an actual wire PDU.
 func dcerpcAttachBodyRanges(info, target map[string]any, ranges map[string]any) {
 	if info["First Frag"] == true && info["Last Frag"] == true && info["Reassembled"] != true {
 		target["Wire Field Ranges"] = ranges
@@ -813,6 +768,9 @@ func (d *binDCERPC) match(call uint32, respName string, info map[string]any, dir
 
 func (d *binDCERPC) stateElements() int {
 	n := len(d.ctx) + len(d.pending) + len(d.frags)
+	for _, fragment := range d.frags {
+		n += fragment.count
+	}
 	for _, proposals := range d.proposals {
 		n += len(proposals)
 	}
@@ -831,7 +789,7 @@ func (d *binDCERPC) retainedBytes() int64 {
 	}
 	n += int64(len(d.pendingContext)) * 16
 	for _, fragment := range d.frags {
-		n += 48 + int64(cap(fragment.body))
+		n += dcerpcFragmentCharge + int64(cap(fragment.body)) + int64(cap(fragment.pieces))*dcerpcFragmentPieceCharge
 	}
 	for _, proposals := range d.proposals {
 		n += 32
@@ -855,20 +813,6 @@ func (d *binDCERPC) reserveMemory(target int64) error {
 		}
 	}
 	return nil
-}
-
-func (d *binDCERPC) reserveFragmentGrowth(previous []byte, newCapacity int, final, hasPrevious bool) error {
-	if newCapacity+16 > d.messageLimit() {
-		return protocolError(ErrResourceExceeded, "DCE/RPC fragment exceeds message budget")
-	}
-	target := d.retainedBytes()
-	if hasPrevious {
-		target -= int64(cap(previous))
-	} else if !final {
-		target += 48
-	}
-	target += int64(newCapacity)
-	return d.reserveMemory(target)
 }
 
 func fragmentKeyFor(direction int, call uint32) dcerpcFragmentKey {

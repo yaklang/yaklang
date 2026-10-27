@@ -130,14 +130,14 @@ func TestDCERPCNumericOwnerIsReservedBeforeAdmission(t *testing.T) {
 	require.Equal(t, int64(d.maxBufferedBytes), d.retainedBytes())
 }
 
-func TestDCERPCFragmentViewsDoNotInventNumericCallLinks(t *testing.T) {
+func TestDCERPCHeaderlessContinuationCannotInventNumericCallLinks(t *testing.T) {
 	d := newReviewDCERPC()
 	wire := dcerpcRequest(9, 0, 2, []byte{1, 2})
 	first := &ProtocolEvent{ID: 42, Raw: dcerpcPDU(0, 1, 9, wire[16:24])}
 	last := &ProtocolEvent{ID: 43, Raw: dcerpcPDU(0, 2, 9, wire[24:])}
 	require.NoError(t, d.consumeEvent(0, first, 4096))
-	require.NoError(t, d.consumeEvent(0, last, 4096))
-	require.Empty(t, d.pendingPDU, "logical fragment body needs its own owned source before a numeric link")
+	require.Error(t, d.consumeEvent(0, last, 4096), "raw stub chunks are not valid RPC continuation PDUs")
+	require.Empty(t, d.pendingPDU, "an invalid continuation cannot establish a complete request owner")
 	response := &ProtocolEvent{ID: 44, Raw: dcerpcResponse(9, 0, nil)}
 	require.NoError(t, d.consumeEvent(1, response, 4096))
 	require.Zero(t, response.ResponseTo)
