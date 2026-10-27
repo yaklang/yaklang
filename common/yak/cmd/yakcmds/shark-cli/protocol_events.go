@@ -648,6 +648,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		add(fmt.Sprintf("%s · PDU #%d · %s", label, e.ID, kind), true)
 		if len(e.Raw) > 0 {
 			name := eventProtocolName(e)
+			if e.Protocol == "dcerpc" {
+				name = "DCE/RPC wire"
+			}
 			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
 				name = "Unadmitted UDP payload"
 			}
@@ -686,6 +689,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		if e.SourceBytes.CompletedIn != nil {
 			kind := "Message"
+			if e.Protocol == "dcerpc" {
+				kind = "RPC wire PDU"
+			}
 			if e.Session["Native Carrier"] == true && (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") {
 				kind = "QUIC wire packet"
 			}

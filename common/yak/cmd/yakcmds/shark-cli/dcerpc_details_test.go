@@ -56,6 +56,7 @@ func TestDCERPCLogicalStubHasItsOwnByteSourceThroughProductionWorker(t *testing.
 	require.Nil(t, r.Err)
 	e := r.Events[0]
 	require.Len(t, e.Raw, 44)
+	e.SourceBytes = pcaputil.ByteSource{Kind: "reassembled", PacketRefs: []pcaputil.PacketReference{{Number: 12}}, CompletedIn: &pcaputil.PacketReference{Number: 12}}
 	encoded, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: []*pcaputil.ProtocolEvent{e}})
 	require.NoError(t, err)
 	var output bytes.Buffer
@@ -63,7 +64,9 @@ func TestDCERPCLogicalStubHasItsOwnByteSourceThroughProductionWorker(t *testing.
 	decoded, err := decodeWorkerOutput(output.Bytes(), &capturedPacket{number: 1})
 	require.NoError(t, err)
 	found := false
+	var lines []string
 	for _, field := range decoded.fields {
+		lines = append(lines, field.text)
 		if !strings.HasPrefix(field.text, "Stub: 40 bytes") || !field.hasRange {
 			continue
 		}
@@ -77,6 +80,7 @@ func TestDCERPCLogicalStubHasItsOwnByteSourceThroughProductionWorker(t *testing.
 		found = true
 	}
 	require.True(t, found)
+	require.Contains(t, strings.Join(lines, "\n"), "RPC wire PDU bytes complete in frame #12 · 1 contributing packet(s)")
 	require.Contains(t, applicationEventSummary(e), "2 fragments · 40 stub bytes")
 }
 
