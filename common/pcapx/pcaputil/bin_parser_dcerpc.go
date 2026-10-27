@@ -599,10 +599,18 @@ func (d *binDCERPC) consumeBindNak(call uint32, dir int, body []byte, info map[s
 	if count > sessionCollectionLimit(max) {
 		return protocolError(ErrResourceExceeded, "DCE/RPC bind nak version count exceeds budget")
 	}
-	if len(body) != 3+count*2 {
+	end := 3 + count*2
+	// Windows sends a four-byte-aligned Bind NAK, including when there is no
+	// optional MS-RPCE signature. Keep unpadded peers compatible and accept
+	// exactly the final alignment octets, never an arbitrary unparsed tail.
+	if len(body) != end && len(body) != (end+3)&^3 {
 		return fmt.Errorf("dcerpc: invalid bind nak protocol-version list")
 	}
+	if len(body) < end {
+		return fmt.Errorf("dcerpc: truncated bind nak protocol-version list")
+	}
 	info["Version Count"] = count
+	ranges := map[string]any{"Reject Reason": []uint64{16, 18}, "Version Count": []uint64{18, 19}}
 	if count > 0 {
 		versions := make([]string, 0, count)
 		for i := 0; i < count; i++ {
@@ -610,7 +618,13 @@ func (d *binDCERPC) consumeBindNak(call uint32, dir int, body []byte, info map[s
 			versions = append(versions, fmt.Sprintf("%d.%d", body[off], body[off+1]))
 		}
 		info["Protocol Versions"] = versions
+		ranges["Protocol Versions"] = []uint64{19, uint64(16 + end)}
 	}
+	if len(body) > end {
+		info["Trailing Padding"] = bytes.Clone(body[end:])
+		ranges["Trailing Padding"] = []uint64{uint64(16 + end), uint64(16 + len(body))}
+	}
+	dcerpcAttachBodyRanges(info, info, ranges)
 	want, pending := d.pending[call]
 	if !pending {
 		d.markUnmatched("BindNak", info, "missing-request")
