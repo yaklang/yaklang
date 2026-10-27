@@ -1,7 +1,5 @@
 dario.cat/mergo v1.0.0 h1:AGCNq9Evsj31mOgNPcLyXc+4PNABt905YmuqPYYpBWk=
 dario.cat/mergo v1.0.0/go.mod h1:uNxQE+84aUszobStD9th8a29P2fMDhsBdgRYvZOxGmk=
-gitee.com/chunanyong/dm v1.8.23 h1:IadSVTP3l1qv41yzTaHffpsAdNtyR3Bl2FwR9Xpgpb8=
-gitee.com/chunanyong/dm v1.8.23/go.mod h1:EPRJnuPFgbyOFgJ0TRYCTGzhq+ZT4wdyaj/GW/LLcNg=
 github.com/BurntSushi/toml v1.3.2 h1:o7IhLm0Msx3BaB+n3Ag7L8EVlByGnpq14C4YWiu/gL8=
 github.com/BurntSushi/toml v1.3.2/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/DataDog/mmh3 v0.0.0-20210722141835-012dc69a9e49 h1:EbzDX8HPk5uE2FsJYxD74QmMw0/3CqSKhEr6teh0ncQ=
@@ -137,6 +135,7 @@ github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da h1:oI5xCqsCo564l
 github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da/go.mod h1:cIg4eruTrX1D+g88fzRXU5OdNfaM+9IcxsU14FzY7Hc=
 github.com/golang/protobuf v1.5.4 h1:i7eJL8qZTpSEXOPTxNKhASYpMn+8e5Q6AdndVa1dWek=
 github.com/golang/protobuf v1.5.4/go.mod h1:lnTiLA8Wa4RWRcIUkrtSVa5nRhsEGBg48fD6rSs7xps=
+github.com/golang/snappy v0.0.1/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/golang/snappy v0.0.4 h1:yAGX7huGHXlcLOEtBnF4w7FQwA26wojNCwOYAEhLjQM=
 github.com/golang/snappy v0.0.4/go.mod h1:/XxbfmMg8lxefKM7IXC3fBNl/7bRcc72aCRzEWrmP2Q=
 github.com/google/btree v1.0.0 h1:0udJVsspx3VBr5FwtLhQQtuAsVc79tTq0ocGIPAU6qo=
@@ -382,6 +381,10 @@ github.com/yaklang/gorm v1.9.17-0.20261019084921-3068c531c129 h1:M6gkH3S+yIVUehB
 github.com/yaklang/gorm v1.9.17-0.20261019084921-3068c531c129/go.mod h1:C5A6qs3ohHkyTElJnNDhJqCD0zBoaNBYRNNWNgYRPEg=
 github.com/yaklang/gorm v1.9.17 h1:K6Ziw6kaLG1ryoA/rwNNZOI1A93R9NtX4uA82fUgFTg=
 github.com/yaklang/gorm v1.9.17/go.mod h1:WwkOfOE20Ck9M4nHX7MT9QAlCelq1wZSTHr50uEvm50=
+github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43 h1:yQsVrUIrSJ43YyhXoNVck7+WXITSxvk+Dviyl0BZ2ZY=
+github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43/go.mod h1:niLO14AGLMYTyzdEP29xp3/Wq+igEpa8nR/dlN0HmMg=
+github.com/yaklang/gorm/dm v0.0.0-20261027074109-c09736ed36a6 h1:DUcGjIVIIQqzQmY5sM2OggN4SzeNOriqhJOvST/YuQI=
+github.com/yaklang/gorm/dm v0.0.0-20261027074109-c09736ed36a6/go.mod h1:P6O+pD1hupHoiA4Dt102vGH5YxCt+vNNnfaJEE204PM=
 github.com/yaklang/javajive v0.1.2 h1:sAE/UruiNqcjCrEK1wyp3E3ooHJPwWHdXnNUbybxHvA=
 github.com/yaklang/javajive v0.1.2/go.mod h1:MP6RfWwjQ40V4J+n4k2NwXH1p5s/dNqzxC3Klx6ckRY=
 github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034 h1:xEjfB8k9GPDzGAwIDeMMzEhOq4MpOPXB/9ZansxYhpI=
@@ -510,6 +513,7 @@ golang.org/x/term v0.5.0/go.mod h1:jMB1sMXY+tzblOD4FWmEbocvup2/aLOaQEp7JmGp78k=
 golang.org/x/term v0.29.0 h1:L6pJp37ocefwRRtYPKSWOWzOtWSxVajvz2ldH/xi3iU=
 golang.org/x/term v0.29.0/go.mod h1:6bl4lRlvVuDgSf3179VpIxBF0o10JUpXWOnI7nErv7s=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
+golang.org/x/text v0.3.2/go.mod h1:bEr9sfX3Q8Zfm5fL9x+3itogRgK3+ptLWKqgva+5dAk=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
 golang.org/x/text v0.3.6/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
 golang.org/x/text v0.3.7/go.mod h1:u+2+/6zg+i71rQMx5EYifcz6MCKuco9NR6JIITiCfzQ=

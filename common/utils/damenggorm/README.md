@@ -25,11 +25,12 @@ it does not import the DM SDK or its Go `plugin` cipher loader. Opening a DM URL
 without the tag returns `ErrNativeUnavailable` before connecting, with rebuild
 instructions. It never falls back to a local SQLite IR database.
 
-The published `github.com/yaklang/gorm/dialects/dameng` package owns the generic
-dialect, batches, native SDK registration and cancellation-safe connection pool.
-This integration uses [GORM v1.9.17](https://github.com/yaklang/gorm/releases/tag/v1.9.17),
-whose source commit is `8899a0c8da16583343d1f73f4e83a18038056be9`;
-`go.sum` records the public module and module-metadata checksums.
+The public `github.com/yaklang/gorm/dialects/dameng` package owns the generic
+dialect, batches, native driver registration and cancellation-safe connection
+pool. Its protocol driver is the separately versioned
+`github.com/yaklang/gorm/dm` submodule in the same GitHub repository. The exact
+GORM and driver versions are pinned in `go.mod`; `go.sum` records their public
+module and module-metadata checksums.
 Yaklang keeps only SSA policy here: the `dm_ssa` GORM alias preserves uppercase
 objects and payload sizes while URL and driver names remain `dm`. No second
 `dm` dialect or driver is registered. The optional cipher loader remains in
@@ -38,8 +39,12 @@ upstream driver.
 
 The shared Linux product, portable and runtime musl build profiles include the
 `dameng` tag, so their binaries support DM, PostgreSQL and SQLite together. The
-driver module path and version are unchanged; no driver fork, local module
-replacement or extra runtime library is required for those static binaries.
+driver source is based on upstream `gitee.com/chunanyong/dm v1.8.23`
+(DM driver `8.1.4.200`), with its module path and internal imports moved to the
+GitHub submodule. The engine no longer requires the Gitee module. This source
+migration preserves the native protocol implementation and existing build tags;
+it does not remove the optional cipher loader. No local module replacement or
+extra runtime library is required for those static binaries.
 
 ## Storage behavior
 
