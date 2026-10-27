@@ -84,13 +84,19 @@ func requireP0DCERPCWireEnvelopeScope(t *testing.T) {
 	t.Helper()
 	TestDCERPCSecurityRuleWireBoundariesAndOpaqueBody(t)
 	TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t)
-	catalog, roadmap := false, false
+	catalog, roadmap, aliasCatalog, aliasRoadmap := false, false, false, false
 	for _, entry := range ProtocolCatalog {
 		if entry.Name == "DCE/RPC" {
 			catalog = true
 			require.Equal(t, statusPartial, entry.Status)
 			require.Contains(t, entry.Notes, "opaque")
 			require.Contains(t, entry.Notes, "not validated")
+		}
+		if entry.Name == "MSRPC" {
+			aliasCatalog = true
+			require.Equal(t, statusPartial, entry.Status)
+			require.Equal(t, "application-layer/dcerpc.yaml", entry.RuleFile)
+			require.Contains(t, entry.Notes, "bounded")
 		}
 	}
 	for _, entry := range ProtocolRoadmap {
@@ -99,7 +105,14 @@ func requireP0DCERPCWireEnvelopeScope(t *testing.T) {
 			require.Equal(t, stPartial, entry.Status)
 			require.Equal(t, priP0, entry.Priority)
 		}
+		if entry.Name == "MSRPC" {
+			aliasRoadmap = true
+			require.Equal(t, stPartial, entry.Status)
+			require.Equal(t, priP0, entry.Priority)
+		}
 	}
 	require.True(t, catalog)
 	require.True(t, roadmap)
+	require.True(t, aliasCatalog)
+	require.True(t, aliasRoadmap)
 }

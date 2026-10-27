@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **621** 项：限定范围 `done` **201**，`partial` **28**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **326**，`new` **168**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **621** 项：限定范围 `done` **200**，`partial` **29**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **326**，`new` **168**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -49,6 +49,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 |---|---|---|---|
 | P0 | AJP | partial | [partial / ](rules/application-layer/ajp.yaml) |
 | P0 | DCE/RPC | partial | [partial / ](rules/application-layer/dcerpc.yaml) |
+| P0 | MSRPC | partial | [partial / ](rules/application-layer/dcerpc.yaml) |
 | P0 | QUIC | partial | [partial / ](rules/application-layer/quic.yaml) |
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
