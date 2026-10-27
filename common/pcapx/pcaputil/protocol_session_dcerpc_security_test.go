@@ -163,6 +163,23 @@ func TestDCERPCSecurityEnvelopeDoesNotGuessPDUAlignmentOrigin(t *testing.T) {
 	require.Equal(t, false, events[0].Session["Trailer Alignment Validated"])
 }
 
+func TestDCERPCMalformedSecurityBoundsPrecedeUnsupportedProfile(t *testing.T) {
+	wire := dcerpcSecurityTestPDU(dcerpcRequest(9, 0, 3, nil), []byte{1, 2, 3}, 6)
+	trailer := len(wire) - 3 - 8
+	wire[trailer], wire[trailer+1] = 0xeb, 0xeb
+	wire[trailer+2] = 0xeb // Outside the PDU body, even without interpreting SSP semantics.
+	events, _ := sessionTestFlow(t, "dcerpc", []sessionStep{{0, wire}}, 1, false)
+	require.NotEmpty(t, events)
+	require.Equal(t, "malformed", events[0].Status, "a demonstrably invalid byte range is not merely an unsupported profile")
+	_, err := events[0].GetFields()
+	require.ErrorContains(t, err, "padding overlaps")
+	wire[trailer+2] = 0
+	events, _ = sessionTestFlow(t, "dcerpc", []sessionStep{{0, wire}}, 1, false)
+	require.Equal(t, "context-required", events[0].Status, "bounded unknown SSP semantics still remain unsupported")
+	_, err = events[0].GetFields()
+	require.ErrorContains(t, err, "UnsupportedFeature")
+}
+
 func TestDCERPCBindCountCannotHideTrailingContext(t *testing.T) {
 	wire := dcerpcBindContexts(11, 3, dcerpcBindContext{uuid: dcerpcEPM, id: 0}, dcerpcBindContext{uuid: dcerpcEPM, id: 1}, dcerpcBindContext{uuid: dcerpcEPM, id: 2})
 	wire[24] = 2 // Three physical contexts, only two declared in the wire header.

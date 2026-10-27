@@ -69,11 +69,11 @@ Package:
         this.ProcessSubNode("Auth Padding Length")
         this.ProcessSubNode("Auth Reserved")
         this.ProcessSubNode("Auth Context ID")
-        if getNodeResult("Auth Type").Value == 0 || getNodeResult("Auth Level").Value < 2 || getNodeResult("Auth Level").Value > 6 {
-          panic("dcerpc: unsupported authentication type or level")
-        }
         if getNodeResult("Auth Padding Length").Value > body {
           panic("dcerpc: authentication padding overlaps common header")
+        }
+        if getNodeResult("Auth Type").Value == 0 || getNodeResult("Auth Level").Value < 2 || getNodeResult("Auth Level").Value > 6 {
+          panic("dcerpc: unsupported authentication type or level")
         }
         this.GetSubNode("Authentication Token").SetMaxLength(al)
         this.ProcessSubNode("Authentication Token")

@@ -20,12 +20,12 @@ func dcerpcSecurityEnvelope(wire []byte, info map[string]any) (map[string]any, e
 		return nil, protocolError(ErrMalformedMessage, "DCE/RPC authentication verifier length exceeds fragment payload")
 	}
 	trailer := wire[start : start+8]
-	if trailer[0] == 0 || trailer[1] < 2 || trailer[1] > 6 {
-		return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC authentication type/level is outside the observed security-envelope profile")
-	}
 	padding := int(trailer[2])
 	if padding > start-16 {
 		return nil, protocolError(ErrMalformedMessage, "DCE/RPC authentication padding overlaps the common header")
+	}
+	if trailer[0] == 0 || trailer[1] < 2 || trailer[1] > 6 {
+		return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC authentication type/level is outside the observed security-envelope profile")
 	}
 	info["RPC Vers"], info["RPC Vers Minor"] = wire[0], wire[1]
 	info["Packed Drep"] = bytes.Clone(wire[4:8])
