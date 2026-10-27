@@ -33,6 +33,7 @@ type ProtocolEvent struct {
 	nativeSNMPObservation              bool
 	nativeSTUNObservation              bool
 	nativeSIPObservation               bool
+	nativeSSHObservation               bool
 	nativeTFTPObservation              bool
 	nativeATGObservation               bool
 	nativeDHCPObservation              bool
@@ -180,6 +181,23 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// A selected native SSH method refusal must not be retried as a successful
+	// generic packet grammar. Both accepted fields and errors are private facts,
+	// independent of caller edits to Protocol, Session and compatibility caches.
+	if e.nativeSSHObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields == nil {
+			return nil, protocolError(ErrContextRequired, "SSH accepted field projection is unavailable")
+		}
+		out := map[string]any{"fields": cloneSession(e.semanticFields)}
+		if e.hasRuleMetadata {
+			out["metadata"] = cloneSessionValue(e.semanticMetadata)
+		}
+		return out, nil
+	}
 	// Native QUIC identity survives edits to all public labels and caches.
 	// A refused packet cannot become a successful rule decode, and accepted
 	// wire fields keep their legacy metadata envelope and private context.
@@ -412,6 +430,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeSSHObservation {
+		return true
+	}
 	if e.nativeSessionMessage {
 		return true
 	}
@@ -1725,7 +1746,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
