@@ -35,3 +35,18 @@ func TestIPVersionRefusalStopsSpeculativeFragmentAndApplicationDisplay(t *testin
 	require.Contains(t, text, "Observed IP Version: 6")
 	require.Contains(t, text, "Expected IP Version: 4")
 }
+
+func TestUnselectedNetworkParentCannotDisplayAConfirmedChild(t *testing.T) {
+	parent := &pcaputil.ProtocolEvent{Protocol: "ip", Profile: "network-encapsulation-refusal", Status: "limited", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: map[string]any{"Child Header Identity": "unconfirmed", "Observed Header Layers": []string{"Ethernet", "IPv4"}}}
+	child := &pcaputil.ProtocolEvent{Protocol: "tls", Status: "decoded", Session: map[string]any{"Negotiated Version": uint16(0x304)}}
+	for _, events := range [][]*pcaputil.ProtocolEvent{{parent, child}, {child, parent}} {
+		row := presentEvents(events).apply(packetSummary{Protocol: "TLS", Layers: []string{"Ethernet", "IPv4", "EtherIP", "Ethernet", "IPv4", "TCP", "TLS"}, Transport: "tcp", SourcePort: 443, ConnectionProtocol: "TLS", StreamID: 9})
+		require.Equal(t, "IPv4", row.Protocol)
+		require.Equal(t, []string{"Ethernet", "IPv4"}, row.ProtocolStack)
+		require.Equal(t, "limited", row.ProtocolStatus)
+		require.Equal(t, "outer network prefix; inner identity unconfirmed", row.ProtocolScope)
+		require.Empty(t, row.ConnectionProtocol)
+		require.Zero(t, row.StreamID)
+		require.Zero(t, row.SourcePort)
+	}
+}

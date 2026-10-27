@@ -736,6 +736,17 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	if e.Protocol == "ip" && e.Profile == "network-encapsulation-refusal" && e.Status == "limited" && e.Session["Child Header Identity"] == "unconfirmed" {
+		names, _ := e.Session["Observed Header Layers"].([]string)
+		label := "IP"
+		if len(names) > 0 && len(names) <= 128 && (names[len(names)-1] == "IPv4" || names[len(names)-1] == "IPv6") {
+			label = names[len(names)-1]
+		} else {
+			names = []string{label}
+		}
+		*p = packetPresentation{networkRefused: true, protocol: label, summary: safeText(e.Summary), status: "limited", visibility: "unselected-network-profile", scope: "outer network prefix; inner identity unconfirmed", evidence: "encapsulation profile unselected; child headers not admitted", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
+		return
+	}
 	if e.Protocol == "ip" && e.Status == "malformed" && e.ExpertCode == "IPVersionMismatch" {
 		expected, observed := number(e.Session["Expected IP Version"]), number(e.Session["Observed IP Version"])
 		if (expected == 4 || expected == 6) && expected != observed {
