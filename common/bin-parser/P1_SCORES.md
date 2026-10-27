@@ -1,5 +1,7 @@
 # P1 协议交付打分
 
+SFTP 当前只具备外层 SSH 的识别和初始明文传输包解析，加密子系统、请求/响应与文件操作尚未解码。原先把 SSH 握手计入 SFTP 的 95/A 是覆盖误标，现明确记为 0/F 和 partial；这不修改冻结捕获或原始材料评分，也不把 SSH 外层测试当作 SFTP 应用证据。
+
 对照 [PROTOCOL_DELIVERY.md](PROTOCOL_DELIVERY.md)。机器可读记录在 `p1_scores.go`，由 `TestP1ScorecardsCovered` 校验：每个 P1 名称都有计分卡；`Status: done` 必须是 **B**（总分 ≥ 75）。A 级（≥ 90）留给 Wireshark 级主 PDU。
 
 维度（满分 100）：Schema 25 / 真实流量 25 / 测试 20 / 分支覆盖 20 / 栈集成 10。硬门槛 G1–G8 全过才计分。
@@ -82,7 +84,7 @@ GSS-API 与 P0 SPNEGO 的评分仅计 `spnego.yaml` 共同的初始 token 子集
 | IMAP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `imap.yaml` |
 | FTP-DATA | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ftp_data.yaml` |
 | TFTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `tftp.yaml` |
-| SFTP | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `application-layer/ssh.yaml` |
+| SFTP | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `application-layer/ssh.yaml` |
 | NFS | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `onc_rpc.yaml` |
 | RPC | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NFS |
 | Portmap/Rpcbind | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | alias of NFS |

@@ -223,7 +223,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "FTP-DATA", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "FTPS", Family: "file", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
 	{Name: "TFTP", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
-	{Name: "SFTP", Family: "file", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
+	{Name: "SFTP", Family: "file", Sources: src(srcWireshark), Status: stPartial, Priority: priP1, Notes: "Outer SSH identification and initial transport packets only; encrypted SFTP subsystem, requests/replies and file operations are not decoded; no SFTP application coverage credited"},
 	{Name: "SCP", Family: "file", Sources: src(srcPrivate), Status: stTodo, Priority: priP2},
 	{Name: "NFS", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "RPC", Family: "file", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},

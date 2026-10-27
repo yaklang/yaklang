@@ -15,6 +15,11 @@ import (
 func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool {
 	t.Helper()
 	covered := map[string]bool{}
+	if priority == priP1 {
+		// This is an explicit historical false-completion correction. It
+		// certifies the boundary of outer SSH support, not an SFTP grammar.
+		covered["SFTP"] = t.Run("SFTPOuterSSHScope", TestSFTPOuterSSHScopeDoesNotClaimSubsystem)
+	}
 	for name, pri := range map[string]string{"AJP": priP0, "BGP": priP1, "RTMP": priP1, "L2TP": priP1, "STP": priP1, "RSTP": priP1} {
 		if pri != priority {
 			continue
@@ -46,6 +51,26 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 		}
 	}
 	return covered
+}
+
+func TestSFTPOuterSSHScopeDoesNotClaimSubsystem(t *testing.T) {
+	sc, ok := ResolveP1Scorecard("SFTP")
+	require.True(t, ok)
+	require.Equal(t, "L4", sc.SampleClass)
+	require.False(t, sc.G5, "outer SSH captures cannot establish SFTP application coverage")
+	require.Zero(t, sc.Schema+sc.Traffic+sc.Tests+sc.Branches+sc.Stack)
+	for _, r := range ProtocolRoadmap {
+		if r.Name == "SFTP" {
+			require.Equal(t, stPartial, r.Status)
+			require.Contains(t, r.Notes, "not decoded")
+		}
+	}
+	for _, c := range ProtocolCatalog {
+		require.NotEqual(t, "SFTP", c.Name, "no SFTP entry may be synthesized from outer transport identity")
+	}
+	n := parseRule(t, sshDirectKEX(), "application-layer.ssh", "SSHPacket")
+	require.Equal(t, uint64(20), uintVal(t, mustChild(t, n, "Payload", "Message Number")))
+	require.Nil(t, n.Child("SFTP"))
 }
 
 func TestObservedSessionCanonicalEntries(t *testing.T) {
