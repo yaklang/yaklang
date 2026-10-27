@@ -30,6 +30,11 @@ func dcerpcEventSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 	if context, ok := v["Context ID"]; ok {
 		parts = append(parts, fmt.Sprintf("context=%d", number(context)))
 	}
+	if name == "BindNak" {
+		if reason, ok := v["Reject Reason"]; ok {
+			parts = append(parts, "reject="+dcerpcDetailValue("Reject Reason", reason, fmt.Sprint(reason), 0, false))
+		}
+	}
 	if e.ResponseTo != 0 {
 		parts = append(parts, fmt.Sprintf("reply to PDU #%d", e.ResponseTo))
 		if request := textValue(v["Matched Request"]); request != "" {
@@ -48,6 +53,14 @@ func dcerpcEventSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 
 func dcerpcDetailValue(name string, value any, fallback string, result uint64, resultKnown bool) string {
 	switch name {
+	case "Reject Reason":
+		if code, ok := detailRangeOffset(value); ok {
+			// MS-RPCE also uses reason 4 for a protocol/state error. Do not
+			// diagnose an unsupported version solely from this ambiguous code.
+			if label := map[int]string{0: "reason not specified", 1: "temporary congestion", 2: "local limit exceeded", 4: "protocol error / protocol version not supported", 8: "authentication type not recognized", 9: "invalid checksum"}[code]; label != "" {
+				return fmt.Sprintf("%d (%s)", code, label)
+			}
+		}
 	case "Result", "Ack Result":
 		if code, ok := detailRangeOffset(value); ok {
 			if label := map[int]string{0: "Acceptance", 1: "User rejection", 2: "Provider rejection", 3: "Feature negotiation ACK"}[code]; label != "" {

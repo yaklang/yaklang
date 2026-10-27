@@ -35,6 +35,43 @@ func TestDCERPCReplySummaryAndProgressiveAssociation(t *testing.T) {
 	require.False(t, ok, "opaque security envelopes retain their own presentation scope")
 }
 
+func TestDCERPCBindNakReasonAndByteRangesSurviveWorker(t *testing.T) {
+	wire, err := hex.DecodeString("05000d031000000018000000020000000400010500ff80a5")
+	require.NoError(t, err)
+	s, err := pcaputil.NewProtocolSession(pcaputil.DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	r := s.Feed(1, time.Unix(1, 0), wire)
+	require.Len(t, r.Events, 1)
+	e := r.Events[0]
+	require.Equal(t, "decoded", e.Status, e.Error)
+	require.Contains(t, applicationEventSummary(e), "reject=4 (protocol error / protocol version not supported)")
+	encoded, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: []*pcaputil.ProtocolEvent{e}})
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, runDecodeWorker(bytes.NewReader(encoded), &output))
+	decoded, err := decodeWorkerOutput(output.Bytes(), &capturedPacket{number: 1})
+	require.NoError(t, err)
+	var lines []string
+	found := map[string]bool{}
+	for i, field := range decoded.fields {
+		lines = append(lines, field.text)
+		for prefix, span := range map[string][]int{"Reject Reason: 4 (protocol error / protocol version not supported)": {16, 18}, "Version Count: 1": {18, 19}, "Trailing Padding: 3 bytes": {21, 24}} {
+			if found[prefix] || !strings.HasPrefix(field.text, prefix) {
+				continue
+			}
+			require.Less(t, i, 18, "rejection details lead the raw field tree")
+			require.True(t, field.hasRange)
+			require.Equal(t, span, []int{field.start, field.end})
+			require.Equal(t, wire, decoded.sources[field.source-1].Data)
+			found[prefix] = true
+		}
+	}
+	require.Len(t, found, 3, strings.Join(lines, "\n"))
+	require.Contains(t, strings.Join(lines, "\n"), "Protocol Versions[0]: 5.0")
+	require.Equal(t, "123", dcerpcDetailValue("Reject Reason", uint16(123), "123", 0, false))
+}
+
 func TestDCERPCLogicalStubHasItsOwnByteSourceThroughProductionWorker(t *testing.T) {
 	stub := bytes.Repeat([]byte{0x5a, 0xa5}, 20)
 	fragment := func(flags byte, payload []byte) []byte {
