@@ -348,6 +348,9 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 	if version != "RTSP/1.0" {
 		return nil, protocolError(ErrUnsupportedVersion, "RTSP version")
 	}
+	if !response && (!rtspMethodToken(parts[0]) || parts[1] == "") {
+		return nil, protocolError(ErrMalformedMessage, "RTSP request method or URI")
+	}
 	seqs := h.Values("Cseq")
 	if len(seqs) == 0 && rtspAppleControlHeader(h) {
 		// Some Apple control exchanges use RTSP syntax without CSeq. Parse
@@ -380,9 +383,6 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 	out := map[string]any{"CSeq": uint32(seq), "Session ID": sid, "Content Length": n, "Content Type": h.Get("Content-Type")}
 	key := rtspKey{dir, uint32(seq)}
 	if !response {
-		if !rtspMethodToken(parts[0]) || parts[1] == "" {
-			return nil, protocolError(ErrMalformedMessage, "RTSP request method or URI")
-		}
 		known := false
 		for _, m := range rtspMethods {
 			if parts[0] == m {
@@ -406,7 +406,9 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 			}
 		}
 		if !known {
-			return nil, protocolError(ErrUnsupportedFeature, "RTSP method")
+			out["Profile"], out["Packet Name"], out["URI"] = "extension-semantics-unsupported", parts[0], parts[1]
+			out["Control Header Observed"], out["Method Semantics Validated"] = true, false
+			return out, protocolError(ErrUnsupportedFeature, "RTSP method %q", parts[0])
 		}
 		var request *rtspRequest
 		if old, ok := s.pending[key]; ok {
@@ -535,7 +537,27 @@ func rtspAppleControlHeader(h textproto.MIMEHeader) bool {
 	return strings.HasPrefix(h.Get("Server"), "AirTunes/") || strings.HasPrefix(h.Get("User-Agent"), "AirPlay/") || strings.HasPrefix(h.Get("User-Agent"), "AirTunes/") || h.Get("Content-Type") == "application/x-apple-binary-plist"
 }
 
-func rtspAppleControlWire(wire []byte, max int) bool {
-	_, h, header, _, err := rtspHeader(wire, max)
-	return err == nil && header > 0 && len(h.Values("Cseq")) == 0 && rtspAppleControlHeader(h)
+func rtspNativeControlWire(wire []byte, max int) bool {
+	line, h, header, body, err := rtspHeader(wire, max)
+	if err != nil || header == 0 || header+body != len(wire) {
+		return false
+	}
+	if len(h.Values("Cseq")) == 0 && rtspAppleControlHeader(h) {
+		return true
+	}
+	parts := strings.SplitN(line, " ", 3)
+	if len(parts) != 3 || parts[2] != "RTSP/1.0" || !rtspMethodToken(parts[0]) || parts[1] == "" {
+		return false
+	}
+	for _, method := range rtspMethods {
+		if parts[0] == method {
+			return false
+		}
+	}
+	if parts[0] == "FLUSH" || (parts[0] == "GET" || parts[0] == "POST") && rtspAppleControlHeader(h) {
+		return false
+	}
+	// RFC 2326 permits extension method tokens. Route their complete envelope
+	// to the native unsupported-semantics result, not a legacy grammar panic.
+	return true
 }

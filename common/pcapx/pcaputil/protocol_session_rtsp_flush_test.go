@@ -65,3 +65,29 @@ func TestRTSPFlushBoundsAndNoInventedMediaReset(t *testing.T) {
 		require.Equal(t, ProbeReject, probeRTSP([]byte(invalid), 32768).Verdict, invalid)
 	}
 }
+
+func TestRTSPUnknownExtensionIsUnsupportedAndCannotUseLegacySuccess(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		for _, method := range []string{"OPTIONSBOGUS", "FLUSHBOGUS", "X-AUDIT"} {
+			wire := []byte(method + " rtsp://example.test/a RTSP/1.0\r\nCSeq: 7\r\n\r\n")
+			events, _ := sessionTestFlow(t, "rtsp", []sessionStep{{0, wire}}, 1, deferred)
+			require.Len(t, events, 1)
+			e := events[0]
+			require.Equal(t, "context-required", e.Status)
+			require.Contains(t, e.Error, "UnsupportedFeature")
+			require.Contains(t, e.Error, method)
+			_, first := e.GetFields()
+			require.ErrorContains(t, first, "UnsupportedFeature")
+			e.Protocol, e.Status = "rtsp", "decoded"
+			e.Fields = map[string]any{"Accepted": true}
+			e.Structured = map[string]any{"fields": e.Fields}
+			fields, err := e.GetFields()
+			require.Nil(t, fields)
+			require.EqualError(t, err, first.Error())
+			_, err = e.Decode()
+			require.EqualError(t, err, first.Error())
+		}
+	}
+	_, err := (&binRTSP{}).consume(0, []byte("BAD@METHOD /info RTSP/1.0\r\nUser-Agent: AirPlay/1.0\r\n\r\n"), time.Time{}, 64)
+	require.ErrorContains(t, err, "MalformedMessage", "Apple headers do not legalize an invalid method token")
+}
