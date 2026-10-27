@@ -1,0 +1,316 @@
+{
+  "scope": "Literal []byte values and invalid-UTF8 string values in canonical event maps/lists survive packet and stream worker JSON without guessing text encodings. Generic binary field values without a verified range have owned extracted sources, explicitly without captured frame offsets. This changes inspection projection, not native protocol classification, field exports or flow/session generation.",
+  "application_source": "494c05efc296df6080f9ea18f01d9f8ce77a2dd0",
+  "native_console_auditor_source": "36ed3525c798fdd2bd27b9b0171eb63727e2b6a9",
+  "full_CLI_tests_seconds": 2.014,
+  "field_type_fuzz": {
+    "executions": 70963,
+    "seconds": 41.343,
+    "limit": "random byte/text/key values; explicit refusal for unrepresentable map keys"
+  },
+  "worker_bounds": {
+    "input_bytes_including_type_facts": 2097152,
+    "type_facts": 16384,
+    "traversal_nodes_per_event": 65536,
+    "depth": 32
+  },
+  "generic_extracted_source_bounds": {
+    "new_sources": 256,
+    "total_bytes": 1048576,
+    "refusal": "visible limit notice; no full-byte selection promise"
+  },
+  "regressions": [
+    "nil and empty byte slices remain distinct",
+    "invalid UTF8 string octets survive JSON replacement",
+    "valid base64-looking text and marker-shaped maps remain literal text/maps",
+    "special map keys and nested array paths bind to exact containers",
+    "wrong/missing/duplicate type descriptors fail before publication",
+    "source-local ranges and owned bytes; no searching for captured offsets",
+    "known wire ranges retain precedence",
+    "TLS/DTLS/QUIC/HTTP3/DoQ retain protected source/authentication gates"
+  ],
+  "base_native_protocol_source": "5986535b9d",
+  "base_protocol_field_certificate_sha256": "338c33be78022fe954502c49e42e27e7c44c543e160b5f5b80e63a6183a0b18b",
+  "executables_sha256": {
+    "yak-byte-fields.exe": "45d661a8a1a65b02bffcb38f143e9bf525abc0110e700947b6d8dc6a0d42c904",
+    "native-console-byte-fields.exe": "51968896ce0a400d2d508f34efce1009f1bb315f5b57e10c6958e6cbfb2e62eb"
+  },
+  "native_console_source_sha256": "e610527cacf9abbc441c28f94d15d280239e4b7085f6a90fb983cf3c7c90abf7",
+  "Windows": [
+    {
+      "case": "actual-curve",
+      "capture_packets": 375,
+      "PDU": 7,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "mouse_byte_field": "Client Curve25519 Public Key",
+      "independent_wire_value_sha256": "78817f0b2ae45692757ae3aa3961644d6b8202680c2c1c9a559c36a52546e007",
+      "independent_initial_field_certificate_sha256": "c929286d5dfefffe597bc42c5c3979aee90a3774592ff7f8bc706012459c9a6a",
+      "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "7ac76916c6df779b758ee076e3cca1d25e2f347a81bccaee2d7852c622982867",
+        "00-filter-ready.json": "7f23628af214031afea81fef16575a4e8d2ab9bbb8321d6373ce510b825d5f63",
+        "01-adaptive-bytes-click.json": "f98c1c9ff12a8ce94af57283b3d25893f16293e8a36d9a2f91375668006fad39",
+        "01-adaptive-fields-before.json": "68a6e4d8c7960dfa3ad9098652d9a27beb35f30ced20c8a9f358542d6c1f6a56",
+        "01-adaptive-fields-click.json": "68a6e4d8c7960dfa3ad9098652d9a27beb35f30ced20c8a9f358542d6c1f6a56",
+        "01-deep-protocol-fields.json": "68a6e4d8c7960dfa3ad9098652d9a27beb35f30ced20c8a9f358542d6c1f6a56",
+        "01-protocol-fields.json": "68a6e4d8c7960dfa3ad9098652d9a27beb35f30ced20c8a9f358542d6c1f6a56",
+        "01-selected-byte-field.json": "e3ca326a69ef7b00339c11cd96ef8cde65215955d55ba1f3488207954acaa76e",
+        "02-byte-sources.json": "f5f4d44c31c418814cf8b04a0e39b1daf96b27a3b6a5a858dc971ec17b159a22",
+        "02-first-byte-source.json": "f98c1c9ff12a8ce94af57283b3d25893f16293e8a36d9a2f91375668006fad39",
+        "03-conversation-messages.json": "079ab645ef58e4631a932d03e334348c2de139edf20de05fbf8ebe204af0d817",
+        "04-association-evidence.json": "5b3a15af1c09d82529fe5c94a219d8777efb5b9c4fd0069529ed2b73456bdb77",
+        "05-narrow.json": "0426e7057391e0552e977b74c0c15ac1d13be64c21978229e4591b125865e653",
+        "06-restored.json": "5b3a15af1c09d82529fe5c94a219d8777efb5b9c4fd0069529ed2b73456bdb77",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-adaptive-bytes-click.png": "8477c37d29aa230349b3a5719839595db71f73c210333f9d3b83612c423e5a50",
+        "01-adaptive-fields-click.png": "d86716fc74a1a3529d8cb580cfa6dd77ac4903acc2dd4d2d8299a21909c69f1c",
+        "01-deep-protocol-fields.png": "d86716fc74a1a3529d8cb580cfa6dd77ac4903acc2dd4d2d8299a21909c69f1c",
+        "01-selected-byte-field.png": "20ddc8012b1f72590c87eb979e33176fc54354d8c4974924b8a7a293f542e43a",
+        "05-narrow.png": "41a9ac5943e2a48cd8566e5eb6f0fb68d849fb8a729d02195a861f51c8ffd34b"
+      }
+    },
+    {
+      "case": "actual-identification",
+      "capture_packets": 375,
+      "PDU": 4,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "mouse_byte_field": null,
+      "independent_wire_value_sha256": null,
+      "independent_initial_field_certificate_sha256": null,
+      "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "7ac76916c6df779b758ee076e3cca1d25e2f347a81bccaee2d7852c622982867",
+        "00-filter-ready.json": "e978ae8c226e8703b51201536a49c4a3e735de38474126e552ea89bc05892889",
+        "01-adaptive-bytes-click.json": "9645b8da0558ed82fbb648df9b93c5b29f15e25cb790363e38a837d22fc5dee8",
+        "01-adaptive-fields-before.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-adaptive-fields-click.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-deep-protocol-fields.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-protocol-fields.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "02-byte-sources.json": "9645b8da0558ed82fbb648df9b93c5b29f15e25cb790363e38a837d22fc5dee8",
+        "02-first-byte-source.json": "a717a32e7e89e418f1f22f972af3aa9bb0b7e94335a6216f023bf786193a901d",
+        "03-conversation-messages.json": "1b540d0703060b437d4278b4d79b4f51d17ff9014554af2ed4e2fe8fdf5de78a",
+        "04-association-evidence.json": "c13fb1491d063257630446186acb6169572da613fc49e043a951189d6fc0a637",
+        "05-narrow.json": "05c05f896e400948a86b13df6c0757e51a870eb927ec901eb0418226162927f3",
+        "06-restored.json": "c13fb1491d063257630446186acb6169572da613fc49e043a951189d6fc0a637",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-adaptive-bytes-click.png": "e60d75a9c1b1a0ca24eefa1dec65c26ca646031f6d446beab0ff0c73863a49dd",
+        "01-adaptive-fields-click.png": "dd29f694e9a91d850f4f05c741856d032014ec6c6007c5243936480868f36b20",
+        "01-deep-protocol-fields.png": "dd29f694e9a91d850f4f05c741856d032014ec6c6007c5243936480868f36b20",
+        "05-narrow.png": "1914a113f9e82ad98ef1f872ebc3b20234a670bb5cc732162d7a91db54cf7430"
+      }
+    },
+    {
+      "case": "public-group",
+      "capture_packets": 51328,
+      "PDU": 4280,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "mouse_byte_field": null,
+      "independent_wire_value_sha256": null,
+      "independent_initial_field_certificate_sha256": null,
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "19849526570029f7ae7932736e7f1ba18455844fd7fde347cfeaff7fb7b0b8eb",
+        "00-filter-ready.json": "4233c06cf5349fc752a160ddf5cb1db2cff98d2044252f682cdd88990a98f567",
+        "01-adaptive-bytes-click.json": "fa3d4b716ee099d990ecc96efe96b7f4845ac554d41f44f83be4c38f71ec6c31",
+        "01-adaptive-fields-before.json": "b3f51798288cf9548ffd6ad27b4bd682994555c2b28ba4f13b9dd11297b588c9",
+        "01-adaptive-fields-click.json": "b3f51798288cf9548ffd6ad27b4bd682994555c2b28ba4f13b9dd11297b588c9",
+        "01-deep-protocol-fields.json": "b3f51798288cf9548ffd6ad27b4bd682994555c2b28ba4f13b9dd11297b588c9",
+        "01-protocol-fields.json": "b3f51798288cf9548ffd6ad27b4bd682994555c2b28ba4f13b9dd11297b588c9",
+        "02-byte-sources.json": "4190d2d7fcb43a6941b14a0eb98fcf2337cd53b05c1fdfc52ee36368b2b82b7b",
+        "02-first-byte-source.json": "70809bc22d92315560fa50abcdb4f2e4b935c8a03b02003cfebac2d4905b8c7c",
+        "03-conversation-messages.json": "ddfb78764970c13ecaef2321867715b0b11adcbadedf582b861a252b2b88118d",
+        "04-association-evidence.json": "c417b999e3bac405ebbca20785c48189aa56de41ae171eb4038581691e49f3fd",
+        "05-narrow.json": "6445efdfd9f7dd7452f4af60e72808042c8e42f0e2ea881bc2fee66bf4afec3c",
+        "06-restored.json": "c417b999e3bac405ebbca20785c48189aa56de41ae171eb4038581691e49f3fd",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-adaptive-bytes-click.png": "4af58ef424f3b450c36f15c7c2467737e664437ae32a85a370e4c6608880eb0b",
+        "01-adaptive-fields-click.png": "ddc4f41db625d54ed7c9b7de3b88df0d67b263894c0e5d3e5482e628cfb1c54b",
+        "01-deep-protocol-fields.png": "ddc4f41db625d54ed7c9b7de3b88df0d67b263894c0e5d3e5482e628cfb1c54b",
+        "05-narrow.png": "b5efa8a60c1876fc39e04db6b047cf6f16b33a5847d835a0ac77e80e5286e719"
+      }
+    },
+    {
+      "case": "quic-refused",
+      "protocol": "QUIC",
+      "PDU": 96,
+      "capture_packets": 151,
+      "field_down": 20,
+      "label": "Rejected Packet Payload: 1 bytes",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "capture_sha256": "91b76e8f2217690c1a118296501bc0755cc2652d2e4306af90d35d8f1fc93a95",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "95118a5f552769a3e34a7ddf72753e1266c4c7b847efb127be63ce2b49606904",
+        "00-filter-ready.json": "3b1cdf8af431afd1663eb1a8275461fd805055a8d9e5c2852d7d3f0af3906889",
+        "01-deep-protocol-fields.json": "daf2f8847ca38cfdb198a33010c817ddfe10bb80e3ee921b67e75f67d3e6188b",
+        "01-protocol-fields.json": "96ae2e896e4063614d1b25168ea9f00aad96a36b985c1e374bdec59859032216",
+        "02-byte-sources.json": "9223ed1baaaba240e4f39ec17488a14dfe055ffa57a5aab8879c0431c193810f",
+        "02-first-byte-source.json": "6ceb3a4dfab07007573143332bc049a08120bd0543ed17181952ed128e60cc72",
+        "03-conversation-messages.json": "3fb6b3b3e9969f22b4ceb6bbd217502b9bdc7146cdb9330e3b213a43fb89afb6",
+        "04-association-evidence.json": "7a81db68412ea7cf25264be00c8bbe6918457bf9bf29fb1a53c36ea1f1b78c8e",
+        "05-narrow.json": "cea22abea2f1922512ba2fc85bb49d3e2645de03d375f8c89bb2724392594de4",
+        "06-restored.json": "7a81db68412ea7cf25264be00c8bbe6918457bf9bf29fb1a53c36ea1f1b78c8e",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "e16e68443c1c2aad994aceba19e6ca1c024e4dd07013e8ae747021cdf985a49b",
+        "01-protocol-fields.png": "e270e58aa97acd80124a5c89423bcf8960b44feb36bd6fcae44662c635ba60aa",
+        "05-narrow.png": "137d3adfbd9632b94faa1be2d35be794ef9c6eb3ab1cbd84906859b225f3f164"
+      }
+    },
+    {
+      "case": "quic-empty",
+      "protocol": "QUIC",
+      "PDU": 103,
+      "capture_packets": 151,
+      "field_down": 20,
+      "label": "0 bytes (AEAD verified; not delivered)",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "capture_sha256": "91b76e8f2217690c1a118296501bc0755cc2652d2e4306af90d35d8f1fc93a95",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "95118a5f552769a3e34a7ddf72753e1266c4c7b847efb127be63ce2b49606904",
+        "00-filter-ready.json": "9590062622461c8631bd453bb1db2f08d393c37d0054f39d34c9a9055dd58d94",
+        "01-deep-protocol-fields.json": "6d019e85f0495cbdc3f43920df346938fae87e280c5e8dcaa2a5c0988f22f188",
+        "01-protocol-fields.json": "ccb4746ea7c3ed796137de27300a81aa36c4ee1c6002f8a005fcdefc13552313",
+        "02-byte-sources.json": "d27f2eabba3ceedc3c9bbc5198a770bfc5821eed979819344902e6e15c5c3833",
+        "02-first-byte-source.json": "6857edd4bba1ce523e83b6189e2ba63b631d78ba1c801e59d29549502817483b",
+        "03-conversation-messages.json": "a21ad4d5b29226d8164c698f14daa7109f56f7ac07d8b1dc6ec922785d860192",
+        "04-association-evidence.json": "2465128d3c6e048aeeb3cb9fad655397d538136452f78cb4b388b39546be3da5",
+        "05-narrow.json": "d1ed140ee7462ee446179b248ab55da51264e6927d332338f28bb4bb3c5cb95a",
+        "06-restored.json": "2465128d3c6e048aeeb3cb9fad655397d538136452f78cb4b388b39546be3da5",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "07776ee3e1551d461d5704dad46f91d9173a05a5c51fa15b86d9b19315683288",
+        "01-protocol-fields.png": "b713d6d5607a06783f33ec8bd1ebcb5d7b40d024c3ff12920efa5e4955375c01",
+        "05-narrow.png": "e10173f96386cb63ae412f95c33191586e46e5fde102358488d4b90b93826db9"
+      }
+    },
+    {
+      "case": "http3-recovery",
+      "protocol": "HTTP/3",
+      "PDU": 107,
+      "capture_packets": 151,
+      "field_down": 45,
+      "label": "/after-transport-faults",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "capture_sha256": "91b76e8f2217690c1a118296501bc0755cc2652d2e4306af90d35d8f1fc93a95",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "95118a5f552769a3e34a7ddf72753e1266c4c7b847efb127be63ce2b49606904",
+        "00-filter-ready.json": "e0f369328b91d4462b7506898ea62c6cd51b884a12f6676b237e493b10023e48",
+        "01-deep-protocol-fields.json": "a306f4f284f712524a80e375e23107b99f530eafa824477b2cd6a1006ea4feb4",
+        "01-protocol-fields.json": "de13f8d6bbd1d7720ad693b2f9464ce2fbdc96145536ede79d1a7df173a6aee5",
+        "02-byte-sources.json": "9c02459e2d38531ffbcc3bf17ff7cbe7b497e58bf0c6c1e3661183ae20598b77",
+        "02-first-byte-source.json": "5814ad4a4da3acdc24dd1d3b3e3e74c5787b5309e28953d72bb03801c1942387",
+        "03-conversation-messages.json": "3704cf0e93f3057545de8343dded7e68eaa0d4079b321dd2cb18c7e81f8d58ff",
+        "04-association-evidence.json": "308003814f57c9c0d1c7a5de9df0788becff845e72366d79d046ace7a29bd529",
+        "05-narrow.json": "8d69ce2e0203615fce1385d23fac8f8681d99366a2386ce89753138a1efbbc63",
+        "06-restored.json": "308003814f57c9c0d1c7a5de9df0788becff845e72366d79d046ace7a29bd529",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "2ede091560f46eda1b59eaa55f926a6c5a12c1b34473595ffe0bd06d6e0a359f",
+        "01-protocol-fields.png": "644826385f962870a02eecb4902c96ded25547570bcae06da24a72471d84f9f6",
+        "05-narrow.png": "4cc95f54c5ac652be2e7584c3b2289504ef87edc876346bd8e6423ac28b95c40"
+      }
+    },
+    {
+      "case": "tls-encrypted",
+      "capture_packets": 51328,
+      "query": "fields pdu.id == 15649",
+      "protocol": "TLSv1.3",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "native_cells_sha256": {
+        "00-capture-ready.json": "b2cf3965a7ad3d4f0356866fa584035ffc865028fae9e259e335b6ef3b133915",
+        "00-filter-ready.json": "169284f41d7cf86d4f9956150826bff1ddf2160d13c292d40e9aedb7b1990dea",
+        "01-deep-protocol-fields.json": "5e0d4be508a6dc911f4fbfc712f6d2367d880a800b1cef651776a4b3082c27a7",
+        "01-protocol-fields.json": "5e0d4be508a6dc911f4fbfc712f6d2367d880a800b1cef651776a4b3082c27a7",
+        "02-byte-sources.json": "97add0edd6597f6cb15231bdb955d9de5a072baf938ad2bebf2a6ba089e61ba7",
+        "02-first-byte-source.json": "6275c53385a43e19d3f18b0234d6311249ca3379827b4d7a148fbe7f51d4c867",
+        "03-conversation-messages.json": "1df7096915fb34e4819b948c701d8be231a2e9f50e4c60a4943a2305f156203c",
+        "04-association-evidence.json": "23a0b042f63522bcf56724a9b6fda16c28bed379d84993c5aa7c2885fd1989af",
+        "05-narrow.json": "9e736f763b7c9eead1be1b57b5a330052df004f1b4c7d55105a5552b1898c5f4",
+        "06-restored.json": "23a0b042f63522bcf56724a9b6fda16c28bed379d84993c5aa7c2885fd1989af",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "d45f551bf035c43e745ddc342fcb8d095f38d56398f36cd2ee9dd2f9dce72264",
+        "01-protocol-fields.png": "d45f551bf035c43e745ddc342fcb8d095f38d56398f36cd2ee9dd2f9dce72264",
+        "05-narrow.png": "453953889ef08ce8b54073f2451e9105a0e95257ff2b44af81a24e27bee2a098"
+      }
+    },
+    {
+      "case": "tls-negotiated-cleartext",
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "capture_packets": 51328,
+      "protocol": "TLSv1.3",
+      "query": "fields tls.version == 772",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "891de61dd6fbf12afd75451ba982089588a5682c32aa6659cbf6752d6da79a80",
+        "00-filter-ready.json": "cfd8d5c79f69aabc983dbf02b1641b8ceb86e422275cc30c58f4c23a6c9cf124",
+        "01-deep-protocol-fields.json": "69de3c6906b80ca4563f4dbbc49183fa9df1e6327d67afbf4921165271c45f21",
+        "01-protocol-fields.json": "69de3c6906b80ca4563f4dbbc49183fa9df1e6327d67afbf4921165271c45f21",
+        "02-byte-sources.json": "8fe250c38a3e975cec20517be0a4e2ff082569787a3a9488c8df5d4c6fb114f1",
+        "02-first-byte-source.json": "edea96116db50c348ff4eff53d40352f5982d36fef63923badc710b845d3514a",
+        "03-conversation-messages.json": "fcd5097382749dea54982ca1386e728efd94aaad1226da38b6e2e458a195af92",
+        "04-association-evidence.json": "40d8c85cb54287fec2cbdb0b312acc0b13ef049d493be288f768239046d2c602",
+        "05-narrow.json": "5223c6d1c6e4686b21d821c5674899d2bc1d1e23eddbb7410237f1372a8b6ea2",
+        "06-restored.json": "40d8c85cb54287fec2cbdb0b312acc0b13ef049d493be288f768239046d2c602",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "dbf712bc327678680ff38da41aaa79bc92fa44ceeb9a3033c8dc7a662e3e1b8d",
+        "05-narrow.png": "1c62e93b747a393a2489198d1958542b22b1bd44142b7639b88e97bda28148af"
+      }
+    }
+  ],
+  "failed_auditor_attempts_retained_outside_Git": [
+    "The first clicked-byte proof assumed title and hex-data columns aligned. Corrected the auditor to locate the actual 000000 row; fresh selected native bytes then matched all 32 independent original-wire bytes.",
+    "The initial TLS postcheck incorrectly demanded secret lookup status on cleartext ServerHello. It is retained. A separate encrypted-record query then passed with missing-key, correct negotiated version and protected source handling."
+  ],
+  "raw_inputs_exports_console_buffers_images_outside_Git": true,
+  "remaining": [
+    "Named custom byte types, fixed byte arrays and custom struct JSON serializers are outside this canonical []byte map/list transport profile",
+    "Five reordered SSH method views still need later-evidence derived refinement",
+    "Ed25519 inner fields and the other partial protocol/field/fuzz scopes remain open"
+  ]
+}
