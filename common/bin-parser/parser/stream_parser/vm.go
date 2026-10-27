@@ -481,6 +481,7 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseHTTP2Fields(invocation.node, invocation.operator, mode)
 		},
+		"validateSSHIdentification": validateSSHIdentification,
 		"parseSSHPlaintextPacket": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("ssh-plaintext: structured generation is not supported")
