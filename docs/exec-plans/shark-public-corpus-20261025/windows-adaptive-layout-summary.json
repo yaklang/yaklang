@@ -1,0 +1,141 @@
+{
+  "scope": "Adaptive sparse-result packet-list height shared by rendering, mouse hit testing and scroll viewports. Extra space expands fields, bytes and stream inspection after EOF or an applied filter. Unfiltered live geometry stays stable. This changes UI layout, not protocol decoding or the certified field values.",
+  "application_source": "04fa716eaa",
+  "native_console_auditor_source": "2538183117",
+  "full_CLI_tests_seconds": 2.067,
+  "unit_interactions": [
+    "actual content filter with one captured UDP match",
+    "moved Fields/Stream tabs clicked at their rendered coordinates",
+    "field wheel and flat row hit testing in the expanded viewport",
+    "70x24, 80x30 and 180x48 geometry and click targets",
+    "zero-match guidance remains within the list border",
+    "clear-live-filter and busy-list layout restoration",
+    "unfiltered live arrivals retain stable layout"
+  ],
+  "base_native_protocol_source": "5986535b9d",
+  "base_protocol_field_certificate_sha256": "338c33be78022fe954502c49e42e27e7c44c543e160b5f5b80e63a6183a0b18b",
+  "raw_inputs_exports_console_buffers_images_outside_Git": true,
+  "executable_sha256": {
+    "yak-adaptive.exe": "ca5ab204098cb0c3c7aab6606f1ce964f3d76129353ccd40d7fe8cc4e93c28e9",
+    "native-console-adaptive.exe": "27ca4aa0dea7e8336f8170ec754c6e7a58cd1bd94327993a7ff39117d2c3b06e"
+  },
+  "native_console_source_sha256": "9ffb0306761b4cab5d7f1fbcaf82be3947e5dfc473c279d0cc0c7d1e14690ec6",
+  "Windows": [
+    {
+      "case": "actual-curve",
+      "capture_packets": 375,
+      "PDU": 7,
+      "old_tabs_row_zero_based": 29,
+      "new_tabs_row_zero_based": 16,
+      "additional_inspector_rows": 13,
+      "native_attribute_checked_mouse_tab_clicks": 2,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "literal_curve_public_key_visible": true,
+      "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+      "before_native_cells_sha256": "6c55bbada9d9f0acd053cfaf57d7ae9450574bab3d6c9baf529b0074b4878fe6",
+      "new_native_cells_sha256": {
+        "00-filter-ready.json": "7f23628af214031afea81fef16575a4e8d2ab9bbb8321d6373ce510b825d5f63",
+        "01-protocol-fields.json": "65adb8aa209197617bcb20803bc3f51f3f6b09d0b45e2333711ba6e9202f9c3d",
+        "01-deep-protocol-fields.json": "65adb8aa209197617bcb20803bc3f51f3f6b09d0b45e2333711ba6e9202f9c3d",
+        "01-adaptive-fields-before.json": "65adb8aa209197617bcb20803bc3f51f3f6b09d0b45e2333711ba6e9202f9c3d",
+        "01-adaptive-bytes-click.json": "b4e8ec96303041dbd5bf774017aa7b16bb78654766f96f3c3c91d9d04b749573",
+        "01-adaptive-fields-click.json": "65adb8aa209197617bcb20803bc3f51f3f6b09d0b45e2333711ba6e9202f9c3d",
+        "02-byte-sources.json": "b4e8ec96303041dbd5bf774017aa7b16bb78654766f96f3c3c91d9d04b749573",
+        "03-conversation-messages.json": "079ab645ef58e4631a932d03e334348c2de139edf20de05fbf8ebe204af0d817",
+        "04-association-evidence.json": "5b3a15af1c09d82529fe5c94a219d8777efb5b9c4fd0069529ed2b73456bdb77",
+        "05-narrow.json": "0426e7057391e0552e977b74c0c15ac1d13be64c21978229e4591b125865e653",
+        "06-restored.json": "5b3a15af1c09d82529fe5c94a219d8777efb5b9c4fd0069529ed2b73456bdb77",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "f2594ca1903a4e02d3f945678efcbc2da4e6978241b2548faef11beb59ba30db",
+        "01-adaptive-bytes-click.png": "d85f9fe12b06f30fa15ea1cbf5496d8e935b2922b0599f78190ce6ecf98aaf19",
+        "01-adaptive-fields-click.png": "f2594ca1903a4e02d3f945678efcbc2da4e6978241b2548faef11beb59ba30db",
+        "05-narrow.png": "41a9ac5943e2a48cd8566e5eb6f0fb68d849fb8a729d02195a861f51c8ffd34b"
+      }
+    },
+    {
+      "case": "actual-identification",
+      "capture_packets": 375,
+      "PDU": 4,
+      "old_tabs_row_zero_based": 29,
+      "new_tabs_row_zero_based": 16,
+      "additional_inspector_rows": 13,
+      "native_attribute_checked_mouse_tab_clicks": 2,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "literal_curve_public_key_visible": false,
+      "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+      "before_native_cells_sha256": "ed5d62e4b6b252f6b2f26fdb1b3541e7f3ffab38f11501d84ef36ace86b748e5",
+      "new_native_cells_sha256": {
+        "00-filter-ready.json": "e978ae8c226e8703b51201536a49c4a3e735de38474126e552ea89bc05892889",
+        "01-protocol-fields.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-deep-protocol-fields.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-adaptive-fields-before.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "01-adaptive-bytes-click.json": "9645b8da0558ed82fbb648df9b93c5b29f15e25cb790363e38a837d22fc5dee8",
+        "01-adaptive-fields-click.json": "d5607cfe6ef0cab950d5a5d9ca9e2ddde7e57146c79f4e746ab1b3e805b1d3b5",
+        "02-byte-sources.json": "9645b8da0558ed82fbb648df9b93c5b29f15e25cb790363e38a837d22fc5dee8",
+        "03-conversation-messages.json": "1b540d0703060b437d4278b4d79b4f51d17ff9014554af2ed4e2fe8fdf5de78a",
+        "04-association-evidence.json": "c13fb1491d063257630446186acb6169572da613fc49e043a951189d6fc0a637",
+        "05-narrow.json": "05c05f896e400948a86b13df6c0757e51a870eb927ec901eb0418226162927f3",
+        "06-restored.json": "c13fb1491d063257630446186acb6169572da613fc49e043a951189d6fc0a637",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "dd29f694e9a91d850f4f05c741856d032014ec6c6007c5243936480868f36b20",
+        "01-adaptive-bytes-click.png": "e60d75a9c1b1a0ca24eefa1dec65c26ca646031f6d446beab0ff0c73863a49dd",
+        "01-adaptive-fields-click.png": "dd29f694e9a91d850f4f05c741856d032014ec6c6007c5243936480868f36b20",
+        "05-narrow.png": "1914a113f9e82ad98ef1f872ebc3b20234a670bb5cc732162d7a91db54cf7430"
+      }
+    },
+    {
+      "case": "public-group",
+      "capture_packets": 51328,
+      "PDU": 4280,
+      "old_tabs_row_zero_based": 29,
+      "new_tabs_row_zero_based": 16,
+      "additional_inspector_rows": 13,
+      "native_attribute_checked_mouse_tab_clicks": 2,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "literal_curve_public_key_visible": false,
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "before_native_cells_sha256": "46ec35fe65f9b1760ae905fc75a9b62a38c4c04fbc11b83c737f5c50689eed45",
+      "new_native_cells_sha256": {
+        "00-filter-ready.json": "4233c06cf5349fc752a160ddf5cb1db2cff98d2044252f682cdd88990a98f567",
+        "01-protocol-fields.json": "8cd3cffc525c0261d3d62680770bb0fa94fd40db71f152fa5026f9d2ce687139",
+        "01-deep-protocol-fields.json": "8cd3cffc525c0261d3d62680770bb0fa94fd40db71f152fa5026f9d2ce687139",
+        "01-adaptive-fields-before.json": "8cd3cffc525c0261d3d62680770bb0fa94fd40db71f152fa5026f9d2ce687139",
+        "01-adaptive-bytes-click.json": "2514ce92d7f3ad7d9aaed66dd44dd0cce51a00a8038fd38d7020150308e0c4a1",
+        "01-adaptive-fields-click.json": "8cd3cffc525c0261d3d62680770bb0fa94fd40db71f152fa5026f9d2ce687139",
+        "02-byte-sources.json": "2514ce92d7f3ad7d9aaed66dd44dd0cce51a00a8038fd38d7020150308e0c4a1",
+        "03-conversation-messages.json": "ddfb78764970c13ecaef2321867715b0b11adcbadedf582b861a252b2b88118d",
+        "04-association-evidence.json": "c417b999e3bac405ebbca20785c48189aa56de41ae171eb4038581691e49f3fd",
+        "05-narrow.json": "6445efdfd9f7dd7452f4af60e72808042c8e42f0e2ea881bc2fee66bf4afec3c",
+        "06-restored.json": "c417b999e3bac405ebbca20785c48189aa56de41ae171eb4038581691e49f3fd",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "62b6af57b5662b42aa5f457ae9db3e811aab68cbc07efba44aff2b46a64b6d11",
+        "01-adaptive-bytes-click.png": "cb2212db2d14add98d5e8188340d1c70d1226aee251c95899f8e61e94ae039d8",
+        "01-adaptive-fields-click.png": "62b6af57b5662b42aa5f457ae9db3e811aab68cbc07efba44aff2b46a64b6d11",
+        "05-narrow.png": "b5efa8a60c1876fc39e04db6b047cf6f16b33a5847d835a0ac77e80e5286e719"
+      }
+    }
+  ],
+  "remaining": [
+    "Generic protocol byte fields currently appear as lossless base64 strings; explicit byte encoding and typed source presentation should be improved",
+    "Five reordered SSH method views still need later-evidence derived refinement",
+    "Ed25519 inner fields and the other partial protocol/field/fuzz scopes remain open"
+  ]
+}
