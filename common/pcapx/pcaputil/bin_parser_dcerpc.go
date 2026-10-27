@@ -399,12 +399,21 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 			transferVersion: transferVersion,
 		})
 		names = append(names, name)
-		contexts = append(contexts, map[string]any{
+		view := map[string]any{
 			"Context ID": id, "Abstract Syntax": bytes.Clone(abstractSyntax),
 			"Interface": name, "Interface Version Major": abstractMajor, "Interface Version Minor": abstractMinor,
 			"Transfer Syntax": bytes.Clone(transferSyntax), "Transfer Version": transferVersion,
 			"Bind Time Feature Proposal": feature,
+		}
+		dcerpcAttachBodyRanges(info, view, map[string]any{
+			"Context ID":              []uint64{uint64(16 + off), uint64(18 + off)},
+			"Abstract Syntax":         []uint64{uint64(20 + off), uint64(36 + off)},
+			"Interface Version Major": []uint64{uint64(36 + off), uint64(38 + off)},
+			"Interface Version Minor": []uint64{uint64(38 + off), uint64(40 + off)},
+			"Transfer Syntax":         []uint64{uint64(40 + off), uint64(56 + off)},
+			"Transfer Version":        []uint64{uint64(56 + off), uint64(60 + off)},
 		})
+		contexts = append(contexts, view)
 		info["Context ID"] = id
 		info["Interface"] = name
 		info["Abstract Syntax"] = hex.EncodeToString(abstractSyntax)
@@ -476,17 +485,24 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 		return err
 	}
 	views := make([]map[string]any, 0, len(results))
+	addressEnd := 10 + int(binary.LittleEndian.Uint16(body[8:10]))
+	resultStart := 16 + ((addressEnd + 3) &^ 3) + 4
 	for i, result := range results {
-		views = append(views, map[string]any{
+		start := uint64(resultStart + 24*i)
+		view := map[string]any{
 			"Ordinal": i, "Result": result.result, "Reason": result.reason,
 			"Transfer Syntax": bytes.Clone(result.transferSyntax), "Transfer Version": result.transferVersion,
+		}
+		dcerpcAttachBodyRanges(info, view, map[string]any{
+			"Result": []uint64{start, start + 2}, "Reason": []uint64{start + 2, start + 4},
+			"Transfer Syntax": []uint64{start + 4, start + 20}, "Transfer Version": []uint64{start + 20, start + 24},
 		})
+		views = append(views, view)
 	}
 	info["Presentation Context Results"] = views
-	addressEnd := 10 + int(binary.LittleEndian.Uint16(body[8:10]))
 	if addressEnd > 10 {
 		info["Secondary Address Bytes"] = bytes.Clone(body[10:addressEnd])
-		info["Wire Field Ranges"] = map[string]any{"Secondary Address Bytes": []uint64{26, uint64(16 + addressEnd)}}
+		dcerpcAttachBodyRanges(info, info, map[string]any{"Secondary Address Bytes": []uint64{26, uint64(16 + addressEnd)}})
 	}
 	want, pending := d.pending[call]
 	if !pending {
@@ -670,7 +686,7 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	info["OpNum"] = op
 	if flags&dcerpcObject != 0 {
 		info["Object UUID"] = bytes.Clone(body[8:24])
-		info["Wire Field Ranges"] = map[string]any{"Object UUID": []uint64{24, 40}}
+		dcerpcAttachBodyRanges(info, info, map[string]any{"Object UUID": []uint64{24, 40}})
 	}
 	if name, ok := d.ctx[ctx]; ok {
 		info["Interface"] = name
@@ -691,6 +707,14 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	stub := body[need:]
 	info["Stub Bytes"] = len(stub)
 	return nil
+}
+
+// Assembled RPC body offsets do not belong to the final wire fragment. Until
+// that logical body has its own owned source, retain values without fake ranges.
+func dcerpcAttachBodyRanges(info, target map[string]any, ranges map[string]any) {
+	if info["First Frag"] == true && info["Last Frag"] == true && info["Reassembled"] != true {
+		target["Wire Field Ranges"] = ranges
+	}
 }
 
 func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16) error {
