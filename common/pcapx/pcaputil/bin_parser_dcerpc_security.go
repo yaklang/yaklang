@@ -112,17 +112,56 @@ func dcerpcContextTailDiagnostic(wire []byte) map[string]any {
 	}
 }
 
-func dcerpcIsolatedContextTail(wire []byte, failure *ProtocolError) map[string]any {
+func dcerpcResultTailDiagnostic(wire []byte) map[string]any {
+	if len(wire) < 32 || wire[0] != 5 || wire[1] != 0 || (wire[2] != 12 && wire[2] != 15) || (wire[3] != 3 && wire[3] != 7) || !dcerpcLittleEndian(wire) || dcerpcFragLen(wire) != len(wire) || dcerpcHasSecurityTrailer(wire) {
+		return nil
+	}
+	addressLength := int(binary.LittleEndian.Uint16(wire[24:26]))
+	if addressLength > 256 {
+		return nil
+	}
+	start := (26 + addressLength + 3) &^ 3
+	if start+4 > len(wire) || wire[start+1] != 0 || wire[start+2] != 0 || wire[start+3] != 0 {
+		return nil
+	}
+	count := int(wire[start])
+	end := start + 4 + count*24
+	if count > 20 || end >= len(wire) {
+		return nil
+	}
+	for at := start + 4; at < end; at += 24 {
+		if binary.LittleEndian.Uint16(wire[at:at+2]) > 3 {
+			return nil
+		}
+	}
+	return map[string]any{
+		"PType": wire[2], "PFC Flags": wire[3], "Call ID": binary.LittleEndian.Uint32(wire[12:16]),
+		"First Frag": true, "Last Frag": true, "Packet Name": dcerpcPTypeName(wire[2]),
+		"Context Level": "partial", "Error Scope": "message", "Presentation Context Updated": false,
+		"Declared Presentation Result Count": count, "Unparsed Result List Tail Bytes": len(wire) - end,
+	}
+}
+
+func dcerpcIsolatedUnconsumedTail(wire []byte, failure *ProtocolError) map[string]any {
 	if failure == nil || failure.Kind != ErrMalformedMessage {
 		return nil
 	}
 	diagnostic := dcerpcContextTailDiagnostic(wire)
+	var unconsumed any
+	if diagnostic != nil {
+		unconsumed = diagnostic["Unparsed Context List Tail Bytes"]
+	} else {
+		diagnostic = dcerpcResultTailDiagnostic(wire)
+		if diagnostic != nil {
+			unconsumed = diagnostic["Unparsed Result List Tail Bytes"]
+		}
+	}
 	if diagnostic == nil {
 		return nil
 	}
 	// Only the strict codec's successful-prefix/excess-tail failure qualifies.
 	// A resource refusal or another semantic failure cannot borrow this scope.
-	if failure.Message != fmt.Sprintf("structured parse: %d unconsumed message bytes", diagnostic["Unparsed Context List Tail Bytes"]) {
+	if failure.Message != fmt.Sprintf("structured parse: %d unconsumed message bytes", unconsumed) {
 		return nil
 	}
 	return diagnostic

@@ -161,6 +161,10 @@ Package:
           this.ProcessSubNode("Alloc Hint")
           this.ProcessSubNode("Context ID")
           this.ProcessSubNode("OpNum")
+          flags = getNodeResult("../../PFC Flags").Value
+          if (flags & 0x80) != 0 {
+            this.ProcessSubNode("Object UUID")
+          }
           if this.GetSubNode("Stub").GetRemainingSpace() != 0 {
             rem = this.GetSubNode("Stub").GetRemainingSpace()
             if rem > 0x100000 {
@@ -172,6 +176,7 @@ Package:
         Alloc Hint: uint32
         Context ID: uint16
         OpNum: uint16
+        Object UUID: raw,16
         Stub: raw
       Response:
         operator: |
@@ -242,8 +247,8 @@ Package:
         Max Recv Frag: uint16
         Assoc Group: uint32
         Sec Addr Len: uint16
-        Sec Addr: string
-        Pad: string
+        Sec Addr: raw
+        Pad: raw
       BindNak:
         operator: |
           this.ProcessSubNode("Reject Reason")
@@ -346,11 +351,21 @@ DCERPCResults:
       this.ProcessSubNode("Ack Reason")
       this.ProcessSubNode("Transfer Syntax")
       this.ProcessSubNode("Transfer Version")
+      if getNodeResult("Ack Result").Value > 3 {
+        panic("dcerpc: invalid bind result")
+      }
     }
     if n > 1 {
       remaining = (n - 1) * 24
       this.GetSubNode("Additional Results").SetMaxLength(remaining)
       this.ProcessSubNode("Additional Results")
+      values = getNodeResult("Additional Results").Value
+      for offset = 0; offset < remaining; offset += 24 {
+        result = int(values[offset]) + int(values[offset+1]) * 256
+        if result > 3 {
+          panic("dcerpc: invalid bind result")
+        }
+      }
     }
     return
   Num Results: uint8
