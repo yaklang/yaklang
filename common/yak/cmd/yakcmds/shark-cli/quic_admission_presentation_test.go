@@ -1,11 +1,42 @@
 package sharkcli
 
 import (
+	"bytes"
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
+
+func TestQUICDatagramPaddingPreservesHandshakeAndUnprotectedByteScope(t *testing.T) {
+	good := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", FlowID: 1, Status: "decoded", Session: map[string]any{"Authentication Verified": true, "Packet Name": "Initial"}}
+	padding := &pcaputil.ProtocolEvent{ID: 2, Protocol: "quic", Transport: "udp", FlowID: 1, Status: "decoded", Completeness: "datagram-padding", Admission: "observed-datagram-padding", Summary: "Datagram padding · offset=1200 · 3 bytes · unprotected UDP bytes", Raw: []byte{0, 0, 0}, Fields: map[string]any{"Datagram Padding": []byte{0, 0, 0}}, Session: map[string]any{"Packet Name": "Datagram padding", "Datagram Offset": 1200, "Datagram Padding Length": uint64(3), "Authentication Verified": false, "Wire Field Ranges": map[string]any{"Datagram Padding": []any{0, 3}}}}
+	encoded, err := json.Marshal(padding)
+	require.NoError(t, err)
+	var ipc pcaputil.ProtocolEvent
+	require.NoError(t, json.Unmarshal(encoded, &ipc))
+	for _, e := range []*pcaputil.ProtocolEvent{padding, &ipc} {
+		row := presentEvents([]*pcaputil.ProtocolEvent{good, e}).apply(packetSummary{Protocol: "UDP", Transport: "udp"})
+		require.Equal(t, "QUIC", row.Protocol)
+		require.Equal(t, "decoded", row.ProtocolStatus)
+		require.Equal(t, "mixed packet protection", row.Visibility)
+		require.Contains(t, row.Info, "Initial")
+		require.Contains(t, row.Info, "unprotected UDP bytes")
+		require.Contains(t, row.ProtocolEvidence, "padding is unprotected")
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+		found := false
+		for _, field := range fields {
+			if strings.HasPrefix(field.text, "Datagram Padding:") {
+				found = true
+				require.True(t, field.hasRange)
+				require.Equal(t, bytes.Repeat([]byte{0}, 3), sources[field.source-1].Data[field.start:field.end])
+			}
+		}
+		require.True(t, found)
+	}
+}
 
 func TestQUICDatagramTailIsPartialAndNeverPresentedAsAuthenticated(t *testing.T) {
 	good := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", FlowID: 1, Status: "decoded", Session: map[string]any{"Authentication Verified": true, "Packet Name": "Initial"}}
