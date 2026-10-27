@@ -53,6 +53,7 @@ func (f *TrafficFrame) PacketReferences() []PacketReference {
 // OnCreated: flow created
 type TrafficFlow struct {
 	binState               *binFlow
+	opening                *tcpOpening
 	key                    flowKey
 	frameMu                sync.Mutex
 	httpStarted            sync.Once
@@ -351,6 +352,7 @@ func (t *TrafficFlow) Release() {
 	t.Index = 0
 	t.streamCapacity = 0
 	t.reassemblyIncomplete = false
+	t.opening = nil
 	t.key = flowKey{}
 	t.httpStarted = sync.Once{}
 	t.IsHalfOpen, t.IsEthernetLinkLayer, t.IsIpv4, t.IsIpv6 = false, false, false, false
@@ -400,6 +402,7 @@ func (t *TrafficFlow) GetHTTPResponseConnection() *TrafficConnection {
 func (t *TrafficFlow) Close() { t.closeWithReason(TrafficFlowCloseReason_RST) }
 
 func (t *TrafficFlow) closeWithReason(reason TrafficFlowCloseReason) {
+	t.opening = nil
 	t.closed.Store(true)
 	t.ServerConn.Close()
 	t.ClientConn.Close()
