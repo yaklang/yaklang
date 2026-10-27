@@ -15,7 +15,7 @@ var semanticFieldPriority = map[string]int{
 	"Command": 4, "Message Stream ID": 5, "Chunk Stream ID": 6, "Transaction Number": 6, "Timestamp": 7, "AMF0 Values": 8,
 	"Message Kind": 2, "Notification Subtype": 3, "Discovery Target": 4, "USN": 5, "Location": 6, "Maximum Age Seconds": 7,
 	"Protocol": 0, "ID": 0, "Status": 1, "Packet Name": 2, "Message Name": 2, "Mechanism": 2,
-	"Authentication Verified": 3, "Negotiation Context": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
+	"Authentication Verified": 3, "Negotiation Context": 3, "Identification Conformance": 3, "Identification Warning": 3, "User Name": 4, "Domain": 5, "Method": 4, "Request Method": 4, "Request URI": 5, "Query": 5, "SQL": 5, "Topic": 5,
 	"Message Type": 6, "QNAME": 4, "QTYPE Name": 5, "Response": 3, "RCODE": 4, "Questions": 5, "Answers": 6, "Headers": 5,
 	"MIC Verified": 7, "Identity Evidence": 8, "Decoded Bytes": 900, "Mechanism Token": 900, "Decoded Fields": 1000,
 }

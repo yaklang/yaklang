@@ -27,6 +27,8 @@ type binSSH struct {
 	selected           map[string]string
 	encrypted          bool
 	guessPending       [2]bool
+	compatIdentProof   [2]bool
+	identWarning       [2]string
 }
 
 type sshKexLists struct {
@@ -46,7 +48,27 @@ func probeSSH(w []byte, limit int) ProbeResult {
 	}
 	if i := bytes.IndexByte(w, '\n'); i >= 0 {
 		if _, _, err := sshIdentification(w[:i+1]); err != nil {
-			return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "unsupported identification"}
+			if _, _, warning, observedErr := sshObservedIdentification(w[:i+1]); observedErr != nil || warning == "" {
+				return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "unsupported identification"}
+			}
+			// A nonconformant software spelling is not sufficient admission.
+			// Require a full initial KEXINIT, including all mandatory fields.
+			body := w[i+1:]
+			want := i + 1 + 16
+			if len(body) >= 4 {
+				n := uint64(binary.BigEndian.Uint32(body)) + 4
+				if n < 16 || n > 35000 || n%8 != 0 || len(body) >= 6 && body[5] != 20 {
+					return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "nonconformant identification lacks a valid initial KEXINIT"}
+				}
+				want = i + 1 + int(n)
+				if len(body) >= int(n) && want <= limit {
+					if _, err := stream_parser.DecodeSSHInitialPacket(body[:int(n)], "transport"); err == nil {
+						return probeAccept("ssh", "observed-nonconformant-identification/2.0", 95)
+					}
+					return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "invalid initial KEXINIT after nonconformant identification"}
+				}
+			}
+			return probeNeed("ssh", "unconfirmed-nonconformant-identification", len(w), min(limit, want))
 		}
 		_ = limit
 		return probeAccept("ssh", "2.0", 95)
@@ -122,6 +144,53 @@ func sshIdentification(raw []byte) (string, string, error) {
 	return string(line), version, nil
 }
 
+// Retain the literal wire string. The owned validation copy only establishes
+// that '-' in softwareversion is the sole strict-grammar discrepancy; it never
+// rewrites capture bytes or turns that discrepancy into standards compliance.
+func sshObservedIdentification(raw []byte) (string, string, string, error) {
+	line, version, originalErr := sshIdentification(raw)
+	if originalErr == nil {
+		return line, version, "", nil
+	}
+	start := 0
+	if bytes.HasPrefix(raw, []byte("SSH-2.0-")) {
+		start = 8
+	} else if bytes.HasPrefix(raw, []byte("SSH-1.99-")) {
+		start = 9
+	} else {
+		return "", "", "", originalErr
+	}
+	trimmed := bytes.TrimSuffix(bytes.TrimSuffix(raw, []byte{'\n'}), []byte{'\r'})
+	end := len(trimmed)
+	if i := bytes.IndexByte(trimmed[start:], ' '); i >= 0 {
+		end = start + i
+	}
+	check := bytes.Clone(raw)
+	changed := false
+	for i := start; i < end; i++ {
+		if check[i] == '-' {
+			check[i], changed = '_', true
+		}
+	}
+	if _, version, err := sshIdentification(check); changed && err == nil {
+		return string(trimmed), version, "softwareversion uses '-' (RFC4253 4.2)", nil
+	}
+	return "", "", "", originalErr
+}
+
+func (s *binSSH) identificationWarningFields(info map[string]any) {
+	var warnings []string
+	for dir, warning := range s.identWarning {
+		if warning != "" {
+			warnings = append(warnings, fmt.Sprintf("endpoint %d: %s", dir, warning))
+		}
+	}
+	if len(warnings) > 0 {
+		info["Identification Conformance"] = "nonconformant"
+		info["Identification Warning"] = strings.Join(warnings, "; ")
+	}
+}
+
 // Call only with observed server direction. A line of arbitrary text, a port
 // hint, or a client preamble alone never admits SSH.
 func probeSSHServerPreamble(w []byte, limit int) ProbeResult {
@@ -179,11 +248,18 @@ func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 		if i := bytes.IndexByte(w, '\n'); i >= 0 {
 			n := i + 1
 			if bytes.HasPrefix(w, []byte("SSH-")) {
-				if _, _, err := sshIdentification(w[:n]); err != nil {
+				_, _, warning, err := sshObservedIdentification(w[:n])
+				if err != nil {
 					return 0, nil, err
+				}
+				if warning != "" && !s.compatIdentProof[dir] && !s.compatIdentProof[1-dir] && !(s.banner[1-dir] && s.identWarning[1-dir] == "") && probeSSH(w, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict != ProbeAccept {
+					return 0, nil, protocolError(ErrContextRequired, "SSH nonconformant identification needs a confirmed peer or complete initial KEXINIT")
 				}
 				if err := f.reserveSession(512 + int64(len(s.ident[0])+len(s.ident[1])+n)); err != nil {
 					return 0, nil, err
+				}
+				if warning != "" {
+					s.compatIdentProof[dir] = true
 				}
 				return n, &binSpec{entry: "SSHIdentification"}, nil
 			}
@@ -240,6 +316,14 @@ func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 }
 
 func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
+	info, err := s.consumeMessage(dir, raw)
+	if err == nil && info != nil {
+		s.identificationWarningFields(info)
+	}
+	return info, err
+}
+
+func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 	if s.client < 0 {
 		s.client = dir
 	}
@@ -259,11 +343,15 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 			s.preBytes += len(raw)
 			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server"}, nil
 		}
-		line, ver, err := sshIdentification(raw)
+		line, ver, warning, err := sshObservedIdentification(raw)
 		if err != nil {
 			return nil, err
 		}
+		if warning != "" && !s.compatIdentProof[dir] && !s.compatIdentProof[1-dir] && !(s.banner[1-dir] && s.identWarning[1-dir] == "") {
+			return nil, protocolError(ErrContextRequired, "SSH nonconformant identification lacks independent admission evidence")
+		}
 		s.banner[dir], s.ident[dir] = true, line
+		s.identWarning[dir] = warning
 		return map[string]any{
 			"Packet Name":    "identification",
 			"Identification": line,

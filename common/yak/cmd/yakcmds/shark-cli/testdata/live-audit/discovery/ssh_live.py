@@ -1,5 +1,5 @@
 """Real Windows OpenSSH clients and independent Paramiko server. No Yak codec.
-Usage: ssh_live.py OUTPUT_DIR TSHARK PYTHON_LIBS OPENSSH [--server-first-proxy]
+Usage: ssh_live.py OUTPUT_DIR TSHARK PYTHON_LIBS OPENSSH [--server-first-proxy] [--nonconforming-banner]
 The optional loopback proxy forwards the actual server banner before forwarding
 client data; it does not rewrite SSH bytes or use a Yak codec.
 """
@@ -8,7 +8,7 @@ from pathlib import Path
 from capture_ready import start_capture
 sys.path.insert(0,sys.argv[3]);import paramiko
 from paramiko.kex_group14 import KexGroup14SHA256
-out=Path(sys.argv[1]);assert not any((p/'.git').exists()for p in[out.resolve(),*out.resolve().parents]);out.mkdir(exist_ok=False);nonce=secrets.token_hex(12);generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest();server_first='--server-first-proxy'in sys.argv[5:]
+out=Path(sys.argv[1]);assert not any((p/'.git').exists()for p in[out.resolve(),*out.resolve().parents]);out.mkdir(exist_ok=False);nonce=secrets.token_hex(12);generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest();server_first='--server-first-proxy'in sys.argv[5:];nonconforming_banner='--nonconforming-banner'in sys.argv[5:]
 host=paramiko.RSAKey.generate(2048);client_key=paramiko.RSAKey.generate(2048);client_key.write_private_key_file(str(out/'client.key'))
 subprocess.run(['icacls',str(out/'client.key'),'/inheritance:r','/grant:r',__import__('getpass').getuser()+':(R,W)'],stdout=subprocess.PIPE,check=True)
 moduli=out/'moduli';moduli.write_text('20261024000000 2 6 100 2047 2 '+format(KexGroup14SHA256.P,'x')+'\n')
@@ -23,6 +23,7 @@ class Server(paramiko.ServerInterface):
 def serve(listener,kex):
  try:
   raw,peer=listener.accept();raw.settimeout(15);server_port=raw.getsockname()[1];t=paramiko.Transport(raw)
+  if nonconforming_banner:t.local_version='SSH-2.0-Cisco-1.25' # Declared Paramiko emulation, not an actual Cisco device.
   if server_first:t.get_security_options().ciphers=('aes256-ctr','aes128-ctr');t.get_security_options().digests=('hmac-sha2-512','hmac-sha2-256')
   t.add_server_key(host);t.load_server_moduli(str(moduli));server=Server();server.ready=threading.Event();t.start_server(server=server)
   ch=t.accept(10);assert ch is not None and server.ready.wait(10);assert server.command==b'audit-payload'
@@ -81,5 +82,5 @@ try:
  assert not errors,errors
 finally:
  stdout,stderr=cap.communicate(timeout=35);(out/'capture.stderr').write_bytes(stderr)
- (out/'manifest.json').write_text(json.dumps(dict(generator_sha256=generator_sha256,nonce=nonce,marker_port=marker_port,ports=ports,client_connect_ports=connect_ports,server_first_proxy=server_first,declared_client_cipher_preference=['aes128-ctr','aes256-ctr']if server_first else None,declared_server_cipher_preference=['aes256-ctr','aes128-ctr']if server_first else None,proxy_records=proxy_records,paramiko=importlib.metadata.version('paramiko'),host_key_sha256=hashlib.sha256(host.asbytes()).hexdigest(),operations=operations,errors=errors),indent=2),encoding='utf8')
+ (out/'manifest.json').write_text(json.dumps(dict(generator_sha256=generator_sha256,nonce=nonce,marker_port=marker_port,ports=ports,client_connect_ports=connect_ports,server_first_proxy=server_first,declared_nonconforming_server_identification='SSH-2.0-Cisco-1.25'if nonconforming_banner else None,identification_emulation='Paramiko test endpoint; no Cisco device claim'if nonconforming_banner else None,declared_client_cipher_preference=['aes128-ctr','aes256-ctr']if server_first else None,declared_server_cipher_preference=['aes256-ctr','aes128-ctr']if server_first else None,proxy_records=proxy_records,paramiko=importlib.metadata.version('paramiko'),host_key_sha256=hashlib.sha256(host.asbytes()).hexdigest(),operations=operations,errors=errors),indent=2),encoding='utf8')
 assert len(operations)==len(kexs)

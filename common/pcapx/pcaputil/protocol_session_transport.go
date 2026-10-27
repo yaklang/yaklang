@@ -223,6 +223,9 @@ func cassandraRequestEvidence(w []byte, maxBytes int) bool {
 }
 
 func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
+	if p := probeSSH(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
 	if p := probeAJP(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}

@@ -32,3 +32,29 @@ func TestSSHRoleLimitationAndOffersSurviveWorkerIPC(t *testing.T) {
 	require.GreaterOrEqual(t, context, 0)
 	require.Greater(t, offered, context, "explain missing role evidence before listing offers")
 }
+
+func TestSSHIdentificationWarningPersistsInClearAndOpaquePresentation(t *testing.T) {
+	for _, encrypted := range []bool{false, true} {
+		e := &pcaputil.ProtocolEvent{ID: 3, FlowID: 1, Protocol: "ssh", Transport: "tcp", Status: "decoded", Session: map[string]any{"Packet Name": "KEXINIT", "Identification Conformance": "nonconformant", "Identification Warning": "endpoint 1: softwareversion uses '-' (RFC4253 4.2)"}}
+		if encrypted {
+			e.Status, e.ExpertCode, e.Summary = "context-required", "Encrypted", "Encrypted: SSH transport is encrypted after NEWKEYS"
+			delete(e.Session, "Packet Name")
+		}
+		wire, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(wire, &ipc))
+		row := presentEvents([]*pcaputil.ProtocolEvent{&ipc}).apply(packetSummary{Protocol: "TCP", Transport: "tcp"})
+		require.Equal(t, "SSH", row.Protocol)
+		require.Contains(t, row.Info, "softwareversion uses '-'")
+		fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		warning := false
+		for _, f := range fields {
+			if strings.Contains(f.text, "Identification Warning:") {
+				warning = true
+				require.False(t, f.hasRange, "a conformance conclusion is not a literal wire span")
+			}
+		}
+		require.True(t, warning)
+	}
+}
