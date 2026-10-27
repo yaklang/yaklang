@@ -110,3 +110,34 @@ func FuzzSSHObservedIdentificationAdmission(f *testing.F) {
 		}
 	})
 }
+
+func TestSSHIdentificationWarningSurvivesIncompleteClose(t *testing.T) {
+	for _, nonconformant := range []bool{false, true} {
+		t.Run(map[bool]string{false: "conformant", true: "nonconformant"}[nonconformant], func(t *testing.T) {
+			s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"), WithSessionClientDirection(0))
+			require.NoError(t, err)
+			ts := time.Unix(1, 0)
+			banner := []byte("SSH-2.0-Review_Server\r\n")
+			if nonconformant {
+				banner = []byte("SSH-2.0-Cisco-1.25\n")
+			}
+			s.Feed(1, ts, banner)
+			r := s.Feed(0, ts, sshIdent("SSH-2.0-OpenSSH_Review"))
+			require.Nil(t, r.Err)
+			packet := sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")
+			r = s.Feed(0, ts, packet[:9])
+			require.Empty(t, r.Events)
+			es := s.Close("captured stream incomplete")
+			require.Len(t, es, 1)
+			require.Equal(t, "incomplete", es[0].Status)
+			require.Equal(t, packet[:9], es[0].Raw)
+			require.NotContains(t, es[0].Session, "Packet Name", "a partial packet is not a decoded initial message")
+			if nonconformant {
+				require.Equal(t, "nonconformant", es[0].Session["Identification Conformance"])
+				require.Contains(t, es[0].Session["Identification Warning"], "softwareversion")
+			} else {
+				require.NotContains(t, es[0].Session, "Identification Warning")
+			}
+		})
+	}
+}

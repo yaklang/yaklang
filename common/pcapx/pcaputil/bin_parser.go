@@ -1033,6 +1033,13 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if f.protocol == "ssh" && f.ssh != nil && status != "decoded" && status != "deferred" {
+		info := map[string]any{}
+		f.ssh.identificationWarningFields(info)
+		if len(info) > 0 {
+			e.Session, e.semanticSession = info, cloneSession(info)
+		}
+	}
 	if f.protocol == "dnp3" && f.a.config.DecodeDNP3ReadPoints {
 		e.Profile = "dnp3-read-points"
 	}
@@ -1239,13 +1246,6 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		e.sessionError = &ProtocolError{Kind: kind, Message: reason}
 	}
 	d.sshOpaque = f.protocol == "ssh" && e.sessionError != nil && e.sessionError.Kind == ErrEncrypted
-	if d.sshOpaque && f.ssh != nil {
-		info := map[string]any{}
-		f.ssh.identificationWarningFields(info)
-		if len(info) > 0 {
-			e.Session, e.semanticSession = info, cloneSession(info)
-		}
-	}
 	e.Length = len(wire)
 	if f.protocol == "http" && d.http != nil {
 		f.httpEvidence(dir, e)
