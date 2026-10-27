@@ -74,7 +74,7 @@ func sshNewKeys() []byte {
 }
 
 func TestProtocolSessionSSHHandshakeAndNewkeys(t *testing.T) {
-	s, err := NewProtocolSession(DefaultParserBudget())
+	s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionClientDirection(0))
 	require.NoError(t, err)
 	ts := time.Unix(1, 0)
 	banner := sshIdent("SSH-2.0-OpenSSH_8.9")
