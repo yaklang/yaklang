@@ -119,7 +119,7 @@ func TestDCERPCRefusedMessagesCannotStealNumericOwner(t *testing.T) {
 func TestDCERPCNumericOwnerIsReservedBeforeAdmission(t *testing.T) {
 	d := newReviewDCERPC()
 	// The pending request has a context slot and an optional numeric-owner slot.
-	d.maxBufferedBytes = int(d.retainedBytes()) + 96 + len("Request") - 1
+	d.maxBufferedBytes = int(d.retainedBytes()) + dcerpcPendingRequestCharge + len("Request") - 1
 	e := &ProtocolEvent{ID: 42, Raw: dcerpcRequest(9, 0, 2, nil)}
 	require.Error(t, d.consumeEvent(0, e, 4096))
 	require.Empty(t, d.pending)
