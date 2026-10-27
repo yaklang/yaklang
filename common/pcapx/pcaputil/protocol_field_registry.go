@@ -561,7 +561,7 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	if e == nil {
 		return s
 	}
-	if e.nativeSessionMessage && e.semanticSession != nil {
+	if (e.nativeSessionMessage || e.Protocol == "ssh" && e.ownedRuleEnvelope) && e.semanticSession != nil {
 		owned := *e
 		owned.Session = e.semanticSession
 		e = &owned
