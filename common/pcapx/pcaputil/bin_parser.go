@@ -1761,7 +1761,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.sessionError = &ProtocolError{Kind: kind, Message: err.Error()}
 				}
 				if e.Protocol == "dcerpc" {
-					if diagnostic := dcerpcIsolatedContextTail(e.Raw, e.sessionError); diagnostic != nil {
+					if diagnostic := dcerpcIsolatedUnconsumedTail(e.Raw, e.sessionError); diagnostic != nil {
 						e.Session = diagnostic
 						e.semanticSession = cloneSession(diagnostic)
 					}

@@ -226,7 +226,7 @@ func TestDCERPCBoundedBadContextListDoesNotHideFollowingRequest(t *testing.T) {
 func TestDCERPCContextTailRecoveryCannotResynchronizeOrBypassLimits(t *testing.T) {
 	bad := dcerpcBindContexts(11, 2, dcerpcBindContext{uuid: dcerpcEPM, id: 1}, dcerpcBindContext{uuid: dcerpcEPM, id: 2})
 	bad[24] = 1
-	require.NotNil(t, dcerpcIsolatedContextTail(bad, &ProtocolError{Kind: ErrMalformedMessage, Message: "structured parse: 44 unconsumed message bytes"}))
+	require.NotNil(t, dcerpcIsolatedUnconsumedTail(bad, &ProtocolError{Kind: ErrMalformedMessage, Message: "structured parse: 44 unconsumed message bytes"}))
 	for _, failure := range []*ProtocolError{
 		nil,
 		{Kind: ErrResourceExceeded, Message: "structured parse: 44 unconsumed message bytes"},
@@ -234,7 +234,7 @@ func TestDCERPCContextTailRecoveryCannotResynchronizeOrBypassLimits(t *testing.T
 		{Kind: ErrMalformedMessage, Message: "another failure"},
 		{Kind: ErrMalformedMessage, Message: "structured parse: 4 unconsumed message bytes"},
 	} {
-		require.Nil(t, dcerpcIsolatedContextTail(bad, failure), "only the actual complete-prefix/excess-tail failure qualifies")
+		require.Nil(t, dcerpcIsolatedUnconsumedTail(bad, failure), "only the actual complete-prefix/excess-tail failure qualifies")
 	}
 	for cut := 0; cut < len(bad); cut++ {
 		require.Nil(t, dcerpcContextTailDiagnostic(bad[:cut]), "a partial declaration is not an isolated complete message")

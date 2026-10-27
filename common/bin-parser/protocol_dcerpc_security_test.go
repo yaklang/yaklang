@@ -95,6 +95,8 @@ func requireP0DCERPCWireEnvelopeScope(t *testing.T) {
 	TestDCERPCSecurityRuleWireBoundariesAndOpaqueBody(t)
 	TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t)
 	TestDCERPCSecurityRuleInvalidBoundsPrecedeUnsupportedProfile(t)
+	TestDCERPCSecondaryAddressAndPaddingKeepOriginalBytes(t)
+	TestDCERPCResultCodesValidateEveryOrdinal(t)
 	catalog, roadmap, aliasCatalog, aliasRoadmap := false, false, false, false
 	for _, entry := range ProtocolCatalog {
 		if entry.Name == "DCE/RPC" {
