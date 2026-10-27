@@ -16,6 +16,9 @@ func TestP0RoadmapCovered(t *testing.T) {
 	coveredScopes := requireP0MessageScopes(t)
 	requireP0QUICWireEnvelopeScope(t)
 	coveredScopes["QUIC"] = true // Explicit bounded header scope, not full version/native coverage.
+	requireP0DCERPCWireEnvelopeScope(t)
+	coveredScopes["DCE/RPC"] = true // Observed outer/control fields, not full NDR/security/fragmentation coverage.
+	coveredScopes["MSRPC"] = true   // The same explicitly checked catalog alias, with the same limitations.
 	for name, passed := range requireObservedSessionScopes(t, priP0) {
 		coveredScopes[name] = passed
 	}
