@@ -207,7 +207,7 @@ func TestStreamPaneSelectionScrollingAndFlatFields(t *testing.T) {
 	u.follow = true
 	u.refreshVisible()
 	u.syncInspection(time.Now())
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 38, y: l.tabs})
 	require.Equal(t, 3, u.pane)
 	require.NotNil(t, u.stream)

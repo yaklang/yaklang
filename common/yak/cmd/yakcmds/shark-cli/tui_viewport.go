@@ -11,7 +11,7 @@ func (u *tui) panel(pane int) (rect, bool) {
 	if u.width < 70 || u.height < 24 {
 		return rect{}, false
 	}
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	switch pane {
 	case 0:
 		return l.packets, true
@@ -204,7 +204,7 @@ func (u *tui) mouse(m mouseEvent) {
 			return
 		}
 		if m.button == 0 && u.width >= 70 && u.height >= 24 {
-			l := layoutDashboard(u.width-1, u.height)
+			l := u.dashboardLayout()
 			if m.y == l.tabs {
 				if u.pane == 3 {
 					for i, x := range []int{54, 71, 85, 101} {

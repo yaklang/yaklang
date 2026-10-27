@@ -105,7 +105,7 @@ func TestBeginningSurvivesRecentWindowTrimmingAndShowsBinaryHTTPHeaders(t *testi
 	require.Contains(t, view, "00000000")
 	require.Contains(t, view, "50 4f 53 54")
 	// The toolbar uses the same keyboard paths and doesn't depend on focus quirks.
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 87, y: l.tabs})
 	require.Equal(t, 3, u.streamMode)
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 73, y: l.tabs})
