@@ -1239,6 +1239,13 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		e.sessionError = &ProtocolError{Kind: kind, Message: reason}
 	}
 	d.sshOpaque = f.protocol == "ssh" && e.sessionError != nil && e.sessionError.Kind == ErrEncrypted
+	if d.sshOpaque && f.ssh != nil {
+		info := map[string]any{}
+		f.ssh.identificationWarningFields(info)
+		if len(info) > 0 {
+			e.Session, e.semanticSession = info, cloneSession(info)
+		}
+	}
 	e.Length = len(wire)
 	if f.protocol == "http" && d.http != nil {
 		f.httpEvidence(dir, e)

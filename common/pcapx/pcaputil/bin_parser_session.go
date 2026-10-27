@@ -179,6 +179,10 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.s7 = "s7comm", &binS7{}
 		return
 	}
+	if probeSSH(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeAccept {
+		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: f.tcpClientKnown}
+		return
+	}
 	if f.tcpClientKnown && dir != f.tcpClientDir && probeSSHServerPreamble(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
 		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: true}
 		return
