@@ -357,6 +357,7 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 	}
 	proposals := make([]dcerpcProposal, 0, n)
 	names := make([]string, 0, n)
+	contexts := make([]map[string]any, 0, n)
 	newIDs := make(map[uint16]struct{}, n)
 	featureProposal := false
 	for i, off := 0, 12; i < n; i, off = i+1, off+44 {
@@ -398,6 +399,12 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 			transferVersion: transferVersion,
 		})
 		names = append(names, name)
+		contexts = append(contexts, map[string]any{
+			"Context ID": id, "Abstract Syntax": bytes.Clone(abstractSyntax),
+			"Interface": name, "Interface Version Major": abstractMajor, "Interface Version Minor": abstractMinor,
+			"Transfer Syntax": bytes.Clone(transferSyntax), "Transfer Version": transferVersion,
+			"Bind Time Feature Proposal": feature,
+		})
 		info["Context ID"] = id
 		info["Interface"] = name
 		info["Abstract Syntax"] = hex.EncodeToString(abstractSyntax)
@@ -414,6 +421,7 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 	if len(names) > 1 {
 		info["Interfaces"] = names
 	}
+	info["Presentation Contexts"] = contexts
 	return proposals, nil
 }
 
@@ -467,6 +475,19 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	if err != nil {
 		return err
 	}
+	views := make([]map[string]any, 0, len(results))
+	for i, result := range results {
+		views = append(views, map[string]any{
+			"Ordinal": i, "Result": result.result, "Reason": result.reason,
+			"Transfer Syntax": bytes.Clone(result.transferSyntax), "Transfer Version": result.transferVersion,
+		})
+	}
+	info["Presentation Context Results"] = views
+	addressEnd := 10 + int(binary.LittleEndian.Uint16(body[8:10]))
+	if addressEnd > 10 {
+		info["Secondary Address Bytes"] = bytes.Clone(body[10:addressEnd])
+		info["Wire Field Ranges"] = map[string]any{"Secondary Address Bytes": []uint64{26, uint64(16 + addressEnd)}}
+	}
 	want, pending := d.pending[call]
 	if !pending {
 		d.markUnmatched(responseName, info, "missing-request")
@@ -491,6 +512,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	var rejected []uint16
 	for i, result := range results {
 		proposal := proposals[i]
+		views[i]["Proposed Context ID"] = proposal.id
 		switch result.result {
 		case 0:
 			if dcerpcBindFeatureProposal(proposal) {
@@ -620,8 +642,12 @@ func parseDCERPCBindResults(body []byte, max int) ([]dcerpcBindResult, error) {
 	}
 	results := make([]dcerpcBindResult, 0, count)
 	for off := resultOffset + 4; off < len(body); off += 24 {
+		result := binary.LittleEndian.Uint16(body[off : off+2])
+		if result > 3 {
+			return nil, protocolError(ErrMalformedMessage, "DCE/RPC invalid bind result %d", result)
+		}
 		results = append(results, dcerpcBindResult{
-			result:          binary.LittleEndian.Uint16(body[off : off+2]),
+			result:          result,
 			reason:          binary.LittleEndian.Uint16(body[off+2 : off+4]),
 			transferSyntax:  append([]byte(nil), body[off+4:off+20]...),
 			transferVersion: binary.LittleEndian.Uint32(body[off+20 : off+24]),
@@ -642,6 +668,10 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	op := binary.LittleEndian.Uint16(body[6:8])
 	info["Context ID"] = ctx
 	info["OpNum"] = op
+	if flags&dcerpcObject != 0 {
+		info["Object UUID"] = bytes.Clone(body[8:24])
+		info["Wire Field Ranges"] = map[string]any{"Object UUID": []uint64{24, 40}}
+	}
 	if name, ok := d.ctx[ctx]; ok {
 		info["Interface"] = name
 		info["Packet Name"] = dcerpcOpName(name, op)
