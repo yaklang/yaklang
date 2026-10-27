@@ -51,6 +51,47 @@ func TestSSHInitialEdwardsFieldsAndInvalidLegacySignature(t *testing.T) {
 	}
 }
 
+func TestSSHNativeRefusalCannotBeReinterpretedAsGenericFields(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"), WithSessionClientDirection(0))
+		require.NoError(t, err)
+		s.(*captureSession).f.a.config.Deferred = deferred
+		ts := time.Unix(1, 0)
+		for dir := 0; dir < 2; dir++ {
+			require.Nil(t, s.Feed(dir, ts, sshIdent("SSH-2.0-RefusalTest")).Err)
+			require.Nil(t, s.Feed(dir, ts, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")).Err)
+		}
+		r := s.Feed(1, ts, sshKexDHReply())
+		require.NotNil(t, r.Err)
+		require.Equal(t, ErrMalformedMessage, r.Err.Kind)
+		require.Len(t, r.Events, 1)
+		e := r.Events[0]
+		for _, edit := range []bool{false, true} {
+			if edit {
+				e.Fields = map[string]any{"forged": "accepted"}
+				e.Structured = map[string]any{"fields": e.Fields}
+				e.Session = map[string]any{"Packet Name": "accepted", "Kex Algorithm": "forged"}
+				e.Protocol, e.Status, e.Entry, e.Error = "http", "decoded", "HTTP", ""
+			}
+			fields, err := e.GetFields()
+			require.Nil(t, fields)
+			require.Error(t, err, "a refused selected method cannot become a successful generic envelope")
+			var typed *ProtocolError
+			require.ErrorAs(t, err, &typed)
+			require.Equal(t, ErrMalformedMessage, typed.Kind)
+			aliases := e.DisplayFieldValues().FieldMap()
+			require.Equal(t, []any{"ssh"}, aliases["protocol"])
+			require.Equal(t, []any{"malformed"}, aliases["status"])
+			require.Empty(t, aliases["ssh.kex.selected"], "failed methods cannot use caller-provided application context")
+			result, err := e.Decode()
+			require.Nil(t, result)
+			require.ErrorAs(t, err, &typed)
+			require.Equal(t, ErrMalformedMessage, typed.Kind)
+		}
+		s.Close("SSH refusal projection test")
+	}
+}
+
 func TestSSHInitialFieldsUseObservedExchangeWithoutLegacyDHReinterpretation(t *testing.T) {
 	for _, deferred := range []bool{false, true} {
 		for _, known := range []bool{false, true} {
@@ -89,6 +130,7 @@ func TestSSHInitialFieldsUseObservedExchangeWithoutLegacyDHReinterpretation(t *t
 			e.Fields = map[string]any{"Payload": "edited public cache"}
 			e.Structured = map[string]any{"fields": e.Fields}
 			e.Session["Kex Algorithm"] = "edited public context"
+			e.Protocol, e.Status, e.Entry = "tls", "malformed", "Transport Layer Security"
 			again, err := e.GetFields()
 			require.NoError(t, err)
 			require.Equal(t, fields, again, "owned selected/generic fields survive mutable public cache edits")

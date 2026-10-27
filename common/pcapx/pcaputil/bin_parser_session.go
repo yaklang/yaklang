@@ -765,6 +765,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "dcerpc":
 		e.Session, err = f.dcerpc.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "ssh":
+		e.nativeSSHObservation = true
 		e.Session, err = f.ssh.consume(dir, e.Raw)
 	case "telnet":
 		e.Session, err = stream_parser.DecodeNetworkControl(e.Raw, "telnet")
