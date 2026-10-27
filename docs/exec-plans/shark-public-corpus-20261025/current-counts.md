@@ -1,6 +1,6 @@
-当前显示标签计数，CLI 与原生字段/SDK 源码 `5ff05f4ff4`。输入原包不入库。全部原显示标签计数与上一轮逐字相同；完整导出逐字节保留关系与 RPC / TCP 代际验证见 [最新证据](dcerpc-tcp-epochs-summary.json)。
+当前显示标签计数：Windows CLI 源码 `f52e386603`，原生 / SDK 源码 `41784e9de7`。输入原包不入库。Weber 的标签总数保留；Sharon 六帧的变化逐一与 Wireshark 核对：SMB2 +5、MODBUS -1、TCP -4。完整字段、来源和结束发布证据见 [最新证据](tcp-native-preview-publication-summary.json)。
 
-最新导出另补回 527 条迟到消息/诊断，见 [调用与延迟发布证据](dcerpc-call-publication-summary.json)。`published_pdus` 是处理过程中可用的结果，原始贡献帧仍在 `byte_source`；它们不重复计入下表物理帧标签。
+物理行中的既有迟到发布仍保留；另外补回 Weber 26、Sharon 552 条结束诊断。`record_type=protocol_publication` 是非物理分析记录，`published_pdus` 的贡献帧由 `byte_source` 定义；它们不计入下表物理帧标签。详见 [结束发布与连接归属证据](tcp-native-preview-publication-summary.json)。
 
 这里逐字保留 Wireshark 和 Shark 的列标签，帧数与 SDK 记录数（含诊断）分开。同名计数不代表解析正确；大小写、子协议、分片及拒绝策略也会产生标签差异。字段、流、重组和来源的验证见主报告及各协议证书。
 
@@ -48,7 +48,7 @@
 | 排名 | WS 原始标签 | WS 帧数 | Shark 完全同名帧数 | 同名差值 |
 |---:|---|---:|---:|---:|
 | 1 | IPv4 | 26,586 | 53,639 | +27,053 |
-| 2 | TCP | 20,096 | 6,639 | -13,457 |
+| 2 | TCP | 20,096 | 6,635 | -13,461 |
 | 3 | GSMTAP | 17,864 | 0 | -17,864 |
 | 4 | BACnet-APDU | 10,607 | 0 | -10,607 |
 | 5 | 802.11 | 10,522 | 0 | -10,522 |
