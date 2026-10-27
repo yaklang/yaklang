@@ -243,7 +243,7 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 					requireP0QUICWireEnvelopeScope(t)
 					historicalPartial = true
 				}
-				if capture.ID == "ndpi-dcerpc" && item.Name == "DCE/RPC" && item.Priority == priP0 && item.Status == stPartial && *capture.RoadmapStatus == stDone {
+				if (capture.ID == "ndpi-dcerpc" && item.Name == "DCE/RPC" || (capture.ID == "gen-msrpc-epm" || capture.ID == "pr5023-gen-msrpc-epm") && item.Name == "MSRPC") && item.Priority == priP0 && item.Status == stPartial && *capture.RoadmapStatus == stDone {
 					// This exact hash-pinned historical score remains unchanged.
 					// Execute the bounded observed profile before recognizing the
 					// current partial declaration; no fixture, answer or floor edits.

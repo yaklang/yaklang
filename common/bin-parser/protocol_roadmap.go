@@ -329,7 +329,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "JSON-RPC 2.0", Family: "mq-rpc", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
 	{Name: "ONC RPC", Family: "mq-rpc", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "DCE/RPC", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "selected v5.0 bind/call context and bounded MS-RPCE security-envelope fields; tokens/body remain unverified and opaque; cross-domain association, general NDR/security and fragmentation scope need further work"},
-	{Name: "MSRPC", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "same as DCE/RPC"},
+	{Name: "MSRPC", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP0, Notes: "same bounded observed DCE/RPC outer/control profile; no general NDR, security-provider validation or complete fragmentation claim"},
 	{Name: "IIOP/GIOP", Family: "mq-rpc", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "T3", Family: "mq-rpc", Sources: src(srcPrivate, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "RMI/JRMP", Family: "mq-rpc", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
