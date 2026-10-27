@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"sync"
 	"time"
@@ -40,21 +41,31 @@ type closed struct {
 
 func main() {
 	workers := flag.Int("workers", 1, "capture workers")
+	maxCapture := flag.Int64("max-capture-bytes", 32<<20, "explicit input limit (at most 256 MiB)")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		panic("usage: flow-observer [-workers N] CAPTURE")
 	}
-	wire, err := os.ReadFile(flag.Arg(0))
+	if *maxCapture < 1 || *maxCapture > 256<<20 {
+		panic("capture byte limit must be within 1..256 MiB")
+	}
+	file, err := os.Open(flag.Arg(0))
 	if err != nil {
 		panic(err)
 	}
-	if len(wire) > 32<<20 {
-		panic("this scoped observer accepts captures up to 32 MiB")
+	defer file.Close()
+	wire, err := io.ReadAll(io.LimitReader(file, *maxCapture+1))
+	if err != nil {
+		panic(err)
+	}
+	if int64(len(wire)) > *maxCapture {
+		panic("capture exceeds the explicit observer input limit")
 	}
 	var mu sync.Mutex
 	var flows []created
 	var packets []packet
 	var closes []closed
+	referenceCount := 0
 	var stats pcaputil.TCPReassemblyStats
 	err = pcaputil.ReplayPcap(bytes.NewReader(wire), pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), pcaputil.WithTCPReassemblyWorkers(*workers),
 		pcaputil.WithOnTrafficFlowCreated(func(f *pcaputil.TrafficFlow) {
@@ -64,6 +75,10 @@ func main() {
 		}), pcaputil.WithOnTrafficFlowPacket(func(f *pcaputil.TrafficFlow, c *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, ts time.Time) {
 			mu.Lock()
 			defer mu.Unlock()
+			referenceCount += len(refs)
+			if len(packets) >= 1000000 || referenceCount > 2000000 {
+				panic("observer exceeds its explicit packet/reference metadata budget")
+			}
 			direction := 0
 			if c != f.ClientConn {
 				direction = 1

@@ -82,7 +82,7 @@ func TestNativePreviewFollowsConfirmedOpeningAfterDelayedOldReset(t *testing.T) 
 		require.Equal(t, tc.stack, view.protocolStack)
 		require.NotEmpty(t, view.events)
 		for _, event := range view.events {
-			require.Equal(t, rows[tc.index].tcpFlowID, event.FlowID, "message history must use the native generation")
+			require.Equal(t, rows[tc.index].tcpFlowID, event.TCPFlowID, "message history must use the captured TCP generation")
 		}
 	}
 }
@@ -177,4 +177,64 @@ func TestNativePreviewEvictionNeverRecreatesAnActiveStream(t *testing.T) {
 	require.Len(t, s.streams.nativeRecords, 1, "closed evicted metadata is removed")
 	require.EqualValues(t, 2, s.streams.next, "no third preview allocated for the still-active first generation")
 	require.Empty(t, s.streams.active, "capture-backed previews allocate no independent assembler streams")
+}
+
+func TestNativePreviewDoesNotConflateTCPAndProtocolFlowNumbers(t *testing.T) {
+	// A control-only TCP connection has no protocol session. Mix in UDP as
+	// well; the following HTTP connection uses distinct numeric namespaces.
+	request := "GET /mixed-capture HTTP/1.1\r\nHost: example.test\r\n\r\n"
+	packets := [][]byte{tcpPacket(t, 1, 99, "", false, true, false, true).data, dnsPacket(t), nativeOpeningPacket(t, 3, 99, 0, "", false, true, false), nativeOpeningPacket(t, 4, 100, 0, request, false, false, false)}
+	src, err := openOffline(fixture(t, "preview-mixed-flow-numbers.pcap", packets...), "")
+	require.NoError(t, err)
+	defer src.Close()
+	s := startCapture(context.Background(), src, captureConfig{}, false)
+	defer s.Stop()
+	var last *capturedPacket
+	for p := range s.packets {
+		last = p
+	}
+	require.NoError(t, s.result())
+	view := s.streams.snapshot(last.streamID)
+	require.NotNil(t, view)
+	var protocolFlow uint64
+	for _, event := range last.protocolEvents() {
+		if event.Protocol == "http" {
+			protocolFlow = event.FlowID
+			require.Equal(t, last.tcpFlowID, event.TCPFlowID)
+		}
+	}
+	require.NotZero(t, protocolFlow)
+	require.NotEqual(t, last.tcpFlowID, protocolFlow, "the separate ID namespaces must actually differ in this regression")
+	require.Equal(t, []string{"HTTP/1.1"}, view.protocolStack, "native identity must not depend on equal numeric IDs")
+	require.NotEmpty(t, view.events, "the page must retain messages from the associated protocol namespace")
+}
+
+func TestNativePreviewDoesNotApplyClosedConnectionIdentityToNewPayload(t *testing.T) {
+	request := "GET /before-reset HTTP/1.1\r\nHost: example.test\r\n\r\n"
+	packets := [][]byte{
+		nativeOpeningPacket(t, 1, 99, 0, "", false, true, false),
+		nativeOpeningPacket(t, 2, 100, 0, request, false, false, false),
+		nativeOpeningPacket(t, 3, 100+uint32(len(request)), 0, "", false, false, true),
+		nativeOpeningPacket(t, 4, 50000, 0, "SSH-2.0-unconfirmed-generation\r\n", false, false, false),
+	}
+	src, err := openOffline(fixture(t, "preview-after-reset.pcap", packets...), "")
+	require.NoError(t, err)
+	defer src.Close()
+	s := startCapture(context.Background(), src, captureConfig{}, false)
+	defer s.Stop()
+	var last *capturedPacket
+	for p := range s.packets {
+		last = p
+	}
+	require.NoError(t, s.result())
+	view := s.streams.snapshot(last.streamID)
+	require.NotNil(t, view, "the native closed-flow observation remains available for forensics")
+	require.Equal(t, request, directionData(view, 0), "post-reset bytes never enter the closed stream")
+	require.Equal(t, []string{"HTTP/1.1"}, view.protocolStack, "the old identity stays in its own history")
+	u := &tui{streams: s.streams}
+	for _, row := range []packetSummary{summarize(last), u.packetRow(&packetEntry{packet: last})} {
+		require.Equal(t, "TCP", row.Protocol, "observation of an old flow is not admission of a new application's bytes")
+		require.Empty(t, row.ConnectionProtocol)
+		require.Contains(t, row.Info, "generation unconfirmed")
+	}
 }

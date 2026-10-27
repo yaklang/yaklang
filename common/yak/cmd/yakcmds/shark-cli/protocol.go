@@ -24,6 +24,25 @@ var applicationNodes = map[string]string{
 
 func applyApplication(row packetSummary, protocol, evidence string, id uint64) packetSummary {
 	row.StreamID = id
+	if row.closedTCPPayload {
+		if !row.connectionAnnotated {
+			row.packetInfo, row.connectionAnnotated = row.Info, true
+		}
+		row.Protocol = row.packetProtocol
+		row.ProtocolStack = append([]string(nil), row.Layers...)
+		if row.TransportView != nil {
+			row.ProtocolStack = append([]string(nil), row.TransportView.Layers...)
+		}
+		row.ConnectionProtocol, row.ConnectionStack = "", nil
+		row.ConnectionEvidence = "native closed TCP observation; payload not admitted to reassembly"
+		row.ProtocolEvidence = "application generation unconfirmed after observed TCP close"
+		row.ProtocolScope, row.Visibility = "unadmitted closed TCP payload", "unassembled-stream"
+		if row.ProtocolStatus == "" {
+			row.ProtocolStatus = "context-required"
+		}
+		row.Info = "TCP payload after observed close; generation unconfirmed · " + row.packetInfo
+		return row
+	}
 	if protocol != "" {
 		if row.connectionAnnotated {
 			row.Info = row.packetInfo

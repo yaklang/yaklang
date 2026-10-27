@@ -878,7 +878,13 @@ func retainedStreamEvents(history *pcaputil.ProtocolInspector, stream *streamSna
 	}
 	var out []*pcaputil.ProtocolEvent
 	remaining := 256 << 10
-	for _, e := range history.Rows("", stream.nativeFlowID) {
+	var metadata []*pcaputil.ProtocolEvent
+	if stream.nativeFlowID != 0 {
+		metadata = history.TCPFlowRows(stream.domain, stream.nativeFlowID)
+	} else {
+		metadata = history.Rows("", 0)
+	}
+	for _, e := range metadata {
 		if e.Domain != stream.domain || e.Transport != "tcp" || !(e.Source == stream.endpoints[0] && e.Destination == stream.endpoints[1] || e.Source == stream.endpoints[1] && e.Destination == stream.endpoints[0]) {
 			continue
 		}
@@ -1017,7 +1023,7 @@ func boundedEvent(e *pcaputil.ProtocolEvent, remaining *int) *pcaputil.ProtocolE
 		*remaining -= cost
 		return e
 	}
-	return &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, Protocol: e.Protocol, Status: "limited", Completeness: "limited", Summary: "Detail unavailable: snapshot byte budget", Domain: e.Domain, Source: e.Source, Destination: e.Destination, ResponseTo: e.ResponseTo, Transport: e.Transport, Direction: e.Direction, Timestamp: e.Timestamp, Admission: e.Admission, ExpertCode: string(pcaputil.ErrResourceExceeded)}
+	return &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, TCPFlowID: e.TCPFlowID, Protocol: e.Protocol, Status: "limited", Completeness: "limited", Summary: "Detail unavailable: snapshot byte budget", Domain: e.Domain, Source: e.Source, Destination: e.Destination, ResponseTo: e.ResponseTo, Transport: e.Transport, Direction: e.Direction, Timestamp: e.Timestamp, Admission: e.Admission, ExpertCode: string(pcaputil.ErrResourceExceeded)}
 }
 
 // Details returns an owned observation alongside its decode error. Only a nil
