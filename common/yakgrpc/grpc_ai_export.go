@@ -6,11 +6,10 @@ import (
 	"encoding/json"
 	"os"
 
-	"github.com/samber/lo"
 	"github.com/yaklang/yaklang/common/consts"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -100,80 +99,21 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 			}
 
 		case "output_event":
-			// If sessionID exists, query by sessionID; otherwise use coordinatorIDs
+			// Export persisted records directly. The protobuf round trip used to
+			// discard session/model/recovery metadata and database timestamps.
+			var events []*schema.AiOutputEvent
+			query := db.Order("id ASC")
 			if sessionID != "" {
-				queryEventRsp, err := s.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
-					Filter: &ypb.AIEventFilter{
-						SessionID: sessionID,
-					},
-				})
-				if err != nil {
-					log.Errorf("failed to query events by sessionID: %v", err)
-					continue
-				}
-				events := lo.Map(queryEventRsp.Events, func(item *ypb.AIOutputEvent, _ int) *schema.AiOutputEvent {
-					return &schema.AiOutputEvent{
-						CoordinatorId:   item.CoordinatorId,
-						Type:            schema.EventType(item.Type),
-						NodeId:          item.NodeId,
-						IsSystem:        item.IsSystem,
-						IsStream:        item.IsStream,
-						IsReason:        item.IsReason,
-						IsSync:          item.IsSync,
-						StreamDelta:     item.StreamDelta,
-						IsJson:          item.IsJson,
-						Content:         item.Content,
-						Timestamp:       item.Timestamp,
-						TaskId:          item.TaskId,
-						TaskIndex:       item.TaskIndex,
-						DisableMarkdown: item.DisableMarkdown,
-						SyncID:          item.SyncID,
-						EventUUID:       item.EventUUID,
-						CallToolID:      item.CallToolID,
-						ContentType:     item.ContentType,
-						AIService:       item.AIService,
-						TaskUUID:        item.TaskUUID,
-						AIModelName:     item.AIModelName,
-					}
-				})
-				dataToExport["AIOutputEvent"] = events
+				query = query.Where("session_id = ?", sessionID)
 			} else if len(coordinatorIDs) > 0 {
-				queryEventRsp, err := s.QueryAIEvent(ctx, &ypb.AIEventQueryRequest{
-					Filter: &ypb.AIEventFilter{
-						CoordinatorId: coordinatorIDs,
-					},
-				})
-				if err != nil {
-					log.Errorf("failed to query events: %v", err)
-					continue
-				}
-				events := lo.Map(queryEventRsp.Events, func(item *ypb.AIOutputEvent, _ int) *schema.AiOutputEvent {
-					return &schema.AiOutputEvent{
-						CoordinatorId:   item.CoordinatorId,
-						Type:            schema.EventType(item.Type),
-						NodeId:          item.NodeId,
-						IsSystem:        item.IsSystem,
-						IsStream:        item.IsStream,
-						IsReason:        item.IsReason,
-						IsSync:          item.IsSync,
-						StreamDelta:     item.StreamDelta,
-						IsJson:          item.IsJson,
-						Content:         item.Content,
-						Timestamp:       item.Timestamp,
-						TaskId:          item.TaskId,
-						TaskIndex:       item.TaskIndex,
-						DisableMarkdown: item.DisableMarkdown,
-						SyncID:          item.SyncID,
-						EventUUID:       item.EventUUID,
-						CallToolID:      item.CallToolID,
-						ContentType:     item.ContentType,
-						AIService:       item.AIService,
-						TaskUUID:        item.TaskUUID,
-						AIModelName:     item.AIModelName,
-					}
-				})
-				dataToExport["AIOutputEvent"] = events
+				query = query.Where("coordinator_id IN (?)", coordinatorIDs)
+			} else {
+				continue
 			}
+			if err := query.Find(&events).Error; err != nil {
+				return nil, utils.Errorf("failed to export events: %v", err)
+			}
+			dataToExport["AIOutputEvent"] = events
 
 		case "memory":
 			var memories []*schema.AIMemoryEntity
@@ -202,7 +142,7 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 	}
 
 	// Create Zip file
-	outFile, err := os.Create(outputPath)
+	outFile, err := os.OpenFile(outputPath, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, utils.Errorf("failed to create zip file: %v", err)
 	}
@@ -224,6 +164,20 @@ func (s *Server) ExportAILogs(ctx context.Context, req *ypb.ExportAILogsRequest)
 		}
 	}
 
+	for _, kind := range exportTypes {
+		if kind == "output_event" || kind == "network" {
+			if _, err := httptrace.Export(ctx, zipWriter, "", sessionID, coordinatorIDs); err != nil {
+				return nil, utils.Errorf("export network debug: %v", err)
+			}
+			break
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		return nil, err
+	}
+	if err := outFile.Close(); err != nil {
+		return nil, err
+	}
 	return &ypb.ExportAILogsResponse{
 		FilePath: outputPath,
 	}, nil

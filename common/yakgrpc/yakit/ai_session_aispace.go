@@ -5,12 +5,13 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/gorm"
 	"github.com/samber/lo"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 )
 
 func queryAISpaceWorkDirs(db *gorm.DB, sessionIDs []string) ([]string, error) {
@@ -41,7 +42,8 @@ func isDeletableAISpaceWorkDir(path string) bool {
 	}
 
 	base := filepath.Clean(consts.GetDefaultAISpaceDir())
-	if path == base {
+	diagnosticRoot := filepath.Clean(httptrace.DefaultDirectory())
+	if path == base || path == diagnosticRoot || strings.HasPrefix(path, diagnosticRoot+string(filepath.Separator)) {
 		return false
 	}
 	prefix := base + string(filepath.Separator)

@@ -31,11 +31,13 @@ type RetryHandler func(https bool, retryCount int, req []byte, rsp []byte, retry
 type CustomFailureChecker func(https bool, req []byte, rsp []byte, fail func(string))
 
 type LowhttpExecConfig struct {
-	Host              string
-	Port              int
-	Packet            []byte
-	VerifyCertificate bool
-	Https             bool
+	// Response mirror is private and set only by an opt-in context trace.
+	networkTraceWriter io.Writer
+	Host               string
+	Port               int
+	Packet             []byte
+	VerifyCertificate  bool
+	Https              bool
 	//ResponseCallback                 func(response *LowhttpResponse) have same option SaveHTTPFlowHandler
 	Http2                            bool
 	Http3                            bool

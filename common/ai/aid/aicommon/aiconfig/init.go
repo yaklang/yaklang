@@ -186,12 +186,15 @@ func buildAIGlobalConfigFromTiered(tiered *consts.TieredAIConfig) *ypb.AIGlobalC
 		return nil
 	}
 	cfg := &ypb.AIGlobalConfig{
-		Enabled:         tiered.Enabled,
-		RoutingPolicy:   string(tiered.RoutingPolicy),
-		DisableFallback: tiered.DisableFallback,
-		DefaultModelId:  tiered.DefaultModelID,
-		SingleModelMode: tiered.SingleModelMode,
-		GlobalWeight:    tiered.GlobalWeight,
+		Enabled:                tiered.Enabled,
+		RoutingPolicy:          string(tiered.RoutingPolicy),
+		DisableFallback:        tiered.DisableFallback,
+		DefaultModelId:         tiered.DefaultModelID,
+		SingleModelMode:        tiered.SingleModelMode,
+		RetryForever:           tiered.RetryForever,
+		NetworkDebug:           tiered.NetworkDebug,
+		ModelRequestsPerMinute: tiered.ModelRequestsPerMinute,
+		GlobalWeight:           tiered.GlobalWeight,
 	}
 	if cfg.RoutingPolicy == "" {
 		cfg.RoutingPolicy = consts.DefaultRoutingPolicy

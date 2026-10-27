@@ -410,8 +410,9 @@ type Config struct {
 	/*
 		debug config
 	*/
-	DebugPrompt bool
-	DebugEvent  bool
+	NetworkDebug bool
+	DebugPrompt  bool
+	DebugEvent   bool
 
 	// other Options
 	OtherOption []any
@@ -658,6 +659,7 @@ func NewConfig(ctx context.Context, opts ...ConfigOption) *Config {
 			log.Errorf("Failed to set AI callback: %v", err)
 		}
 	}
+	config.applyProviderFunctionCallDefault()
 	if consumptionState := config.ensureConsumptionState(); consumptionState != nil {
 		consumptionState.InitializeEffectiveSingleModelMode(config.IsSingleAIModelMode())
 	}
@@ -2700,11 +2702,25 @@ func WithAIChatInfo(serviceName string, modelName string) ConfigOption {
 			cfg.m = &sync.Mutex{}
 		}
 		cfg.m.Lock()
-		defer cfg.m.Unlock()
 		cfg.AiServerName = serviceName
 		cfg.AiModelName = modelName
+		cfg.m.Unlock()
+		cfg.applyProviderFunctionCallDefault()
 		return nil
 	}
+}
+
+// Resolve the default before loops assemble their protocol-specific prompts.
+// This also handles choosing a provider from the desktop model selector before
+// a new task. Explicit protocol options and legacy callbacks keep their mode.
+func (c *Config) applyProviderFunctionCallDefault() {
+	c.m.Lock()
+	defer c.m.Unlock()
+	if c.functionCallModeExplicit || c.legacyAICallbackConfigured {
+		return
+	}
+	c.EnableFunctionCallMode = aispec.ProviderSupportsNativeToolCalling(c.AiServerName)
+	c.SetConfig("EnableFunctionCallMode", c.EnableFunctionCallMode)
 }
 
 func WithDisableEnhanceDirectlyAnswer(disable bool) ConfigOption {
@@ -4593,7 +4609,7 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// once init config flag
 	opts = append(opts, WithInitConfigStatus(i.InitStatus))
 
-	opts = append(opts, WithContext(i.Ctx))
+	opts = append(opts, WithContext(i.Ctx), WithNetworkDebug(i.NetworkDebug))
 
 	// Propagate browser session tracker so child invokers (P&E, focus loops)
 	// record browser.Open ids on the parent ReAct session for cleanup.

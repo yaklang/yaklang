@@ -1071,7 +1071,7 @@ func (r *ReActLoop) callAINormalTransaction(streamWg *sync.WaitGroup, prompt str
 			if currentCtxCanceled() {
 				actionErr = utils.Wrap(actionErr, "task context canceled while parsing action")
 			}
-			return utils.Wrap(actionErr, "failed to parse action")
+			return aicommon.NewModelOutputValidationError(utils.Wrap(actionErr, "failed to parse action"))
 		}
 		observedActionType := ""
 		admittedActionType := ""

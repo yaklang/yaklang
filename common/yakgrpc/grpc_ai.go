@@ -47,6 +47,9 @@ func (s *Server) ListAiModel(ctx context.Context, req *ypb.ListAiModelRequest) (
 		aispec.WithNoHttps(config.NoHttps),
 		aispec.WithDomain(config.Domain),
 		aispec.WithProxy(config.Proxy),
+		aispec.WithModel(config.Model),
+		aispec.WithScript(config.Script),
+		aispec.WithContext(ctx),
 	)
 	if err != nil {
 		return nil, err
@@ -214,7 +217,7 @@ func recommendAIHealthCheckConfig(ctx context.Context, original *ypb.ThirdPartyA
 }
 
 func buildRecommendedAIConfigs(original *ypb.ThirdPartyApplicationConfig) []*ypb.ThirdPartyApplicationConfig {
-	if original == nil {
+	if original == nil || original.GetType() == "yak-script" {
 		return nil
 	}
 	apiTypeCandidates := recommendedAIAPITypes(original.GetAPIType())

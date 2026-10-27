@@ -36,6 +36,13 @@ type RawHTTPResponseHeaderCallback func(headerBytes []byte)
 type ModelInfoCallback func(provider, model string, thinkingLevel ...string)
 
 type AIConfig struct {
+	NetworkDebug bool `json:"network_debug"`
+	// ModelRequestStatus reports queue/recovery state separately from model tokens.
+	ModelRequestStatus func(string)
+
+	// Script is trusted Yak source executed by the yak-script provider. It is
+	// stored with the model configuration, not fetched from a remote URL.
+	Script string `json:"script"`
 	// gateway network config
 	BaseURL        string `json:"base_url" app:"name:base_url,verbose:BaseURL,desc:BaseURL,id:3"`
 	Endpoint       string `json:"endpoint" app:"name:endpoint,verbose:Endpoint,desc:Endpoint,id:4"`
@@ -371,6 +378,7 @@ func hasExplicitConfigBeyondType(c *AIConfig) bool {
 		return false
 	}
 	if c.APIKey != "" ||
+		c.Script != "" ||
 		c.Model != "" ||
 		c.Domain != "" ||
 		c.BaseURL != "" ||
@@ -422,6 +430,7 @@ func NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 		p(c)
 	}
 	mergeMissingAIConfigDefaults(c)
+	prepareNetworkDebug(c)
 	return c
 }
 
@@ -479,10 +488,16 @@ func _NewDefaultAIConfig(opts ...AIConfigOption) *AIConfig {
 	for _, p := range opts {
 		p(c)
 	}
+	prepareNetworkDebug(c)
 	return c
 }
 
 type AIConfigOption func(*AIConfig)
+
+// WithScript selects the source implementing chat(request, emit) for yak-script.
+func WithScript(source string) AIConfigOption {
+	return func(c *AIConfig) { c.Script = source }
+}
 
 func WithContext(ctx context.Context) AIConfigOption {
 	return func(c *AIConfig) {
@@ -1507,4 +1522,9 @@ func WithRawMessages(msgs []ChatDetail) AIConfigOption {
 	return func(c *AIConfig) {
 		c.RawMessages = msgs
 	}
+}
+
+// WithModelRequestStatus reports provider queue/recovery state without emitting model text.
+func WithModelRequestStatus(cb func(string)) AIConfigOption {
+	return func(c *AIConfig) { c.ModelRequestStatus = cb }
 }

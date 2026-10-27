@@ -21,6 +21,12 @@ type aiGatewayTemplateProfile struct {
 }
 
 var aiGatewayTemplateProfiles = map[string]aiGatewayTemplateProfile{
+	"yak-script": {
+		Verbose: "Yak 脚本模型",
+		ExtTag: map[string]string{
+			"api_key": "required:false",
+		},
+	},
 	"aibalance": {
 		Verbose: "AIBalance",
 		ExtTag: map[string]string{
@@ -166,6 +172,12 @@ func buildAIGatewayTemplates() ([]*ypb.GetThirdPartyAppConfigTemplate, error) {
 		aiOptions, err := parseAppTagToOptions(&aispec.AIConfig{}, extTag)
 		if err != nil {
 			return nil, err
+		}
+		if name == "yak-script" {
+			aiOptions = append(aiOptions,
+				&ypb.ThirdPartyAppConfigItemTemplate{Name: "script", Verbose: "Yak 模型脚本", Type: "string", Required: true, Desc: "可信 Yak 源码，定义 chat(request, emit)"},
+				&ypb.ThirdPartyAppConfigItemTemplate{Name: "script_timeout_seconds", Verbose: "脚本超时秒数", Type: "number", DefaultValue: "240"},
+			)
 		}
 		templates = append(templates, newThirdPartyAppConfigTemplate(name, verbose, thirdPartyTemplateTypeAI, aiOptions...))
 	}

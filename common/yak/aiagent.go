@@ -341,6 +341,7 @@ var AIAgentExport = map[string]any{
 	"systemFileOperator":           aicommon.WithSystemFileOperator,
 	"omniSearchTool":               aicommon.WithOmniSearchTool,
 	"debugPrompt":                  aicommon.WithDebugPrompt,
+	"networkDebug":                 aicommon.WithNetworkDebug,
 	"debug":                        aicommon.WithDebug,
 	"appendPersistentMemory":       aicommon.WithAppendPersistentContext,
 	"timelineContentLimit":         aicommon.WithTimelineContentLimit,

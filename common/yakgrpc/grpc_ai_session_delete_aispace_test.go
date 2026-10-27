@@ -1,7 +1,9 @@
 package yakgrpc
 
 import (
+	"archive/zip"
 	"context"
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -12,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -41,6 +44,20 @@ func TestServer_DeleteAISession_RemovesAISpaceWorkDir(t *testing.T) {
 		WorkDir:           workDir,
 	}).Error)
 
+	traceCtx := httptrace.WithEnabled(httptrace.WithScope(context.Background(), httptrace.Scope{SessionID: sessionID}), true)
+	record := httptrace.Start(traceCtx, []byte("POST / HTTP/1.1\r\nHost: fixture\r\n\r\n"), false)
+	require.NotNil(t, record)
+	record.Write([]byte("HTTP/1.1 200 OK\r\nContent-Length: 2\r\n\r\nok"))
+	record.Finish(nil, 200, "text/plain", "", true)
+	assertTraceCount := func(want int) {
+		archive := zip.NewWriter(io.Discard)
+		count, err := httptrace.Export(context.Background(), archive, httptrace.DefaultDirectory(), sessionID, nil)
+		require.NoError(t, err)
+		require.NoError(t, archive.Close())
+		require.Equal(t, want, count)
+	}
+	assertTraceCount(1)
+	t.Cleanup(func() { httptrace.RemoveSessions([]string{sessionID}) })
 	srv := &Server{projectDatabase: db}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -55,4 +72,5 @@ func TestServer_DeleteAISession_RemovesAISpaceWorkDir(t *testing.T) {
 
 	_, statErr := os.Stat(workDir)
 	require.True(t, os.IsNotExist(statErr))
+	assertTraceCount(0)
 }

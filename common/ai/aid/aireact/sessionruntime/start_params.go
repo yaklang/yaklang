@@ -19,7 +19,7 @@ func ConvertStartParamsToReActConfig(i *ypb.AIStartParams) []aicommon.ConfigOpti
 	if i == nil {
 		return opts
 	}
-	opts = append(opts, aicommon.WithSingleAIModelMode(i.GetSingleModelMode()))
+	opts = append(opts, aicommon.WithSingleAIModelMode(i.GetSingleModelMode()), aicommon.WithNetworkDebug(i.GetNetworkDebug()))
 	enableMultiAgent, goalModeEnabled, goalMinIterations, maxSubAgents := resolveAIExecutionStrategy(i)
 	if i.DisallowRequireForUserPrompt {
 		opts = append(opts, aicommon.WithAllowRequireForUserInteract(false))

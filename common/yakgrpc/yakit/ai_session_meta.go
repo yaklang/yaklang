@@ -240,6 +240,10 @@ func MergeCachedAISessionStartParams(cached, request *ypb.AIStartParams) *ypb.AI
 
 	merged := proto.Clone(cached).(*ypb.AIStartParams)
 	merged.SingleModelMode = cached.GetSingleModelMode() || request.GetSingleModelMode()
+	if request.NetworkDebug != nil {
+		value := request.GetNetworkDebug()
+		merged.NetworkDebug = &value
+	}
 	merged.CoordinatorId = request.GetCoordinatorId()
 	merged.Sequence = request.GetSequence()
 	merged.UserQuery = request.GetUserQuery()
@@ -261,6 +265,10 @@ func OverlayAISessionStartParams(base, patch *ypb.AIStartParams) *ypb.AIStartPar
 	}
 
 	next := proto.Clone(base).(*ypb.AIStartParams)
+	if patch.NetworkDebug != nil {
+		value := patch.GetNetworkDebug()
+		next.NetworkDebug = &value
+	}
 	if patch.GetSingleModelMode() {
 		next.SingleModelMode = true
 	}

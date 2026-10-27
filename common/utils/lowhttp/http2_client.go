@@ -213,6 +213,9 @@ func (s *http2ClientStream) handleHeadersDone() {
 	s.headersHandled = true
 
 	headerRaw := s.buildResponseHeaderRaw()
+	if s.option != nil && s.option.networkTraceWriter != nil {
+		s.option.networkTraceWriter.Write(headerRaw)
+	}
 	if s.option != nil && s.option.AutoDetectSSE {
 		if IsSSEContentTypeHeader(headerRaw) {
 			s.noBodyBuffer = true
@@ -1249,6 +1252,9 @@ func (rl *http2ClientConnReadLoop) processData(f *http2.DataFrame) {
 		}
 	}
 	if data := f.Data(); len(data) > 0 {
+		if cs.option != nil && cs.option.networkTraceWriter != nil {
+			cs.option.networkTraceWriter.Write(data)
+		}
 		cs.bodyReceived += int64(len(data))
 		if cs.contentLength >= 0 && cs.bodyReceived > cs.contentLength || cs.resp.StatusCode == 204 || cs.resp.StatusCode == 304 || cs.req != nil && cs.req.Method == http.MethodHead {
 			rl.failStream(cs, http2.ErrCodeProtocol, "response body exceeds declared length")

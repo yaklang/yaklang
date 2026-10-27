@@ -18,7 +18,9 @@ func (t *h3Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 		return nil, err
 	}
 	resp, responsePacket, err := doHttp3Request(ctx, http3Conn, tr.packet)
-	_ = resp
+	if tr.option.networkTraceWriter != nil {
+		tr.option.networkTraceWriter.Write(responsePacket)
+	}
 	if tr.reqIns != nil {
 		httpctx.SetBareResponseBytes(tr.reqIns, responsePacket)
 	}

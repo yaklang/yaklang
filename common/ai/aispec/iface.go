@@ -86,6 +86,22 @@ type AIClient interface {
 	ModelListCaller
 }
 
+// NativeToolCallingCapability is optional so existing providers retain their
+// historical native-tool default. Text-only providers must opt out before an
+// Agent builds its prompt and response parser.
+type NativeToolCallingCapability interface {
+	SupportsNativeToolCalling() bool
+}
+
+func ProviderSupportsNativeToolCalling(provider string) bool {
+	client, ok := Lookup(provider)
+	if !ok || client == nil {
+		return true
+	}
+	capability, ok := client.(NativeToolCallingCapability)
+	return !ok || capability.SupportsNativeToolCalling()
+}
+
 type EmbeddingCaller interface {
 	Embedding(string) ([]float32, error)
 	// EmbeddingRaw 返回原始的 embedding 结果，可能包含多个向量

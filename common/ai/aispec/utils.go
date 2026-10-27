@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -246,6 +247,30 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 
 	if provider == nil {
 		return opts
+	}
+	for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
+		for _, param := range params {
+			if param.GetKey() == "network_debug" {
+				enabled, _ := strconv.ParseBool(param.GetValue())
+				opts = append(opts, WithNetworkDebug(enabled))
+			}
+		}
+	}
+	if provider.GetType() == "yak-script" {
+		// Model parameters override provider parameters, matching model selection.
+		for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
+			for _, param := range params {
+				switch param.GetKey() {
+				case "script":
+					opts = append(opts, WithScript(param.GetValue()))
+				case "script_timeout_seconds":
+					timeout, err := strconv.ParseFloat(param.GetValue(), 64)
+					if err == nil && timeout > 0 {
+						opts = append(opts, WithTimeout(timeout))
+					}
+				}
+			}
+		}
 	}
 
 	// Set API key

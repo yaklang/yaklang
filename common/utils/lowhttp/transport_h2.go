@@ -51,6 +51,7 @@ func (t *h2Transport) RoundTrip(ctx context.Context, tr *transportRequest) (*tra
 			return false
 		}
 		reconnectTimes++
+		restartNetworkTrace(ctx, tr, err)
 		return true
 	}
 
