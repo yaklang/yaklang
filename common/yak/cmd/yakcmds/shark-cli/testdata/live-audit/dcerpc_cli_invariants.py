@@ -15,6 +15,7 @@ from pathlib import Path
 from mail_rtsp_export_invariants import canonical, rows, sha
 
 SELECTED='dcerpc'
+GENERATED_RPC_REFERENCES={'dcerpc.message_id','dcerpc.message_complete_in','dcerpc.message_parent'}
 PRESENTATION={'protocol','protocol_stack','connection_protocol','connection_stack','connection_evidence',
               'protocol_status','protocol_scope','protocol_evidence','visibility','info',
               'message_source','message_destination','message_transport','message_domain','pdu_scope'}
@@ -109,6 +110,11 @@ def selected_projection(pdu,e,sdk_to_cli=None):
     for field in expected.get('values')or[]:
         if field['name']=='pdu.id':field['value']=pdu['id'];field['exact_value']=str(pdu['id'])
         if field['name']=='pdu.response_to':field['value']=sdk_to_cli[field['value']];field['exact_value']=str(field['value'])
+        if field['name']in GENERATED_RPC_REFERENCES:
+            # Only these explicitly generated references share the PDU ID
+            # namespace. Wire Call ID/context/opnum/lengths remain literal.
+            assert field['value']in sdk_to_cli,'logical fragment parent/completion resolves to the original source-bound PDU'
+            field['value']=sdk_to_cli[field['value']];field['exact_value']=str(field['value'])
     assert canonical(expected)==canonical(pdu['field_values']),'complete selected typed alias snapshot'
     aliases=collections.defaultdict(list)
     for field in expected.get('values')or[]:aliases[field['name']].append(field['value'])
