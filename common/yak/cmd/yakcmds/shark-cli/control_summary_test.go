@@ -55,6 +55,10 @@ func TestLateReassemblyNoticeSurvivesNarrowInfoAndRedraw(t *testing.T) {
 	require.True(t, strings.HasPrefix(row.Info, badge))
 	require.Contains(t, clipText(row.Info, 70), "complete in frame #2")
 	require.Equal(t, row, entry.row(), "stable redraw does not duplicate the reassembly notice")
+	projected := applyApplication(row, "imap", "validated protocol events", 1)
+	require.True(t, strings.HasPrefix(projected.Info, badge), "connection projection must retain the leading completion provenance")
+	require.Equal(t, 1, strings.Count(projected.Info, badge))
+	require.Equal(t, projected, applyApplication(projected, "imap", "validated protocol events", 1), "repeated connection redraw preserves one notice")
 	final := tcpPacket(t, 2, 107, "PACE", true, false, false, false)
 	final.reference, final.history = last, history
 	finalEntry := packetEntry{packet: final}

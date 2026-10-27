@@ -69,7 +69,13 @@ func (e *packetEntry) row() packetSummary {
 				if completed := message.SourceBytes.CompletedIn; completed != nil && completed.Number != p.reference.Number && (message.Status == "decoded" || message.Status == "deferred") {
 					// Put provenance first: long application text otherwise clips
 					// this notice and makes each tiny contributor look complete.
-					e.summary.Info = fmt.Sprintf("Reassembled PDU #%d · complete in frame #%d · %s", message.ID, completed.Number, e.summary.Info)
+					notice := fmt.Sprintf("Reassembled PDU #%d · complete in frame #%d · ", message.ID, completed.Number)
+					e.summary.Info = notice + e.summary.Info
+					if e.summary.connectionAnnotated {
+						// Connection redraws restore packetInfo before adding the
+						// connection label. Preserve provenance in that base too.
+						e.summary.packetInfo = notice + e.summary.packetInfo
+					}
 					break
 				}
 			}
