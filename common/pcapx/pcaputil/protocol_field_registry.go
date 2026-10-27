@@ -265,6 +265,10 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		{"ssh", "ssh.host_key.selected", "Observed SSH host-key algorithm", "Host Key Algorithm", "context", DisplayString, 0},
 		{"ssh", "ssh.host_key.sha256", "SSH public-key fingerprint", "Host Key Fingerprint", "derived", DisplayString, 0},
 		{"ssh", "ssh.signature.verified", "SSH signature verified", "Signature Verified", "derived", DisplayBoolean, 0},
+		{"imap", "imap.sasl.mechanism", "Observed IMAP SASL mechanism", "Mechanism", "context", DisplayString, 0},
+		{"imap", "imap.sasl.stage", "Observed IMAP SASL stage", "SASL Stage", "context", DisplayString, 0},
+		{"imap", "imap.sasl.server_result", "Observed IMAP server authentication result", "Server Result Observed", "pdu", DisplayString, 0},
+		{"imap", "imap.authentication.verified", "IMAP authentication verified", "Authentication Verified", "derived", DisplayBoolean, 0},
 		{"ssh", "ssh.peer_identity.verified", "SSH peer identity verified", "Peer Identity Verified", "derived", DisplayBoolean, 0},
 		{"wireguard", "wg.type", "WireGuard message type", "Message Type", "pdu", DisplayUnsigned, 32},
 		{"wireguard", "wg.sender", "WireGuard sender index", "Sender Index", "pdu", DisplayUnsigned, 32},
@@ -561,9 +565,12 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	if e == nil {
 		return s
 	}
-	if e.nativeSSHObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation {
 		owned := *e
 		owned.Protocol, owned.Session = "ssh", e.semanticSession
+		if e.nativeIMAPObservation {
+			owned.Protocol = "imap"
+		}
 		if e.sessionError != nil {
 			owned.Status, _ = classifySessionError(e.sessionError)
 		}

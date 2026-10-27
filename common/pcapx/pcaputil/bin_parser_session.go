@@ -218,8 +218,10 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		return
 	}
-	if (bytes.HasPrefix(wire, []byte("GET ")) || bytes.HasPrefix(wire, []byte("POST "))) && probeRTSP(wire, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+	if p := probeRTSP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
 	if isHTTPStartLineCandidate(wire) {
@@ -616,6 +618,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
+		if err == nil && e.Session["Profile"] == "extension-envelope" {
+			e.nativeSessionMessage = true
+			e.Profile, e.Completeness = "rtsp-extension-envelope", "message"
+			e.semanticSession = cloneSession(e.Session)
+		}
 		if err == nil && e.Session["Profile"] == "apple-control" {
 			e.Profile = "rtsp-apple-control"
 			e.Completeness = "message"
@@ -798,7 +805,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "smtp":
 		e.Session, err = f.smtp.consume(dir, e.Raw)
 	case "imap":
-		e.Session, err = f.imap.consume(dir, e.Raw)
+		err = f.consumeIMAP(dir, e)
 	case "pop3":
 		e.Session, err = f.pop3.consume(e.Raw)
 	case "ftp":

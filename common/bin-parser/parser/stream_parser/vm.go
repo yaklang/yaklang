@@ -433,6 +433,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseMySQLFields(invocation.node, invocation.operator, profile)
 		},
+		"parseIMAPSASL": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("imap-sasl: structured generation is unsupported")
+			}
+			return parseIMAPSASL(invocation.node, invocation.operator, profile)
+		},
 		"parseIMAPFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("imap-fields: structured generation is unsupported")

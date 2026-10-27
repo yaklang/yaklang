@@ -170,31 +170,58 @@ func (s *binRTSP) recordRequestEvidence(req *rtspRequest, e *ProtocolEvent, max 
 
 var rtspMethods = []string{"OPTIONS", "DESCRIBE", "SETUP", "PLAY", "PAUSE", "TEARDOWN", "GET_PARAMETER", "SET_PARAMETER", "ANNOUNCE", "RECORD", "REDIRECT"}
 
+func rtspMethodToken(method string) bool {
+	if len(method) == 0 || len(method) > 256 {
+		return false
+	}
+	for _, b := range []byte(method) {
+		if b <= 32 || b >= 127 || strings.ContainsRune("()<>@,;:\\\"/[]?={}", rune(b)) {
+			return false
+		}
+	}
+	return true
+}
+
 func probeRTSP(w []byte, limit int) ProbeResult {
-	if bytes.HasPrefix(w, []byte("RTSP/")) {
-		return probeAccept("rtsp", "1.0", 99)
+	limit = min(limit, 32<<10)
+	first, _, complete := bytes.Cut(w, []byte("\r\n"))
+	if !complete {
+		candidate := bytes.HasPrefix(w, []byte("RTSP/"))
+		for _, method := range append(append([]string{}, rtspMethods...), "FLUSH", "GET", "POST") {
+			candidate = candidate || bytes.HasPrefix(w, []byte(method+" "))
+		}
+		if candidate && len(w) < limit {
+			return probeNeed("rtsp", "1.0", len(w), limit)
+		}
+		return ProbeResult{Verdict: ProbeReject}
 	}
-	if bytes.HasPrefix(w, []byte("GET ")) || bytes.HasPrefix(w, []byte("POST ")) {
-		line, _, _ := bytes.Cut(w, []byte("\r\n"))
-		if bytes.HasSuffix(line, []byte(" RTSP/1.0")) {
-			return probeAccept("rtsp", "1.0", 98)
-		}
+	parts := strings.SplitN(string(first), " ", 3)
+	if len(parts) != 3 || !(parts[0] == "RTSP/1.0" || parts[2] == "RTSP/1.0" && rtspMethodToken(parts[0]) && parts[1] != "") {
+		return ProbeResult{Verdict: ProbeReject}
 	}
-	for _, m := range rtspMethods {
-		prefix := m + " "
-		if !bytes.HasPrefix(w, []byte(prefix)) {
-			continue
-		}
-		rest := strings.ToLower(string(w[len(prefix):]))
-		if strings.HasPrefix(rest, "rtsp://") || strings.HasPrefix(rest, "rtsps://") || strings.Contains(rest, " RTSP/1.0") || strings.Contains(rest, " rtsp/1.0") {
-			return probeAccept("rtsp", "1.0", 98)
-		}
-		if strings.Contains(rest, "\r\n") || strings.HasPrefix(rest, "sip:") || strings.HasPrefix(rest, "sips:") || strings.Contains(rest, " http/") || strings.Contains(rest, " sip/") {
+	if parts[0] == "RTSP/1.0" {
+		status, err := strconv.Atoi(parts[1])
+		if len(parts[1]) != 3 || err != nil || status < 100 || status > 599 {
 			return ProbeResult{Verdict: ProbeReject}
 		}
+	}
+	_, h, hdr, _, err := rtspHeader(w, 4096)
+	if err != nil {
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	if hdr == 0 {
 		if len(w) < limit {
 			return probeNeed("rtsp", "1.0", len(w), limit)
 		}
+		return ProbeResult{Verdict: ProbeReject}
+	}
+	seqs := h.Values("Cseq")
+	if len(seqs) == 1 {
+		if _, err := strconv.ParseUint(seqs[0], 10, 32); err == nil {
+			return probeAccept("rtsp", "1.0", 98)
+		}
+	} else if len(seqs) == 0 && rtspAppleControlHeader(h) {
+		return probeAccept("rtsp", "apple-control", 98)
 	}
 	return ProbeResult{Verdict: ProbeReject}
 }
@@ -353,6 +380,9 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 	out := map[string]any{"CSeq": uint32(seq), "Session ID": sid, "Content Length": n, "Content Type": h.Get("Content-Type")}
 	key := rtspKey{dir, uint32(seq)}
 	if !response {
+		if !rtspMethodToken(parts[0]) || parts[1] == "" {
+			return nil, protocolError(ErrMalformedMessage, "RTSP request method or URI")
+		}
 		known := false
 		for _, m := range rtspMethods {
 			if parts[0] == m {
@@ -362,6 +392,18 @@ func (s *binRTSP) consume(dir int, w []byte, ts time.Time, max int) (map[string]
 		if (parts[0] == "GET" || parts[0] == "POST") && rtspAppleControlHeader(h) {
 			known = true
 			out["Profile"], out["CSeq Observed"] = "apple-control", true
+		}
+		if parts[0] == "FLUSH" {
+			known = true
+			out["Profile"], out["Extension Method"] = "extension-envelope", "FLUSH"
+			out["Headers"], out["Media Effect Verified"] = httpHeaderFields(http.Header(h)), false
+			if values := h.Values("Rtp-Info"); len(values) > 0 {
+				info, err := rtspFlushRTPInfo(values)
+				if err != nil {
+					return nil, err
+				}
+				out["RTP Info"] = info
+			}
 		}
 		if !known {
 			return nil, protocolError(ErrUnsupportedFeature, "RTSP method")
