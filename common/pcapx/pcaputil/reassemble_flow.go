@@ -330,6 +330,7 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 }
 
 func (t *TrafficFlow) Release() {
+	t.discardOpening()
 	if t.binState != nil {
 		t.binState.close(TrafficFlowCloseReason_CTX_CANCEL)
 		t.binState = nil
@@ -402,7 +403,6 @@ func (t *TrafficFlow) GetHTTPResponseConnection() *TrafficConnection {
 func (t *TrafficFlow) Close() { t.closeWithReason(TrafficFlowCloseReason_RST) }
 
 func (t *TrafficFlow) closeWithReason(reason TrafficFlowCloseReason) {
-	t.opening = nil
 	t.closed.Store(true)
 	t.ServerConn.Close()
 	t.ClientConn.Close()
