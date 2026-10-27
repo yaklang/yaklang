@@ -380,6 +380,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := dcerpcEventSummary(e); ok {
+		return summary
+	}
 	if summary, ok := mailRTSPEventSummary(e); ok {
 		return summary
 	}
