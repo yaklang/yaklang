@@ -143,6 +143,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var routingVersion uint64
 	var currentSource int
 	var wireRanges map[string][]int
+	var dcerpcResult uint64
+	var dcerpcResultKnown bool
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
 	var http3FrameKind string
@@ -170,6 +172,17 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "dcerpc" {
+				previous, previousKnown := dcerpcResult, dcerpcResultKnown
+				defer func() { dcerpcResult, dcerpcResultKnown = previous, previousKnown }()
+				if result, ok := x["Result"]; ok {
+					code, valid := detailRangeOffset(result)
+					dcerpcResult, dcerpcResultKnown = uint64(code), valid
+				} else if result, ok := x["Ack Result"]; ok {
+					code, valid := detailRangeOffset(result)
+					dcerpcResult, dcerpcResultKnown = uint64(code), valid
+				}
+			}
 			if protocol == "http3" {
 				if x["Frame Type"] == "STREAM" {
 					previous := http3StreamID
@@ -207,16 +220,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 					}
 				}
 			}
-			if protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
-				if local, ok := x["Wire Field Ranges"].(map[string]any); ok {
+			if protocol == "dcerpc" || protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
+				if local, ok := x["Wire Field Ranges"]; ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
-					wireRanges = map[string][]int{}
-					for k, v := range local {
-						if a, ok := v.([]any); ok && len(a) == 2 {
-							wireRanges[k] = []int{int(number(a[0])), int(number(a[1]))}
-						}
-					}
+					wireRanges = detailWireRanges(local)
 				}
 			}
 			if name, ok := x["Display Name"].(string); ok && strings.Contains("|dns|mdns|llmnr|dot|doh|doq|", "|"+protocol+"|") {
@@ -233,6 +241,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = view
 			}
 			add(name, true)
+			if span := wireRanges[name]; protocol == "dcerpc" && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+				f := &out[len(out)-1]
+				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
+			}
 			keys := make([]string, 0, len(x))
 			for k := range x {
 				if k == "Wire Field Ranges" || protocol == "http3" && k == "Frame Header Ranges" {
@@ -245,6 +257,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			sort.Slice(keys, func(i, j int) bool {
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
+				if protocol == "dcerpc" {
+					if rank, ok := dcerpcDetailPriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := dcerpcDetailPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if protocol == "ripng" {
 					if rank, ok := ripngEntryPriority[keys[i]]; ok {
 						a = rank
@@ -452,6 +472,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 				x = generated
 			}
 			value := formatFieldValue(name, x)
+			if protocol == "dcerpc" {
+				value = dcerpcDetailValue(name, x, value, dcerpcResult, dcerpcResultKnown)
+			}
 			emptyCID := x == nil
 			if b, ok := x.([]byte); ok {
 				emptyCID = len(b) == 0
@@ -534,7 +557,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -584,17 +607,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		protocol, currentSource = e.Protocol, 0
 		quicHeaderForm = textValue(e.Session["Header Form"])
 		routingVersion = number(e.Session["Protocol Version"])
-		wireRanges = map[string][]int{}
-		switch ranges := e.Session["Wire Field Ranges"].(type) {
-		case map[string][]int:
-			wireRanges = ranges
-		case map[string]any:
-			for k, v := range ranges {
-				if a, ok := v.([]any); ok && len(a) == 2 {
-					wireRanges[k] = []int{int(number(a[0])), int(number(a[1]))}
-				}
-			}
-		}
+		wireRanges = detailWireRanges(e.Session["Wire Field Ranges"])
+		dcerpcResult, dcerpcResultKnown = 0, false
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
@@ -679,6 +693,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if e.Protocol == "dcerpc" {
+			add("DCE/RPC message and observed association", true)
+			for _, key := range []string{"Packet Name", "Call ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
+				if value, ok := values[key]; ok {
+					walk(key, value, 0)
+					delete(values, key)
+				}
+			}
+		}
 		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 			add("QUIC wire header and observed context", true)
 			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
