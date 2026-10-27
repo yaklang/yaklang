@@ -34,6 +34,7 @@ type ProtocolEvent struct {
 	nativeSTUNObservation              bool
 	nativeSIPObservation               bool
 	nativeSSHObservation               bool
+	nativeIMAPObservation              bool
 	nativeTFTPObservation              bool
 	nativeATGObservation               bool
 	nativeDHCPObservation              bool
@@ -184,13 +185,13 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	// A selected native SSH method refusal must not be retried as a successful
 	// generic packet grammar. Both accepted fields and errors are private facts,
 	// independent of caller edits to Protocol, Session and compatibility caches.
-	if e.nativeSSHObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
 			return nil, &owned
 		}
 		if e.semanticFields == nil {
-			return nil, protocolError(ErrContextRequired, "SSH accepted field projection is unavailable")
+			return nil, protocolError(ErrContextRequired, "native accepted field projection is unavailable")
 		}
 		out := map[string]any{"fields": cloneSession(e.semanticFields)}
 		if e.hasRuleMetadata {
@@ -430,7 +431,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeSSHObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation {
 		return true
 	}
 	if e.nativeSessionMessage {
@@ -1603,7 +1604,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" || f.imap != nil && f.imap.needsNativeSASL(dir, e.Raw) {
 				result = map[string]any{}
 			} else if f.protocol == "ssh" && e.Entry == "SSHPacket" {
 				// Packet numbers 30..49 depend on the observed exchange. Decode
@@ -1746,7 +1747,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation) && e.sessionError == nil {
+				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation || e.nativeIMAPObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1773,7 +1774,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.Protocol == "ssh" || e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "ssh" || e.nativeIMAPObservation || e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {

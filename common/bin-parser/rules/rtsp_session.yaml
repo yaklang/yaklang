@@ -7,7 +7,7 @@ Package:
       if first.HasPrefix("RTSP/") {
         this.ProcessSubNode("RTSP Response")
       }else{
-        if !(first.HasPrefix("OPTIONS") || first.HasPrefix("DESCRIBE") || first.HasPrefix("SETUP") || first.HasPrefix("PLAY") || first.HasPrefix("PAUSE") || first.HasPrefix("TEARDOWN") || first.HasPrefix("GET_PARAMETER") || first.HasPrefix("SET_PARAMETER") || first.HasPrefix("ANNOUNCE") || first.HasPrefix("RECORD") || first.HasPrefix("REDIRECT") || first == "GET" || first == "POST") {
+        if !(first == "OPTIONS" || first == "DESCRIBE" || first == "SETUP" || first == "PLAY" || first == "PAUSE" || first == "TEARDOWN" || first == "GET_PARAMETER" || first == "SET_PARAMETER" || first == "ANNOUNCE" || first == "RECORD" || first == "REDIRECT" || first == "GET" || first == "POST" || first == "FLUSH") {
           panic("rtsp: unknown method")
         }
         this.ProcessSubNode("RTSP Request")

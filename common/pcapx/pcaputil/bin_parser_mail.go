@@ -25,13 +25,15 @@ type binSMTP struct {
 }
 
 type binIMAP struct {
-	pending      map[string]string
-	maxPending   int
-	pendingBytes int
-	literal      [2]int
-	literalTail  [2]bool
-	startTLS     string
-	encrypted    bool
+	pending             map[string]string
+	maxPending          int
+	pendingBytes        int
+	literal             [2]int
+	literalTail         [2]bool
+	startTLS            string
+	encrypted           bool
+	sasl                *imapSASL
+	protectionUncertain string
 }
 
 type binPOP3 struct {
@@ -472,13 +474,20 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 		}
 		return 0, nil, protocolError(ErrEncrypted, "IMAP transport is encrypted after STARTTLS")
 	}
+	if s.protectionUncertain != "" && len(w) > 0 {
+		return 0, nil, protocolError(ErrContextRequired, "IMAP SASL mechanism %s may install a security layer", s.protectionUncertain)
+	}
 	if n := s.literal[dir]; n > 0 {
 		if len(w) < n {
 			return n, nil, nil
 		}
 		return n, f.a.specs["imap/IMAP"], nil
 	}
-	n, err := frameCRLFLine(w, imapLineMax)
+	lineMax := imapLineMax
+	if s.sasl != nil {
+		lineMax = imapSASLLineMax
+	}
+	n, err := frameCRLFLine(w, lineMax)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -539,6 +548,9 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	}
 	fields := strings.Fields(line)
+	if out, handled, err := s.consumeSASL(dir, raw, fields); handled {
+		return out, err
+	}
 	if len(fields) > 0 && fields[0] == "+" {
 		return map[string]any{"Tag": "+", "Role": "continuation", "Packet Name": "Continuation", "Line": line}, nil
 	}

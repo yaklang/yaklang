@@ -193,6 +193,7 @@ func reusableBridgeName(name string) bool {
 		"parsePostgreSQLFields",
 		"parseMySQLFields",
 		"parseIMAPFields",
+		"parseIMAPSASL",
 		"parsePOP3Fields",
 		"parseSMTPFields",
 		"parseMQTTFields",
