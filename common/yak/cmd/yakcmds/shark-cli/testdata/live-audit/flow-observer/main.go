@@ -67,7 +67,7 @@ func main() {
 	var closes []closed
 	referenceCount := 0
 	var stats pcaputil.TCPReassemblyStats
-	err = pcaputil.ReplayPcap(bytes.NewReader(wire), pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), pcaputil.WithTCPReassemblyWorkers(*workers),
+	err = pcaputil.ReplayPcap(bytes.NewReader(wire), pcaputil.WithIgnoreEmbeddedSecrets(true), pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), pcaputil.WithTCPReassemblyWorkers(*workers),
 		pcaputil.WithOnTrafficFlowCreated(func(f *pcaputil.TrafficFlow) {
 			mu.Lock()
 			defer mu.Unlock()
@@ -96,5 +96,8 @@ func main() {
 	}
 	if err := json.NewEncoder(os.Stdout).Encode(map[string]any{"capture_SHA256": hex.EncodeToString(digest[:]), "flows": flows, "packets": packets, "closed": closes, "stats": stats, "error": failure}); err != nil {
 		panic(err)
+	}
+	if failure != "" {
+		os.Exit(1)
 	}
 }

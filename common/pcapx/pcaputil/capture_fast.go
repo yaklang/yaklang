@@ -122,13 +122,7 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 	var transport layers.IPProtocol
 	switch next {
 	case layers.LayerTypeIPv4:
-		var err error
-		if d.conf.binParser != nil {
-			err = decodeProtocolIPv4(&d.ipv4, ipBytes, d)
-		} else {
-			d.ipv4 = layers.IPv4{Options: d.ipv4.Options[:0]}
-			err = d.ipv4.DecodeFromBytes(ipBytes, d)
-		}
+		err := decodeProtocolIPv4(&d.ipv4, ipBytes, d)
 		if err != nil {
 			return fallback()
 		}
@@ -140,12 +134,7 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 			transport = d.ipv4.Protocol
 		}
 	case layers.LayerTypeIPv6:
-		var err error
-		if d.conf.binParser != nil {
-			err = decodeProtocolIPv6(&d.ipv6, ipBytes, d)
-		} else {
-			err = d.ipv6.DecodeFromBytes(ipBytes, d)
-		}
+		err := decodeProtocolIPv6(&d.ipv6, ipBytes, d)
 		if err != nil {
 			return fallback()
 		}
@@ -225,14 +214,14 @@ func openOfflineFast(conf *CaptureConfig, ctx context.Context, handler *PcapHand
 		}
 		if conf.trafficPool.parallel != nil && conf.trafficPool.owner == nil && !conf.DisableAssembly {
 			if key, ok, err := rawFlowKey(raw, d.link); err != nil {
-				if conf.binParser != nil {
+				if conf.binParser != nil || conf.transportNormalizer != nil {
 					d.feedWithEvidence(ctx, raw, ci, evidence)
 				} else {
 					conf.trafficPool.malformedPacket(err.Error())
 				}
 			} else if ok {
 				conf.trafficPool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, captureLength: ci.CaptureLength, originalLength: ci.Length, link: d.link, raw: true, key: key, evidence: evidence})
-			} else if conf.binParser != nil {
+			} else if conf.binParser != nil || conf.transportNormalizer != nil {
 				d.feedWithEvidence(ctx, raw, ci, evidence)
 			}
 		} else {

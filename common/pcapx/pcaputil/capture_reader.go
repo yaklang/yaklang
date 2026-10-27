@@ -138,7 +138,7 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 			conf.packetHandlerWithLink(ctx, packet, link)
 		} else if pool.parallel != nil && !conf.DisableAssembly {
 			if key, ok, err := rawFlowKey(raw, link); err != nil {
-				if conf.binParser != nil {
+				if conf.binParser != nil || conf.transportNormalizer != nil {
 					d.feedWithEvidence(ctx, raw, ci, e)
 				} else {
 					pool.malformedPacket(err.Error())
@@ -146,7 +146,7 @@ func replayWithConfig(input io.Reader, conf *CaptureConfig) (resultErr error) {
 			} else if ok {
 				key.domain = e.Ref.Domain
 				pool.parallel.submit(workerPacket{data: raw, ts: ci.Timestamp, captureLength: ci.CaptureLength, originalLength: ci.Length, link: link, raw: true, key: key, evidence: e})
-			} else if conf.binParser != nil {
+			} else if conf.binParser != nil || conf.transportNormalizer != nil {
 				d.feedWithEvidence(ctx, raw, ci, e) // datagrams; TCP still uses the private worker path
 			}
 		} else {

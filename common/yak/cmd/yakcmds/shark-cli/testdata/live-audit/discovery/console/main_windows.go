@@ -540,6 +540,11 @@ func main() {
 	shot("02-byte-sources")
 	send("4x")
 	shot("03-conversation-messages")
+	if os.Getenv("SHARK_QA_NATIVE_WIRE") == "1" {
+		send("ah")
+		shot("03-native-wire-stream")
+		send("a")
+	}
 	send("e")
 	shot("04-association-evidence")
 	fail(windows.ResizePseudoConsole(console, windows.Coord{X: 80, Y: 30}))
