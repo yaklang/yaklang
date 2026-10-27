@@ -37,10 +37,11 @@ type fragmentSet struct {
 	rejected bool
 }
 type fragmentStore struct {
-	mu           sync.Mutex
-	sets         map[fragmentKey]*fragmentSet
-	clock        time.Time
-	blockedUntil time.Time
+	mu            sync.Mutex
+	sets          map[fragmentKey]*fragmentSet
+	blocked       bool
+	blockedDomain CaptureDomain
+	blockedUntil  time.Time
 }
 
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
@@ -460,12 +461,12 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 	if s.sets == nil {
 		s.sets = map[fragmentKey]*fragmentSet{}
 	}
-	if ci.Timestamp.After(s.clock) {
-		s.clock = ci.Timestamp
-	}
 	var expired []fragmentKey
 	for k, v := range s.sets {
-		if s.clock.Sub(v.last) > 30*time.Second {
+		// Interfaces, sections and tunnels can have independent capture clocks.
+		// Only this domain's actual timestamp can prove a known lease expired.
+		// Unknown time remains unknown within the existing count/byte bounds.
+		if k.domain == key.domain && !ci.Timestamp.IsZero() && !v.last.IsZero() && ci.Timestamp.Sub(v.last) > 30*time.Second {
 			expired = append(expired, k)
 		}
 	}
@@ -476,9 +477,12 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		delete(s.sets, k)
 		a.fragmentDiagnostic(v, "FragmentTimeout")
 	}
-	if s.clock.Before(s.blockedUntil) {
-		a.networkDiagnostic(e, ci, "limited", "FragmentQuarantineBudget")
-		return nil, true
+	if s.blocked {
+		if key.domain != s.blockedDomain || s.blockedUntil.IsZero() || ci.Timestamp.IsZero() || ci.Timestamp.Before(s.blockedUntil) {
+			a.networkDiagnostic(e, ci, "limited", "FragmentQuarantineBudget")
+			return nil, true
+		}
+		s.blocked, s.blockedDomain, s.blockedUntil = false, CaptureDomain{}, time.Time{}
 	}
 	if v := s.sets[key]; v != nil && v.rejected {
 		return nil, true
@@ -492,12 +496,16 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 		} else {
 			delete(s.sets, key) // An unreserved, empty provisional set owns no bytes.
 			if len(s.sets) < a.budget.MaxCollectionElements && a.reserveEvidence(128) {
-				s.sets[key] = &fragmentSet{last: s.clock, cost: 128, rejected: true}
+				s.sets[key] = &fragmentSet{last: ci.Timestamp, cost: 128, rejected: true}
 			} else {
 				// Without space to remember a rejected ID, fail closed for fragment
 				// admission for one bounded lifetime. Unfragmented traffic and IPv6
 				// atomic fragments remain independent.
-				s.blockedUntil = s.clock.Add(30 * time.Second)
+				s.blocked, s.blockedDomain = true, key.domain
+				s.blockedUntil = time.Time{}
+				if !ci.Timestamp.IsZero() {
+					s.blockedUntil = ci.Timestamp.Add(30 * time.Second)
+				}
 			}
 		}
 		a.networkDiagnostic(e, ci, "malformed", code)
@@ -518,7 +526,7 @@ func (a *binParser) fragment(p gopacket.Packet, e captureEvidence, key fragmentK
 			a.networkDiagnostic(e, ci, "limited", "FragmentSessionBudget")
 			return nil, true
 		}
-		v = &fragmentSet{end: -1, last: s.clock}
+		v = &fragmentSet{end: -1, last: ci.Timestamp}
 		s.sets[key] = v
 	}
 	for _, part := range v.parts {
@@ -757,7 +765,7 @@ func (a *binParser) closeFragments() {
 		a.fragmentDiagnostic(v, "FragmentCaptureEnded")
 	}
 	s.sets = nil
-	s.blockedUntil = time.Time{}
+	s.blocked, s.blockedDomain, s.blockedUntil = false, CaptureDomain{}, time.Time{}
 }
 
 // Diagnostics allocate PDU IDs and compete for bounded history just like
