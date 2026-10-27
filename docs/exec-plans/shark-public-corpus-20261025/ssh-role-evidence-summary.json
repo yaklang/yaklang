@@ -1266,6 +1266,34 @@
         "01-deep-protocol-fields.png": "ee6cce822bb7af613a1250da3e8587a4c9eeb227f0d1f896ab09b60f832f1fa4",
         "05-narrow.png": "78226f6c6f1031bb6f9df70692b4a55a4e86831758285d37e91a153f813a6a46"
       }
+    },
+    {
+      "case": "public-role",
+      "capture_packets": 51328,
+      "PDU": 38760,
+      "physical_frame": 49653,
+      "label": "Negotiation Context: client/server role not observed",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "80a66e9cdb77f068d39a9d331deb663bbbcda6a3039808a81e3d5119adf13a05",
+        "01-protocol-fields.json": "e2e950fc9e51c275e4b41aea7c7719145500c212ebca5dfc2666f2be1a5fbd89",
+        "01-deep-protocol-fields.json": "e2e950fc9e51c275e4b41aea7c7719145500c212ebca5dfc2666f2be1a5fbd89",
+        "02-byte-sources.json": "5cb270f57df7043563c240b237619fd35f429d94d940578fa429c8c5231b48b8",
+        "03-conversation-messages.json": "6969b41e5dbb39951cad37135e4c3686655199d65f92891cc0c8c6dafd5be0e4",
+        "04-association-evidence.json": "09758f00f47d7b67a326633b75d825cc60c560f881dbefb6e2d63d07c902ccce",
+        "05-narrow.json": "2d2ff9c96f5c3f262f611a5b7bbae30ba07970d5872b34665eec0a9a6625aad8",
+        "06-restored.json": "09758f00f47d7b67a326633b75d825cc60c560f881dbefb6e2d63d07c902ccce",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "41fddb5f51729cac20696656e285bc36f6d8b4bd1df650afdb056a6c3dbd94a4",
+        "01-deep-protocol-fields.png": "41fddb5f51729cac20696656e285bc36f6d8b4bd1df650afdb056a6c3dbd94a4",
+        "05-narrow.png": "baa21e5de823ee80cf2897d34bba927113250abde5b5b0f8f03e01c1375fa65f"
+      }
     }
   ],
   "remaining": [
