@@ -64,3 +64,15 @@ func TestLateReassemblyNoticeSurvivesNarrowInfoAndRedraw(t *testing.T) {
 	finalEntry := packetEntry{packet: final}
 	require.NotContains(t, finalEntry.row().Info, "complete in frame #2", "the actual completion frame needs no contributor warning")
 }
+
+func TestRTSPUnsupportedHeaderShowsSpecificIdentityWithoutSuccess(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "rtsp", Profile: "rtsp-extension-semantics-unsupported", Status: "context-required", ExpertCode: string(pcaputil.ErrUnsupportedFeature), Error: "UnsupportedFeature: RTSP method X-AUDIT", Session: map[string]any{"Profile": "extension-semantics-unsupported", "Packet Name": "X-AUDIT", "CSeq": uint32(7), "Control Header Observed": true, "Method Semantics Validated": false}}
+	row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Transport: "tcp"})
+	require.Equal(t, "RTSP", row.Protocol)
+	require.Equal(t, "context-required", row.ProtocolStatus)
+	require.Contains(t, row.ProtocolScope, "semantics unavailable")
+	require.Contains(t, row.Info, "X-AUDIT")
+	require.Contains(t, row.Info, "CSeq=7")
+	e.Profile = "port-hint"
+	require.Equal(t, "TCP", presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Transport: "tcp"}).Protocol)
+}
