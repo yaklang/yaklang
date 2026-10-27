@@ -26,17 +26,20 @@ func (a *binParser) decodeCoAPDatagram(e *ProtocolEvent, wire []byte) bool {
 		if !request {
 			return false
 		}
-		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: e.Timestamp}
+		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
 		a.udpSessions = s
 	}
-	if e.Timestamp.After(s.clock) {
-		s.clock = e.Timestamp
-	}
-	for el := s.lru.Front(); el != nil && s.clock.Sub(el.Value.(*binUDPEntry).touched) >= 10*time.Minute; el = s.lru.Front() {
+	for el := s.lru.Front(); el != nil; {
+		next := el.Next()
 		entry := el.Value.(*binUDPEntry)
-		entry.flow.closeSession()
-		delete(s.entries, entry.key)
-		s.lru.Remove(el)
+		// This store also owns QUIC, DNS, DTLS and other protocols' retained
+		// identities. CoAP expiry cannot erase their keys or refusal history.
+		if entry.flow.coap != nil && entry.key.domain == e.Domain && !e.Timestamp.IsZero() && !entry.touched.IsZero() && e.Timestamp.Sub(entry.touched) >= 10*time.Minute {
+			entry.flow.closeSession()
+			delete(s.entries, entry.key)
+			s.lru.Remove(el)
+		}
+		el = next
 	}
 	el := s.entries[key]
 	if el == nil && !request {
@@ -48,13 +51,15 @@ func (a *binParser) decodeCoAPDatagram(e *ProtocolEvent, wire []byte) bool {
 			err = protocolError(ErrResourceExceeded, "UDP conversation budget")
 		} else {
 			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "coap", coap: &binCoAP{maxPending: a.budget.MaxCollectionElements}, endpoints: [2]string{e.Source, e.Destination}}
-			el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
+			el = s.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 			s.entries[key] = el
 		}
 	}
 	if el != nil {
 		v := el.Value.(*binUDPEntry)
-		v.touched = s.clock
+		if e.Timestamp.After(v.touched) {
+			v.touched = e.Timestamp
+		}
 		s.lru.MoveToBack(el)
 		f := v.flow
 		e.FlowID = f.id
