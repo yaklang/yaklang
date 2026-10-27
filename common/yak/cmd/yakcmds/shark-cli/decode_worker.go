@@ -28,6 +28,7 @@ const decoderInputLimit = 2 << 20
 const decoderOutputLimit = 8 << 20
 
 type decodeRequest struct {
+	ByteFields         []workerByteField    `json:",omitempty"`
 	TransportView      *packetTransportView `json:",omitempty"`
 	TransportHeader    []byte               `json:",omitempty"`
 	ConnectionStack    []string             `json:",omitempty"`
@@ -84,6 +85,13 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	}
 	if len(req.Data) > 262144 {
 		return fmt.Errorf("packet exceeds decoder limit")
+	}
+	events := req.Events
+	if req.Stream != nil {
+		events = req.Stream.Events
+	}
+	if err := restoreWorkerByteFields(events, req.ByteFields); err != nil {
+		return err
 	}
 	var d packetDetail
 	if req.Stream != nil {
@@ -184,6 +192,7 @@ func runIsolated(parent context.Context, request decodeRequest) ([]byte, error) 
 func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 	// JSON escapes and repeated maps are charged as transmitted bytes. Work
 	// on shallow copies: history snapshots still belong to their callers.
+	request.ByteFields = nil // Parent facts are regenerated from actual Go types.
 	var events []*pcaputil.ProtocolEvent
 	if request.Stream != nil {
 		stream := *request.Stream
@@ -208,7 +217,7 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 			remaining -= 5
 			continue
 		}
-		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC encoded byte budget", Error: "Detail unavailable: IPC encoded byte budget", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
+		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC byte/type projection limit", Error: "Detail unavailable: IPC byte/type projection limit", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
 		wire, err := json.Marshal(marker)
 		if err != nil {
 			return nil, err
@@ -227,9 +236,22 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 		if err != nil {
 			return nil, err
 		}
-		delta := len(wire) - markerCosts[i]
+		types, typeErr := eventByteFields(e, i)
+		if typeErr != nil || len(request.ByteFields)+len(types) > workerByteFieldLimit {
+			continue // The explicit IPC-limited marker remains, never untyped success.
+		}
+		typeCost := 0
+		for _, descriptor := range types {
+			encoded, err := json.Marshal(descriptor)
+			if err != nil {
+				return nil, err
+			}
+			typeCost += len(encoded) + 1
+		}
+		delta := len(wire) - markerCosts[i] + typeCost
 		if delta <= remaining {
 			bounded[i] = e
+			request.ByteFields = append(request.ByteFields, types...)
 			remaining -= delta
 		}
 	}

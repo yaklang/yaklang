@@ -2,6 +2,7 @@ package sharkcli
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"errors"
 	"fmt"
 	"sort"
@@ -149,6 +150,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
 	var fieldViewLimited bool
+	var byteSourceLimited bool
+	fieldValueBytes := 0
+	fieldValueSourceCount := 0
+	fieldValueSources := map[struct {
+		name string
+		hash [32]byte
+	}]int{}
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
 		if len(out) >= 4096 || depth > 32 {
@@ -536,6 +544,37 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 					f.source, f.start, f.end, f.hasRange = currentSource, ranges[0], ranges[1], true
 				}
 			}
+			// TLS/QUIC families already have stricter record authentication,
+			// frame-context and exact wire-span source policies above. A generic
+			// type fact must not bypass those policies for an unselected payload.
+			genericValueSource := protocol != "tls" && protocol != "dtls" && protocol != "quic" && protocol != "http3" && protocol != "doq"
+			if data, ok := fieldValueOctets(name, x); ok && len(data) > 0 && !out[len(out)-1].hasRange && genericValueSource {
+				// The native value's type is evidence of octets, not of their
+				// location. Use an owned extracted-value source; never search a
+				// frame for equal bytes and manufacture a captured byte range.
+				key := struct {
+					name string
+					hash [32]byte
+				}{protocol + "\x00" + name, sha256.Sum256(data)}
+				source := fieldValueSources[key]
+				if source > 0 && !bytes.Equal(sources[source-1].Data, data) {
+					source = 0
+				}
+				if source == 0 && fieldValueSourceCount < 256 && len(data) <= (1<<20)-fieldValueBytes {
+					sources = append(sources, detailSource{Name: "Extracted field value · frame offsets unavailable · " + protocolName(protocol) + " " + clipText(name, 96), Data: bytes.Clone(data)})
+					source = len(sources)
+					fieldValueSources[key] = source
+					fieldValueBytes += len(data)
+					fieldValueSourceCount++
+				}
+				f := &out[len(out)-1]
+				if source > 0 {
+					f.source, f.start, f.end, f.hasRange = source, 0, len(data), true
+				} else {
+					byteSourceLimited = true
+					f.text = strings.ReplaceAll(f.text, "select for full bytes", "full byte source unavailable: detail budget")
+				}
+			}
 		}
 	}
 	for _, e := range ordered {
@@ -770,6 +809,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	}
 	if fieldViewLimited {
 		out = append([]field{{text: "Field view limited · retained protocol detail exceeds this view's node/depth budget"}}, out...)
+	}
+	if byteSourceLimited {
+		out = append([]field{{text: "Byte-value source budget reached · some full values unavailable; previews retain their literal bytes"}}, out...)
 	}
 	return out, sources
 }

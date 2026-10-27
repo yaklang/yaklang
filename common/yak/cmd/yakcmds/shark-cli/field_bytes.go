@@ -52,11 +52,10 @@ func fieldOctetList(v any) ([]byte, bool) {
 	return out, true
 }
 
-func formatFieldValue(name string, value any) string {
-	var data []byte
+func fieldValueOctets(name string, value any) ([]byte, bool) {
 	switch v := value.(type) {
 	case []byte:
-		data = v
+		return v, true
 	case string:
 		binary := !utf8.ValidString(v)
 		for _, r := range v {
@@ -67,10 +66,17 @@ func formatFieldValue(name string, value any) string {
 		}
 		lower := strings.ToLower(name)
 		if !binary && lower != "data" && lower != "payload" && !strings.HasSuffix(lower, "protocol data") {
-			return safeText(v)
+			return nil, false
 		}
-		data = []byte(v)
+		return []byte(v), true // Literal string octets, never base64 guessing.
 	default:
+		return nil, false
+	}
+}
+
+func formatFieldValue(name string, value any) string {
+	data, binary := fieldValueOctets(name, value)
+	if !binary {
 		return safeText(fmt.Sprint(value))
 	}
 	preview := data[:min(32, len(data))]
