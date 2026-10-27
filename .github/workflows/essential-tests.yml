@@ -7,21 +7,12 @@ on:
         description: "PR number, branch (e.g. owner:branch for fork), or commit SHA"
         required: false
         default: ""
-      test_scope:
-        description: "Test scope (PR events are detected automatically)"
-        required: true
-        type: choice
-        options:
-          - full
-          - scannode
-        default: full
   pull_request:
     branches: [main]
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
       - "embed/**"
-      - "scannode/**"
       - ".github/workflows/essential-tests.yml"
       - ".github/workflows/essential-cache-warm.yml"
       - ".github/actions/essential-go-cache/**"
@@ -55,7 +46,6 @@ jobs:
       fork_repo: ${{ steps.target.outputs.fork_repo }}
       is_same_repo: ${{ steps.target.outputs.is_same_repo }}
       is_pull_request: ${{ steps.target.outputs.is_pull_request }}
-      test_scope: ${{ steps.scope.outputs.test_scope }}
     steps:
       - name: Determine target revision
         id: target
@@ -179,51 +169,6 @@ jobs:
         if: steps.target.outputs.is_pull_request != 'true' || steps.target.outputs.is_same_repo == 'false'
         run: echo "SHOULD_RUN=true" >> $GITHUB_ENV
 
-      - name: Detect test scope
-        id: scope
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REQUESTED_SCOPE: ${{ inputs.test_scope }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          TEST_SCOPE="full"
-
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TEST_SCOPE="${REQUESTED_SCOPE:-full}"
-          elif [ -n "$PR_NUMBER" ]; then
-            PAGE=1
-            FILE_COUNT=0
-            SCANNODE_ONLY="true"
-
-            while [ "$PAGE" -le 30 ]; do
-              RESPONSE=$(curl -fsSL \
-                -H "Authorization: Bearer $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github+json" \
-                -H "X-GitHub-Api-Version: 2022-11-28" \
-                "https://api.github.com/repos/${{ github.repository }}/pulls/$PR_NUMBER/files?per_page=100&page=$PAGE")
-              PAGE_COUNT=$(echo "$RESPONSE" | jq 'length')
-
-              if ! echo "$RESPONSE" | jq -e 'all(.[]; (.filename | startswith("scannode/")))' >/dev/null; then
-                SCANNODE_ONLY="false"
-              fi
-
-              FILE_COUNT=$((FILE_COUNT + PAGE_COUNT))
-              if [ "$PAGE_COUNT" -lt 100 ]; then
-                break
-              fi
-              PAGE=$((PAGE + 1))
-            done
-
-            # GitHub caps this endpoint at 3,000 files. Fall back to the full
-            # suite when the complete PR scope cannot be proven.
-            if [ "$FILE_COUNT" -gt 0 ] && [ "$FILE_COUNT" -lt 3000 ] && [ "$SCANNODE_ONLY" = "true" ]; then
-              TEST_SCOPE="scannode"
-            fi
-          fi
-
-          echo "test_scope=$TEST_SCOPE" >> "$GITHUB_OUTPUT"
-          echo "Selected test scope: $TEST_SCOPE"
-
       - name: Finalize outputs
         id: finalize
         run: echo "should_run_tests=$SHOULD_RUN" >> $GITHUB_OUTPUT
@@ -237,7 +182,7 @@ jobs:
   prepare-yak:
     timeout-minutes: 30
     needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope == 'full'
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     runs-on: ubuntu-22.04
     outputs:
       yak_artifact_id: ${{ steps.upload_yak.outputs.artifact-id }}
@@ -406,39 +351,10 @@ jobs:
           retention-days: 3
           if-no-files-found: warn
 
-  scannode-focused:
-    name: Test ScanNode Focused
-    needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope == 'scannode'
-    runs-on: ubuntu-22.04
-    timeout-minutes: 20
-    steps:
-      - name: Check out code
-        uses: actions/checkout@v4
-        with:
-          repository: ${{ needs.check-wip.outputs.fork_repo || github.repository }}
-          ref: ${{ needs.check-wip.outputs.target_ref || github.sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Restore toolchain and Go caches
-        id: go_cache
-        uses: ./.github/actions/essential-go-cache
-
-      - name: Test ScanNode packages
-        run: |
-          go test -count=1 -timeout 10s ./common/dockerhttp ./common/thirdpartyservices
-          go test -count=1 -timeout 10m ./scannode/...
-
-      - name: Test Legion Node entrypoint
-        run: go test -count=1 -timeout 10m ./cmd/legion-smoke-node
-
-      - name: Vet ScanNode and Legion Node
-        run: go vet ./scannode/... ./cmd/legion-smoke-node
-
   embedded-resources:
     # Resource checks do not need the prepared engine or its large cache artifact.
     needs: check-wip
-    if: needs.check-wip.outputs.should_run_tests == 'true' && needs.check-wip.outputs.test_scope != 'scannode'
+    if: needs.check-wip.outputs.should_run_tests == 'true'
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -681,7 +597,8 @@ jobs:
                 {"package": "./common/netx/mustpass", "timeout": "20s"},
                 {"package": "./common/authhack/...", "timeout": "1m"},
                 {"package": "./common/vulinboxagentclient", "timeout": "1m", "run": "TestMUSTPASS_Ping"},
-                {"package": "./scannode/...", "timeout": "30s"}
+                {"package": "./common/yak/distyak", "timeout": "60s"},
+                {"package": "./common/yak/cmd/yakcmds", "timeout": "60s", "run": "^TestRetiredNodeCommand$"}
               ]
 
           # Pure utilities can build/run concurrently without competing with the
@@ -1305,7 +1222,6 @@ jobs:
     timeout-minutes: 10
     needs:
       - check-wip
-      - scannode-focused
       - slim-gate
       - embedded-resources
       - ipc-smoke
@@ -1322,8 +1238,6 @@ jobs:
       - name: Verify selected test scope
         env:
           SHOULD_RUN_TESTS: ${{ needs.check-wip.outputs.should_run_tests }}
-          TEST_SCOPE: ${{ needs.check-wip.outputs.test_scope }}
-          SCANNODE_RESULT: ${{ needs.scannode-focused.result }}
           SLIM_RESULT: ${{ needs.slim-gate.result }}
           RESOURCES_RESULT: ${{ needs.embedded-resources.result }}
           IPC_RESULT: ${{ needs.ipc-smoke.result }}
@@ -1334,15 +1248,6 @@ jobs:
         run: |
           if [ "$SHOULD_RUN_TESTS" != "true" ]; then
             echo "Tests were intentionally disabled by the pre-check."
-            exit 0
-          fi
-
-          if [ "$TEST_SCOPE" = "scannode" ]; then
-            if [ "$SCANNODE_RESULT" != "success" ]; then
-              echo "ScanNode focused tests did not pass: $SCANNODE_RESULT" >&2
-              exit 1
-            fi
-            echo "ScanNode focused test scope passed."
             exit 0
           fi
 

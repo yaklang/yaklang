@@ -12,12 +12,9 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
@@ -39,17 +36,15 @@ import (
 	"github.com/yaklang/yaklang/common/cybertunnel/tpb"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/mutate"
-	"github.com/yaklang/yaklang/common/node"
-	"github.com/yaklang/yaklang/common/spec"
 	"github.com/yaklang/yaklang/common/urfavecli"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/omap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/dap"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak/yakfmt"
+	"github.com/yaklang/yaklang/common/yak/distyak"
 	"github.com/yaklang/yaklang/common/yak/yaklib"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
-	"github.com/yaklang/yaklang/scannode"
 )
 
 type embedHashConfig struct {
@@ -958,97 +953,13 @@ const %s string = %q
 }
 
 var DistributionCommands = []*cli.Command{
-	&scannode.DistYakCommand,
+	&distyak.DistYakCommand,
 	{
-		Name:   "node",
-		Usage:  "join legion platform, bootstrap node session over HTTP, and consume job commands over NATS",
-		Before: nil,
-		After:  nil,
+		Name:            "node",
+		Usage:           "retired: use the Legion-owned yaklang-node executable",
+		SkipFlagParsing: true,
 		Action: func(c *cli.Context) error {
-			maxRunningJobs, err := nodeMaxRunningJobsFromInt(c.Int("max-running-jobs"))
-			if err != nil {
-				return err
-			}
-			scanNode, err := scannode.NewScanNode(node.BaseConfig{
-				NodeType:            spec.NodeType_Scanner,
-				NodeID:              c.String("id"),
-				DisplayName:         c.String("name"),
-				AgentInstallationID: c.String("agent-installation-id"),
-				BaseDir:             c.String("base-dir"),
-				EnrollmentToken:     c.String("enrollment-token"),
-				PlatformAPIBaseURL:  c.String("api-url"),
-				Version:             c.String("version"),
-				MaxRunningJobs:      maxRunningJobs,
-				HeartbeatInterval:   c.Duration("heartbeat-interval"),
-			}, scannode.WithRuleSnapshotCacheDir(c.String("rule-snapshot-cache-dir")))
-			if err != nil {
-				return err
-			}
-
-			ctx, stop := signal.NotifyContext(
-				context.Background(),
-				syscall.SIGINT,
-				syscall.SIGTERM,
-			)
-			defer stop()
-
-			done := make(chan struct{})
-			go func() {
-				defer close(done)
-				scanNode.Run()
-			}()
-
-			<-ctx.Done()
-			scanNode.Shutdown()
-			<-done
-			return nil
-		},
-		Flags: []cli.Flag{
-			cli.StringFlag{
-				Name:  "api-url",
-				Usage: "Legion platform HTTP API base URL",
-				Value: "http://127.0.0.1:8080",
-			},
-			cli.StringFlag{
-				Name:  "enrollment-token",
-				Usage: "Legion node enrollment token",
-			},
-			cli.StringFlag{
-				Name:  "id",
-				Usage: "Legacy node ID fallback; canonical node_id is assigned by platform",
-			},
-			cli.StringFlag{
-				Name:  "name",
-				Usage: "Display name reported to Legion",
-				Value: fmt.Sprintf("scannode-[%s]", runtime.GOOS+runtime.GOARCH),
-			},
-			cli.StringFlag{
-				Name:  "agent-installation-id",
-				Usage: "Override persisted agent installation ID",
-			},
-			cli.StringFlag{
-				Name:  "base-dir",
-				Usage: "Node local state base directory",
-			},
-			cli.StringFlag{
-				Name:  "rule-snapshot-cache-dir",
-				Usage: "Immutable rule snapshot bundle cache directory",
-			},
-			cli.StringFlag{
-				Name:  "version",
-				Usage: "Node version reported to Legion",
-				Value: "dev",
-			},
-			cli.IntFlag{
-				Name:  "max-running-jobs",
-				Usage: "Maximum concurrent jobs reported in heartbeat",
-				Value: 1,
-			},
-			cli.DurationFlag{
-				Name:  "heartbeat-interval",
-				Usage: "Interval between node heartbeats",
-				Value: 30 * time.Second,
-			},
+			return cli.NewExitError("yak node has moved to Legion; use the Legion-distributed yaklang-node executable. Existing node identity and state must be preserved during migration.", 1)
 		},
 	},
 	{
@@ -1139,16 +1050,6 @@ var DistributionCommands = []*cli.Command{
 			return nil
 		},
 	},
-}
-
-func nodeMaxRunningJobsFromInt(value int) (uint32, error) {
-	if value < 0 {
-		return 0, fmt.Errorf("max-running-jobs must be zero or a positive integer")
-	}
-	if uint64(value) > uint64(^uint32(0)) {
-		return 0, fmt.Errorf("max-running-jobs exceeds uint32 range")
-	}
-	return uint32(value), nil
 }
 
 var XPathCommand = &cli.Command{

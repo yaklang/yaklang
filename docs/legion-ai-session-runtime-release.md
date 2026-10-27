@@ -1,3 +1,7 @@
+> Historical Legion Node documentation. Current adapter, build and release ownership
+> is in Legion `services/node`. See [source retirement](legion-node-session-transport-refactor.md).
+> Commands below refer to an exact historical Yaklang checkout, not current main.
+
 # AI Session Runtime in the Unified Yaklang Release
 
 The AI Session Runtime is the containerized `legion-smoke-node` execution form
