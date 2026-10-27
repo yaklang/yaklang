@@ -1,6 +1,9 @@
 package sharkcli
 
-import "math"
+import (
+	"encoding/json"
+	"math"
+)
 
 // Range metadata can arrive directly from a native decoder or through worker
 // JSON. Keep the same exact nonnegative integer contract in both cases.
@@ -11,6 +14,10 @@ func detailRangeOffset(value any) (int, bool) {
 	case int64:
 		n := int(v)
 		return n, n >= 0 && int64(n) == v
+	case json.Number:
+		value, err := v.Int64()
+		n := int(value)
+		return n, err == nil && n >= 0 && int64(n) == value
 	case uint8:
 		return int(v), true
 	case uint16:
