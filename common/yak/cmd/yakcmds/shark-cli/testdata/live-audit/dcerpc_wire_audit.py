@@ -126,7 +126,7 @@ def records(capture):
     assert at==len(wire)
 
 
-def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
+def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False):
     checks=0
     def check(ok,why):
         nonlocal checks
@@ -171,7 +171,7 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
         # they cannot retroactively establish a previously unobserved prefix.
         base=state['syns'][0]if state['syns']else anchor
         check(all(v==base for v in state['syns']),'no TCP generation conflation')
-        cells={};owners={};before_origin=[]
+        cells={};owners={};before_origin=[];delivered=0;deliveries=[]
         for seq,data,no in state['packets']:
             start=((seq-base+(1<<31))&0xffffffff)-(1<<31)
             if start<0:
@@ -181,9 +181,12 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
             for at,byte in enumerate(data,start):
                 check(at not in cells or cells[at]==byte,'no conflicting selected TCP overlaps')
                 cells[at]=byte;owners.setdefault(at,no)
+            previous_delivery=delivered
+            while delivered in cells:delivered+=1
+            if delivered>previous_delivery:deliveries.append((delivered,no))
         contiguous=0
         while contiguous in cells:contiguous+=1
-        state.update(cells=cells,owners=owners,contiguous=contiguous,before_origin=before_origin,captured_SYN=bool(state['syns']))
+        state.update(cells=cells,owners=owners,contiguous=contiguous,prefix_deliveries=deliveries,before_origin=before_origin,captured_SYN=bool(state['syns']))
     reference_views=collections.defaultdict(list);outside=[];aggregate_reference_limits=[]
     for row in json.loads(oracle.read_text(encoding='utf-8-sig')):
         layers=row['_source']['layers'];no=int(layers['frame']['frame.number'])
@@ -200,17 +203,19 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
             aggregate_reference_limits.append(dict(frame=no,raw_views=len(raw),reason='reference fields are aggregated without a unique per-PDU tree'))
             paired=[]
         for span,view in paired:reference_views[no].append((bytes.fromhex(span[0]),view))
-    compared=[];closures=[];tails=[];reference_fields=collections.Counter();reference_limits=[];used_views=set();status=collections.Counter();receipt_matches=[];adjudications=[];complete_clear_trees=0;reference_field_limits=[];proposals={};association_checks=0
+    compared=[];closures=[];prefixes=[];tails=[];reference_fields=collections.Counter();reference_limits=[];used_views=set();status=collections.Counter();receipt_matches=[];adjudications=[];complete_clear_trees=0;reference_field_limits=[];proposals={};association_checks=0;pdu_deliveries={}
     for e in native:
         status[e['status']]+=1
         if not e.get('raw'):
             check(e['status']in ['incomplete','context-required'],'empty event is an explicit diagnostic');closures.append(e['id']);continue
-        raw=base64.b64decode(e['raw'],validate=True);state=streams[direction(e)];start=state['cursor'];end=start+len(raw)
+        raw=base64.b64decode(e['raw'],validate=True);state=streams[direction(e)];start=state['cursor'];wire_start=start;end=start+len(raw)
         snapshot=e['field_values'];eq(snapshot['pdu'],e['id'],'typed field snapshot belongs to this PDU')
         identity_fields=[v for v in snapshot['values']if v['name']=='pdu.id']
         eq(len(identity_fields),1,'one typed PDU identity');eq(identity_fields[0]['value'],e['id'],'typed identity literal value');eq(identity_fields[0]['exact_value'],str(e['id']),'typed identity exact decimal')
         check(end<=state['contiguous'],('no native bytes cross a captured TCP hole',e['id'],start,end,state['contiguous']))
         eq(bytes(state['cells'][i]for i in range(start,end)).hex(),raw.hex(),'complete PDU bytes equal independent captured TCP bytes')
+        delivery=next(frame for prefix,frame in state['prefix_deliveries']if prefix>=end)
+        pdu_deliveries[e['id']]=delivery
         state['cursor']=end;source=e['source_bytes'];owners=sorted({state['owners'][i]for i in range(start,end)})
         eq(source['SHA256'],sha(raw),'literal source raw SHA')
         eq(sorted(r['Number']for r in source['PacketRefs']),owners,'complete original contributor frames')
@@ -218,6 +223,12 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
             eq(ref['Domain'],e['domain'],'native contributor domain');eq(physical[ref['Number']]['domain'],e['domain'],'original VLAN/interface/section domain')
         if source.get('CompletedIn'):
             eq(source['CompletedIn']['Number'],max(owners),'actual last byte-arrival frame');eq(source['CompletedIn']['Domain'],e['domain'],'completion domain')
+        if e['status']=='incomplete'and not e.get('entry'):
+            check(bool(e.get('fields_error'))and not e.get('fields')and not e.get('session'),'captured prefix remains an explicit field-query refusal')
+            check(raw[:min(2,len(raw))]==b'\x05\0'[:min(2,len(raw))],'captured incomplete RPC prefix is not an unrelated message')
+            check(len(raw)<16 or int.from_bytes(raw[8:10],'little')>len(raw),'incomplete prefix cannot contain a whole declared RPC PDU')
+            eq(e['response_to'],0,'an incomplete prefix has no fabricated request link')
+            prefixes.append(dict(PDU=e['id'],physical_frames=owners,captured_bytes=len(raw),raw_sha256=sha(raw)));continue
         check(len(raw)>=16 and raw[:2]==b'\x05\0'and raw[4:8]==b'\x10\0\0\0','selected connection-oriented little-endian header')
         size,auth,call=struct.unpack_from('<HHI',raw,8)
         if size!=len(raw):
@@ -332,7 +343,10 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
                     proposals.pop((connection(e),call));association_checks+=1
             elif raw[2]==0 and raw[3]&0x80:
                 eq(s['Object UUID'],b64(raw[24:40]),'native object UUID is separate from the stub');eq(s['Stub Bytes'],len(raw)-40,'exact stub length after object identity');eq(s['Wire Field Ranges']['Object UUID'],[24,40],'object identity owns its actual PDU interval')
-        candidates=[(no,index,view)for no in owners for index,(span,view)in enumerate(reference_views[no])if len(span)>=16 and raw.startswith(span)]
+        # TCP can deliver several cached PDUs when an earlier hole is filled.
+        # Wireshark's request_in names that delivery frame; byte contributors
+        # still keep their exact original frames and are never rewritten.
+        candidates=[(no,index,view)for no in sorted(set(owners)|{delivery})for index,(span,view)in enumerate(reference_views[no])if len(span)>=16 and raw.startswith(span)]
         if candidates:
             no,index,view=max(candidates,key=lambda item:len(reference_views[item[0]][item[1]][0]));used_views.add((no,index))
             for key,value in required.items():
@@ -349,7 +363,7 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
                 eq(values,expected,'ordered literal reference body fields '+key)
                 reference_fields[key]+=len(expected)
         else:reference_limits.append(dict(PDU=e['id'],physical_frames=owners,reason='no exact complete/prefix raw-view attribution; independent full wire bytes still checked'))
-        compared.append(dict(PDU=e['id'],protocol=e['protocol'],status=e['status'],physical_frames=owners,raw_sha256=sha(raw),auth_bytes=auth))
+        compared.append(dict(PDU=e['id'],protocol=e['protocol'],status=e['status'],physical_frames=owners,stream_offset=wire_start,stream_prefix_delivery_frame=delivery,raw_sha256=sha(raw),auth_bytes=auth))
     if receipts:
         for r in json.loads(receipts.read_text(encoding='utf-8-sig')):
             raw=base64.b64decode(r['wire_base64'],validate=True);eq(sha(raw),r['sha256'],'endpoint receipt digest')
@@ -367,19 +381,29 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
             if size<16 or at+size>available:break
             data=bytes(state['cells'][i]for i in range(at,at+size))
             unexported.append(dict(**state['meta'],start=at,length=size,raw_sha256=sha(data)));at+=size
-        details.append(dict(**state['meta'],native_consumed_bytes=state['cursor'],captured_contiguous_bytes=available,remaining_captured_bytes=available-state['cursor'],captured_SYN=state.get('captured_SYN',False),later_pre_origin_segments=state.get('before_origin',[])))
-    return dict(scope=__doc__,require_scoped_field_ranges=require_scoped_ranges,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
+        holes=[];previous=0
+        for offset in sorted(state['cells']):
+            if offset>previous:holes.append([previous,offset])
+            previous=offset+1
+        details.append(dict(**state['meta'],native_consumed_bytes=state['cursor'],captured_contiguous_bytes=available,remaining_captured_bytes=available-state['cursor'],captured_sequence_bytes=len(state['cells']),captured_sequence_holes=holes,bytes_captured_beyond_first_hole=len(state['cells'])-available,captured_SYN=state.get('captured_SYN',False),later_pre_origin_segments=state.get('before_origin',[])))
+    numeric_links=None
+    if require_call_links:
+        from dcerpc_call_links import audit_call_links
+        numeric_links=audit_call_links(native,reference_views,pdu_deliveries)
+    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])
+    audit_sources={name:sha((Path(__file__).parent/name).read_bytes())for name in sources}
+    return dict(scope=__doc__,audit_sources_sha256=audit_sources,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
                 compared_PDUs=compared,status_counts=dict(status),complete_clear_field_trees_checked=complete_clear_trees,matched_bind_or_alter_associations_checked=association_checks,reference_field_counts=dict(reference_fields),reference_layout_limits=reference_limits,reference_field_limits=reference_field_limits,
                 outside_selected_reference_frames=outside,aggregate_reference_limits=aggregate_reference_limits,unused_selected_reference_views=[dict(frame=no,view=index)for no,values in reference_views.items()for index,_ in enumerate(values)if(no,index)not in used_views],
-                closure_diagnostics=closures,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
+                closure_diagnostics=closures,incomplete_captured_prefix_diagnostics=prefixes,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
 
 
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ['capture','events','oracle','out']:ap.add_argument('--'+name,type=Path,required=True)
-    ap.add_argument('--receipts',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');a=ap.parse_args()
+    ap.add_argument('--receipts',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');a=ap.parse_args()
     for p in vars(a).values():
         if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges)
+    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links)
     a.out.write_text(json.dumps(proof,indent=2)+'\n',encoding='utf8')
     print(json.dumps(dict(checks=proof['checks'],physical_frames=proof['physical_frames'],native_PDUs=len(proof['compared_PDUs']),statuses=proof['status_counts'],reference_fields=sum(proof['reference_field_counts'].values()),unexported_complete_PDUs=len(proof['unexported_complete_wire_PDUs']))))

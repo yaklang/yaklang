@@ -14,12 +14,24 @@ from mail_rtsp_export_invariants import canonical,rows,sha
 
 ap=argparse.ArgumentParser(description=__doc__)
 for name in ['before','after','sdk','certificate','wire-certificate','out-dir']:ap.add_argument('--'+name,type=Path,required=True)
+ap.add_argument('--publication-certificate',type=Path)
 a=ap.parse_args()
-for p in vars(a).values():assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
+for p in vars(a).values():
+    if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
 certificate=json.loads(a.certificate.read_text(encoding='utf8'));wire=json.loads(a.wire_certificate.read_text(encoding='utf8'))
 assert certificate['before_sha256']==sha(a.before)and certificate['after_sha256']==sha(a.after)and certificate['SDK_sha256']==sha(a.sdk)
 assert certificate['wire_certificate_sha256']==sha(a.wire_certificate)and wire['events_sha256']==sha(a.sdk)
+publications_proven=False
+if certificate.get('publication_certificate_sha256'):
+    assert a.publication_certificate and certificate['publication_certificate_sha256']==sha(a.publication_certificate)
+    publications=json.loads(a.publication_certificate.read_text(encoding='utf8'))
+    assert publications['after_sha256']==sha(a.after)and publications['SDK_sha256']==sha(a.sdk)
+    publications_proven=True
 refs=References(a.before,a.after)
+sdk_to_cli={0:0}
+for cli_id,binding in certificate['selected_SDK_bindings'].items():
+    assert binding['SDK_PDU']not in sdk_to_cli
+    sdk_to_cli[binding['SDK_PDU']]=int(cli_id)
 native={native_identity(e):e for e in rows(a.sdk)if e['protocol']=='dcerpc'and e.get('raw')}
 targets={change['frame']for change in certificate['changed_RPC_scope_rows']}
 inside=next(r for r in rows(a.after)if r['number']in targets and any(p['protocol']=='dcerpc'and p['byte_source'].get('SHA256')for p in r.get('pdus')or[]))
@@ -28,9 +40,9 @@ outside=next(r for r in rows(a.after)if physical_tuple(r)not in tuples and r.get
 chosen={inside['number'],outside['number']}
 before={r['number']:r for r in rows(a.before)if r['number']in chosen}
 after={r['number']:r for r in[inside,outside]}
-for no in chosen:compare_row(before[no],after[no],refs,tuples)
+for no in chosen:compare_row(before[no],after[no],refs,tuples,publications_proven)
 selected=next(p for p in inside['pdus']if p['protocol']=='dcerpc'and identity(p)in native)
-e=native[identity(selected)];selected_projection(selected,e)
+e=native[identity(selected)];selected_projection(selected,e,sdk_to_cli)
 a.out_dir.mkdir(exist_ok=False)
 rejected=[]
 row_controls=[
@@ -46,11 +58,12 @@ row_controls=[
 for name,no,mutate in row_controls:
     changed=copy.deepcopy(after[no]);mutate(changed)
     (a.out_dir/(name+'.json')).write_text(json.dumps(changed,indent=2)+'\n',encoding='utf8')
-    try:compare_row(before[no],changed,refs,tuples)
+    try:compare_row(before[no],changed,refs,tuples,publications_proven)
     except (AssertionError,KeyError,TypeError,ValueError,IndexError)as exc:rejected.append(dict(name=name,frame=no,rejection=str(exc)))
     else:raise AssertionError('CLI row negative accepted: '+name)
 selected_controls=[
     ('selected-status',lambda p:p.__setitem__('status','unrecognized')),
+    ('selected-completeness',lambda p:p.__setitem__('completeness','invented full semantics')),
     ('selected-response',lambda p:p.__setitem__('response_to',999)),
     ('selected-source-SHA',lambda p:p['byte_source'].__setitem__('SHA256','0'*64)),
     ('selected-source-contributors',lambda p:p['byte_source'].__setitem__('PacketRefs',[])),
@@ -61,7 +74,7 @@ selected_controls=[
 for name,mutate in selected_controls:
     changed=copy.deepcopy(selected);mutate(changed)
     (a.out_dir/(name+'.json')).write_text(json.dumps(changed,indent=2)+'\n',encoding='utf8')
-    try:selected_projection(changed,e)
+    try:selected_projection(changed,e,sdk_to_cli)
     except (AssertionError,KeyError,TypeError,ValueError,IndexError)as exc:rejected.append(dict(name=name,CLI_PDU=selected['id'],SDK_PDU=e['id'],rejection=str(exc)))
     else:raise AssertionError('CLI PDU negative accepted: '+name)
 proof=dict(scope=__doc__,full_CLI_certificate_sha256=sha(a.certificate),wire_certificate_sha256=sha(a.wire_certificate),full_before_sha256=sha(a.before),full_after_sha256=sha(a.after),SDK_sha256=sha(a.sdk),selected_physical_rows=sorted(chosen),full_nonselected_PDU_mapping=refs.nonselected,negative_controls_rejected=len(rejected),rejected=rejected)
