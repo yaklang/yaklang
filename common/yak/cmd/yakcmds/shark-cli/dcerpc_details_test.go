@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -35,13 +36,17 @@ func TestDCERPCOrderedResultsLeadDetailsAndOwnDistinctRanges(t *testing.T) {
 	require.Equal(t, "decoded", e.Status, e.Error)
 	_, err = e.GetFields()
 	require.NoError(t, err)
-	for _, ipc := range []bool{false, true} {
+	for mode := 0; mode < 3; mode++ {
 		current := e
-		if ipc {
+		if mode > 0 {
 			encoded, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: []*pcaputil.ProtocolEvent{e}})
 			require.NoError(t, err)
 			var request decodeRequest
-			require.NoError(t, json.Unmarshal(encoded, &request))
+			decoder := json.NewDecoder(bytes.NewReader(encoded))
+			if mode == 2 {
+				decoder.UseNumber()
+			}
+			require.NoError(t, decoder.Decode(&request))
 			require.NoError(t, restoreWorkerByteFields(request.Events, request.ByteFields))
 			current = request.Events[0]
 		}
@@ -76,12 +81,30 @@ func TestDCERPCOrderedResultsLeadDetailsAndOwnDistinctRanges(t *testing.T) {
 		require.Contains(t, text, "Reason: 0x0003 (observed feature bits)")
 		require.Contains(t, text, "Association Status: missing-request")
 	}
+	encoded, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: []*pcaputil.ProtocolEvent{e}})
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, runDecodeWorker(bytes.NewReader(encoded), &output))
+	decoded, err := decodeWorkerOutput(output.Bytes(), &capturedPacket{number: 1})
+	require.NoError(t, err)
+	selected := 0
+	for _, field := range decoded.fields {
+		if strings.HasPrefix(field.text, "Transfer Syntax: ") && selected < 3 {
+			start := 40 + 24*selected
+			require.True(t, field.hasRange)
+			require.Equal(t, []int{start, start + 16}, []int{field.start, field.end})
+			require.Equal(t, wire, decoded.sources[field.source-1].Data)
+			selected++
+		}
+	}
+	require.Equal(t, 3, selected, "the production worker decoder must retain all scoped occurrences")
 }
 
 func TestDetailWireRangesKeepExactTypesAndRejectInvalidCoordinates(t *testing.T) {
 	values := map[string]any{"a": []uint64{64, 80}, "b": []int{0, 0}, "c": []any{float64(0), float64(8)}, "d": []any{uint16(1), uint32(3)}}
 	require.Equal(t, map[string][]int{"a": {64, 80}, "b": {0, 0}, "c": {0, 8}, "d": {1, 3}}, detailWireRanges(values))
-	for _, span := range []any{[]int{-1, 3}, []int{3, 1}, []int{0}, []any{0.5, 3.0}, []any{math.NaN(), 3.0}, []any{0.0, math.Inf(1)}, []any{0.0, math.MaxFloat64}, []any{uint64(0), ^uint64(0)}, []any{"0", "3"}, []any{false, true}} {
+	require.Equal(t, map[string][]int{"a": {64, 80}}, detailWireRanges(map[string]any{"a": []any{json.Number("64"), json.Number("80")}}))
+	for _, span := range []any{[]int{-1, 3}, []int{3, 1}, []int{0}, []any{0.5, 3.0}, []any{math.NaN(), 3.0}, []any{0.0, math.Inf(1)}, []any{0.0, math.MaxFloat64}, []any{uint64(0), ^uint64(0)}, []any{"0", "3"}, []any{false, true}, []any{json.Number("0.5"), json.Number("3")}, []any{json.Number("0"), json.Number("18446744073709551615")}} {
 		require.Empty(t, detailWireRanges(map[string]any{"bad": span}))
 	}
 	original := map[string][]int{"a": {1, 3}}
