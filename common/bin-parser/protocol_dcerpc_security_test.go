@@ -79,3 +79,27 @@ func TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t *testing.T
 	protocolCorpusRequireValue(t, root, "Authentication Token", wire[64:])
 	require.Nil(t, protocolCorpusFindNode(root, "BindAck"))
 }
+
+func requireP0DCERPCWireEnvelopeScope(t *testing.T) {
+	t.Helper()
+	TestDCERPCSecurityRuleWireBoundariesAndOpaqueBody(t)
+	TestDCERPCSecurityRuleDoesNotAssumeCommonHeaderAlignmentOrigin(t)
+	catalog, roadmap := false, false
+	for _, entry := range ProtocolCatalog {
+		if entry.Name == "DCE/RPC" {
+			catalog = true
+			require.Equal(t, statusPartial, entry.Status)
+			require.Contains(t, entry.Notes, "opaque")
+			require.Contains(t, entry.Notes, "not validated")
+		}
+	}
+	for _, entry := range ProtocolRoadmap {
+		if entry.Name == "DCE/RPC" {
+			roadmap = true
+			require.Equal(t, stPartial, entry.Status)
+			require.Equal(t, priP0, entry.Priority)
+		}
+	}
+	require.True(t, catalog)
+	require.True(t, roadmap)
+}
