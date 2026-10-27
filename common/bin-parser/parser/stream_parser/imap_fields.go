@@ -526,7 +526,7 @@ func (r *imapFieldsReader) command() map[string]any {
 		}
 	}
 	switch name {
-	case "CAPABILITY", "NOOP", "LOGOUT", "STARTTLS", "CHECK", "CLOSE", "EXPUNGE":
+	case "CAPABILITY", "NOOP", "LOGOUT", "STARTTLS", "CHECK", "CLOSE", "EXPUNGE", "NAMESPACE", "IDLE":
 	case "LOGIN":
 		r.sp()
 		r.stringValue("User Name", "astring")
@@ -613,6 +613,14 @@ func (r *imapFieldsReader) response() map[string]any {
 			r.statusText(info)
 		case "CAPABILITY":
 			info["Capabilities"] = r.capabilities('\r')
+		case "NAMESPACE":
+			if tag != "*" {
+				r.fail("NAMESPACE response must be untagged")
+			}
+			for _, group := range []string{"Personal Namespaces", "Other Users Namespaces", "Shared Namespaces"} {
+				r.sp()
+				info[group] = r.namespaceGroup(group)
+			}
 		case "FLAGS":
 			r.sp()
 			info["Flags"] = r.flags("mailbox-state")
