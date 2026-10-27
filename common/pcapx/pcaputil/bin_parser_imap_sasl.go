@@ -46,6 +46,15 @@ func (s *binIMAP) needsNativeSASL(dir int, raw []byte) bool {
 		return true
 	}
 	f := bytes.Fields(raw)
+	if owner := s.idle; owner != nil && (dir == owner.client || bytes.HasPrefix(raw, []byte("+")) || len(f) > 0 && string(f[0]) == owner.tag) {
+		return true
+	}
+	if len(f) >= 2 && (bytes.EqualFold(f[1], []byte("NAMESPACE")) || bytes.EqualFold(f[1], []byte("IDLE"))) {
+		return true
+	}
+	if len(f) > 0 && s.namespaces[string(f[0])] != nil {
+		return true
+	}
 	if a := s.sasl; a != nil && (dir == a.client || bytes.HasPrefix(raw, []byte("+")) || len(f) > 0 && string(f[0]) == a.tag) {
 		return true
 	}
@@ -147,7 +156,7 @@ func (s *binIMAP) consumeSASL(dir int, raw []byte, fields []string) (map[string]
 		return s.saslRefusal("invalid-command", "expected tag AUTHENTICATE mechanism and optional initial value")
 	}
 	for _, b := range []byte(words[0]) {
-		if b <= 32 || b >= 127 || strings.ContainsRune("(){%*\"\\]+", rune(b)) {
+		if b <= 32 || b >= 127 || strings.ContainsRune("(){%*\"\\+", rune(b)) {
 			return s.saslRefusal("invalid-command", "invalid authentication tag")
 		}
 	}
@@ -194,18 +203,83 @@ func (s *binIMAP) consumeSASL(dir int, raw []byte, fields []string) (map[string]
 func (f *binFlow) consumeIMAP(dir int, e *ProtocolEvent) error {
 	s := f.imap
 	before := s.sasl
+	beforeIdle := s.idle
+	words := bytes.Fields(e.Raw)
+	var beforeNamespace *imapNamespaceRequest
+	if len(words) > 0 {
+		beforeNamespace = s.namespaces[string(words[0])]
+	}
 	e.nativeIMAPObservation = true
 	if e.ID == 0 {
 		e.ID = f.a.ids.Add(1)
 	}
-	if before == nil && f.tcpClientKnown && dir != f.tcpClientDir && s.needsNativeSASL(dir, e.Raw) {
+	if before == nil && f.tcpClientKnown && dir != f.tcpClientDir && len(words) >= 2 && bytes.EqualFold(words[1], []byte("AUTHENTICATE")) {
 		e.Session, _, _ = s.saslRefusal("invalid-command", "AUTHENTICATE came from the observed TCP server")
 		e.nativeSessionMessage = true
 		e.semanticSession = cloneSession(e.Session)
 		return protocolError(ErrMalformedMessage, "IMAP SASL AUTHENTICATE came from the observed TCP server")
 	}
+	if f.tcpClientKnown && len(words) >= 2 && (bytes.EqualFold(words[1], []byte("NAMESPACE")) || bytes.EqualFold(words[1], []byte("IDLE"))) {
+		response := bytes.Equal(words[0], []byte("*"))
+		if response && dir == f.tcpClientDir || !response && dir != f.tcpClientDir {
+			out, _, err := imapExtensionError("imap-extension-observed", "extension command/response contradicts observed TCP role")
+			e.Session = out
+			e.nativeSessionMessage = true
+			e.semanticSession = cloneSession(e.Session)
+			return err
+		}
+	}
 	var err error
 	e.Session, err = s.consume(dir, e.Raw)
+	if e.Session != nil && (e.Session["Profile"] == "imap-namespace-observed" || e.Session["Profile"] == "imap-idle-observed") {
+		e.nativeSessionMessage = true
+		e.Profile, _ = e.Session["Profile"].(string)
+		if err == nil {
+			if e.Session["Profile"] == "imap-idle-observed" {
+				owner := beforeIdle
+				if owner == nil {
+					owner = s.idle
+				}
+				if owner != nil {
+					switch e.Session["IDLE Stage"] {
+					case "command":
+						owner.commandID = e.ID
+					case "continuation":
+						e.ResponseTo, owner.continuationID = owner.commandID, e.ID
+					case "done":
+						e.ResponseTo = owner.continuationID
+					case "result":
+						e.ResponseTo = owner.commandID
+					}
+					e.TransactionID = owner.commandID
+				}
+			} else {
+				switch e.Session["Namespace Stage"] {
+				case "command":
+					s.namespaces[string(words[0])].id = e.ID
+					e.TransactionID = e.ID
+				case "result":
+					if beforeNamespace != nil {
+						e.ResponseTo, e.TransactionID = beforeNamespace.id, beforeNamespace.id
+					}
+				case "response":
+					var candidates []*imapNamespaceRequest
+					for _, r := range s.namespaces {
+						if r.client != dir {
+							candidates = append(candidates, r)
+						}
+					}
+					e.Session["Association"] = "request-not-observed"
+					if len(candidates) == 1 {
+						e.ResponseTo, e.TransactionID = candidates[0].id, candidates[0].id
+						e.Session["Association"] = "one-outstanding-opposite-direction-namespace"
+					} else if len(candidates) > 1 {
+						e.Session["Association"] = "ambiguous-outstanding-namespace"
+					}
+				}
+			}
+		}
+	}
 	if e.Session != nil && e.Session["Profile"] == "imap-sasl-observed" {
 		e.nativeSessionMessage = true
 		e.Profile = "imap-sasl-observed"

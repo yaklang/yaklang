@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **618** 项：限定范围 `done` **203**，`partial` **23**，`todo` **392**。目录共 **506** 个入口：`stable` **15**，`partial` **321**，`new` **170**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **621** 项：限定范围 `done` **202**，`partial` **27**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **324**，`new` **170**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -51,9 +51,13 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P0 | QUIC | partial | [partial / ](rules/application-layer/quic.yaml) |
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
+| P1 | IMAP SASL Challenge | partial | [partial / IMAPSASLChallenge](rules/application-layer/imap_sasl.yaml) |
+| P1 | IMAP SASL Initial Value | partial | [partial / IMAPSASLInitialValue](rules/application-layer/imap_sasl.yaml) |
+| P1 | IMAP SASL Response | partial | [partial / IMAPSASLResponse](rules/application-layer/imap_sasl.yaml) |
 | P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
 | P1 | RSTP | partial | [partial / STPFields](rules/stp.yaml) |
 | P1 | RTMP | partial | [partial / ](rules/rtmp.yaml) |
+| P1 | SFTP | partial | 需核对别名/Fields 入口 |
 | P1 | STP | partial | [partial / STPFields](rules/stp.yaml) |
 | P2 | 3GPP NAS | todo | 需核对别名/Fields 入口 |
 | P2 | 3GPP NGAP | todo | 需核对别名/Fields 入口 |
@@ -511,6 +515,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/iax2.yaml](rules/application-layer/iax2.yaml) | IAX2 (`IAX2`, partial) |
 | [application-layer/iiop.yaml](rules/application-layer/iiop.yaml) | IIOP (`GIOP`, partial)<br>IIOP Locate (`GIOP`, partial)<br>IIOP/GIOP (`GIOP`, partial) |
 | [application-layer/imap_fields.yaml](rules/application-layer/imap_fields.yaml) | IMAP Command Fields (`IMAPCommandFields`, partial)<br>IMAP Response Block Fields (`IMAPResponseBlockFields`, partial)<br>IMAP Response Fields (`IMAPResponseFields`, partial) |
+| [application-layer/imap_sasl.yaml](rules/application-layer/imap_sasl.yaml) | IMAP SASL Challenge (`IMAPSASLChallenge`, partial)<br>IMAP SASL Initial Value (`IMAPSASLInitialValue`, partial)<br>IMAP SASL Response (`IMAPSASLResponse`, partial) |
 | [application-layer/ipfix.yaml](rules/application-layer/ipfix.yaml) | IPFIX (`IPFIX`, partial) |
 | [application-layer/isotp.yaml](rules/application-layer/isotp.yaml) | COTP (`COTP`, partial)<br>TPKT (`TPKT`, partial) |
 | [application-layer/java_ser.yaml](rules/application-layer/java_ser.yaml) | Java serialization (``, new) |
