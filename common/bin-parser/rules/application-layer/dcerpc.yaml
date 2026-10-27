@@ -12,6 +12,9 @@ Package:
         panic("dcerpc: RPC vers must be 5")
       }
       this.ProcessSubNode("RPC Vers Minor")
+      if getNodeResult("RPC Vers Minor").Value != 0 {
+        panic("dcerpc: unsupported connection-oriented minor version")
+      }
       this.ProcessSubNode("PType")
       ptype = getNodeResult("PType").Value
       if ptype > 19 {
@@ -19,6 +22,10 @@ Package:
       }
       this.ProcessSubNode("PFC Flags")
       this.ProcessSubNode("Packed Drep")
+      dr = getNodeResult("Packed Drep").Value
+      if dr[0] != 0x10 || dr[1] != 0 || dr[2] != 0 || dr[3] != 0 {
+        panic("dcerpc: unsupported data representation")
+      }
       this.ProcessSubNode("Frag Length")
       fl = getNodeResult("Frag Length").Value
       if fl < 16 {
@@ -29,6 +36,16 @@ Package:
       }
       this.ProcessSubNode("Auth Length")
       this.ProcessSubNode("Call ID")
+      al = getNodeResult("Auth Length").Value
+      if al > 0 {
+        body = fl - al - 24
+        if body < 0 {
+          panic("dcerpc: authentication verifier exceeds fragment")
+        }
+        this.GetSubNode("Security Envelope").SetMaxLength(fl - 16)
+        this.ProcessSubNode("Security Envelope")
+        return
+      }
       this.GetSubNode("PDU").SetMaxLength(fl - 16)
       this.ProcessSubNode("PDU")
     RPC Vers: uint8
@@ -39,6 +56,34 @@ Package:
     Frag Length: uint16
     Auth Length: uint16
     Call ID: uint32
+    Security Envelope:
+      operator: |
+        al = getNodeResult("../Auth Length").Value
+        body = this.GetMaxLength() - al - 8
+        if body > 0 {
+          this.GetSubNode("Opaque Body And Padding").SetMaxLength(body)
+          this.ProcessSubNode("Opaque Body And Padding")
+        }
+        this.ProcessSubNode("Auth Type")
+        this.ProcessSubNode("Auth Level")
+        this.ProcessSubNode("Auth Padding Length")
+        this.ProcessSubNode("Auth Reserved")
+        this.ProcessSubNode("Auth Context ID")
+        if getNodeResult("Auth Type").Value == 0 || getNodeResult("Auth Level").Value < 2 || getNodeResult("Auth Level").Value > 6 {
+          panic("dcerpc: unsupported authentication type or level")
+        }
+        if getNodeResult("Auth Padding Length").Value > body {
+          panic("dcerpc: authentication padding overlaps common header")
+        }
+        this.GetSubNode("Authentication Token").SetMaxLength(al)
+        this.ProcessSubNode("Authentication Token")
+      Opaque Body And Padding: raw
+      Auth Type: uint8
+      Auth Level: uint8
+      Auth Padding Length: uint8
+      Auth Reserved: uint8
+      Auth Context ID: uint32
+      Authentication Token: raw
     PDU:
       operator: |
         ptype = getNodeResult("../PType").Value
