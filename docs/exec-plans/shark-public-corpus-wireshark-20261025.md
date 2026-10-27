@@ -3070,3 +3070,105 @@ NDR64 `[64,80)`、特征项全零 UUID `[88,104)`。每次都以独立端点回�
 保留独立范围证书、完整 SDK/CLI 比较、最终 EXE、生产 worker 回归、实际单元格与
 高亮控制。捕获、回执、原始导出、EXE 和图像仍不入库。数字请求/回复引用、反向
 调用/复用、命名管道与安全/NDR/分片语义等前述未完成项继续保留。
+
+## 2026-10-27 RPC 调用归属、实抓复用与迟到消息导出
+
+原生/SDK 源码 `7822ba2aa5`，最终 CLI `24c9ad0a45`。本节替代前文“数字请求引用仍为零”
+在**完整、无认证、单个 RPC PDU** 范围内的现状描述；一般 RPC 分片、安全提供者与 NDR
+服务正文仍未通过完整验收。PR 继续为草稿，不能将这一阶段等同于 TOP30 全协议完备。
+
+### 实际修复
+
+1. 普通 Response/Fault 原先可以错误地消耗同 Call ID 的 Bind/AlterContext。四个类型组合
+   的回归在旧版全部失败。现在必须先确认是普通调用，再检查方向和 Context ID；类型、
+   方向或上下文不合、拒绝重复请求、未验证的认证包络均保留原 owner，不写入错误引用。
+2. 成功匹配的完整清晰调用写入 `ResponseTo` 和同一来源的 `pdu.response_to`。生成的 PDU
+   ID 与 wire Call ID 分开，完成后清除 owner，顺序复用必须得到新 ID。新身份槽在写入
+   pending 状态前计入预算；预算不足不留下半个 owner。RPC 协议分片逻辑体暂不声称该
+   数字关联契约，反向调用的重名空间也继续保持明确限制。
+3. EPM v3.0 的操作显示精确 IDL 名称，包含 `ept_lookup`、`ept_lookup_handle_free` 等；
+   仅在观察到正确 UUID、版本和接受的 presentation context 后使用这些名称。列表和
+   递进详情同时显示 call、context、对应请求 PDU 及操作名。该名称不意味着已解释 NDR stub。
+   方法顺序对照 [Wireshark 4.6.9 EPM 源码](https://raw.githubusercontent.com/wireshark/wireshark/v4.6.9/epan/dissectors/packet-dcerpc-epm.c)
+   和 [MS-RPCE ept_lookup](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rpce/86fc67d3-f44c-4a14-afeb-1e46048841c5)。
+4. 乱序实抓对照发现另一处实际导出错误：补洞后才发布的两个请求，字节分别来自更早帧，
+   原生 SDK 已有，但原先流式 JSON 没导出，导致回复指向不存在的请求。这也能用 HTTP
+   复现：三个请求只导出两个。现在独立导出 `published_pdus`，并写明 availability scope；
+   `byte_source` 不变，不给当前物理行贴上其他流/旧包的协议，也不将其加入当前包的字段
+   筛选集合。普通观察和发布共用有界快照预算，超限明确标记 limited。该通道也保留
+   处理当前帧时其他流发布的结果，不把“此时可用”误当成同一连接或字节归属。
+
+### 本机真实 Windows RPC 与观察对照
+
+新增捕获通过独立 Python ctypes 声明调用系统 `Rpcrt4.dll`，向本机 TCP/135 做只读端点
+查询。先显式关闭认证，API 成功状态及全部 56 个 wire PDU 的 Auth Length=0 分别验证。
+不注册/删除端点，也不调用发现的服务。三轮 binding handle 操作实际复用**一条 TCP 连接**，
+24 次 Next API 操作对应本次实际观察到的 24 次 Lookup，加 3 次 handle-free，共 27 组
+过程调用和回复，另有一组 Bind/ACK；42 条 API 回执不是 42 个 wire PDU。
+接口声明依据 [Windows RPC Next API](https://learn.microsoft.com/en-us/windows/win32/api/rpcdce/nf-rpcdce-rpcmgmtepeltinqnextw)
+和 [认证设置 API](https://learn.microsoft.com/en-us/windows/win32/api/rpcdce/nf-rpcdce-rpcbindingsetauthinfow)。
+
+实抓文件 16,124 字节、117 帧，SHA-256
+`f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85`。
+生成器实执行字节和 API 回执、原包均保存在本机；未提交原包、原始回执或服务数据。
+
+| 输入/对照 | 物理帧 | 完整 RPC PDU | 数字请求链接 | 与 WS request_in / response_in 对比 |
+|---|---:|---:|---:|---:|
+| 新增 DLL 实抓 | 117 | 56 | 28 | 27 / 27 |
+| 重复一个请求包的观察 | 118 | 56 | 28 | 27 / 27 |
+| 延后首请求至两个后续请求之后 | 117 | 56 | 26 | 25 / 25 |
+| 永久缺少该请求包 | 116 | 29 | 1 | 0 / 0 |
+| 同一请求截短为 12 字节 RPC 前缀 | 117 | 29 | 1 | 0 / 0 |
+
+四个派生输入是明确记录原帧映射、时间戳策略和哈希的观察变异，**不是实际 socket 丢包
+或注入测试**。延后对照在补洞后恢复完整消息，先于请求到达的两条回复保持 missing-request，
+不改写既有事件或靠事后猜测关联。缺包/截短保留 TCP hole、原始前缀及 incomplete 诊断，
+不跨缺口拼接；两种情况下只有已完成 Bind 的链接，没有编造 27 个应用请求。此前两份
+真实 Windows socket 捕获也重放，各自保留 6 个 PDU 和 2 条 Bind 关联。
+
+在延后对照中，一条请求的原始字节贡献帧为 17，独立 TCP 连续前缀在补洞帧 18 才交付。
+Wireshark 的 request_in 指向 18；这不是字节都属于 18。最初把 request_in 与最后字节
+贡献帧直接比较的审计假设被该对照否定。最终分别重建连续前缀交付和字节来源，并检查
+第 18 帧的参考 PDU 视图确实包含该请求。将贡献帧改写为 18、或将参考关联改成 17 的
+控制均被拒绝；没有用编号归一化掩盖这一差别。
+
+### 大捕获重放与完整导出验证
+
+两份公开原包再次完整运行。Weber 的 39,740 条、Sharon 的 245,784 条 SDK 导出与前一轮
+**逐字节相同**，合计 285,524 条；所有原类型、编号、流、字段、诊断及来源都保留。
+新 CLI 相对修复调用展示后的版本保留全部原物理行和普通 PDU，只有下列额外发布：
+
+| 原始大捕获 | 新增发布消息/诊断 | 其中的协议/类别 |
+|---|---:|---|
+| Weber | 122 | 未识别 96、DCE/RPC 6、DNS 2、HTTP 1、Modbus 1、SMB2 1、TLS 3、WHOIS 12 |
+| Sharon | 405 | 未识别 50、IP 339、DNS 2、HTTP 1、Modbus 1、WHOIS 12 |
+
+这 527 项的完整 source、类型化字段、普通字段投影、状态和引用均与原始 SDK 逐项相同，
+没有 ID 重映射。所有 379,455 个原物理行和普通 PDU 元数据不变，没有新增物理帧，也
+没有将未识别项改标签冒充识别。两份输入中共 59,394 个 decoded/deferred 且 Raw 非空
+的 SDK 消息 ID 均能在未过滤导出中找到，数字回复目标无悬空；这个覆盖指标不证明
+其余未识别流量被支持，也不证明所有协议字段与 Wireshark 相同。流式物理包筛选仍按
+当时的包字段集合执行，不宣称支持事后补全所有过滤结果。
+
+本阶段九份输入合计 380,210 帧、285,782 条 SDK 记录，独立原包字节检查 775,544 项，
+核对 636 个完整 wire PDU、88 条数字调用关联、79 组双向参考帧链接。连续已观察范围内
+没有遗漏完整 PDU；原有捕获域、缺口、晚到 pre-origin、命名管道和畸形/不支持范围继续
+单列，不能把这些数字扩大为全部载体或 NDR 正文的通过率。
+
+### Windows 与检查
+
+最终 EXE 在 Windows 实际打开延后对照，`fields pdu.id == 9` 选中原贡献帧 17，并显示
+`EPM.ept_lookup`、EPM v3.0 和 OpNum=2；JSON 发布在帧 18，二者职责清楚。真实普通回复
+页面也验证了列表、详情中相同的请求链接。实际原生单元格、字段/字节来源、会话/证据、
+80×30 / 180×48 缩放、退出和输入/输出码页恢复 936 均通过，图像与快照留本机。
+
+原生完整测试 415.375s、CLI 2.078s，最终导出修复后的完整 CLI 2.045s 通过。调用归属
+fuzz 41.483s 完成 91,860 次。原请求/回复控制 16 项、乱序来源与参考交付控制 19 项、
+完整映射下两条明确 CLI 行的深层控制 16 项、完整延迟发布导出控制 12 项，共 63 项
+全部拒绝；部分行控制不冒充整份被修改大包的重放。
+
+[调用与延迟发布聚合证据](shark-public-corpus-20261025/dcerpc-call-publication-summary.json)
+包含九份输入的证书哈希、全部 SDK/CLI 保留关系、发布分类、实际 Windows 证明、EXE
+及审计源码摘要。原包、派生包、原始导出、API 回执、EXE 和图像继续不入库。一般 RPC
+分片重复头/逻辑 stub、反向调用空间、多个 transfer offer、安全验证与 NDR 服务正文，
+以及前文 SSH 后置视图、TLS/QUIC 的未覆盖恢复边界仍需继续完成。
