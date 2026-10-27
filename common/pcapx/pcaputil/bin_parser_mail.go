@@ -34,6 +34,8 @@ type binIMAP struct {
 	encrypted           bool
 	sasl                *imapSASL
 	protectionUncertain string
+	idle                *imapIdle
+	namespaces          map[string]*imapNamespaceRequest
 }
 
 type binPOP3 struct {
@@ -215,7 +217,7 @@ func imapKnownCommand(cmd string) bool {
 	switch cmd {
 	case "CAPABILITY", "NOOP", "LOGOUT", "STARTTLS", "AUTHENTICATE", "LOGIN", "SELECT", "EXAMINE",
 		"CREATE", "DELETE", "RENAME", "SUBSCRIBE", "UNSUBSCRIBE", "LIST", "LSUB", "STATUS", "APPEND",
-		"CHECK", "CLOSE", "EXPUNGE", "SEARCH", "FETCH", "STORE", "COPY", "UID", "IDLE", "ENABLE", "ID":
+		"CHECK", "CLOSE", "EXPUNGE", "SEARCH", "FETCH", "STORE", "COPY", "UID", "IDLE", "ENABLE", "ID", "NAMESPACE":
 		return true
 	}
 	return false
@@ -465,7 +467,7 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("IMAP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes)); err != nil {
+	if err := f.reserveSession(512 + int64(len(s.pending)+1)*192 + int64(s.pendingBytes)); err != nil {
 		return 0, nil, err
 	}
 	if s.encrypted {
@@ -494,7 +496,7 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 	if n == 0 || n > len(w) {
 		return n, nil, nil
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes+n)); err != nil {
+	if err := f.reserveSession(512 + int64(len(s.pending)+1)*192 + int64(s.pendingBytes+n)); err != nil {
 		return 0, nil, err
 	}
 	// Both literal forms have a line header followed by exactly n opaque bytes.
@@ -548,7 +550,15 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	}
 	fields := strings.Fields(line)
-	if out, handled, err := s.consumeSASL(dir, raw, fields); handled {
+	if s.idle == nil {
+		if out, handled, err := s.consumeSASL(dir, raw, fields); handled {
+			return out, err
+		}
+	}
+	if out, handled, err := s.consumeIdle(dir, raw, fields); handled {
+		return out, err
+	}
+	if out, handled, err := s.consumeNamespace(dir, raw, fields); handled {
 		return out, err
 	}
 	if len(fields) > 0 && fields[0] == "+" {
