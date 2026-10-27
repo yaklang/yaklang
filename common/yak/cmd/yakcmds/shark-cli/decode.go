@@ -24,6 +24,7 @@ type packetSummary struct {
 	PhysicalDestination  string                  `json:"physical_destination,omitempty"`
 	TCPFlowID            uint64                  `json:"tcp_flow_id,omitempty"`
 	TCPFlowDomain        *pcaputil.CaptureDomain `json:"tcp_flow_domain,omitempty"`
+	TCPFlowState         string                  `json:"tcp_flow_state,omitempty"`
 	MessageSource        string                  `json:"message_source,omitempty"`
 	MessageDestination   string                  `json:"message_destination,omitempty"`
 	MessageTransport     string                  `json:"message_transport,omitempty"`
@@ -45,6 +46,7 @@ type packetSummary struct {
 	connectionAnnotated  bool
 	payloadBytes         int
 	opaqueTransport      bool
+	closedTCPPayload     bool
 	ProtocolScope        string    `json:"protocol_scope,omitempty"`
 	Transport            string    `json:"transport,omitempty"`
 	SourcePort           uint16    `json:"source_port,omitempty"`
@@ -69,6 +71,7 @@ func summarize(raw *capturedPacket) packetSummary {
 	row := packetSummary{Number: raw.number, Time: raw.ci.Timestamp, Length: raw.ci.Length, CapturedLength: len(raw.data), Protocol: raw.link.String()}
 	row.CaptureDomain = raw.reference.Domain
 	row.TCPFlowID = raw.tcpFlowID
+	row.TCPFlowState = raw.tcpFlowState
 	if raw.tcpFlowID != 0 {
 		d := raw.tcpFlowDomain
 		row.TCPFlowDomain = &d
@@ -184,6 +187,7 @@ func summarize(raw *capturedPacket) packetSummary {
 		}
 	}
 	row.opaqueTransport = raw.opaqueTransport
+	row.closedTCPPayload = raw.tcpFlowState != "" && row.payloadBytes > 0
 	row.packetProtocol = row.Protocol
 	row.ProtocolScope = "packet"
 	if headerObservation {

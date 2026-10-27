@@ -47,6 +47,9 @@ func (e *ProtocolEvent) DumpLine() string {
 		stamp, e.ID, e.FlowID, strconv.Quote(protocol), strconv.Quote(e.Transport),
 		strconv.Quote(e.Status), strconv.Quote(direction), strconv.Quote(e.Source),
 		strconv.Quote(e.Destination), e.Offset, e.Length)
+	if e.TCPFlowID != 0 {
+		fmt.Fprintf(&line, " tcp_flow=%d", e.TCPFlowID)
+	}
 	add := func(key, value string) {
 		if value != "" {
 			line.WriteByte(' ')

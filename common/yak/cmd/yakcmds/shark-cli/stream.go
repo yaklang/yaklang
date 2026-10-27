@@ -567,7 +567,9 @@ func (s *streamStore) identify(id uint64, protocol string) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if r := s.records[id]; r != nil {
-		if r.nativeIdentity {
+		if r.nativeIdentity || r.nativeFlowID != 0 {
+			// Capture-backed identity belongs to admitted native events. A
+			// selected-prefix worker cannot promote an incomplete message.
 			return false
 		}
 		verified := false

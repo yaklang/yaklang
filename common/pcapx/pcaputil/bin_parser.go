@@ -62,10 +62,14 @@ type ProtocolEvent struct {
 	SourceBytes                        ByteSource
 	// CarrierLayers lists observed protocol envelopes between the physical
 	// transport and this PDU. It does not turn a UDP carrier into TCP.
-	CarrierLayers                            []string
-	Profile, Completeness, ExpertCode        string
-	TransactionID, ResponseTo                uint64
-	ID, FlowID                               uint64
+	CarrierLayers                     []string
+	Profile, Completeness, ExpertCode string
+	TransactionID, ResponseTo         uint64
+	ID, FlowID                        uint64
+	// TCPFlowID identifies the physical capture reassembler generation. FlowID
+	// belongs to the separate protocol-session namespace. Zero means no direct
+	// captured TCP flow (including standalone sessions and reliable UDP carriers).
+	TCPFlowID                                uint64
 	Timestamp                                time.Time
 	Transport, Source, Destination, Protocol string
 	Direction                                int    // 0: first observed endpoint -> peer, 1: reverse (not a role guess)
@@ -1059,6 +1063,9 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if f.transportFlow != nil {
+		e.TCPFlowID = f.transportFlow.Index
+	}
 	if f.protocol == "ssh" && status != "decoded" && status != "deferred" {
 		info := map[string]any{}
 		if f.ssh != nil {
@@ -2137,6 +2144,30 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 			row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 			rows = append(rows, &row)
 		}
+	}
+	return rows
+}
+
+// TCPFlowRows returns owned message metadata for an exact capture-domain/TCP
+// generation. Protocol FlowID is independent and must not be used as this ID.
+// A zero generation has no capture binding and returns no rows.
+func (v *ProtocolInspector) TCPFlowRows(domain CaptureDomain, tcpFlow uint64) []*ProtocolEvent {
+	if tcpFlow == 0 {
+		return nil
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	var rows []*ProtocolEvent
+	for i := 0; i < v.count; i++ {
+		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
+		if e.Domain != domain || e.TCPFlowID != tcpFlow || e.Transport != "tcp" {
+			continue
+		}
+		row := *e
+		cloneEvidence(&row)
+		row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+		row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
+		rows = append(rows, &row)
 	}
 	return rows
 }

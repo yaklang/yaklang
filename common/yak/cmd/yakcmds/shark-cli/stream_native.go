@@ -72,6 +72,14 @@ func (s *streamStore) nativePacket(flow *pcaputil.TrafficFlow, conn *pcaputil.Tr
 	// separate from whether the packet is admitted. Held SYN copies have no
 	// payload and need no retained packet headers to count them exactly once.
 	if current != nil && current.tcpFlowID == flow.Index && current.tcpFlowDomain == r.key.domain {
+		// The core reports late packet ownership without feeding a closed
+		// direction again. Preserve that distinction in the immutable row.
+		if conn.IsClosed() {
+			current.tcpFlowState = "closed-direction-observation"
+			if flow.ClientConn.IsClosed() && flow.ServerConn.IsClosed() {
+				current.tcpFlowState = "closed-observation"
+			}
+		}
 		state := conn.SequenceObservation()
 		if v := current.transportView; v != nil && v.Protocol == "tcp" && v.PayloadLength > 0 && state.Initialized {
 			seq := v.Sequence

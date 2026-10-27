@@ -148,7 +148,7 @@ func TestNativePreviewExternalCaptureAudit(t *testing.T) {
 			proof.SHA256[direction] = hex.EncodeToString(digest[:])
 		}
 		for _, event := range v.events {
-			require.Equal(t, flow, event.FlowID)
+			require.Equal(t, flow, event.TCPFlowID)
 		}
 		proofs = append(proofs, proof)
 	}

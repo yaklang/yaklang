@@ -135,6 +135,7 @@ type capturedPacket struct {
 	physicalRecord        bool
 	tcpFlowID             uint64
 	tcpFlowDomain         pcaputil.CaptureDomain
+	tcpFlowState          string
 	messageTransport      string
 	messageSource         string
 	messageDestination    string
