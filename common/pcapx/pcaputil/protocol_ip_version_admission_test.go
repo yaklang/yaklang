@@ -179,3 +179,53 @@ func FuzzInvalidIPVersionCannotMutateFragmentState(f *testing.F) {
 		require.ElementsMatch(t, []PacketReference{{Number: 1, Domain: domain}, {Number: 3, Domain: domain}}, packetEvidence(q).refs)
 	})
 }
+
+func TestUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T) {
+	for _, profile := range []string{"EtherIP-version0", "EtherIP-version3", "IPv4-HOPOPT"} {
+		t.Run(profile, func(t *testing.T) {
+			inner := versionAdmissionWire(t, 4)
+			inner[14] = 0x65
+			protocol := layers.IPProtocol(97)
+			payload := append([]byte{0, 0}, inner...)
+			if profile == "EtherIP-version3" {
+				payload[0] = 0x30
+			} else if profile == "IPv4-HOPOPT" {
+				protocol = 0
+				payload = append([]byte{4, 0, 0, 0, 0, 0, 0, 0}, inner[14:]...)
+			}
+			eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
+			ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: protocol, SrcIP: net.ParseIP("198.51.100.1"), DstIP: net.ParseIP("198.51.100.2")}
+			wire := gopacket.NewSerializeBuffer()
+			require.NoError(t, gopacket.SerializeLayers(wire, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(payload)))
+			var events []*ProtocolEvent
+			a := coreFragmentParser(&events, 1<<20, 16)
+			t.Cleanup(func() { a.closeFragments(); require.Zero(t, a.buffered.Load()) })
+			original := coreIPPackets(t, "ipv4-options")
+			domain := CaptureDomain{Interface: 17}
+			_, consumed := a.networkPacket(fragmentClockPacket(original[0], domain, 10, time.Unix(100, 0), false))
+			require.True(t, consumed)
+			buffered := a.buffered.Load()
+			p := gopacket.NewPacket(wire.Bytes(), protocolPacketDecoder{decoder: layers.LinkTypeEthernet}, gopacket.Default)
+			p.Metadata().CaptureInfo = withEvidence(gopacket.CaptureInfo{Timestamp: time.Unix(10000, 0), CaptureLength: len(wire.Bytes()), Length: len(wire.Bytes())}, captureEvidence{Ref: PacketReference{Number: 1, Domain: CaptureDomain{Interface: 17}}})
+			_, consumed = a.networkPacket(p)
+			require.True(t, consumed)
+			require.Len(t, events, 1)
+			e := events[0]
+			require.Equal(t, "network-encapsulation-refusal", e.Profile)
+			require.Equal(t, "limited", e.Status)
+			require.Equal(t, "EncapsulationDepthOrProfile", e.ExpertCode)
+			require.Equal(t, "unconfirmed", e.Session["Child Header Identity"])
+			require.Equal(t, []string{"Ethernet", "IPv4"}, e.Session["Observed Header Layers"])
+			require.NotContains(t, e.Session, "Observed IP Version")
+			require.Equal(t, CaptureDomain{Interface: 17}, e.Domain)
+			require.Equal(t, []PacketReference{{Number: 1, Domain: e.Domain}}, e.SourceBytes.PacketRefs)
+			require.Zero(t, e.FlowID)
+			require.Nil(t, a.udpSessions)
+			require.Len(t, a.fragments.sets, 1)
+			require.Equal(t, buffered, a.buffered.Load(), "the unselected child cannot advance the domain's fragment clock")
+			q, consumed := a.networkPacket(fragmentClockPacket(original[1], domain, 11, time.Unix(101, 0), false))
+			require.False(t, consumed)
+			require.NotNil(t, q)
+		})
+	}
+}

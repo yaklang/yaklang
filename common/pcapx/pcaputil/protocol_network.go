@@ -45,12 +45,86 @@ type fragmentStore struct {
 	blockedUntil  time.Time
 }
 
+func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, networks, tunnels int, unsupported bool) {
+	for _, l := range p.Layers() {
+		if n, ok := l.(gopacket.NetworkLayer); ok {
+			inner = n
+			networks++
+		}
+		switch v := l.(type) {
+		case *capturePIM:
+			if v.Type == 1 && !v.NullRegister {
+				tunnels++
+			}
+		case *layers.GRE, *layers.VXLAN:
+			tunnels++
+		case *layers.Geneve:
+			tunnels++
+			// Only option-free v0 Ethernet data is selected for normalization.
+			header := v.LayerContents()
+			if len(header) != 8 || header[0] != 0 || header[1] != 0 || header[7] != 0 || v.Protocol != layers.EthernetTypeTransparentEthernetBridging {
+				unsupported = true
+			}
+		case *layers.IPv4:
+			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
+				tunnels++
+			}
+		case *layers.IPv6:
+			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
+				tunnels++
+			}
+		}
+	}
+	return
+}
+
+type networkPrefixPacket struct {
+	gopacket.Packet
+	prefix []gopacket.Layer
+}
+
+func (p networkPrefixPacket) Layers() []gopacket.Layer { return p.prefix }
+
+func outerNetworkObservation(p gopacket.Packet) (captureEvidence, []string) {
+	prefix := make([]gopacket.Layer, 0, 8)
+	for _, layer := range p.Layers() {
+		if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == gopacket.LayerTypePayload || len(prefix) >= maxCaptureTransportLayers {
+			break
+		}
+		prefix = append(prefix, layer)
+		if _, network := layer.(gopacket.NetworkLayer); network {
+			break
+		}
+	}
+	// Recompute domains from this observed outer prefix. A legacy decoder's
+	// speculative child must not contribute another tunnel identity.
+	e := packetEvidence(networkPrefixPacket{Packet: p, prefix: prefix})
+	names := make([]string, 0, len(e.networkPrefix)+len(prefix))
+	for _, typ := range e.networkPrefix {
+		names = append(names, typ.String())
+	}
+	for _, layer := range prefix {
+		if len(names) >= maxCaptureTransportLayers {
+			return e, nil
+		}
+		names = append(names, layer.LayerType().String())
+	}
+	return e, names
+}
+
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
 	if failure := p.ErrorLayer(); failure != nil {
 		var version *ipVersionError
 		if errors.As(failure.Error(), &version) {
+			_, networks, tunnels, unsupported := networkCarrierProfile(p)
+			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
+				outer, names := outerNetworkObservation(p)
+				fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile"}
+				a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: outer.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(outer)})
+				return nil, true
+			}
 			// A decoder's partial layer cannot admit a fragment/tunnel/native
 			// message, advance clocks, or create an application connection.
 			// Keep only the validated outer domain and literal physical source.
@@ -135,41 +209,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	}
 	// gopacket exposes the outer NetworkLayer and TransportLayer. Normalize a
 	// supported tunnel to its innermost IP before transport dispatch.
-	var inner gopacket.NetworkLayer
-	networks, tunnels := 0, 0
-	unsupportedTunnel := false
-	for _, l := range p.Layers() {
-		if n, ok := l.(gopacket.NetworkLayer); ok {
-			inner = n
-			networks++
-		}
-		switch v := l.(type) {
-		case *capturePIM:
-			if v.Type == 1 && !v.NullRegister {
-				tunnels++
-			}
-		case *layers.GRE, *layers.VXLAN:
-			tunnels++
-		case *layers.Geneve:
-			tunnels++
-			// Admit only the option-free v0 Ethernet data profile. Read the version
-			// bits from the captured header: gopacket's Version field does
-			// not retain both bits. OAM and critical options need semantics
-			// that this transport normalization does not implement.
-			header := v.LayerContents()
-			if len(header) != 8 || header[0] != 0 || header[1] != 0 || header[7] != 0 || v.Protocol != layers.EthernetTypeTransparentEthernetBridging {
-				unsupportedTunnel = true
-			}
-		case *layers.IPv4:
-			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
-				tunnels++
-			}
-		case *layers.IPv6:
-			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
-				tunnels++
-			}
-		}
-	}
+	inner, networks, tunnels, unsupportedTunnel := networkCarrierProfile(p)
 	if networks > 1 {
 		// The inner carrier can become visible only after outer reassembly.
 		// Every contributing fragment belongs to that same reconstructed domain.
