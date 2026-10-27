@@ -30,6 +30,7 @@ type captureConfig struct {
 	decodeAs                      []pcaputil.CaptureOption
 	initialDisplayFilter          string
 	retentionPackets              int
+	protocolHistoryMiB            int
 	freezePacketFields            bool
 }
 
@@ -204,6 +205,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	// Keep the default 20k packet window useful after a full-file replay while
 	// bounding both observation count and retained structured/raw bytes.
 	messages, bytes := protocolHistoryBudget(cfg.retentionPackets)
+	if cfg.protocolHistoryMiB > 0 {
+		bytes = cfg.protocolHistoryMiB << 20
+	}
 	history, _ := pcaputil.NewProtocolInspector(messages, bytes)
 	if s.streams != nil {
 		s.streams.mu.Lock()
