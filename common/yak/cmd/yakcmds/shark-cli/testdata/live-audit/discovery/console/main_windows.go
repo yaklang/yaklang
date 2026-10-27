@@ -414,6 +414,20 @@ func main() {
 		if fy != y || fields.Attributes[fy][ff+1] != selected || fields.Attributes[fy][fb+1] == selected || !matching(fields, true) {
 			panic("mouse click missed the rendered adaptive Fields tab or changed the inspected packet")
 		}
+		if name := os.Getenv("SHARK_QA_SELECT_FIELD"); name != "" {
+			fieldY := -1
+			for y, row := range fields.Rows {
+				if strings.Contains(row, name+": ") {
+					fieldY = y
+					break
+				}
+			}
+			if fieldY < 0 {
+				panic("requested field is not visible in the actual native pane")
+			}
+			click(8, fieldY)
+			loadShot("01-selected-field")
+		}
 		if name := os.Getenv("SHARK_QA_BYTE_FIELD"); name != "" {
 			want, err := hex.DecodeString(os.Getenv("SHARK_QA_BYTE_HEX"))
 			fail(err)
