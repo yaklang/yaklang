@@ -9,13 +9,54 @@ import (
 )
 
 const (
-	dcerpcFragmentCharge      int64 = 128
-	dcerpcFragmentPieceCharge int64 = 24
+	dcerpcStateCharge                   = 80 // Includes the private sequence and generation map.
+	dcerpcPendingGenerationCharge       = 16
+	dcerpcPendingRequestCharge          = 96 + dcerpcPendingGenerationCharge
+	dcerpcFragmentCharge          int64 = 136
+	dcerpcFragmentPieceCharge     int64 = 24
 )
 
 type dcerpcFragmentPiece struct {
 	id         uint64
 	start, end uint64
+}
+
+type dcerpcMessageAssembly struct {
+	body       []byte
+	flags      byte
+	complete   bool
+	generation uint64
+}
+
+// This sequence is private connection state, never a wire Call ID or a public
+// PDU reference. In particular, the consumeFrom API has no generated PDU IDs.
+func (d *binDCERPC) nextCallGeneration() (uint64, error) {
+	if d.callGeneration == ^uint64(0) {
+		return 0, protocolError(ErrResourceExceeded, "DCE/RPC observed call generation space exhausted")
+	}
+	d.callGeneration++
+	return d.callGeneration, nil
+}
+
+func (d *binDCERPC) setPendingGeneration(call uint32, generation uint64) {
+	if d.pendingGeneration == nil {
+		d.pendingGeneration = make(map[uint32]uint64)
+	}
+	d.pendingGeneration[call] = generation
+}
+
+func (d *binDCERPC) matchMessageContext(call uint32, name string, info map[string]any, dir int, context uint16, flags byte, generation uint64) bool {
+	if flags&3 != 3 {
+		if generation == 0 {
+			d.markUnmatched(name, info, "request-not-observed-at-message-start")
+			return false
+		}
+		if d.pendingGeneration[call] != generation {
+			d.markUnmatched(name, info, "original-request-no-longer-outstanding-or-incomplete")
+			return false
+		}
+	}
+	return d.matchContext(call, name, info, dir, context)
 }
 
 // The common header is followed by a request/response header in EVERY RPC
@@ -39,17 +80,17 @@ func dcerpcMessageHeader(ptype, flags byte, body []byte) (int, error) {
 	return need, nil
 }
 
-func dcerpcFragmentFailure(info map[string]any, err error) ([]byte, byte, bool, error) {
+func dcerpcFragmentFailure(info map[string]any, err error) (dcerpcMessageAssembly, error) {
 	// Only semantic failures at an already framed RPC boundary are isolated.
 	// Memory failures remain fatal; this never skips a TCP byte hole.
 	var typed *ProtocolError
 	if errors.Is(err, errBinContext) || errors.As(err, &typed) && typed.Kind != ErrResourceExceeded {
 		info["Error Scope"], info["Context Level"] = "message", "partial"
 	}
-	return nil, 0, false, err
+	return dcerpcMessageAssembly{}, err
 }
 
-func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags byte, body []byte, info map[string]any, maxElements int, pduID uint64) ([]byte, byte, bool, error) {
+func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags byte, body []byte, info map[string]any, maxElements int, pduID uint64) (dcerpcMessageAssembly, error) {
 	header, err := dcerpcMessageHeader(ptype, flags, body)
 	if err != nil {
 		d.discardFragment(key)
@@ -67,6 +108,11 @@ func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags b
 	}
 	piece := dcerpcFragmentPiece{id: pduID, start: uint64(16 + header), end: uint64(16 + len(body))}
 	if flags&dcerpcFirst != 0 {
+		if ptype == 0 {
+			if _, pending := d.pending[key.callID]; pending {
+				return dcerpcFragmentFailure(info, d.duplicateCall(key.callID, key.direction))
+			}
+		}
 		if d.stateElements()+2 > sessionCollectionLimit(maxElements) || len(body)+16 > d.messageLimit() {
 			return dcerpcFragmentFailure(info, protocolError(ErrResourceExceeded, "DCE/RPC first-fragment state exceeds budget"))
 		}
@@ -74,14 +120,30 @@ func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags b
 		if err := d.reserveMemory(d.retainedBytes() + charge); err != nil {
 			return dcerpcFragmentFailure(info, err)
 		}
+		var generation uint64
+		if ptype == 0 {
+			generation, err = d.nextCallGeneration()
+			if err != nil {
+				return dcerpcFragmentFailure(info, err)
+			}
+		} else {
+			generation = d.pendingGeneration[key.callID]
+			if generation == 0 {
+				// A captured request first fragment may be awaiting its tail.
+				// Freeze that exact identity, without admitting an incomplete call.
+				if request, observed := d.frags[fragmentKeyFor(1-key.direction, key.callID)]; observed && request.ptype == 0 {
+					generation = request.generation
+				}
+			}
+		}
 		if d.frags == nil {
 			d.frags = make(map[dcerpcFragmentKey]dcerpcFragment)
 		}
 		ownedBody := make([]byte, len(body))
 		copy(ownedBody, body)
-		d.frags[key] = dcerpcFragment{ptype: ptype, firstFlags: flags, body: ownedBody, header: header, count: 1, pieces: []dcerpcFragmentPiece{piece}}
+		d.frags[key] = dcerpcFragment{ptype: ptype, firstFlags: flags, body: ownedBody, header: header, count: 1, pieces: []dcerpcFragmentPiece{piece}, generation: generation}
 		info["Message ID"], info["Fragment Index"], info["Outstanding"] = pduID, 1, true
-		return nil, flags, false, nil
+		return dcerpcMessageAssembly{flags: flags}, nil
 	}
 	previous, exists := d.frags[key]
 	if !exists {
@@ -128,7 +190,7 @@ func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags b
 	if flags&dcerpcLast == 0 {
 		d.frags[key] = previous
 		info["Outstanding"] = true
-		return nil, previous.firstFlags, false, nil
+		return dcerpcMessageAssembly{flags: previous.firstFlags}, nil
 	}
 	stub := bytes.Clone(assembled[previous.header:])
 	digest := sha256.Sum256(stub)
@@ -150,5 +212,5 @@ func (d *binDCERPC) consumeMessageFragment(key dcerpcFragmentKey, ptype, flags b
 	}
 	d.discardFragment(key)
 	_ = d.reserveMemory(d.retainedBytes())
-	return assembled, previous.firstFlags, true, nil
+	return dcerpcMessageAssembly{body: assembled, flags: previous.firstFlags, complete: true, generation: previous.generation}, nil
 }

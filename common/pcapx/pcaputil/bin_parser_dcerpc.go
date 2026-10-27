@@ -19,6 +19,8 @@ type binDCERPC struct {
 	pendingDir           map[uint32]int
 	pendingContext       map[uint32]uint16
 	pendingPDU           map[uint32]uint64
+	pendingGeneration    map[uint32]uint64
+	callGeneration       uint64
 	proposals            map[uint32][]dcerpcProposal
 	ctxVersion           map[uint16]uint32
 	frags                map[dcerpcFragmentKey]dcerpcFragment
@@ -39,6 +41,7 @@ type dcerpcFragment struct {
 	header     int
 	count      int
 	pieces     []dcerpcFragmentPiece
+	generation uint64 // request identity, or reply's frozen expected request identity
 }
 
 type dcerpcProposal struct {
@@ -253,20 +256,21 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 	d.peerMessages[dir] = true
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
 	parseFlags := flags
+	var fragmentGeneration uint64
 	if flags&dcerpcFirst != 0 {
 		if _, exists := d.frags[fragmentKey]; exists {
 			d.discardFragment(fragmentKey)
 			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrDesynchronized, "DCE/RPC duplicate first fragment for call")
+			_, err := dcerpcFragmentFailure(info, protocolError(ErrDesynchronized, "DCE/RPC duplicate first fragment for call"))
+			return info, err
 		}
 	}
 	if flags&(dcerpcFirst|dcerpcLast) != dcerpcFirst|dcerpcLast {
-		var complete bool
-		var err error
-		body, parseFlags, complete, err = d.consumeMessageFragment(fragmentKey, ptype, flags, body, info, max, pduID)
-		if err != nil || !complete {
+		message, err := d.consumeMessageFragment(fragmentKey, ptype, flags, body, info, max, pduID)
+		if err != nil || !message.complete {
 			return info, err
 		}
+		body, parseFlags, fragmentGeneration = message.body, message.flags, message.generation
 	}
 	switch ptype {
 	case 11, 14:
@@ -301,7 +305,7 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 			return nil, err
 		}
 		contextID := info["Context ID"].(uint16)
-		if err := d.push(call, fmt.Sprint(info["Packet Name"]), max, dir, contextID); err != nil {
+		if err := d.push(call, fmt.Sprint(info["Packet Name"]), max, dir, contextID, fragmentGeneration); err != nil {
 			return dcerpcCallError(info, err)
 		}
 		info["Outstanding"] = true
@@ -311,13 +315,13 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 		}
 		contextID := binary.LittleEndian.Uint16(body[4:6])
 		info["Context ID"] = contextID
-		d.matchContext(call, "Response", info, dir, contextID)
+		d.matchMessageContext(call, "Response", info, dir, contextID, flags, fragmentGeneration)
 	case 3:
 		if len(body) >= 16 {
 			contextID := binary.LittleEndian.Uint16(body[4:6])
 			info["Context ID"] = contextID
 			info["Status"] = binary.LittleEndian.Uint32(body[8:12])
-			d.matchContext(call, "Fault", info, dir, contextID)
+			d.matchMessageContext(call, "Fault", info, dir, contextID, flags, fragmentGeneration)
 		} else {
 			return nil, fmt.Errorf("dcerpc: truncated fault header")
 		}
@@ -431,13 +435,18 @@ func (d *binDCERPC) stageProposals(call uint32, name string, dir int, proposals 
 	if d.stateElements()+len(proposals)+1 > max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	extra := int64(32 + 80 + len(name)) // proposal, pending request and optional PDU identity.
+	extra := int64(32 + 80 + dcerpcPendingGenerationCharge + len(name)) // proposal and pending request identity.
 	for _, proposal := range proposals {
 		extra += int64(64 + len(proposal.name) + cap(proposal.abstractSyntax) + cap(proposal.transferSyntax))
 	}
 	if err := d.reserveMemory(d.retainedBytes() + extra); err != nil {
 		return err
 	}
+	generation, err := d.nextCallGeneration()
+	if err != nil {
+		return err
+	}
+	d.setPendingGeneration(call, generation)
 	d.pending[call] = name
 	if d.pendingDir == nil {
 		d.pendingDir = make(map[uint32]int)
@@ -706,7 +715,7 @@ func dcerpcAttachBodyRanges(info, target map[string]any, ranges map[string]any) 
 	}
 }
 
-func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16) error {
+func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16, generation uint64) error {
 	max = sessionCollectionLimit(max)
 	if _, exists := d.pending[call]; exists {
 		return d.duplicateCall(call, dir)
@@ -714,9 +723,17 @@ func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint1
 	if d.stateElements() >= max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	if err := d.reserveMemory(d.retainedBytes() + int64(96+len(name))); err != nil {
+	if err := d.reserveMemory(d.retainedBytes() + int64(dcerpcPendingRequestCharge+len(name))); err != nil {
 		return err
 	}
+	if generation == 0 {
+		var err error
+		generation, err = d.nextCallGeneration()
+		if err != nil {
+			return err
+		}
+	}
+	d.setPendingGeneration(call, generation)
 	d.pending[call] = name
 	if d.pendingDir == nil {
 		d.pendingDir = make(map[uint32]int)
@@ -757,6 +774,7 @@ func (d *binDCERPC) match(call uint32, respName string, info map[string]any, dir
 		delete(d.pendingDir, call)
 		delete(d.pendingContext, call)
 		delete(d.pendingPDU, call)
+		delete(d.pendingGeneration, call)
 		info["Matched Request"] = want
 		info["Association Status"] = "matched"
 		info["Packet Name"] = respName
@@ -780,7 +798,7 @@ func (d *binDCERPC) stateElements() int {
 // retainedBytes conservatively charges actual retained fragment capacities,
 // UUID data, pending-call names, optional PDU identities and map/slice bookkeeping.
 func (d *binDCERPC) retainedBytes() int64 {
-	n := int64(64) + int64(len(d.ctx))*80 + int64(len(d.pending))*80
+	n := int64(dcerpcStateCharge) + int64(len(d.ctx))*80 + int64(len(d.pending))*80
 	for _, uuid := range d.uuid {
 		n += int64(cap(uuid))
 	}
@@ -788,6 +806,7 @@ func (d *binDCERPC) retainedBytes() int64 {
 		n += int64(len(name))
 	}
 	n += int64(len(d.pendingContext)) * 16
+	n += int64(len(d.pendingGeneration)) * dcerpcPendingGenerationCharge
 	for _, fragment := range d.frags {
 		n += dcerpcFragmentCharge + int64(cap(fragment.body)) + int64(cap(fragment.pieces))*dcerpcFragmentPieceCharge
 	}

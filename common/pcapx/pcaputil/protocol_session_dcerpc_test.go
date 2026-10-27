@@ -472,7 +472,7 @@ func TestProtocolSessionDCERPCBudgetsDirectionAndBigEndian(t *testing.T) {
 	// independently of the per-message ceiling.
 	budget = DefaultParserBudget()
 	budget.MaxMessageBytes = 128
-	budget.MaxBufferedBytes = 263 + 16 // The Bind also reserves its optional immutable PDU owner.
+	budget.MaxBufferedBytes = 263 + 16 + 32 // PDU owner plus private generation state/map entry.
 	s, err = NewProtocolSession(budget)
 	require.NoError(t, err)
 	require.Nil(t, s.Feed(0, ts, dcerpcBind(dcerpcEPM, 0, 1)).Err)
