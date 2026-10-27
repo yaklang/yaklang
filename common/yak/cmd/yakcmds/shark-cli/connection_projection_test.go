@@ -5,7 +5,27 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
+
+func TestConnectionIdentityRetainsPacketDiagnosticOnRedraw(t *testing.T) {
+	for _, tc := range []struct{ status, code, reason string }{
+		{"malformed", "MalformedMessage", "ssh-plaintext: Ed25519 Signature Bytes requires 64 bytes"},
+		{"limited", "ResourceExceeded", "SSH retained field budget exhausted"},
+	} {
+		e := &pcaputil.ProtocolEvent{Protocol: "ssh", Transport: "tcp", Status: tc.status, ExpertCode: tc.code, Error: tc.code + ": " + tc.reason}
+		row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Protocol: "TCP", Transport: "tcp", packetProtocol: "TCP", payloadBytes: 192, Layers: []string{"Loopback", "IPv4", "TCP"}})
+		require.Equal(t, tc.status, row.ProtocolStatus)
+		require.Equal(t, "protocol parser diagnostic", row.ProtocolEvidence)
+		first := applyApplication(row, "SSH", "validated protocol events", 1)
+		require.Equal(t, "SSH", first.Protocol)
+		require.Equal(t, tc.status, first.ProtocolStatus)
+		require.Equal(t, "connection-associated diagnostic", first.ProtocolScope)
+		require.Contains(t, first.Info, tc.reason)
+		require.NotContains(t, first.Info, "no complete decoded message")
+		require.Equal(t, first, applyApplication(first, "SSH", "validated protocol events", 1))
+	}
+}
 
 func TestConnectionProjectionRetainsPayloadScopeOnRedraw(t *testing.T) {
 	row := packetSummary{Protocol: "TCP", Transport: "tcp", packetProtocol: "TCP", payloadBytes: 100,
