@@ -1,3 +1,33 @@
+# Legion Node source retirement
+
+New Yaklang builds no longer contain the Legion Node adapter, transport, copied
+protocols, or Node/Session Runtime producers. Use the `yaklang-node` executable
+from Legion (`VillanCh/legion`, `services/node`). `yak node` fails with a migration
+message, including when passed historical flags; it never enrolls a node.
+`yak distyak` continues to use the public `common/yak/distyak` implementation.
+
+Existing tagged releases and immutable artifacts remain available for the
+supported upgrade/rollback window. Removing source from main does not remove
+installed nodes, state, credentials, release indexes or historical protocol
+support. Historical source checks must select an exact pre-retirement commit;
+they must not follow Yaklang main. New development uses Legion's independent
+module and its immutable public engine dependency.
+
+The retirement merge gates and remaining fleet/architecture acceptance are tracked
+in https://github.com/VillanCh/legion/issues/710. Source verification is distinct
+from exact-artifact rollout acceptance; do not infer that all existing nodes have
+migrated or that a support window has ended from this source change.
+
+Public SSA/SyntaxFlow, AI/ReAct, HIDS, Docker HTTP, shared workspace helpers and
+engine contracts remain owned by Yaklang. The public engine never imports Legion.
+Node capabilities and packaging tests belong in Legion; public HIDS and optional
+DM driver tests remain in this repository.
+
+## Historical transport design
+
+The following records the pre-migration implementation and is not a current
+source map or operating procedure.
+
 # Legion Node Session And Job Bridge Refactor
 
 更新时间：2026-08-20

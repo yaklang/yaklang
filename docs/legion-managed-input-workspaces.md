@@ -1,3 +1,7 @@
+> Historical Legion Node documentation. Current adapter, build and release ownership
+> is in Legion `services/node`. See [source retirement](legion-node-session-transport-refactor.md).
+> Commands below refer to an exact historical Yaklang checkout, not current main.
+
 # Legion managed input workspaces
 
 Legion authorizes attachments and sends a versioned `InputManifest` in the typed
