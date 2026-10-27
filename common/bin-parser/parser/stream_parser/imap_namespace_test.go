@@ -8,6 +8,10 @@ import (
 )
 
 func TestIMAPNamespaceFieldsGroupsExtensionsAndBoundaries(t *testing.T) {
+	_, empty, emptyErr := decodeIMAPFields([]byte("* NAMESPACE ((\"\" \"/\")) NIL NIL\r\n"), "response")
+	require.NoError(t, emptyErr)
+	emptyPrefix := empty["Personal Namespaces"].(map[string]any)["Entries"].([]map[string]any)[0]["Prefix"]
+	require.Equal(t, []byte{}, emptyPrefix, "an observed empty prefix is an empty byte vector, not an absent value")
 	for _, wire := range []string{
 		"* NAMESPACE ((\"\" \"/\")) NIL NIL\r\n",
 		"* NAMESPACE NIL ((\"~\" NIL)) ((\"#shared/\" \"/\")(\"#other.\" \".\" \"X-AUDIT\" (\"one\" \"two\")))\r\n",

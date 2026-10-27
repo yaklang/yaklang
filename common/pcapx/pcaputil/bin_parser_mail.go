@@ -36,6 +36,7 @@ type binIMAP struct {
 	protectionUncertain string
 	idle                *imapIdle
 	namespaces          map[string]*imapNamespaceRequest
+	peerCaptureGap      bool
 }
 
 type binPOP3 struct {

@@ -91,3 +91,32 @@ func TestIMAPNamespaceAmbiguityAndIdleRefusal(t *testing.T) {
 	r := role.Feed(1, time.Unix(1, 0), mailCR("a IDLE"))
 	require.NotNil(t, r.Err)
 }
+
+func TestIMAPIdleMissingPeerBytesIsContextAndLateDeliveryRecovers(t *testing.T) {
+	s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionClientDirection(0))
+	require.NoError(t, err)
+	defer s.Close("test")
+	native := s.(*captureSession)
+	ts := time.Unix(1, 0)
+	require.Nil(t, s.Feed(1, ts, mailCR("* OK IMAP4rev1 ready")).Err)
+	command := s.Feed(0, ts, mailCR("a IDLE"))
+	require.Nil(t, command.Err)
+	native.f.plaintextGap[1] = true
+	missing := s.Feed(0, ts, mailCR("DONE"))
+	require.NotNil(t, missing.Err)
+	require.Equal(t, ErrContextRequired, missing.Err.Kind)
+	require.Len(t, missing.Events, 1)
+	require.Equal(t, "context-required", missing.Events[0].Status)
+	require.Zero(t, missing.Events[0].ResponseTo)
+	originalSession := cloneSession(missing.Events[0].Session)
+	late := s.Feed(1, ts, mailCR("+ idling"))
+	require.Nil(t, late.Err)
+	require.Equal(t, command.Events[0].ID, late.Events[0].ResponseTo)
+	native.f.plaintextGap[1] = false
+	completion := s.Feed(1, ts, mailCR("a OK idle complete"))
+	require.Nil(t, completion.Err)
+	require.Equal(t, command.Events[0].ID, completion.Events[0].ResponseTo)
+	require.Equal(t, originalSession, missing.Events[0].Session, "late evidence never rewrites a published observation")
+	require.Nil(t, s.Feed(0, ts, mailCR("a NOOP")).Err)
+	require.Nil(t, s.Feed(1, ts, mailCR("a OK reused")).Err)
+}

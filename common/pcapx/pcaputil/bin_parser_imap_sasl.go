@@ -86,6 +86,10 @@ func (s *binIMAP) consumeSASL(dir int, raw []byte, fields []string) (map[string]
 	if a != nil {
 		if dir == a.client {
 			if !a.waiting || a.canceled || a.quarantined {
+				if s.peerCaptureGap && !a.waiting && !a.canceled {
+					a.quarantined = true
+					return imapExtensionContext("imap-sasl-observed", "SASL challenge/completion is behind an observed peer TCP delivery gap")
+				}
 				a.quarantined, a.waiting = true, false
 				return s.saslRefusal("unexpected-response", "client data has no outstanding server challenge")
 			}
@@ -202,6 +206,14 @@ func (s *binIMAP) consumeSASL(dir int, raw []byte, fields []string) (map[string]
 
 func (f *binFlow) consumeIMAP(dir int, e *ProtocolEvent) error {
 	s := f.imap
+	s.peerCaptureGap = f.plaintextGap[1-dir]
+	if tf := f.transportFlow; tf != nil {
+		peer := tf.ServerConn
+		if dir == 1 {
+			peer = tf.ClientConn
+		}
+		s.peerCaptureGap = s.peerCaptureGap || tf.reassemblyIncomplete || peer != nil && peer.pendingBytes > 0
+	}
 	before := s.sasl
 	beforeIdle := s.idle
 	words := bytes.Fields(e.Raw)

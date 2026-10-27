@@ -28,6 +28,9 @@ func (r *imapFieldsReader) namespaceGroup(name string) map[string]any {
 		start, fs := r.at, len(r.fields)
 		r.exact("Namespace Descriptor Open", "(")
 		prefix := r.stringValue("Namespace Prefix", "string")
+		if prefix.value == nil {
+			prefix.value = []byte{}
+		}
 		r.sp()
 		delimiter := r.stringValue("Namespace Hierarchy Delimiter", "nstring")
 		if delimiter.kind != "nil" && (delimiter.kind != "quoted" || len(delimiter.value) != 1) {
@@ -43,9 +46,15 @@ func (r *imapFieldsReader) namespaceGroup(name string) map[string]any {
 			r.items++
 			r.sp()
 			extName := r.stringValue("Namespace Extension Name", "string")
+			if extName.value == nil {
+				extName.value = []byte{}
+			}
 			r.sp()
 			values := r.list("Namespace Extension Values", 1, func() map[string]any {
 				v := r.stringValue("Namespace Extension Value", "string")
+				if v.value == nil {
+					v.value = []byte{}
+				}
 				return map[string]any{"Value": v.value, "Encoding": v.kind, "Encoded Byte Ranges": v.ranges}
 			})
 			extensions = append(extensions, map[string]any{"Name": extName.value, "Values": values, "Semantics Validated": false})
