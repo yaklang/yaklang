@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
 	"sort"
@@ -47,6 +48,18 @@ type fragmentStore struct {
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
+	if failure := p.ErrorLayer(); failure != nil {
+		var version *ipVersionError
+		if errors.As(failure.Error(), &version) {
+			// A decoder's partial layer cannot admit a fragment/tunnel/native
+			// message, advance clocks, or create an application connection.
+			// Keep only the validated outer domain and literal physical source.
+			fields := map[string]any{"Observed IP Version": version.observed, "Expected IP Version": version.expected}
+			a.malformed.Add(1)
+			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: "malformed", Completeness: "malformed", ExpertCode: "IPVersionMismatch", Error: version.Error(), Summary: version.Error(), Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+			return nil, true
+		}
+	}
 	if a.observeSTP(p, e) {
 		return nil, true
 	}

@@ -156,12 +156,24 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated, datagramDecodeAs: b.datagramDecodeAs})
 }
 
+type ipVersionError struct{ observed, expected uint8 }
+
+func (e *ipVersionError) Error() string {
+	return fmt.Sprintf("invalid IPv%d version %d", e.expected, e.observed)
+}
+
 // gopacket 1.3.1 returns at the IPv4 end-of-options marker before assigning
 // fixed header fields. Reset reusable state and finish those fields only after
 // its length/option checks succeed. Both fresh and private decoding share this
 // adapter, so valid EOL padding is accepted without borrowing prior endpoints.
 func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFeedback) error {
 	*ip = layers.IPv4{Options: ip.Options[:0]}
+	// Validate the complete fixed header before the dependency can expose
+	// partial addresses/fragment flags and return an unrelated option error.
+	// A short captured header still takes its existing truncation path.
+	if len(data) >= 20 && data[0]>>4 != 4 {
+		return &ipVersionError{observed: data[0] >> 4, expected: 4}
+	}
 	if err := ip.DecodeFromBytes(data, feedback); err != nil {
 		return err
 	}
@@ -175,7 +187,7 @@ func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFe
 		ip.SrcIP, ip.DstIP = net.IP(data[12:16]), net.IP(data[16:20])
 	}
 	if ip.Version != 4 {
-		return fmt.Errorf("invalid IPv4 version %d", data[0]>>4)
+		return &ipVersionError{observed: data[0] >> 4, expected: 4}
 	}
 	return nil
 }
@@ -195,7 +207,7 @@ func decodeProtocolIPv6(ip *layers.IPv6, data []byte, feedback gopacket.DecodeFe
 		return fmt.Errorf("IPv6 header truncated: %d of 40 bytes", len(data))
 	}
 	if data[0]>>4 != 6 {
-		return fmt.Errorf("invalid IPv6 version %d", data[0]>>4)
+		return &ipVersionError{observed: data[0] >> 4, expected: 6}
 	}
 	declared := int(binary.BigEndian.Uint16(data[4:6]))
 	if declared == 0 {
