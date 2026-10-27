@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -572,12 +572,6 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		}
 	}
 
-	// diff 的两侧必须是同一形态。参与增量序列的编译已禁止归档展开
-	// （disableArchiveExpansion），newFS 与 baseFS 都保持裸形态；这里
-	// 仍然过一遍语言预处理，保证非归档相关的映射（如 .class→.java）与
-	// 全量编译一致。历史上归档展开过的 base（展开条目形如
-	// lib/foo.jar/com/x/A.java）由 diff 域过滤排除（isRawArchiveDiffEntry
-	// 匹配归档内部路径），不会产生幻影删除。
 	newFSForDiff := c.swapLanguageFs(c.fs)
 	c.Processf(0.09, "diff inputs aligned: new filesystem keeps archives un-expanded (incremental compile forbids jar/zip expansion)")
 
@@ -939,22 +933,8 @@ func calculateFileSystemDiff(baseFS, newFS fi.FileSystem, exclude ExcludeFunc, p
 // The raw-file suffix set delegates to javaclassparser.IsArchiveFile so it
 // stays in lockstep with the archives the preprocessor actually expands.
 func isRawArchiveDiffEntry(pathname string) bool {
-	return javaclassparser.IsArchiveFile(pathname) || isArchiveExpandedDiffPath(pathname)
+	return javaclassparser.IsArchiveFile(pathname)
 }
-
-// isArchiveExpandedDiffPath matches paths that live inside an archive
-// (lib/foo.jar/com/x/A.java) by spotting ".jar/", ".zip/", ... segments.
-func isArchiveExpandedDiffPath(pathname string) bool {
-	lower := strings.ToLower(strings.ReplaceAll(pathname, "\\", "/"))
-	for _, ext := range rawArchiveDiffSegmentSuffixes {
-		if strings.Contains(lower, ext+"/") {
-			return true
-		}
-	}
-	return false
-}
-
-var rawArchiveDiffSegmentSuffixes = []string{".jar", ".war", ".ear", ".par", ".zip"}
 
 func hasDeleteEntries(fileHashMap map[string]int) bool {
 	for _, v := range fileHashMap {
