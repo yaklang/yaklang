@@ -427,6 +427,15 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	})
 	b.protocols = "|quic|http3|doq|"
 	out = append(out, b)
+	for _, padding := range []struct{ name, key string }{{"quic.datagram.padding_length", "Datagram Padding Length"}, {"quic.datagram.padding_offset", "Datagram Offset"}} {
+		padding := padding
+		b := displayCustom("quic", padding.name, "Observed unprotected UDP datagram padding; not a protected QUIC PADDING frame", DisplayUnsigned, 32, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if e.nativeQUICObservation && e.Admission == "observed-datagram-padding" {
+				emit(e.semanticSession[padding.key])
+			}
+		})
+		out = append(out, b)
+	}
 	for _, spec := range []struct {
 		name, key string
 		typ       DisplayFieldType

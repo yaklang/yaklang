@@ -218,7 +218,37 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 	var events []*ProtocolEvent
 	var datagramCID []byte
+	datagramAuthenticated, lastLongBoundary := false, false
 	for off := 0; off < len(wire); {
+		// RFC9312 2.4 also describes unused UDP payload after an Initial.
+		// Observe only an all-zero suffix at a declared long-packet boundary
+		// following authenticated wire in this datagram. It is not a protected
+		// QUIC PADDING frame and grants no packet/application authentication.
+		if datagramAuthenticated && lastLongBoundary && el != nil && wire[off] == 0 && bytes.Count(wire[off:], []byte{0}) == len(wire)-off {
+			e := *base
+			e.ID, e.FlowID, e.ResponseTo, e.TransactionID = a.ids.Add(1), f.id, 0, 0
+			e.Protocol, e.Profile, e.Direction = "quic", quicNativeProfile(f.quic.effectiveVersion()), dir
+			e.Length = len(wire) - off
+			e.nativeQUICObservation = true
+			e.Completeness, e.Admission = "datagram-padding", "observed-datagram-padding"
+			e.Session = map[string]any{"Packet Name": "Datagram padding", "Datagram Offset": off, "Datagram Padding Length": uint64(len(wire) - off), "Authentication Verified": false, "Peer Identity Verified": false, "Payload Delivery": "unprotected UDP bytes; not delivered to QUIC packet or application state", "Wire Field Ranges": map[string]any{"Datagram Padding": []any{0, len(wire) - off}}}
+			e.semanticSession = cloneSession(e.Session)
+			e.semanticFields = map[string]any{"Datagram Padding": bytes.Clone(wire[off:])}
+			var paddingError error
+			if len(events) >= a.budget.MaxCollectionElements {
+				e.Session, e.semanticSession, e.semanticFields = nil, nil, nil
+				e.Completeness, e.Admission = "datagram", "unparsed-datagram-remainder"
+				paddingError = protocolError(ErrResourceExceeded, "QUIC packet/conversation budget")
+			}
+			a.finishProtocolDatagram(&e, wire[off:], nil, paddingError)
+			e.Summary = fmt.Sprintf("Datagram padding · offset=%d · %d bytes · unprotected UDP bytes", off, len(wire)-off)
+			if paddingError != nil {
+				e.Summary = fmt.Sprintf("Unparsed QUIC datagram remainder · offset=%d · %d bytes · authentication not verified", off, len(wire)-off)
+				f.retireQUICUDP()
+			}
+			events = append(events, &e)
+			break
+		}
 		e := *base
 		e.Protocol = "quic"
 		e.Profile = quicNativeProfile(f.quic.effectiveVersion())
@@ -394,6 +424,8 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// native event; mutable public labels/caches cannot grant success.
 		e.semanticSession = cloneSession(e.Session)
 		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
+		datagramAuthenticated = datagramAuthenticated || e.Admission == "authenticated-wire-and-observed-CID" && e.Session["Authentication Verified"] == true
+		lastLongBoundary = bounded && h.long && size == h.size && !rejectedCID
 		if e.Admission == "unparsed-datagram-remainder" {
 			e.Summary = fmt.Sprintf("Unparsed QUIC datagram remainder · offset=%d · %d bytes · authentication not verified", off, size)
 		}
