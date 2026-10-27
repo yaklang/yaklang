@@ -1,6 +1,6 @@
 {
-  "scope": "Literal counts refreshed after complete ordered SDK/CLI export equality. Capture identities, labels, values, flow/session/source and PDU-reference facts remain exact; no normalization. Original reference-label counts are reused only for these same immutable inputs.",
-  "source": "5986535b9d",
+  "scope": "Literal counts refreshed after complete ordered SDK/CLI export comparison. Only one independently certified SSH Edwards inner-field expansion per capture is allowed; all other values, types, identities, flow/session/source associations and record order remain exact. Original reference-label counts remain tied to the same immutable inputs.",
+  "source": "6829457341",
   "generator_sha256": "84c2d20369593aa1b71f5c73fcdd8208f204fafc49db107e933262acd6641905",
   "inputs": {
     "weber": {
@@ -1237,16 +1237,18 @@
         }
       ],
       "reference_summary_sha256": "d1dabd7495793f96e274db82128fc33be849e561d0dda75b2995ffad2840558d",
-      "SDK_export_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+      "SDK_export_sha256": "6aca37a890628409a19e85a2345a29679288871df2d1cf2d1b6a82af52f1eb05",
       "CLI_export_sha256": "821d29268aa17ce573e43975ca03241f1db86dfb783a3c5deedc51fcb2449159",
-      "SDK_invariants_sha256": "fdedb0e200977e50d50c1920c3d75f93cfbbeb252817b0f3ce1ebb0a93c76031",
+      "SDK_invariants_sha256": "9213ad0bd7bbed9b35c0201a136339d5737814d470912f863e3e5d630b7fe350",
       "CLI_invariants_sha256": "270f690bd3949aa631e5d521f1bc7204e8e2a4bf14924c8c3bf9331664ea6315",
       "header_certificate_sha256": "04ce9ca2521e0c6ae6fa138bd446829a32eea471e421723e0725ca7bd654e5bd",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
       "previous_recovery_SDK_invariants_sha256": "aba940dacc59393b21fde29b62d5ca7084da929c3062c04cb8c12474235f3847",
       "previous_recovery_CLI_invariants_sha256": "6e8bac2128b40eac67e02e4375eea993012f2afca9ae1e10be3b97ac7717d877",
-      "exact_ordered_export_equality_without_ID_or_field_normalization": true
+      "exact_ordered_export_equality_without_ID_or_field_normalization": false,
+      "certified_Edwards_inner_field_expansions": 1,
+      "all_other_values_types_order_and_IDs_exact": true
     },
     "sharon": {
       "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
@@ -14417,19 +14419,22 @@
         }
       ],
       "reference_summary_sha256": "88e582b8f94b1a2c548fa9feabef2bcd00a0e4df963de52998ccd5bc37fdbd6b",
-      "SDK_export_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+      "SDK_export_sha256": "7de00a8c05af5ac72f7f54f18eb2bdc0d77726e8a7b02936d3f5bf40ec0d7369",
       "CLI_export_sha256": "81850c8e7dfbb1879d43e48fc6fc9b88a287b4b7b91ca8361153ea5898cf69dc",
-      "SDK_invariants_sha256": "7c4948297705f9c3ad2db464cbf91aa09d596553ae8d0707deff8ea7d39e0dda",
+      "SDK_invariants_sha256": "0f2e14e88db62f8249e1aaebfbcc8f53865436e7b1d497b69a28343c6b2adcda",
       "CLI_invariants_sha256": "cd361a40b165e074451f92ab087f50098ae5e1b6effef877e217ee6567ab6e3b",
       "header_certificate_sha256": "dc6ad7d541f67be63e01a370170ea78a1f81389225f821ca6ebcc4a4f2d178e7",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
       "previous_recovery_SDK_invariants_sha256": "caec9a848d838e622f04ec4997ae7225cdcd39f0b8973620bbc3bc937f55e7a7",
       "previous_recovery_CLI_invariants_sha256": "d3f44b6673738b6317c502b1f6077f4d47d28f13ed89ec6c1e632f038fc2e633",
-      "exact_ordered_export_equality_without_ID_or_field_normalization": true
+      "exact_ordered_export_equality_without_ID_or_field_normalization": false,
+      "certified_Edwards_inner_field_expansions": 1,
+      "all_other_values_types_order_and_IDs_exact": true
     }
   },
-  "prior_count_snapshot_sha256": "5b5c98e2b6d9450d611a10c3213676c6fcdb2dce1bb9eaaa9c18afed20eb3f58",
-  "previous_source": "0edee7f77b",
-  "refresh_audit_source": "279958f1be"
+  "prior_count_snapshot_sha256": "fd303eebf04d414fb7eaea6925616e0c4a62e0b510d661bfc0484c3fe14fcb70",
+  "previous_source": "5986535b9d",
+  "refresh_audit_source": "78c563ea06",
+  "refresh_generator_sha256": "28603c605a00b0140986ea317251311c5c89ad3b919d827ea715ab2cfe1bfed2"
 }
