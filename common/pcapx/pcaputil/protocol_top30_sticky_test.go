@@ -14,10 +14,11 @@ import (
 func TestTop30StreamSegmentationAndStickyAdmission(t *testing.T) {
 	var cases []m1Sample
 	for _, c := range m1SessionSamples(t) {
-		if c.name == "ssh-kex-newkeys" { // Valid companion; the sealed original remains a one-byte Curve25519 negative.
+		if c.name == "ssh-kex-newkeys" { // Valid companion; the sealed original retains both invalid key/signature lengths.
 			c.name = "ssh-valid-curve-newkeys"
 			c.steps = append([]sessionStep(nil), c.steps...)
 			c.steps[4].wire = sshValidCurveInit()
+			c.steps[5].wire = sshValidCurveReply()
 		}
 		if c.name == "snmpv3-get-response" {
 			// The historical mixed sample deliberately changes contextEngineID
