@@ -251,7 +251,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	v := eventValues(e)
 	if e.Protocol == "ssh" {
 		parts := []string{textValue(v["Packet Name"])}
-		for _, key := range []string{"Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Identification"} {
+		for _, key := range []string{"Negotiation Context", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Identification"} {
 			if value := textValue(v[key]); value != "" {
 				parts = append(parts, value)
 			}
