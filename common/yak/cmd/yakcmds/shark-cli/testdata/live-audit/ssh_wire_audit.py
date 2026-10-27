@@ -61,6 +61,8 @@ for key,ss in segments.items():
   r={'key':key,'start':offset,'end':offset+size,'raw':raw,'type':kind,'fields':fields};records[(key,sha(raw))]=r;expected[(key,sha(raw))]+=1;offset+=size
   if code==21:break
 observed=collections.Counter();flows={};selected_count=collections.Counter();seen_offers=set();known_roles={port:bool(syn[(port,0)]and syn[(port,1)])for port in ops};events=native(a.events);refmatched=0;refmissing=[];source_checks=0
+soft=m.get('declared_nonconforming_server_identification');warned={};warning_pdus=0;opaque_warning_pdus=0
+endpoint_orientation={}
 def leaves(o,key):
  if isinstance(o,dict):
   for k,v in o.items():
@@ -89,7 +91,20 @@ selected_keys=['Kex Algorithm','Host Key Algorithm','Encryption C2S','Encryption
 ws_names={'Identification':'ssh.protocol','Kex Algorithms':'ssh.kex_algorithms','Host Key Algorithms':'ssh.server_host_key_algorithms','Offered Encryption C2S':'ssh.encryption_algorithms_client_to_server','Offered Encryption S2C':'ssh.encryption_algorithms_server_to_client','Offered MAC C2S':'ssh.mac_algorithms_client_to_server','Offered MAC S2C':'ssh.mac_algorithms_server_to_client','Offered Compression C2S':'ssh.compression_algorithms_client_to_server','Offered Compression S2C':'ssh.compression_algorithms_server_to_client','Languages C2S':'ssh.languages_client_to_server','Languages S2C':'ssh.languages_server_to_client','Message Number':'ssh.message_code'}
 for e in events:
  s=e.get('session')or{}
- if e['protocol']!='ssh'or'Packet Name'not in s:continue
+ if e['protocol']!='ssh':continue
+ sport=int(e['source'].rsplit(':',1)[1]);dport=int(e['destination'].rsplit(':',1)[1]);port=sport if sport in ops else dport;check(port in ops,'native SSH endpoint belongs to the actual capture');direction=1 if sport==port else 0;check(e['direction']in[0,1],'native logical endpoint index is binary');endpoint_orientation.setdefault(port,e['direction']^direction);eq(e['direction']^direction,endpoint_orientation[port],'logical endpoint indexing is stable across both actual directions')
+ if soft and s.get('Identification')==soft:
+  check(direction==1,'declared nonconformant identifier belongs to the actual server')
+  warned[port]="endpoint %d: softwareversion uses '-' (RFC4253 4.2)"%e['direction']
+ if port in warned:
+  eq(s.get('Identification Conformance'),'nonconformant','nonconformant literal identifier never becomes a conformant transport')
+  eq(s.get('Identification Warning'),warned[port],'warning persists after the observed identification, including opaque transport')
+  vals=(e.get('field_values')or{}).get('values',[])
+  for name,value in [('ssh.identification.conformance','nonconformant'),('ssh.identification.warning',warned[port])]:
+   bound=[v for v in vals if v['name']==name];eq(len(bound),1,'one queryable identification evidence field');eq(bound[0]['value'],value,'literal context warning projection');eq(bound[0]['origin'],'context','warning is context, not a fabricated wire field');check('pdu_range'not in bound[0],'warning has no invented byte range')
+  warning_pdus+=1;opaque_warning_pdus+='Packet Name'not in s
+ else:check('Identification Conformance'not in s and'Identification Warning'not in s,'a compatibility warning cannot precede its observed nonconformant identity or appear on a conformant connection')
+ if'Packet Name'not in s:continue
  sport=int(e['source'].rsplit(':',1)[1]);dport=int(e['destination'].rsplit(':',1)[1]);port=sport if sport in ops else dport;check(port in ops,'native captured endpoint');key=(port,1 if sport==port else 0);raw=base64.b64decode(e['raw']or'');lookup=(key,sha(raw));check(lookup in records,('native PDU is an exact independently reassembled initial message',e['id'],s['Packet Name']));r=records[lookup];observed[lookup]+=1;eq(e['source_bytes']['SHA256'],sha(raw),'owned literal PDU digest');check(e['flow'],'native connection retained');flows.setdefault(port,e['flow']);eq(flows[port],e['flow'],'one observed connection per actual endpoint pair');cursor=r['start'];intervals=[]
  for pr in e['source_bytes']['PacketRefs']:
   f=frames[pr['Number']];check(f and f['complete']and f['key']==key,'each contributing physical packet is complete and belongs to this direction');start=(f['seq']-bases[key])&0xffffffff;end=start+len(f['payload']);check(start<r['end']and end>r['start'],'physical contributor intersects logical message');intervals.append((start,end));source_checks+=1
@@ -128,4 +143,5 @@ if a.before:
   if e['protocol']!='ssh':continue
   sport=int(e['source'].rsplit(':',1)[1]);dport=int(e['destination'].rsplit(':',1)[1]);port=sport if sport in ops else dport
   if port in ops and'Kex Algorithm'in s:wrong_before+=any(name in s and s[name]!=value for name,value in ops[port]['client_selected'].items())
-out={'scope':__doc__,'profile':a.profile,'checks':checks,'physical_frames':len(frames),'native_connections':len(flows),'complete_initial_PDUs':sum(expected.values()),'physical_source_checks':source_checks,'known_TCP_roles':known_roles,'PDUs_compared_to_reference':refmatched,'reference_unavailable_initial_PDUs':refmissing,'baseline_PDUs_with_wrong_selected_algorithms':wrong_before,'selected_algorithm_comparisons':sum(selected_count.values()),'capture_sha256':sha(w),'manifest_sha256':sha(a.manifest.read_bytes()),'events_sha256':sha(a.events.read_bytes()),'oracle_sha256':sha(a.oracle.read_bytes()),'before_events_sha256':sha(a.before.read_bytes())if a.before else None};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps(out))
+if soft:eq(set(warned),set(ops),'all five actual nonconformant server identifiers observed')
+out={'scope':__doc__,'profile':a.profile,'checks':checks,'physical_frames':len(frames),'native_connections':len(flows),'complete_initial_PDUs':sum(expected.values()),'physical_source_checks':source_checks,'known_TCP_roles':known_roles,'PDUs_compared_to_reference':refmatched,'reference_unavailable_initial_PDUs':refmissing,'baseline_PDUs_with_wrong_selected_algorithms':wrong_before,'selected_algorithm_comparisons':sum(selected_count.values()),'declared_nonconforming_server_identification':soft,'PDUs_with_persistent_identification_warning':warning_pdus,'opaque_PDUs_with_persistent_identification_warning':opaque_warning_pdus,'capture_sha256':sha(w),'manifest_sha256':sha(a.manifest.read_bytes()),'events_sha256':sha(a.events.read_bytes()),'oracle_sha256':sha(a.oracle.read_bytes()),'before_events_sha256':sha(a.before.read_bytes())if a.before else None};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n',encoding='utf8');print(json.dumps(out))
