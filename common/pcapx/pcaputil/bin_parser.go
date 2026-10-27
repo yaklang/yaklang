@@ -1584,6 +1584,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			var err error
 			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" {
 				result = map[string]any{}
+			} else if f.protocol == "ssh" && e.Entry == "SSHPacket" {
+				// Packet numbers 30..49 depend on the observed exchange. Decode
+				// their generic envelope first, never the legacy fixed-DH layout.
+				var fields map[string]any
+				fields, err = stream_parser.DecodeSSHInitialPacket(e.Raw, "transport")
+				result = map[string]any{"fields": fields["Wire Fields"]}
 			} else if f.protocol == "tls" {
 				if f.byteSource == "decrypted" {
 					err = protocolError(ErrUnsupportedFeature, "nested TLS carrier")
@@ -1613,6 +1619,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if err == nil && e.Protocol == "ssh" {
+					e.semanticSession = cloneSession(e.Session)
+					if fields, ok := e.Session["Initial Packet Fields"].(map[string]any); ok {
+						result = map[string]any{"fields": cloneSession(fields)}
+					}
+				}
 				if e.nativeSessionMessage {
 					result = map[string]any{"fields": cloneSession(e.Session)}
 				}
@@ -1740,7 +1752,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "ssh" || e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
