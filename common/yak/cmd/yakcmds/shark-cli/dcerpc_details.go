@@ -3,6 +3,9 @@ package sharkcli
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
+
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
 var dcerpcDetailPriority = map[string]int{
@@ -10,6 +13,33 @@ var dcerpcDetailPriority = map[string]int{
 	"Result": 3, "Ack Result": 3, "Reason": 4, "Ack Reason": 4,
 	"Abstract Syntax": 5, "Interface Version Major": 6, "Interface Version Minor": 7,
 	"Transfer Syntax": 8, "Transfer Version": 9, "Bind Time Feature Proposal": 10,
+}
+
+func dcerpcEventSummary(e *pcaputil.ProtocolEvent) (string, bool) {
+	if e.Protocol != "dcerpc" || e.Profile == "dcerpc-security-envelope" || e.Error != "" || (e.Status != "decoded" && e.Status != "deferred") {
+		return "", false
+	}
+	v := eventValues(e)
+	name := textValue(v["Packet Name"])
+	if name == "" {
+		return "", false
+	}
+	parts := []string{name, fmt.Sprintf("call=%d", number(v["Call ID"]))}
+	if context, ok := v["Context ID"]; ok {
+		parts = append(parts, fmt.Sprintf("context=%d", number(context)))
+	}
+	if e.ResponseTo != 0 {
+		parts = append(parts, fmt.Sprintf("reply to PDU #%d", e.ResponseTo))
+		if request := textValue(v["Matched Request"]); request != "" {
+			parts = append(parts, request)
+		}
+	} else if v["Unmatched"] == true {
+		parts = append(parts, "unmatched: "+textValue(v["Association Status"]))
+	}
+	if v["Fragment"] == true {
+		parts = append(parts, "RPC fragment")
+	}
+	return strings.Join(parts, " · "), true
 }
 
 func dcerpcDetailValue(name string, value any, fallback string, result uint64, resultKnown bool) string {

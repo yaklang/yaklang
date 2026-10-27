@@ -14,6 +14,27 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
+func TestDCERPCReplySummaryAndProgressiveAssociation(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "dcerpc", Status: "decoded", ResponseTo: 42,
+		Session: map[string]any{"Packet Name": "Response", "Call ID": uint32(9), "Context ID": uint16(0), "Matched Request": "EPM.ept_lookup", "Association Status": "matched"}}
+	require.Equal(t, "Response · call=9 · context=0 · reply to PDU #42 · EPM.ept_lookup", applicationEventSummary(e))
+	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	var lines []string
+	for _, field := range fields {
+		lines = append(lines, field.text)
+		if strings.HasPrefix(field.text, "Response to PDU:") {
+			require.False(t, field.hasRange, "generated call links cannot masquerade as bytes")
+		}
+	}
+	require.Contains(t, strings.Join(lines, "\n"), "Response to PDU: #42 (observed request on this connection)")
+	e.ResponseTo = 0
+	e.Session = map[string]any{"Packet Name": "Response", "Call ID": uint32(9), "Context ID": uint16(0), "Unmatched": true, "Association Status": "missing-request"}
+	require.Equal(t, "Response · call=9 · context=0 · unmatched: missing-request", applicationEventSummary(e))
+	e.Profile = "dcerpc-security-envelope"
+	_, ok := dcerpcEventSummary(e)
+	require.False(t, ok, "opaque security envelopes retain their own presentation scope")
+}
+
 func TestDCERPCOrderedResultsLeadDetailsAndOwnDistinctRanges(t *testing.T) {
 	// A complete unassociated server ACK: no fictitious request IDs are needed
 	// to render the three observed result values and their original byte ranges.
