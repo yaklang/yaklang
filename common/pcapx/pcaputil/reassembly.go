@@ -212,7 +212,7 @@ func (t *TrafficConnection) queueFuture(seq uint32, payload []byte, fin bool, ts
 		return
 	}
 	opts := &t.Flow.pool.options
-	if len(t.waitGroup) >= opts.MaxPendingSegments || len(payload) > opts.MaxPendingBytes-t.pendingBytes || !t.Flow.pool.reservePending(len(payload), 1) {
+	if len(t.waitGroup)+t.Flow.pendingOpeningSegments(t) >= opts.MaxPendingSegments || len(payload) > opts.MaxPendingBytes-t.pendingBytes || !t.Flow.pool.reservePending(len(payload), 1) {
 		t.Flow.closeWithReason(TrafficFlowCloseReason_RESOURCE_LIMIT)
 		return
 	}
