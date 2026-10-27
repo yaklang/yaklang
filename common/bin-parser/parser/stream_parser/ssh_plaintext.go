@@ -77,6 +77,13 @@ func (r *sshPlaintextReader) str(name, typ string) []byte {
 	return r.take(name, typ, int(size))
 }
 
+func (r *sshPlaintextReader) fixedString(name string, size int) {
+	b := r.str(name, "raw")
+	if r.err == nil && len(b) != size {
+		r.err = fmt.Errorf("ssh-plaintext: %s requires %d bytes", name, size)
+	}
+}
+
 // DH values and RSA public components are nonnegative mpints. Zero is a valid
 // encoding (empty), not evidence of a usable key/group. Never do key arithmetic.
 func (r *sshPlaintextReader) mpint(name string) {
@@ -166,11 +173,18 @@ func (r *sshPlaintextReader) reply(exchange string, info map[string]any) {
 			return
 		}
 		info["Host Key Format"] = string(format)
-		if string(format) == "ssh-rsa" {
+		switch string(format) {
+		case "ssh-rsa":
 			sub.mpint("RSA Exponent")
 			sub.mpint("RSA Modulus")
 			info["Host Key Fields Decoded"] = true
-		} else {
+		case "ssh-ed25519":
+			sub.fixedString("Ed25519 Public Key", 32)
+			info["Host Key Fields Decoded"] = true
+		case "ssh-ed448":
+			sub.fixedString("Ed448 Public Key", 57)
+			info["Host Key Fields Decoded"] = true
+		default:
 			sub.take("Opaque Host Key Data", "raw", sub.end-sub.at)
 		}
 	})
@@ -194,6 +208,12 @@ func (r *sshPlaintextReader) reply(exchange string, info map[string]any) {
 		switch string(format) {
 		case "ssh-rsa", "rsa-sha2-256", "rsa-sha2-512":
 			sub.str("RSA Signature Bytes", "raw")
+			info["Signature Fields Decoded"] = true
+		case "ssh-ed25519":
+			sub.fixedString("Ed25519 Signature Bytes", 64)
+			info["Signature Fields Decoded"] = true
+		case "ssh-ed448":
+			sub.fixedString("Ed448 Signature Bytes", 114)
 			info["Signature Fields Decoded"] = true
 		default:
 			// Other format identifiers need not have the RSA string grammar.

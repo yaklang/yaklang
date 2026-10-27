@@ -114,7 +114,7 @@ func m1SessionSamples(t testing.TB) []m1Sample {
 			{0, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
 			{1, sshKex("curve25519-sha256", "ssh-ed25519", "aes128-ctr", "hmac-sha2-256", "none")},
 			{0, sshKexDHInit()},
-			{1, sshKexDHReply()},
+			{1, sshValidCurveReply()},
 			{0, sshNewKeys()},
 			{1, sshNewKeys()},
 		}},

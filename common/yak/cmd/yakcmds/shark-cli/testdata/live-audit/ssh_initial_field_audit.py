@@ -1,5 +1,5 @@
-"""Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.
-Use RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.
+"""Independently decode selected clear SSH DH/GEX/ECDH/RSA/EdDSA field layouts.
+Use RFC 4253/4419/5656/8709 binary strings and bounded cursors, not a Yak codec.
 Compare the entire native initial packet field tree with exact PDU bytes, then
 compare selected values with byte/frame-matched Wireshark views. This certifies
 framing, values and fingerprints, not DH mathematics, a signature or identity.
@@ -64,7 +64,7 @@ class Reader:
  def done(self):eq(self.p,len(self.b),'all mandatory bytes consumed exactly; no hidden trailing fields')
 def b64(w):return base64.b64encode(w).decode()
 def positive(w):check(bool(w)and w[0]<128 and(w[0]!=0 or len(w)>1 and w[1]>=128),'canonical positive SSH mpint')
-messages=[];profiles=collections.Counter();unselected=[];opaque_keys=[];reference_opaque_signatures=[];generic_packets=[]
+messages=[];profiles=collections.Counter();unselected=[];opaque_keys=[];typed_edwards_keys=[];reference_opaque_signatures=[];generic_packets=[]
 for line in a.events.open(encoding='utf-8-sig'):
  e=json.loads(line);s=e.get('session')or{};tree=s.get('Initial Packet Fields')
  if e['protocol']!='ssh'or e.get('entry')!='SSHPacket'or e['status']not in['decoded','deferred']:continue
@@ -106,20 +106,20 @@ for line in a.events.open(encoding='utf-8-sig'):
   if kind=='ssh-rsa':
    for name,field in[('RSA Exponent','ssh.host_key.rsa.e'),('RSA Modulus','ssh.host_key.rsa.n')]:
     w=h.string();positive(w);key[name+' Length']=len(w);key[name]=b64(w);expected_ref[field]=w
+  elif kind in['ssh-ed25519','ssh-ed448']:
+   name,size=('Ed25519',32)if kind=='ssh-ed25519'else('Ed448',57);w=h.string();eq(len(w),size,'RFC8709 '+name+' key length');key[name+' Public Key Length']=len(w);key[name+' Public Key']=b64(w);expected_ref['ssh.host_key.eddsa.key']=w;expected_ref['ssh.host_key.eddsa.key_length']=len(w);typed_edwards_keys.append({'PDU':e['id'],'host_key':kind,'key_bytes':len(w),'key_sha256':digest(w)})
   else:
-   key['Opaque Host Key Data']=b64(host[h.p:]);opaque_keys.append({'PDU':e['id'],'host_key':kind})
-   if kind=='ssh-ed25519':
-    w=h.string();eq(len(w),32,'RFC8709 Ed25519 key length');expected_ref['ssh.host_key.eddsa.key']=w;expected_ref['ssh.host_key.eddsa.key_length']=len(w)
-   else:unselected.append({'PDU':e['id'],'host_key':kind});h.p=len(host)
+   key['Opaque Host Key Data']=b64(host[h.p:]);opaque_keys.append({'PDU':e['id'],'host_key':kind});unselected.append({'PDU':e['id'],'host_key':kind});h.p=len(host)
   h.done();payload['Host Key']=key;item('Server Curve25519 Public Key'if curve else'Server Point'if ecdh else'Server Exchange Value','ssh.ecdh.q_s'if ecdh else'ssh.dh.f',not ecdh)
   sig=r.string();payload['Signature Length']=len(sig);expected_ref['ssh.host_sig.length']=len(sig);sr=Reader(sig);sig_type=sr.string().decode('ascii');opaque_sig=sig[sr.p:];sig_bytes=sr.string();sr.done();expected_ref.update({'ssh.host_sig.type':sig_type,'ssh.host_sig.type_length':len(sig_type)});signature={'Signature Format Length':len(sig_type),'Signature Format':sig_type}
   if sig_type in['ssh-rsa','rsa-sha2-256','rsa-sha2-512']:
    signature.update({'RSA Signature Bytes Length':len(sig_bytes),'RSA Signature Bytes':b64(sig_bytes)})
    if sig_type=='ssh-rsa':expected_ref['ssh.host_sig.rsa']=sig_bytes
    else:expected_ref['ssh.host_sig.data']=opaque_sig;reference_opaque_signatures.append({'PDU':e['id'],'signature_format':sig_type,'reference_field':'ssh.host_sig.data','native_inner_bytes_independently_decoded':True})
+  elif sig_type in['ssh-ed25519','ssh-ed448']:
+   name,size=('Ed25519',64)if sig_type=='ssh-ed25519'else('Ed448',114);eq(len(sig_bytes),size,'RFC8709 '+name+' signature length');signature.update({name+' Signature Bytes Length':len(sig_bytes),name+' Signature Bytes':b64(sig_bytes)});expected_ref['ssh.host_sig.data']=opaque_sig;reference_opaque_signatures.append({'PDU':e['id'],'signature_format':sig_type,'reference_field':'ssh.host_sig.data','native_inner_bytes_independently_decoded':True})
   else:
    signature['Opaque Signature Data']=b64(opaque_sig)
-   if sig_type=='ssh-ed25519':eq(len(sig_bytes),64,'RFC8709 Ed25519 signature length')
    expected_ref['ssh.host_sig.data']=opaque_sig
   payload['Signature']=signature
   eq(s.get('Host Key SHA256'),digest(host),'exact literal public host key digest');eq(s.get('Signature Verified'),False,'signature bytes are not signature verification');eq(s.get('Peer Identity Verified'),False,'public key bytes do not verify the peer')
@@ -131,4 +131,4 @@ for line in a.events.open(encoding='utf-8-sig'):
   elif isinstance(value,int):vals=[int(v)for v in vals]
   check(value in vals,('literal reference field',e['id'],field));ref_fields+=1
  profiles[method]+=1;messages.append({'PDU':e['id'],'message':code,'physical_frames':sorted(frames),'source':e['source'],'destination':e['destination'],'capture_domain':e['domain'],'raw_sha256':digest(raw),'field_tree_sha256':field_digest(expected)})
-out={'scope':__doc__,'checks':checks,'complete_method_PDUs':len(messages),'complete_generic_packet_PDUs':len(generic_packets),'method_profiles':dict(profiles),'native_literal_tree_fields_compared':wire_fields,'reference_fields_compared':ref_fields,'native_opaque_host_key_views':opaque_keys,'reference_opaque_signature_views':reference_opaque_signatures,'unselected_host_key_views':unselected,'unselected_reference_carriers':unselected_reference_carriers,'reference_attribution_differences':attribution_differences,'independent_wire_certificate_sha256':digest(a.wire_certificate.read_bytes())if a.wire_certificate else None,'compared_PDUs':messages,'generic_PDUs':generic_packets,'events_sha256':digest(a.events.read_bytes()),'oracle_sha256':digest(a.oracle.read_bytes())};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n');print(json.dumps({k:v for k,v in out.items()if k not in['scope','compared_PDUs','generic_PDUs']}))
+out={'scope':__doc__,'checks':checks,'complete_method_PDUs':len(messages),'complete_generic_packet_PDUs':len(generic_packets),'method_profiles':dict(profiles),'native_literal_tree_fields_compared':wire_fields,'reference_fields_compared':ref_fields,'native_opaque_host_key_views':opaque_keys,'native_typed_edwards_host_key_views':typed_edwards_keys,'reference_opaque_signature_views':reference_opaque_signatures,'unselected_host_key_views':unselected,'unselected_reference_carriers':unselected_reference_carriers,'reference_attribution_differences':attribution_differences,'independent_wire_certificate_sha256':digest(a.wire_certificate.read_bytes())if a.wire_certificate else None,'compared_PDUs':messages,'generic_PDUs':generic_packets,'events_sha256':digest(a.events.read_bytes()),'oracle_sha256':digest(a.oracle.read_bytes())};a.out.parent.mkdir(parents=True,exist_ok=True);a.out.write_text(json.dumps(out,indent=2)+'\n');print(json.dumps({k:v for k,v in out.items()if k not in['scope','compared_PDUs','generic_PDUs']}))
