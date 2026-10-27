@@ -1,0 +1,805 @@
+{
+  "scope": "Actual Windows clear EPM RPC fragmentation, exact opaque logical stubs and scoped source/field regression; not all-protocol or NDR-service conformance",
+  "native_source": "ba47d7a7e93e2d42da04b4a29678c7dced135ba3",
+  "CLI_source": "0bcb9289558365f441034f2daeeca522814d2101",
+  "audit_source": "ed5d11835bbee55de02c0261e703636a6b9ea8f4",
+  "capture_generator_sha256": "5dcb66973f15fd267ad9e0f51d31a759f3008b0c2c997ea3dcd3635499fcad9c",
+  "binaries_sha256": {
+    "events-fragments.exe": "f0819b40fb5a307c946ae4449bd13797530f53081900c9aec7f65412564db779",
+    "yak-fragments.exe": "9a233f4e62afb2590c6d8873f160d29e4f37727d58bf6781d04174873ed58730",
+    "yak-ui-final.exe": "dc88f33fa0087e1fba15f8322f3a0262a37066e3a7008aa895fa9e10cfc191f5"
+  },
+  "totals": {
+    "physical_frames": 380522,
+    "SDK_records": 285920,
+    "complete_RPC_wire_PDUs": 768,
+    "wire_checks": 1112513,
+    "numeric_links": 100,
+    "added_RPC_typed_values": 4133
+  },
+  "cases": [
+    {
+      "case": "duplicate-request-observation",
+      "capture_sha256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "physical_frames": 118,
+      "SDK_records": 58,
+      "complete_RPC_wire_PDUs": 56,
+      "wire_checks": 11596,
+      "numeric_links": 28,
+      "added_RPC_typed_values": 306,
+      "changed_RPC_records": 56,
+      "unchanged_RPC_records": 0,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "20109ad7c8b445995614c62b7bb2062bfb1a1ba6ce00f0a9979c35d162485bc8"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "c105af164da636df7c61fd0f40a554b86d17f1b45a6578a40dca94f0cea038f0"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "9b4539518ae2f5aee0ee3cc2cf5a7004e09fa1a7f97f0d32224b12d249ac2897"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "35efcab2d69146a73832b7354eaff5aa2e4c14fb3782fa1ae0a360926f21e592"
+        }
+      ]
+    },
+    {
+      "case": "live-fragmented",
+      "capture_sha256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "physical_frames": 134,
+      "SDK_records": 9,
+      "complete_RPC_wire_PDUs": 6,
+      "wire_checks": 1418,
+      "numeric_links": 2,
+      "added_RPC_typed_values": 26,
+      "changed_RPC_records": 6,
+      "unchanged_RPC_records": 0,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "a45efe412501e131a653246d551d82e2f7e08843f85e91593dd3e7e97fae486f"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "88d61bebfb7bf3a5d278d2e42b24c2ac37e691c2d303281ae339f60c7a6c5f39"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "23adf355dd3e3261c57989664fabcabf490163ff2c0a091eeb1452cb3cefa4d6"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "2075b1823df5bef95878cda9e942c5b2e894115a7bd018c0866d05e061f97139"
+        }
+      ]
+    },
+    {
+      "case": "live-query",
+      "capture_sha256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "physical_frames": 117,
+      "SDK_records": 58,
+      "complete_RPC_wire_PDUs": 56,
+      "wire_checks": 11482,
+      "numeric_links": 28,
+      "added_RPC_typed_values": 306,
+      "changed_RPC_records": 56,
+      "unchanged_RPC_records": 0,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "7a41b006902e9bbeef3cfe01f7b583ce41b0613d3bcf4cc8e534de9a44b57601"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "13ab28542a0fd3f49a7d20efef880fd8966abdfddc92d233dfb1d529d17aa538"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "9860f16655ba8f44d83bb525933957e4fb653da3261979ee1a8cc712bd97633a"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "c62329f03e4e7d80429da2dac9c235069f7155fa4790f914f331475044230d34"
+        }
+      ]
+    },
+    {
+      "case": "live-unfragmented",
+      "capture_sha256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "physical_frames": 36,
+      "SDK_records": 9,
+      "complete_RPC_wire_PDUs": 6,
+      "wire_checks": 1250,
+      "numeric_links": 2,
+      "added_RPC_typed_values": 26,
+      "changed_RPC_records": 6,
+      "unchanged_RPC_records": 0,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "4466a52e5475a354d3f93d7772fef85ba73d089ed4467236a691fb08dbfa1175"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "a2deb7d927393204800f95e7c9390d185a2cfba2883cdbca7acb1e1b0deba74e"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "1bafd44f290b47fa2d78dc177d395acc01c06d703bdab71567a1e982bd1ddc6e"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "7702d3ba3c0d128500167643ddf83c84d9bcd641421472ac5752259ce0f734c3"
+        }
+      ]
+    },
+    {
+      "case": "permanent-request-capture-hole",
+      "capture_sha256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "physical_frames": 116,
+      "SDK_records": 32,
+      "complete_RPC_wire_PDUs": 29,
+      "wire_checks": 10264,
+      "numeric_links": 1,
+      "added_RPC_typed_values": 144,
+      "changed_RPC_records": 29,
+      "unchanged_RPC_records": 1,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "82e1cd40ac7899e8f22cbb11fe49ffcd7a587e1527de6ec3760c3eb3d9ec61e2"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "8a191d2adb745f47e6b310b0c573da083269b04c172b5a848d417563de904cad"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "005ca02eff344b2cd7cc530e17d5314138221dabc540998e508e9eecd28236c7"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "81504ddd97ec7cbde786e14b06e2f47351a6eefc892e84eaa73cc9f2f86eff45"
+        }
+      ]
+    },
+    {
+      "case": "request-arrives-after-two-later-requests",
+      "capture_sha256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "physical_frames": 117,
+      "SDK_records": 59,
+      "complete_RPC_wire_PDUs": 56,
+      "wire_checks": 11484,
+      "numeric_links": 26,
+      "added_RPC_typed_values": 306,
+      "changed_RPC_records": 56,
+      "unchanged_RPC_records": 1,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "548690f667b9182e828673d61fd3f462e4b18d4a1f3761847e2f320ed3a0212f"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "f7703f542ec5624cdf5ab9eac04794fb1c39aae0093c55f5ef4c7f2d438cbcad"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "31c58fa570db7d16319544d1361804843974d5a24e3f701b4b4033455993b13f"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "e069f5f65539e38d54b0dd5cd780811f02149ec21b99a0a3209a90ebde989c47"
+        }
+      ]
+    },
+    {
+      "case": "sharon",
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "complete_RPC_wire_PDUs": 14,
+      "wire_checks": 494670,
+      "numeric_links": 0,
+      "added_RPC_typed_values": 38,
+      "changed_RPC_records": 9,
+      "unchanged_RPC_records": 6,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "4e8c20c6be96deb98ad2e8ddc1648811a5d7c35d35fac887323c49ac2f322a18"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "1e6aef92e49403e8c1a5be32771351d5b5cb1680100d084e5e29e46d6fc58333"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "dfdc0bdac623c3f2fdf81c9978c4ff57208e930a08400f900cce19af07c1bb93"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "7ffc73d94b967edbca86d05aea409ea0602d950674277b4ef0dd70f02ca9cdcc"
+        }
+      ]
+    },
+    {
+      "case": "snaplen-request-capture-hole",
+      "capture_sha256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "physical_frames": 117,
+      "SDK_records": 33,
+      "complete_RPC_wire_PDUs": 29,
+      "wire_checks": 10294,
+      "numeric_links": 1,
+      "added_RPC_typed_values": 144,
+      "changed_RPC_records": 29,
+      "unchanged_RPC_records": 2,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "d4ab74709b34c99793859511d73bf3d26f5f0d266fb785bc7554716ed4c65b87"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "9bfd17bc1c8c081c5382e7b1965c30620a12d34c920a79daa8ef063eec83162e"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "6cae1b491cd2d71d21ac91b7da32c16db016c5ba0e768e87d14f62c7b1e4b94f"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "c53579ab8fe0a0ef23ce43997a8ec908c5063a59f3ae56ad0cea0aa6f081510a"
+        }
+      ]
+    },
+    {
+      "case": "weber",
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "complete_RPC_wire_PDUs": 384,
+      "wire_checks": 223086,
+      "numeric_links": 0,
+      "added_RPC_typed_values": 1661,
+      "changed_RPC_records": 384,
+      "unchanged_RPC_records": 16,
+      "all_other_SDK_metadata_exact": true,
+      "all_original_CLI_metadata_except_added_aliases_exact": true,
+      "final_UI_export_byte_identical": true,
+      "certificates": [
+        {
+          "file": "wire-certified.json",
+          "sha256": "1758b744d14b9052a0e2e0259b6e98c4526fb23a5cb4e6666d1b091de5143ead"
+        },
+        {
+          "file": "SDK-preservation-v2.json",
+          "sha256": "ae016f5c000003d683710c74f836c17395b4c283e26b1576a826b6b45548c440"
+        },
+        {
+          "file": "CLI-preservation-v2.json",
+          "sha256": "716bccf43547b24a6a8b79db1296c6e8f172b54f45fc760dfb84f15920b5de13"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "a5f90f997d5c95db6af2dfc7b7426c4b167b1f88220352352c3eef4122bb9662"
+        }
+      ]
+    },
+    {
+      "case": "rpc-fragments-live",
+      "capture_sha256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "complete_RPC_wire_PDUs": 44,
+      "wire_checks": 112323,
+      "logical_checks": 609,
+      "logical_messages": [
+        {
+          "first_PDU": 5,
+          "complete_PDU": 6,
+          "PType": 0,
+          "fragments": 2,
+          "stub_bytes": 40,
+          "stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+          "first_frame": 10,
+          "completion_frame": 12,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 10,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 12,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 7,
+          "complete_PDU": 33,
+          "PType": 2,
+          "fragments": 27,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 14,
+          "completion_frame": 66,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 14,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 66,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 37,
+          "complete_PDU": 46,
+          "PType": 2,
+          "fragments": 10,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 81,
+          "completion_frame": 99,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 81,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 99,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        }
+      ],
+      "numeric_links": 4,
+      "added_RPC_typed_values": 392,
+      "certificates": [
+        {
+          "file": "wire-physical-audit.json",
+          "sha256": "a0a86e94af43c907516c80e81fc16a9809c9cb427225a423ed0fcf67582e9c28"
+        },
+        {
+          "file": "logical-fragments-audit.json",
+          "sha256": "18208ce05298ad36a3150d56bc63f481ed2e0b1b1db65a13db09799517e7c106"
+        },
+        {
+          "file": "SDK-invariants.json",
+          "sha256": "55cdba2a696020c607d9362a4135a7d05cf46bcd2ccfba9c4542742ea163ded9"
+        },
+        {
+          "file": "CLI-invariants.json",
+          "sha256": "fb882d46b1a85643630ca94fccb42bddaf64146695cc5a6808557a1b4d5300ad"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "ed5f6163fce19ff354c0d1f9de4454a12227a22327d1f36f7f35fd6059616fbc"
+        }
+      ]
+    },
+    {
+      "case": "request-tail-arrives-after-first-response",
+      "capture_sha256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "complete_RPC_wire_PDUs": 44,
+      "wire_checks": 112323,
+      "logical_checks": 609,
+      "logical_messages": [
+        {
+          "first_PDU": 5,
+          "complete_PDU": 8,
+          "PType": 0,
+          "fragments": 2,
+          "stub_bytes": 40,
+          "stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+          "first_frame": 10,
+          "completion_frame": 16,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 10,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 16,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 6,
+          "complete_PDU": 33,
+          "PType": 2,
+          "fragments": 27,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 14,
+          "completion_frame": 66,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 14,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 66,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 37,
+          "complete_PDU": 46,
+          "PType": 2,
+          "fragments": 10,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 81,
+          "completion_frame": 99,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 81,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 99,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        }
+      ],
+      "numeric_links": 4,
+      "added_RPC_typed_values": 392,
+      "certificates": [
+        {
+          "file": "wire-physical-audit.json",
+          "sha256": "dabf23ca26da399eb1caaa5ea616b49b171ad6732c45513c06022ee8a4a64826"
+        },
+        {
+          "file": "logical-fragments-audit.json",
+          "sha256": "73026db673bdc26d0bc860faaf67d1ee29767256ee040600b5ea45f78f61fca2"
+        },
+        {
+          "file": "SDK-invariants.json",
+          "sha256": "6c1466d923b51423d9667b070e84ab35028036b92021a4baae33acea94cae084"
+        },
+        {
+          "file": "CLI-invariants.json",
+          "sha256": "497484b81eefa8b64590625e479eb42b8b1d5b202394b013e07fb3cf5492757e"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "7bd81c48faff200348e592d94f42536353caa51a7b88a66ff2dbcb904de00cbb"
+        }
+      ]
+    },
+    {
+      "case": "response-first-two-swapped",
+      "capture_sha256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "complete_RPC_wire_PDUs": 44,
+      "wire_checks": 112323,
+      "logical_checks": 609,
+      "logical_messages": [
+        {
+          "first_PDU": 5,
+          "complete_PDU": 6,
+          "PType": 0,
+          "fragments": 2,
+          "stub_bytes": 40,
+          "stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+          "first_frame": 10,
+          "completion_frame": 12,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 10,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 12,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 7,
+          "complete_PDU": 33,
+          "PType": 2,
+          "fragments": 27,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 16,
+          "completion_frame": 66,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 16,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 66,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        },
+        {
+          "first_PDU": 37,
+          "complete_PDU": 46,
+          "PType": 2,
+          "fragments": 10,
+          "stub_bytes": 54480,
+          "stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+          "first_frame": 81,
+          "completion_frame": 99,
+          "first_PDU_byte_contributors": [
+            {
+              "Number": 81,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "completion_PDU_byte_contributors": [
+            {
+              "Number": 99,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ]
+        }
+      ],
+      "numeric_links": 4,
+      "added_RPC_typed_values": 392,
+      "certificates": [
+        {
+          "file": "wire-physical-audit.json",
+          "sha256": "eb1d16c6477aaa3fe58fb30587d561aba2850e591b2ca4e3d3bc3e9257183bc6"
+        },
+        {
+          "file": "logical-fragments-audit.json",
+          "sha256": "d44689187e7364def879e42c3d4ff3284cab32e80acdf35857fddc33639a390f"
+        },
+        {
+          "file": "SDK-invariants.json",
+          "sha256": "2a701d039bd17431f7956f2236f31f67f23a68e455defa4f59e2fb9a12a50009"
+        },
+        {
+          "file": "CLI-invariants.json",
+          "sha256": "4e703cf60e0fc151ae7a0450e8e2d63c30277079393a62004c63ba1f6a86ccd0"
+        },
+        {
+          "file": "producer-and-preservation.json",
+          "sha256": "2ac6846da490c809bc5e1e39d0ab180eefd6117ea45e2055d218788c7fc2bd01"
+        }
+      ]
+    }
+  ],
+  "negative_controls": {
+    "logical_metadata": 30,
+    "generated_namespace": 14,
+    "positive_changed_namespace_snapshots": 3,
+    "all_refused": true,
+    "certificates": [
+      {
+        "file": "logical-negative-controls.json",
+        "sha256": "0c1e5d7bb04f7fbe6baf1577aaf44a8c21615b49cda983f8bbed633af6278b76"
+      },
+      {
+        "file": "CLI-reference-negative-controls.json",
+        "sha256": "d412dd5ddc85b9d732cf2d22ac20a86442d6a59ad0357bc5a2db7648b3c1bbf8"
+      }
+    ]
+  },
+  "tests": {
+    "full": {
+      "source": "0bcb9289558365f441034f2daeeca522814d2101",
+      "packages": [
+        {
+          "Time": "2026-10-27T23:42:37.0355827+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "Elapsed": 452.12
+        },
+        {
+          "Time": "2026-10-27T23:42:41.2182002+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "Elapsed": 2.073
+        }
+      ],
+      "total_passing_test_cases": 235526,
+      "failures": 0,
+      "stdout_encoding": "utf-8-sig"
+    },
+    "fuzz": {
+      "target": "FuzzDCERPCFragmentMessageHeaderIsolation",
+      "executions": 106345,
+      "elapsed_seconds": 40.752,
+      "passed": true
+    },
+    "log_certificates": [
+      {
+        "file": "full-native-cli-03.jsonl",
+        "sha256": "e99e526e859c914f353503541f4527c130be5e39ec4d3d54ad30b88fd25cc390"
+      },
+      {
+        "file": "fuzz-fragment-header-02.log",
+        "sha256": "694cafa99d75fa3e1906ccd7404d39ec6cfab26742d4a0b38ec4044429ca0f46"
+      }
+    ]
+  },
+  "windows": [
+    {
+      "case": "windows-request-final-01",
+      "CLI_source": "0bcb9289558365f441034f2daeeca522814d2101",
+      "screen_sha256": "67f6b6509239b3a653ebfe95b6f93ed5787eeb6089bfd28bbb17b84701f2351e",
+      "logical_stub_bytes": 40,
+      "logical_stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+      "visible_literal_stub_bytes": 40,
+      "all_visible_octets_match_independent_socket_receipts": true,
+      "entire_stub_visible": true,
+      "capture_sha256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "snapshot_sha256": "67f6b6509239b3a653ebfe95b6f93ed5787eeb6089bfd28bbb17b84701f2351e",
+      "rendered_PNG_sha256": "18e1f7608b9737b14924e42a7abe690ef5937009f419ae51b7eea58486a2af3c"
+    },
+    {
+      "case": "windows-response-final-01",
+      "CLI_source": "0bcb9289558365f441034f2daeeca522814d2101",
+      "screen_sha256": "6b55eca95a150037dec7122743753bbbb293d0db832aadb125430e25ffc2a675",
+      "logical_stub_bytes": 54480,
+      "logical_stub_sha256": "161f12b12462d010c3a3568febbbcd1f4eec575356c54cab38b8d3dfdd437771",
+      "visible_literal_stub_bytes": 416,
+      "all_visible_octets_match_independent_socket_receipts": true,
+      "entire_stub_visible": false,
+      "capture_sha256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "snapshot_sha256": "6b55eca95a150037dec7122743753bbbb293d0db832aadb125430e25ffc2a675",
+      "rendered_PNG_sha256": "d076f882d37cce616ae80a5ad9a391a1ceb75af5b8daf8a2d940b388896289cc"
+    }
+  ],
+  "audit_sources_sha256": {
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_cli_invariants.py": "eea16f837b764f6758df02ca036ba294e630726f2e9aa8cfa79d4091a03167b5",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_wire_audit.py": "c4bfbba87967ff49d120a629ddf6f13950dc659c260979808ee646e438e28976",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_call_links.py": "8bfc9942e418db826d78306851a0a4449eea0ef9a1bd55bb1325d9291783cca7",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_scoped_range_invariants.py": "42cc7f090a27bb350bb4d1b420e16fd8492cc5a117fee8d2dece1106e50aa526",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_alias_cli_preservation.py": "12f54c532fe28c3ee9ec9c27a381d30e3126e92a901ccf2cead280d8cfc61bc4",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_fragment_cli_invariants.py": "98ab93854317fb587a443253687b2a5227c6da3e3f0218e2111c9310c2721c5c",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_fragment_cli_negative_controls.py": "403e25b41896d9e998d67ff6dfdd6b9f739062e4767d80e7a451c68c79bc620a",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_fragment_messages.py": "a658e9358ba4000fb1a5774d9ddfa3d827ee8ad431907b31ff6f2adaaad9922f",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_fragment_negative_controls.py": "d7ecf94d810b1e63708aada1350d1ff91de18177e2165eec5cf1e8f1149d0b2c",
+    "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/dcerpc_fragment_sdk_invariants.py": "a58cd3844bb29e7e81848aed3e41df4ca3a26198b5a7f8c393b5efbb9e1dc899"
+  },
+  "limits": [
+    "NDR service semantics remain opaque in Yak; independent EPM num_ents/status checks do not implement a native NDR decoder",
+    "Exact logical-stub-to-frame projection is not asserted; exact per-parent-PDU stub intervals are retained",
+    "No authentication/signature/privacy verification, callback namespace, multiple transfer-offer or SMB named-pipe completeness claim",
+    "Two new reordering cases modify capture observations; they are not live socket impairment",
+    "Broader remaining TLS/QUIC/SSH and protocol/field/fuzz report work remains active"
+  ]
+}
