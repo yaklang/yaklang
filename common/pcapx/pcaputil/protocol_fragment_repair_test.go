@@ -41,8 +41,11 @@ func TestFragmentBatchDiagnosticsKeepStableIDsAndHistoryTail(t *testing.T) {
 			}
 			require.Empty(t, events)
 			if timeout {
-				_, consumed := a.networkPacket(makePacket(128, stamp.Add(31*time.Second)))
-				require.True(t, consumed)
+				for domain := 0; domain < 4; domain++ {
+					_, consumed := a.networkPacket(makePacket(128+domain, stamp.Add(31*time.Second)))
+					require.True(t, consumed)
+					require.Len(t, events, (domain+1)*16, "each domain advances only its own fragment clock")
+				}
 			} else {
 				a.closeFragments()
 			}

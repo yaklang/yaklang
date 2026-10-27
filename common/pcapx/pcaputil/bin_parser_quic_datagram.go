@@ -33,22 +33,15 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if !long || first.typeName != "Initial" {
 			return nil, false
 		}
-		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}, clock: base.Timestamp}
+		s = &binUDPStore{entries: map[binUDPKey]*list.Element{}}
 		a.udpSessions = s
 	}
-	if base.Timestamp.After(s.clock) {
-		s.clock = base.Timestamp
-	}
-	for el := s.lru.Front(); el != nil; {
-		next := el.Next()
-		v := el.Value.(*binUDPEntry)
-		if s.clock.Sub(v.touched) < 10*time.Minute {
-			break
-		}
-		if v.flow.quic != nil {
+	retireMatchedIdle := func(v *binUDPEntry) {
+		// Unknown CIDs and foreign capture domains cannot age an observed
+		// connection. Shared UDP LRU order is not a per-connection clock.
+		if !base.Timestamp.IsZero() && !v.touched.IsZero() && base.Timestamp.Sub(v.touched) >= 10*time.Minute {
 			v.flow.retireQUICUDP()
 		}
-		el = next
 	}
 
 	var el, retired *list.Element
@@ -82,6 +75,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		// Zero-length CIDs cannot migrate: retain the observed endpoint tuple.
 		for d := 0; d < 2; d++ {
 			if q.zeroCID[1-d] && (!long || len(first.dcid) == 0) && base.Source == v.flow.endpoints[d] && base.Destination == v.flow.endpoints[1-d] {
+				retireMatchedIdle(v)
 				if q.retired {
 					selectRetired(candidate, d, false)
 					continue
@@ -95,6 +89,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		for cid, owner := range q.cids {
 			match := long && string(first.dcid) == cid || !long && len(wire) >= 1+len(cid) && string(wire[1:1+len(cid)]) == cid
 			if match {
+				retireMatchedIdle(v)
 				if q.retired {
 					selectRetired(candidate, 1-owner, true)
 					continue
@@ -291,7 +286,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		}
 		if el == nil && err == nil && e.Session["Authentication Verified"] == true {
 			f.id = a.flows.Add(1)
-			el = s.lru.PushBack(&binUDPEntry{key, f, s.clock})
+			el = s.lru.PushBack(&binUDPEntry{key, f, base.Timestamp})
 			s.entries[key] = el
 		}
 		if el != nil && !rejectedCID {
@@ -299,7 +294,9 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			// Closed-generation evidence may be inspected, but must not keep
 			// obsolete keys alive indefinitely through late packets.
 			if !f.quic.closed {
-				v.touched = s.clock
+				if base.Timestamp.After(v.touched) {
+					v.touched = base.Timestamp
+				}
 				s.lru.MoveToBack(el)
 			}
 			e.FlowID = f.id
