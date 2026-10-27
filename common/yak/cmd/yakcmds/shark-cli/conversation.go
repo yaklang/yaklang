@@ -442,11 +442,16 @@ func (s *streamStore) observeProtocol(e *pcaputil.ProtocolEvent) {
 		if r.key.domain != e.Domain || !((r.sides[0].endpoint == e.Source && r.sides[1].endpoint == e.Destination) || (r.sides[1].endpoint == e.Source && r.sides[0].endpoint == e.Destination)) {
 			continue
 		}
-		contributes := false
-		for _, ref := range e.SourceBytes.PacketRefs {
-			if ref.Domain == r.key.domain && ref.Number >= r.firstReference && ref.Number <= r.lastReference && r.firstReference != 0 {
-				contributes = true
-				break
+		// Native generation IDs remain exact when capture timestamps overlap or
+		// a held SYN is associated later. Endpoint/time windows alone can splice
+		// protocol messages from reused tuples.
+		contributes := r.nativeFlowID != 0 && r.nativeFlowID == e.FlowID
+		if r.nativeFlowID == 0 {
+			for _, ref := range e.SourceBytes.PacketRefs {
+				if ref.Domain == r.key.domain && ref.Number >= r.firstReference && ref.Number <= r.lastReference && r.firstReference != 0 {
+					contributes = true
+					break
+				}
 			}
 		}
 		if !contributes {

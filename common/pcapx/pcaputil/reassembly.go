@@ -116,6 +116,23 @@ func (t *TrafficConnection) RemotePort() int {
 	return t.remotePort
 }
 
+// TCPSequenceObservation is a detached view of the passive reassembler's
+// cursor. It describes captured evidence, not the peer's TCP acceptance.
+type TCPSequenceObservation struct {
+	Initialized  bool
+	SYNObserved  bool
+	NextSequence uint32
+	Pending      bool
+}
+
+// SequenceObservation must be called in a capture callback for this flow,
+// before the pooled connection is released. Packet callbacks run before that
+// packet is fed; arrived-frame callbacks run after its ordered bytes advance
+// the cursor. The returned value retains no flow or packet storage.
+func (t *TrafficConnection) SequenceObservation() TCPSequenceObservation {
+	return TCPSequenceObservation{Initialized: t.initialed, SYNObserved: t.synSeen, NextSequence: t.nextSeq, Pending: len(t.waitGroup) > 0 || t.resetPending}
+}
+
 func (t *TrafficConnection) Hash() string {
 	return t.hash
 }

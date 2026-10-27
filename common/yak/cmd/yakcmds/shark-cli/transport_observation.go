@@ -88,21 +88,3 @@ func (p *capturedPacket) observeTransportHeader(packet gopacket.Packet) {
 	v.Header = bytes.Clone(transport.LayerContents())
 	p.transportView = v
 }
-
-// Tunnel/fragment normalization may yield an IP-rooted packet absent from the
-// physical frame. Copy inside the borrowed callback; replay its preview only
-// after the native TCP generation has been selected. Ordinary Ethernet packets
-// continue using their already-owned original frame.
-func ownedNormalizedPreview(packet gopacket.Packet) gopacket.Packet {
-	decoded := packet.Layers()
-	if len(decoded) == 0 {
-		return nil
-	}
-	typ := decoded[0].LayerType()
-	if typ != layers.LayerTypeIPv4 && typ != layers.LayerTypeIPv6 {
-		return nil
-	}
-	owned := gopacket.NewPacket(packet.Data(), typ, gopacket.DecodeOptions{NoCopy: false, DecodeStreamsAsDatagrams: false})
-	owned.Metadata().CaptureInfo.Timestamp = packet.Metadata().CaptureInfo.Timestamp
-	return owned
-}

@@ -216,8 +216,6 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
-	var normalizedPreview gopacket.Packet
-	var currentProtocolEvents []*pcaputil.ProtocolEvent
 	// Inspection must retain useful packets from imperfect captures. The engine
 	// still reports gaps and never concatenates bytes across a missing range.
 	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
@@ -227,12 +225,21 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	options = append(options, pcaputil.WithBeforeTransportPacket(func(packet gopacket.Packet) {
 		if current != nil {
 			current.observeTransportHeader(packet)
-			if current.transportView != nil && current.transportView.Protocol == "tcp" {
-				normalizedPreview = ownedNormalizedPreview(packet)
-			}
 		}
 	}))
-	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, _ *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, _ time.Time) {
+	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnTrafficFlowCreated(func(flow *pcaputil.TrafficFlow) {
+		if s.streams != nil {
+			s.streams.nativeCreated(flow)
+		}
+	}), pcaputil.WithOnTrafficFlowOnDataFrameArrived(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+		if s.streams != nil {
+			s.streams.nativeData(flow, conn, frame)
+		}
+	}), pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
+		if s.streams != nil {
+			s.streams.nativeClosed(reason, flow)
+		}
+	}), pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, ts time.Time) {
 		if current != nil {
 			for _, ref := range refs {
 				if ref.Number == current.reference.Number {
@@ -241,6 +248,9 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 					break
 				}
 			}
+		}
+		if s.streams != nil {
+			s.streams.nativePacket(flow, conn, refs, ts, current)
 		}
 	}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		history.OnEvent(e)
@@ -261,9 +271,6 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 					recordProtocolConversation(current, e)
 					if current.fieldsAtObservation {
 						current.recordObservedPDU(e)
-					}
-					if e.Transport == "tcp" && len(currentProtocolEvents) < 128 {
-						currentProtocolEvents = append(currentProtocolEvents, e)
 					}
 					if len(current.eventIDs) < 128 {
 						current.eventIDs = append(current.eventIDs, e.ID)
@@ -289,11 +296,12 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 	if err != nil {
 		return err
 	}
-	defer func() { result = errors.Join(result, analyzer.Close()) }()
-
-	if s.streams != nil {
-		defer s.streams.finish()
-	}
+	defer func() {
+		result = errors.Join(result, analyzer.Close())
+		if s.streams != nil {
+			s.streams.finish()
+		}
+	}()
 	var writer packetWriter
 	var ngWriter *pcapgo.NgWriter
 	type outputDomain struct {
@@ -425,27 +433,13 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 			packet.observedFieldBudget = observedPacketFieldBytes - 1024
 		}
 		current = packet
-		normalizedPreview = nil
-		currentProtocolEvents = nil
 		if err := analyzer.Feed(data, ci, link); err != nil {
 			return err
 		}
 		if s.streams != nil {
-			if normalizedPreview != nil && packet.transportView != nil {
-				s.streams.addDecoded(packet, normalizedPreview, packet.transportView.Domain)
-			} else {
-				s.streams.add(packet)
-			}
-			// The first PDU can be published before its preview record exists.
-			// Replay only retained TCP contributors after the core's generation ID
-			// is known; identity updates are idempotent, bytes are never fed twice.
-			for _, event := range currentProtocolEvents {
-				s.streams.observeProtocol(event)
-			}
+			s.streams.attachNative(packet)
 			s.streams.annotate(packet)
 		}
-		normalizedPreview = nil
-		currentProtocolEvents = nil
 		current = nil
 		if packet.conversationID != 0 && len(packet.connectionStack) == 0 {
 			packet.connectionStack = append([]string(nil), packet.presentation.stack...)
