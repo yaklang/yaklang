@@ -95,7 +95,7 @@ func TestCaptureBackedPreviewRequiresNativeFlowAssociation(t *testing.T) {
 	require.Empty(t, store.records)
 	packet.tcpFlowID = 17
 	store.add(packet)
-	require.NotZero(t, packet.streamID, "a native flow association permits an independent bounded byte preview")
+	require.Zero(t, packet.streamID, "a scalar ID without native creation/data observations cannot create a second reassembler")
 }
 
 func TestReassembledDatagramPresentationUsesObservedHeaderPathOnce(t *testing.T) {
