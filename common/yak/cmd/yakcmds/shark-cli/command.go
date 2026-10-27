@@ -245,6 +245,10 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 			if asJSON {
 				if packet.fieldsAtObservation {
 					row.PDUs = packet.observedPDUs
+					if len(packet.publishedPDUs) != 0 {
+						row.PublishedPDUs = packet.publishedPDUs
+						row.PublishedPDUScope = "available_during_processing; byte_contribution_is_defined_by_byte_source"
+					}
 				}
 				for _, e := range events {
 					values := e.DisplayFieldValues()
