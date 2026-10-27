@@ -27,6 +27,8 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 	const max = 4096
 	call := uint32(71)
 	body := []byte{0, 0, 0, 0, 0, 0, 3, 0, 0xaa, 0xbb}
+	// RPC continuations repeat their full request header, unlike TCP chunks.
+	continuation := append(append([]byte(nil), body[:8]...), body[9:]...)
 
 	t.Run("orphan-continuation-is-context-required", func(t *testing.T) {
 		d := newReviewDCERPC()
@@ -39,10 +41,10 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 		d := newReviewDCERPC()
 		_, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcFirst, call, body[:9]), max)
 		require.NoError(t, err)
-		_, err = d.consumeFrom(1, dcerpcPDU(0, dcerpcLast, call, body[9:]), max)
+		_, err = d.consumeFrom(1, dcerpcPDU(0, dcerpcLast, call, continuation), max)
 		require.ErrorIs(t, err, errBinContext)
 		require.Len(t, d.frags, 1, "a reverse-direction PDU cannot consume the request-direction first fragment")
-		info, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call, body[9:]), max)
+		info, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call, continuation), max)
 		require.NoError(t, err)
 		require.Equal(t, 2, info["Stub Bytes"])
 		require.Empty(t, d.frags)
@@ -62,7 +64,7 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 		d := newReviewDCERPC()
 		_, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcFirst, call, body[:9]), max)
 		require.NoError(t, err)
-		_, err = d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call+1, body[9:]), max)
+		_, err = d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call+1, continuation), max)
 		require.ErrorIs(t, err, errBinContext)
 		require.Len(t, d.frags, 1)
 	})
@@ -74,12 +76,20 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 		binary.LittleEndian.PutUint16(objectBody[6:8], 3)
 		copy(objectBody[8:24], dcerpcEPM)
 		objectBody[24], objectBody[25] = 0xaa, 0xbb
-		_, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcFirst|dcerpcObject, call, objectBody[:13]), max)
+		_, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcFirst|dcerpcObject, call, objectBody[:25]), max)
 		require.NoError(t, err)
-		info, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call, objectBody[13:]), max)
+		lastBody := append(append([]byte(nil), objectBody[:8]...), objectBody[25:]...)
+		info, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcLast, call, lastBody), max)
 		require.NoError(t, err)
 		require.Equal(t, 2, info["Stub Bytes"])
 		require.Equal(t, uint16(3), info["OpNum"])
+	})
+
+	t.Run("object-header-itself-cannot-be-split-across-RPC-fragments", func(t *testing.T) {
+		d := newReviewDCERPC()
+		_, err := d.consumeFrom(0, dcerpcPDU(0, dcerpcFirst|dcerpcObject, call, make([]byte, 13)), max)
+		require.Error(t, err)
+		require.Empty(t, d.frags)
 	})
 
 	t.Run("authenticated-stub-is-opaque-and-auth-length-is-bounded", func(t *testing.T) {

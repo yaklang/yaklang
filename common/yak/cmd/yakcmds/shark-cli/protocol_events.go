@@ -145,6 +145,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 	var wireRanges map[string][]int
 	var dcerpcResult uint64
 	var dcerpcResultKnown bool
+	var dcerpcMessage bool
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
 	var http3FrameKind string
@@ -173,6 +174,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		switch x := v.(type) {
 		case map[string]any:
 			if protocol == "dcerpc" {
+				if name == "Reassembled Message" {
+					previous := dcerpcMessage
+					defer func() { dcerpcMessage = previous }()
+					dcerpcMessage = true
+				}
 				previous, previousKnown := dcerpcResult, dcerpcResultKnown
 				defer func() { dcerpcResult, dcerpcResultKnown = previous, previousKnown }()
 				if result, ok := x["Result"]; ok {
@@ -418,6 +424,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			}
 			var generated []byte
 			sourceName := ""
+			if protocol == "dcerpc" && dcerpcMessage && name == "Stub" {
+				generated = bytesValue(x)
+				x = generated
+				sourceName = "DCE/RPC message stub · reassembled from parent PDU ranges · NDR semantics unavailable"
+			}
 			if protocol == "ntp" {
 				if name == "Control Data" || name == "Padding Bytes" || name == "Authenticator Bytes" || name == "Unselected Trailer Bytes" || strings.HasSuffix(name, " Timestamp") {
 					x = bytesValue(x)
@@ -698,7 +709,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			if e.ResponseTo != 0 {
 				add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
 			}
-			for _, key := range []string{"Packet Name", "Call ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
+			for _, key := range []string{"Packet Name", "Call ID", "Context ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Fragment Stub Bytes", "Message ID", "Fragment Index", "Reassembled Message", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)
