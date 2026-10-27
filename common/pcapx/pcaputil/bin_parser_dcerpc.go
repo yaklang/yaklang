@@ -12,6 +12,7 @@ import (
 // state. Ports including 135 are never consulted.
 type binDCERPC struct {
 	client               int
+	peerMessages         [2]bool
 	ctx                  map[uint16]string
 	uuid                 map[uint16][]byte
 	pending              map[uint32]string
@@ -159,6 +160,9 @@ func (d *binDCERPC) consume(raw []byte, max int) (map[string]any, error) {
 }
 
 func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, error) {
+	if dir < 0 || dir > 1 {
+		return nil, protocolError(ErrMalformedMessage, "DCE/RPC direction is outside the observed connection")
+	}
 	if len(raw) < 16 {
 		return nil, fmt.Errorf("dcerpc: truncated header")
 	}
@@ -168,6 +172,9 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 	}
 	if !dcerpcLittleEndian(raw) {
 		return nil, protocolError(ErrUnsupportedVersion, "DCE/RPC data representation is not supported")
+	}
+	if raw[0] != 5 || raw[1] != 0 || raw[2] > 19 {
+		return nil, protocolError(ErrUnsupportedVersion, "DCE/RPC security/session profile requires connection-oriented version 5.0")
 	}
 	ptype := raw[2]
 	flags := raw[3]
@@ -184,9 +191,8 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		"Last Frag":     flags&dcerpcLast != 0,
 	}
 	if authLength > 0 {
-		// A security trailer contains an 8-byte verifier header before the
-		// auth_value. We do not decode authenticated stub data, so reject the
-		// whole PDU as opaque rather than counting verifier bytes as stub.
+		// Token boundaries can be observed without security-provider state.
+		// Never feed unverified protected bodies into bind/call/fragment state.
 		if len(body) < 8 || authLength > len(body)-8 {
 			return nil, fmt.Errorf("dcerpc: authentication verifier length exceeds fragment payload")
 		}
@@ -194,8 +200,9 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		if err := d.reserveMemory(d.retainedBytes()); err != nil {
 			return nil, err
 		}
-		return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC authentication verifier is not supported")
+		return dcerpcSecurityEnvelope(raw, info)
 	}
+	d.peerMessages[dir] = true
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
 	parseFlags := flags
 	if flags&dcerpcFirst != 0 {
@@ -275,14 +282,14 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 	switch ptype {
 	case 11, 14:
 		if _, exists := d.pending[call]; exists {
-			return nil, fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+			return dcerpcCallError(info, d.duplicateCall(call, dir))
 		}
 		proposals, err := d.parseBind(body, info, max)
 		if err != nil {
 			return nil, err
 		}
 		if err := d.stageProposals(call, dcerpcPTypeName(ptype), dir, proposals, max); err != nil {
-			return nil, err
+			return dcerpcCallError(info, err)
 		}
 		info["Outstanding"] = true
 	case 12:
@@ -306,7 +313,7 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		}
 		contextID := info["Context ID"].(uint16)
 		if err := d.push(call, fmt.Sprint(info["Packet Name"]), max, dir, contextID); err != nil {
-			return nil, err
+			return dcerpcCallError(info, err)
 		}
 		info["Outstanding"] = true
 	case 2:
@@ -351,6 +358,7 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 	proposals := make([]dcerpcProposal, 0, n)
 	names := make([]string, 0, n)
 	newIDs := make(map[uint16]struct{}, n)
+	featureProposal := false
 	for i, off := 0, 12; i < n; i, off = i+1, off+44 {
 		id := binary.LittleEndian.Uint16(body[off : off+2])
 		if _, duplicate := newIDs[id]; duplicate {
@@ -369,6 +377,17 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 		name := dcerpcIfaceName(abstractSyntax, abstractMajor, abstractMinor)
 		transferSyntax := append([]byte(nil), body[off+24:off+40]...)
 		transferVersion := binary.LittleEndian.Uint32(body[off+40 : off+44])
+		feature := len(transferSyntax) == 16 && bytes.Equal(transferSyntax[:8], dcerpcBindFeaturePrefix) && transferVersion == 1
+		if feature {
+			if featureProposal {
+				return nil, protocolError(ErrMalformedMessage, "DCE/RPC bind feature proposal appears more than once")
+			}
+			if i == 0 || !bytes.Equal(abstractSyntax, proposals[i-1].abstractSyntax) || abstractMajor != proposals[i-1].abstractMajor || abstractMinor != proposals[i-1].abstractMinor {
+				return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC bind feature placement is outside the observed matching-predecessor profile")
+			}
+			featureProposal = true
+			info["Proposed Bind Time Feature Bits"] = binary.LittleEndian.Uint64(transferSyntax[8:])
+		}
 		proposals = append(proposals, dcerpcProposal{
 			id:              id,
 			name:            name,
@@ -389,6 +408,9 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 			info["Interface Alias State"] = "UUID or abstract syntax version is outside the supported alias profile"
 		}
 	}
+	if len(body) != 12+n*44 {
+		return nil, protocolError(ErrMalformedMessage, "DCE/RPC bind context list leaves %d trailing bytes", len(body)-12-n*44)
+	}
 	if len(names) > 1 {
 		info["Interfaces"] = names
 	}
@@ -398,7 +420,7 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 func (d *binDCERPC) stageProposals(call uint32, name string, dir int, proposals []dcerpcProposal, max int) error {
 	max = sessionCollectionLimit(max)
 	if _, exists := d.pending[call]; exists {
-		return fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+		return d.duplicateCall(call, dir)
 	}
 	if d.stateElements()+len(proposals)+1 > max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
@@ -471,6 +493,9 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 		proposal := proposals[i]
 		switch result.result {
 		case 0:
+			if dcerpcBindFeatureProposal(proposal) {
+				return protocolError(ErrUnsupportedFeature, "DCE/RPC bind feature proposal cannot establish an ordinary transfer context")
+			}
 			if result.reason != 0 {
 				return fmt.Errorf("dcerpc: accepted bind result has a rejection reason")
 			}
@@ -480,6 +505,12 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 			accepted = append(accepted, proposal)
 		case 1, 2:
 			rejected = append(rejected, proposal.id)
+		case 3:
+			if !dcerpcBindFeatureProposal(proposal) || result.transferVersion != 0 || !bytes.Equal(result.transferSyntax, make([]byte, 16)) {
+				return protocolError(ErrMalformedMessage, "DCE/RPC negotiate_ack has no matching feature proposal or nonzero transfer syntax")
+			}
+			info["Observed Bind Time Feature Bits"] = result.reason
+			info["Bind Time Feature Endpoint State Verified"] = false
 		default:
 			return fmt.Errorf("dcerpc: invalid bind result %d", result.result)
 		}
@@ -635,7 +666,7 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16) error {
 	max = sessionCollectionLimit(max)
 	if _, exists := d.pending[call]; exists {
-		return fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+		return d.duplicateCall(call, dir)
 	}
 	if d.stateElements() >= max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")

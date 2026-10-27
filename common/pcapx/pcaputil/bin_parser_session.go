@@ -786,6 +786,23 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "dcerpc":
 		e.Session, err = f.dcerpc.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err != nil || dcerpcHasSecurityTrailer(e.Raw) {
+			e.nativeSessionMessage = true
+			e.semanticSession = cloneSession(e.Session)
+			if err == nil {
+				e.Profile, e.Completeness = "dcerpc-security-envelope", "envelope"
+				e.semanticFields = cloneSession(e.Session)
+			} else {
+				status, typed := classifySessionError(err)
+				if typed == nil {
+					kind := ErrMalformedMessage
+					if status == "context-required" {
+						kind = ErrContextRequired
+					}
+					err = protocolError(kind, "%s", err)
+				}
+			}
+		}
 	case "ssh":
 		e.nativeSSHObservation = true
 		e.Session, err = f.ssh.consume(dir, e.Raw)
@@ -1229,6 +1246,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
 		case "dcerpc":
 			e.Summary = fmt.Sprintf("DCE/RPC %v call %v", e.Session["Packet Name"], e.Session["Call ID"])
+			if e.Profile == "dcerpc-security-envelope" {
+				e.Summary += " · security envelope · authentication unverified"
+			}
 		case "ssh":
 			e.Summary = fmt.Sprintf("SSH %v", e.Session["Packet Name"])
 		case "nfs":

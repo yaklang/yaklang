@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **621** 项：限定范围 `done` **202**，`partial` **27**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **324**，`new` **170**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **621** 项：限定范围 `done` **201**，`partial` **28**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **326**，`new` **168**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -48,6 +48,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | 优先级 | 协议 | 路线图状态 | 同名目录入口 |
 |---|---|---|---|
 | P0 | AJP | partial | [partial / ](rules/application-layer/ajp.yaml) |
+| P0 | DCE/RPC | partial | [partial / ](rules/application-layer/dcerpc.yaml) |
 | P0 | QUIC | partial | [partial / ](rules/application-layer/quic.yaml) |
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
@@ -488,7 +489,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/checkmk.yaml](rules/application-layer/checkmk.yaml) | Checkmk (`CheckmkReport`, partial) |
 | [application-layer/cifs.yaml](rules/application-layer/cifs.yaml) | CIFS Negotiate Request (`CIFSDirectTCP`, partial) |
 | [application-layer/cldap.yaml](rules/application-layer/cldap.yaml) | CLDAP (`CLDAP`, partial) |
-| [application-layer/dcerpc.yaml](rules/application-layer/dcerpc.yaml) | DCE/RPC (``, new)<br>DCOM (``, new)<br>DRSUAPI (``, new)<br>LSARPC (``, new)<br>MSRPC (``, new)<br>MSRPC EPM (``, new)<br>NETLOGON (``, new)<br>PsExec/SMB-svcctl (``, new)<br>SAMR (``, new)<br>SRVSVC (``, new)<br>SVCCTL (``, new)<br>WINREG (``, new)<br>WMI (``, new) |
+| [application-layer/dcerpc.yaml](rules/application-layer/dcerpc.yaml) | DCE/RPC (``, partial)<br>DCOM (``, new)<br>DRSUAPI (``, new)<br>LSARPC (``, new)<br>MSRPC (``, partial)<br>MSRPC EPM (``, new)<br>NETLOGON (``, new)<br>PsExec/SMB-svcctl (``, new)<br>SAMR (``, new)<br>SRVSVC (``, new)<br>SVCCTL (``, new)<br>WINREG (``, new)<br>WMI (``, new) |
 | [application-layer/dhcp.yaml](rules/application-layer/dhcp.yaml) | DHCP (``, new) |
 | [application-layer/dicom.yaml](rules/application-layer/dicom.yaml) | DICOM Upper Layer (`DICOM`, partial) |
 | [application-layer/dns.yaml](rules/application-layer/dns.yaml) | Bonjour (`DNS`, partial)<br>mDNS (`DNS`, new) |

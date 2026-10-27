@@ -1604,7 +1604,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" || f.imap != nil && f.imap.needsNativeSASL(dir, e.Raw) {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" || f.imap != nil && f.imap.needsNativeSASL(dir, e.Raw) || f.protocol == "dcerpc" && dcerpcHasSecurityTrailer(e.Raw) {
 				result = map[string]any{}
 			} else if f.protocol == "ssh" && e.Entry == "SSHPacket" {
 				// Packet numbers 30..49 depend on the observed exchange. Decode
@@ -1746,8 +1746,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if errors.Is(err, stream_parser.ErrKafkaUnsupported) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
+				if e.Protocol == "dcerpc" {
+					e.nativeSessionMessage = true
+				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation || e.nativeIMAPObservation) && e.sessionError == nil {
+				if (e.Protocol == "dcerpc" || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation || e.nativeIMAPObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
