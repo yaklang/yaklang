@@ -126,7 +126,7 @@ def records(capture):
     assert at==len(wire)
 
 
-def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False):
+def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False,control_manifest=None):
     checks=0
     def check(ok,why):
         nonlocal checks
@@ -141,6 +141,10 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
                 elif isinstance(value,(dict,list)):yield from leaves(value,name)
         elif isinstance(node,list):
             for value in node:yield from leaves(value,name)
+    control_refusals={}
+    if control_manifest is not None:
+        from dcerpc_generation_control_audit import original_control_refusals
+        control_refusals=original_control_refusals(capture,control_manifest)
     native=[];identities=set();SDK_records=0
     for e in sdk_rows(events):
         check(type(e['id'])is int and e['id']>0,'literal positive SDK identity')
@@ -240,6 +244,11 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
             for name,value in [('PType',raw[2]),('PFC Flags',raw[3]),('Call ID',call),('First Frag',bool(raw[3]&1)),('Last Frag',bool(raw[3]&2))]:eq(s[name],value,'literal native common field '+name)
         required={'dcerpc.ver':5,'dcerpc.ver_minor':0,'dcerpc.pkt_type':raw[2],'dcerpc.cn_flags':raw[3],'dcerpc.cn_frag_len':size,'dcerpc.cn_auth_len':auth,'dcerpc.cn_call_id':call};body_reference={}
         invalid=None;unsupported=None
+        control_refusal=control_refusals.get(delivery)
+        if control_refusal:
+            eq(owners,[delivery],'control semantic refusal belongs to its one exact original TCP PDU')
+            eq(control_refusal['raw_sha256'],sha(raw),'independently derived control refusal binds literal original bytes')
+            eq(e['status'],control_refusal['expected_status'],'original-wire control cause determines refusal status')
         if auth:
             trailer=len(raw)-auth-8
             if trailer<16:invalid=dict(reason='authentication declaration exceeds fragment',auth_bytes=auth,available_body_bytes=len(raw)-16)
@@ -283,6 +292,11 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
             for name,span in {'Opaque PDU Body':[16,trailer-pad],'Authentication Padding':[trailer-pad,trailer],'Security Trailer':[trailer,trailer+8],'Authentication Token':[trailer+8,len(raw)]}.items():eq(s['Wire Field Ranges'][name],span,'exact owned security wire range')
             for key,value in [('dcerpc.auth_type',header[0]),('dcerpc.auth_level',header[1]),('dcerpc.auth_pad_len',pad),('dcerpc.auth_rsrvd',header[3]),('dcerpc.auth_ctx_id',fields['Auth Context ID'])]:required[key]=value
             eq(e['fields'],s,'complete owned security-envelope field-query projection')
+        elif control_refusal:
+            eq(e['fields'],None,'semantically refused control has no successful field-query projection')
+            eq(s['Error Scope'],'message','control semantic failure is isolated at its exact framed boundary')
+            check(bool(e.get('fields_error')),'semantic control field query retains its refusal')
+            adjudications.append(dict(PDU=e['id'],physical_frames=owners,**control_refusal))
         elif e['status']=='context-required':
             eq(e['fields'],None,'missing association does not become accepted generic fields')
             eq(s['Error Scope'],'message','complete message context refusal is isolated')
@@ -390,9 +404,9 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
     if require_call_links:
         from dcerpc_call_links import audit_call_links
         numeric_links=audit_call_links(native,reference_views,pdu_deliveries)
-    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])
+    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])+(['dcerpc_generation_control_audit.py']if control_manifest is not None else[])
     audit_sources={name:sha((Path(__file__).parent/name).read_bytes())for name in sources}
-    return dict(scope=__doc__,audit_sources_sha256=audit_sources,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
+    return dict(scope=__doc__,audit_sources_sha256=audit_sources,control_manifest_sha256=sha(control_manifest.read_bytes())if control_manifest is not None else None,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
                 compared_PDUs=compared,status_counts=dict(status),complete_clear_field_trees_checked=complete_clear_trees,matched_bind_or_alter_associations_checked=association_checks,reference_field_counts=dict(reference_fields),reference_layout_limits=reference_limits,reference_field_limits=reference_field_limits,
                 outside_selected_reference_frames=outside,aggregate_reference_limits=aggregate_reference_limits,unused_selected_reference_views=[dict(frame=no,view=index)for no,values in reference_views.items()for index,_ in enumerate(values)if(no,index)not in used_views],
                 closure_diagnostics=closures,incomplete_captured_prefix_diagnostics=prefixes,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
@@ -401,9 +415,9 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ['capture','events','oracle','out']:ap.add_argument('--'+name,type=Path,required=True)
-    ap.add_argument('--receipts',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');a=ap.parse_args()
+    ap.add_argument('--receipts',type=Path);ap.add_argument('--control-manifest',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');a=ap.parse_args()
     for p in vars(a).values():
         if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links)
+    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links,a.control_manifest)
     a.out.write_text(json.dumps(proof,indent=2)+'\n',encoding='utf8')
     print(json.dumps(dict(checks=proof['checks'],physical_frames=proof['physical_frames'],native_PDUs=len(proof['compared_PDUs']),statuses=proof['status_counts'],reference_fields=sum(proof['reference_field_counts'].values()),unexported_complete_PDUs=len(proof['unexported_complete_wire_PDUs']))))
