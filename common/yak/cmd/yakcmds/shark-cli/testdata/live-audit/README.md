@@ -332,3 +332,32 @@ rejects missing, corrupted, reordered, duplicated and falsely physical records.
 Consumers of the new JSONL contract must count physical packets separately from
 `record_type=protocol_publication`; final publications never relabel the last
 captured packet or change its original contributors.
+
+`discovery/coap_clock_live.py OUTPUT_DIRECTORY TSHARK` produces three real
+bounded CoAP GET/ACK socket exchanges. `discovery/capture_clock_controls.py`
+derives declared PCAPNG cross-interface clock and fragment controls from the
+actual TLS/QUIC/CoAP captures. These are explicit offline observation changes,
+not a claim that a network fault was injected. Original records and transport
+bytes stay exact. `capture_clock_wire_audit.py --help` independently checks
+every record, timestamp, fragment interval and checksum against source captures;
+`capture_clock_negative_controls.py` rejects forged provenance metadata.
+
+`owned_tls_clock_audit.py`, `owned_quic_clock_audit.py` and
+`owned_coap_clock_audit.py` expose `--capture --events --manifest --oracle --out`.
+They bind actual wire contributors, connection identities, literal reference
+fields and independent socket transcripts. The QUIC check retains literal
+Wireshark connection numbers: missing per-packet metadata in a coalesced UDP
+datagram may inherit its unique owner only after checking the same original
+destination CID. It checks each STREAM occurrence, complete peer byte interval
+and exactly-once HTTP3 frame delivery; unprotected datagram padding is distinct
+from authenticated PADDING frames. These owned profiles do not certify every
+feature of their protocols. `owned_clock_negative_controls.py ROOT OUTPUT_DIR`
+requires the auditors to reject forged bytes, source, field, plaintext and
+connection metadata.
+
+`clock_public_preservation_audit.py --capture --before --after --out` pairs
+every non-fragment event by literal source bytes, capture domain, endpoints and
+both native/protocol connection identities. Only generated event-ID aliases can
+be renumbered; no wire integers or application fields are normalized. It lists
+zero-tail changes and source-bound fragment diagnostics separately, including
+invalid IP versions as an unresolved defect rather than valid fragment proof.

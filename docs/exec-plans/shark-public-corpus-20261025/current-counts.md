@@ -1,4 +1,4 @@
-当前显示标签计数：Windows CLI 源码 `f52e386603`，原生 / SDK 源码 `41784e9de7`。输入原包不入库。Weber 的标签总数保留；Sharon 六帧的变化逐一与 Wireshark 核对：SMB2 +5、MODBUS -1、TCP -4。完整字段、来源和结束发布证据见 [最新证据](tcp-native-preview-publication-summary.json)。
+当前显示标签计数：Windows CLI / 原生 / SDK 生产源码 `356a2555fb`，完整测试源码 `30e54d42b5`。输入原包不入库。相对上一轮两份大包的全部物理帧标签保持不变；Weber 六条 QUIC 零尾改为显式的未保护数据报填充，Sharon 分片时钟隔离使内部诊断净增 57 条。新实抓、逐字节比对和已知无效 IP 版本问题见 [最新证据](capture-clock-padding-summary.json)。前一轮 Sharon 六帧的 SMB2 +5、MODBUS -1、TCP -4 展示差异继续保留，见 [结束发布证据](tcp-native-preview-publication-summary.json)。
 
 物理行中的既有迟到发布仍保留；另外补回 Weber 26、Sharon 552 条结束诊断。`record_type=protocol_publication` 是非物理分析记录，`published_pdus` 的贡献帧由 `byte_source` 定义；它们不计入下表物理帧标签。详见 [结束发布与连接归属证据](tcp-native-preview-publication-summary.json)。
 
@@ -43,7 +43,7 @@
 
 ## sharon
 
-物理帧 328,127；SDK 记录 245,784。
+物理帧 328,127；SDK 记录 245,841。
 
 | 排名 | WS 原始标签 | WS 帧数 | Shark 完全同名帧数 | 同名差值 |
 |---:|---|---:|---:|---:|
