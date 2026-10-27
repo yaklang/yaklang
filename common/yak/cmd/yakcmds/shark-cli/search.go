@@ -441,6 +441,9 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 		}
 		if result.Partial || !result.Complete {
 			u.notice = fieldFilterPartialNoticePrefix + result.Reason
+			if strings.Contains(result.Reason, "retained history") {
+				u.notice += "; replay with a larger --protocol-history-mib budget"
+			}
 		}
 		return result.Complete && result.Matched
 	}
