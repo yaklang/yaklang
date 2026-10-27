@@ -223,6 +223,7 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 	}
 	defer p.retireFlows()
 	flow, ok := p.flowCache.GetAt(key, ts)
+	var opening *tcpOpening
 	if ok && tcp.SYN && !tcp.ACK && !flow.IsClosed() {
 		old := flow.ServerConn
 		if old == nil {
@@ -243,6 +244,22 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 			// isolated generation. It must not inherit the old application state.
 			// The exact delayed original SYN remains in its existing generation.
 			p.finishFlow(flow, TrafficFlowCloseReason("new SYN after midstream observation"))
+			p.flowCache.Remove(key)
+			ok = false
+		}
+	}
+	if ok && tcp.SYN && !flow.IsClosed() {
+		sender := flow.ServerConn
+		if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
+			sender = flow.ClientConn
+		}
+		confirmed, hold := flow.observeOpening(sender, tcp, evidence, ts)
+		if hold {
+			if confirmed == nil {
+				return
+			}
+			opening = confirmed
+			p.finishFlow(flow, TrafficFlowCloseReason("new observed TCP handshake without prior close"))
 			p.flowCache.Remove(key)
 			ok = false
 		}
@@ -275,17 +292,33 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		// Packet-layer address slices may be overwritten by the next read.
 		src := &net.TCPAddr{IP: append(net.IP(nil), srcIP...), Port: int(tcp.SrcPort)}
 		dst := &net.TCPAddr{IP: append(net.IP(nil), dstIP...), Port: int(tcp.DstPort)}
+		if opening != nil {
+			// The current packet confirms the reverse side of the held SYN.
+			src, dst = dst, src
+		}
 		flow = p.newFlowWithAddrsAt(network, src, dst, evidence.Ref.Domain, ts)
 		if flow == nil {
 			return
 		}
 		flow.IsIpv4, flow.IsIpv6 = !ipv6, ipv6
 		flow.IsHalfOpen = !tcp.SYN || tcp.ACK
+		if opening != nil {
+			flow.IsHalfOpen = false
+		}
 		if ethernetLayer != nil {
 			flow.IsEthernetLinkLayer = true
 			flow.HardwareSrcMac, flow.HardwareDstMac = ethernetLayer.SrcMAC.String(), ethernetLayer.DstMAC.String()
+			if opening != nil {
+				flow.HardwareSrcMac, flow.HardwareDstMac = flow.HardwareDstMac, flow.HardwareSrcMac
+			}
 		}
 		flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
+		if opening != nil {
+			initial := flow.ClientConn
+			initial.evidence = captureEvidence{Ref: opening.ref}
+			p.observeFlowPacket(flow, initial, initial.evidence, opening.captured)
+			initial.FeedClient(&layers.TCP{SrcPort: layers.TCPPort(src.Port), DstPort: layers.TCPPort(dst.Port), Seq: opening.sequence, SYN: true, Window: opening.window}, opening.captured)
+		}
 	}
 	// Port alone cannot identify direction when endpoints use the same port.
 	conn := flow.ServerConn
