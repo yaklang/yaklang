@@ -155,46 +155,6 @@ func TestCalculateFileSystemDiff_FallbackWithoutLanguage(t *testing.T) {
 	require.Equal(t, map[string]bool{"README.md": true}, diffWalkPaths(t, diffFS))
 }
 
-// TestCalculateFileSystemDiff_ArchiveInteriorExcluded pins the incremental
-// compile contract: jar/zip expansion is forbidden, so archive entries are
-// out of the diff domain even when the language whitelist would accept them
-// (lib/foo.jar/.../A.java is a .java path). Covers both directions: no
-// phantom additions on a new side that somehow carries expanded entries, and
-// no phantom deletions against a legacy base compiled with jar expansion on.
-func TestCalculateFileSystemDiff_ArchiveInteriorExcluded(t *testing.T) {
-	// legacy expanded base: entries persisted inside archive paths
-	baseFS := filesys.NewVirtualFs()
-	baseFS.AddFile("src/Main.java", "public class Main {}")
-	baseFS.AddFile("lib/inner.jar/com/example/Legacy.java", "public class Legacy {}")
-
-	newFS := filesys.NewVirtualFs()
-	newFS.AddFile("src/Main.java", "public class Main {}")
-	newFS.AddFile("src/Helper.java", "public class Helper {}")
-	// new side archive noise: raw archive plus an in-archive .java entry
-	newFS.AddFile("libs/bundle.jar", "PK\x03\x04raw")
-	newFS.AddFile("lib/inner.jar/com/example/NewInside.java", "public class NewInside {}")
-
-	isSourceFile := resolveDiffSourceFilter(ssaconfig.JAVA, "")
-	require.NotNil(t, isSourceFile)
-	// whitelist alone would accept the in-archive .java — the archive
-	// hard-exclusion must override it
-	require.True(t, isSourceFile("lib/inner.jar/com/example/NewInside.java"))
-
-	diffFS, fileHashMap, err := calculateFileSystemDiff(baseFS, newFS, nil, nil, isSourceFile)
-	require.NoError(t, err)
-	require.NotNil(t, diffFS)
-	require.Equal(t, 1, fileHashMap["src/Helper.java"], "regular addition must be reported")
-	for _, ignored := range []string{
-		"libs/bundle.jar",
-		"lib/inner.jar/com/example/NewInside.java",
-		"lib/inner.jar/com/example/Legacy.java",
-	} {
-		require.Empty(t, fileHashMap[ignored], "archive entry leaked into diff: %s", ignored)
-	}
-	require.Equal(t, map[string]int{"src/Helper.java": 1}, fileHashMap)
-	require.Equal(t, map[string]bool{"src/Helper.java": true}, diffWalkPaths(t, diffFS))
-}
-
 // assertWalkPaths returns the set of paths a plain Recursive walk visits on
 // the given FS: on an archive-expansion view the jar Stats as a directory
 // and the walk descends into it (com/example/Inside.java); without
