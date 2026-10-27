@@ -37,7 +37,7 @@ jobs:
         run: |
           set -euo pipefail
           go list -mod=readonly -deps ./common/consts ./common/yak/ssaapi > "$RUNNER_TEMP/ssa-default-deps.txt"
-          if grep -E '^(plugin|gitee.com/chunanyong/dm(/.*)?)$' "$RUNNER_TEMP/ssa-default-deps.txt"; then
+          if grep -E '^(plugin|gitee.com/chunanyong/dm(/.*)?|github.com/yaklang/gorm/dm(/.*)?)$' "$RUNNER_TEMP/ssa-default-deps.txt"; then
             echo 'Default engine build unexpectedly includes the optional DM driver' >&2
             exit 1
           fi
@@ -65,6 +65,17 @@ jobs:
           go-version-file: go.mod
           cache: true
       - uses: ./.github/actions/linux-pcap
+      - name: Verify native DM builds use the GitHub driver submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          go list -mod=readonly -m all > "$RUNNER_TEMP/ssa-native-modules.txt"
+          go list -mod=readonly -deps -tags dameng ./common/consts ./common/yak/ssaapi > "$RUNNER_TEMP/ssa-native-deps.txt"
+          grep -Fx 'github.com/yaklang/gorm/dm' "$RUNNER_TEMP/ssa-native-deps.txt"
+          if grep -E '^gitee.com/chunanyong/dm([ /]|$)' "$RUNNER_TEMP/ssa-native-modules.txt" "$RUNNER_TEMP/ssa-native-deps.txt"; then
+            echo 'Native engine build still depends on the old Gitee DM module' >&2
+            exit 1
+          fi
       - name: Verify SSA policy with the native driver
         run: go test -mod=readonly -race -tags dameng ./common/utils/damenggorm -count=1 -timeout=2m
       - name: Verify the public native driver's races in an isolated module
