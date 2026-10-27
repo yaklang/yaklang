@@ -280,6 +280,21 @@ type dashboardLayout struct {
 }
 
 func layoutDashboard(w, h int) dashboardLayout {
+	return layoutDashboardForPackets(w, h, -1)
+}
+
+// Keep the live, unfiltered layout stable while packets arrive. An EOF replay
+// or an applied filter can use spare list rows for the protocol inspector.
+// Rendering, hit testing and scroll geometry must use this same decision.
+func (u *tui) dashboardLayout() dashboardLayout {
+	rows := -1
+	if u.finished || u.searchText != "" || u.displayFilter != nil {
+		rows = len(u.visible)
+	}
+	return layoutDashboardForPackets(u.width-1, u.height, rows)
+}
+
+func layoutDashboardForPackets(w, h, visibleRows int) dashboardLayout {
 	usable := w - 2
 	top := clamp(h/5, 7, 11)
 	l := dashboardLayout{footer: h - 3, split: w >= 118}
@@ -296,6 +311,11 @@ func layoutDashboard(w, h int) dashboardLayout {
 	}
 	remaining := l.footer - (2 + top)
 	packetHeight := max(6, remaining*53/100)
+	if visibleRows >= 0 {
+		// Two borders and the column header precede packet rows. Keep a
+		// separate empty-result message inside even a zero-match panel.
+		packetHeight = min(packetHeight, max(5, visibleRows+3))
+	}
 	detailHeight := remaining - packetHeight
 	l.packets = rect{1, 2 + top, usable, packetHeight}
 	y := l.packets.y + packetHeight
@@ -322,7 +342,7 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		c.text(1, 3, width-2, "Capture continues. q quits; Ctrl+C stops safely.", inkText)
 		return c.render(u.color)
 	}
-	l := layoutDashboard(width, height)
+	l := u.dashboardLayout()
 	u.drawSearch(c)
 	state := "● LIVE"
 	if src.offline {
