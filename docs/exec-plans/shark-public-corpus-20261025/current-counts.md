@@ -1,4 +1,4 @@
-当前显示标签计数，CLI 与原生字段/SDK 源码 `1d1a15bd2f`。输入原包不入库。全部原显示标签计数与上一轮逐字相同；完整导出逐字节保留关系与 RPC 调用身份验证见 [最新证据](dcerpc-call-generations-summary.json)。
+当前显示标签计数，CLI 与原生字段/SDK 源码 `5ff05f4ff4`。输入原包不入库。全部原显示标签计数与上一轮逐字相同；完整导出逐字节保留关系与 RPC / TCP 代际验证见 [最新证据](dcerpc-tcp-epochs-summary.json)。
 
 最新导出另补回 527 条迟到消息/诊断，见 [调用与延迟发布证据](dcerpc-call-publication-summary.json)。`published_pdus` 是处理过程中可用的结果，原始贡献帧仍在 `byte_source`；它们不重复计入下表物理帧标签。
 
