@@ -695,6 +695,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		delete(values, "Wire Field Ranges")
 		if e.Protocol == "dcerpc" {
 			add("DCE/RPC message and observed association", true)
+			if e.ResponseTo != 0 {
+				add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
+			}
 			for _, key := range []string{"Packet Name", "Call ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)

@@ -18,6 +18,7 @@ type binDCERPC struct {
 	pending              map[uint32]string
 	pendingDir           map[uint32]int
 	pendingContext       map[uint32]uint16
+	pendingPDU           map[uint32]uint64
 	proposals            map[uint32][]dcerpcProposal
 	ctxVersion           map[uint16]uint32
 	frags                map[dcerpcFragmentKey]dcerpcFragment
@@ -157,6 +158,39 @@ func (d *binDCERPC) consume(raw []byte, max int) (map[string]any, error) {
 		dir = 1 - dir
 	}
 	return d.consumeFrom(dir, raw, max)
+}
+
+// Wire Call IDs are scoped to this connection and remain separate from generated
+// PDU identities. Only a successfully admitted, complete clear request may own
+// a numeric reply link. Opaque and logical RPC fragment views do not establish
+// that contract, even if their common headers contain the same Call ID.
+func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
+	e.ResponseTo = 0
+	var call uint32
+	if len(e.Raw) >= 16 {
+		call = binary.LittleEndian.Uint32(e.Raw[12:16])
+	}
+	owner := d.pendingPDU[call]
+	var err error
+	e.Session, err = d.consumeFrom(dir, e.Raw, max)
+	if err != nil {
+		return err
+	}
+	if e.Session["First Frag"] != true || e.Session["Last Frag"] != true || e.Session["Reassembled"] == true || dcerpcHasSecurityTrailer(e.Raw) {
+		return nil
+	}
+	if e.Session["Outstanding"] == true && e.ID != 0 {
+		// push/stageProposals reserved this optional identity slot before they
+		// admitted the request. Refused duplicates cannot overwrite its owner.
+		if d.pendingPDU == nil {
+			d.pendingPDU = make(map[uint32]uint64)
+		}
+		d.pendingPDU[call] = e.ID
+	}
+	if e.Session["Association Status"] == "matched" {
+		e.ResponseTo = owner
+	}
+	return nil
 }
 
 func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, error) {
@@ -442,7 +476,7 @@ func (d *binDCERPC) stageProposals(call uint32, name string, dir int, proposals 
 	if d.stateElements()+len(proposals)+1 > max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	extra := int64(32 + 64 + len(name)) // proposal map slot and pending request.
+	extra := int64(32 + 80 + len(name)) // proposal, pending request and optional PDU identity.
 	for _, proposal := range proposals {
 		extra += int64(64 + len(proposal.name) + cap(proposal.abstractSyntax) + cap(proposal.transferSyntax))
 	}
@@ -555,7 +589,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	// Reserve the post-ack state before matching/removing the pending call so
 	// an accepted context can never become visible without its memory charge.
-	target := d.retainedBytes() - int64(64+len(want)) - 32
+	target := d.retainedBytes() - int64(80+len(want)) - 32
 	for _, proposal := range proposals {
 		target -= int64(64 + len(proposal.name) + cap(proposal.abstractSyntax) + cap(proposal.transferSyntax))
 	}
@@ -725,7 +759,7 @@ func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint1
 	if d.stateElements() >= max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	if err := d.reserveMemory(d.retainedBytes() + int64(80+len(name))); err != nil {
+	if err := d.reserveMemory(d.retainedBytes() + int64(96+len(name))); err != nil {
 		return err
 	}
 	d.pending[call] = name
@@ -742,7 +776,12 @@ func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint1
 
 func (d *binDCERPC) matchContext(call uint32, respName string, info map[string]any, dir int, contextID uint16) bool {
 	if _, pending := d.pending[call]; pending {
-		if requestContext, hasContext := d.pendingContext[call]; hasContext && requestContext != contextID {
+		requestContext, hasContext := d.pendingContext[call]
+		if !hasContext {
+			d.markUnmatched(respName, info, "request-type-mismatch")
+			return false
+		}
+		if requestContext != contextID {
 			d.markUnmatched(respName, info, "context-mismatch")
 			return false
 		}
@@ -762,6 +801,7 @@ func (d *binDCERPC) match(call uint32, respName string, info map[string]any, dir
 		delete(d.pending, call)
 		delete(d.pendingDir, call)
 		delete(d.pendingContext, call)
+		delete(d.pendingPDU, call)
 		info["Matched Request"] = want
 		info["Association Status"] = "matched"
 		info["Packet Name"] = respName
@@ -780,9 +820,9 @@ func (d *binDCERPC) stateElements() int {
 }
 
 // retainedBytes conservatively charges actual retained fragment capacities,
-// UUID data, pending-call names, and map/slice bookkeeping.
+// UUID data, pending-call names, optional PDU identities and map/slice bookkeeping.
 func (d *binDCERPC) retainedBytes() int64 {
-	n := int64(64) + int64(len(d.ctx))*80 + int64(len(d.pending))*64
+	n := int64(64) + int64(len(d.ctx))*80 + int64(len(d.pending))*80
 	for _, uuid := range d.uuid {
 		n += int64(cap(uuid))
 	}
@@ -882,8 +922,21 @@ func dcerpcIfaceName(uuid []byte, major, minor uint16) string {
 func dcerpcOpName(iface string, op uint16) string {
 	switch iface {
 	case "EPM":
-		if op == 3 {
+		switch op {
+		case 0:
+			return "EPM.ept_insert"
+		case 1:
+			return "EPM.ept_delete"
+		case 2:
+			return "EPM.ept_lookup"
+		case 3:
 			return "EPM.ept_map"
+		case 4:
+			return "EPM.ept_lookup_handle_free"
+		case 5:
+			return "EPM.ept_inq_object"
+		case 6:
+			return "EPM.ept_mgmt_delete"
 		}
 	case "SRVSVC":
 		if op == 15 {
