@@ -100,6 +100,7 @@ Package:
           return
         }
         if ptype == 13 {
+          this.GetSubNode("BindNak").SetMaxLength(this.GetMaxLength())
           this.ProcessSubNode("BindNak")
           return
         }
@@ -260,6 +261,15 @@ Package:
           if n > 0 {
             this.ProcessSubNode("Versions")
           }
+          rest = this.GetMaxLength() - this.Length()
+          if rest > 0 {
+            pad = (4 - (this.Length() % 4)) % 4
+            if rest != pad {
+              panic("dcerpc: unsupported bind nak trailing bytes")
+            }
+            this.GetSubNode("Trailing Padding").SetMaxLength(pad)
+            this.ProcessSubNode("Trailing Padding")
+          }
         Reject Reason: uint16
         Num Versions: uint8
         Versions:
@@ -268,6 +278,7 @@ Package:
           Version:
             Major: uint8
             Minor: uint8
+        Trailing Padding: raw
 DCERPCv4:
   unpack: true
   operator: |
