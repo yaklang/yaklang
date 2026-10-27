@@ -42,6 +42,7 @@ type CaptureConfig struct {
 	canDecodeAs            map[int]string
 	binParserConfig        *BinParserConfig
 	binParser              *binParser
+	transportNormalizer    *binParser
 	recorder               *captureWriter
 	outputFile             string
 	captureBuffer          int
@@ -578,10 +579,14 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if packet == nil {
 		return
 	}
-	if c.binParser != nil {
-		packet = protocolAnalysisPacket(packet, c.binParser.datagramDecodeAs)
+	normalizer := c.binParser
+	if normalizer == nil {
+		normalizer = c.transportNormalizer
+	}
+	if normalizer != nil {
+		packet = protocolAnalysisPacket(packet, normalizer.datagramDecodeAs)
 		var consumed bool
-		packet, consumed = c.binParser.networkPacket(packet)
+		packet, consumed = normalizer.networkPacket(packet)
 		if consumed {
 			return
 		}
@@ -644,7 +649,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	}
 
 	if save {
-		c.Save(packet)
+		c.Save(originalPacket)
 	}
 }
 

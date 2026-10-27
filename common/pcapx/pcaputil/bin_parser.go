@@ -757,6 +757,20 @@ func (c *CaptureConfig) prepareBinParser() error {
 		return fmt.Errorf("MMS description validation requires explicit service/value ports")
 	}
 	if c.binParserConfig == nil || (c.binParserConfig.OnEvent == nil && c.binParserConfig.OnStats == nil) {
+		if !c.DisableAssembly {
+			// Network validation, tunnel admission and bounded IP reassembly are
+			// required by TCP consumers independently of protocol subscriptions.
+			// Keep this instance out of TrafficFlow.onFrame: it creates no
+			// application plans, probes, sessions or readable TCP stream copies.
+			a := &binParser{config: BinParserConfig{MaxMessageBytes: 16 << 20, MaxBufferedBytes: 128 << 20, ProbeBytes: 64}, budget: DefaultParserBudget()}
+			a.budget.MaxMessageBytes, a.budget.MaxFrameBytes = a.config.MaxMessageBytes, a.config.MaxMessageBytes
+			a.budget.MaxBufferedBytes, a.budget.ProbeBytes = a.config.MaxBufferedBytes, a.config.ProbeBytes
+			a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
+			for port, profile := range c.datagramDecodeAs {
+				a.datagramDecodeAs[port] = profile
+			}
+			c.transportNormalizer = a
+		}
 		return nil
 	}
 	if c.DisableAssembly || c.EnableCache || c.requiresFullStream {
@@ -844,10 +858,13 @@ func (a *binParser) stats() BinParserStats {
 }
 
 func (c *CaptureConfig) finishBinParser() error {
-	if c.binParser == nil {
+	a := c.binParser
+	if a == nil {
+		a = c.transportNormalizer
+	}
+	if a == nil {
 		return nil
 	}
-	a := c.binParser
 	a.closeCANISO()
 	a.closeJ1939TP()
 	a.closeDroneCANStats()
