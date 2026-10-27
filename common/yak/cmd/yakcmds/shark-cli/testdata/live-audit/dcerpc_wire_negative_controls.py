@@ -12,11 +12,13 @@ from dcerpc_wire_audit import audit,canonical,sha
 
 ap=argparse.ArgumentParser(description=__doc__)
 for name in ['capture','events','oracle','receipts','out-dir']:ap.add_argument('--'+name,type=Path,required=True)
+ap.add_argument('--require-scoped-ranges',action='store_true')
 a=ap.parse_args()
-for p in vars(a).values():assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
+for p in vars(a).values():
+    if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
 a.out_dir.mkdir(exist_ok=False)
 rows=[json.loads(line)for line in a.events.open(encoding='utf-8-sig')]
-baseline=audit(a.capture,a.events,a.oracle,a.receipts)
+baseline=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges)
 index=next(i for i,e in enumerate(rows)if e.get('profile')=='dcerpc-security-envelope')
 
 def both(e,fn):
@@ -64,11 +66,18 @@ controls.extend([
     ('feature-bits',feature_ack,lambda e:e['session'].__setitem__('Observed Bind Time Feature Bits',65535)),
     ('feature-endpoint-state',feature_ack,lambda e:e['session'].__setitem__('Bind Time Feature Endpoint State Verified',True)),
 ])
+if a.require_scoped_ranges:
+    controls.extend([
+        ('proposal-range-loss',proposal,lambda e:e['session']['Presentation Contexts'][0].pop('Wire Field Ranges')),
+        ('proposal-range-other-ordinal',proposal,lambda e:e['session']['Presentation Contexts'][1]['Wire Field Ranges'].__setitem__('Transfer Syntax',[52,68])),
+        ('result-range-loss',feature_ack,lambda e:e['session']['Presentation Context Results'][0].pop('Wire Field Ranges')),
+        ('result-range-other-ordinal',feature_ack,lambda e:e['session']['Presentation Context Results'][1]['Wire Field Ranges'].__setitem__('Transfer Syntax',[40,56])),
+    ])
 rejected=[]
 for name,target,mutate in controls:
     changed=copy.deepcopy(rows);mutate(changed[target])
     path=a.out_dir/(name+'.jsonl');path.write_text(''.join(canonical(e)+'\n'for e in changed),encoding='utf8')
-    try:audit(a.capture,path,a.oracle,a.receipts)
+    try:audit(a.capture,path,a.oracle,a.receipts,a.require_scoped_ranges)
     except (AssertionError,KeyError,ValueError,IndexError,TypeError)as exc:
         rejected.append(dict(name=name,PDU=rows[target]['id'],rejection=str(exc),mutated_export_sha256=sha(path.read_bytes())))
     else:raise AssertionError('DCE/RPC negative control accepted: '+name)

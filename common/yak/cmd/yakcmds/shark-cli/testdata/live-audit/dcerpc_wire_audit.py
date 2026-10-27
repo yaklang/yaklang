@@ -126,7 +126,7 @@ def records(capture):
     assert at==len(wire)
 
 
-def audit(capture,events,oracle,receipts=None):
+def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False):
     checks=0
     def check(ok,why):
         nonlocal checks
@@ -286,10 +286,14 @@ def audit(capture,events,oracle,receipts=None):
             if raw[2]in[11,14]:
                 contexts=expected['PDU']['Bind'].get('Contexts')or[];views=[]
                 aliases={'e1af8308-5d1f-11c9-91a4-08002b14a0fa':'EPM','4b324fc8-1670-01d3-1278-5a47bf6ee188':'SRVSVC'}
-                for context in contexts:
+                for ordinal,context in enumerate(contexts):
                     abstract=base64.b64decode(context['Abstract Syntax']);transfer=base64.b64decode(context['Transfer Syntax']);version=context['Abstract Version'];major=version&65535;minor=version>>16
                     name=aliases.get(str(uuid.UUID(bytes_le=abstract)),'unknown')if(major,minor)==(3,0)else'unknown'
-                    views.append({'Context ID':context['Context ID'],'Abstract Syntax':b64(abstract),'Interface':name,'Interface Version Major':major,'Interface Version Minor':minor,'Transfer Syntax':b64(transfer),'Transfer Version':context['Transfer Version'],'Bind Time Feature Proposal':transfer[:8]==bytes.fromhex('2c1cb76c12984045')and context['Transfer Version']==1})
+                    view={'Context ID':context['Context ID'],'Abstract Syntax':b64(abstract),'Interface':name,'Interface Version Major':major,'Interface Version Minor':minor,'Transfer Syntax':b64(transfer),'Transfer Version':context['Transfer Version'],'Bind Time Feature Proposal':transfer[:8]==bytes.fromhex('2c1cb76c12984045')and context['Transfer Version']==1}
+                    if require_scoped_ranges or 'Wire Field Ranges'in s['Presentation Contexts'][ordinal]:
+                        at=28+44*ordinal
+                        view['Wire Field Ranges']={'Context ID':[at,at+2],'Abstract Syntax':[at+4,at+20],'Interface Version Major':[at+20,at+22],'Interface Version Minor':[at+22,at+24],'Transfer Syntax':[at+24,at+40],'Transfer Version':[at+40,at+44]}
+                    views.append(view)
                 eq(s['Presentation Contexts'],views,'all ordered native presentation context proposals')
                 proposals[(connection(e),call)]=dict(PType=raw[2],source=e['source'],contexts=contexts)
             elif raw[2]in[12,15]:
@@ -302,6 +306,9 @@ def audit(capture,events,oracle,receipts=None):
                 for index,pos in enumerate(range(at+4,len(body),24)):
                     result=int.from_bytes(body[pos:pos+2],'little');reason=int.from_bytes(body[pos+2:pos+4],'little');transfer=body[pos+4:pos+20];version=int.from_bytes(body[pos+20:pos+24],'little')
                     view={'Ordinal':index,'Result':result,'Reason':reason,'Transfer Syntax':b64(transfer),'Transfer Version':version}
+                    if require_scoped_ranges or 'Wire Field Ranges'in s['Presentation Context Results'][index]:
+                        start=16+pos
+                        view['Wire Field Ranges']={'Result':[start,start+2],'Reason':[start+2,start+4],'Transfer Syntax':[start+4,start+20],'Transfer Version':[start+20,start+24]}
                     if matched:
                         check(index<len(owner['contexts']),'original ACK has a proposal at the same ordinal')
                         context=owner['contexts'][index];view['Proposed Context ID']=context['Context ID']
@@ -361,7 +368,7 @@ def audit(capture,events,oracle,receipts=None):
             data=bytes(state['cells'][i]for i in range(at,at+size))
             unexported.append(dict(**state['meta'],start=at,length=size,raw_sha256=sha(data)));at+=size
         details.append(dict(**state['meta'],native_consumed_bytes=state['cursor'],captured_contiguous_bytes=available,remaining_captured_bytes=available-state['cursor'],captured_SYN=state.get('captured_SYN',False),later_pre_origin_segments=state.get('before_origin',[])))
-    return dict(scope=__doc__,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
+    return dict(scope=__doc__,require_scoped_field_ranges=require_scoped_ranges,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
                 compared_PDUs=compared,status_counts=dict(status),complete_clear_field_trees_checked=complete_clear_trees,matched_bind_or_alter_associations_checked=association_checks,reference_field_counts=dict(reference_fields),reference_layout_limits=reference_limits,reference_field_limits=reference_field_limits,
                 outside_selected_reference_frames=outside,aggregate_reference_limits=aggregate_reference_limits,unused_selected_reference_views=[dict(frame=no,view=index)for no,values in reference_views.items()for index,_ in enumerate(values)if(no,index)not in used_views],
                 closure_diagnostics=closures,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
@@ -370,9 +377,9 @@ def audit(capture,events,oracle,receipts=None):
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ['capture','events','oracle','out']:ap.add_argument('--'+name,type=Path,required=True)
-    ap.add_argument('--receipts',type=Path);a=ap.parse_args()
+    ap.add_argument('--receipts',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');a=ap.parse_args()
     for p in vars(a).values():
-        if p is not None:assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-    proof=audit(a.capture,a.events,a.oracle,a.receipts)
+        if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
+    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges)
     a.out.write_text(json.dumps(proof,indent=2)+'\n',encoding='utf8')
     print(json.dumps(dict(checks=proof['checks'],physical_frames=proof['physical_frames'],native_PDUs=len(proof['compared_PDUs']),statuses=proof['status_counts'],reference_fields=sum(proof['reference_field_counts'].values()),unexported_complete_PDUs=len(proof['unexported_complete_wire_PDUs']))))

@@ -420,9 +420,37 @@ func main() {
 			if len(want) == 0 || len(want) > 256 || fields.Width != 180 {
 				panic("literal byte-value QA requires 1..256 bytes and the native 180-column viewport")
 			}
+			valueStart, readUntil := 0, len(want)
+			mappedRange := os.Getenv("SHARK_QA_BYTE_RANGE")
+			if mappedRange != "" {
+				parts := strings.Split(mappedRange, ":")
+				if len(parts) != 2 {
+					panic("mapped byte QA requires an explicit start:end PDU interval")
+				}
+				valueStart, err = strconv.Atoi(parts[0])
+				fail(err)
+				readUntil, err = strconv.Atoi(parts[1])
+				fail(err)
+				if valueStart < 0 || readUntil-valueStart != len(want) || readUntil > 4096 {
+					panic("mapped PDU interval does not match the independent field bytes")
+				}
+			}
+			occurrence := 0
+			if value := os.Getenv("SHARK_QA_BYTE_OCCURRENCE"); value != "" {
+				occurrence, err = strconv.Atoi(value)
+				fail(err)
+				if occurrence < 0 || occurrence > 64 {
+					panic("byte field occurrence outside bounded QA range")
+				}
+			}
 			fieldY := -1
+			seen := 0
 			for row, text := range fields.Rows {
 				if strings.Contains(text, name+": ") {
+					if seen < occurrence {
+						seen++
+						continue
+					}
 					if !strings.Contains(text, fmt.Sprintf("%d bytes", len(want))) || !strings.Contains(text, "HEX") {
 						panic("native binary field did not retain its literal length and hex representation")
 					}
@@ -437,13 +465,20 @@ func main() {
 			state := loadShot("01-selected-byte-field")
 			headerY, rightX := -1, -1
 			for row, text := range state.Rows {
+				if mappedRange != "" {
+					if at := strings.Index(text, "3 "); at >= 0 && strings.Contains(text[at:], "PDU") && strings.Contains(text[at:], fmt.Sprintf("0x%x–0x%x · %d bytes", valueStart, readUntil-1, len(want))) {
+						headerY, rightX = row, len(utf16.Encode([]rune(text[:at])))
+						break
+					}
+					continue
+				}
 				if at := strings.Index(text, "3 Extracted field value"); at >= 0 && strings.Contains(text, "frame offsets unavailable") {
 					headerY, rightX = row, len(utf16.Encode([]rune(text[:at])))
 					break
 				}
 			}
 			if headerY < 0 {
-				panic("selected byte value was incorrectly presented as captured-frame offsets")
+				panic("selected field does not expose its expected extracted-value or PDU byte scope")
 			}
 			// The box title has its own padding. Locate the zero-offset hex
 			// column in the actual first data row instead of reusing title X.
@@ -476,18 +511,18 @@ func main() {
 				// The initial 180-column split uses sixteen octets per row.
 				// Stop before the ASCII preview, even if it resembles hex.
 				for _, word := range words[1:min(17, len(words))] {
-					if len(observed) == len(want) || len(word) != 2 {
+					if len(observed) == readUntil || len(word) != 2 {
 						break
 					}
 					part, err := hex.DecodeString(word)
 					fail(err)
 					observed = append(observed, part...)
 				}
-				if len(observed) == len(want) {
+				if len(observed) == readUntil {
 					break
 				}
 			}
-			if !bytes.Equal(observed, want) {
+			if len(observed) != readUntil || !bytes.Equal(observed[valueStart:], want) {
 				panic("selected native hex cells differ from the independent original-wire field value")
 			}
 		}

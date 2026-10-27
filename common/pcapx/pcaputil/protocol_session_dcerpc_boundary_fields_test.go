@@ -78,6 +78,46 @@ func TestDCERPCObjectUUIDHasItsOwnWireField(t *testing.T) {
 	}
 }
 
+func TestDCERPCContextAndResultRangesBelongToEveryWireOrdinal(t *testing.T) {
+	d := newReviewDCERPC()
+	bind := dcerpcBindContexts(11, 1, dcerpcBindContext{uuid: dcerpcEPM, id: 0}, dcerpcBindContext{uuid: dcerpcEPM, id: 1})
+	info, err := d.consumeFrom(0, bind, 4096)
+	require.NoError(t, err)
+	for i, view := range info["Presentation Contexts"].([]map[string]any) {
+		ranges := view["Wire Field Ranges"].(map[string]any)
+		for name, span := range map[string][]uint64{"Context ID": {uint64(28 + i*44), uint64(30 + i*44)}, "Abstract Syntax": {uint64(32 + i*44), uint64(48 + i*44)}, "Transfer Syntax": {uint64(52 + i*44), uint64(68 + i*44)}} {
+			require.Equal(t, span, ranges[name])
+		}
+	}
+	ack := dcerpcBindAckResults(12, 1, dcerpcBindAckEntry{syntax: dcerpcNDR, version: 2}, dcerpcBindAckEntry{result: 2, syntax: make([]byte, 16)})
+	info, err = d.consumeFrom(1, ack, 4096)
+	require.NoError(t, err)
+	for i, view := range info["Presentation Context Results"].([]map[string]any) {
+		ranges := view["Wire Field Ranges"].(map[string]any)
+		start := uint64(32 + 24*i)
+		require.Equal(t, []uint64{start, start + 2}, ranges["Result"])
+		require.Equal(t, view["Result"], binary.LittleEndian.Uint16(ack[start:start+2]))
+		require.Equal(t, []uint64{start + 4, start + 20}, ranges["Transfer Syntax"])
+		require.Equal(t, view["Transfer Syntax"], ack[start+4:start+20])
+	}
+}
+
+func TestDCERPCBodyRangesCannotClaimFinalFragmentOffsets(t *testing.T) {
+	for _, info := range []map[string]any{
+		{"First Frag": true, "Last Frag": false},
+		{"First Frag": false, "Last Frag": true, "Reassembled": true},
+		{"First Frag": true, "Last Frag": true, "Reassembled": true},
+		{},
+	} {
+		target := map[string]any{"Value": []byte{1, 2}}
+		dcerpcAttachBodyRanges(info, target, map[string]any{"Value": []uint64{16, 18}})
+		require.NotContains(t, target, "Wire Field Ranges")
+	}
+	info := map[string]any{"First Frag": true, "Last Frag": true}
+	dcerpcAttachBodyRanges(info, info, map[string]any{"Value": []uint64{16, 18}})
+	require.Contains(t, info, "Wire Field Ranges")
+}
+
 func TestDCERPCResultTailRecoveryCannotScanOrBypassLimits(t *testing.T) {
 	bad := dcerpcBindAckResults(15, 1, dcerpcBindAckEntry{syntax: dcerpcNDR, version: 2}, dcerpcBindAckEntry{syntax: dcerpcNDR, version: 2})
 	bad[28] = 1
