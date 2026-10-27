@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"golang.org/x/sys/windows"
@@ -402,9 +403,9 @@ func main() {
 			send(fmt.Sprintf("\x1b[<0;%d;%dM\x1b[<0;%d;%dm", x+1, y+1, x+1, y+1))
 		}
 		click(xb+2, y)
-		bytes := loadShot("01-adaptive-bytes-click")
-		by, bf, bb := tabs(bytes)
-		if by != y || bytes.Attributes[by][bb+1] != selected || bytes.Attributes[by][bf+1] == selected {
+		byteView := loadShot("01-adaptive-bytes-click")
+		by, bf, bb := tabs(byteView)
+		if by != y || byteView.Attributes[by][bb+1] != selected || byteView.Attributes[by][bf+1] == selected {
 			panic("mouse click missed the rendered adaptive Bytes tab")
 		}
 		click(xf+2, y)
@@ -412,6 +413,83 @@ func main() {
 		fy, ff, fb := tabs(fields)
 		if fy != y || fields.Attributes[fy][ff+1] != selected || fields.Attributes[fy][fb+1] == selected || !matching(fields, true) {
 			panic("mouse click missed the rendered adaptive Fields tab or changed the inspected packet")
+		}
+		if name := os.Getenv("SHARK_QA_BYTE_FIELD"); name != "" {
+			want, err := hex.DecodeString(os.Getenv("SHARK_QA_BYTE_HEX"))
+			fail(err)
+			if len(want) == 0 || len(want) > 256 || fields.Width != 180 {
+				panic("literal byte-value QA requires 1..256 bytes and the native 180-column viewport")
+			}
+			fieldY := -1
+			for row, text := range fields.Rows {
+				if strings.Contains(text, name+": ") {
+					if !strings.Contains(text, fmt.Sprintf("%d bytes", len(want))) || !strings.Contains(text, "HEX") {
+						panic("native binary field did not retain its literal length and hex representation")
+					}
+					fieldY = row
+					break
+				}
+			}
+			if fieldY < 0 {
+				panic("requested literal byte field is not visible in the actual native field pane")
+			}
+			click(8, fieldY)
+			state := loadShot("01-selected-byte-field")
+			headerY, rightX := -1, -1
+			for row, text := range state.Rows {
+				if at := strings.Index(text, "3 Extracted field value"); at >= 0 && strings.Contains(text, "frame offsets unavailable") {
+					headerY, rightX = row, len(utf16.Encode([]rune(text[:at])))
+					break
+				}
+			}
+			if headerY < 0 {
+				panic("selected byte value was incorrectly presented as captured-frame offsets")
+			}
+			// The box title has its own padding. Locate the zero-offset hex
+			// column in the actual first data row instead of reusing title X.
+			line := utf16.Encode([]rune(state.Rows[headerY+1]))
+			dataX := -1
+			for x := max(0, rightX-4); x <= rightX+2 && x+6 < len(line); x++ {
+				if string(utf16.Decode(line[x:x+6])) == "000000" && line[x+6] == ' ' {
+					dataX = x
+					break
+				}
+			}
+			if dataX < 0 {
+				panic("selected extracted bytes do not start at an observable zero-offset row")
+			}
+			rightX = dataX
+			var observed []byte
+			for _, text := range state.Rows[headerY+1:] {
+				cells := utf16.Encode([]rune(text))
+				if rightX >= len(cells) {
+					continue
+				}
+				words := strings.Fields(string(utf16.Decode(cells[rightX:])))
+				if len(words) < 2 || len(words[0]) != 6 {
+					continue
+				}
+				offset, err := strconv.ParseUint(words[0], 16, 32)
+				if err != nil || int(offset) != len(observed) {
+					continue
+				}
+				// The initial 180-column split uses sixteen octets per row.
+				// Stop before the ASCII preview, even if it resembles hex.
+				for _, word := range words[1:min(17, len(words))] {
+					if len(observed) == len(want) || len(word) != 2 {
+						break
+					}
+					part, err := hex.DecodeString(word)
+					fail(err)
+					observed = append(observed, part...)
+				}
+				if len(observed) == len(want) {
+					break
+				}
+			}
+			if !bytes.Equal(observed, want) {
+				panic("selected native hex cells differ from the independent original-wire field value")
+			}
 		}
 	}
 	send("b")
