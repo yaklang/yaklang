@@ -51,6 +51,11 @@ def invalid_clear_body(raw):
         for index,pos in enumerate(range(at+4,end,24)):
             result=int.from_bytes(body[pos:pos+2],'little')
             if result>3:return dict(reason='invalid presentation context result code',index=index,result=result)
+    if raw[2]==13:
+        if len(body)<3:return dict(reason='bind-NAK fixed header exceeds selected version-list profile')
+        end=3+2*body[2]
+        if end>len(body):return dict(reason='declared bind-NAK version list exceeds body',required_end=end+16,available_end=len(raw))
+        if len(body)not in[end,(end+3)&~3]:return dict(reason='tail outside selected bind-NAK alignment profile',extra_bytes=len(body)-end)
     return None
 
 
@@ -91,6 +96,16 @@ def clear_wire_fields(raw):
         f['DCERPCResults']=results;name='BindAck'
         ref={'dcerpc.cn_max_xmit':u16(0),'dcerpc.cn_max_recv':u16(2),'dcerpc.cn_assoc_group':u32(4),'dcerpc.cn_sec_addr_len':address,'dcerpc.cn_num_results':count,
              'dcerpc.cn_ack_result':[u16(pos)for pos in range(at+4,len(body),24)],'dcerpc.cn_ack_trans_id':[guid(body[pos+4:pos+20])for pos in range(at+4,len(body),24)],'dcerpc.cn_ack_trans_ver':[u32(pos+20)for pos in range(at+4,len(body),24)]}
+    elif ptype==13:
+        assert invalid_clear_body(raw)is None and body[2]<=20
+        count=body[2];end=3+2*count
+        f={'Reject Reason':u16(0),'Num Versions':count}
+        if count:f['Versions']=[dict(Major=body[3+2*i],Minor=body[4+2*i])for i in range(count)]
+        if end<len(body):f['Trailing Padding']=b64(body[end:])
+        ref={'dcerpc.cn_reject_reason':u16(0)}
+        if u16(0)==4:
+            ref.update({'dcerpc.cn_num_protocols':count,'dcerpc.cn_protocol_ver_major':[body[3+2*i]for i in range(count)],'dcerpc.cn_protocol_ver_minor':[body[4+2*i]for i in range(count)]})
+        name='BindNak'
     elif ptype in[0,2,3]:
         assert len(body)>=8
         f={'Alloc Hint':u32(0),'Context ID':u16(4)}
@@ -126,14 +141,19 @@ def records(capture):
     assert at==len(wire)
 
 
-def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False,control_manifest=None):
+def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False,control_manifest=None,tcp_generations=False):
     checks=0
     def check(ok,why):
         nonlocal checks
         checks+=1;assert ok,why
     def eq(a,b,why):check(canonical(a)==canonical(b),why)
     def connection(e):return canonical([e['domain'],sorted([e['source'],e['destination']])])
-    def direction(e):return canonical([e['domain'],e['source'],e['destination']])
+    event_epochs={};original_epochs=[];flow_epochs={}
+    def direction(e):
+        parts=[e['domain'],e['source'],e['destination']]
+        if tcp_generations:parts.append(event_epochs[e['id']]if'id'in e else e['epoch'])
+        return canonical(parts)
+    def association(e):return canonical([connection(e),event_epochs[e['id']]])if tcp_generations else connection(e)
     def leaves(node,name):
         if isinstance(node,dict):
             for key,value in node.items():
@@ -159,10 +179,18 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
             check(len(frame)>=4,'complete loopback family')
             if frame[:4]not in[b'\x02\0\0\0',b'\0\0\0\x02']:continue
             decoded=bytes(12)+b'\x08\0'+frame[4:];decode_link=1
-        packet=tcp_packet(decoded,decode_link,section,interface)
+        packet=tcp_packet(decoded,decode_link,section,interface,include_control=tcp_generations)
         if packet is None or connection(packet)not in wanted:continue
         physical[no]=dict(packet,frame_sha256=sha(frame))
+    if tcp_generations:
+        check(not require_call_links,'the legacy whole-PDU-only call-link certificate is not a multi-epoch certificate')
+        from tcp_epoch_audit import partition,bind_events
+        by_frame,original_epochs=partition(physical)
+        event_epochs,flow_epochs=bind_events(native,physical,by_frame)
+        for no,packet in physical.items():packet['epoch']=by_frame[no]
+    for no,packet in physical.items():
         state=streams.setdefault(direction(packet),dict(meta={k:packet[k]for k in ['domain','source','destination']},packets=[],syns=[],cursor=0))
+        if tcp_generations:state['meta']['epoch']=packet['epoch']
         if packet['syn']:state['syns'].append((packet['sequence']+1)&0xffffffff)
         if packet['payload']:state['packets'].append((packet['sequence']+int(packet['syn']),packet['payload'],no))
     for state in streams.values():
@@ -320,10 +348,10 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
                         view['Wire Field Ranges']={'Context ID':[at,at+2],'Abstract Syntax':[at+4,at+20],'Interface Version Major':[at+20,at+22],'Interface Version Minor':[at+22,at+24],'Transfer Syntax':[at+24,at+40],'Transfer Version':[at+40,at+44]}
                     views.append(view)
                 eq(s['Presentation Contexts'],views,'all ordered native presentation context proposals')
-                proposals[(connection(e),call)]=dict(PType=raw[2],source=e['source'],contexts=contexts)
+                proposals[(association(e),call)]=dict(PType=raw[2],source=e['source'],contexts=contexts)
             elif raw[2]in[12,15]:
                 body=raw[16:];at=(10+int.from_bytes(body[8:10],'little')+3)&~3;views=[]
-                owner=proposals.get((connection(e),call))
+                owner=proposals.get((association(e),call))
                 matched=owner is not None and owner['source']!=e['source']and owner['PType']==(11 if raw[2]==12 else 14)
                 if matched:eq(s['Association Status'],'matched','original observed opposite-direction proposal owns ACK')
                 else:check(s.get('Association Status')!='matched','missing or incompatible original proposal cannot own ACK')
@@ -354,7 +382,18 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
                     eq(len(views),len(owner['contexts']),'all original proposal ordinals have a result')
                     eq(s.get('Accepted Context IDs')or[],accepted,'feature/rejected entries cannot become accepted transfer contexts')
                     eq(s.get('Rejected Context IDs')or[],rejected,'ordered rejected context IDs')
-                    proposals.pop((connection(e),call));association_checks+=1
+                    proposals.pop((association(e),call));association_checks+=1
+            elif raw[2]==13:
+                body=raw[16:];count=body[2];end=3+2*count
+                eq(s['Reject Reason'],int.from_bytes(body[:2],'little'),'literal native bind-NAK rejection reason')
+                eq(s['Version Count'],count,'literal native bind-NAK supported-version count')
+                eq(s.get('Protocol Versions')or[],[str(body[3+2*i])+'.'+str(body[4+2*i])for i in range(count)],'all supported versions preserve order')
+                ranges={'Reject Reason':[16,18],'Version Count':[18,19]}
+                if count:ranges['Protocol Versions']=[19,16+end]
+                if end<len(body):
+                    eq(s['Trailing Padding'],b64(body[end:]),'original bounded bind-NAK trailing alignment octets')
+                    ranges['Trailing Padding']=[16+end,len(raw)]
+                eq(s['Wire Field Ranges'],ranges,'bind-NAK views select their exact original PDU bytes')
             elif raw[2]==0 and raw[3]&0x80:
                 eq(s['Object UUID'],b64(raw[24:40]),'native object UUID is separate from the stub');eq(s['Stub Bytes'],len(raw)-40,'exact stub length after object identity');eq(s['Wire Field Ranges']['Object UUID'],[24,40],'object identity owns its actual PDU interval')
         # TCP can deliver several cached PDUs when an earlier hole is filled.
@@ -377,13 +416,13 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
                 eq(values,expected,'ordered literal reference body fields '+key)
                 reference_fields[key]+=len(expected)
         else:reference_limits.append(dict(PDU=e['id'],physical_frames=owners,reason='no exact complete/prefix raw-view attribution; independent full wire bytes still checked'))
-        compared.append(dict(PDU=e['id'],protocol=e['protocol'],status=e['status'],physical_frames=owners,stream_offset=wire_start,stream_prefix_delivery_frame=delivery,raw_sha256=sha(raw),auth_bytes=auth))
+        compared.append(dict(PDU=e['id'],protocol=e['protocol'],status=e['status'],physical_frames=owners,stream_offset=wire_start,stream_prefix_delivery_frame=delivery,raw_sha256=sha(raw),auth_bytes=auth,**({'TCP_epoch':event_epochs[e['id']]}if tcp_generations else{})))
     if receipts:
         for r in json.loads(receipts.read_text(encoding='utf-8-sig')):
-            raw=base64.b64decode(r['wire_base64'],validate=True);eq(sha(raw),r['sha256'],'endpoint receipt digest')
-            matches=[v for v in compared if v['raw_sha256']==r['sha256']]
+            raw=base64.b64decode(r['wire_base64'],validate=True);digest=r['SHA256']if tcp_generations else r['sha256'];eq(sha(raw),digest,'endpoint receipt digest')
+            matches=[v for v in compared if v['raw_sha256']==digest and(not tcp_generations or v['TCP_epoch']==r['generation']+1)]
             eq(len(matches),1,'each actual sent/received complete PDU has one native wire record')
-            receipt_matches.append(dict(case=r['case'],direction=r['direction'],PDU=matches[0]['PDU'],raw_sha256=r['sha256']))
+            receipt_matches.append(dict(case=r['generation']if tcp_generations else r['case'],direction=r['direction'],PDU=matches[0]['PDU'],raw_sha256=digest))
         eq(len(compared),len(receipt_matches),'no extra selected PDU in owned endpoint capture')
     details=[];unexported=[]
     for state in streams.values():
@@ -404,9 +443,9 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
     if require_call_links:
         from dcerpc_call_links import audit_call_links
         numeric_links=audit_call_links(native,reference_views,pdu_deliveries)
-    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])+(['dcerpc_generation_control_audit.py']if control_manifest is not None else[])
+    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])+(['dcerpc_generation_control_audit.py']if control_manifest is not None else[])+(['tcp_epoch_audit.py']if tcp_generations else[])
     audit_sources={name:sha((Path(__file__).parent/name).read_bytes())for name in sources}
-    return dict(scope=__doc__,audit_sources_sha256=audit_sources,control_manifest_sha256=sha(control_manifest.read_bytes())if control_manifest is not None else None,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
+    return dict(scope=__doc__,audit_sources_sha256=audit_sources,original_TCP_epochs=original_epochs,native_flow_epochs=[dict(connection=key[0],flow=key[1],epoch=value)for key,value in flow_epochs.items()],control_manifest_sha256=sha(control_manifest.read_bytes())if control_manifest is not None else None,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
                 compared_PDUs=compared,status_counts=dict(status),complete_clear_field_trees_checked=complete_clear_trees,matched_bind_or_alter_associations_checked=association_checks,reference_field_counts=dict(reference_fields),reference_layout_limits=reference_limits,reference_field_limits=reference_field_limits,
                 outside_selected_reference_frames=outside,aggregate_reference_limits=aggregate_reference_limits,unused_selected_reference_views=[dict(frame=no,view=index)for no,values in reference_views.items()for index,_ in enumerate(values)if(no,index)not in used_views],
                 closure_diagnostics=closures,incomplete_captured_prefix_diagnostics=prefixes,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
@@ -415,9 +454,9 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ['capture','events','oracle','out']:ap.add_argument('--'+name,type=Path,required=True)
-    ap.add_argument('--receipts',type=Path);ap.add_argument('--control-manifest',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');a=ap.parse_args()
+    ap.add_argument('--receipts',type=Path);ap.add_argument('--control-manifest',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');ap.add_argument('--tcp-generations',action='store_true');a=ap.parse_args()
     for p in vars(a).values():
         if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links,a.control_manifest)
+    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links,a.control_manifest,a.tcp_generations)
     a.out.write_text(json.dumps(proof,indent=2)+'\n',encoding='utf8')
     print(json.dumps(dict(checks=proof['checks'],physical_frames=proof['physical_frames'],native_PDUs=len(proof['compared_PDUs']),statuses=proof['status_counts'],reference_fields=sum(proof['reference_field_counts'].values()),unexported_complete_PDUs=len(proof['unexported_complete_wire_PDUs']))))
