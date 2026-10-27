@@ -122,7 +122,13 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	})
 	meta("source", "Source endpoint", DisplayString, 0, func(e *ProtocolEvent) any { return e.Source })
 	meta("destination", "Destination endpoint", DisplayString, 0, func(e *ProtocolEvent) any { return e.Destination })
-	meta("flow.id", "Observed flow identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.FlowID })
+	meta("flow.id", "Protocol session identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any { return e.FlowID })
+	meta("tcp.flow.id", "Captured TCP generation identifier", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
+		if e.TCPFlowID != 0 {
+			return e.TCPFlowID
+		}
+		return nil
+	})
 	meta("pdu.response_to", "Response to PDU", DisplayUnsigned, 64, func(e *ProtocolEvent) any {
 		if e.ResponseTo != 0 {
 			return e.ResponseTo

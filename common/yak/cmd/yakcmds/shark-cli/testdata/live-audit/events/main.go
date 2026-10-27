@@ -23,6 +23,9 @@ func main() {
 	opts := []pcaputil.CaptureOption{pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		fields, err := e.GetFields()
 		message := map[string]any{"id": e.ID, "flow": e.FlowID, "protocol": e.Protocol, "status": e.Status, "profile": e.Profile, "completeness": e.Completeness, "summary": e.Summary, "expert": e.ExpertCode, "source_bytes": e.SourceBytes, "fields": fields, "session": e.Session}
+		if e.TCPFlowID != 0 {
+			message["tcp_flow_id"] = e.TCPFlowID
+		}
 		message["field_values"] = e.DisplayFieldValues()
 		message["raw"], message["entry"], message["admission"] = e.Raw, e.Entry, e.Admission
 		message["source"], message["destination"], message["direction"] = e.Source, e.Destination, e.Direction

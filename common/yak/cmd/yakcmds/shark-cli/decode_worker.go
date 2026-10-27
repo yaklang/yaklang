@@ -217,7 +217,7 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 			remaining -= 5
 			continue
 		}
-		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC byte/type projection limit", Error: "Detail unavailable: IPC byte/type projection limit", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
+		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, TCPFlowID: e.TCPFlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC byte/type projection limit", Error: "Detail unavailable: IPC byte/type projection limit", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
 		wire, err := json.Marshal(marker)
 		if err != nil {
 			return nil, err
