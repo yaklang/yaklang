@@ -299,3 +299,36 @@ seven declared offline IPv4 fragmentation/order/duplicate/loss/capture-cut/
 repair controls from a complete real router IP115 frame. Whole logical bytes,
 session ID and physical carrier peers must remain exact. This establishes wire
 reassembly only; full L2TP control/session negotiation is a separate scope.
+
+`discovery/dcerpc_opening_observations.py` derives explicitly declared
+old-close/opening-copy controls from a source-certified live capture. It copies
+whole original records and timestamps, without changing sequence numbers or
+injecting network retransmissions. `tcp_opening_wire_audit.py` independently
+checks the original source/certificate/manifest chain and exact old-close cursors.
+`tcp_flow_observation_audit.py` checks every native packet reference, direction,
+timestamp and original opener, then retains literal Wireshark grouping
+differences. `tcp_opening_negative_controls.py` rejects forged source/control and
+native-observation metadata. Every capture, manifest and raw result stays outside
+Git; `--help` describes each audit's required paths.
+
+`tcp_projection_metadata_invariants.py` checks the explicit additive
+`tcp.flow.id` / `tcp_flow_id` transition while preserving all prior PDU values
+and JSON types. `tcp_protocol_binding_audit.py` checks protocol sessions, native
+TCP generations and page streams against actual native callback observations.
+These are separate ID namespaces. Deferred original SYNs and independently
+readable outer IP fragments have separate counts; no guessed inner TCP header
+certifies ownership. This is an ownership/projection check, not an independent
+TCP implementation or a claim of all-field Wireshark parity.
+`tcp_protocol_binding_negative_controls.py` rejects missing or cross-generation
+links, false deferred payloads, type changes, source changes and preview splices.
+
+`close_publication_export_audit.py --before ... --after ... --sdk ... --out ...`
+requires every original physical JSON row and its earlier PDU copies to remain
+exact. The only new rows are bounded nonphysical capture-close publications.
+It binds every SDK/CLI identity without equating generated numbers, then checks
+each final typed projection, reason and byte source in full. A missing PDU or
+detail-limit marker cannot certify complete parity. `close_publication_negative_controls.py`
+rejects missing, corrupted, reordered, duplicated and falsely physical records.
+Consumers of the new JSONL contract must count physical packets separately from
+`record_type=protocol_publication`; final publications never relabel the last
+captured packet or change its original contributors.

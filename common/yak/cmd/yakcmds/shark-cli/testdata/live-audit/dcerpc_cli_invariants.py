@@ -98,6 +98,7 @@ class References:
 
 
 def selected_projection(pdu,e,sdk_to_cli=None):
+    if 'tcp_flow_id'in e:assert pdu.get('tcp_flow_id')==e['tcp_flow_id'],'explicit native TCP generation survives the CLI projection'
     assert canonical(pdu['byte_source'])==canonical(e['source_bytes']),'complete selected source projection'
     assert pdu['status']==e['status'],'selected PDU status is the native status'
     assert pdu['protocol']==e['protocol']and pdu['completeness']==e['completeness'],'complete native protocol/scope projection'
