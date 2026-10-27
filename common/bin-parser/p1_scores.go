@@ -119,8 +119,11 @@ var P1Scorecards = []ProtocolScorecard{
 		"TestP1WiresharkAndRFCSamples RFC 959 §3.4.1 STREAM file + §3.4.2 EOR/EOF Ethernet+TCP/20; TestP1FailPaths empty/trunc-hdr/count-overflow", ""),
 	p1card("TFTP", "tftp.yaml", 25, 25, 20, 20, 10, "L2",
 		"tftp/blksize RFC 2348 blksize 512; tftp/timeout RFC 2349 timeout 5 two-option list; tftp/oack tsize UDP/69; TestP1FailPaths tftp", ""),
-	p1card("SFTP", "application-layer/ssh.yaml", 20, 25, 20, 20, 10, "L2",
-		"TestP1WiresharkAndRFCSamples RFC 4253 SSH_MSG_KEXINIT kex_algorithms curve25519-sha256 + KEXDH_INIT mpint e Ethernet+TCP/22; TestSSHPacketAndFTPSMTPCommands", ""),
+	// SSH transport fields do not implement an encrypted SFTP subsystem.
+	// No SFTP grammar, original subsystem traffic or application tests are
+	// credited to this card. Keep the outer transport's useful scope separate.
+	p1card("SFTP", "application-layer/ssh.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestSFTPOuterSSHScopeDoesNotClaimSubsystem; only the outer SSH identification and initial transport packet are decoded; no SFTP subsystem grammar or decrypted application evidence", "encrypted SSH subsystem; SFTP requests, replies and file operations remain unavailable"),
 	p1card("NFS", "onc_rpc.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1TCPApplications ONC RPC TCP/111; TestP1FailPaths onc_rpc", "stub opaque"),
 	alias("RPC", "NFS"),
