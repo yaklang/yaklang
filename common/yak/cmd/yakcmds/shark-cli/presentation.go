@@ -251,7 +251,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	v := eventValues(e)
 	if e.Protocol == "ssh" {
 		parts := []string{textValue(v["Packet Name"])}
-		for _, key := range []string{"Negotiation Context", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Identification"} {
+		for _, key := range []string{"Identification Warning", "Negotiation Context", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Identification"} {
 			if value := textValue(v[key]); value != "" {
 				parts = append(parts, value)
 			}
@@ -829,6 +829,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if protectedSSHEvent(e) {
 		p.protocol, p.status, p.visibility = "SSH", "encrypted", "encrypted"
 		p.evidence, p.summary = "observed SSH NEWKEYS", "SSH encrypted transport · NEWKEYS observed; plaintext unavailable"
+		if warning := textValue(e.Session["Identification Warning"]); warning != "" {
+			p.summary = warning + " · " + p.summary
+		}
 		p.addLayer("SSH")
 		return
 	}
