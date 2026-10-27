@@ -19,6 +19,10 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 		// This is an explicit historical false-completion correction. It
 		// certifies the boundary of outer SSH support, not an SFTP grammar.
 		covered["SFTP"] = t.Run("SFTPOuterSSHScope", TestSFTPOuterSSHScopeDoesNotClaimSubsystem)
+		boundedSASL := t.Run("IMAPSASLCanonicalBoundedScope", TestIMAPSASLCanonicalBoundedScope)
+		for _, name := range []string{"IMAP SASL Response", "IMAP SASL Challenge", "IMAP SASL Initial Value"} {
+			covered[name] = boundedSASL
+		}
 	}
 	for name, pri := range map[string]string{"AJP": priP0, "BGP": priP1, "RTMP": priP1, "L2TP": priP1, "STP": priP1, "RSTP": priP1} {
 		if pri != priority {

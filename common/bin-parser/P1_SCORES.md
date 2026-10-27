@@ -1,5 +1,7 @@
 # P1 协议交付打分
 
+IMAP SASL Response / Challenge / Initial Value 是新增的有边界传输值子集，保持 partial；不继承历史 IMAP greeting 的 100/A。当前静态评分没有核算原生字段和仓库外实流量证据，三项均保守记为 0/F（L4），不代表这些解析器没有字段或未通过实流量校验。SASL 机制认证、身份与安全层验证未实现；详细运行证据另见公开大包报告。
+
 SFTP 当前只具备外层 SSH 的识别和初始明文传输包解析，加密子系统、请求/响应与文件操作尚未解码。原先把 SSH 握手计入 SFTP 的 95/A 是覆盖误标，现明确记为 0/F 和 partial；这不修改冻结捕获或原始材料评分，也不把 SSH 外层测试当作 SFTP 应用证据。
 
 对照 [PROTOCOL_DELIVERY.md](PROTOCOL_DELIVERY.md)。机器可读记录在 `p1_scores.go`，由 `TestP1ScorecardsCovered` 校验：每个 P1 名称都有计分卡；`Status: done` 必须是 **B**（总分 ≥ 75）。A 级（≥ 90）留给 Wireshark 级主 PDU。
@@ -82,6 +84,9 @@ GSS-API 与 P0 SPNEGO 的评分仅计 `spnego.yaml` 共同的初始 token 子集
 | SMTPS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | alias of TLS |
 | POP3 | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `pop3.yaml` |
 | IMAP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `imap.yaml` |
+| IMAP SASL Response | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `application-layer/imap_sasl.yaml` |
+| IMAP SASL Challenge | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `application-layer/imap_sasl.yaml` |
+| IMAP SASL Initial Value | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `application-layer/imap_sasl.yaml` |
 | FTP-DATA | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `ftp_data.yaml` |
 | TFTP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `tftp.yaml` |
 | SFTP | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `application-layer/ssh.yaml` |

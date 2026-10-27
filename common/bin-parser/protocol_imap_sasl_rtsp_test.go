@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 func TestIMAPSASLRuleCatalogAndWireCoordinates(t *testing.T) {
@@ -36,6 +37,44 @@ func TestIMAPSASLRuleCatalogAndWireCoordinates(t *testing.T) {
 			require.Equal(t, packed.Bytes(), NodeToBytes(base.GetNodeByPath(root, "@Wrapped")))
 		}
 	}
+}
+
+func TestIMAPSASLCanonicalBoundedScope(t *testing.T) {
+	// Execute actual wire/bit-boundary tests before recognizing these exact
+	// partial rows. This is no blanket exemption for incomplete P1 protocols.
+	TestIMAPSASLRuleCatalogAndWireCoordinates(t)
+	for _, name := range []string{"IMAP SASL Response", "IMAP SASL Challenge", "IMAP SASL Initial Value"} {
+		catalog, roadmap := false, false
+		for _, entry := range ProtocolCatalog {
+			if entry.Name == name {
+				catalog = true
+				require.Equal(t, statusPartial, entry.Status)
+				require.Equal(t, "application-layer/imap_sasl.yaml", entry.RuleFile)
+				require.NotEmpty(t, entry.Notes)
+			}
+		}
+		for _, entry := range ProtocolRoadmap {
+			if entry.Name == name {
+				roadmap = true
+				require.Equal(t, stPartial, entry.Status)
+				require.Equal(t, priP1, entry.Priority)
+				require.NotEmpty(t, entry.Notes)
+			}
+		}
+		require.True(t, catalog)
+		require.True(t, roadmap)
+		score, ok := ResolveP1Scorecard(name)
+		require.True(t, ok)
+		require.Equal(t, "L4", score.SampleClass)
+		require.Zero(t, score.Schema+score.Traffic+score.Tests+score.Branches+score.Stack)
+	}
+	info, err := stream_parser.DecodeIMAPSASLValue([]byte("ZHVtbXk=\r\n"), "response")
+	require.NoError(t, err)
+	for _, key := range []string{"Authentication Verified", "Peer Identity Verified", "Security Layer Verified", "Decoded Values Are Wire Spans"} {
+		require.Equal(t, false, info[key])
+	}
+	_, err = stream_parser.DecodeIMAPSASLValue([]byte("%%%invalid\r\n"), "response")
+	require.Error(t, err)
 }
 
 func TestRTSPRuleFlushAndExactMethod(t *testing.T) {
