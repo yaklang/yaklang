@@ -115,6 +115,15 @@ var P1Scorecards = []ProtocolScorecard{
 		"pop3/list RFC 1939 scan Number=1 Size=120; pop3/stat Messages=2 Octets=320 TCP/110; pop3/capa RFC 2449 USER/UIDL; TestP1FailPaths pop3", ""),
 	p1card("IMAP", "imap.yaml", 25, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 3501 greeting Arg Ethernet+TCP/143; TestP1FailPaths imap", ""),
+	// These explicit transport profiles do not inherit the historical IMAP
+	// greeting's score. Dynamic native fields/external live captures are not
+	// credited by this frozen YAML evidence rubric; keep the scope partial.
+	p1card("IMAP SASL Response", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope, TestIMAPSASLRuleCatalogAndWireCoordinates, TestIMAPSASLRejectsInvalidValuesAndLimits and native TestIMAPSASLAssociationFragmentationAndReuse; external capture evidence is separate", "caller-selected SASL transport value; mechanism authentication and security layers are not verified"),
+	p1card("IMAP SASL Challenge", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope and shared bounded challenge grammar; native opposite-direction challenge ownership is separate from this score", "no credential, identity, or negotiated mechanism verification"),
+	p1card("IMAP SASL Initial Value", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope; RFC 4959 explicit initial-value boundary including empty = marker; external live receipts are not frozen scorecard samples", "capability authorization and mechanism semantics are not verified"),
 	p1card("FTP-DATA", "ftp_data.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 959 §3.4.1 STREAM file + §3.4.2 EOR/EOF Ethernet+TCP/20; TestP1FailPaths empty/trunc-hdr/count-overflow", ""),
 	p1card("TFTP", "tftp.yaml", 25, 25, 20, 20, 10, "L2",

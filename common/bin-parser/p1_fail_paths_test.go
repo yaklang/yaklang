@@ -13,6 +13,11 @@ type p1FailCase struct {
 }
 
 var p1FailCases = []p1FailCase{
+	// Valid-looking values still require an explicit caller-owned boundary;
+	// these are boundary-refusal cases, not credited malformed-base64 branches.
+	{"application-layer.imap_sasl", []string{"IMAPSASLResponse"}, []byte("ZHVtbXk=\r\n"), "response-requires-caller-boundary"},
+	{"application-layer.imap_sasl", []string{"IMAPSASLChallenge"}, []byte("+ \r\n"), "challenge-requires-caller-boundary"},
+	{"application-layer.imap_sasl", []string{"IMAPSASLInitialValue"}, []byte("="), "initial-value-requires-caller-boundary"},
 	{"internet_control_message_protocol", []string{"ICMP"}, nil, "empty"},
 	{"internet_control_message_protocol", []string{"ICMP"}, []byte{0x08}, "trunc"},
 	{"internet_control_message_protocol", []string{"ICMP"}, []byte{0x08, 0x00}, "trunc-hdr"},
