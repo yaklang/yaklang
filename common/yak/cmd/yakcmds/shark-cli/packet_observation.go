@@ -8,6 +8,17 @@ import (
 
 const observedPacketFieldBytes = 256 << 10
 
+// A close publication has no fabricated frame number, timestamp or packet
+// length. Each record shares the bounded output queue and owns one field
+// snapshot, so arbitrarily many final diagnostics cannot exhaust one packet's
+// 128-PDU budget or change an already published physical row.
+type protocolPublication struct {
+	RecordType        string           `json:"record_type"`
+	PublicationPhase  string           `json:"publication_phase"`
+	PublishedPDUScope string           `json:"published_pdu_scope"`
+	PublishedPDUs     []map[string]any `json:"published_pdus"`
+}
+
 // Freeze scalar typed values and owned byte-source metadata while the native
 // event is being published. Output speed must not decide whether a later
 // global history eviction or EOF diagnostic changes an earlier JSON row.
@@ -49,7 +60,7 @@ func (p *capturedPacket) recordPDUAtObservation(e *pcaputil.ProtocolEvent, publi
 	// Missing context, unsupported profiles and resource refusal are meaningful
 	// outcomes on every carrier. Retain their reason just like a malformed UDP
 	// packet; omitting it makes a compact row disagree with the owned detail.
-	if e.Error != "" || e.ExpertCode != "" {
+	if e.Error != "" || e.ExpertCode != "" || p.publicationPhase != "" {
 		row["summary"], row["error"], row["expert"] = e.Summary, e.Error, e.ExpertCode
 	}
 	wire, err := json.Marshal(row)
