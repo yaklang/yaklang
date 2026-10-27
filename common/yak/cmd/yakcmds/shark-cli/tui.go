@@ -67,7 +67,9 @@ func (e *packetEntry) row() packetSummary {
 			e.summary = summarize(&view)
 			for _, message := range events {
 				if completed := message.SourceBytes.CompletedIn; completed != nil && completed.Number != p.reference.Number && (message.Status == "decoded" || message.Status == "deferred") {
-					e.summary.Info += fmt.Sprintf(" · includes message completed in frame #%d", completed.Number)
+					// Put provenance first: long application text otherwise clips
+					// this notice and makes each tiny contributor look complete.
+					e.summary.Info = fmt.Sprintf("Reassembled PDU #%d · complete in frame #%d · %s", message.ID, completed.Number, e.summary.Info)
 					break
 				}
 			}
