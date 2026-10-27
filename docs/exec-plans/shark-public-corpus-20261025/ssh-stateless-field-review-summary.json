@@ -1,0 +1,1626 @@
+{
+  "scope": "Strict bounded stateless SSH identification/initial packets; complete original 94/39 TLS/DNS case review with independent physical/reassembled carrier scope; unchanged full native SDK and CLI exports. This does not certify whole-protocol conformance.",
+  "native_and_CLI_source": "5986535b9d",
+  "audit_source": "279958f1be",
+  "raw_captures_keys_moduli_exports_console_buffers_images_outside_Git": true,
+  "tests": {
+    "full_bin_parser_seconds": 116.162,
+    "full_parser_seconds": 6.112,
+    "full_base_seconds": 0.551,
+    "full_stream_parser_seconds": 5.045,
+    "embedded_rule_check_seconds": 0.404,
+    "full_native_seconds": 408.512,
+    "full_CLI_seconds": 2.034,
+    "native_test_scope_note": "Complete native/CLI tests used the same SSH grammar/runtime changes; subsequent SFTP coverage declarations and catalog notes were checked by the final complete bin-parser suite and exact final-executable exports.",
+    "stateless_boundary_fuzz_executions": 108067,
+    "stateless_boundary_fuzz_seconds": 41.376,
+    "unchanged_original_nDPI_frames": 322,
+    "strict_identifications_in_original_nDPI": 5,
+    "explicitly_rejected_original_nonconformant_APACHE_identifications": 1,
+    "original_clear_initial_packets_still_checked": 20,
+    "frozen_inputs_and_score_floors_unchanged": true
+  },
+  "stateless_contract": {
+    "accepted_versions": [
+      "2.0",
+      "1.99"
+    ],
+    "maximum_identification_bytes_including_ending": 255,
+    "line_endings": [
+      "CRLF",
+      "LF"
+    ],
+    "UTF8_comment_display_policy_matches_native": true,
+    "complete_8_aligned_initial_binary_envelopes_only": true,
+    "standalone_binary_TCP_identity_requires_complete_KEXINIT": true,
+    "method_30_to_49_opaque_without_explicit_exchange_profile": true,
+    "native_guarded_nonconformant_compatibility_unchanged": true
+  },
+  "SFTP_scope_correction": {
+    "old_roadmap_status": "done",
+    "new_roadmap_status": "partial",
+    "old_score": "95/A credited from SSH handshake",
+    "new_score": "0/F; no application evidence credited",
+    "decoded_scope": "outer SSH identification and initial transport only",
+    "subsystem_requests_replies_file_operations_decoded": false
+  },
+  "auditor_sha256": {
+    "field_difference_audit.py": "10ede07ddf2e0c681170343012ad561864337fb8d5c4ccb436a31efd145f2a7d",
+    "field_review_negative_controls.py": "1adb0064227f78c23a3bc4fe7499c29753a57695637c593fd5177def48298ccb",
+    "exact_export_invariants.py": "f42d4f4993218c4d3f14a341d5e6db3019a3adc6c371673f875d0e04d2e951bf",
+    "exact_export_negative_controls.py": "f6b3f3671ecf546bb69b5dbf2cc19855c22379539247f550880d584140a428b4",
+    "ssh_capture_controls.py": "71dce155c5ebfd4c776214e42f18609ff7c4f5fb1a93413c0b5e7c7f1cb1d8b9",
+    "ssh_wire_audit.py": "308f89ab2fe04476c63068d657e71acd4b90e02e481c47d8acb164427cacecb4",
+    "ssh_initial_field_audit.py": "ed6ce5b34e429ef5bb975f6e579412e28d16b1687ba7c614854b4eb6575e84c5",
+    "ssh_public_field_audit.py": "bcd0d682fc733c09599473ab4e454af4c22112fb3d9904fed521933d49968a02",
+    "discovery/ssh_live.py": "8b66571c511e5e195072118c7c6d2baa21fe7eaa0cb5959f03b8c3cf1447f402",
+    "discovery/render_console.py": "427379a3b9c1ac7e8257a81d3d6e478904fd96659468f231bbec57a55e336e83"
+  },
+  "executables_sha256": {
+    "events-stateless.exe": "91c8add6885198efe3229c9042fb39378f28b29c48dc916e30504511fda9b30a",
+    "yak-stateless.exe": "5580f29943a206c46b0a69ce26f13df25482b0a0c7e084448d4398c08e77ed0e"
+  },
+  "public": {
+    "weber": {
+      "SDK": {
+        "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+        "kind": "SDK",
+        "records_compared": 39293,
+        "before_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+        "after_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+        "ordered_semantic_export_sha256": "a6dcd40c8221dd57cbc615bcd4b96706d1e74390691a051320f7a63b8a9ef3f1",
+        "protocol_record_counts": {
+          "": 3498,
+          "arp": 218,
+          "bfd": 135,
+          "bgp": 315,
+          "dcerpc": 109,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "dtls": 93,
+          "ftp": 96,
+          "ftp-data": 46,
+          "glbp": 777,
+          "hsrp": 941,
+          "http": 117,
+          "icmp": 2509,
+          "icmpv6": 2957,
+          "ike": 719,
+          "imap": 17,
+          "ip": 144,
+          "ipmi": 868,
+          "ipp": 19,
+          "isis": 678,
+          "kerberos": 134,
+          "l2tp": 706,
+          "ldap": 193,
+          "ldp": 322,
+          "lldp": 71,
+          "llmnr": 18,
+          "mdns": 396,
+          "modbus": 2,
+          "nbns": 36,
+          "netflow-v9": 196,
+          "ntp": 1331,
+          "pim": 333,
+          "pop3": 45,
+          "quic": 88,
+          "radius": 72,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "rip": 68,
+          "ripng": 124,
+          "rtp": 6462,
+          "rtsp": 15,
+          "sip": 21,
+          "smb2": 155,
+          "smtp": 23,
+          "snmp": 678,
+          "ssdp": 104,
+          "ssh": 42,
+          "stp": 2612,
+          "stun": 22,
+          "syslog": 119,
+          "telnet": 133,
+          "tftp": 22,
+          "tls": 4408,
+          "whois": 24
+        },
+        "changed_records_first_64": [],
+        "all_records_exact": true,
+        "identity_or_field_normalization": false
+      },
+      "CLI": {
+        "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+        "kind": "CLI",
+        "records_compared": 51328,
+        "before_sha256": "821d29268aa17ce573e43975ca03241f1db86dfb783a3c5deedc51fcb2449159",
+        "after_sha256": "821d29268aa17ce573e43975ca03241f1db86dfb783a3c5deedc51fcb2449159",
+        "ordered_semantic_export_sha256": "2765080420409d595db1088abd8b4ed9c5282060b4ddd8d4dbf057124063e1df",
+        "protocol_record_counts": {
+          "ARP": 218,
+          "BFDv1": 135,
+          "BGP": 245,
+          "CiscoDiscoveryInfo": 109,
+          "DCE/RPC": 128,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "DTLS": 93,
+          "Dot1Q": 78,
+          "EAPOL": 144,
+          "Ethernet": 70,
+          "EthernetCTPReply": 339,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "Fragment": 232,
+          "GLBP": 777,
+          "GRE": 44,
+          "HSRPv1": 177,
+          "HSRPv2": 764,
+          "HTTP/1.0": 25,
+          "HTTP/1.1": 82,
+          "ICMP": 2509,
+          "ICMPV6": 2957,
+          "IGMP": 57,
+          "IKEv1": 239,
+          "IKEv2": 480,
+          "IMAP": 44,
+          "IPMI": 868,
+          "IPP": 84,
+          "IPSecAH": 5,
+          "IPSecESP": 1593,
+          "IPv4": 111,
+          "IPv6": 79,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "Kerberos": 119,
+          "L2TPv3": 706,
+          "LDAP": 365,
+          "LDP": 322,
+          "LLDP": 71,
+          "LLMNR": 18,
+          "MLDv2MulticastListenerReport": 10,
+          "NBNS": 36,
+          "NTLMSSP": 5,
+          "NTP": 1331,
+          "NetFlow v9": 196,
+          "OSPF": 673,
+          "PIMv2": 333,
+          "POP3": 43,
+          "PPP": 35,
+          "PPPoE": 8,
+          "QUIC": 58,
+          "RADIUS": 29,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "RIP": 68,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "RSTP": 407,
+          "RTP": 6462,
+          "RTSP": 176,
+          "SIP": 21,
+          "SMB2": 156,
+          "SMTP": 24,
+          "SNAP": 73,
+          "SNMP": 678,
+          "SPNEGO": 8,
+          "SSDP": 104,
+          "SSH": 547,
+          "STUN": 22,
+          "Syslog": 111,
+          "TCP": 9164,
+          "TFTP": 22,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "TLSv1.3": 991,
+          "Telnet": 127,
+          "UDP": 3262,
+          "VRRP": 818,
+          "WHOIS": 24,
+          "mDNS": 396
+        },
+        "changed_records_first_64": [],
+        "all_records_exact": true,
+        "identity_or_field_normalization": false
+      },
+      "initial_fields": {
+        "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+        "checks": 541,
+        "complete_method_PDUs": 8,
+        "complete_generic_packet_PDUs": 18,
+        "method_profiles": {
+          "diffie-hellman-group-exchange-sha1": 4,
+          "diffie-hellman-group14-sha1": 2,
+          "curve25519-sha256@libssh.org": 2
+        },
+        "native_literal_tree_fields_compared": 341,
+        "reference_fields_compared": 124,
+        "native_opaque_host_key_views": [
+          {
+            "PDU": 16515,
+            "host_key": "ssh-ed25519"
+          }
+        ],
+        "reference_opaque_signature_views": [],
+        "unselected_host_key_views": [],
+        "unselected_reference_carriers": [],
+        "reference_attribution_differences": [],
+        "independent_wire_certificate_sha256": null,
+        "events_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+        "oracle_sha256": "ae79dffc088747198943ece6aa089733ff01ad0bb63adb30b225d3b8f29b3c52"
+      },
+      "initial_reference_fields": {
+        "scope": "Compare native initial SSH fields with literal public-reference PDU views.\nCaptured domains and byte-contributing frames are preserved. Complete native\nmessages, reference views, opaque encrypted suffixes and refusal diagnostics\nremain separate counts; this does not certify all encrypted SSH contents.\n",
+        "checks": 124,
+        "reference_physical_rows": 536,
+        "reference_complete_clear_views": 34,
+        "native_complete_initial_PDUs": 34,
+        "native_PDUs_compared": 34,
+        "KEXINITs_compared": 8,
+        "field_comparisons": 98,
+        "reference_unavailable_native_PDUs": [],
+        "reference_only_clear_views": [],
+        "native_refusal_profiles": {
+          "('context-required', 'Encrypted')": 8
+        },
+        "events_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+        "oracle_sha256": "ae79dffc088747198943ece6aa089733ff01ad0bb63adb30b225d3b8f29b3c52"
+      },
+      "certificate_sha256": {
+        "exact-SDK.json": "fdedb0e200977e50d50c1920c3d75f93cfbbeb252817b0f3ce1ebb0a93c76031",
+        "exact-CLI.json": "270f690bd3949aa631e5d521f1bc7204e8e2a4bf14924c8c3bf9331664ea6315",
+        "initial-fields.json": "37af0731e75cacdbea288c257d5bb77ad68bb1bc4cd5331a88c542758a37f05f",
+        "SSH-fields.json": "40a140716d59c825d921ab4e1010fff27f2967f33f1b69964a7b0ce1389137bc"
+      }
+    },
+    "sharon": {
+      "SDK": {
+        "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+        "kind": "SDK",
+        "records_compared": 245625,
+        "before_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+        "after_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+        "ordered_semantic_export_sha256": "fead343f8a7f3935228993748c2bd05df220890fa738b0e89aa2dd918273bfcf",
+        "protocol_record_counts": {
+          "": 109969,
+          "arp": 227,
+          "bfd": 65,
+          "bgp": 315,
+          "dcerpc": 12,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "diameter": 5,
+          "dns": 1289,
+          "ftp": 96,
+          "ftp-data": 46,
+          "glbp": 777,
+          "hsrp": 764,
+          "http": 83,
+          "icmp": 2501,
+          "icmpv6": 2985,
+          "ike": 274,
+          "imap": 5,
+          "ip": 110769,
+          "ipp": 19,
+          "isis": 678,
+          "kafka": 5,
+          "l2tp": 1365,
+          "ldp": 322,
+          "lldp": 71,
+          "mdns": 396,
+          "modbus": 2,
+          "netflow-v9": 196,
+          "ntp": 1213,
+          "pim": 131,
+          "postgresql": 4,
+          "quic": 1,
+          "rip": 68,
+          "ripng": 124,
+          "rtp": 6462,
+          "rtsp": 15,
+          "sip": 23,
+          "smb2": 16,
+          "smtp": 20,
+          "snmp": 234,
+          "ssdp": 73,
+          "ssh": 32,
+          "stp": 2612,
+          "stun": 2,
+          "syslog": 119,
+          "telnet": 136,
+          "tftp": 22,
+          "tls": 842,
+          "turn": 1,
+          "whois": 24
+        },
+        "changed_records_first_64": [],
+        "all_records_exact": true,
+        "identity_or_field_normalization": false
+      },
+      "CLI": {
+        "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+        "kind": "CLI",
+        "records_compared": 328127,
+        "before_sha256": "81850c8e7dfbb1879d43e48fc6fc9b88a287b4b7b91ca8361153ea5898cf69dc",
+        "after_sha256": "81850c8e7dfbb1879d43e48fc6fc9b88a287b4b7b91ca8361153ea5898cf69dc",
+        "ordered_semantic_export_sha256": "48b6253fc3f9116ea0ecc18c7d01d31ab4b7dfd44236b6ea5c365dcaa36d70c4",
+        "protocol_record_counts": {
+          "ARP": 227,
+          "BFDv1": 65,
+          "BGP": 245,
+          "CiscoDiscovery": 1,
+          "CiscoDiscoveryInfo": 109,
+          "DCE/RPC": 1,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "Dot1Q": 26,
+          "EAP": 26,
+          "EAPOL": 53,
+          "EtherIP": 7,
+          "Ethernet": 11103,
+          "EthernetCTP": 4,
+          "EthernetCTPForwardData": 3,
+          "EthernetCTPReply": 339,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "Fragment": 51897,
+          "GLBP": 777,
+          "GRE": 18052,
+          "HSRPv2": 764,
+          "HTTP/1.0": 23,
+          "HTTP/1.1": 54,
+          "ICMP": 2501,
+          "ICMPV6": 2985,
+          "ICMPv4": 18,
+          "ICMPv6": 51,
+          "IGMP": 75,
+          "IKEv1": 239,
+          "IKEv2": 35,
+          "IMAP": 32,
+          "IPP": 84,
+          "IPSecAH": 4,
+          "IPSecESP": 1005,
+          "IPv4": 53639,
+          "IPv6": 87,
+          "IPv6Destination": 13,
+          "IPv6Fragment": 2,
+          "IPv6HopByHop": 17388,
+          "IPv6Routing": 5,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "L2TPv3": 707,
+          "LDP": 322,
+          "LLC": 6305,
+          "LLDP": 71,
+          "MDP": 1,
+          "MLDv2MulticastListenerReport": 10,
+          "MODBUS": 2,
+          "MPLS": 255,
+          "NTP": 1213,
+          "NetFlow v9": 196,
+          "OSPF": 647,
+          "PIMv2": 94,
+          "PPP": 37,
+          "PPPoE": 11,
+          "RIP": 68,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "RSTP": 407,
+          "RTP": 6462,
+          "RTSP": 176,
+          "SCTP": 25412,
+          "SIP": 22,
+          "SMB2": 9,
+          "SMTP": 20,
+          "SNAP": 73,
+          "SNMP": 234,
+          "SSDP": 73,
+          "SSH": 369,
+          "STUN": 2,
+          "Syslog": 111,
+          "TCP": 6643,
+          "TFTP": 22,
+          "TLS": 49,
+          "TLS?": 1,
+          "TLSv1.2": 452,
+          "TLSv1.3": 302,
+          "Telnet": 129,
+          "UDP": 109376,
+          "VRRP": 818,
+          "WHOIS": 24,
+          "mDNS": 396
+        },
+        "changed_records_first_64": [],
+        "all_records_exact": true,
+        "identity_or_field_normalization": false
+      },
+      "initial_fields": {
+        "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+        "checks": 447,
+        "complete_method_PDUs": 8,
+        "complete_generic_packet_PDUs": 12,
+        "method_profiles": {
+          "diffie-hellman-group-exchange-sha1": 4,
+          "diffie-hellman-group14-sha1": 2,
+          "curve25519-sha256@libssh.org": 2
+        },
+        "native_literal_tree_fields_compared": 269,
+        "reference_fields_compared": 106,
+        "native_opaque_host_key_views": [
+          {
+            "PDU": 18858,
+            "host_key": "ssh-ed25519"
+          }
+        ],
+        "reference_opaque_signature_views": [],
+        "unselected_host_key_views": [],
+        "unselected_reference_carriers": [
+          {
+            "physical_frame": 71367,
+            "reference_protocol_stack": "eth:ethertype:ip:udp:sctp:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 80576,
+            "reference_protocol_stack": "eth:ethertype:ip:udp:sctp:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 114623,
+            "reference_protocol_stack": "eth:ethertype:ip:udp:sctp:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 116083,
+            "reference_protocol_stack": "eth:ethertype:ip:udp:sctp:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 134472,
+            "reference_protocol_stack": "eth:ethertype:ip:udp:sctp:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 150992,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 152005,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 158910,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh:bicc:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 164473,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 176887,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 216336,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 217210,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 219639,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 226723,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 240197,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 258090,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 258959,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 264309,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 284286,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 289621,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 303765,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 310463,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 315781,
+            "reference_protocol_stack": "eth:ethertype:ip:ipcomp:data:sctp:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh:ssh",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          },
+          {
+            "physical_frame": 324927,
+            "reference_protocol_stack": "eth:ethertype:ip:sctp",
+            "scope": "selected auditor requires observed IP/TCP carrier"
+          }
+        ],
+        "reference_attribution_differences": [],
+        "independent_wire_certificate_sha256": null,
+        "events_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+        "oracle_sha256": "74dc93eae91389da4ab8e66de13612ffaa53f2a4a9d616f979e8e7991fc87cc0"
+      },
+      "initial_reference_fields": {
+        "scope": "Compare native initial SSH fields with literal public-reference PDU views.\nCaptured domains and byte-contributing frames are preserved. Complete native\nmessages, reference views, opaque encrypted suffixes and refusal diagnostics\nremain separate counts; this does not certify all encrypted SSH contents.\n",
+        "checks": 94,
+        "reference_physical_rows": 386,
+        "reference_complete_clear_views": 26,
+        "native_complete_initial_PDUs": 26,
+        "native_PDUs_compared": 26,
+        "KEXINITs_compared": 6,
+        "field_comparisons": 74,
+        "reference_unavailable_native_PDUs": [],
+        "reference_only_clear_views": [],
+        "native_refusal_profiles": {
+          "('context-required', 'Encrypted')": 6
+        },
+        "events_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+        "oracle_sha256": "74dc93eae91389da4ab8e66de13612ffaa53f2a4a9d616f979e8e7991fc87cc0"
+      },
+      "certificate_sha256": {
+        "exact-SDK.json": "7c4948297705f9c3ad2db464cbf91aa09d596553ae8d0707deff8ea7d39e0dda",
+        "exact-CLI.json": "cd361a40b165e074451f92ab087f50098ae5e1b6effef877e217ee6567ab6e3b",
+        "initial-fields.json": "06c818a8c78e0721218fe7c53d5a0d55774847e48e67c6b022b8bc54cfcfe6d1",
+        "SSH-fields.json": "5d7e37ac2093b3f60ed8deba6ce5c28ac50db552168fb51ba01cb833d49c8d70"
+      }
+    }
+  },
+  "original_field_cases": {
+    "weber": {
+      "original_difference_count": 94,
+      "events_sha256": "354c49f678af79aa0c3e804780441f774a9dab44e8b319a388af61a32f364b99",
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "TLS_oracle_sha256": "f99126d99def5fe3a14fbb20a18cdaf6dd4cd926438843b93f425b926b4bafd4",
+      "physical_scope_oracle_sha256": "b9181a5d6eaad83ca3675b0f61720c6ee6a454548af190bd194706c3f2ac9906",
+      "physical_scope_frames": 255,
+      "independent_outer_IPv6_reassemblies": [
+        {
+          "section": 0,
+          "interface": 28,
+          "next_header": 47,
+          "fragment_id": 3024233048,
+          "source_frames": [
+            49573,
+            49574
+          ],
+          "complete_payload_length": 1542,
+          "complete_payload_sha256": "e11ba9f83f4ce3de5504f514dfe3fe6708df02553627a95b6728a5e3b18b9ae9"
+        },
+        {
+          "section": 0,
+          "interface": 28,
+          "next_header": 47,
+          "fragment_id": 1582708242,
+          "source_frames": [
+            49575,
+            49576
+          ],
+          "complete_payload_length": 1542,
+          "complete_payload_sha256": "526658adb1bc06aaa666e7f32804430176647bc5ff6fca9febb974a1ddea1b72"
+        },
+        {
+          "section": 0,
+          "interface": 28,
+          "next_header": 47,
+          "fragment_id": 3174734018,
+          "source_frames": [
+            49619,
+            49620
+          ],
+          "complete_payload_length": 1542,
+          "complete_payload_sha256": "10c92e9a8a25db63e047088fb5d3f2d12523a690dd91859f0a9f762f51f7823b"
+        },
+        {
+          "section": 0,
+          "interface": 28,
+          "next_header": 47,
+          "fragment_id": 1204957298,
+          "source_frames": [
+            49621,
+            49622
+          ],
+          "complete_payload_length": 1542,
+          "complete_payload_sha256": "1887c01181751c26d77fde2bd5a4363f267915c58039578c677ce8a1f248fe7a"
+        }
+      ],
+      "DNS_oracle_sha256": "83f9abc8905f8cb0d09b280d417e9b643965ce0ffd99f643ea87502c9056303e",
+      "original_review_sha256": "3567fd9f09c1ce7004d6d2ab33493da7f25330e16df60fabca5c852174e0694a",
+      "RDPUDP_derived_capture_sha256": "66eed42e17ad07fb9dff331874320f3ffe11b565529c64c4968b21d990014824",
+      "classification_counts": {
+        "contributor/frame attribution with exact record bytes": 87,
+        "readable DNS name display fixed": 4,
+        "invalid UTF-8 retained losslessly; Wireshark replacement text differs": 2,
+        "contributor attribution plus original RDPUDP oracle limitation; independent derived byte proof": 1
+      },
+      "unreviewed": 0
+    },
+    "sharon": {
+      "original_difference_count": 39,
+      "events_sha256": "0458fa3978928b9468123971376df12187d6572b71bb1665541fdc29eb397d05",
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "TLS_oracle_sha256": "8aef15a465a89664f80dc093db572d3f7cce17a060561fc2561dbe6a09d06921",
+      "physical_scope_oracle_sha256": "499934ccc13c08995379a4e4271c9c5eb07b91ad41462d696d760b0d63b9e4c7",
+      "physical_scope_frames": 115,
+      "independent_outer_IPv6_reassemblies": [],
+      "DNS_oracle_sha256": "717808b6a67a465268d1735d885c8dd2f37965d55e0f10e9d5d4617bf393e587",
+      "original_review_sha256": "3567fd9f09c1ce7004d6d2ab33493da7f25330e16df60fabca5c852174e0694a",
+      "RDPUDP_derived_capture_sha256": "66eed42e17ad07fb9dff331874320f3ffe11b565529c64c4968b21d990014824",
+      "classification_counts": {
+        "contributor/frame attribution with exact record bytes": 35,
+        "readable DNS name display fixed": 4
+      },
+      "unreviewed": 0
+    }
+  },
+  "negative_controls": {
+    "field_review": {
+      "scope": "Challenge field-review proofs using declared small subsets of real exports.\n\nThe original capture/oracle bytes and case byte hashes stay unchanged. Reduced\ncase inventories and mutated SDK projections are synthetic audit controls,\nnever newly observed traffic or replacements for the complete 94/39 review.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 19,
+      "case_counts": {
+        "weber": 5,
+        "sharon": 2
+      },
+      "subset_record_counts": {
+        "weber": 186,
+        "sharon": 3
+      },
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "TLS-typed-length",
+          "accepted": false
+        },
+        {
+          "control": "TLS-session-length",
+          "accepted": false
+        },
+        {
+          "control": "TLS-literal-wire",
+          "accepted": false
+        },
+        {
+          "control": "TLS-reference-source-endpoint",
+          "accepted": false
+        },
+        {
+          "control": "TLS-reference-destination-endpoint",
+          "accepted": false
+        },
+        {
+          "control": "TLS-reference-section-interface",
+          "accepted": false
+        },
+        {
+          "control": "TLS-byte-completion-frame",
+          "accepted": false
+        },
+        {
+          "control": "TLS-original-record-missing",
+          "accepted": false
+        },
+        {
+          "control": "fragmented-tunnel-outer-IP-as-inner-endpoint",
+          "accepted": false
+        },
+        {
+          "control": "DNS-readable-display",
+          "accepted": false
+        },
+        {
+          "control": "DNS-invalid-octets-replaced",
+          "accepted": false
+        },
+        {
+          "control": "DNS-escaped-name",
+          "accepted": false
+        },
+        {
+          "control": "DNS-expanded-wire-name",
+          "accepted": false
+        },
+        {
+          "control": "DNS-wire-transaction-ID",
+          "accepted": false
+        },
+        {
+          "control": "DNS-wire-question-type",
+          "accepted": false
+        },
+        {
+          "control": "DNS-reference-endpoint",
+          "accepted": false
+        },
+        {
+          "control": "DNS-response-transaction",
+          "accepted": false
+        },
+        {
+          "control": "DNS-response-domain",
+          "accepted": false
+        },
+        {
+          "control": "mDNS-invented-request-association",
+          "accepted": false
+        }
+      ],
+      "certificate_sha256": "9922fe61ad4c14ff0b1e77fe49f7c419818f36513cef64d3dc455fe55483217c"
+    },
+    "whole_export": {
+      "scope": "Verify that exact export comparison rejects changed values, types and order.\nThese are declared small derived SDK controls, not complete-capture evidence.\n",
+      "baseline_passed": true,
+      "subset_records": 4,
+      "rejected_corruptions": 13,
+      "controls": [
+        {
+          "control": "formatting-and-key-order-only",
+          "accepted": true
+        },
+        {
+          "control": "generated-PDU-ID",
+          "accepted": false
+        },
+        {
+          "control": "numeric-type",
+          "accepted": false
+        },
+        {
+          "control": "boolean-numeric-type",
+          "accepted": false
+        },
+        {
+          "control": "flow-ID",
+          "accepted": false
+        },
+        {
+          "control": "endpoint-direction",
+          "accepted": false
+        },
+        {
+          "control": "capture-domain",
+          "accepted": false
+        },
+        {
+          "control": "response-association",
+          "accepted": false
+        },
+        {
+          "control": "source-parent",
+          "accepted": false
+        },
+        {
+          "control": "literal-message-bytes",
+          "accepted": false
+        },
+        {
+          "control": "typed-field",
+          "accepted": false
+        },
+        {
+          "control": "record-missing",
+          "accepted": false
+        },
+        {
+          "control": "record-duplicated",
+          "accepted": false
+        },
+        {
+          "control": "record-order",
+          "accepted": false
+        }
+      ],
+      "certificate_sha256": "bc36684cefe3cc962427d3247e94497d3b624b43c85d23bc694610d5a2af8e11"
+    }
+  },
+  "live": {
+    "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+    "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+    "generator_sha256": "8b66571c511e5e195072118c7c6d2baa21fe7eaa0cb5959f03b8c3cf1447f402",
+    "actual_payload_receipts": 5,
+    "payload_bytes_each": 131072,
+    "declared_nonconformant_test_banner": "SSH-2.0-Cisco-1.25",
+    "endpoint_emulation": "Paramiko test endpoint; no Cisco device claim",
+    "actual_endpoint_selections": [
+      {
+        "requested": "curve25519-sha256@libssh.org",
+        "client_selected": {
+          "Kex Algorithm": "curve25519-sha256@libssh.org",
+          "Host Key Algorithm": "rsa-sha2-256",
+          "Encryption C2S": "aes128-ctr",
+          "MAC C2S": "hmac-sha2-256",
+          "Encryption S2C": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256"
+        },
+        "server_selected": {
+          "Encryption S2C": "aes128-ctr",
+          "Encryption C2S": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256",
+          "MAC C2S": "hmac-sha2-256"
+        }
+      },
+      {
+        "requested": "ecdh-sha2-nistp256",
+        "client_selected": {
+          "Kex Algorithm": "ecdh-sha2-nistp256",
+          "Host Key Algorithm": "rsa-sha2-256",
+          "Encryption C2S": "aes128-ctr",
+          "MAC C2S": "hmac-sha2-256",
+          "Encryption S2C": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256"
+        },
+        "server_selected": {
+          "Encryption S2C": "aes128-ctr",
+          "Encryption C2S": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256",
+          "MAC C2S": "hmac-sha2-256"
+        }
+      },
+      {
+        "requested": "diffie-hellman-group14-sha256",
+        "client_selected": {
+          "Kex Algorithm": "diffie-hellman-group14-sha256",
+          "Host Key Algorithm": "rsa-sha2-256",
+          "Encryption C2S": "aes128-ctr",
+          "MAC C2S": "hmac-sha2-256",
+          "Encryption S2C": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256"
+        },
+        "server_selected": {
+          "Encryption S2C": "aes128-ctr",
+          "Encryption C2S": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256",
+          "MAC C2S": "hmac-sha2-256"
+        }
+      },
+      {
+        "requested": "diffie-hellman-group-exchange-sha256",
+        "client_selected": {
+          "Kex Algorithm": "diffie-hellman-group-exchange-sha256",
+          "Host Key Algorithm": "rsa-sha2-256",
+          "Encryption C2S": "aes128-ctr",
+          "MAC C2S": "hmac-sha2-256",
+          "Encryption S2C": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256"
+        },
+        "server_selected": {
+          "Encryption S2C": "aes128-ctr",
+          "Encryption C2S": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256",
+          "MAC C2S": "hmac-sha2-256"
+        }
+      },
+      {
+        "requested": "default",
+        "client_selected": {
+          "Kex Algorithm": "curve25519-sha256@libssh.org",
+          "Host Key Algorithm": "rsa-sha2-256",
+          "Encryption C2S": "aes128-ctr",
+          "MAC C2S": "hmac-sha2-256",
+          "Encryption S2C": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256"
+        },
+        "server_selected": {
+          "Encryption S2C": "aes128-ctr",
+          "Encryption C2S": "aes128-ctr",
+          "MAC S2C": "hmac-sha2-256",
+          "MAC C2S": "hmac-sha2-256"
+        }
+      }
+    ],
+    "replays": {
+      "live": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "live",
+          "checks": 342853,
+          "physical_frames": 375,
+          "native_connections": 5,
+          "complete_initial_PDUs": 42,
+          "physical_source_checks": 42,
+          "known_TCP_roles": {
+            "56291": true,
+            "56292": true,
+            "56293": true,
+            "56294": true,
+            "56295": true
+          },
+          "PDUs_compared_to_reference": 42,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 162,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 47,
+          "opaque_PDUs_with_persistent_identification_warning": 10,
+          "capture_sha256": "c552f636bd8da91b18fd6c4b29e866d40ea7487f6d9a6f2010d4600a0113a96a",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "87cfb35dccb8b423186e6a7c68a3325a59a2b6885dd595d4d72fe949f0db86b1",
+          "oracle_sha256": "c0c7f1ac21fc334e92e76874d5ab73d6d4affdff3646255be36f9222010f636b",
+          "before_events_sha256": "87cfb35dccb8b423186e6a7c68a3325a59a2b6885dd595d4d72fe949f0db86b1"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 727,
+          "complete_method_PDUs": 12,
+          "complete_generic_packet_PDUs": 20,
+          "method_profiles": {
+            "curve25519-sha256@libssh.org": 4,
+            "ecdh-sha2-nistp256": 2,
+            "diffie-hellman-group14-sha256": 2,
+            "diffie-hellman-group-exchange-sha256": 4
+          },
+          "native_literal_tree_fields_compared": 449,
+          "reference_fields_compared": 168,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [
+            {
+              "PDU": 8,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 18,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 28,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 40,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 50,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            }
+          ],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [],
+          "independent_wire_certificate_sha256": "9e0d126711c286fedcae0bff629102f611a9605e27543589e84eab34fbdf5ae5",
+          "events_sha256": "87cfb35dccb8b423186e6a7c68a3325a59a2b6885dd595d4d72fe949f0db86b1",
+          "oracle_sha256": "c0c7f1ac21fc334e92e76874d5ab73d6d4affdff3646255be36f9222010f636b"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 54,
+          "before_sha256": "87cfb35dccb8b423186e6a7c68a3325a59a2b6885dd595d4d72fe949f0db86b1",
+          "after_sha256": "87cfb35dccb8b423186e6a7c68a3325a59a2b6885dd595d4d72fe949f0db86b1",
+          "ordered_semantic_export_sha256": "5064f2fdaac3d4266a4af011169604aaa75829b76199ab8f7de5f2c23efc3cd5",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 52
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "9e0d126711c286fedcae0bff629102f611a9605e27543589e84eab34fbdf5ae5",
+          "initial-fields.json": "c929286d5dfefffe597bc42c5c3979aee90a3774592ff7f8bc706012459c9a6a",
+          "exact-export.json": "82656bd290628cadf813a926829044f6fc31b7ccade150023aa11442346ff495"
+        }
+      },
+      "no-syn": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "no-syn",
+          "checks": 343032,
+          "physical_frames": 365,
+          "native_connections": 5,
+          "complete_initial_PDUs": 42,
+          "physical_source_checks": 42,
+          "known_TCP_roles": {
+            "56291": false,
+            "56292": false,
+            "56293": false,
+            "56294": false,
+            "56295": false
+          },
+          "PDUs_compared_to_reference": 42,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 0,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 47,
+          "opaque_PDUs_with_persistent_identification_warning": 10,
+          "capture_sha256": "e4e7745b5c4e77ca93f681ffd6773a09dc9ae453dd331b5a9184983a3e944301",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "a7581387ce626d6779d15f2adbbc1ad846c0ef9ee0c5dd712e02d16c8eb0c1ff",
+          "oracle_sha256": "d20b1887d6003fa8d6a667b353dde843cc0a82fa93a6a3afb159466a4d28e418",
+          "before_events_sha256": "a7581387ce626d6779d15f2adbbc1ad846c0ef9ee0c5dd712e02d16c8eb0c1ff"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 488,
+          "complete_method_PDUs": 0,
+          "complete_generic_packet_PDUs": 32,
+          "method_profiles": {},
+          "native_literal_tree_fields_compared": 370,
+          "reference_fields_compared": 96,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [],
+          "independent_wire_certificate_sha256": "cb1b52d55455522953f5e4056d0e6d2411e2ffd9aa517d8a1c3274117d93806b",
+          "events_sha256": "a7581387ce626d6779d15f2adbbc1ad846c0ef9ee0c5dd712e02d16c8eb0c1ff",
+          "oracle_sha256": "d20b1887d6003fa8d6a667b353dde843cc0a82fa93a6a3afb159466a4d28e418"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 54,
+          "before_sha256": "a7581387ce626d6779d15f2adbbc1ad846c0ef9ee0c5dd712e02d16c8eb0c1ff",
+          "after_sha256": "a7581387ce626d6779d15f2adbbc1ad846c0ef9ee0c5dd712e02d16c8eb0c1ff",
+          "ordered_semantic_export_sha256": "54dba704b3fa084208010ca06cecaa155143754a0eb93c880630f9d6242b7815",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 52
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "cb1b52d55455522953f5e4056d0e6d2411e2ffd9aa517d8a1c3274117d93806b",
+          "initial-fields.json": "62e28e2bdd4c0b156731185cb7f67c76f70c0a60f5f649e4c193f3427bf218ec",
+          "exact-export.json": "d8b34a5c794a1172a44f1bd38b399cc1ba2e934fabf38b3c6daff3b00239e431"
+        }
+      },
+      "out-of-order": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "out-of-order",
+          "checks": 342798,
+          "physical_frames": 375,
+          "native_connections": 5,
+          "complete_initial_PDUs": 42,
+          "physical_source_checks": 42,
+          "known_TCP_roles": {
+            "56291": true,
+            "56292": true,
+            "56293": true,
+            "56294": true,
+            "56295": true
+          },
+          "PDUs_compared_to_reference": 42,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 132,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 47,
+          "opaque_PDUs_with_persistent_identification_warning": 10,
+          "capture_sha256": "8a57606ccf4354150bf06940852541d7693908cb4019c4bc0be837ff7e3eaf56",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "0141411bb876e7ae3d52fddc2956aa2c6b625ccfe6c1e52e6ca8f99b2d37854d",
+          "oracle_sha256": "76a9b35dc17aaf7735b425e22948a4b2e7d169edb062618665f0edb1e14024d4",
+          "before_events_sha256": "0141411bb876e7ae3d52fddc2956aa2c6b625ccfe6c1e52e6ca8f99b2d37854d"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 700,
+          "complete_method_PDUs": 7,
+          "complete_generic_packet_PDUs": 25,
+          "method_profiles": {
+            "curve25519-sha256@libssh.org": 2,
+            "ecdh-sha2-nistp256": 1,
+            "diffie-hellman-group14-sha256": 1,
+            "diffie-hellman-group-exchange-sha256": 3
+          },
+          "native_literal_tree_fields_compared": 441,
+          "reference_fields_compared": 156,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [
+            {
+              "PDU": 8,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 18,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 28,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 40,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 50,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            }
+          ],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [
+            {
+              "PDU": 8,
+              "native_byte_contributors": [
+                10
+              ],
+              "reference_reassembly_trigger_frames": [
+                16
+              ],
+              "literal_bytes_and_exact_direction_match": true
+            },
+            {
+              "PDU": 18,
+              "native_byte_contributors": [
+                83
+              ],
+              "reference_reassembly_trigger_frames": [
+                89
+              ],
+              "literal_bytes_and_exact_direction_match": true
+            },
+            {
+              "PDU": 28,
+              "native_byte_contributors": [
+                156
+              ],
+              "reference_reassembly_trigger_frames": [
+                162
+              ],
+              "literal_bytes_and_exact_direction_match": true
+            },
+            {
+              "PDU": 38,
+              "native_byte_contributors": [
+                229
+              ],
+              "reference_reassembly_trigger_frames": [
+                235
+              ],
+              "literal_bytes_and_exact_direction_match": true
+            },
+            {
+              "PDU": 50,
+              "native_byte_contributors": [
+                310
+              ],
+              "reference_reassembly_trigger_frames": [
+                316
+              ],
+              "literal_bytes_and_exact_direction_match": true
+            }
+          ],
+          "independent_wire_certificate_sha256": "973e61937dc2f4e6153f746df44cbd4577172c02ecf6e969f64a071a8c6c1627",
+          "events_sha256": "0141411bb876e7ae3d52fddc2956aa2c6b625ccfe6c1e52e6ca8f99b2d37854d",
+          "oracle_sha256": "76a9b35dc17aaf7735b425e22948a4b2e7d169edb062618665f0edb1e14024d4"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 54,
+          "before_sha256": "0141411bb876e7ae3d52fddc2956aa2c6b625ccfe6c1e52e6ca8f99b2d37854d",
+          "after_sha256": "0141411bb876e7ae3d52fddc2956aa2c6b625ccfe6c1e52e6ca8f99b2d37854d",
+          "ordered_semantic_export_sha256": "46f289bda164c10696bf63d46c5aee94d2347a0fa5f55c83feb722641ec587cc",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 52
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "973e61937dc2f4e6153f746df44cbd4577172c02ecf6e969f64a071a8c6c1627",
+          "initial-fields.json": "6ebe27244c92c0fd59b509415b5382c8c0e781ea05d8affd73652c2463112bad",
+          "exact-export.json": "21af361f32c5383bc6a53eaf19da70cde6ce08d38100c147d74aeebbb4cbbd5c"
+        }
+      },
+      "duplicate": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "duplicate",
+          "checks": 344593,
+          "physical_frames": 380,
+          "native_connections": 5,
+          "complete_initial_PDUs": 42,
+          "physical_source_checks": 42,
+          "known_TCP_roles": {
+            "56291": true,
+            "56292": true,
+            "56293": true,
+            "56294": true,
+            "56295": true
+          },
+          "PDUs_compared_to_reference": 42,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 162,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 47,
+          "opaque_PDUs_with_persistent_identification_warning": 10,
+          "capture_sha256": "e65104bf7ebbb5958d49385ab31de1616afeca7826b0659895c0b47c488fb83a",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "44ddc931dce01b12e8b7e953e3a5a0e333d0740e84a9f772f88c1c961b3abab4",
+          "oracle_sha256": "7a42456b0bbe6a86f377f8cd87ff597137f083ee0884ba4170bbb8931c83c0a3",
+          "before_events_sha256": "44ddc931dce01b12e8b7e953e3a5a0e333d0740e84a9f772f88c1c961b3abab4"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 727,
+          "complete_method_PDUs": 12,
+          "complete_generic_packet_PDUs": 20,
+          "method_profiles": {
+            "curve25519-sha256@libssh.org": 4,
+            "ecdh-sha2-nistp256": 2,
+            "diffie-hellman-group14-sha256": 2,
+            "diffie-hellman-group-exchange-sha256": 4
+          },
+          "native_literal_tree_fields_compared": 449,
+          "reference_fields_compared": 168,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [
+            {
+              "PDU": 8,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 18,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 28,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 40,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            },
+            {
+              "PDU": 50,
+              "signature_format": "rsa-sha2-256",
+              "reference_field": "ssh.host_sig.data",
+              "native_inner_bytes_independently_decoded": true
+            }
+          ],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [],
+          "independent_wire_certificate_sha256": "e77a59d683010a7ce18553149e1ea34c83bc1a1fd5f4d8fdf583069dd48a1e3c",
+          "events_sha256": "44ddc931dce01b12e8b7e953e3a5a0e333d0740e84a9f772f88c1c961b3abab4",
+          "oracle_sha256": "7a42456b0bbe6a86f377f8cd87ff597137f083ee0884ba4170bbb8931c83c0a3"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 54,
+          "before_sha256": "44ddc931dce01b12e8b7e953e3a5a0e333d0740e84a9f772f88c1c961b3abab4",
+          "after_sha256": "44ddc931dce01b12e8b7e953e3a5a0e333d0740e84a9f772f88c1c961b3abab4",
+          "ordered_semantic_export_sha256": "2c8f25d60883d119d5f354aa63382f9d5e85663e9c4f745e063a90a9299caae6",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 52
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "e77a59d683010a7ce18553149e1ea34c83bc1a1fd5f4d8fdf583069dd48a1e3c",
+          "initial-fields.json": "7bcfb6c278a89af451001e01e7883a0dcb98b45bcf87c0cc9ab4262f22743ccc",
+          "exact-export.json": "28779c8da0fcf7ff3598c861defe863ea05ea6316037e792bb4e75268398e3d4"
+        }
+      },
+      "loss": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "loss",
+          "checks": 340111,
+          "physical_frames": 370,
+          "native_connections": 5,
+          "complete_initial_PDUs": 26,
+          "physical_source_checks": 26,
+          "known_TCP_roles": {
+            "56291": true,
+            "56292": true,
+            "56293": true,
+            "56294": true,
+            "56295": true
+          },
+          "PDUs_compared_to_reference": 26,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 0,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 31,
+          "opaque_PDUs_with_persistent_identification_warning": 10,
+          "capture_sha256": "daf66fdb19f085861cef48f766f22e8928331a7cc47e3071115a601cbcc7411c",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "0d04e91bfa468ffd5ce9e04871e8a771c2ebca7b3730080f51fe7c839c9ce093",
+          "oracle_sha256": "34560630ddba4c4ad7b2cc68f74e0e1faf2bcfe7db1801d655b330b986ecca08",
+          "before_events_sha256": "0d04e91bfa468ffd5ce9e04871e8a771c2ebca7b3730080f51fe7c839c9ce093"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 245,
+          "complete_method_PDUs": 0,
+          "complete_generic_packet_PDUs": 16,
+          "method_profiles": {},
+          "native_literal_tree_fields_compared": 185,
+          "reference_fields_compared": 48,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [],
+          "independent_wire_certificate_sha256": "a8d46ed60350ead4ea6f8133342c60765cd7e0ef92cff88290526f4c783ae68c",
+          "events_sha256": "0d04e91bfa468ffd5ce9e04871e8a771c2ebca7b3730080f51fe7c839c9ce093",
+          "oracle_sha256": "34560630ddba4c4ad7b2cc68f74e0e1faf2bcfe7db1801d655b330b986ecca08"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 38,
+          "before_sha256": "0d04e91bfa468ffd5ce9e04871e8a771c2ebca7b3730080f51fe7c839c9ce093",
+          "after_sha256": "0d04e91bfa468ffd5ce9e04871e8a771c2ebca7b3730080f51fe7c839c9ce093",
+          "ordered_semantic_export_sha256": "a99529699d16a8f0f672809ffb00542cedb5e162b98291b19c99df18130422ea",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 36
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "a8d46ed60350ead4ea6f8133342c60765cd7e0ef92cff88290526f4c783ae68c",
+          "initial-fields.json": "61678a0436da7f55358d0f4c4f4a8a83ef78b91981d669434ac766a82be73856",
+          "exact-export.json": "9885a9604eafe3f9214edc2084217bf4b8af32af46c484ce910513954e7e7bb8"
+        }
+      },
+      "snaplen": {
+        "wire": {
+          "scope": "Independently certify selected initial SSH PDUs and role/offer evidence.\nScope: owned IPv4 loopback TCP, original capture or declared replay controls,\ninitial uncompressed no-MAC packets through each direction's first NEWKEYS.\nEncrypted rekey/authentication/application contents, key mathematics, signature\nverification and native peer identity are not certified. DecodeAs server ports\nare declared reference hints, not native role evidence.\n",
+          "profile": "snaplen",
+          "checks": 340206,
+          "physical_frames": 375,
+          "native_connections": 5,
+          "complete_initial_PDUs": 26,
+          "physical_source_checks": 26,
+          "known_TCP_roles": {
+            "56291": true,
+            "56292": true,
+            "56293": true,
+            "56294": true,
+            "56295": true
+          },
+          "PDUs_compared_to_reference": 26,
+          "reference_unavailable_initial_PDUs": [],
+          "baseline_PDUs_with_wrong_selected_algorithms": 0,
+          "selected_algorithm_comparisons": 0,
+          "declared_nonconforming_server_identification": "SSH-2.0-Cisco-1.25",
+          "PDUs_with_persistent_identification_warning": 36,
+          "opaque_PDUs_with_persistent_identification_warning": 15,
+          "capture_sha256": "63a4f7ed0e98b2fac9728f20bbb4dd42a5e7680e3c3c8b965c3e1da321e6527c",
+          "manifest_sha256": "c51f0ef83a8fb058da596db4aa747e55bbdad03decda717a932b6518c506284b",
+          "events_sha256": "1b21edf84d2da22a85db46da52b26e57a39fd9bb7e28618c0bc0880f549eca4d",
+          "oracle_sha256": "bbb6c5c9769cdc87141a997b21d85231d5ffdc8aa5071cbe3682bf6155f09117",
+          "before_events_sha256": "1b21edf84d2da22a85db46da52b26e57a39fd9bb7e28618c0bc0880f549eca4d"
+        },
+        "fields": {
+          "scope": "Independently decode selected clear SSH DH/GEX/ECDH/RSA field layouts.\nUse RFC 4253/4419/5656 binary strings and bounded cursors, not a Yak codec.\nCompare the entire native initial packet field tree with exact PDU bytes, then\ncompare selected values with byte/frame-matched Wireshark views. This certifies\nframing, values and fingerprints, not DH mathematics, a signature or identity.\n",
+          "checks": 245,
+          "complete_method_PDUs": 0,
+          "complete_generic_packet_PDUs": 16,
+          "method_profiles": {},
+          "native_literal_tree_fields_compared": 185,
+          "reference_fields_compared": 48,
+          "native_opaque_host_key_views": [],
+          "reference_opaque_signature_views": [],
+          "unselected_host_key_views": [],
+          "unselected_reference_carriers": [],
+          "reference_attribution_differences": [],
+          "independent_wire_certificate_sha256": "ceffb1801f34be617fba2d2413f96229461f2b56637905a7bda87ef0109d9014",
+          "events_sha256": "1b21edf84d2da22a85db46da52b26e57a39fd9bb7e28618c0bc0880f549eca4d",
+          "oracle_sha256": "bbb6c5c9769cdc87141a997b21d85231d5ffdc8aa5071cbe3682bf6155f09117"
+        },
+        "exact_export": {
+          "scope": "Compare every SDK message or CLI physical row without normalizing any field.\n\nOnly JSON object-key ordering and insignificant JSON whitespace may differ.\nIdentity numbers, protocol labels, typed values, wire bytes, fields, sources,\nflows, transactions and associations must retain their exact types and values.\nInputs and detailed results stay outside Git.\n",
+          "kind": "SDK",
+          "records_compared": 43,
+          "before_sha256": "1b21edf84d2da22a85db46da52b26e57a39fd9bb7e28618c0bc0880f549eca4d",
+          "after_sha256": "1b21edf84d2da22a85db46da52b26e57a39fd9bb7e28618c0bc0880f549eca4d",
+          "ordered_semantic_export_sha256": "63938d05dd174529c12ec1f76cf516907485cc19e954e737a04816bde105aac2",
+          "protocol_record_counts": {
+            "": 2,
+            "ssh": 41
+          },
+          "changed_records_first_64": [],
+          "all_records_exact": true,
+          "identity_or_field_normalization": false
+        },
+        "certificate_sha256": {
+          "wire-audit.json": "ceffb1801f34be617fba2d2413f96229461f2b56637905a7bda87ef0109d9014",
+          "initial-fields.json": "ed8078e7c343f6b13f01b19646a675a8d1244b7be78d8acd7f1f91c20f85b702",
+          "exact-export.json": "024e86e9fd1d7bdff7880693128c77ba16e36810cb5c3983255f0675f85b0121"
+        }
+      }
+    }
+  },
+  "Windows": [
+    {
+      "case": "actual-identification",
+      "capture_packets": 375,
+      "PDU": 4,
+      "label": "Identification Conformance: nonconformant",
+      "packet_capacity": 475,
+      "protocol_history_MiB": 1024,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_buffer_sha256": {
+        "00-filter-ready.json": "d67da4ee3069dd4871c6382d43b1792474c0d22b86a7ebe5daaadabeb7ea5018",
+        "01-protocol-fields.json": "ed5d62e4b6b252f6b2f26fdb1b3541e7f3ffab38f11501d84ef36ace86b748e5",
+        "01-deep-protocol-fields.json": "ed5d62e4b6b252f6b2f26fdb1b3541e7f3ffab38f11501d84ef36ace86b748e5",
+        "02-byte-sources.json": "2417249879f67ad493dc7ff2256759055b2a333cde5e75fda0e8de1fce631d82",
+        "03-conversation-messages.json": "8cebf3c6fd1f686715579b64e2fc07ea734ac6d26e24d5b04b111e944622e134",
+        "04-association-evidence.json": "df13c45dbfefa8d9d68a64be40e473dfe9527c1a585e8f7bba7758df293db8f0",
+        "05-narrow.json": "dd65f78d3426eee6f1b931ee19ae2f6dee6f0ec25e7a407b5f2977e029424097",
+        "06-restored.json": "df13c45dbfefa8d9d68a64be40e473dfe9527c1a585e8f7bba7758df293db8f0",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_buffer_sha256": {
+        "01-protocol-fields.png": "df2db9cbfc5dcd7ff2835232ba05619eaa1128e8c6cc6923c8eeed479154e5d2",
+        "01-deep-protocol-fields.png": "df2db9cbfc5dcd7ff2835232ba05619eaa1128e8c6cc6923c8eeed479154e5d2",
+        "05-narrow.png": "b7466054569bb8f08af0a85972d3682ca7d6410da49f7547122ad17fb2baeabf"
+      }
+    },
+    {
+      "case": "actual-curve",
+      "capture_packets": 375,
+      "PDU": 7,
+      "label": "KEX_ECDH_INIT",
+      "packet_capacity": 475,
+      "protocol_history_MiB": 1024,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_buffer_sha256": {
+        "00-filter-ready.json": "9431acce80caef615ff6b81f88a60f83e3a3ba84c0fe677a3e6b1bfb22791b89",
+        "01-protocol-fields.json": "6c55bbada9d9f0acd053cfaf57d7ae9450574bab3d6c9baf529b0074b4878fe6",
+        "01-deep-protocol-fields.json": "6c55bbada9d9f0acd053cfaf57d7ae9450574bab3d6c9baf529b0074b4878fe6",
+        "02-byte-sources.json": "435fbabff04a3f4ccc11ed31f289b6d00fb3349b4d59eed0aa142550a38c7f3d",
+        "03-conversation-messages.json": "d41e5dde25ff3c8a9da9028c33a9c79ab7f281d19ac65b909280fc989f1c7a6c",
+        "04-association-evidence.json": "e88a3f0ffc52031ac9d988ad1cf09bf4fa1bea93f8887baeaf1da2994cc94bfa",
+        "05-narrow.json": "a1fa2a10d3f4ca0469639bdc2f31717a27bca121e05b3c2dc884c202f7de60a3",
+        "06-restored.json": "e88a3f0ffc52031ac9d988ad1cf09bf4fa1bea93f8887baeaf1da2994cc94bfa",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_buffer_sha256": {
+        "01-protocol-fields.png": "e2318520a7e0ad1625ef613224e519f7fc18801d2eb56d988ded260d07a058e0",
+        "01-deep-protocol-fields.png": "e2318520a7e0ad1625ef613224e519f7fc18801d2eb56d988ded260d07a058e0",
+        "05-narrow.png": "bfc1436bbe838d5265e8c0bf236163819aa6d2350c04dd88c578d4a353c3b7e4"
+      }
+    },
+    {
+      "case": "public-group",
+      "capture_packets": 51328,
+      "PDU": 4280,
+      "label": "KEX_DH_GEX_GROUP",
+      "packet_capacity": 100000,
+      "protocol_history_MiB": 1024,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_buffer_sha256": {
+        "00-filter-ready.json": "6d046d7052fdd692bee4587e69712da96d78813bde076edc97515ecffccb2425",
+        "01-protocol-fields.json": "46ec35fe65f9b1760ae905fc75a9b62a38c4c04fbc11b83c737f5c50689eed45",
+        "01-deep-protocol-fields.json": "46ec35fe65f9b1760ae905fc75a9b62a38c4c04fbc11b83c737f5c50689eed45",
+        "02-byte-sources.json": "56a54368ae8253d5407b3f93520978ea672bdcacf7caf3997902606dfcd0bd27",
+        "03-conversation-messages.json": "598f3c5cd3e818900a76745d2758d4cc7fb375ecb1f625ac4d4e90fcd7d5ec3e",
+        "04-association-evidence.json": "549fb2be34c94f02530d8308ff4a2c8013697756c877e43ec82fcfc7cc4fcb50",
+        "05-narrow.json": "5b06959f623296bb0762c8615298e3fb12c4af8ac59c38be964d4c69ce4f8fb2",
+        "06-restored.json": "549fb2be34c94f02530d8308ff4a2c8013697756c877e43ec82fcfc7cc4fcb50",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_buffer_sha256": {
+        "01-protocol-fields.png": "c9a22675d40f59deae4e0b7f9863bac63c550d004bab67264a646b1bbb5781d0",
+        "01-deep-protocol-fields.png": "c9a22675d40f59deae4e0b7f9863bac63c550d004bab67264a646b1bbb5781d0",
+        "05-narrow.png": "6dc4f0bc3e0bf0e9d62d9c1588bbb5a8b94b713b8914a10ccd60346d9cec89dc"
+      }
+    }
+  ],
+  "remaining": [
+    "Five reordered method messages retain generic method bodies until a future evidence-derived refinement view is implemented",
+    "Ed25519 host key/signature containers retain literal bytes but have no typed native inner expansion",
+    "SFTP, encrypted SSH authentication/channels/rekey contents and identity/signature verification are not decoded or certified",
+    "Reference SSH over non-IP/TCP carriers remains separately unselected",
+    "Filtered Windows packet lists still reserve many empty rows; use that space for deeper fields in the next UI pass",
+    "Other protocol/field and public fuzz scopes remain partial; literal display-label count equality is not protocol correctness"
+  ],
+  "current_counts_summary_sha256": "fd303eebf04d414fb7eaea6925616e0c4a62e0b510d661bfc0484c3fe14fcb70",
+  "full_94_39_review_sha256": "670035ebc31274b7b161084cc27a7a539346915e6f828f701bf72b2a9ea32ec1"
+}
