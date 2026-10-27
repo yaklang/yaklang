@@ -149,6 +149,28 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}
 	for _, f := range []struct {
 		name, label, key string
+		bits             int
+	}{
+		{"dcerpc.cn_call_id", "RPC wire Call ID", "Call ID", 32},
+		{"dcerpc.pkt_type", "RPC PDU type", "PType", 8},
+		{"dcerpc.pfc_flags", "RPC per-PDU flags", "PFC Flags", 8},
+		{"dcerpc.cn_ctx_id", "RPC presentation context", "Context ID", 16},
+		{"dcerpc.opnum", "RPC request operation number", "OpNum", 16},
+	} {
+		path("dcerpc", "dcerpc", f.name, f.label, DisplayUnsigned, f.bits, "pdu", f.key)
+	}
+	path("dcerpc", "dcerpc", "dcerpc.packet_name", "RPC observed operation", DisplayString, 0, "context", "Packet Name")
+	path("dcerpc", "dcerpc", "dcerpc.message_id", "RPC first message PDU", DisplayUnsigned, 64, "derived", "Message ID")
+	path("dcerpc", "dcerpc", "dcerpc.message_complete_in", "RPC message completion PDU", DisplayUnsigned, 64, "derived", "Reassembled Message", "Complete In PDU")
+	path("dcerpc", "dcerpc", "dcerpc.message_fragments", "RPC message fragment count", DisplayUnsigned, 32, "derived", "Reassembled Message", "Fragment Count")
+	path("dcerpc", "dcerpc", "dcerpc.reassembled_length", "RPC reassembled opaque stub length", DisplayUnsigned, 64, "derived", "Reassembled Message", "Stub Bytes")
+	path("dcerpc", "dcerpc", "dcerpc.reassembled_sha256", "RPC reassembled opaque stub digest", DisplayString, 0, "derived", "Reassembled Message", "Byte Source", "SHA256")
+	path("dcerpc", "dcerpc", "dcerpc.message_parent", "RPC fragment source PDU", DisplayUnsigned, 64, "derived", "Reassembled Message", "Fragment Sources", "*", "PDU ID")
+	path("dcerpc", "dcerpc", "dcerpc.message_stub_offset", "RPC stub offset in parent PDU", DisplayUnsigned, 32, "derived", "Reassembled Message", "Fragment Sources", "*", "Stub Offset")
+	path("dcerpc", "dcerpc", "dcerpc.message_stub_length", "RPC stub bytes from parent PDU", DisplayUnsigned, 32, "derived", "Reassembled Message", "Fragment Sources", "*", "Stub Length")
+	path("dcerpc", "dcerpc", "dcerpc.stub_decoded", "RPC reassembled stub semantics decoded", DisplayBoolean, 0, "derived", "Reassembled Message", "Stub Decoded")
+	for _, f := range []struct {
+		name, label, key string
 		typ              DisplayFieldType
 		bits             int
 	}{
@@ -565,11 +587,14 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	if e == nil {
 		return s
 	}
-	if e.nativeSSHObservation || e.nativeIMAPObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation {
 		owned := *e
 		owned.Protocol, owned.Session = "ssh", e.semanticSession
 		if e.nativeIMAPObservation {
 			owned.Protocol = "imap"
+		}
+		if e.nativeDCERPCObservation {
+			owned.Protocol = "dcerpc"
 		}
 		if e.sessionError != nil {
 			owned.Status, _ = classifySessionError(e.sessionError)

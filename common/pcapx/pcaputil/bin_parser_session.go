@@ -789,6 +789,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.ID = f.a.ids.Add(1)
 		}
 		err = f.dcerpc.consumeEvent(dir, e, f.a.budget.MaxCollectionElements)
+		e.nativeDCERPCObservation = true
+		e.semanticSession = cloneSession(e.Session)
 		if err != nil || dcerpcHasSecurityTrailer(e.Raw) {
 			e.nativeSessionMessage = true
 			e.semanticSession = cloneSession(e.Session)

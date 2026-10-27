@@ -35,6 +35,7 @@ type ProtocolEvent struct {
 	nativeSIPObservation               bool
 	nativeSSHObservation               bool
 	nativeIMAPObservation              bool
+	nativeDCERPCObservation            bool
 	nativeTFTPObservation              bool
 	nativeATGObservation               bool
 	nativeDHCPObservation              bool

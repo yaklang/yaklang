@@ -13,6 +13,8 @@ var dcerpcDetailPriority = map[string]int{
 	"Result": 3, "Ack Result": 3, "Reason": 4, "Ack Reason": 4,
 	"Abstract Syntax": 5, "Interface Version Major": 6, "Interface Version Minor": 7,
 	"Transfer Syntax": 8, "Transfer Version": 9, "Bind Time Feature Proposal": 10,
+	"Message ID": 0, "Complete In PDU": 1, "Header In PDU": 2, "Fragment Count": 3,
+	"Stub Bytes": 4, "Stub Decoded": 5, "Stub": 6, "Fragment Sources": 7, "Byte Source": 8,
 }
 
 func dcerpcEventSummary(e *pcaputil.ProtocolEvent) (string, bool) {
@@ -36,7 +38,9 @@ func dcerpcEventSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 	} else if v["Unmatched"] == true {
 		parts = append(parts, "unmatched: "+textValue(v["Association Status"]))
 	}
-	if v["Fragment"] == true {
+	if message, ok := v["Reassembled Message"].(map[string]any); ok {
+		parts = append(parts, fmt.Sprintf("RPC message: %d fragments · %d stub bytes", number(message["Fragment Count"]), number(message["Stub Bytes"])))
+	} else if v["Fragment"] == true {
 		parts = append(parts, "RPC fragment")
 	}
 	return strings.Join(parts, " · "), true

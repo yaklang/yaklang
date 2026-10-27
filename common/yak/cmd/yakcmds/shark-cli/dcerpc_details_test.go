@@ -35,6 +35,51 @@ func TestDCERPCReplySummaryAndProgressiveAssociation(t *testing.T) {
 	require.False(t, ok, "opaque security envelopes retain their own presentation scope")
 }
 
+func TestDCERPCLogicalStubHasItsOwnByteSourceThroughProductionWorker(t *testing.T) {
+	stub := bytes.Repeat([]byte{0x5a, 0xa5}, 20)
+	fragment := func(flags byte, payload []byte) []byte {
+		wire := make([]byte, 24+len(payload))
+		wire[0], wire[2], wire[3], wire[4] = 5, 0, flags, 0x10
+		binary.LittleEndian.PutUint16(wire[8:10], uint16(len(wire)))
+		binary.LittleEndian.PutUint32(wire[12:16], 2)
+		binary.LittleEndian.PutUint32(wire[16:20], uint32(len(payload)))
+		binary.LittleEndian.PutUint16(wire[22:24], 2)
+		copy(wire[24:], payload)
+		return wire
+	}
+	s, err := pcaputil.NewProtocolSession(pcaputil.DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	r := s.Feed(0, time.Unix(1, 0), fragment(1, stub[:20]))
+	require.Nil(t, r.Err)
+	r = s.Feed(0, time.Unix(2, 0), fragment(2, stub[20:]))
+	require.Nil(t, r.Err)
+	e := r.Events[0]
+	require.Len(t, e.Raw, 44)
+	encoded, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: []*pcaputil.ProtocolEvent{e}})
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, runDecodeWorker(bytes.NewReader(encoded), &output))
+	decoded, err := decodeWorkerOutput(output.Bytes(), &capturedPacket{number: 1})
+	require.NoError(t, err)
+	found := false
+	for _, field := range decoded.fields {
+		if !strings.HasPrefix(field.text, "Stub: 40 bytes") || !field.hasRange {
+			continue
+		}
+		source := decoded.sources[field.source-1]
+		if !strings.Contains(source.Name, "DCE/RPC message stub") {
+			continue
+		}
+		require.Equal(t, stub, source.Data, "IPC must not leave the logical stub as base64 text or a last-fragment slice")
+		require.Equal(t, []int{0, 40}, []int{field.start, field.end})
+		require.NotEqual(t, e.Raw, source.Data, "logical offsets are relative to their own owned data, never the last wire PDU")
+		found = true
+	}
+	require.True(t, found)
+	require.Contains(t, applicationEventSummary(e), "2 fragments · 40 stub bytes")
+}
+
 func TestDCERPCOrderedResultsLeadDetailsAndOwnDistinctRanges(t *testing.T) {
 	// A complete unassociated server ACK: no fictitious request IDs are needed
 	// to render the three observed result values and their original byte ranges.
