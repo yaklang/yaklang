@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -23,6 +24,9 @@ type packetEntry struct {
 	fieldResult                     pcaputil.DisplayFilterResult
 	fieldEventIDs                   []uint64
 	fieldKnownIDs                   []uint64
+	rowHistory                      *pcaputil.ProtocolInspector
+	rowRevision                     pcaputil.ProtocolPacketRevision
+	rowEventIDs                     []uint64
 }
 type packetRing struct {
 	entries     []packetEntry
@@ -49,6 +53,29 @@ func (r *packetRing) add(p *capturedPacket) {
 func (r *packetRing) at(i int) *packetEntry { return &r.entries[(r.start+i)%len(r.entries)] }
 
 func (e *packetEntry) row() packetSummary {
+	if p := e.packet; p != nil && p.history != nil {
+		// A message can be confirmed after its last byte-contributing packet
+		// was already displayed. Keep its row in step with the detail pane.
+		// Read the token first so a concurrent arrival is seen next redraw.
+		revision := p.history.PacketQueryRevision(p.reference, p.eventIDs, p.physicalRecord)
+		if e.summary.Number == 0 || e.rowHistory != p.history || e.rowRevision != revision || !slices.Equal(e.rowEventIDs, p.eventIDs) {
+			view := *p
+			events := p.protocolEvents()
+			if late := presentEvents(events); late.protocol != "" {
+				view.presentation = late
+			}
+			e.summary = summarize(&view)
+			for _, message := range events {
+				if completed := message.SourceBytes.CompletedIn; completed != nil && completed.Number != p.reference.Number && (message.Status == "decoded" || message.Status == "deferred") {
+					e.summary.Info += fmt.Sprintf(" · includes message completed in frame #%d", completed.Number)
+					break
+				}
+			}
+			e.rowHistory, e.rowRevision = p.history, revision
+			e.rowEventIDs = append(e.rowEventIDs[:0], p.eventIDs...)
+		}
+		return e.summary
+	}
 	if e.summary.Number == 0 {
 		e.summary = summarize(e.packet)
 	}
