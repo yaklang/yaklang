@@ -370,6 +370,50 @@ func main() {
 	if len(visible) != 2 || visible[1] == "0" {
 		panic("no complete matching protocol rows after replay")
 	}
+	if os.Getenv("SHARK_QA_EXPECT_ADAPTIVE") == "1" {
+		loadShot := func(name string) snapshot {
+			shot(name)
+			data, err := os.ReadFile(filepath.Join(dir, name+".json"))
+			fail(err)
+			var state snapshot
+			fail(json.Unmarshal(data, &state))
+			return state
+		}
+		tabs := func(state snapshot) (int, int, int) {
+			for y, row := range state.Rows {
+				xf, xb := strings.Index(row, "[2 Fields]"), strings.Index(row, "[3 Bytes]")
+				if xf >= 0 && xb >= 0 {
+					return y, xf, xb
+				}
+			}
+			panic("adaptive tabs not present in fresh native cells")
+		}
+		send("2")
+		before := loadShot("01-adaptive-fields-before")
+		y, xf, xb := tabs(before)
+		if before.Height-3-(y+1) < 24 {
+			panic("sparse result did not release enough native rows for deep inspection")
+		}
+		selected := before.Attributes[y][xf+1]
+		if selected == before.Attributes[y][xb+1] {
+			panic("native field-tab selection is not visually distinct")
+		}
+		click := func(x, y int) {
+			send(fmt.Sprintf("\x1b[<0;%d;%dM\x1b[<0;%d;%dm", x+1, y+1, x+1, y+1))
+		}
+		click(xb+2, y)
+		bytes := loadShot("01-adaptive-bytes-click")
+		by, bf, bb := tabs(bytes)
+		if by != y || bytes.Attributes[by][bb+1] != selected || bytes.Attributes[by][bf+1] == selected {
+			panic("mouse click missed the rendered adaptive Bytes tab")
+		}
+		click(xf+2, y)
+		fields := loadShot("01-adaptive-fields-click")
+		fy, ff, fb := tabs(fields)
+		if fy != y || fields.Attributes[fy][ff+1] != selected || fields.Attributes[fy][fb+1] == selected || !matching(fields, true) {
+			panic("mouse click missed the rendered adaptive Fields tab or changed the inspected packet")
+		}
+	}
 	send("b")
 	shot("02-first-byte-source")
 	if os.Args[6] == "observed transport header" {
