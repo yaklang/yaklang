@@ -69,6 +69,16 @@ opaque TLS record without handshake/session evidence remains a candidate; it
 cannot establish a sticky connection identity. ALPN and port numbers alone do
 not assert that encrypted application content was decoded.
 
+Capture-backed TCP previews consume the same native reassembly callbacks as
+protocol parsing, including normalized tunnel and fragment contributors. They
+do not run an independent TCP assembler. `flow.id` identifies a protocol session;
+`tcp.flow.id` / `tcp_flow_id` identifies an explicitly observed native TCP
+generation. These namespaces can differ, and unavailable TCP links are omitted.
+`stream_id` selects a retained page preview. Missing close packets followed by
+an exactly confirmed new handshake create a separate generation. Payload after
+a closed direction cannot inherit its previous application identity. Gaps and
+eviction remain explicit; the preview never inserts absent bytes to fill a hole.
+
 `--tls-keylog` accepts an NSS key log for authorized captured sessions. Supported
 TLS records are authenticated before their plaintext enters application parsers.
 The table shows handshake names, alerts, SNI/ALPN, HTTP/2 stream IDs, request paths

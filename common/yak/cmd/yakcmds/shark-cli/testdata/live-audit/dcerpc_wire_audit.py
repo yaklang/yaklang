@@ -141,14 +141,15 @@ def records(capture):
     assert at==len(wire)
 
 
-def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False,control_manifest=None,tcp_generations=False):
+def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,require_call_links=False,control_manifest=None,tcp_generations=False,source_capture=None,source_manifest=None,source_certificate=None):
     checks=0
     def check(ok,why):
         nonlocal checks
         checks+=1;assert ok,why
     def eq(a,b,why):check(canonical(a)==canonical(b),why)
     def connection(e):return canonical([e['domain'],sorted([e['source'],e['destination']])])
-    event_epochs={};original_epochs=[];flow_epochs={}
+    event_epochs={};original_epochs=[];flow_epochs={};source_observation_proof=None
+    check(all(v is None for v in[source_capture,source_manifest,source_certificate])or tcp_generations and all(v is not None for v in[source_capture,source_manifest,source_certificate]),'source-observation profile needs the complete source/certificate/manifest chain and TCP epochs')
     def direction(e):
         parts=[e['domain'],e['source'],e['destination']]
         if tcp_generations:parts.append(event_epochs[e['id']]if'id'in e else e['epoch'])
@@ -185,7 +186,12 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
     if tcp_generations:
         check(not require_call_links,'the legacy whole-PDU-only call-link certificate is not a multi-epoch certificate')
         from tcp_epoch_audit import partition,bind_events
-        by_frame,original_epochs=partition(physical)
+        if source_capture is None:by_frame,original_epochs=partition(physical)
+        else:
+            from tcp_opening_wire_audit import source_partition
+            original_physical,by_frame,original_epochs,source_observation_proof=source_partition(capture,source_capture,source_manifest,source_certificate)
+            eq(sorted(original_physical),sorted(physical),'source profile and selected literal TCP scope are identical')
+            for no,packet in physical.items():eq(packet['frame_sha256'],original_physical[no]['frame_sha256'],'all independently source-certified physical frames')
         event_epochs,flow_epochs=bind_events(native,physical,by_frame)
         for no,packet in physical.items():packet['epoch']=by_frame[no]
     for no,packet in physical.items():
@@ -443,9 +449,9 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
     if require_call_links:
         from dcerpc_call_links import audit_call_links
         numeric_links=audit_call_links(native,reference_views,pdu_deliveries)
-    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])+(['dcerpc_generation_control_audit.py']if control_manifest is not None else[])+(['tcp_epoch_audit.py']if tcp_generations else[])
+    sources=['dcerpc_wire_audit.py','mail_rtsp_public_wire_audit.py','mail_rtsp_export_invariants.py']+(['dcerpc_call_links.py']if require_call_links else[])+(['dcerpc_generation_control_audit.py']if control_manifest is not None else[])+(['tcp_epoch_audit.py']if tcp_generations else[])+(['tcp_opening_wire_audit.py']if source_capture is not None else[])
     audit_sources={name:sha((Path(__file__).parent/name).read_bytes())for name in sources}
-    return dict(scope=__doc__,audit_sources_sha256=audit_sources,original_TCP_epochs=original_epochs,native_flow_epochs=[dict(connection=key[0],flow=key[1],epoch=value)for key,value in flow_epochs.items()],control_manifest_sha256=sha(control_manifest.read_bytes())if control_manifest is not None else None,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
+    return dict(scope=__doc__,audit_sources_sha256=audit_sources,source_observation_proof=source_observation_proof,original_TCP_epochs=original_epochs,native_flow_epochs=[dict(connection=key[0],flow=key[1],epoch=value)for key,value in flow_epochs.items()],control_manifest_sha256=sha(control_manifest.read_bytes())if control_manifest is not None else None,require_scoped_field_ranges=require_scoped_ranges,numeric_call_links=numeric_links,checks=checks,capture_sha256=sha(capture.read_bytes()),events_sha256=sha(events.read_bytes()),oracle_sha256=sha(oracle.read_bytes()),physical_frames=total_frames,SDK_records_with_unique_positive_IDs=SDK_records,
                 compared_PDUs=compared,status_counts=dict(status),complete_clear_field_trees_checked=complete_clear_trees,matched_bind_or_alter_associations_checked=association_checks,reference_field_counts=dict(reference_fields),reference_layout_limits=reference_limits,reference_field_limits=reference_field_limits,
                 outside_selected_reference_frames=outside,aggregate_reference_limits=aggregate_reference_limits,unused_selected_reference_views=[dict(frame=no,view=index)for no,values in reference_views.items()for index,_ in enumerate(values)if(no,index)not in used_views],
                 closure_diagnostics=closures,incomplete_captured_prefix_diagnostics=prefixes,aggregate_direction_diagnostics=tails,diagnostic_wire_adjudications=adjudications,actual_endpoint_receipt_matches=receipt_matches,streams=details,unexported_complete_wire_PDUs=unexported,wire_or_capture_domain_normalization=False)
@@ -454,9 +460,10 @@ def audit(capture,events,oracle,receipts=None,require_scoped_ranges=False,requir
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in ['capture','events','oracle','out']:ap.add_argument('--'+name,type=Path,required=True)
+    for name in['source-capture','source-manifest','source-certificate']:ap.add_argument('--'+name,type=Path)
     ap.add_argument('--receipts',type=Path);ap.add_argument('--control-manifest',type=Path);ap.add_argument('--require-scoped-ranges',action='store_true');ap.add_argument('--require-call-links',action='store_true');ap.add_argument('--tcp-generations',action='store_true');a=ap.parse_args()
     for p in vars(a).values():
         if isinstance(p,Path):assert not any((q/'.git').exists()for q in[p.resolve(),*p.resolve().parents])
-    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links,a.control_manifest,a.tcp_generations)
+    proof=audit(a.capture,a.events,a.oracle,a.receipts,a.require_scoped_ranges,a.require_call_links,a.control_manifest,a.tcp_generations,a.source_capture,a.source_manifest,a.source_certificate)
     a.out.write_text(json.dumps(proof,indent=2)+'\n',encoding='utf8')
     print(json.dumps(dict(checks=proof['checks'],physical_frames=proof['physical_frames'],native_PDUs=len(proof['compared_PDUs']),statuses=proof['status_counts'],reference_fields=sum(proof['reference_field_counts'].values()),unexported_complete_PDUs=len(proof['unexported_complete_wire_PDUs']))))
