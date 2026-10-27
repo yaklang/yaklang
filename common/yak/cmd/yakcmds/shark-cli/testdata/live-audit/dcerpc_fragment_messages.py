@@ -3,6 +3,8 @@
 This profile requires lossless, ordered, complete clear call fragments. It does
 not infer NDR semantics, authenticate bodies, bridge TCP holes, or convert a
 parent PDU's frame contributors into a claimed exact logical-stub projection.
+An explicit opt-in additionally certifies outstanding/unfinished messages in
+independently partitioned TCP epochs, without declaring those messages complete.
 """
 import argparse
 import base64
@@ -15,10 +17,14 @@ from dcerpc_call_links import leaves
 from mail_rtsp_export_invariants import canonical, rows, sha
 
 
-def audit(events, wire_certificate, oracle):
+def audit(events, wire_certificate, oracle, allow_open_tcp_epochs=False):
     proof = json.loads(wire_certificate.read_text(encoding='utf8'))
     assert proof['events_sha256'] == sha(events)
     assert proof['oracle_sha256'] == sha(oracle)
+    if allow_open_tcp_epochs:
+        assert proof['original_TCP_epochs'] and proof['native_flow_epochs'],'open-message profile requires original two-way-handshake epoch proof'
+        assert not proof['unexported_complete_wire_PDUs'],'every contiguous complete wire PDU remains exported'
+        assert {v['epoch']for v in proof['original_TCP_epochs']}=={v['epoch']for v in proof['native_flow_epochs']},'all observed epochs have their own native flow'
     proven = {v['PDU']: v for v in proof['compared_PDUs']}
     native = [e for e in rows(events) if e['protocol'] == 'dcerpc']
     reference = {}
@@ -26,7 +32,7 @@ def audit(events, wire_certificate, oracle):
         layers = row['_source']['layers']
         reference[int(layers['frame']['frame.number'])] = layers
     fragments = {}; pending = {}; contexts = {}; expected = {}; messages = []; links = []
-    checks = 0
+    checks = 0; closures=[]
 
     def equal(a, b, why):
         nonlocal checks
@@ -49,6 +55,11 @@ def audit(events, wire_certificate, oracle):
 
     for e in native:
         identifier = e['id']; want = 0
+        if not e.get('raw'):
+            assert allow_open_tcp_epochs and identifier in proof['closure_diagnostics'],'only independently scoped empty closure diagnostics are allowed'
+            assert e['status']in['incomplete','context-required']
+            equal(e['response_to'],0,'an empty closure never invents a completed reply owner')
+            expected[str(identifier)]=0;closures.append(identifier);continue
         assert identifier in proven, 'every selected PDU requires full original-wire proof'
         raw = base64.b64decode(e['raw']); session = e.get('session') or {}
         assert e['status'] in ['decoded', 'deferred'], 'clear complete capture profile only'
@@ -154,6 +165,12 @@ def audit(events, wire_certificate, oracle):
                     pending[key]['proposal'] = (int.from_bytes(raw[28:30], 'little'), {
                         'Interface': 'EPM', 'Abstract Syntax': raw[32:48].hex(),
                         'Interface Version Major': 3, 'Interface Version Minor': 0})
+            elif ptype==13 and allow_open_tcp_epochs and pending.get(key,{}).get('ptype')==0:
+                owner=pending[key]
+                assert owner['source']!=e['source'],'observed association rejection comes from the peer'
+                equal(session['Unmatched'],True,'bind-NAK cannot consume an ordinary operation owner')
+                equal(session['Association Status'],'request-type-mismatch','rejection preserves typed call ownership')
+                assert 'Matched Request'not in session and 'Context Rejected'not in session,'an operation rejection does not manufacture a negotiation owner'
             elif ptype in [2, 3, 12, 13, 15]:
                 owner = pending.get(key)
                 expected_type = {2: 0, 3: 0, 12: 11, 15: 14}.get(ptype)
@@ -182,8 +199,12 @@ def audit(events, wire_certificate, oracle):
         if values:
             equal(values[0]['exact_value'], str(want), 'exact generated ownership value')
         expected[str(identifier)] = want
-    assert not fragments and not pending, 'this complete controlled observation must finish every call'
+    if not allow_open_tcp_epochs:
+        assert not fragments and not pending, 'this complete controlled observation must finish every call'
+    unfinished=[dict(first_PDU=parts[0][0]['id'],last_captured_PDU=parts[-1][0]['id'],captured_fragments=len(parts),captured_stub_bytes=sum(len(wire)-header for _,wire,header in parts),TCP_epoch=proven[parts[0][0]['id']].get('TCP_epoch'))for parts in fragments.values()]
+    outstanding=[dict(request_PDU=owner['id'],request_PType=owner['ptype'],wire_Call_ID=key[1],TCP_epoch=proven[owner['id']].get('TCP_epoch'))for key,owner in pending.items()]
     return dict(scope=__doc__, checks=checks, events_sha256=sha(events), wire_certificate_sha256=sha(wire_certificate),
+                allow_open_TCP_epochs=allow_open_tcp_epochs,unfinished_captured_messages=unfinished,outstanding_observed_calls=outstanding,empty_closure_diagnostics=closures,auditor_sha256=sha(Path(__file__)),
                 oracle_sha256=sha(oracle), SDK_RPC_records=len(native), messages=messages, links=links,
                 positive_links=len(links), verified_response_owner_PDU_IDs=expected,
                 all_numeric_links_match_original_request_ownership=True,
@@ -194,9 +215,10 @@ if __name__ == '__main__':
     ap = argparse.ArgumentParser(description=__doc__)
     for key in ['events', 'wire-certificate', 'oracle', 'out']:
         ap.add_argument('--'+key, type=Path, required=True)
+    ap.add_argument('--allow-open-tcp-epochs',action='store_true')
     args = ap.parse_args()
     for path in vars(args).values():
-        assert not any((p/'.git').exists() for p in [path.resolve(), *path.resolve().parents])
-    result = audit(args.events, args.wire_certificate, args.oracle)
+        if isinstance(path,Path):assert not any((p/'.git').exists() for p in [path.resolve(), *path.resolve().parents])
+    result = audit(args.events, args.wire_certificate, args.oracle,args.allow_open_tcp_epochs)
     args.out.write_text(json.dumps(result, indent=2)+'\n', encoding='utf8')
     print(json.dumps({k: result[k] for k in ['checks', 'SDK_RPC_records', 'messages', 'positive_links']}))

@@ -52,7 +52,7 @@ def records(path):
     assert at==len(data)
 
 
-def tcp_packet(wire,link,section,interface):
+def tcp_packet(wire,link,section,interface,include_control=False):
     if link!=1 or len(wire)<14:return None
     at,etype=14,int.from_bytes(wire[12:14],'big');encapsulation=''
     while etype in [0x8100,0x88a8,0x9100]:
@@ -82,7 +82,10 @@ def tcp_packet(wire,link,section,interface):
     hlen=(wire[at+12]>>4)*4
     if hlen<20 or at+hlen>end:return None
     endpoint=lambda host,port:('['+host+']'if ':'in host else host)+':'+str(port)
-    return dict(domain={'Section':section,'Interface':interface,'Encapsulation':encapsulation},source=endpoint(source,sport),destination=endpoint(destination,dport),sequence=sequence,syn=bool(wire[at+13]&2),payload=wire[at+hlen:end])
+    packet=dict(domain={'Section':section,'Interface':interface,'Encapsulation':encapsulation},source=endpoint(source,sport),destination=endpoint(destination,dport),sequence=sequence,syn=bool(wire[at+13]&2),payload=wire[at+hlen:end])
+    if include_control:
+        packet.update(ack=bool(wire[at+13]&16),ack_sequence=struct.unpack_from('>I',wire,at+8)[0],fin=bool(wire[at+13]&1),reset=bool(wire[at+13]&4))
+    return packet
 
 
 def audit(capture,events,oracle):
