@@ -51,6 +51,8 @@ type streamSide struct {
 }
 type tcpStream struct {
 	nativeFlowID                                    uint64
+	nativeClosed                                    bool
+	retentionNotice                                 string
 	protocolStack                                   []string
 	nativeIdentity                                  bool
 	firstReference, lastReference                   uint64
@@ -86,6 +88,7 @@ type streamStore struct {
 	assemblers                      map[pcaputil.CaptureDomain]*reassembly.Assembler
 	currentDomain                   pcaputil.CaptureDomain
 	active                          map[streamKey]*tcpStream
+	nativeRecords                   map[nativeStreamKey]*tcpStream
 	records                         map[uint64]*tcpStream
 	lru                             list.List
 	next                            uint64
@@ -182,6 +185,23 @@ func (r *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 	dir, _, _, skip := sg.Info()
 	d := directionIndex(dir)
 	n, _ := sg.Lengths()
+	var data []byte
+	var timestamp time.Time
+	if n > 0 {
+		data = sg.Fetch(n)
+		timestamp = sg.CaptureInfo(0).Timestamp
+	}
+	r.appendData(d, data, skip, timestamp)
+}
+
+// appendData receives ordered bytes from one reassembler. Capture-backed
+// previews use the native engine; the standalone assembler remains useful for
+// callers that only have owned packets and no capture session.
+func (r *tcpStream) appendData(d int, data []byte, skip int, timestamp time.Time) {
+	if r.evicted {
+		return
+	}
+	n := len(data)
 	if n == 0 && skip == 0 {
 		return
 	}
@@ -194,13 +214,9 @@ func (r *tcpStream) ReassembledSG(sg reassembly.ScatterGather, ac reassembly.Ass
 			side.broken = true
 		}
 	}
-	var data []byte
-	if n > 0 {
-		data = sg.Fetch(n)
-	}
 	if !side.broken && len(side.prefix) < streamPrefixLimit {
 		if len(side.prefix) == 0 && n > 0 {
-			side.prefixTime = sg.CaptureInfo(0).Timestamp
+			side.prefixTime = timestamp
 			side.startKnown = side.syn && skip == 0 && side.bytes == 0
 		}
 		side.prefix = append(side.prefix, data[:min(n, streamPrefixLimit-len(side.prefix))]...)
@@ -260,9 +276,10 @@ func (s *streamStore) add(raw *capturedPacket) {
 }
 
 func (s *streamStore) addDecoded(raw *capturedPacket, p gopacket.Packet, domain pcaputil.CaptureDomain) {
-	// Capture-backed previews require an actual core flow association. A
-	// malformed or orphan segment must not allocate an independent app stream.
-	if raw.history != nil && raw.tcpFlowID == 0 {
+	// A capture session already owns sequence validation and generation state.
+	// Never feed its bytes into a second assembler, even with a known flow ID.
+	if raw.history != nil {
+		s.attachNative(raw)
 		return
 	}
 	network, selectedTransport := pcaputil.CaptureTransport(p)
@@ -391,6 +408,9 @@ func (s *streamStore) trim() {
 			r.sides[d].prefix = nil
 		}
 		delete(s.records, r.id)
+		if r.nativeClosed {
+			delete(s.nativeRecords, nativeStreamKey{domain: r.key.domain, flow: r.nativeFlowID})
+		}
 		s.lru.Remove(e)
 		r.lru = nil
 	}
@@ -446,6 +466,7 @@ func (s *streamStore) label(id uint64) (string, string) {
 }
 
 type streamSnapshot struct {
+	nativeFlowID                                    uint64
 	associationProofs                               []associationObservation
 	associationReferences                           []associationReference
 	associationUnavailable                          []uint64
@@ -481,7 +502,7 @@ func (s *streamStore) snapshot(id uint64) *streamSnapshot {
 	if r == nil {
 		return nil
 	}
-	v := &streamSnapshot{first: r.first, last: r.last, id: r.id, version: r.version, protocol: r.protocol, evidence: r.evidence, closed: r.closed, packets: r.packets, retransmits: r.retransmits, outOfOrder: r.outOfOrder, gaps: r.gaps, missing: r.missing, omitted: r.omitted}
+	v := &streamSnapshot{nativeFlowID: r.nativeFlowID, retentionNotice: r.retentionNotice, first: r.first, last: r.last, id: r.id, version: r.version, protocol: r.protocol, evidence: r.evidence, closed: r.closed, packets: r.packets, retransmits: r.retransmits, outOfOrder: r.outOfOrder, gaps: r.gaps, missing: r.missing, omitted: r.omitted}
 	v.protocolStack = append([]string(nil), r.protocolStack...)
 	for d, side := range r.sides {
 		v.startKnown[d], v.prefixGap[d], v.prefixTime[d] = side.startKnown, side.broken, side.prefixTime

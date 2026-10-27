@@ -878,11 +878,11 @@ func retainedStreamEvents(history *pcaputil.ProtocolInspector, stream *streamSna
 	}
 	var out []*pcaputil.ProtocolEvent
 	remaining := 256 << 10
-	for _, e := range history.Rows("", 0) {
+	for _, e := range history.Rows("", stream.nativeFlowID) {
 		if e.Domain != stream.domain || e.Transport != "tcp" || !(e.Source == stream.endpoints[0] && e.Destination == stream.endpoints[1] || e.Source == stream.endpoints[1] && e.Destination == stream.endpoints[0]) {
 			continue
 		}
-		if !stream.first.IsZero() && e.Timestamp.Before(stream.first) || !stream.last.IsZero() && e.Timestamp.After(stream.last) {
+		if stream.nativeFlowID == 0 && (!stream.first.IsZero() && e.Timestamp.Before(stream.first) || !stream.last.IsZero() && e.Timestamp.After(stream.last)) {
 			continue
 		}
 		if len(out) >= 128 {
