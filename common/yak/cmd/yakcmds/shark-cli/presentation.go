@@ -380,6 +380,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := mailRTSPEventSummary(e); ok {
+		return summary
+	}
 	if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" && e.Summary != "" {
 		return safeText(e.Summary)
 	}
