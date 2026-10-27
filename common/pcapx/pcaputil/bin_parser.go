@@ -1760,6 +1760,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					}
 					e.sessionError = &ProtocolError{Kind: kind, Message: err.Error()}
 				}
+				if e.Protocol == "dcerpc" {
+					if diagnostic := dcerpcIsolatedContextTail(e.Raw, e.sessionError); diagnostic != nil {
+						e.Session = diagnostic
+						e.semanticSession = cloneSession(diagnostic)
+					}
+				}
 				e.Error = err.Error()
 			} else if a.config.Deferred {
 				if e.Protocol == "tls" || e.Protocol == "hart-ip" || e.Protocol == "enip" || e.Protocol == "doip" || e.Protocol == "genisys" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" || e.Protocol == "roc-plus" || e.Protocol == "atg" || e.Protocol == "stratum" || e.Protocol == "gearman" || e.Protocol == "beanstalkd" || e.Protocol == "scgi" || e.Protocol == "msgpack-rpc" {

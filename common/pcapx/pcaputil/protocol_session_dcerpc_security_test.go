@@ -178,6 +178,112 @@ func TestDCERPCBindCountCannotHideTrailingContext(t *testing.T) {
 	require.EqualError(t, repeated, original.Error(), "a failed shared rule cannot be replaced by a caller-provided tree")
 }
 
+func TestDCERPCBoundedBadContextListDoesNotHideFollowingRequest(t *testing.T) {
+	bad := dcerpcBindContexts(11, 2, dcerpcBindContext{uuid: dcerpcEPM, id: 1}, dcerpcBindContext{uuid: dcerpcEPM, id: 2}, dcerpcBindContext{uuid: dcerpcEPM, id: 3})
+	bad[24] = 2
+	for _, deferred := range []bool{false, true} {
+		for _, chunk := range []int{0, 1} {
+			events, _ := sessionTestFlow(t, "dcerpc", []sessionStep{
+				{0, dcerpcBind(dcerpcEPM, 0, 1)}, {1, dcerpcBindAck(1)},
+				{0, append(bytes.Clone(bad), dcerpcRequest(3, 0, 3, []byte{1, 2, 3})...)},
+				{1, dcerpcResponse(3, 0, nil)},
+			}, chunk, deferred)
+			messages := make([]*ProtocolEvent, 0, len(events))
+			for _, e := range events {
+				if len(e.Raw) > 0 {
+					messages = append(messages, e)
+				}
+			}
+			require.Len(t, messages, 5, "a rejected complete context list cannot erase the subsequent captured request")
+			require.Equal(t, "malformed", messages[2].Status)
+			require.Equal(t, "message", messages[2].Session["Error Scope"])
+			require.Equal(t, false, messages[2].Session["Presentation Context Updated"])
+			require.Equal(t, "EPM.ept_map", messages[3].Session["Packet Name"], "the malformed proposal cannot replace the prior observed accepted context")
+			require.Equal(t, "matched", messages[4].Session["Association Status"])
+			_, err := messages[2].GetFields()
+			require.Error(t, err, "recovery cannot turn the malformed event into successful fields")
+		}
+	}
+}
+
+func TestDCERPCContextTailRecoveryCannotResynchronizeOrBypassLimits(t *testing.T) {
+	bad := dcerpcBindContexts(11, 2, dcerpcBindContext{uuid: dcerpcEPM, id: 1}, dcerpcBindContext{uuid: dcerpcEPM, id: 2})
+	bad[24] = 1
+	require.NotNil(t, dcerpcIsolatedContextTail(bad, &ProtocolError{Kind: ErrMalformedMessage, Message: "structured parse: 44 unconsumed message bytes"}))
+	for _, failure := range []*ProtocolError{
+		nil,
+		{Kind: ErrResourceExceeded, Message: "structured parse: 44 unconsumed message bytes"},
+		{Kind: ErrDesynchronized, Message: "structured parse: 44 unconsumed message bytes"},
+		{Kind: ErrMalformedMessage, Message: "another failure"},
+		{Kind: ErrMalformedMessage, Message: "structured parse: 4 unconsumed message bytes"},
+	} {
+		require.Nil(t, dcerpcIsolatedContextTail(bad, failure), "only the actual complete-prefix/excess-tail failure qualifies")
+	}
+	for cut := 0; cut < len(bad); cut++ {
+		require.Nil(t, dcerpcContextTailDiagnostic(bad[:cut]), "a partial declaration is not an isolated complete message")
+	}
+	for _, mutate := range []func([]byte){
+		func(w []byte) { w[0] = 4 },
+		func(w []byte) { w[3] = 1 },
+		func(w []byte) { w[10] = 1 },
+		func(w []byte) { w[24] = 21 },
+		func(w []byte) { w[30] = 2 },
+	} {
+		w := bytes.Clone(bad)
+		mutate(w)
+		require.Nil(t, dcerpcContextTailDiagnostic(w))
+	}
+	request := dcerpcRequest(3, 0, 3, nil)
+	invalidNext := bytes.Clone(request)
+	invalidNext[0] = 4
+	events, _ := sessionTestFlow(t, "dcerpc", []sessionStep{
+		{0, dcerpcBind(dcerpcEPM, 0, 1)}, {1, dcerpcBindAck(1)},
+		{0, append(append(bytes.Clone(bad), invalidNext...), request...)},
+	}, 0, false)
+	for _, event := range events {
+		require.NotEqual(t, "EPM.ept_map", event.Session["Packet Name"], "recovery never skips a bad next header to find later plausible bytes")
+	}
+}
+
+func TestDCERPCContextTailRecoveryPolicyIsFrozenBeforeCallback(t *testing.T) {
+	tail := dcerpcBindContexts(11, 2, dcerpcBindContext{uuid: dcerpcEPM, id: 1}, dcerpcBindContext{uuid: dcerpcEPM, id: 2})
+	tail[24] = 1
+	for _, test := range []struct {
+		wire    []byte
+		claim   string
+		recover bool
+	}{
+		{tail, "connection", true},
+		{dcerpcPDU(0, 3, 2, make([]byte, 4)), "message", false},
+	} {
+		c := NewDefaultConfig()
+		var events []*ProtocolEvent
+		require.NoError(t, WithBinParserConfig(BinParserConfig{OnEvent: func(e *ProtocolEvent) {
+			if e.Error != "" {
+				if e.Session == nil {
+					e.Session = map[string]any{}
+				}
+				e.Session["Error Scope"] = test.claim
+			}
+			events = append(events, e)
+		}})(c))
+		require.NoError(t, c.prepareBinParser())
+		flow := &binFlow{a: c.binParser, id: 1, endpoints: [2]string{"192.0.2.1:12345", "192.0.2.2:135"}, ports: [2]uint16{12345, 135}}
+		for _, step := range []sessionStep{{0, dcerpcBind(dcerpcEPM, 0, 1)}, {1, dcerpcBindAck(1)}, {0, test.wire}, {0, dcerpcRequest(3, 0, 3, nil)}} {
+			flow.feed(step.dir, step.wire, time.Unix(1, 0))
+		}
+		flow.close(TrafficFlowCloseReason_FIN)
+		found := false
+		for _, e := range events {
+			if e.Session["Packet Name"] == "EPM.ept_map" {
+				found = true
+			}
+		}
+		require.Equal(t, test.recover, found, "a caller-visible scope cannot stop isolated recovery or resurrect a stopped malformed stream")
+		require.Zero(t, flow.a.stats().BufferedBytes)
+	}
+}
+
 func FuzzDCERPCSecurityEnvelopeBoundaries(f *testing.F) {
 	f.Add([]byte{0, 0xff, 0x80}, []byte{1, 2, 3}, uint8(0))
 	f.Add([]byte("opaque body"), []byte("not-authenticated"), uint8(5))
@@ -207,5 +313,49 @@ func FuzzDCERPCSecurityEnvelopeBoundaries(f *testing.F) {
 		}
 		_, err = newReviewDCERPC().consumeFrom(0, bad, 4096)
 		require.Error(t, err)
+	})
+}
+
+func FuzzDCERPCContextTailRecovery(f *testing.F) {
+	f.Add([]byte{1, 2, 3}, uint8(0))
+	f.Add([]byte{0, 0xff, 0x80}, uint8(7))
+	f.Add([]byte("opaque"), uint8(8))
+	f.Fuzz(func(t *testing.T, input []byte, mode uint8) {
+		input = input[:min(len(input), 64)]
+		declared, extra := 1+int(mode%4), 1+int((mode>>4)%2)
+		contexts := make([]dcerpcBindContext, declared+extra)
+		for i := range contexts {
+			contexts[i] = dcerpcBindContext{uuid: dcerpcEPM, id: uint16(i + 1)}
+		}
+		bad := dcerpcBindContexts(11, 2, contexts...)
+		bad[24] = byte(declared)
+		if mode&1 != 0 {
+			bad[3] = 7
+		}
+		recover := mode&8 == 0
+		if !recover {
+			bad[3] = dcerpcFirst
+		}
+		events, _ := sessionTestFlow(t, "dcerpc", []sessionStep{
+			{0, dcerpcBind(dcerpcEPM, 0, 1)}, {1, dcerpcBindAck(1)},
+			{0, append(bytes.Clone(bad), dcerpcRequest(3, 0, 3, input)...)},
+			{1, dcerpcResponse(3, 0, nil)},
+		}, int(mode%19), mode&2 != 0)
+		request, refusal := false, false
+		for _, e := range events {
+			if e.Error != "" && bytes.Equal(e.Raw, bad) {
+				refusal = true
+				_, original := e.GetFields()
+				require.Error(t, original)
+				e.Status, e.Fields, e.Structured = "decoded", map[string]any{"Accepted": true}, map[string]any{"fields": map[string]any{"Accepted": true}}
+				_, repeated := e.GetFields()
+				require.EqualError(t, repeated, original.Error())
+			}
+			if e.Session["Packet Name"] == "EPM.ept_map" {
+				request = true
+			}
+		}
+		require.True(t, refusal)
+		require.Equal(t, recover, request, "random chunking and body bytes cannot promote an unsupported recovery scope")
 	})
 }
