@@ -1,5 +1,5 @@
 """Real Windows OpenSSH clients and independent Paramiko server. No Yak codec.
-Usage: ssh_live.py OUTPUT_DIR TSHARK PYTHON_LIBS OPENSSH [--server-first-proxy] [--nonconforming-banner]
+Usage: ssh_live.py OUTPUT_DIR TSHARK PYTHON_LIBS OPENSSH [--server-first-proxy] [--nonconforming-banner] [--ed25519-host-key]
 The optional loopback proxy forwards the actual server banner before forwarding
 client data; it does not rewrite SSH bytes or use a Yak codec.
 """
@@ -9,7 +9,16 @@ from capture_ready import start_capture
 sys.path.insert(0,sys.argv[3]);import paramiko
 from paramiko.kex_group14 import KexGroup14SHA256
 out=Path(sys.argv[1]);assert not any((p/'.git').exists()for p in[out.resolve(),*out.resolve().parents]);out.mkdir(exist_ok=False);nonce=secrets.token_hex(12);generator_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest();server_first='--server-first-proxy'in sys.argv[5:];nonconforming_banner='--nonconforming-banner'in sys.argv[5:]
-host=paramiko.RSAKey.generate(2048);client_key=paramiko.RSAKey.generate(2048);client_key.write_private_key_file(str(out/'client.key'))
+ed25519_host='--ed25519-host-key'in sys.argv[5:]
+if ed25519_host:
+ import io
+ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+ from cryptography.hazmat.primitives import serialization
+ pem=Ed25519PrivateKey.generate().private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.OpenSSH,serialization.NoEncryption())
+ host=paramiko.Ed25519Key(file_obj=io.StringIO(pem.decode('ascii')))
+else:host=paramiko.RSAKey.generate(2048)
+host_algorithm='ssh-ed25519'if ed25519_host else'rsa-sha2-256'
+client_key=paramiko.RSAKey.generate(2048);client_key.write_private_key_file(str(out/'client.key'))
 subprocess.run(['icacls',str(out/'client.key'),'/inheritance:r','/grant:r',__import__('getpass').getuser()+':(R,W)'],stdout=subprocess.PIPE,check=True)
 moduli=out/'moduli';moduli.write_text('20261024000000 2 6 100 2047 2 '+format(KexGroup14SHA256.P,'x')+'\n')
 kexs=['curve25519-sha256@libssh.org','ecdh-sha2-nistp256','diffie-hellman-group14-sha256','diffie-hellman-group-exchange-sha256','default']
@@ -64,7 +73,7 @@ if server_first:
 cap,marker_port=start_capture(sys.argv[2],out/'live.pcap',' or '.join(f'tcp port {p}' for p in ports),30)
 try:
  for kex,port in zip(kexs,connect_ports):
-  options=['BatchMode=yes','IdentitiesOnly=yes','StrictHostKeyChecking=yes','UserKnownHostsFile='+str(out/'known_hosts'),'GlobalKnownHostsFile='+str(out/'known_hosts'),'HostKeyAlgorithms=rsa-sha2-256','RekeyLimit=32K','ConnectTimeout=5']
+  options=['BatchMode=yes','IdentitiesOnly=yes','StrictHostKeyChecking=yes','UserKnownHostsFile='+str(out/'known_hosts'),'GlobalKnownHostsFile='+str(out/'known_hosts'),'HostKeyAlgorithms='+host_algorithm,'RekeyLimit=32K','ConnectTimeout=5']
   if server_first:options+=['Ciphers=aes128-ctr,aes256-ctr','MACs=hmac-sha2-256,hmac-sha2-512']
   if kex!='default':options+=['KexAlgorithms='+kex]
   args=[sys.argv[4],'-vvv','-F','none','-p',str(port),'-i',str(out/'client.key')]
@@ -82,5 +91,5 @@ try:
  assert not errors,errors
 finally:
  stdout,stderr=cap.communicate(timeout=35);(out/'capture.stderr').write_bytes(stderr)
- (out/'manifest.json').write_text(json.dumps(dict(generator_sha256=generator_sha256,nonce=nonce,marker_port=marker_port,ports=ports,client_connect_ports=connect_ports,server_first_proxy=server_first,declared_nonconforming_server_identification='SSH-2.0-Cisco-1.25'if nonconforming_banner else None,identification_emulation='Paramiko test endpoint; no Cisco device claim'if nonconforming_banner else None,declared_client_cipher_preference=['aes128-ctr','aes256-ctr']if server_first else None,declared_server_cipher_preference=['aes256-ctr','aes128-ctr']if server_first else None,proxy_records=proxy_records,paramiko=importlib.metadata.version('paramiko'),host_key_sha256=hashlib.sha256(host.asbytes()).hexdigest(),operations=operations,errors=errors),indent=2),encoding='utf8')
+ (out/'manifest.json').write_text(json.dumps(dict(generator_sha256=generator_sha256,nonce=nonce,marker_port=marker_port,ports=ports,client_connect_ports=connect_ports,server_first_proxy=server_first,declared_nonconforming_server_identification='SSH-2.0-Cisco-1.25'if nonconforming_banner else None,identification_emulation='Paramiko test endpoint; no Cisco device claim'if nonconforming_banner else None,declared_client_cipher_preference=['aes128-ctr','aes256-ctr']if server_first else None,declared_server_cipher_preference=['aes256-ctr','aes128-ctr']if server_first else None,proxy_records=proxy_records,paramiko=importlib.metadata.version('paramiko'),host_key_format=host.get_name(),requested_host_key_algorithm=host_algorithm,host_key_sha256=hashlib.sha256(host.asbytes()).hexdigest(),operations=operations,errors=errors),indent=2),encoding='utf8')
 assert len(operations)==len(kexs)
