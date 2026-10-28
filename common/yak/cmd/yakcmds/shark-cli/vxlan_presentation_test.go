@@ -12,7 +12,7 @@ import (
 )
 
 func gpePresentationEvent() *pcaputil.ProtocolEvent {
-	return &pcaputil.ProtocolEvent{Protocol: "ip", Transport: "network", Profile: "network-encapsulation-refusal", Status: "limited", Completeness: "headers", ExpertCode: "VXLANProfileUnselected", Summary: "VXLAN-GPE v0 header VNI=42 next=3; payload profile not selected; inner identity unconfirmed", Session: map[string]any{"Observed Header Layers": []string{"Ethernet", "IPv4"}, "Unselected Carrier": "VXLAN-GPE", "Child Header Identity": "unconfirmed", "VXLAN-GPE Version": uint8(0), "VXLAN-GPE Flags": uint8(12), "VXLAN-GPE VNI": uint32(42), "VXLAN-GPE Next Protocol Present": true, "VXLAN-GPE Next Protocol": uint8(3), "Payload Profile Implemented": false}}
+	return &pcaputil.ProtocolEvent{Protocol: "ip", Transport: "network", Domain: pcaputil.CaptureDomain{Section: 7, Interface: 11, Encapsulation: "/vxlan-gpe:198.51.100.1~198.51.100.2:42"}, Profile: "network-encapsulation-refusal", Status: "limited", Completeness: "headers", ExpertCode: "VXLANProfileUnselected", Summary: "VXLAN-GPE v0 header VNI=42 next=3; payload profile not selected; inner identity unconfirmed", Session: map[string]any{"Observed Header Layers": []string{"Ethernet", "IPv4"}, "Unselected Carrier": "VXLAN-GPE", "Child Header Identity": "unconfirmed", "VXLAN-GPE Version": uint8(0), "VXLAN-GPE Flags": uint8(12), "VXLAN-GPE VNI": uint32(42), "VXLAN-GPE Next Protocol Present": true, "VXLAN-GPE Next Protocol": uint8(3), "Payload Profile Implemented": false}}
 }
 
 func TestVXLANGPEHeaderIdentityAndLimitedPayloadAgreeAcrossInspectors(t *testing.T) {
@@ -29,6 +29,10 @@ func TestVXLANGPEHeaderIdentityAndLimitedPayloadAgreeAcrossInspectors(t *testing
 		require.Contains(t, row.ProtocolScope, "payload profile unselected")
 		require.Empty(t, row.ConnectionProtocol)
 		require.Zero(t, row.StreamID)
+		require.NotNil(t, row.MessageDomain)
+		require.Equal(t, gpePresentationEvent().Domain, *row.MessageDomain)
+		require.Empty(t, row.CaptureDomain.Encapsulation, "physical frame domain is not the logical header domain")
+		require.Equal(t, "network", row.MessageTransport)
 		request, err := marshalDecodeRequest(decodeRequest{Number: 1, Events: events, Data: wire, Length: len(wire), Link: raw.link})
 		require.NoError(t, err)
 		var output bytes.Buffer

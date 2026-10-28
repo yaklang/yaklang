@@ -132,6 +132,7 @@ func tlsAlertCheckEvent(t *testing.T, e *ProtocolEvent, c tlsAlertCase, w tlsAle
 		raw = wrapperWire(t, w.Wire)
 	}
 	want := tlsAlertWant(t, w.Fields)
+	want = tlsFrozenExpectedMetadata(t, c, w, want)
 	require.Equal(t, "tls", e.Protocol)
 	require.Equal(t, "tcp", e.Transport)
 	require.Equal(t, w.Direction, e.Direction)

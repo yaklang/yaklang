@@ -495,6 +495,47 @@ func TestTLSResumptionEmptyRecordIsNotHandshakeByteContributor(t *testing.T) {
 	require.Equal(t, []byte{4, 0, 0, 7, 0}, s.handshake[1])
 }
 
+func TestTLSResumptionRefusedRecordKeepsPrivateWireAliases(t *testing.T) {
+	for _, deferred := range []bool{false, true} {
+		t.Run(fmt.Sprint(deferred), func(t *testing.T) {
+			s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("tcp"), WithSessionPorts(40000, 443))
+			require.NoError(t, err)
+			defer s.Close("cleanup")
+			s.(*captureSession).f.a.config.Deferred = deferred
+			ch := s.Feed(0, time.Unix(1, 0), tlsResumptionRecord(reliabilityHS(1, tlsResumptionHello(true, nil, 0xc02b))))
+			require.Nil(t, ch.Err)
+			bad := s.Feed(1, time.Unix(2, 0), []byte{22, 3, 3, 0, 4, 2, 0, 0, 0})
+			rocTypedError(t, "MalformedMessage", bad.Err)
+			require.Len(t, bad.Events, 1)
+			e := bad.Events[0]
+			require.Equal(t, "malformed", e.Status)
+			require.NotEmpty(t, e.Error)
+			want := map[string][]any{
+				"tls.record.wire_type": {uint64(22)}, "tls.record.content_type": {uint64(22)},
+				"tls.record.version": {uint64(0x303)}, "tls.record.length": {uint64(4)},
+				"tls.record.authenticated": {false},
+			}
+			check := func() {
+				fields := e.DisplayFields()
+				for name, values := range want {
+					require.Equal(t, values, fields[name], name)
+				}
+				queried, queryErr := e.GetFields()
+				rocTypedError(t, "MalformedMessage", queryErr)
+				require.Nil(t, queried)
+				decoded, decodeErr := e.Decode()
+				rocTypedError(t, "MalformedMessage", decodeErr)
+				require.Nil(t, decoded)
+			}
+			check()
+			for _, name := range []string{"radius", "tls", "redis", "caller"} {
+				tlsDTLSPoison(e, name)
+				check()
+			}
+		})
+	}
+}
+
 func FuzzTLSResumptionHelloFailureIsAtomic(f *testing.F) {
 	offer := tlsResumptionPSKs([][]byte{[]byte("identity")}, []uint32{1}, []int{32})
 	f.Add(tlsResumptionPSKClient(nil, offer, 0))

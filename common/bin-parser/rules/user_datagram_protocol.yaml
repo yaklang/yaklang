@@ -15,7 +15,23 @@ Package:
               // These decoders need a port or explicit caller context. In
               // particular, arbitrary DHT bencoding resembles an NTP header.
               typeNameList = []string{}
-              if src == 53 || dst == 53 {
+              if dst == 4789 || dst == 4790 {
+                // Destination service and the complete UDP envelope own the
+                // candidate before source-port application hints. A source
+                // port alone cannot select an inner Ethernet namespace.
+                length = getNodeResult("@UDP/Length").Value
+                if length < 8 { panic("udp: tunnel carrier length is below fixed header") }
+                payloadLength = length - 8
+                if bounded && payloadLength > maximum { panic("udp: tunnel carrier exceeds datagram boundary") }
+                this.SetMaxLength(payloadLength)
+                maximum = payloadLength
+                bounded = true
+                if dst == 4789 {
+                  typeNameList = ["VXLAN"]
+                } else {
+                  typeNameList = ["VXLANGPEHeader"]
+                }
+              } else if src == 53 || dst == 53 {
                 typeNameList = ["DNS"]
               } else if src == 5353 || dst == 5353 {
                 typeNameList = ["MDNS"]
@@ -59,8 +75,6 @@ Package:
                 typeNameList = ["NCPCarrier"]
               } else if src == 6081 || dst == 6081 {
                 typeNameList = ["Geneve"]
-              } else if src == 4789 || dst == 4789 {
-                typeNameList = ["VXLAN"]
               } else if src == 500 || dst == 500 {
                 typeNameList = ["IKE"]
               } else if src == 4500 || dst == 4500 {
@@ -170,6 +184,7 @@ RIPng: "import:ripng.yaml;node:RIPng"
 NCPCarrier: "import:application-layer/ncp.yaml;node:NCPCarrier"
 Geneve: "import:geneve.yaml;node:Geneve"
 VXLAN: "import:vxlan.yaml;node:VXLAN"
+VXLANGPEHeader: "import:vxlan.yaml;node:VXLANGPEHeader"
 IKE: "import:ike.yaml;node:IKE"
 NATT: "import:nat_t.yaml;node:NATTCarrier"
 AllJoynNSCarrier: "import:application-layer/alljoyn.yaml;node:AllJoynNSCarrier"

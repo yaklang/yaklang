@@ -102,6 +102,9 @@ func quicReviewedLegacyExpectations(t *testing.T, e *ProtocolEvent, session, fie
 	}
 	rocEqualFields(t, ranges, e.Session["Wire Field Ranges"].(map[string]any))
 	session["Wire Field Ranges"] = ranges
+	// The frozen expected CRYPTO plaintext independently supplies these new
+	// handshake facts; neither the actual parser tree nor ciphertext labels do.
+	tlsFrozenQUICMetadata(t, session)
 	return session, fields
 }
 
