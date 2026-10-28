@@ -36,6 +36,7 @@ func TestIPv4EOLOptionKeepsPacketRowAndInspectorEndpointsConsistent(t *testing.T
 	require.Equal(t, "198.51.100.1", row.Source)
 	require.Equal(t, "198.51.100.2", row.Destination)
 	require.Equal(t, []string{"Ethernet", "IPv4", "ICMPv4"}, row.Layers)
+	require.Equal(t, []string{"Ethernet", "IPv4", "ICMP"}, row.ProtocolStack)
 	require.NotContains(t, row.Info, "incomplete/undecoded")
 	require.NotContains(t, row.ProtocolStack, "IPv6HopByHop")
 	for _, got := range []packetDetail{detail(raw), workerMetadataDetailForPacket(t, raw)} {
