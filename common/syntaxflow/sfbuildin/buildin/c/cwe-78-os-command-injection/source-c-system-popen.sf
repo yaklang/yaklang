@@ -1,0 +1,59 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C system/popen 命令执行"
+	title_zh: "源码扫描：C system/popen 命令执行"
+	type: vuln
+	level: high
+	rule_id: "source-c-system-popen"
+	risk: "command-injection"
+	cwe: "CWE-78"
+	desc: <<<DESC
+### 规则说明
+`system` 和 `popen` 通过 `/bin/sh -c` 执行命令字符串。命令字符串由 `sprintf`、`strcat` 拼接用户输入时，攻击者可以用 `;`、`|`、`&&`、`` ` `` 或 `$()` 追加任意命令。`execl`/`execv` 等族不经 shell，但可执行文件路径被外部控制时同样能执行任意程序。
+
+### 风险类型
+command-injection
+
+### 影响
+攻击者可在服务器上执行任意 shell 命令，读取敏感文件、窃取凭据、以服务权限横向移动。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明命令参数来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配作为独立单词的 `system(`、`popen(` 以及 `exec` 族调用。cwe-77 的 SSA 规则（`c-command-injection.sf`）从数据流角度覆盖同一问题，命中条件不同，修复时看实际告警来自哪一条。
+
+### 参考
+- [CWE-78：操作系统命令中使用的特殊元素转义处理不恰当](https://cwe.mitre.org/data/definitions/78.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 优先用 `execv`/`execvp` 数组参数直接调用目标程序，不经过 shell。
+- 必须 `system` 时，把用户输入限制为严格允许列表（例如仅 `^[a-zA-Z0-9.-]+$`）。
+- 不要依赖转义 shell 元字符，转义无法覆盖全部方言与编码场景。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdlib.h>
+void bad(const char *dir) {
+    char cmd[256];
+    sprintf(cmd, "ls %s", dir);
+    system(cmd);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <stdio.h>
+void ok(void) { printf("hello\n"); }
+
+NEG
+)
+${*.c}.pattern_regex(/\b(system|popen|execl|execlp|execle|execv|execvp|execvpe|spawnl|spawnlp|spawnv|spawnvp)\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C system/popen 命令执行",
+	title_zh: "源码扫描：C system/popen 命令执行",
+	message: "源码扫描：C system/popen 命令执行",
+	risk: "command-injection",
+}

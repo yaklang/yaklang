@@ -1,0 +1,65 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# JWT 签名校验缺失"
+	title_zh: "检测 C# JWT 签名校验缺失"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-jwt-no-signature-validation"
+	risk: "improper-authentication"
+	cwe: "CWE-345"
+	desc: <<<DESC
+### 规则说明
+`JwtSecurityTokenHandler.ValidateToken`/`JsonWebTokens.ValidateToken` 传入的 `TokenValidationParameters` 若 `ValidateSignature = false`、`SignatureValidator = (_, _) => true` 或未提供签名密钥，任何人都能伪造任意 claims 的有效令牌。
+
+### 风险类型
+improper-authentication
+
+### 影响
+任意用户可伪造 admin 声明，完全绕过基于 JWT 的认证与授权。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+匹配 `ValidateSignature` 置 false、`SignatureValidator` 返回 true、`RequireSignedTokens = false` 三类模式。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- `ValidateSignature` 保持默认 true，并配置正确的签发方密钥（对称密钥或公钥）。
+- `RequireSignedTokens = true`，明确 `ValidIssuers`/`ValidAudiences`。
+- 不要用 `SignatureValidator` 直接返回 true 来"临时跳过"。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using Microsoft.IdentityModel.Tokens;
+
+public class JwtDemo {
+    public TokenValidationParameters Bad() {
+        return new TokenValidationParameters {
+            ValidateSignature = false
+        };
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using Microsoft.IdentityModel.Tokens;
+
+public class JwtDemo {
+    public TokenValidationParameters Ok() {
+        return new TokenValidationParameters {
+            ValidateSignature = true,
+            RequireSignedTokens = true
+        };
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/ValidateSignature\s*=\s*false|SignatureValidator\s*=\s*[A-Za-z]*\s*=>\s*true|RequireSignedTokens\s*=\s*false/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 C# JWT 签名校验缺失",
+	title_zh: "检测 C# JWT 签名校验缺失",
+	message: "检测 C# JWT 签名校验缺失",
+	risk: "improper-authentication",
+}

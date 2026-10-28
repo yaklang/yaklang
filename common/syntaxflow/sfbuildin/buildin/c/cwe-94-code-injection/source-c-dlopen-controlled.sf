@@ -1,0 +1,61 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C 动态加载库路径可控"
+	title_zh: "源码扫描：C 动态加载库路径可控"
+	type: vuln
+	level: high
+	rule_id: "source-c-dlopen-controlled"
+	risk: "code-injection"
+	cwe: "CWE-94"
+	desc: <<<DESC
+### 规则说明
+`dlopen`/`LoadLibrary` 的库路径来自配置、环境变量或网络输入时，攻击者可以控制加载哪个动态库——库内的构造函数在加载时立即执行，等同任意代码执行。相对路径还会被 `LD_LIBRARY_PATH` 劫持。
+
+### 风险类型
+code-injection
+
+### 影响
+加载恶意 so/dll 后代码以当前进程权限执行；配合可写目录即稳定 RCE。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明路径来自外部输入。注释、字符串和文档中的相同文本也会命中。
+正则匹配作为独立单词的 `dlopen(`、`LoadLibrary`、`LoadLibraryEx`。
+
+### 参考
+- [CWE-94：代码生成控制不恰当（代码注入）](https://cwe.mitre.org/data/definitions/94.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 库路径固定为绝对路径并纳入安装目录白名单。
+- 禁止来自环境变量、配置文件任意值或网络输入的路径直接进入 `dlopen`。
+- 校验失败时拒绝加载而不是回退到相对路径。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <dlfcn.h>
+void bad(const char *name) {
+    char path[256];
+    sprintf(path, "/opt/app/plugins/%s.so", name);
+    dlopen(path, RTLD_NOW);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <dlfcn.h>
+void ok(void) {
+    dlopen("/opt/app/plugins/core.so", RTLD_NOW);
+}
+
+NEG
+)
+${*.c}.pattern_regex(/\b(dlopen|LoadLibrary(Ex)?)\s*\(\s*[^""]/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C 动态加载库路径可控",
+	title_zh: "源码扫描：C 动态加载库路径可控",
+	message: "源码扫描：C 动态加载库路径可控",
+	risk: "code-injection",
+}

@@ -1,0 +1,61 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C 明文传输与明文存储"
+	title_zh: "源码扫描：C 明文传输与明文存储"
+	type: vuln
+	level: middle
+	rule_id: "source-c-cleartext-transmission"
+	risk: "cleartext-transmission"
+	cwe: "CWE-319"
+	desc: <<<DESC
+### 规则说明
+用明文端口发送敏感数据是 C 服务端常见问题：`http://`、`ftp://`、`telnet://` 目标，或直接 `connect` 到 21/23/80 等明文端口后传输口令、Token。中间人可以直接读取、篡改流量。
+
+### 风险类型
+cleartext-storage
+
+### 影响
+中间人窃取传输中的凭据与会话；流量可被篡改注入恶意内容。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配字符串字面量中的 `http://`、`ftp://`、`telnet://` 协议头（`https://` 不命中）。
+
+### 参考
+- [CWE-319：明文传输敏感信息](https://cwe.mitre.org/data/definitions/319.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 敏感数据一律走 TLS（`https://`），用 OpenSSL/GnuTLS 建立加密通道。
+- 遗留明文协议（FTP、Telnet）替换为 SFTP、SSH。
+- 内部服务间通信同样启用 TLS，不要因为内网而省略。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+void bad(void) {
+    char *url = "http://api.example.com/v1/pay";
+    fetch(url);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <stdio.h>
+void ok(void) {
+    char *url = "https://api.example.com/v1/pay";
+    fetch(url);
+}
+
+NEG
+)
+${*.c}.pattern_regex(/"(http|ftp|telnet):\/\/[^"]*"/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C 明文传输与明文存储",
+	title_zh: "源码扫描：C 明文传输与明文存储",
+	message: "源码扫描：C 明文传输与明文存储",
+	risk: "cleartext-transmission",
+}

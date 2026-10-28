@@ -1,0 +1,61 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# 敏感信息暴露"
+	title_zh: "检测 C# 敏感信息暴露"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-information-exposure"
+	risk: "information-exposure"
+	cwe: "CWE-200"
+	desc: <<<DESC
+### 规则说明
+生产代码把内部细节输出给外部：`Response.Write(ex.ToString())` 返回完整堆栈、`return ex.Message` 直出数据库错误、`Console.WriteLine` 打印连接串。攻击者据此了解框架版本、SQL 结构、文件路径，为下一步攻击缩小成本。
+
+### 风险类型
+information-exposure
+
+### 影响
+堆栈暴露内部路径与组件版本；数据库错误暴露表结构；日志中的凭据被二次泄露。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+匹配 `Response.Write`/`WriteAsync` 接收 `ex.ToString()`/`ex.Message`、`Console.WriteLine` 接收异常对象。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对外统一返回通用错误页/错误码，详细异常只进服务端日志。
+- 生产关闭 `developerExceptionPage`、`customErrors mode="Off"` 等调试配置。
+- 日志脱敏：连接串、Token、口令字段写入前掩码。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using System;
+
+public class ErrorDemo {
+    public void Bad(Exception ex) {
+        Response.Write(ex.ToString());
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using System;
+
+public class ErrorDemo {
+    public void Bad(Exception ex) {
+        Response.Write("server error");
+        Log.Error(ex);
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/(Response\.Write(Async)?|Console\.WriteLine)\s*\(\s*(ex|e|exc|exception)\s*(\.ToString\(\)|\.Message)?\s*\)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测 C# 敏感信息暴露",
+	title_zh: "检测 C# 敏感信息暴露",
+	message: "检测 C# 敏感信息暴露",
+	risk: "information-exposure",
+}
