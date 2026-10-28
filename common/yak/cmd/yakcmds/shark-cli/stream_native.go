@@ -150,7 +150,10 @@ func (s *streamStore) nativeClosed(reason pcaputil.TrafficFlowCloseReason, flow 
 }
 
 func (s *streamStore) attachNative(raw *capturedPacket) {
-	if raw.tcpFlowID == 0 {
+	if raw.tcpFlowID == 0 || raw.tcpFlowState == "closed-observation" {
+		// The observer may retain a closed native namespace for an ambiguous
+		// late packet. Its copied TCP ID is useful evidence, but does not
+		// associate an application page with an unconfirmed generation.
 		return
 	}
 	s.mu.Lock()
