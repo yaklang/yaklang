@@ -1,0 +1,663 @@
+{
+  "scope": "Final TLS metadata, VXLAN parent admission and Windows source-prefix presentation evidence; captures/keys/full exports/binaries/screenshots/logs remain outside Git. No full Wireshark feature-parity claim.",
+  "native_source": "117280addd5b7a3ccf93aca507042a48b025d797",
+  "Windows_CLI_source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+  "sources_and_tests": {
+    "scope": "Native/rules remain byte-for-byte source-identical to full/fuzz-tested 117; exact changed CLI sources match the later full CLI test manifest and 743 build",
+    "native_source": "117280addd5b7a3ccf93aca507042a48b025d797",
+    "CLI_source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+    "native_and_rules_source_diff_empty": true,
+    "CLI_tested_files_exact": {
+      "common\\yak\\cmd\\yakcmds\\shark-cli\\decode.go": "f2a4fb1dbd69671e30f386a22a25d83ede53a1fbd6317bf11ee270316080e8d9",
+      "common\\yak\\cmd\\yakcmds\\shark-cli\\network_header_endpoints.go": "a7e193c83425a8c822b27dd74286c276c40f947206e33ec94a755920d4197daf",
+      "common\\yak\\cmd\\yakcmds\\shark-cli\\network_header_endpoints_test.go": "2dd811fad91470c2b97a9f77cfd440bf90079b4ee0ea50d30bad31eca165f698"
+    },
+    "all_previous_CLI_tests_retained": true,
+    "CLI_started_items": 676,
+    "CLI_actions": {
+      "pass": 674,
+      "skip": 2
+    },
+    "added_CLI_tests": [
+      "TestCapturedNetworkEndpointProjectionKeepsIPv4OptionsInsideTheirEnvelope",
+      "TestCapturedNetworkEndpointProjectionRequiresCompleteCorrectIPHeaders",
+      "TestCapturedNetworkEndpointProjectionStopsAtICMPQuotation",
+      "TestCapturedNetworkEndpointsCannotCrossRejectedVXLANOrBorrowEnvelopeTail",
+      "TestNativeNestedParentEndpointScopeNeverUsesAnUnadmittedDeepChild",
+      "TestNativeParentEndpointRangesUseRecordedRawAndLoopbackLinkOffsets",
+      "TestNativeParentRefusalKeepsConfirmedOuterEndpointsAcrossInspectors"
+    ],
+    "native_full_receipt_SHA256": "07c74f09abc3fc60ce3ae64983b53aed5bde37480234d1a20544a1157c2e6e3e",
+    "CLI_full_receipt_SHA256": "1fb10dca2c1fc03aa3ddf20c5c386af887aa2cb9134e506e2170a13ce8b25d2b",
+    "CLI_binary_SHA256": "eace26921f5fa05a2b14c9f75a6bcc1325ac7ebba2c619b9c6aa4c97d107b005",
+    "CLI_build_receipt_SHA256": "d214683f96ac91f1666bf6513f39a55ca34d45dbc65b6be391b4a6957c5f5f28"
+  },
+  "original_captures": {
+    "weber": {
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "native_records": 39740,
+      "SDK_SHA256": "35bbcdc56e200b03f4399660adb9a38ab325ceb1358e88d12fbb366361bd09b4",
+      "CLI_SHA256": "48ca43a344c62162629c276e7e46f6eff59825873cb10261ccd69c1d3d4d4e76",
+      "endpoint_projection_counts": {
+        "physical_rows": 51328,
+        "literal_rows": 51306,
+        "source_bound_refusal_rows": 22,
+        "expert:EncapsulationDepthOrProfile": 22,
+        "corrected_rows": 22,
+        "literal_publications": 26
+      },
+      "original_field_inventory": 94
+    },
+    "sharon": {
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "native_records": 249718,
+      "SDK_SHA256": "23fd1435e82bbd35385813d350de788f929d35af83071ba852024ff2f678dc0f",
+      "CLI_SHA256": "d640eaff7dc917cd5d1843a551103f869e98775db92c60cb886bd62ff12c2a02",
+      "endpoint_projection_counts": {
+        "physical_rows": 328127,
+        "literal_rows": 313509,
+        "source_bound_refusal_rows": 14618,
+        "expert:EncapsulationDepthOrProfile": 10385,
+        "corrected_rows": 14618,
+        "expert:PPTPHeaderAdmission": 271,
+        "expert:IPVersionMismatch": 3929,
+        "expert:IPHeaderTruncated": 33,
+        "literal_publications": 552
+      },
+      "original_field_inventory": 39
+    }
+  },
+  "metadata_phase": {
+    "source": "117280addd5b7a3ccf93aca507042a48b025d797",
+    "replay_inputs": 37,
+    "SDK_records": 292070,
+    "old_scalar_values_and_types_exact": 41402031,
+    "old_alias_occurrences_and_order_exact": 5433562,
+    "new_public_handshake_messages": 303,
+    "admitted_TLS_QUIC_records": 5253,
+    "current_context_events": 4967,
+    "source_gaps": 0,
+    "public_negative_controls": 94,
+    "owned_inputs": 14,
+    "owned_metadata_negative_controls": 92,
+    "owned_projection_negative_controls": 280,
+    "bridge_negative_controls": 22,
+    "context_and_handshake_counts_overlap": true,
+    "final_CLI_address_corrections_are_separately_certified": true
+  },
+  "VXLAN": {
+    "actual_inputs": 31,
+    "physical_frames": 619,
+    "extra_real_public_frames": 535,
+    "owned_OS_UDP_frames": 21,
+    "corrected_CLI_endpoint_rows": 27,
+    "literal_CLI_rows": 592,
+    "worker_requests": 18,
+    "source_identity_CLI_worker_negative_controls": 54,
+    "final_UI_endpoint_gap_count": 0,
+    "bin_parser_profiles_partial": true
+  },
+  "tests": {
+    "full_source": "117280addd5b7a3ccf93aca507042a48b025d797",
+    "four_package_pass": 276857,
+    "four_package_skip": 23,
+    "earlier_actual_test_items_retained": 236376,
+    "later_CLI_source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+    "later_CLI_pass": 674,
+    "later_CLI_skip": 2,
+    "later_CLI_suite_overlaps_prior_suite": true
+  },
+  "fuzz": {
+    "FuzzTLSResumptionHelloFailureIsAtomic": {
+      "executions": 160685,
+      "configured_active_seconds": 40,
+      "receipt_SHA256": "d78aed6de4ba868ece0feb396a4f40cc6cc9facf089ccd6df1f10f671f1e6c31",
+      "source": "117280addd5b7a3ccf93aca507042a48b025d797",
+      "target": "FuzzTLSResumptionHelloFailureIsAtomic",
+      "arguments": [
+        "C:\\Users\\V\\sdk\\go1.22.12\\bin\\go.exe",
+        "test",
+        "-p",
+        "1",
+        "-ldflags=-w",
+        "./common/pcapx/pcaputil",
+        "-run",
+        "^$",
+        "-fuzz",
+        "^FuzzTLSResumptionHelloFailureIsAtomic$",
+        "-fuzztime",
+        "40s",
+        "-parallel",
+        "2",
+        "-timeout",
+        "12m"
+      ],
+      "exit_code": 0,
+      "seconds": 125.625,
+      "log_SHA256": "ddd977d71f943d2d5d9193233a9c008013149d11cd96119838b5091bd68fc21f",
+      "free_bytes_after": 25297833984
+    },
+    "FuzzVXLANHeaderAdmissionNeverInventsChild": {
+      "executions": 104885,
+      "configured_active_seconds": 40,
+      "receipt_SHA256": "d3c8982a2c2fda297e9290a33f035552ea1bd22113df6b9e600d869b52cedb64",
+      "source": "117280addd5b7a3ccf93aca507042a48b025d797",
+      "target": "FuzzVXLANHeaderAdmissionNeverInventsChild",
+      "arguments": [
+        "C:\\Users\\V\\sdk\\go1.22.12\\bin\\go.exe",
+        "test",
+        "-p",
+        "1",
+        "-ldflags=-w",
+        "./common/pcapx/pcaputil",
+        "-run",
+        "^$",
+        "-fuzz",
+        "^FuzzVXLANHeaderAdmissionNeverInventsChild$",
+        "-fuzztime",
+        "40s",
+        "-parallel",
+        "2",
+        "-timeout",
+        "12m"
+      ],
+      "exit_code": 0,
+      "seconds": 51.219,
+      "log_SHA256": "040d0d6f99b0e53b81567c8b862fe24e7974fd0e9a8df81626f40a8689b9d7ae",
+      "free_bytes_after": 25373663232
+    }
+  },
+  "Windows": {
+    "GBP": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\GBP-proof.json",
+      "proof_SHA256": "e61b7fe7a138e9357970e3edf9e6c44aea542d1dd85e9b0da1cf248176e2462e",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "67d45a63903dc3dc386dbaa2ef7ff0c16050609158d66fb5de1b17a708d92852",
+      "expected_protocol": "DNS",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "80156faf86df5c5d4b561eda041b18e3a0255253193c373e5761c4abe20d28f3",
+          "PNG_SHA256": "eb2b748e7f91c938448947c80a0c754cfd5ac35641a841ebb180dc3c176d2122"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "80156faf86df5c5d4b561eda041b18e3a0255253193c373e5761c4abe20d28f3",
+          "PNG_SHA256": "eb2b748e7f91c938448947c80a0c754cfd5ac35641a841ebb180dc3c176d2122"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "258be4a438252aafd6975a0737ed3f7d1ce4e7f6bca1ace3fea88f3c2108c73a",
+          "PNG_SHA256": "b54eecee1b0dc42c0faf1194fb60aac7da35d5d297e06f195b3e391971844709"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "258be4a438252aafd6975a0737ed3f7d1ce4e7f6bca1ace3fea88f3c2108c73a",
+          "PNG_SHA256": "b54eecee1b0dc42c0faf1194fb60aac7da35d5d297e06f195b3e391971844709"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "6b8c3b7c9a950ede1a34523ef70512c666f3fddd16155a63f860c3733039b413",
+          "PNG_SHA256": "022b0eb82d9f22fab9b1482b11cf981aebcfb4246c528d79d6dd341a17f072b3"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "79376f7de61b8d8985fd63ad765bd4a528f57e52e632e01667b467b325315287",
+          "PNG_SHA256": "f67d11b522addd14563022117532bc725f0bbc94c3966b5a45cfd42e56afd96d"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "79376f7de61b8d8985fd63ad765bd4a528f57e52e632e01667b467b325315287",
+          "PNG_SHA256": "f67d11b522addd14563022117532bc725f0bbc94c3966b5a45cfd42e56afd96d"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "79376f7de61b8d8985fd63ad765bd4a528f57e52e632e01667b467b325315287",
+          "PNG_SHA256": "f67d11b522addd14563022117532bc725f0bbc94c3966b5a45cfd42e56afd96d"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "79376f7de61b8d8985fd63ad765bd4a528f57e52e632e01667b467b325315287",
+          "PNG_SHA256": "f67d11b522addd14563022117532bc725f0bbc94c3966b5a45cfd42e56afd96d"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "d8c2bdb394f508a5b9c5773ec313a7fbc43c89420966054a33f6bfb0ef7caa37",
+          "PNG_SHA256": "5d5c612e85885702f665a03311d61375846df40e02816c0df6ed4d2781c057f9"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "89f565d89512d9baaf929a012ed1af222b7e47e80ad7eba28ad9a69ee616a302",
+          "PNG_SHA256": "83c7ed288194bf63a8f1e16467016b4e636dddd6b0f3667ed2749aca873c70b9"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "03b6f946b2b117f5035c84be9575198b7198898af9e010988a6df623ad3b4cf3",
+          "PNG_SHA256": "a53ae103d4f735dfa323fa9a1b516797640e00c3ef852c965b08ee10b3b3ed31"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "84a42d42c6c6c0d7f90581be3e82c866ab3ac55f7c27d473ee5543bff6961be9",
+          "PNG_SHA256": "027fec6cc5d09980dc5128bd5eb927e540d87e802fa96abce48ecda1e5466b19"
+        },
+        "05-narrow": {
+          "cells_SHA256": "3e8a07f3f80e15cd82cd73f3aafdcebb16d4539557b53b4a1d2407a387b5fa3c",
+          "PNG_SHA256": "fbdd436d587edb5263ae5fbbf9567470e34ec69e218faa8fd819556c1d8fcda3"
+        },
+        "06-restored": {
+          "cells_SHA256": "84a42d42c6c6c0d7f90581be3e82c866ab3ac55f7c27d473ee5543bff6961be9",
+          "PNG_SHA256": "027fec6cc5d09980dc5128bd5eb927e540d87e802fa96abce48ecda1e5466b19"
+        }
+      }
+    },
+    "GPE": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\GPE-proof.json",
+      "proof_SHA256": "a782e2d6660ecdcfea1f11bd511667ab87ae259ef6b358e32ac76f282cbb94c5",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "ae5918a82d357613b4a87255892606cd172d505f60d60dec59ae370ae0087693",
+      "expected_protocol": "VXLAN-GPE",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "22257c4cff9d3239b3ba2752a2434994ec0128fcefa69b6dfe0a80fb1b6720c8",
+          "PNG_SHA256": "09a40b4c9b117990f6044ed247bdf33fb1105620ec24c7f44c5df89ac8095b0d"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "22257c4cff9d3239b3ba2752a2434994ec0128fcefa69b6dfe0a80fb1b6720c8",
+          "PNG_SHA256": "09a40b4c9b117990f6044ed247bdf33fb1105620ec24c7f44c5df89ac8095b0d"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "60b581dea57bdb349dc0040273e21061f49512068f9b8a13e8d89b47a942351b",
+          "PNG_SHA256": "e9a1aa8e4917b8964a57b7445031c6df458d3637ed930cc8b4cd4ba220221360"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "60b581dea57bdb349dc0040273e21061f49512068f9b8a13e8d89b47a942351b",
+          "PNG_SHA256": "e9a1aa8e4917b8964a57b7445031c6df458d3637ed930cc8b4cd4ba220221360"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "cf97d21aed8346553457934e2509e9365128da3355157aee9b3a20acb3949378",
+          "PNG_SHA256": "d372b3090b0c0b2481a1e14e726ffa591817343379192d5d870a1eaf16bd0796"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "18897241d1afaf44a7fcae3850ce5eab3a1c0b1bab0c826ad4739fd07b825d5e",
+          "PNG_SHA256": "0f3db1170b397b7ec2f6444dcf4c5fd067549142623a63e064438338e885ad81"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "18897241d1afaf44a7fcae3850ce5eab3a1c0b1bab0c826ad4739fd07b825d5e",
+          "PNG_SHA256": "0f3db1170b397b7ec2f6444dcf4c5fd067549142623a63e064438338e885ad81"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "18897241d1afaf44a7fcae3850ce5eab3a1c0b1bab0c826ad4739fd07b825d5e",
+          "PNG_SHA256": "0f3db1170b397b7ec2f6444dcf4c5fd067549142623a63e064438338e885ad81"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "18897241d1afaf44a7fcae3850ce5eab3a1c0b1bab0c826ad4739fd07b825d5e",
+          "PNG_SHA256": "0f3db1170b397b7ec2f6444dcf4c5fd067549142623a63e064438338e885ad81"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "cf97d21aed8346553457934e2509e9365128da3355157aee9b3a20acb3949378",
+          "PNG_SHA256": "d372b3090b0c0b2481a1e14e726ffa591817343379192d5d870a1eaf16bd0796"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "cf97d21aed8346553457934e2509e9365128da3355157aee9b3a20acb3949378",
+          "PNG_SHA256": "d372b3090b0c0b2481a1e14e726ffa591817343379192d5d870a1eaf16bd0796"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "0c512af35ffb26114e9795c3b47fe55d0a33b5f148508b0ceaed55d14883634b",
+          "PNG_SHA256": "eb6e9f55adda773dd441f7098946b793e9024e63eef4de2665793acc42e2d953"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "18590b76135ada0d454e6c45e3dc2e94328047bcbcef32270e937490c41b5fa0",
+          "PNG_SHA256": "8716fd012cb441d12ea786771f37cf834d7b1d4c27957cae7c304717dc3d733b"
+        },
+        "05-narrow": {
+          "cells_SHA256": "71072b784e58bbc52cd043929a086aa80622136646d1d6d30448f90a4426ae75",
+          "PNG_SHA256": "7030b3716fca145c9c36801375638269a7921f8096ac722967910559e514813c"
+        },
+        "06-restored": {
+          "cells_SHA256": "18590b76135ada0d454e6c45e3dc2e94328047bcbcef32270e937490c41b5fa0",
+          "PNG_SHA256": "8716fd012cb441d12ea786771f37cf834d7b1d4c27957cae7c304717dc3d733b"
+        }
+      }
+    },
+    "invalid-I": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\invalid-I-proof.json",
+      "proof_SHA256": "4d3a4e3296d6c223ce33eba4bf925f282620d1e85fcfde84a6718ab970810a03",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "26eb258d12271aadf2383552a18daf223a87a9fa730310da379b35739e9b4cb8",
+      "expected_protocol": "IPv4",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "f270cf7f18c054b74e805c44059d9dd271d5e50d36609826f4ce4cc1e6a5bfd0",
+          "PNG_SHA256": "a70d5ab58e91ab9e0e553492329e771cbbf31c0f59dfc60a3c47354566af5bd9"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "f270cf7f18c054b74e805c44059d9dd271d5e50d36609826f4ce4cc1e6a5bfd0",
+          "PNG_SHA256": "a70d5ab58e91ab9e0e553492329e771cbbf31c0f59dfc60a3c47354566af5bd9"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "c8d685d0ce06e33fe8d2c2fef87e74e58f5ced56f0b097108e8da338a53d0356",
+          "PNG_SHA256": "388fb1c0ceca2a4a4ba99c5305eed99fc9d62d724ca6f203d804ba7319f0ae0f"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "c8d685d0ce06e33fe8d2c2fef87e74e58f5ced56f0b097108e8da338a53d0356",
+          "PNG_SHA256": "388fb1c0ceca2a4a4ba99c5305eed99fc9d62d724ca6f203d804ba7319f0ae0f"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "1f6379db44a2c5e2219299368219548f9c06daedd494b355b5816f6db784ebaa",
+          "PNG_SHA256": "bba83dd17f1298a50b4d3cc929f070c39109187d5344def2f7fa957cdf34ad3a"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "96c50e363235f128a89e266bfbaf55e1939b841beeda20972fb811983b90017d",
+          "PNG_SHA256": "cdfa1e6e9e4741cda65c025022856a856661c1e912ba6b8540c9f87db04a4d78"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "96c50e363235f128a89e266bfbaf55e1939b841beeda20972fb811983b90017d",
+          "PNG_SHA256": "cdfa1e6e9e4741cda65c025022856a856661c1e912ba6b8540c9f87db04a4d78"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "96c50e363235f128a89e266bfbaf55e1939b841beeda20972fb811983b90017d",
+          "PNG_SHA256": "cdfa1e6e9e4741cda65c025022856a856661c1e912ba6b8540c9f87db04a4d78"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "96c50e363235f128a89e266bfbaf55e1939b841beeda20972fb811983b90017d",
+          "PNG_SHA256": "cdfa1e6e9e4741cda65c025022856a856661c1e912ba6b8540c9f87db04a4d78"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "1f6379db44a2c5e2219299368219548f9c06daedd494b355b5816f6db784ebaa",
+          "PNG_SHA256": "bba83dd17f1298a50b4d3cc929f070c39109187d5344def2f7fa957cdf34ad3a"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "1f6379db44a2c5e2219299368219548f9c06daedd494b355b5816f6db784ebaa",
+          "PNG_SHA256": "bba83dd17f1298a50b4d3cc929f070c39109187d5344def2f7fa957cdf34ad3a"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "e5413c37f7b8251b8ed2f01e231d2b658a58c24e2ed18fa4ca46104fc635dd61",
+          "PNG_SHA256": "9c22536a6b96902334c55fb67ff8cd9f9373c615704a3ebc8d036a413c696170"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "f56675af59c030e5a9af52d1d6af2b69eef29346e25873351a6d44218723cc48",
+          "PNG_SHA256": "58cf485ead5eca157e9e280c9cdb31cc3d15b3ed8426e903b5645d3f87658ae8"
+        },
+        "05-narrow": {
+          "cells_SHA256": "c3a189da99f91583dfb6db2f0964357077df721f02deb791269004139523c198",
+          "PNG_SHA256": "71f4a3107203aac705203a0d70e8a093ec1d96ba75013c3ba6bc8debe4e0d3d8"
+        },
+        "06-restored": {
+          "cells_SHA256": "f56675af59c030e5a9af52d1d6af2b69eef29346e25873351a6d44218723cc48",
+          "PNG_SHA256": "58cf485ead5eca157e9e280c9cdb31cc3d15b3ed8426e903b5645d3f87658ae8"
+        }
+      }
+    },
+    "TLS13-PSK": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\TLS13-PSK-proof.json",
+      "proof_SHA256": "1db5d87e43f9138c2c75a93cbba600ca4267e8498d72f2af1b654d986a474863",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "c5c7118153ca7b08c49ddb18e1f7eaee5e3b599c41939d5197f7558b52d9dc6f",
+      "expected_protocol": "TLSv1.3",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "3ae9e425354da9677d45ed4916776cd4cc8024eec9b4037ef3ed0cf56ef87506",
+          "PNG_SHA256": "bad03dd7df1a551cf21512e734e7d3e94be8abb6c2404dd59d8a584aa3175d68"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "3ae9e425354da9677d45ed4916776cd4cc8024eec9b4037ef3ed0cf56ef87506",
+          "PNG_SHA256": "bad03dd7df1a551cf21512e734e7d3e94be8abb6c2404dd59d8a584aa3175d68"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "25a5883c64493fcb74a448ed46f9bb44f95b115394ff86a6e44d88b2f358f350",
+          "PNG_SHA256": "c52325e33fa5e79acf667b160130efec3cdb0f636610438d757bd81cbc226119"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "b855392402d8a0a3360d4ecc23a833a2b4e8525560060bbfaf899976b6dcfa91",
+          "PNG_SHA256": "42cddd252ee1d5543425c8fc32ed6e4319b3c2cc9b5238ddab1e650a3a9701fa"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "b855392402d8a0a3360d4ecc23a833a2b4e8525560060bbfaf899976b6dcfa91",
+          "PNG_SHA256": "42cddd252ee1d5543425c8fc32ed6e4319b3c2cc9b5238ddab1e650a3a9701fa"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "b855392402d8a0a3360d4ecc23a833a2b4e8525560060bbfaf899976b6dcfa91",
+          "PNG_SHA256": "42cddd252ee1d5543425c8fc32ed6e4319b3c2cc9b5238ddab1e650a3a9701fa"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "b855392402d8a0a3360d4ecc23a833a2b4e8525560060bbfaf899976b6dcfa91",
+          "PNG_SHA256": "42cddd252ee1d5543425c8fc32ed6e4319b3c2cc9b5238ddab1e650a3a9701fa"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "e1e65081d1199b785ebc459f7b10a52192c3694d98edfcb13c43a8af1ce9e449",
+          "PNG_SHA256": "8372af80475df21d720d36b84a17080421ac8ad73ae7a40e07b4e2582c3714dc"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "d262cc9e13f05d09b07728558e40b99f93d39c223065fc7289aab247896fd3de",
+          "PNG_SHA256": "76883f47e807def63ad3e943a6f411e261edf75a8abda31d6c453aa0bfba4308"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "8ffc08359745732bfad936eade1ad74a16568acb99383a3100400d2f3e01ae85",
+          "PNG_SHA256": "4c59b4ac96f3e48bb1132f25bcdfd99740a5173a5694335e3410a9ded7fe2db0"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "ea20fb41db840f5b2f97e6698c301847a33d4b57a0490e36e4421c827ed3f47f",
+          "PNG_SHA256": "2af6477a652a3c1895a40aae51e320f6f3c810088f4c6c3dd2d0bc40ebec8336"
+        },
+        "05-narrow": {
+          "cells_SHA256": "dd03b602d3ebb73724580604fee2ac97d14707103355a8b3e43c88fc541373a8",
+          "PNG_SHA256": "e2509b80feda8949d528326cc9f1269985e9884be0a83262f478f5e34179ecb5"
+        },
+        "06-restored": {
+          "cells_SHA256": "ea20fb41db840f5b2f97e6698c301847a33d4b57a0490e36e4421c827ed3f47f",
+          "PNG_SHA256": "2af6477a652a3c1895a40aae51e320f6f3c810088f4c6c3dd2d0bc40ebec8336"
+        }
+      }
+    },
+    "TLS12-SID": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\TLS12-SID-proof.json",
+      "proof_SHA256": "f72cb637c5eecae8a0c30976f40f687b9eb041b27ca03170a6330d1aa46d8fcf",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "c5c7118153ca7b08c49ddb18e1f7eaee5e3b599c41939d5197f7558b52d9dc6f",
+      "expected_protocol": "TLSv1.2",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "ab42ac9d4229e2a88b21071196945a038e0870958516855cd4b8314045180576",
+          "PNG_SHA256": "d9caf908a4077529f841db512a7f21afde439408b051ee0efe0154e0c0b110a6"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "ab42ac9d4229e2a88b21071196945a038e0870958516855cd4b8314045180576",
+          "PNG_SHA256": "d9caf908a4077529f841db512a7f21afde439408b051ee0efe0154e0c0b110a6"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "2e0a17d4e2230bc83ac295c4d806bc2ccab9c7f11550b743bb4c9941cf9937ae",
+          "PNG_SHA256": "86d4ed346a19d884e530a70f761fea2487a4bfb8831643bf126d842545bd53d9"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "bc342da8ceb04a29b2de3da6662a741c48d0f8c4db86489711db61d912088c4b",
+          "PNG_SHA256": "11f5d1eac90354c2182ed5a33444a799dc25a9231499b0bd44d783da09ee1105"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "bc342da8ceb04a29b2de3da6662a741c48d0f8c4db86489711db61d912088c4b",
+          "PNG_SHA256": "11f5d1eac90354c2182ed5a33444a799dc25a9231499b0bd44d783da09ee1105"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "bc342da8ceb04a29b2de3da6662a741c48d0f8c4db86489711db61d912088c4b",
+          "PNG_SHA256": "11f5d1eac90354c2182ed5a33444a799dc25a9231499b0bd44d783da09ee1105"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "bc342da8ceb04a29b2de3da6662a741c48d0f8c4db86489711db61d912088c4b",
+          "PNG_SHA256": "11f5d1eac90354c2182ed5a33444a799dc25a9231499b0bd44d783da09ee1105"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "d0a0f0ee93df0e1f26aac05a2634a5d7f89054d6cab0d0bdfa612f62d2887a56",
+          "PNG_SHA256": "c9f0db15a573ed2c8bc2f5908ec4c2836ef6070f73302be4a88bedf94e9b4a0c"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "2b340000bcff2c8f4cced010850055a17340c6949c782c210603d7061f77b4b3",
+          "PNG_SHA256": "7f005d40bea09d3f85463cc5e2f62a6a2aaf9a0da2b428bcede8cc9f5bb67512"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "4e8421a4cdd3f1d567c4c77c526bece0c56cc479accdaf084bcc9f4e624107ee",
+          "PNG_SHA256": "9c05acf740e54234dcd921906040ccc0843e2c05960063e0aefaebe5d7617ecd"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "1acc20e4a8c0a5df3759025e08a361d048d141f0bba60b76b8e1345db25cfc7d",
+          "PNG_SHA256": "cfa835e0bf78d379da6fc49bef63ea01d28b384ef18b17417b2a3ecaaf20683e"
+        },
+        "05-narrow": {
+          "cells_SHA256": "04e3ea92d38d5d974ba6108c9f10654c37a5d66c5012b399973c26cbbced1abf",
+          "PNG_SHA256": "775e9781cc090c77c2ab76d2f2018f1e13d8494d7f9d121608651a1cff1dbee6"
+        },
+        "06-restored": {
+          "cells_SHA256": "1acc20e4a8c0a5df3759025e08a361d048d141f0bba60b76b8e1345db25cfc7d",
+          "PNG_SHA256": "cfa835e0bf78d379da6fc49bef63ea01d28b384ef18b17417b2a3ecaaf20683e"
+        }
+      }
+    },
+    "TLS13-ticket": {
+      "proof_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\windows-final-04\\TLS13-ticket-proof.json",
+      "proof_SHA256": "7685622303c875c9219a46e2bbc4296c17ca835cf549b410e4f6e6cfb4303d96",
+      "source": "7434814a2847ca0228da28ba1856482e8b4b0f13",
+      "capture_SHA256": "c5c7118153ca7b08c49ddb18e1f7eaee5e3b599c41939d5197f7558b52d9dc6f",
+      "expected_protocol": "TLSv1.3",
+      "snapshots": {
+        "00-capture-ready-wait-000": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-capture-ready": {
+          "cells_SHA256": "7d631b8ca368840bf5d05878c5042619b0c452bf95849c87768980e38c603cae",
+          "PNG_SHA256": "eafd85ded5da517c4d9eec9f2ccfbe638467099ceda0192e9fcc0cb9f35ebc85"
+        },
+        "00-filter-ready-wait-000": {
+          "cells_SHA256": "bcc136a47963d151ff8657f8c4cc2abc76d29bbb5d3838a3fda73df28b2a1cd3",
+          "PNG_SHA256": "0568bd3c513e05c869b0edc4fc31264a23437692da317394415d1b1d4af0d361"
+        },
+        "00-filter-ready": {
+          "cells_SHA256": "bcc136a47963d151ff8657f8c4cc2abc76d29bbb5d3838a3fda73df28b2a1cd3",
+          "PNG_SHA256": "0568bd3c513e05c869b0edc4fc31264a23437692da317394415d1b1d4af0d361"
+        },
+        "01-adaptive-bytes-click": {
+          "cells_SHA256": "fa27d02cce0f30451407e94eb93bffd3c1a84c8626cbbb5b93eebae100bdef18",
+          "PNG_SHA256": "a1e78afe111275b1da0bbb43ecf11a457738b6cba6b485f70d8810e6d0cbbd4b"
+        },
+        "01-adaptive-fields-before": {
+          "cells_SHA256": "f1fb5bf720943b96746dd043caa41222640e29cb4cb87354294c3e5a89ad5e3e",
+          "PNG_SHA256": "28cd7113887f23b7aa3cdeb7bbd30fabc022c7cb4f10fc30c97d3b2087a4e234"
+        },
+        "01-adaptive-fields-click": {
+          "cells_SHA256": "f1fb5bf720943b96746dd043caa41222640e29cb4cb87354294c3e5a89ad5e3e",
+          "PNG_SHA256": "28cd7113887f23b7aa3cdeb7bbd30fabc022c7cb4f10fc30c97d3b2087a4e234"
+        },
+        "01-protocol-fields-wait-000": {
+          "cells_SHA256": "f1fb5bf720943b96746dd043caa41222640e29cb4cb87354294c3e5a89ad5e3e",
+          "PNG_SHA256": "28cd7113887f23b7aa3cdeb7bbd30fabc022c7cb4f10fc30c97d3b2087a4e234"
+        },
+        "01-protocol-fields": {
+          "cells_SHA256": "f1fb5bf720943b96746dd043caa41222640e29cb4cb87354294c3e5a89ad5e3e",
+          "PNG_SHA256": "28cd7113887f23b7aa3cdeb7bbd30fabc022c7cb4f10fc30c97d3b2087a4e234"
+        },
+        "02-byte-sources": {
+          "cells_SHA256": "fa27d02cce0f30451407e94eb93bffd3c1a84c8626cbbb5b93eebae100bdef18",
+          "PNG_SHA256": "a1e78afe111275b1da0bbb43ecf11a457738b6cba6b485f70d8810e6d0cbbd4b"
+        },
+        "02-first-byte-source": {
+          "cells_SHA256": "0b0f91da1a364031b46693014a24267ec45dec48f30f4552feba5b89bd7ed508",
+          "PNG_SHA256": "294487cd915ed73a9c4441f05d4bce32c0740f821f4e975dfcb23081bf5317fc"
+        },
+        "03-conversation-messages": {
+          "cells_SHA256": "2511a07cfef3be7b2f97a9e10afeec095ca421b6c3860a026912e7c633c0fd64",
+          "PNG_SHA256": "a6a711dc9031fd94086e4034ae33b1e9f55f27769ec425d63ea448f0cd8e361c"
+        },
+        "04-association-evidence": {
+          "cells_SHA256": "6c59432bd6189491950e61ba6442cfb0a392028e309fe4ac4dec5347ddf50f51",
+          "PNG_SHA256": "2b316dfd59e3ad0e96dfbb39e15014f97b31b8ea21ff531472493b39fde1b56b"
+        },
+        "05-narrow": {
+          "cells_SHA256": "c05a2dc861d63e6c22c0cacaba712c58dac4bc2c0940c5a9128dba1a2694f5d7",
+          "PNG_SHA256": "d9138184faef0af1010f63675407134b77e4b10a72b5d1172d326cd2110cc402"
+        },
+        "06-restored": {
+          "cells_SHA256": "6c59432bd6189491950e61ba6442cfb0a392028e309fe4ac4dec5347ddf50f51",
+          "PNG_SHA256": "2b316dfd59e3ad0e96dfbb39e15014f97b31b8ea21ff531472493b39fde1b56b"
+        }
+      }
+    }
+  },
+  "certificates": {
+    "full_tests": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\full-03\\receipt.json",
+      "SHA256": "07c74f09abc3fc60ce3ae64983b53aed5bde37480234d1a20544a1157c2e6e3e"
+    },
+    "test_name_completeness": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\full-03\\test-completeness.json",
+      "SHA256": "cd96d7b699879bcdb0445f40a982d876331d21391e926fc1734d9e97b5f4a21b"
+    },
+    "later_CLI_source_composition": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\final-source-composition-04.json",
+      "SHA256": "bc2190249fd98ad924b21186fe670a50660714cba71880909d568a8517a88946"
+    },
+    "old_value_and_alias_bridge": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\public-extension-preservation-03.json",
+      "SHA256": "b8633ff577e4aa44e50266583bd70f3c5a5d67dc68984b7f37f8b72cd20c4b28"
+    },
+    "public_TLS_source": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\public-TLS-metadata-source-final-summary.json",
+      "SHA256": "6950c6569fac98c4db9ed45fa3941d255e3f41d97850f5a5e925acc535d97eaf"
+    },
+    "owned_TLS": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\runtime-TLS-03\\TLS-owned-117280-summary.json",
+      "SHA256": "0160d47725665f99fc69a108174002a379c02c5f8aa26bfae20244d007024cbb"
+    },
+    "later_owned_TLS_CLI": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\runtime-TLS-CLI-04\\TLS-CLI-04-summary.json",
+      "SHA256": "24b30efbd17be8626836165aec22849a1cab2d0e1696ddbe7d7aa44be25aeebe"
+    },
+    "VXLAN": {
+      "path": "C:\\tmp\\yak-shark-VXLAN-profile-20261028\\VXLAN-summary-final04-02.json",
+      "SHA256": "6f7294e60726d90d1a905990abdab8b5251bb8034a85828a6e464b7b8b7fda4c"
+    },
+    "public_endpoint_projection": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\public-endpoint-projection-final02-summary.json",
+      "SHA256": "197cf8d255e99bfe8d44136dd8c4516a46b7e2737134398d45f6cd421553eb84"
+    },
+    "independent_endpoint_review": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\endpoint-auditor-independent-review-02\\summary.json",
+      "SHA256": "f8f6ff757609dce3090a6b2c62f781e1580f0b680e5cd73d6a29de7f3f464e01"
+    },
+    "endpoint_selector_controls": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\endpoint-auditor-independent-review-02\\selector-controls.json",
+      "SHA256": "6dc4cde11bafdec0f17f74d9d730b0ec6feb0d5f000e920d3c114e29e29652ab"
+    },
+    "original_94_39_recheck": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\original-133-final-02-receipt.json",
+      "SHA256": "3b576e07742bcc9dcc1f1b2778eadf7c83b3c0d7299720dfd2004b43c26f4b35"
+    },
+    "disk_archives": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\disk-health-02.json",
+      "SHA256": "970f283c6d30930ef43fab81eea6d612d524d357d719ca276a42aabcbf0d1015"
+    },
+    "disk_closed_logs": {
+      "path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\disk-health-closed-logs-03.json",
+      "SHA256": "05f41bd21ef73987a6c7edd6e45e6c04317914d43c9bb464e496a5e97f3edce8"
+    }
+  },
+  "original_field_recheck_composition": {
+    "original_verifier_source": "b566d14ec1d3ab5bcf68a789fca6a2f645b9a3a7",
+    "current_native_source": "117280addd5b7a3ccf93aca507042a48b025d797",
+    "both_complete_current_SDK_exports_byte_identical_to_rechecked_exports": true,
+    "reference_oracles_reused_explicitly": true,
+    "unreviewed_original_differences": 0
+  },
+  "limitations": [
+    "PSK selection is an observation; binders, certificate trust and cross-connection ticket cache are not verified",
+    "Declared omission/reordering controls are not live network-loss injection",
+    "Whole protected TLS record loss retains the documented common recovery limit",
+    "VXLAN-GPE is a validated v0 header profile only; complete payload/policy/OAM profiles are not implemented",
+    "SSH authentication/channels/SFTP/rekey, full RPC NDR/authentication, PPTP control pairing and broader QUIC CID/QPACK/0-RTT remain incomplete",
+    "TLS connection-observation placement and duplicate DNS/native field trees remain UI refinement work"
+  ],
+  "disk_free_bytes_at_summary": 25677991936,
+  "full_TOP30_or_all_protocols_complete": false
+}
