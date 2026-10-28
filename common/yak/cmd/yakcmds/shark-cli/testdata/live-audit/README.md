@@ -389,3 +389,43 @@ not all-field Wireshark parity. `ip_version_negative_controls.py --help` and
 `ip_version_reference_negative_controls.py --help` reject forged source,
 projection and reference descriptors, including boolean/integer substitutions
 and experts moved away from their owning captured byte.
+
+`discovery/ip_short_header_controls.py --help` copies five original short-header
+witnesses and derives nine declared prefix observations from owned TLS, QUIC and
+CoAP traffic. The latter preserve every original record, adding one incomplete
+fixed header at a future or literal epoch-zero timestamp. These are capture
+observations, not a claim of real network loss. `ip_short_header_wire_audit.py`
+independently checks source bytes, timestamps, intervals and original order;
+`ip_short_header_source_audit.py` checks native refusal exclusivity, absent
+transport state and exact CLI list/detail identity.
+
+`ip_prefix_protocol_preservation_audit.py` checks every original native value and
+source graph. It translates only attested physical references and actual
+generated PDU aliases, including explicit QUIC/HTTP3 source annotations and
+request-PDU transactions. It never normalizes wire stream IDs, packet numbers,
+offsets, plaintext or connection/session IDs. The separate
+`ip_prefix_reference_preservation_audit.py` checks raw reference descriptors and
+their scalar values; generated frame references use the actual TShark
+FT_FRAMENUM registry and the declared record ledger. Other generated fields
+without a raw witness are outside its scope. `ip_prefix_negative_controls.py
+--help` rehashes intentionally changed external exports and requires semantic
+source, type, graph and field rejection beyond simple file digests.
+
+`gre_parent_source_audit.py --help` binds every reported parent refusal to its
+original wire envelope, complete observed source domain and raw reference field
+offset/mask/data-source. Unselected parents cannot contribute an application or
+transport observation. The default CLI projection requires the precise reason
+without a redundant generic suffix; `--allow-legacy-generic-marker` explicitly
+audits a predecessor. `discovery/gre_parent_negative_controls.py --help` tests
+source, child-identity, namespace, wire descriptor and removal-certificate
+forgeries using four original public witnesses without bundling capture bytes.
+
+The optional `ip_admission_public_preservation_audit.py --parent-proof` permits
+only independently proved removal of earlier unrecognized UDP observations.
+It recomputes the parent wire/source audit and binds each complete old event
+fingerprint; the default still permits no disappearing non-IP event.
+`ip_version_proof_continuity_audit.py` preserves an earlier original-wire version
+proof across the parent correction and rechecks complete-source exclusivity.
+`network_reason_projection_audit.py` permits only removal of an explained
+network error's generic suffix; every other CLI value and JSON type stays
+literal. None of these preservation checks certifies every protocol feature.
