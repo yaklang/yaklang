@@ -43,10 +43,11 @@ type decodeRequest struct {
 	Link               layers.LinkType
 }
 type streamDecodeRequest struct {
-	Events []*pcaputil.ProtocolEvent
-	ID     uint64
-	Ports  [2]uint16
-	Prefix [2][]byte
+	fieldsProjected bool
+	Events          []*pcaputil.ProtocolEvent
+	ID              uint64
+	Ports           [2]uint16
+	Prefix          [2][]byte
 }
 type decodeField struct {
 	Depth      int
@@ -95,9 +96,11 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	}
 	var d packetDetail
 	if req.Stream != nil {
+		req.Stream.fieldsProjected = true
 		d = decodeStream(*req.Stream)
 	} else {
 		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw.workerFieldProjection = true
 		if req.TransportView != nil {
 			v := req.TransportView
 			if len(req.TransportHeader) != v.HeaderLength || v.Protocol == "tcp" && (v.HeaderLength < 20 || v.HeaderLength > 60 || int(req.TransportHeader[12]>>4)*4 != v.HeaderLength) || v.Protocol == "udp" && v.HeaderLength != 8 || v.Protocol != "tcp" && v.Protocol != "udp" {
@@ -232,11 +235,12 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 		if e == nil {
 			continue
 		}
-		wire, err := json.Marshal(e)
+		display := protocolDisplayEvent(e)
+		wire, err := json.Marshal(display)
 		if err != nil {
 			return nil, err
 		}
-		types, typeErr := eventByteFields(e, i)
+		types, typeErr := eventByteFields(display, i)
 		if typeErr != nil || len(request.ByteFields)+len(types) > workerByteFieldLimit {
 			continue // The explicit IPC-limited marker remains, never untyped success.
 		}
@@ -250,7 +254,7 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 		}
 		delta := len(wire) - markerCosts[i] + typeCost
 		if delta <= remaining {
-			bounded[i] = e
+			bounded[i] = display
 			request.ByteFields = append(request.ByteFields, types...)
 			remaining -= delta
 		}
@@ -340,7 +344,18 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
 	if req.Events != nil {
-		d.fields, d.sources = protocolEventDetail(req.Events)
+		for _, event := range req.Events {
+			if _, _, refused := networkHeaderRefusalPresentation(event); refused {
+				// There is no captured frame in a stream-only request. Retain the
+				// exact diagnostic and its observed prefix identity, without child
+				// dissectors or fabricated physical network-header byte ranges.
+				events := []*pcaputil.ProtocolEvent{event}
+				d.fields, d.sources = protocolEventDetail(events, !req.fieldsProjected)
+				d.protocol = presentEvents(events).protocol
+				return
+			}
+		}
+		d.fields, d.sources = protocolEventDetail(req.Events, !req.fieldsProjected)
 		d.protocol = eventProtocols(req.Events)
 		return
 	}
