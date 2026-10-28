@@ -216,8 +216,13 @@ func testUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T, childVersio
 			buffered := a.buffered.Load()
 			p := gopacket.NewPacket(wire.Bytes(), protocolPacketDecoder{decoder: layers.LinkTypeEthernet}, gopacket.Default)
 			p.Metadata().CaptureInfo = withEvidence(gopacket.CaptureInfo{Timestamp: time.Unix(10000, 0), CaptureLength: len(wire.Bytes()), Length: len(wire.Bytes())}, captureEvidence{Ref: PacketReference{Number: 1, Domain: CaptureDomain{Interface: 17}}})
-			_, consumed = a.networkPacket(p)
-			require.True(t, consumed)
+			q, consumed := a.networkPacket(p)
+			if strings.HasPrefix(profile, "EtherIP-") && p.ErrorLayer() != nil {
+				require.False(t, consumed)
+				require.Same(t, p, q, "refusal preserves capture error accounting without admitting the child")
+			} else {
+				require.True(t, consumed)
+			}
 			require.Len(t, events, 1)
 			e := events[0]
 			require.Equal(t, "network-encapsulation-refusal", e.Profile)
@@ -232,7 +237,7 @@ func testUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T, childVersio
 			require.Nil(t, a.udpSessions)
 			require.Len(t, a.fragments.sets, 1)
 			require.Equal(t, buffered, a.buffered.Load(), "the unselected child cannot advance the domain's fragment clock")
-			q, consumed := a.networkPacket(fragmentClockPacket(original[1], domain, 11, time.Unix(101, 0), false))
+			q, consumed = a.networkPacket(fragmentClockPacket(original[1], domain, 11, time.Unix(101, 0), false))
 			require.False(t, consumed)
 			require.NotNil(t, q)
 		})
