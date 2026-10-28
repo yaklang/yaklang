@@ -84,7 +84,7 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		}
 		switch v := l.(type) {
 		case *capturePIM:
-			if v.Type == 1 && !v.NullRegister && v.ChecksumVerified {
+			if v.Type == 1 && !v.NullRegister && v.ChecksumVerified && v.MessageExtentComplete {
 				e.Ref.Domain.Encapsulation += "/pim-register:" + outer
 			}
 		case *captureERSPAN3:
