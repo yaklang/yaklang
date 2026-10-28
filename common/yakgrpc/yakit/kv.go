@@ -158,6 +158,30 @@ func SetKey(db *gorm.DB, key interface{}, value interface{}) error {
 	return nil
 }
 
+// SetKeyIfAbsent atomically creates a KV without overwriting an existing value.
+// The unique index on GeneralStorage.Key arbitrates concurrent creators. Callers
+// must read the stored value afterwards, since another process may have won.
+func SetKeyIfAbsent(db *gorm.DB, key interface{}, value interface{}) error {
+	if db == nil {
+		return utils.Error("no set database")
+	}
+	keyStr := strconv.Quote(utils.InterfaceToString(key))
+	valueStr := strconv.Quote(utils.InterfaceToString(value))
+	if valueStr == `""` {
+		valueStr = ""
+	}
+	err := db.Create(&schema.GeneralStorage{Key: keyStr, Value: valueStr}).Error
+	if err != nil {
+		// An existing readable key is a successful no-op, including when a
+		// competing process inserted it. Other failures must remain visible.
+		if _, readErr := GetKeyModel(db, key); readErr == nil {
+			return nil
+		}
+		return utils.Errorf("create storage kv if absent failed: %w", err)
+	}
+	return nil
+}
+
 func InitKey(db *gorm.DB, key interface{}, verbose interface{}, env bool) error {
 	if db == nil {
 		return utils.Error("no set database")

@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
@@ -78,6 +79,14 @@ func (c *Client) doRequest(ctx context.Context, path string, params url.Values, 
 	req = lowhttp.ReplaceAllHTTPPacketQueryParams(req, paramsMap)
 
 	opts := slices.Clone(c.config.lowhttpOptions)
+	if c.config.isAIBalanceProxy {
+		// Resolve per request so a long-lived client follows Profile switches.
+		opts = append(opts, poc.WithDeleteHeader(aibalanceclient.ClientUserIDHeader), poc.WithDeleteHeader("Trace-ID"))
+		if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+			opts = append(opts, poc.WithReplaceHttpPacketHeader(aibalanceclient.ClientUserIDHeader, id),
+				poc.WithReplaceHttpPacketHeader("Trace-ID", id))
+		}
+	}
 	opts = append([]poc.PocConfigOption{
 		poc.WithForceHTTPS(ishttps),
 	}, opts...)

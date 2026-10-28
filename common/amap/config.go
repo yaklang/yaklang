@@ -4,7 +4,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -90,12 +89,6 @@ func NewConfig(opts ...AmapConfigOption) *Config {
 			log.Warnf("failed to load TOTP header for amap proxy: %v", err)
 		} else if totpHeader != "" {
 			cfg.lowhttpOptions = append(cfg.lowhttpOptions, poc.WithReplaceHttpPacketHeader("X-Memfit-OTP-Auth", totpHeader))
-		}
-
-		// Add Trace-ID header for rate limiting identification
-		traceID := aibalanceclient.GetTraceID()
-		if traceID != "" {
-			cfg.lowhttpOptions = append(cfg.lowhttpOptions, poc.WithReplaceHttpPacketHeader("Trace-ID", traceID))
 		}
 	}
 
