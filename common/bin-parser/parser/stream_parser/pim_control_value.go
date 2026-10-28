@@ -37,8 +37,38 @@ func pimCharge(r *controlReader, budget *int) bool {
 }
 
 func pimRanges(r *controlReader) map[string]any {
-	r.info["Wire Field Ranges"] = routingFieldRanges(r.fields)
+	ranges := routingFieldRanges(r.fields)
+	for _, alias := range [][2]string{
+		{"Version", "Version and Type"}, {"Type", "Version and Type"},
+		{"Border", "Register Flags"}, {"Null Register", "Register Flags"},
+		{"RPT", "Metric Preference Word"}, {"Metric Preference", "Metric Preference Word"},
+		{"Prune Indicator", "Refresh Flags"}, {"Prune Now", "Refresh Flags"}, {"Assert Override", "Refresh Flags"},
+		{"Tracking Support", "Propagation Flags"}, {"Propagation Delay", "Propagation Flags"},
+		{"Bidirectional", "Flags"}, {"Admin Scope Zone", "Flags"},
+		{"Sparse", "Flags"}, {"Wildcard", "Flags"}, {"RPT", "Flags"},
+	} {
+		if _, present := r.info[alias[0]]; present {
+			if span, complete := ranges[alias[1]]; complete {
+				ranges[alias[0]] = span
+			}
+		}
+	}
+	r.info["Wire Field Ranges"] = ranges
 	return r.info
+}
+
+// A failed later child does not erase earlier complete fields or authorize a
+// scan for another plausible record. A zero-byte attempted child has no row.
+func pimRetainPrefix(parent, child *controlReader) map[string]any {
+	consumed := child.at > parent.at
+	parent.at = child.at
+	if parent.err == nil {
+		parent.err = child.err
+	}
+	if !consumed {
+		return nil
+	}
+	return pimRanges(child)
 }
 
 // PIMChecksum checks one's-complement integrity, not authentication. Register
@@ -121,6 +151,7 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 	if err != nil && r.err == nil {
 		r.err = err
 	}
+	r.need(r.at == len(w), "PIM message trailing bytes")
 	if r.err != nil {
 		// Header bytes alone never become a decoded control message. Opaque
 		// extensions stay inspectable without guessing subsequent boundaries.
@@ -130,24 +161,7 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 		r.info["Observation Scope"] = pimPrefixScope
 		return pimRanges(r), r.err
 	}
-	r.need(r.at == len(w), "PIM message trailing bytes")
-	if r.err != nil {
-		return nil, r.err
-	}
-	ranges := routingFieldRanges(r.fields)
-	ranges["Version"], ranges["Type"] = []any{uint64(0), uint64(1)}, []any{uint64(0), uint64(1)}
-	if typ == 1 {
-		ranges["Border"], ranges["Null Register"] = ranges["Register Flags"], ranges["Register Flags"]
-	}
-	if typ == 5 || typ == 9 {
-		ranges["RPT"], ranges["Metric Preference"] = ranges["Metric Preference Word"], ranges["Metric Preference Word"]
-	}
-	if typ == 9 {
-		for _, key := range []string{"Prune Indicator", "Prune Now", "Assert Override"} {
-			ranges[key] = ranges["Refresh Flags"]
-		}
-	}
-	r.info["Wire Field Ranges"] = ranges
+	pimRanges(r)
 	r.info["Checksum Verified"] = false
 	r.info["Checksum Scope"] = "unverified: enclosing IP addresses not supplied"
 	completeExtent := context.DeclaredBytes == 0 || context.DeclaredBytes == len(w)
@@ -194,7 +208,7 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 // Every address is nested with absolute PDU spans so repeated group/source
 // fields highlight their own bytes. Unsupported encoding cannot be skipped
 // with an invented width.
-func pimAddress(r *controlReader, kind string, budget *int) map[string]any {
+func pimAddress(r *controlReader, kind string, budget *int) (prefix map[string]any) {
 	if r.err != nil {
 		return nil
 	}
@@ -202,11 +216,15 @@ func pimAddress(r *controlReader, kind string, budget *int) map[string]any {
 		return nil
 	}
 	c := &controlReader{w: r.w, at: r.at, info: map[string]any{"Kind": kind}}
+	defer func() { prefix = pimRetainPrefix(r, c) }()
 	af := c.num("Address Family", 1, false)
 	enc := c.num("Encoding", 1, false)
+	if c.err != nil {
+		return
+	}
 	if c.err == nil && (af != 1 && af != 2 || enc != 0) {
-		r.err = fmt.Errorf("%w: unselected PIM address family/encoding %d/%d", ErrObservedWireContext, af, enc)
-		return nil
+		c.err = fmt.Errorf("%w: unselected PIM address family/encoding %d/%d", ErrObservedWireContext, af, enc)
+		return
 	}
 	n := 4
 	if af == 2 {
@@ -214,12 +232,20 @@ func pimAddress(r *controlReader, kind string, budget *int) map[string]any {
 	}
 	if kind == "group" || kind == "source" {
 		flags := c.num("Flags", 1, false)
-		mask := c.num("Mask Length", 1, false)
-		c.need(mask <= uint64(n*8), "PIM mask exceeds address width")
+		if c.err != nil {
+			return
+		}
 		if kind == "group" {
 			c.info["Bidirectional"], c.info["Admin Scope Zone"] = flags&128 != 0, flags&1 != 0
 		} else {
 			c.info["Sparse"], c.info["Wildcard"], c.info["RPT"] = flags&4 != 0, flags&2 != 0, flags&1 != 0
+		}
+		mask := c.num("Mask Length", 1, false)
+		if c.err != nil {
+			return
+		}
+		c.need(mask <= uint64(n*8), "PIM mask exceeds address width")
+		if kind == "source" {
 			// Preserve received prefix/flag values. Non-host source masks and
 			// WC without RPT are receive-semantic issues, never routes.
 			c.info["Source Semantics Valid"] = mask == uint64(n*8) && (flags&2 == 0 || flags&1 != 0)
@@ -227,29 +253,21 @@ func pimAddress(r *controlReader, kind string, budget *int) map[string]any {
 	}
 	routingAddress(c, "Address", n)
 	if c.err != nil {
-		r.err = c.err
-		return nil
+		return
 	}
 	if kind == "group" {
 		address, _ := netip.ParseAddr(c.info["Address"].(string))
 		if !address.IsMulticast() {
-			r.err = fmt.Errorf("pim: encoded group is not multicast")
-			return nil
+			c.err = fmt.Errorf("pim: encoded group is not multicast")
+			return
 		}
 	}
-	r.at = c.at
-	pimRanges(c)
-	ranges := c.info["Wire Field Ranges"].(map[string]any)
-	for _, key := range []string{"Bidirectional", "Admin Scope Zone", "Sparse", "Wildcard", "RPT"} {
-		if _, ok := c.info[key]; ok {
-			ranges[key] = ranges["Flags"]
-		}
-	}
-	return c.info
+	return
 }
 
 func decodePIMHello(r *controlReader, budget *int) error {
 	var options []map[string]any
+	defer func() { r.info["Options"] = options }()
 	for r.at < len(r.w) && r.err == nil {
 		if !pimCharge(r, budget) {
 			break
@@ -257,18 +275,27 @@ func decodePIMHello(r *controlReader, budget *int) error {
 		c := &controlReader{w: r.w, at: r.at, info: map[string]any{}}
 		typ := c.num("Option Type", 2, false)
 		n := c.num("Option Length", 2, false)
-		c.need(n <= uint64(len(c.w)-c.at), "PIM Hello option crosses datagram")
 		if c.err != nil {
-			return c.err
+			if prefix := pimRetainPrefix(r, c); prefix != nil {
+				options = append(options, prefix)
+			}
+			break
 		}
-		end := c.at + int(n)
+		declaredEnd := c.at + int(n)
+		end := min(declaredEnd, len(c.w))
+		var boundaryErr error
+		if declaredEnd > end {
+			boundaryErr = fmt.Errorf("network-control: PIM Hello option crosses datagram")
+		}
 		c.w = c.w[:end]
 		switch typ {
 		case 1:
 			c.num("Hold Time", 2, false)
 		case 2:
 			v := c.num("Propagation Flags", 2, false)
-			c.info["Tracking Support"], c.info["Propagation Delay"] = v&0x8000 != 0, v&0x7fff
+			if c.err == nil {
+				c.info["Tracking Support"], c.info["Propagation Delay"] = v&0x8000 != 0, v&0x7fff
+			}
 			c.num("Override Interval", 2, false)
 		case 19:
 			c.num("DR Priority", 4, false)
@@ -286,7 +313,7 @@ func decodePIMHello(r *controlReader, budget *int) error {
 				if a == nil {
 					break
 				}
-				if family != nil {
+				if family != nil && c.err == nil {
 					c.need(family == a["Address Family"], "PIM address list mixes families")
 				}
 				family = a["Address Family"]
@@ -294,21 +321,20 @@ func decodePIMHello(r *controlReader, budget *int) error {
 			}
 			c.info["Addresses"] = addresses
 		default:
-			c.rest("Unknown Option Value")
+			if boundaryErr == nil {
+				c.rest("Unknown Option Value")
+			}
 		}
-		c.need(c.at == end, "PIM Hello option has trailing bytes")
-		if c.err != nil {
-			return c.err
+		if boundaryErr != nil {
+			// Keep the first structural failure, while retaining complete
+			// words inside the captured portion of a known option body.
+			c.err = boundaryErr
 		}
-		pimRanges(c)
-		if typ == 2 {
-			ranges := c.info["Wire Field Ranges"].(map[string]any)
-			ranges["Tracking Support"], ranges["Propagation Delay"] = ranges["Propagation Flags"], ranges["Propagation Flags"]
+		c.need(c.at == declaredEnd, "PIM Hello option has trailing bytes")
+		if prefix := pimRetainPrefix(r, c); prefix != nil {
+			options = append(options, prefix)
 		}
-		options = append(options, c.info)
-		r.at = end
 	}
-	r.info["Options"] = options
 	return r.err
 }
 
@@ -433,6 +459,7 @@ func decodePIMJoinPrune(r *controlReader, budget *int) error {
 	n := r.num("Group Count", 1, false)
 	r.num("Hold Time", 2, false)
 	var groups []map[string]any
+	defer func() { r.info["Groups"] = groups }()
 	for i := uint64(0); i < n && r.err == nil; i++ {
 		if !pimCharge(r, budget) {
 			break
@@ -446,26 +473,27 @@ func decodePIMJoinPrune(r *controlReader, budget *int) error {
 		}{{"Joined Sources", joins}, {"Pruned Sources", prunes}} {
 			var addresses []map[string]any
 			for j := uint64(0); j < list.count && c.err == nil; j++ {
-				addresses = append(addresses, pimAddress(c, "source", budget))
+				if prefix := pimAddress(c, "source", budget); prefix != nil {
+					addresses = append(addresses, prefix)
+				}
 			}
 			c.info[list.name] = addresses
 		}
-		if c.err != nil {
-			return c.err
+		if prefix := pimRetainPrefix(r, c); prefix != nil {
+			groups = append(groups, prefix)
 		}
-		groups = append(groups, pimRanges(c))
-		r.at = c.at
 	}
-	r.info["Groups"] = groups
 	return r.err
 }
 
 func decodePIMBootstrap(r *controlReader, budget *int) error {
+	r.info["Bootstrap Reassembly"] = "not attempted; fragment advertisements only"
 	r.num("Fragment Tag", 2, false)
 	r.num("Hash Mask Length", 1, false)
 	r.num("BSR Priority", 1, false)
 	r.info["BSR"] = pimAddress(r, "unicast", budget)
 	var groups []map[string]any
+	defer func() { r.info["Groups"] = groups }()
 	for r.at < len(r.w) && r.err == nil {
 		if !pimCharge(r, budget) {
 			break
@@ -483,22 +511,18 @@ func decodePIMBootstrap(r *controlReader, budget *int) error {
 			p.num("Hold Time", 2, false)
 			p.num("Priority", 1, false)
 			p.num("Reserved", 1, false)
-			if p.err != nil {
-				return p.err
+			if prefix := pimRetainPrefix(c, p); prefix != nil {
+				rps = append(rps, prefix)
 			}
-			rps = append(rps, pimRanges(p))
-			c.at = p.at
-		}
-		if c.err != nil {
-			return c.err
 		}
 		c.info["RPs"] = rps
-		c.info["RP Set Complete In Message"] = n == fragment
-		groups = append(groups, pimRanges(c))
-		r.at = c.at
+		if c.err == nil {
+			c.info["RP Set Complete In Message"] = n == fragment
+		}
+		if prefix := pimRetainPrefix(r, c); prefix != nil {
+			groups = append(groups, prefix)
+		}
 	}
-	r.info["Groups"] = groups
-	r.info["Bootstrap Reassembly"] = "not attempted; fragment advertisements only"
 	return r.err
 }
 
@@ -509,7 +533,9 @@ func decodePIMCandidateRP(r *controlReader, budget *int) error {
 	r.info["RP"] = pimAddress(r, "unicast", budget)
 	var groups []map[string]any
 	for i := uint64(0); i < n && r.err == nil; i++ {
-		groups = append(groups, pimAddress(r, "group", budget))
+		if prefix := pimAddress(r, "group", budget); prefix != nil {
+			groups = append(groups, prefix)
+		}
 	}
 	r.info["Advertised Groups"] = groups
 	return r.err
