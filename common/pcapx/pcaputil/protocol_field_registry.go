@@ -212,6 +212,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, isisDisplayBindings()...)
 	out = append(out, netflowV9DisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
+	out = append(out, tlsResumptionDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
 		typ       DisplayFieldType
@@ -602,7 +603,7 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	if e == nil {
 		return s
 	}
-	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation {
 		owned := *e
 		owned.Protocol, owned.Session = "ssh", e.semanticSession
 		if e.nativeIMAPObservation {
@@ -610,6 +611,12 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 		}
 		if e.nativeDCERPCObservation {
 			owned.Protocol = "dcerpc"
+		}
+		if e.nativeTLSObservation {
+			// TLS owns its complete wire observation and passive context in
+			// semanticFields, as Decode/GetFields do. semanticSession is for
+			// codecs which keep rule fields separate from connection context.
+			owned.Protocol, owned.Session = "tls", e.semanticFields
 		}
 		if e.sessionError != nil {
 			owned.Status, _ = classifySessionError(e.sessionError)

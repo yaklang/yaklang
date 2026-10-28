@@ -108,7 +108,13 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		case *layers.Dot1Q:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vlan:%d", v.VLANIdentifier)
 		case *layers.VXLAN:
-			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vxlan:%s:%d", outer, v.VNI)
+			if len(v.LayerContents()) >= 7 {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/vxlan:%s:%d", outer, v.VNI)
+			}
+		case *captureVXLANGPE:
+			h := v.LayerContents()
+			vni := uint32(h[4])<<16 | uint32(h[5])<<8 | uint32(h[6])
+			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vxlan-gpe:%s:%d", outer, vni)
 		case *layers.GRE:
 			if directionalOuter != "" && selectedPPTPGRE(v) {
 				// RFC 2637 divides Key into changing Payload Length and the
