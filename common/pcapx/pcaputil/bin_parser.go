@@ -28,6 +28,7 @@ type ProtocolEvent struct {
 	nativeHARTIPObservation            bool
 	nativeTLSObservation               bool
 	nativeESPObservation               bool
+	nativeNetworkFields                *nativeNetworkObservation
 	nativeDTLSObservation              bool
 	nativeRADIUSObservation            bool
 	radiusApplicationRefusal           bool
@@ -919,6 +920,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	}
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
+	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
 	// IEC104, DNP3, GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.

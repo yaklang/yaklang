@@ -168,3 +168,40 @@ func TestDeepDecodeDoesNotResetAnInteractedTree(t *testing.T) {
 	require.Zero(t, u.fieldTop)
 	require.Nil(t, u.pendingDetail)
 }
+
+func TestDeepDecodeDoesNotReplaceAnInspectedByteSource(t *testing.T) {
+	for _, action := range []string{"source", "wheel", "keyboard", "scrollbar"} {
+		t.Run(action, func(t *testing.T) {
+			u := browsingFixture(t)
+			longInspector(u)
+			u.fields.sources = []detailSource{{Name: "logical PDU", Data: make([]byte, 4096)}}
+			u.bytesSource = 1
+			switch action {
+			case "source":
+				u.bytesSource = 0
+				u.key("b", &captureSource{})
+			case "wheel":
+				u.scroll(2, 3)
+			case "keyboard":
+				u.key("3", &captureSource{})
+				u.key("\x1b[6~", &captureSource{})
+			case "scrollbar":
+				r := u.viewport(2)
+				u.mouse(mouseEvent{action: mousePress, x: r.x + r.w - 1, y: r.y + 5, button: 0})
+			}
+			top, label := u.hexTop, u.bytesLabel()
+			d := packetDetail{number: u.selected, fields: []field{{text: "late full tree"}}, sources: []detailSource{{Name: "different PDU", Data: []byte{1}}}}
+			u.applyDetail(detailResult{number: u.selected, detail: d})
+			require.Equal(t, 1, u.bytesSource)
+			require.Equal(t, top, u.hexTop)
+			require.Equal(t, label, u.bytesLabel())
+			require.Len(t, u.byteData(), 4096)
+			require.NotNil(t, u.pendingDetail)
+			u.key("d", &captureSource{})
+			require.Zero(t, u.bytesSource)
+			require.Zero(t, u.hexTop)
+			require.Equal(t, "late full tree", u.fields.fields[0].text)
+			require.Nil(t, u.pendingDetail)
+		})
+	}
+}

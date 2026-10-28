@@ -60,3 +60,46 @@ func TestICMPv4TimestampPartialNativeAndWorkerAgree(t *testing.T) {
 	raw.ci.Length += 17
 	require.Contains(t, summarize(raw).Info, "truncated capture:")
 }
+
+func TestICMPv4LegacyMTUTreeMatchesNativeAndWorker(t *testing.T) {
+	for _, tc := range []struct {
+		typ, code byte
+		want      string
+	}{{3, 4, "Next-Hop MTU: 1492"}, {3, 1, "Rest of Header:"}, {11, 0, "Rest of Header:"}} {
+		eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
+		ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolICMPv4, SrcIP: net.ParseIP("198.51.100.10"), DstIP: net.ParseIP("198.51.100.20")}
+		icmp := &layers.ICMPv4{TypeCode: layers.CreateICMPv4TypeCode(tc.typ, tc.code), Id: 0x1234, Seq: 1492}
+		b := gopacket.NewSerializeBuffer()
+		require.NoError(t, gopacket.SerializeLayers(b, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, icmp, gopacket.Payload([]byte{0x45, 0, 0, 20})))
+		wire := bytes.Clone(b.Bytes())
+		ci := gopacket.CaptureInfo{Timestamp: time.Unix(42, 0), CaptureLength: len(wire), Length: len(wire)}
+		var input bytes.Buffer
+		w := pcapgo.NewWriter(&input)
+		require.NoError(t, w.WriteFileHeader(65535, layers.LinkTypeEthernet))
+		require.NoError(t, w.WritePacket(ci, wire))
+		var events []*pcaputil.ProtocolEvent
+		require.NoError(t, pcaputil.ReplayPcap(bytes.NewReader(input.Bytes()), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { events = append(events, e) })))
+		require.Len(t, events, 1)
+		raw := &capturedPacket{number: 1, data: wire, ci: ci, link: layers.LinkTypeEthernet, events: events, presentation: presentEvents(events)}
+		for _, got := range []packetDetail{detail(raw), workerMetadataDetailForPacket(t, raw)} {
+			var text strings.Builder
+			for _, f := range got.fields {
+				text.WriteString(f.text)
+				text.WriteByte('\n')
+			}
+			require.Contains(t, text.String(), tc.want)
+			require.NotContains(t, text.String(), "Unused:")
+			require.NotContains(t, text.String(), "Sequence Number:")
+			require.NotContains(t, text.String(), "YAML dissector incomplete")
+			if tc.typ == 3 && tc.code == 4 {
+				f := findField(t, got, "ICMP.ICMP Destination Unreachable.Next-Hop MTU")
+				require.True(t, f.hasRange)
+				require.Zero(t, f.source)
+				require.Equal(t, []byte{5, 0xd4}, wire[f.start:f.end])
+				require.Equal(t, 40, f.start)
+			} else {
+				require.NotContains(t, text.String(), "Next-Hop MTU:")
+			}
+		}
+	}
+}
