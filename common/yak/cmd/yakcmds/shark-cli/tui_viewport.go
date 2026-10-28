@@ -138,6 +138,9 @@ func (u *tui) resumeLive() {
 func (u *tui) focusPane(pane int) {
 	u.freezeList()
 	u.pane = pane
+	if pane == 2 {
+		u.touchFields()
+	}
 	if pane == 3 {
 		u.syncStream()
 	}
@@ -346,8 +349,8 @@ func (u *tui) applyDetail(result detailResult) {
 		u.decodeStatus = "Deep decode unavailable · using packet headers"
 		return
 	}
-	// Once the user has interacted with the fields, keep their viewport and
-	// structure stable. Cache the full result until an explicit 'd' requests it.
+	// Field and byte interactions own the current structure and source. Cache
+	// the full result until an explicit 'd' requests it.
 	if u.fieldsTouched {
 		u.pendingDetail = &result.detail
 		u.decodeStatus = "Deep decode ready · d opens all fields"

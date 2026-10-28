@@ -58,7 +58,13 @@ ICMP Echo Reply:
   Echo Data: string
 ICMP Destination Unreachable:
   operator: |
-    this.ProcessSubNode("Unused")
+    code = getNodeResult("@ICMP/Code").Value
+    if code == 4 {
+      this.ProcessSubNode("Rest of Header Prefix")
+      this.ProcessSubNode("Next-Hop MTU")
+    } else {
+      this.ProcessSubNode("Rest of Header")
+    }
     rest = 0
     if this.GetMaxLength() > this.Length() {
       rest = this.GetMaxLength() - this.Length()
@@ -67,11 +73,13 @@ ICMP Destination Unreachable:
       this.GetSubNode("Original Datagram").SetMaxLength(rest)
       this.ProcessSubNode("Original Datagram")
     }
-  Unused: raw,4
+  Rest of Header Prefix: raw,2
+  Next-Hop MTU: uint16
+  Rest of Header: raw,4
   Original Datagram: string
 ICMP Time Exceeded:
   operator: |
-    this.ProcessSubNode("Unused")
+    this.ProcessSubNode("Rest of Header")
     rest = 0
     if this.GetMaxLength() > this.Length() {
       rest = this.GetMaxLength() - this.Length()
@@ -80,7 +88,7 @@ ICMP Time Exceeded:
       this.GetSubNode("Original Datagram").SetMaxLength(rest)
       this.ProcessSubNode("Original Datagram")
     }
-  Unused: raw,4
+  Rest of Header: raw,4
   Original Datagram: string
 ICMP Redirect:
   operator: |
