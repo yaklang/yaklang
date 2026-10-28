@@ -39,6 +39,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	}
 	var fields map[string]any
 	switch profile {
+	case "icmpv4-header":
+		fields, err = DecodeICMPv4HeaderWire(wire, 1<<20)
 	case "esp-header":
 		fields, err = DecodeESPHeaderWire(wire, 1<<20)
 	case "netflow-v5":

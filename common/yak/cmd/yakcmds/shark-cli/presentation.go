@@ -1029,14 +1029,17 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("RTSP")
 		return
 	}
-	if e.Protocol == "icmpv6" && e.Transport == "network" && e.Profile == "icmpv6-header-observation" && e.Completeness == e.Status &&
-		(e.Status == "incomplete" && e.ExpertCode == "ICMPv6HeaderTruncated" || e.Status == "malformed" && e.ExpertCode == "NDOptionLength" || e.Status == "limited" && e.ExpertCode == "NDOptionBudget") {
-		p.addLayer("ICMPv6")
+	icmpPartial := e.Protocol == "icmp" && e.Profile == "icmp-header-observation" && e.Status == "incomplete" && e.ExpertCode == "ICMPHeaderTruncated"
+	icmpv6Partial := e.Protocol == "icmpv6" && e.Profile == "icmpv6-header-observation" &&
+		(e.Status == "incomplete" && e.ExpertCode == "ICMPv6HeaderTruncated" || e.Status == "malformed" && e.ExpertCode == "NDOptionLength" || e.Status == "limited" && e.ExpertCode == "NDOptionBudget")
+	if (icmpPartial || icmpv6Partial) && e.Transport == "network" && e.Completeness == e.Status {
+		label := protocolName(e.Protocol)
+		p.addLayer(label)
 		if p.priority <= 5 {
-			p.protocol, p.priority, p.status, p.visibility = "ICMPv6", 5, e.Status, "partial-message"
+			p.protocol, p.priority, p.status, p.visibility = label, 5, e.Status, "partial-message"
 			p.summary = safeText(e.Summary)
-			p.scope = "observed ICMPv6 header fields; complete message not admitted"
-			p.evidence = "ICMPv6 generic header observed; body or options incomplete, invalid or limited"
+			p.scope = "observed " + label + " header fields; complete message not admitted"
+			p.evidence = label + " generic header observed; body or options incomplete, invalid or limited"
 			if len(e.CarrierLayers) > 0 {
 				p.nativeHeaders = headerLayerNames(eventValues(e)["Observed Header Layers"])
 				p.nativeSource, p.nativeDestination, p.nativeDomain = e.Source, e.Destination, e.Domain

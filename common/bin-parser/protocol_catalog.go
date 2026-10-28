@@ -237,6 +237,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "IPv4", Layer: "L3", RuleFile: "internet_protocol.yaml", Status: statusStable, SampleFrom: "existing ethernet fixtures"},
 	{Name: "IPv6", Layer: "L3", RuleFile: "internet_protocol_version_6.yaml", Status: statusStable, SampleFrom: "existing ethernet fixtures"},
 	{Name: "ICMP", Layer: "L3", RuleFile: "internet_control_message_protocol.yaml", Status: statusNew, Notes: "echo, dest-unreach, time-exceeded, redirect, timestamp"},
+	{Name: "ICMPv4 Header Fields", Layer: "L3", RuleFile: "network_icmp.yaml", EntryNode: "ICMPv4HeaderFields", ProfileOf: "ICMP", Status: statusPartial, Notes: "Explicit bounded observed ICMPv4 payload: type-gated Id/Seq, opaque rest-of-header, MTU, gateway, pointer, quoted bytes and complete available Timestamp/Address Mask words. Shared native codec; short fixed bodies refuse a complete message. No checksum validation, quoted-IP semantics, RFC4884 extension selection or routing/neighbor state", SampleFrom: "RFC792/950/1191; original public ICMP type-specific sources and authored boundary controls"},
 	{Name: "ICMPv6", Layer: "L3", RuleFile: "internet_control_message_protocol_v6.yaml", Status: statusNew, Notes: "echo/NS/NA/RS/RA"},
 	{Name: "GRE", Layer: "L3", RuleFile: "generic_routing_encapsulation.yaml", Status: statusStable},
 	{Name: "TCP", Layer: "L4", RuleFile: "transmission_control_protocol.yaml", Status: statusStable},

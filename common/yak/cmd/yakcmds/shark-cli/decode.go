@@ -432,6 +432,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	}
 	espIncomplete := !networkRefused && appendESPIncompleteCapturedPrefix(&d, raw, events)
 	icmpv6Partial := !networkRefused && appendICMPv6PartialCapturedPrefix(&d, raw, events)
+	icmpv4Partial := !networkRefused && appendICMPv4PartialCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -450,7 +451,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			d.protocol = presentEvents(events).protocol
 		}
 	}
-	if networkRefused || espIncomplete || icmpv6Partial {
+	if networkRefused || espIncomplete || icmpv6Partial || icmpv4Partial {
 		return d
 	}
 	appendTransportObservation(&d, row)
