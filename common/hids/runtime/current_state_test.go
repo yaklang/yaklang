@@ -124,6 +124,32 @@ func TestCurrentStateSynchronousSinkDeliversLargeInventory(t *testing.T) {
 	}
 }
 
+func TestCurrentStateKeepsExplicitCollectionBudgetSeparateFromArtifactBudget(t *testing.T) {
+	t.Parallel()
+	var collectionDeadline time.Time
+	manager := currentStateManager(currentStateProvider{processes: func(ctx context.Context) ([]model.Event, error) {
+		deadline, ok := ctx.Deadline()
+		if !ok || time.Until(deadline) < 15*time.Second || time.Until(deadline) > 20*time.Second {
+			t.Fatalf("collection inherited the automatic artifact budget: deadline=%v ok=%v", deadline, ok)
+		}
+		collectionDeadline = deadline
+		return []model.Event{{Type: model.EventTypeProcessState, Process: &model.Process{PID: 1, Image: "/unread/image"}}}, nil
+	}})
+	count, err := manager.CollectCurrentStateWithSink(context.Background(), "processes", func(ctx context.Context, event model.Event) error {
+		deadline, _ := ctx.Deadline()
+		if !deadline.Equal(collectionDeadline) {
+			t.Errorf("sink lost the collection budget: deadline=%v collection=%v", deadline, collectionDeadline)
+		}
+		if event.Process.Artifact != nil || event.Data["artifact_errors"] != nil {
+			t.Error("explicit inventory entered the automatic artifact/pipeline path")
+		}
+		return nil
+	})
+	if err != nil || count != 1 {
+		t.Fatalf("explicit collection failed: count=%d err=%v", count, err)
+	}
+}
+
 func TestCurrentStateSinkFailureReturnsAcknowledgedCount(t *testing.T) {
 	t.Parallel()
 	wantErr := errors.New("durable publish failed")
