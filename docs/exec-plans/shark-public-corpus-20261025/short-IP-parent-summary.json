@@ -1,0 +1,4484 @@
+{
+  "scope": "Source-bound incomplete IP headers and unselected parent admission. Literal reference labels remain differences; no full protocol, all-field or all-carrier parity claim.",
+  "native_source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+  "Windows_CLI_source": "81b486343c93d46f7b66ad72580e5a314901029d",
+  "reference": "TShark4.6.9",
+  "raw_captures_keys_exports_logs_binaries_images_outside_Git": true,
+  "public": {
+    "weber": {
+      "preservation": {
+        "proof_SHA256": "72b2f0b27f87d295b0e3b9e58d935920f0db91d9a715aba4823314b0f60d2ed9",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "before_SDK_SHA256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+        "after_SDK_SHA256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+        "before_CLI_SHA256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+        "after_CLI_SHA256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+        "auditor_SHA256": "f40a66e7daba489f8b4c5f13e01825ee4f4a13aa348d6b695a247ce54f35134b",
+        "source_bound_non_IP_events": 39596,
+        "complete_non_IP_events_identical": 39596,
+        "non_IP_events_with_only_generated_ID_changes": 0,
+        "independently_source_bound_removed_observations": [],
+        "parent_proof_SHA256": null,
+        "parent_removal_policy_recomputed": false,
+        "all_other_application_values_and_connections_literal": true,
+        "physical_rows": 51328,
+        "physical_facts_unchanged": true,
+        "before_literal_CLI_labels": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 8890,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 133,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 22,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 402,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "after_literal_CLI_labels": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 8890,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 133,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 22,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 402,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "before_IP_diagnostics": [
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 22
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 122
+          }
+        ],
+        "after_IP_diagnostics": [
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 22
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 122
+          }
+        ],
+        "all_protocol_Wireshark_parity_claim": false
+      },
+      "generated_ID_mapping_SHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+      "literal_label_changes": [],
+      "literal_label_change_frames": 0,
+      "TCP_binding": {
+        "proof_SHA256": "f3877bf04b11d0e92e2df4cdfa4ed58970f96b925d297826c64ee5cc01c28c58",
+        "native_TCP_generations": 824,
+        "all_checked_bindings_exact": true,
+        "CLI_proof_scope": "31142 CLI; final 81b projection separately proves every connection/source/identity field literal"
+      },
+      "RPC": {
+        "proof_SHA256": "790a02319cd35f2d053bd8a8d1621132013964e60ba74e1a52ed9a1f3acb414c",
+        "PDUs": 384,
+        "reference_fields": 4788,
+        "unexported_complete_wire_PDUs": 0
+      }
+    },
+    "sharon": {
+      "preservation": {
+        "proof_SHA256": "66f217817c7abaf1760ee8defa035ab546acaaac4fcae7eabf95d636fa78d5b7",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "before_SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+        "after_SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+        "before_CLI_SHA256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
+        "after_CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+        "auditor_SHA256": "f40a66e7daba489f8b4c5f13e01825ee4f4a13aa348d6b695a247ce54f35134b",
+        "source_bound_non_IP_events": 135001,
+        "complete_non_IP_events_identical": 132984,
+        "non_IP_events_with_only_generated_ID_changes": 2017,
+        "independently_source_bound_removed_observations": [
+          {
+            "frame": 39621,
+            "before_event_canonical_SHA256": "1f5243c6a4c22171b3b6a3c2564ec000ee6b012e102c017f38971d50fdd50f21",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 39797,
+            "before_event_canonical_SHA256": "ceca7fea434a910d90d46ba919aff2a9c9e8e689382970c11b5dfa2051757ee2",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 44075,
+            "before_event_canonical_SHA256": "0893f1613893ceda5a4be6ec27f02792d7c6fd332e8b1394c0f6bd25c5980973",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 46552,
+            "before_event_canonical_SHA256": "11a81db1d151d89cf3df94f9794c614d380553d401b09f5959450f5ab2886aa0",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 84358,
+            "before_event_canonical_SHA256": "2f1852552f71ebd47315ab5b959071e4b229c41e4659fcfa34c79e382729777e",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 96272,
+            "before_event_canonical_SHA256": "2e26f3de3e25e8eee3c6a291973e73f005d46ad022fd77afa7d7a92352970767",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 98352,
+            "before_event_canonical_SHA256": "bf3c7595869e19612e16548728b0800e6459806e9bf802b94396dd6126be4dc4",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 103562,
+            "before_event_canonical_SHA256": "d1a42a9545e659b8443aa9e85265d1f66c6e7aca26cc59c17cc0ecafa170aad8",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 110230,
+            "before_event_canonical_SHA256": "fa177953561cb7f2d8c980ca717f86cfa664f03948f19420d92e2d7b098f6c5e",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 112931,
+            "before_event_canonical_SHA256": "c7f83993a6e8fd3e7b3d899f81757ddb5b2f044debf0ad1fc20a873c0379561b",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 119723,
+            "before_event_canonical_SHA256": "b6cb42038b01c2b946d140f08f4953ce5171373f832d7ed4115dcf706198b51e",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 129185,
+            "before_event_canonical_SHA256": "267c9449030ff711bbbef0cb7b854a4a8922bf7d5dac27e6400625a69bd386e0",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 129543,
+            "before_event_canonical_SHA256": "7dbbf30bc5af635a3186affa42d6caade50cb4bc0479a6bfad5295a23bc0d0d6",
+            "wire_profile": "unselected-Geneve-profile"
+          },
+          {
+            "frame": 133492,
+            "before_event_canonical_SHA256": "d80ac6d425acf3090dcd16cbd58b05a4cce2545777225bfa994a820413988c47",
+            "wire_profile": "unselected-Geneve-profile"
+          }
+        ],
+        "parent_proof_SHA256": "e6a8825de9e594355f9ca6c6fdb5e0b771f96e98cac94ede02bb0fdb3384d372",
+        "parent_removal_policy_recomputed": true,
+        "all_other_application_values_and_connections_literal": true,
+        "physical_rows": 328127,
+        "physical_facts_unchanged": true,
+        "before_literal_CLI_labels": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6634,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 82,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 54975,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51606,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18028,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 16381,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "DCE/RPC": 5,
+          "IPv6Destination": 13,
+          "ICMPv4": 11,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "SMB2": 14,
+          "EtherIP": 6,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 1
+        },
+        "after_literal_CLI_labels": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6634,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109362,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 82,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 35,
+          "IPv4": 65310,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51606,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 7711,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 16380,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 254,
+          "EAPOL": 53,
+          "EAP": 26,
+          "DCE/RPC": 5,
+          "IPv6Destination": 13,
+          "ICMPv4": 11,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "SMB2": 14,
+          "EtherIP": 6,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 1
+        },
+        "before_IP_diagnostics": [
+          {
+            "status": "incomplete",
+            "expert": "FragmentCaptureEnded",
+            "reason": "FragmentCaptureEnded",
+            "records": 109
+          },
+          {
+            "status": "incomplete",
+            "expert": "FragmentTimeout",
+            "reason": "FragmentTimeout",
+            "records": 324
+          },
+          {
+            "status": "incomplete",
+            "expert": "ICMPv6HeaderTruncated",
+            "reason": "ICMPv6HeaderTruncated",
+            "records": 2
+          },
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 50
+          },
+          {
+            "status": "limited",
+            "expert": "FragmentQuarantineBudget",
+            "reason": "FragmentQuarantineBudget",
+            "records": 44202
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentLength",
+            "reason": "FragmentLength",
+            "records": 14932
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentOverlapRejected",
+            "reason": "FragmentOverlapRejected",
+            "records": 18
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 0",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 1",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 6",
+            "records": 3926
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 8",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "NDOptionLength",
+            "reason": "NDOptionLength",
+            "records": 57
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 50859
+          }
+        ],
+        "after_IP_diagnostics": [
+          {
+            "status": "incomplete",
+            "expert": "FragmentCaptureEnded",
+            "reason": "FragmentCaptureEnded",
+            "records": 109
+          },
+          {
+            "status": "incomplete",
+            "expert": "FragmentTimeout",
+            "reason": "FragmentTimeout",
+            "records": 324
+          },
+          {
+            "status": "incomplete",
+            "expert": "ICMPv6HeaderTruncated",
+            "reason": "ICMPv6HeaderTruncated",
+            "records": 2
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "IPv6 header truncated: 1 of 40 bytes",
+            "records": 1
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "IPv6 header truncated: 6 of 40 bytes",
+            "records": 1
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 0 less than 20",
+            "records": 1
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 1 less than 20",
+            "records": 2
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 10 less than 20",
+            "records": 2
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 12 less than 20",
+            "records": 2
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 16 less than 20",
+            "records": 4
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 3 less than 20",
+            "records": 1
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 4 less than 20",
+            "records": 8
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 5 less than 20",
+            "records": 1
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 6 less than 20",
+            "records": 2
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 8 less than 20",
+            "records": 6
+          },
+          {
+            "status": "incomplete",
+            "expert": "IPHeaderTruncated",
+            "reason": "Invalid ip4 header. Length 9 less than 20",
+            "records": 2
+          },
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 10385
+          },
+          {
+            "status": "limited",
+            "expert": "FragmentQuarantineBudget",
+            "reason": "FragmentQuarantineBudget",
+            "records": 44202
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentLength",
+            "reason": "FragmentLength",
+            "records": 14932
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentOverlapRejected",
+            "reason": "FragmentOverlapRejected",
+            "records": 18
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 0",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 1",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 6",
+            "records": 3926
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 8",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "NDOptionLength",
+            "reason": "NDOptionLength",
+            "records": 57
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 40626
+          }
+        ],
+        "all_protocol_Wireshark_parity_claim": false
+      },
+      "generated_ID_mapping_SHA256": "e1b0236219a0eccbfdf4cc57872fa67bf1a856ba14c7e4273341cf68ccce0631",
+      "literal_label_changes": [
+        {
+          "before": "GRE",
+          "after": "IPv4",
+          "frames": 10317
+        },
+        {
+          "before": "UDP",
+          "after": "IPv4",
+          "frames": 14
+        },
+        {
+          "before": "MPLS",
+          "after": "IPv4",
+          "frames": 1
+        },
+        {
+          "before": "IPv6HopByHop",
+          "after": "IPv4",
+          "frames": 1
+        },
+        {
+          "before": "PPP",
+          "after": "IPv4",
+          "frames": 2
+        }
+      ],
+      "literal_label_change_frames": 10335,
+      "TCP_binding": {
+        "proof_SHA256": "ce128711d9a33fb083b1601907e8f08aa86d73332da71e2b1d1734eab9f414e5",
+        "native_TCP_generations": 840,
+        "all_checked_bindings_exact": true,
+        "CLI_proof_scope": "31142 CLI; final 81b projection separately proves every connection/source/identity field literal"
+      },
+      "RPC": {
+        "proof_SHA256": "ece6b5da7b0f6d538c55ee4c32abbc560fc8384aa10ab4dd22f47e2b537acf7a",
+        "PDUs": 14,
+        "reference_fields": 121,
+        "unexported_complete_wire_PDUs": 0
+      },
+      "version_continuity": {
+        "proof_SHA256": "2542800aba9f1fc3ebc913e9281d75a749285ad1ec825fd96e91e226ebae6d79",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "baseline_SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+        "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+        "CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+        "original_wire_proof_SHA256": "32353c639284c3f24e510bd33a220a500d9128e596969e8a1effa8dcc21febf7",
+        "reference_SHA256": "49f87d87ff69c61c533407547b011bc93427f1f37f7e2fae7dcf59e0db64b06b",
+        "reference_labels_SHA256": "c6a1b987a9133ecf354e4993bfc8c165a2da89b1cbea743094023cf7fc5119df",
+        "auditor_SHA256": "0254b5a6f7d545cbc619bd765b00b8359a68399a5ed514f140f2ab0ba9ed4df2",
+        "version_refusals": 3929,
+        "complete_records_exact": 5,
+        "only_generated_PDU_ID_aliases_changed": 3924,
+        "every_other_value_and_type_literal": true,
+        "complete_new_source_contributors_exclusive": true,
+        "physical_CLI_projection_exact": true,
+        "new_parent_or_short_header_parity_claim": false
+      },
+      "short_headers": {
+        "proof_SHA256": "860162bd5e97c7035ecce0a24fd24a22ec87e260e14ace6c3d483dedda2d48e0",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+        "CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+        "reference_SHA256": "8c300432d49f3f5e4b179ce9ce46605dab7e92e531ed616fed520a8b617032e7",
+        "reference_labels_SHA256": "5d7ab69c4b92eddd23cec39cf82de02419fe6293ce19d76f5e6f712c573b59fd",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 33,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 23,
+          "IP": 3,
+          "IPv6": 7
+        },
+        "literal_native_columns": {
+          "IPv4": 31,
+          "IPv6": 2
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      }
+    }
+  },
+  "regression_inputs": [
+    {
+      "group": "matrix",
+      "name": "actual",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "fdfedafe1a58cffa2f1e455c72610adc48af07ce32051540c50f7a44f997292d",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close",
+      "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+      "SDK_SHA256": "db9f8e32ba7302bb20b0ae8077d59d48e86f1fe2a64652ef2fabf415d7aa356e",
+      "CLI_SHA256": "3b90ed3a6c69656969ae5c758bb9ec729af619b2bd8b2e372d09dd3850487be0",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "f0af7a212aeae487ef7f29692ee52b6e961707c2510cde9d5bc274a3f7fbef82",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close-opening-retry",
+      "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+      "SDK_SHA256": "35e5c7c73ffbb22a9f72e713a71bc430cdd30e7f1cd399d2f524d4f88e0d1f58",
+      "CLI_SHA256": "fc7c18dae1f0d6a23efc8129105df391ced054ac0f9d9fed1c6b70a2d09c9168",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "a598415606102cf22dae884452d90fda658b93fd5ae90baa8a9a4faef19abdab",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close-with-duplicates",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "SDK_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+      "CLI_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "00bad4019946e55df031cf9e6a2799e2e3bbcfd6cf63482f7e59ba61bf7adfa8",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "matrix",
+      "name": "missing-close-opening-duplicates",
+      "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+      "SDK_SHA256": "8e633801fdefe53de3c6be3c216142f48c1a68ff052ba842fff738129d6babf3",
+      "CLI_SHA256": "c8f7ac8c8bb9eb9f0ab248e7d00ad3df86c92bd67b30476ebbdbef4519fb2f85",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "448fe2287e9b468bffd04e669bd2f96ec0caff832e8b43715ae489cc83b3c0d0",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-CoAP",
+      "capture_SHA256": "753bb741173787edcf4535974e704cce796e51a6380c51443677c8341b99e093",
+      "SDK_SHA256": "a29ed9d981cd5eeb07ff126b1c70b69067f0a02f9b8ea4292181ee601c743f0a",
+      "CLI_SHA256": "735f9009d6ade52b2e16f990360a10c4d6b0ad9eb5ede728e010603a564bc239",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "da0cd0d1055fc7b96a5c3cc762cebb3f3d395dd288ee63caad439bd2d964cd1f",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-QUIC",
+      "capture_SHA256": "00347cb1e27508cf951737cf048fb42d5629d6ce585329b9dbfd31a3613d1434",
+      "SDK_SHA256": "7b18be93f3459b54d81360c3f71a9fe1338b8cf416d0fa123549f849eccd946f",
+      "CLI_SHA256": "58bde43604c894af94b2aea22b0d76d68bdd9696b22cf8e9b6b0146431586a1a",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "137691c1b4b06b2d526185fbb8e9da63cee87ddf8606a6e463284126f86c217d",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-TLS",
+      "capture_SHA256": "5e751ac78e765c5adb43a68562e35b6b502a83849a49fd4e9d01dcc869b91ddb",
+      "SDK_SHA256": "57dfde072dcae0e3d1a2e2f9ef1223234efb7dd7603db9e2cf5489eeacdfcd6d",
+      "CLI_SHA256": "58b5ed62236fcb753fe216e4c0f33f8a20aa488065ea229c4a309c54b2ce93f9",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "2213abe1ef578e46cc54d51c1c1186562f104a41f1e176aadc9546ab7023a3cc",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-CoAP-foreign-clock",
+      "capture_SHA256": "f89dad749612c5794c0d9f96e6674462dc7ecd1655ecc1f87295791b8f5fb405",
+      "SDK_SHA256": "dba35f75ebaa21e13f918e43453959aca6d03e1b3f9b4ed2205939b14e509420",
+      "CLI_SHA256": "8e63763fb356c53e188ce190412770f51a508c13eca86193e1022c3132f02969",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "9e2f2fb0278c82e8fe251f2eb41e2e96ed4e22226388b6e600bcf85c84716bcb",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-fragment-foreign-clock",
+      "capture_SHA256": "4d1cc26de8d128a16b0efeddb1a9c9e075b1a13a43fc851645ca73fb49fc3fef",
+      "SDK_SHA256": "dcd2a24077100be2d7840cb10691382648f6e5d0900d04fd2808061f56e0abd5",
+      "CLI_SHA256": "9eb0defe1a4b3e561e1a3177d2107fc6981e104de8e84109fbe8e040401ad01f",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "34ba3f1d3a1ccc4e776e5430c4e99e48908f047a51a99474e90f088a75699f3b",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-fragment-local",
+      "capture_SHA256": "77bf61f8ebf8326f6b3a0855ea18cc83d143355149ca6b8562c4310ab3e983a8",
+      "SDK_SHA256": "7c86f6c1c843f519d961c6b7932416b5466493570d24b8c79c836166e983e596",
+      "CLI_SHA256": "929265608c5d45f22b1576c6f1e4ce528edb35f3f2460132c3309c2a83194662",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "83e2dd4a0f7fd9151fdc302d56d7699f28b25bb764b1f05a8b20fd839713997b",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-unknown-CID-foreign-clock",
+      "capture_SHA256": "f32c2b9308792607af65880feae66a25bdaed56072dbc46b4d40217d88d7e70b",
+      "SDK_SHA256": "402bbc6806ef349250c82b51a0da04fa62723915f50fe142a31841b525533e39",
+      "CLI_SHA256": "e3a86148d6ff01120557c0923debad00df7a2b9939e5b35cb3754ff5d62aaf00",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "d00594925b02739aafbe26e30265ab8e230a7d2b4358076976e813ce927575da",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "TLS-fragment-foreign-clock",
+      "capture_SHA256": "24882585ddfc21262c441fd59303c7292cff7a81921c007476c740f3bcd42738",
+      "SDK_SHA256": "4fe0d7bff89ea401762f4cc8f2dca5afd29c66e247ee1b03e442fd02952175eb",
+      "CLI_SHA256": "825a526dc5ccb7ade5ee9fecd5cebb42674d8a17ca9d632b0e411e9de7a1b203",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "05901f06c29341c6f8bbf4692f3968ba713b0fa74d777dbe050559c7551df8c6",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "owned",
+      "name": "TLS-fragment-local",
+      "capture_SHA256": "63e1799fba46691b2809327d1b8b3b74ad81eb9d9b819e83ff180c4b4e4c498f",
+      "SDK_SHA256": "8c73f32b86ef53e20268f278ad22a05196bbc2e2c4317fece3a39cfdbee4e0a3",
+      "CLI_SHA256": "b7536a776d57c97863f40b033aec065f3a87485a0507ff9259c7a4a78132fe6b",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "9d68caf63e93c55348ea20179dc4a0fc91acba6f7029578040aeb96e7c31bb72",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-invalid-first-request-replaced",
+      "capture_SHA256": "837b013d82c6150a63b52cdb544fa2347352fe9cd5f48529663db6b7847ba69f",
+      "SDK_SHA256": "4391336840dae7be945f0f64d39f31b1ea26c2b3044335970e756227b0091a1a",
+      "CLI_SHA256": "35130d2dc8b59d93c92b147b1c2580049ccd9cc3c018fa0c6ca6f13ad409a8e3",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "6a370f70a8efc9c1e5e67ceccabd433aa8b22678091d01e3e53feb49ee2e8011",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-known-request-late-completion",
+      "capture_SHA256": "75780cc495b2b9aac828d6988f53fe3c8b5f957f93503770b92bcbecfc014aaa",
+      "SDK_SHA256": "42df0b5c51def9c8a423ac542664eaccf6b7c8acabac744b7c25f4da705ac770",
+      "CLI_SHA256": "4ca17fcc1bd20a212356d5b835a2626c12985ef8a72c9689406778fc12cb247f",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "5ae2fbbf5af09648b9c2006aec9963f7f0b004ca3e079fe0c274158cddb9d89d",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-overlap-before-old-reply",
+      "capture_SHA256": "30644406001f2d245a9414571772ed8159521ac73becdb5e67300c45f9a75b08",
+      "SDK_SHA256": "ec09b109b513c8df976477a59cd10658aa2bda09c4b352c7023e8edab86c3b87",
+      "CLI_SHA256": "2dae44804bbc02e2d1effcd4f8245bd14e72ae8f3c71205e82a2ce15ca25822a",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "a3e092133e176683fac8f6651e83df384a0fd5c1a5c55a46ce11a55ffab7dcdb",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-reply-before-any-request",
+      "capture_SHA256": "8321dc3021d9f8183b19488f04203af883b6f08f70d3ef15f60594ef059723ed",
+      "SDK_SHA256": "f94e0de46a8318e23c02b7be90f2199dfd2d8349ba1bf297ab03efd4a0d7f57f",
+      "CLI_SHA256": "33c5b6ffdd3802c8c3fb40cc4ff1aa66d869e6e9da22332eb3abcbc673471390",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "21f24b72b27476c00a7280defc06c6648fe717dcee5d323e9cd1e65dacc1d431",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "duplicate-request-observation",
+      "capture_SHA256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "SDK_SHA256": "1f72c76e2befd4de0f77582a948c7e844ce0de78312d90885c4c464442fc114a",
+      "CLI_SHA256": "68e65dd7bb9c9ac895ee09236fe37d46a890702f6391c8ac656e10cf27543d5c",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "e4451552510e16d7698a8b9764b0e72393a068c8411ffeca21421839828b5f34",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "fresh-live",
+      "capture_SHA256": "54cf33366e832801c96bd11fad6686ec4f073b0b286f8c1be62e8e622510c64d",
+      "SDK_SHA256": "95bee6c4c76f84f7805bfcec047f8777760e0e9260a490089fe72615fce660a7",
+      "CLI_SHA256": "8ffba30f2d58ae243e26a034c7a62967077fe3cefc4254d3368d4c1917af984b",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "e0c0b341d1e8836790034dba38e06a175fe7ff9b9bd6b4cb1d76378e0fb4d671",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-fragmented",
+      "capture_SHA256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "SDK_SHA256": "84abd3bec559f31782cc20dbe493e6a26e3813d55fcff6d5cab8027e5c853f9c",
+      "CLI_SHA256": "c6391a3f548cecb91acbaae0a10391e8a8da037d5e245724c3ad9c02b981e144",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "6c4bfe70b4a32117739c0bd7c4e3748a640acc2108dec5a0b221c7a7cab2b7cd",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-query",
+      "capture_SHA256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "SDK_SHA256": "745fa480613fb0ca95dfcc86d8cfb92938216d0b25f276bf3ed068e897361031",
+      "CLI_SHA256": "a01905d94f7ee4910a159ea6488671bc8faa5fa3dc064369660b339cd9846cdc",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "7ce4c156d8d379a465c0f0a2420fbc84dd0a9ea98b12fbc2a544be585d08ced3",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-unfragmented",
+      "capture_SHA256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "SDK_SHA256": "2e7a0a06d9d5bb96a4e4db9abdd0d83c8c8dbc40f8ffb2a5eea04f35f723781c",
+      "CLI_SHA256": "f8d18f5ba043d73418e12bf86e0bd343e311f9a82f6fe2f17ed4b4edad6f5328",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "115507e887f2242d17098961862d6766bc2b591fbe631c64fcb048a0bdae0c4e",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "permanent-request-capture-hole",
+      "capture_SHA256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "SDK_SHA256": "1c0df028740f6ee9604a1edc85a6ef50a947670ff3b41255662f7eba925685ad",
+      "CLI_SHA256": "cf30c20e7a4f19a2965c40658584e1ef886fa5cde0ba884c6670a548b0d76eda",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "111f28331ddf840f8f4f3c4e108854fa4db858eb190f34583669c4fbce6dd282",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "request-arrives-after-two-later-requests",
+      "capture_SHA256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "SDK_SHA256": "2b4fb6c28998d305ef91418a98ec98b7f2c513b4c731b65b76304528372a6b2c",
+      "CLI_SHA256": "e16ed41bc3d80e313da3126add266babec9ef036f8257b0359d7358c7ffd16da",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "f7c0cd3b8bfdcfa33f030248c31834c0006105154037cb8ce9329841f01258f1",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "request-tail-arrives-after-first-response",
+      "capture_SHA256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "SDK_SHA256": "5b51f22dcb312953ecd1b557e864b3e5bcc5fcf9bc01525ae8d993422982cc3b",
+      "CLI_SHA256": "d226688f3cd4d928bc0c87b2549a8121be4e0a9f0941cdf532d95dd7bf987bab",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "2d7364aef74a7b0c7feb8f59d8fcc625726cc9b689e31a32c4d10c2452bac8b0",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "response-first-two-swapped",
+      "capture_SHA256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "SDK_SHA256": "fad834e7f97e3a9e93fdefd28cf703a88a1a2a24c0c99bc2f88451a4352d4cee",
+      "CLI_SHA256": "3ce4b61eb7117a78d62ce25c47c2c59c9ad64fa0325274584f8afafd85bbd438",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "61e93dff2cbea3efbcc8471a7a5975d77436b58ca3dc0dfd764e7423176904ed",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-actual",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "fdfedafe1a58cffa2f1e455c72610adc48af07ce32051540c50f7a44f997292d",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-close",
+      "capture_SHA256": "643577643950565946f5fcb8b8dd2e8955c937a2b2813d37f89e0d1333b031ff",
+      "SDK_SHA256": "e133aa4dc3a248c113cb6d4613b048d8b804f12ece0c7547b1d05da6eab60b05",
+      "CLI_SHA256": "ecf17b9da0a3c3c07b1d871dc3813c152af7bcb506c0e4af7036f65275b840a6",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "486808e245f130bd4f0c1178e16759ed4619209d5ba9575fef1cf82372fcf1b2",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-close-out-of-order",
+      "capture_SHA256": "e7a6af68a0aa75dcf7c39b3acd182e0f1996ea6326524c7d200971e02aa3a031",
+      "SDK_SHA256": "7b89ae66f44d200ec5f0a43ddbfe161c3cc4263e89254cd018a907ffb2d6a44f",
+      "CLI_SHA256": "350fbb0e3860db620294892c151f9c34ea58340f79b3ecd2f0da208f7f42dd0b",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "28f861056e6c91ebcdb0a6c0c80ac037edc24be6cd38cc45f311d834b6b038cd",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-middle",
+      "capture_SHA256": "8ff8ed83c800f56981791f7de25479531da98471c431fbc100e4c574a2d8b4b7",
+      "SDK_SHA256": "a631323fd1245ec63c438dc55a3f4930ce6e450d586a4e5334a75d2be3c40158",
+      "CLI_SHA256": "1132aa347a8b836e1626aca2603ca9a594f019392403dd68dd4bc91843fec1a3",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "c3d0a4ea21af10a1306e6759013ca2dfed6ba0b976f23c1332fbc127be8afd54",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-middle-and-close",
+      "capture_SHA256": "13b49c05399fb5c21a4c8d5413f582e5192d5699c7dad816dde6b374d39897db",
+      "SDK_SHA256": "79e0bd7090665a6407363233bd7e89c3c8ad9094dc2596e859a65006d4d97ac1",
+      "CLI_SHA256": "6bbacc765938573cdf7e3674b51a2a68f80d3ffae7f54c395f37f96bbb1ccd8d",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "9354d27bea5bf30de1ae0eb35f44362a77540b53153dd3e8d2543438e84ff464",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-out-of-order",
+      "capture_SHA256": "43eec2f51f71d46e587c6c2ebd9d6456e4bcfd99df964a1d400b9e5f22f4c4eb",
+      "SDK_SHA256": "c05fb03ce59430973117bd2a572e13a46590e9b0b456cfc584e9ae6cc8c3d79a",
+      "CLI_SHA256": "3a20fdce5213ac5081e69d900239f0f54c83186f72c13ca42dfc5cc918451f32",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "f766bf38c9ecf8d2b12c1a230da71f382378285b096ab6d07fdf3814a46d35a6",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "rpc-fragments-live",
+      "capture_SHA256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "SDK_SHA256": "49b3072f874c34babead638d623afad54d737a659fa8995b6292cfe478a6d8d6",
+      "CLI_SHA256": "a37c4dddcf83f3a8380e43fe89e35b522b62152180e3a238ded22fac35363ca8",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "575f1cba7e261f5b36b6d6519890ab45ee85a549688ae3df9e703729ffacf65c",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "sharon",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+      "CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+      "SDK_byte_identical_to_31ba": false,
+      "final_CLI_projection_proof_SHA256": "1b5c5b241a76312f70c0748c95aca4575e7616c769947f0b5d34cc0c2fd07d59",
+      "only_precise_reason_changes": 13972,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "snaplen-request-capture-hole",
+      "capture_SHA256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "SDK_SHA256": "425f1e12c14d48b12020277bab8dacac7546754d206e58fe04471ddb96a20d0e",
+      "CLI_SHA256": "95d1a2b3a887b486e8767841191e06f173f8ac67de7357370a1c7ce285a3b1cd",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "f8937d9de3a1884578ad7fe58ec71f9bef4d3b720c7dc27ebb7b360aead3933a",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    },
+    {
+      "group": "preservation",
+      "name": "weber",
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "SDK_SHA256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+      "CLI_SHA256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+      "SDK_byte_identical_to_31ba": true,
+      "final_CLI_projection_proof_SHA256": "9886a02adcef638e76198ea15ce25d11276b79c7483b7851bb89a28de733359d",
+      "only_precise_reason_changes": 0,
+      "every_other_CLI_value_literal": true
+    }
+  ],
+  "prefix_controls": [
+    {
+      "name": "CoAP-absent-future",
+      "wire": {
+        "proof_SHA256": "99dd089a333884d6e6beeb161dd97944e19c6466fe558a5224dad3ad6ed923c9",
+        "capture_SHA256": "7ae07f05a13d20dd93796c81919a81ee4c105c3da7b2b6ca79503f2efc72cc0c",
+        "manifest_SHA256": "4b59de42b38d85d780cd586065d7f31c507a0ddef8778082aafeadb9eb765987",
+        "source_capture_SHA256": "753bb741173787edcf4535974e704cce796e51a6380c51443677c8341b99e093",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 9,
+        "original_records": 8,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 6,
+            "source_frame": 5,
+            "IP_offset": 4,
+            "available": 0,
+            "required": 20,
+            "source_wire_SHA256": "50b98818b8d89f278cf587ddaa6a92c21915d7d921d2a1ecac54fa22f4e7a7d3",
+            "captured_prefix_SHA256": "26b25d457597a7b0463f9620f666dd10aa2c4373a505967c7c8d70922a2d6ece",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "b61d1368869d63c026352a4f15a71ff2a111a38e0cb5368e386df2fc048cb09a",
+        "capture_SHA256": "7ae07f05a13d20dd93796c81919a81ee4c105c3da7b2b6ca79503f2efc72cc0c",
+        "SDK_SHA256": "9521b54ec776e7d6cce2719958431942732c2ad3a4c3328919a04735f63713ef",
+        "CLI_SHA256": "004494aa16de188436ab29d3c32c2522c2b2a79867f615c353de61e1c4ac2f70",
+        "reference_SHA256": "29f59cef78fa133e3c68de7f1da7e0f169358fbb531f9ae7f92134296d54b55c",
+        "reference_labels_SHA256": "0b3900c151c26007635390b67b0c34b220eddb9578da037b26e6d0a1e55eb0a0",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "N/A": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "c9b7cef82c07165d1047975b9226b854b4e2bdfb16135c4e049cbfaedf5b1538",
+        "capture_SHA256": "7ae07f05a13d20dd93796c81919a81ee4c105c3da7b2b6ca79503f2efc72cc0c",
+        "observer_SHA256": "58ab0011185098cc2297c84077e9d5979d77de325bbfedc6f0b89aec536f7f08",
+        "SDK_SHA256": "9521b54ec776e7d6cce2719958431942732c2ad3a4c3328919a04735f63713ef",
+        "CLI_SHA256": "004494aa16de188436ab29d3c32c2522c2b2a79867f615c353de61e1c4ac2f70",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 9,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 9,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "ccd754b04de88b92148a05b6a737403877acab1ccc6aa3f8846bac46686776e8",
+        "before_CLI_SHA256": "004494aa16de188436ab29d3c32c2522c2b2a79867f615c353de61e1c4ac2f70",
+        "CLI_SHA256": "004494aa16de188436ab29d3c32c2522c2b2a79867f615c353de61e1c4ac2f70",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 9
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "8afdb8fe9ea469493a70e407df512e17dcd1fca554df6ed1cb1728b7ae05ea5b",
+        "baseline_SDK_SHA256": "a29ed9d981cd5eeb07ff126b1c70b69067f0a02f9b8ea4292181ee601c743f0a",
+        "SDK_SHA256": "9521b54ec776e7d6cce2719958431942732c2ad3a4c3328919a04735f63713ef",
+        "baseline_receipt_SHA256": "655ae737cd4f791876b4d6f4af1884ad0f239509720bd9567bb5d5078c2d0d34",
+        "receipt_SHA256": "7b865d8b0432e6d31cbe2d251c938603b541c48e85217a5404d9b324cc1dcd63",
+        "manifest_SHA256": "4b59de42b38d85d780cd586065d7f31c507a0ddef8778082aafeadb9eb765987",
+        "wire_proof_SHA256": "99dd089a333884d6e6beeb161dd97944e19c6466fe558a5224dad3ad6ed923c9",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 8,
+        "protocol_counts": {
+          "": 2,
+          "coap": 6
+        },
+        "generated_ID_mapping_SHA256": "fd3faecaf63e1df37cbb994037943dce6b78f8f7e0923706495a8c9ea6b265c2",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "8f4a82816ddde7f74376e2f6dc6c5e1afff2c00e333b2e1ea7635813994d6990",
+        "baseline_reference_SHA256": "ebd19c75d37d9ef64809c87f9af4ca4dcdb924aeafeb393acbf79753109159b6",
+        "reference_SHA256": "29f59cef78fa133e3c68de7f1da7e0f169358fbb531f9ae7f92134296d54b55c",
+        "manifest_SHA256": "4b59de42b38d85d780cd586065d7f31c507a0ddef8778082aafeadb9eb765987",
+        "wire_proof_SHA256": "99dd089a333884d6e6beeb161dd97944e19c6466fe558a5224dad3ad6ed923c9",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 8,
+        "literal_raw_field_occurrences": 360,
+        "attested_generated_frame_references": 0,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "CoAP-short-future",
+      "wire": {
+        "proof_SHA256": "975fa2d8bd78258bbaa76ea9fd057e1a615b0853ce2c4010a72cd79795054012",
+        "capture_SHA256": "9e3543435aa62e23c6ab3398df6999a1df060ea337cd3199dd85a6c237eba383",
+        "manifest_SHA256": "2a200ccb0d19541c9f77301ac0b16cc585c9ce51e9b4fa5575fc18f063d13ca8",
+        "source_capture_SHA256": "753bb741173787edcf4535974e704cce796e51a6380c51443677c8341b99e093",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 9,
+        "original_records": 8,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 6,
+            "source_frame": 5,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "50b98818b8d89f278cf587ddaa6a92c21915d7d921d2a1ecac54fa22f4e7a7d3",
+            "captured_prefix_SHA256": "c1f4c161a36425fd53d3c8db5669cb2892b7b7ad130313d97701dd8878736c52",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "7edab1e2ec9c090591e10507764f70e90d61628121243473721338735886b996",
+        "capture_SHA256": "9e3543435aa62e23c6ab3398df6999a1df060ea337cd3199dd85a6c237eba383",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "CLI_SHA256": "741994004e6f7133907147115d3122a17b094a28c9570de536532301a21cd61d",
+        "reference_SHA256": "21eaf1434c3e9fdf14dd9995fb25a3cc814ea23302722c3a4898d6edde6646a0",
+        "reference_labels_SHA256": "7a53cd4e534a88c9c579eff4952d71d6e8727924d1f8c43849603d7da6e788d9",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "79461741346452c5b844c65266d70763a579a2086cb95d270554b5999630358a",
+        "capture_SHA256": "9e3543435aa62e23c6ab3398df6999a1df060ea337cd3199dd85a6c237eba383",
+        "observer_SHA256": "2163aa227260159ed2aa74625fdeafa9e91aa2c8634b75c8aef891762b6511d8",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "CLI_SHA256": "741994004e6f7133907147115d3122a17b094a28c9570de536532301a21cd61d",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 9,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 9,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "52014caa65aba8d03c55340a9136aca87f8c70e799ef86df239ab7716408ac4a",
+        "before_CLI_SHA256": "741994004e6f7133907147115d3122a17b094a28c9570de536532301a21cd61d",
+        "CLI_SHA256": "741994004e6f7133907147115d3122a17b094a28c9570de536532301a21cd61d",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 9
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "ad126f891fba424ff31f30e6fc339621f38da3e44e3d738a5a8faab0498a050f",
+        "baseline_SDK_SHA256": "a29ed9d981cd5eeb07ff126b1c70b69067f0a02f9b8ea4292181ee601c743f0a",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "baseline_receipt_SHA256": "655ae737cd4f791876b4d6f4af1884ad0f239509720bd9567bb5d5078c2d0d34",
+        "receipt_SHA256": "e70bf362e89e9c71e6310c099092dfd8dac45eac5f97303d15dac3fce6df5e72",
+        "manifest_SHA256": "2a200ccb0d19541c9f77301ac0b16cc585c9ce51e9b4fa5575fc18f063d13ca8",
+        "wire_proof_SHA256": "975fa2d8bd78258bbaa76ea9fd057e1a615b0853ce2c4010a72cd79795054012",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 8,
+        "protocol_counts": {
+          "": 2,
+          "coap": 6
+        },
+        "generated_ID_mapping_SHA256": "fd3faecaf63e1df37cbb994037943dce6b78f8f7e0923706495a8c9ea6b265c2",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "28edb6e02937565f3ed6a43597f65f735cdb60bc36945960a2cad1a6b862629a",
+        "baseline_reference_SHA256": "ebd19c75d37d9ef64809c87f9af4ca4dcdb924aeafeb393acbf79753109159b6",
+        "reference_SHA256": "21eaf1434c3e9fdf14dd9995fb25a3cc814ea23302722c3a4898d6edde6646a0",
+        "manifest_SHA256": "2a200ccb0d19541c9f77301ac0b16cc585c9ce51e9b4fa5575fc18f063d13ca8",
+        "wire_proof_SHA256": "975fa2d8bd78258bbaa76ea9fd057e1a615b0853ce2c4010a72cd79795054012",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 8,
+        "literal_raw_field_occurrences": 360,
+        "attested_generated_frame_references": 0,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "CoAP-short-zero-epoch",
+      "wire": {
+        "proof_SHA256": "975b37c96b77c5b32ca700fac5e61dcb245d8b983e4eac8cb6dd2b3e547b3cb4",
+        "capture_SHA256": "1ba785a702336d7bd755673fd9482464ff9819fc7430bc989074080fa74acfd4",
+        "manifest_SHA256": "0031c7d4fcc6074c7dc955484b462f181395565ea400765ed71ffe1e9fff0a7a",
+        "source_capture_SHA256": "753bb741173787edcf4535974e704cce796e51a6380c51443677c8341b99e093",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 9,
+        "original_records": 8,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 6,
+            "source_frame": 5,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "50b98818b8d89f278cf587ddaa6a92c21915d7d921d2a1ecac54fa22f4e7a7d3",
+            "captured_prefix_SHA256": "c1f4c161a36425fd53d3c8db5669cb2892b7b7ad130313d97701dd8878736c52",
+            "timestamp_interpretation": "literal PCAP epoch zero"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "3b79533ac33ab850d57c6131ab9fd03601a9c9c0e0e2d41dcb80f6543e0d3f3d",
+        "capture_SHA256": "1ba785a702336d7bd755673fd9482464ff9819fc7430bc989074080fa74acfd4",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "CLI_SHA256": "0ebe91884605f347f1733324f160969ff30d68f288f79d8176e5aef9812f6f23",
+        "reference_SHA256": "1afb72bd46f8bc68303ead79f40a87d47f2a2a6eb4a69c2697cb9e931052b8cd",
+        "reference_labels_SHA256": "7a53cd4e534a88c9c579eff4952d71d6e8727924d1f8c43849603d7da6e788d9",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "99e87066fac1af9fbb5828f75f94d3a6db498bef97d316a3f13ab6c0aaf39dac",
+        "capture_SHA256": "1ba785a702336d7bd755673fd9482464ff9819fc7430bc989074080fa74acfd4",
+        "observer_SHA256": "45fa5388b2f7a85265f8b28d64a5195ef6429cfa92a52348c7c314b3386a3539",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "CLI_SHA256": "0ebe91884605f347f1733324f160969ff30d68f288f79d8176e5aef9812f6f23",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 9,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 9,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "1f438217c17e8e67b83dc5f901d7cacaeb2262de8bf14a34a5a8edca90ecbcde",
+        "before_CLI_SHA256": "0ebe91884605f347f1733324f160969ff30d68f288f79d8176e5aef9812f6f23",
+        "CLI_SHA256": "0ebe91884605f347f1733324f160969ff30d68f288f79d8176e5aef9812f6f23",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 9
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "b49809015346f44080d6eacef79d1ee256c5329a683b02b5a158c0fc2e25daac",
+        "baseline_SDK_SHA256": "a29ed9d981cd5eeb07ff126b1c70b69067f0a02f9b8ea4292181ee601c743f0a",
+        "SDK_SHA256": "3c7e2db838db9c027f0411a6c461abd10a976dabd31c9c103484751efbea1f82",
+        "baseline_receipt_SHA256": "655ae737cd4f791876b4d6f4af1884ad0f239509720bd9567bb5d5078c2d0d34",
+        "receipt_SHA256": "6ead91ae6d76bc9713babcbc3ff0f3c7deb897a12e0a6e2c93c3451c40db868c",
+        "manifest_SHA256": "0031c7d4fcc6074c7dc955484b462f181395565ea400765ed71ffe1e9fff0a7a",
+        "wire_proof_SHA256": "975b37c96b77c5b32ca700fac5e61dcb245d8b983e4eac8cb6dd2b3e547b3cb4",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 8,
+        "protocol_counts": {
+          "": 2,
+          "coap": 6
+        },
+        "generated_ID_mapping_SHA256": "fd3faecaf63e1df37cbb994037943dce6b78f8f7e0923706495a8c9ea6b265c2",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "f7b81875b3dbd3e8c10fb500dbcf1716e13e8df976bdd10d7283dc042b3611b7",
+        "baseline_reference_SHA256": "ebd19c75d37d9ef64809c87f9af4ca4dcdb924aeafeb393acbf79753109159b6",
+        "reference_SHA256": "1afb72bd46f8bc68303ead79f40a87d47f2a2a6eb4a69c2697cb9e931052b8cd",
+        "manifest_SHA256": "0031c7d4fcc6074c7dc955484b462f181395565ea400765ed71ffe1e9fff0a7a",
+        "wire_proof_SHA256": "975b37c96b77c5b32ca700fac5e61dcb245d8b983e4eac8cb6dd2b3e547b3cb4",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 8,
+        "literal_raw_field_occurrences": 360,
+        "attested_generated_frame_references": 0,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "original-five",
+      "wire": {
+        "proof_SHA256": "f35f341011165a9221020af77a8e68c632d4b0ce1a7787384c0df82d72217c83",
+        "capture_SHA256": "62118d7f1dd0cfb090e93473b6e02a2c14ed7679e4db75e649ee47d6cab43412",
+        "manifest_SHA256": "482c5d5cb83a6a7c7e236fd755c33ab9c946258d5065ec5ef92d74f08cd908b3",
+        "source_capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 5,
+        "original_records": 5,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "e65e2b8ac7f3dd0aa608e37a965dd3f8d499b19e689996f69c6d176065b6dde1",
+        "capture_SHA256": "62118d7f1dd0cfb090e93473b6e02a2c14ed7679e4db75e649ee47d6cab43412",
+        "SDK_SHA256": "127929c8d46bb3fd4a266c81bb92faf19b4eab3454792b847c9cf8d2234a52d4",
+        "CLI_SHA256": "cbce2f7bc07386766b466a9b5e89a5d796acbcf0f0feb9a9395a861b71132e19",
+        "reference_SHA256": "66eb33e53b595201d7e7875ceed47d59674e64e9053a921e0f3159a45ec45834",
+        "reference_labels_SHA256": "092e9699d75e000e6f4ddf6826cbfac0e7b013250b33d1ef8caa73cff0c15e04",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 5,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv6": 5
+        },
+        "literal_native_columns": {
+          "IPv4": 5
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "bb074f06f3edc22de029c1023c7377bdb70b1df2b893d588a4e738ed21b3b3d4",
+        "capture_SHA256": "62118d7f1dd0cfb090e93473b6e02a2c14ed7679e4db75e649ee47d6cab43412",
+        "observer_SHA256": "907bdd990548b9216cd0c79f99a1781dd3bd76331eff5a1151c8caeac0b1bab6",
+        "SDK_SHA256": "127929c8d46bb3fd4a266c81bb92faf19b4eab3454792b847c9cf8d2234a52d4",
+        "CLI_SHA256": "cbce2f7bc07386766b466a9b5e89a5d796acbcf0f0feb9a9395a861b71132e19",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 5,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 10,
+        "compared_CLI_PDUs": 5,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "07ef914c9aca6e20cb250b87f1ca5a8ace7bea4ba825ded195d67028dad16e23",
+        "before_CLI_SHA256": "cbce2f7bc07386766b466a9b5e89a5d796acbcf0f0feb9a9395a861b71132e19",
+        "CLI_SHA256": "cbce2f7bc07386766b466a9b5e89a5d796acbcf0f0feb9a9395a861b71132e19",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 5
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      }
+    },
+    {
+      "name": "QUIC-absent-future",
+      "wire": {
+        "proof_SHA256": "d65bc3eca8c2af79a161abc0c7f6d72353b234db60acb324428c0ea78eb5ea92",
+        "capture_SHA256": "7beec903ef061a89ba52c19ecb4465ac346fbd4f4ca5a3da0b873e91e2086ed4",
+        "manifest_SHA256": "2a89a481ec39cf9b28693112c369fc484b21dfbf86955fc037c4b6cc331345c3",
+        "source_capture_SHA256": "00347cb1e27508cf951737cf048fb42d5629d6ce585329b9dbfd31a3613d1434",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 148,
+        "original_records": 147,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 75,
+            "source_frame": 74,
+            "IP_offset": 4,
+            "available": 0,
+            "required": 20,
+            "source_wire_SHA256": "d23073f015745e42b96f145e87690d00cfb952db79814d8c400cb74dc0bfd1a0",
+            "captured_prefix_SHA256": "26b25d457597a7b0463f9620f666dd10aa2c4373a505967c7c8d70922a2d6ece",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "eca240a8f603c6e26d8156ad51dbeaefee8e0d32af61a00ec024d23588720fa5",
+        "capture_SHA256": "7beec903ef061a89ba52c19ecb4465ac346fbd4f4ca5a3da0b873e91e2086ed4",
+        "SDK_SHA256": "d7a9e4e7059599de5c46bb64f61e1b88343a3ad2f7bd41dc62961ba8f87d83d8",
+        "CLI_SHA256": "b87ac236672c504ee2f2090a47cf79fcc7a27471c9e692e7ef619d6bd7432231",
+        "reference_SHA256": "ab1d83548260dfa3d6f041cb89f11eb5b89391b1e941fcb62ff07722f2cbccd5",
+        "reference_labels_SHA256": "4b2e52b997712b98f6f7aa7a5d5239890277178b7801006e7e28480d54a6e97e",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "N/A": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "191b94d123dc90b798bd490899c803080d729ef881de0a17db46b25c73678f5e",
+        "capture_SHA256": "7beec903ef061a89ba52c19ecb4465ac346fbd4f4ca5a3da0b873e91e2086ed4",
+        "observer_SHA256": "7c92736884e6c224fd127d8c210a9531a1ddf7c4294147a96da7e6bc79017e11",
+        "SDK_SHA256": "d7a9e4e7059599de5c46bb64f61e1b88343a3ad2f7bd41dc62961ba8f87d83d8",
+        "CLI_SHA256": "b87ac236672c504ee2f2090a47cf79fcc7a27471c9e692e7ef619d6bd7432231",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 148,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 164,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "0b931a7b7fe14f3988a099c6acfe3bb434dc1c5e9c7c98bbb595902c84e9ab04",
+        "before_CLI_SHA256": "b87ac236672c504ee2f2090a47cf79fcc7a27471c9e692e7ef619d6bd7432231",
+        "CLI_SHA256": "b87ac236672c504ee2f2090a47cf79fcc7a27471c9e692e7ef619d6bd7432231",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 148
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "8bddb4e6b3a79564f8544954c461372cacc8fda1bb2b1a6f45e749c6669ea4ca",
+        "baseline_SDK_SHA256": "7b18be93f3459b54d81360c3f71a9fe1338b8cf416d0fa123549f849eccd946f",
+        "SDK_SHA256": "d7a9e4e7059599de5c46bb64f61e1b88343a3ad2f7bd41dc62961ba8f87d83d8",
+        "baseline_receipt_SHA256": "a5999c66d9d9971f86f836ab43809b7296bcc6baad310f76ddc80b7b1f1b3cb0",
+        "receipt_SHA256": "0a642aa64f08fe062da367b2d7d9a7481bfa852fa512d01f0a8dee5e25c62889",
+        "manifest_SHA256": "2a89a481ec39cf9b28693112c369fc484b21dfbf86955fc037c4b6cc331345c3",
+        "wire_proof_SHA256": "d65bc3eca8c2af79a161abc0c7f6d72353b234db60acb324428c0ea78eb5ea92",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 163,
+        "protocol_counts": {
+          "": 2,
+          "quic": 65,
+          "http3": 96
+        },
+        "generated_ID_mapping_SHA256": "a7f15229beedd5936cd2b8031cbb009ead9382ba89fc2d2f4dfa91444fadbcad",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "e2b0ecbc844eb0a329851b7d0db8d78eab7a260efef3d438d45317ba1294a4ef",
+        "baseline_reference_SHA256": "c4030d90bf289cf140b0a37471a3c22b94a48e91ac3b20c0dfc1b0fd4d65635f",
+        "reference_SHA256": "ab1d83548260dfa3d6f041cb89f11eb5b89391b1e941fcb62ff07722f2cbccd5",
+        "manifest_SHA256": "2a89a481ec39cf9b28693112c369fc484b21dfbf86955fc037c4b6cc331345c3",
+        "wire_proof_SHA256": "d65bc3eca8c2af79a161abc0c7f6d72353b234db60acb324428c0ea78eb5ea92",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 147,
+        "literal_raw_field_occurrences": 10973,
+        "attested_generated_frame_references": 67,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "QUIC-short-future",
+      "wire": {
+        "proof_SHA256": "ec4c61049309ae8000ab8bb1eab8007ccb6795df0b352888969396107a2e2851",
+        "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+        "manifest_SHA256": "68fecfc53ced4e5368996cdf5e48ced31d03c5a11085c9b049b7bccf958486c0",
+        "source_capture_SHA256": "00347cb1e27508cf951737cf048fb42d5629d6ce585329b9dbfd31a3613d1434",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 148,
+        "original_records": 147,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 75,
+            "source_frame": 74,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "d23073f015745e42b96f145e87690d00cfb952db79814d8c400cb74dc0bfd1a0",
+            "captured_prefix_SHA256": "bf6f6114ac3ec8d8b79e5b1351043c646b355661c0ba5c43027a264276b2212e",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "5cce065fe977c44c09786997cd615039329e595ad9ed82b5762f30560378b321",
+        "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+        "reference_SHA256": "e79c3c0b2f264bd4c3473f235540c2812dee380ce01f435cbce5630fd53e235d",
+        "reference_labels_SHA256": "72b77beb06f8c62fbee35100a8a6759306c8c96542ae9a169cf3d7bc70723f47",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "cf16725f978f7655c211f0a54c1bde058b17ffb8a0cc3e225afda9a9308c6279",
+        "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+        "observer_SHA256": "a04a4a8b8dd585fba8f0c31b09b1df2339e6e3b7c2745037983faf53e6851800",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 148,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 164,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "e6954f64db27cafbe48091dca975d360632049c151c9df560a4a8ff9c960f90d",
+        "before_CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+        "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 148
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "a9f1add37a505556adf8b15c862e9bc1806fb735b5f574b0008fe747d9ac5a53",
+        "baseline_SDK_SHA256": "7b18be93f3459b54d81360c3f71a9fe1338b8cf416d0fa123549f849eccd946f",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "baseline_receipt_SHA256": "a5999c66d9d9971f86f836ab43809b7296bcc6baad310f76ddc80b7b1f1b3cb0",
+        "receipt_SHA256": "948209cd8a6e49f01a6bfc099c79e1e66870b8e6537451fa0831960a5bbd2eaa",
+        "manifest_SHA256": "68fecfc53ced4e5368996cdf5e48ced31d03c5a11085c9b049b7bccf958486c0",
+        "wire_proof_SHA256": "ec4c61049309ae8000ab8bb1eab8007ccb6795df0b352888969396107a2e2851",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 163,
+        "protocol_counts": {
+          "": 2,
+          "quic": 65,
+          "http3": 96
+        },
+        "generated_ID_mapping_SHA256": "a7f15229beedd5936cd2b8031cbb009ead9382ba89fc2d2f4dfa91444fadbcad",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "ffea60c719ead80a50efcb907e3bd8692ca3fb6aa53d198c7c1e59649d3c6d90",
+        "baseline_reference_SHA256": "c4030d90bf289cf140b0a37471a3c22b94a48e91ac3b20c0dfc1b0fd4d65635f",
+        "reference_SHA256": "e79c3c0b2f264bd4c3473f235540c2812dee380ce01f435cbce5630fd53e235d",
+        "manifest_SHA256": "68fecfc53ced4e5368996cdf5e48ced31d03c5a11085c9b049b7bccf958486c0",
+        "wire_proof_SHA256": "ec4c61049309ae8000ab8bb1eab8007ccb6795df0b352888969396107a2e2851",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 147,
+        "literal_raw_field_occurrences": 10973,
+        "attested_generated_frame_references": 67,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "QUIC-short-zero-epoch",
+      "wire": {
+        "proof_SHA256": "cd648ca696f60828fa3b6a70ca5f06fd71adc49cf28fcde6bccb81ecbe8d9164",
+        "capture_SHA256": "5c9100e991b43724bd80adfb6da414c80a1dac1781f00723fd10db89949d42ee",
+        "manifest_SHA256": "1e3c4a491277b4f54cbc0b8add104e99e8452af8b1680edfda511ce977dbe981",
+        "source_capture_SHA256": "00347cb1e27508cf951737cf048fb42d5629d6ce585329b9dbfd31a3613d1434",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 148,
+        "original_records": 147,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 75,
+            "source_frame": 74,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "d23073f015745e42b96f145e87690d00cfb952db79814d8c400cb74dc0bfd1a0",
+            "captured_prefix_SHA256": "bf6f6114ac3ec8d8b79e5b1351043c646b355661c0ba5c43027a264276b2212e",
+            "timestamp_interpretation": "literal PCAP epoch zero"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "d9dd9c6f4b98c5ad49aecf6fc6c45eea2a35c82a650ef5ed50a3e99ad43feb24",
+        "capture_SHA256": "5c9100e991b43724bd80adfb6da414c80a1dac1781f00723fd10db89949d42ee",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "CLI_SHA256": "d6a7913c96c305a8236501f49a0c7df0366b3f22d3e3fb4c5f5affbc8b3ccd1a",
+        "reference_SHA256": "ddb445dbe79a2dab4199d8f341547b9b297a7f23a0d2bcef1703113909b8c106",
+        "reference_labels_SHA256": "72b77beb06f8c62fbee35100a8a6759306c8c96542ae9a169cf3d7bc70723f47",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "a3f8bcad9ef38ae13888c107374c183d4ecc530ffc4f697921cb39ca12522ffe",
+        "capture_SHA256": "5c9100e991b43724bd80adfb6da414c80a1dac1781f00723fd10db89949d42ee",
+        "observer_SHA256": "569c3f53c5a08cdb2384ff81679132f0a1827fb2ef8f5bb06f8aa0574f82a696",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "CLI_SHA256": "d6a7913c96c305a8236501f49a0c7df0366b3f22d3e3fb4c5f5affbc8b3ccd1a",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 148,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 0,
+        "source_bound_TCP_events": 0,
+        "positive_captured_TCP_coverage": false,
+        "explicit_empty_TCP_namespace": true,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 0,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 164,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {},
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "7ab6b8fc2719425ba80bcd899d77942c3bd2886236dccf0579dc40cbdb24b2ee",
+        "before_CLI_SHA256": "d6a7913c96c305a8236501f49a0c7df0366b3f22d3e3fb4c5f5affbc8b3ccd1a",
+        "CLI_SHA256": "d6a7913c96c305a8236501f49a0c7df0366b3f22d3e3fb4c5f5affbc8b3ccd1a",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 148
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "70fe794e8f1323c77135685c000236c11cc1d2bed71f19eaf754aeda1403d4f5",
+        "baseline_SDK_SHA256": "7b18be93f3459b54d81360c3f71a9fe1338b8cf416d0fa123549f849eccd946f",
+        "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+        "baseline_receipt_SHA256": "a5999c66d9d9971f86f836ab43809b7296bcc6baad310f76ddc80b7b1f1b3cb0",
+        "receipt_SHA256": "e863bf26554ca22d33ecf1837118e9618ee460dce4a2763a9f390779b32a3aaf",
+        "manifest_SHA256": "1e3c4a491277b4f54cbc0b8add104e99e8452af8b1680edfda511ce977dbe981",
+        "wire_proof_SHA256": "cd648ca696f60828fa3b6a70ca5f06fd71adc49cf28fcde6bccb81ecbe8d9164",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 163,
+        "protocol_counts": {
+          "": 2,
+          "quic": 65,
+          "http3": 96
+        },
+        "generated_ID_mapping_SHA256": "a7f15229beedd5936cd2b8031cbb009ead9382ba89fc2d2f4dfa91444fadbcad",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "46647538dbd14005365e789b0d37b1b63eb03508bb082450f90f36ac903c7566",
+        "baseline_reference_SHA256": "c4030d90bf289cf140b0a37471a3c22b94a48e91ac3b20c0dfc1b0fd4d65635f",
+        "reference_SHA256": "ddb445dbe79a2dab4199d8f341547b9b297a7f23a0d2bcef1703113909b8c106",
+        "manifest_SHA256": "1e3c4a491277b4f54cbc0b8add104e99e8452af8b1680edfda511ce977dbe981",
+        "wire_proof_SHA256": "cd648ca696f60828fa3b6a70ca5f06fd71adc49cf28fcde6bccb81ecbe8d9164",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 147,
+        "literal_raw_field_occurrences": 10973,
+        "attested_generated_frame_references": 67,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "TLS-absent-future",
+      "wire": {
+        "proof_SHA256": "d3022f8b557d3fc7f1fa1817be3a1771567b09c259228efa823db2c7755124e0",
+        "capture_SHA256": "401f706c6d716597f292140a08b688694679cbb807a5a0deba247fd7064ad5e9",
+        "manifest_SHA256": "3f77e5d2c76391ed1f1d462b1c5a14e81a329ec9125466dc60cffd0d12c63f42",
+        "source_capture_SHA256": "5e751ac78e765c5adb43a68562e35b6b502a83849a49fd4e9d01dcc869b91ddb",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 205,
+        "original_records": 204,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 99,
+            "source_frame": 98,
+            "IP_offset": 4,
+            "available": 0,
+            "required": 20,
+            "source_wire_SHA256": "c4731125ea1368b3b730b007740baab2a0120c4733922cb3bb7e7cb192233c83",
+            "captured_prefix_SHA256": "26b25d457597a7b0463f9620f666dd10aa2c4373a505967c7c8d70922a2d6ece",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "a87ccc4046be224edc594bddc3c39c94a0a13bcadb99995805b8ddd88ec0a251",
+        "capture_SHA256": "401f706c6d716597f292140a08b688694679cbb807a5a0deba247fd7064ad5e9",
+        "SDK_SHA256": "2e63676ab0ccd153e24e03947e69b14bc033f1f92090a7d807890a1e3acb32ef",
+        "CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+        "reference_SHA256": "ed364807aefb4606b8a50967a04dbfaa9538cb28a5e6acc347106a584824cb25",
+        "reference_labels_SHA256": "3e99ff731c9f86e8ca4ef88eb27151d9bd5371422017ca17ac4ce4eb13b355c3",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "N/A": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "721e0a75f1a427d3f38e14da86880883a6b732208bc6538445c494e8d29f6fc8",
+        "capture_SHA256": "401f706c6d716597f292140a08b688694679cbb807a5a0deba247fd7064ad5e9",
+        "observer_SHA256": "ed57aeacf4dc694b8ec8741a7d14a630be28458a39aed5055345259356b5a82e",
+        "SDK_SHA256": "2e63676ab0ccd153e24e03947e69b14bc033f1f92090a7d807890a1e3acb32ef",
+        "CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 205,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 6,
+        "source_bound_TCP_events": 156,
+        "positive_captured_TCP_coverage": true,
+        "explicit_empty_TCP_namespace": false,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 6,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 157,
+        "source_bound_parent_links": 90,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6
+        },
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "3ec1b9d3291f1ea0c34229ba6d60390ab8709d585f17e16bec8a7880215b9669",
+        "before_CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+        "CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 205
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "8b4d8c1315f63daa540e9d9bdfa53bf1f8195fac2e401333cd844469dd15de82",
+        "baseline_SDK_SHA256": "57dfde072dcae0e3d1a2e2f9ef1223234efb7dd7603db9e2cf5489eeacdfcd6d",
+        "SDK_SHA256": "2e63676ab0ccd153e24e03947e69b14bc033f1f92090a7d807890a1e3acb32ef",
+        "baseline_receipt_SHA256": "a12119d786eb031152e3f9ec5897885e7c4735a949864eeaa9782ade99a85fe6",
+        "receipt_SHA256": "9fd6a4e97dc76427ab228b635b39f12110d9df2308c6da576391703206d84adb",
+        "manifest_SHA256": "3f77e5d2c76391ed1f1d462b1c5a14e81a329ec9125466dc60cffd0d12c63f42",
+        "wire_proof_SHA256": "d3022f8b557d3fc7f1fa1817be3a1771567b09c259228efa823db2c7755124e0",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 156,
+        "protocol_counts": {
+          "tls": 120,
+          "http": 36
+        },
+        "generated_ID_mapping_SHA256": "315b9743fa12953d05077bab8fb0211cde9ba5d0aee1bd8778509a6cd1109ad3",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "baeb0c91029365667c5506895840b3ee6c2bb21800fe5e96d90dfae4e925764c",
+        "baseline_reference_SHA256": "74f810b7f6a30f695b3368d3747de1085a885742ec312f729a7458470a680637",
+        "reference_SHA256": "ed364807aefb4606b8a50967a04dbfaa9538cb28a5e6acc347106a584824cb25",
+        "manifest_SHA256": "3f77e5d2c76391ed1f1d462b1c5a14e81a329ec9125466dc60cffd0d12c63f42",
+        "wire_proof_SHA256": "d3022f8b557d3fc7f1fa1817be3a1771567b09c259228efa823db2c7755124e0",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 204,
+        "literal_raw_field_occurrences": 13227,
+        "attested_generated_frame_references": 36,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "TLS-short-future",
+      "wire": {
+        "proof_SHA256": "54dcba2350def16c4674b1c723b2782720cae3670a90f17170134a0f5e60ecb4",
+        "capture_SHA256": "969d000d9f40e18a0dc23ac56f0c18de0ea70c59a9a7348797e027393aa477aa",
+        "manifest_SHA256": "0a6c35cf6128913582528d0e7987629f128dbcbb624494badb87bf9925c14742",
+        "source_capture_SHA256": "5e751ac78e765c5adb43a68562e35b6b502a83849a49fd4e9d01dcc869b91ddb",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 205,
+        "original_records": 204,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 99,
+            "source_frame": 98,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "c4731125ea1368b3b730b007740baab2a0120c4733922cb3bb7e7cb192233c83",
+            "captured_prefix_SHA256": "a13e64854a9eefbd3e877a46a8facad05317185e98e5de76ba529eb20207967e",
+            "timestamp_interpretation": "literal future timestamp"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "bfa0bc72edf5d6ee4a9b87461af096f50241b5173cc76142cee009e065814de9",
+        "capture_SHA256": "969d000d9f40e18a0dc23ac56f0c18de0ea70c59a9a7348797e027393aa477aa",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "CLI_SHA256": "906e8476065725405efb3be93398e2572d20be52f101ff23781030bb7488b755",
+        "reference_SHA256": "6993bf1845320e40581f57a18385d940d144cc009277d1eb242e400d5b9ac78b",
+        "reference_labels_SHA256": "0b5526b3b73b658e2282d9628c77d006be73ec7afde5b1f6f4d94bf11dce1b8c",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "cf92a5ded420becc2899d962cbf423a7e48712997a4c5561043c99d84b541b6c",
+        "capture_SHA256": "969d000d9f40e18a0dc23ac56f0c18de0ea70c59a9a7348797e027393aa477aa",
+        "observer_SHA256": "87b4925f76988a0e33c81fb8de43ea7be7590aacbc58d7a72ac8f77e1cb67975",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "CLI_SHA256": "906e8476065725405efb3be93398e2572d20be52f101ff23781030bb7488b755",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 205,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 6,
+        "source_bound_TCP_events": 156,
+        "positive_captured_TCP_coverage": true,
+        "explicit_empty_TCP_namespace": false,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 6,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 157,
+        "source_bound_parent_links": 90,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6
+        },
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "49a35bbdd639ea2bb0e324a82e4c4830f192836f3562263ea0de0584ce739547",
+        "before_CLI_SHA256": "906e8476065725405efb3be93398e2572d20be52f101ff23781030bb7488b755",
+        "CLI_SHA256": "906e8476065725405efb3be93398e2572d20be52f101ff23781030bb7488b755",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 205
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "fe05d27a4968982ce260dee58935fd554eb8b1776bc67493b43965c72c059137",
+        "baseline_SDK_SHA256": "57dfde072dcae0e3d1a2e2f9ef1223234efb7dd7603db9e2cf5489eeacdfcd6d",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "baseline_receipt_SHA256": "a12119d786eb031152e3f9ec5897885e7c4735a949864eeaa9782ade99a85fe6",
+        "receipt_SHA256": "fa0b98483fe252c6d0fd5467a0c76ae71a8dd259ce1f3c0d1daf3baffe182a6e",
+        "manifest_SHA256": "0a6c35cf6128913582528d0e7987629f128dbcbb624494badb87bf9925c14742",
+        "wire_proof_SHA256": "54dcba2350def16c4674b1c723b2782720cae3670a90f17170134a0f5e60ecb4",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 156,
+        "protocol_counts": {
+          "tls": 120,
+          "http": 36
+        },
+        "generated_ID_mapping_SHA256": "315b9743fa12953d05077bab8fb0211cde9ba5d0aee1bd8778509a6cd1109ad3",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "468a40368b342b08c9b842c50df612041648dcdbb0efb080a28d14876a5c6291",
+        "baseline_reference_SHA256": "74f810b7f6a30f695b3368d3747de1085a885742ec312f729a7458470a680637",
+        "reference_SHA256": "6993bf1845320e40581f57a18385d940d144cc009277d1eb242e400d5b9ac78b",
+        "manifest_SHA256": "0a6c35cf6128913582528d0e7987629f128dbcbb624494badb87bf9925c14742",
+        "wire_proof_SHA256": "54dcba2350def16c4674b1c723b2782720cae3670a90f17170134a0f5e60ecb4",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 204,
+        "literal_raw_field_occurrences": 13227,
+        "attested_generated_frame_references": 36,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    },
+    {
+      "name": "TLS-short-zero-epoch",
+      "wire": {
+        "proof_SHA256": "41e30d872130562cacc8a16332045f96d0b94bab7d75816df7afb58b06a1b294",
+        "capture_SHA256": "2bf1e37a6d1bed8e92b2c50ebb3b61d7acf84150a162aa3fbcfdbd9ee611d40b",
+        "manifest_SHA256": "5f19f40364768061b30ac23045187fabdc03444372a6e64843bca90aa6ae07a3",
+        "source_capture_SHA256": "5e751ac78e765c5adb43a68562e35b6b502a83849a49fd4e9d01dcc869b91ddb",
+        "auditor_SHA256": "c2724b67b910258d2aa654055ab0a3f79c211bf532d973dd13d6f0a688067cc0",
+        "physical_records": 205,
+        "original_records": 204,
+        "all_declared_source_bytes_and_timestamps_exact": true,
+        "inserted_prefixes": [
+          {
+            "number": 99,
+            "source_frame": 98,
+            "IP_offset": 4,
+            "available": 4,
+            "required": 20,
+            "source_wire_SHA256": "c4731125ea1368b3b730b007740baab2a0120c4733922cb3bb7e7cb192233c83",
+            "captured_prefix_SHA256": "a13e64854a9eefbd3e877a46a8facad05317185e98e5de76ba529eb20207967e",
+            "timestamp_interpretation": "literal PCAP epoch zero"
+          }
+        ],
+        "network_fault_injection_claim": false
+      },
+      "source": {
+        "proof_SHA256": "d24b84fea887c863f891c80277ff9fdcba95b230d7c7753c7a282db5f8ecc4ea",
+        "capture_SHA256": "2bf1e37a6d1bed8e92b2c50ebb3b61d7acf84150a162aa3fbcfdbd9ee611d40b",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "CLI_SHA256": "709617813dfd561cfb52aa241da9d4b2aa691ab47be0a73d6273c21d3302563d",
+        "reference_SHA256": "1004c1369d3427a8c9dca18d32e2cf7391908bf75898fffd6c7075e453738393",
+        "reference_labels_SHA256": "0b5526b3b73b658e2282d9628c77d006be73ec7afde5b1f6f4d94bf11dce1b8c",
+        "auditor_SHA256": "ab0bdbae0250745409cc981d3102b1a2eb54162394f8f1d3eb2a48242477bfa1",
+        "source_bound_short_headers": 1,
+        "each_source_has_one_refusal_and_no_transport_contribution": true,
+        "literal_reference_columns": {
+          "IPv4": 1
+        },
+        "literal_native_columns": {
+          "IPv4": 1
+        },
+        "complete_header_or_full_protocol_parity_claim": false
+      },
+      "binding": {
+        "proof_SHA256": "a55a22dc2358708952ccc0b66eef62d19f0e5416227cdbc8f1f5d08b77ad1969",
+        "capture_SHA256": "2bf1e37a6d1bed8e92b2c50ebb3b61d7acf84150a162aa3fbcfdbd9ee611d40b",
+        "observer_SHA256": "009d1e94667927844e1c0d75e8e0128687ac7f3b0447a6e76601a7f5b6957ea4",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "CLI_SHA256": "709617813dfd561cfb52aa241da9d4b2aa691ab47be0a73d6273c21d3302563d",
+        "auditor_SHA256": "a106fcd140caf0c764e27b5886846cb61eef9b84e76f625cbdf08464fc97069e",
+        "physical_rows": 205,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 6,
+        "source_bound_TCP_events": 156,
+        "positive_captured_TCP_coverage": true,
+        "explicit_empty_TCP_namespace": false,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 6,
+        "context_only_TCP_records": [],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 2,
+        "compared_CLI_PDUs": 157,
+        "source_bound_parent_links": 90,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "preview_by_native_TCP": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4,
+          "5": 5,
+          "6": 6
+        },
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "new_source_complete_exports_identical": {
+        "events": true,
+        "flows": true,
+        "yak": true
+      },
+      "final_CLI_projection": {
+        "proof_SHA256": "e28deb95f35f8eb3974b6c2612eb802d100405d311db716c7b4e013abe70229b",
+        "before_CLI_SHA256": "709617813dfd561cfb52aa241da9d4b2aa691ab47be0a73d6273c21d3302563d",
+        "CLI_SHA256": "709617813dfd561cfb52aa241da9d4b2aa691ab47be0a73d6273c21d3302563d",
+        "auditor_SHA256": "275394c78beb265c45bf1510490c28cf201d0e7084c1ea23c5db3e2ef91a8135",
+        "record_counts": {
+          "physical": 205
+        },
+        "precise_reason_changes": 0,
+        "every_other_value_type_and_connection_literal": true
+      },
+      "protocol": {
+        "proof_SHA256": "b88ad3f9b70c61eecab0369d084614808305a8a8c95696ba1f73cf3ffcd35614",
+        "baseline_SDK_SHA256": "57dfde072dcae0e3d1a2e2f9ef1223234efb7dd7603db9e2cf5489eeacdfcd6d",
+        "SDK_SHA256": "4cc1d0a4c4fb8274900fec3f72bb8ba28a5542559edbb476a67c31c53e2c7a4e",
+        "baseline_receipt_SHA256": "a12119d786eb031152e3f9ec5897885e7c4735a949864eeaa9782ade99a85fe6",
+        "receipt_SHA256": "60a31779924e0b99ba7d2db6d4ad94d8f08d2709bb6c91a3ad76a02158d86e1e",
+        "manifest_SHA256": "5f19f40364768061b30ac23045187fabdc03444372a6e64843bca90aa6ae07a3",
+        "wire_proof_SHA256": "41e30d872130562cacc8a16332045f96d0b94bab7d75816df7afb58b06a1b294",
+        "auditor_SHA256": "796c5ecbb4603f7daabf1ddf6fab88a3d6e4ae55c6ce4c37b8c5905b02ce733e",
+        "compared_native_records": 156,
+        "protocol_counts": {
+          "tls": 120,
+          "http": 36
+        },
+        "generated_ID_mapping_SHA256": "315b9743fa12953d05077bab8fb0211cde9ba5d0aee1bd8778509a6cd1109ad3",
+        "inserted_header_diagnostics": 1,
+        "wire_plaintext_types_and_connection_namespaces_literal": true,
+        "only_attested_frame_and_generated_PDU_references_translated": true,
+        "full_protocol_parity_claim": false
+      },
+      "reference": {
+        "proof_SHA256": "0d6f724c47e6cf579575bfcc26dca4c320ed978faf184edd3eee323d9e4a0b96",
+        "baseline_reference_SHA256": "74f810b7f6a30f695b3368d3747de1085a885742ec312f729a7458470a680637",
+        "reference_SHA256": "1004c1369d3427a8c9dca18d32e2cf7391908bf75898fffd6c7075e453738393",
+        "manifest_SHA256": "5f19f40364768061b30ac23045187fabdc03444372a6e64843bca90aa6ae07a3",
+        "wire_proof_SHA256": "41e30d872130562cacc8a16332045f96d0b94bab7d75816df7afb58b06a1b294",
+        "auditor_SHA256": "57d2faed87c984fd8abc20310375f2152f2d1560f01c7017032f81a584c10563",
+        "reference_schema_SHA256": "d32823ac935dca23ee9a009f3d7ef2b280a3c747f737e9e2daf966a596f9f306",
+        "original_reference_frames": 204,
+        "literal_raw_field_occurrences": 13227,
+        "attested_generated_frame_references": 36,
+        "all_available_raw_descriptors_and_scalar_values_literal": true,
+        "generated_analysis_or_all_protocol_parity_claim": false
+      }
+    }
+  ],
+  "Windows": {
+    "initial_five_cases": {
+      "proof_SHA256": "8da5e68f1edbabb07bba601fb1e69c5949de8479233524191278d4c3e6349024",
+      "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+      "cases": [
+        {
+          "case": "short-four",
+          "proof": {
+            "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+            "binary_SHA256": "29fdeaf9325f032a79147ab095041e4957349bf67a46d90e7127991dd79fb678",
+            "capture_SHA256": "62118d7f1dd0cfb090e93473b6e02a2c14ed7679e4db75e649ee47d6cab43412",
+            "CLI_SHA256": "cbce2f7bc07386766b466a9b5e89a5d796acbcf0f0feb9a9395a861b71132e19",
+            "selected_CLI_frame": 1,
+            "selected_PDU": 1,
+            "selected_stack": [
+              "Ethernet",
+              "IPv4"
+            ],
+            "query": "fields pdu.id == 1",
+            "expected_detail": "Available Header Bytes: 4",
+            "field_snapshot_SHA256": "3d87a89cdc26be45c7e2864ba0a02d301ee5d02f3c72deb599a324b9b69a7818",
+            "native_tabs_click_correct": true,
+            "restored": {
+              "error": "<nil>",
+              "input_cp": 936,
+              "output_cp": 936
+            },
+            "case": "short-four"
+          },
+          "proof_SHA256": "453c23d246f78f7db0454bd9bb315c01b050451276da6ccdd9507b5fcfcb0712",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "3d87a89cdc26be45c7e2864ba0a02d301ee5d02f3c72deb599a324b9b69a7818",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "24bbc8234663b79d41a9dccfaa0bcc7db2e5473f79db6381cb1e8484cb18d749"
+            },
+            "03-conversation-messages": {
+              "SHA256": "3e3172ab471872401a36bb924397dffdf4aaa1e3c9b49c5ca4e0ebdf06e066a8",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "66d908e7e73ce1fa87e4870945fa2c85bec4e66b57cc8ea9e5d896681f0a193f"
+            },
+            "04-association-evidence": {
+              "SHA256": "de09563fa51d88b1c2a069833808e3f20ee5cc0f0131168248974a3a15d9538c",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "e3bae182596ff96f825b5c19cd89c1229b4eab23ec93146dc007c4d2b5076c67"
+            },
+            "05-narrow": {
+              "SHA256": "d687af04b4a6706f73e53115cfbdcc04bf83d59ef95bf698db68be3af78f88de",
+              "Width": 80,
+              "Height": 30,
+              "PNG_SHA256": "8dc7aa2909ea904f68ff1faebc1239792ec1186d92164c9d23a6254ea4889629"
+            },
+            "06-restored": {
+              "SHA256": "de09563fa51d88b1c2a069833808e3f20ee5cc0f0131168248974a3a15d9538c",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "case": "short-zero",
+          "proof": {
+            "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+            "binary_SHA256": "29fdeaf9325f032a79147ab095041e4957349bf67a46d90e7127991dd79fb678",
+            "capture_SHA256": "401f706c6d716597f292140a08b688694679cbb807a5a0deba247fd7064ad5e9",
+            "CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+            "selected_CLI_frame": 99,
+            "selected_PDU": 78,
+            "selected_stack": [
+              "Loopback",
+              "IPv4"
+            ],
+            "query": "fields pdu.id == 78",
+            "expected_detail": "Available Header Bytes: 0",
+            "field_snapshot_SHA256": "bcbac9b0e0e7d661ee14353dddc7dce1b635c637bf214ad6c47c5648eb771fe8",
+            "native_tabs_click_correct": true,
+            "restored": {
+              "error": "<nil>",
+              "input_cp": 936,
+              "output_cp": 936
+            },
+            "case": "short-zero"
+          },
+          "proof_SHA256": "35fea5ef81fe7bd63b6cad7a29ea811a4d39745a1a2c81498d23650d19ba20da",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "bcbac9b0e0e7d661ee14353dddc7dce1b635c637bf214ad6c47c5648eb771fe8",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "9c65dc493834a89f8495b500f883a9a5354907a6c98d80a7b33186c72ca62a07"
+            },
+            "03-conversation-messages": {
+              "SHA256": "1d964e7f301cb272d6c494c217d818746bb1a58a5d675e3c0d5a331fe419a98d",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "0ca129cdfad9601be40e0cbb983b48477912b2ef90fada50534ad79f1d3fa42a"
+            },
+            "04-association-evidence": {
+              "SHA256": "0e53d9ead3cb27d9ea47824bc5740bb92e2e274bb1986a058d27012ae4530831",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "2b237653645b18482c73ebd98ff0be608eb322aa4b1377c0b53c2e67cabe7e08"
+            },
+            "05-narrow": {
+              "SHA256": "afef1ee4ed39b6adb8332e2a44a155e52af6f78018766afd4eac3d85d2d082de",
+              "Width": 80,
+              "Height": 30,
+              "PNG_SHA256": "2b9d9f529fcb76dd9bfeff63331c72465099267582444b06d5ebb60aaf274f10"
+            },
+            "06-restored": {
+              "SHA256": "0e53d9ead3cb27d9ea47824bc5740bb92e2e274bb1986a058d27012ae4530831",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "case": "HTTP3-recovered",
+          "proof": {
+            "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+            "binary_SHA256": "29fdeaf9325f032a79147ab095041e4957349bf67a46d90e7127991dd79fb678",
+            "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+            "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+            "selected_CLI_frame": 76,
+            "selected_PDU": 86,
+            "selected_stack": [
+              "Loopback",
+              "IPv4",
+              "UDP",
+              "QUIC",
+              "HTTP/3"
+            ],
+            "query": "fields pdu.id == 86",
+            "expected_detail": "HTTP/3",
+            "field_snapshot_SHA256": "1682be7876995e778c25b7514be77b72360c19414e55b3952d96d1281228d4a5",
+            "native_tabs_click_correct": true,
+            "restored": {
+              "error": "<nil>",
+              "input_cp": 936,
+              "output_cp": 936
+            },
+            "case": "HTTP3-recovered"
+          },
+          "proof_SHA256": "f67512370ea64d75e64bca39e113a730771a43a5e08d255117ac727dffd511e2",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "1682be7876995e778c25b7514be77b72360c19414e55b3952d96d1281228d4a5",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "7aaf3d26be587d64a5df59653e76f54714635fe23fecb79bfba63ca8e307a0d4"
+            },
+            "03-conversation-messages": {
+              "SHA256": "80e4e3eadbc9bb35b32bf596d3583f909cb7686b0333316e59d4b520573b3db0",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "55a7808e4ff2106d99322494a3563b549a183983d8966118572ecc094066cea7"
+            },
+            "04-association-evidence": {
+              "SHA256": "a6aa705a73871abfc770e7f2750ffe6509e1f530ad65bf63dc0b6c303cefa1d9",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "cbdbd24ba8ca78d11392ababc42477f28575e9e7f317791a9b01dbaa45ff8c51"
+            },
+            "05-narrow": {
+              "SHA256": "58fd9e407b3ab09f8a30f2901d0a835e410010c33a4b3812538a5ad64951e93a",
+              "Width": 80,
+              "Height": 30,
+              "PNG_SHA256": "d1c0234d829be82ce898319699c540698869e4e5e8df525a745801d62988eb94"
+            },
+            "06-restored": {
+              "SHA256": "a6aa705a73871abfc770e7f2750ffe6509e1f530ad65bf63dc0b6c303cefa1d9",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "case": "GRE-version7",
+          "proof": {
+            "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+            "binary_SHA256": "29fdeaf9325f032a79147ab095041e4957349bf67a46d90e7127991dd79fb678",
+            "capture_SHA256": "145922b07b1b27c9404d5df6d56d5324355bed22a527549e28b60b83a5dbc4bd",
+            "CLI_SHA256": "354e73be33d5e039e69d7cd49c1f8f67d2b84d75998a754998d3a6f32a3b57f9",
+            "selected_CLI_frame": 1,
+            "selected_PDU": 1,
+            "selected_stack": [
+              "Ethernet",
+              "IPv4"
+            ],
+            "query": "fields pdu.id == 1",
+            "expected_detail": "Observed GRE Version: 7",
+            "field_snapshot_SHA256": "41e4003ca1c49b8cb7886a22095bba4081962bf85b830c35f42d092e4bf222c2",
+            "native_tabs_click_correct": true,
+            "restored": {
+              "error": "<nil>",
+              "input_cp": 936,
+              "output_cp": 936
+            },
+            "case": "GRE-version7"
+          },
+          "proof_SHA256": "1a3461d20b2034f840483d1b4a1c3354d1d93c6d348fada0db436ff17dc88ee2",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "41e4003ca1c49b8cb7886a22095bba4081962bf85b830c35f42d092e4bf222c2",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "c25a78b4f9bb6fa7cc0fe20855b6f6c87f2bde826f0d754999f0e69b565645b4"
+            },
+            "03-conversation-messages": {
+              "SHA256": "9df2663a8f92ea66897c4f4783adae0607f6cc5094c20aef891fafa35a7da852",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "784363d50dcba140028bae9785d36df947b6ef817a7865e1c40ae731fab0537e"
+            },
+            "04-association-evidence": {
+              "SHA256": "1252eac093c8f5254bfbf91151752f57eea27aa8128d7168a341d7cb3d7fc594",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "5444890c5159930ec916bf2dc8adf3b03c0b4d8f17b8fd2018dfd3870b08fb5e"
+            },
+            "05-narrow": {
+              "SHA256": "caf2a05685c25c7c988335aeea7b24676c7077b2dc9313776d1e2f83786df839",
+              "Width": 80,
+              "Height": 30,
+              "PNG_SHA256": "5a076b66fe5edcaf61a8ac2cda5fdfa83d411c1af7b4dbd7e5a4555160603ae3"
+            },
+            "06-restored": {
+              "SHA256": "1252eac093c8f5254bfbf91151752f57eea27aa8128d7168a341d7cb3d7fc594",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "case": "HTTP3-decoded",
+          "proof": {
+            "source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+            "binary_SHA256": "29fdeaf9325f032a79147ab095041e4957349bf67a46d90e7127991dd79fb678",
+            "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+            "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+            "SDK_SHA256": "ed819f096a15a44b40e57533393946be817e97252c9e81d28e92da505ab131c4",
+            "selected_CLI_frame": 144,
+            "selected_PDU": 160,
+            "selected_stack": [
+              "Loopback",
+              "IPv4",
+              "UDP",
+              "QUIC",
+              "HTTP/3"
+            ],
+            "query": "fields pdu.id == 160",
+            "decoded_request_path": "/after-client-key-update",
+            "native_tabs_click_correct": true,
+            "restored": {
+              "error": "<nil>",
+              "input_cp": 936,
+              "output_cp": 936
+            },
+            "field_snapshot_SHA256": "f2de9827a4ac2f234ed7a7a2ee6231cd6f32004392808c001ab488f5b39b5e8b",
+            "deep_snapshot_SHA256": "fadafe6aab19be101cbfa1ef04aa1f154f4fc2fac11c9cd8455356290a2816d8"
+          },
+          "proof_SHA256": "6302a6ec7bb3f75170ed37ec6df4c4afc3883363a081e616a54e37ed83d8087c",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "f2de9827a4ac2f234ed7a7a2ee6231cd6f32004392808c001ab488f5b39b5e8b",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "a3f2882c5b616ce8a8fed2584ae9fc37201b926536c1c82f55fa4f091cffb076"
+            },
+            "03-conversation-messages": {
+              "SHA256": "3d3ef029a8db5662da47cde73fe18d9da886d4153084f8cd5afcf827ad04c73e",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "9a8c950a14590c19e2c0f127c564695db538c49c96615a2c8ba9920b6d164859"
+            },
+            "04-association-evidence": {
+              "SHA256": "4df009917f1aed3e916c2da2486919b26559b3413234af051742b9b86d9b42ee",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "edc05439786904d5bd6dd0a51256445d0f90162738766c2dad0dfc6207880424"
+            },
+            "05-narrow": {
+              "SHA256": "518d6091160fe985324b95e7dab50330d0adca157090c0c21707edd3e60486d1",
+              "Width": 80,
+              "Height": 30,
+              "PNG_SHA256": "783e5973eda794a0e731e21c472a29b52de976aa26916b46d968f95b4201d2df"
+            },
+            "06-restored": {
+              "SHA256": "4df009917f1aed3e916c2da2486919b26559b3413234af051742b9b86d9b42ee",
+              "Width": 180,
+              "Height": 48
+            },
+            "01-deep-protocol-fields": {
+              "SHA256": "fadafe6aab19be101cbfa1ef04aa1f154f4fc2fac11c9cd8455356290a2816d8",
+              "Width": 180,
+              "Height": 48,
+              "PNG_SHA256": "50daeffe627d32a80a533ae3a306ba2e3aed3ef39c57e3c3099692653061440a"
+            }
+          }
+        }
+      ],
+      "actual_native_console_cells": true,
+      "visual_inspection_performed": true
+    },
+    "final_three_cases": {
+      "proof_SHA256": "190e5469f882c3e313fd0ffea2348460d6136e8ea2332cedad3f75213ea8e1f2",
+      "source": "81b486343c93d46f7b66ad72580e5a314901029d",
+      "binary_SHA256": "910f46c63e586ae10ec3d3e19472ff551e89a9043293a75d1529d5d4b86e6d8d",
+      "cases": [
+        {
+          "source": "81b486343c93d46f7b66ad72580e5a314901029d",
+          "binary_SHA256": "910f46c63e586ae10ec3d3e19472ff551e89a9043293a75d1529d5d4b86e6d8d",
+          "capture_SHA256": "145922b07b1b27c9404d5df6d56d5324355bed22a527549e28b60b83a5dbc4bd",
+          "CLI_SHA256": "435da487adef2ba76a1294bca675c77baf3477190c484fa8476db32278c95dc5",
+          "baseline_CLI_SHA256": "354e73be33d5e039e69d7cd49c1f8f67d2b84d75998a754998d3a6f32a3b57f9",
+          "literal_CLI_change": "Only redundant Info suffix removed; all other CLI values exact",
+          "selected_CLI_frame": 1,
+          "selected_PDU": 1,
+          "selected_stack": [
+            "Ethernet",
+            "IPv4"
+          ],
+          "query": "fields pdu.id == 1",
+          "expected_detail": "Observed GRE Version: 7",
+          "native_tabs_click_correct": true,
+          "restored": {
+            "error": "<nil>",
+            "input_cp": 936,
+            "output_cp": 936
+          },
+          "case": "GRE-version7",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "855aafde57d003f6815ac40578b10e0fa7d4a04ad150b7609392de0623c0dcbc",
+              "PNG_SHA256": "b4434fdaaec3be5650d9cc8bb1369af4823e4fbe52423fd1ddfb4301ead64c10",
+              "Width": 180,
+              "Height": 48
+            },
+            "03-conversation-messages": {
+              "SHA256": "bd39d2547335d3b98565353b8b66be433a5b26b243ca7e854af631e291287678",
+              "PNG_SHA256": "cd845c8c09ca8c94cdabd0cd3ff2ab63a16f0476fe5ad28a492435d9aa62a493",
+              "Width": 180,
+              "Height": 48
+            },
+            "04-association-evidence": {
+              "SHA256": "da15c01888ac4fbfc012e755dcccb4f2b0987f8d283359d647b87de7bf5ff21a",
+              "PNG_SHA256": "55710f02ad9749ea3eb21b0e33024704de860f99f98e4fa46ac14f4238558f0a",
+              "Width": 180,
+              "Height": 48
+            },
+            "05-narrow": {
+              "SHA256": "caf2a05685c25c7c988335aeea7b24676c7077b2dc9313776d1e2f83786df839",
+              "PNG_SHA256": "5a076b66fe5edcaf61a8ac2cda5fdfa83d411c1af7b4dbd7e5a4555160603ae3",
+              "Width": 80,
+              "Height": 30
+            },
+            "06-restored": {
+              "SHA256": "da15c01888ac4fbfc012e755dcccb4f2b0987f8d283359d647b87de7bf5ff21a",
+              "PNG_SHA256": "55710f02ad9749ea3eb21b0e33024704de860f99f98e4fa46ac14f4238558f0a",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "source": "81b486343c93d46f7b66ad72580e5a314901029d",
+          "binary_SHA256": "910f46c63e586ae10ec3d3e19472ff551e89a9043293a75d1529d5d4b86e6d8d",
+          "capture_SHA256": "401f706c6d716597f292140a08b688694679cbb807a5a0deba247fd7064ad5e9",
+          "CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+          "baseline_CLI_SHA256": "51359fe2939e40d5fba9d3583974bdce2ec54dd1d280395500ced5df253add70",
+          "literal_CLI_change": "none; complete CLI JSONL byte-identical",
+          "selected_CLI_frame": 99,
+          "selected_PDU": 78,
+          "selected_stack": [
+            "Loopback",
+            "IPv4"
+          ],
+          "query": "fields pdu.id == 78",
+          "expected_detail": "Available Header Bytes: 0",
+          "native_tabs_click_correct": true,
+          "restored": {
+            "error": "<nil>",
+            "input_cp": 936,
+            "output_cp": 936
+          },
+          "case": "short-zero",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "bcbac9b0e0e7d661ee14353dddc7dce1b635c637bf214ad6c47c5648eb771fe8",
+              "PNG_SHA256": "9c65dc493834a89f8495b500f883a9a5354907a6c98d80a7b33186c72ca62a07",
+              "Width": 180,
+              "Height": 48
+            },
+            "03-conversation-messages": {
+              "SHA256": "1d964e7f301cb272d6c494c217d818746bb1a58a5d675e3c0d5a331fe419a98d",
+              "PNG_SHA256": "0ca129cdfad9601be40e0cbb983b48477912b2ef90fada50534ad79f1d3fa42a",
+              "Width": 180,
+              "Height": 48
+            },
+            "04-association-evidence": {
+              "SHA256": "0e53d9ead3cb27d9ea47824bc5740bb92e2e274bb1986a058d27012ae4530831",
+              "PNG_SHA256": "2b237653645b18482c73ebd98ff0be608eb322aa4b1377c0b53c2e67cabe7e08",
+              "Width": 180,
+              "Height": 48
+            },
+            "05-narrow": {
+              "SHA256": "afef1ee4ed39b6adb8332e2a44a155e52af6f78018766afd4eac3d85d2d082de",
+              "PNG_SHA256": "2b9d9f529fcb76dd9bfeff63331c72465099267582444b06d5ebb60aaf274f10",
+              "Width": 80,
+              "Height": 30
+            },
+            "06-restored": {
+              "SHA256": "0e53d9ead3cb27d9ea47824bc5740bb92e2e274bb1986a058d27012ae4530831",
+              "PNG_SHA256": "2b237653645b18482c73ebd98ff0be608eb322aa4b1377c0b53c2e67cabe7e08",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        },
+        {
+          "source": "81b486343c93d46f7b66ad72580e5a314901029d",
+          "binary_SHA256": "910f46c63e586ae10ec3d3e19472ff551e89a9043293a75d1529d5d4b86e6d8d",
+          "capture_SHA256": "ac30afa366cfe271076d2f2fd1a4f2f67760f1f3d9c88ed49197c6a959b28f0a",
+          "CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+          "baseline_CLI_SHA256": "35bbc5228e8bfff25052579d6f3f5db4290ada2ed5a9734afe5d1ec44dcbcc88",
+          "literal_CLI_change": "none; complete CLI JSONL byte-identical",
+          "selected_CLI_frame": 144,
+          "selected_PDU": 160,
+          "selected_stack": [
+            "Loopback",
+            "IPv4",
+            "UDP",
+            "QUIC",
+            "HTTP/3"
+          ],
+          "query": "fields pdu.id == 160",
+          "expected_detail": "HTTP/3",
+          "native_tabs_click_correct": true,
+          "restored": {
+            "error": "<nil>",
+            "input_cp": 936,
+            "output_cp": 936
+          },
+          "case": "HTTP3-decoded",
+          "snapshots": {
+            "01-protocol-fields": {
+              "SHA256": "f2de9827a4ac2f234ed7a7a2ee6231cd6f32004392808c001ab488f5b39b5e8b",
+              "PNG_SHA256": "a3f2882c5b616ce8a8fed2584ae9fc37201b926536c1c82f55fa4f091cffb076",
+              "Width": 180,
+              "Height": 48
+            },
+            "03-conversation-messages": {
+              "SHA256": "3d3ef029a8db5662da47cde73fe18d9da886d4153084f8cd5afcf827ad04c73e",
+              "PNG_SHA256": "9a8c950a14590c19e2c0f127c564695db538c49c96615a2c8ba9920b6d164859",
+              "Width": 180,
+              "Height": 48
+            },
+            "04-association-evidence": {
+              "SHA256": "4df009917f1aed3e916c2da2486919b26559b3413234af051742b9b86d9b42ee",
+              "PNG_SHA256": "edc05439786904d5bd6dd0a51256445d0f90162738766c2dad0dfc6207880424",
+              "Width": 180,
+              "Height": 48
+            },
+            "05-narrow": {
+              "SHA256": "518d6091160fe985324b95e7dab50330d0adca157090c0c21707edd3e60486d1",
+              "PNG_SHA256": "783e5973eda794a0e731e21c472a29b52de976aa26916b46d968f95b4201d2df",
+              "Width": 80,
+              "Height": 30
+            },
+            "06-restored": {
+              "SHA256": "4df009917f1aed3e916c2da2486919b26559b3413234af051742b9b86d9b42ee",
+              "PNG_SHA256": "edc05439786904d5bd6dd0a51256445d0f90162738766c2dad0dfc6207880424",
+              "Width": 180,
+              "Height": 48
+            },
+            "01-deep-protocol-fields": {
+              "SHA256": "fadafe6aab19be101cbfa1ef04aa1f154f4fc2fac11c9cd8455356290a2816d8",
+              "PNG_SHA256": "50daeffe627d32a80a533ae3a306ba2e3aed3ef39c57e3c3099692653061440a",
+              "Width": 180,
+              "Height": 48
+            }
+          }
+        }
+      ],
+      "actual_native_console_cells": true,
+      "visual_inspection_pending": false,
+      "visual_inspection_performed": true,
+      "visually_inspected_PNGs": [
+        {
+          "path": "C:\\tmp\\yak-shark-short-IP-20261028\\windows-parent-final-GRE-version7-01\\01-protocol-fields.png",
+          "SHA256": "b4434fdaaec3be5650d9cc8bb1369af4823e4fbe52423fd1ddfb4301ead64c10"
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-short-IP-20261028\\windows-parent-final-short-zero-01\\01-protocol-fields.png",
+          "SHA256": "9c65dc493834a89f8495b500f883a9a5354907a6c98d80a7b33186c72ca62a07"
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-short-IP-20261028\\windows-parent-final-HTTP3-decoded-01\\01-deep-protocol-fields.png",
+          "SHA256": "50daeffe627d32a80a533ae3a306ba2e3aed3ef39c57e3c3099692653061440a"
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-short-IP-20261028\\windows-parent-final-GRE-version7-01\\05-narrow.png",
+          "SHA256": "5a076b66fe5edcaf61a8ac2cda5fdfa83d411c1af7b4dbd7e5a4555160603ae3"
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-short-IP-20261028\\windows-parent-final-HTTP3-decoded-01\\05-narrow.png",
+          "SHA256": "783e5973eda794a0e731e21c472a29b52de976aa26916b46d968f95b4201d2df"
+        }
+      ]
+    },
+    "literal_column_gaps": {
+      "proof_SHA256": "9c798a5efb845b6542d06d75398dccabfbde98c43f1faec54d8e9390c0305948",
+      "source_SHA256": "fadafe6aab19be101cbfa1ef04aa1f154f4fc2fac11c9cd8455356290a2816d8",
+      "PNG_SHA256": "50daeffe627d32a80a533ae3a306ba2e3aed3ef39c57e3c3099692653061440a",
+      "PNG_size": [
+        1640,
+        1028
+      ],
+      "render_character_width": 9.0,
+      "header_row": 12,
+      "data_row": 13,
+      "header_token_columns": {
+        "Source": 37,
+        "Destination": 50,
+        "Bytes": 63,
+        "Info": 70
+      },
+      "destination_columns": [
+        50,
+        58
+      ],
+      "destination_to_bytes_blank_columns": [
+        59,
+        60,
+        61,
+        62
+      ],
+      "bytes_columns": [
+        63,
+        65
+      ],
+      "bytes_to_info_blank_columns": [
+        66,
+        67,
+        68,
+        69
+      ],
+      "gap_PIXELS_are_literal_solid_selected_background": true,
+      "column_pixels": [
+        {
+          "column": 55,
+          "character": ".",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 141
+            },
+            {
+              "rgb": [
+                159,
+                178,
+                234
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                162,
+                180,
+                234
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                231,
+                233,
+                241
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                232,
+                234,
+                241
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 56,
+          "character": "0",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 90
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 6
+            },
+            {
+              "rgb": [
+                236,
+                238,
+                241
+              ],
+              "count": 3
+            },
+            {
+              "rgb": [
+                228,
+                231,
+                241
+              ],
+              "count": 2
+            },
+            {
+              "rgb": [
+                101,
+                133,
+                228
+              ],
+              "count": 2
+            }
+          ]
+        },
+        {
+          "column": 57,
+          "character": ".",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 141
+            },
+            {
+              "rgb": [
+                159,
+                178,
+                234
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                162,
+                180,
+                234
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                231,
+                233,
+                241
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                232,
+                234,
+                241
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 58,
+          "character": "1",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 115
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 13
+            },
+            {
+              "rgb": [
+                125,
+                152,
+                230
+              ],
+              "count": 9
+            },
+            {
+              "rgb": [
+                65,
+                105,
+                224
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                148,
+                169,
+                233
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 59,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 60,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 61,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 62,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 63,
+          "character": "1",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 115
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 13
+            },
+            {
+              "rgb": [
+                125,
+                152,
+                230
+              ],
+              "count": 9
+            },
+            {
+              "rgb": [
+                65,
+                105,
+                224
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                148,
+                169,
+                233
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 64,
+          "character": "5",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 107
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 8
+            },
+            {
+              "rgb": [
+                102,
+                134,
+                228
+              ],
+              "count": 5
+            },
+            {
+              "rgb": [
+                209,
+                216,
+                239
+              ],
+              "count": 3
+            },
+            {
+              "rgb": [
+                148,
+                169,
+                233
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 65,
+          "character": "9",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 97
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 2
+            },
+            {
+              "rgb": [
+                9,
+                62,
+                219
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                159,
+                178,
+                234
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                209,
+                216,
+                239
+              ],
+              "count": 1
+            }
+          ]
+        },
+        {
+          "column": 66,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 67,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 68,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 69,
+          "character": " ",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 147
+            }
+          ]
+        },
+        {
+          "column": 70,
+          "character": "1",
+          "pixel_color_counts": [
+            {
+              "rgb": [
+                0,
+                55,
+                218
+              ],
+              "count": 115
+            },
+            {
+              "rgb": [
+                242,
+                242,
+                242
+              ],
+              "count": 13
+            },
+            {
+              "rgb": [
+                125,
+                152,
+                230
+              ],
+              "count": 9
+            },
+            {
+              "rgb": [
+                65,
+                105,
+                224
+              ],
+              "count": 1
+            },
+            {
+              "rgb": [
+                148,
+                169,
+                233
+              ],
+              "count": 1
+            }
+          ]
+        }
+      ],
+      "conclusion": "No missing cell or PNG pixel separator in these artifacts. Actual gap cells are four blank cells (destination/bytes and bytes/info). Inline image scaling can make small gaps appear crowded; no Go layout fix justified by this witness."
+    },
+    "native_console_cells_and_actual_PNGs_visually_inspected": true
+  },
+  "tests": {
+    "proof_SHA256": "a4d74fc73aa2a51677a5aed3c1e365d5d287240b4e8155162dbeeac6dc2d6787",
+    "native_source": "31142ae0c8a697a7119a9579d94f585d37464f09",
+    "CLI_source": "81b486343c93d46f7b66ad72580e5a314901029d",
+    "native": {
+      "counts": {
+        "run": 235651,
+        "output": 496538,
+        "pass": 235641,
+        "skip": 10
+      },
+      "packages": [
+        {
+          "Time": "2026-10-28T10:44:11.3724311+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "Elapsed": 413.059
+        }
+      ],
+      "log_SHA256": "e7926a590048d84baea4d5c218de756cb6406a99f437d5089704c1bdfb0b2782"
+    },
+    "CLI": {
+      "counts": {
+        "run": 643,
+        "output": 1319,
+        "pass": 641,
+        "skip": 2
+      },
+      "packages": [
+        {
+          "Time": "2026-10-28T10:54:53.9986816+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "Elapsed": 2.874
+        }
+      ],
+      "log_SHA256": "44bee2598bdc5ddb9b2e8dc0fb76ad1537880720312e7a0e4f9c8ff4deda768d"
+    },
+    "combined_passed": 236282,
+    "combined_skipped": 12,
+    "all_prior_tests_retained": true,
+    "every_started_test_has_one_terminal": true,
+    "native_unchanged_after_full_suite": true,
+    "short_header_fuzz": {
+      "source": "09bf98c8fc6a866adaa49a3f4911b8dace249464",
+      "executions": 92721,
+      "active_seconds": 40,
+      "total_package_seconds": 41.093,
+      "receipt": {
+        "proof_SHA256": "77d49a40fa580eb8832c160eb592de25ef9b17b5cd5f397f936132477f2491a5",
+        "source": "09bf98c8fc6a866adaa49a3f4911b8dace249464",
+        "arguments": [
+          "C:\\Users\\V\\sdk\\go1.22.12\\bin\\go.exe",
+          "test",
+          "-p",
+          "1",
+          "-ldflags=-w",
+          "./common/pcapx/pcaputil",
+          "-run=^$",
+          "-fuzz=^FuzzIncompleteIPHeaderCannotMutateFragmentState$",
+          "-fuzztime=40s",
+          "-parallel=2"
+        ],
+        "exit_code": 0,
+        "seconds": 117.625,
+        "log_SHA256": "84f30ed9d4dcc5affd5754ba9cfffff8a2a42c2e636a98b6d04620b39e03a5ab"
+      },
+      "scope": "predecessor short-header implementation; final source separately passes complete suites and explicit GRE parent/state regression matrix"
+    }
+  },
+  "negative_controls": {
+    "prefix": {
+      "proof_SHA256": "e74e80a43797be125190203d2d50d14c97933986f2f8c9083a8194259f34ae6e",
+      "auditor_SHA256": "e33bc13b0fd93db02366f95807d21039a586ca0c84ba31c89bf9823cd8882e39",
+      "positive_groups": [
+        "source",
+        "wire",
+        "native-graph",
+        "reference"
+      ],
+      "rejected": 37,
+      "controls": [
+        {
+          "group": "source",
+          "control": "boolean-observed-version",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "wrong-required-bytes",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "wrong-available-bytes",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "false-complete-fields",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "false-TCP-generation",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "wrong-source-interface",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "duplicate-contribution",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "child-header-splice",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "CLI-confirmed-TLS",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "CLI-stale-connection",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "CLI-complete-status",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "source",
+          "control": "CLI-child-stack",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "wrong-source-time",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "wrong-observed-time",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "boolean-original-frame",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "duplicate-original-owner",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "wrong-source-domain",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "wrong-prefix-interval",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "forged-clock-interpretation",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "wire",
+          "control": "missing-original-record",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "native-graph",
+          "control": "wire-stream-ID",
+          "rejected": true,
+          "reason": "AssertionError: ('a non-reference message value changed', 'http3', 11)"
+        },
+        {
+          "group": "native-graph",
+          "control": "wire-stream-offset",
+          "rejected": true,
+          "reason": "AssertionError: ('a non-reference message value changed', 'quic', 3)"
+        },
+        {
+          "group": "native-graph",
+          "control": "wire-packet-number",
+          "rejected": true,
+          "reason": "AssertionError: ('a non-reference message value changed', 'quic', 3)"
+        },
+        {
+          "group": "native-graph",
+          "control": "false-authentication",
+          "rejected": true,
+          "reason": "AssertionError: ('a non-reference message value changed', 'quic', 3)"
+        },
+        {
+          "group": "native-graph",
+          "control": "generated-parent-splice",
+          "rejected": true,
+          "reason": "AssertionError: ('a non-reference message value changed', 'http3', 11)"
+        },
+        {
+          "group": "native-graph",
+          "control": "generated-request-splice",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "native-graph",
+          "control": "boolean-frame-reference",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "native-graph",
+          "control": "false-native-flow",
+          "rejected": true,
+          "reason": "AssertionError: ('literal source/protocol/connection identity changed', '', 1)"
+        },
+        {
+          "group": "native-graph",
+          "control": "missing-message",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "reference",
+          "control": "wire-version-scalar",
+          "rejected": true,
+          "reason": "AssertionError: ('reference wire fields changed', 1, {'ip.version': 2})"
+        },
+        {
+          "group": "reference",
+          "control": "raw-offset",
+          "rejected": true,
+          "reason": "AssertionError: ('reference wire fields changed', 1, {'ip.version': 2})"
+        },
+        {
+          "group": "reference",
+          "control": "raw-mask",
+          "rejected": true,
+          "reason": "AssertionError: ('reference wire fields changed', 1, {'ip.version': 2})"
+        },
+        {
+          "group": "reference",
+          "control": "raw-data-source-index",
+          "rejected": true,
+          "reason": "AssertionError: ('reference wire fields changed', 1, {'ip.version': 2})"
+        },
+        {
+          "group": "reference",
+          "control": "raw-boolean-offset",
+          "rejected": true,
+          "reason": "AssertionError: "
+        },
+        {
+          "group": "reference",
+          "control": "absolute-TCP-sequence-scalar",
+          "rejected": true,
+          "reason": "AssertionError: ('reference wire fields changed', 1, {'tcp.seq_raw': 2})"
+        },
+        {
+          "group": "reference",
+          "control": "generated-reference-to-prefix",
+          "rejected": true,
+          "reason": "AssertionError: generated references cannot attach an incomplete-header observation to an original protocol message"
+        },
+        {
+          "group": "reference",
+          "control": "missing-original-frame",
+          "rejected": true,
+          "reason": "AssertionError: "
+        }
+      ],
+      "semantic_export_receipts_rehashed": true
+    },
+    "parent": {
+      "proof_SHA256": "56e814d12a6432ff06f263539490b08227c890ca15227b72dbf40143b40cb4b8",
+      "auditor_SHA256": "a6bf103139f0cb90261c45991accefb0914bd41af7081ca9555f0637f4cb3a7b",
+      "driver_SHA256": "2e88959f3539e8ee48709430283b0506c1090d5b4fed91b447a866a516d95d80",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+      "CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+      "baseline_SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+      "reference_SHA256": "6c0e9905dfaede0b93bcb9aabadfba472beb83bb803a16c6267cc79c77b44bf0",
+      "legacy_generic_markers_allowed": false,
+      "source_positive_frames": 4,
+      "negative_controls": 30,
+      "all_rejected": true,
+      "checks": [
+        {
+          "name": "wrong literal GRE version",
+          "rejected": true
+        },
+        {
+          "name": "numerically equal noninteger GRE version",
+          "rejected": true
+        },
+        {
+          "name": "lost observed nested source domain",
+          "rejected": true
+        },
+        {
+          "name": "wrong physical frame reference",
+          "rejected": true
+        },
+        {
+          "name": "boolean physical section",
+          "rejected": true
+        },
+        {
+          "name": "claimed child IP behind refused parent",
+          "rejected": true
+        },
+        {
+          "name": "claimed GRE identity behind unselected Geneve",
+          "rejected": true
+        },
+        {
+          "name": "child transport connection ownership",
+          "rejected": true
+        },
+        {
+          "name": "exact native fields for limited parent",
+          "rejected": true
+        },
+        {
+          "name": "boolean source parent PDU",
+          "rejected": true
+        },
+        {
+          "name": "floating source interface",
+          "rejected": true
+        },
+        {
+          "name": "floating source frame number",
+          "rejected": true
+        },
+        {
+          "name": "noninteger SDK projection PDU",
+          "rejected": true
+        },
+        {
+          "name": "wrong physical source kind",
+          "rejected": true
+        },
+        {
+          "name": "actual wire GRE version changed independently",
+          "rejected": true
+        },
+        {
+          "name": "second application contribution from refused source",
+          "rejected": true
+        },
+        {
+          "name": "UI claims child TLS",
+          "rejected": true
+        },
+        {
+          "name": "UI speculative inner stack",
+          "rejected": true
+        },
+        {
+          "name": "UI foreign PDU source identity",
+          "rejected": true
+        },
+        {
+          "name": "UI drops exact refusal reason",
+          "rejected": true
+        },
+        {
+          "name": "removed UDP replaced with a recognized protocol",
+          "rejected": true
+        },
+        {
+          "name": "removed UDP preview byte changed",
+          "rejected": true
+        },
+        {
+          "name": "removed UDP preview digest falsely covers full body",
+          "rejected": true
+        },
+        {
+          "name": "removed UDP socket endpoint changed",
+          "rejected": true
+        },
+        {
+          "name": "removed UDP contributes through wrong capture interface",
+          "rejected": true
+        },
+        {
+          "name": "raw descriptor rebound to another byte offset",
+          "rejected": true
+        },
+        {
+          "name": "raw descriptor uses transformed source bytes",
+          "rejected": true
+        },
+        {
+          "name": "raw descriptor forged byte mask",
+          "rejected": true
+        },
+        {
+          "name": "raw field scalar differs from exact captured bytes",
+          "rejected": true
+        },
+        {
+          "name": "boolean raw descriptor source index",
+          "rejected": true
+        }
+      ]
+    },
+    "rejected": 67
+  },
+  "remaining_scope": [
+    "Reference-only 577-frame inventory is classification only: 208 parent refusals and 10 short headers now have their own source proofs; the other rows, including 82 with no published source contribution, still need carrier/data-source/fragment adjudication.",
+    "GRE v1/PPTP grammar and stable Call ID domain have independently reproduced follow-up defects; this phase certifies versions 2..7 refusal, not PPTP correctness.",
+    "Fresh real TLS1.2/TLS1.3 resumption capture is under separate audit; resumed/selected-PSK fields are not yet exposed by this source.",
+    "TLS0-RTT/missing-handshake, broader QUIC CID/dynamic QPACK, numeric CoAP response-PDU links, SSH advanced profiles and full RPC/NDR/authentication remain incomplete."
+  ],
+  "parent_admission": {
+    "auditor_SHA256": "a6bf103139f0cb90261c45991accefb0914bd41af7081ca9555f0637f4cb3a7b",
+    "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+    "CLI_SHA256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+    "baseline_SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+    "source_bound_parent_refusals": 10385,
+    "categories": {
+      "terminal-GRE-without-selected-network-child": 22,
+      "direct-unsupported-GRE": 10324,
+      "unselected-Geneve-profile": 14,
+      "retained-opaque-parent-policy": 24,
+      "IPIP-depth-exceeds-four": 1
+    },
+    "direct_GRE_versions": {
+      "2": 6176,
+      "6": 2091,
+      "4": 526,
+      "7": 219,
+      "3": 813,
+      "5": 499
+    },
+    "generic_outer_protocols": {
+      "47": 22,
+      "17": 14,
+      "0": 4,
+      "97": 6,
+      "4": 1,
+      "137": 14
+    },
+    "exclusive_refused_sources": true,
+    "full_observed_domains_preserved": true,
+    "CLI_refusals": 10385,
+    "legacy_generic_markers_allowed": false,
+    "observed_legacy_generic_markers": 0,
+    "old_parent_count": 50,
+    "retained_old_parent_count": 49,
+    "replaced_old_parents": [
+      {
+        "frame": 268628,
+        "source_frame_SHA256": "18c509f55d80c392821f4a071d3335609c30f2c8ea2dd2972facad60e3ab2ef8",
+        "before_PDU": 211630,
+        "after_PDU": 211705,
+        "new_expert": "IPHeaderTruncated",
+        "domain": {
+          "Section": 0,
+          "Interface": 226,
+          "Encapsulation": "/ipip:0.0.97.115~0.182.1.0/ipip:0.0.97.115~0.182.1.0/ipip:38.1.0.47~75.0.159.0"
+        },
+        "zero_header_offset": 74,
+        "selected_parent_depth": 3
+      }
+    ],
+    "complete_inner_protocol_or_full_field_parity_claim": false,
+    "scope": "Source-bind unselected GRE/Geneve parents without confirming their children.\n\nThe original capture is authoritative for physical bytes and capture domains.\nOnly direct unsupported GRE versions, the declared option-free Geneve profile,\nobserved terminal GRE topology and bounded IPIP depth are adjudicated here.\nRetained opaque extension/EtherIP/MPLS parents certify the literal outer protocol\nand unchanged refusal policy, not any inferred inner grammar. Wireshark's own\nraw fields/columns remain separately reported rather than rewritten to match us.\n",
+    "proof_path": "C:\\tmp\\yak-shark-short-IP-20261028\\GRE-parent-audit-source-04.json",
+    "proof_SHA256": "e6a8825de9e594355f9ca6c6fdb5e0b771f96e98cac94ede02bb0fdb3384d372",
+    "prior_proof_observations_and_authorized_removals_identical": true,
+    "reference": {
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+      "reference_SHA256": "6c0e9905dfaede0b93bcb9aabadfba472beb83bb803a16c6267cc79c77b44bf0",
+      "reference_columns_SHA256": "424762446059f7cc8b07e75ace0989d9c584cd4e5c4b6f3d871ff187416beb84",
+      "source_bound_parent_frames": 10385,
+      "source_zero_raw_GRE_flags_and_version_fields": 10346,
+      "matching_child_protocol_parity_claim": false,
+      "literal_reference_protocol_names": 445,
+      "literal_reference_top15": {
+        "802.11": 3601,
+        "TCP": 481,
+        "CLNP": 472,
+        "S7COMM": 429,
+        "IPv4": 357,
+        "BACnet-APDU": 317,
+        "TDLS": 272,
+        "LLC": 247,
+        "MMS/IEC61850": 198,
+        "DEC DNA": 181,
+        "COTP": 172,
+        "PPP MP": 155,
+        "FC": 115,
+        "ICMP": 97,
+        "CDP": 90
+      },
+      "literal_reference_IPv4_count": 357,
+      "native_IPv4_count": 10385,
+      "literal_reference_all_other_labels": 10028,
+      "literal_reference_full_histogram": {
+        "GRE": 55,
+        "0x0015": 2,
+        "802.11": 3601,
+        "LTP": 13,
+        "MARS": 30,
+        "PPP CCP": 5,
+        "ISIS HELLO": 43,
+        "0x0619": 27,
+        "0x002d": 4,
+        "LBT-TCP": 11,
+        "ISIS": 23,
+        "WSMP": 33,
+        "TCP": 481,
+        "RARP": 21,
+        "CLNP": 472,
+        "DEC DNA": 181,
+        "RPL": 7,
+        "IPv4": 357,
+        "LLC": 247,
+        "NEMO": 10,
+        "DDP": 22,
+        "FC": 115,
+        "0x0000": 89,
+        "PPP MP": 155,
+        "SNA": 25,
+        "0xfe00": 2,
+        "0x0005": 16,
+        "PPP": 31,
+        "MMS/IEC61850": 198,
+        "COTP": 172,
+        "ISIS CSNP": 21,
+        "0x0008": 3,
+        "TDLS": 272,
+        "GEONW": 7,
+        "DCCP": 68,
+        "BACnet-APDU": 317,
+        "ISO": 50,
+        "S7COMM": 429,
+        "CDP": 90,
+        "PPP BCP NCP": 49,
+        "RSVP": 18,
+        "MIPv6": 17,
+        "TTE/MAC CTRL": 1,
+        "0x008a": 9,
+        "Ethernet": 44,
+        "PPP PPPMux": 6,
+        "VRRP": 11,
+        "0x0e33": 21,
+        "WCP": 14,
+        "0x4600": 4,
+        "LACP": 24,
+        "ICMP": 97,
+        "ISIS LSP": 42,
+        "0x005d": 18,
+        "POWERLINK": 37,
+        "ZigBee": 2,
+        "0x006b": 1,
+        "0x0053": 26,
+        "AFP": 11,
+        "ICMPv6": 51,
+        "Wreth": 20,
+        "PPP BCP": 90,
+        "LAPB": 2,
+        "CRTP": 41,
+        "BACnet-NPDU": 82,
+        "EAP": 32,
+        "ZigBee IPM": 19,
+        "0xb6d7": 10,
+        "IEC61850 Sampled Values": 3,
+        "0x0045": 42,
+        "0x0082": 4,
+        "IGMPv0": 10,
+        "BATADV_BATMAN": 2,
+        "H1": 16,
+        "PTPv2": 12,
+        "PPPoED": 8,
+        "JXTA": 14,
+        "ARP": 35,
+        "0x1c08": 3,
+        "MPLS": 21,
+        "0x0060": 2,
+        "PPP BAP": 15,
+        "ESP": 28,
+        "0x32ff": 1,
+        "0x0006": 6,
+        "LLDP": 21,
+        "0x3a46": 1,
+        "AMQP": 17,
+        "0x4623": 7,
+        "0x00d0": 3,
+        "MDS Header": 6,
+        "0x3400": 1,
+        "CFM": 19,
+        "POP/IMF": 2,
+        "Vines RTP": 9,
+        "0x4e88": 8,
+        "ISIS PSNP": 34,
+        "Ceph": 24,
+        "PPP CBCP": 5,
+        "Inverse ATMARP": 3,
+        "0x009f": 6,
+        "0x00d1": 4,
+        "BATADV_VIS": 21,
+        "0x00b9": 8,
+        "FCP": 1,
+        "IP": 36,
+        "MCX": 4,
+        "0x88f8": 1,
+        "PSC": 5,
+        "IGMPv1": 6,
+        "EAPOL": 7,
+        "HPEXT": 15,
+        "HP": 6,
+        "T.125": 55,
+        "ISMP": 6,
+        "PRES": 7,
+        "IGMP": 13,
+        "0x7c00": 6,
+        "0x8201": 5,
+        "0x0001": 19,
+        "PPP MPLSCP": 43,
+        "IGMPv2": 4,
+        "3Com XNS|ROHC": 15,
+        "PPP OSINLCP": 11,
+        "ieee1905": 11,
+        "0x0200": 2,
+        "0x4601": 3,
+        "0xc281": 4,
+        "3Com XNS": 41,
+        "0x3030": 4,
+        "XID": 3,
+        "RTMP": 12,
+        "0x664b": 2,
+        "0x0025": 7,
+        "SMPP": 34,
+        "IDP": 11,
+        "IPX": 18,
+        "0xf800": 2,
+        "0xff02": 4,
+        "0x0040": 3,
+        "IDRP": 6,
+        "IEEE 802.15.4": 16,
+        "0x9ace": 3,
+        "Q.931": 11,
+        "0xffff": 5,
+        "STP": 13,
+        "HSR/PRP": 5,
+        "LMI": 7,
+        "0x0087": 1,
+        "0x00ff": 12,
+        "0x0081": 20,
+        "FCoE": 1,
+        "0x7a00": 3,
+        "BATADV_ICMP": 20,
+        "0x0049": 4,
+        "PIMv2": 10,
+        "Vines IPC": 12,
+        "0x0222": 1,
+        "0x2647": 1,
+        "0x009c": 5,
+        "CLTP": 8,
+        "SSL": 3,
+        "0x0095": 8,
+        "0x00b1": 15,
+        "Inverse ARP": 8,
+        "0x002f": 9,
+        "0x1c7a": 10,
+        "ASAM-CMP": 36,
+        "ESIS": 19,
+        "TECMP": 2,
+        "IRC": 1,
+        "0x165d": 1,
+        "HIP": 3,
+        "Turbocell": 19,
+        "0x0004": 2,
+        "SIP": 2,
+        "Vines IP": 8,
+        "0x003f": 14,
+        "PPP CHAP": 25,
+        "SCoP": 5,
+        "0x0277": 1,
+        "0x00e3": 9,
+        "0x004f": 3,
+        "POP/0x0000": 1,
+        "NAN": 28,
+        "FLIP": 7,
+        "0x0033": 6,
+        "HomePlug AV": 5,
+        "0x8205": 4,
+        "CSM_ENCAPS": 4,
+        "0x0075": 2,
+        "ERSPAN": 7,
+        "0x00c7": 6,
+        "0x2f0a": 1,
+        "0x00f5": 6,
+        "0x886c": 3,
+        "0x0003": 6,
+        "IPv6": 6,
+        "Q.933": 14,
+        "0x00cf": 4,
+        "0x000f": 7,
+        "0x746e": 4,
+        "0x0020": 2,
+        "0x007f": 2,
+        "CL-PRES": 2,
+        "0x00b5": 1,
+        "XIP": 18,
+        "0x00df": 2,
+        "MDP": 5,
+        "SES": 6,
+        "openSAFETY/Powerlink": 5,
+        "0x0043": 2,
+        "OSPF": 1,
+        "0x0009": 5,
+        "0x00b3": 1,
+        "0xe201": 1,
+        "0x30e2": 7,
+        "DNS": 12,
+        "0x0002": 2,
+        "0x0028": 3,
+        "OSSP": 2,
+        "0x240a": 2,
+        "VLAN": 3,
+        "LLT": 3,
+        "0xd0d0": 2,
+        "CGMP": 3,
+        "0xc010": 4,
+        "Vines SARP": 12,
+        "0x0083": 3,
+        "0x1212": 3,
+        "0x0046": 1,
+        "0x8400": 3,
+        "0x00fb": 3,
+        "Vines SRTP": 4,
+        "0x008d": 3,
+        "RDP": 4,
+        "0x303f": 2,
+        "0x60ff": 2,
+        "0x0076": 3,
+        "Vines LLC": 1,
+        "ZIP": 6,
+        "0x3c45": 1,
+        "0x0057": 1,
+        "PPPoES": 7,
+        "PPP Comp": 4,
+        "0x1200": 1,
+        "0xf1fe": 1,
+        "0x7000": 2,
+        "LAT": 7,
+        "MIH": 13,
+        "0x001d": 1,
+        "SNMP": 1,
+        "PPP LCP": 2,
+        "0x3e06": 1,
+        "Broadcom tag": 7,
+        "RRB": 1,
+        "QNET_LWL4": 2,
+        "MAPOS": 1,
+        "0x7c80": 5,
+        "0x2445": 1,
+        "0x06b2": 1,
+        "0x3200": 3,
+        "0x1000": 2,
+        "0x0063": 1,
+        "LWAPP": 4,
+        "0x00e2": 2,
+        "0x00af": 5,
+        "0x00c1": 1,
+        "0x00a7": 9,
+        "AoE": 2,
+        "0x463f": 1,
+        "0x2ae2": 1,
+        "ESIS (X.25)": 7,
+        "Vines ARP": 5,
+        "NCSI": 3,
+        "0xe0e0": 1,
+        "BATADV_BCAST": 3,
+        "IEEE1722": 6,
+        "0xdbe8": 1,
+        "FR": 6,
+        "0x00ae": 1,
+        "0x022e": 1,
+        "0x2488": 1,
+        "AARP": 1,
+        "0xb100": 4,
+        "0x32b9": 1,
+        "0x4e80": 1,
+        "0x5c00": 1,
+        "C15CH_HBEAT": 2,
+        "0x001f": 1,
+        "bluecom": 5,
+        "0xbcbc": 3,
+        "NWP": 11,
+        "TTE/TTE/PPP BCP": 1,
+        "SIII MDT": 1,
+        "0x1806": 1,
+        "DEC_STP": 3,
+        "MAC CTRL": 4,
+        "C15": 2,
+        "FC ELS": 3,
+        "GOOSE": 6,
+        "0xa000": 1,
+        "0x0077": 1,
+        "0xe0f7": 4,
+        "0x9090": 1,
+        "0x6820": 2,
+        "RSVP-E2EI": 1,
+        "0x3423": 2,
+        "0x4663": 1,
+        "PIMv0": 6,
+        "SCCP (Int. ITU)": 2,
+        "0x0c0c": 1,
+        "0x0069": 4,
+        "DCERPC": 1,
+        "0x1800": 2,
+        "0x6464": 1,
+        "DECT": 2,
+        "LLAP": 5,
+        "0xdc00": 2,
+        "0x8881": 3,
+        "0x006f": 2,
+        "NetBIOS": 5,
+        "0x45bb": 2,
+        "TTE/TTE/MAC CTRL": 1,
+        "0xaa02": 1,
+        "DSR": 3,
+        "ECP": 2,
+        "POP/0x1200": 1,
+        "0x00e7": 1,
+        "0x32e3": 1,
+        "0x9a3a": 1,
+        "0xa0a0": 2,
+        "MRP-MVRP": 2,
+        "OAM": 3,
+        "Intel ANS probe": 1,
+        "LINX": 3,
+        "POP": 5,
+        "0xa441": 2,
+        "PPP CDPCP": 2,
+        "CESoETH": 1,
+        "AH": 1,
+        "0x0041": 4,
+        "0x8047": 1,
+        "PIMv1": 3,
+        "0xc200": 2,
+        "0xf230": 1,
+        "DECT Unk": 2,
+        "0x0201": 1,
+        "ATMARP": 1,
+        "0x4000": 3,
+        "0x0019": 1,
+        "0x00c3": 3,
+        "0x0632": 2,
+        "0x2000": 1,
+        "0x6e73": 1,
+        "IEEE802a": 1,
+        "0x6045": 1,
+        "0x3453": 2,
+        "0x2c92": 4,
+        "0x022f": 1,
+        "NSH": 1,
+        "0x1c34": 1,
+        "0x0400": 1,
+        "0x462c": 1,
+        "0xd604": 1,
+        "0x0b0b": 1,
+        "0x0018": 1,
+        "0xbeef": 2,
+        "0x3023": 1,
+        "VSNCP": 2,
+        "0x0036": 1,
+        "TTE/TTE/TTE/0x891d": 1,
+        "0x8424": 1,
+        "0x00f7": 4,
+        "0x7fff": 1,
+        "PAP": 1,
+        "TSCF": 1,
+        "0x7a7a": 1,
+        "0x8445": 1,
+        "0xfed0": 3,
+        "0x5082": 3,
+        "0x005f": 1,
+        "0x82c7": 1,
+        "0x00a9": 1,
+        "BOFL": 1,
+        "0x00eb": 1,
+        "TDMA": 1,
+        "0x0073": 1,
+        "E-LMI": 1,
+        "0x08bb": 2,
+        "X.25": 3,
+        "0x383f": 1,
+        "NSRP": 2,
+        "IGAP": 1,
+        "0x7045": 1,
+        "0x7c81": 1,
+        "0x7423": 1,
+        "0x827a": 2,
+        "0x0039": 2,
+        "0xf402": 1,
+        "0xe031": 2,
+        "PPP PAP": 1,
+        "BATADV_CODED": 1,
+        "0x0010": 1,
+        "NCS": 1,
+        "0x00d9": 1,
+        "0x0013": 2,
+        "0xc631": 1,
+        "0x00e5": 1,
+        "HomePlug": 2,
+        "0x887b": 1,
+        "ASP": 1,
+        "HomePNA": 1,
+        "0x0030": 1,
+        "0x00dd": 1,
+        "0x0007": 1,
+        "0x006d": 1,
+        "TIPC": 1,
+        "0x02fc": 1,
+        "0x32e2": 2,
+        "0x00d5": 1,
+        "0x0084": 1,
+        "CLSES": 1,
+        "0x8235": 1,
+        "0x008b": 1,
+        "0x007c": 1,
+        "0x00a5": 1,
+        "Vines SPP": 1,
+        "0xfe29": 1,
+        "0x800d": 1,
+        "0x3c82": 1,
+        "6LoWPAN": 1,
+        "0xf634": 1,
+        "0x4088": 1,
+        "0x1818": 1,
+        "0x1882": 1,
+        "ATP": 1,
+        "0x7272": 1,
+        "0x0093": 1,
+        "0x0a07": 1,
+        "0x000d": 1,
+        "0x5300": 1,
+        "0x6672": 1,
+        "0x2600": 1,
+        "0x82fe": 1
+      }
+    },
+    "negative_controls": {
+      "proof_path": "C:\\tmp\\yak-shark-short-IP-20261028\\GRE-parent-audit-negatives-04.json",
+      "proof_SHA256": "56e814d12a6432ff06f263539490b08227c890ca15227b72dbf40143b40cb4b8",
+      "count": 30,
+      "all_rejected": true,
+      "auditor_SHA256": "a6bf103139f0cb90261c45991accefb0914bd41af7081ca9555f0637f4cb3a7b",
+      "driver_SHA256": "2e88959f3539e8ee48709430283b0506c1090d5b4fed91b447a866a516d95d80"
+    },
+    "source_proof_SHA256": "e6a8825de9e594355f9ca6c6fdb5e0b771f96e98cac94ede02bb0fdb3384d372"
+  },
+  "reference_only_inventory": {
+    "proof_SHA256": "d75a7b4d1a8f713df1f61ee15a805cfa72959439ed6b2bad66557e82e6b65ebb",
+    "frames": 577,
+    "native_observation_categories": {
+      "[{\"expert\": \"UnsupportedOrMalformedNetworkLayer\", \"protocol\": \"ip\", \"status\": \"unrecognized\"}]": 161,
+      "[{\"expert\": \"EncapsulationDepthOrProfile\", \"protocol\": \"ip\", \"status\": \"limited\"}]": 208,
+      "[{\"expert\": \"\", \"protocol\": \"icmpv6\", \"status\": \"decoded\"}]": 24,
+      "[]": 82,
+      "[{\"expert\": \"FragmentQuarantineBudget\", \"protocol\": \"ip\", \"status\": \"limited\"}]": 54,
+      "[{\"expert\": \"FragmentLength\", \"protocol\": \"ip\", \"status\": \"malformed\"}]": 19,
+      "[{\"expert\": \"NDOptionLength\", \"protocol\": \"ip\", \"status\": \"malformed\"}]": 3,
+      "[{\"expert\": \"IPHeaderTruncated\", \"protocol\": \"ip\", \"status\": \"incomplete\"}]": 10,
+      "[{\"expert\": \"\", \"protocol\": \"icmp\", \"status\": \"decoded\"}]": 15,
+      "[{\"expert\": \"MalformedMessage\", \"protocol\": \"pim\", \"status\": \"malformed\"}]": 1
+    },
+    "frames_without_published_source_contribution": 82,
+    "inventory_only_no_parity_claim": true
+  },
+  "disk_maintenance": {
+    "receipt_SHA256": "e903366102f0297b07ead7935f309c517cd5d5025df064f0ae5ff4994938179c",
+    "lossless_NTFS_compression": true,
+    "old_Go_archives": 28,
+    "reclaimed_allocated_bytes": 2503155712,
+    "files_deleted": 0,
+    "full_receipt_outside_Git": true
+  }
+}

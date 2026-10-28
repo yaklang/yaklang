@@ -1,6 +1,6 @@
 {
-  "scope": "Literal physical label counts and complete SDK record counts after source-bound IP admission. Equal labels do not certify protocol/field parity; refusal labels remain unnormalized.",
-  "generator_sha256": "1e1d71a5acd15af0e68ca53f87bdb4ef3206c5578e173e22c0615d7aa177037a",
+  "scope": "Literal physical label and SDK counts after source-bound short-header/parent admission. Equal labels are not protocol/field parity.",
+  "generator_sha256": "f046673655e66035b7f56355983f015c1cf332e1a5e534baf545fc69f3b3508a",
   "inputs": {
     "weber": {
       "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
@@ -1248,12 +1248,12 @@
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 19,
       "previous_Edwards_inner_field_expansions": 1,
-      "source_preservation_certificate_sha256": "b7b71c3aa183458a42c9e1c4814f328e21e0ffe3ebe9566847090961c3ac88ed"
+      "source_preservation_certificate_sha256": "72b2f0b27f87d295b0e3b9e58d935920f0db91d9a715aba4823314b0f60d2ed9"
     },
     "sharon": {
       "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
       "physical_frames": 328127,
-      "native_message_records": 249497,
+      "native_message_records": 249618,
       "reference_labels": {
         "IPv4": 26586,
         "TCP": 20096,
@@ -3098,7 +3098,7 @@
         "TCP": 6634,
         "HTTP/1.1": 54,
         "HTTP/1.0": 23,
-        "UDP": 109376,
+        "UDP": 109362,
         "ICMPV6": 2985,
         "DHCP": 17,
         "DHCPv6": 198,
@@ -3127,8 +3127,8 @@
         "mDNS": 396,
         "RTSP": 176,
         "PPPoE": 11,
-        "PPP": 37,
-        "IPv4": 54975,
+        "PPP": 35,
+        "IPv4": 65310,
         "IPSecAH": 4,
         "IMAP": 32,
         "Fragment": 51606,
@@ -3137,7 +3137,7 @@
         "TLSv1.3": 302,
         "WHOIS": 24,
         "NetFlow v9": 196,
-        "GRE": 18028,
+        "GRE": 7711,
         "MLDv2MulticastListenerReport": 10,
         "Telnet": 129,
         "IPP": 84,
@@ -3152,11 +3152,11 @@
         "VRRP": 818,
         "Syslog": 111,
         "SCTP": 25412,
-        "IPv6HopByHop": 16381,
+        "IPv6HopByHop": 16380,
         "STUN": 2,
         "LLC": 6305,
         "PIMv2": 94,
-        "MPLS": 255,
+        "MPLS": 254,
         "EAPOL": 53,
         "EAP": 26,
         "DCE/RPC": 5,
@@ -3181,7 +3181,7 @@
         "icmp": 2501,
         "bgp": 315,
         "http": 83,
-        "": 109969,
+        "": 109955,
         "icmpv6": 2985,
         "dhcp": 17,
         "dhcpv6": 198,
@@ -3201,7 +3201,7 @@
         "ssdp": 73,
         "mdns": 396,
         "rtsp": 132,
-        "ip": 114482,
+        "ip": 114617,
         "imap": 44,
         "sip": 23,
         "rtp": 6462,
@@ -3230,8 +3230,8 @@
         {
           "label": "IPv4",
           "reference_frames": 26586,
-          "same_label_native_frames": 54975,
-          "same_label_delta": 28389
+          "same_label_native_frames": 65310,
+          "same_label_delta": 38724
         },
         {
           "label": "TCP",
@@ -3284,8 +3284,8 @@
         {
           "label": "UDP",
           "reference_frames": 5705,
-          "same_label_native_frames": 109376,
-          "same_label_delta": 103671
+          "same_label_native_frames": 109362,
+          "same_label_delta": 103657
         },
         {
           "label": "X2AP",
@@ -5012,8 +5012,8 @@
         {
           "label": "GRE",
           "reference_frames": 121,
-          "same_label_native_frames": 18028,
-          "same_label_delta": 17907
+          "same_label_native_frames": 7711,
+          "same_label_delta": 7590
         },
         {
           "label": "MTP3MG (Int. ITU)",
@@ -5042,8 +5042,8 @@
         {
           "label": "MPLS",
           "reference_frames": 119,
-          "same_label_native_frames": 255,
-          "same_label_delta": 136
+          "same_label_native_frames": 254,
+          "same_label_delta": 135
         },
         {
           "label": "SKINNY/RESP",
@@ -6092,8 +6092,8 @@
         {
           "label": "PPP",
           "reference_frames": 45,
-          "same_label_native_frames": 37,
-          "same_label_delta": -8
+          "same_label_native_frames": 35,
+          "same_label_delta": -10
         },
         {
           "label": "RARP",
@@ -14324,8 +14324,8 @@
         {
           "label": "IPv6HopByHop",
           "reference_frames": 0,
-          "same_label_native_frames": 16381,
-          "same_label_delta": 16381
+          "same_label_native_frames": 16380,
+          "same_label_delta": 16380
         },
         {
           "label": "IPv6Routing",
@@ -14419,8 +14419,8 @@
         }
       ],
       "reference_summary_sha256": "88e582b8f94b1a2c548fa9feabef2bcd00a0e4df963de52998ccd5bc37fdbd6b",
-      "SDK_export_sha256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
-      "CLI_export_sha256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
+      "SDK_export_sha256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
+      "CLI_export_sha256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
       "header_certificate_sha256": "dc6ad7d541f67be63e01a370170ea78a1f81389225f821ca6ebcc4a4f2d178e7",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
@@ -14431,7 +14431,7 @@
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 2,
       "previous_Edwards_inner_field_expansions": 1,
-      "source_preservation_certificate_sha256": "5b1382b56e3b51045361434664ea8a8e65de51c1b2c4f734ff18a558866dbbe4"
+      "source_preservation_certificate_sha256": "66f217817c7abaf1760ee8defa035ab546acaaac4fcae7eabf95d636fa78d5b7"
     }
   },
   "prior_count_snapshot_sha256": "98a05dc1be92dd89860da7d58d76d69a5d8d797ee3166e6cd1c7c69c885c2f7a",
@@ -14439,7 +14439,7 @@
   "refresh_audit_source": "2097181736",
   "refresh_generator_sha256": "8bde82259b0b4be125919c562d43b8963faa0cea409ed9888adae1c28e6a3aa1",
   "native_SDK_source": "2154ab1dac",
-  "source_native": "31ba17a699daa2a4931f45bc3769de359ff58711",
-  "source_Windows_CLI": "a8a4de07e8592c895987cf7c86d984af58de679a",
-  "latest_evidence_sha256": "97ed46c9df7a285662972708d27ba3643bed8cb97a8fe8f4e1fd6f6d8913141f"
+  "source_native": "31142ae0c8a697a7119a9579d94f585d37464f09",
+  "source_Windows_CLI": "81b486343c93d46f7b66ad72580e5a314901029d",
+  "latest_evidence_sha256": "2d4678e98245d139a4b51323cf3c3859bf38e309a35a60cff8380a43677c7528"
 }
