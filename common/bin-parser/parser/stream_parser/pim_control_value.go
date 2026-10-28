@@ -285,6 +285,9 @@ func decodePIMHello(r *controlReader, budget *int) error {
 
 func decodePIMRegister(r *controlReader, context PIMWireContext) error {
 	flags := r.num("Register Flags", 4, false)
+	if r.err != nil {
+		return r.err // Missing flag bytes cannot establish false Border/Null values.
+	}
 	null := flags&0x40000000 != 0
 	r.info["Null Register"], r.info["Border"] = null, flags&0x80000000 != 0
 	start := r.at
@@ -378,14 +381,18 @@ func decodePIMGroupSource(r *controlReader, typ uint64, budget *int) error {
 	}
 	if typ == 5 || typ == 9 {
 		v := r.num("Metric Preference Word", 4, false)
-		r.info["RPT"], r.info["Metric Preference"] = v&0x80000000 != 0, v&0x7fffffff
+		if r.err == nil {
+			r.info["RPT"], r.info["Metric Preference"] = v&0x80000000 != 0, v&0x7fffffff
+		}
 		r.num("Metric", 4, false)
 	}
 	if typ == 9 {
 		r.num("Mask Length", 1, false)
 		r.num("TTL", 1, false)
 		v := r.num("Refresh Flags", 1, false)
-		r.info["Prune Indicator"], r.info["Prune Now"], r.info["Assert Override"] = v&128 != 0, v&64 != 0, v&32 != 0
+		if r.err == nil {
+			r.info["Prune Indicator"], r.info["Prune Now"], r.info["Assert Override"] = v&128 != 0, v&64 != 0, v&32 != 0
+		}
 		r.num("Interval", 1, false)
 	}
 	return r.err
