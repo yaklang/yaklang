@@ -43,7 +43,7 @@ func top30Cases() []top30Case {
 		{"08 QUIC HTTP3", top30Sessions + "m2b-quic-native.pcap", top30Sessions + "m2b-quic.keys", []string{"QUIC", "HTTP/3"}, []string{"UDP"}},
 		{"09 HTTP2 gRPC", tls, tlsKey, []string{"HTTP/2", "gRPC"}, nil},
 		{"10 ARP", "synthetic:ethernet-arp", "", []string{"ARP"}, nil},
-		{"11 ICMP NDP", top30Sessions + "first-batch-m1/dhcpv6-native.pcap", "", []string{"ICMPV6"}, nil},
+		{"11 ICMP NDP", top30Sessions + "first-batch-m1/dhcpv6-native.pcap", "", []string{"ICMPv6"}, nil},
 		{"12 DHCP", top30Sessions + "first-batch-m1/dhcpv6-native.pcap", "", []string{"DHCPv6"}, nil},
 		{"13 mDNS LLMNR NBNS", top30Corpus + "wireshark-tests/wireshark-mdns.pcap", "", []string{"mDNS"}, nil},
 		{"14 WebSocket", top30Sessions + "first-batch-m1/http-ws-native.pcap", "", []string{"WebSocket"}, nil},

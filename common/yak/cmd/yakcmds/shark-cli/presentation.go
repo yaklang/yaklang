@@ -54,6 +54,7 @@ var protocolDisplayNames = map[string]string{
 	"smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
 	"ntlmssp": "NTLMSSP", "spnego": "SPNEGO", "mdns": "mDNS", "llmnr": "LLMNR",
 	"snmp": "SNMP", "dhcp": "DHCP", "dhcpv6": "DHCPv6", "syslog": "Syslog",
+	"icmp": "ICMP", "icmpv6": "ICMPv6",
 }
 
 func protocolName(protocol string) string {
@@ -1274,6 +1275,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
+			if semantic == "ICMP" && physical == "ICMPv4" {
+				row.ProtocolStack[i], present = "ICMP", true
+				break
+			}
 			if semantic == "ESP" && physical == "IPSecESP" && (p.status == "limited" && p.visibility == "headers" || p.nativeESPIncomplete && p.status == "incomplete") {
 				row.ProtocolStack[i], present = "ESP", true
 				break
