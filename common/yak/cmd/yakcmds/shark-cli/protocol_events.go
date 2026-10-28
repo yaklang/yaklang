@@ -690,6 +690,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			}
 			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
 				name = "Unadmitted UDP payload"
+				if e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw) {
+					name = fmt.Sprintf("Unadmitted UDP payload preview · %d/%d captured bytes", len(e.Raw), e.Length)
+				}
 			}
 			if e.Protocol == "grpc" {
 				name = "HTTP/2 frame (gRPC)"
@@ -700,7 +703,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			if len(authenticationLayers(e)) > 0 {
 				name = "SMB2 wire PDU (authentication)"
 			}
-			sources = append(sources, detailSource{Name: name + " · " + kind + " PDU", Data: bytes.Clone(e.Raw)})
+			sourceName := name + " · " + kind + " PDU"
+			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" && e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw) {
+				sourceName = name // A bounded preview is not a complete application PDU.
+			}
+			sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(e.Raw)})
 			currentSource = len(sources)
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}

@@ -134,6 +134,32 @@ func TestProtocolDetailStatusDoesNotDrawMissingEndpointArrows(t *testing.T) {
 	}
 }
 
+func TestUnadmittedUDPPayloadPreviewNamesItsActualCapturedExtent(t *testing.T) {
+	for _, tc := range []struct {
+		protocol, transport, kind, failure string
+		preview                            bool
+	}{
+		{"", "udp", "captured", "invalid UDP length", true},
+		{"", "udp", "captured", "", false},
+		{"", "tcp", "captured", "rejected", false},
+		{"", "udp", "decrypted", "rejected", false},
+		{"tls", "tcp", "captured", "rejected", false},
+	} {
+		e := &pcaputil.ProtocolEvent{Protocol: tc.protocol, Transport: tc.transport, Status: "malformed", Raw: bytes.Repeat([]byte{0xa5}, 64), Length: 111, Error: tc.failure}
+		e.SourceBytes.Kind = tc.kind
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+		require.NotEmpty(t, fields)
+		require.Len(t, sources, 1)
+		require.Equal(t, e.Raw, sources[0].Data)
+		if tc.preview {
+			require.Equal(t, "Unadmitted UDP payload preview · 64/111 captured bytes", sources[0].Name)
+			require.NotContains(t, sources[0].Name, " PDU")
+		} else {
+			require.NotContains(t, sources[0].Name, "preview")
+		}
+	}
+}
+
 func TestESPObservedHeaderFieldsPrecedeOpaqueBodyWithoutAuthenticationClaims(t *testing.T) {
 	raw := append([]byte{0, 0, 0, 42, 0, 0, 0, 7}, bytes.Repeat([]byte{0xaa}, 64)...)
 	e := &pcaputil.ProtocolEvent{Protocol: "esp", Status: "limited", Raw: raw, Session: map[string]any{"SPI": uint32(42), "Sequence": uint32(7), "Header Complete": true, "Algorithm Context Available": false, "Authentication Verified": false, "Extended Sequence Reconstructed": false, "Observation Scope": "wire header only", "Opaque Body": raw[8:], "Wire Field Ranges": map[string][]int{"SPI": {0, 4}, "Sequence": {4, 8}, "Opaque Body": {8, len(raw)}}}}

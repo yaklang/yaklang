@@ -62,6 +62,16 @@ func TestObservedOuterTransportDoesNotPublishSpeculativeGTPPhysicalEndpoints(t *
 		require.Contains(t, row.Layers, "GTPv1U", "decoder inventory is retained separately from selected protocol scope")
 		require.Zero(t, row.StreamID)
 		require.Empty(t, row.ConnectionProtocol)
+		fast := quickDetail(raw)
+		for _, f := range fast.fields {
+			require.NotContains(t, f.text, "GTP")
+			require.NotContains(t, f.text, "203.0.113.")
+			require.NotContains(t, f.text, "2001:db8:")
+		}
+		selected := inspectionPacketLayers(decoded, view)
+		require.Len(t, selected, 3)
+		require.Equal(t, layers.LayerTypeUDP, selected[2].LayerType())
+		require.Greater(t, len(decoded.Layers()), len(selected), "the control retains its raw decoder inventory")
 	}
 }
 
