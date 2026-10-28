@@ -58,6 +58,7 @@ func (a *binParser) observePIM(p gopacket.Packet, evidence captureEvidence) bool
 			e.Session = m
 			e.semanticFields, e.semanticSession = cloneSession(m), cloneSession(m)
 		}
+		e.retainNativePIMFields(wire)
 		a.finishProtocolDatagram(e, wire, nil, observedWireError(err))
 		if err != nil {
 			// The complete selected field tree was not available. In

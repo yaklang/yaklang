@@ -27,6 +27,7 @@ type nativeNetworkObservation struct {
 	values                                              map[string]nativeNetworkField
 	mldValues                                           map[string][]nativeNetworkField
 	igmpValues                                          map[string][]nativeNetworkField
+	pimValues                                           map[string][]nativeNetworkField
 	frozen                                              bool
 }
 
