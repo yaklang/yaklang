@@ -3,7 +3,7 @@ yakit.AutoInitYakit()
 // 支持的语言注册表（单一数据源）：新增语言只需在 langOrder 增加一项，并补全
 // langExts / langMarkers / langManifests 即可，扩展名映射、标记/清单计分都会自动
 // 跟进，无需再分散修改多处。CLI 的语言选项仍保持手写，与注册表独立。
-langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c"]
+langOrder = ["java", "php", "go", "python", "js", "ts", "yak", "c", "csharp"]
 
 // 源码扩展名 -> 语言（一个语言可对应多个扩展名）
 langExts = {
@@ -15,6 +15,7 @@ langExts = {
     "ts":     ["ts", "tsx"],
     "yak":    ["yak"],
     "c":      ["c", "h"],
+    "csharp": ["cs"],
 }
 
 // 通用标记文件（小写文件名）-> 语言；命中累计 markerWeight（弱信号）
@@ -27,6 +28,7 @@ langMarkers = {
     "ts":     [],
     "yak":    [],
     "c":      ["makefile", "makefile.am", "makefile.in", "configure.ac", "configure.in", "configure"],
+    "csharp": ["web.config", "global.asax"],
 }
 
 // 高权重构建/依赖清单（小写文件名）-> 语言；命中累计 manifestWeight（强信号）
@@ -39,6 +41,7 @@ langManifests = {
     "ts":     [],
     "yak":    [],
     "c":      ["cmakelists.txt"],
+    "csharp": ["packages.config", "global.json", "nuget.config", "directory.build.props"],
 }
 
 // 扩展名 -> 语言，由 langExts 反向构建
@@ -102,6 +105,7 @@ languages = cli.StringSlice(
     cli.setSelectOption("Golang", "go"), 
     cli.setSelectOption("C", "c"), 
     cli.setSelectOption("Python", "python"), 
+    cli.setSelectOption("C#", "csharp"), 
 )
 
 compile_immediately := cli.Bool(
