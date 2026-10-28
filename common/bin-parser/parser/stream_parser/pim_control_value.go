@@ -10,7 +10,15 @@ import (
 // PIMWireContext contains the actual enclosing IP addresses, never dummy
 // addresses inside a Null-Register. A stateless canonical entry has no IPv6
 // pseudo-header and explicitly leaves that checksum unverified.
-type PIMWireContext struct{ Source, Destination netip.Addr }
+type PIMWireContext struct {
+	Source, Destination netip.Addr
+	// Zero selects an explicitly bounded standalone PIM input. Native callers
+	// must supply the literal enclosing IP payload length, or -1 when unknown.
+	// A decoder's replacement of an IP zero length is not a declared boundary.
+	DeclaredBytes int
+}
+
+const pimPrefixScope = "captured field prefixes only; control message not fully validated; no installed routing or verified neighbor state"
 
 func PIMMessageName(typ uint64) string {
 	if typ < 10 {
@@ -72,6 +80,9 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 	if budget <= 0 {
 		return nil, ErrObservedWireBudget
 	}
+	if context.DeclaredBytes > 0 && len(w) > context.DeclaredBytes {
+		return nil, fmt.Errorf("%w: PIM input exceeds the enclosing IP message", ErrObservedWireContext)
+	}
 	r := &controlReader{w: w, info: map[string]any{}}
 	v := r.num("Version and Type", 1, false)
 	r.need(v>>4 == 2, "unselected PIM version")
@@ -116,6 +127,7 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 		if r.at >= 0 && r.at <= len(w) {
 			r.info["Unparsed Body"] = bytes.Clone(w[r.at:])
 		}
+		r.info["Observation Scope"] = pimPrefixScope
 		return pimRanges(r), r.err
 	}
 	r.need(r.at == len(w), "PIM message trailing bytes")
@@ -138,9 +150,18 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 	r.info["Wire Field Ranges"] = ranges
 	r.info["Checksum Verified"] = false
 	r.info["Checksum Scope"] = "unverified: enclosing IP addresses not supplied"
+	completeExtent := context.DeclaredBytes == 0 || context.DeclaredBytes == len(w)
+	if !completeExtent {
+		r.info["Observation Scope"] = pimPrefixScope
+		r.info["Checksum Scope"] = "unverified: enclosing IP message extent unavailable or incomplete"
+	}
 	if context.Source.IsValid() && context.Destination.IsValid() {
 		if context.Source.Is4() != context.Destination.Is4() {
+			r.info["Observation Scope"] = pimPrefixScope
 			return r.info, fmt.Errorf("pim: enclosing address families differ")
+		}
+		if !completeExtent && typ != 1 {
+			return r.info, fmt.Errorf("%w: enclosing IP message extent unavailable or incomplete", ErrObservedWireContext)
 		}
 		n := len(w)
 		if typ == 1 {
@@ -150,14 +171,22 @@ func DecodePIMControl(w []byte, context PIMWireContext, budget int) (map[string]
 		scope := "message"
 		if typ == 1 {
 			scope = "register-header"
-			if !verified && PIMChecksum(w, context, 8) == 0 {
+			if !verified && completeExtent && PIMChecksum(w, context, 8) == 0 {
 				verified, scope = true, "register-whole-message-interop"
 			}
 		}
 		r.info["Checksum Verified"], r.info["Checksum Scope"] = verified, scope
 		if !verified {
+			r.info["Observation Scope"] = pimPrefixScope
+			if !completeExtent {
+				r.info["Checksum Scope"] = "unverified: enclosing IP message extent unavailable or incomplete"
+				return r.info, fmt.Errorf("%w: enclosing IP message extent unavailable or incomplete", ErrObservedWireContext)
+			}
 			return r.info, fmt.Errorf("pim: checksum failed")
 		}
+	}
+	if !completeExtent {
+		return r.info, fmt.Errorf("%w: enclosing IP message extent unavailable or incomplete", ErrObservedWireContext)
 	}
 	return r.info, nil
 }
@@ -362,7 +391,7 @@ func decodePIMRegister(r *controlReader, context PIMWireContext) error {
 			c.info["Dummy PIM Header Present"] = present
 			if present {
 				s, _ := netip.ParseAddr(fmt.Sprint(c.info["Source"]))
-				c.info["Dummy PIM Checksum Valid"] = PIMChecksum(b[40:44], PIMWireContext{s, group}, 4) == 0
+				c.info["Dummy PIM Checksum Valid"] = PIMChecksum(b[40:44], PIMWireContext{Source: s, Destination: group}, 4) == 0
 			}
 		}
 	} else {

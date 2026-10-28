@@ -53,7 +53,7 @@ func (a *binParser) observePIM(p gopacket.Packet, evidence captureEvidence) bool
 		}
 		src, _ := netip.ParseAddr(e.Source)
 		dst, _ := netip.ParseAddr(e.Destination)
-		m, err := stream_parser.DecodePIMControl(wire, stream_parser.PIMWireContext{Source: src, Destination: dst}, a.budget.MaxCollectionElements)
+		m, err := stream_parser.DecodePIMControl(wire, stream_parser.PIMWireContext{Source: src, Destination: dst, DeclaredBytes: pimDeclaredPayloadBytes(network)}, a.budget.MaxCollectionElements)
 		if m != nil {
 			e.Session = m
 			e.semanticFields, e.semanticSession = cloneSession(m), cloneSession(m)
