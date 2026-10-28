@@ -222,19 +222,26 @@ func TestNativePreviewDoesNotApplyClosedConnectionIdentityToNewPayload(t *testin
 	defer src.Close()
 	s := startCapture(context.Background(), src, captureConfig{}, false)
 	defer s.Stop()
-	var last *capturedPacket
+	var beforeClose, last *capturedPacket
 	for p := range s.packets {
+		if p.number == 2 {
+			beforeClose = p
+		}
 		last = p
 	}
 	require.NoError(t, s.result())
-	view := s.streams.snapshot(last.streamID)
-	require.NotNil(t, view, "the native closed-flow observation remains available for forensics")
+	require.NotNil(t, beforeClose)
+	require.NotZero(t, last.tcpFlowID, "the closed native namespace remains source evidence")
+	require.Zero(t, last.streamID, "an unconfirmed generation cannot open the earlier application's page")
+	view := s.streams.snapshot(beforeClose.streamID)
+	require.NotNil(t, view, "the old packet's closed-flow history remains available for forensics")
 	require.Equal(t, request, directionData(view, 0), "post-reset bytes never enter the closed stream")
 	require.Equal(t, []string{"HTTP/1.1"}, view.protocolStack, "the old identity stays in its own history")
 	u := &tui{streams: s.streams}
 	for _, row := range []packetSummary{summarize(last), u.packetRow(&packetEntry{packet: last})} {
 		require.Equal(t, "TCP", row.Protocol, "observation of an old flow is not admission of a new application's bytes")
 		require.Empty(t, row.ConnectionProtocol)
+		require.Zero(t, row.StreamID)
 		require.Contains(t, row.Info, "generation unconfirmed")
 	}
 }

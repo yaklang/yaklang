@@ -24,7 +24,10 @@ var applicationNodes = map[string]string{
 
 func applyApplication(row packetSummary, protocol, evidence string, id uint64) packetSummary {
 	row.StreamID = id
-	if row.closedTCPPayload {
+	if row.closedTCPPayload || row.TCPFlowState == "closed-observation" {
+		if row.TCPFlowState == "closed-observation" {
+			row.StreamID = 0 // Keep the TCP namespace as evidence, not an old application-page association.
+		}
 		if !row.connectionAnnotated {
 			row.packetInfo, row.connectionAnnotated = row.Info, true
 		}
@@ -41,6 +44,14 @@ func applyApplication(row packetSummary, protocol, evidence string, id uint64) p
 			row.ProtocolStatus = "context-required"
 		}
 		row.Info = "TCP payload after observed close; generation unconfirmed · " + row.packetInfo
+		if row.payloadBytes == 0 {
+			// The native callback retains a closed namespace for forensic
+			// ownership. An ACK or reset after both directions closed does not
+			// prove that its application belongs to that earlier generation.
+			row.ConnectionEvidence = "native closed TCP observation; application generation unconfirmed"
+			row.ProtocolScope, row.Visibility = "closed TCP observation", "header-only"
+			row.Info = "TCP header after observed close; generation unconfirmed · " + row.packetInfo
+		}
 		return row
 	}
 	if protocol != "" {
