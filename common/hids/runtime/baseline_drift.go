@@ -389,6 +389,8 @@ type driftAggregator struct {
 	maxEntries     int
 	updateInterval time.Duration
 	entries        map[string]driftAggregateEntry
+	windows        observationTimeIndex
+	seen           observationTimeIndex
 }
 
 type driftAggregateEntry struct {
@@ -455,6 +457,7 @@ func (a *driftAggregator) observe(key string, observedAt time.Time) driftAggrega
 			entry.lastEmitAt = observedAt
 		}
 		a.entries[key] = entry
+		a.seen.set(key, entry.lastSeenAt)
 		return driftAggregationResult{
 			key:             key,
 			windowStartedAt: entry.windowStartedAt,
@@ -469,6 +472,8 @@ func (a *driftAggregator) observe(key string, observedAt time.Time) driftAggrega
 		lastEmitAt:      observedAt,
 		count:           1,
 	}
+	a.windows.set(key, observedAt)
+	a.seen.set(key, observedAt)
 	a.enforceCapacity()
 	return driftAggregationResult{
 		key:             key,
@@ -483,11 +488,19 @@ func (a *driftAggregator) prune(observedAt time.Time) {
 	if a == nil || a.window <= 0 {
 		return
 	}
-	for key, entry := range a.entries {
-		if observedAt.Sub(entry.windowStartedAt) >= a.window {
-			delete(a.entries, key)
+	for {
+		key, startedAt, exists := a.windows.first()
+		if !exists || observedAt.Sub(startedAt) < a.window {
+			return
 		}
+		a.forget(key)
 	}
+}
+
+func (a *driftAggregator) forget(key string) {
+	delete(a.entries, key)
+	a.windows.remove(key)
+	a.seen.remove(key)
 }
 
 func (a *driftAggregator) enforceCapacity() {
@@ -495,17 +508,10 @@ func (a *driftAggregator) enforceCapacity() {
 		return
 	}
 	for len(a.entries) > a.maxEntries {
-		oldestKey := ""
-		var oldestSeen time.Time
-		for key, entry := range a.entries {
-			if oldestKey == "" || entry.lastSeenAt.Before(oldestSeen) {
-				oldestKey = key
-				oldestSeen = entry.lastSeenAt
-			}
-		}
-		if oldestKey == "" {
+		oldestKey, _, exists := a.seen.first()
+		if !exists {
 			return
 		}
-		delete(a.entries, oldestKey)
+		a.forget(oldestKey)
 	}
 }

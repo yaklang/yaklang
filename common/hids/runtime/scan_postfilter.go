@@ -3,10 +3,12 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/hids/rule"
+	"github.com/yaklang/yaklang/common/yak"
 )
 
 type scanPostFilterConfig struct {
@@ -39,12 +41,27 @@ func (p *pipeline) applyScanPostFilters(
 	request map[string]any,
 	summary map[string]any,
 ) (map[string]any, error) {
+	return p.applyScanPostFiltersContext(context.Background(), request, summary)
+}
+
+func (p *pipeline) applyScanPostFiltersContext(
+	ctx context.Context,
+	request map[string]any,
+	summary map[string]any,
+) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	config := parseScanPostFilterConfig(request)
 	if len(summary) == 0 || isEmptyScanPostFilterConfig(config) {
-		return summary, nil
+		return summary, ctx.Err()
 	}
+	// Manual scans and automatic evidence have different deadlines. A shared
+	// sandbox serializes whole expressions and could make a short request wait
+	// behind a long one before its context is checked. Keep each request isolated.
+	sandbox := rule.NewSandbox()
 
-	if matched, ok, err := p.evaluateScanMatch(config.ScanMatch, request, summary); err != nil {
+	if matched, ok, err := evaluateScanMatch(ctx, sandbox, config.ScanMatch, request, summary); err != nil {
 		return nil, fmt.Errorf("scan_match: %w", err)
 	} else if ok {
 		summary["scan_match"] = map[string]any{
@@ -53,7 +70,7 @@ func (p *pipeline) applyScanPostFilters(
 		}
 	}
 
-	if matches, ok, err := p.evaluateEntryMatches(config.EntryMatch, request, summary); err != nil {
+	if matches, ok, err := evaluateEntryMatches(ctx, sandbox, config.EntryMatch, request, summary); err != nil {
 		return nil, fmt.Errorf("entry_match: %w", err)
 	} else if ok {
 		summary["matched_entries"] = matches
@@ -67,7 +84,7 @@ func (p *pipeline) applyScanPostFilters(
 		}
 	}
 
-	if matches, ok, err := p.evaluateFindingMatches(config.FindingMatch, request, summary); err != nil {
+	if matches, ok, err := evaluateFindingMatches(ctx, sandbox, config.FindingMatch, request, summary); err != nil {
 		return nil, fmt.Errorf("finding_match: %w", err)
 	} else if ok {
 		summary["matched_findings"] = matches
@@ -85,10 +102,12 @@ func (p *pipeline) applyScanPostFilters(
 	if config.MatchedOnly {
 		summary["matched_only"] = true
 	}
-	return summary, nil
+	return summary, ctx.Err()
 }
 
-func (p *pipeline) evaluateScanMatch(
+func evaluateScanMatch(
+	ctx context.Context,
+	sandbox *yak.Sandbox,
 	expression string,
 	request map[string]any,
 	summary map[string]any,
@@ -97,15 +116,18 @@ func (p *pipeline) evaluateScanMatch(
 	if expression == "" {
 		return false, false, nil
 	}
-	matched, err := rule.EvaluateBooleanExpression(
-		p.scanSandbox,
+	matched, err := rule.EvaluateBooleanExpressionContext(
+		ctx,
+		sandbox,
 		expression,
 		rule.BuildScanEvaluationContext(summary, request, nil, nil),
 	)
 	return matched, true, err
 }
 
-func (p *pipeline) evaluateEntryMatches(
+func evaluateEntryMatches(
+	ctx context.Context,
+	sandbox *yak.Sandbox,
 	expression string,
 	request map[string]any,
 	summary map[string]any,
@@ -121,8 +143,9 @@ func (p *pipeline) evaluateEntryMatches(
 	}
 	matches := make([]map[string]any, 0, len(entries))
 	for _, entry := range entries {
-		matched, err := rule.EvaluateBooleanExpression(
-			p.scanSandbox,
+		matched, err := rule.EvaluateBooleanExpressionContext(
+			ctx,
+			sandbox,
 			expression,
 			rule.BuildScanEvaluationContext(summary, request, entry, nil),
 		)
@@ -136,7 +159,9 @@ func (p *pipeline) evaluateEntryMatches(
 	return matches, true, nil
 }
 
-func (p *pipeline) evaluateFindingMatches(
+func evaluateFindingMatches(
+	ctx context.Context,
+	sandbox *yak.Sandbox,
 	expression string,
 	request map[string]any,
 	summary map[string]any,
@@ -152,8 +177,9 @@ func (p *pipeline) evaluateFindingMatches(
 	}
 	matches := make([]map[string]any, 0, len(findings))
 	for _, finding := range findings {
-		matched, err := rule.EvaluateBooleanExpression(
-			p.scanSandbox,
+		matched, err := rule.EvaluateBooleanExpressionContext(
+			ctx,
+			sandbox,
 			expression,
 			rule.BuildScanEvaluationContext(summary, request, nil, finding),
 		)
