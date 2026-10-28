@@ -3835,3 +3835,135 @@ authenticated retransmission。真正解码的 HTTP/3 帧 144 / PDU 160 显示 s
 
 磁盘维护仅对 28 个旧 Go 归档做无损 NTFS 压缩，校验原内容，回收 2.33 GiB 分配空间；
 没有删除原包或证据。后续继续监控可用空间。
+
+## PPTP 准入、真实 TLS 恢复和连接页面隔离（2026-10-28）
+
+最终原生 `fcbddc4956`、Windows CLI `15fe385a4c`，完整源码与审计工具提交
+`0c2d5fc439`。[本轮摘要](shark-public-corpus-20261025/PPTP-TLS-resumption-summary.json)
+及当前逐标签计数已更新。原始 PCAP、密钥、完整导出、二进制、日志和原生控制台图
+继续只在本机。这轮继续修实际状态和字段边界，不宣称 TOP30 或全部关键字段完备。
+
+### GRE v1 是独立头部，不能沿用任意 EtherType 分发
+
+新 authored 原包独立核验 IPv4/UDP/TCP 校验和、长度及 Wireshark 原始字段，排除
+fixture 本身错误。它证明两个旧问题：v1 可以带任意 IPv4/ARP 或错误长度进入子层；
+合法 PPTP 的 PayloadLength 与 CallID 被一起当作 GRE Key，同一个 CallID 的三个
+不同长度 TCP 包被拆成三条流，HTTP 无法重组，Wireshark 则保持一条流并重组成功。
+
+现按 [RFC 2637 §4.1](https://www.rfc-editor.org/rfc/rfc2637.html)独立校验 PPTP 的
+K/reserved 位、PPP 类型、固定头、S/A 可选字段、声明 payload 长度和 PPP 短前缀。
+错误父层不进入 IP、ARP、TCP、UDP 或应用状态。数据域使用有方向的
+`source>destination:CallID`，排除变化的长度；同一内层 tuple 的两方向和不同 CallID
+仍隔离。没有捕获控制面，不能将两端独立分配的 CallID 猜成一个已协商会话；
+PFC/ACFC 只接受其线形，未证明 LCP 协商或完整 PPP conformance。
+
+ACK-only 明确无 PPP payload，不创建传输状态。Windows 列名和详情标题为 PPTP，
+摘要完整显示 CallID/Ack，路径为 `Ethernet › IPv4 › GRE › PPTP`，并注明
+`limited · headers` 和控制面关联不可用。SDK 底层仍是 `protocol=ip` /
+`profile=pptp-acknowledgment` 的头部观察，不能当成完整 PPTP 应用解析或已协商会话。
+
+24 组主要控制含 16 个 PPTP/通用 GRE 输入和 8 个 Geneve/VXLAN 载体输入，另有
+4 个嵌套源域对照。11 个坏 PPTP 头全部只产生一个精确拒绝；合法分段 CallID42
+为一条 TCP 流和完整 HTTP，字段、typed values 和原始 message bytes 均核对。
+这些坏头 Wireshark 仍可能宽松解出 DNS，因此列名一致不能替代父层 grammar。
+
+### 隧道内层失败不能回到外层 UDP，也不能丢掉错误计数
+
+实际控制另外发现：合法 Geneve/VXLAN 载体内的短 IP，曾同时输出精确短头与一条
+伪外层 UDP NeedMore；PPTP 拒绝则让默认捕获 DecodeErrors 少计。内层失败留下了
+outer UDP TransportLayer，而既有错误分支在 UDP 分发之后，因而绕过错误处理。
+
+现保留原 error packet，由捕获入口在 outer UDP 分发前处理已确认的
+`pptpHeaderError` / `ipHeaderTruncatedError`。未选择父层仍优先返回，不能把其内
+推测出的 child error 计成独立捕获错误。严格/AllowIncomplete、有/无协议 callback、
+两个载体和 selected/unselected 路径全部测试；保留原始捕获观察，不建立 UDP、分片
+或 TCP 状态。独立 actual replay 也验证两个伪 UDP 观察消失，四个 selected 控制
+各恢复一个 DecodeError，四个 unselected 控制保持既有拒绝策略。
+
+### 完整大包与展示链
+
+Sharon 的 271 个直接 v1 原始帧全部得到精确父层拒绝，raw flags/protocol/CallID
+字段按原始偏移与 source 0 核对。原有 171 条泛型网络观察被纠正，另外 100 条此前
+只有捕获错误、没有原生观察的帧得到具体诊断。其余 **249,447 条** SDK 观察严格保留：
+135,001 non-IP 加 114,446 IP；全部值、类型、字节、域和两种连接号逐项比较。
+仅根据实际源 PDU 双射翻译明确的生成引用，不归一化 wire 整数。
+
+原有 **10,385 条父层拒绝、3,929 条版本拒绝、33 条短头**及所有其他 IP 专家字段
+均保留。271 条纠正显式记录旧错误派生域到新观察域的迁移；物理帧、wire、时间、
+section/interface、captured/original 长度不变。新增嵌套对照说明：外层错误 GRE 内的
+v1 子 tag 也可能被纠正，不能从原大包集合稳定推论所有任意嵌套源域都不变。
+
+| 原包 | 物理帧 | SDK 记录 | TCP 代际 | callback 包归属 | 默认完整 flow 导出 |
+|---|---:|---:|---:|---:|---|
+| Weber | 51,328 | 39,740 | 824 | 独立 hook 复核 | 与前阶段逐字节相同 |
+| Sharon | 328,127 | 249,718 | 840 | 7,700 | 与前阶段逐字节相同 |
+
+中间实现曾把 Sharon 默认 DecodeErrors 从 82,017 降到 81,746，已修复并在最终版本
+恢复 **82,017**，没有把计数下降当作错误减少。最终完整 flows.json 的字节相同同时
+证明连接、包归属、关闭及其它统计保持原值。RPC 再核对 Weber 384 PDU / 4,788 字段、
+Sharon 14 PDU / 121 字段，均无缺失完整 wire PDU。
+
+CLI 先按源 SDK 双射处理生成 PDU 引用，并逐字段验证这 271 个精确拒绝行；随后
+独立审核关闭连接投影。Sharon **328,679 行**中（328,127 物理 + 552 结束发布），
+该中间层后只有 frame298485 的 `stream_id637→0`，由实际 hook/source 绑定；其余
+328,678 行全部字段/PDU/连接号相同。Weber 只改 4 个来源已证实的关闭观察；其它
+35 个较小输入的完整 SDK 与前阶段逐字节相同，CLI 差异也全部独立通过。参考原始
+Protocol 标签继续保留，未把保守拒绝改成深层协议标签来缩小计数差。
+前阶段另 10 个短头控制也用最终三个 EXE 实际重放，30 份完整 SDK/默认 flow/CLI
+导出均与前阶段逐字节相同。
+
+### 新抓真实 TLS 恢复，区分缺包、乱序和缺失握手
+
+本机自建双方实际执行 TLS1.2 / TLS1.3 各四代：完整握手、恢复、恢复、全新握手，
+每个版本真实复用相同五元组。仅捕获自建端口及 readiness 标记，原包 63,799 字节，
+226 帧；16 份端点收据确认 8 代中恰有 4 次真实恢复。双方 24 对 HTTP 原文/body
+digest 与 native/reference 对齐。136 条 TLS 记录、49,973 字节、56 个握手消息、
+376 个 native 协商上下文字段和 24 个参考 cipher/ALPN 检查均通过；48 条完整 HTTP
+只指向当前代请求与认证后的 TLS 来源，没有旧代明文粘连。
+
+12 个派生捕获明确列出删除/重排台账，保留其它每个字节和时间；不称真实网络丢包。
+重排测试显式打开 Wireshark `tcp.reassemble_out_of_order:TRUE`，逐消息比较，不能
+把承载两条 response 的一帧只算一次。缺 ClientHello/ServerHello、中途起抓及删除
+整条加密 record 均保守保留上下文边界，后续新 SYN 代正常；1,836 次非目标事件比较
+是重复控制中的核对次数，不是额外 1,836 个独立消息。删除一条 server record 后，
+双方都无法解析该方向后续完整 response，是共同恢复限制，未伪称已修好。
+
+真实中途起抓还复核了此前的 TLS-like 疑问：Wireshark 并非一律只列 TCP，但在没有
+握手时会把原本真实协商 TLS1.3 的兼容记录头 `0x0303` 也列成 TLSv1.2。Shark 在这组
+数据中显示 TLS 记录载体并保留协商版本未知；不能用 legacy record version 证明
+协商版本。TLS1.3 完整握手中的兼容 SessionID 也会 echo，不能仅凭相等就认作恢复。
+最终解密准确，但 resumed/PSK/ticket 的完整展示 metadata 仍未提供。
+
+### 已关闭连接的来源号不等于应用页面
+
+删去目标代握手但保留前代 RST 的两个控制暴露旧展示问题：payload 已标代际未知，
+相邻 ACK/RST 却沿用旧 TLS/HTTP 和页面。现仅在关闭方向出现实际未准入 payload 后
+将该观察标为不确认；双向已关闭时，其后的控制包也不能借用旧应用页面。原 TCP
+来源号/domain/state 保留，不硬造新代，旧合法包仍可访问旧历史，新 SYN 单独建代。
+
+不能一概清掉所有 closed ACK。完整回归确实发现中间实现破坏了原有正常最终 ACK
+历史断言，最终保留该断言并修正策略。另独立解析六套真实 TLS 的双 FIN 序号，六条
+最终 ACK 都保持合法页面，实际 Windows 验证了其中一条。`flow-observer -packet-state`
+导出的真实 hook state 同时表明这两类包都可能是 closed；需要未准入数据证据，
+不能只根据 state 决定页面。真实控制最终仅纠正 36 行，所有 TCP 号、域和 PDU 原值不变。
+
+### 最终验证与未覆盖工作
+
+最终 **236,364 个测试运行项通过 / 12 跳过**，原生 462.159s、CLI 3.422s；全部既有
+测试保留，每个开始项有唯一结束项。最终源 fuzz **78,733 次 / 40s active**，package
+49.924s。PPTP 33、SDK 双射 8、额外 public/CLI 14，以及 TLS/关闭页面 56 个负控
+分别全部拒绝；各自范围和证书单列，不拿失败准备运行充作通过。
+
+Windows 实际验证 PPTP ACK、未知 ACK、旧合法历史、新 SYN 后 TLS→HTTP 和正常
+最终 ACK，检查字段、字节、消息/证据、鼠标、隔离详情进程、缩放及 CP936 恢复。
+原生 cells 和 PNG 均实际检查；PPTP 列中地址的起始字符和列空格还逐像素复核，
+没有按缩略图的视觉误差改代码。
+
+下一阶段优先补可验证的 TLS1.2 session-ID 恢复证据、TLS1.3 selected-PSK/offer
+索引及 ticket 来源；外部 PSK 与 ticket 恢复必须区分，不能假称验证 binder。再处理
+受控 TCP gap 后认证记录的有限展示，仍不猜应用消息边界。PPTP 控制面/双向 CallID、
+PPP 协商、VXLAN flags profile、更多 QUIC CID/QPACK、CoAP 数值事务、SSH 高级 profile
+及完整 RPC/NDR/authentication 继续保留，PR 仍为草稿。
+
+第二轮磁盘维护只无损压缩 30 个旧 Go 归档，额外回收 **1.914 GiB** 分配空间，全部
+hash 和时间戳核验通过，没有删除/移动文件或证据。维护后 C 盘可用约 36.12 GiB。
