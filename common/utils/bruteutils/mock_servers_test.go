@@ -180,8 +180,16 @@ func startMockSMTP(t *testing.T, user, pass string) string {
 						stage = 0
 						fmt.Fprint(w, "334 "+base64.StdEncoding.EncodeToString([]byte("Username:"))+"\r\n")
 					case strings.HasPrefix(line, "MAIL"), strings.HasPrefix(line, "RCPT"):
+						if stage < 2 {
+							fmt.Fprint(w, "530 authentication required\r\n")
+							continue
+						}
 						fmt.Fprint(w, "250 ok\r\n")
 					case strings.HasPrefix(line, "DATA"):
+						if stage < 2 {
+							fmt.Fprint(w, "530 authentication required\r\n")
+							continue
+						}
 						fmt.Fprint(w, "354 go ahead\r\n")
 					case strings.HasPrefix(line, "QUIT"):
 						fmt.Fprint(w, "221 bye\r\n")
@@ -246,6 +254,7 @@ func startMockRedis(t *testing.T, pass string) string {
 				defer c.Close()
 				r := bufio.NewReader(c)
 				kv := map[string]string{}
+				authed := pass == ""
 				for {
 					line, err := r.ReadString('\n')
 					if err != nil {
@@ -279,17 +288,26 @@ func startMockRedis(t *testing.T, pass string) string {
 					switch strings.ToUpper(parts[0]) {
 					case "AUTH":
 						if pass == "" || (len(parts) >= 2 && parts[1] == pass) {
+							authed = true
 							c.Write([]byte("+OK\r\n"))
 						} else {
 							c.Write([]byte("-ERR invalid password\r\n"))
 							return
 						}
 					case "SET":
+						if !authed {
+							c.Write([]byte("-NOAUTH Authentication required.\r\n"))
+							continue
+						}
 						if len(parts) >= 3 {
 							kv[parts[1]] = parts[2]
 							c.Write([]byte("+OK\r\n"))
 						}
 					case "GET":
+						if !authed {
+							c.Write([]byte("-NOAUTH Authentication required.\r\n"))
+							continue
+						}
 						if v, ok := kv[parts[1]]; ok {
 							fmt.Fprintf(c, "$%d\r\n%s\r\n", len(v), v)
 						} else {
@@ -453,9 +471,9 @@ func startMockLDAP(t *testing.T, user, pass string) string {
 					// 简化：bind 请求中的明文凭证以 UTF-8 出现在 BER 内
 					okUser := bytes.Contains(req, []byte(user))
 					okPass := bytes.Contains(req, []byte(pass))
-					// 未授权探测（空 DN 空密码）：全部允许则 success
+					// Only fixtures configured with empty credentials allow anonymous bind.
 					code := 49
-					if (okUser && okPass) || (!okUser && !okPass && bytes.Contains(req, []byte{0x80, 0x00})) {
+					if okUser && okPass {
 						code = 0
 					}
 					c.Write(ldapBindResponse(1, code))
