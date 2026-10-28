@@ -1,6 +1,7 @@
 package sharkcli
 
 import (
+	"bytes"
 	"strings"
 	"testing"
 
@@ -18,8 +19,13 @@ func TestNetworkRefusalAppliesToBothInspectorsAndStaleChildEvents(t *testing.T) 
 	for _, refusal := range []*pcaputil.ProtocolEvent{bad, parent} {
 		for _, events := range [][]*pcaputil.ProtocolEvent{{refusal}, {refusal, child}, {child, refusal}} {
 			raw := &capturedPacket{number: 1, data: wire, ci: gopacket.CaptureInfo{Length: len(wire), CaptureLength: len(wire)}, link: layers.LinkTypeEthernet, events: events, presentation: presentEvents(events)}
-			for _, inspect := range []func(*capturedPacket) packetDetail{detail, quickDetail} {
-				got := inspect(raw)
+			request, err := marshalDecodeRequest(decodeRequest{Number: raw.number, Events: events, Data: raw.data, Length: len(wire), Link: raw.link})
+			require.NoError(t, err)
+			var output bytes.Buffer
+			require.NoError(t, runDecodeWorker(bytes.NewReader(request), &output))
+			worker, err := decodeWorkerOutput(output.Bytes(), raw)
+			require.NoError(t, err)
+			for _, got := range []packetDetail{detail(raw), quickDetail(raw), worker} {
 				require.Equal(t, "IPv4", got.protocol)
 				require.NotEmpty(t, got.hex, "the original frame stays inspectable")
 				require.True(t, got.fields[0].hasRange)
