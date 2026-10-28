@@ -57,11 +57,15 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 				tunnels++
 			}
 		case *layers.GRE:
-			tunnels++
+			// ACK-only PPTP has no child network to normalize. Counting it
+			// as another network tunnel would reject a valid terminal header.
+			if !selectedPPTPGRE(v) || len(v.LayerPayload()) != 0 {
+				tunnels++
+			}
 			// Version zero and the legacy PPTP version-one decoder have
 			// distinct existing layouts. Other version bits cannot select an
 			// inner grammar merely because Protocol Type resembles an EtherType.
-			if v.Version > 1 {
+			if v.Version > 1 || v.Version == 1 && !selectedPPTPGRE(v) {
 				unsupported = true
 			}
 		case *layers.VXLAN:
@@ -136,6 +140,11 @@ func (a *binParser) refuseUnselectedNetworkParent(p gopacket.Packet, e captureEv
 					fields["Unselected Carrier"] = "GRE"
 					fields["Observed GRE Version"] = gre.Version
 					summary = fmt.Sprintf("GRE version %d not selected; inner identity unconfirmed", gre.Version)
+				} else if gre.Version == 1 && !selectedPPTPGRE(gre) {
+					fields["Unselected Carrier"] = "PPTP"
+					fields["Observed GRE Version"] = uint8(1)
+					fields["Parent Admission Reason"] = "unselected enhanced GRE header"
+					summary = "PPTP header profile unavailable; inner identity unconfirmed"
 				}
 				break
 			}
@@ -170,6 +179,20 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		return nil, true
 	}
 	if failure := p.ErrorLayer(); failure != nil {
+		var pptp *pptpHeaderError
+		if errors.As(failure.Error(), &pptp) {
+			// The enclosing topology/profile gate above takes precedence: an
+			// error in a child behind unselected Geneve/GRE is not a PPTP claim.
+			fields := map[string]any{"Observed Header Layers": outerNetworkHeaderNames(p), "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile", "Unselected Carrier": "PPTP", "Observed GRE Version": uint8(1), "Parent Admission Reason": pptp.reason, "GRE Header Flags": pptp.flags, "Available GRE Bytes": pptp.available, "Required GRE Bytes": pptp.required}
+			if pptp.hasProtocol {
+				fields["GRE Protocol Type"] = pptp.protocol
+			}
+			if pptp.truncated {
+				fields["Declared GRE Bytes Unavailable"] = true
+			}
+			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "PPTPHeaderAdmission", Error: pptp.Error(), Summary: pptp.Error() + "; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+			return nil, true
+		}
 		var truncated *ipHeaderTruncatedError
 		if errors.As(failure.Error(), &truncated) {
 			fields := map[string]any{"Expected IP Version": truncated.expected, "Available Header Bytes": truncated.available, "Required Header Bytes": truncated.required, "Header Observation Scope": "incomplete fixed header; declared carrier only"}
@@ -235,6 +258,15 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: "malformed", Completeness: "malformed", ExpertCode: "IPVersionMismatch", Error: version.Error(), Summary: version.Error(), Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
 			return nil, true
 		}
+	}
+	for _, layer := range p.Layers() {
+		gre, ok := layer.(*layers.GRE)
+		if !ok || !selectedPPTPGRE(gre) || len(gre.LayerPayload()) != 0 {
+			continue
+		}
+		fields := map[string]any{"Observed GRE Version": uint8(1), "PPTP Call ID": uint16(gre.Key), "PPTP Payload Length": uint16(0), "PPTP Acknowledgment Number": gre.Ack, "Header Observation Scope": "PPTP acknowledgment header only", "Child Header Identity": "not present", "PPTP Data Path Scope": "one direction; call-control association unavailable"}
+		a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "pptp-acknowledgment", Domain: e.Ref.Domain, Status: "limited", Completeness: "headers", ExpertCode: "PPTPAcknowledgment", Summary: fmt.Sprintf("PPTP acknowledgment call=%d ack=%d; no PPP payload", uint16(gre.Key), gre.Ack), Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+		return nil, true
 	}
 	if a.observeSTP(p, e) {
 		return nil, true
