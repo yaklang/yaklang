@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **621** 项：限定范围 `done` **200**，`partial` **29**，`todo` **392**。目录共 **509** 个入口：`stable` **15**，`partial` **326**，`new` **168**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **622** 项：限定范围 `done` **199**，`partial` **31**，`todo` **392**。目录共 **511** 个入口：`stable` **14**，`partial` **330**，`new` **167**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -56,6 +56,8 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P1 | IMAP SASL Challenge | partial | [partial / IMAPSASLChallenge](rules/application-layer/imap_sasl.yaml) |
 | P1 | IMAP SASL Initial Value | partial | [partial / IMAPSASLInitialValue](rules/application-layer/imap_sasl.yaml) |
 | P1 | IMAP SASL Response | partial | [partial / IMAPSASLResponse](rules/application-layer/imap_sasl.yaml) |
+| P1 | IPsec ESP | partial | [partial / ESP](rules/ipsec.yaml) |
+| P1 | IPsec ESP Header Fields | partial | [partial / ESPHeaderFields](rules/ipsec_esp.yaml) |
 | P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
 | P1 | RSTP | partial | [partial / STPFields](rules/stp.yaml) |
 | P1 | RTMP | partial | [partial / ](rules/rtmp.yaml) |
@@ -636,7 +638,8 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [internet_protocol_version_6.yaml](rules/internet_protocol_version_6.yaml) | IPv6 Destination Options (`Internet Protocol Version 6`, partial)<br>IPv6 Fragment (`Internet Protocol Version 6`, partial)<br>IPv6 Hop-by-Hop (`Internet Protocol Version 6`, partial)<br>IPv6 Routing Header (`Internet Protocol Version 6`, partial) |
 | [ipfix.yaml](rules/ipfix.yaml) | IPFIX Observed Message Fields (`IPFIXFields`, partial) |
 | [ipmi.yaml](rules/ipmi.yaml) | IPMI (``, new)<br>IPMI RMCP+ (`IPMI`, partial) |
-| [ipsec.yaml](rules/ipsec.yaml) | IPsec AH (``, new) |
+| [ipsec.yaml](rules/ipsec.yaml) | IPsec AH (``, new)<br>IPsec ESP (`ESP`, partial) |
+| [ipsec_esp.yaml](rules/ipsec_esp.yaml) | IPsec ESP Header Fields (`ESPHeaderFields`, partial) |
 | [ipx.yaml](rules/ipx.yaml) | IPX (`IPX`, partial) |
 | [isis.yaml](rules/isis.yaml) | IS-IS (`ISIS`, partial) |
 | [j1939.yaml](rules/j1939.yaml) | J1939 (`J1939`, partial) |
@@ -715,7 +718,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [vines.yaml](rules/vines.yaml) | VINES (`VINESVIP`, partial) |
 | [vnc.yaml](rules/vnc.yaml) | VNC/RFB (``, new) |
 | [vrrp.yaml](rules/vrrp.yaml) | VRRP (``, new) |
-| [vxlan.yaml](rules/vxlan.yaml) | VXLAN (``, new) |
+| [vxlan.yaml](rules/vxlan.yaml) | VXLAN (`VXLAN`, partial)<br>VXLAN-GPE Observed Header (`VXLANGPEHeader`, partial) |
 | [wep.yaml](rules/wep.yaml) | WEP (`WEP`, partial) |
 | [wireguard.yaml](rules/wireguard.yaml) | WireGuard (``, new) |
 | [wsmp.yaml](rules/wsmp.yaml) | WSMP (`WSMP`, partial) |

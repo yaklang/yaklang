@@ -219,3 +219,18 @@ func TestNetworkHeaderRefusalDoesNotInventEndpointsFromPartialOrInvalidFixedIP(t
 		}
 	}
 }
+
+func TestNetworkHeaderOrderRefusalRequiresTheCompleteOwnedPrefixContract(t *testing.T) {
+	e := refusalPresentationEvent("IPv6OptionsHeaderOrder", []string{"Ethernet", "IPv4"})
+	names, label, ok := networkHeaderRefusalPresentation(e)
+	require.True(t, ok)
+	require.Equal(t, []string{"Ethernet", "IPv4"}, names)
+	require.Equal(t, "IPv4", label)
+	p := presentEvents([]*pcaputil.ProtocolEvent{e})
+	require.True(t, p.networkRefused)
+	require.Equal(t, "malformed-network-header", p.visibility)
+	delete(e.Session, "Header Observation Scope")
+	_, _, ok = networkHeaderRefusalPresentation(e)
+	require.False(t, ok, "a header-order expert code alone cannot declare a validated parent")
+	require.False(t, presentEvents([]*pcaputil.ProtocolEvent{e}).networkRefused)
+}

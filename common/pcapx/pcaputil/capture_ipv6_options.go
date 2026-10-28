@@ -10,7 +10,10 @@ import (
 // The dependency passes the entire remaining packet to each TLV decoder. An
 // option can consequently borrow bytes from the next header and still succeed.
 // Validate and expose options only inside this extension's declared boundary.
-type ipv6OptionsHeaderError struct{ message string }
+type ipv6OptionsHeaderError struct {
+	message   string
+	placement bool
+}
 
 func (e *ipv6OptionsHeaderError) Error() string { return e.message }
 
@@ -20,7 +23,9 @@ type ipv6OptionSpan struct {
 }
 
 func boundedIPv6Options(data []byte, feedback gopacket.DecodeFeedback) (int, []ipv6OptionSpan, error) {
-	fail := func(message string) (int, []ipv6OptionSpan, error) { return 0, nil, &ipv6OptionsHeaderError{message} }
+	fail := func(message string) (int, []ipv6OptionSpan, error) {
+		return 0, nil, &ipv6OptionsHeaderError{message: message}
+	}
 	if len(data) < 2 {
 		feedback.SetTruncated()
 		return fail("IPv6 options extension requires a two-byte fixed prefix")
@@ -71,12 +76,11 @@ type captureIPv6OptionsDecoder struct{ hop bool }
 
 func (d captureIPv6OptionsDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
 	if d.hop {
-		h, err := decodeBoundedIPv6HopByHop(data, b)
-		if err != nil {
-			return err
-		}
-		b.AddLayer(h)
-		return b.NextDecoder(h.NextHeader)
+		// The legal first HBH is decoded inside decodeProtocolIPv6. Reaching
+		// a standalone NextHeader0 dispatcher means its preceding header was
+		// something else (including IPv4 or another extension). RFC8200 §4
+		// requires refusal here; do not reinterpret its payload as an app.
+		return &ipv6OptionsHeaderError{message: "IPv6 Hop-by-Hop Options must immediately follow the IPv6 fixed header", placement: true}
 	}
 	n, options, err := boundedIPv6Options(data, b)
 	if err != nil {
