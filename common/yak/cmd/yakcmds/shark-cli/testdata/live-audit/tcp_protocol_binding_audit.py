@@ -106,16 +106,18 @@ def opening_controls(capture,wanted):
     return dict(openings=sorted(openings),network_fragments=fragments)
 
 
-def audit(capture,observer,sdk,cli):
+def audit(capture,observer,sdk,cli,allow_empty_tcp=False):
     hooks=json.loads(observer.read_text('utf8'))
     assert hooks['capture_SHA256']==sha(capture),'observer binds the exact input file'
     assert not hooks['error'],('a failed native replay cannot certify ownership',hooks['error'])
-    flows={v['flow']:v for v in hooks['flows']}
-    assert all(type(v['flow'])is int and v['flow']>0 for v in hooks['flows'])
-    assert len(flows)==len(hooks['flows']),'unique physical TCP generation IDs'
+    for name in['flows','packets','closed']:assert hooks[name]is None or type(hooks[name])is list
+    observed_flows=hooks['flows']or[];observed_packets=hooks['packets']or[]
+    flows={v['flow']:v for v in observed_flows}
+    assert all(type(v['flow'])is int and v['flow']>0 for v in observed_flows)
+    assert len(flows)==len(observed_flows),'unique physical TCP generation IDs'
     owners=collections.defaultdict(set)
     physical_owners=collections.defaultdict(set)
-    for packet in hooks['packets']:
+    for packet in observed_packets:
         assert type(packet['flow'])is int and packet['flow']in flows
         for ref in packet['refs']:
             assert type(ref['Number'])is int and ref['Number']>0
@@ -173,7 +175,8 @@ def audit(capture,observer,sdk,cli):
     assert all(len(values)==1 for values in protocol_to_tcp.values()),'a protocol session cannot span separate TCP generations'
     for child,native,parent in parent_links:
         assert parent in event_bindings and event_bindings[parent]==native,('TCP child and original parent keep their generation',child,parent)
-    assert captured>0,'positive captured-TCP projection coverage is required'
+    empty_tcp=not flows and not observed_packets and not hooks['closed']and captured==tcp_without_direct_binding==0 and bool(event_bindings)
+    assert captured>0 or allow_empty_tcp and empty_tcp,'positive captured-TCP coverage is required unless explicitly certifying an observed empty TCP namespace'
     selected={};preview_by_tcp={};preview_to_tcp={};deferred_controls=set()
     physical=0;PDU_count=0;close_publications=0
     for row in rows(cli):
@@ -216,14 +219,15 @@ def audit(capture,observer,sdk,cli):
             PDU_count+=1
     deferred=opening_controls(capture,deferred_controls)if deferred_controls else dict(openings=[],network_fragments=[])
     assert not any(pools.values()),'no SDK PDU disappeared from the frozen CLI projection'
-    return dict(scope=__doc__,capture_SHA256=sha(capture),observer_SHA256=sha(observer),SDK_SHA256=sha(sdk),CLI_SHA256=sha(cli),auditor_SHA256=sha(Path(__file__)),physical_rows=physical,capture_close_publications=close_publications,native_TCP_generations=len(flows),source_bound_TCP_events=captured,events_with_different_protocol_and_TCP_numbers=tcp_different_protocol_numbers,protocol_sessions_with_captured_TCP=len(protocol_to_tcp),context_only_TCP_records=context_only,TCP_events_without_direct_capture_binding=tcp_without_direct_binding,unavailable_endpoint_projections=unavailable_endpoint_projections,compared_CLI_PDUs=PDU_count,source_bound_parent_links=len(parent_links),deferred_opening_rows=deferred['openings'],deferred_network_fragment_rows=deferred['network_fragments'],preview_by_native_TCP=preview_by_tcp,all_checked_bindings_exact=True,wire_or_Wireshark_parity_claim=False)
+    return dict(scope=__doc__,capture_SHA256=sha(capture),observer_SHA256=sha(observer),SDK_SHA256=sha(sdk),CLI_SHA256=sha(cli),auditor_SHA256=sha(Path(__file__)),physical_rows=physical,capture_close_publications=close_publications,native_TCP_generations=len(flows),source_bound_TCP_events=captured,positive_captured_TCP_coverage=captured>0,explicit_empty_TCP_namespace=empty_tcp and allow_empty_tcp,events_with_different_protocol_and_TCP_numbers=tcp_different_protocol_numbers,protocol_sessions_with_captured_TCP=len(protocol_to_tcp),context_only_TCP_records=context_only,TCP_events_without_direct_capture_binding=tcp_without_direct_binding,unavailable_endpoint_projections=unavailable_endpoint_projections,compared_CLI_PDUs=PDU_count,source_bound_parent_links=len(parent_links),deferred_opening_rows=deferred['openings'],deferred_network_fragment_rows=deferred['network_fragments'],preview_by_native_TCP=preview_by_tcp,all_checked_bindings_exact=True,wire_or_Wireshark_parity_claim=False)
 
 
 if __name__=='__main__':
     ap=argparse.ArgumentParser(description=__doc__)
     for name in['capture','observer','sdk','cli','out']:ap.add_argument('--'+name,type=Path,required=True)
+    ap.add_argument('--allow-empty-tcp',action='store_true',help='Explicit absence/projection check for complete observations with no native TCP flows, packets or closes; does not certify positive TCP coverage.')
     a=ap.parse_args()
-    for path in vars(a).values():assert not any((p/'.git').exists()for p in[path.resolve(),*path.resolve().parents])
-    result=audit(a.capture,a.observer,a.sdk,a.cli)
+    for path in[a.capture,a.observer,a.sdk,a.cli,a.out]:assert not any((p/'.git').exists()for p in[path.resolve(),*path.resolve().parents])
+    result=audit(a.capture,a.observer,a.sdk,a.cli,a.allow_empty_tcp)
     with a.out.open('x',encoding='utf8',newline='\n')as out:json.dump(result,out,indent=2);out.write('\n')
     print(json.dumps(dict(TCP_events=result['source_bound_TCP_events'],CLI_PDUs=result['compared_CLI_PDUs'],all_checked_bindings_exact=True)),flush=True)
