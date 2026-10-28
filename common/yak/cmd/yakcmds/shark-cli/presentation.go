@@ -773,7 +773,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		// This is a verified tunnel header, even though its payload profile
 		// is unavailable. Keep the concrete identity and the admission limit
 		// together; no inner protocol or application connection is implied.
-		*p = packetPresentation{networkRefused: true, protocol: "VXLAN-GPE", summary: safeText(e.Summary), status: "limited", visibility: "tunnel-header", scope: "VXLAN-GPE v0 header; inner payload profile unselected", evidence: "validated VXLAN-GPE header; inner identity unconfirmed", stack: []string{"VXLAN-GPE"}, priority: 1000}
+		*p = packetPresentation{networkRefused: true, protocol: "VXLAN-GPE", summary: safeText(e.Summary), status: "limited", visibility: "tunnel-header", scope: "VXLAN-GPE v0 header; inner payload profile unselected", evidence: "validated VXLAN-GPE header; inner identity unconfirmed", stack: []string{"VXLAN-GPE"}, nativeDomain: e.Domain, priority: 1000}
 		return
 	}
 	if e.Protocol == "ip" && e.Profile == "pptp-acknowledgment" && e.Status == "limited" && e.Completeness == "headers" && e.ExpertCode == "PPTPAcknowledgment" && number(e.Session["Observed GRE Version"]) == 1 && number(e.Session["PPTP Payload Length"]) == 0 && e.Session["Child Header Identity"] == "not present" {
@@ -1185,6 +1185,12 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 		row.ConnectionProtocol, row.ConnectionEvidence = "", ""
 		row.ConnectionStack = nil
 		row.StreamID = 0
+		if p.visibility == "tunnel-header" {
+			// Keep the physical capture domain separate from this admitted
+			// header's VNI namespace. Neither establishes a data session.
+			d := p.nativeDomain
+			row.MessageDomain, row.MessageTransport = &d, "network"
+		}
 	}
 	if row.MessageTransport != "" && row.MessageTransport != "network" {
 		carrier := strings.ToUpper(row.MessageTransport)

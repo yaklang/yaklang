@@ -10,11 +10,15 @@ func tlsResumptionDisplayBindings() []displayFieldBinding {
 	handshake := func(name, label string, typ DisplayFieldType, bits int, tail ...string) {
 		b := displayCustom("tls", name, label, typ, bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 			root := "Handshake Messages"
+			session := e.Session
 			if e.Protocol == "quic" {
 				root = "TLS Handshakes"
+				if e.nativeQUICObservation {
+					session = e.semanticSession
+				}
 			}
 			path := append([]string{root, "*"}, tail...)
-			p.walk(e.Session, path, func(value any) {
+			p.walk(session, path, func(value any) {
 				if modes, ok := value.([]byte); ok {
 					for _, mode := range modes {
 						emit(mode)
@@ -61,9 +65,15 @@ func tlsResumptionDisplayBindings() []displayFieldBinding {
 	handshake("tls.handshake.session_ticket.authenticated", "TLS ticket record authentication verified", DisplayBoolean, 0, "New Session Ticket", "Record Authentication Verified")
 	handshake("tls.handshake.session_ticket.max_early_data_size", "TLS ticket maximum early data size", DisplayUnsigned, 32, "New Session Ticket", "Extensions", "*", "Maximum Early Data Size")
 	context := func(name, label string, typ DisplayFieldType, bits int, tail ...string) {
-		b := displayRoot("tls", name, label, typ, bits, "context", "")
+		path := append([]string{"Session Establishment"}, tail...)
+		b := displayCustom("tls", name, label, typ, bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			session := e.Session
+			if e.nativeQUICObservation {
+				session = e.semanticSession
+			}
+			p.walk(session, path, emit)
+		})
 		b.protocols = "|tls|quic|"
-		b.path = append([]string{"Session Establishment"}, tail...)
 		b.descriptor.Description = label + "; retained current-connection hello observation, not binder/certificate verification or ticket-cache confirmation"
 		out = append(out, b)
 	}

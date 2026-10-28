@@ -342,6 +342,9 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if !networkRefused {
+		appendCapturedVXLANHeaders(&d, raw)
+	}
 	if len(events) > 0 {
 		fields, sources := protocolEventDetail(events)
 		d.fields = append(d.fields, fields...)
@@ -418,7 +421,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 						}
 					}
 				}
-				for i := 1; i < len(d.fields); i++ {
+				for i := wireStart; i < len(d.fields); i++ {
 					f := &d.fields[i]
 					if f.source != 0 {
 						continue
@@ -509,6 +512,9 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	row := summarize(raw)
 	d.protocol = row.Protocol
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if !networkRefused {
+		appendCapturedVXLANHeaders(&d, raw)
+	}
 	if len(events) > 0 {
 		fields, sources := protocolEventDetail(events)
 		d.fields = append(d.fields, fields...)

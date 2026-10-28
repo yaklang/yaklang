@@ -135,7 +135,14 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		info["ALPN"] = t.alpn
 	}
 	e.Session = info
-	defer func() { t.resumption.project(info) }()
+	defer func() {
+		t.resumption.project(info)
+		// A refused record still has exact header/authentication observations.
+		// Freeze those separately from editable public maps. sessionError is
+		// checked before this cache by Decode/GetFields, so it grants no
+		// successful decode or application admission to a rejected message.
+		e.semanticFields = cloneSession(info)
+	}()
 	if t.version == 0x304 && typ == 22 && t.finalHello {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 cleartext handshake after ServerHello")
 	}
