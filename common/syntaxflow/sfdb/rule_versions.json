@@ -7174,5 +7174,143 @@
     "rule_name": "结构扫描：Python 模型批量接收请求体",
     "hash": "28f63e21e8145bcf4f165db23fe233505798b72d856060a895951af096aba437",
     "version": "20261022.0001"
+  },
+  {
+    "rule_id": "a7c2d9e0-3f5b-4c6a-9d35-7e9f1a5c3b80",
+    "rule_name": "净化与校验函数（C 库规则）",
+    "hash": "8ea1be9b87e855647b092128cff125b78aeef888f8361adceb4f15dd110ab794",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "c2e8f5a3-6d17-4b28-9e0f-3a5c7d9b1e46",
+    "rule_name": "动态代码执行入口（C#/.NET 库规则）",
+    "hash": "212b8207c78d555560fdee80b716910a55224d836c1d97a744557ccc9505e033",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "d4f9a6b5-7c28-4a3e-8f01-4b6d8e2c9a57",
+    "rule_name": "净化与编码函数（C#/.NET 库规则）",
+    "hash": "43a1af1fc705a2420143f28af95f0d5d052b0315018adf7039325c3a0b7e9773",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "e5a0b7c8-1d39-4f2a-9b13-5c7d9e3a1f68",
+    "rule_name": "SQL 执行入口（C 库规则）",
+    "hash": "10ba0674993a2b6f23496b21119c1839b1762f07381a6b2e8b22583ced2d6e17",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "f6b1c8d9-2e4a-5a3b-8c24-6d8e0f4b2a79",
+    "rule_name": "操作系统命令执行入口（C 库规则）",
+    "hash": "42e0c1a429f5ca3dd5ef88a3e2b12d14341629585da7408d2c2ae3a87870d91d",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-cleartext-transmission",
+    "rule_name": "源码扫描：C 明文传输与明文存储",
+    "hash": "4ac439ef26b7944b89a1bfac17ec1fb97d63b7ac337711a809564eb6575c1b32",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-cors-origin",
+    "rule_name": "源码扫描：C 反射 Origin 的 CORS 头",
+    "hash": "bdd5b7a20f971f55d2b6b375c6bd74d8d79e919ef52984ad5905a10178461776",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-csrf-state-change",
+    "rule_name": "源码扫描：C 状态变更处理缺少 CSRF 防护",
+    "hash": "26d2bdfc109d5b1c53cedbcbff6dfd2e4183572d9ed4332ae3917eeb5ccaac96",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-dlopen-controlled",
+    "rule_name": "源码扫描：C 动态加载库路径可控",
+    "hash": "08f83690bf0329b945a85c4e25904bcdb6c3a1f6b1d70d4445aa93f74d56c9f4",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-hardcoded-credentials",
+    "rule_name": "源码扫描：C 硬编码口令与凭据",
+    "hash": "c93d750ff486920bd6bfa647aa8e79aae4e8043901dad41db2c6d26cf99acdef",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-header-manipulation",
+    "rule_name": "源码扫描：C HTTP 响应头注入",
+    "hash": "d766cae36be1c76d9c3221bb71a06fc6df5775eee03941b4efc432104618265f",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-leftover-debug",
+    "rule_name": "源码扫描：C 遗留调试代码",
+    "hash": "66f81ba132fbfacae7f3cbbcf89bf6b5ecde5f3051db8ddcee0a7a9d37cdcdbd",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-libxml2-xxe",
+    "rule_name": "源码扫描：C libxml2 外部实体加载",
+    "hash": "fe277bf3b6be226b56a393fb034f2315281b5fb282912a0c9ae074ab06f15622",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-system-popen",
+    "rule_name": "源码扫描：C system/popen 命令执行",
+    "hash": "62bef2d1a36183c81c0884245cf1d9326e6ced7ad12744d2e4ee5c6047974a64",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-c-tls-verify-none",
+    "rule_name": "源码扫描：C TLS 证书校验被禁用",
+    "hash": "bc686652b30923cfcf2ff977fb8753fa0016b1ded193f79632f41af4e73050ff",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-cookie-httponly-false",
+    "rule_name": "检测 C# Cookie HttpOnly 关闭",
+    "hash": "44d12de3eeca23a9aeb8560370241a3524fe7539ad974e3ff89c167e594fe8cb",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-crlf-injection",
+    "rule_name": "检测 C# CRLF 响应头注入",
+    "hash": "eac2f3599f6cfdcfaae86889413df81c45e8c02d0e0b47f76f76238984ece8df",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-hardcoded-password",
+    "rule_name": "检测 C# 硬编码口令",
+    "hash": "98b58d7805f9b8c3036e8155dbb0f664ad75361c6096d506c0abd011163c6f98",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-information-exposure",
+    "rule_name": "检测 C# 敏感信息暴露",
+    "hash": "9170d67b766f388b1541d0e146a50c2ec4d058e5976a38df604bc2fa7ffae067",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-insecure-tempfile",
+    "rule_name": "检测 C# 不安全临时文件",
+    "hash": "b0392b78dda4ed9c38b4207b5a48601597f5142f842d043d9a611d498dc9b59a",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-json-injection",
+    "rule_name": "检测 C# JSON 注入",
+    "hash": "a121b5748135a294eb46a7e8189a5d199e76212933bf9dc563dd77603b156667",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-jwt-no-signature-validation",
+    "rule_name": "检测 C# JWT 签名校验缺失",
+    "hash": "16a9d06afa338b37f591dac7473cddbff97de4334341572a6f04f7cec4154e9d",
+    "version": "20261028.0001"
+  },
+  {
+    "rule_id": "source-csharp-unrestricted-file-upload",
+    "rule_name": "检测 C# 不受限制的文件上传",
+    "hash": "2c84931f33eb536216591f206d3132b5be889f233b96eed32a92ba55f90db06a",
+    "version": "20261028.0001"
   }
 ]
