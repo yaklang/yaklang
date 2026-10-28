@@ -1,0 +1,118 @@
+// Run from repository root:
+// AISMOKING_CASE=mcp_management yak common/ai/aismoking/run.yak
+// Real aim.InvokeReAct, embedded Yak tools, profile SQLite and MCP HTTP;
+// deterministic model decisions and a local remote-MCP fixture.
+include "common/ai/aismoking/mock.inc"
+assert os.Getenv("YAKIT_HOME") != "", "Use a disposable home"
+mcpPort = os.GetRandomAvailableTCPPort()
+mcpBase = "http://" + str.HostPort("127.0.0.1", mcpPort)
+remoteCalls = 0
+go httpserver.Serve("127.0.0.1", mcpPort, httpserver.context(smokeCtx), httpserver.handler(func(w, req) {
+    if req.URL.Path == "/ready" { w.Write("ready"); return }
+    if req.Method == "GET" { w.WriteHeader(405); return }
+    if req.Method == "DELETE" { w.WriteHeader(204); return }
+    try {
+        assert req.Header.Get("Authorization") == "Bearer local-mcp-fixture", "saved headers must reach the remote MCP"
+        message = json.loads(string(io.ReadAll(req.Body)~))
+        if str.HasPrefix(message.method,"notifications/") { w.WriteHeader(202); return }
+        result = {}
+        if message.method == "initialize" {
+            result = {"protocolVersion":message.params.protocolVersion,"capabilities":{"tools":{}},"serverInfo":{"name":"mcp-smoke-remote","version":"1"}}
+        } elif message.method == "tools/list" {
+            if message.params.cursor == nil || message.params.cursor == "" {
+                result = {"tools":[{"name":"echo","description":"Return the input message","inputSchema":{"type":"object","properties":{"message":{"type":"string"}},"required":["message"]}}],"nextCursor":"opaque+/=page2"}
+            } else {
+                assert message.params.cursor == "opaque+/=page2"
+                result = {"tools":[{"name":"second_page_marker","description":"Second MCP page","inputSchema":{"type":"object","properties":{}}}]}
+            }
+        } elif message.method == "tools/call" {
+            assert message.params.name == "echo" && message.params.arguments.message == "MCP_REACT_ECHO\n引号\""
+            smokeMutex.Lock();remoteCalls++;smokeMutex.Unlock()
+            result = {"content":[{"type":"text","text":message.params.arguments.message}]}
+        } else { assert false, "unexpected MCP method " + message.method }
+        w.Header().Set("Content-Type","application/json")
+        w.Write(json.dumps({"jsonrpc":"2.0","id":message.id,"result":result}))~
+    } catch err {
+        smokeMutex.Lock();smokeErrors=append(smokeErrors,string(err));smokeMutex.Unlock()
+        smokeCancel();w.WriteHeader(500)
+    }
+}))
+ready = false
+for i=0;i<100;i++ { _,err=http.Get(mcpBase+"/ready");if err==nil {ready=true;break};time.Sleep(0.02) }
+assert ready
+config,operator,cursor,awaiting = nil,nil,0,false
+artifactDirs,results,loaded = {},[],{}
+plan = [
+    {"name":"manage_mcp_server","params":{"op":"add","name":"mcp-smoke-active","type":"streamable_http","endpoint":mcpBase+"/mcp","headers":{"Authorization":"Bearer local-mcp-fixture"}}},
+    {"name":"manage_mcp_server","params":{"op":"add","name":"mcp-smoke-disabled","type":"stdio","endpoint":`python3 "/tmp/MCP fixture.py"`,"env":{"TOKEN":"local-env-fixture"},"disabled":true}},
+    {"name":"manage_mcp_server","params":{"op":"list","keyword":"mcp-smoke-","limit":1}},
+    {"name":"manage_mcp_server","params":{"op":"list","keyword":"mcp-smoke-","limit":1,"offset":1}},
+    {"name":"query_mcp_tools","params":{"server_name":"mcp-smoke-active"}},
+    {"name":"query_mcp_tools","params":{"server_name":"mcp-smoke-active","cursor":"opaque+/=page2"}},
+    {"name":"call_mcp_tool","params":{"server_name":"mcp-smoke-active","remote_tool":"echo","arguments":{"message":"MCP_REACT_ECHO\n引号\""}}},
+    {"name":"manage_mcp_server","params":{"op":"delete","name":"mcp-smoke-active"}},
+    {"name":"manage_mcp_server","params":{"op":"delete","name":"mcp-smoke-disabled"}},
+    {"name":"manage_mcp_server","params":{"op":"list","keyword":"mcp-smoke-"}},
+]
+func checkPrevious() {
+    calls = operator.GetCurrentTask().GetAllToolCallResults()
+    assert len(calls)==cursor
+    actual = calls[len(calls)-1]
+    assert actual.Success && actual.Name==plan[cursor-1].name
+    directory=""
+    for i=0;i<100;i++ { smokeMutex.Lock();directory=artifactDirs[actual.ToolCallID];smokeMutex.Unlock();if directory!=nil && directory!="" {break};time.Sleep(0.01) }
+    assert directory!=nil && directory!=""
+    manifest=json.loads(string(file.ReadFile(file.Join(directory,"manifest.json"))~))
+    assert manifest.success && manifest.files.result.bytes==0, "MCP scripts must return raw stdout"
+    text=string(file.ReadFile(manifest.files.stdout.path)~)
+    value=json.loads(text)
+    if cursor==1 { assert value.server.name=="mcp-smoke-active" && value.server.enable && !("Bearer local-mcp-fixture" in text) }
+    if cursor==2 { assert !value.server.enable && !("local-env-fixture" in text) }
+    if cursor==3 { assert value.total==2 && value.has_more && value.next_offset==1 && len(value.servers)==1 }
+    if cursor==4 { assert value.total==2 && !value.has_more && len(value.servers)==1 && !value.servers[0].enable }
+    if cursor==5 { assert value.nextCursor=="opaque+/=page2" && value.tools[0].name=="echo" && value.tools[0].inputSchema.required[0]=="message" }
+    if cursor==6 { assert value.nextCursor==nil && value.tools[0].name=="second_page_marker" }
+    if cursor==7 { assert value.content[0].text=="MCP_REACT_ECHO\n引号\"" }
+    if cursor==8 || cursor==9 { assert value.deleted }
+    if cursor==10 { assert value.total==0 && !value.has_more && len(value.servers)==0 }
+    awaiting=false
+}
+smokeHandler=func(w,body) {
+    native,prompt=len(body.tools)>0,smokePrompt(body)
+    if "SMOKE_CALLER:liteforge[session-title-generator]" in prompt { smokeAnswer(w,native,"session-title-generator",{"session_title":"MCP 管理验证"});return }
+    if "SMOKE_CALLER:directly-answer" in prompt { smokeAnswer(w,false,"directly_answer",{"answer_payload":"MCP 注册、分页发现、调用与删除已通过验证。"});return }
+    if "SMOKE_CALLER:liteforge[perception]" in prompt { smokeAnswer(w,false,"perception",{"summary":"MCP 验证完成。","topics":["MCP"],"keywords":["MCP"],"changed":true,"confidence":1});return }
+    if "SMOKE_CALLER:verification" in prompt {
+        w.Header().Set("Content-Type","text/event-stream")
+        smokeFrame(w,{"content":`{"@action":"verify-satisfaction","user_satisfied":true,"reasoning":"真实数据库与远端 MCP 调用已核验。","evidence":[]}`},"stop")
+        w.Write("data: [DONE]\n\n")~;return
+    }
+    assert "SMOKE_CALLER:react-loop:default" in prompt || "SMOKE_CALLER:react-loop:main" in prompt
+    assert "管理 MCP" in prompt && "manage_mcp_server" in prompt, "system skill must auto-load the MCP entry point"
+    assert !("query_mcp_servers" in prompt), "redundant MCP server action must be absent"
+    if awaiting { checkPrevious() }
+    if cursor==len(plan) { smokeAnswer(w,native,"finish",{});return }
+    item=plan[cursor]
+    if loaded[item.name]==nil {
+        loaded[item.name]=true
+        smokeAnswer(w,native,"require_tool",{"require_tool_payload":item.name});return
+    }
+    cursor++;awaiting=true
+    smokeAnswer(w,native,"directly_call_tool",{"directly_call_tool_name":item.name,"directly_call_tool_params":item.params,"directly_call_reason":"核验 MCP 注册表和真实远端调用"})
+}
+for native in [false,true] {
+    config,operator,cursor,awaiting,loaded=nil,nil,0,false,{}
+    die(aim.InvokeReAct("使用 system skill 中的 manage_mcp_server 添加 MCP，再列出服务器和远端工具，调用 echo，最后删除测试配置并核实为空。",aim.sessionID("mcp-management-"+randstr(12)),aim.context(smokeCtx),aim.workdir(smokeRoot),aim.reviewPolicy("yolo"),aim.maxIteration(18),aim.timeout(90),aim.disableMCPServers(false),aim.disableAIForge(true),aim.aiCallback(smokeModel),aim.onEvent(func(op,e){
+        config,operator=op.GetConfig(),op
+        if string(e.Type)=="tool_call_log_dir" { info=json.loads(string(e.Content));smokeMutex.Lock();artifactDirs[info.call_tool_id]=file.Join(info.dir_path,"..");smokeMutex.Unlock() }
+    }),aim.configOptions(aiagent.aiCallback(smokeModel),aiagent.functionCallMode(native),func(c){
+        c.DisablePerception,c.DisableMemoryTriage,c.DisableIntervalReview=true,true,true
+        c.AiAutoRetry,c.AiTransactionAutoRetry=1,1
+        return nil
+    })))
+    assert cursor==len(plan) && !awaiting && len(loaded)==3
+    results=append(results,{"function_call":native,"tool_calls":cursor,"required_tools":len(loaded),"passed":true})
+    file.SaveJson(file.Join(smokeRoot,"task-results.json"),results)~
+}
+assert remoteCalls==2, "remote MCP must execute exactly once per protocol"
+smokeCheck()

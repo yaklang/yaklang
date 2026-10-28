@@ -111,9 +111,9 @@ func MigrateSyntaxFlowWithDB(db *gorm.DB, hash string, i *schema.SyntaxFlowRule)
 		i.Hash = i.CalcHash()
 		// only one rule, check and update
 		rule := rules[0]
-		if rule.Hash != hash || (rule.OpCodes == "" && i.OpCodes != "") {
-			// Also repair legacy rows without opcodes: compiled opcodes are
-			// intentionally excluded from CalcHash.
+		if rule.Hash != hash || (i.OpCodes != "" && rule.OpCodes != i.OpCodes) {
+			// Also replace stale compiled opcodes even when the source/metadata
+			// hash is unchanged: opcodes are intentionally excluded from CalcHash.
 			return db.Model(&rule).Updates(i).Error
 		}
 		return nil

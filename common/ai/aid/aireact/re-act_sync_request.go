@@ -49,6 +49,12 @@ func (r *ReAct) handleSyncMessage(event *ypb.AIInputEvent) error {
 		return r.HandleSyncTypeCloseBrowserEvent(event)
 	case aicommon.SYNC_TYPE_LOAD_SKILL:
 		return r.HandleSyncTypeLoadSkillEvent(event)
+	case aicommon.SYNC_TYPE_SKILL_LOADED:
+		return r.HandleSyncTypeSkillLoadedEvent(event)
+	case aicommon.SYNC_TYPE_SKILL_AVAILABLE:
+		return r.HandleSyncTypeSkillAvailableEvent(event)
+	case aicommon.SYNC_TYPE_SKILL_DETAIL:
+		return r.HandleSyncTypeSkillDetailEvent(event)
 	case SYNC_TYPE_AI_MINI_TASK:
 		return r.HandleSyncTypeAIMiniTaskEvent(event)
 	case SYNC_TYPE_ADD_TODO:
@@ -74,6 +80,9 @@ func (r *ReAct) RegisterReActSyncEvent() {
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT, r.HandleSyncTypeTaskSnapshotEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER, r.HandleSyncTypeCloseBrowserEvent)
 	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL, r.HandleSyncTypeLoadSkillEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_LOADED, r.HandleSyncTypeSkillLoadedEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_AVAILABLE, r.HandleSyncTypeSkillAvailableEvent)
+	r.config.InputEventManager.RegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_DETAIL, r.HandleSyncTypeSkillDetailEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK, r.HandleSyncTypeAIMiniTaskEvent)
 	r.config.InputEventManager.RegisterSyncCallback(SYNC_TYPE_ADD_TODO, r.HandleSyncTypeAddTodoEvent)
 }
@@ -94,6 +103,9 @@ func (r *ReAct) UnRegisterReActSyncEvent() {
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_TASK_SNAPSHOT)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_CLOSE_BROWSER)
 	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_LOAD_SKILL)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_LOADED)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_AVAILABLE)
+	r.config.InputEventManager.UnRegisterSyncCallback(aicommon.SYNC_TYPE_SKILL_DETAIL)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_AI_MINI_TASK)
 	r.config.InputEventManager.UnRegisterSyncCallback(SYNC_TYPE_ADD_TODO)
 }

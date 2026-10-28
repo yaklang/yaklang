@@ -22,7 +22,11 @@ func protocolAnalysisPacket(packet gopacket.Packet) gopacket.Packet {
 		// Payload layer tag must not be used to recreate an untyped packet.
 		return packet
 	}
-	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoded[0].LayerType()}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
+	decoder := gopacket.Decoder(decoded[0].LayerType())
+	if _, ok := decoded[0].(*capturePPILayer); ok {
+		decoder = capturePPIDecoder{}
+	}
+	p := gopacket.NewPacket(packet.Data(), protocolPacketDecoder{decoder: decoder}, gopacket.DecodeOptions{Lazy: true, NoCopy: true, DecodeStreamsAsDatagrams: false})
 	p.Metadata().CaptureInfo = packet.Metadata().CaptureInfo
 	return p
 }
@@ -110,4 +114,36 @@ func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFe
 		return fmt.Errorf("invalid IPv4 version %d", data[0]>>4)
 	}
 	return nil
+}
+
+// capturedTCPPayloadMissing admits only a reader-proven capture suffix after
+// complete IP/TCP headers. Wire-invalid lengths, truncated options and fragments
+// remain rejected. Missing bytes are never manufactured or reserved as payload.
+func capturedTCPPayloadMissing(packet gopacket.Packet, tcp *layers.TCP) (uint32, bool) {
+	ci := packet.Metadata().CaptureInfo
+	if ci.CaptureLength != len(packet.Data()) || ci.Length <= ci.CaptureLength || tcp == nil || len(tcp.LayerContents()) < 20 || len(tcp.LayerContents()) != int(tcp.DataOffset)*4 || packet.ErrorLayer() != nil {
+		return 0, false
+	}
+	var declared, captured int
+	switch ip := packet.NetworkLayer().(type) {
+	case *layers.IPv4:
+		if ip.Version != 4 || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 || ip.Protocol != layers.IPProtocolTCP {
+			return 0, false
+		}
+		declared = int(ip.Length)
+		captured = len(ip.LayerContents()) + len(ip.LayerPayload())
+	case *layers.IPv6:
+		if ip.Version != 6 || ip.Length == 0 || packet.Layer(layers.LayerTypeIPv6Fragment) != nil {
+			return 0, false
+		}
+		declared = 40 + int(ip.Length)
+		captured = len(ip.LayerContents()) + len(ip.LayerPayload())
+	default:
+		return 0, false
+	}
+	offset := len(packet.Data()) - captured
+	if offset < 0 || declared <= captured || declared > ci.Length-offset || captured < len(tcp.LayerContents())+len(tcp.Payload) {
+		return 0, false
+	}
+	return uint32(declared - captured), true
 }

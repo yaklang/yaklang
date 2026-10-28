@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
+	"github.com/yaklang/yaklang/common/ai/aid/aicommon/aiskillloader"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -49,6 +50,17 @@ func parseLoadSkillRequest(event *ypb.AIInputEvent) loadSkillRequest {
 	return req
 }
 
+// skillManagerForSessionInput 保留活跃 loop 的专用 loader；空闲会话使用 config
+// 的 manager，手动加载和热加载因此不再依赖 loop 的生命周期。
+func (r *ReAct) skillManagerForSessionInput() *aiskillloader.SkillsContextManager {
+	if loop := r.GetCurrentLoop(); loop != nil {
+		if mgr := loop.GetSkillsContextManager(); mgr != nil {
+			return mgr
+		}
+	}
+	return r.config.GetSkillsContextManager()
+}
+
 // HandleSyncTypeLoadSkillEvent 处理用户强制加载 SKILL 的 sync 事件.
 func (r *ReAct) HandleSyncTypeLoadSkillEvent(event *ypb.AIInputEvent) error {
 	req := parseLoadSkillRequest(event)
@@ -58,16 +70,7 @@ func (r *ReAct) HandleSyncTypeLoadSkillEvent(event *ypb.AIInputEvent) error {
 	alreadyForced := make([]string, 0)
 
 	loop := r.GetCurrentLoop()
-	if loop == nil {
-		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "load_skill", map[string]interface{}{
-			"loaded":         loaded,
-			"failed":         failed,
-			"already_loaded": alreadyForced,
-			"error":          "no active loop",
-		}, event.SyncID)
-		return nil
-	}
-	mgr := loop.GetSkillsContextManager()
+	mgr := r.skillManagerForSessionInput()
 	if mgr == nil {
 		_, _ = r.EmitSyncJSON(schema.EVENT_TYPE_STRUCTURED, "load_skill", map[string]interface{}{
 			"loaded":         loaded,

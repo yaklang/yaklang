@@ -33,6 +33,8 @@ const (
 	minAutoASTMemoryBudget      = int64(2 * 1024 * 1024 * 1024)
 	defaultASTSlotCost          = int64(1024 * 1024 * 1024)
 	defaultLargeProjectGC       = 100
+	minCompileGCTuneBytes       = 256 * 1024
+	minCompileGCUsableMemory    = int64(4 * 1024 * 1024 * 1024)
 )
 
 var (
@@ -43,6 +45,58 @@ var (
 	largeProjectLogOnce             sync.Once
 	antlrCacheResetEveryBytesCached int64
 )
+
+// GC percent is process-wide. Overlapping SSA compiles must not restore the
+// CLI's pre-compile value until the last compile has finished.
+var compileGCScopes struct {
+	mu       sync.Mutex
+	next     uint64
+	baseline int
+	current  int
+	active   map[uint64]int
+}
+
+func beginCompileGCPercent(percent int) (int, func()) {
+	compileGCScopes.mu.Lock()
+	if compileGCScopes.active == nil {
+		compileGCScopes.active = make(map[uint64]int)
+	}
+	previous := compileGCScopes.current
+	if len(compileGCScopes.active) == 0 {
+		previous = debug.SetGCPercent(percent)
+		compileGCScopes.baseline = previous
+		compileGCScopes.current = percent
+	} else if percent > compileGCScopes.current {
+		debug.SetGCPercent(percent)
+		compileGCScopes.current = percent
+	}
+	compileGCScopes.next++
+	id := compileGCScopes.next
+	compileGCScopes.active[id] = percent
+	compileGCScopes.mu.Unlock()
+
+	var once sync.Once
+	return previous, func() {
+		once.Do(func() {
+			compileGCScopes.mu.Lock()
+			delete(compileGCScopes.active, id)
+			target := compileGCScopes.baseline
+			if len(compileGCScopes.active) != 0 {
+				target = 0
+				for _, requested := range compileGCScopes.active {
+					if requested > target {
+						target = requested
+					}
+				}
+			}
+			if target != compileGCScopes.current {
+				debug.SetGCPercent(target)
+				compileGCScopes.current = target
+			}
+			compileGCScopes.mu.Unlock()
+		})
+	}
+}
 
 func antlrCacheResetEveryFiles() int {
 	antlrCacheResetEveryFilesOnce.Do(func() {
@@ -91,9 +145,10 @@ type astBuildWindowDecision struct {
 	budgetSource     string
 }
 
-type largeProjectGCDecision struct {
+type compileProjectGCDecision struct {
 	percent        int
 	manualOverride bool
+	eligible       bool
 	largeProject   bool
 	source         string
 }
@@ -205,26 +260,36 @@ func parseGCPercentEnv(raw string) (int, bool) {
 	return v, true
 }
 
-func (c *Config) resolveLargeProjectGCPercent() largeProjectGCDecision {
-	decision := largeProjectGCDecision{
-		largeProject: c != nil && c.GetCompileProjectBytes() >= largeProjectByteCap,
-	}
-	if !decision.largeProject || c == nil {
+func (c *Config) resolveCompileProjectGCPercent(totalMemory int64) compileProjectGCDecision {
+	decision := compileProjectGCDecision{}
+	if c == nil || c.GetCompileProjectBytes() < minCompileGCTuneBytes {
 		return decision
 	}
+	decision.largeProject = c.GetCompileProjectBytes() >= largeProjectByteCap
 	create, ok := LanguageBuilderCreater[c.GetLanguage()]
 	if !ok || !create().UsesDeferredFileBuild() {
 		return decision
 	}
+	decision.eligible = true
 	if raw := strings.TrimSpace(os.Getenv("GOGC")); raw != "" {
 		decision.manualOverride = true
 		decision.source = "env:GOGC"
 		return decision
 	}
+	if envFlagEnabled(ssaCompileAdaptiveGCEnv) {
+		decision.manualOverride = true
+		decision.source = "env:YAK_SSA_COMPILE_ADAPTIVE_GC"
+		return decision
+	}
+	if strings.TrimSpace(os.Getenv(ssaCompileGOGCEnv)) != "" {
+		decision.manualOverride = true
+		decision.source = "env:YAK_SSA_COMPILE_GOGC"
+		return decision
+	}
 	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_GC_PERCENT")); raw != "" {
 		percent, ok := parseGCPercentEnv(raw)
 		if !ok {
-			log.Warnf("invalid YAK_SSA_GC_PERCENT=%q, using %d for large SSA project", raw, defaultLargeProjectGC)
+			log.Warnf("invalid YAK_SSA_GC_PERCENT=%q, using %d for SSA compilation", raw, defaultLargeProjectGC)
 		} else if percent <= 0 {
 			decision.manualOverride = true
 			decision.source = "env:YAK_SSA_GC_PERCENT"
@@ -235,33 +300,44 @@ func (c *Config) resolveLargeProjectGCPercent() largeProjectGCDecision {
 			return decision
 		}
 	}
+	if !decision.largeProject {
+		// yak's CLI uses GOGC=8 by default. That keeps memory low but makes
+		// ANTLR-heavy compiles spend most CPU time scanning the heap. Restore
+		// the ordinary 100% policy only when the configured usable memory
+		// budget has room for the measured increase in peak RSS.
+		limit, enabled := c.resolveCompileMemoryLimit(totalMemory)
+		if !enabled || limit < minCompileGCUsableMemory {
+			decision.eligible = false
+			return decision
+		}
+		decision.source = "auto:ssa-compile"
+	} else {
+		decision.source = "auto:large-project"
+	}
 	decision.percent = defaultLargeProjectGC
-	decision.source = "auto:large-project"
 	return decision
 }
 
-func (c *Config) applyLargeProjectGCPercent() func() {
-	decision := c.resolveLargeProjectGCPercent()
-	if !decision.largeProject {
+func (c *Config) applyCompileProjectGCPercent() func() {
+	decision := c.resolveCompileProjectGCPercent(systemMemoryTotalBytes())
+	if !decision.eligible {
 		return nil
 	}
 	if decision.manualOverride {
-		log.Infof("[ssa-compile] large project GC percent controlled by %s", decision.source)
+		log.Infof("[ssa-compile] GC percent controlled by %s", decision.source)
 		return nil
 	}
 	if decision.percent <= 0 {
 		return nil
 	}
-	previous := debug.SetGCPercent(decision.percent)
+	previous, restore := beginCompileGCPercent(decision.percent)
 	log.Infof(
-		"[ssa-compile] large project GC percent=%d (previous=%d source=%s), restore after compile",
+		"[ssa-compile] GC percent=%d (previous=%d source=%s), restore after compile",
 		decision.percent,
 		previous,
 		decision.source,
 	)
-	return func() {
-		debug.SetGCPercent(previous)
-	}
+	return restore
 }
 
 type antlrWorkerState struct {
@@ -401,9 +477,9 @@ func (c *Config) GetFileHandler(
 		// Use sync.Once to avoid setting/logging 98 times (once per concurrent worker).
 		gomeMemLimitOnce.Do(func() {
 			totalMem := systemMemoryTotalBytes()
-			if memLimit, enabled := automaticSSACompileMemoryLimit(totalMem); enabled {
+			if memLimit, enabled := c.resolveCompileMemoryLimit(totalMem); enabled {
 				debug.SetMemoryLimit(memLimit)
-				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (80%% of %s system memory)",
+				log.Infof("[ssa-compile] large project: set GOMEMLIMIT=%s (usable of %s system memory, compile_memory_limit)",
 					formatFileSize(int(memLimit)), formatFileSize(int(totalMem)))
 			}
 		})
@@ -443,7 +519,6 @@ func (c *Config) GetFileHandler(
 	return ssareducer.FilesHandler(
 		c.ctx, filesystem, preHandlerFiles,
 		parse, initWorker,
-		c.GetCompileASTSequence(),
 		concurrency,
 		astBuildWindow.window,
 	)
@@ -518,10 +593,10 @@ func skipCompileFile(exclude ssaconfig.CompileExcludeFunc, path string, info fs.
 // ScanProjectFiles scans the project directory and returns the files to be processed
 func ScanProjectFiles(cfg ScanConfig) (*ScanResult, error) {
 	result := &ScanResult{
-		HandlerFiles:     make([]string, 0),
-		PreHandlerFiles:  make([]string, 0),
+		HandlerFiles:      make([]string, 0),
+		PreHandlerFiles:   make([]string, 0),
 		PreHandlerFileSet: make(map[string]struct{}),
-		Folders:          make([][]string, 0),
+		Folders:           make([][]string, 0),
 	}
 	exclude := cfg.ExcludeFunc
 

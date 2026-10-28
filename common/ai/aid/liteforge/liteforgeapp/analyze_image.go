@@ -661,7 +661,7 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 		defer indexedChannel.Close()
 		err = ar.Run()
 		if err != nil {
-			log.Errorf("failed to run analyze media image: %v", err)
+			analyzeConfig.reportError(fmt.Errorf("failed to analyze media image: %w", err))
 		}
 	}()
 
@@ -673,7 +673,11 @@ func AnalyzeSingleMedia(mediaPath string, opts ...any) (<-chan AnalysisResult, e
 			analyzeConfig.AnalyzeStatusCard("知识实体分析(Entity Analyzing)", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
-			return AnalyzeImage(chunk.Data(), opts...)
+			result, err := AnalyzeImage(chunk.Data(), opts...)
+			if err != nil {
+				analyzeConfig.reportError(err)
+			}
+			return result, err
 		} else {
 			return &TextAnalysisResult{Text: string(chunk.Data())}, nil
 		}

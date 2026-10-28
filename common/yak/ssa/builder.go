@@ -66,6 +66,11 @@ type FunctionBuilder struct {
 	CurrentRange *memedit.Range // current position in source code
 	CurrentFile  string         // current file name
 
+	// The entry state of a private stored execution view. A method build may
+	// trigger another initializer in this function without advancing this view.
+	executionInitialBlock  *BasicBlock
+	executionInitialReturn bool
+
 	parentScope *ParentScope
 
 	DefineFunc map[string]any
@@ -87,6 +92,8 @@ type FunctionBuilder struct {
 	// this function. Later assignments of those names are marked so const
 	// folding does not drop the callback's update.
 	capturedNames map[string]struct{}
+
+	placeholderConstants *utils.SafeMapWithKey[placeholderConstantKey, placeholderConstant]
 }
 
 func NewBuilder(editor *memedit.MemEditor, f *Function, parent *FunctionBuilder) *FunctionBuilder {
@@ -232,6 +239,7 @@ func (b *FunctionBuilder) PopFunction() *FunctionBuilder {
 
 // function param
 func (b FunctionBuilder) HandlerEllipsis() {
+	defer b.Function.markPersistenceDirty()
 	if len(b.Params) == 0 {
 		b.hasEllipsis = true
 		return

@@ -17,6 +17,12 @@ type CompileUnit struct {
 	Files    []string
 	Bytes    int64
 	Language ssaconfig.Language
+	// LibraryName identifies a frontend-owned library when its name cannot be
+	// derived from the unit key (notably Go's declared package name).
+	LibraryName string
+	// DeclaredLibrary means the frontend owns this unit's library. An empty
+	// LibraryName then stays on the application instead of the path-derived name.
+	DeclaredLibrary bool
 }
 
 // UnitRef is a directed dependency edge between two compile units.
@@ -41,6 +47,75 @@ type UnitPartitioner interface {
 	// (e.g. PHP/JS dynamic imports); the engine then falls back to a
 	// deterministic directory order.
 	CompileUnitDependencies(fs filesys_interface.FileSystem, units []*CompileUnit) []UnitRef
+}
+
+// ConcurrentUnitBuilder opts a frontend into parallel library body builds.
+// The frontend must provide dependency edges and keep execution builders local
+// to a unit. Declaration registration and shared deferred helpers remain serial.
+type ConcurrentUnitBuilder interface {
+	SupportsConcurrentUnitBuild() bool
+}
+
+// ConcurrentUnitPreHandler is optional. A frontend may parallelize independent
+// library body builds while keeping declaration registration serial.
+type ConcurrentUnitPreHandler interface {
+	SupportsConcurrentUnitPreHandler() bool
+}
+
+// MethodLookupBuilder tells the engine not to drain a foreign library's method
+// body on the caller's goroutine. Frontends that schedule bodies themselves opt in.
+type MethodLookupBuilder interface {
+	DeferMethodBuildOnLookup() bool
+}
+
+// SetDeferMethodBuildOnLookup records the frontend's lookup policy.
+func (p *Program) SetDeferMethodBuildOnLookup(enabled bool) {
+	if app := p.GetApplication(); app != nil {
+		app.deferMethodBuild = enabled
+	}
+}
+
+// SetConcurrentUnitBuild fixes the ownership policy before unit work starts.
+// Frontends that have not opted in retain their existing shared-scope behavior.
+func (p *Program) SetConcurrentUnitBuild(enabled bool) {
+	if app := p.GetApplication(); app != nil {
+		app.concurrentUnitBuild = enabled
+	}
+}
+
+func (p *Program) ConcurrentUnitBuildEnabled() bool {
+	app := p.GetApplication()
+	return app != nil && app.concurrentUnitBuild
+}
+
+// shouldBuildOnLookup reports whether reading a class or function should also
+// drain its lazy body. Opted-in concurrent units register skeletons first and
+// drain each library's bodies from the scheduler, so a lookup must not start a
+// foreign library's body on the caller's goroutine.
+func (p *Program) shouldBuildOnLookup() bool {
+	if p == nil || p.PreHandler() {
+		return false
+	}
+	return !p.ConcurrentUnitBuildEnabled()
+}
+
+// A frontend that schedules method bodies itself opts out of draining them on
+// lookup. Other frontends still rely on eager method lookup.
+func (p *Program) deferMethodBuildOnLookup() bool {
+	if p == nil || !p.ConcurrentUnitBuildEnabled() {
+		return false
+	}
+	app := p.GetApplication()
+	return app != nil && app.deferMethodBuild
+}
+
+func (f *Function) buildOnLookup() {
+	if f == nil {
+		return
+	}
+	if program := f.GetProgram(); program == nil || !program.deferMethodBuildOnLookup() {
+		f.Build()
+	}
 }
 
 // --- shared compile-unit path helpers (used by language builders) ---

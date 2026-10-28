@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"container/list"
 	"encoding/binary"
+	"errors"
 	"time"
 )
 
@@ -15,6 +16,29 @@ import (
 func slmpStart(w []byte) bool {
 	return len(w) >= 2 && w[1] == 0 && (w[0] == 0x50 || w[0] == 0x54 || w[0] == 0xd0 || w[0] == 0xd4)
 }
+
+// Fixed header evidence for refusal only; never validate or parse an oversized
+// loopback body. Reserved words, declared size, command and count must agree.
+func slmpUDPRefusalHint(w []byte) bool {
+	if !slmpStart(w) || (w[0] != 0x50 && w[0] != 0x54) {
+		return false
+	}
+	at := 2
+	if w[0] == 0x54 {
+		at = 6
+		if len(w) < 6 || w[4] != 0 || w[5] != 0 {
+			return false
+		}
+	}
+	if len(w) < at+15 {
+		return false
+	}
+	body := w[at+7:]
+	n := int(binary.LittleEndian.Uint16(body[6:8]))
+	return int(binary.LittleEndian.Uint16(w[at+5:at+7])) == len(body) &&
+		binary.LittleEndian.Uint16(body[2:4]) == 0x0619 && binary.LittleEndian.Uint16(body[4:6]) == 0 && n >= 1 && n <= 960 && n == len(body)-8
+}
+
 func slmpError(kind ProtocolErrorKind, s string) error { return protocolError(kind, "SLMP %s", s) }
 
 type slmpMessage struct {
@@ -136,14 +160,51 @@ type binSLMP struct {
 	seen              map[uint16]bool
 }
 
+// A retained identity is old unless it names the currently pending request.
+// It must not retire an independently observed request with a distinct serial.
+func (s *binSLMP) retiredRequest(m *slmpMessage) bool {
+	return m.request && (m.frame == 3 && s.used3E && (s.pending == nil || s.pending.frame != 3) ||
+		m.frame == 4 && s.seen[m.serial] && (s.pending == nil || s.pending.frame != 4 || s.pending.serial != m.serial))
+}
+
+// A denied or unsupported body cannot erase an independent live serial when
+// its complete fixed header identifies an already retired wire identity.
+func (s *binSLMP) retiredWire(w []byte) bool {
+	if !slmpStart(w) {
+		return false
+	}
+	at := 2
+	frame := 3
+	if w[0] == 0x54 || w[0] == 0xd4 {
+		at = 6
+		frame = 4
+		if len(w) < 6 || w[4] != 0 || w[5] != 0 {
+			return false
+		}
+	}
+	if len(w) < at+7 || int(binary.LittleEndian.Uint16(w[at+5:at+7])) != len(w)-at-7 {
+		return false
+	}
+	if frame == 3 {
+		return s.used3E && (s.pending == nil || s.pending.frame != 3)
+	}
+	serial := binary.LittleEndian.Uint16(w[2:4])
+	return s.seen[serial] && (s.pending == nil || s.pending.frame != 4 || s.pending.serial != serial)
+}
+
 func (s *binSLMP) consume(m *slmpMessage, w []byte, dir int, id uint64, limit int) (map[string]any, uint64, error) {
 	context := func(why string) (map[string]any, uint64, error) { return nil, 0, slmpError(ErrContextRequired, why) }
 	if s.ambiguous {
-		return context("overlap/reuse requires a new idle conversation")
+		return context("ambiguous observed exchange; idle does not reset wire identity")
 	}
 	if m.request {
 		if dir != 0 {
 			return context("request direction differs from observed requester")
+		}
+		// A completed old identity cannot verify a new exchange or retire an
+		// independently observed pending exchange using a distinct 4E serial.
+		if s.retiredRequest(m) {
+			return context("previously observed unsequenced exchange or serial cannot prove a new generation")
 		}
 		if s.pending != nil {
 			if !bytes.Equal(s.pending.wire, w) {
@@ -195,10 +256,11 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 	a.udpMu.Lock()
 	store := a.udpSessions
 	existing := store != nil && store.entries[key] != nil
-	if !explicit && !(slmpStart(w) && (existing || slmpRequestEvidence(w))) {
+	if !explicit && !(slmpStart(w) && (existing || len(w) > a.budget.MaxFrameBytes && slmpUDPRefusalHint(w) || len(w) <= a.budget.MaxFrameBytes && slmpRequestEvidence(w))) {
 		a.udpMu.Unlock()
 		return false
 	}
+	e.nativeDLMSOrSLMPObservation = true
 	e.Protocol, e.Profile, e.Admission, e.Completeness = "slmp", "slmp-binary-self-test", "wire-signature", "message"
 	if explicit {
 		e.Admission = "explicit-decode-as"
@@ -210,18 +272,12 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		store = &binUDPStore{entries: make(map[binUDPKey]*list.Element), clock: e.Timestamp}
 		a.udpSessions = store
 	}
-	if e.Timestamp.After(store.clock) {
-		store.clock = e.Timestamp
-	}
-	for el := store.lru.Front(); el != nil; {
-		next := el.Next()
-		entry := el.Value.(*binUDPEntry)
-		if entry.flow.slmp != nil && store.clock.Sub(entry.touched) >= slmpIdleTTL {
-			entry.flow.closeSession()
-			delete(store.entries, entry.key)
-			store.lru.Remove(el)
+	el := store.entries[key]
+	if el != nil {
+		v := el.Value.(*binUDPEntry)
+		if e.Timestamp.Sub(v.touched) >= slmpIdleTTL {
+			v.flow.retireSLMPUDP()
 		}
-		el = next
 	}
 	var m *slmpMessage
 	var err error
@@ -231,7 +287,6 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 	} else {
 		m, err = decodeSLMPMessage(w)
 	}
-	el := store.entries[key]
 	// With no observed flow, the subheader still identifies a response role.
 	// An existing flow uses its observed endpoint direction instead.
 	if slmpStart(w) && (w[0] == 0xd0 || w[0] == 0xd4) {
@@ -243,19 +298,21 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		} else if len(store.entries) >= sessionCollectionLimit(a.budget.MaxCollectionElements) {
 			err = slmpError(ErrResourceExceeded, "UDP conversation limit")
 		} else {
-			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "slmp", slmp: &binSLMP{}, endpoints: [2]string{e.Source, e.Destination}}
+			f := &binFlow{a: a, id: a.flows.Add(1), protocol: "slmp", slmp: &binSLMP{ambiguous: a.slmpUntrackedRefusal}, endpoints: [2]string{e.Source, e.Destination}}
 			if err = f.reserveSession(512 + int64(len(w))*3 + 64); err == nil {
-				el = store.lru.PushBack(&binUDPEntry{key, f, store.clock})
+				el = store.lru.PushBack(&binUDPEntry{key, f, e.Timestamp})
 				store.entries[key] = el
 			}
 		}
 	}
 	if el != nil {
 		entry := el.Value.(*binUDPEntry)
-		entry.touched = store.clock
+		if e.Timestamp.After(entry.touched) {
+			entry.touched = e.Timestamp
+		}
 		store.lru.MoveToBack(el)
 		f := entry.flow
-		if budgetExceeded {
+		if budgetExceeded && !f.slmp.retiredWire(w) {
 			f.slmp.pending = nil
 			f.slmp.ambiguous = true
 			retained := 512 + 64*int64(len(f.slmp.seen))
@@ -271,11 +328,13 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		}
 		// Even an unsupported new command can produce an indistinguishable 3E
 		// success reply. Retire the earlier slot instead of associating by length.
-		if err != nil && e.Direction == 0 && slmpStart(w) && (w[0] == 0x50 || w[0] == 0x54) && f.slmp.pending != nil {
+		if err != nil && e.Direction == 0 && slmpStart(w) && (w[0] == 0x50 || w[0] == 0x54) && !f.slmp.retiredWire(w) && f.slmp.pending != nil {
 			f.slmp.pending = nil
 			f.slmp.ambiguous = true
 		}
-		if err == nil {
+		if err == nil && f.slmp.retiredRequest(m) {
+			e.Session, e.ResponseTo, err = f.slmp.consume(m, w, e.Direction, e.ID, a.budget.MaxCollectionElements)
+		} else if err == nil {
 			n := len(f.slmp.seen)
 			if m.request && m.frame == 4 && f.slmp.pending == nil && !f.slmp.seen[m.serial] {
 				n++
@@ -289,9 +348,24 @@ func (a *binParser) decodeSLMPDatagram(e *ProtocolEvent, w []byte, explicit bool
 		// Resource denial does not make a distinct on-wire request disappear. A 3E
 		// error response has no echo/serial to distinguish it from the old slot.
 		// Preserve the resource error, but retire that now-ambiguous association.
-		if err != nil && m != nil && m.request && e.Direction == 0 && f.slmp.pending != nil && !bytes.Equal(f.slmp.pending.wire, w) {
+		if err != nil && m != nil && m.request && e.Direction == 0 && !f.slmp.retiredRequest(m) && f.slmp.pending != nil && !bytes.Equal(f.slmp.pending.wire, w) {
 			f.slmp.pending = nil
 			f.slmp.ambiguous = true
+		}
+		// Only pending request content is retained. Completed/refused observations
+		// keep bounded identity history without charging the incoming body forever.
+		if f.slmp.pending == nil {
+			retained := int64(512 + 64*len(f.slmp.seen))
+			if retained < f.sessionBytes {
+				a.buffered.Add(retained - f.sessionBytes)
+				f.sessionBytes = retained
+			}
+		}
+	}
+	if el == nil && (explicit || slmpUDPRefusalHint(w)) {
+		var pe *ProtocolError
+		if errors.As(err, &pe) && pe.Kind == ErrResourceExceeded {
+			a.slmpUntrackedRefusal = true
 		}
 	}
 	a.udpMu.Unlock()

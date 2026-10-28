@@ -4,7 +4,7 @@ desc(
 	title: "检测 JavaScript eval 调用"
 	title_zh: "检测 JavaScript eval 调用",
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-js-eval"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -35,7 +35,7 @@ NEG
 
 ${*.js}.pattern_regex(/(?m)(?<![\w.])eval\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript eval 调用",
 	title_zh: "检测 JavaScript eval 调用",
 	message: "检测 JavaScript eval 调用",

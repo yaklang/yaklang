@@ -172,7 +172,10 @@ func TestBinParserHTTPContextAndChunks(t *testing.T) {
 func TestBinParserInspectorAndCallbackFailure(t *testing.T) {
 	wire := append(append([]byte{}, binMQTTConnect...), binMQTTPublish(64)...)
 	pcap := binTestPcap(t, []tcpStep{{seq: 0, syn: true}, {seq: 1, data: string(wire)}}, 1883, false, false)
-	v, err := NewBinParserInspector(1, 1024)
+	// Native MQTT now owns the decoded rule tree as well as its observed
+	// connection context. Keep a bounded capacity for the row-eviction test;
+	// check the exact byte ceiling independently below.
+	v, err := NewBinParserInspector(1, 8192)
 	require.NoError(t, err)
 	err = ReplayPcap(bytes.NewReader(pcap), WithBinParserDeferred(true), WithBinParser(v.OnEvent))
 	require.NoError(t, err)
@@ -183,6 +186,20 @@ func TestBinParserInspectorAndCallbackFailure(t *testing.T) {
 	detail, err := v.Details(rows[0].ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, detail.Structured)
+	cost := detail.RetainedBytes()
+	require.LessOrEqual(t, cost, 8192)
+	for _, limit := range []int{cost - 1, cost} {
+		bounded, err := NewBinParserInspector(1, limit)
+		require.NoError(t, err)
+		bounded.OnEvent(detail)
+		if limit < cost {
+			require.Empty(t, bounded.Rows("mqtt", 0))
+			require.EqualValues(t, 1, bounded.Evicted())
+		} else {
+			require.Len(t, bounded.Rows("mqtt", 0), 1)
+			require.Zero(t, bounded.Evicted())
+		}
+	}
 	detail.Raw[0] = 0
 	again, err := v.Details(rows[0].ID)
 	require.NoError(t, err)
@@ -238,6 +255,25 @@ func TestBinParserCoalescedMessageLimitAndBindingIndex(t *testing.T) {
 	publish := binMQTTPublish(58)
 	wire := string(append(append([]byte{}, publish...), publish...))
 	steps := []tcpStep{{seq: 0, syn: true}, {seq: 1, data: string(binMQTTConnect)}, {seq: 17, data: wire[:50]}, {seq: 67, data: wire[50:]}}
+	// The native connection context is retained state too. A 128-byte total
+	// budget must reject it, rather than silently exceeding the old wire-only
+	// ceiling. Keep the bounded stateless binding available for framing users.
+	require.NoError(t, ReplayPcap(bytes.NewReader(binTestPcap(t, steps, 1883, false, false)), WithBinParserConfig(config)))
+	require.Len(t, events, 1)
+	require.Equal(t, "context-required", events[0].Status) // Existing framing diagnostic status.
+	fields, err := events[0].GetFields()
+	require.Nil(t, fields)
+	var typed *ProtocolError
+	require.ErrorAs(t, err, &typed)
+	require.Equal(t, ErrResourceExceeded, typed.Kind)
+	require.Equal(t, "connection state exceeds capture memory budget", typed.Message)
+	require.Equal(t, binMQTTConnect, events[0].Raw)
+	require.Zero(t, events[0].TransactionID)
+	require.Zero(t, events[0].ResponseTo)
+	require.Zero(t, stats.BufferedBytes)
+	require.LessOrEqual(t, stats.PeakBufferedBytes, int64(128))
+	events = nil
+	config.Bindings = []BinParserBinding{{Port: 1883, Protocol: "mqtt-explicit", Rule: "application-layer.mqtt_fields", Entry: "MQTT311PacketFields", Probe: func(w []byte) bool { return len(w) >= 16 && w[0] == 0x10 }, Frame: func(w []byte) (int, error) { n, _, err := mqttLength(w); return n, err }}}
 	require.NoError(t, ReplayPcap(bytes.NewReader(binTestPcap(t, steps, 1883, false, false)), WithBinParserConfig(config)))
 	require.Len(t, events, 3)
 	require.Equal(t, uint64(3), stats.Decoded)

@@ -167,7 +167,7 @@ See [session profiles and explicit limits](PROFILES.md) for the supported versio
 | --- | --- |
 | HTTP/1.0, HTTP/1.1 | Observed request methods, lengths, chunks, trailers, HEAD, interim responses, CONNECT/101 upgrade; complete existing `HTTPExact` fields |
 | TLS | Exact records; existing record/ClientHello rule. Ciphertext remains opaque; no decryption or new handshake semantics |
-| MQTT | CONNECT establishes 3.1 or 3.1.1 profile for both directions; complete native fields; 5.0 / missing CONNECT needs context |
+| MQTT | CONNECT establishes observed 3.1.1 or 5.0 connection context and bounded directional QoS tracking; exact wire fields and binary payloads. Legacy 3.1 has fields without native connection state; missing CONNECT needs context |
 | DNS | UDP datagrams or length-prefixed TCP, port hint plus header checks; existing DNS rule |
 | Kerberos | Port 88 plus DER application tag; UDP messages or TCP records; existing native fields |
 | Memcached | Existing stats request/response and binary GET request profiles |

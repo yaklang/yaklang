@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -54,11 +55,26 @@ func odidControls(t *testing.T) []bsapControl {
 	return m.Cases
 }
 func odidInput(t *testing.T, c bsapControl) ([]byte, bsapAnswer) {
+	return odidSelectedInput(t, "opendroneid-v2", c)
+}
+
+func odidSelectedInput(t *testing.T, prefix string, c bsapControl) ([]byte, bsapAnswer) {
+	return odidAliasedInput(t, prefix, c, "")
+}
+
+func odidAliasedInput(t *testing.T, prefix string, c bsapControl, captureAlias string) ([]byte, bsapAnswer) {
 	t.Helper()
-	b, err := trafficfixture.ReadFile("opendroneid-v2/" + c.Capture)
+	if captureAlias == "" {
+		captureAlias = prefix + "/" + c.Capture
+	} else {
+		const packagePrefix = "common/pcapx/pcaputil/"
+		require.True(t, strings.HasPrefix(captureAlias, packagePrefix))
+		captureAlias = strings.TrimPrefix(captureAlias, packagePrefix)
+	}
+	b, err := trafficfixture.ReadFile(captureAlias)
 	require.NoError(t, err)
 	require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(b)))
-	ab, err := trafficfixture.ReadFile("opendroneid-v2/" + c.Answer)
+	ab, err := trafficfixture.ReadFile(prefix + "/" + c.Answer)
 	require.NoError(t, err)
 	require.Equal(t, c.AnswerSHA, fmt.Sprintf("%x", sha256.Sum256(ab)))
 	var a bsapAnswer
@@ -85,88 +101,130 @@ func TestOpenDroneIDSealedReplay(t *testing.T) {
 	for _, c := range odidControls(t) {
 		t.Run(c.ID, func(t *testing.T) {
 			raw, want := odidInput(t, c)
-			for _, workers := range []int{1, 2, 4} {
-				for _, deferred := range []bool{false, true} {
-					for _, observe := range []bool{false, true} {
-						t.Run(fmt.Sprintf("w%d/d%t/o%t", workers, deferred, observe), func(t *testing.T) {
-							var events []*ProtocolEvent
-							var stats ProtocolStats
-							var asm TCPReassemblyStats
-							var seen atomic.Int64
-							opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithProtocolDecodeAs("udp", 28400, "opendroneid"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { asm = s })}
-							if observe {
-								opts = append(opts, WithEveryPacket(func(p gopacket.Packet) { require.NotEmpty(t, p.Data()); seen.Add(1) }))
-							}
-							owned := bytes.Clone(raw)
-							require.NoError(t, ReplayPcap(bytes.NewReader(owned), opts...))
-							clear(owned)
-							require.Len(t, events, len(want.Events))
-							require.Zero(t, stats.BufferedBytes)
-							require.Zero(t, stats.CallbackPanics)
-							require.Zero(t, asm.UnreassembledBytes)
-							require.EqualValues(t, c.Packets, asm.CapturedPackets)
-							if observe {
-								require.EqualValues(t, c.Packets, seen.Load())
-							}
-							for i, e := range events {
-								w := want.Events[i]
-								require.Equal(t, "opendroneid", e.Protocol)
-								require.Equal(t, "opendroneid-v2-basic-location", e.Profile)
-								require.Equal(t, "udp", e.Transport)
-								require.Equal(t, "explicit-decode-as", e.Admission)
-								require.Zero(t, e.FlowID)
-								require.Zero(t, e.ResponseTo)
-								require.Zero(t, e.TransactionID)
-								require.Zero(t, e.Direction) // No requester or aircraft role is inferred.
-								src, dst := "192.0.2.10:39200", "192.0.2.20:28400"
-								if w.Direction == 1 {
-									src, dst = dst, src
-								}
-								require.Equal(t, src, e.Source)
-								require.Equal(t, dst, e.Destination)
-								require.Equal(t, w.Raw, hex.EncodeToString(e.Raw))
-								require.Len(t, e.SourceBytes.PacketRefs, 1)
-								require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
-								require.Equal(t, e.Domain, e.SourceBytes.PacketRefs[0].Domain)
-								if w.Fields == nil {
-									rocTypedError(t, w.Error, e.sessionError)
-									require.NotEmpty(t, e.Error)
-									require.Nil(t, e.Session)
-									require.Nil(t, e.Structured)
-									require.Nil(t, e.Fields)
-									_, err := e.GetFields()
-									require.Error(t, err)
-									rocTypedError(t, w.Error, err)
-									require.Equal(t, e.Status, e.Completeness)
-								} else {
-									status := "decoded"
-									if deferred {
-										status = "deferred"
-									}
-									require.Equal(t, status, e.Status)
-									require.Equal(t, "message", e.Completeness)
-									require.Empty(t, e.Error)
-									rocEqualFields(t, w.Fields, e.Session)
-									f, err := e.GetFields()
-									require.NoError(t, err)
-									rocEqualFields(t, w.Fields, f)
-									ms := f["Messages"].([]map[string]any)
-									ms[0]["Raw"].([]byte)[0] ^= 255
-									f["Message Count"] = 999
-									d, err := e.Decode()
-									require.NoError(t, err)
-									rocEqualFields(t, w.Fields, protocolFields(d))
-									rocEqualFields(t, w.Fields, e.Session)
-								}
-							}
-						})
-					}
-				}
-			}
+			odidReplayCase(t, c, raw, want, 28400, "opendroneid", "opendroneid-v2-basic-location")
 		})
+	}
+	t.Run("system-profile", testOpenDroneIDSystemReplay)
+	t.Run("identity-profile", testOpenDroneIDIdentityReplay)
+	t.Run("auth-pages-profile", testOpenDroneIDAuthPagesReplay)
+}
+
+func odidReplayCase(t *testing.T, c bsapControl, raw []byte, want bsapAnswer, port uint16, selection, profile string) {
+	t.Helper()
+	for _, workers := range []int{1, 2, 4} {
+		for _, deferred := range []bool{false, true} {
+			for _, observe := range []bool{false, true} {
+				t.Run(fmt.Sprintf("w%d/d%t/o%t", workers, deferred, observe), func(t *testing.T) {
+					var events []*ProtocolEvent
+					var stats ProtocolStats
+					var asm TCPReassemblyStats
+					var seen atomic.Int64
+					opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithProtocolDeferred(deferred), WithProtocolDecodeAs("udp", port, selection), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) }), WithOnProtocolStats(func(s ProtocolStats) { stats = s }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { asm = s })}
+					if observe {
+						opts = append(opts, WithEveryPacket(func(p gopacket.Packet) { require.NotEmpty(t, p.Data()); seen.Add(1) }))
+					}
+					owned := bytes.Clone(raw)
+					require.NoError(t, ReplayPcap(bytes.NewReader(owned), opts...))
+					clear(owned)
+					require.Len(t, events, len(want.Events))
+					require.Zero(t, stats.BufferedBytes)
+					require.Zero(t, stats.CallbackPanics)
+					require.Zero(t, asm.UnreassembledBytes)
+					require.EqualValues(t, c.Packets, asm.CapturedPackets)
+					if observe {
+						require.EqualValues(t, c.Packets, seen.Load())
+					}
+					var previousID uint64
+					for i, e := range events {
+						w := want.Events[i]
+						require.Greater(t, e.ID, previousID)
+						previousID = e.ID
+						if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile || profile == openDroneIDAuthProfile {
+							require.Equal(t, time.Unix(int64(i+1), 0).UTC(), e.Timestamp.UTC())
+						}
+						require.Equal(t, "opendroneid", e.Protocol)
+						require.Equal(t, profile, e.Profile)
+						require.Equal(t, "udp", e.Transport)
+						require.Equal(t, "explicit-decode-as", e.Admission)
+						require.Zero(t, e.FlowID)
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						require.Zero(t, e.Direction) // No requester or aircraft role is inferred.
+						src, dst := "192.0.2.10:39200", fmt.Sprintf("192.0.2.20:%d", port)
+						if w.Direction == 1 {
+							src, dst = dst, src
+						}
+						require.Equal(t, src, e.Source)
+						require.Equal(t, dst, e.Destination)
+						require.Equal(t, w.Raw, hex.EncodeToString(e.Raw))
+						require.Len(t, e.SourceBytes.PacketRefs, 1)
+						require.EqualValues(t, i+1, e.SourceBytes.PacketRefs[0].Number)
+						require.Equal(t, e.Domain, e.SourceBytes.PacketRefs[0].Domain)
+						if w.Fields == nil {
+							rocTypedError(t, w.Error, e.sessionError)
+							require.NotEmpty(t, e.Error)
+							require.Nil(t, e.Session)
+							require.Nil(t, e.Structured)
+							require.Nil(t, e.Fields)
+							_, err := e.GetFields()
+							require.Error(t, err)
+							rocTypedError(t, w.Error, err)
+							require.Equal(t, e.Status, e.Completeness)
+						} else {
+							status := "decoded"
+							if deferred {
+								status = "deferred"
+							}
+							require.Equal(t, status, e.Status)
+							require.Equal(t, "message", e.Completeness)
+							require.Empty(t, e.Error)
+							rocEqualFields(t, w.Fields, e.Session)
+							f, err := e.GetFields()
+							require.NoError(t, err)
+							rocEqualFields(t, w.Fields, f)
+							if profile == openDroneIDSystemProfile || profile == openDroneIDIdentityProfile || profile == openDroneIDAuthProfile {
+								require.Len(t, e.Raw, len(w.Raw)/2)
+								require.Equal(t, fmt.Sprintf("%x", sha256.Sum256(e.Raw)), e.SourceBytes.SHA256)
+								clear(e.Raw)
+							}
+							ms := f["Messages"].([]map[string]any)
+							ms[0]["Raw"].([]byte)[0] ^= 255
+							for _, m := range ms {
+								if data, ok := m["Authentication Data"].([]byte); ok {
+									data[0] ^= 255
+								}
+							}
+							f["Message Count"] = 999
+							d, err := e.Decode()
+							require.NoError(t, err)
+							rocEqualFields(t, w.Fields, protocolFields(d))
+							rocEqualFields(t, w.Fields, e.Session)
+							rocEqualFields(t, w.Fields, d["session"].(map[string]any))
+							// Public projections and returned session trees belong to the
+							// caller. None can rewrite the accepted private observation.
+							e.Session["Message Count"] = 999
+							e.Session["Messages"].([]map[string]any)[0]["Raw"].([]byte)[0] ^= 255
+							d["session"].(map[string]any)["Messages"].([]map[string]any)[0]["Raw"].([]byte)[0] ^= 255
+							d["session"].(map[string]any)["Message Count"] = 998
+							for _, session := range []map[string]any{e.Session, {"forged": true}, nil} {
+								e.Session = session
+								d, err = e.Decode()
+								require.NoError(t, err)
+								rocEqualFields(t, w.Fields, protocolFields(d))
+								rocEqualFields(t, w.Fields, d["session"].(map[string]any))
+							}
+						}
+					}
+				})
+			}
+		}
 	}
 }
 func TestOpenDroneIDBoundsOwnershipAndAdmission(t *testing.T) {
+	t.Run("projection-depth", testOpenDroneIDDepthBudget)
+	t.Run("system-profile", testOpenDroneIDSystemBounds)
+	t.Run("identity-profile", testOpenDroneIDIdentityBounds)
+	t.Run("auth-pages-profile", testOpenDroneIDAuthPagesBounds)
 	var basic, pack []byte
 	for _, c := range odidControls(t) {
 		cap, a := odidInput(t, c)

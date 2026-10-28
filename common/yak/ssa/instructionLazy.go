@@ -159,6 +159,7 @@ func (lz *LazyInstruction) check() {
 			}
 			inst.SetProgram(lz.prog)
 			lz.cache.IrCodeToInstruction(inst, lz.ir, lz.cache)
+			bindInstructionPersistence(inst)
 			lz.Instruction = inst
 		}
 		if utils.IsNil(lz.Value) {
@@ -277,6 +278,11 @@ func (lz *LazyInstruction) markModify() {
 		return
 	}
 	lz.Modify = true
+	if lz.prog != nil && lz.prog.Cache != nil {
+		if store := lz.prog.Cache.instructions; store != nil && store.residentCache != nil {
+			store.residentCache.Set(lz.id, lz.Instruction)
+		}
+	}
 }
 
 func (lz *LazyInstruction) HasValues() bool {

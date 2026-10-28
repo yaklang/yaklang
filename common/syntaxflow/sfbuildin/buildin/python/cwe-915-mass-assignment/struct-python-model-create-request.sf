@@ -4,7 +4,7 @@ desc(
 	title: "结构扫描：Python 模型批量接收请求体"
 	title_zh: "结构扫描：Python 模型批量接收请求体"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-python-model-create-request"
 	risk: "mass-assignment"
 	cwe: "CWE-915"
@@ -49,7 +49,7 @@ NEG
 create as $call
 create(* as $arg) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "结构扫描：Python 模型批量接收请求体",
 	title_zh: "结构扫描：Python 模型批量接收请求体",
 	message: "结构扫描：Python 模型批量接收请求体",

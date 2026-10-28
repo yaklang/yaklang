@@ -2,10 +2,10 @@ package ssa
 
 import "crypto/sha256"
 
-// Type IDs are allocated sequentially. Store their full fingerprints in small
+// Type and instruction IDs are allocated sequentially. Store fingerprints in small
 // pages instead of a hash-map entry per type. The page map also bounds allocation
 // for imported/sparse IDs; a large ID never allocates a slice up to that ID.
-// Only typeStore.flush uses this table, under flushMu.
+// Type stores use flushMu; instruction stores use persistedIDsMu.
 type typeFingerprints map[int64]*typeFingerprintPage
 
 type typeFingerprintPage struct {

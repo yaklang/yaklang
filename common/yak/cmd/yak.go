@@ -588,15 +588,10 @@ var startGRPCServerCommand = cli.Command{
 		var grpcReasonI18n *schema.I18n
 		transport := c.String("transport")
 		socketPath := c.String("socket-path")
-		// Windows cache logging redirects os.Stdout asynchronously. Control events
-		// must reach the parent even when a startup failure immediately exits.
-		originalOutput := os.Stdout
-		eventOutput := func() *os.File {
-			if runtime.GOOS == "windows" {
-				return originalOutput
-			}
-			return os.Stdout
-		}
+		// Cache logging redirects os.Stdout asynchronously on every platform.
+		// Control events must reach the parent even if cache cleanup unlinks the
+		// redirected file or a startup failure immediately exits.
+		eventOutput := os.Stdout
 		defer func() {
 			if finalError != nil {
 				elapsedMs := time.Since(grpcStartTime).Milliseconds()
@@ -621,7 +616,7 @@ var startGRPCServerCommand = cli.Command{
 					ReasonI18n:    grpcReasonI18n,
 				}
 				payload, _ := json.Marshal(failedEvent)
-				fmt.Fprintf(eventOutput(), "yak grpc failed %s\n", payload)
+				fmt.Fprintf(eventOutput, "yak grpc failed %s\n", payload)
 				log.Flush()
 			}
 		}()
@@ -1023,7 +1018,7 @@ var startGRPCServerCommand = cli.Command{
 		actualAddress := lis.Addr().String()
 		instanceId := utils.RandStringBytes(8)
 		log.Infof("yak grpc listener ready on: %s", actualAddress)
-		if err := writeGRPCReadyEvent(eventOutput(), actualAddress, transport, instanceId); err != nil {
+		if err := writeGRPCReadyEvent(eventOutput, actualAddress, transport, instanceId); err != nil {
 			log.Warnf("write yak grpc ready event failed: %v", err)
 		}
 

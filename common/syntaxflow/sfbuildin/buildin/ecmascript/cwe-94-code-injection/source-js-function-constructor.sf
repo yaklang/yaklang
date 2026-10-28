@@ -4,7 +4,7 @@ desc(
 	title: "检测 JavaScript Function 构造器"
 	title_zh: "检测 JavaScript Function 构造器"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-js-function-constructor"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -37,7 +37,7 @@ NEG
 
 ${*.js}.pattern_regex(/(?m)new\s+Function\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 JavaScript Function 构造器",
 	title_zh: "检测 JavaScript Function 构造器",
 	message: "检测 JavaScript Function 构造器",

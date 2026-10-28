@@ -1,6 +1,6 @@
 # Docker Engine HTTP client
 
-`dockerhttp` replaces the Docker SDK behind scannode's runtime host and the
+`dockerhttp` replaces the Docker SDK behind Legion's Node runtime host and the
 Postgres/RabbitMQ service helpers. Together with SCA's snapshot-only analysis
 core, it removes the remaining Docker SDK users and prepares dependency cleanup
 without adding project dependency-removal behavior.
@@ -25,20 +25,19 @@ With verification enabled and no cert path, certificates are read from `~/.docke
 Image load/pull/import decode progress streams and return embedded errors or
 malformed JSON. A failed start or inspect rolls back only the newly created
 container, using a bounded cleanup context even after caller cancellation.
-Scannode retains exact cleanup-label matching and rejects multiple matches.
+The Legion Node adapter retains exact cleanup-label matching and rejects multiple matches.
 
 ## Tests
 
 ```sh
 go test ./common/dockerhttp -count=1 -timeout=10s
-go test scannode/runtime_host_docker.go scannode/runtime_host_docker_test.go -count=1 -timeout=10s
 go test common/thirdpartyservices/docker_images.go common/thirdpartyservices/docker_test.go -count=1 -timeout=10s
 ```
 
 These tests use temporary local HTTP/Unix/named-pipe mocks, require no daemon,
 images, certificates, or external services, and finish within 10 seconds once
 compiled. Essential Tests adds only the client and service-pull entries; its
-existing scannode entry covers the adapter. No additional jobs or runner setup.
+Node adapter tests are owned by Legion under `services/node/internal/scannode`.
 
 Real-daemon tests are opt-in local checks, requiring preinstalled `alpine:3.20`
 and `nginx:alpine`:

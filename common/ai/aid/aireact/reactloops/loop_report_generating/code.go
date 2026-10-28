@@ -48,7 +48,6 @@ func init() {
 				// Report edits read their body from GEN_REPORT; the native action schema
 				// has no content field, so keep this loop on the text/tag protocol.
 				reactloops.WithFunctionCallMode(false),
-				reactloops.WithAllowRAG(true),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
@@ -145,7 +144,6 @@ func init() {
 				// 注册查资料 actions
 				readReferenceFileAction(r),
 				grepReferenceAction(r),
-				searchKnowledgeAction(r),
 				// 注册视图控制 actions
 				changeOffsetLineAction(r),
 			}

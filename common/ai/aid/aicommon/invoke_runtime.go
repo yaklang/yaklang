@@ -238,8 +238,22 @@ func NewSelectedKnowledgeBaseResult(reason string, knowledgeBases []string) *Sel
 	}
 }
 
+type LoopPromptMode uint8
+
+const (
+	LoopPromptModeNormal LoopPromptMode = iota
+	LoopPromptModeCompressContext
+)
+
 type LoopPromptAssemblyInput struct {
 	Nonce string
+	// Both modes share the same cacheable prefix. Only the dynamic section
+	// changes; compression carries instructions and the snapshot's candidates.
+	PromptMode       LoopPromptMode
+	CompressionGuide string
+	// HistoryThroughID, when set, renders and reports timeline history only
+	// through that ID. Later items stay outside this request.
+	HistoryThroughID *int64
 	// FunctionCallMode describes this request's output protocol, not the loop's
 	// global preference. Auxiliary parameter-generation requests remain textual.
 	FunctionCallMode bool
@@ -319,7 +333,11 @@ type LoopPromptAssemblyInput struct {
 
 type LoopPromptAssemblyResult struct {
 	Prompt   string
-	Sections any
+	Mode     LoopPromptMode
+	Sections []*PromptSectionObservation
+	// Captured with the rendered Timeline; compression must not consume later writes.
+	TimelineThroughID *int64
+	TimelineItemIDs   []int64
 }
 
 // ExecutePlanInput carries an approved plan generated outside Coordinator plan loop.
@@ -354,13 +372,9 @@ type AIInvokeRuntime interface {
 	AskForClarification(ctx context.Context, question string, payloads []string) string
 	DirectlyAnswer(ctx context.Context, query string, tools []*aitool.Tool, opts ...any) (string, error)
 	CompressLongTextWithDestination(ctx context.Context, i any, destination string, targetByteSize int64) (string, error)
-	// QuickKnowledgeSearch performs a fast local knowledge-base search using LIKE + BM25.
+	// Deprecated: use query_knowledge_base with explicit scope and token limits.
 	QuickKnowledgeSearch(ctx context.Context, query string, keywords []string, collections ...string) (string, error)
-	// EnhanceKnowledgeGetterEx 支持多种 EnhancePlan 的知识增强获取器
-	// enhancePlans 参数可选，支持：
-	//   - nil 或空切片：使用默认完整增强流程
-	//   - []string{"exact_keyword_search"}: 仅使用精准关键词搜索
-	//   - []string{"hypothetical_answer", "generalize_query"}: 指定增强策略组合
+	// Deprecated: legacy AI RAG retrieval is disabled; use the Skill-guided knowledge tools.
 	EnhanceKnowledgeGetterEx(ctx context.Context, userQuery string, enhancePlans []string, collections ...string) (string, error)
 	// VerifyUserSatisfaction verifies if the user is satisfied with the result
 	VerifyUserSatisfaction(ctx context.Context, query string, isToolCall bool, payload string) (*VerifySatisfactionResult, error)
@@ -381,8 +395,7 @@ type AIInvokeRuntime interface {
 	// so they participate in the auxiliary-task registry.
 	InvokeSpeedPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
 	InvokeQualityPriorityLiteForge(ctx context.Context, actionName string, prompt string, outputs []aitool.ToolOption, opts ...GeneralKVConfigOption) (*Action, error)
-	// SelectKnowledgeBase selects appropriate knowledge bases based on the user query
-	// It uses AI to analyze the query and match it with available knowledge bases
+	// Deprecated: select explicit names using manage_knowledge_base(op=list).
 	SelectKnowledgeBase(ctx context.Context, originQuery string) (*SelectedKnowledgeBaseResult, error)
 
 	ExecuteLoopTaskIF(taskTypeName string, task AIStatefulTask, options ...any) (bool, error)

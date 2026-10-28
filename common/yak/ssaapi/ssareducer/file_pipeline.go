@@ -3,7 +3,6 @@ package ssareducer
 import (
 	"context"
 	"os"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -20,13 +19,9 @@ import (
 type ASTSequenceType = ssaconfig.ASTSequenceType
 
 const (
-	OutOfOrder                  = ssaconfig.OutOfOrder
-	Order                       = ssaconfig.Order
-	ReverseOrder                = ssaconfig.ReverseOrder
-	defaultPipeConcurrency      = 10
-	defaultOrderedASTBufferFile = 1024
-	maxSourceQueueSize          = 8192
-	parsedASTQueueSize          = 0
+	OutOfOrder             = ssaconfig.OutOfOrder
+	defaultPipeConcurrency = 10
+	maxSourceQueueSize     = 8192
 )
 
 const maxFileSize = 5 * 1024 * 1024 // 5MB
@@ -64,19 +59,6 @@ func effectivePipeConcurrency(concurrency int) int {
 		return concurrency
 	}
 	return defaultPipeConcurrency
-}
-
-func orderedASTBufferFileLimit() int {
-	limit := defaultOrderedASTBufferFile
-	if raw := strings.TrimSpace(os.Getenv("YAK_SSA_ORDERED_AST_MAX_FILES")); raw != "" {
-		if v, err := strconv.Atoi(raw); err == nil {
-			limit = v
-		}
-	}
-	if limit < 0 {
-		return 0
-	}
-	return limit
 }
 
 func astBuildWindowSize(compileConcurrency int, override int) int {
@@ -142,7 +124,6 @@ func FilesHandler(
 	paths []string,
 	handler func(path string, content []byte, store *utils.SafeMap[any]) (ssa.FrontAST, error),
 	initWorker func() *utils.SafeMap[any],
-	orderType ASTSequenceType,
 	concurrency int,
 	astBuildWindowOverride int,
 ) <-chan *FileContent {
@@ -151,8 +132,6 @@ func FilesHandler(
 	}
 	bufSize := pipeInitBufSize(len(paths), concurrency)
 	concurrency = effectivePipeConcurrency(concurrency)
-
-	orderType = effectiveASTSequence(orderType, len(paths))
 
 	readFile := func(path string) *FileContent {
 		info, err := filesystem.Stat(path)
@@ -219,17 +198,13 @@ func FilesHandler(
 	)
 	readPipe.FeedSlice(paths)
 
-	parseBufSize := parsedASTQueueSize
-	parseConcurrency := concurrency
-	if orderType == OutOfOrder {
-		window := astBuildWindowSize(concurrency, astBuildWindowOverride)
-		parseConcurrency = window
-		if parseConcurrency < 1 {
-			parseConcurrency = 1
-		}
-		// Unbuffered channels bound in-flight parsed AST count to the window.
-		parseBufSize = 0
+	window := astBuildWindowSize(concurrency, astBuildWindowOverride)
+	parseConcurrency := window
+	if parseConcurrency < 1 {
+		parseConcurrency = 1
 	}
+	// Unbuffered channels bound in-flight parsed AST count to the window.
+	parseBufSize := 0
 	parsePipe := pipeline.NewBoundedPipeWithStore[*FileContent, *FileContent](
 		ctx,
 		parseBufSize,
@@ -240,64 +215,5 @@ func FilesHandler(
 		parseConcurrency,
 	)
 	parsePipe.FeedChannel(readPipe.Out())
-	parseOut := parsePipe.Out()
-
-	sort := func(index int) <-chan *FileContent {
-		out := make([]*FileContent, 0, len(paths))
-		for fc := range parseOut {
-			out = append(out, fc)
-		}
-
-		pathIndex := make(map[string]int, len(paths))
-		for i, p := range paths {
-			pathIndex[p] = i
-		}
-
-		slices.SortFunc(out, func(a, b *FileContent) int {
-			indexA := pathIndex[a.Path]
-			indexB := pathIndex[b.Path]
-			if indexA < indexB {
-				return index
-			}
-			if indexA > indexB {
-				return -index
-			}
-			return 0
-		})
-		ch := make(chan *FileContent, bufSize)
-		go func() {
-			defer close(ch)
-			for _, fc := range out {
-				ch <- fc
-			}
-		}()
-		return ch
-	}
-
-	switch orderType {
-	case OutOfOrder:
-		return parseOut
-	case Order:
-		return sort(-1)
-	case ReverseOrder:
-		return sort(1)
-	}
-
-	return parseOut
-}
-
-func effectiveASTSequence(orderType ASTSequenceType, pathCount int) ASTSequenceType {
-	if orderType == OutOfOrder {
-		return orderType
-	}
-	limit := orderedASTBufferFileLimit()
-	if limit > 0 && pathCount <= limit {
-		return orderType
-	}
-	log.Warnf(
-		"[ssa-compile] AST order mode buffers all parsed trees; downgrade to OutOfOrder for %d files (limit=%d)",
-		pathCount,
-		limit,
-	)
-	return OutOfOrder
+	return parsePipe.Out()
 }

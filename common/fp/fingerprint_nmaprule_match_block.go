@@ -3,12 +3,15 @@ package fp
 import (
 	"context"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/yaklang/yaklang/common/log"
-	utils2 "github.com/yaklang/yaklang/common/utils"
 	"net"
 	"strconv"
+	"strings"
 	"time"
+
+	"github.com/pkg/errors"
+	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/netx"
+	utils2 "github.com/yaklang/yaklang/common/utils"
 )
 
 func getDeadlineFromContext(ctx context.Context, timeout time.Duration) time.Time {
@@ -18,6 +21,92 @@ func getDeadlineFromContext(ctx context.Context, timeout time.Duration) time.Tim
 	}
 
 	return time.Now().Add(timeout)
+}
+
+// readBanner stops when the probe context is cancelled. StableReader only
+// watches its own timeout, so a cancelled scan used to keep the connection
+// until that timeout expired.
+func readBanner(ctx context.Context, conn net.Conn, timeout time.Duration, maxSize int) []byte {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if timeout <= 0 {
+		timeout = time.Second
+	}
+	if ddl, ok := ctx.Deadline(); ok {
+		if remain := time.Until(ddl); remain < timeout {
+			if remain <= 0 {
+				timeout = time.Millisecond
+			} else {
+				timeout = remain
+			}
+		}
+	}
+	stop := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-stop:
+		}
+	}()
+	banner := stableReader(conn, timeout, maxSize)
+	close(stop)
+	return banner
+}
+
+func dialProbeUDP(ctx context.Context, target string, config *Config) (net.Conn, error) {
+	timeout := time.Second
+	var proxies []string
+	if config != nil {
+		if config.ProbeTimeout > 0 {
+			timeout = config.ProbeTimeout
+		}
+		proxies = config.Proxies
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	opts := []netx.DialXOption{
+		netx.DialX_WithContext(ctx),
+		netx.DialX_WithTimeout(timeout),
+	}
+	triedSocks := false
+	var last error
+	for _, proxy := range proxies {
+		if !socks5Proxy(proxy) {
+			continue
+		}
+		triedSocks = true
+		conn, err := netx.DialSocks5UDPContext(ctx, target, proxy, opts...)
+		if err == nil {
+			return conn, nil
+		}
+		last = err
+		log.Errorf("socks5 udp associate failed: %v", err)
+	}
+	if triedSocks {
+		return nil, last
+	}
+	conn, _, err := netx.DialUdpX(target, opts...)
+	return conn, err
+}
+
+func socks5Proxy(proxy string) bool {
+	proxy = strings.TrimSpace(proxy)
+	if proxy == "" {
+		return false
+	}
+	scheme := proxy
+	if i := strings.Index(proxy, "://"); i >= 0 {
+		scheme = proxy[:i]
+	}
+	switch strings.ToLower(scheme) {
+	case "socks", "socks5", "socks5h", "s5":
+		return true
+	default:
+		return false
+	}
 }
 
 // 设置 Banner 检查函数
@@ -88,11 +177,12 @@ func match(rule *NmapMatch, data []rune, port int, host net.IP, safeBanner strin
 
 func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *RuleBlock, config *Config) (open PortState, _ *FingerprintInfo, _ error) {
 	rootCtx := ctx
-	ctx, _ = context.WithTimeout(ctx, config.ProbeTimeout)
+	ctx, cancel := context.WithTimeout(ctx, config.ProbeTimeout)
+	defer cancel()
 
-	timeout := config.ProbeTimeout
+	dialTimeout := config.ProbeTimeout
 	if block.Probe.Payload == "" {
-		timeout = 5 * time.Second
+		dialTimeout = 5 * time.Second
 	}
 
 	if block.Probe.Proto == TCP || block.Probe.Proto == UDP || fmt.Sprint(block.Probe.Proto) == "" {
@@ -101,11 +191,14 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 		}
 
 		if block.Probe.Proto == TCP && config.CanScanTCP() {
-			conn, err := tcpConnectionMaker(host.String(), port, config.Proxies, timeout)
+			dialCtx, dialCancel := context.WithTimeout(rootCtx, dialTimeout)
+			conn, err := netx.DialContext(dialCtx, utils2.HostPort(host.String(), port), config.Proxies...)
+			dialCancel()
 			if err != nil {
 				return CLOSED, nil, utils2.Errorf("%s: %v", block.Probe.Name, err)
 			}
 			defer conn.Close()
+			var request []byte
 
 			// Send Payload
 			if block.Probe.Payload != "" {
@@ -114,10 +207,13 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 					host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(block.Probe.Payload),
 				)
 				_ = conn.SetWriteDeadline(getDeadlineFromContext(ctx, 3*time.Second))
-				_, _ = conn.Write([]byte(block.Probe.Payload))
+				payload := []byte(block.Probe.Payload)
+				n, _ := conn.Write(payload)
+				request = payload[:n]
 			}
 
-			banner := stableReader(conn, config.ProbeTimeout, config.FingerprintDataSize)
+			responseConn := &protocolResponseConn{Conn: conn}
+			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
 			log.Debugf(
 				"active probe for %s:%v recv(%v)-%v: %v",
 				host, port, block.Probe.Proto, block.Probe.Name, strconv.Quote(string(banner)),
@@ -137,26 +233,15 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 			if banner == nil {
 				return OPEN, resultFingerprintInfo, nil
 			}
-			rules := block.Matched
 			shortBanner := utils2.RemoveUnprintableChars(string(banner))
 			if len(shortBanner) > 30 {
 				shortBanner = shortBanner[:30] + "..."
 			}
 
-			// check by regexp
-			bannerRunesForMatchingRules := utils2.AsciiBytesToRegexpMatchedRunes(banner)
-			for _, rule := range rules {
-				if rootCtx.Err() != nil {
-					break
-				}
-				if info := match(
-					rule, bannerRunesForMatchingRules, port, host,
-					resultFingerprintInfo.Banner, block.Probe.Proto,
-				); info != nil {
-					resultFingerprintInfo = info
-					break
-				}
+			if info := applyMatchRules(rootCtx, block, banner, port, host, resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
+				resultFingerprintInfo = info
 			}
+			resultFingerprintInfo.protocolFields = responseConn.parse(rootCtx, request, banner, TCP, port)
 			return OPEN, resultFingerprintInfo, nil
 		}
 
@@ -176,30 +261,26 @@ func (f *Matcher) matchBlock(ctx context.Context, host net.IP, port int, block *
 				}
 			)
 
-			udpConn, err := net.DialTimeout("udp", utils2.HostPort(host.String(), port), config.ProbeTimeout)
+			udpConn, err := dialProbeUDP(ctx, utils2.HostPort(host.String(), port), config)
 			if err != nil {
 				return CLOSED, resultFingerprintInfo, nil
 			}
 			defer udpConn.Close()
 
-			udpConn.Write([]byte(block.Probe.Payload))
-			banner := stableReader(udpConn, config.ProbeTimeout, config.FingerprintDataSize)
+			payload := []byte(block.Probe.Payload)
+			var request []byte
+			if n, err := udpConn.Write(payload); err == nil && n == len(payload) {
+				request = payload
+			}
+			responseConn := &protocolResponseConn{Conn: udpConn, udp: true}
+			banner := readBanner(ctx, responseConn, config.ProbeTimeout, config.FingerprintDataSize)
 			if banner != nil {
 				resultFingerprintInfo.Banner = bannerToString(banner)
 				log.Infof("%s udp banner: %v", block.Probe.Name, resultFingerprintInfo.Banner)
-				bannerRunesForMatchingRules := utils2.AsciiBytesToRegexpMatchedRunes(banner)
-				for _, rule := range block.Matched {
-					if rootCtx.Err() != nil {
-						break
-					}
-					if info := match(
-						rule, bannerRunesForMatchingRules, port, host,
-						resultFingerprintInfo.Banner, block.Probe.Proto,
-					); info != nil {
-						resultFingerprintInfo = info
-						break
-					}
+				if info := applyMatchRules(rootCtx, block, banner, port, host, resultFingerprintInfo.Banner, block.Probe.Proto); info != nil {
+					resultFingerprintInfo = info
 				}
+				resultFingerprintInfo.protocolFields = responseConn.parse(rootCtx, request, banner, UDP, port)
 			} else {
 				return UNKNOWN, resultFingerprintInfo, nil
 			}

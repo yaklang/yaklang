@@ -297,6 +297,55 @@ func TestAsyncPersist_BarrierFlushesQueuedTasksBeforeWaiting(t *testing.T) {
 	require.Equal(t, 0, cache.Count(), "Barrier must settle and evict the queued item")
 }
 
+func TestAsyncPersist_BarrierWaitsForFinalSettlement(t *testing.T) {
+	for _, wantErr := range []error{nil, errors.New("last batch failed")} {
+		t.Run(fmt.Sprint(wantErr), func(t *testing.T) {
+			settled, release := make(chan struct{}), make(chan struct{})
+			var releaseOnce, settledOnce sync.Once
+			cache := dbcache.NewCache[*flushItem, *flushItem](
+				0, 0,
+				func(item *flushItem, _ utils.EvictionReason) (*flushItem, error) { return item, nil },
+				func([]*flushItem) error { return wantErr }, nil,
+				dbcache.WithSaveTimeout(time.Millisecond),
+			)
+			t.Cleanup(func() {
+				releaseOnce.Do(func() { close(release) })
+				_ = cache.Close()
+			})
+			cache.SetSettlementCallback(func(_ int64, _ uint64, _ dbcache.PersistOutcome) {
+				// FinishPersist has already released the resident WaitGroup, but
+				// the saver still needs to record its result and pending metrics.
+				settledOnce.Do(func() {
+					close(settled)
+					<-release
+				})
+			})
+			cache.Set(&flushItem{id: 1})
+			cache.MarkDirty([]int64{1}, utils.EvictionReasonCapacityReached)
+			select {
+			case <-settled:
+			case <-time.After(3 * time.Second):
+				t.Fatal("save did not reach final settlement")
+			}
+			done := make(chan error, 1)
+			go func() { done <- cache.Barrier() }()
+			select {
+			case <-done:
+				t.Fatal("Barrier returned before the last saver callback completed")
+			case <-time.After(20 * time.Millisecond):
+			}
+			releaseOnce.Do(func() { close(release) })
+			select {
+			case err := <-done:
+				require.ErrorIs(t, err, wantErr)
+			case <-time.After(3 * time.Second):
+				t.Fatal("Barrier did not finish after settlement")
+			}
+			require.Zero(t, cache.Stats().Saver.Pending)
+		})
+	}
+}
+
 // TestAsyncPersist_BackpressureBlocksEnqueue proves that when queue depth
 // exceeds the backpressure limit, MarkDirty blocks until the writer catches up.
 func TestAsyncPersist_BackpressureBlocksEnqueue(t *testing.T) {

@@ -98,7 +98,14 @@ func compileExtrasHaveStructRule(t *testing.T, extra []ssaconfig.Option) bool {
 		}
 		require.NoError(t, opt(dummy))
 	}
-	_, ok := dummy.GetExtraInfo("ssa_compile/struct_rule_raw")
+	// Struct rules reach the compile either as raw text (WithStructRuleRaw) or
+	// as rules the scan already compiled once (WithStructRules). ssaconfig
+	// stores options wrapped in ExtraOption, so only the key is inspected here;
+	// the stage assertions below prove the rules actually ran.
+	if _, ok := dummy.GetExtraInfo("ssa_compile/struct_rule_raw"); ok {
+		return true
+	}
+	_, ok := dummy.GetExtraInfo("ssa_compile/struct_rules")
 	return ok
 }
 

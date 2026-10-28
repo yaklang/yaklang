@@ -18,15 +18,18 @@ const (
 
 // SkillContextPart 是 Timeline 中仍可见的一个技能部分。
 type SkillContextPart struct {
-	Name       string
-	Kind       string
-	Path       string
-	StartLine  int
-	EndLine    int
-	Total      int
-	ReachedEnd bool
+	Name       string `json:"name"`
+	Kind       string `json:"kind"`
+	Path       string `json:"path,omitempty"`
+	StartLine  int    `json:"start_line,omitempty"`
+	EndLine    int    `json:"end_line,omitempty"`
+	Total      int    `json:"total,omitempty"`
+	ReachedEnd bool   `json:"reached_end,omitempty"`
 	// TokenCount 是该部分当前可见正文的 token 之和，不包含渲染标签或目录。
-	TokenCount int
+	TokenCount int `json:"token_count"`
+	// Content 是该部分当前仍在 Timeline 中可见的正文。同一路径和范围存在多个
+	// 不同版本时按展示顺序以换行拼接，供不依赖 manager 本地缓存的状态查询使用。
+	Content string `json:"content"`
 }
 
 // SkillContentSink 是 aiskillloader 侧对“运行时上下文 Timeline”的最小依赖。
@@ -85,6 +88,31 @@ func (m *SkillsContextManager) timelineSink() SkillContentSink {
 	return m.timeline.sink
 }
 
+// syncViewWindowsFromTimelineLocked 只把 Timeline 中本地尚未建立的文件窗口补进
+// state，取并集而不覆盖已有窗口/offset，也不向 Timeline 回写。
+// 同一文件的历史范围仍由 Timeline 保留；首次恢复游标时使用最靠后的可见起始行。
+// 调用方持有 m.mu。脚本引用、grep 等非文件窗口无法从 loader 重建，保持原样即可。
+func (m *SkillsContextManager) syncViewWindowsFromTimelineLocked(state *skillContextState, parts []SkillContextPart) {
+	pending := make(map[string]SkillContextPart)
+	for _, part := range parts {
+		if part.Kind != SkillContentKindContent || part.Path == "" || state.ViewWindows[part.Path] != nil {
+			continue
+		}
+		if previous, ok := pending[part.Path]; !ok || part.StartLine > previous.StartLine {
+			pending[part.Path] = part
+		}
+	}
+	for path, part := range pending {
+		vw, err := newSkillFileWindow(state.Skill, path)
+		if err != nil {
+			continue
+		}
+		vw.SetOffset(part.StartLine)
+		vw.Segment()
+		state.ViewWindows[path] = vw
+	}
+}
+
 func (m *SkillsContextManager) appendSkillMetadataToTimeline(name, content, source string) bool {
 	sink := m.timelineSink()
 	if sink == nil {
@@ -120,6 +148,16 @@ func (m *SkillsContextManager) skillContentVisibleInTimeline(name string) bool {
 		return false
 	}
 	return len(sink.VisibleSkillParts(name)) > 0
+}
+
+// VisibleSkillParts 返回目标 Timeline 中指定技能当前仍可见的分片。查询只读，
+// 不回填 manager 的本地窗口，也不改变 Timeline。
+func (m *SkillsContextManager) VisibleSkillParts(name string) []SkillContextPart {
+	sink := m.timelineSink()
+	if sink == nil {
+		return nil
+	}
+	return sink.VisibleSkillParts(name)
 }
 
 // appendSkillCatalogToTimeline 把意图识别命中的「最相关 SKILL 目录」交给 Timeline。

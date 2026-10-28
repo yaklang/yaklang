@@ -386,7 +386,7 @@ var loopAction_directlyCallTool = &reactloops.LoopAction{
 		resolveTool := func(name string) (*aitool.Tool, error) {
 			config := loop.GetConfig()
 
-			if buildinaitools.IsMCPToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
+			if buildinaitools.IsMCPRelatedToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
 				return nil, utils.Errorf("MCP tools are disabled for this runtime")
 			}
 

@@ -13,6 +13,14 @@ import (
 func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*ssa.Program, *ssa.FunctionBuilder, error) {
 	application := ssa.NewProgram(c.Config, c.databaseKind, ssa.Application, filesystem, c.programPath, fileSize)
 	application.Language = c.GetLanguage()
+	if application.Language == "" && c.LanguageBuilder != nil {
+		// Set once, before prehandler workers start. Build used to write this
+		// string while other workers read it in libraryNameForCompileUnit.
+		application.Language = c.LanguageBuilder.GetLanguage()
+	}
+	if language, ok := c.LanguageBuilder.(ssa.MethodLookupBuilder); ok {
+		application.SetDeferMethodBuildOnLookup(language.DeferMethodBuildOnLookup())
+	}
 	application.ProjectID = c.GetProjectID()
 	application.ProcessInfof = func(s string, v ...any) {
 		msg := fmt.Sprintf(s, v...)
@@ -37,10 +45,6 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		if LanguageBuilder == nil {
 			return utils.Errorf("not support language %s", c.GetLanguage())
 		}
-		if application.Language == "" {
-			application.Language = LanguageBuilder.GetLanguage()
-		}
-
 		// get source code
 		if src == nil {
 			return fmt.Errorf("origin source code (MemEditor) is nil")
@@ -62,16 +66,20 @@ func (c *Config) init(filesystem filesys_interface.FileSystem, fileSize int) (*s
 		if originEditor != nil {
 			originEditor.PushSourceCodeContext(newCodeEditor.SourceCodeMd5())
 		}
-		// push into program for recording what code is compiling
-		application.PushEditor(newCodeEditor)
+		// Record the editor on the builder's program so concurrent unit
+		// pre-handlers do not share the application editor stack.
+		editorOwner := fb.GetProgram()
+		if editorOwner == nil {
+			editorOwner = application
+		}
+		editorOwner.PushEditor(newCodeEditor)
 		defer func() {
-			// recover source code context
 			fb.SetEditor(originEditor)
 			save := true
 			if c.GetCompileStrictMode() && err != nil {
 				save = false
 			}
-			application.PopEditor(save)
+			editorOwner.PopEditor(save)
 		}()
 
 		if editor := fb.GetEditor(); editor != nil {

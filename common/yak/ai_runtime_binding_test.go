@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
@@ -32,6 +33,8 @@ func TestAIToolRuntimeBindingsPreserveExports(t *testing.T) {
 		{"db", "SaveHTTPFlowFromRawWithOption", bindDBHistoryToEngine},
 		{"aimemory", "memoryLimit", bindMemorySearchToEngine},
 		{"aihistory", "limit", bindAIHistoryToEngine},
+		{"mcp", "timeout", bindMCPToEngine},
+		{"aiknowledge", "db", bindAIKnowledgeToEngine},
 	} {
 		t.Run(tc.module, func(t *testing.T) {
 			engine := yaklang.New()
@@ -42,6 +45,90 @@ func TestAIToolRuntimeBindingsPreserveExports(t *testing.T) {
 			require.True(t, called, "runtime binding replaced an unrelated engine export")
 		})
 	}
+}
+
+func TestAIToolKnowledgeRuntimeDatabaseAndContext(t *testing.T) {
+	newProfile := func() *gorm.DB {
+		db, err := utils.CreateTempTestDatabaseInMemory()
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = db.Close() })
+		require.NoError(t, db.AutoMigrate(&schema.KnowledgeBaseInfo{}).Error)
+		return db
+	}
+	fallback := newProfile()
+	previous, previousPath := consts.GetGormProfileDatabase(), consts.GetCurrentProfileDatabasePath()
+	consts.BindProfileDatabase(fallback, "")
+	t.Cleanup(func() { consts.BindProfileDatabase(previous, previousPath) })
+	code := `
+aiknowledge.Add("bound", aiknowledge.dimension(4))~
+entry = aiknowledge.AddEntry("bound", "startup", "BOUND_CONTENT", aiknowledge.index(false))~
+page = aiknowledge.Query(["bound"], "BOUND_CONTENT", 1024, aiknowledge.limit(1))~
+assert len(page.Results) == 1
+assert page.Results[0].Content == "BOUND_CONTENT"
+aiknowledge.Update("bound", aiknowledge.description("updated"))~
+base = aiknowledge.Get("bound")~
+assert base.knowledge_base.Description == "updated"
+aiknowledge.DeleteEntry("bound", entry.entry_id)~
+aiknowledge.Delete("bound")~
+page = aiknowledge.List(aiknowledge.limit(1))~
+assert page.total == 0
+aiknowledge.Add("remaining", aiknowledge.dimension(4))~
+yakit.Info("knowledge-runtime-ok")
+`
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+			profile := newProfile()
+			runtime := &aitool.ToolRuntimeConfig{ProfileDatabase: profile}
+			var stdout string
+			if native {
+				var out, stderr bytes.Buffer
+				_, err := executeNativeYakPlugin(context.Background(), &schema.YakScript{ScriptName: "knowledge-runtime", Content: code}, nil, runtime, &out, &stderr)
+				require.NoError(t, err)
+				stdout = out.String()
+			} else {
+				tool := YakTool2AITool([]*schema.AIYakTool{{Name: "knowledge-runtime", Content: code, Params: `{"type":"object","properties":{}}`}})[0]
+				config := aitool.NewToolInvokeConfig()
+				aitool.WithRuntimeConfig(runtime)(config)
+				result, err := tool.ExecuteToolWithCapture(context.Background(), nil, config)
+				require.NoError(t, err)
+				stdout = result.Stdout
+			}
+			require.Contains(t, stdout, "knowledge-runtime-ok")
+			var count int
+			require.NoError(t, profile.Unscoped().Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)
+			require.Equal(t, 1, count, "the complete lifecycle must execute against the runtime profile")
+		})
+	}
+
+	t.Run("explicit-option-overrides-runtime", func(t *testing.T) {
+		profile, explicit := newProfile(), newProfile()
+		engine := yaklang.New()
+		engine.SetVars(map[string]any{"explicitProfile": explicit})
+		bindAIKnowledgeToEngine(engine, context.Background(), &aitool.ToolRuntimeConfig{ProfileDatabase: profile})
+		require.NoError(t, engine.SafeEval(context.Background(), `aiknowledge.Add("explicit", aiknowledge.db(explicitProfile))~`))
+		var count int
+		require.NoError(t, explicit.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)
+		require.Equal(t, 1, count)
+		require.NoError(t, profile.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)
+		require.Zero(t, count)
+	})
+
+	t.Run("cancelled-runtime", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		engine := yaklang.New()
+		checked := false
+		engine.SetVars(map[string]any{"checkCancellation": func(err error) {
+			checked = true
+			require.ErrorIs(t, err, context.Canceled)
+		}})
+		bindAIKnowledgeToEngine(engine, ctx, &aitool.ToolRuntimeConfig{ProfileDatabase: fallback})
+		require.NoError(t, engine.SafeEval(context.Background(), `_, err = aiknowledge.Add("cancelled"); checkCancellation(err)`))
+		require.True(t, checked)
+	})
+	var count int
+	require.NoError(t, fallback.Model(&schema.KnowledgeBaseInfo{}).Count(&count).Error)
+	require.Zero(t, count, "runtime operations must not write to the global profile")
 }
 
 func TestYakToolPluginFeedbackRiskBinding(t *testing.T) {

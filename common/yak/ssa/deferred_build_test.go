@@ -79,6 +79,33 @@ func TestRunDeferredBuildsForUnitsOnlyDrainsMatchingUnit(t *testing.T) {
 	require.Equal(t, []string{"a", "b"}, ran)
 }
 
+func TestEnsureLibraryForCompileUnitCreatesPackageLibrary(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "ensure-library")
+	lib := prog.EnsureLibraryForCompileUnit("java:com.example.pkg")
+	require.NotNil(t, lib)
+	require.NotEqual(t, prog, lib)
+	again := prog.EnsureLibraryForCompileUnit("java:com.example.pkg")
+	require.Equal(t, lib, again)
+	app := prog.EnsureLibraryForCompileUnit("resource:web")
+	require.Equal(t, prog.GetApplication(), app)
+}
+
+func TestGetOrCreateUnitBuilderHasCurrentBlock(t *testing.T) {
+	prog := newDeferredBuildTestProgram(t, "unit-builder")
+	parent := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
+	require.NotNil(t, parent)
+	require.NotNil(t, parent.CurrentBlock)
+
+	builder := prog.GetOrCreateUnitBuilder("java:com.example.pkg", parent)
+	require.NotNil(t, builder)
+	require.NotEqual(t, parent, builder)
+	require.NotNil(t, builder.CurrentBlock)
+	require.Equal(t, builder, prog.GetOrCreateUnitBuilder("java:com.example.pkg", parent))
+
+	appBuilder := prog.GetOrCreateUnitBuilder("resource:web", parent)
+	require.Equal(t, parent, appBuilder)
+}
+
 func TestRunDeferredBuildsForUnitsRestoresUnitDuringTask(t *testing.T) {
 	prog := newDeferredBuildTestProgram(t, "deferred-build-unit-context")
 	builder := prog.GetAndCreateFunctionBuilder("", string(MainFunctionName))
@@ -108,7 +135,12 @@ func TestProgramForCompileUnitIsLibrary(t *testing.T) {
 	require.Equal(t, libA, prog.ProgramForCompileUnit("java:a"))
 	require.Equal(t, libA, prog.ProgramForCompileUnit("a"))
 	require.Nil(t, prog.ProgramForCompileUnit("java:missing"))
-	require.Equal(t, prog, prog.ProgramForCompileUnit("dir:pkg"))
+	require.Equal(t, prog, prog.ProgramForCompileUnit("dir:."))
+	require.Equal(t, prog, prog.ProgramForCompileUnit("resource:web"))
+	dirLib := prog.EnsureLibraryForCompileUnit("dir:pkg")
+	require.NotNil(t, dirLib)
+	require.NotEqual(t, prog, dirLib)
+	require.Equal(t, dirLib, prog.ProgramForCompileUnit("dir:pkg"))
 }
 
 func TestLazyBuildForUnitsOnlyRunsMatchingUnit(t *testing.T) {

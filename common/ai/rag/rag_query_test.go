@@ -9,6 +9,7 @@ import (
 	"github.com/samber/lo"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/rag/enhancesearch"
+	"github.com/yaklang/yaklang/common/ai/rag/hnsw"
 	"github.com/yaklang/yaklang/common/ai/rag/vectorstore"
 
 	"github.com/stretchr/testify/assert"
@@ -389,6 +390,14 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	contentGeneralizeQuery := mockEmbedding.GenerateRandomText(40)
 	contentSplitQuery := mockEmbedding.GenerateRandomText(40)
 
+	// GenerateSimilarText only guarantees similarity >= threshold, so a 0.4
+	// text can land above 0.6 and pass the middle filter. Pin each query to
+	// a band that matches exactly one threshold step, and keep it away from
+	// the other documents.
+	highText := bandedSimilarText(t, mockEmbedding, contentHypotheticalAnswer, []string{contentGeneralizeQuery, contentSplitQuery}, 0.85, 0.99, 0.35)
+	midText := bandedSimilarText(t, mockEmbedding, contentGeneralizeQuery, []string{contentHypotheticalAnswer, contentSplitQuery}, 0.65, 0.75, 0.35)
+	lowText := bandedSimilarText(t, mockEmbedding, contentSplitQuery, []string{contentHypotheticalAnswer, contentGeneralizeQuery}, 0.45, 0.55, 0.35)
+
 	uuidHypotheticalAnswer := uuid.NewString()
 	uuidGeneralizeQuery := uuid.NewString()
 	uuidSplitQuery := uuid.NewString()
@@ -396,27 +405,15 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 	enhanceHandler := enhancesearch.NewMockSearchHandler()
 
 	enhanceHandler.SetHypotheticalAnswerFunc(func(ctx context.Context, query string) (string, error) {
-		return mockEmbedding.GenerateSimilarText(contentHypotheticalAnswer, HighSimilarThresh)
+		return highText, nil
 	})
 
 	enhanceHandler.SetGeneralizeQueryFunc(func(ctx context.Context, query string) ([]string, error) {
-		result, err := mockEmbedding.GenerateSimilarText(contentGeneralizeQuery, MidSimilarThresh)
-		if err != nil {
-			return nil, err
-		}
-		return []string{
-			result,
-		}, nil
+		return []string{midText}, nil
 	})
 
 	enhanceHandler.SetSplitQueryFunc(func(ctx context.Context, query string) ([]string, error) {
-		result, err := mockEmbedding.GenerateSimilarText(contentSplitQuery, LowSimilarThresh)
-		if err != nil {
-			return nil, err
-		}
-		return []string{
-			result,
-		}, nil
+		return []string{lowText}, nil
 	})
 
 	// 定义三个不同领域的集合
@@ -528,4 +525,48 @@ func TestMUSTPASS_RAGQuery(t *testing.T) {
 		}), uuidHypotheticalAnswer)
 	})
 
+}
+
+func bandedSimilarText(t *testing.T, client *vectorstore.MockEmbeddingClient, target string, others []string, low, high, otherMax float64) string {
+	t.Helper()
+	targetVec, err := client.Embedding(target)
+	require.NoError(t, err)
+	otherVecs := make([][]float32, len(others))
+	for i, other := range others {
+		otherVecs[i], err = client.Embedding(other)
+		require.NoError(t, err)
+	}
+	for attempt := 0; attempt < 30; attempt++ {
+		text, err := client.GenerateSimilarText(target, low)
+		require.NoError(t, err)
+		for step := 0; step < 80; step++ {
+			got, err := client.Embedding(text)
+			require.NoError(t, err)
+			sim, err := hnsw.CosineSimilarity(targetVec, got)
+			require.NoError(t, err)
+			if sim >= low && sim < high && crossBelow(otherVecs, got, otherMax) {
+				return text
+			}
+			if sim < low {
+				break
+			}
+			extra := client.GenerateRandomWord(1)
+			if len(extra) == 0 {
+				break
+			}
+			text += " " + extra[0]
+		}
+	}
+	t.Fatalf("could not build mock text in [%.2f, %.2f) with other documents below %.2f", low, high, otherMax)
+	return ""
+}
+
+func crossBelow(others [][]float32, got []float32, otherMax float64) bool {
+	for _, other := range others {
+		sim, err := hnsw.CosineSimilarity(other, got)
+		if err != nil || sim >= otherMax {
+			return false
+		}
+	}
+	return true
 }

@@ -119,7 +119,7 @@ var loopAction_Finish = &LoopAction{
 func NativeDirectlyAnswerOptions() []aitool.ToolOption {
 	return []aitool.ToolOption{
 		aitool.WithStringParam("answer_payload",
-			aitool.WithParam_Description("Complete answer to deliver to the user, including long Markdown or code when needed. Do not use an external AITAG."),
+			aitool.WithParam_Description("Complete answer to hand over formally to the user, including long Markdown or code when needed. When choosing directly_answer, leave ordinary content empty; do not preview, repeat or paraphrase this answer there. Do not use an external AITAG."),
 			aitool.WithParam_Required(true),
 		),
 	}
@@ -127,7 +127,7 @@ func NativeDirectlyAnswerOptions() []aitool.ToolOption {
 
 var loopAction_DirectlyAnswer = &LoopAction{
 	ActionType:        "directly_answer",
-	NativeDescription: "Deliver the complete answer to the user in answer_payload. For ordinary tasks this delivers an answer without ending the loop; use finish after all work is complete. Do not repeat an unchanged answer. Adjust TODO state with adjust_todolist, alone or in the same batch.",
+	NativeDescription: "Hand the formal answer directly to the user via answer_payload. Ordinary content is also user-visible, but informal; when choosing this action, leave content empty instead of previewing, repeating or paraphrasing the answer. For ordinary tasks this delivers an answer without ending the loop; use finish after all work is complete. Do not repeat an unchanged answer. Adjust TODO state with adjust_todolist, alone or in the same batch.",
 	NativeOptions:     NativeDirectlyAnswerOptions(),
 	Description: "Emit a direct answer to the user via 'answer_payload' or FINAL_ANSWER tag. For simple direct answers, omit 'human_readable_thought'. " +
 		"For ordinary tasks directly_answer ONLY delivers the answer; use 'finish' when the latest user input is fully answered and no open TODO remains. " +

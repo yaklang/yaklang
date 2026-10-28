@@ -4,7 +4,7 @@ desc(
 	title: "检测 Python compile 调用"
 	title_zh: "检测 Python compile 调用"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-python-compile"
 	risk: "code-injection"
 	desc: <<<DESC
@@ -39,7 +39,7 @@ NEG
 
 ${*.py}.pattern_regex(/(?m)(?<![\w.])compile\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Python compile 调用",
 	title_zh: "检测 Python compile 调用",
 	message: "检测 Python compile 调用",

@@ -32,7 +32,7 @@ func TestPromptWorkspaceStableAcrossDirectoryAndDynamicChanges(t *testing.T) {
 	r.AddToTimeline("test", "first observation")
 	first, err := r.AssembleLoopPrompt(nil, input)
 	require.NoError(t, err)
-	firstSections := mustLoopPromptSections(t, first.Sections)
+	firstSections := first.Sections
 	var workspace string
 	for _, section := range firstSections {
 		for _, child := range section.Children {
@@ -63,7 +63,7 @@ func TestPromptWorkspaceStableAcrossDirectoryAndDynamicChanges(t *testing.T) {
 	openAt := strings.Index(first.Prompt, "# Timeline Memory (Open Tail)")
 	require.Positive(t, openAt)
 	require.Equal(t, first.Prompt[:openAt], second.Prompt[:strings.Index(second.Prompt, "# Timeline Memory (Open Tail)")])
-	sections := mustLoopPromptSections(t, second.Sections)
+	sections := second.Sections
 	for _, section := range sections {
 		for _, child := range section.Children {
 			switch child.Key {

@@ -33,14 +33,19 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
+	c37118Engineering     bool
+	mavlinkSigning        *mavlinkSigningOptions
 	tlsSecrets            TLSSecretProvider
 	datagramDecodeAs      map[uint16]string
+	rtpsShapeWriters      map[uint16]RTPSShapeWriter
+	canISOTransports      map[int][]CANISOTransport
 	canDecodeAs           map[int]string
 	binParserConfig       *BinParserConfig
 	binParser             *binParser
 	recorder              *captureWriter
 	outputFile            string
 	captureBuffer         int
+	normalizePcapLength   bool
 	reassemblyOptions     TCPReassemblyOptions
 	requiresFullStream    bool
 	Context               context.Context
@@ -68,6 +73,14 @@ type CaptureConfig struct {
 }
 
 type CaptureOption func(*CaptureConfig) error
+
+// WithLegacyPcapLengthNormalization explicitly normalizes classic PCAP original
+// length metadata during offline replay only. Raw bytes and protocol bounds are
+// unchanged; callbacks can recover PcapOriginalLength from AncillaryData.
+// PCAPNG validation is unchanged. Native/live sources reject this option.
+func WithLegacyPcapLengthNormalization(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error { c.normalizePcapLength = enabled; return nil }
+}
 
 func emptyOption(_ *CaptureConfig) error {
 	return nil
@@ -504,7 +517,7 @@ func WithHTTPFlow(h func(flow *TrafficFlow, req *http.Request, rsp *http.Respons
 	})
 }
 
-func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time) {
+func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopacket.SerializableLayer, tcp *layers.TCP, ts time.Time, supplied ...captureEvidence) {
 	if c.DisableAssembly {
 		return
 	}
@@ -517,7 +530,11 @@ func (c *CaptureConfig) assemblyWithTS(flow gopacket.Packet, networkLayer gopack
 		}
 	}()
 	raw, _ := flow.Layer(layers.LayerTypeEthernet).(*layers.Ethernet)
-	c.trafficPool.feedEvidence(raw, networkLayer, tcp, packetEvidence(flow), ts)
+	evidence := packetEvidence(flow)
+	if len(supplied) > 0 {
+		evidence = supplied[0]
+	}
+	c.trafficPool.feedEvidence(raw, networkLayer, tcp, evidence, ts)
 }
 
 func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packet) {
@@ -586,9 +603,14 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if !isOk || ret == nil {
 		return
 	}
+	evidence := packetEvidence(packet)
 	if packet.Metadata().Truncated {
-		c.trafficPool.malformedPacket("truncated decoded TCP packet")
-		return
+		missing, ok := capturedTCPPayloadMissing(packet, ret)
+		if !ok {
+			c.trafficPool.malformedPacket("truncated or wire-invalid TCP headers")
+			return
+		}
+		evidence.tcpMissingTail = missing
 	}
 
 	if netIPv4Layer, ipv4ok := packet.NetworkLayer().(*layers.IPv4); ipv4ok {
@@ -596,13 +618,13 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 			c.trafficPool.malformedPacket("invalid IPv4 version or fragmented TCP packet")
 			return
 		}
-		c.assemblyWithTS(packet, netIPv4Layer, ret, ts)
+		c.assemblyWithTS(packet, netIPv4Layer, ret, ts, evidence)
 	} else if netIPv6Layer, ipv6ok := packet.NetworkLayer().(*layers.IPv6); ipv6ok {
 		if netIPv6Layer.Version != 6 || packet.Layer(layers.LayerTypeIPv6Fragment) != nil {
 			c.trafficPool.malformedPacket("invalid IPv6 version or fragmented TCP packet")
 			return
 		}
-		c.assemblyWithTS(packet, netIPv6Layer, ret, ts)
+		c.assemblyWithTS(packet, netIPv6Layer, ret, ts, evidence)
 	} else {
 		log.Warnf("unknown network layer: %v", packet.NetworkLayer())
 	}

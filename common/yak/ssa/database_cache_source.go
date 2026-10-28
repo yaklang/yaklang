@@ -44,8 +44,8 @@ func (p *Program) SaveFolder(folderPath []string) {
 	p.Cache.sources.RegisterFolder(folderPath)
 }
 
-// sourceStore keeps editor/source payloads resident until source rows are
-// flushed so async lookups can still resolve hashes before the final DB write.
+// sourceStore keeps source payloads until persistence completes. Afterwards
+// only URL/hash and visited-file metadata are needed for cross-unit lookups.
 type sourceStore struct {
 	mode        ProgramCacheKind
 	programName string
@@ -57,6 +57,13 @@ type sourceStore struct {
 	editors      map[string]*memedit.MemEditor
 	editorsByURL map[string]*memedit.MemEditor
 	visitedURLs  map[string]*memedit.MemEditor
+	urlHashes    map[string]string
+
+	flushMu        sync.Mutex
+	asyncMu        sync.Mutex
+	asyncDone      chan struct{}
+	asyncRequested bool
+	closing        bool
 }
 
 func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceStore {
@@ -73,6 +80,7 @@ func newSourceStore(prog *Program, mode ProgramCacheKind, db *gorm.DB) *sourceSt
 		editors:      make(map[string]*memedit.MemEditor),
 		editorsByURL: make(map[string]*memedit.MemEditor),
 		visitedURLs:  make(map[string]*memedit.MemEditor),
+		urlHashes:    make(map[string]string),
 	}
 }
 
@@ -104,9 +112,14 @@ func (s *sourceStore) rememberEditor(url string, editor *memedit.MemEditor) {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.rememberEditorLocked(url, hash, editor)
+}
+
+func (s *sourceStore) rememberEditorLocked(url, hash string, editor *memedit.MemEditor) {
 	s.editors[hash] = editor
 	if url != "" {
 		s.editorsByURL[url] = editor
+		s.urlHashes[url] = hash
 	}
 }
 
@@ -117,10 +130,12 @@ func (s *sourceStore) markVisitedEditor(url string, editor *memedit.MemEditor) {
 	if url == "" {
 		url = editor.GetUrl()
 	}
-	s.rememberEditor(url, editor)
-
+	hash := editor.GetIrSourceHash()
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if hash != "" {
+		s.rememberEditorLocked(url, hash, editor)
+	}
 	if url != "" {
 		s.visitedURLs[url] = editor
 	}
@@ -174,14 +189,67 @@ func (s *sourceStore) Close() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return nil
 	}
-	defer s.releaseEditors()
-	return s.Flush()
+	// Join the single source saver before the final flush. Requests arriving
+	// during a previous flush are coalesced, never abandoned by replacing done.
+	s.asyncMu.Lock()
+	s.closing = true
+	done := s.asyncDone
+	s.asyncMu.Unlock()
+	if done != nil {
+		<-done
+	}
+	if err := s.Flush(); err != nil {
+		return err // retain payloads/editors so a failed write can be retried
+	}
+	s.releaseEditors()
+	return nil
+}
+
+// FlushAsync hands immutable source rows to one background saver. Compilation
+// can continue while SQLite I/O runs; Close is the final completion barrier.
+func (s *sourceStore) FlushAsync() {
+	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
+		return
+	}
+	s.asyncMu.Lock()
+	defer s.asyncMu.Unlock()
+	if s.closing {
+		return
+	}
+	s.asyncRequested = true
+	if s.asyncDone != nil {
+		return
+	}
+	s.asyncDone = make(chan struct{})
+	go s.runAsyncFlush()
+}
+
+func (s *sourceStore) runAsyncFlush() {
+	for {
+		s.asyncMu.Lock()
+		if !s.asyncRequested {
+			close(s.asyncDone)
+			s.asyncDone = nil
+			s.asyncMu.Unlock()
+			return
+		}
+		s.asyncRequested = false
+		s.asyncMu.Unlock()
+
+		if err := s.Flush(); err != nil {
+			log.Errorf("async source flush failed: %v", err)
+			continue // retry on the next request or final Close, not a busy loop
+		}
+		s.ReleasePersistedEditors()
+	}
 }
 
 func (s *sourceStore) Flush() error {
 	if s == nil || s.mode != ProgramCacheDBWrite || s.db == nil {
 		return nil
 	}
+	s.flushMu.Lock()
+	defer s.flushMu.Unlock()
 
 	sources, hashes := s.collectRegisteredSources()
 	if len(sources) == 0 {
@@ -247,14 +315,19 @@ func (s *sourceStore) ReleasePersistedEditors() int {
 			continue
 		}
 		delete(s.editors, hash)
-		url := editor.GetUrl()
-		if url != "" {
-			delete(s.editorsByURL, url)
-			if _, visited := s.visitedURLs[url]; visited {
-				s.visitedURLs[url] = nil
-			}
-		}
 		released++
+	}
+	// Use the registered URL/hash pair rather than editor.GetUrl(): one
+	// editor can have aliases. This also protects newer text registered at
+	// the same URL while an older source write was in flight.
+	for url := range s.editorsByURL {
+		if _, saved := s.persisted[s.urlHashes[url]]; !saved {
+			continue
+		}
+		delete(s.editorsByURL, url)
+		if _, visited := s.visitedURLs[url]; visited {
+			s.visitedURLs[url] = nil
+		}
 	}
 	return released
 }
@@ -306,6 +379,7 @@ func (s *sourceStore) releaseEditors() {
 	clear(s.editors)
 	clear(s.editorsByURL)
 	clear(s.visitedURLs)
+	clear(s.urlHashes)
 }
 
 func (s *sourceStore) PersistedCount() int {
@@ -340,9 +414,19 @@ func (s *sourceStore) GetEditorByHash(hash string) (*memedit.MemEditor, bool) {
 		return nil, false
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	editor, ok := s.editors[hash]
-	return editor, ok
+	_, persisted := s.persisted[hash]
+	s.mu.Unlock()
+	if ok && editor != nil {
+		return editor, true
+	}
+	if !persisted {
+		return nil, false
+	}
+	// ssadb owns a bounded source LRU. Do not repopulate this store's
+	// unbounded editor maps when a later unit reloads a persisted source.
+	editor, err := ssadb.GetEditorByHash(hash)
+	return editor, err == nil && editor != nil
 }
 
 func (s *sourceStore) GetEditorByURL(url string) (*memedit.MemEditor, bool) {
@@ -350,9 +434,13 @@ func (s *sourceStore) GetEditorByURL(url string) (*memedit.MemEditor, bool) {
 		return nil, false
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	editor, ok := s.editorsByURL[url]
-	return editor, ok
+	hash := s.urlHashes[url]
+	s.mu.Unlock()
+	if ok && editor != nil {
+		return editor, true
+	}
+	return s.GetEditorByHash(hash)
 }
 
 func (s *sourceStore) GetVisitedEditorByURL(url string) (*memedit.MemEditor, bool) {
@@ -360,12 +448,15 @@ func (s *sourceStore) GetVisitedEditorByURL(url string) (*memedit.MemEditor, boo
 		return nil, false
 	}
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	editor, ok := s.visitedURLs[url]
-	if editor == nil {
+	s.mu.Unlock()
+	if !ok {
 		return nil, false
 	}
-	return editor, ok
+	if editor != nil {
+		return editor, true
+	}
+	return s.GetEditorByURL(url)
 }
 
 func (s *sourceStore) HasEditorURL(url string) bool {
@@ -374,7 +465,7 @@ func (s *sourceStore) HasEditorURL(url string) bool {
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	_, ok := s.editorsByURL[url]
+	_, ok := s.urlHashes[url]
 	return ok
 }
 

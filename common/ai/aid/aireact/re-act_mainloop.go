@@ -818,19 +818,17 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		if len(skillNames) == 0 {
 			return
 		}
-		if loop := invoker.GetCurrentLoop(); loop != nil {
-			if mgr := loop.GetSkillsContextManager(); mgr != nil {
-				for _, name := range skillNames {
-					added, err := mgr.LoadForcedSkill(name)
-					if err != nil {
-						log.Warnf("hotload skill %q failed: %v", name, err)
-						continue
-					}
-					if added {
-						// 用户强制加载: timeline 明确记录 + 命中反馈.
-						invoker.AddToTimeline("user_loaded_skill", fmt.Sprintf("User forced load: %s", name))
-						aicommon.SubmitSkillHit(invoker.config, name, aicommon.StatsSourceSkillUserForce)
-					}
+		if mgr := invoker.skillManagerForSessionInput(); mgr != nil {
+			for _, name := range skillNames {
+				added, err := mgr.LoadForcedSkill(name)
+				if err != nil {
+					log.Warnf("hotload skill %q failed: %v", name, err)
+					continue
+				}
+				if added {
+					// 用户强制加载: timeline 明确记录 + 命中反馈.
+					invoker.AddToTimeline("user_loaded_skill", fmt.Sprintf("User forced load: %s", name))
+					aicommon.SubmitSkillHit(invoker.config, name, aicommon.StatsSourceSkillUserForce)
 				}
 			}
 		}
@@ -849,12 +847,10 @@ func BuildReActInvoker(ctx context.Context, options ...aicommon.ConfigOption) (a
 		if len(skillNames) == 0 {
 			return
 		}
-		if loop := invoker.GetCurrentLoop(); loop != nil {
-			if mgr := loop.GetSkillsContextManager(); mgr != nil {
-				for _, name := range skillNames {
-					if mgr.UnloadSkill(name) {
-						log.Infof("hot-unload skill %q from context", name)
-					}
+		if mgr := invoker.skillManagerForSessionInput(); mgr != nil {
+			for _, name := range skillNames {
+				if mgr.UnloadSkill(name) {
+					log.Infof("hot-unload skill %q from context", name)
 				}
 			}
 		}

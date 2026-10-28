@@ -20,11 +20,14 @@ type timelineMemoryRetry struct {
 
 func newTimelineMemoryRetry(snapshot *timelineCompressionSnapshot) timelineMemoryRetry {
 	copy := *snapshot
-	copy.Context, copy.MemoryCompletion, copy.Output, copy.NotifyCommitted = nil, nil, nil, nil
+	copy.Context, copy.MemoryCompletion = nil, nil
 	copy.Head = cloneTimelineCompressedHead(snapshot.Head)
 	copy.Items = append([]timelineCompressionSnapshotItem(nil), snapshot.Items...)
 	copy.PromotedItems = append([]timelineCompressionPromotedItem(nil), snapshot.PromotedItems...)
 	copy.ExactItemIDs = append([]int64(nil), snapshot.ExactItemIDs...)
+	if snapshot.ObservedIDs != nil {
+		copy.ObservedIDs = append([]int64{}, snapshot.ObservedIDs...)
+	}
 	copy.UserContexts = append([]timelineCompressionUserContext(nil), snapshot.UserContexts...)
 	copy.SessionMemoryCandidates = cloneCompressionMemoryEntities(snapshot.SessionMemoryCandidates)
 	copy.RetainedContext = make(map[string]string, len(snapshot.RetainedContext))
@@ -238,11 +241,7 @@ func (m *Timeline) ArchiveMemoryBranch(branch *Timeline, afterID int64) error {
 // once. The caller supplies a bounded lifecycle and persists candidates before
 // FinishMemoryFinalization. Runtime-only locks and durable receipts are never
 // used by prompt rendering.
-func (m *Timeline) FinalizeMemory(ctx context.Context, limits ...TimelineCompressionOptions) error {
-	var options TimelineCompressionOptions
-	if len(limits) > 0 {
-		options = limits[0]
-	}
+func (m *Timeline) FinalizeMemory(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -262,42 +261,16 @@ func (m *Timeline) FinalizeMemory(ctx context.Context, limits ...TimelineCompres
 	if err := m.replayMemorySources(ctx); err != nil {
 		return err
 	}
-	for {
-		m.mu.Lock()
-		if m.compressing {
-			done := m.compressionDone
-			m.mu.Unlock()
-			select {
-			case <-done:
-				continue
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		}
-		state := m.memoryFingerprintLocked()
-		covered := m.memoryCoveredState
-		m.mu.Unlock()
-		if state == "" || state == covered {
-			return h.saveOwner()
-		}
-		options.Context, options.FinalizeMemory = ctx, true
-		if options.MaxInputTokens <= 0 {
-			options.MaxInputTokens = TimelineCompressionMaxInputTokens
-		}
-		if options.MaxSummaryTokens <= 0 {
-			options.MaxSummaryTokens = TimelineCompressionMaxSummaryTokens
-		}
-		if _, err := m.CompressOnce(options); err != nil {
-			if err == errTimelineCompressionBusy {
-				continue
-			}
-			return err
-		}
-		if err := h.wait(ctx); err != nil {
-			return err
-		}
+	m.mu.Lock()
+	state := m.memoryFingerprintLocked()
+	covered := m.memoryCoveredState
+	m.mu.Unlock()
+	if state == "" || state == covered {
 		return h.saveOwner()
 	}
+	// Timeline compression belongs to the main loop. This boundary no longer
+	// calls the old auxiliary compressor just to extract memory.
+	return h.saveOwner()
 }
 
 // PrepareMemoryRecovery captures only the restored pending source. Later user
@@ -358,35 +331,11 @@ func (m *Timeline) replayMemorySources(ctx context.Context) error {
 		if processed {
 			continue
 		}
-		snapshot := job.Snapshot
-		snapshot.SessionMemoryCandidates = h.snapshot()
-		limits := TimelineCompressionOptions{Context: ctx, MaxInputTokens: snapshot.MemoryInputLimit, MaxSummaryTokens: snapshot.MemoryOutputLimit}
-		if limits.MaxInputTokens <= 0 {
-			limits.MaxInputTokens = TimelineCompressionMaxInputTokens
-		}
-		if limits.MaxSummaryTokens <= 0 {
-			limits.MaxSummaryTokens = TimelineCompressionMaxSummaryTokens
-		}
-		if _, err := m.summarizeCompressionSnapshot(snapshot, limits); err != nil {
-			return err
-		}
-		completion := snapshot.MemoryCompletion
-		select {
-		case <-completion.done:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
-		if completion.err != nil {
-			return completion.err
-		}
-		entities := completion.output.MemoryEntities
+		// Recovery used to re-run the old auxiliary compression only to recover
+		// memory entities. That model call is skipped; the archived job is closed.
 		h.mu.Lock()
-		h.appendLocked(cloneCompressionMemoryEntities(entities))
-		if len(entities) == 0 {
-			delete(h.retries, job.Key)
-		}
+		delete(h.retries, job.Key)
 		h.processed[job.Key] = true
-		callbacks := h.callbacks.snapshot()
 		h.mu.Unlock()
 		if job.CoveredState != "" {
 			m.mu.Lock()
@@ -395,22 +344,6 @@ func (m *Timeline) replayMemorySources(ctx context.Context) error {
 		}
 		if err := h.saveOwner(); err != nil {
 			return err
-		}
-		completion.retryKey = job.Key
-		h.mu.Lock()
-		h.pending = append(h.pending, completion)
-		h.mu.Unlock()
-		go func() {
-			defer close(completion.notified)
-			for _, callback := range callbacks {
-				invokeTimelineCallback(callback, TimelineMemoryEvent{ThroughID: snapshot.ThroughID, Prompt: snapshot.SummaryPrompt,
-					MemoryEntities: cloneCompressionMemoryEntities(entities)})
-			}
-		}()
-		select {
-		case <-completion.notified:
-		case <-ctx.Done():
-			return ctx.Err()
 		}
 	}
 	return nil
@@ -438,8 +371,9 @@ func (m *Timeline) markCompressionMemoryCoveredLocked(source *timelineCompressio
 		return
 	}
 	items := current.Items[:0]
+	observed := compressionObservedIDs(source.ObservedIDs)
 	for _, item := range current.Items {
-		if item.ID <= source.ThroughID {
+		if item.ID <= source.ThroughID && (observed == nil || observed[item.ID]) {
 			items = append(items, item)
 		}
 	}

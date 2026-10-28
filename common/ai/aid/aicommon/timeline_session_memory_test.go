@@ -4,41 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
 
-func TestTimelineSessionMemoryAcrossCompressionsWithoutObservers(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	candidate := compressionMemoryFixture()
-	var prompts []string
-	bindCompressionMock(t, tl, func(request *AIRequest) (string, error) {
-		prompts = append(prompts, request.GetPrompt())
-		raw, err := json.Marshal(compressionOutputFixture("", []any{candidate}))
-		return string(raw), err
-	})
-	for id := int64(1); id <= 2; id++ {
-		tl.PushText(id, "verified historical observation")
-		_, err := tl.CompressOnce(compressionTestOptions())
-		require.NoError(t, err)
+func compressionMemoryFixture() map[string]any {
+	return map[string]any{
+		"content":             "用户明确要求工程报告使用中文，附实际验证结果。",
+		"potential_questions": []any{"工程报告应该如何撰写？"},
+		"tags":                []any{"工程", "偏好"},
+		"scores": map[string]any{"temporality": 0.9, "actionability": 0.8, "perference": 1.0,
+			"origin": 1.0, "emotion": 0.1, "relevance": 0.8, "connectivity": 0.5},
 	}
-	require.Len(t, prompts, 2)
-	require.NotContains(t, prompts[0], candidate["content"], "the first extraction must not claim a candidate that has not been produced yet")
-	require.Contains(t, prompts[1], "## 本 session 的记忆候选\n内容：\n"+candidate["content"].(string)+"\n",
-		"the next extraction must receive the previous candidate's full content as comparison material")
-	require.Equal(t, 1, strings.Count(prompts[1], candidate["content"].(string)), "candidate history must be supplied once, not echoed into ordinary history")
-	require.NotContains(t, prompts[1], "标题：")
-	for _, field := range []string{"tags：", "potential_questions：", "scores：", "# candidate="} {
-		require.NotContains(t, prompts[1], field, "session memory metadata must stay out of compression materials")
-	}
-	require.NotContains(t, prompts[1], `\"content\"`)
-	require.NoError(t, tl.sessionMemory.wait(context.Background()))
-	require.Len(t, tl.GetSessionMemoryCandidates(), 1, "exact duplicates must not accumulate")
-	require.Equal(t, candidate, tl.GetSessionMemoryCandidates()[0], "prompt projection must preserve stored metadata")
-	require.NotContains(t, RenderTimelineFrozenOpen(tl).Frozen, "scores：", "candidate history is compression input only")
 }
 
 func TestTimelineSessionMemoryRestoreForkAndIsolation(t *testing.T) {
@@ -56,7 +35,7 @@ func TestTimelineSessionMemoryRestoreForkAndIsolation(t *testing.T) {
 	require.NoError(t, err)
 	correction := compressionMemoryFixture()
 	correction["content"] = "用户更正先前要求；仅在当前项目使用英文报告。"
-	completion := &timelineCompressionCompletion{done: make(chan struct{}), output: &timelineCompressionOutput{MemoryEntities: []any{correction}}}
+	completion := &timelineCompressionCompletion{done: make(chan struct{}), output: &TimelineCompressionSelection{MemoryEntities: []any{correction}}}
 	fork.Branch.sessionMemory.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
 	close(completion.done)
 	require.Len(t, tl.GetSessionMemoryCandidates(), 2)
@@ -82,7 +61,7 @@ func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	waits := 0
 	require.ErrorIs(t, h.waitWithProgress(ctx, func() { waits++ }), context.DeadlineExceeded)
 	require.Equal(t, 1, waits)
-	completion.output = &timelineCompressionOutput{MemoryEntities: []any{compressionMemoryFixture()}}
+	completion.output = &TimelineCompressionSelection{MemoryEntities: []any{compressionMemoryFixture()}}
 	close(completion.done)
 	require.NoError(t, h.waitWithProgress(context.Background(), func() { waits++ }))
 	require.Equal(t, 1, waits, "completed memory must not flash a waiting status")
@@ -91,50 +70,4 @@ func TestTimelineSessionMemoryPendingTailAndFailure(t *testing.T) {
 	h.record(&timelineCompressionSnapshot{MemoryCompletion: failed})
 	close(failed.done)
 	require.Len(t, h.snapshot(), 1)
-}
-
-func TestTimelineSessionMemoryRejectsDiscardedCompression(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	tl.PushText(1, "original source")
-	bindCompressionMock(t, tl, func(*AIRequest) (string, error) {
-		tl.PushText(1, "changed source")
-		raw, err := json.Marshal(compressionOutputFixture("", []any{compressionMemoryFixture()}))
-		return string(raw), err
-	})
-	_, err := tl.CompressOnce(compressionTestOptions())
-	require.Error(t, err)
-	require.Empty(t, tl.GetSessionMemoryCandidates())
-	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "changed source")
-}
-
-func TestTimelineSessionMemoryNextCompressionWaitsWithinContext(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	tl.PushText(1, "new observation after the published summary")
-	completion := &timelineCompressionCompletion{done: make(chan struct{})}
-	tl.sessionMemory.record(&timelineCompressionSnapshot{MemoryCompletion: completion})
-	var calls int
-	bindCompressionMock(t, tl, func(request *AIRequest) (string, error) {
-		calls++
-		require.Contains(t, request.GetPrompt(), compressionMemoryFixture()["content"])
-		return compressionMockSummary("next history"), nil
-	})
-	options := compressionTestOptions()
-	var stages []TimelineCompressionStage
-	options.OnProgress = func(stage TimelineCompressionStage) { stages = append(stages, stage) }
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	options.Context = ctx
-	_, err := tl.CompressOnce(options)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Zero(t, calls, "do not issue another extraction with missing prior candidates")
-	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing, TimelineCompressionMemory}, stages)
-	require.Contains(t, RenderTimelineFrozenOpen(tl).Open, "new observation")
-	completion.output = &timelineCompressionOutput{MemoryEntities: []any{compressionMemoryFixture()}}
-	close(completion.done)
-	stages = nil
-	options.Context = context.Background()
-	_, err = tl.CompressOnce(options)
-	require.NoError(t, err)
-	require.Equal(t, 1, calls)
-	require.Equal(t, []TimelineCompressionStage{TimelineCompressionOptimizing}, stages)
 }

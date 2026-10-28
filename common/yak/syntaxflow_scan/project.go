@@ -532,33 +532,11 @@ func (c *Config) customRules() []*schema.SyntaxFlowRule {
 	if c == nil {
 		return nil
 	}
-	if c.parsedCustomRulesDone {
-		return c.parsedCustomRules
+	rules, _, err := c.preparedRuleInputs()
+	if err != nil {
+		return nil
 	}
-	c.parsedCustomRulesDone = true
-	var raws []string
-	if c.IsTaskLocalRuleInput() {
-		rules, _, err := loadTaskLocalSyntaxFlowRules(c.SyntaxFlowRule)
-		if err != nil {
-			return nil
-		}
-		c.parsedCustomRules = rules
-		return rules
-	}
-	for _, in := range c.GetRuleInput() {
-		if in == nil || strings.TrimSpace(in.Content) == "" {
-			continue
-		}
-		raws = append(raws, in.Content)
-	}
-	for _, raw := range raws {
-		rule, err := compileRuleContent(raw)
-		if err != nil {
-			continue
-		}
-		c.parsedCustomRules = append(c.parsedCustomRules, rule)
-	}
-	return c.parsedCustomRules
+	return rules
 }
 
 func hasCodeSource(cfg *Config) bool {
@@ -875,17 +853,15 @@ func structCompileOptions(cfg *Config) []ssaconfig.Option {
 		opts = append(opts, ssaconfig.WithNoSaveRisk(true))
 	}
 	rules := cfg.customRules()
-	var structRaws []string
+	opts = append(opts, ssaapi.WithStructRuleLoader(&cfg.rulePreparationState().loader))
+	var structRules []*schema.SyntaxFlowRule
 	for _, rule := range rules {
 		if rule != nil && rule.IsStructMode() && strings.TrimSpace(rule.Content) != "" {
-			structRaws = append(structRaws, rule.Content)
+			structRules = append(structRules, rule)
 		}
 	}
-	if len(structRaws) > 0 {
-		for _, raw := range structRaws {
-			opts = append(opts, ssaapi.WithStructRuleRaw(raw))
-		}
-		return opts
+	if len(structRules) > 0 {
+		return append(opts, ssaapi.WithStructRules(structRules...))
 	}
 	if len(rules) > 0 {
 		return opts
@@ -911,24 +887,26 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 	if cfg == nil {
 		return utils.Errorf("scan config is nil")
 	}
-	files, err := sfpattern.LoadFilesFromDir(dir)
+	fsys := filesys.NewUnifiedFS(filesys.NewRelLocalFs(dir))
+	opt := sfpattern.DefaultLoadOptions()
+	store, err := sfpattern.OpenStreamingSource(fsys, &opt, sfpattern.DefaultSourceInFlight)
 	if err != nil {
 		return err
 	}
-	if len(files) == 0 {
-		files, err = sfpattern.LoadFilesFromFS(filesys.NewRelLocalFs(dir))
+	if len(store.Paths()) == 0 {
+		store, err = sfpattern.OpenStreamingSource(fsys, nil, sfpattern.DefaultSourceInFlight)
 		if err != nil {
 			return err
 		}
 	}
-	files = filterCompileExcludedSourceFiles(cfg.Config, files)
+	store = filterCompileExcludedSourcePaths(cfg.Config, store)
 	name := "source-target"
 	if n := strings.TrimSpace(cfg.GetProjectName()); n != "" {
 		name = n
 	} else if n := strings.TrimSpace(cfg.GetProgramName()); n != "" {
 		name = n
 	}
-	cfg.QueryTargets = append(cfg.QueryTargets, ssaapi.NewSourceQueryTarget(name, files))
+	cfg.QueryTargets = append(cfg.QueryTargets, ssaapi.NewSourceQueryTargetFromStore(name, store))
 	return nil
 }
 
@@ -939,23 +917,18 @@ func attachLiveSourceTarget(cfg *Config, dir string) error {
 // compiled program, so without this filter compile-excluded files re-enter the
 // scan through source-mode rules (e.g. *_test.go in a CI diff alerting via
 // source-go-listen-and-serve).
-func filterCompileExcludedSourceFiles(sc *ssaconfig.Config, files map[string]string) map[string]string {
-	if sc == nil || len(files) == 0 {
-		return files
+func filterCompileExcludedSourcePaths(sc *ssaconfig.Config, store *sfpattern.StreamingSource) *sfpattern.StreamingSource {
+	if store == nil || sc == nil || len(store.Paths()) == 0 {
+		return store
 	}
 	var userExclude []string
 	if sc.SSACompile != nil {
 		userExclude = sc.SSACompile.ExcludeFiles
 	}
 	exclude := ssaconfig.BuildCompileExcludeFunc(userExclude, sc.GetCodeSourceLocalFile(), !sc.GetCompileDisableDefaultExcludes())
-	out := make(map[string]string, len(files))
-	for path, content := range files {
-		if exclude(path) {
-			continue
-		}
-		out[path] = content
-	}
-	return out
+	return store.FilterPaths(func(path string) bool {
+		return !exclude(path)
+	})
 }
 
 func inspectLiveSourceOptions(cfg *Config, emit func(ProductStage, float64, *RuleProcessInfoList)) []ssaconfig.Option {
@@ -975,6 +948,7 @@ func sharedScanCallbackOptions(cfg *Config) []ssaconfig.Option {
 	if cfg == nil {
 		return opts
 	}
+	opts = append(opts, withRulePreparation(cfg.rulePreparationState()))
 	// ScanProject starts nested scans via StartScan, which rebuilds the
 	// config from the forwarded options only. Rule-detail reporting must be
 	// forwarded explicitly or every per-rule snapshot inside a product scan

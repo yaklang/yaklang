@@ -1,0 +1,52 @@
+__DESC__ = "Manage the MCP server registry shared with Yakit. op=add saves a new stdio/SSE/Streamable HTTP server, op=delete removes an exact name and its cached tools, op=list shows enabled and disabled servers with pagination."
+__VERBOSE_NAME__ = "Manage MCP Servers"
+__VERBOSE_NAME_ZH__ = "管理 MCP 服务器"
+__KEYWORDS__ = "mcp,server,add,delete,list,registry,服务器,添加,删除,管理"
+__USAGE__ = <<<USAGE
+AI 管理 MCP 服务器的核心入口。先 require_tool 加载 manage_mcp_server，再传业务参数。
+op=add：name、type、endpoint 必填。type 为 stdio/sse/streamable_http；stdio 的 endpoint 是带引号的完整命令行，直接按 argv 启动，不经过 shell；HTTP 类型为完整 URL。env/headers 是 JSON 对象，值必须为字符串。disabled 默认 false；设为 true 只保存禁用配置。只添加新名称，重复名称报错，不覆盖。保存配置本身不连接服务器或启动进程。
+op=list：keyword 只匹配名称/类型，limit 1..100，offset 非负；包含禁用服务器。has_more=true 时继续 next_offset，直到完整。输出不包含命令参数、环境变量值、请求头值或 URL 查询凭据。
+op=delete：name 必填，只删除精确名称及其工具/桥接缓存；不存在时报错。删除后再 list 核实。
+添加后可立即 require query_mcp_tools(server_name) 查看远端工具及参数，再 require call_mcp_tool(server_name,remote_tool,arguments) 调用；无需重启会话。禁用服务器不能连接。已加载的桥接工具属于既有连接，修改配置不撤销正在执行的调用。
+
+[[- if .FunctionCallMode -]]
+```json
+{"op":"add","name":"local-demo","type":"streamable_http","endpoint":"http://127.0.0.1:8080/mcp","headers":{"Authorization":"Bearer token"}}
+```
+```json
+{"op":"list","limit":20,"offset":0}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_mcp_server","directly_call_tool_params":{"op":"add","name":"local-demo","type":"streamable_http","endpoint":"http://127.0.0.1:8080/mcp","headers":{"Authorization":"Bearer token"}}}
+```
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"manage_mcp_server","directly_call_tool_params":{"op":"list","limit":20,"offset":0}}
+```
+[[- end -]]
+USAGE
+op = cli.String("op", cli.setRequired(true), cli.setJsonSchema(`{"type":"string","enum":["add","delete","list"]}`), cli.setHelp("add / delete / list"))
+name = cli.String("name", cli.setHelp("add/delete 的精确服务器名称"))
+transport = cli.String("type", cli.setHelp("add 时必填：stdio / sse / streamable_http"))
+endpoint = cli.String("endpoint", cli.setHelp("add 时必填：stdio 完整命令行，或 HTTP/SSE URL"))
+env = cli.Json("env", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"type":"string"}}`), cli.setHelp("stdio 环境变量对象，值为字符串"))
+headers = cli.Json("headers", cli.setDefault("{}"), cli.setJsonSchema(`{"type":"object","additionalProperties":{"type":"string"}}`), cli.setHelp("HTTP 请求头对象，值为字符串"))
+disabled = cli.Bool("disabled", cli.setDefault(false), cli.setHelp("true 只保存禁用配置，默认 false（启用）"))
+keyword = cli.String("keyword", cli.setHelp("list 的名称/类型关键词"))
+limit = cli.Int("limit", cli.setDefault(20), cli.setHelp("list 每页条数，1..100"))
+offset = cli.Int("offset", cli.setDefault(0), cli.setHelp("list 偏移，使用 next_offset 续查"))
+if op == "" { die("op is required: add, delete or list") }
+if json.dumps(env) == "null" || json.dumps(headers) == "null" { die("env and headers must be JSON objects with string values") }
+cli.check()
+if op == "add" {
+    if str.TrimSpace(name) == "" || transport == "" || endpoint == "" { die("add requires name, type and endpoint") }
+    added = mcp.AddServer(name, transport, endpoint, mcp.env(env), mcp.headers(headers), mcp.enabled(!disabled))~
+    println(json.dumps({"op":op,"server":added}))
+} elif op == "delete" {
+    die(mcp.DeleteServer(name))
+    println(json.dumps({"op":op,"name":name,"deleted":true}))
+} elif op == "list" {
+    println(json.dumps(mcp.ListServers(keyword, mcp.limit(limit), mcp.offset(offset))~))
+} else {
+    die("unsupported op; use add, delete or list")
+}

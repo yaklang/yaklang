@@ -2,6 +2,8 @@ package pcaputil
 
 import (
 	"encoding/binary"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -92,6 +94,59 @@ func TestTURNObservedChannelLifecycle(t *testing.T) {
 	require.Error(t, err)
 }
 func TestSTUNIPv6AndMalformed(t *testing.T) {
+	t.Run("owned-error-query", func(t *testing.T) {
+		s, err := NewProtocolSessionWithOptions(DefaultParserBudget(), WithSessionTransport("udp"), WithSessionPorts(40000, 3478))
+		require.NoError(t, err)
+		defer s.Close("cleanup")
+		wire := stunTestMessage(1, 2, 1, stunTestAttr(0x8028, []byte{0, 0, 0, 0}))
+		out := s.Feed(1, time.Unix(1, 0), wire)
+		require.Len(t, out.Events, 1)
+		require.Equal(t, ErrMalformedMessage, out.Err.Kind)
+		fields, err := out.Events[0].GetFields()
+		require.Nil(t, fields)
+		assertOwnedProtocolRefusal(t, out.Events[0], "MalformedMessage", err)
+		require.Equal(t, ErrMalformedMessage, out.Err.Kind)
+		require.Zero(t, out.Events[0].ResponseTo)
+		require.Zero(t, out.Events[0].TransactionID)
+		require.Empty(t, s.Close("complete"))
+		require.Zero(t, s.Stats().BufferedBytes)
+	})
+	// RFC 8489 section 14.7: the message length includes FINGERPRINT;
+	// this fixed request CRC was also checked using Python's independent
+	// binascii.crc32. No credentials or integrity/authentication claim is made.
+	valid, err := hex.DecodeString("000100082112a44200000000000000000000000180280004c5adc960")
+	require.NoError(t, err)
+	for _, deferred := range []bool{false, true} {
+		for _, chunk := range []int{0, 1, 7} {
+			for _, bad := range []bool{false, true} {
+				t.Run(fmt.Sprintf("fingerprint/deferred=%v/chunk=%d/bad=%v", deferred, chunk, bad), func(t *testing.T) {
+					wire := append([]byte(nil), valid...)
+					if bad {
+						wire[len(wire)-1] ^= 1
+					}
+					events, _ := sessionTestFlow(t, "stun", []sessionStep{{0, wire}}, chunk, deferred)
+					require.Len(t, events, 1)
+					e := events[0]
+					require.Equal(t, wire, e.Raw)
+					fields, queryErr := e.GetFields()
+					if bad {
+						require.Nil(t, fields)
+						require.Equal(t, "malformed", e.Status)
+						require.Nil(t, e.Session)
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						assertOwnedProtocolRefusal(t, e, "MalformedMessage", queryErr)
+					} else {
+						require.NoError(t, queryErr)
+						encoded, err := json.Marshal(fields)
+						require.NoError(t, err)
+						require.JSONEq(t, `{"Message Type":1,"Length":8,"Magic Cookie":554869826,"Transaction ID":"AAAAAAAAAAAAAAAB","Attributes":[{"Type":32808,"Length":4,"Fingerprint":3316500832}]}`, string(encoded))
+						require.Equal(t, map[string]any{"Packet Name": "Binding", "Class": uint16(0), "Transaction ID": "000000000000000000000001", "TURN": false, "Integrity": "absent", "Fingerprint Valid": true, "Attributes": []any{map[string]any{"Type": uint16(32808), "Length": 4}}, "Retransmission": false, "Pending Transactions": 1}, e.Session)
+					}
+				})
+			}
+		}
+	}
 	w := stunTestMessage(1, 2, 3)
 	v := make([]byte, 20)
 	v[1] = 2

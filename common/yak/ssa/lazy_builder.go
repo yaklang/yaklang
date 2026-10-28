@@ -138,15 +138,22 @@ func (p *Program) LazyBuild() {
 	if function != nil {
 		function.Finish()
 	}
-	virtualFunction := p.GetFunction(string(VirtualFunctionName), "")
-	if virtualFunction != nil {
-		virtualFunction.Finish()
-	}
+	// Missing imports each own a function named @virtual so they do not
+	// share one CurrentBlock. Finish every one of them, not only the
+	// canonical map entry.
+	hasVirtual := false
+	p.Funcs.ForEach(func(_ string, fun *Function) bool {
+		if fun != nil && fun.GetName() == string(VirtualFunctionName) {
+			hasVirtual = true
+			fun.Finish()
+		}
+		return true
+	})
 	initFunction := p.GetFunction(string(InitFunctionName), "")
 	if initFunction != nil {
 		initFunction.Finish()
 	}
-	if function == nil && virtualFunction == nil && initFunction == nil {
+	if function == nil && !hasVirtual && initFunction == nil {
 		// Library/placeholder programs may legitimately contain no entry functions.
 		// Treat this as "nothing to finish" instead of an error log which is noisy in
 		// contexts like SyntaxFlow rule verification and language-server analysis.
@@ -159,8 +166,14 @@ func (p *Program) LazyBuild() {
 }
 
 // LazyBuildForUnits drains lazy closures on each unit's library Program
-// (functions + blueprints). A compile unit is that library: it already owns
-// the package's methods and classes, so there is no per-task unit tag.
+// (functions + blueprints) and then, for application-owned units, the upstream
+// libraries the unit depends on. It is the single-pass path for frontends that
+// share one application scope (no dependency DAG available); the DAG scheduler
+// calls DrainUnscheduledApplicationUpstreams instead so it only picks up
+// libraries it did not schedule itself.
+//
+// A compile unit is that library: it already owns the package's methods and
+// classes, so there is no per-task unit tag.
 func (prog *Program) LazyBuildForUnits(unitKeys []string) {
 	if prog == nil || len(unitKeys) == 0 {
 		return
@@ -176,20 +189,59 @@ func (prog *Program) LazyBuildForUnits(unitKeys []string) {
 		}
 		seen[lib] = struct{}{}
 		drainProgramLazy(lib)
-		if libraryNameFromCompileUnitKey(key) == "" && lib.UpStream != nil {
-			lib.UpStream.ForEach(func(_ string, child *Program) bool {
-				if child == nil {
-					return true
-				}
-				if _, ok := seen[child]; ok {
-					return true
-				}
-				seen[child] = struct{}{}
-				drainProgramLazy(child)
-				return true
-			})
+		drainApplicationUpstreams(key, lib, seen)
+	}
+}
+
+// DrainUnscheduledApplicationUpstreams drains upstream libraries reachable from
+// the given application-owned unit keys but not owned by this batch. The DAG
+// scheduler builds every library it scheduled, so draining those again would be
+// wasted work and could pull later batches early; the unscheduled remainder is
+// what the single-pass path used to cover for application-owned units.
+func (prog *Program) DrainUnscheduledApplicationUpstreams(unitKeys []string) {
+	if prog == nil || len(unitKeys) == 0 {
+		return
+	}
+	seen := make(map[*Program]struct{}, len(unitKeys))
+	for _, key := range unitKeys {
+		if lib := prog.ProgramForCompileUnit(key); lib != nil {
+			seen[lib] = struct{}{}
 		}
 	}
+	for _, key := range unitKeys {
+		lib := prog.ProgramForCompileUnit(key)
+		if lib == nil {
+			continue
+		}
+		drainApplicationUpstreams(key, lib, seen)
+	}
+}
+
+// drainApplicationUpstreams drains the upstream libraries of an
+// application-owned compile unit. Library-owned units keep their dependencies
+// behind the scheduler: expanding them here would defeat unit isolation.
+func drainApplicationUpstreams(unitKey string, lib *Program, seen map[*Program]struct{}) {
+	if lib == nil || lib.UpStream == nil || libraryNameFromCompileUnitKey(unitKey) != "" {
+		return
+	}
+	lib.UpStream.ForEach(func(_ string, child *Program) bool {
+		if child == nil {
+			return true
+		}
+		if _, ok := seen[child]; ok {
+			return true
+		}
+		seen[child] = struct{}{}
+		drainProgramLazy(child)
+		return true
+	})
+}
+
+// LazyBuildCurrentProgram drains only this program's declarations. A scheduler
+// that already owns the dependency graph must not implicitly build all upstream
+// libraries when it schedules an application-owned unit.
+func (p *Program) LazyBuildCurrentProgram() {
+	drainProgramLazy(p)
 }
 
 func drainProgramLazy(p *Program) {
@@ -221,10 +273,13 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 			if !ok || bp == nil {
 				continue
 			}
-			for _, value := range bp.MagicMethod {
-				if fun, ok := ToFunction(value); ok && fun != nil {
-					stack = append(stack, fun)
-				}
+			if bp.MagicMethod != nil {
+				bp.MagicMethod.ForEach(func(_ BlueprintMagicMethodKind, value Value) bool {
+					if fun, ok := ToFunction(value); ok && fun != nil {
+						stack = append(stack, fun)
+					}
+					return true
+				})
 			}
 			for _, fun := range bp.NormalMethod {
 				if fun != nil {
@@ -262,10 +317,13 @@ func (p *Program) forEachFunction(fn func(*Function)) {
 }
 
 func (c *Blueprint) BuildConstructorAndDestructor() {
-	for _, value := range c.MagicMethod {
-		if function, b := ToFunction(value); b {
-			function.Build()
-		}
+	if c.MagicMethod != nil {
+		c.MagicMethod.ForEach(func(_ BlueprintMagicMethodKind, value Value) bool {
+			if function, b := ToFunction(value); b {
+				function.Build()
+			}
+			return true
+		})
 	}
 	for _, m := range c.NormalMethod {
 		m.Build()

@@ -50,11 +50,19 @@ type queryConfig struct {
 	// runtime
 	vm    *sfvm.SyntaxFlowVirtualMachine
 	frame *sfvm.SFFrame
+	// ruleLoader is borrowed from the scan's rulePreparation when a product
+	// scan set it. Nil means this query has no shared instruction cache.
+	ruleLoader *sfvm.RuleLoader
 
 	// sourceResultCallback lets source-mode bounded hit batches stream to a
 	// consumer immediately. The fallback aggregate path is retained for callers
 	// that do not provide a result callback.
 	sourceResultCallback func(*SyntaxFlowResult)
+
+	// sourceScanRuntime is the scan-owned pre-scan. A nil runtime means this
+	// query builds one for its own direct file searches; either way the frame
+	// and its later opcodes stay on this query.
+	sourceScanRuntime *sfpattern.SourceScanRuntime
 
 	// structBound, when set by QueryWithStruct, allows mode=struct frames to run.
 	structBound *structBound
@@ -96,7 +104,7 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 
 	// use rule compiled
 	if config.rule != nil {
-		frame, resave, err := vm.Load(config.rule)
+		frame, resave, err := config.ruleLoader.Load(vm, config.rule)
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s error: %v", config.rule.RuleName, err)
 		}
@@ -128,7 +136,7 @@ func (config *queryConfig) GetFrame() (*sfvm.SFFrame, error) {
 		if err != nil {
 			return nil, utils.Errorf("SyntaxflowQuery: load rule %s from db error: %v", config.ruleName, err)
 		}
-		frame, resave, err := vm.Load(rule)
+		frame, resave, err := config.ruleLoader.Load(vm, rule)
 		if resave {
 			// save rule to db
 			sfdb.MigrateSyntaxFlow("", rule)
@@ -251,12 +259,29 @@ func QuerySyntaxflow(opt ...QueryOption) (*SyntaxFlowResult, error) {
 	// runtime
 	var res *sfvm.SFFrameResult
 	if sfvm.FrameIsSourceMode(frame) {
-		files, ferr := collectFilesForSourceMode(config)
-		if ferr != nil {
-			return nil, ferr
+		root := existingPatternRoot(config)
+		if root == nil {
+			files, ferr := collectFilesForSourceMode(config)
+			if ferr != nil {
+				return nil, ferr
+			}
+			root = sfpattern.NewRoot(files)
 		}
-		root := sfpattern.NewRoot(files)
-		if config.program != nil {
+		if config.sourceScanRuntime != nil {
+			config.sourceScanRuntime.Use(root)
+			root.SetFileFilterMatcher(config.sourceScanRuntime.Matcher(queryCtx))
+		} else {
+			owned, plan, startErr := sfpattern.StartFrameRuntime(queryCtx, frame, root)
+			if startErr != nil {
+				log.Warnf("source pre-scan: single rule stays on the per-search matcher: %v", startErr)
+			}
+			if owned != nil {
+				defer plan.Close()
+				defer owned.Close()
+				root.SetFileFilterMatcher(owned.Matcher(queryCtx))
+			}
+		}
+		if config.program != nil && root.GetProgramName() == "" {
 			root.SetProgramName(config.program.GetProgramName())
 		}
 		res, err = executeSourceFrameBatches(frame, root, config)
@@ -419,6 +444,20 @@ func QueryWithStruct(unit *ssa.CompileUnit) QueryOption {
 			sfvm.WithRuntimeOption(bound),
 			sfvm.WithRuntimeOption(WithStructBound(bound)),
 		)
+	}
+}
+
+// QueryWithRuleLoader reuses scan-local decoded instructions, never a frame.
+func QueryWithRuleLoader(loader *sfvm.RuleLoader) QueryOption {
+	return func(c *queryConfig) { c.ruleLoader = loader }
+}
+
+// QueryWithSourceScanRuntime supplies direct-search results from a scan-owned
+// runtime. Queries that do not set one still pre-scan that frame's own direct
+// searches; this option is how several rules share a single pre-scan.
+func QueryWithSourceScanRuntime(runtime *sfpattern.SourceScanRuntime) QueryOption {
+	return func(c *queryConfig) {
+		c.sourceScanRuntime = runtime
 	}
 }
 

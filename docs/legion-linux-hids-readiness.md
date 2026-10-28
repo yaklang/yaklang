@@ -1,3 +1,7 @@
+> Historical Legion Node documentation. Current adapter, build and release ownership
+> is in Legion `services/node`. See [source retirement](legion-node-session-transport-refactor.md).
+> Commands below refer to an exact historical Yaklang checkout, not current main.
+
 # Legion Linux HIDS Readiness
 
 This document describes how to build, validate, and operate the current Legion HIDS capability in `yaklang-scannode-refactor`.
@@ -56,7 +60,7 @@ Linux amd64 and arm64 product nodes with Go 1.22.12 and musl 1.2.5. The shared
 `.github/scripts/build-legion-linux-musl.sh` recipe compiles every CGO C source
 with the pinned Alpine 3.21 GCC toolchain and links the node fully statically.
 Product builds retain CGO and use
-`hids,musl,netgo,osusergo,sqlite_omit_load_extension`; the `musl` selection uses
+`hids,musl,netgo,osusergo,sqlite_omit_load_extension,dameng`; the `musl` selection uses
 the matching static libpcap archive. Native amd64 and arm64 CI runners use
 architecture-specific manifests selected from the same pinned Go builder index.
 The trusted packaging workflow runs only for tags in the isolated

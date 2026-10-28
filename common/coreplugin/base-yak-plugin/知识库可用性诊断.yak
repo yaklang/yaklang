@@ -57,7 +57,7 @@ if !str.Contains(resultStr, "数据库") {
 yakit.SetProgress(0.5)
 status("AI image recognition OK")
 
-// Step 2: Check Online Embedding service (always test)
+// Step 2: Reuse the same lazy, once-only AIBalance check used by vector writes.
 yakit.SetProgress(0.55)
 status("checking online embedding service")
 
@@ -65,10 +65,10 @@ onlineOK := false
 onlineErr := ""
 onlineDim := 0
 try {
-    onlineResult, err := rag.OnlineEmbedding("你好")
-    if err == nil && onlineResult != nil && len(onlineResult) > 0 {
+    onlineDimension, err := rag.CheckOnlineEmbedding()
+    if err == nil && onlineDimension > 0 {
         onlineOK = true
-        onlineDim = len(onlineResult)
+        onlineDim = onlineDimension
     } else if err != nil {
         onlineErr = sprintf("%v", err)
     } else {
@@ -84,41 +84,38 @@ if onlineOK {
     status(f`online embedding failed: ${onlineErr}`)
 }
 
-// Step 3: Check Local Embedding service with retry
+// Step 3: Probe the running local service once, with a total 3s budget.
+// Do not auto-start a model or retry a known failure during diagnostics.
 yakit.SetProgress(0.7)
-status("checking local embedding service")
 
 localOK := false
 localErr := ""
 localDim := 0
-maxRetry := 5
-
-for i := 0; i < maxRetry; i++ {
-    try {
-        localResult, err := rag.LocalEmbedding("你好")
-        if err == nil && localResult != nil && len(localResult) > 0 {
-            localOK = true
-            localDim = len(localResult)
-            break
-        } else if err != nil {
-            localErr = sprintf("%v", err)
-        } else {
-            localErr = "empty result"
-        }
-    } catch err {
+if !onlineOK {
+status("online unavailable; checking local embedding once (budget: 3s, no auto-start)")
+localStarted := time.Now()
+try {
+    localResult, err := rag.ProbeLocalEmbedding("你好")
+    if err == nil && localResult != nil && len(localResult) > 0 {
+        localOK = true
+        localDim = len(localResult)
+    } else if err != nil {
         localErr = sprintf("%v", err)
+    } else {
+        localErr = "empty result"
     }
-    
-    if i < maxRetry - 1 {
-        status(f`local embedding loading, retry ${i+1}/${maxRetry}...`)
-        sleep(3)
-    }
+} catch err {
+    localErr = sprintf("%v", err)
 }
+yakit.Info("local embedding probe completed in %s (budget 3s)", time.Since(localStarted))
 
 if localOK {
     status(f`local embedding OK (dim: ${localDim})`)
 } else {
     status(f`local embedding failed: ${localErr}`)
+}
+} else {
+    status("using AIBalance online embedding (cached); local probe skipped")
 }
 
 // Step 4: Check results and report
@@ -139,7 +136,7 @@ yakit.SetProgress(1.0)
 if onlineOK && localOK {
     status("ready")
 } else if onlineOK {
-    status("ready (online only, local unavailable)")
+    status("ready (AIBalance online embedding; local not needed)")
 } else if localOK {
     status("ready (local only, online unavailable)")
 } else {

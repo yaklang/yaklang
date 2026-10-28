@@ -660,9 +660,12 @@ jobs:
             ../yak sha256 -f "$bin"
             sha_file="${bin}.sha256.txt"
             if [[ -z "$UPLOAD_FILES" ]]; then
-              UPLOAD_FILES="${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file};${bin}:/yak/latest/${bin};${sha_file}:/yak/latest/${sha_file}"
+              UPLOAD_FILES="${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
             else
-              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file};${bin}:/yak/latest/${bin};${sha_file}:/yak/latest/${sha_file}"
+              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/${YAK_TAG}/${bin};${sha_file}:/yak/${YAK_TAG}/${sha_file}"
+            fi
+            if [[ "$YAK_TAG" != *alpha* ]]; then
+              UPLOAD_FILES="${UPLOAD_FILES};${bin}:/yak/latest/${bin};${sha_file}:/yak/latest/${sha_file}"
             fi
           done
 
@@ -670,7 +673,9 @@ jobs:
           echo "$YAK_VERSION" > ../yak-slim-version.txt
           UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/${YAK_TAG}/yak-slim-version.txt"
 
-          UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/latest/yak-slim-version.txt"
+          if [[ "$YAK_TAG" != *alpha* ]]; then
+            UPLOAD_FILES="${UPLOAD_FILES};../yak-slim-version.txt:/yak/latest/yak-slim-version.txt"
+          fi
 
           echo "Uploading: $UPLOAD_FILES"
           ../yak upload-oss --ak ${{ secrets.OSS_KEY_ID }} --sk ${{ secrets.OSS_KEY_SECRET }} -t 5 -f "$UPLOAD_FILES"
@@ -843,8 +848,8 @@ jobs:
           # Use repo root as context so COPY scripts/get-yak-version.sh in Dockerfile can find the script
           docker buildx build -f common/yak/cmd/docker/Dockerfile --platform linux/amd64,linux/arm64 -t v1ll4n/yaklang:$formatted_tag --build-arg VERSION=${{ env.YAK_TAG }} . --push
           
-          echo "Check if the latest label should be updated(formatted_tag is not start with dev)"
-          if [[ ! $formatted_tag == dev* ]]; then
+          echo "Check if the latest label should be updated (exclude dev and alpha)"
+          if [[ "$formatted_tag" != dev* && "$formatted_tag" != *alpha* ]]; then
             echo "start to update latest tag"
             docker buildx build -f common/yak/cmd/docker/Dockerfile --platform linux/amd64,linux/arm64 -t v1ll4n/yaklang:latest --build-arg VERSION=${{ env.YAK_TAG }} . --push
           fi
@@ -854,5 +859,5 @@ jobs:
     uses: ./.github/workflows/update-syntaxflow-meta.yml
     with:
       update_version: ${{ needs.build_and_upload_to_oss.outputs.YAK_TAG }}
-      update_last: true
+      update_last: ${{ !contains(needs.build_and_upload_to_oss.outputs.YAK_TAG, 'alpha') }}
     secrets: inherit

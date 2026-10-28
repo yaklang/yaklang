@@ -119,6 +119,6 @@ func TestPromptRebuildReusesTheTodoCheckpoint(t *testing.T) {
 	require.NoError(t, err)
 	second, err := loop.generateLoopPromptFromInput(input)
 	require.NoError(t, err)
-	require.Contains(t, first, "主要矛盾", "the first build carries the checkpoint")
-	require.Contains(t, second, "主要矛盾", "the rebuild reuses the same checkpoint")
+	require.Contains(t, first.Prompt, "主要矛盾", "the first build carries the checkpoint")
+	require.Contains(t, second.Prompt, "主要矛盾", "the rebuild reuses the same checkpoint")
 }

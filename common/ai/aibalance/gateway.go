@@ -160,6 +160,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 		aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 		aispec.WithChatBase_ErrHandler(wrappedErrorHandler),
 		aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+		aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 		aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.config),
 		aispec.WithChatBase_Tools(g.config.Tools),
@@ -197,6 +198,7 @@ func (g *GatewayClient) Chat(s string, function ...any) (string, error) {
 			aispec.WithChatBase_ReasonStreamHandler(reasonStreamHandler),
 			aispec.WithChatBase_ErrHandler(g.config.HTTPErrorHandler),
 			aispec.WithChatBase_ImageRawInstance(g.config.Images...),
+			aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
 			aispec.WithChatBase_Tools(g.config.Tools),
@@ -305,6 +307,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 	reader, err := aispec.ChatWithStream(
 		g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 		g.BuildHTTPOptions,
+		aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 		aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 		aispec.WithChatBase_AISamplingFromConfig(g.config),
 	)
@@ -320,6 +323,7 @@ func (g *GatewayClient) ChatStream(s string) (io.Reader, error) {
 		return aispec.ChatWithStream(
 			g.targetUrl, g.config.Model, s, wrappedErrorHandler, g.config.ReasonStreamHandler,
 			g.BuildHTTPOptions,
+			aispec.WithChatBase_VideoRawInstance(g.config.Videos...),
 			aispec.ChatBaseThinkingOptions(g.config, g.targetUrl),
 			aispec.WithChatBase_AISamplingFromConfig(g.config),
 		)
@@ -421,6 +425,7 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 		poc.WithConnectTimeout(10), // set connect timeout
 		poc.WithRetryTimes(2),      // retry on failure
 	}
+	opts = appendClientUserIDOptions(opts)
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
 	}
@@ -520,6 +525,7 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		poc.WithSave(false),    // do not save AI chat requests to database
 	}
 	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
+	opts = appendClientUserIDOptions(opts)
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
@@ -540,4 +546,13 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithPort(g.config.Port))
 	}
 	return opts, nil
+}
+
+// Apply after custom headers, removing all case variants and duplicates first.
+func appendClientUserIDOptions(opts []poc.PocConfigOption) []poc.PocConfigOption {
+	opts = append(opts, poc.WithDeleteHeader(aibalanceclient.ClientUserIDHeader))
+	if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+		opts = append(opts, poc.WithReplaceHttpPacketHeader(aibalanceclient.ClientUserIDHeader, id))
+	}
+	return opts
 }

@@ -13,11 +13,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/yaklang/antlr/v4"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/antlr4util"
 	phpparser "github.com/yaklang/yaklang/common/yak/php/parser"
 	"github.com/yaklang/yaklang/common/yak/ssa"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 
@@ -155,10 +157,14 @@ func validateProjectBuild(t *testing.T, filename string, src string) {
 			ssaapi.WithConcurrency(1),
 		)
 		if errors.Is(err, ssaapi.ErrNoFoundCompiledFile) {
+			// Repeated fixture runs must not collide with a previous persisted
+			// program's instruction IDs and unique source-offset index.
+			name := "fixture-" + flattenedProjectFixtureName(filename) + "-" + uuid.NewString()
+			t.Cleanup(func() { ssadb.DeleteProgram(ssadb.GetDB(), name) })
 			singleProg, singleErr := ssaapi.Parse(
 				src,
 				ssaapi.WithLanguage(ssaconfig.PHP),
-				ssaapi.WithProgramName("fixture-"+flattenedProjectFixtureName(filename)),
+				ssaapi.WithProgramName(name),
 			)
 			require.NoError(t, singleErr, "parse/build single-file fixture %s", filename)
 			require.NotNil(t, singleProg, "nil single-file program for %s", filename)

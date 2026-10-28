@@ -1,0 +1,24 @@
+__DESC__ = "Connect to an enabled MCP server in the shared registry and list one live page of its tools with complete input schemas. Follow nextCursor until empty before claiming the tool list is complete."
+__VERBOSE_NAME__ = "Query MCP Tools"
+__VERBOSE_NAME_ZH__ = "查询 MCP 工具"
+__KEYWORDS__ = "mcp,tools,schema,discover,工具,查询,参数"
+__USAGE__ = <<<USAGE
+先使用 manage_mcp_server(op=list) 获得精确 server_name，再调用本工具。连接远端而非仅查询缓存，适用于刚添加的服务器。cursor 为空获取第一页；输出 nextCursor 非空时继续传入该游标。工具清单带原始 inputSchema。timeout 为单次请求秒数，默认 30；远端不可用或被禁用时返回错误。随后用 call_mcp_tool 调用裸工具名。
+[[- if .FunctionCallMode -]]
+```json
+{"server_name":"local-demo"}
+```
+[[- else -]]
+```json
+{"@action":"directly_call_tool","directly_call_tool_name":"query_mcp_tools","directly_call_tool_params":{"server_name":"local-demo"}}
+```
+[[- end -]]
+USAGE
+serverName = cli.String("server_name", cli.setRequired(true), cli.setHelp("manage_mcp_server 返回的精确名称"))
+cursor = cli.String("cursor", cli.setHelp("上页 nextCursor，第一页为空"))
+timeout = cli.Float("timeout", cli.setDefault(30), cli.setHelp("单次请求超时秒数，>0 且 <=3600"))
+if str.TrimSpace(serverName) == "" { die("server_name is required") }
+cli.check()
+client = mcp.Connect(serverName, mcp.timeout(timeout))~
+defer client.Close()
+println(json.dumps(client.ListTools(cursor)~))

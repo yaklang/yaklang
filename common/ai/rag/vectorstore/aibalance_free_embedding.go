@@ -1,8 +1,10 @@
 package vectorstore
 
 import (
+	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/ai/embedding"
@@ -71,7 +73,17 @@ func NewAIBalanceFreeEmbedder() (*AIBalanceFreeEmbedding, error) {
 
 			// 使用简单的测试文本检测服务
 			testText := "test"
-			_, err := embeddingClient.Embedding(testText)
+			// The readiness probe has one total budget. The reusable client above
+			// must not retain this short-lived context for real embedding work.
+			probeCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			probeClient := embedding.NewOpenaiEmbeddingClient(aispec.WithBaseURL(aibalanceBaseURL),
+				aispec.WithModel(aibalanceFreeModel), aispec.WithAPIKey(aibalanceFakAPIKey),
+				aispec.WithContext(probeCtx), aispec.WithTimeout(3))
+			probeVector, err := probeClient.Embedding(testText)
+			if err == nil && len(probeVector) != normalizedModelDimension {
+				err = fmt.Errorf("aibalance embedding dimension mismatch: expected %d, got %d", normalizedModelDimension, len(probeVector))
+			}
 			if err != nil {
 				aibalanceFreeCheckError = fmt.Errorf("aibalance free embedding service is not available: %w", err)
 				aibalanceFreeAvailable = false
@@ -172,6 +184,16 @@ func (a *AIBalanceFreeEmbedding) GetModelDimension() int {
 // 这是一个便捷函数，直接返回单例实例
 func GetAIBalanceFreeEmbeddingService() (*AIBalanceFreeEmbedding, error) {
 	return NewAIBalanceFreeEmbedder()
+}
+
+// CheckOnlineEmbedding shares the same on-demand sync.Once initialization as
+// actual vector writes. Repeated diagnostics do not send extra test requests.
+func CheckOnlineEmbedding() (int, error) {
+	service, err := GetAIBalanceFreeEmbeddingService()
+	if err != nil {
+		return 0, err
+	}
+	return service.GetModelDimension(), nil
 }
 
 // IsAIBalanceFreeServiceAvailable 检查 AIBalance 免费服务是否可用

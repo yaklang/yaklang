@@ -110,7 +110,7 @@ func openPortGuardLimit(config *fp.Config) int {
 }
 
 // sendMatchResultOrDrop 把 fingerprint 结果送入 outC. 当 ctx 已 cancel
-// 时主动放弃, 防止下游已停止消费时 inner goroutine 永久阻塞 (chan send hang).
+// 时仍优先保留可立即送达的结果；仅在下游阻塞时放弃，防止 goroutine 泄漏。
 //
 // 这是 fingerprint goroutine 泄漏修复的核心点. 历史问题: 当上游 yak VM 或
 // servicescan 调用方在 cancel ctx 后停止 range outC, 但 outC 未关闭 (因为
@@ -121,6 +121,14 @@ func openPortGuardLimit(config *fp.Config) int {
 func sendMatchResultOrDrop(ctx context.Context, outC chan<- *fp.MatchResult, result *fp.MatchResult) {
 	if ctx == nil {
 		ctx = context.Background()
+	}
+	// A completed probe must survive cancellation when the consumer or buffer
+	// can accept it now. Selecting directly against Done randomly drops results
+	// when both cases are ready, even with an empty output buffer.
+	select {
+	case outC <- result:
+		return
+	default:
 	}
 	select {
 	case outC <- result:
@@ -301,7 +309,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 				if h != hRaw {
 					buildinHost, buildinPort, _ := utils.ParseStringToHostPort(hRaw)
 					if buildinPort > 0 {
-						swg.Add()
+						if err := swg.AddWithContext(scanCtx); err != nil {
+							break dispatch
+						}
 						go func() {
 							defer swg.Done()
 							fingerprintInFlight.Add(1)
@@ -341,7 +351,9 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 				if guard.skipping(h) {
 					continue
 				}
-				swg.Add()
+				if err := swg.AddWithContext(scanCtx); err != nil {
+					break dispatch
+				}
 				rawPort := p
 				rawHost := h
 				proto, portWithoutProto := utils.ParsePortToProtoPort(p) // 这里将协议和端口分开，便于后面打印日志
@@ -410,26 +422,59 @@ func _scanFingerprint(ctx context.Context, config *fp.Config, concurrent int, ho
 // ```
 // <|EXAMPLE_END|>
 func _scanFromPingUtils(res chan *pingutil.PingResult, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
+	config := fp.NewConfig(opts...)
+	ctx := config.Ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	synResults := make(chan *synscan.SynScanResult, 1000)
 	portsInt := utils.ParseStringToPorts(ports)
 	go func() {
 		defer close(synResults)
-		for result := range res {
-			if !result.Ok {
-				log.Debugf("%v is may not alive.", result.IP)
-				continue
+		if res == nil {
+			return
+		}
+		emit := func(host string, port int) bool {
+			select {
+			case <-ctx.Done():
+				return false
+			case synResults <- &synscan.SynScanResult{Host: host, Port: port}:
+				return true
 			}
+		}
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case result, ok := <-res:
+				if !ok {
+					return
+				}
+				if result == nil || !result.Ok {
+					if result != nil {
+						log.Debugf("%v is may not alive.", result.IP)
+					}
+					continue
+				}
 
-			hostRaw, portRaw, _ := utils.ParseStringToHostPort(result.IP)
-			if portRaw > 0 {
-				synResults <- &synscan.SynScanResult{Host: hostRaw, Port: portRaw}
-			}
-
-			// log.Errorf("%v is alive", result.IP)
-			for _, port := range portsInt {
-				synResults <- &synscan.SynScanResult{
-					Host: result.IP,
-					Port: port,
+				host := result.IP
+				embeddedPort := 0
+				if parsedHost, parsedPort, err := utils.ParseStringToHostPort(result.IP); parsedHost != "" {
+					host = parsedHost
+					if err == nil && parsedPort > 0 {
+						embeddedPort = parsedPort
+					}
+				}
+				if embeddedPort > 0 && !emit(host, embeddedPort) {
+					return
+				}
+				for _, port := range portsInt {
+					if embeddedPort > 0 && port == embeddedPort {
+						continue
+					}
+					if !emit(host, port) {
+						return
+					}
 				}
 			}
 		}
@@ -903,6 +948,7 @@ var FingerprintScanExports = map[string]interface{}{
 	"ScanFromSynResult":   _scanFromTargetStream,
 	"ScanFromSpaceEngine": _scanFromTargetStream,
 	"ScanFromPing":        _scanFromPingUtils,
+	"ParseProtocolFields": fp.ParseProtocolFields,
 
 	"proto": _protoOption,
 
@@ -951,7 +997,8 @@ var FingerprintScanExports = map[string]interface{}{
 	// 主动发包模式打开
 	"active": fp.WithActiveMode,
 
-	// 每个服务最多主动发几个包？
+	// 每个服务最多主动发几个通用探测包？端口命中的探针另有预算，
+	// 实际发包上限见 fp.Config.ProbesMax 的注释。
 	"maxProbes": fp.WithProbesMax,
 
 	// 主动发包模式下，并发量？

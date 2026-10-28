@@ -4,7 +4,7 @@ desc(
 	title: "检测 Java RSA PKCS1Padding"
 	title_zh: "检测 Java RSA PKCS1Padding"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-java-rsa-pkcs1"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 ${*.java}.pattern_regex(/RSA\/ECB\/(NoPadding|PKCS1Padding)/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Java RSA PKCS1Padding",
 	title_zh: "检测 Java RSA PKCS1Padding",
 	message: "检测 Java RSA PKCS1Padding",

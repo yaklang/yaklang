@@ -1,29 +1,9 @@
 package fp
 
 import (
-	"sort"
-
 	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/log"
 )
-
-type byRarity []*RuleBlock
-
-func (a byRarity) Len() int           { return len(a) }
-func (a byRarity) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byRarity) Less(i, j int) bool { return a[i].Probe.Rarity < a[j].Probe.Rarity }
-
-type byIndex []*RuleBlock
-
-func (a byIndex) Len() int           { return len(a) }
-func (a byIndex) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byIndex) Less(i, j int) bool { return a[i].Probe.Index < a[j].Probe.Index }
-
-type byName []*RuleBlock
-
-func (a byName) Len() int           { return len(a) }
-func (a byName) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a byName) Less(i, j int) bool { return a[i].Probe.Name > a[j].Probe.Name }
 
 func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBlock, blocks []*RuleBlock, ok bool) {
 	var bestBlocks []*RuleBlock
@@ -69,9 +49,8 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 				}
 			}
 
-			// 过滤稀有度
-			if probe.Rarity > config.RarityMax {
-				// log.Debugf("Probe %s is skipped for rarity is %v (config %v)", probe.Name, probe.Rarity, config.RarityMax)
+			// 过滤稀有度。覆盖值只影响非端口探针，端口命中在上面已经收进 bestBlocks。
+			if effectiveProbeRarity(probe) > config.RarityMax {
 				continue
 			}
 
@@ -83,56 +62,27 @@ func GetRuleBlockByConfig(currentPort int, config *Config) (emptyBlock *RuleBloc
 		}
 	}
 
-	// 如果 probe 端口匹配到了，则说明这些是最合适的
-	// 同时也合并一些通用规则，以提高非标准端口服务的识别率
-	if len(bestBlocks) > 0 {
-		// 排序端口特定规则
-		sort.Sort(byName(bestBlocks))
-		sort.Sort(byIndex(bestBlocks))
-		sort.Sort(byRarity(bestBlocks))
-		//result := funk.Map(bestBlocks, func(i *RuleBlock) string {
-		//	return i.Probe.Name
-		//})
-		//panic(strings.Join(result.([]string), "/"))
-
-		if len(blocks) > 0 {
-			sort.Sort(byName(blocks))
-			sort.Sort(byIndex(blocks))
-			sort.Sort(byRarity(blocks))
-		}
-
-		// 合并规则：bestBlocks 在前，blocks 在后
-		combinedBlocks := append(bestBlocks, blocks...)
-
-		// 应用 ProbesMax 限制
-		if config.ProbesMax > 0 && len(combinedBlocks) > config.ProbesMax {
-			log.Debugf("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(combinedBlocks))
-			return emptyBlock, combinedBlocks[:config.ProbesMax], true
-		}
-		return emptyBlock, combinedBlocks, true
+	// 端口命中的探针单独占一份预算，不跟通用探针抢 ProbesMax，也不因稀有度被丢掉。
+	// 通用预算里再把常见协议的覆盖探针换进来。总上限见 defaultProbeTotalBudget。
+	sortPortProbeBlocks(bestBlocks)
+	sortProbeBlocks(blocks)
+	portLimit, genericLimit, limited := selectionLimits(config)
+	if limited && len(bestBlocks) > portLimit {
+		log.Debugf("keep %d of %d port-matched probes", portLimit, len(bestBlocks))
+		bestBlocks = bestBlocks[:portLimit]
+	}
+	candidates := blocks
+	if limited {
+		blocks = preferLoweredProbes(candidates, blocks, bestBlocks, genericLimit, config.RarityMax)
 	}
 
-	// 如果没有过滤出任何 blocks 就直接退出
-	if len(blocks) <= 0 {
+	if len(bestBlocks) > 0 {
+		return emptyBlock, append(bestBlocks, blocks...), true
+	}
+	if len(blocks) == 0 {
 		return
 	}
-
-	sort.Sort(byName(blocks))
-	sort.Sort(byIndex(blocks))
-	sort.Sort(byRarity(blocks))
-	blocks = funk.Filter(blocks, func(block *RuleBlock) bool {
-		if block.Probe == nil {
-			if block.Probe.Rarity > config.RarityMax {
-				return false
-			}
-		}
-		return true
-	}).([]*RuleBlock)
-	if config.ProbesMax > 0 && config.ProbesMax < len(blocks) {
-		log.Debugf("filter probe only[%v] by config ProbeMax, total: %v", config.ProbesMax, len(blocks))
-		return emptyBlock, blocks[:config.ProbesMax], false
-	}
-	return
+	return emptyBlock, blocks, false
 }
 
 func GetRuleBlockByServiceName(serviceName string, config *Config) (blocks []*RuleBlock) {

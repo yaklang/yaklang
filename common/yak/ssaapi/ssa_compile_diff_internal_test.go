@@ -1,11 +1,17 @@
 package ssaapi
 
 import (
+	"archive/zip"
+	"bytes"
 	"io/fs"
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
@@ -147,4 +153,77 @@ func TestCalculateFileSystemDiff_FallbackWithoutLanguage(t *testing.T) {
 	// legacy added-then-rejected behavior, only archives are blacklisted
 	require.Equal(t, 1, fileHashMap["README.md"])
 	require.Equal(t, map[string]bool{"README.md": true}, diffWalkPaths(t, diffFS))
+}
+
+// assertWalkPaths returns the set of paths a plain Recursive walk visits on
+// the given FS: on an archive-expansion view the jar Stats as a directory
+// and the walk descends into it (com/example/Inside.java); without
+// expansion the jar stays an opaque file the walk cannot enter.
+func assertWalkPaths(t *testing.T, walkFS fi.FileSystem) map[string]bool {
+	t.Helper()
+	paths := make(map[string]bool)
+	err := filesys.Recursive(".", filesys.WithFileSystem(walkFS), filesys.WithFileStat(func(pathname string, _ fs.FileInfo) error {
+		if pathname == "" {
+			return nil
+		}
+		paths[pathname] = true
+		return nil
+	}))
+	require.NoError(t, err)
+	return paths
+}
+
+// TestSwapLanguageFs_DisableArchiveExpansion pins the incremental compile
+// contract at the FS level: with disableArchiveExpansion the language
+// preprocessing must NOT turn archives into enterable directories (the walk
+// never sees archive-interior entries), while a normal full compile expands
+// them per jar_recursive_parse.
+func TestSwapLanguageFs_DisableArchiveExpansion(t *testing.T) {
+	// build a real zip on disk so the archive scan in MaybeWrapExpandedArchiveFS
+	// finds something to wrap
+	dir := t.TempDir()
+	jarPath := filepath.Join(dir, "lib.jar")
+	buf := new(bytes.Buffer)
+	zw := zip.NewWriter(buf)
+	w, err := zw.Create("com/example/Inside.class")
+	require.NoError(t, err)
+	_, err = w.Write([]byte("\xca\xfe\xba\xbe"))
+	require.NoError(t, err)
+	require.NoError(t, zw.Close())
+	require.NoError(t, os.WriteFile(jarPath, buf.Bytes(), 0o644))
+
+	newConfig := func() *Config {
+		cfg, err := DefaultConfig(
+			WithLanguage(ssaconfig.JAVA),
+			WithLocalFs(dir),
+		)
+		require.NoError(t, err)
+		require.NotNil(t, cfg.LanguageBuilder)
+		return cfg
+	}
+
+	// sanity: both sides start from the same wrapped cfg.fs; only the flag
+	// differs, so the delta below is attributable to it alone
+	require.False(t, newConfig().disableArchiveExpansion)
+
+	// full compile, default jar_recursive_parse=true: the jar becomes an
+	// enterable directory and the walk sees the in-archive class (mapped to
+	// .java by the preprocessor's UnifiedFS ext map)
+	wrapped := newConfig().swapLanguageFs(newConfig().fs)
+	walked := assertWalkPaths(t, wrapped)
+	require.Contains(t, walked, "lib.jar/com/example/Inside.java", "full compile should expand archive, walked %v", walked)
+
+	// incremental sequence member: jar/zip stay opaque — no ExpandedZipFS,
+	// no in-archive entries; only the raw jar file is visible
+	cfg := newConfig()
+	cfg.disableArchiveExpansion = true
+	raw := cfg.swapLanguageFs(cfg.fs)
+	_, isExpanded := raw.(*javaclassparser.ExpandedZipFS)
+	require.False(t, isExpanded, "incremental compile must not wrap fs into archive expansion view, got %T", raw)
+	inner, err := raw.Stat("lib.jar")
+	require.NoError(t, err)
+	require.False(t, inner.IsDir(), "with archive expansion disabled the jar must stay an opaque file, got %T", raw)
+	walked = assertWalkPaths(t, raw)
+	require.Contains(t, walked, "lib.jar")
+	require.NotContains(t, walked, "lib.jar/com/example/Inside.java", "incremental compile must keep archives un-expanded, walked %v", walked)
 }

@@ -183,10 +183,25 @@ func (m *SkillsContextManager) HasRegisteredSkills() bool {
 // HasTruncatedViews 返回是否存在被截断的阅读窗口, 用于决定 change_skill_view_offset
 // 动作是否可见。
 func (m *SkillsContextManager) HasTruncatedViews() bool {
+	// Timeline 中可能有其它 manager 加载的窗口。只读范围即可判断是否可翻页，
+	// 不为一次能力查询加载技能文件；实际窗口在读取/翻页时按需补齐。
+	sink := m.timelineSink()
+	visible := make(map[string]bool)
+	if sink != nil {
+		for _, part := range sink.VisibleSkillParts("") {
+			visible[part.Name] = true
+			if part.Kind == SkillContentKindContent && part.EndLine > 0 && part.EndLine < part.Total {
+				return true
+			}
+		}
+	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	hasTruncated := false
 	m.states.ForEach(func(name string, state *skillContextState) bool {
+		if state == nil || (sink != nil && !visible[name]) {
+			return true
+		}
 		for _, vw := range state.ViewWindows {
 			if vw != nil && vw.IsTruncatedFlag() {
 				hasTruncated = true
@@ -369,44 +384,54 @@ func (m *SkillsContextManager) stateFor(skillName string) (*skillContextState, b
 	return m.states.Get(skillName)
 }
 
-// newSkillState 构造一个技能的查看状态: 说明 + 文件树 + SKILL.md 阅读窗口。
-func newSkillState(loaded *LoadedSkill) *skillContextState {
-	if loaded == nil {
-		return nil
+func newSkillFileWindow(loaded *LoadedSkill, path string) (*ViewWindow, error) {
+	content := loaded.SkillMDContent
+	if path == skillMDFilename {
+		content = TransformIncludesToResourceHints(content, loaded.Meta.Name)
+	} else {
+		if loaded.FileSystem == nil {
+			return nil, utils.Error("skill filesystem is unavailable")
+		}
+		raw, err := loaded.FileSystem.ReadFile(path)
+		if err != nil {
+			return nil, err
+		}
+		content = string(raw)
 	}
-	transformedContent := TransformIncludesToResourceHints(loaded.SkillMDContent, loaded.Meta.Name)
-	nonce := GenerateNonce(loaded.Meta.Name, skillMDFilename)
-	skillMDWindow := NewViewWindow(loaded.Meta.Name, skillMDFilename, transformedContent, nonce)
-	return &skillContextState{
-		Skill: loaded,
-		ViewWindows: map[string]*ViewWindow{
-			skillMDFilename: skillMDWindow,
-		},
-	}
+	return NewViewWindow(loaded.Meta.Name, path, content, GenerateNonce(loaded.Meta.Name, path)), nil
 }
 
-// ensureLoaded 读取 (必要时加载) 一个技能的查看状态。
-// 已绑定 Timeline 时正文写入目标 Timeline; 未绑定时只保留本地查看状态,
-// 绑定不会把这些本地状态补写或覆盖到 Timeline。
+// ensureLoaded 读取 (必要时加载) 一个技能的查看状态，并从 Timeline 补齐缺少的
+// 文件窗口。只更新本地缓存，不写 Timeline。调用方需持有 m.mu。
 //
-// 返回 (state, loaded, error): loaded=true 表示本次新建了查看状态。
+// 返回 (state, loaded, error): loaded=true 表示本次新建状态且 Timeline 中尚无
+// 可见内容；恢复其它 manager 的窗口不应触发资源访问入口再次写入技能主文档。
 func (m *SkillsContextManager) ensureLoaded(skillName string) (*skillContextState, bool, error) {
 	if m.loader == nil {
 		return nil, false, utils.Error("skills context manager: no loader configured")
 	}
-	if state, ok := m.stateFor(skillName); ok && state != nil && state.Skill != nil {
-		return state, false, nil
+	var parts []SkillContextPart
+	if sink := m.timelineSink(); sink != nil {
+		parts = sink.VisibleSkillParts(skillName)
 	}
-	loaded, err := m.loader.LoadSkill(skillName)
-	if err != nil {
-		return nil, false, utils.Wrapf(err, "failed to load skill %q", skillName)
+	state, ok := m.stateFor(skillName)
+	isNew := !ok || state == nil || state.Skill == nil
+	if isNew {
+		loaded, err := m.loader.LoadSkill(skillName)
+		if err != nil {
+			return nil, false, utils.Wrapf(err, "failed to load skill %q", skillName)
+		}
+		if loaded == nil || loaded.Meta == nil {
+			return nil, false, utils.Errorf("failed to build view state for skill %q", skillName)
+		}
+		state = &skillContextState{Skill: loaded, ViewWindows: make(map[string]*ViewWindow)}
 	}
-	state := newSkillState(loaded)
-	if state == nil {
-		return nil, false, utils.Errorf("failed to build view state for skill %q", skillName)
+	m.syncViewWindowsFromTimelineLocked(state, parts)
+	if state.ViewWindows[skillMDFilename] == nil {
+		state.ViewWindows[skillMDFilename], _ = newSkillFileWindow(state.Skill, skillMDFilename)
 	}
 	m.states.Set(skillName, state)
-	return state, true, nil
+	return state, isNew && len(parts) == 0, nil
 }
 
 // LoadSkill 加载一个技能: 读取说明与文件树, 把正文写进 Timeline。
@@ -536,22 +561,25 @@ func (m *SkillsContextManager) ChangeViewOffset(skillName, filePath string, offs
 	}
 	m.mu.Lock()
 	state, ok := m.stateFor(skillName)
-	if !ok || state == nil || state.Skill == nil {
+	if (!ok || state == nil || state.Skill == nil) && !m.skillContentVisibleInTimeline(skillName) {
 		m.mu.Unlock()
 		return utils.Errorf("skill %q is not loaded", skillName)
+	}
+	state, _, err := m.ensureLoaded(skillName)
+	if err != nil {
+		m.mu.Unlock()
+		return err
 	}
 	if filePath == "" {
 		filePath = skillMDFilename
 	}
 	vw, ok := state.ViewWindows[filePath]
 	if !ok {
-		content, err := state.Skill.FileSystem.ReadFile(filePath)
+		vw, err = newSkillFileWindow(state.Skill, filePath)
 		if err != nil {
 			m.mu.Unlock()
 			return utils.Wrapf(err, "failed to read file %q from skill %q", filePath, skillName)
 		}
-		nonce := GenerateNonce(skillName, filePath)
-		vw = NewViewWindow(skillName, filePath, string(content), nonce)
 		state.ViewWindows[filePath] = vw
 	}
 	vw.SetOffset(offset)

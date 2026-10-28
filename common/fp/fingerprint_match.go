@@ -38,6 +38,7 @@ func (m *Matcher) reportFinished(port *MatchResult) {
 func (m *Matcher) reportOpen(port *MatchResult) {
 	reportOpenMutex.Lock()
 	defer reportOpenMutex.Unlock()
+	port.mergeProtocolFields(nil)
 
 	if m.Config.OpenPortSyncMap == nil {
 		m.Config.OpenPortSyncMap = new(sync.Map)
@@ -60,6 +61,12 @@ func (f *Matcher) Match(host string, port int, options ...ConfigOption) (result 
 }
 
 func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, options ...ConfigOption) (result *MatchResult, err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	// One target shares a parse budget across every probe so protocol fields
+	// cannot accumulate unbounded CPU or memory.
+	ctx = withScanProtocolBudget(ctx)
 	host = utils2.ExtractHost(host)
 	proto, port := utils2.ParsePortToProtoPort(port)
 	addr := utils2.HostPort(host, port)
@@ -114,9 +121,10 @@ func (f *Matcher) MatchWithContext(ctx context.Context, host string, port int, o
 
 	// 设置初始化匹配结果
 	result = &MatchResult{
-		Target: host,
-		Port:   port,
-		State:  CLOSED,
+		Target:         host,
+		Port:           port,
+		State:          CLOSED,
+		ProtocolFields: make(map[string]any),
 		Fingerprint: &FingerprintInfo{
 			IP:   host,
 			Port: port,

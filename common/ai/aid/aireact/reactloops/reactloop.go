@@ -88,7 +88,6 @@ type ReActLoop struct {
 	allowAIForge       func() bool
 	allowPlanAndExec   func() bool
 	planExecActionType string
-	allowRAG           func() bool
 	allowToolCall      func() bool
 	allowUserInteract  func() bool
 
@@ -112,6 +111,14 @@ type ReActLoop struct {
 	// execution state
 	taskMutex   *sync.Mutex
 	currentTask aicommon.AIStatefulTask
+	// promptMode is the prompt mode of the current iteration. It is set when the
+	// prompt is built and stays until the next prompt replaces it.
+	promptMode               aicommon.LoopPromptMode
+	requestTimelineThroughID *int64
+	requestTimelineItemIDs   []int64
+	// lastFittingTimelineThroughID is the boundary of the latest prompt the
+	// provider accepted. Overflow compression rebuilds only through this ID.
+	lastFittingTimelineThroughID *int64
 
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.
@@ -226,7 +233,7 @@ type ReActLoop struct {
 	observationInflight sync.WaitGroup
 
 	// Init handler action constraints
-	// These are set by the init handler and cleared after first iteration
+	// These remain active through rendering, retries and compression until a business action is dispatched.
 	initActionMustUse  []string // Actions that MUST be used (set by init)
 	initActionDisabled []string // Actions that are DISABLED (set by init)
 	initActionApplied  bool     // Whether the init constraints have been applied
@@ -363,7 +370,7 @@ func (r *ReActLoop) Release() {
 
 // WaitForInflightObservation 等待所有异步 prompt observation 构建 goroutine
 // 完成. 主循环不应调用 (会破坏 fire-and-forget 语义); 仅用于测试在
-// generateLoopPrompt 返回后断言 observation 字段.
+// publishPromptObservation 提交后断言 observation 字段.
 // 关键词: 异步 observation join, 测试可观测
 func (r *ReActLoop) WaitForInflightObservation() {
 	if r == nil {
@@ -474,11 +481,7 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 		}
 	}
 
-	if r.allowRAG != nil && r.allowRAG() {
-		info["AllowKnowledgeEnhanceAnswer"] = true
-	} else {
-		info["AllowKnowledgeEnhanceAnswer"] = false
-	}
+	info["AllowKnowledgeEnhanceAnswer"] = true // Legacy template key; retrieval uses Skill-guided tools.
 
 	if r.allowToolCall != nil && !r.allowToolCall() { // default allow tool call
 		info["AllowToolCall"] = false
@@ -706,6 +709,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		loopAction_DirectlyAnswer,
 		loopAction_Finish,
 		loopAction_SaveEvidence,
+		loopAction_CompressContext,
 		loopAction_ManageAsyncExecutionRuntime,
 	} {
 		r.actions.Set(action.ActionType, withNativeActionDescription(action))
@@ -847,15 +851,6 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if r.allowRAG == nil || r.allowRAG() {
-		// allow tool call, must have tools
-		ins, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_KNOWLEDGE_ENHANCE, "knowledge enhancement enabled")
-		if err != nil {
-			return nil, err
-		}
-		r.actions.Set(ins.ActionType, ins)
-	}
-
 	if r.allowAIForge == nil || r.allowAIForge() {
 		aiforge, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_REQUIRE_AI_BLUEPRINT, "AI Forge enabled")
 		if err != nil {
@@ -907,22 +902,7 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		}
 	}
 
-	if IsMCPServersAllowed(invoker) {
-		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS); !ok {
-			queryMCPServers, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_SERVERS, "MCP servers enabled")
-			if err != nil {
-				return nil, err
-			}
-			r.actions.Set(queryMCPServers.ActionType, queryMCPServers)
-		}
-		if _, ok := r.actions.Get(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS); !ok {
-			queryMCPTools, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_QUERY_MCP_TOOLS, "MCP servers enabled")
-			if err != nil {
-				return nil, err
-			}
-			r.actions.Set(queryMCPTools.ActionType, queryMCPTools)
-		}
-	}
+	// MCP discovery and management use require_tool and embedded Yak tools.
 
 	if r.emitter == nil {
 		return nil, utils.Error("loop's emitter is nil in ReActLoop")

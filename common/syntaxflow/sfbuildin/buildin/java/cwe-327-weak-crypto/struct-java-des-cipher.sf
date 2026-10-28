@@ -4,7 +4,7 @@ desc(
 	title: "Struct scan: Java DES Cipher"
 	title_zh: "结构扫描：Java DES 加密算法"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "struct-java-des-cipher"
 	risk: "weak-cryptographic-algorithm"
 	desc: <<<DESC
@@ -44,7 +44,7 @@ NEG
 
 Cipher.getInstance(*?{have: "DES"}) as $call
 alert $call for {
-	level: "high",
+	level: "middle",
 	title: "Weak DES Cipher",
 	title_zh: "弱加密 DES",
 	message: "结构扫描：Java DES 加密算法",

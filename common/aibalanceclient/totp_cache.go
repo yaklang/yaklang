@@ -1,9 +1,7 @@
 package aibalanceclient
 
 import (
-	"crypto/rand"
 	"encoding/json"
-	"fmt"
 	"strings"
 	"sync"
 	"time"
@@ -20,18 +18,14 @@ const (
 	// Both the AI GatewayClient and Omnisearch AiBalanceSearchClient use this key
 	TOTP_SECRET_DB_KEY = "AIBALANCE_CLIENT_TOTP_SECRET"
 
-	// TRACE_ID_DB_KEY is the database key for storing the persistent client Trace-ID
-	// Once generated, this ID is bound to this client installation and never changes.
-	// This prevents users from bypassing rate limiting by restarting the process.
+	// TRACE_ID_DB_KEY identifies a Profile, not a physical machine or an
+	// authenticated user. Copying a Profile also copies its identity.
 	TRACE_ID_DB_KEY = "AIBALANCE_CLIENT_TRACE_ID"
 )
 
 var (
 	secretCache     string
 	secretCacheLock sync.RWMutex
-
-	traceIDCache     string
-	traceIDCacheLock sync.RWMutex
 )
 
 // GetCachedSecret returns the TOTP secret from memory cache
@@ -137,48 +131,9 @@ func GenerateTOTPCode(fetchFunc func() string) string {
 	return twofa.GetUTCCode(secret)
 }
 
-// ==================== Persistent Trace-ID ====================
-// The Trace-ID is generated once per client installation and persisted to the local database.
-// It binds the client to a stable identity for server-side rate limiting.
-// Unlike TOTP secrets which can be refreshed, Trace-ID is immutable once created.
-
-// GetTraceID returns the persistent Trace-ID for this client.
-// Priority: memory cache -> database -> generate new UUID and persist.
-// Once generated, the Trace-ID never changes across process restarts.
+// GetTraceID is the compatibility entry point for the persistent Profile UUID.
 func GetTraceID() string {
-	// 1. Check memory cache
-	traceIDCacheLock.RLock()
-	cached := traceIDCache
-	traceIDCacheLock.RUnlock()
-	if cached != "" {
-		return cached
-	}
-
-	// 2. Check database
-	db := consts.GetGormProfileDatabase()
-	if db != nil {
-		if stored := yakit.GetKey(db, TRACE_ID_DB_KEY); stored != "" {
-			traceIDCacheLock.Lock()
-			traceIDCache = stored
-			traceIDCacheLock.Unlock()
-			return stored
-		}
-	}
-
-	// 3. Generate new UUID and persist
-	newID := generateUUID()
-	traceIDCacheLock.Lock()
-	traceIDCache = newID
-	traceIDCacheLock.Unlock()
-
-	if db != nil {
-		if err := yakit.SetKey(db, TRACE_ID_DB_KEY, newID); err != nil {
-			log.Errorf("failed to persist Trace-ID to database: %v", err)
-		}
-	}
-
-	log.Infof("generated new persistent Trace-ID: %s", newID)
-	return newID
+	return GetOrCreateClientUserID()
 }
 
 // FetchTOTPSecretFromAIBalance fetches the TOTP secret from the standard aibalance server.
@@ -188,6 +143,9 @@ func FetchTOTPSecretFromAIBalance() string {
 	totpURL := "https://aibalance.yaklang.com/v1/memfit-totp-uuid"
 
 	rawReq := []byte("GET /v1/memfit-totp-uuid HTTP/1.1\r\nHost: aibalance.yaklang.com\r\nAccept: application/json\r\nUser-Agent: yaklang-amap-client\r\n\r\n")
+	if id := GetOrCreateClientUserID(); id != "" {
+		rawReq = lowhttp.ReplaceHTTPPacketHeader(rawReq, ClientUserIDHeader, id)
+	}
 
 	rspIns, err := lowhttp.HTTPWithoutRedirect(
 		lowhttp.WithHttps(true),
@@ -223,20 +181,4 @@ func FetchTOTPSecretFromAIBalance() string {
 
 	log.Debugf("successfully fetched TOTP secret from aibalance for amap proxy")
 	return secret
-}
-
-// generateUUID creates a new UUID v4 string without importing uuid package
-func generateUUID() string {
-	// Use crypto/rand for a proper UUID v4
-	b := make([]byte, 16)
-	_, err := rand.Read(b)
-	if err != nil {
-		// Fallback: use timestamp-based ID if crypto/rand fails
-		return fmt.Sprintf("trace-%d", time.Now().UnixNano())
-	}
-	// Set version 4 and variant bits
-	b[6] = (b[6] & 0x0f) | 0x40
-	b[8] = (b[8] & 0x3f) | 0x80
-	return fmt.Sprintf("%08x-%04x-%04x-%04x-%012x",
-		b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
 }

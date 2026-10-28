@@ -37,9 +37,7 @@ func finalizeTimelineMemory(tl *aicommon.Timeline, persister TimelineMemoryPersi
 	}
 	ctx, cancel := context.WithTimeout(ctx, TimelineMemoryFinalizationTimeout)
 	defer cancel()
-	if err := tl.FinalizeMemory(ctx, aicommon.TimelineCompressionOptions{
-		RetainedContext: map[string]string{"user_query": userInput},
-	}); err != nil {
+	if err := tl.FinalizeMemory(ctx); err != nil {
 		return err
 	}
 	candidates, sources := tl.GetMemoryPersistenceBatch()

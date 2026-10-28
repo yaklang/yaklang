@@ -365,19 +365,17 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if len(skillNames) == 0 {
 			return
 		}
-		if loop := react.GetCurrentLoop(); loop != nil {
-			if mgr := loop.GetSkillsContextManager(); mgr != nil {
-				for _, name := range skillNames {
-					added, err := mgr.LoadForcedSkill(name)
-					if err != nil {
-						log.Warnf("hotload skill %q failed: %v", name, err)
-						continue
-					}
-					if added {
-						// 用户强制加载: timeline 明确记录 + 命中反馈.
-						react.AddToTimeline("user_loaded_skill", fmt.Sprintf("User forced load: %s", name))
-						aicommon.SubmitSkillHit(react.config, name, aicommon.StatsSourceSkillUserForce)
-					}
+		if mgr := react.skillManagerForSessionInput(); mgr != nil {
+			for _, name := range skillNames {
+				added, err := mgr.LoadForcedSkill(name)
+				if err != nil {
+					log.Warnf("hotload skill %q failed: %v", name, err)
+					continue
+				}
+				if added {
+					// 用户强制加载: timeline 明确记录 + 命中反馈.
+					react.AddToTimeline("user_loaded_skill", fmt.Sprintf("User forced load: %s", name))
+					aicommon.SubmitSkillHit(react.config, name, aicommon.StatsSourceSkillUserForce)
 				}
 			}
 		}
@@ -396,12 +394,10 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		if len(skillNames) == 0 {
 			return
 		}
-		if loop := react.GetCurrentLoop(); loop != nil {
-			if mgr := loop.GetSkillsContextManager(); mgr != nil {
-				for _, name := range skillNames {
-					if mgr.UnloadSkill(name) {
-						log.Infof("hot-unload skill %q from context", name)
-					}
+		if mgr := react.skillManagerForSessionInput(); mgr != nil {
+			for _, name := range skillNames {
+				if mgr.UnloadSkill(name) {
+					log.Infof("hot-unload skill %q from context", name)
 				}
 			}
 		}

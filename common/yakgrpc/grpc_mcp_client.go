@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/mcp/mcp-go/mcp"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/shlex"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
@@ -211,10 +212,10 @@ func (s *Server) getMCPServerTools(ctx context.Context, server *schema.MCPServer
 	// 根据服务器类型创建客户端
 	switch server.Type {
 	case "stdio":
-		// 解析命令和参数 - 简单的空格分割
-		commandParts := utils.PrettifyListFromStringSplited(server.Command, " ")
-		if len(commandParts) == 0 {
-			return nil, utils.Errorf("invalid command: %s", server.Command)
+		// Parse the same quoted argv accepted by the Yak MCP registry.
+		commandParts, parseErr := shlex.Split(server.Command)
+		if parseErr != nil || len(commandParts) == 0 {
+			return nil, utils.Error("invalid MCP stdio command")
 		}
 		command := commandParts[0]
 		args := commandParts[1:]

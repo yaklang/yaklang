@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -92,11 +93,59 @@ class A{
 }
 `)
 	ssatest.CheckSyntaxFlowWithFS(t, vf,
-		`off #-> * as $param`,
+		// Import linking must not compile the interface a second time. One
+		// formal declaration resolves to the actual argument at its sole call.
+		`off as $formal; off #-> * as $param`,
 		map[string][]string{
-			"param": {"1", "Parameter-off"},
+			"formal": {"Parameter-off"},
+			"param":  {"1"},
 		}, false, ssaapi.WithLanguage(ssaconfig.JAVA))
 }
+
+func TestImportInterfaceDeclarationOwnership(t *testing.T) {
+	for _, workers := range []int{1, 4} {
+		for _, imported := range []struct {
+			name, declaration, separator string
+		}{
+			{"explicit", "HomeDao", "\n"},
+			{"explicit_inline", "HomeDao", " "},
+			{"wildcard", "*", "\n"},
+			{"wildcard_inline", "*", " "},
+		} {
+			for _, called := range []bool{false, true} {
+				t.Run(fmt.Sprintf("workers=%d/import=%s/called=%t", workers, imported.name, called), func(t *testing.T) {
+					vf := filesys.NewVirtualFs()
+					vf.AddFile("src/main/java/A.java", `package src.main.java;
+public interface HomeDao { void consume(Integer off); }`)
+					body := ""
+					want := []string{"Parameter-off"}
+					calls := 0
+					if called {
+						body = "homeDao.consume(1);"
+						want = []string{"1"}
+						calls = 1
+					}
+					vf.AddFile("src/main/org/B.java", "package src.main.org;"+imported.separator+"import src.main.java."+imported.declaration+";\n"+
+						`class A { private HomeDao homeDao; public void run() { `+body+` } }`)
+					ssatest.CheckWithFS(vf, t, func(programs ssaapi.Programs) error {
+						require.Len(t, programs, 1)
+						parameters := programs[0].Ref("off")
+						require.Len(t, parameters, 1, "the unit scheduler must declare the imported method once")
+						method := parameters[0].GetFunction()
+						require.NotNil(t, method)
+						require.Equal(t, "consume", method.GetName())
+						require.Len(t, method.GetCalledBy(), calls)
+						result, err := programs[0].SyntaxFlowWithError(`off #-> * as $param`)
+						require.NoError(t, err)
+						ssatest.CompareResult(t, false, result, map[string][]string{"param": want})
+						return nil
+					}, ssaapi.WithLanguage(ssaconfig.JAVA), ssaconfig.WithCompileConcurrency(workers))
+				})
+			}
+		}
+	}
+}
+
 func TestImportClass(t *testing.T) {
 	t.Run("import class", func(t *testing.T) {
 		fs := filesys.NewVirtualFs()

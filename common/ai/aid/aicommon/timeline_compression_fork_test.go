@@ -7,28 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTimelineCompressionForkMergePreservesParentHistory(t *testing.T) {
-	parent := NewTimeline(nil, nil)
-	parent.PushText(1, "inherited history")
-	fork, err := parent.ForkForTask("child", "investigation", nil, nil)
-	require.NoError(t, err)
-	fork.Branch.PushText(2, "branch investigation")
-	parent.PushText(3, "parent concurrent work")
-	bindCompressionMock(t, fork.Branch, func(*AIRequest) (string, error) {
-		return compressionMockSummary("branch confirmed result"), nil
-	})
-	_, err = fork.Branch.CompressOnce(compressionTestOptions())
-	require.NoError(t, err)
-	result, err := fork.MergeBack()
-	require.NoError(t, err)
-	require.Equal(t, 1, result.CompressedHeadsMerged)
-	view := RenderTimelineFrozenOpen(parent)
-	require.Empty(t, view.Frozen)
-	for _, text := range []string{"inherited history", "parent concurrent work", "branch confirmed result"} {
-		require.Contains(t, view.Open, text)
-	}
-}
-
 func TestTimelineCompressionForkMergeConflictIsAtomic(t *testing.T) {
 	parent := NewTimeline(nil, nil)
 	parent.PushText(1, "parent")

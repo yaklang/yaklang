@@ -46,6 +46,13 @@ type SkillMetaSearcher interface {
 	SearchSkillMetas(query string, limit int) ([]*SkillMeta, error)
 }
 
+// SkillMetaPager enumerates every loadable skill without prompt-token budgeting.
+// Database-backed loaders implement this so management APIs can show lazy
+// sources before their individual skills enter the loader cache.
+type SkillMetaPager interface {
+	ListSkillMetas(offset, limit int) ([]*SkillMeta, int, error)
+}
+
 // SkillSourceStats describes how many skills are available from each source class.
 type SkillSourceStats struct {
 	LocalCount    int

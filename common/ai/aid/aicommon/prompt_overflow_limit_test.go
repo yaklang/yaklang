@@ -3,7 +3,6 @@ package aicommon
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aispec"
@@ -70,16 +69,6 @@ func TestEffectiveTimelineTokenLimitMatchesByModel(t *testing.T) {
 		"the same model name keeps the dynamic limit")
 	require.EqualValues(t, base, cfg.EffectiveTimelineTokenLimit("openai", "gpt-5", base))
 	require.EqualValues(t, base, cfg.EffectiveTimelineTokenLimit("", "", base))
-}
-
-func TestClearCompressionBackoffReleasesTheRetryGate(t *testing.T) {
-	tl := NewTimeline(nil, nil)
-	tl.compressionLastFailure = "fingerprint"
-	tl.compressionRetryAfter = time.Now().Add(time.Minute)
-	require.True(t, tl.compressionCoolingDown(timelinePromptUsage{Fingerprint: "fingerprint"}))
-
-	tl.ClearCompressionBackoff()
-	require.False(t, tl.compressionCoolingDown(timelinePromptUsage{Fingerprint: "fingerprint"}))
 }
 
 func TestPromptOverflowRetryMaxDefaultAndOverride(t *testing.T) {

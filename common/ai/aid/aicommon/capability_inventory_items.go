@@ -88,8 +88,32 @@ func BuildCapabilityInventoryItems(cfg *Config, loop CapabilityInventoryLoopCont
 		})
 	}
 
-	// Skills (SemiDynamic if loaded, Dynamic if only meta suggested)
-	for _, s := range resolveCapabilityInventorySkills(cfg, loop) {
+	items = append(items, BuildCapabilityInventorySkillItems(resolveCapabilityInventorySkills(cfg, loop))...)
+
+	// Forges (Dynamic)
+	for _, f := range loop.DynamicForges() {
+		if strings.TrimSpace(f.Name) == "" {
+			continue
+		}
+		items = append(items, CapabilityInventoryItem{
+			Name:        f.Name,
+			VerboseName: f.VerboseName,
+			Description: f.Description,
+			Type:        "forge",
+			Stage:       CapabilityInventoryStageMetadata,
+			Position:    CapabilityInventoryPositionDynamic,
+			IsFixed:     false,
+		})
+	}
+
+	return items
+}
+
+// BuildCapabilityInventorySkillItems converts skill inventory records to the
+// flattened shape used by session_snapshot and capability_inventory events.
+func BuildCapabilityInventorySkillItems(skills []CapabilityInventoryNamedItem) []CapabilityInventoryItem {
+	items := make([]CapabilityInventoryItem, 0, len(skills))
+	for _, s := range skills {
 		if strings.TrimSpace(s.Name) == "" {
 			continue
 		}
@@ -118,22 +142,5 @@ func BuildCapabilityInventoryItems(cfg *Config, loop CapabilityInventoryLoopCont
 			Data:        data,
 		})
 	}
-
-	// Forges (Dynamic)
-	for _, f := range loop.DynamicForges() {
-		if strings.TrimSpace(f.Name) == "" {
-			continue
-		}
-		items = append(items, CapabilityInventoryItem{
-			Name:        f.Name,
-			VerboseName: f.VerboseName,
-			Description: f.Description,
-			Type:        "forge",
-			Stage:       CapabilityInventoryStageMetadata,
-			Position:    CapabilityInventoryPositionDynamic,
-			IsFixed:     false,
-		})
-	}
-
 	return items
 }

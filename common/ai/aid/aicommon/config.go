@@ -48,6 +48,10 @@ const DefaultMaxSubAgentConcurrency = 5
 // AbsoluteMaxSubAgentConcurrency 是子 Agent 并发数的硬上限。
 const AbsoluteMaxSubAgentConcurrency = 20
 
+// DefaultTimelineContentSizeLimit 是运行时上下文的服务端默认压缩阈值，单位是 token。
+// RuntimeContextSizeLimit <= 0 时使用该值，避免零值把带有 Skill、Evidence 的时间线提前压小。
+const DefaultTimelineContentSizeLimit = 300 * 1024
+
 type ConfigOption func(*Config) error
 
 var configOptionIDRegistry sync.Map
@@ -435,6 +439,11 @@ type Config struct {
 	// Multiple sources can be added via WithSkillsLocalDir, WithSkillsZipFile, WithSkillsFS
 	skillLoader *aiskillloader.AutoSkillLoader
 
+	// Session 入口使用独立 manager；loop 保留自己的 manager，通过 Timeline 互相可见。
+	// 不经 ConvertConfigToOptions 传播，避免子 config 重新绑定父 manager。
+	skillsContextManagerMu sync.Mutex
+	skillsContextManager   *aiskillloader.SkillsContextManager
+
 	// disableAutoSkills controls whether to automatically load skills from the default directory
 	// (~/.yakit-projects/ai-skills). Default is false (auto-load enabled).
 	// Use WithDisableAutoSkills(true) to disable this behavior (e.g., in tests).
@@ -773,7 +782,7 @@ func newConfig(ctx context.Context) *Config {
 		ContextProviderManager:             NewContextProviderManager(),
 		AiAutoRetry:                        5,
 		AiTransactionAutoRetry:             5,
-		TimelineContentSizeLimit:           300 * 1024, // Default limit for 300k tokens
+		TimelineContentSizeLimit:           DefaultTimelineContentSizeLimit,
 		promptOverflowRetryMax:             promptOverflowDefaultRetryMax,
 		Guardian:                           NewAsyncGuardian(ctx, id),
 		PerTaskUserInteractiveLimitedTimes: 1, // Default to 1 time
@@ -2270,13 +2279,16 @@ func WithMemoryLimits(contentSizeLimit, totalContentLimit int) ConfigOption {
 		if contentSizeLimit < 0 || totalContentLimit < 0 {
 			return utils.Error("memory limits cannot be negative")
 		}
+		if c == nil {
+			return nil
+		}
 		if c.m == nil {
 			c.m = &sync.Mutex{}
 		}
 		c.m.Lock()
-		c.TimelineContentSizeLimit = contentSizeLimit
 		c.TimelineTotalContentLimit = totalContentLimit
 		c.m.Unlock()
+		c.applyTimelineContentSizeLimit(contentSizeLimit)
 		return nil
 	}
 }
@@ -3351,19 +3363,38 @@ func WithDisableOutputEvent(types ...string) ConfigOption {
 }
 
 // WithTimelineLimit sets the timeline content size limit (deprecated name, kept for compatibility).
+// The value is applied to the bound Timeline as well. Writing only the config field leaves
+// compression on the previous threshold, so the new setting looks successful but does not take effect.
 func WithTimelineLimit(limit int) ConfigOption {
 	return func(c *Config) error {
 		if limit < 0 {
 			return utils.Error("timeline limit cannot be negative")
 		}
-		if c.m == nil {
-			c.m = &sync.Mutex{}
+		if c == nil {
+			return nil
 		}
-		c.m.Lock()
-		c.TimelineContentSizeLimit = limit
-		c.m.Unlock()
+		c.applyTimelineContentSizeLimit(limit)
 		return nil
 	}
+}
+
+// applyTimelineContentSizeLimit stores the base threshold and pushes it onto the live timeline.
+// The main-loop compressor also reads the config field, so both views must move together.
+func (c *Config) applyTimelineContentSizeLimit(limit int) {
+	if c == nil {
+		return
+	}
+	if c.m == nil {
+		c.m = &sync.Mutex{}
+	}
+	c.m.Lock()
+	c.TimelineContentSizeLimit = limit
+	timeline := c.Timeline
+	c.m.Unlock()
+	if timeline == nil {
+		return
+	}
+	timeline.SetTimelineContentLimit(int64(limit))
 }
 
 func WithTimeline(t *Timeline) ConfigOption {

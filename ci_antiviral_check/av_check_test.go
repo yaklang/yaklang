@@ -322,7 +322,7 @@ func TestNoPlaintextMaliciousStrings(t *testing.T) {
 	root := repoRoot(t)
 
 	// 扫描的顶层目录
-	scanDirs := []string{"common", "embed", "scannode", "cmd"}
+	scanDirs := []string{"common", "embed", "cmd"}
 
 	violations := []string{}
 

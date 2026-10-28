@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"path"
+	"sort"
 	"strings"
 	"sync/atomic"
 	"unicode/utf8"
@@ -29,6 +30,9 @@ var (
 type lineMappings struct {
 	startOffsets []int
 	lens         []int
+	// byteStarts is the byte offset of each line. Nil when it matches
+	// startOffsets, which is true for ASCII and invalid UTF-8.
+	byteStarts []int
 }
 
 type MemEditor struct {
@@ -100,6 +104,36 @@ func NewMemEditorWithFileUrl(sourceCode string, fileUrl string) *MemEditor {
 	return editor
 }
 
+// NewMemEditorFromSafeString builds an editor over an existing immutable body.
+// The SafeString is not copied, so each rule can keep its own editor and line
+// map while every editor of one file reads the same bytes.
+func NewMemEditorFromSafeString(source *SafeString, fileUrl string) *MemEditor {
+	if source == nil {
+		source = NewSafeString("")
+	}
+	editor := &MemEditor{safeSourceCode: source}
+	if fileUrl != "" {
+		editor.SetUrl(fileUrl)
+	}
+	return editor
+}
+
+// SourceBody returns the immutable text this editor reads.
+func (ve *MemEditor) SourceBody() *SafeString {
+	if ve == nil {
+		return nil
+	}
+	return ve.safeSourceCode
+}
+
+// SameSource reports whether both editors reference one immutable body.
+func (ve *MemEditor) SameSource(other *MemEditor) bool {
+	if ve == nil || other == nil || ve.safeSourceCode == nil {
+		return false
+	}
+	return ve.safeSourceCode == other.safeSourceCode
+}
+
 func (ve *MemEditor) ensureLineMappings() {
 	ve.getLineMappings()
 }
@@ -153,6 +187,40 @@ func (ve *MemEditor) GetRuneOffsetMap() *RuneOffsetMap {
 	m := NewRuneOffsetMap(ve.GetSourceCodeUnsafe())
 	ve.runeOffsetMap.Store(m)
 	return m
+}
+
+// ByteOffsetToRuneIndex converts a byte offset into the rune offset used by
+// positions. ASCII and invalid UTF-8 are identity, so they do not allocate a
+// per-rune table. Valid multibyte text uses the line index and scans only the
+// target line.
+func (ve *MemEditor) ByteOffsetToRuneIndex(byteOff int) (int, bool) {
+	if ve == nil || ve.safeSourceCode == nil || byteOff < 0 {
+		return 0, false
+	}
+	raw := ve.safeSourceCode.Bytes()
+	n := len(raw)
+	if byteOff > n {
+		return 0, false
+	}
+	if ve.safeSourceCode.isASCII() || !ve.safeSourceCode.utf8Valid {
+		return byteOff, true
+	}
+	lm := ve.getLineMappings()
+	if lm == nil || len(lm.byteStarts) == 0 || len(lm.byteStarts) != len(lm.startOffsets) {
+		return 0, false
+	}
+	if byteOff == n {
+		last := len(lm.startOffsets) - 1
+		return lm.startOffsets[last] + lm.lens[last], true
+	}
+	line := sort.Search(len(lm.byteStarts), func(i int) bool {
+		return lm.byteStarts[i] > byteOff
+	}) - 1
+	if line < 0 {
+		return 0, false
+	}
+	chunk := raw[lm.byteStarts[line]:byteOff]
+	return lm.startOffsets[line] + utf8.RuneCount(chunk), true
 }
 
 func (ve *MemEditor) CodeLength() int {
@@ -672,13 +740,17 @@ func (ve *MemEditor) recalculateLineMappings() {
 			currentOffset++
 		}
 	} else {
+		bytePos := 0
+		lm.byteStarts = []int{0}
 		for len(data) > 0 {
 			r, size := utf8.DecodeRune(data)
 			data = data[size:]
+			bytePos += size
 			if r == '\n' {
 				lm.lens = append(lm.lens, currentLineLen)
 				currentOffset++
 				lm.startOffsets = append(lm.startOffsets, currentOffset)
+				lm.byteStarts = append(lm.byteStarts, bytePos)
 				currentLineLen = 0
 				continue
 			}

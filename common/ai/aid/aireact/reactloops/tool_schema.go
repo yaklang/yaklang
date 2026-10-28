@@ -54,7 +54,7 @@ func (r *ReActLoop) loadToolSchemas(ctx context.Context, names []string, preload
 			entry["detail"] = err.Error()
 			continue
 		}
-		if buildinaitools.IsMCPToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
+		if buildinaitools.IsMCPRelatedToolName(name) && !aicommon.IsMCPServersAllowedConfig(config) {
 			entry["detail"] = "MCP tools are disabled"
 			continue
 		}

@@ -111,14 +111,16 @@ func (v Values) GetIds() []int64 {
 
 func GetEx[T any](c *ProgramCache, Cover func(Instruction) (T, bool), id int64) (T, bool) {
 	var zero T
-	if c == nil {
+	if c == nil || id == 0 {
 		return zero, false
 	}
-	slice := GetExs[T](c, Cover, id)
-	if len(slice) == 0 {
+	inst := c.GetInstruction(id)
+	v, ok := Cover(inst)
+	if !ok {
+		logInstructionLookupFailure(inst, id)
 		return zero, false
 	}
-	return slice[0], !utils.IsNil(slice[0])
+	return v, !utils.IsNil(v)
 }
 
 func GetExs[T any](c *ProgramCache, Cover func(Instruction) (T, bool), ids ...int64) []T {
@@ -134,17 +136,24 @@ func GetExs[T any](c *ProgramCache, Cover func(Instruction) (T, bool), ids ...in
 		inst := c.GetInstruction(id)
 		v, ok := Cover(inst)
 		if !ok {
-			if utils.IsNil(inst) {
-				// TODO(scan-log): ir_code id not found after split-compile flush; contributes to scan "instruction is nil".
-				log.Debugf("BUG::: nil instruction %v err: %d", inst, id)
-			} else if IsControlInstruction(inst) {
-				// log.Errorf("BUG::: control instruction %v err: %d", inst, id)
-			} else {
-				log.Debugf("BUG::: %v err: %d", inst, id)
-			}
+			logInstructionLookupFailure(inst, id)
 			continue
+		}
+		if len(ret) == 0 {
+			// Allocate once, after the first successful conversion. Fully
+			// filtered lookups retain their non-nil empty result without allocating.
+			ret = make([]T, 0, len(ids))
 		}
 		ret = append(ret, v)
 	}
 	return ret
+}
+
+func logInstructionLookupFailure(inst Instruction, id int64) {
+	if utils.IsNil(inst) {
+		// TODO(scan-log): ir_code id not found after split-compile flush.
+		log.Debugf("BUG::: nil instruction %v err: %d", inst, id)
+	} else if !IsControlInstruction(inst) {
+		log.Debugf("BUG::: %v err: %d", inst, id)
+	}
 }

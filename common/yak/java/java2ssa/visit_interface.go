@@ -32,20 +32,28 @@ func (y *singleFileBuilder) VisitInterfaceDeclaration(raw javaparser.IInterfaceD
 	}
 
 	store := y.StoreFunctionBuilder()
-	blueprint.AddLazyBuilder(func() {
+	linkHierarchy := func(declareMissing bool) {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 
 		for _, extendName := range extendNames {
 			bp := y.GetBluePrint(extendName)
-			if utils.IsNil(bp) {
+			if utils.IsNil(bp) && declareMissing {
 				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
 				y.AddFullTypeNameForAllImport(extendName, bp)
+			}
+			if utils.IsNil(bp) {
+				continue
 			}
 			bp.SetKind(ssa.BlueprintInterface)
 			blueprint.AddParentBlueprint(bp)
 		}
-	})
+	}
+	// Interface inheritance must exist before either library in a cycle
+	// builds method bodies. See registerJavaHierarchyTask.
+	y.registerJavaHierarchyTask(blueprint, func() { linkHierarchy(false) })
+	blueprint.AddLazyBuilder(func() { linkHierarchy(true) })
 	y.MarkedThisClassBlueprint = blueprint
 	defer func() {
 		y.MarkedThisClassBlueprint = nil

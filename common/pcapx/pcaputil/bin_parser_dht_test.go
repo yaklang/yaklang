@@ -8,6 +8,7 @@ import (
 )
 
 func TestDHTKRPCWireAdmission(t *testing.T) {
+	testDHTBudgetsAndIntegers(t)
 	request := []byte("d1:ad2:id20:winlab-node-5013!!!!e1:q4:ping1:t2:aa1:y1:qe")
 	fields, err := decodeDHTMessage(request, 32)
 	require.NoError(t, err)
@@ -49,6 +50,8 @@ func TestDHTKRPCErrorResponseFromBEP5(t *testing.T) {
 }
 
 func TestDHTCompactPeersFromBEP5(t *testing.T) {
+	testDHTContactMatrix(t)
+	testDHTContactBudgets(t)
 	// A get_peers response may carry a list of six-byte compact IPv4 peers.
 	wire := []byte("d1:rd2:id20:mnopqrstuvwxyz1234566:valuesl6:abcdefee1:t2:aa1:y1:re")
 	fields, err := decodeDHTMessage(wire, 32)
@@ -59,6 +62,7 @@ func TestDHTCompactPeersFromBEP5(t *testing.T) {
 }
 
 func TestWinlab5013DHTEightDatagrams(t *testing.T) {
+	testOwnedDatagramMatrix(t, "bittorrent-dht")
 	events := replayWinlab5013Protocols(t, "16-bittorrent-dht.pcapng")
 	require.Len(t, events, 8)
 	for i, event := range events {

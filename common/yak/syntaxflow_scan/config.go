@@ -7,6 +7,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfpattern"
+	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/yak/ssaapi"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/sfreport"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
@@ -73,8 +74,7 @@ type ScanTaskCallback struct {
 	// an earlier finding.
 	scanRuntime *ssaapi.ScanRuntime `json:"-"`
 
-	parsedCustomRules     []*schema.SyntaxFlowRule
-	parsedCustomRulesDone bool
+	rulePreparation *rulePreparation
 }
 
 const (
@@ -223,14 +223,15 @@ func WithSourceFiles(name string, files map[string]string) ssaconfig.Option {
 // targetDir = code under scan; select rules via RuleFilter (e.g. Tag=source for builtin mode:source).
 func WithSourceDir(name, targetDir string) ssaconfig.Option {
 	return func(c *ssaconfig.Config) error {
-		files, err := sfpattern.LoadFilesFromDir(targetDir)
+		opt := sfpattern.DefaultLoadOptions()
+		store, err := sfpattern.OpenStreamingSource(filesys.NewUnifiedFS(filesys.NewRelLocalFs(targetDir)), &opt, sfpattern.DefaultSourceInFlight)
 		if err != nil {
 			return err
 		}
 		if name == "" {
 			name = filepath.Base(targetDir)
 		}
-		return WithSourceFiles(name, files)(c)
+		return WithQueryTargets(ssaapi.NewSourceQueryTargetFromStore(name, store))(c)
 	}
 }
 

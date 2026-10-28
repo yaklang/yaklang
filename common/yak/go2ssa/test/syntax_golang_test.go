@@ -53,6 +53,11 @@ func goFixtureVirtualPath(filename string) string {
 	if trimmed == "" {
 		trimmed = "fixture"
 	}
+	// Default compile excludes drop *_test.go. These files are syntax
+	// fixtures, so build them under a name the project compiler accepts.
+	if strings.HasSuffix(trimmed, "_test.go") {
+		trimmed = strings.TrimSuffix(trimmed, "_test.go") + "_syntax.go"
+	}
 	return path.Join("fixture", trimmed)
 }
 
@@ -64,10 +69,13 @@ func validateBuildFromSource(t *testing.T, filename string, src string) {
 	vf.AddFile(goFixtureVirtualPath(filename), src)
 
 	require.NotPanics(t, func() {
+		// Corpus inputs may be named *_test.go or live in fixture directories.
+		// Compile every input instead of applying production scan exclusions.
 		progs, err := ssaapi.ParseProjectWithFS(
 			vf,
 			ssaapi.WithLanguage(ssaconfig.GO),
 			ssaapi.WithMemory(),
+			ssaapi.WithDisableDefaultCompileExcludes(true),
 		)
 		require.NoError(t, err, "build from AST fixture failed: %s", filename)
 		require.NotEmpty(t, progs)
@@ -117,6 +125,26 @@ func TestAllSyntaxForGo_G4(t *testing.T) {
 		return nil
 	})
 	require.NoError(t, err, "walk go syntax fixtures")
+}
+
+func TestGoSyntaxFixturesBuildExcludedPaths(t *testing.T) {
+	const src = `//go:build ignore
+
+package main
+
+func fixtureValue() int { return 42 }
+`
+	for _, filename := range []string{
+		"code/main.go",
+		"code/main_test.go",
+		"code/upstream/main_test.go",
+		"code/testdata/main.go",
+		"code/fixtures/main.go",
+	} {
+		t.Run(filename, func(t *testing.T) {
+			validateBuildFromSource(t, filename, src)
+		})
+	}
 }
 
 func TestGoSyntaxFixturesUseIgnoreBuildTags(t *testing.T) {

@@ -28,9 +28,9 @@ type SimpleValue struct {
 	empty  bool
 	editor *memedit.MemEditor // optional full-file editor containing this hit
 
-	// files backs chained context search ($a.regexp(...)): the path→content
-	// map the hit was produced from. Set by sfpattern when creating hits.
-	files map[string]string
+	// source is the root's one body. Chained searches ($a.regexp(...)) read it
+	// again; a hit does not keep its own map and reader.
+	source Source
 }
 
 // NewSimpleValue builds a pattern hit value.
@@ -52,12 +52,34 @@ func (v *SimpleValue) FileEditor() *memedit.MemEditor {
 	return v.editor
 }
 
-// SetFiles attaches the source path→content map so chained FileFilter calls
-// ($a.regexp(...)) can search within the hit's file. Nil-safe.
-func (v *SimpleValue) SetFiles(files map[string]string) {
+// SetSource attaches the one body chained searches of this hit read.
+func (v *SimpleValue) SetSource(source Source) {
 	if v != nil {
-		v.files = files
+		v.source = source
 	}
+}
+
+// SetFiles attaches a path→content snapshot for chained FileFilter calls.
+// Nil-safe. It replaces any source already installed on the hit.
+func (v *SimpleValue) SetFiles(files map[string]string) {
+	v.SetSource(newMapSource(files))
+}
+
+func (v *SimpleValue) fileContent() (string, error) {
+	if v == nil {
+		return "", utils.Error("simple value: nil hit")
+	}
+	if v.source == nil {
+		return "", utils.Error("simple value: no files backing for chained search")
+	}
+	return v.source.Read(v.path)
+}
+
+func copyText(s string) string {
+	if s == "" {
+		return ""
+	}
+	return string([]byte(s))
 }
 
 // NewSimpleConst builds a const-like simple value (no path).
@@ -168,12 +190,9 @@ func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]str
 	if v.path == "" {
 		return nil, utils.Error("simple value: hit has no file path")
 	}
-	if v.files == nil {
-		return nil, utils.Error("simple value: no files backing for chained search")
-	}
-	content, ok := v.files[v.path]
-	if !ok {
-		return nil, utils.Errorf("simple value: file %q not in backing files", v.path)
+	content, err := v.fileContent()
+	if err != nil {
+		return nil, err
 	}
 
 	// scope=region searches within the hit's own range; default scope=file
@@ -199,7 +218,7 @@ func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]str
 	// pattern_regex_not / pattern_not_regex in the CHAINED form: the hit itself
 	// is the positive; every param is a negative. Keep the hit only when no
 	// negative match overlaps it (Semgrep pattern-not-regex).
-	if paramMap != nil && (paramMap["__sf_pattern_not_list"] == "1" || paramMap["__sf_pattern_not"] == "1") {
+	if FileFilterParamOn(paramMap, FileFilterParamPatternNotList) || FileFilterParamOn(paramMap, FileFilterParamPatternNot) {
 		if len(cleaned) == 0 {
 			return nil, utils.Error("simple value: negative filter requires at least one pattern")
 		}
@@ -239,8 +258,8 @@ func (v *SimpleValue) FileFilter(name, matchType string, paramMap map[string]str
 			if start < 0 || end > len(content) || end < start {
 				continue
 			}
-			hit := NewSimpleValue(content[start:end], v.path, start, end)
-			hit.SetFiles(v.files)
+			hit := NewSimpleValue(copyText(content[start:end]), v.path, start, end)
+			hit.SetSource(v.source)
 			out = append(out, hit)
 		}
 	}
@@ -293,8 +312,8 @@ func chainedRegexpWithNegatives(v *SimpleValue, content string, from, to int, po
 		if overlap {
 			continue
 		}
-		hit := NewSimpleValue(content[h.start:h.end], v.path, h.start, h.end)
-		hit.SetFiles(v.files)
+		hit := NewSimpleValue(copyText(content[h.start:h.end]), v.path, h.start, h.end)
+		hit.SetSource(v.source)
 		out = append(out, hit)
 	}
 	return NewValues(out), nil
@@ -330,10 +349,10 @@ func (v *SimpleValue) NewConst(i any, _ ...*memedit.Range) ValueOperator {
 func (v *SimpleValue) GetAnchorBitVector() *utils.BitVector { return nil }
 func (v *SimpleValue) SetAnchorBitVector(*utils.BitVector)  {}
 
-// PatternRoot is the feed root for source-mode scans: holds files and responds to
-// FileFilter by delegating to a registered regexp matcher (set by sfpattern).
+// PatternRoot is the feed root for source-mode scans: holds one Source and
+// responds to FileFilter by delegating to a registered regexp matcher.
 type PatternRoot struct {
-	files            map[string]string
+	source           Source
 	matcher          FileFilterFunc
 	programName      string
 	sourceMu         sync.RWMutex
@@ -354,14 +373,12 @@ type SourceHit struct {
 
 // FileFilterFunc is injected by sfpattern to avoid sfvm→sfpattern import cycles
 // when wiring is done from the opcode side (sfvm calls sfpattern package).
-type FileFilterFunc func(root *PatternRoot, files map[string]string, pathPattern string, matchType string, paramMap map[string]string, patterns []string) (Values, error)
+// The root's Source is the only file input.
+type FileFilterFunc func(root *PatternRoot, pathPattern string, matchType string, paramMap map[string]string, patterns []string) (Values, error)
 
 // NewPatternRoot builds a source-scan root from path→content.
 func NewPatternRoot(files map[string]string) *PatternRoot {
-	if files == nil {
-		files = map[string]string{}
-	}
-	return &PatternRoot{files: files}
+	return &PatternRoot{source: newMapSource(files)}
 }
 
 // SetFileFilterMatcher registers the regexp/xpath/json implementation (usually sfpattern).
@@ -389,6 +406,9 @@ func (r *PatternRoot) SetSourceHitBatch(offset, limit int) {
 	defer r.sourceMu.Unlock()
 	r.sourceHitOffset = max(0, offset)
 	r.sourceHitLimit = max(0, limit)
+	// Each feed may access multiple independent direct searches. Recompute
+	// their maximum for this window instead of letting the last one win.
+	r.sourceHitTotal = 0
 }
 
 // SourceHitBatch returns the current raw-hit window and its total.
@@ -418,9 +438,8 @@ func (r *PatternRoot) SetSourceHits(key string, hits []SourceHit) {
 	if _, ok := r.sourceHitCaches[key]; !ok {
 		r.sourceHitCaches[key] = append([]SourceHit(nil), hits...)
 	}
-	// sourceHitTotal tracks the size of the most recently accessed cache entry,
-	// which is what the batch window slices in sourceHitsToValues.
-	r.sourceHitTotal = len(r.sourceHitCaches[key])
+	// A smaller later search must not truncate the other searches' windows.
+	r.sourceHitTotal = max(r.sourceHitTotal, len(r.sourceHitCaches[key]))
 }
 
 // SourceHits returns cached raw hits when the filter key matches.
@@ -428,13 +447,13 @@ func (r *PatternRoot) SourceHits(key string) ([]SourceHit, bool) {
 	if r == nil {
 		return nil, false
 	}
-	r.sourceMu.RLock()
-	defer r.sourceMu.RUnlock()
+	r.sourceMu.Lock()
+	defer r.sourceMu.Unlock()
 	hits, ok := r.sourceHitCaches[key]
 	if !ok {
 		return nil, false
 	}
-	r.sourceHitTotal = len(hits)
+	r.sourceHitTotal = max(r.sourceHitTotal, len(hits))
 	return hits, true
 }
 
@@ -445,18 +464,33 @@ func (r *PatternRoot) SourceHitEditor(path string) *memedit.MemEditor {
 		return nil
 	}
 	r.sourceMu.Lock()
+	if editor, ok := r.sourceHitEditors[path]; ok {
+		r.sourceMu.Unlock()
+		return editor
+	}
+	r.sourceMu.Unlock()
+	// Read outside the lock. The reader may block on the in-flight cap.
+	var editor *memedit.MemEditor
+	if shared, ok := r.source.(SharedBodySource); ok && shared != nil {
+		if raw, ok := shared.SharedBody(path); ok && raw != nil {
+			editor = memedit.NewMemEditorFromSafeString(raw, path)
+		}
+	}
+	if editor == nil {
+		content, err := r.FileContent(path)
+		if err != nil {
+			return nil
+		}
+		editor = memedit.NewMemEditorWithFileUrl(content, path)
+	}
+	r.sourceMu.Lock()
 	defer r.sourceMu.Unlock()
 	if r.sourceHitEditors == nil {
 		r.sourceHitEditors = make(map[string]*memedit.MemEditor)
 	}
-	if editor, ok := r.sourceHitEditors[path]; ok {
-		return editor
+	if existing, ok := r.sourceHitEditors[path]; ok {
+		return existing
 	}
-	content, ok := r.files[path]
-	if !ok {
-		return nil
-	}
-	editor := memedit.NewMemEditorWithFileUrl(content, path)
 	r.sourceHitEditors[path] = editor
 	return editor
 }
@@ -469,18 +503,65 @@ func (r *PatternRoot) GetProgramName() string {
 	return r.programName
 }
 
-// Files returns the underlying path→content map.
+// SetSource installs the one body this root and its hits read.
+func (r *PatternRoot) SetSource(source Source) {
+	if r != nil && source != nil {
+		r.source = source
+	}
+}
+
+// Source returns the body installed on this root.
+func (r *PatternRoot) Source() Source {
+	if r == nil {
+		return nil
+	}
+	return r.source
+}
+
+// SetFileSource installs an on-demand reader. paths are the scan list;
+// read loads one of them. The root does not keep the file bodies.
+func (r *PatternRoot) SetFileSource(paths []string, read func(string) (string, error)) {
+	if r == nil {
+		return
+	}
+	r.source = &callbackSource{paths: append([]string(nil), paths...), read: read}
+}
+
+// FilePaths returns the scan list.
+func (r *PatternRoot) FilePaths() []string {
+	if r == nil || r.source == nil {
+		return nil
+	}
+	return r.source.Paths()
+}
+
+// FileContent returns one file body from the root's source.
+func (r *PatternRoot) FileContent(path string) (string, error) {
+	if r == nil || r.source == nil {
+		return "", utils.Error("nil pattern root")
+	}
+	return r.source.Read(path)
+}
+
+// Files returns the underlying path→content map. It is nil when the root
+// reads through FileContent instead of keeping every file.
 func (r *PatternRoot) Files() map[string]string {
 	if r == nil {
 		return nil
 	}
-	return r.files
+	mapped, ok := r.source.(*mapSource)
+	if !ok {
+		return nil
+	}
+	return mapped.Files()
 }
 
 func (r *PatternRoot) String() string { return "pattern-root" }
 func (r *PatternRoot) IsMap() bool    { return false }
 func (r *PatternRoot) IsList() bool   { return false }
-func (r *PatternRoot) IsEmpty() bool  { return r == nil || len(r.files) == 0 }
+func (r *PatternRoot) IsEmpty() bool {
+	return r == nil || r.source == nil || len(r.source.Paths()) == 0
+}
 func (r *PatternRoot) ShouldUseConditionCandidate() bool {
 	return false
 }
@@ -521,7 +602,7 @@ func (r *PatternRoot) FileFilter(pathPattern, matchType string, paramMap map[str
 	if r.matcher == nil {
 		return nil, utils.Error("pattern root: file filter matcher not registered")
 	}
-	vals, err := r.matcher(r, r.files, pathPattern, matchType, paramMap, patterns)
+	vals, err := r.matcher(r, pathPattern, matchType, paramMap, patterns)
 	if err != nil {
 		return nil, err
 	}

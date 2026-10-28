@@ -16,12 +16,13 @@ func TestTypePersistenceBlueprintJSONAndMutableFields(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
 	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
+	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`).Error)
 	store := &typeStore{mode: ProgramCacheDBWrite, db: db, programName: "test",
 		saveSize: 512, resident: utils.NewSafeMapWithKey[int64, Type]()}
 	bp := NewBlueprint("A")
 	bp.SetId(1)
 	bp.SetKind(BlueprintClass)
-	bp.fullTypeName = []string{"pkg.A"}
+	bp.SetFullTypeNames([]string{"pkg.A"})
 	parent, iface := NewBlueprint("Parent"), NewBlueprint("Interface")
 	parent.SetId(2)
 	iface.SetId(3)
@@ -39,7 +40,7 @@ func TestTypePersistenceBlueprintJSONAndMutableFields(t *testing.T) {
 	require.Equal(t, first.ID, load().ID, "unchanged types must not be rewritten")
 	// Neither edit replaces the owning type pointer or calls remember again.
 	// Fingerprints must cover contents, not slice/pointer identity.
-	bp.fullTypeName[0] = "other.A"
+	bp.SetFullTypeNames([]string{"other.A"})
 	parent.SetId(4)
 	require.NoError(t, store.flush())
 	require.JSONEq(t, `{"name":"A","kind":"class","fullTypeName":["other.A"],"parentBlueprints":[4],"interfaceBlueprints":[3],"container":-1}`, load().ExtraInformation)
@@ -58,6 +59,7 @@ func TestTypePersistenceFailedWriteCanRetry(t *testing.T) {
 	// still encode and save the type once storage becomes available.
 	require.Error(t, store.flush())
 	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
+	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`).Error)
 	require.NoError(t, store.flush())
 	var count int
 	require.NoError(t, db.Model(&ssadb.IrType{}).Count(&count).Error)

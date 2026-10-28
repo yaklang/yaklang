@@ -2,6 +2,7 @@ package aibalance
 
 import (
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -36,6 +37,10 @@ func testChatAuthRecovery(t *testing.T, totpFailure, recoverySucceeds bool) {
 			return
 		}
 		requests++
+		body, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		require.Contains(t, string(body), `"video_url"`, "preserve video input on authentication retry")
+		require.Contains(t, string(body), "data:;base64,dGVzdA==")
 		if requests == 1 || !recoverySucceeds {
 			w.WriteHeader(http.StatusUnauthorized)
 			if totpFailure {
@@ -55,6 +60,7 @@ func testChatAuthRecovery(t *testing.T, totpFailure, recoverySucceeds bool) {
 	var requestStatuses []int
 	client := &GatewayClient{}
 	client.LoadOption(aispec.WithAPIKey("test-key"), aispec.WithModel("memfit-test"),
+		aispec.WithVideoUrl("data:;base64,dGVzdA=="),
 		aispec.WithHTTPErrorHandler(func(err error) { callbackErrors = append(callbackErrors, err) }),
 		aispec.WithRawHTTPResponseHeaderCallback(func(header []byte) {
 			statuses = append(statuses, lowhttp.GetStatusCodeFromResponse(header))

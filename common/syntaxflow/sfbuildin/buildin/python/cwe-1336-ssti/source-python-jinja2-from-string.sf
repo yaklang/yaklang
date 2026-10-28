@@ -4,7 +4,7 @@ desc(
 	title: "检测 Python jinja2 字符串模板"
 	title_zh: "检测 Python jinja2 字符串模板"
 	type: vuln
-	level: high
+	level: middle
 	rule_id: "source-python-jinja2-from-string"
 	risk: "ssti"
 	desc: <<<DESC
@@ -40,7 +40,7 @@ NEG
 
 ${*.py}.pattern_regex(/jinja2\.Template\s*\(|from_string\s*\(/) as $hit
 alert $hit for {
-	level: "high",
+	level: "middle",
 	title: "检测 Python jinja2 字符串模板",
 	title_zh: "检测 Python jinja2 字符串模板",
 	message: "检测 Python jinja2 字符串模板",

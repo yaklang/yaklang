@@ -452,8 +452,17 @@ func DialX(target string, opt ...DialXOption) (net.Conn, error) {
 	return nil, utils.Error("unknown tls strategy error, BUG here!")
 }
 
-// dialPlainUdpConn get abstract udp conn, with global netx config (disallow address, etc)
+// dialPlainUdpConn get abstract udp conn, with global netx config (disallow address, etc).
+// A caller context bounds DNS and the dial. Direct UDP has no handshake, so a
+// cancelled context must be checked before DialUDP returns a connected socket.
 func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn, remoteAddr *net.UDPAddr, err error) {
+	ctx := context.Background()
+	if config != nil && config.Context != nil {
+		ctx = config.Context
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
+	}
 	host, port, err := utils.ParseStringToHostPort(target)
 	if err != nil {
 		return nil, nil, utils.Errorf("invalid target %#v, cannot find host:port", target)
@@ -462,8 +471,10 @@ func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn,
 	host = utils.FixForParseIP(host)
 	ipIns := net.ParseIP(host)
 	if ipIns == nil {
-		// not valid ip
-		host = LookupFirst(host, config.DNSOpts...)
+		host = lookupFirstWithContext(ctx, host, config.DNSOpts...)
+		if err := ctx.Err(); err != nil {
+			return nil, nil, err
+		}
 		if ipIns = net.ParseIP(host); ipIns == nil {
 			return nil, nil, utils.Errorf("cannot resolve %v", target)
 		}
@@ -474,6 +485,9 @@ func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn,
 		if config.DisallowAddress.Contains(host) {
 			return nil, nil, utils.Errorf("disallow address %v by config(check your yakit system/network config)", host)
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, nil, err
 	}
 
 	remoteAddr = &net.UDPAddr{
@@ -486,8 +500,20 @@ func dialPlainUdpConn(target string, config *dialXConfig) (udpConn *net.UDPConn,
 		return
 	}
 
-	udpConn, err = net.DialUDP("udp", config.LocalAddr, remoteAddr)
-	return
+	var timeout time.Duration
+	if config.Timeout > 0 {
+		timeout = config.Timeout
+	}
+	conn, err := (&net.Dialer{Timeout: timeout, LocalAddr: config.LocalAddr}).DialContext(ctx, "udp", remoteAddr.String())
+	if err != nil {
+		return nil, remoteAddr, err
+	}
+	udpConn, _ = conn.(*net.UDPConn)
+	if udpConn == nil {
+		_ = conn.Close()
+		return nil, remoteAddr, utils.Errorf("udp dial returned %T", conn)
+	}
+	return udpConn, remoteAddr, nil
 }
 
 func DialUdpX(target string, opt ...DialXOption) (*net.UDPConn, *net.UDPAddr, error) {

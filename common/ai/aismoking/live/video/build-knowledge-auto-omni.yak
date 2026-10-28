@@ -1,0 +1,48 @@
+/*
+Use the same automatic media route as the built-in knowledge construction plugin.
+Configure an Omni model locally, or pass AIBALANCE_API_KEY in the environment.
+Example:
+  yak build-knowledge-auto-omni.yak --files /path/recovery.mp4 --kb-name media-demo --verify ORBIT-731
+The script drains every build channel and checks asynchronous errors before querying.
+*/
+files = cli.FileNames("files", cli.setRequired(true))
+kbName = cli.String("kb-name", cli.setDefault("omni-smoke-" + randstr(8)))
+mode = cli.String("omni-mode", cli.setDefault("required"))
+verify = cli.String("verify", cli.setDefault(""))
+seconds = cli.Float("segment-seconds", cli.setDefault(20))
+cli.check()
+
+options = [rag.omniMode(mode), rag.disableERM(true), liteforge.omniSegmentSeconds(seconds)]
+apiKey = os.Getenv("AIBALANCE_API_KEY")
+if apiKey != "" {
+    options = append(options, rag.omniConfig(ai.type("aibalance"), ai.model("qwen3.8-omni-flash"), ai.apiKey(apiKey)))
+}
+errors = []
+errorLock = sync.NewMutex()
+options = append(options, rag.onError(func(err) {
+    errorLock.Lock()
+    errors = append(errors, sprint(err))
+    errorLock.Unlock()
+}))
+count = 0
+for path in files {
+    entries = rag.BuildCollectionFromFile(kbName, path, options...)~
+    for entry in entries {
+        assert entry != nil
+        count++
+        printf("KNOWLEDGE_ENTRY %s\n", entry.KnowledgeTitle)
+    }
+}
+assert len(errors) == 0, str.Join(errors, "; ")
+assert count > 0, "No knowledge entries were built"
+if verify != "" {
+    entries = rag.DBQueryKnowledge(verify, rag.dbQueryCollection(kbName), rag.dbQueryLimit(10))~
+    assert len(entries) > 0, "Verification text was not found in the new knowledge base"
+    found = false
+    for entry in entries {
+        if str.Contains(entry.KnowledgeDetails, verify) { found = true }
+    }
+    assert found, "Extracted knowledge must contain the verification text from the media"
+    printf("KNOWLEDGE_VERIFIED %s matches=%d\n", verify, len(entries))
+}
+printf("KNOWLEDGE_BUILD_OK kb=%s entries=%d\n", kbName, count)

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
 	"github.com/yaklang/yaklang/common/utils"
@@ -340,6 +341,14 @@ func (c *OpenaiEmbeddingClient) doEmbeddingRequest(targetURL string, body []byte
 				continue
 			}
 			request.Header.Set(header.GetKey(), header.GetValue())
+		}
+		// The free AIBalance embedder uses this OpenAI-compatible client too.
+		// Keep the Profile UUID confined to AIBalance business requests.
+		if c.config.Type == "aibalance" || strings.EqualFold(request.URL.Hostname(), "aibalance.yaklang.com") {
+			request.Header.Del(aibalanceclient.ClientUserIDHeader)
+			if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+				request.Header.Set(aibalanceclient.ClientUserIDHeader, id)
+			}
 		}
 
 		response, err := c.httpClient.Do(request)

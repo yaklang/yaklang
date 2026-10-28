@@ -90,8 +90,11 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 
 	// 2) 无字面量的 exact: 每条记录整段验证.
 	for _, idx := range d.alwaysOnExact {
-		sc.statAlwaysScan++
 		cp := d.all[idx]
+		if !patternAllowed(sc, cp.id) {
+			continue
+		}
+		sc.statAlwaysScan++
 		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
 		if err != nil {
 			return false, verifierScanError(cp, err)
@@ -105,6 +108,9 @@ func (d *engineDB) scan(data []byte, sc *scratch, handler MatchHandler) (bool, e
 
 	// 3) regexp2-only always-on: 逐条验证整段数据.
 	for _, cp := range d.inexact {
+		if !patternAllowed(sc, cp.id) {
+			continue
+		}
 		sc.statAlwaysScan++
 		locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
 		if err != nil {
@@ -125,9 +131,14 @@ func (d *engineDB) verifyFull(data []byte, idx int, sc *scratch, handler MatchHa
 	if sc.fullDone[idx] {
 		return false, nil
 	}
+	cp := d.all[idx]
+	// A glob that cannot see this file must not pay for a full-record rescan.
+	if !patternAllowed(sc, cp.id) {
+		sc.fullDone[idx] = true
+		return false, nil
+	}
 	sc.fullDone[idx] = true
 	sc.statFullScan++
-	cp := d.all[idx]
 	locs, err := findAllInRecord(cp.v, data, 0, len(data), sc)
 	if err != nil {
 		return false, verifierScanError(cp, err)

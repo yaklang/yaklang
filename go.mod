@@ -89,7 +89,7 @@ require (
 	github.com/segmentio/ksuid v1.0.4
 	github.com/shirou/gopsutil/v4 v4.25.2
 	github.com/stacktitan/smb v0.0.0-20190531122847-da9a425dceb8
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 	github.com/teambition/rrule-go v1.8.2
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/sjson v1.2.5
@@ -104,8 +104,8 @@ require (
 	github.com/yaklang/go-llvm v0.0.0-20260713075540-46cdfea08f33
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
-	github.com/yaklang/gorm v1.9.17-0.20261014094850-478163d62c38
-	github.com/yaklang/javajive v0.1.2
+	github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43
+	github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034
 	github.com/yaklang/pcap v1.0.7-0.20261013042911-fa4332334a4a
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
@@ -185,6 +185,7 @@ require (
 	github.com/xuri/efp v0.0.0-20240408161823-9ad904a10d6d // indirect
 	github.com/xuri/nfp v0.0.0-20240318013403-ab9948c2c4a7 // indirect
 	github.com/yaklang/antlr/v4 v4.0.0-20260713034513-d8e6ed6334bf
+	github.com/yaklang/gorm/dm v0.0.0-20261027074109-c09736ed36a6 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect
 	github.com/ysmood/got v0.40.0 // indirect

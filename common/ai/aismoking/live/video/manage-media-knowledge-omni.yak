@@ -1,0 +1,28 @@
+/*
+Exercise the skill-guided knowledge management API from Yak using real Omni and
+embedding services. Configure the Omni provider locally before running.
+  yak manage-media-knowledge-omni.yak --file /path/recovery.mp4 --verify ORBIT-731
+*/
+source = cli.String("file", cli.setRequired(true))
+name = cli.String("name", cli.setDefault("managed-omni-" + randstr(8)))
+verify = cli.String("verify", cli.setRequired(true))
+mode = cli.String("omni-mode", cli.setDefault("required"))
+cli.check()
+
+aiknowledge.Add(name, aiknowledge.description("Omni media knowledge smoke"))~
+built = aiknowledge.BuildFromFile(name, source, aiknowledge.buildMode("chunks"),
+    aiknowledge.omniMode(mode), aiknowledge.omniSegmentSeconds(3), aiknowledge.omniPayloadBytes(7340032), aiknowledge.onProgress(message => { println(message) }))~
+assert built["entries_added"] > 0, "No persisted media knowledge"
+printf("MANAGED_BUILD_OK kb=%s entries=%d\n", name, built["entries_added"])
+
+for queryMode in ["keyword", "semantic"] {
+    query = verify
+    if queryMode == "semantic" { query = "What is the recovery code?" }
+    result = aiknowledge.Query(name, query, 8192, aiknowledge.mode(queryMode), aiknowledge.limit(5))~
+    found = false
+    for hit in result.Results {
+        if str.Contains(hit.Content, verify) { found = true }
+    }
+    assert found, queryMode + " query did not retrieve the fact from the media"
+    printf("MANAGED_QUERY_OK mode=%s fact=%s used_tokens=%d\n", queryMode, verify, result.UsedTokens)
+}

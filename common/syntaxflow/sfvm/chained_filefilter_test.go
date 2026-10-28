@@ -36,14 +36,14 @@ func TestSimpleValueFileFilter_ChainedNot(t *testing.T) {
 	// hit = ws:// at [9,14) — evil, not overlapping localhost line
 	evil := NewSimpleValue("ws://", "a.js", 9, 14)
 	evil.SetFiles(files)
-	res, err := evil.FileFilter("", "regexp", map[string]string{"__sf_pattern_not_list": "1"}, []string{`\bws:\/\/localhost.*`})
+	res, err := evil.FileFilter("", "regexp", SetFileFilterParam(nil, FileFilterParamPatternNotList), []string{`\bws:\/\/localhost.*`})
 	require.NoError(t, err)
 	require.Equal(t, 1, ValuesLen(res))
 
 	// hit = ws:// at [39,44) — localhost, overlapping the negative → dropped
 	loc := NewSimpleValue("ws://", "a.js", 39, 44)
 	loc.SetFiles(files)
-	res, err = loc.FileFilter("", "regexp", map[string]string{"__sf_pattern_not_list": "1"}, []string{`\bws:\/\/localhost.*`})
+	res, err = loc.FileFilter("", "regexp", SetFileFilterParam(nil, FileFilterParamPatternNotList), []string{`\bws:\/\/localhost.*`})
 	require.NoError(t, err)
 	require.True(t, res.IsEmpty())
 }

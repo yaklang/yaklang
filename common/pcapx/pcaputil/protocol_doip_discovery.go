@@ -147,6 +147,9 @@ func (a *binParser) decodeDoIPDiscoveryDatagram(e *ProtocolEvent, w []byte, src,
 	if err == nil {
 		e.semanticFields = cloneSession(fields)
 		e.Session = map[string]any{"Association": "unassociated-discovery", "Authentication Verified": false, "Vehicle Identity Verified": false}
+		// Discovery does not establish authentication or vehicle identity.
+		// Freeze that context separately from the wire fields and public copy.
+		e.semanticSession = cloneSession(e.Session)
 	}
 	// Do not allocate a raw event copy when the shared projection reservation
 	// failed or the captured bytes exceeded the configured limit.

@@ -174,16 +174,16 @@ func SearchWithCFG(value *Value, mod ssadb.MatchMode, compare func(string) bool,
 }
 
 // searchMembersFromInst 从 SSA instruction 中查找成员
-func searchMembersFromInst(value *Value, inst ssa.Value, check func(*Value) bool, add func(*Value)) {
+func searchMembersFromInst(value *Value, inst ssa.Value, check func(ssa.Value) bool, add func(*Value)) {
 	for _, pair := range ssa.GetMemberPairs(inst) {
-		if check(value.NewValue(pair.Key)) {
+		if check(pair.Key) {
 			add(value.NewValue(pair.Member))
 		}
 	}
 }
 
 // searchMembersInKeyMatchMode 在 KeyMatch 模式下查找对象的成员
-func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(*Value) bool, add func(*Value)) {
+func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(ssa.Value) bool, add func(*Value)) {
 	if !value.IsObject() {
 		return
 	}
@@ -205,7 +205,7 @@ func searchMembersInKeyMatchMode(value *Value, inst ssa.Value, check func(*Value
 			if isFromOverlay {
 				memberMap := searchMembersWithOverlay(value, overlay)
 				for keyName, memberVal := range memberMap {
-					keyVal := value.NewValue(ssa.NewConst(keyName))
+					keyVal := ssa.NewConst(keyName)
 					if check(keyVal) {
 						add(memberVal)
 					}
@@ -228,27 +228,35 @@ func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) boo
 		newValue = append(newValue, v)
 	}
 
-	check := func(value *Value) bool {
-		if compare(value.GetName()) || compare(value.String()) {
+	// Matching reads IR metadata only. Analysis wrappers are needed for
+	// accepted members, but candidate keys need no independent query state.
+	check := func(inst ssa.Value) bool {
+		if utils.IsNil(inst) {
+			return compare("")
+		}
+		if resolved, ok := ssa.ToValue(inst.Self()); ok {
+			inst = resolved
+		}
+		if compare(inst.GetName()) || compare(ssa.LineDisASM(inst)) {
 			return true
 		}
 
-		if value.IsConstInst() && compare(codec.AnyToString(value.GetConstValue())) {
-			return true
+		if inst.GetOpcode() == ssa.SSAOpcodeConstInst {
+			if c, ok := ssa.ToConstInst(inst); ok && compare(codec.AnyToString(c.GetRawValue())) {
+				return true
+			}
 		}
 
-		for name := range value.GetAllVariables() {
+		for name := range inst.GetAllVariables() {
 			if compare(name) {
 				return true
 			}
 		}
 
-		if raw := value.getValue(); raw != nil {
-			for _, pair := range ssa.GetObjectKeyPairs(raw) {
-				keyName := pair.KeyString()
-				if keyName != "" && compare(keyName) {
-					return true
-				}
+		for _, pair := range ssa.GetObjectKeyPairs(inst) {
+			keyName := pair.KeyString()
+			if keyName != "" && compare(keyName) {
+				return true
 			}
 		}
 
@@ -256,13 +264,13 @@ func SearchWithValue(value *Value, mod ssadb.MatchMode, compare func(string) boo
 	}
 
 	if mod&ssadb.ConstType != 0 {
-		if check(value) {
+		if check(inst) {
 			add(value)
 		}
 	}
 
 	if mod&ssadb.NameMatch != 0 {
-		if check(value) {
+		if check(inst) {
 			add(value)
 		}
 	}

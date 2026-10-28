@@ -148,7 +148,7 @@ func (m StringMap) Value() (driver.Value, error) {
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return string(data), nil
 }
 
 func (m *StringMap) Scan(value any) error {

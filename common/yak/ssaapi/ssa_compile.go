@@ -72,9 +72,10 @@ func (c *Config) parseFile() (ret *Program, err error) {
 		wait = prog.UpdateToDatabase()
 		// prog.ProcessInfof("[SSA/persist] program %s program metadata saved, cost %v", prog.Name, time.Since(metaStart))
 	}
-	total := prog.Cache.CountInstruction()
-	persisted := prog.Cache.InstructionPersistedCount()
-	totalExpected := total + persisted
+	accounting := prog.Cache.GetFlushAccounting()
+	total := int(accounting.RemainingDirty)
+	persisted := int(accounting.AlreadyPersisted)
+	totalExpected := int(accounting.InstructionsTotal)
 	if prog.DatabaseKind != ssa.ProgramCacheMemory {
 		prog.ProcessInfof("[SSA/persist] program %s flushing IR cache (remaining=%d persisted=%d total=%d) to database",
 			prog.Name, total, persisted, totalExpected)
@@ -236,7 +237,11 @@ func (c *Config) checkLanguageEx(path string, handler func(ssa.Builder) bool) er
 
 func (c *Config) swapLanguageFs(fs fi.FileSystem) fi.FileSystem {
 	if c.LanguageBuilder != nil {
-		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, c.GetCodeSourceJarRecursiveParse())
+		// jar/zip 等归档展开由语言预处理负责；参与增量序列的编译
+		// （基础全量 + 差量）禁止展开（disableArchiveExpansion），普通
+		// 全量编译遵循用户的 jar_recursive_parse 设置。
+		jarRecursiveParse := !c.disableArchiveExpansion && c.GetCodeSourceJarRecursiveParse()
+		return c.LanguageBuilder.WrapWithPreprocessedFS(fs, jarRecursiveParse)
 	}
 	return fs
 }

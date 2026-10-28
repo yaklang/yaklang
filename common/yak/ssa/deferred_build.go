@@ -12,10 +12,18 @@ const (
 	DeferredBuildKindBlueprint DeferredBuildKind = "blueprint"
 	DeferredBuildKindFile      DeferredBuildKind = "file"
 	DeferredBuildKindHelper    DeferredBuildKind = "helper"
+	// Binding runs after every skeleton and before hierarchy and bodies.
+	// Frontends use it for import and name links that cannot be resolved
+	// while another worker still owns a package.
+	DeferredBuildKindBinding DeferredBuildKind = "binding"
+	// Hierarchy runs after binding and before bodies, so type relations exist
+	// no matter which library is built first.
+	DeferredBuildKindHierarchy DeferredBuildKind = "hierarchy"
 )
 
 type deferredBuildTask struct {
 	id      string
+	kind    DeferredBuildKind
 	unitKey string
 	*LazyBuilder
 }
@@ -23,6 +31,7 @@ type deferredBuildTask struct {
 func newDeferredBuildTask(kind DeferredBuildKind, name string, unitKey string, work func()) *deferredBuildTask {
 	task := &deferredBuildTask{
 		id:          string(kind) + ":" + name,
+		kind:        kind,
 		unitKey:     unitKey,
 		LazyBuilder: NewLazyBuilder("deferred:" + string(kind) + ":" + name),
 	}
@@ -47,6 +56,8 @@ func (prog *Program) registerDeferredBuildTask(task *deferredBuildTask) *deferre
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
+	defer app.deferredBuildsMu.Unlock()
 	if app.deferredBuilds == nil {
 		app.deferredBuilds = omap.NewEmptyOrderedMap[string, *deferredBuildTask]()
 	}
@@ -101,6 +112,8 @@ func (prog *Program) DeferredBuildCount() int {
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
+	defer app.deferredBuildsMu.Unlock()
 	return app.deferredBuildTotal
 }
 
@@ -112,25 +125,37 @@ func (prog *Program) RunDeferredBuildsWithCallback(afterEach func(index int, tot
 	if app == nil {
 		app = prog
 	}
-	if app.deferredBuilds == nil {
-		return true
-	}
-	total := app.deferredBuilds.Len()
-	for index := 0; index < app.deferredBuilds.Len(); index++ {
+	index := 0
+	for {
+		app.deferredBuildsMu.Lock()
+		if app.deferredBuilds == nil {
+			app.deferredBuildsMu.Unlock()
+			return true
+		}
+		total := app.deferredBuilds.Len()
+		if index >= total {
+			app.deferredBuildsMu.Unlock()
+			break
+		}
 		task, ok := app.deferredBuilds.GetByIndex(index)
+		app.deferredBuildsMu.Unlock()
 		if !ok || task == nil {
+			index++
 			continue
 		}
 		task.Build()
 		task.release()
 		if afterEach != nil {
-			if app.deferredBuilds.Len() > total {
+			app.deferredBuildsMu.Lock()
+			if app.deferredBuilds != nil && app.deferredBuilds.Len() > total {
 				total = app.deferredBuilds.Len()
 			}
+			app.deferredBuildsMu.Unlock()
 			if !afterEach(index+1, total) {
 				return false
 			}
 		}
+		index++
 	}
 	app.releaseDeferredBuildTasks()
 	return true
@@ -144,7 +169,9 @@ func (prog *Program) releaseDeferredBuildTasks() {
 	if app == nil {
 		app = prog
 	}
+	app.deferredBuildsMu.Lock()
 	app.deferredBuilds = nil
+	app.deferredBuildsMu.Unlock()
 }
 
 // RunDeferredBuildsForUnits 只执行归属给定编译单元的延迟构建任务，执行后从队列移除。
@@ -170,15 +197,34 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 	afterEach func(index int, total int) bool,
 	afterUnit func(unitKey string) bool,
 ) bool {
+	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, nil)
+}
+
+// RunDeferredBuildsForUnitsOfKind runs the tasks of one kind that belong to
+// unitKeys. The kind is the frontend's phase, not a language name.
+func (prog *Program) RunDeferredBuildsForUnitsOfKind(
+	unitKeys []string,
+	kind DeferredBuildKind,
+	afterEach func(index int, total int) bool,
+	afterUnit func(unitKey string) bool,
+) bool {
+	return prog.runDeferredBuildsForUnits(unitKeys, afterEach, afterUnit, func(task *deferredBuildTask) bool {
+		return task != nil && task.kind == kind
+	})
+}
+
+func (prog *Program) runDeferredBuildsForUnits(
+	unitKeys []string,
+	afterEach func(index int, total int) bool,
+	afterUnit func(unitKey string) bool,
+	match func(*deferredBuildTask) bool,
+) bool {
 	if prog == nil || len(unitKeys) == 0 {
 		return true
 	}
 	app := prog.GetApplication()
 	if app == nil {
 		app = prog
-	}
-	if app.deferredBuilds == nil {
-		return true
 	}
 	units := make(map[string]struct{}, len(unitKeys))
 	for _, unitKey := range unitKeys {
@@ -190,21 +236,16 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		return true
 	}
 
+	app.deferredBuildsMu.Lock()
+	if app.deferredBuilds == nil {
+		app.deferredBuildsMu.Unlock()
+		return true
+	}
+
 	// Count tasks per unit and total, in a single pass over the keys.
 	total := 0
 	unitRemaining := make(map[string]int, len(units))
 	keys := app.deferredBuilds.Keys()
-	for _, id := range keys {
-		task, ok := app.deferredBuilds.Get(id)
-		if !ok || task == nil {
-			continue
-		}
-		if _, match := units[task.unitKey]; match {
-			total++
-			unitRemaining[task.unitKey]++
-		}
-	}
-
 	queue := make([]string, 0, len(keys))
 	queued := make(map[string]struct{}, len(keys))
 	for _, id := range keys {
@@ -215,37 +256,44 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
+		if match != nil && !match(task) {
+			continue
+		}
+		total++
+		unitRemaining[task.unitKey]++
 		queue = append(queue, id)
 		queued[id] = struct{}{}
 	}
+	app.deferredBuildsMu.Unlock()
 
 	completed := 0
 	for len(queue) > 0 {
 		id := queue[0]
 		queue = queue[1:]
+		app.deferredBuildsMu.Lock()
 		task, ok := app.deferredBuilds.Get(id)
+		app.deferredBuildsMu.Unlock()
 		if !ok || task == nil {
 			continue
 		}
 		if _, match := units[task.unitKey]; !match {
 			continue
 		}
-		// 执行 task 期间恢复其所属编译单元上下文，task 内通过 CurrentCompileUnit()
-		// 取到的 unitKey 与注册时一致；执行完恢复原值。
-		previousUnit := app.currentCompileUnit
-		if task.unitKey != "" {
-			app.currentCompileUnit = task.unitKey
-		}
-		task.Build()
-		app.currentCompileUnit = previousUnit
-		task.release()
-		app.deferredBuilds.Delete(id)
-		completed++
-		if afterEach != nil {
-			if !afterEach(completed, total) {
-				return false
+		// Restore only this goroutine's registration context. A task may visit
+		// another library or register more work, but must not overwrite a
+		// concurrent worker's context. Restore even if the task panics.
+		func() {
+			previousUnit := app.CurrentCompileUnit()
+			if task.unitKey != "" {
+				app.BeginCompileUnit(task.unitKey)
 			}
-		}
+			defer app.BeginCompileUnit(previousUnit)
+			task.Build()
+		}()
+		task.release()
+		app.deferredBuildsMu.Lock()
+		app.deferredBuilds.Delete(id)
+		var newcomers []string
 		for _, nid := range app.deferredBuilds.Keys() {
 			if _, seen := queued[nid]; seen {
 				continue
@@ -257,10 +305,21 @@ func (prog *Program) RunDeferredBuildsForUnitsWithUnitCallback(
 			if _, match := units[ntask.unitKey]; !match {
 				continue
 			}
+			if match != nil && !match(ntask) {
+				continue
+			}
 			queued[nid] = struct{}{}
-			queue = append(queue, nid)
+			newcomers = append(newcomers, nid)
 			total++
 			unitRemaining[ntask.unitKey]++
+		}
+		app.deferredBuildsMu.Unlock()
+		queue = append(queue, newcomers...)
+		completed++
+		if afterEach != nil {
+			if !afterEach(completed, total) {
+				return false
+			}
 		}
 		// Per-unit completion: decrement this unit's remaining count.
 		// When it reaches zero, all tasks for this unit are done.

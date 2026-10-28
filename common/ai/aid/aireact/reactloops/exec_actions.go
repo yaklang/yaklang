@@ -258,6 +258,9 @@ func mergeLoopActionOperator(dst, src *LoopActionHandlerOperator) {
 	if feedback := strings.TrimSpace(src.GetFeedback().String()); feedback != "" {
 		dst.Feedback(feedback)
 	}
+	if src.contextCompressionError != nil {
+		dst.contextCompressionError = src.contextCompressionError
+	}
 	dst.nextActionMustUse = append(dst.nextActionMustUse, src.nextActionMustUse...)
 	dst.nextActionDisabled = append(dst.nextActionDisabled, src.nextActionDisabled...)
 	if src.GetDisallowLoopExit() {
@@ -273,6 +276,9 @@ func (r *ReActLoop) execOneCall(
 	prompt string, done *utils.Once, position, callCount int, eventSink loopActionEventSink,
 ) loopActionsResult {
 	op := newLoopActionHandlerOperator(task)
+	op.requestPrompt = prompt
+	op.requestTimelineThroughID = r.requestTimelineThroughID
+	op.requestTimelineItemIDs = r.requestTimelineItemIDs
 	result := loopActionsResult{operator: op, result: loopActionsContinue}
 	action, handler := call.Action, call.LoopAction
 	if action == nil || handler == nil {
@@ -405,11 +411,20 @@ func (r *ReActLoop) execOneCall(
 	invoker := r.GetInvoker()
 	previousTask := invoker.GetCurrentTask()
 	invoker.SetCurrentTask(task)
+	if actionName != aicommon.ContextCompressionAction {
+		r.initActionApplied = true
+	}
 	func() {
 		defer invoker.SetCurrentTask(previousTask)
 		handler.ActionHandler(r, action, op)
 	}()
 	r.applyActionExecutionRecord(record, op)
+	if op.contextCompressionError != nil {
+		result.countsEffectiveIteration = false
+		result.skipPostIteration = true
+		emitLoopActionEvent(eventSink, call, "rejected", op.contextCompressionError.Error())
+		return result
+	}
 	if err := r.recordSubAgentControl(actionName, op, appliedTodoDelta); err != nil {
 		result.result, result.err = loopActionsError, err
 		result.skipErrorSummary = true

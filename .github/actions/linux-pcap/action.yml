@@ -1,0 +1,15 @@
+name: Linux glibc libpcap
+description: Install and select the shared PIC libpcap for Linux CI builds and prepared binaries
+runs:
+  using: composite
+  steps:
+    - name: Install system libpcap
+      if: runner.os == 'Linux'
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install --no-install-recommends -y libpcap-dev pkg-config
+    - name: Select the PIC libpcap for Go external linking
+      if: runner.os == 'Linux'
+      shell: bash
+      run: bash scripts/ci/configure-linux-pcap.sh

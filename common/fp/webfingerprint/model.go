@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"sync"
 
 	"github.com/pkg/errors"
 )
@@ -90,7 +91,9 @@ func (c *CPE) LikeSearchString() string {
 type KeywordMatcher struct {
 	CPE `yaml:"cpe,inline,omitempty"`
 
-	regexp *regexp.Regexp
+	regexpOnce sync.Once
+	regexp     *regexp.Regexp
+	regexpErr  error
 
 	Regexp        string `yaml:"regexp,omitempty"`
 	VendorIndex   int    `yaml:"vendor_index,omitempty"`
@@ -102,20 +105,17 @@ type KeywordMatcher struct {
 }
 
 func (k *KeywordMatcher) Match(raw string) (*CPE, error) {
-	var err error
-
-	if k.regexp == nil {
-		if k.Regexp == "" {
-			if raw == "EMPTY" {
-				return &k.CPE, nil
-			}
-			return nil, errors.New("empty regexp")
+	if k.Regexp == "" {
+		if raw == "EMPTY" {
+			return &k.CPE, nil
 		}
-
-		k.regexp, err = regexp.Compile(k.Regexp)
-		if err != nil {
-			return nil, errors.Errorf("compile [%s] to re failed: %s", k.Regexp, err)
-		}
+		return nil, errors.New("empty regexp")
+	}
+	k.regexpOnce.Do(func() {
+		k.regexp, k.regexpErr = regexp.Compile(k.Regexp)
+	})
+	if k.regexpErr != nil {
+		return nil, errors.Errorf("compile [%s] to re failed: %s", k.Regexp, k.regexpErr)
 	}
 
 	saveToCPE := func(dst *string, list []string, index int) {
@@ -127,7 +127,7 @@ func (k *KeywordMatcher) Match(raw string) (*CPE, error) {
 
 	for _, r := range k.regexp.FindAllStringSubmatch(raw, 1) {
 		saveToCPE(&k.Vendor, r, k.VendorIndex)
-		saveToCPE(&k.Product, r, k.ProductIndex) 
+		saveToCPE(&k.Product, r, k.ProductIndex)
 		saveToCPE(&k.Version, r, k.VersionIndex)
 		saveToCPE(&k.Edition, r, k.EditionIndex)
 		saveToCPE(&k.Update, r, k.UpdateIndex)

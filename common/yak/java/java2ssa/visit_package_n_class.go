@@ -123,30 +123,49 @@ func (y *singleFileBuilder) VisitClassDeclaration(raw javaparser.IClassDeclarati
 		该lazyBuilder顺序按照cls解析顺序
 	*/
 	store := y.StoreFunctionBuilder()
-	blueprint.AddLazyBuilder(func() {
+	// declareMissing is false for the skeleton barrier: a supertype that no
+	// file has declared yet must not be materialized there, or its container is
+	// appended to the entry block and a later branch terminator lands in front
+	// of it. The class lazy task passes true and keeps the original timing.
+	linkHierarchy := func(declareMissing bool) {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 
 		if extendName != "" {
 			bp := y.GetBluePrint(extendName)
-			if bp == nil {
+			if bp == nil && declareMissing {
+				restore := y.switchToLiveDeclarationBlock()
 				bp = y.CreateBlueprint(extendName, tokenMap[extendName])
+				restore()
 				y.AddFullTypeNameForAllImport(extendName, bp)
 			}
-			bp.SetKind(ssa.BlueprintClass)
-			blueprint.AddParentBlueprint(bp)
+			if bp != nil {
+				bp.SetKind(ssa.BlueprintClass)
+				blueprint.AddParentBlueprint(bp)
+			}
 		}
 
 		for _, implName := range implNames {
 			bp := y.GetBluePrint(implName)
-			if bp == nil {
+			if bp == nil && declareMissing {
+				restore := y.switchToLiveDeclarationBlock()
 				bp = y.CreateBlueprint(implName, tokenMap[implName])
+				restore()
 				y.AddFullTypeNameForAllImport(implName, bp)
+			}
+			if bp == nil {
+				continue
 			}
 			bp.SetKind(ssa.BlueprintInterface)
 			blueprint.AddInterfaceBlueprint(bp)
 		}
-	})
+	}
+	// A cyclic compile unit may build this class before the interface's
+	// library. Relate types that already exist before either body starts. The
+	// lazy task still declares anything the barrier skipped.
+	y.registerJavaHierarchyTask(blueprint, func() { linkHierarchy(false) })
+	blueprint.AddLazyBuilder(func() { linkHierarchy(true) })
 
 	container := blueprint.Container()
 	y.MarkedThisClassBlueprint = blueprint
@@ -232,6 +251,7 @@ func (y *singleFileBuilder) VisitMemberDeclaration(raw javaparser.IMemberDeclara
 		}
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
+			y := y.forkForLazyBuild()
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			var fieldType ssa.Type
@@ -571,6 +591,7 @@ func (y *singleFileBuilder) VisitClassBodyDeclaration(
 		block := ssa.DetachAST(ret)
 		store := y.StoreFunctionBuilder()
 		class.AddLazyBuilder(func() {
+			y := y.forkForLazyBuild()
 			switchHandler := y.SwitchFunctionBuilder(store)
 			defer switchHandler()
 			y.VisitBlock(block)
@@ -653,6 +674,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 	formalParameters := ssa.DetachAST(i.FormalParameters())
 	methodBody := ssa.DetachAST(i.MethodBody())
 	newFunc.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		log.Debugf("lazybuild: %s %s ", funcName, key)
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
@@ -672,7 +694,7 @@ func (y *singleFileBuilder) VisitMethodDeclaration(
 		// framework support for spring boot
 		y.ResetUIModel()
 		y.isInController = false
-		newFunc.Type.AddAnnotationFunc(annotationFunc...)
+		newFunc.AddAnnotationFunc(annotationFunc...)
 		y.FunctionBuilder = y.PopFunction()
 		if len(annotationFunc) > 0 || len(defCallback) > 0 {
 			log.Debugf("start to build annotation ref to def: %v", funcName)
@@ -928,6 +950,7 @@ func (y *singleFileBuilder) VisitConstructorDeclaration(raw javaparser.IConstruc
 	formalParameters := ssa.DetachAST(i.FormalParameters())
 	block := ssa.DetachAST(i.Block())
 	newFunc.AddLazyBuilder(func() {
+		y := y.forkForLazyBuild()
 		switchHandler := y.SwitchFunctionBuilder(store)
 		defer switchHandler()
 		y.FunctionBuilder = y.PushFunction(newFunc)

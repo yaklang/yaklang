@@ -121,8 +121,6 @@ func TestWritePerceptionDebugMarkdown(t *testing.T) {
 	}
 	SetWorkspaceDebugDuration(loop, perceptionDebugTotalDurationKey, 220*time.Millisecond)
 	SetWorkspaceDebugDuration(loop, perceptionDebugAIDurationKey, 90*time.Millisecond)
-	SetWorkspaceDebugDuration(loop, perceptionDebugKnowledgeDurationKey, 60*time.Millisecond)
-	SetWorkspaceDebugDuration(loop, perceptionDebugKnowledgeCompressDurationKey, 20*time.Millisecond)
 
 	filePath := writePerceptionDebugMarkdown(loop, state, input, result, nil)
 	require.NotEmpty(t, filePath)
@@ -139,5 +137,6 @@ func TestWritePerceptionDebugMarkdown(t *testing.T) {
 	require.Contains(t, content, "internet_research")
 	require.Contains(t, content, "## Timing")
 	require.Contains(t, content, "Perception AI: 90 ms")
-	require.Contains(t, content, "Knowledge Compress: 20 ms")
+	require.NotContains(t, content, "Knowledge Refresh")
+	require.NotContains(t, content, "Knowledge Compress")
 }

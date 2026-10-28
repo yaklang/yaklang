@@ -271,7 +271,7 @@ func (s *VulinServer) registerSSRF() {
 				if request.Method == "GET" {
 					writer.Header().Set("Content-Type", "text/html; charset=utf8")
 					writer.Write([]byte(`
-<form action="/ssrf-in-post" method="post" enctype="multipart/form-data">
+<form action="/ssrf/in-post-multipart" method="post" enctype="multipart/form-data">
 	<label for="name">姓名:</label>
 	<input type="text" id="name" name="name" ><br><br>
 
@@ -301,15 +301,42 @@ func (s *VulinServer) registerSSRF() {
 `))
 					return
 				}
+				ssrfFetchAndEcho(writer, request.FormValue("url"))
 			},
 			RiskDetected: true,
 		},
 		{
 			DefaultQuery: "",
 			Path:         "/in-json-body",
-			Title:        "SSRF JSON Body SSRF",
+			Title:        "SSRF POST JSON Body 中 URL 参数",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				return
+				if request.Method == "GET" {
+					writer.Header().Set("Content-Type", "text/html; charset=utf8")
+					writer.Write([]byte(`
+<form action="/ssrf/in-json-body" method="post">
+	<label for="url">URL(JSON Body)</label>
+	<input id='url' name="url"><br><br>
+
+	<input type="submit" value="提交">
+</form>
+`))
+					return
+				}
+				raw, err := ioutil.ReadAll(request.Body)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				if len(raw) == 0 {
+					writer.Write([]byte(`暂无数据！`))
+					return
+				}
+				m := make(map[string]interface{})
+				if err := json.Unmarshal(raw, &m); err != nil {
+					writer.Write([]byte(`JSON Syntax Error: ` + err.Error()))
+					return
+				}
+				ssrfFetchAndEcho(writer, ssrfURLFromJSON(m))
 			},
 			RiskDetected: true,
 		},
@@ -318,7 +345,39 @@ func (s *VulinServer) registerSSRF() {
 			Path:         "/json-in-post-param",
 			Title:        "SSRF POST参数是JSON（包含URL）的情况",
 			Handler: func(writer http.ResponseWriter, request *http.Request) {
-				return
+				if request.Method == "GET" {
+					writer.Header().Set("Content-Type", "text/html; charset=utf8")
+					writer.Write([]byte(`
+<form action="/ssrf/json-in-post-param" method="post">
+	<label for="json">JSON</label>
+	<input id='json' name="json" style="width:400px" placeholder='{"url": "http://..."}'><br><br>
+
+	<input type="submit" value="提交">
+</form>
+`))
+					return
+				}
+				raw, err := ioutil.ReadAll(request.Body)
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				values, err := url.ParseQuery(string(raw))
+				if err != nil {
+					writer.Write([]byte(err.Error()))
+					return
+				}
+				rawJSON := values.Get("json")
+				if rawJSON == "" {
+					writer.Write([]byte(`暂无数据！`))
+					return
+				}
+				m := make(map[string]interface{})
+				if err := json.Unmarshal([]byte(rawJSON), &m); err != nil {
+					writer.Write([]byte(`JSON Syntax Error: ` + err.Error()))
+					return
+				}
+				ssrfFetchAndEcho(writer, ssrfURLFromJSON(m))
 			},
 			RiskDetected: true,
 		},
@@ -479,6 +538,35 @@ func getPath(u string) string {
 		return ""
 	}
 	return urlInfo.Path
+}
+
+func ssrfURLFromJSON(m map[string]interface{}) string {
+	for _, key := range []string{"url", "ref"} {
+		if v, ok := m[key]; ok {
+			return fmt.Sprint(v)
+		}
+	}
+	return ""
+}
+
+func ssrfFetchAndEcho(writer http.ResponseWriter, u string) {
+	if u == "" {
+		writer.Write([]byte(`暂无数据！`))
+		return
+	}
+	c := utils.NewDefaultHTTPClient()
+	c.Timeout = 10 * time.Second
+	rsp, err := c.Get(u)
+	if err != nil {
+		writer.Write([]byte(err.Error()))
+		return
+	}
+	rawResponse, err := utils.HttpDumpWithBody(rsp, true)
+	if err != nil {
+		writer.Write([]byte(err.Error()))
+		return
+	}
+	writer.Write(rawResponse)
 }
 
 func checkIP(value string) bool {

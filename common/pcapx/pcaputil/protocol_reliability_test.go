@@ -2,8 +2,11 @@ package pcaputil
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"github.com/gopacket/gopacket"
 	"github.com/stretchr/testify/require"
 
 	"testing"
@@ -40,6 +43,7 @@ func TestDNSCanonicalLabels(t *testing.T) {
 	require.Equal(t, a, b)
 }
 func TestDNSCarrierAssociation(t *testing.T) {
+	t.Run("owned-datagram-queries", testDNSOwnedDatagramQueries)
 	c := NewDefaultConfig()
 	require.NoError(t, WithOnProtocolMessage(func(*ProtocolEvent) {})(c))
 	require.NoError(t, c.prepareBinParser())
@@ -384,23 +388,104 @@ func FuzzRedisReplyModeSequence(f *testing.F) {
 func TestReliabilityDNSNativeReplay(t *testing.T) {
 	cap, err := trafficfixture.ReadFile("testdata/protocol-sessions/reliability/dns-lan.pcap")
 	require.NoError(t, err)
-	for _, workers := range []int{1, 4} {
-		ev, stats, err := binReplay(t, cap, workers, WithProtocolDecodeAs("udp", 19553, "dns"))
-		require.NoError(t, err)
-		require.Zero(t, stats.BufferedBytes)
-		byID := map[uint64]*ProtocolEvent{}
-		matches := map[string]int{}
-		for _, e := range ev {
-			require.Empty(t, e.Error)
-			byID[e.ID] = e
-			if e.ResponseTo != 0 {
-				matches[e.Protocol]++
-				q := byID[e.ResponseTo]
-				require.NotNil(t, q)
-				require.Equal(t, dnsQuestionKey(q.Session["DNS"].(map[string]any)), dnsQuestionKey(e.Session["DNS"].(map[string]any)))
+	require.Equal(t, "8b6683b4080dbdbe0adee1f0b61324605bf17eaab717d2a844bd655c5fb17698", fmt.Sprintf("%x", sha256.Sum256(cap)))
+	// Fixed RFC1035 label bytes distinguish literal-dot and two-label names.
+	// EXAMPLE then example reuses the completed canonical identity; its second
+	// reply has no proven new generation. The old count-only assertion hid this.
+	wires := []string{"12340000000100000000000003612e620000010001", "12348000000100000000000003612e620000010001", "123400000001000000000000016101620000010001", "123480000001000000000000016101620000010001", "123400000001000000000000074558414d504c450000010001", "123480000001000000000000074558414d504c450000010001", "123400000001000000000000076578616d706c650000010001", "123480000001000000000000076578616d706c650000010001", "1234000000010000000000000a6c6f63616c2d746573740000010001", "1234800000010000000000000a6c6f63616c2d746573740000010001"}
+	names := []string{`a\.b`, `a\.b`, "a.b", "a.b", "EXAMPLE", "EXAMPLE", "example", "example", "local-test", "local-test"}
+	ns := []int64{286927000, 287019000, 287170000, 287220000, 287314000, 287361000, 287427000, 287469000, 287826000, 287885000}
+	replies := map[int]int{1: 0, 3: 2, 5: 4, 9: 8}
+	for _, workers := range []int{1, 2, 4} {
+		for _, deferred := range []bool{false, true} {
+			for _, observe := range []bool{false, true} {
+				options := []CaptureOption{WithProtocolDecodeAs("udp", 19553, "dns"), WithProtocolDeferred(deferred)}
+				if observe {
+					options = append(options, WithEveryPacket(func(gopacket.Packet) {}))
+				}
+				ev, stats, err := binReplay(t, cap, workers, options...)
+				require.NoError(t, err)
+				require.Len(t, ev, 10)
+				require.Zero(t, stats.BufferedBytes)
+				seen := map[uint64]bool{}
+				for i, e := range ev {
+					raw, er := hex.DecodeString(wires[i])
+					require.NoError(t, er)
+					proto := "dns"
+					if i >= 8 {
+						proto = "llmnr"
+					}
+					require.Equal(t, proto, e.Protocol)
+					require.Equal(t, proto+"-native", e.Profile)
+					require.Equal(t, "udp", e.Transport)
+					require.Zero(t, e.FlowID)
+					require.Zero(t, e.Direction)
+					require.Equal(t, CaptureDomain{}, e.Domain)
+					require.Equal(t, raw, e.Raw)
+					require.Equal(t, len(raw), e.Length)
+					require.Zero(t, e.Offset)
+					require.True(t, time.Unix(1790058767, ns[i]).Equal(e.Timestamp))
+					require.Len(t, e.SourceBytes.PacketRefs, 1)
+					require.Equal(t, uint64(i+1), e.SourceBytes.PacketRefs[0].Number)
+					src, dst := "127.0.0.1:55097", "127.0.0.1:19553"
+					if i%2 == 1 {
+						src, dst = dst, src
+					}
+					if i == 8 {
+						src, dst = "127.0.0.1:65087", "224.0.0.252:5355"
+					}
+					if i == 9 {
+						src, dst = "127.0.0.1:5355", "127.0.0.1:65087"
+					}
+					require.Equal(t, src, e.Source)
+					require.Equal(t, dst, e.Destination)
+					flag := uint16(0)
+					if i%2 == 1 {
+						flag = 0x8000
+					}
+					want := map[string]any{"ID": uint16(0x1234), "Flags": flag, "Response": i%2 == 1, "Opcode": uint16(0), "RCODE": uint16(0), "Truncated": false, "Questions": []map[string]any{{"Name": names[i], "Name Wire": bytes.Clone(raw[12 : len(raw)-4]), "Type": uint16(1), "Class": uint16(1), "Class Base": uint16(1), "QU": false}}, "Answers": []map[string]any{}, "Authority": []map[string]any{}, "Additional": []map[string]any{}}
+					f, er := e.GetFields()
+					require.NoError(t, er)
+					require.Equal(t, want, f)
+					session := map[string]any{"DNS": cloneSession(want)}
+					complete := "message"
+					reply, matched := replies[i]
+					require.NotZero(t, e.ID)
+					require.False(t, seen[e.ID])
+					seen[e.ID] = true
+					if matched {
+						require.Equal(t, ev[reply].ID, e.ResponseTo)
+						require.Equal(t, ev[reply].ID, e.TransactionID)
+						session["Association Status"] = "matched"
+						session["Matched Request"] = names[i]
+						session["Latency"] = float64(ns[i]-ns[reply]) / 1e9
+						complete = "transaction"
+						if i == 9 {
+							session["Responder Count"] = 1
+						}
+					} else if i == 6 || i == 7 {
+						require.Zero(t, e.ResponseTo)
+						require.Zero(t, e.TransactionID)
+						session["Association"], session["Association Status"] = "ambiguous-context", "ambiguous"
+						if i == 7 {
+							session["Unmatched"] = true
+						}
+					} else {
+						require.Zero(t, e.ResponseTo)
+						require.Equal(t, e.ID, e.TransactionID)
+					}
+					require.Equal(t, session, e.Session)
+					require.Equal(t, complete, e.Completeness)
+					require.Empty(t, e.Error)
+					require.Empty(t, e.ExpertCode)
+					status := "decoded"
+					if deferred {
+						status = "deferred"
+					}
+					require.Equal(t, status, e.Status)
+				}
 			}
 		}
-		require.Equal(t, map[string]int{"dns": 4, "llmnr": 1}, matches)
 	}
 }
 

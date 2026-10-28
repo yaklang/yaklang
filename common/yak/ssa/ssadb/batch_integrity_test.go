@@ -23,6 +23,9 @@ func TestLargeBatchChunksPersistAllRows(t *testing.T) {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}, &IrIndex{}, &IrOffset{}).Error)
+	require.NoError(t, db.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
+	).Error)
 
 	const n = 2000
 	const chunk = 1000
@@ -144,6 +147,9 @@ func TestSaveIrTypeBatchLargeBatchesKeepsIndexIntegrity(t *testing.T) {
 	db, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
+	require.NoError(t, db.Exec(
+		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
+	).Error)
 
 	longJSON := `{"fullTypeName":["` + strings.Repeat("org.apache.hadoop.example.TypeName", 20) + `"],"name":"x"}`
 	for round := 0; round < 10; round++ {

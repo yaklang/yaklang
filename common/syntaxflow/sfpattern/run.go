@@ -1,8 +1,10 @@
 package sfpattern
 
 import (
+	"context"
 	"strings"
 
+	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
@@ -31,7 +33,25 @@ func ExecFrame(frame *sfvm.SFFrame, files map[string]string, opts ...sfvm.Option
 	if frame == nil {
 		return nil, utils.Error("sfpattern: nil frame")
 	}
-	root := NewRoot(files)
+	return execRoot(frame, NewRoot(files), opts...)
+}
+
+// execRoot runs one frame against a root. Direct file searches in that frame
+// share one pre-scan even when the caller did not start a runtime itself.
+func execRoot(frame *sfvm.SFFrame, root *sfvm.PatternRoot, opts ...sfvm.Option) (*sfvm.SFFrameResult, error) {
+	ctx := context.Background()
+	if frame != nil && frame.GetContext() != nil {
+		ctx = frame.GetContext()
+	}
+	runtime, plan, err := StartFrameRuntime(ctx, frame, root)
+	if err != nil {
+		log.Warnf("source pre-scan: single rule stays on the per-search matcher: %v", err)
+	}
+	if runtime != nil {
+		defer plan.Close()
+		defer runtime.Close()
+		root.SetFileFilterMatcher(runtime.Matcher(ctx))
+	}
 	return frame.Feed(sfvm.ValuesOf(root), opts...)
 }
 

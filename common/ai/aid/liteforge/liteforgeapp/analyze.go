@@ -9,7 +9,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/aireducer"
 	"github.com/yaklang/yaklang/common/chunkmaker"
-	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/chanx"
 
@@ -46,6 +45,11 @@ func AnalyzeFile(path string, option ...any) (<-chan AnalysisResult, error) {
 	mime, err := mimetype.DetectFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("connot detect mime type '%s': %w", path, err)
+	}
+	if mime.IsVideo() || mime.IsImage() || mime.Is("application/pdf") {
+		if ch, handled, err := tryAnalyzeOmniMedia(path, mime, analyzeConfig, option); handled {
+			return ch, err
+		}
 	}
 
 	if mime.IsVideo() {
@@ -89,7 +93,7 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 		defer indexedChannel.Close()
 		err = ar.Run()
 		if err != nil {
-			log.Errorf("failed to run analyze raw data: %v", err)
+			analyzeConfig.reportError(fmt.Errorf("failed to analyze raw data: %w", err))
 		}
 	}()
 
@@ -101,7 +105,11 @@ func AnalyzeReader(rawReader io.Reader, opts ...any) (<-chan AnalysisResult, err
 			analyzeConfig.AnalyzeStatusCard("[analyze raw data]:analysed chunk ", processedCount)
 		}()
 		if chunk.MIMEType().IsImage() {
-			return AnalyzeImage(chunk.Data(), opts...)
+			result, err := AnalyzeImage(chunk.Data(), opts...)
+			if err != nil {
+				analyzeConfig.reportError(err)
+			}
+			return result, err
 		} else {
 			return &TextAnalysisResult{Text: string(chunk.Data())}, nil
 		}

@@ -12,9 +12,11 @@ cli.setJsonSchema(<<<jsonschema
             "enum": [
                 "CA",
                 "Server",
-                "Client"
+                "Client",
+                "EMudhraServer"
             ],
-            "default": "CA"
+            "default": "CA",
+            "description": "EMudhraServer 使用公开的 eMudhra 中间 CA 签发服务器证书，仅生成文件；已封禁该 CA 或要求证书透明度的客户端会拒绝连接。"
         }
     },
     "allOf": [
@@ -115,7 +117,10 @@ cli.check()
 
 
 // build options
-options := [tls.commonName(commonName),tls.organization(org)]
+if years <= 0 || years > 100 {
+    die("有效期必须在 1 到 100 年之间")
+}
+options := [tls.commonName(commonName),tls.organization(org),tls.validity(time.ParseDuration(sprintf("%dh", 24 * 365 * years))~)]
 if country != "" {
     options = append(options, tls.country(country))
 }
@@ -131,26 +136,54 @@ if locality != "" {
 }
 
 if notBefore != "" {
-    beforeTime := time.Parse("2020-01-01T00:00:00Z", notBefore)~
+    beforeTime := time.Parse("2006-01-02T15:04:05Z07:00", notBefore)~
     options = append(options, tls.notBefore(beforeTime))
 }
 if notAfter != "" {
-    afterTime := time.Parse("2020-01-01T00:00:00Z", notAfter)~
+    afterTime := time.Parse("2006-01-02T15:04:05Z07:00", notAfter)~
     options = append(options, tls.notAfter(afterTime))
 }
 // --- Group: 证书用途与名称 ---
 
-if dnslist != "" {
-    options = append(options, tls.alternativeDNS(str.Split(dnslist, ",")...))
+dnsNames := []
+for name in str.Split(dnslist, ",") {
+    name = str.TrimSpace(name)
+    if name != "" {
+        dnsNames = append(dnsNames, name)
+    }
 }
-if iplist != "" {
-    options = append(options, tls.alternativeIP(str.Split(iplist, ",")...))
+ipAddresses := []
+for ip in str.Split(iplist, ",") {
+    ip = str.TrimSpace(ip)
+    if ip == "" {
+        continue
+    }
+    if !str.IsIPv4(ip) && !str.IsIPv6(ip) {
+        die(sprintf("无效的 IP 地址：%s", ip))
+    }
+    // IPv6 可使用方括号输入，传给证书生成器时使用纯地址。
+    if str.HasPrefix(ip, "[") && str.HasSuffix(ip, "]") {
+        ip = str.TrimSuffix(str.TrimPrefix(ip, "["), "]")
+    }
+    ipAddresses = append(ipAddresses, ip)
+}
+if len(dnsNames) > 0 {
+    options = append(options, tls.alternativeDNS(dnsNames...))
+}
+if len(ipAddresses) > 0 {
+    options = append(options, tls.alternativeIP(ipAddresses...))
 }
 
 
 certType := certTypeInfo["kind"]
 var ca,key
-if certType == "CA" {
+if certType == "EMudhraServer" {
+    if len(dnsNames) == 0 && len(ipAddresses) == 0 {
+        die("生成服务器证书需要填写 DNS 名称或 IP 地址（SAN）")
+    }
+    ca,key = tls.GenerateEMudhraServerCert(options...)~
+    yakit.Info("已生成 eMudhra 测试服务器证书链及独立私钥；未启动代理、安装证书或修改 MITM 配置。")
+}else if certType == "CA" {
     ca,key = tls.GenerateRootCA(commonName, options...)~
 }else if certType == "Server" {
     parentCAPath := certTypeInfo["CA_Path"]
@@ -178,8 +211,11 @@ file.Save(NewCaPath, ca)~
 yakit.File(NewCaPath, yakit.fileCreateAction(false, 777))
 yakit.StatusCard("CA 文件地址", NewCaPath)
 
-file.Save(NewPrviPath, key)~
-yakit.File(NewPrviPath, yakit.fileCreateAction(false, 777))
+keyFile := file.OpenFile(NewPrviPath, file.O_WRONLY|file.O_CREATE|file.O_EXCL, 0o600)~
+defer keyFile.Close()
+keyFile.Write(key)~
+keyFile.Close()~
+yakit.File(NewPrviPath, yakit.fileCreateAction(false, 0o600))
 yakit.StatusCard("私钥 文件地址", NewPrviPath)
 
 
