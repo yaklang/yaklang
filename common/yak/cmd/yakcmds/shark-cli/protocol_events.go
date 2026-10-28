@@ -673,8 +673,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			}
 		}
 		label := eventProtocolName(e)
-		if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
-			label = "UDP carrier diagnostic"
+		udpPayload := e.Protocol == "" && e.Transport == "udp"
+		udpPreview := udpPayload && e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw)
+		if udpPayload {
+			label = "UDP payload · application unrecognized"
+			if e.Error != "" {
+				label = "UDP carrier diagnostic"
+			}
 		}
 		if !credibleTLSIdentity(e) {
 			label = "TLS?"
@@ -688,10 +693,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			if e.Protocol == "dcerpc" {
 				name = "DCE/RPC wire"
 			}
-			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" {
-				name = "Unadmitted UDP payload"
-				if e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw) {
-					name = fmt.Sprintf("Unadmitted UDP payload preview · %d/%d captured bytes", len(e.Raw), e.Length)
+			if udpPayload {
+				name = "Unidentified UDP payload"
+				if e.Error != "" {
+					name = "Unadmitted UDP payload"
+				}
+				if udpPreview {
+					name += fmt.Sprintf(" preview · %d/%d captured bytes", len(e.Raw), e.Length)
 				}
 			}
 			if e.Protocol == "grpc" {
@@ -704,7 +712,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 				name = "SMB2 wire PDU (authentication)"
 			}
 			sourceName := name + " · " + kind + " PDU"
-			if e.Protocol == "" && e.Transport == "udp" && e.Error != "" && e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw) {
+			if udpPreview {
 				sourceName = name // A bounded preview is not a complete application PDU.
 			}
 			sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(e.Raw)})
