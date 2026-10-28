@@ -87,3 +87,18 @@ func TestUnselectedNetworkParentCannotDisplayAConfirmedChild(t *testing.T) {
 		require.Zero(t, row.SourcePort)
 	}
 }
+
+func TestTruncatedIPSummaryKeepsOneSpecificNativeReason(t *testing.T) {
+	wire := udpPacket(t, 53, []byte("no transport header captured"))[:18]
+	event := &pcaputil.ProtocolEvent{Protocol: "ip", Transport: "network", Status: "incomplete", ExpertCode: "IPHeaderTruncated", Summary: "IPv4 header incomplete: 4 of 20 fixed bytes available; transport not admitted", Session: map[string]any{"Expected IP Version": uint8(4), "Observed IP Version": uint8(4), "Available Header Bytes": 4, "Required Header Bytes": 20, "Observed Header Layers": []string{"Ethernet", "IPv4"}}}
+	raw := &capturedPacket{number: 1, data: wire, ci: gopacket.CaptureInfo{Length: 100, CaptureLength: len(wire)}, link: layers.LinkTypeEthernet, events: []*pcaputil.ProtocolEvent{event}, presentation: presentEvents([]*pcaputil.ProtocolEvent{event})}
+	row := summarize(raw)
+	require.Equal(t, event.Summary+" [truncated capture: 18/100 bytes]", row.Info, "the specific reason replaces the generic marker while actual capture loss stays visible")
+	require.Equal(t, "incomplete", row.ProtocolStatus)
+	require.Equal(t, "truncated-network-header", row.Visibility)
+	require.Equal(t, "network", row.Transport)
+	require.Zero(t, row.SourcePort)
+	require.Zero(t, row.DestinationPort)
+	require.Empty(t, row.ConnectionProtocol)
+	require.Zero(t, row.StreamID)
+}
