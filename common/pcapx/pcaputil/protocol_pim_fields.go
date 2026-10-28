@@ -50,25 +50,115 @@ func pimFieldRows(root map[string]any) []map[string]any {
 	return rows
 }
 
+func pimOccurrenceRange(row map[string]any, key string, available int) *DisplayFieldRange {
+	ranges, _ := row["Wire Field Ranges"].(map[string]any)
+	span, _ := ranges[key].([]any)
+	if len(span) != 2 {
+		return nil
+	}
+	start, a := displayUint(span[0])
+	end, b := displayUint(span[1])
+	if !a || !b || end <= start || end > uint64(available) {
+		return nil
+	}
+	return &DisplayFieldRange{Offset: int(start), Length: int(end - start)}
+}
+
+func pimObservedBinding(name, label string, typ DisplayFieldType, bits int, origin string, collect func(*ProtocolEvent, func(any, *DisplayFieldRange))) displayFieldBinding {
+	b := displayCustom("pim", name, label, typ, bits, origin, func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
+		if n := e.nativeNetworkFields; n != nil && n.frozen && n.protocol == "pim" {
+			for _, field := range n.pimValues[name] {
+				emit(field.value)
+			}
+			return
+		}
+		collect(e, func(value any, _ *DisplayFieldRange) { emit(value) })
+	})
+	b.collectWireFields = collect
+	b.rangeFor = func(e *ProtocolEvent, ordinal int) *DisplayFieldRange {
+		if n := e.nativeNetworkFields; n != nil && n.frozen && n.protocol == "pim" {
+			values := n.pimValues[name]
+			if ordinal < 0 || ordinal >= len(values) || values[ordinal].span.Length <= 0 {
+				return nil
+			}
+			span := values[ordinal].span
+			return &span
+		}
+		// Standalone caller-created events have no ingress cache. Their own
+		// row/range map still locates occurrences without searching Raw bytes.
+		var selected *DisplayFieldRange
+		index := 0
+		collect(e, func(_ any, span *DisplayFieldRange) {
+			if index == ordinal && span != nil {
+				owned := *span
+				selected = &owned
+			}
+			index++
+		})
+		return selected
+	}
+	b.descriptor.Description = "Observed PIM field; native ingress freezes each occurrence and its exact logical-PDU span. No raw-byte search, installed route, neighbor verification or authentication claim."
+	return b
+}
+
+func (e *ProtocolEvent) retainNativePIMFields(wire []byte) {
+	n := &nativeNetworkObservation{protocol: "pim", values: map[string]nativeNetworkField{}, pimValues: map[string][]nativeNetworkField{}}
+	owned := *e
+	owned.Session, owned.Raw = e.semanticSession, wire
+	// Collect values and spans together once. Repeated snapshot queries use
+	// the private arrays, rather than rewalking every record for every range.
+	for _, binding := range displayFieldBindings {
+		if binding.protocols != "|pim|" || binding.collectWireFields == nil {
+			continue
+		}
+		name := binding.descriptor.Name
+		binding.collectWireFields(&owned, func(value any, span *DisplayFieldRange) {
+			field := nativeNetworkField{value: value}
+			if span != nil {
+				field.span = *span
+			}
+			n.pimValues[name] = append(n.pimValues[name], field)
+		})
+	}
+	e.nativeNetworkFields = n
+}
+
+func pimAddressRows(value any) []map[string]any {
+	switch rows := value.(type) {
+	case []map[string]any:
+		return rows
+	case []any:
+		var out []map[string]any
+		for _, item := range rows {
+			if row, ok := item.(map[string]any); ok {
+				out = append(out, row)
+			}
+		}
+		return out
+	}
+	return nil
+}
+
 func pimDisplayBindings() []displayFieldBinding {
 	var out []displayFieldBinding
 	add := func(name, key string, typ DisplayFieldType, bits int, nested bool) {
-		b := displayRoot("pim", name, key, typ, bits, "pdu", key)
-		if nested {
-			b = displayCustom("pim", name, key, typ, bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
-				for _, m := range pimFieldRows(e.Session) {
-					if strings.HasPrefix(name, "pim.source_addr.") && m["Kind"] != "source" {
-						continue
-					}
-					if strings.HasPrefix(name, "pim.group_addr.") && m["Kind"] != "group" {
-						continue
-					}
-					if v, ok := m[key]; ok {
-						emit(v)
-					}
+		b := pimObservedBinding(name, key, typ, bits, "pdu", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
+			rows := []map[string]any{e.Session}
+			if nested {
+				rows = pimFieldRows(e.Session)
+			}
+			for _, m := range rows {
+				if strings.HasPrefix(name, "pim.source_addr.") && m["Kind"] != "source" {
+					continue
 				}
-			})
-		}
+				if strings.HasPrefix(name, "pim.group_addr.") && m["Kind"] != "group" {
+					continue
+				}
+				if v, ok := m[key]; ok {
+					emit(v, pimOccurrenceRange(m, key, len(e.Raw)))
+				}
+			}
+		})
 		out = append(out, b)
 	}
 	for _, f := range []struct {
@@ -110,7 +200,7 @@ func pimDisplayBindings() []displayFieldBinding {
 				name += "_ip6"
 			}
 			path := f.path
-			b := displayCustom("pim", "pim."+name, path, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			b := pimObservedBinding("pim."+name, path, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
 				for _, row := range pimFieldRows(e.Session) {
 					// Wireshark uses ip/ipv6 fields for versioned Register IP
 					// headers, and pim.source/group only for version-zero dummy
@@ -119,20 +209,21 @@ func pimDisplayBindings() []displayFieldBinding {
 					if _, register := row["Dummy Header"]; register && routingNumber(row, "IP Version") != 0 {
 						continue
 					}
-					v := row[path]
+					owner, key := row, path
+					v := row[key]
 					if path == "Group" && row["Kind"] == "group" {
-						v = row["Address"]
+						key, v = "Address", row["Address"]
 					}
 					if path == "Source" && row["Kind"] == "source" {
-						v = row["Address"]
+						key, v = "Address", row["Address"]
 					}
 					if path != "Group" {
 						if a, ok := v.(map[string]any); ok {
-							v = a["Address"]
+							owner, key, v = a, "Address", a["Address"]
 						}
 					}
 					if s, ok := v.(string); ok && strings.Contains(s, ":") == v6 {
-						emit(s)
+						emit(s, pimOccurrenceRange(owner, key, len(e.Raw)))
 					}
 				}
 			})
@@ -150,21 +241,31 @@ func pimDisplayBindings() []displayFieldBinding {
 				}
 			}
 			path := f.path
-			out = append(out, displayCustom("pim", "pim."+name, path, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			out = append(out, pimObservedBinding("pim."+name, path, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
 				for _, row := range pimFieldRows(e.Session) {
-					p.walk(row, []string{path, "*", "Address"}, func(v any) {
-						if s, ok := v.(string); ok && strings.Contains(s, ":") == v6 {
-							emit(s)
+					for _, address := range pimAddressRows(row[path]) {
+						if s, ok := address["Address"].(string); ok && strings.Contains(s, ":") == v6 {
+							emit(s, pimOccurrenceRange(address, "Address", len(e.Raw)))
 						}
-					})
+					}
 				}
 			}))
 		}
 	}
-	out = append(out, displayRoot("pim", "pim.observed.checksum_verified", "Checksum Verified", DisplayBoolean, 0, "context", "Checksum Verified"))
+	out = append(out, pimObservedBinding("pim.observed.checksum_verified", "Checksum Verified", DisplayBoolean, 0, "context", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
+		if value, present := e.Session["Checksum Verified"]; present {
+			emit(value, nil)
+		}
+	}))
 	for _, key := range []string{"Source", "Group"} {
-		b := displayRoot("pim", "pim.observed.register."+strings.ToLower(key), key, DisplayAddress, 0, "pdu", "")
-		b.path = []string{"Register IP Header", key}
+		key := key
+		b := pimObservedBinding("pim.observed.register."+strings.ToLower(key), key, DisplayAddress, 0, "pdu", func(e *ProtocolEvent, emit func(any, *DisplayFieldRange)) {
+			if header, ok := e.Session["Register IP Header"].(map[string]any); ok {
+				if value, present := header[key]; present {
+					emit(value, pimOccurrenceRange(header, key, len(e.Raw)))
+				}
+			}
+		})
 		out = append(out, b)
 	}
 	return out

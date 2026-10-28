@@ -87,6 +87,9 @@ type displayFieldBinding struct {
 	rangeKey   string
 	rangeFor   func(*ProtocolEvent, int) *DisplayFieldRange
 	custom     func(*ProtocolEvent, func(any), *displayProjection)
+	// An ingress adapter can collect values and their owned occurrence spans
+	// together once, before any public event cache can be edited.
+	collectWireFields func(*ProtocolEvent, func(any, *DisplayFieldRange))
 }
 
 func displayRoot(protocol, name, label string, typ DisplayFieldType, bits int, origin, key string) displayFieldBinding {

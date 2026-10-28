@@ -424,6 +424,7 @@ func decodePIMRegister(r *controlReader, context PIMWireContext) error {
 		c.info["Observation"] = "encapsulated multicast data; transport normalization validated separately"
 	}
 	r.info["Register IP Header"] = pimRanges(c)
+	c.info["Wire Field Ranges"].(map[string]any)["IP Version"] = []any{uint64(start), uint64(start + 1)}
 	r.rest("Encapsulated Bytes")
 	return r.err
 }
