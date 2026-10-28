@@ -255,15 +255,22 @@ func TestVNCLoginProbeHandler(t *testing.T) {
 	})
 	t.Run("none-and-vncauth-reports-unauth", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{1, 2}, password: "secret"})
-		res := mockProbe(t, "vnc", addr, "admin", "secret")
+		handler, err := bruteutils.GetBruteFuncByType("vnc")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Dictionary attempts in one scan share the same unauthorized check.
+		res := handler(&bruteutils.BruteItem{Type: "vnc", Target: addr, Username: "admin", Password: "secret"})
 		assertUnauth(t, "mixed-unauth", res)
-		wrong := mockProbe(t, "vnc", addr, "", "nope")
+		wrong := handler(&bruteutils.BruteItem{Type: "vnc", Target: addr, Password: "nope"})
 		if wrong.Ok {
 			t.Fatal("wrong VNC-Auth password must not succeed via None fallback")
 		}
 		if wrong.Finished {
 			t.Fatal("wrong password must not finish the target")
 		}
+		// A new scan must discover None again, regardless of its input password.
+		assertUnauth(t, "mixed-unauth-new-scan", mockProbe(t, "vnc", addr, "admin", "nope"))
 	})
 	t.Run("tight-vnauth", func(t *testing.T) {
 		addr := startMockRFB(t, mockRFBConfig{secTypes: []byte{16}, password: "TightPass", nTunnels: 1})
