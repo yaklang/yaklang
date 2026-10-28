@@ -78,44 +78,33 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 	return
 }
 
-type networkPrefixPacket struct {
-	gopacket.Packet
-	prefix []gopacket.Layer
-}
-
-func (p networkPrefixPacket) Layers() []gopacket.Layer { return p.prefix }
-
-func outerNetworkObservation(p gopacket.Packet) (captureEvidence, []string) {
-	prefix := make([]gopacket.Layer, 0, 8)
+func outerNetworkHeaderNames(p gopacket.Packet) []string {
+	e := evidenceFrom(p.Metadata().CaptureInfo)
+	names := make([]string, 0, len(e.networkPrefix)+8)
+	for _, typ := range e.networkPrefix {
+		names = append(names, typ.String())
+	}
 	for _, layer := range p.Layers() {
-		if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == gopacket.LayerTypePayload || len(prefix) >= maxCaptureTransportLayers {
+		if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == gopacket.LayerTypePayload {
 			break
 		}
-		prefix = append(prefix, layer)
+		if len(names) >= maxCaptureTransportLayers {
+			return nil
+		}
+		names = append(names, layer.LayerType().String())
 		if _, network := layer.(gopacket.NetworkLayer); network {
 			break
 		}
 	}
-	// Recompute domains from this observed outer prefix. A legacy decoder's
-	// speculative child must not contribute another tunnel identity.
-	e := packetEvidence(networkPrefixPacket{Packet: p, prefix: prefix})
-	names := make([]string, 0, len(e.networkPrefix)+len(prefix))
-	for _, typ := range e.networkPrefix {
-		names = append(names, typ.String())
-	}
-	for _, layer := range prefix {
-		if len(names) >= maxCaptureTransportLayers {
-			return e, nil
-		}
-		names = append(names, layer.LayerType().String())
-	}
-	return e, names
+	return names
 }
 
-func (a *binParser) refuseUnselectedNetworkParent(p gopacket.Packet, ci gopacket.CaptureInfo) {
-	outer, names := outerNetworkObservation(p)
+func (a *binParser) refuseUnselectedNetworkParent(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo) {
+	names := outerNetworkHeaderNames(p)
 	fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile"}
-	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: outer.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(outer)})
+	// Narrow the displayed interpretation, never the observed source identity.
+	// The zero flow IDs and explicit refusal admit no child connection state.
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
 }
 
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
@@ -126,7 +115,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		if errors.As(failure.Error(), &version) {
 			_, networks, tunnels, unsupported := networkCarrierProfile(p)
 			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
-				a.refuseUnselectedNetworkParent(p, ci)
+				a.refuseUnselectedNetworkParent(p, e, ci)
 				return nil, true
 			}
 			// A decoder's partial layer cannot admit a fragment/tunnel/native
@@ -224,7 +213,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			}
 		}
 		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
-			a.refuseUnselectedNetworkParent(p, ci)
+			a.refuseUnselectedNetworkParent(p, e, ci)
 			return nil, true
 		}
 		e.normalizedTunnels += tunnels
