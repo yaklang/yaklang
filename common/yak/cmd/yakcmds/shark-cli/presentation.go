@@ -732,12 +732,45 @@ func isisMalformedNotice(e *pcaputil.ProtocolEvent) string {
 	return notice
 }
 
+// Native session lists become []any in the isolated JSON detail worker. Accept
+// only bounded, literal string lists in either representation; stringifying an
+// arbitrary value here would turn malformed metadata into an observed header.
+func headerLayerNames(value any) []string {
+	var names []string
+	switch value := value.(type) {
+	case []string:
+		if len(value) == 0 || len(value) > 128 {
+			return nil
+		}
+		names = append([]string(nil), value...)
+	case []any:
+		if len(value) == 0 || len(value) > 128 {
+			return nil
+		}
+		for _, item := range value {
+			name, ok := item.(string)
+			if !ok {
+				return nil
+			}
+			names = append(names, name)
+		}
+	default:
+		return nil
+	}
+	for _, name := range names {
+		if name == "" || len(name) > 128 || name != safeText(name) {
+			return nil
+		}
+	}
+	return names
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
 	if e.Protocol == "ip" && e.Profile == "network-encapsulation-refusal" && e.Status == "limited" && e.Session["Child Header Identity"] == "unconfirmed" {
-		names, _ := e.Session["Observed Header Layers"].([]string)
+		names := headerLayerNames(e.Session["Observed Header Layers"])
 		label := "IP"
 		if len(names) > 0 && len(names) <= 128 && (names[len(names)-1] == "IPv4" || names[len(names)-1] == "IPv6") {
 			label = names[len(names)-1]
@@ -750,7 +783,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e.Protocol == "ip" && e.Status == "malformed" && e.ExpertCode == "IPVersionMismatch" {
 		expected, observed := number(e.Session["Expected IP Version"]), number(e.Session["Observed IP Version"])
 		if (expected == 4 || expected == 6) && expected != observed {
-			names, _ := e.Session["Observed Header Layers"].([]string)
+			names := headerLayerNames(e.Session["Observed Header Layers"])
 			label := fmt.Sprintf("IPv%d", expected)
 			if len(names) == 0 || len(names) > 128 || names[len(names)-1] != label {
 				names = []string{label}
@@ -999,7 +1032,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	p.protocol, p.priority, p.status = label, rank, e.Status
 	p.nativeHeaders = nil
 	if e.Transport == "network" && len(e.CarrierLayers) > 0 {
-		if names, ok := eventValues(e)["Observed Header Layers"].([]string); ok && len(names) > 0 && len(names) <= 128 {
+		if names := headerLayerNames(eventValues(e)["Observed Header Layers"]); len(names) > 0 {
 			p.nativeHeaders = append([]string(nil), names...)
 			p.nativeSource, p.nativeDestination, p.nativeDomain = e.Source, e.Destination, e.Domain
 			for _, name := range names {
