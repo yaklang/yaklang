@@ -416,8 +416,23 @@ func main() {
 		}
 		if name := os.Getenv("SHARK_QA_SELECT_FIELD"); name != "" {
 			fieldY := -1
+			value := os.Getenv("SHARK_QA_SELECT_FIELD_VALUE")
+			occurrence := 0
+			if word := os.Getenv("SHARK_QA_SELECT_FIELD_OCCURRENCE"); word != "" {
+				n, err := strconv.Atoi(word)
+				fail(err)
+				if n < 0 || n > 64 {
+					panic("field occurrence outside bounded QA range")
+				}
+				occurrence = n
+			}
+			seen := 0
 			for y, row := range fields.Rows {
-				if strings.Contains(row, name+": ") {
+				if strings.Contains(row, name+": ") && (value == "" || strings.Contains(row, name+": "+value)) {
+					if seen < occurrence {
+						seen++
+						continue
+					}
 					fieldY = y
 					break
 				}

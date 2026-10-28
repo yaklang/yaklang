@@ -461,7 +461,16 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 		parts := []string{textValue(v["Packet Name"])}
 		address := func(key string) string {
 			m, _ := v[key].(map[string]any)
-			return textValue(m["Address"])
+			if address := textValue(m["Address"]); address != "" {
+				return address
+			}
+			return "unavailable"
+		}
+		count := func(value any) string {
+			if value == nil {
+				return "unavailable"
+			}
+			return fmt.Sprintf("%d", number(value))
 		}
 		switch number(v["Type"]) {
 		case 0:
@@ -485,24 +494,45 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 			}
 		case 1:
 			m, _ := v["Register IP Header"].(map[string]any)
-			parts = append(parts, fmt.Sprintf("(S,G)=(%s,%s)", textValue(m["Source"]), textValue(m["Group"])))
+			source, group := textValue(m["Source"]), textValue(m["Group"])
+			if source == "" {
+				source = "unavailable"
+			}
+			if group == "" {
+				group = "unavailable"
+			}
+			parts = append(parts, fmt.Sprintf("(S,G)=(%s,%s)", source, group))
 			if v["Null Register"] == true {
 				parts[0] = "Null-Register"
 				parts = append(parts, "dummy header; advertised addresses only")
 			}
 		case 3, 6, 7:
 			var joins, prunes uint64
-			for _, g := range mapList(v["Groups"]) {
+			groups := mapList(v["Groups"])
+			_, countsKnown := v["Group Count"]
+			countsKnown = countsKnown && uint64(len(groups)) == number(v["Group Count"])
+			for _, g := range groups {
+				_, joinKnown := g["Join Count"]
+				_, pruneKnown := g["Prune Count"]
+				countsKnown = countsKnown && joinKnown && pruneKnown
 				joins += number(g["Join Count"])
 				prunes += number(g["Prune Count"])
 			}
-			parts = append(parts, fmt.Sprintf("upstream=%s · groups=%d · joins=%d prunes=%d", address("Upstream Neighbor"), number(v["Group Count"]), joins, prunes))
+			joinText, pruneText := "unavailable", "unavailable"
+			if countsKnown {
+				joinText, pruneText = count(joins), count(prunes)
+			}
+			parts = append(parts, fmt.Sprintf("upstream=%s · groups=%s · joins=%s prunes=%s", address("Upstream Neighbor"), count(v["Group Count"]), joinText, pruneText))
 		case 2, 5, 9:
 			parts = append(parts, fmt.Sprintf("(S,G)=(%s,%s)", address("Source"), address("Group")))
 		case 4:
-			parts = append(parts, fmt.Sprintf("BSR=%s · fragment=0x%04x · RP-set not assembled", address("BSR"), number(v["Fragment Tag"])))
+			fragment := "unavailable"
+			if value, present := v["Fragment Tag"]; present {
+				fragment = fmt.Sprintf("0x%04x", number(value))
+			}
+			parts = append(parts, fmt.Sprintf("BSR=%s · fragment=%s · RP-set not assembled", address("BSR"), fragment))
 		case 8:
-			parts = append(parts, fmt.Sprintf("advertised RP=%s · groups=%d", address("RP"), number(v["Prefix Count"])))
+			parts = append(parts, fmt.Sprintf("advertised RP=%s · groups=%s", address("RP"), count(v["Prefix Count"])))
 		}
 		return strings.Join(parts, " · ")
 	}

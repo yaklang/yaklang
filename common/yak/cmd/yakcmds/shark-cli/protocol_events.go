@@ -163,6 +163,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	}]int{}
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
+		if protocol == "pim" && v == nil {
+			return // An unread sibling or collection has no scalar wire value.
+		}
 		if len(out) >= 4096 || depth > 32 {
 			fieldViewLimited = true
 			return
