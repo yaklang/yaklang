@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"text/template"
 	"time"
 
@@ -65,7 +66,7 @@ type Timeline struct {
 	// 关键词: bucketSizer, 动态桶大小, 主动缓存调优
 	bucketSizer BucketSizer
 
-	branchTimeline        bool
+	branchTimeline        atomic.Bool
 	memoryCoveredState    string // internal extraction watermark; never rendered into prompts
 	memoryFinalizePending bool   // normal completion or interruption still requires memory processing
 }
@@ -236,8 +237,8 @@ func (m *Timeline) CopyReducibleTimelineWithMemory() *Timeline {
 		totalDumpContentLimit: m.totalDumpContentLimit,
 		bucketByteSize:        m.bucketByteSize,
 		bucketSizer:           m.bucketSizer,
-		branchTimeline:        m.branchTimeline,
 	}
+	tl.branchTimeline.Store(m.branchTimeline.Load())
 	return tl
 }
 
@@ -297,7 +298,7 @@ func (m *Timeline) IsBranchTimeline() bool {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.branchTimeline
+	return m.branchTimeline.Load()
 }
 
 func (m *Timeline) markBranchTimeline(branch bool) {
@@ -306,14 +307,14 @@ func (m *Timeline) markBranchTimeline(branch bool) {
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.branchTimeline = branch
+	m.branchTimeline.Store(branch)
 }
 
 func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 	m.mu.Lock()
 	if config != nil {
 		m.config = config
-		if owner, ok := config.(*Config); ok && m.trajectoryConfig == nil && !m.branchTimeline && !owner.DisableCreateDBRuntime && owner.PersistentSessionId != "" {
+		if owner, ok := config.(*Config); ok && m.trajectoryConfig == nil && !m.branchTimeline.Load() && !owner.DisableCreateDBRuntime && owner.PersistentSessionId != "" {
 			m.trajectoryConfig = owner
 		}
 	}
@@ -336,7 +337,6 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 		promotedState:        newTimelinePromotedState(),
 		freezeState:          &TimelineFreezeState{},
 		userInputBoundaryKey: newUserInputBoundaryKey(),
-		branchTimeline:       false,
 	}
 	tl.sessionMemory = newTimelineSessionMemory(tl, nil)
 	return tl
@@ -347,6 +347,13 @@ func NewTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 func NewPrivateTimeline(ai AICaller, extraMetaInfo func() string) *Timeline {
 	tl := NewTimeline(ai, extraMetaInfo)
 	tl.markBranchTimeline(true)
+	// Private worker history is still part of the persistent session. Reuse
+	// its original owner even when the worker cannot create a DB runtime.
+	if parent, ok := ai.(*Config); ok && parent != nil && parent.Timeline != nil {
+		parent.Timeline.mu.RLock()
+		tl.trajectoryConfig = parent.Timeline.trajectoryConfig
+		parent.Timeline.mu.RUnlock()
+	}
 	return tl
 }
 

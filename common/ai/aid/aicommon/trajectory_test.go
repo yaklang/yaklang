@@ -59,6 +59,10 @@ func captureTrajectoryEvaluations(t *testing.T) *trajectoryEvaluationCapture {
 	return capture
 }
 
+func readyTrajectoryResponse(response string) TrajectoryResponseReceipt {
+	return func(receive func(string)) { receive(response) }
+}
+
 func TestTrajectoryShortSessionAndContinuation(t *testing.T) {
 	cfg := newTrajectoryConfig(t)
 	evaluations := captureTrajectoryEvaluations(t)
@@ -98,9 +102,8 @@ func TestTrajectoryCompressionPlusTerminal(t *testing.T) {
 	evaluations := captureTrajectoryEvaluations(t)
 	for i, prompt := range []string{"first exact main-loop prompt", "second exact main-loop prompt"} {
 		cfg.Timeline.PushText(int64(i+1), "observation %d", i)
-		result, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "committed summary"}, prompt, func() string {
-			return `{"content":"full compression response","summary":"committed summary","retain_timeline":""}`
-		})
+		result, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "committed summary"}, prompt,
+			readyTrajectoryResponse(`{"content":"full compression response","summary":"committed summary","retain_timeline":""}`))
 		require.NoError(t, err)
 		require.NotNil(t, result)
 	}
@@ -133,7 +136,7 @@ func TestTrajectoryCompressionStorageFailureDoesNotAffectCompression(t *testing.
 	captureTrajectoryEvaluations(t)
 	cfg.Timeline.PushText(1, "original must not disappear")
 	require.NoError(t, cfg.GetDB().Exec("CREATE TRIGGER reject_trajectory BEFORE INSERT ON ai_trajectories BEGIN SELECT RAISE(ABORT, 'trajectory storage unavailable'); END").Error)
-	_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "summary"}, "exact prompt", func() string { return "full compression response" })
+	_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "summary"}, "exact prompt", readyTrajectoryResponse("full compression response"))
 	require.NoError(t, err, "telemetry storage must not reject compression")
 	require.NotContains(t, cfg.Timeline.Dump(), "original must not disappear")
 	require.Contains(t, cfg.Timeline.Dump(), "summary")
@@ -149,7 +152,7 @@ func TestTrajectoryCompressionKeepsSessionOwnerWhenNestedConfigBinds(t *testing.
 	cfg.Timeline.PushText(1, "session observation")
 	nested := &Config{Id: "nested-helper", Ctx: context.Background(), DisableCreateDBRuntime: true}
 	cfg.Timeline.SoftBindConfig(nested, nil)
-	_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "nested-loop summary"}, "actual shared-timeline prompt", func() string { return "full compression response" })
+	_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "nested-loop summary"}, "actual shared-timeline prompt", readyTrajectoryResponse("full compression response"))
 	require.NoError(t, err)
 	waitForTrajectoryWrites(t)
 	rows, err := yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
@@ -163,10 +166,10 @@ func TestTrajectoryCompressionKeepsSessionOwnerWhenNestedConfigBinds(t *testing.
 func TestTrajectoryCompressionResponseFailureDoesNotAffectCommit(t *testing.T) {
 	cfg := newTrajectoryConfig(t)
 	evaluations := captureTrajectoryEvaluations(t)
-	for i, response := range []func() string{
+	for i, response := range []TrajectoryResponseReceipt{
 		nil,
-		func() string { return "" },
-		func() string { panic("broken response receipt") },
+		readyTrajectoryResponse(""),
+		func(func(string)) { panic("broken response receipt") },
 	} {
 		cfg.Timeline.PushText(int64(i+1), "source observation")
 		_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "committed summary"}, "exact prompt", response)
@@ -178,6 +181,39 @@ func TestTrajectoryCompressionResponseFailureDoesNotAffectCommit(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, rows, "missing or broken response receipts must not fabricate trajectory data")
 	require.Zero(t, evaluations.count())
+}
+
+func TestTrajectoryPendingCompressionResponseDoesNotOccupyWriters(t *testing.T) {
+	cfg := newTrajectoryConfig(t)
+	evaluations := captureTrajectoryEvaluations(t)
+	var receive func(string)
+	source := strings.Repeat("complete original compression input ", 16000)
+	cfg.Timeline.PushText(1, "%s", source)
+	requireTrajectoryCollectionReturns(t, func() {
+		_, err := cfg.Timeline.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "summary"}, source,
+			func(callback func(string)) { receive = callback })
+		require.NoError(t, err)
+	})
+	require.NotNil(t, receive)
+	require.Zero(t, trajectoryWrites.pending.Load(), "an incomplete provider must not occupy the database queue or its workers")
+	task := NewStatefulTaskBase("user-task", "goal", context.Background(), nil)
+	task.SetStatus(AITaskState_Completed)
+	RecordTaskTrajectoryPrompt(task, "full terminal prompt")
+	require.True(t, cfg.CollectTerminalTrajectory(task))
+	waitForTrajectoryWrites(t)
+	rows, err := yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
+	require.NoError(t, err)
+	require.Len(t, rows, 1, "terminal persistence is independent of a pending compression receipt")
+	fullResponse := strings.Repeat("complete response reasoning and content ", 12000)
+	receive(fullResponse)
+	receive(fullResponse)
+	waitForTrajectoryWrites(t)
+	rows, err = yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
+	require.NoError(t, err)
+	require.Len(t, rows, 2, "the completed receipt is admitted only once")
+	require.Equal(t, source, rows[0].Prompt)
+	require.Equal(t, fullResponse, rows[0].Response)
+	require.Equal(t, 2, evaluations.count())
 }
 
 func TestTrajectoryIgnoresInternalTasksAndDisabledPersistence(t *testing.T) {
@@ -241,7 +277,96 @@ func TestTrajectoryCollectionNeverWaitsForDatabase(t *testing.T) {
 	require.Len(t, rows, 1)
 }
 
-func TestTrajectoryCollectionDropsInsteadOfWaitingForFullQueueOrTimeline(t *testing.T) {
+func TestTrajectoryTerminalSurvivesBusySourceLocks(t *testing.T) {
+	cfg := newTrajectoryConfig(t)
+	captureTrajectoryEvaluations(t)
+	task := NewStatefulTaskBase("completed-task", "long task", context.Background(), nil)
+	task.SetStatus(AITaskState_Completed)
+	prompt := strings.Repeat("complete terminal context ", 20000) + "TERMINAL_CONTEXT_END"
+	RecordTaskTrajectoryPrompt(task, prompt)
+	admitted := false
+	func() {
+		task.statusMu.Lock()
+		defer task.statusMu.Unlock()
+		cfg.Timeline.mu.Lock()
+		defer cfg.Timeline.mu.Unlock()
+		requireTrajectoryCollectionReturns(t, func() { admitted = cfg.CollectTerminalTrajectory(task) })
+	}()
+	require.True(t, admitted, "ordinary lifecycle/timeline contention must not discard the final prompt")
+	waitForTrajectoryWrites(t)
+	rows, err := yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
+	require.NoError(t, err)
+	require.Len(t, rows, 1)
+	require.Equal(t, prompt, rows[0].Prompt)
+}
+
+func TestTrajectoryStatusSnapshotTracksDeferredAndRestoredLifecycle(t *testing.T) {
+	task := NewStatefulTaskBase("lifecycle", "goal", context.Background(), nil)
+	check := func(expected AITaskState) {
+		task.statusMu.Lock()
+		defer task.statusMu.Unlock()
+		status, ok := task.TryGetStatus()
+		require.True(t, ok)
+		require.Equal(t, expected, status)
+	}
+	check(AITaskState_Created)
+	task.SetStatus(AITaskState_Processing)
+	release := task.DeferCompletion()
+	task.SetStatus(AITaskState_Completed)
+	check(AITaskState_Processing)
+	release()
+	check(AITaskState_Completed)
+	task.ForceSetStatus(AITaskState_Processing)
+	check(AITaskState_Processing)
+	task.RestoreStatus(AITaskState_Skipped)
+	check(AITaskState_Skipped)
+}
+
+func TestTrajectoryCompressionOnPrivateTaskTimelinesIsRetained(t *testing.T) {
+	for _, private := range []bool{false, true} {
+		t.Run(map[bool]string{false: "fork", true: "private"}[private], func(t *testing.T) {
+			cfg := newTrajectoryConfig(t)
+			evaluations := captureTrajectoryEvaluations(t)
+			worker := &Config{Id: "worker-without-own-runtime", Ctx: context.Background(), DisableCreateDBRuntime: true, Timeline: cfg.Timeline}
+			var branch *Timeline
+			if private {
+				branch = NewPrivateTimeline(worker, nil)
+				branch.SoftBindConfig(worker, worker)
+			} else {
+				fork, err := cfg.Timeline.ForkForTask("worker", "long worker", worker, worker)
+				require.NoError(t, err)
+				branch = fork.Branch
+			}
+			source := strings.Repeat("original private-task observation ", 16000) + "PRIVATE_SOURCE_END"
+			response := strings.Repeat("complete compression response ", 2500) + "PRIVATE_RESPONSE_END"
+			branch.PushText(1, "%s", source)
+			_, err := branch.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "worker summary"}, source, readyTrajectoryResponse(response))
+			require.NoError(t, err)
+			waitForTrajectoryWrites(t)
+			rows, err := yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
+			require.NoError(t, err)
+			require.Len(t, rows, 1, "a worker's successful compression belongs to its persistent session")
+			require.Equal(t, cfg.Id, rows[0].RuntimeID)
+			require.Equal(t, source, rows[0].Prompt)
+			require.Equal(t, response, rows[0].Response)
+			require.Equal(t, 1, evaluations.count())
+			// A worker may settle after its parent session has been deleted.
+			// Its inherited owner must not resurrect either runtime or payloads.
+			require.NoError(t, cfg.GetDB().Unscoped().Where("uuid = ?", cfg.Id).Delete(&schema.AIAgentRuntime{}).Error)
+			require.NoError(t, yakit.DeleteAITrajectories(cfg.GetDB(), cfg.PersistentSessionId))
+			branch.PushText(2, "late worker observation")
+			_, err = branch.ApplyCompressionSelection(&TimelineCompressionSelection{Summary: "late summary"}, "late worker prompt", readyTrajectoryResponse("late response"))
+			require.NoError(t, err)
+			waitForTrajectoryWrites(t)
+			rows, err = yakit.QueryAITrajectories(cfg.GetDB(), cfg.PersistentSessionId)
+			require.NoError(t, err)
+			require.Empty(t, rows)
+			require.Equal(t, 1, evaluations.count())
+		})
+	}
+}
+
+func TestTrajectoryCollectionDropsInsteadOfWaitingForFullQueue(t *testing.T) {
 	cfg := newTrajectoryConfig(t)
 	waitForTrajectoryWrites(t)
 	task := NewStatefulTaskBase("task", "goal", context.Background(), nil)
@@ -252,12 +377,6 @@ func TestTrajectoryCollectionDropsInsteadOfWaitingForFullQueueOrTimeline(t *test
 	fullPool.queue <- trajectoryWrite{}
 	trajectoryWrites = fullPool
 	defer func() { trajectoryWrites = originalPool }()
-	requireTrajectoryCollectionReturns(t, func() { require.False(t, cfg.CollectTerminalTrajectory(task)) })
-	task.statusMu.Lock()
-	requireTrajectoryCollectionReturns(t, func() { require.False(t, cfg.CollectTerminalTrajectory(task)) })
-	task.statusMu.Unlock()
-	cfg.Timeline.mu.Lock()
-	defer cfg.Timeline.mu.Unlock()
 	requireTrajectoryCollectionReturns(t, func() { require.False(t, cfg.CollectTerminalTrajectory(task)) })
 }
 
@@ -300,7 +419,7 @@ func TestTrajectoryCollectionNeverWaitsForSlowEvaluator(t *testing.T) {
 	entered := make(chan struct{}, 2)
 	RegisterTrajectoryEvaluator(func(*gorm.DB, bool, *schema.AITrajectory) { entered <- struct{}{}; <-release })
 	for range 2 {
-		cfg.compressionTrajectoryNotification("source", &TimelineCompressionResult{Summary: "summary"}, func() string { return "full compression response" })()
+		cfg.compressionTrajectoryNotification("source", &TimelineCompressionResult{Summary: "summary"}, readyTrajectoryResponse("full compression response"))()
 	}
 	for range 2 {
 		select {

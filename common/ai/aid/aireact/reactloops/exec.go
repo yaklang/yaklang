@@ -828,17 +828,7 @@ LOOP:
 		// Pass the existing response receipt only to successful compression capture.
 		for i := range loopCalls {
 			if loopCalls[i].Action != nil && loopCalls[i].Action.Name() == aicommon.ContextCompressionAction {
-				descriptor := resultDescriptor
-				loopCalls[i].trajectoryResponse = func() string {
-					// Text-mode response finalization may still be running. Only
-					// the background trajectory writer waits for this receipt.
-					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-					defer cancel()
-					if !descriptor.WaitComplete(ctx) {
-						return ""
-					}
-					return descriptor.Snapshot().ResponseJSON
-				}
+				loopCalls[i].trajectoryResponse = resultDescriptor.onTrajectoryResponse
 			}
 		}
 		batch := r.execCalls(loopCalls, iterationCount, task, prompt, done, eventSink)

@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
@@ -48,7 +49,7 @@ type LoopCall struct {
 	Index              int
 	Description        string
 	ArgumentsJSON      string
-	trajectoryResponse func() string // read the existing complete response on the background writer
+	trajectoryResponse aicommon.TrajectoryResponseReceipt
 }
 
 // Callbacks own their readers until EOF and must not return while another
@@ -72,15 +73,45 @@ type LoopResultSnapshot struct {
 }
 
 type LoopResultDescriptor struct {
-	mu            sync.RWMutex
-	snapshot      LoopResultSnapshot
-	contentReady  bool
-	providerReady bool
-	output        string
-	reason        string
-	calls         []*aispec.ToolCall
-	done          chan struct{}
-	once          sync.Once
+	mu                 sync.RWMutex
+	snapshot           LoopResultSnapshot
+	contentReady       bool
+	providerReady      bool
+	output             string
+	reason             string
+	calls              []*aispec.ToolCall
+	done               chan struct{}
+	once               sync.Once
+	trajectoryReceiver atomic.Pointer[trajectoryResponseReceiver]
+}
+
+type trajectoryResponseReceiver struct {
+	delivered atomic.Bool
+	receive   func(string)
+}
+
+func (r *trajectoryResponseReceiver) deliver(response string) {
+	defer aicommon.RecoverTrajectoryCollection()
+	if r != nil && r.delivered.CompareAndSwap(false, true) {
+		r.receive(response)
+	}
+}
+
+// A committed compression subscribes without waiting for either the descriptor
+// lock or provider completion. The receiver only submits a bounded write job.
+func (d *LoopResultDescriptor) onTrajectoryResponse(receive func(string)) {
+	if d == nil || receive == nil {
+		return
+	}
+	receiver := &trajectoryResponseReceiver{receive: receive}
+	d.trajectoryReceiver.Store(receiver)
+	select {
+	case <-d.done:
+		// ResponseJSON is immutable after done closes. Avoid acquiring the
+		// descriptor lock on the task's foreground collection path.
+		receiver.deliver(d.snapshot.ResponseJSON)
+	default:
+	}
 }
 
 func newLoopResultDescriptor(mode string) *LoopResultDescriptor {
@@ -203,6 +234,7 @@ func (d *LoopResultDescriptor) finalizeLocked() {
 	}
 	d.snapshot.Complete = true
 	d.once.Do(func() { close(d.done) })
+	d.trajectoryReceiver.Load().deliver(d.snapshot.ResponseJSON)
 }
 
 // callAILoopTransaction only decides and validates the model's proposed calls.

@@ -92,7 +92,7 @@ func (c *Config) persistEvidenceTimelineLocked(s *SessionPromptState, timeline *
 	timeline.mu.RLock()
 	store, _ := timeline.evidenceStoreLocked()
 	s.evidenceJSON = store.Marshal()
-	if c.PersistentSessionId == "" || c.GetDB() == nil || timeline.branchTimeline {
+	if c.PersistentSessionId == "" || c.GetDB() == nil || timeline.branchTimeline.Load() {
 		timeline.mu.RUnlock()
 		return
 	}
