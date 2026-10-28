@@ -1,5 +1,7 @@
 # P1 协议交付打分
 
+ESP Header Fields 只观察 SPI、线上低 32 位序号和不透明剩余字节，保持 partial；SA、算法、认证、重放判断和解密均不在此范围。新入口的原生字段与仓库外实流量证据不计入历史 YAML 静态评分，保守记为 0/F（L4）。原 ESP 的 86/B 只代表旧结构合同，不代表完整 IPsec 实现。
+
 IMAP SASL Response / Challenge / Initial Value 是新增的有边界传输值子集，保持 partial；不继承历史 IMAP greeting 的 100/A。当前静态评分没有核算原生字段和仓库外实流量证据，三项均保守记为 0/F（L4），不代表这些解析器没有字段或未通过实流量校验。SASL 机制认证、身份与安全层验证未实现；详细运行证据另见公开大包报告。
 
 SFTP 当前只具备外层 SSH 的识别和初始明文传输包解析，加密子系统、请求/响应与文件操作尚未解码。原先把 SSH 握手计入 SFTP 的 95/A 是覆盖误标，现明确记为 0/F 和 partial；这不修改冻结捕获或原始材料评分，也不把 SSH 外层测试当作 SFTP 应用证据。
@@ -48,6 +50,7 @@ GSS-API 与 P0 SPNEGO 的评分仅计 `spnego.yaml` 共同的初始 token 子集
 | GRE | A | 95 | 20 | 25 | 20 | 20 | 10 | L2 | `generic_routing_encapsulation.yaml` |
 | IPsec AH | B | 86 | 15 | 25 | 16 | 20 | 10 | L1 | `ipsec.yaml` |
 | IPsec ESP | B | 86 | 15 | 25 | 16 | 20 | 10 | L2 | `ipsec.yaml` |
+| IPsec ESP Header Fields | F | 0 | 0 | 0 | 0 | 0 | 0 | L4 | `ipsec_esp.yaml` |
 | MPLS | A | 95 | 20 | 25 | 20 | 20 | 10 | L1 | `mpls.yaml` |
 | VXLAN | A | 90 | 15 | 25 | 20 | 20 | 10 | L1 | `vxlan.yaml` |
 | L2TP | A | 100 | 25 | 25 | 20 | 20 | 10 | L2 | `l2tp.yaml` |
