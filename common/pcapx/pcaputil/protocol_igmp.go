@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 
 	"github.com/gopacket/gopacket"
@@ -50,11 +51,14 @@ func igmpIPv4Payload(p gopacket.Packet) (wire []byte, offset, declared int, ok b
 		return nil, 0, 0, false
 	}
 	declared = -1
-	if ip.Length != 0 {
-		if int(ip.Length) < len(h) || len(wire) > int(ip.Length)-len(h) {
+	// gopacket replaces a zero Length with len(data) for compatibility. That
+	// synthesized value is not an enclosing length declared on the wire.
+	total := int(binary.BigEndian.Uint16(h[2:4]))
+	if total != 0 {
+		if total < len(h) || len(wire) > total-len(h) {
 			return nil, 0, 0, false
 		}
-		declared = int(ip.Length) - len(h)
+		declared = total - len(h)
 	}
 	if failure := p.ErrorLayer(); failure != nil && !bytes.Equal(failure.LayerContents(), wire) {
 		// Includes malformed/truncated IPv4 options and unrelated deeper errors.
