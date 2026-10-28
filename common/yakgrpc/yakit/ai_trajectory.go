@@ -120,7 +120,6 @@ func QueryAITrajectories(db *gorm.DB, persistentSessionID string) ([]*schema.AIT
 	}
 	var records []*schema.AITrajectory
 	query := bizhelper.ExactQueryString(db.Model(&schema.AITrajectory{}), "persistent_session_id", persistentSessionID)
-	query = bizhelper.QueryOrder(query, "kind", "asc")
 	query = bizhelper.QueryOrder(query, "captured_at", "asc")
 	query = bizhelper.QueryOrder(query, "id", "asc")
 	err := query.Find(&records).Error

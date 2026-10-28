@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/liteforge/liteforgeapp"
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
@@ -23,10 +24,8 @@ import (
 )
 
 const (
-	trajectoryEvaluatorModel           = "memfit-light-free"
-	trajectoryEvaluationTimeout        = 30 * time.Second
-	trajectoryEvaluationPromptTokens   = 32 * 1024
-	trajectoryEvaluationResponseTokens = 8 * 1024
+	trajectoryEvaluatorModel    = "memfit-light-free"
+	trajectoryEvaluationTimeout = 30 * time.Second
 )
 
 type trajectoryEvaluationJob struct {
@@ -137,6 +136,9 @@ func evaluateTrajectory(ctx context.Context, record *schema.AITrajectory, callba
 		liteforgeapp.WithLiteForge_Prompt(buildTrajectoryPrompt(record)),
 		liteforgeapp.WithLiteForge_DisableTimeline(),
 		liteforgeapp.WithLiteForge_SpeedPriority(),
+		liteforgeapp.WithLiteForge_ExtraRequestOpts(aicommon.WithAIRequest_ExtraSpecOpts(
+			aispec.WithDisableProviderFallback(true), aispec.WithFunctionCallRetryTimes(1),
+		)),
 		liteforgeapp.WithLiteForge_OutputSchemaRaw(name, aitool.NewObjectSchemaWithActionName(name,
 			aitool.WithIntegerParam("value_score", aitool.WithParam_Required(), aitool.WithParam_Description("Training value from 0 to 10 inclusive")),
 			aitool.WithStringParam("reason", aitool.WithParam_Required(), aitool.WithParam_Description("Explain the evidence for this training-value judgement")),
@@ -177,11 +179,8 @@ func buildTrajectoryPrompt(record *schema.AITrajectory) string {
 	payload := map[string]any{
 		"trajectory_schema": "ai_trajectory.v1", "persistent_session_id": record.PersistentSessionID,
 		"trajectory_id": record.ID, "trajectory_key": record.TrajectoryKey, "content_hash": record.ContentHash,
-		"kind": record.Kind, "task_status": record.Status, "user_query": record.UserQuery,
-		"prompt":             aicommon.ShrinkTextBlockByTokens(record.Prompt, trajectoryEvaluationPromptTokens),
-		"response":           aicommon.ShrinkTextBlockByTokens(record.Response, trajectoryEvaluationResponseTokens),
-		"prompt_truncated":   aicommon.MeasureTokens(record.Prompt) > trajectoryEvaluationPromptTokens,
-		"response_truncated": aicommon.MeasureTokens(record.Response) > trajectoryEvaluationResponseTokens,
+		"kind": record.Kind, "task_status": record.Status,
+		"user_query": record.UserQuery, "prompt": record.Prompt, "response": record.Response,
 	}
 	raw, _ := json.Marshal(payload)
 	return "Judge the training value of this AI agent trajectory, from 0 to 10. " +
@@ -190,5 +189,5 @@ func buildTrajectoryPrompt(record *schema.AITrajectory) string {
 		"A failure with a clear correction can be valuable; automatic approval alone is not evidence of quality. " +
 		"For compression, assess what the summary preserves or loses against its source prompt. " +
 		"For terminal trajectories, assess the accumulated prompt against the user goal and observed evidence; no emitted final result is collected. " +
-		"Missing or truncated evidence is unknown, not success or failure. Give a concise evidence-based reason.\n" + string(raw)
+		"Missing evidence is unknown, not success or failure. Give an evidence-based reason.\n" + string(raw)
 }

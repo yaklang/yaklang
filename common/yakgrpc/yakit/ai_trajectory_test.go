@@ -69,9 +69,9 @@ func TestAITrajectorySegmentsAndRevision(t *testing.T) {
 	rows, err := QueryAITrajectories(db, "session_%")
 	require.NoError(t, err)
 	require.Len(t, rows, 3, "two compressions plus one terminal")
-	require.Equal(t, "compress-1", rows[0].TrajectoryKey)
-	require.Equal(t, "compress-2", rows[1].TrajectoryKey)
-	require.Equal(t, schema.AITrajectoryTerminal, rows[2].Kind)
+	require.Equal(t, schema.AITrajectoryTerminal, rows[0].Kind)
+	require.Equal(t, "compress-1", rows[1].TrajectoryKey)
+	require.Equal(t, "compress-2", rows[2].TrajectoryKey)
 	_, err = SaveAITrajectory(db, &schema.AITrajectory{PersistentSessionID: "session_%", Kind: schema.AITrajectoryCompression,
 		TrajectoryKey: "compress-1", Prompt: "edited source"})
 	require.ErrorContains(t, err, "immutable")
@@ -231,4 +231,26 @@ func TestAITrajectoryRepeatedLatestPromptKeepsCaptureWatermark(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.Equal(t, "latest prompt", rows[0].Prompt)
 	require.WithinDuration(t, latest.CapturedAt, rows[0].CapturedAt, time.Millisecond)
+}
+
+func TestAITrajectoryQueryPreservesChronologyAcrossTasks(t *testing.T) {
+	db := trajectoryTestDB(t)
+	start := time.Now()
+	for i, record := range []schema.AITrajectory{
+		{Kind: schema.AITrajectoryCompression, TrajectoryKey: "compression-first"},
+		{Kind: schema.AITrajectoryTerminal, TaskID: "first"},
+		{Kind: schema.AITrajectoryCompression, TrajectoryKey: "compression-second"},
+		{Kind: schema.AITrajectoryTerminal, TaskID: "second"},
+	} {
+		record.PersistentSessionID, record.CapturedAt = "session_%", start.Add(time.Duration(i)*time.Second)
+		_, err := SaveAITrajectory(db, &record)
+		require.NoError(t, err)
+	}
+	rows, err := QueryAITrajectories(db, "session_%")
+	require.NoError(t, err)
+	var keys []string
+	for _, row := range rows {
+		keys = append(keys, row.TrajectoryKey)
+	}
+	require.Equal(t, []string{"compression-first", "terminal:first", "compression-second", "terminal:second"}, keys)
 }
