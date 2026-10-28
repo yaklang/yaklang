@@ -56,7 +56,15 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 			if v.Type == 1 && !v.NullRegister {
 				tunnels++
 			}
-		case *layers.GRE, *layers.VXLAN:
+		case *layers.GRE:
+			tunnels++
+			// Version zero and the legacy PPTP version-one decoder have
+			// distinct existing layouts. Other version bits cannot select an
+			// inner grammar merely because Protocol Type resembles an EtherType.
+			if v.Version > 1 {
+				unsupported = true
+			}
+		case *layers.VXLAN:
 			tunnels++
 		case *layers.Geneve:
 			tunnels++
@@ -102,22 +110,68 @@ func outerNetworkHeaderNames(p gopacket.Packet) []string {
 func (a *binParser) refuseUnselectedNetworkParent(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo) {
 	names := outerNetworkHeaderNames(p)
 	fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile"}
+	summary := "Encapsulation profile unavailable; inner identity unconfirmed"
+	// Report a literal GRE version only directly after the observed outer IP.
+	// A child behind some other unselected parent has no admitted GRE identity.
+	network := p.NetworkLayer()
+	directGRE := false
+	switch ip := network.(type) {
+	case *layers.IPv4:
+		directGRE = ip.Protocol == layers.IPProtocolGRE
+	case *layers.IPv6:
+		directGRE = ip.NextHeader == layers.IPProtocolGRE
+	}
+	if directGRE && e.normalizedTunnels < 4 {
+		afterNetwork := false
+		for _, layer := range p.Layers() {
+			if layer == network {
+				afterNetwork = true
+				continue
+			}
+			if !afterNetwork {
+				continue
+			}
+			if gre, ok := layer.(*layers.GRE); ok {
+				if gre.Version > 1 {
+					fields["Unselected Carrier"] = "GRE"
+					fields["Observed GRE Version"] = gre.Version
+					summary = fmt.Sprintf("GRE version %d not selected; inner identity unconfirmed", gre.Version)
+				}
+				break
+			}
+			if _, inner := layer.(gopacket.NetworkLayer); inner {
+				break
+			}
+		}
+	}
 	// Narrow the displayed interpretation, never the observed source identity.
 	// The zero flow IDs and explicit refusal admit no child connection state.
-	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: summary, Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
 }
 
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
+	inner, networks, tunnels, unsupportedTunnel := networkCarrierProfile(p)
+	if networks > 1 {
+		// Preserve the existing full observation domain before narrowing a
+		// rejected interpretation, including sources reconstructed from fragments.
+		e.refs = append([]PacketReference(nil), e.refs...)
+		if !e.carrierOwned {
+			for i := range e.refs {
+				e.refs[i].Domain = e.Ref.Domain
+			}
+		}
+	}
+	if unsupportedTunnel || networks > 1 && (tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
+		// Parent admission precedes every child observation, including ARP,
+		// topology/discovery codecs and errors in incomplete inner IP headers.
+		a.refuseUnselectedNetworkParent(p, e, ci)
+		return nil, true
+	}
 	if failure := p.ErrorLayer(); failure != nil {
 		var truncated *ipHeaderTruncatedError
 		if errors.As(failure.Error(), &truncated) {
-			_, networks, tunnels, unsupported := networkCarrierProfile(p)
-			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
-				a.refuseUnselectedNetworkParent(p, e, ci)
-				return nil, true
-			}
 			fields := map[string]any{"Expected IP Version": truncated.expected, "Available Header Bytes": truncated.available, "Required Header Bytes": truncated.required, "Header Observation Scope": "incomplete fixed header; declared carrier only"}
 			if truncated.hasVersion {
 				fields["Observed IP Version"] = truncated.observed
@@ -152,11 +206,6 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		var version *ipVersionError
 		if errors.As(failure.Error(), &version) {
-			_, networks, tunnels, unsupported := networkCarrierProfile(p)
-			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
-				a.refuseUnselectedNetworkParent(p, e, ci)
-				return nil, true
-			}
 			// A decoder's partial layer cannot admit a fragment/tunnel/native
 			// message, advance clocks, or create an application connection.
 			// Keep only the validated outer domain and literal physical source.
@@ -241,20 +290,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	}
 	// gopacket exposes the outer NetworkLayer and TransportLayer. Normalize a
 	// supported tunnel to its innermost IP before transport dispatch.
-	inner, networks, tunnels, unsupportedTunnel := networkCarrierProfile(p)
 	if networks > 1 {
-		// The inner carrier can become visible only after outer reassembly.
-		// Every contributing fragment belongs to that same reconstructed domain.
-		e.refs = append([]PacketReference(nil), e.refs...)
-		if !e.carrierOwned {
-			for i := range e.refs {
-				e.refs[i].Domain = e.Ref.Domain
-			}
-		}
-		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
-			a.refuseUnselectedNetworkParent(p, e, ci)
-			return nil, true
-		}
 		e.normalizedTunnels += tunnels
 		e.preserveNetworkPrefix(p, inner)
 		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
