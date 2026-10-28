@@ -3,6 +3,7 @@ package sharkcli
 import (
 	"bytes"
 	"encoding/json"
+	"net/netip"
 	"strings"
 	"testing"
 
@@ -86,4 +87,40 @@ func TestLegacyFieldHierarchyLimitsDeepAndWideTrees(t *testing.T) {
 	flattenFields(&base.NodeValue{Name: "IP", Value: children}, 0, &fields)
 	require.Len(t, fields, 8192)
 	require.Contains(t, fields[len(fields)-1].text, "view limited")
+}
+
+func TestLegacyAddressFieldsFormatRawStringsWithoutChangingFamilyOrSource(t *testing.T) {
+	for _, tc := range []struct {
+		section, expected string
+		wire              []byte
+	}{
+		{"IP", "127.0.0.1", []byte{127, 0, 0, 1}},
+		{"IPv4", "192.0.2.1", []byte{192, 0, 2, 1}},
+		{"IPv6", "::ffff:192.0.2.1", netip.MustParseAddr("::ffff:192.0.2.1").AsSlice()},
+		{"Ethernet", "41:42:43:44:45:46", []byte("ABCDEF")},
+	} {
+		for _, value := range []any{tc.wire, string(tc.wire)} {
+			node := &base.NodeValue{Name: "Source", Value: value}
+			root := &base.NodeValue{Name: tc.section, Value: []*base.NodeValue{node}}
+			var fields []field
+			flattenFields(root, 0, &fields)
+			require.Len(t, fields, 2)
+			require.Equal(t, "Source: "+tc.expected, fields[1].text)
+			require.Equal(t, value, node.Value, "formatting retains the original raw value and its type")
+			require.False(t, fields[1].hasRange, "formatting cannot invent a byte range")
+		}
+	}
+	for _, tc := range []struct {
+		section, name string
+		wire          []byte
+	}{
+		{"IP", "Source", []byte{1, 2}},
+		{"IP", "Source", netip.MustParseAddr("2001:db8::1").AsSlice()},
+		{"IPv6", "Source", []byte{192, 0, 2, 1}},
+		{"TCP", "Source", []byte{192, 0, 2, 1}},
+		{"Ethernet", "Payload", []byte("ABCDEF")},
+	} {
+		_, ok := legacyAddressFieldValue(tc.section, tc.name, tc.wire)
+		require.False(t, ok, "only complete address words in the actual family are formatted")
+	}
 }
