@@ -361,3 +361,31 @@ both native/protocol connection identities. Only generated event-ID aliases can
 be renumbered; no wire integers or application fields are normalized. It lists
 zero-tail changes and source-bound fragment diagnostics separately, including
 invalid IP versions as an unresolved defect rather than valid fragment proof.
+
+`discovery/ip_version_original_controls.py SOURCE_PCAPNG FRAGMENT_PROOF OUTPUT_DIR`
+copies the 269 original malformed-version witnesses without changing headers,
+transport bytes or timestamps. Filtering, frame renumbering and the mapping to
+one classic-PCAP interface are explicit in its source ledger.
+`ip_version_source_audit.py --help` checks their complete SDK/CLI projection and
+requires each original frame in the full capture to have exactly one refusal,
+with no contribution to a fragment, transport connection or application PDU.
+
+`ip_version_full_capture_audit.py --help` checks every reported version refusal
+in the full original capture. `--oracle` is the full original-frame TShark
+`-T json -x --no-duplicate-keys` export; `--reference-labels-path` is the matching
+literal field/Protocol-column JSON export. Each version binds to its own raw
+offset, width, mask and captured data-source index, including the owning expert
+node. Global field occurrence order cannot prove nested-header ownership.
+Unselected parents remain limited outer-prefix observations. The optional
+baseline checks preserve their original refusal frame sets. Reference-only
+frames are retained explicitly, not declared to be missing applications.
+
+`ip_admission_public_preservation_audit.py --help` compares every non-IP event
+across the admission change with exact values, types, source contributors,
+bytes and both connection namespaces. Only generated PDU-ID aliases may change.
+It separately inventories IP diagnostics and requires physical label changes to
+belong to explicit source-bound IP refusals. This is preservation evidence,
+not all-field Wireshark parity. `ip_version_negative_controls.py --help` and
+`ip_version_reference_negative_controls.py --help` reject forged source,
+projection and reference descriptors, including boolean/integer substitutions
+and experts moved away from their owning captured byte.

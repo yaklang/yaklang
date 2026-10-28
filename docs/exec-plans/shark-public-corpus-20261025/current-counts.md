@@ -1,8 +1,8 @@
-当前显示标签计数：Windows CLI / 原生 / SDK 生产源码 `356a2555fb`，完整测试源码 `30e54d42b5`。输入原包不入库。相对上一轮两份大包的全部物理帧标签保持不变；Weber 六条 QUIC 零尾改为显式的未保护数据报填充，Sharon 分片时钟隔离使内部诊断净增 57 条。新实抓、逐字节比对和已知无效 IP 版本问题见 [最新证据](capture-clock-padding-summary.json)。前一轮 Sharon 六帧的 SMB2 +5、MODBUS -1、TCP -4 展示差异继续保留，见 [结束发布证据](tcp-native-preview-publication-summary.json)。
+当前显示标签计数：原生 / SDK 源码 `31ba17a699`，Windows CLI 源码 `a8a4de07e8`。输入原包不入库。此次修复错误 IP 版本的状态准入，并将不支持的封装限制为外层观察；物理帧标签变化均有原始来源证明，详见 [IP 准入证据](IP-admission-summary.json)。
 
-物理行中的既有迟到发布仍保留；另外补回 Weber 26、Sharon 552 条结束诊断。`record_type=protocol_publication` 是非物理分析记录，`published_pdus` 的贡献帧由 `byte_source` 定义；它们不计入下表物理帧标签。详见 [结束发布与连接归属证据](tcp-native-preview-publication-summary.json)。
+所有物理捕获事实不变；Weber 22 帧、Sharon 1,336 帧改为保守的 IPv4 拒绝展示。Wireshark 原始列标签逐字保留，不将标签差异归一化。结束发布仍是 `record_type=protocol_publication` 的非物理记录，不计入物理标签。
 
-这里逐字保留 Wireshark 和 Shark 的列标签，帧数与 SDK 记录数（含诊断）分开。同名计数不代表解析正确；大小写、子协议、分片及拒绝策略也会产生标签差异。字段、流、重组和来源的验证见主报告及各协议证书。
+同名计数不代表字段、重组或连接正确；不同标签也不自动等于漏识别。完整字段、流和会话的适用范围见主报告及各独立证书。
 
 ## weber
 
@@ -43,12 +43,12 @@
 
 ## sharon
 
-物理帧 328,127；SDK 记录 245,841。
+物理帧 328,127；SDK 记录 249,497。
 
 | 排名 | WS 原始标签 | WS 帧数 | Shark 完全同名帧数 | 同名差值 |
 |---:|---|---:|---:|---:|
-| 1 | IPv4 | 26,586 | 53,639 | +27,053 |
-| 2 | TCP | 20,096 | 6,635 | -13,461 |
+| 1 | IPv4 | 26,586 | 54,975 | +28,389 |
+| 2 | TCP | 20,096 | 6,634 | -13,462 |
 | 3 | GSMTAP | 17,864 | 0 | -17,864 |
 | 4 | BACnet-APDU | 10,607 | 0 | -10,607 |
 | 5 | 802.11 | 10,522 | 0 | -10,522 |

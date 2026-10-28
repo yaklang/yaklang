@@ -1,12 +1,11 @@
 {
-  "scope": "Literal protocol labels and counts remain unchanged after exact full SDK comparison and complete CLI comparison permitting only 19/2 independently witnessed native diagnostic-status restorations. No field/ID normalization. Source hashes, flows/sessions, bytes and source associations retain their original namespace values. Native refusals are not thereby certified RFC violations.",
-  "source": "898f74a789",
-  "generator_sha256": "84c2d20369593aa1b71f5c73fcdd8208f204fafc49db107e933262acd6641905",
+  "scope": "Literal physical label counts and complete SDK record counts after source-bound IP admission. Equal labels do not certify protocol/field parity; refusal labels remain unnormalized.",
+  "generator_sha256": "1e1d71a5acd15af0e68ca53f87bdb4ef3206c5578e173e22c0615d7aa177037a",
   "inputs": {
     "weber": {
       "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
       "physical_frames": 51328,
-      "native_message_records": 39293,
+      "native_message_records": 39740,
       "reference_labels": {
         "TCP": 8683,
         "RTP": 6462,
@@ -139,7 +138,7 @@
         "CiscoDiscoveryInfo": 109,
         "ICMP": 2509,
         "BGP": 245,
-        "TCP": 9164,
+        "TCP": 8890,
         "HTTP/1.1": 82,
         "HTTP/1.0": 25,
         "UDP": 3262,
@@ -172,7 +171,7 @@
         "RTSP": 176,
         "PPPoE": 8,
         "PPP": 35,
-        "IPv4": 111,
+        "IPv4": 133,
         "IPSecAH": 5,
         "IMAP": 44,
         "Fragment": 232,
@@ -181,7 +180,7 @@
         "TLSv1.3": 991,
         "WHOIS": 24,
         "NetFlow v9": 196,
-        "GRE": 44,
+        "GRE": 22,
         "MLDv2MulticastListenerReport": 10,
         "Telnet": 127,
         "IPP": 84,
@@ -206,7 +205,7 @@
         "NTLMSSP": 5,
         "SPNEGO": 8,
         "LDAP": 365,
-        "DCE/RPC": 128,
+        "DCE/RPC": 402,
         "RDP": 7,
         "RDPUDP": 2,
         "RDPUDP2": 1056,
@@ -242,9 +241,9 @@
         "ike": 719,
         "ssdp": 104,
         "mdns": 396,
-        "rtsp": 15,
+        "rtsp": 132,
         "ip": 144,
-        "imap": 17,
+        "imap": 56,
         "sip": 21,
         "rtp": 6462,
         "whois": 24,
@@ -265,7 +264,7 @@
         "kerberos": 134,
         "smb2": 155,
         "ldap": 193,
-        "dcerpc": 109,
+        "dcerpc": 400,
         "rdp": 6,
         "rdpudp": 2380,
         "stun": 22,
@@ -278,8 +277,8 @@
         {
           "label": "TCP",
           "reference_frames": 8683,
-          "same_label_native_frames": 9164,
-          "same_label_delta": 481
+          "same_label_native_frames": 8890,
+          "same_label_delta": 207
         },
         {
           "label": "RTP",
@@ -494,8 +493,8 @@
         {
           "label": "IPv4",
           "reference_frames": 167,
-          "same_label_native_frames": 111,
-          "same_label_delta": -56
+          "same_label_native_frames": 133,
+          "same_label_delta": -34
         },
         {
           "label": "DRSUAPI",
@@ -686,8 +685,8 @@
         {
           "label": "GRE",
           "reference_frames": 44,
-          "same_label_native_frames": 44,
-          "same_label_delta": 0
+          "same_label_native_frames": 22,
+          "same_label_delta": -22
         },
         {
           "label": "POP",
@@ -1010,8 +1009,8 @@
         {
           "label": "DCE/RPC",
           "reference_frames": 0,
-          "same_label_native_frames": 128,
-          "same_label_delta": 128
+          "same_label_native_frames": 402,
+          "same_label_delta": 402
         },
         {
           "label": "DTLS",
@@ -1237,10 +1236,8 @@
         }
       ],
       "reference_summary_sha256": "d1dabd7495793f96e274db82128fc33be849e561d0dda75b2995ffad2840558d",
-      "SDK_export_sha256": "6aca37a890628409a19e85a2345a29679288871df2d1cf2d1b6a82af52f1eb05",
-      "CLI_export_sha256": "83fa72120db6db528a8b345f3f7d1be0b7fab1e13fde4bf0959733c1e598794e",
-      "SDK_invariants_sha256": "716c7c63422e9ae8142796201449b4266681819eaa3c3955bd49c781fecb6cea",
-      "CLI_invariants_sha256": "80294837fb0e2ca1c73f0c0ff63fdea63669b177aa42731dbac6325bdbdc0b6d",
+      "SDK_export_sha256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+      "CLI_export_sha256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
       "header_certificate_sha256": "04ce9ca2521e0c6ae6fa138bd446829a32eea471e421723e0725ca7bd654e5bd",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
@@ -1250,12 +1247,13 @@
       "all_other_values_types_order_and_IDs_exact": true,
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 19,
-      "previous_Edwards_inner_field_expansions": 1
+      "previous_Edwards_inner_field_expansions": 1,
+      "source_preservation_certificate_sha256": "b7b71c3aa183458a42c9e1c4814f328e21e0ffe3ebe9566847090961c3ac88ed"
     },
     "sharon": {
       "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
       "physical_frames": 328127,
-      "native_message_records": 245625,
+      "native_message_records": 249497,
       "reference_labels": {
         "IPv4": 26586,
         "TCP": 20096,
@@ -3097,7 +3095,7 @@
         "CiscoDiscoveryInfo": 109,
         "ICMP": 2501,
         "BGP": 245,
-        "TCP": 6643,
+        "TCP": 6634,
         "HTTP/1.1": 54,
         "HTTP/1.0": 23,
         "UDP": 109376,
@@ -3106,7 +3104,7 @@
         "DHCPv6": 198,
         "DNS": 1296,
         "IGMP": 75,
-        "IPv6": 87,
+        "IPv6": 82,
         "TLS": 49,
         "TLSv1.2": 452,
         "SMTP": 20,
@@ -3130,16 +3128,16 @@
         "RTSP": 176,
         "PPPoE": 11,
         "PPP": 37,
-        "IPv4": 53639,
+        "IPv4": 54975,
         "IPSecAH": 4,
         "IMAP": 32,
-        "Fragment": 51897,
+        "Fragment": 51606,
         "SIP": 22,
         "RTP": 6462,
         "TLSv1.3": 302,
         "WHOIS": 24,
         "NetFlow v9": 196,
-        "GRE": 18052,
+        "GRE": 18028,
         "MLDv2MulticastListenerReport": 10,
         "Telnet": 129,
         "IPP": 84,
@@ -3154,27 +3152,27 @@
         "VRRP": 818,
         "Syslog": 111,
         "SCTP": 25412,
-        "IPv6HopByHop": 17388,
+        "IPv6HopByHop": 16381,
         "STUN": 2,
         "LLC": 6305,
         "PIMv2": 94,
         "MPLS": 255,
         "EAPOL": 53,
         "EAP": 26,
+        "DCE/RPC": 5,
         "IPv6Destination": 13,
-        "ICMPv4": 18,
+        "ICMPv4": 11,
         "IPv6Routing": 5,
         "ICMPv6": 51,
-        "DCE/RPC": 1,
-        "SMB2": 9,
-        "EtherIP": 7,
+        "SMB2": 14,
+        "EtherIP": 6,
         "EthernetCTP": 4,
         "MDP": 1,
         "EthernetCTPForwardData": 3,
         "CiscoDiscovery": 1,
         "TLS?": 1,
         "IPv6Fragment": 2,
-        "MODBUS": 2
+        "MODBUS": 1
       },
       "native_message_protocols": {
         "ldp": 322,
@@ -3202,9 +3200,9 @@
         "ike": 274,
         "ssdp": 73,
         "mdns": 396,
-        "rtsp": 15,
-        "ip": 110769,
-        "imap": 5,
+        "rtsp": 132,
+        "ip": 114482,
+        "imap": 44,
         "sip": 23,
         "rtp": 6462,
         "whois": 24,
@@ -3220,7 +3218,7 @@
         "stun": 2,
         "turn": 1,
         "pim": 131,
-        "dcerpc": 12,
+        "dcerpc": 15,
         "smb2": 16,
         "diameter": 5,
         "postgresql": 4,
@@ -3232,14 +3230,14 @@
         {
           "label": "IPv4",
           "reference_frames": 26586,
-          "same_label_native_frames": 53639,
-          "same_label_delta": 27053
+          "same_label_native_frames": 54975,
+          "same_label_delta": 28389
         },
         {
           "label": "TCP",
           "reference_frames": 20096,
-          "same_label_native_frames": 6643,
-          "same_label_delta": -13453
+          "same_label_native_frames": 6634,
+          "same_label_delta": -13462
         },
         {
           "label": "GSMTAP",
@@ -3634,8 +3632,8 @@
         {
           "label": "IPv6",
           "reference_frames": 810,
-          "same_label_native_frames": 87,
-          "same_label_delta": -723
+          "same_label_native_frames": 82,
+          "same_label_delta": -728
         },
         {
           "label": "X11",
@@ -4084,8 +4082,8 @@
         {
           "label": "SMB2",
           "reference_frames": 366,
-          "same_label_native_frames": 9,
-          "same_label_delta": -357
+          "same_label_native_frames": 14,
+          "same_label_delta": -352
         },
         {
           "label": "TPKT",
@@ -5014,8 +5012,8 @@
         {
           "label": "GRE",
           "reference_frames": 121,
-          "same_label_native_frames": 18052,
-          "same_label_delta": 17931
+          "same_label_native_frames": 18028,
+          "same_label_delta": 17907
         },
         {
           "label": "MTP3MG (Int. ITU)",
@@ -14224,8 +14222,8 @@
         {
           "label": "DCE/RPC",
           "reference_frames": 0,
-          "same_label_native_frames": 1,
-          "same_label_delta": 1
+          "same_label_native_frames": 5,
+          "same_label_delta": 5
         },
         {
           "label": "Dot1Q",
@@ -14236,8 +14234,8 @@
         {
           "label": "EtherIP",
           "reference_frames": 0,
-          "same_label_native_frames": 7,
-          "same_label_delta": 7
+          "same_label_native_frames": 6,
+          "same_label_delta": 6
         },
         {
           "label": "EthernetCTP",
@@ -14260,8 +14258,8 @@
         {
           "label": "Fragment",
           "reference_frames": 0,
-          "same_label_native_frames": 51897,
-          "same_label_delta": 51897
+          "same_label_native_frames": 51606,
+          "same_label_delta": 51606
         },
         {
           "label": "HTTP/1.0",
@@ -14284,8 +14282,8 @@
         {
           "label": "ICMPv4",
           "reference_frames": 0,
-          "same_label_native_frames": 18,
-          "same_label_delta": 18
+          "same_label_native_frames": 11,
+          "same_label_delta": 11
         },
         {
           "label": "IKEv1",
@@ -14326,8 +14324,8 @@
         {
           "label": "IPv6HopByHop",
           "reference_frames": 0,
-          "same_label_native_frames": 17388,
-          "same_label_delta": 17388
+          "same_label_native_frames": 16381,
+          "same_label_delta": 16381
         },
         {
           "label": "IPv6Routing",
@@ -14368,8 +14366,8 @@
         {
           "label": "MODBUS",
           "reference_frames": 0,
-          "same_label_native_frames": 2,
-          "same_label_delta": 2
+          "same_label_native_frames": 1,
+          "same_label_delta": 1
         },
         {
           "label": "NetFlow v9",
@@ -14421,10 +14419,8 @@
         }
       ],
       "reference_summary_sha256": "88e582b8f94b1a2c548fa9feabef2bcd00a0e4df963de52998ccd5bc37fdbd6b",
-      "SDK_export_sha256": "7de00a8c05af5ac72f7f54f18eb2bdc0d77726e8a7b02936d3f5bf40ec0d7369",
-      "CLI_export_sha256": "112000f53f20aa9492e60dadd237805206923a44439095f8de5be4f1559d38cb",
-      "SDK_invariants_sha256": "4e25090e92737c85c288edb4e241cea9201f88e4b6f4f6d85473dd3927e2e646",
-      "CLI_invariants_sha256": "029b8d75af76d28d84ebea5a000b329a7d1a74d1ccbeb4806bf6b6518b41fda6",
+      "SDK_export_sha256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+      "CLI_export_sha256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
       "header_certificate_sha256": "dc6ad7d541f67be63e01a370170ea78a1f81389225f821ca6ebcc4a4f2d178e7",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
@@ -14434,12 +14430,16 @@
       "all_other_values_types_order_and_IDs_exact": true,
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 2,
-      "previous_Edwards_inner_field_expansions": 1
+      "previous_Edwards_inner_field_expansions": 1,
+      "source_preservation_certificate_sha256": "5b1382b56e3b51045361434664ea8a8e65de51c1b2c4f734ff18a558866dbbe4"
     }
   },
   "prior_count_snapshot_sha256": "98a05dc1be92dd89860da7d58d76d69a5d8d797ee3166e6cd1c7c69c885c2f7a",
   "previous_source": "6829457341",
   "refresh_audit_source": "2097181736",
   "refresh_generator_sha256": "8bde82259b0b4be125919c562d43b8963faa0cea409ed9888adae1c28e6a3aa1",
-  "native_SDK_source": "2154ab1dac"
+  "native_SDK_source": "2154ab1dac",
+  "source_native": "31ba17a699daa2a4931f45bc3769de359ff58711",
+  "source_Windows_CLI": "a8a4de07e8592c895987cf7c86d984af58de679a",
+  "latest_evidence_sha256": "97ed46c9df7a285662972708d27ba3643bed8cb97a8fe8f4e1fd6f6d8913141f"
 }
