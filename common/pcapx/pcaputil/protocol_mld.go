@@ -1,6 +1,8 @@
 package pcaputil
 
 import (
+	"encoding/binary"
+
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
@@ -41,12 +43,22 @@ func DecodeMLDPacketFields(p gopacket.Packet, maxBytes, maxElements int) (result
 		if located {
 			switch ip := network.(type) {
 			case *layers.IPv4:
-				if ip.Version == 4 && int(ip.Length) >= offset-at {
-					context.DeclaredBytes = int(ip.Length) - (offset - at)
+				header := ip.LayerContents()
+				if len(header) >= 20 && ip.Version == 4 {
+					// Read the literal total-length word: the decoder may have
+					// replaced zero with a captured-length compatibility value.
+					total := int(binary.BigEndian.Uint16(header[2:4]))
+					if total >= offset-at {
+						context.DeclaredBytes = total - (offset - at)
+					}
 				}
 			case *layers.IPv6:
-				if ip.Version == 6 && ip.Length > 0 && 40+int(ip.Length) >= offset-at {
-					context.DeclaredBytes = 40 + int(ip.Length) - (offset - at)
+				header := ip.LayerContents()
+				if len(header) >= 40 && ip.Version == 6 {
+					payload := int(binary.BigEndian.Uint16(header[4:6]))
+					if payload > 0 && 40+payload >= offset-at {
+						context.DeclaredBytes = 40 + payload - (offset - at)
+					}
 				}
 			}
 		}
