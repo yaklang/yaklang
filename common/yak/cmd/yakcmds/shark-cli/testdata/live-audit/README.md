@@ -472,3 +472,44 @@ ownership. Its default export schema stays unchanged. The general TCP binding
 audit accepts a missing application page only with that actual closed hook
 state and the explicit unconfirmed CLI projection; a closed state alone is not
 a reason to erase a normal final ACK's page.
+
+`tls_resumption_metadata_audit.py` and its negative-control driver check literal
+SID, PSK-vector and NewSessionTicket fields in the two owned eight-generation
+captures. `tls_resumption_metadata_projection_audit.py` composes those source
+proofs with twelve declared capture-omission/reordering controls, preserving
+every old value, alias occurrence, type, source and connection identity.
+Its admission checks include current GetFields metadata and legitimate
+source-free refusal records. `public_tls_metadata_source_audit.py` independently
+selects admitted public TLS records and authenticated QUIC packets even after
+all new context fields have been removed. It checks the actual message bytes,
+available Wireshark fields, EAP parent fragments, QUIC CRYPTO and current-flow
+hello observations. Repeated Wireshark JSON keys are retained. Its negative
+driver tests missing entire context as well as wrong values and source claims.
+PSK selection never claims verified binders, certificate trust or a confirmed
+cross-connection ticket cache. TLS1.3 compatibility SID echo is not resumption.
+
+`tls_public_extension_preservation_audit.py` requires all old SDK and CLI values
+to remain literal and joins every CLI PDU to its actual SDK snapshot. Only the
+finite new TLS metadata contract can extend a record; source-only pseudo-VXLAN
+corrections in the original Sharon capture are independently rebuilt from
+literal IP/UDP extents. Its semantic negative driver bypasses producer hash
+guards so synchronized source/field forgeries must fail the auditor itself.
+New metadata accuracy remains a separate mandatory source certificate.
+
+`vxlan_parent_source_audit.py` verifies the public 535-frame VXLAN capture,
+the original Sharon witnesses, authored header controls and 21 owned OS UDP
+observations. Genuine ICMP quotations do not own captured child flows.
+`vxlan_worker_source_audit.py` checks complete isolated-worker responses and
+source-zero field spans, including missing-native-event fallbacks. Standard
+VXLAN GBP and observed VXLAN-GPE headers have separate, explicitly bounded
+contracts; the latter does not admit a payload profile or session.
+
+`vxlan_endpoint_projection_audit.py` independently reads physical capture
+records and native admitted-prefix contracts, then constructs complete expected
+CLI rows for the endpoint correction. It does not waive arbitrary changes to
+source-related fields. A rejected parent cannot borrow endpoints from its
+speculative child or ICMP quotation. Runtime/build/producer hashes and the
+preceding full SDK/CLI proof are required composition evidence outside this
+library. `tls_metadata_count_snapshot.py` refreshes physical display labels,
+native message counts and nonphysical end publications separately, and can
+compose the later CLI endpoint certificate with the unchanged native source.
