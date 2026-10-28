@@ -3,15 +3,14 @@ package bruteutils
 import (
 	"bytes"
 	"context"
-	"crypto/tls"
-	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/netx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
 // Match the page identity rather than its explanatory text, which has changed.
@@ -31,55 +30,51 @@ func testHTTPProxyWithContext(ctx context.Context, host, username, password stri
 		(proxy.Path != "" && proxy.Path != "/") || proxy.RawQuery != "" || proxy.ForceQuery || proxy.Fragment != "" {
 		return false
 	}
-	if port := proxy.Port(); port != "" {
-		n, err := strconv.Atoi(port)
-		if err != nil || n < 1 || n > 65535 {
+	port := 80
+	if proxy.Scheme == "https" {
+		port = 443
+	}
+	if rawPort := proxy.Port(); rawPort != "" {
+		port, err = strconv.Atoi(rawPort)
+		if err != nil || port < 1 || port > 65535 {
 			return false
 		}
 	}
 
-	// An unauthenticated probe must not reuse credentials embedded in the target.
-	proxy.User = nil
-	if username != "" || password != "" {
-		proxy.User = url.UserPassword(username, password)
-	}
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	ctx, cancel := context.WithTimeout(ctx, defaultTimeout)
+	defer cancel()
 
 	// Use ordinary HTTP forwarding: some HTTP proxies do not allow CONNECT to
-	// port 80. The transport adds Proxy-Authorization only to the proxy request.
-	transport := &http.Transport{
-		Proxy:             http.ProxyURL(proxy),
-		DisableKeepAlives: true,
-		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
-			return netx.DialContextWithoutProxy(ctx, addr)
-		},
-		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true}, // Proxy certificates may be self-signed.
-		TLSHandshakeTimeout: defaultTimeout,
-	}
-	defer transport.CloseIdleConnections()
-	client := &http.Client{
-		Transport: transport,
-		Timeout:   defaultTimeout,
-		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://example.com/", nil)
+	// port 80. Send the absolute-form request directly to the proxy endpoint.
+	packet, err := lowhttp.BuildLegacyProxyRequest(lowhttp.BasicRequest())
 	if err != nil {
 		return false
 	}
-	response, err := client.Do(request)
-	if err != nil {
-		return false
+	// Use only the supplied credentials, ignoring any embedded in the target URL.
+	if username != "" || password != "" {
+		packet = lowhttp.ReplaceHTTPPacketHeader(packet, "Proxy-Authorization", "Basic "+codec.EncodeBase64(username+":"+password))
 	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return false
-	}
-	body, err := io.ReadAll(io.LimitReader(response.Body, 1<<20))
-	return err == nil && bytes.Contains(body, ExampleChallengeContent)
+	response, err := lowhttp.HTTP(
+		lowhttp.WithPacketBytes(packet),
+		lowhttp.WithHost(proxy.Hostname()),
+		lowhttp.WithPort(port),
+		lowhttp.WithHttps(proxy.Scheme == "https"),
+		lowhttp.WithContext(ctx),
+		lowhttp.WithConnectTimeout(defaultTimeout),
+		lowhttp.WithTimeout(defaultTimeout),
+		lowhttp.WithRedirectTimes(0),
+		lowhttp.WithEnableSystemProxyFromEnv(false),
+		lowhttp.WithExtendDialXOption(netx.DialX_WithDisableProxy(true)),
+		lowhttp.WithConnPool(false),
+		lowhttp.WithDisableSession(true),
+		lowhttp.WithSaveHTTPFlow(false),
+		lowhttp.WithMaxContentLength(1<<20),
+	)
+	return err == nil && response != nil && response.GetStatusCode() == http.StatusOK &&
+		bytes.Contains(lowhttp.GetHTTPPacketBody(response.RawPacket), ExampleChallengeContent)
 }
 
 var httpProxyAuth = &DefaultServiceAuthInfo{
