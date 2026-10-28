@@ -182,8 +182,9 @@ func TestIncompleteIPChildRequiresSelectedParent(t *testing.T) {
 					require.Equal(t, []string{"Ethernet", "IPv4", "IPv4"}, e.Session["Observed Header Layers"])
 					require.Equal(t, "/ipip:198.51.100.1~198.51.100.2", e.Domain.Encapsulation)
 				} else {
-					require.True(t, consumed)
-					require.Nil(t, out)
+					require.False(t, consumed)
+					require.Same(t, packet, out)
+					require.NotNil(t, out.ErrorLayer(), "refusal must preserve the original capture decoder error")
 					require.Equal(t, "network-encapsulation-refusal", e.Profile)
 					require.Equal(t, "unconfirmed", e.Session["Child Header Identity"])
 					require.NotContains(t, e.Session, "Expected IP Version")

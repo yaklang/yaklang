@@ -43,6 +43,9 @@ type protocolPacketDecoder struct {
 }
 
 func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilder) error {
+	// A child may only read its declared input, even when the parent slice
+	// retains capacity for frame padding, another record or a reusable buffer.
+	data = data[:len(data):len(data)]
 	b := &protocolPacketBuilder{PacketBuilder: builder, network: d.network, captureTruncated: d.captureTruncated, datagramDecodeAs: d.datagramDecodeAs}
 	decoder := d.decoder
 	if decoder == layers.LayerTypeGRE {

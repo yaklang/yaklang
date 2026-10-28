@@ -143,6 +143,9 @@ func (s *streamStore) observeDatagram(e *pcaputil.ProtocolEvent) {
 }
 
 func (s *streamStore) projectDatagram(row packetSummary, raw *capturedPacket) packetSummary {
+	if row.tcpHeaderFailure != nil {
+		return row.tcpHeaderFailure.apply(row)
+	}
 	if s == nil || raw.conversationID == 0 {
 		return row
 	}
@@ -540,6 +543,9 @@ func (s *streamStore) annotate(raw *capturedPacket) {
 }
 
 func (s *streamStore) projectConversation(row packetSummary, id uint64) packetSummary {
+	if row.tcpHeaderFailure != nil {
+		return row.tcpHeaderFailure.apply(row)
+	}
 	if s == nil || id == 0 {
 		return row
 	}
