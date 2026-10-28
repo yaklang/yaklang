@@ -4299,3 +4299,89 @@ YAML 报错。这里的图片是**真实控制台缓冲区的渲染**；本轮�
 TLS 整记录丢失的共同恢复限制、SSH authentication/channel/SFTP/rekey、完整
 MLD records、广泛 QUIC CID/QPACK/0-RTT，以及上述 303/390 个未覆盖来源仍
 开放。本报告不将核心协议、TOP30 或 Wireshark 全协议功能声明为完备。
+
+
+## 2026-10-28 ICMPv4 语义、23 个 typed 字段与 TCP 残头闭环
+
+本检查点的生产代码为 `4e664ebaed542ffb80024ad70d797695975cee77`。
+ICMPv4 union/时间戳修复在 `1ea484dcf78c`，私有字段与字节窗格状态修复在
+`5403ffe55b21`，TCP 完整前缀诊断和解码容量边界在 `aafb675b4183`，最后修复
+了隧道拒绝后重复发布通用网络诊断。下列数字是分阶段证书，不能相互累加为更多包。
+
+### ICMPv4 与源字段
+
+独立原始来源构造覆盖全部 5,009 个既有 ICMPv4 对象：475 个完整对象得到修正，
+4,534 个不变。错误/Redirect 等 rest-of-header 不再虚构 Echo Identifier/Sequence；
+MTU1492 直接显示 MTU。Timestamp 只保留已到达的完整32位字，新增18个短 Timestamp
+和2个短 Mask 的 incomplete 状态。Timestamp 字不被解释为可靠墙钟时间。
+
+新增23个 `arp.*`、`icmp.*`、`icmpv6.*` typed 描述符，注册表667→690。值和范围由
+私有原生入口拥有；修改 public Session/Raw/Protocol 或 JSON 不能生成字段所有权。
+同一地址字段保留 IPv6 的128位来源，IPv4 typed literal 不接受 IPv6 字面量。
+字段证书在5403修订覆盖11,475个来源、42,823个新值，逐自身绝对位置、长度、原始
+字节与实际 TShark4.6.9 scalar 比较，零差异，16个真实负控通过。该字段证书没有
+准入错误的父层；后续46个未选择 EtherIP 后的 ARP 子层已经撤回。
+
+### 缓冲区、父层与完整输出
+
+每层解码均收窄输入的 capacity 到其 length，防止旧依赖把物理填充或下一帧缓冲区
+当成 PPPoE 声明的载荷。完整父头加错误子头仍保留父头；缺失载荷不能产生 PPPoE
+namespace。同一个包在 SDK、CLI、原生 worker 中不能依赖分配容量得到不同结果。
+
+| 检查 | 数量与结果 |
+| --- | --- |
+| 37组完整原生输出 | 295,123→306,304个对象 |
+| 原始字节构造的父层拒绝对象 | 17,532，全部整对象一致 |
+| 保留的旧对象 | 288,772，仅允许明确已知 PDU 引用的单射对应后完整一致 |
+| 37组完整 CLI | 384,518行 |
+| CLI 字面相同行 | 150,890 |
+| CLI 仅生成的已知 PDU 引用改变 | 215,391 |
+| CLI 独立来源整行预期 | 17,532父层行 + 705 TCP行，零差异 |
+
+PDU 引用对应不改 frame、flow、interface、sequence、长度、domain 或普通数值；
+父层来源保持 flow0，不凭隧道中的相似字节建立子连接。曾发现6,299条重复的通用
+IP诊断，已通过保留原始 decoder error、停止后续分发修复；严格 API 和错误计数
+不能因展示拒绝而消失。旧容量相关的15条 namespace 差异没有被忽略或归一化。
+
+两个完整 flow 导出另行比较：Weber 完全字面相同，Sharon 的 flows、packets、close
+和其余所有统计均相同；DecodeErrors 为81,613→81,616。精确3条来源仍在定位，
+此处明确不称整个 flow 文件一致。原生整对象与 CLI 整行证书没有豁免这些数值。
+
+### 705 条真实 TCP 异常与 Windows
+
+705条原始来源包括467条坏 TLV、159条选项未收全、57条固定头未收全、14条 MPTCP
+尺寸错误和8条非法 data offset。固定头只有2/4/8/14/16/17/18/19字节等情形按完整
+字段阈值展示；缺失字段没有默认零。固定/选项边界不可靠时载荷是 unknown，完整
+TCP边界加坏 option 时才显示可靠的 captured payload 长度。
+
+705个完整 CLI 行及705个实际 worker response 均逐原始来源整对象一致，11个
+candidate 篡改负控被拒绝。它们没有原生 PDU、Source1 或连接身份，也不会借用
+旧连接协议。原145条 pre-candidate 整对象计划保持冻结；扩展705条是发现范围后
+重新从原始字节构造的独立 oracle，不能描述为候选版本运行前的705条计划。
+
+Windows 在最终修订实际运行4个 TCP 页面、读取60个原生 console buffer，检查
+CP936 恢复、resize、quit。三次字节来源切换时 Source0 的完整68/84/69/64字节分别
+与原包相等，Source1不存在。MP_CAPABLE 坏长度不再触发旧 formatter nil dereference。
+ICMPv4另有590/47/64字节两种来源的完整核验；延迟详情完成不能重置正在滚动的
+字节窗格。这些 PNG 是实际 console cell/attribute 渲染，仍不称原生窗口像素截图。
+Quick/deep 的同树由 targeted Go 和实际初始/延迟页面检查；没有独立的外部 quick API。
+
+完整五包测试285,229通过、24跳过，每个开始项有唯一结束项，日志SHA
+`d86d8e983b5817ebc8e8959cc932007560b0bce4b19cea8a601b0f377eb2ef20`。
+该修订的[显式流量CI](https://github.com/yaklang/yaklang/actions/runs/40711396009)
+和[Essential Tests](https://github.com/yaklang/yaklang/actions/runs/40711308589)
+均成功；draft 自动跳过不计为通过。
+
+### 仍在执行的边界
+
+下一项 MLD 来源盘点已绑定全部237个观察，发现10条 body 不完整而原生标为 decoded；
+原生目前缺少 MLD records，旧规则的源/记录数量门槛和未消费 auxiliary data 也需
+修复。按[RFC3810](https://www.rfc-editor.org/rfc/rfc3810.html#section-5)区分原始
+timer code、换算后的毫秒/秒、位域、以32位字为单位的 auxiliary length 与额外数据，
+并逐自身位置对照 TShark。这个来源盘点尚不是新版解析通过证书。
+
+历史303个 EOL 投影和390个 parent 调查条目不因新 scoped 证书自动全部关闭。
+SSH authentication/channel/SFTP/rekey、广泛 QUIC CID/QPACK/0-RTT、完整 RPC/PPTP/GPE
+以及整条受保护 TLS record 丢失后的共同恢复限制继续逐项审计。本检查点不将核心
+协议、TOP30 或 Wireshark 全部功能宣布完备。所有 PCAP、keylog、完整输出、程序、
+截图与日志继续留在 Git 外。
