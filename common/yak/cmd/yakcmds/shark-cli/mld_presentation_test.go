@@ -69,6 +69,7 @@ func TestMLDInspectorNativeAndWorkerHaveProgressiveExactRecordRanges(t *testing.
 			}
 		}
 		require.Equal(t, [][2]int{{66, 82}, {122, 138}}, ranges, "the second record must not reuse the first record's bytes")
+		assertMembershipFieldDepths(t, got.fields, "MLD", "Address Records[0]", "Sources", "Sources[1]: ::ffff:192.0.2.1")
 	}
 }
 

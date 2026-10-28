@@ -710,7 +710,10 @@ func (u *tui) drawFields(c *canvas, r rect) {
 		prefix := "  "
 		if f.branch {
 			prefix = "── "
+		} else if f.depth > 0 {
+			prefix = ""
 		}
+		prefix = strings.Repeat("  ", min(max(0, f.depth), 16)) + prefix
 		style := inkText
 		if f.branch {
 			style = inkCyan
