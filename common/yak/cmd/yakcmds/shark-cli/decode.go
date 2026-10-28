@@ -313,6 +313,18 @@ type packetDetail struct {
 	sources  []detailSource
 }
 
+// The same admission barrier applies to both the summary and every inspector.
+// A generic stateless dissector may expose speculative fragment/child layers
+// after an invalid header. Those are not admitted protocol observations.
+func protocolDetailEvents(events []*pcaputil.ProtocolEvent) ([]*pcaputil.ProtocolEvent, bool) {
+	for _, event := range events {
+		if presentEvents([]*pcaputil.ProtocolEvent{event}).networkRefused {
+			return []*pcaputil.ProtocolEvent{event}, true
+		}
+	}
+	return events, false
+}
+
 func detail(raw *capturedPacket) (d packetDetail) {
 	d.number = raw.number
 	row := summarize(raw)
@@ -327,13 +339,17 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		// at index zero, which is excluded from network-header offset rebasing.
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
-	if events := raw.protocolEvents(); len(events) > 0 {
+	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if len(events) > 0 {
 		fields, sources := protocolEventDetail(events)
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 		if d.protocol == "" {
 			d.protocol = presentEvents(events).protocol
 		}
+	}
+	if networkRefused {
+		return d
 	}
 	appendTransportObservation(&d, row)
 	rule := ""
@@ -490,10 +506,14 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame #%d · %d bytes · %d captured", raw.number, raw.ci.Length, len(raw.data)), branch: true, hasRange: len(raw.data) > 0, end: len(raw.data)})
 	row := summarize(raw)
 	d.protocol = row.Protocol
-	if events := raw.protocolEvents(); len(events) > 0 {
+	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if len(events) > 0 {
 		fields, sources := protocolEventDetail(events)
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
+	}
+	if networkRefused {
+		return d
 	}
 	appendTransportObservation(&d, row)
 	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
