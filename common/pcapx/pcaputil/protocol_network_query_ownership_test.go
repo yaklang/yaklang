@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/gopacket/gopacket"
@@ -113,6 +114,26 @@ func testNetworkObservationQueryOwnership(t *testing.T, arp bool) {
 						require.Zero(t, e.TransactionID)
 						f, err := e.GetFields()
 						if c.Error != "" {
+							if c.Error == "NDOptionLength" {
+								// The immutable wire/answer stays unchanged. A malformed
+								// option no longer hides its complete NS fixed header.
+								wire := doipDiscoveryWire(t, c.Frame)
+								want := map[string]any{"Type": byte(135), "Code": byte(0), "Target": net.IP(wire[62:78]).String(), "Options": []map[string]any(nil)}
+								require.NoError(t, err)
+								require.Equal(t, want, f)
+								require.Equal(t, "icmpv6", e.Protocol)
+								require.Equal(t, "malformed", e.Status)
+								require.Equal(t, c.Error, e.ExpertCode)
+								require.Equal(t, wire, e.Raw)
+								require.Zero(t, stats.Messages)
+								require.EqualValues(t, 1, stats.Malformed)
+								corruptNetworkObservation(f)
+								corruptNetworkObservation(e.Session)
+								f, err = e.GetFields()
+								require.NoError(t, err)
+								require.Equal(t, want, f)
+								return
+							}
 							require.EqualError(t, err, "protocol parser: no exact rule for this message")
 							require.Nil(t, f)
 							require.Equal(t, "ip", e.Protocol)
