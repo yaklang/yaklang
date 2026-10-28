@@ -1029,6 +1029,21 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("RTSP")
 		return
 	}
+	if e.Protocol == "icmpv6" && e.Transport == "network" && e.Profile == "icmpv6-header-observation" && e.Completeness == e.Status &&
+		(e.Status == "incomplete" && e.ExpertCode == "ICMPv6HeaderTruncated" || e.Status == "malformed" && e.ExpertCode == "NDOptionLength" || e.Status == "limited" && e.ExpertCode == "NDOptionBudget") {
+		p.addLayer("ICMPv6")
+		if p.priority <= 5 {
+			p.protocol, p.priority, p.status, p.visibility = "ICMPv6", 5, e.Status, "partial-message"
+			p.summary = safeText(e.Summary)
+			p.scope = "observed ICMPv6 header fields; complete message not admitted"
+			p.evidence = "ICMPv6 generic header observed; body or options incomplete, invalid or limited"
+			if len(e.CarrierLayers) > 0 {
+				p.nativeHeaders = headerLayerNames(eventValues(e)["Observed Header Layers"])
+				p.nativeSource, p.nativeDestination, p.nativeDomain = e.Source, e.Destination, e.Domain
+			}
+		}
+		return
+	}
 	if e.Protocol == "quic" && e.Admission == "observed-datagram-padding" && e.Completeness == "datagram-padding" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") {
 		p.addLayer("QUIC")
 		info := applicationEventSummary(e)

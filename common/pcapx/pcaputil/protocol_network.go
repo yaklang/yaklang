@@ -549,8 +549,18 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			if len(b) >= 20 {
 				fields["Target"] = net.IP(b[4:20]).String()
 			}
+		case 137:
+			// RFC 4861 section 4.5: reserved, target and destination follow
+			// the generic four-byte ICMPv6 header, before any ND options.
+			fixed = 36
+			if len(b) >= 20 {
+				fields["Target"] = net.IP(b[4:20]).String()
+			}
+			if len(b) >= 36 {
+				fields["Destination"] = net.IP(b[20:36]).String()
+			}
 		case 1, 2, 3, 4:
-			fixed = len(b)
+			fixed = 4 // RFC 4443: type-specific word precedes the quoted packet.
 			if len(b) >= 4 {
 				fields["Quoted Packet"] = bytes.Clone(b[4:])
 				if typ == 2 {
@@ -558,25 +568,29 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				}
 			}
 		case 128, 129:
-			fixed = len(b)
+			fixed = 4 // Identifier and sequence are mandatory, even with no data.
 			if len(b) >= 4 {
 				fields["Identifier"], fields["Sequence"] = binary.BigEndian.Uint16(b), binary.BigEndian.Uint16(b[2:])
 			}
 		}
 		if fixed > len(b) {
-			a.networkDiagnostic(e, ci, "incomplete", "ICMPv6HeaderTruncated")
+			fields["Available ICMPv6 Bytes"] = 4 + len(b)
+			fields["Required ICMPv6 Header Bytes"] = 4 + fixed
+			a.emitNativeNetworkObservation(p, e, ci, protocol, fields, "incomplete", "ICMPv6HeaderTruncated")
 			return nil, true
 		}
-		if typ >= 133 && typ <= 136 {
+		if typ >= 133 && typ <= 137 {
 			var opts []map[string]any
 			for at := fixed; at < len(b); {
 				if len(b)-at < 2 || b[at+1] == 0 || int(b[at+1])*8 > len(b)-at {
-					a.networkDiagnostic(e, ci, "malformed", "NDOptionLength")
+					fields["Options"] = opts
+					a.emitNativeNetworkObservation(p, e, ci, protocol, fields, "malformed", "NDOptionLength")
 					return nil, true
 				}
 				n := int(b[at+1]) * 8
 				if len(opts) >= a.budget.MaxCollectionElements {
-					a.networkDiagnostic(e, ci, "limited", "NDOptionBudget")
+					fields["Options"] = opts
+					a.emitNativeNetworkObservation(p, e, ci, protocol, fields, "limited", "NDOptionBudget")
 					return nil, true
 				}
 				opts = append(opts, map[string]any{"Type": b[at], "Value": bytes.Clone(b[at+2 : at+n])})
@@ -593,45 +607,75 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	}
 	if protocol != "" {
-		if e.carrierOwned {
-			// The logical native network PDU can consume the packet before the
-			// transport callback. Preserve its actual full header path for the
-			// UI instead of pairing an inner ICMP/ARP label with outer peers.
-			names := make([]string, 0, len(e.networkPrefix)+8)
-			for _, typ := range e.networkPrefix {
-				names = append(names, typ.String())
-			}
-			for _, layer := range p.Layers() {
-				if layer.LayerType() == gopacket.LayerTypePayload || layer.LayerType() == gopacket.LayerTypeDecodeFailure {
-					break
-				}
-				if len(names) >= maxCaptureTransportLayers {
-					break
-				}
-				names = append(names, layer.LayerType().String())
-			}
-			fields["Observed Header Layers"] = names
-		}
-		event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: "decoded", Completeness: "message", Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
-		event.CarrierLayers = append([]string(nil), e.carrierLayers...)
-		if n := p.NetworkLayer(); n != nil {
-			event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
-		}
-		if protocol == "arp" {
-			arp := p.Layer(layers.LayerTypeARP).(*layers.ARP)
-			if arp.Protocol == layers.EthernetTypeIPv4 && arp.ProtAddressSize == 4 {
-				event.Source, event.Destination = net.IP(arp.SourceProtAddress).String(), net.IP(arp.DstProtAddress).String()
-			} else {
-				event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
-			}
-		}
-		event.Structured = map[string]any{"fields": cloneSession(fields)}
-		a.messages.Add(1)
-		a.decoded.Add(1)
-		a.emit(event)
+		a.emitNativeNetworkObservation(p, e, ci, protocol, fields, "decoded", "")
 		return nil, true
 	}
 	return p, false
+}
+
+// A complete generic header proves the observed family, not a complete body.
+// Preserve only available fields and their source on a refusal; quoted inner
+// decoder errors do not invalidate a complete outer ICMP message.
+func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo, protocol string, fields map[string]any, status, code string) {
+	if e.carrierOwned {
+		// The logical native network PDU can consume the packet before the
+		// transport callback. Preserve its actual full header path for the
+		// UI instead of pairing an inner ICMP/ARP label with outer peers.
+		names := make([]string, 0, len(e.networkPrefix)+8)
+		for _, typ := range e.networkPrefix {
+			names = append(names, typ.String())
+		}
+		for _, layer := range p.Layers() {
+			if layer.LayerType() == gopacket.LayerTypePayload || layer.LayerType() == gopacket.LayerTypeDecodeFailure {
+				break
+			}
+			if len(names) >= maxCaptureTransportLayers {
+				break
+			}
+			names = append(names, layer.LayerType().String())
+		}
+		fields["Observed Header Layers"] = names
+	}
+	completeness := status
+	if status == "decoded" {
+		completeness = "message"
+	}
+	event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: status, Completeness: completeness, ExpertCode: code, Error: code, Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
+	if code != "" {
+		event.Profile = "icmpv6-header-observation"
+		name := layers.CreateICMPv6TypeCode(fields["Type"].(uint8), fields["Code"].(uint8)).String()
+		event.Summary = "ICMPv6 " + name + "; " + code
+		if code == "ICMPv6HeaderTruncated" {
+			event.Summary = fmt.Sprintf("ICMPv6 %s; incomplete fixed header (%v/%v bytes)", name, fields["Available ICMPv6 Bytes"], fields["Required ICMPv6 Header Bytes"])
+		} else if code == "NDOptionLength" {
+			event.Summary = "ICMPv6 " + name + "; invalid ND option length"
+		}
+	}
+	event.CarrierLayers = append([]string(nil), e.carrierLayers...)
+	if n := p.NetworkLayer(); n != nil {
+		event.Source, event.Destination = n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
+	}
+	if protocol == "arp" {
+		arp := p.Layer(layers.LayerTypeARP).(*layers.ARP)
+		if arp.Protocol == layers.EthernetTypeIPv4 && arp.ProtAddressSize == 4 {
+			event.Source, event.Destination = net.IP(arp.SourceProtAddress).String(), net.IP(arp.DstProtAddress).String()
+		} else {
+			event.Source, event.Destination = fmt.Sprintf("%x", arp.SourceProtAddress), fmt.Sprintf("%x", arp.DstProtAddress)
+		}
+	}
+	event.Structured = map[string]any{"fields": cloneSession(fields)}
+	switch status {
+	case "decoded":
+		a.messages.Add(1)
+		a.decoded.Add(1)
+	case "incomplete":
+		a.incomplete.Add(1)
+	case "malformed":
+		a.malformed.Add(1)
+	case "limited":
+		a.limited.Add(uint64(len(p.Data())))
+	}
+	a.emit(event)
 }
 
 // decodeGOOSEEthernet admits IEC 61850 GOOSE only when the caller has matched
