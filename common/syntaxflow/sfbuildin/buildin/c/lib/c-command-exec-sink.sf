@@ -1,0 +1,63 @@
+desc(
+	title: "C OS command execution sinks (lib)"
+	title_zh: "操作系统命令执行入口（C 库规则）"
+	type: audit
+	level: info
+	language: c
+	lib: "c-command-exec-sink"
+	risk: "command-injection"
+	desc: <<<DESC
+### 说明
+`system`、`popen` 经 `/bin/sh -c` 执行命令字符串，`execl`/`execlp`/`execv`/`execvp`/`execle` 直接执行程序，`spawnl`/`spawnv` 系列在部分平台上同样落 shell。命令文本或程序路径受用户输入影响时，攻击者可以改写要执行的命令或附加参数。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要把用户输入拼进命令字符串。优先用 `execv` 数组参数形式直接调用目标程序；必须经 shell 时把用户输入限制为严格允许列表。不要依赖转义 shell 元字符。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-78](https://cwe.mitre.org/data/definitions/78.html)
+REFERENCE
+	rule_id: "f6b1c8d9-2e4a-5a3b-8c24-6d8e0f4b2a79"
+)
+
+system as $output
+popen as $output
+execl as $output
+execlp as $output
+execle as $output
+execv as $output
+execvp as $output
+spawnl as $output
+spawnlp as $output
+spawnv as $output
+spawnvp as $output
+
+alert $output for {
+	title: "C command execution API",
+	title_zh: "C 语言命令执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "command-injection",
+	message: "检测到可执行系统命令的 API，请确认命令文本/程序路径是否受用户输入影响。",
+	name: "output",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_cmd_sink.c': <<<UNSAFE
+#include <stdlib.h>
+
+void run(const char *host) {
+    char cmd[256];
+    sprintf(cmd, "ping -c 1 %s", host);
+    system(cmd);
+}
+UNSAFE
+	'safefile://safe_cmd_sink.c': <<<SAFE
+int plain(void) {
+    int n = 1 + 2;
+    return n;
+}
+SAFE
+)

@@ -1,0 +1,62 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C 反射 Origin 的 CORS 头"
+	title_zh: "源码扫描：C 反射 Origin 的 CORS 头"
+	type: vuln
+	level: middle
+	rule_id: "source-c-cors-origin"
+	risk: "cors"
+	cwe: "CWE-942"
+	desc: <<<DESC
+### 规则说明
+C 语言 Web 服务（CGI、嵌入式 HTTP 服务）在响应头中输出 `Access-Control-Allow-Origin` 时，如果直接反射请求的 `Origin` 值或固定为 `*`，同时允许凭据（`Access-Control-Allow-Credentials: true`），任意来源的页面即可携带受害者 Cookie 读取受保护资源，同源策略被绕过。
+
+### 风险类型
+cors
+
+### 影响
+任意第三方页面读取受保护接口响应；配合凭据窃取受害者账号数据。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `Access-Control-Allow-Origin` 头名。命中后需要人工确认来源是否固定允许列表、是否与凭据共存。
+
+### 参考
+- [CWE-942：过于宽松的跨域白名单](https://cwe.mitre.org/data/definitions/942.html)
+- [MDN CORS](https://developer.mozilla.org/docs/Web/HTTP/CORS)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 只对固定、可信来源输出 CORS 头，不要反射请求方提交的 Origin。
+- `*` 只用于完全公开、无需凭据的资源；需要 Cookie 的接口绝不能配 `*`。
+- `Access-Control-Allow-Methods`、`Access-Control-Allow-Headers` 按需最小化。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+void bad(const char *origin) {
+    char h[512];
+    sprintf(h, "Access-Control-Allow-Origin: %s\r\n", origin);
+    send_response(h);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <stdio.h>
+void ok(void) {
+    send_response("Access-Control-Allow-Origin: https://example.com\r\n");
+}
+
+NEG
+)
+${*.c}.pattern_regex(/(sprintf|strcat|snprintf)\s*\([^)]*Access-Control-Allow-Origin[^%]*%s|Access-Control-Allow-Origin:\s*\*/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C 反射 Origin 的 CORS 头",
+	title_zh: "源码扫描：C 反射 Origin 的 CORS 头",
+	message: "源码扫描：C 反射 Origin 的 CORS 头",
+	risk: "cors",
+}

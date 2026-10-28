@@ -1,0 +1,62 @@
+desc(
+	title: "C#/.NET dynamic code execution sinks (lib)"
+	title_zh: "动态代码执行入口（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-code-exec-sink"
+	risk: "code-execution"
+	desc: <<<DESC
+### 说明
+`CSharpScript.EvaluateAsync`（Roslyn Scripting）、`Assembly.Load`/`LoadFile`/`LoadFrom`、`Activator.CreateInstance` 与 `Reflection.Emit` 会在运行时编译或加载代码。脚本内容、程序集路径、类型名来自用户输入时，攻击者可以让进程执行任意代码或加载恶意程序集。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+不要把用户输入交给 Roslyn Scripting 或动态程序集加载。需要脚本能力时在受限 AppDomain/容器内运行，并只允许固定脚本集；程序集用强名称签名验证后再加载。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-94](https://cwe.mitre.org/data/definitions/94.html)
+REFERENCE
+	rule_id: "c2e8f5a3-6d17-4b28-9e0f-3a5c7d9b1e46"
+)
+
+CSharpScript.EvaluateAsync as $output
+CSharpScript.RunAsync as $output
+Assembly.Load as $output
+Assembly.LoadFile as $output
+Assembly.LoadFrom as $output
+Assembly.LoadModule as $output
+Activator.CreateInstance as $output
+
+alert $output for {
+	title: "C#/.NET dynamic code execution API",
+	title_zh: "C#/.NET 动态代码执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "code-execution",
+	message: "检测到动态编译/加载类 API，请确认脚本内容或程序集来源可信。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_code_exec.cs': <<<UNSAFE
+using System;
+using Microsoft.CodeAnalysis.CSharp.Scripting;
+
+public class ScriptRunner {
+    public object Run(string code) {
+        return CSharpScript.EvaluateAsync(code).Result;
+    }
+}
+UNSAFE
+	'safefile://safe_code_exec.cs': <<<SAFE
+public class ScriptRunner {
+    public int Run() {
+        int n = 1 + 2;
+        return n;
+    }
+}
+SAFE
+)

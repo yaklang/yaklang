@@ -1,0 +1,61 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C 遗留调试代码"
+	title_zh: "源码扫描：C 遗留调试代码"
+	type: vuln
+	level: low
+	rule_id: "source-c-leftover-debug"
+	risk: "security-misconfiguration"
+	cwe: "CWE-489"
+	desc: <<<DESC
+### 规则说明
+调试构建、`#ifdef DEBUG` 块或后门检查（如 magic 值跳过认证）遗留在生产代码中，会暴露调试接口、打印敏感信息或提供未授权入口。
+
+### 风险类型
+security-misconfiguration
+
+### 影响
+调试信息泄露内部结构；后门检查允许绕过认证；调试接口无访问控制可被直接调用。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `#ifdef DEBUG`、`#if DEBUG` 与 `debug_mode`/`is_debug` 标志。
+
+### 参考
+- [CWE-489：遗留调试代码](https://cwe.mitre.org/data/definitions/489.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 发布构建关闭调试宏，CI 用独立的 release 配置编译。
+- 调试打印统一走日志级别开关，生产默认关闭。
+- 后门类检查（magic 值）彻底删除，不要靠混淆隐藏。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+void bad(void) {
+#ifdef DEBUG
+    printf("auth bypassed\n");
+#endif
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <stdio.h>
+void ok(void) {
+    printf("service started\n");
+}
+
+NEG
+)
+${*.c}.pattern_regex(/#\s*(ifdef|if)\s+DEBUG|\b(debug_mode|is_debug)\b/) as $hit
+alert $hit for {
+	level: "low",
+	title: "源码扫描：C 遗留调试代码",
+	title_zh: "源码扫描：C 遗留调试代码",
+	message: "源码扫描：C 遗留调试代码",
+	risk: "security-misconfiguration",
+}

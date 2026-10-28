@@ -1,0 +1,62 @@
+desc(
+	title: "C#/.NET sanitization and encoding helpers (lib)"
+	title_zh: "净化与编码函数（C#/.NET 库规则）"
+	type: audit
+	level: info
+	language: csharp
+	lib: "csharp-filter"
+	risk: "input-validation"
+	desc: <<<DESC
+### 说明
+这些 API 在输出位置做上下文相关的编码或校验，数据流经过它们后风险显著降低：HTML 输出用 `HtmlEncoder`/`WebUtility.HtmlEncode`，URL 拼接用 `UrlEncoder`/`Uri.EscapeDataString`，SQL 值绑定用 `Parameters.AddWithValue`，命令参数用 `ArgumentList`，路径限制用 `Path.GetFileName`。规则引擎可用它们排除已净化的数据流。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+输出位置按上下文选择编码器；优先使用框架自带的参数化/编码 API，而不是手写转义。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "d4f9a6b5-7c28-4a3e-8f01-4b6d8e2c9a57"
+)
+
+HtmlEncoder.Encode as $output
+WebUtility.HtmlEncode as $output
+UrlEncoder.Encode as $output
+Uri.EscapeDataString as $output
+Uri.EscapeUriString as $output
+*.Parameters.AddWithValue as $output
+Path.GetFileName as $output
+WebUtility.UrlEncode as $output
+
+alert $output for {
+	title: "C#/.NET sanitization/encoding API",
+	title_zh: "C#/.NET 净化与编码类 API",
+	level: "info",
+	type: "audit",
+	risk: "input-validation",
+	message: "检测到净化/编码 API，数据流经此处后风险降低。",
+	name: "output",
+}
+
+desc(
+	lang: csharp
+	alert_min: 1
+	'file://unsafe_filter.cs': <<<UNSAFE
+using System.Net;
+
+public class Renderer {
+    public string Render(string name) {
+        return WebUtility.HtmlEncode(name);
+    }
+}
+UNSAFE
+	'safefile://safe_filter.cs': <<<SAFE
+public class Renderer {
+    public string Render() {
+        int n = 1 + 2;
+        return n.ToString();
+    }
+}
+SAFE
+)

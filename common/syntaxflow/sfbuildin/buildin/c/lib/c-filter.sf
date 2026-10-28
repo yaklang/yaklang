@@ -1,0 +1,57 @@
+desc(
+	title: "C sanitization and validation helpers (lib)"
+	title_zh: "净化与校验函数（C 库规则）"
+	type: audit
+	level: info
+	language: c
+	lib: "c-filter"
+	risk: "input-validation"
+	desc: <<<DESC
+### 说明
+这些 API 在边界处限制或转换输入，数据流经过它们后风险显著降低：`strspn` 按允许字符集截断，`snprintf` 带边界写入防溢出，`realpath` 规范化路径供后续前缀校验，自定义 `is_safe_path`/`is_valid_*` 校验函数。规则引擎可用它们排除已净化的数据流。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+边界输入统一做长度与字符集校验（`strspn` + `snprintf`）；文件路径用 `realpath` 规范化后校验前缀；校验失败直接拒绝而不是尝试修复输入。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-20](https://cwe.mitre.org/data/definitions/20.html)
+REFERENCE
+	rule_id: "a7c2d9e0-3f5b-4c6a-9d35-7e9f1a5c3b80"
+)
+
+strspn as $output
+snprintf as $output
+realpath as $output
+strncpy as $output
+
+alert $output for {
+	title: "C sanitization/validation API",
+	title_zh: "C 语言净化与校验类 API",
+	level: "info",
+	type: "audit",
+	risk: "input-validation",
+	message: "检测到净化/校验类 API，数据流经此处后风险降低。",
+	name: "output",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_filter.c': <<<UNSAFE
+#include <stdio.h>
+#include <stdlib.h>
+
+int check(const char *input) {
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%s", input);
+    return 0;
+}
+UNSAFE
+	'safefile://safe_filter.c': <<<SAFE
+int plain(void) {
+    int n = 1 + 2;
+    return n;
+}
+SAFE
+)

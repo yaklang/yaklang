@@ -1,0 +1,63 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C TLS 证书校验被禁用"
+	title_zh: "源码扫描：C TLS 证书校验被禁用"
+	type: vuln
+	level: high
+	rule_id: "source-c-tls-verify-none"
+	risk: "certificate-validation"
+	cwe: "CWE-295"
+	desc: <<<DESC
+### 规则说明
+OpenSSL 的 `SSL_CTX_set_verify` 传 `SSL_VERIFY_NONE`、libcurl 的 `CURLOPT_SSL_VERIFYPEER`/`CURLOPT_SSL_VERIFYHOST` 设为 0 时，TLS 连接虽加密但不校验对端身份。攻击者用自签证书即可完成中间人攻击，解密并篡改全部流量。
+
+### 风险类型
+mitm
+
+### 影响
+中间人解密、记录、篡改 TLS 流量；认证 Token、密码明文暴露给攻击者；被篡改的响应可诱导客户端执行恶意逻辑。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `SSL_VERIFY_NONE` 与 `CURLOPT_SSL_VERIFYPEER`/`CURLOPT_SSL_VERIFYHOST` 跟随 0 的模式。
+
+### 参考
+- [CWE-295：证书校验不恰当](https://cwe.mitre.org/data/definitions/295.html)
+- [OpenSSL SSL_CTX_set_verify](https://www.openssl.org/docs/man3.0/man3/SSL_CTX_set_verify.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- OpenSSL 用 `SSL_VERIFY_PEER` 并设置校验深度，不要传 `SSL_VERIFY_NONE`。
+- 除链校验外用 `X509_VERIFY_PARAM_set_host` 校验主机名。
+- libcurl 保持 `CURLOPT_SSL_VERIFYPEER`/`CURLOPT_SSL_VERIFYHOST` 默认开启，不要显式设 0。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <openssl/ssl.h>
+void bad(void) {
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <openssl/ssl.h>
+void ok(void) {
+    SSL_CTX *ctx = SSL_CTX_new(TLS_client_method());
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    SSL_CTX_set_verify_depth(ctx, 9);
+}
+
+NEG
+)
+${*.c}.pattern_regex(/SSL_VERIFY_NONE|CURLOPT_SSL_VERIFY(PEER|HOST)\s*,\s*\(?0/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C TLS 证书校验被禁用",
+	title_zh: "源码扫描：C TLS 证书校验被禁用",
+	message: "源码扫描：C TLS 证书校验被禁用",
+	risk: "certificate-validation",
+}
