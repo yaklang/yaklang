@@ -117,12 +117,16 @@ def audit(capture,observer,sdk,cli,allow_empty_tcp=False):
     assert len(flows)==len(observed_flows),'unique physical TCP generation IDs'
     owners=collections.defaultdict(set)
     physical_owners=collections.defaultdict(set)
+    physical_states=collections.defaultdict(set)
     for packet in observed_packets:
         assert type(packet['flow'])is int and packet['flow']in flows
         for ref in packet['refs']:
             assert type(ref['Number'])is int and ref['Number']>0
             owners[(ref['Number'],domain(ref['Domain']))].add(packet['flow'])
             physical_owners[(ref['Number'],ref['Domain']['Section'],ref['Domain']['Interface'])].add(packet['flow'])
+            if 'state'in packet:
+                assert packet['state']in['observed','closed-direction-observation','closed-observation']
+                physical_states[(ref['Number'],ref['Domain']['Section'],ref['Domain']['Interface'])].add((packet['flow'],packet['state']))
     pools=collections.defaultdict(collections.deque)
     protocol_to_tcp=collections.defaultdict(set)
     event_bindings={};parent_links=[];missing=[];captured=0;tcp_without_direct_binding=0
@@ -178,7 +182,7 @@ def audit(capture,observer,sdk,cli,allow_empty_tcp=False):
     empty_tcp=not flows and not observed_packets and not hooks['closed']and captured==tcp_without_direct_binding==0 and bool(event_bindings)
     assert captured>0 or allow_empty_tcp and empty_tcp,'positive captured-TCP coverage is required unless explicitly certifying an observed empty TCP namespace'
     selected={};preview_by_tcp={};preview_to_tcp={};deferred_controls=set()
-    physical=0;PDU_count=0;close_publications=0
+    physical=0;PDU_count=0;close_publications=0;unconfirmed_closed_without_page=0
     for row in rows(cli):
         publication=row.get('record_type')=='protocol_publication'
         if publication:
@@ -196,10 +200,15 @@ def audit(capture,observer,sdk,cli,allow_empty_tcp=False):
             assert domain(row['tcp_flow_domain'])==domain(flows[native]['domain'])
             physical_key=(row['number'],row['capture_domain']['Section'],row['capture_domain']['Interface'])
             assert native in physical_owners[physical_key],'physical row links to its actual native packet observation (including normalized tunnel domains)'
-            assert preview>0,'every observed native TCP packet has a page stream ID'
-            if native in preview_by_tcp:assert preview_by_tcp[native]==preview,'one preview per native generation'
-            if preview in preview_to_tcp:assert preview_to_tcp[preview]==native,'a preview cannot merge different native generations'
-            preview_by_tcp[native]=preview;preview_to_tcp[preview]=native
+            if preview==0:
+                state=row.get('tcp_flow_state');assert state in['closed-observation','closed-direction-observation']and(native,state)in physical_states[physical_key],'a missing page requires its actual closed native packet-hook state'
+                assert not row.get('connection_protocol')and not row.get('connection_stack')and row['protocol']=='TCP'
+                assert row['protocol_status']=='context-required'and row['visibility']in['header-only','unassembled-stream']and'after observed close; generation unconfirmed'in row['info']
+                unconfirmed_closed_without_page+=1
+            else:
+                if native in preview_by_tcp:assert preview_by_tcp[native]==preview,'one preview per native generation'
+                if preview in preview_to_tcp:assert preview_to_tcp[preview]==native,'a preview cannot merge different native generations'
+                preview_by_tcp[native]=preview;preview_to_tcp[preview]=native
         elif not publication and(row['number'],row['capture_domain']['Section'],row['capture_domain']['Interface'])in physical_owners:
             deferred_controls.add((row['number'],row['capture_domain']['Section'],row['capture_domain']['Interface']))
         for pdu in(row.get('pdus')or[])+(row.get('published_pdus')or[]):
