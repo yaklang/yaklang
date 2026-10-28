@@ -254,19 +254,27 @@ func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFe
 		}
 		return err
 	}
-	if ip.Version == 0 && data[0]>>4 == 4 {
-		flags := binary.BigEndian.Uint16(data[6:8])
-		ip.Version, ip.TOS = data[0]>>4, data[1]
-		ip.Id = binary.BigEndian.Uint16(data[4:6])
-		ip.Flags, ip.FragOffset = layers.IPv4Flag(flags>>13), flags&0x1fff
-		ip.TTL, ip.Protocol = data[8], layers.IPProtocol(data[9])
-		ip.Checksum = binary.BigEndian.Uint16(data[10:12])
-		ip.SrcIP, ip.DstIP = net.IP(data[12:16]), net.IP(data[16:20])
-	}
+	restoreIPv4FixedFieldsAfterOptions(ip, data)
 	if ip.Version != 4 {
 		return &ipVersionError{observed: data[0] >> 4, expected: 4}
 	}
 	return nil
+}
+
+// Call only after DecodeFromBytes succeeds. The dependency returns at EOL
+// before filling these fixed fields, even though the complete header/options
+// have already been checked. Keep observer and native views on the same bytes.
+func restoreIPv4FixedFieldsAfterOptions(ip *layers.IPv4, data []byte) {
+	if ip.Version != 0 || len(data) < 20 || data[0]>>4 != 4 {
+		return
+	}
+	flags := binary.BigEndian.Uint16(data[6:8])
+	ip.Version, ip.TOS = data[0]>>4, data[1]
+	ip.Id = binary.BigEndian.Uint16(data[4:6])
+	ip.Flags, ip.FragOffset = layers.IPv4Flag(flags>>13), flags&0x1fff
+	ip.TTL, ip.Protocol = data[8], layers.IPProtocol(data[9])
+	ip.Checksum = binary.BigEndian.Uint16(data[10:12])
+	ip.SrcIP, ip.DstIP = net.IP(data[12:16]), net.IP(data[16:20])
 }
 
 type protocolDecodeFeedback struct{ truncated bool }
