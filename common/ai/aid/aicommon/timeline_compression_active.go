@@ -116,7 +116,7 @@ func (m *Timeline) CompressionCandidates(throughID ...int64) ([]TimelineCompress
 
 // ApplyCompressionSelection applies a parsed action through its request boundary.
 // It captures a local memory source without retaining a cross-request snapshot.
-func (m *Timeline) ApplyCompressionSelection(selection *TimelineCompressionSelection, requestPrompt string, response ...func() string) (*TimelineCompressionResult, error) {
+func (m *Timeline) ApplyCompressionSelection(selection *TimelineCompressionSelection, requestPrompt string, response ...TrajectoryResponseReceipt) (*TimelineCompressionResult, error) {
 	if m == nil {
 		return nil, fmt.Errorf("timeline is nil")
 	}
@@ -132,10 +132,7 @@ func (m *Timeline) ApplyCompressionSelection(selection *TimelineCompressionSelec
 	}
 	m.mu.Lock()
 	trajectoryConfig := m.trajectoryConfig
-	if m.branchTimeline {
-		trajectoryConfig = nil
-	}
-	var responseSnapshot func() string
+	var responseSnapshot TrajectoryResponseReceipt
 	if len(response) > 0 {
 		responseSnapshot = response[0]
 	}

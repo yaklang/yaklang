@@ -17,6 +17,11 @@ import (
 // must enqueue model work without retaining a live session or its UI consumer.
 type TrajectoryEvaluator func(*gorm.DB, bool, *schema.AITrajectory)
 
+// TrajectoryResponseReceipt registers a nonblocking notification for the complete
+// response. An unfinished provider must not occupy a database writer or expire
+// an otherwise successful compression's receipt.
+type TrajectoryResponseReceipt func(receive func(string))
+
 var trajectoryEvaluatorRegistry struct {
 	sync.RWMutex
 	evaluator TrajectoryEvaluator
@@ -50,7 +55,6 @@ type trajectoryWrite struct {
 	singleModel bool
 	record      schema.AITrajectory
 	compression *trajectoryCompressionMetadata
-	response    func() string
 	resume      bool
 }
 
@@ -105,9 +109,6 @@ func (p *trajectoryWritePool) worker() {
 				}
 				job.record.TrajectoryKey = uuid.NewString()
 				job.record.CompressionJSON = string(raw)
-				if job.response != nil {
-					job.record.Response = job.response()
-				}
 				if job.record.Response == "" {
 					return // An incomplete response is not a successful compression receipt.
 				}
@@ -138,13 +139,9 @@ func (c *Config) trajectoryPersistenceEnabled() bool {
 	if c == nil || c.DisableCreateDBRuntime || c.BaseCheckpointableStorage == nil || c.GetDB() == nil || c.PersistentSessionId == "" || c.Timeline == nil {
 		return false
 	}
-	// Collection is expendable if another writer owns the timeline lock.
-	if !c.Timeline.mu.TryRLock() {
-		return false
-	}
-	branch := c.Timeline.branchTimeline
-	c.Timeline.mu.RUnlock()
-	return !branch
+	// The branch identity is an atomic snapshot: unrelated timeline writes must
+	// neither block nor cause the only terminal receipt to be discarded.
+	return !c.Timeline.branchTimeline.Load()
 }
 
 func (c *Config) newTrajectory(kind string) schema.AITrajectory {
@@ -219,7 +216,7 @@ func (c *Config) CollectTerminalTrajectory(task AIStatefulTask) bool {
 // Capture only immutable strings and fixed-size metadata while the compression
 // state is locked. The notification enqueues after a successful commit; even
 // capture, queue, database or evaluator failures cannot reject compression.
-func (c *Config) compressionTrajectoryNotification(prompt string, result *TimelineCompressionResult, response func() string) (notify func()) {
+func (c *Config) compressionTrajectoryNotification(prompt string, result *TimelineCompressionResult, response TrajectoryResponseReceipt) (notify func()) {
 	defer RecoverTrajectoryCollection()
 	if c == nil || c.DisableCreateDBRuntime || c.BaseCheckpointableStorage == nil || c.GetDB() == nil || c.PersistentSessionId == "" || prompt == "" || response == nil {
 		return nil
@@ -228,9 +225,18 @@ func (c *Config) compressionTrajectoryNotification(prompt string, result *Timeli
 	record.Prompt, record.Status = prompt, "committed"
 	metadata := &trajectoryCompressionMetadata{ThroughID: result.ThroughID, RetainedRange: result.RetainedRange,
 		InputTokens: result.InputTokens, SummaryTokens: result.SummaryTokens}
-	job := trajectoryWrite{db: c.GetDB(), singleModel: c.singleAIModelMode, record: record, compression: metadata, response: response}
+	job := trajectoryWrite{db: c.GetDB(), singleModel: c.singleAIModelMode, record: record, compression: metadata}
+	var received atomic.Bool
 	return func() {
 		defer RecoverTrajectoryCollection()
-		trajectoryWrites.enqueue(job)
+		response(func(fullResponse string) {
+			defer RecoverTrajectoryCollection()
+			if fullResponse == "" || !received.CompareAndSwap(false, true) {
+				return
+			}
+			ready := job
+			ready.record.Response = fullResponse
+			trajectoryWrites.enqueue(ready)
+		})
 	}
 }

@@ -54,7 +54,7 @@ func (m *Timeline) IsSessionTimeline() bool {
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return !m.branchTimeline && m.sessionMemory != nil && m.sessionMemory.owner == m
+	return !m.branchTimeline.Load() && m.sessionMemory != nil && m.sessionMemory.owner == m
 }
 
 func newTimelineSessionMemory(owner *Timeline, items []any) *timelineSessionMemory {

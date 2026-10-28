@@ -41,6 +41,7 @@ func (m *Timeline) ForkForTask(taskIndex, taskName string, config AICallerConfig
 	// Session extraction history is shared; ordinary task history stays private.
 	m.mu.RLock()
 	branch.sessionMemory = m.sessionMemory
+	branch.trajectoryConfig = m.trajectoryConfig
 	m.mu.RUnlock()
 	branch.SoftBindConfig(config, ai)
 	branch.markBranchTimeline(true)

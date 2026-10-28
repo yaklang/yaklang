@@ -112,7 +112,7 @@ func (m *Timeline) compressionSourceStateLocked(through int64) (string, error) {
 // applyCompressionLocked commits one parsed compress_context selection.
 // The caller holds Timeline.mu. The snapshot taken here is only the pre-delete
 // memory source; retain and retire decisions come from selection.
-func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelection, requestPrompt string, trajectoryConfig *Config, response func() string) (*TimelineCompressionResult, func(), error) {
+func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelection, requestPrompt string, trajectoryConfig *Config, response TrajectoryResponseReceipt) (*TimelineCompressionResult, func(), error) {
 	if selection == nil {
 		return nil, nil, fmt.Errorf("compression selection is nil")
 	}

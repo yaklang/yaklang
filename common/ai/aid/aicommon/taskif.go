@@ -159,6 +159,7 @@ type AIStatefulTaskBase struct {
 	taskMutex           *sync.Mutex
 	statusMu            sync.RWMutex
 	status              AITaskState
+	statusSnapshot      atomic.Pointer[AITaskState]
 	completionHolds     int
 	completionRequested bool
 	createdAt           time.Time
@@ -684,14 +685,15 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 	return s.status
 }
 
-// TryGetStatus lets expendable observers skip a busy task instead of waiting
-// for its lifecycle lock. Normal task execution continues to use GetStatus.
+// TryGetStatus reads the last published lifecycle state without waiting for
+// statusMu. A busy lifecycle writer must not discard the terminal trajectory.
 func (s *AIStatefulTaskBase) TryGetStatus() (AITaskState, bool) {
-	if s == nil || !s.statusMu.TryRLock() {
-		return "", false
+	if s != nil {
+		if snapshot := s.statusSnapshot.Load(); snapshot != nil {
+			return *snapshot, true
+		}
 	}
-	defer s.statusMu.RUnlock()
-	return s.status, true
+	return "", false
 }
 
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
@@ -743,6 +745,7 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 	}
 	old := s.status
 	s.status = status
+	s.statusSnapshot.Store(&status)
 	finished := isFinishedTaskStatus(status)
 	s.statusMu.Unlock()
 
@@ -775,6 +778,7 @@ func (s *AIStatefulTaskBase) RestoreStatus(status AITaskState) {
 	}
 	s.statusMu.Lock()
 	s.status = status
+	s.statusSnapshot.Store(&status)
 	s.statusMu.Unlock()
 }
 
@@ -946,6 +950,8 @@ func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBa
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 		uuid:              ksuid.New().String(),
 	}
+	initialStatus := AITaskState_Created
+	base.statusSnapshot.Store(&initialStatus)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(base)
