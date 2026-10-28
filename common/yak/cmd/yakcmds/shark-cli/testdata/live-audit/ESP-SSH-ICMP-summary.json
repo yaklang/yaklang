@@ -1,0 +1,200 @@
+{
+  "scope": "Evidence metadata only. Captures, keys, complete exports, programs, images and logs remain external. This is not complete TOP30 or Wireshark parity.",
+  "native_source": "49b0a99102357d22ee6e6c935a2a3a8358503f7c",
+  "CLI_source": "4c023fd47c2b940b509d08220a4576f525af33e6",
+  "captures": [
+    {
+      "name": "The-Ultimate-PCAP.pcapng",
+      "frames": 51328,
+      "SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4"
+    },
+    {
+      "name": "ultimate_wireshark_protocols_pcap_220213.pcap",
+      "frames": 328127,
+      "SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c"
+    }
+  ],
+  "SDK": {
+    "actual_inputs": 37,
+    "exported_objects": 295123,
+    "byte_identical_objects": 295060,
+    "whole_source_expected_changes": 63,
+    "whole_flow_files_byte_identical": 2,
+    "negative_controls": 9
+  },
+  "ICMPv6_changes": {
+    "old_IP_malformed": 57,
+    "old_IP_incomplete": 2,
+    "old_decoded_short_body": 3,
+    "old_decoded_bad_Redirect_option": 1,
+    "new_malformed": 58,
+    "new_incomplete": 5
+  },
+  "fields": {
+    "actual_TShark_version": "4.6.9",
+    "observations": 11085,
+    "selected_key_scalars": 40785,
+    "ARP": 1524,
+    "ICMP": 18784,
+    "ICMPv6": 20477,
+    "selected_native_or_WS_differences": 0,
+    "valid_direct_or_simple": 10679,
+    "explicit_cross_family_observations": 384,
+    "explicit_zero_IP_length_compatibility": 22,
+    "uncovered_tunnel_or_parent_profiles": 390
+  },
+  "CLI": {
+    "actual_inputs": 37,
+    "rows": 384518,
+    "whole_source_expected_diagnostic_changes": 60,
+    "all_other_rows_and_all_PDU_projections_whole_literal": true,
+    "negative_controls": 6
+  },
+  "earlier_CLI_projections": {
+    "ICMP_alias_whole_expected": 10971,
+    "alias_negative_controls": 12,
+    "EOL_changes": 16342,
+    "EOL_whole_source_expected": 16039,
+    "EOL_uncovered": 303,
+    "EOL_negative_controls": 12
+  },
+  "Windows": {
+    "method": "Native Windows console cells/attributes rendered to PNG, not native Windows Terminal pixels.",
+    "final_pages": 2,
+    "buffers": 30,
+    "CP936_restore_resize_quit": true,
+    "Source0_Source1_lengths": [
+      [
+        58,
+        58
+      ],
+      [
+        102,
+        102
+      ]
+    ],
+    "native_window_capture_runtime": "Initialization failed: kernel asset path not found (os error 3)."
+  },
+  "tests": {
+    "full_native_source": {
+      "source": "49b0a99102357d22ee6e6c935a2a3a8358503f7c",
+      "passed": 285058,
+      "skipped": 24,
+      "unique_started_and_terminated": 285082
+    },
+    "later_CLI": {
+      "source": "4c023fd47c2b940b509d08220a4576f525af33e6",
+      "passed": 763,
+      "skipped": 2,
+      "unique_started_and_terminated": 765
+    }
+  },
+  "CI": {
+    "tested_source": "49b0a99102357d22ee6e6c935a2a3a8358503f7c",
+    "manual_traffic_run": 40679733077,
+    "manual_traffic_conclusion": "success",
+    "essential_run": 40678503306,
+    "essential_conclusion_after_failed_job_retry": "success",
+    "first_failure": "MITM/XSS integration found no risks; unchanged failed job rerun passed. Original failure retained.",
+    "automatic_draft_traffic": "skipped",
+    "final_document_head_checks": "Verify separately; do not attribute these earlier runs to a later commit."
+  },
+  "open_findings": [
+    "Typed ARP/ICMP/ICMPv6 display field namespaces absent in the current 667-field registry.",
+    "ICMPv4 type-specific header incorrectly shown as Identifier/Sequence for errors/Redirect; public MTU example1492 mislabeled Sequence.",
+    "18 public short ICMPv4 Timestamp messages still decoded; 198 error unions mislabeled and188 complete Timestamp messages lack time fields; native fix pending.",
+    "303 EOL physical projections and390 own-header tunnel/parent profiles remain uncovered.",
+    "Broader SSH channel/authentication/rekey, MLD records and QUIC CID/QPACK/0-RTT remain open."
+  ],
+  "proofs": [
+    {
+      "external_relative_name": "ESP-portable-final07-summary.json",
+      "SHA256": "1424e8d2d7950e3345f1ecf464e56db02352a65251a2c348cc2d11cadf3660fb"
+    },
+    {
+      "external_relative_name": "esp-public-source-final07-01/summary.json",
+      "SHA256": "071773d3c686fd5ecfaa388ceeef269c66ed07dc9cbbc3d903ce081b726bd4c2"
+    },
+    {
+      "external_relative_name": "parent-portable-source08-02/summary.json",
+      "SHA256": "6192a3131e4b9e9774819e6e9b3048f8ff47fae2bc54fffd16533d1b804d263b"
+    },
+    {
+      "external_relative_name": "native-121792-to-02d2-complete-identity.json",
+      "SHA256": "f85fd371bc91bd2805ce0f568087b87c21e87dd1abd7d185b326d03c31a31c2d"
+    },
+    {
+      "external_relative_name": "EOL-live-verified-02/summary.json",
+      "SHA256": "04622b37a490f5bb140418601a48983dae18ee30700d0739ad9325bf9dca44ad"
+    },
+    {
+      "external_relative_name": "windows-native-fef614-01/visual-summary.json",
+      "SHA256": "51c661d9d4835e07fdacfd69b9641650de315d2359389e7e9e25ef3f995d7828"
+    },
+    {
+      "external_relative_name": "windows-source-bytes-fef614-01/summary.json",
+      "SHA256": "c83acf5ff7f4b2245b7b934e18c81efda7e36a2af6ef5a8e0fc9adf272c5384e"
+    },
+    {
+      "external_relative_name": "CLI-EOL-source-06/summary.json",
+      "SHA256": "34dd6aa16bd06ceee8830a7f27711eafc76a97a54f2a22a095a048d55ab5130e"
+    },
+    {
+      "external_relative_name": "CLI-alias-source-02/summary.json",
+      "SHA256": "66625881c1974549c39c51d6f16b12285a3965b4dc17a93987a7cbd8063ea597"
+    },
+    {
+      "external_relative_name": "network-self-header-controls-final06-01/summary.json",
+      "SHA256": "f4f770f103af76bb635e085e88d910de788e9e07ff4e6dfcd7fc1435266a7648"
+    },
+    {
+      "external_relative_name": "icmpv6-full-SDK-bridge-03/summary.json",
+      "SHA256": "e87e19706dcfdecf4415fd1c2e3730b803b3a05d95125f03abdc89e4db7a4e0a"
+    },
+    {
+      "external_relative_name": "network-self-header-WS-fields-04/summary.json",
+      "SHA256": "155a514a7572e297439dd3db01b78f7543ef7612952c4adeb8dc68a0f4775d4d"
+    },
+    {
+      "external_relative_name": "CLI-ICMP6-UI-source-01/summary.json",
+      "SHA256": "e68f7a7ad629c919a48e32c0aa0e9f054897e0d7b2cba6cfef26ab290069ca9d"
+    },
+    {
+      "external_relative_name": "windows-icmpv6-4c023-01/visual-summary.json",
+      "SHA256": "afc1d38f12b42b61b6a9b0402d1816f7fee2b4c4a95ccd4cdf1b3120949521ee"
+    },
+    {
+      "external_relative_name": "windows-icmpv6-source-bytes-4c023-01/summary.json",
+      "SHA256": "b551af5c1945839b037410070bc001e9f5d2353f0e520efe62440563c1ea0f67"
+    },
+    {
+      "external_relative_name": "full-06/receipt.json",
+      "SHA256": "07d05a911e07dd22b7fa43364d27548b82212852e572d35e740f2be293348544"
+    },
+    {
+      "external_relative_name": "CLI-ICMP6-UI-full01/receipt.json",
+      "SHA256": "29a71f37dd8b42a7293931112d0ce7b5a1a07a61bc4a176fcea57f58598b6a63"
+    },
+    {
+      "external_relative_name": "disk-health-closed-13.json",
+      "SHA256": "738846c51afab377e54992a90cd1a40598896cb5118ef2ce52f6e742e59701e8"
+    }
+  ],
+  "binary_identity": {
+    "events06_and07": "ad4997a7614a411aaf6245a8fb245ba4e79c1757550e3a5179b532c59cfbd029",
+    "flows06_and07": "1e1fac92e32e130b5e3fe8e470f79b6e19974af86ac2bf5294bcb128786fba85",
+    "CLI07": "4ccdf682ef7033b688bd4eb946fbb0383fd55128b4998c2e07508ca96b27d8f2"
+  },
+  "disk": {
+    "method": "Lossless NTFS compression; content SHA and all three file times verified; no deletion.",
+    "latest_batch_files": 24,
+    "latest_batch_saved_bytes": 1206862198,
+    "free_bytes_observed": 35605950464
+  },
+  "quota": {
+    "primary_used_percent": 8,
+    "stop_expansion_at_remaining_percent": 50,
+    "threshold_reached": false,
+    "max_active_child_agents": 1
+  }
+}
