@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -236,4 +237,22 @@ func testUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T, childVersio
 			require.NotNil(t, q)
 		})
 	}
+}
+
+func TestUnselectedParentKeepsObservedDomainBeyondDisplayedPrefix(t *testing.T) {
+	raw := tunnelAdmissionWire(t, "ipip", 5013, "198.51.100.1", false, 5, false)
+	p := gopacket.NewPacket(raw, protocolPacketDecoder{decoder: layers.LinkTypeEthernet}, gopacket.Default)
+	p.Metadata().CaptureInfo = withEvidence(gopacket.CaptureInfo{Timestamp: time.Unix(100, 0), CaptureLength: len(raw), Length: len(raw)}, captureEvidence{Ref: PacketReference{Number: 1, Domain: CaptureDomain{Interface: 17}}})
+	var events []*ProtocolEvent
+	a := coreFragmentParser(&events, 1<<20, 16)
+	_, consumed := a.networkPacket(p)
+	require.True(t, consumed)
+	require.Len(t, events, 1)
+	e := events[0]
+	require.Equal(t, "network-encapsulation-refusal", e.Profile)
+	require.Equal(t, CaptureDomain{Interface: 17, Encapsulation: strings.Repeat("/ipip:198.51.100.1~198.51.100.2", 5)}, e.Domain)
+	require.Equal(t, []PacketReference{{Number: 1, Domain: e.Domain}}, e.SourceBytes.PacketRefs)
+	require.Equal(t, []string{"Ethernet", "IPv4"}, e.Session["Observed Header Layers"])
+	require.Zero(t, e.FlowID)
+	require.Nil(t, a.udpSessions)
 }
