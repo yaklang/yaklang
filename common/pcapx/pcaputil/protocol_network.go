@@ -92,6 +92,11 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 				unsupported = true
 			}
 		case *layers.IPv4:
+			if v.Version == 4 && v.Protocol == layers.IPProtocol(97) && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
+				// EtherIP is not a selected carrier. An ARP child has no IP
+				// NetworkLayer, so the network-count gate alone cannot refuse it.
+				unsupported = true
+			}
 			if v.Version == 4 && v.Protocol == layers.IPProtocolIPv6HopByHop && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
 				// IPv4 HOPOPT is an unselected carrier profile. Its typed
 				// standalone-HBH refusal must not elevate any child identity or
@@ -104,6 +109,9 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 				tunnels++
 			}
 		case *layers.IPv6:
+			if v.Version == 6 && v.NextHeader == layers.IPProtocol(97) {
+				unsupported = true
+			}
 			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
 				tunnels++
 			}
