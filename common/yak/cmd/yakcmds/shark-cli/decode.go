@@ -367,7 +367,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		appendCapturedVXLANHeaders(&d, raw)
 	}
 	if len(events) > 0 {
-		fields, sources := protocolEventDetail(events)
+		fields, sources := protocolEventDetail(events, !raw.workerFieldProjection)
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 		if d.protocol == "" {
@@ -547,7 +547,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		appendCapturedVXLANHeaders(&d, raw)
 	}
 	if len(events) > 0 {
-		fields, sources := protocolEventDetail(events)
+		fields, sources := protocolEventDetail(events, !raw.workerFieldProjection)
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 	}

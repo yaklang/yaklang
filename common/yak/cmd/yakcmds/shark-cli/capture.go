@@ -132,6 +132,7 @@ func openOffline(name, filter string, ignoreSecrets ...bool) (_ *captureSource, 
 }
 
 type capturedPacket struct {
+	workerFieldProjection bool   // IPC values have normalized types; equality was decided by the parent.
 	publicationPhase      string // Nonphysical, bounded JSON analysis record; never a captured frame.
 	transportView         *packetTransportView
 	physicalRecord        bool

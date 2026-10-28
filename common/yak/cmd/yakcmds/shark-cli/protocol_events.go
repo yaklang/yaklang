@@ -78,9 +78,10 @@ func protocolEventFields(events []*pcaputil.ProtocolEvent) []field {
 	return fields
 }
 
-func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSource) {
+func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...bool) ([]field, []detailSource) {
 	var out []field
 	var sources []detailSource
+	allowDNSDedup := len(deduplicateDNS) == 0 || deduplicateDNS[0]
 	ordered := append([]*pcaputil.ProtocolEvent(nil), events...)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		if ordered[i] == nil {
@@ -707,9 +708,20 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 			values[k] = v
 		}
 		for k, v := range e.Session {
+			if k == "DNS" && allowDNSDedup && duplicateDNSSessionFields(e) {
+				continue // A complete typed copy of this same PDU is already in Fields.
+			}
 			values[k] = v
 		}
 		delete(values, "Wire Field Ranges")
+		if hasTLSConnectionObservation(e.Protocol) {
+			if context, ok := values["Session Establishment"].(map[string]any); ok {
+				fields, limited := connectionObservationFields(context, 4096-len(out))
+				out = append(out, fields...)
+				fieldViewLimited = fieldViewLimited || limited
+				delete(values, "Session Establishment")
+			}
+		}
 		if e.Protocol == "dcerpc" {
 			add("DCE/RPC message and observed association", true)
 			if e.ResponseTo != 0 {
@@ -725,6 +737,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 			add("QUIC wire header and observed context", true)
 			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+				if value, ok := values[key]; ok {
+					walk(key, value, 0)
+					delete(values, key)
+				}
+			}
+		}
+		if e.Protocol == "esp" {
+			for _, key := range []string{"SPI", "Sequence", "Sequence Number", "Header Complete", "Algorithm Context Available", "Authentication Verified", "Extended Sequence Reconstructed", "Observation Scope"} {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)
@@ -839,7 +859,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent) ([]field, []detailSou
 		if e.Completeness != "" && e.Completeness != state {
 			state += " · " + e.Completeness
 		}
-		add(fmt.Sprintf("Status: %s · source %s → %s", state, e.Source, e.Destination), false)
+		add(protocolEventStatusText(e, state), false)
 		if e.Error != "" && !earlyQUICDiagnostic {
 			message := e.Error
 			if e.Protocol == "ssh" && e.ExpertCode != "" && strings.HasPrefix(message, e.ExpertCode+": ") {
@@ -906,7 +926,7 @@ func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 		if e == nil {
 			continue
 		}
-		if e.Status != "decoded" && e.Status != "deferred" {
+		if e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) {
 			continue
 		}
 		name := eventProtocolName(e)

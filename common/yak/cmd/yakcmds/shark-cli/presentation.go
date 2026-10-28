@@ -765,8 +765,50 @@ func headerLayerNames(value any) []string {
 	return names
 }
 
+// A diagnostic code alone is not a declaration of an admitted network prefix.
+// Accept only the complete native refusal contract; capturedNetworkPrefix still
+// validates the literal headers before giving the row addresses or byte spans.
+func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, string, bool) {
+	if e == nil || e.Protocol != "ip" || e.Transport != "network" || e.Profile != "network-header-refusal" || e.Status != "malformed" || e.Completeness != "malformed" {
+		return nil, "", false
+	}
+	switch e.ExpertCode {
+	case "IPv6OptionsHeaderBounds", "AHHeaderBounds", "ESPParentLengthInvalid":
+	default:
+		return nil, "", false
+	}
+	if e.Session["Header Observation Scope"] != "validated network prefix before refused child header" || e.Session["Child Header Identity"] != "unconfirmed" || e.Session["Parent Header Refusal"] != e.ExpertCode {
+		return nil, "", false
+	}
+	names := headerLayerNames(e.Session["Observed Header Layers"])
+	label := ""
+	for _, name := range names {
+		switch name {
+		case "IPv4", "IPv6":
+			label = name
+		case "ICMPv4", "ICMPv6", "TCP", "IPSecESP":
+			return nil, "", false // A quotation or refused child is not this prefix.
+		}
+	}
+	return names, label, label != ""
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
+		return
+	}
+	if names, label, ok := networkHeaderRefusalPresentation(e); ok {
+		*p = packetPresentation{networkRefused: true, protocol: label, summary: safeText(e.Summary), status: "malformed", visibility: "malformed-network-header", scope: "validated network prefix before refused child header", evidence: "child header refused; no transport or application state admitted", nativeHeaders: names, nativeDomain: e.Domain, priority: 1000}
+		return
+	}
+	if validESPHeaderObservation(e) {
+		p.addLayer("ESP")
+		if p.priority <= 5 {
+			p.protocol, p.priority, p.status, p.visibility = "ESP", 5, "limited", "headers"
+			p.scope = "observed clear ESP header and opaque remainder"
+			p.evidence = "SA context unavailable; authentication, decryption and replay not verified"
+			p.summary = safeText(e.Summary)
+		}
 		return
 	}
 	if validVXLANGPEHeaderObservation(e) {
@@ -1214,6 +1256,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
+			if semantic == "ESP" && physical == "IPSecESP" && p.status == "limited" && p.visibility == "headers" {
+				row.ProtocolStack[i], present = "ESP", true
+				break
+			}
 			if physical == "IS-IS" && strings.HasPrefix(semantic, "IS-IS ") {
 				row.ProtocolStack[i], present = semantic, true
 				break
