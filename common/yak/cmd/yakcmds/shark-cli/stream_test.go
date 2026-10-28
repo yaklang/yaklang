@@ -179,22 +179,26 @@ func TestStreamApplicationSignaturesAndYAMLDecode(t *testing.T) {
 	d := decodeStream(streamDecodeRequest{ID: 9, Ports: [2]uint16{45000, 12011}, Prefix: [2][]byte{[]byte("GET /assembled HTTP/1.1\r\nHost: example.com\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHELLO")}})
 	require.Equal(t, "HTTP", d.protocol)
 	var text strings.Builder
+	nested := false
 	for _, f := range d.fields {
 		text.WriteString(f.text)
 		text.WriteByte('\n')
-		require.Zero(t, f.depth)
+		nested = nested || f.depth > 0
 	}
+	require.True(t, nested, "decoded stream fields retain their protocol nesting")
 	require.Contains(t, text.String(), "/assembled")
 	require.Contains(t, text.String(), "HELLO")
 	require.NotContains(t, text.String(), "Sequence Number")
 }
-func TestStreamPaneSelectionScrollingAndFlatFields(t *testing.T) {
+func TestStreamPaneSelectionScrollingAndProgressiveFields(t *testing.T) {
 	u := browsingFixture(t)
 	u.fields = detail(u.inspect)
+	nested := false
 	for _, f := range u.fields.fields {
-		require.Zero(t, f.depth)
+		nested = nested || f.depth > 0
 		require.NotEqual(t, "root", f.text)
 	}
+	require.True(t, nested)
 	frame := u.view(&captureSession{}, &captureSource{}, captureConfig{})
 	require.NotContains(t, frame, "▾")
 	require.NotContains(t, frame, "▸")
