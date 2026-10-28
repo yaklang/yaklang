@@ -186,6 +186,32 @@ func TestArtifactEnricherCanceledContextDoesNotPoisonCacheOrMutateInput(t *testi
 	}
 }
 
+func TestProcessEvidenceRetainsErrorFromAutomaticPartialArtifact(t *testing.T) {
+	t.Parallel()
+	path := filepath.Join(t.TempDir(), "over-budget")
+	if err := os.WriteFile(path, []byte("large enough"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	artifacts := newArtifactEnricher(model.EvidencePolicy{CaptureFileHash: true}, shortTermContextConfig{})
+	artifacts.options.MaxHashBytes = 1
+	event := artifacts.Apply(model.Event{Process: &model.Process{PID: 1, Image: path}})
+	if event.Process.Artifact == nil || event.Data["artifact_errors"] == nil {
+		t.Fatalf("fixture did not retain a partial snapshot: %#v", event)
+	}
+	p := &pipeline{artifacts: artifacts}
+	result, err := p.executeEvidenceRequestContext(context.Background(), event, map[string]any{"kind": "process_tree", "target": "process"})
+	if err == nil || result["process_tree"] == nil {
+		t.Fatalf("known partial image became completed process evidence: result=%v err=%v", result, err)
+	}
+	// An unrelated PID must not inherit this event's image failure.
+	p.processes = newProcessTracker()
+	p.processes.byPID[2] = trackedProcess{process: model.Process{PID: 2}}
+	result, err = p.executeEvidenceRequestContext(context.Background(), event, map[string]any{"kind": "process_tree", "metadata": map[string]any{"pid": 2}})
+	if err != nil || result["resolved_target"] != 2 {
+		t.Fatalf("event image error leaked to another PID: result=%v err=%v", result, err)
+	}
+}
+
 func TestFileEvidenceContextReachesTraversalAndPostFilter(t *testing.T) {
 	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())

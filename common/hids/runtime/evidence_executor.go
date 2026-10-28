@@ -81,12 +81,33 @@ func (p *pipeline) executeEvidenceRequestContext(ctx context.Context, event mode
 	case "directory", "directory_scan":
 		return p.executeDirectoryScanEvidence(ctx, event, request)
 	case "process_tree":
-		return p.executeProcessTreeEvidence(ctx, event, request)
+		result, err := p.executeProcessTreeEvidence(ctx, event, request)
+		return validateEventProcessArtifact(event, result, err)
 	case "process_memory":
-		return p.executeProcessMemoryEvidence(ctx, event, request)
+		result, err := p.executeProcessMemoryEvidence(ctx, event, request)
+		return validateEventProcessArtifact(event, result, err)
 	default:
 		return nil, fmt.Errorf("unsupported evidence kind %q", kind)
 	}
+}
+
+// A process may already carry a partial artifact from automatic enrichment.
+// Reusing that snapshot must retain the failure without re-reading its image.
+func validateEventProcessArtifact(event model.Event, result map[string]any, err error) (map[string]any, error) {
+	if err != nil || event.Process == nil {
+		return result, err
+	}
+	pid, ok := anyToInt(result["resolved_target"])
+	if !ok || pid != event.Process.PID {
+		return result, nil
+	}
+	issues, _ := toEvidenceMapSlice(event.Data["artifact_errors"])
+	for _, issue := range issues {
+		if readEvidenceString(issue, "target") == "process.image" {
+			return result, fmt.Errorf("process artifact enrichment incomplete: %s", readEvidenceString(issue, "error"))
+		}
+	}
+	return result, nil
 }
 
 func (p *pipeline) executeFileEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
