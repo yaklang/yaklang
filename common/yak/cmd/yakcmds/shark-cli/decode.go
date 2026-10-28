@@ -555,10 +555,28 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		d.fields = append(d.fields, field{text: fmt.Sprintf("YAML dissector incomplete: %v; showing available packet layers", err)})
 	}
 	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
-	for _, layer := range p.Layers() {
+	for _, layer := range inspectionPacketLayers(p, row.TransportView) {
 		d.fields = append(d.fields, field{text: safeText(gopacket.LayerString(layer))})
 	}
 	return d
+}
+
+// An ingress-owned transport view selects the header prefix for this packet.
+// Fast/fallback details must not expose a speculative decoder child beyond it.
+// The original decoder inventory in packetSummary.Layers remains unchanged.
+func inspectionPacketLayers(p gopacket.Packet, view *packetTransportView) []gopacket.Layer {
+	layers := p.Layers()
+	if view == nil {
+		return layers
+	}
+	matched := 0
+	for i, name := range view.Layers {
+		if i >= len(layers) || layers[i].LayerType().String() != name {
+			break
+		}
+		matched++
+	}
+	return layers[:matched]
 }
 
 func hasObservedTLS(raw *capturedPacket) bool {
@@ -728,7 +746,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		d.fields = append(d.fields, field{depth: 1, text: name + ": " + formatFieldValue(name, value)})
 	}
 	offset := 0
-	for _, l := range p.Layers() {
+	for _, l := range inspectionPacketLayers(p, row.TransportView) {
 		start := offset
 		offset += len(l.LayerContents())
 		if l.LayerType() == gopacket.LayerTypePayload {
