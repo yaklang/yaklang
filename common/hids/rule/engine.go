@@ -16,9 +16,9 @@ import (
 )
 
 type Engine struct {
-	sandbox *yak.Sandbox
-	builtin []builtinrules.Rule
-	rules   []compiledRule
+	sandbox      *yak.Sandbox
+	builtin      []builtinrules.Rule
+	rulesByEvent map[string][]compiledRule
 }
 
 type compiledRule struct {
@@ -27,7 +27,8 @@ type compiledRule struct {
 
 func NewEngine(spec model.DesiredSpec) (*Engine, error) {
 	engine := &Engine{
-		sandbox: NewSandbox(),
+		sandbox:      NewSandbox(),
+		rulesByEvent: make(map[string][]compiledRule),
 	}
 	builtinRules, err := builtinrules.Compile(spec.BuiltinRuleSets)
 	if err != nil {
@@ -42,9 +43,8 @@ func NewEngine(spec model.DesiredSpec) (*Engine, error) {
 		if err := engine.validateRule(i, rule); err != nil {
 			return nil, err
 		}
-		engine.rules = append(engine.rules, compiledRule{
-			rule: rule,
-		})
+		compiled := compiledRule{rule: rule}
+		engine.rulesByEvent[rule.MatchEventType] = append(engine.rulesByEvent[rule.MatchEventType], compiled)
 	}
 
 	return engine, nil
@@ -56,18 +56,22 @@ func (e *Engine) Evaluate(event model.Event) []model.Alert {
 	}
 
 	alerts := builtinrules.Evaluate(e.builtin, event)
-	if e.sandbox == nil || len(e.rules) == 0 {
+	matchedRules := e.rulesByEvent[event.Type]
+	if e.sandbox == nil || len(matchedRules) == 0 {
 		return alerts
 	}
 
+	// Rule dependencies are scoped to this event, never imported into the
+	// long-lived engine. Keep one session for condition/action script semantics.
 	context := buildEvalContext(event)
-	for _, compiled := range e.rules {
+	session := e.sandbox.NewSession(context)
+	for _, compiled := range matchedRules {
 		rule := compiled.rule
 		if !rule.Enabled || rule.MatchEventType != event.Type {
 			continue
 		}
 
-		matched, err := e.sandbox.ExecuteAsBoolean(rule.Condition, context)
+		matched, err := session.ExecuteAsBoolean(rule.Condition)
 		if err != nil {
 			log.Warnf("hids custom rule evaluation failed: rule_id=%s err=%v", rule.RuleID, err)
 			continue
@@ -76,7 +80,7 @@ func (e *Engine) Evaluate(event model.Event) []model.Alert {
 			continue
 		}
 
-		actionResult, actionErr := e.evaluateAction(rule, context)
+		actionResult, actionErr := e.evaluateAction(session, rule)
 		alerts = append(alerts, buildAlert(rule, event, context, actionResult, actionErr))
 	}
 	return alerts
@@ -95,13 +99,8 @@ func (e *Engine) HasRulesForEventType(eventTypes ...string) bool {
 				return true
 			}
 		}
-		for _, compiled := range e.rules {
-			if !compiled.rule.Enabled || compiled.rule.IsBlank() {
-				continue
-			}
-			if compiled.rule.MatchEventType == eventType {
-				return true
-			}
+		if len(e.rulesByEvent[eventType]) > 0 {
+			return true
 		}
 	}
 	return false
@@ -111,14 +110,15 @@ func (e *Engine) validateRule(index int, rule model.CustomRule) error {
 	if e == nil || e.sandbox == nil {
 		return fmt.Errorf("rule sandbox is not initialized")
 	}
-	_, err := e.sandbox.ExecuteAsBoolean(rule.Condition, buildValidationContext(rule.MatchEventType))
+	session := e.sandbox.NewSession(buildValidationContext(rule.MatchEventType))
+	_, err := session.ExecuteAsBoolean(rule.Condition)
 	if err != nil {
 		return &model.ValidationError{
 			Field:  fmt.Sprintf("custom_rules[%d].condition", index),
 			Reason: fmt.Sprintf("invalid yak rule condition: %v", err),
 		}
 	}
-	if err := validateActionExpression(e.sandbox, rule.Action, buildValidationContext(rule.MatchEventType)); err != nil {
+	if err := validateActionExpression(session, rule.Action, nil); err != nil {
 		return &model.ValidationError{
 			Field:  fmt.Sprintf("custom_rules[%d].action", index),
 			Reason: fmt.Sprintf("invalid yak rule action: %v", err),
@@ -128,14 +128,14 @@ func (e *Engine) validateRule(index int, rule model.CustomRule) error {
 }
 
 func (e *Engine) evaluateAction(
+	sandbox *yak.Sandbox,
 	rule model.CustomRule,
-	context map[string]any,
 ) (customRuleActionResult, error) {
-	if e == nil || e.sandbox == nil || strings.TrimSpace(rule.Action) == "" {
+	if e == nil || sandbox == nil || strings.TrimSpace(rule.Action) == "" {
 		return customRuleActionResult{}, nil
 	}
 
-	raw, err := e.sandbox.ExecuteAsExpression(rule.Action, context)
+	raw, err := sandbox.ExecuteAsExpression(rule.Action)
 	if err != nil {
 		return customRuleActionResult{}, err
 	}
