@@ -42,12 +42,13 @@ func failedLoopStopReason(descriptor *LoopResultDescriptor, err error) LoopStopR
 // LoopCall keeps the native call identity alongside the existing action pair.
 // The executor can use ToolCallID to return a matching tool result later.
 type LoopCall struct {
-	Action        *aicommon.Action
-	LoopAction    *LoopAction
-	ToolCallID    string
-	Index         int
-	Description   string
-	ArgumentsJSON string
+	Action             *aicommon.Action
+	LoopAction         *LoopAction
+	ToolCallID         string
+	Index              int
+	Description        string
+	ArgumentsJSON      string
+	trajectoryResponse func() string // read the existing complete response on the background writer
 }
 
 // Callbacks own their readers until EOF and must not return while another

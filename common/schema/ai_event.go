@@ -294,11 +294,8 @@ const (
 	// 关键词: EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE, 当前任务 TODO 事件
 	EVENT_TYPE_CURRENT_TASK_TODO_LIST_UPDATE EventType = "current_task_todo_list_update"
 
-	// EVENT_TYPE_VALUE_FEEDBACK 价值评估结果事件: 由 aive 价值评估链路在拿到小模型
-	// 价值分后回吐给用户的唯一结果事件. 该事件只用于回吐前端展示, 不写本地数据库
-	// (见下方 eventTypeNotSaveBlackList). 携带 record_id / signature / value_score
-	// 等字段.
-	// 关键词: EVENT_TYPE_VALUE_FEEDBACK, 价值评估结果, aive value feedback, 不落本地
+	// Legacy value-feedback event, retained for stored-event/protocol compatibility.
+	// New trajectory evaluations are persisted on AITrajectory instead.
 	EVENT_TYPE_VALUE_FEEDBACK EventType = "value_feedback"
 )
 

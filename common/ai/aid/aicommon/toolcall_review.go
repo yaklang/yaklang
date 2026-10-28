@@ -1,12 +1,19 @@
 package aicommon
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func invokeParamsEqual(a, b aitool.InvokeParams) bool {
+	ra, ea := json.Marshal(a)
+	rb, eb := json.Marshal(b)
+	return ea == nil && eb == nil && string(ra) == string(rb)
+}
 
 type ToolUseReviewSuggestion struct {
 	Value                   string `json:"value"`

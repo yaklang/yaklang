@@ -11,6 +11,14 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
+const (
+	ApprovalSourceHuman           = "human"
+	ApprovalSourcePolicy          = "policy"
+	ApprovalSourceModelJudge      = "model_judge"
+	ApprovalSourceRule            = "rule"
+	ApprovalSourceTimeoutFallback = "timeout_fallback"
+)
+
 type Endpoint struct {
 	mu              sync.RWMutex
 	id              string

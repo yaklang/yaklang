@@ -11,18 +11,10 @@ import (
 	"github.com/segmentio/ksuid"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 )
 
-func TestToolCaller_ExplicitEditedParamsValueFeedback(t *testing.T) {
-	// This test verifies the normal-mode feedback path. Keep it independent of
-	// the user's persisted global single-model setting, which intentionally
-	// disables value-feedback AI work.
-	previousTieredConfig := consts.GetTieredAIConfig()
-	consts.SetTieredAIConfig(nil)
-	t.Cleanup(func() { consts.SetTieredAIConfig(previousTieredConfig) })
-
+func TestToolCaller_ExplicitEditedParamsDoesNotEvaluateTrajectory(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -51,17 +43,7 @@ func TestToolCaller_ExplicitEditedParamsValueFeedback(t *testing.T) {
 		}),
 	)
 
-	valueFeedbackSubmitterMu.Lock()
-	previousSubmitter := valueFeedbackSubmitter
-	valueFeedbackSubmitterMu.Unlock()
-	var feedbackMu sync.Mutex
-	var feedback []*ValueFeedbackRecord
-	RegisterValueFeedbackSubmitter(func(_ *Config, record *ValueFeedbackRecord) {
-		feedbackMu.Lock()
-		defer feedbackMu.Unlock()
-		feedback = append(feedback, record)
-	})
-	t.Cleanup(func() { RegisterValueFeedbackSubmitter(previousSubmitter) })
+	evaluations := captureTrajectoryEvaluations(t)
 
 	var callbackParams aitool.InvokeParams
 	tool, err := aitool.New(
@@ -89,22 +71,7 @@ func TestToolCaller_ExplicitEditedParamsValueFeedback(t *testing.T) {
 	require.Equal(t, int64(42), callbackParams.GetInt("id"))
 	require.Equal(t, 2, reviewCount, "edited params must be approved as a fresh proposal")
 
-	feedbackMu.Lock()
-	feedbackSnapshot := append([]*ValueFeedbackRecord(nil), feedback...)
-	feedbackMu.Unlock()
-	var editedApproval *ValueFeedbackApproval
-	for _, record := range feedbackSnapshot {
-		if record != nil && record.Approval != nil &&
-			aitool.InvokeParams(record.Approval.OriginalValue).GetInt("id") == 1 {
-			editedApproval = record.Approval
-			break
-		}
-	}
-	require.NotNil(t, editedApproval)
-	require.Equal(t, ApprovalDecisionApproveWithEdit, editedApproval.Decision)
-	require.True(t, editedApproval.Changed)
-	require.Equal(t, int64(1), aitool.InvokeParams(editedApproval.OriginalValue).GetInt("id"))
-	require.Equal(t, int64(42), aitool.InvokeParams(editedApproval.FinalValue).GetInt("id"))
+	require.Zero(t, evaluations.count(), "tool review must not evaluate a trajectory")
 }
 
 func TestReviewEditedParams_ContinueWithoutParamsRemainsScalarCompatible(t *testing.T) {

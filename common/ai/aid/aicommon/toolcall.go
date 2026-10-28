@@ -1080,11 +1080,6 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 			return nil, false, reviewErr
 		}
 
-		// 审批前快照原始提议参数 (original_value), 供价值评估比对是否被改动.
-		originalReviewParams := make(aitool.InvokeParams, len(invokeParams))
-		for k, v := range invokeParams {
-			originalReviewParams[k] = v
-		}
 		reviewQuestion := fmt.Sprintf("determite tool[%v]'s params is proper? what should I do?", tool.Name)
 
 		var params aitool.InvokeParams
@@ -1132,10 +1127,6 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		// acquire the same gate without deadlocking.
 		releaseReview()
 		if params == nil {
-			// 价值评估: 用户取消工具审批 (空响应释放) 是高价值的人工否决信号, 不能漏采.
-			if cfg, ok := config.(*Config); ok {
-				cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, nil)
-			}
 			t.emitter.EmitError("tool use [%v] review params is nil, user may cancel the review", tool.Name)
 			handleError(fmt.Sprintf("tool use [%v] review params is nil, user may cancel the review", tool.Name))
 			return nil, false, fmt.Errorf("tool use [%v] review params is nil", tool.Name)
@@ -1147,25 +1138,11 @@ func (t *ToolCaller) CallToolWithExistedParams(tool *aitool.Tool, invokeParams a
 		)
 		if err != nil {
 			var reconsider *ToolReviewReconsiderError
-			if errors.As(err, &reconsider) {
-				if !reviewReplayed {
-					if cfg, ok := config.(*Config); ok {
-						cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, nil)
-					}
-				}
-			} else {
+			if !errors.As(err, &reconsider) {
 				t.emitter.EmitError("error handling tool use review: %v", err)
 				handleError(fmt.Sprintf("error handling tool use review: %v", err))
 			}
 			return nil, false, err
-		}
-
-		// 价值评估 (review_decision): 记录审批事实 (original/final 参数 + 运行时来源),
-		// invokeParams 此时已是 review 应用后的最终参数. 非阻塞, 绝不影响主流程.
-		if !reviewReplayed {
-			if cfg, ok := config.(*Config); ok {
-				cfg.SubmitToolReviewValueFeedback(ep, reviewQuestion, originalReviewParams, invokeParams)
-			}
 		}
 
 		switch next {

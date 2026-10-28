@@ -454,6 +454,7 @@ func NewReAct(opts ...aicommon.ConfigOption) (*ReAct, error) {
 		return nil, err
 	}
 	cfg.FlushRestoredSessionEvidence()
+	cfg.ResumeTrajectoryEvaluations()
 	// EmitPinDirectory is deferred to ensureWorkDirectory when user input arrives
 
 	// When the session is restricted to its injected MCP servers, the profile/DB

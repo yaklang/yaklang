@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/segmentio/ksuid"
@@ -168,6 +169,7 @@ type AIStatefulTaskBase struct {
 	// index info
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
 	reActLoop         ReActLoopIF
+	trajectoryPrompt  atomic.Pointer[string]
 	db                *gorm.DB
 
 	uuid            string
@@ -680,6 +682,16 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 	s.statusMu.RLock()
 	defer s.statusMu.RUnlock()
 	return s.status
+}
+
+// TryGetStatus lets expendable observers skip a busy task instead of waiting
+// for its lifecycle lock. Normal task execution continues to use GetStatus.
+func (s *AIStatefulTaskBase) TryGetStatus() (AITaskState, bool) {
+	if s == nil || !s.statusMu.TryRLock() {
+		return "", false
+	}
+	defer s.statusMu.RUnlock()
+	return s.status, true
 }
 
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {

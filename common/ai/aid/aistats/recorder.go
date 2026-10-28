@@ -40,7 +40,7 @@ const (
 	statsJobAICall
 )
 
-// statsPool 是进程级的有界队列 + 固定 worker pool (与 aive valueFeedbackPool 同构).
+// statsPool 是进程级的有界队列 + 固定 worker pool.
 type statsPool struct {
 	queue chan *statsJob
 	once  sync.Once

@@ -277,6 +277,7 @@ func (r *ReActLoop) execOneCall(
 ) loopActionsResult {
 	op := newLoopActionHandlerOperator(task)
 	op.requestPrompt = prompt
+	op.trajectoryResponse = call.trajectoryResponse
 	op.requestTimelineThroughID = r.requestTimelineThroughID
 	op.requestTimelineItemIDs = r.requestTimelineItemIDs
 	result := loopActionsResult{operator: op, result: loopActionsContinue}

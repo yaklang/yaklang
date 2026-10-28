@@ -140,6 +140,7 @@ func (r *ReAct) processReActFromQueue() {
 
 // processReActTask 处理单个 Task
 func (r *ReAct) processReActTask(task aicommon.AIStatefulTask) {
+	defer r.collectTerminalTrajectory(task)
 	releaseCompletion := r.beginUserTaskMemory(task)
 	defer r.memoryContinuations.Delete(task.GetId())
 	defer releaseCompletion()
