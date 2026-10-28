@@ -3969,3 +3969,132 @@ PPP 协商、VXLAN flags profile、更多 QUIC CID/QPACK、CoAP 数值事务、S
 
 第二轮磁盘维护只无损压缩 30 个旧 Go 归档，额外回收 **1.914 GiB** 分配空间，全部
 hash 和时间戳核验通过，没有删除/移动文件或证据。维护后 C 盘可用约 36.12 GiB。
+
+## TLS 会话证据、VXLAN 准入与 Windows 来源展示复核（2026-10-28）
+
+本轮原生/规则最终源码为 `117280addd5b7a3ccf93aca507042a48b025d797`，
+Windows CLI 为 `7434814a2847ca0228da28ba1856482e8b4b0f13`。后一个提交只改 CLI；
+原生与规则目录较前者没有任何源码差异。证书、二进制与实际重放分别绑定这两个版本，
+不把文档提交或较新的 CLI 提交冒充已经重编译、重测的原生版本。
+机器可读结果见 [本轮摘要](shark-public-corpus-20261025/TLS-metadata-VXLAN-summary.json)，
+最新逐字标签计数见 [TOP30 对照表](shark-public-corpus-20261025/current-counts.md)。
+
+### 会话观察与认证、恢复成功分开
+
+ClientHello/ServerHello 现提供 Session ID 长度与 SHA256。TLS1.2 及更早版本的
+非空 ID echo 仅报告“恢复迹象”；TLS1.3 的兼容 ID echo 单独命名，绝不据此报告
+旧式会话恢复。完整 PSK identities/binders/modes、selected index 与当前 ClientHello
+对应关系均经过边界检查；外部 PSK 与票据来源仍可能不确定，Binder Verified 仍为
+false，证书信任仍未评估。没有新增跨连接票据缓存，也不导出票据、身份或 binder 原文。
+
+NewSessionTicket 展示 literal lifetime、age_add、nonce/ticket 长度与摘要、扩展和
+early-data 上限。超出七天的原 lifetime 保留，另列诊断与客户端缓存上限
+（[RFC 8446 §4.6.1](https://www.rfc-editor.org/rfc/rfc8446.html#section-4.6.1)），不能
+为了“正确”篡改线上的整数。HRR 后第二个 ClientHello 的身份次序、允许移除项、
+binder 重算及 selected index 归属有独立回归；未观察到的握手、未知版本和未认证
+记录不会补造可信状态。握手跨多条记录时，认证标记要求所有实际贡献记录满足认证。
+
+字段来源分为本 PDU 握手、派生摘要和当前连接观察。后续普通记录可保留已观察的
+会话上下文，但不能重复宣称包含新的 ServerHello。QUIC 改名 HTTP/3 或 DoQ 后也
+保留同一个私有 TLS 上下文与查询字段，修复了“详情有 context、过滤/导出没有”的
+实际问题。QUIC GetFields 保持原有 wire-envelope API；解密的 TLS 语义位于 Session
+与 typed aliases，不强行把两种不同契约的树认作相同。拒绝的 TLS PDU 也保留其
+既有记录字段，GetFields/Decode 的原始拒绝不会被 Session cache 绕过。
+
+两次独立 Windows loopback 捕获各有 TLS1.2/TLS1.3 共八代、四次真实恢复，并真实
+复用五元组。每次 16 份端点收据、136 条 TLS 记录、56 个握手和 24 对 HTTP 都逐字
+核对。另十二个缺 CH/SH、中途起抓、乱序和整记录删除控制显式保留变换台账；它们
+是捕获变换，不冒充真实网络丢包。14 个输入的 SDK/flow/CLI 均实际重放，372 项
+metadata/projection 负控全部拒绝。最后只改地址展示的 CLI 再实际重放这 14 个输入，
+全部完整 CLI 文件与前版本逐字节一致，原生证据明确复用。
+
+### 两个大原包的新增字段来源和原值保持
+
+两个原包仍在仓库外，原始大小、帧号、时间、接口和 digest 不变。
+
+| 输入 | 物理帧 | 原生记录 | 新增握手逐消息源验证 | 当前连接 context 核对 |
+|---|---:|---:|---:|---:|
+| Weber | 51,328 | 39,740 | 223（CH108/SH96/NST19） | 4,180 |
+| Sharon | 328,127 | 249,718 | 80（CH34/SH33/NST13） | 787 |
+
+303/303 条新增握手字段都对照 literal message 与可用 Wireshark 字段；三个早于
+参考重组完成时发布的 RADIUS/EAP ServerHello 逐属性/分片回溯，十二个 QUIC Initial
+hello 对照实际 CRYPTO 字节。补导出精确十八个原始帧，保留 coalesced QUIC 的重复
+JSON 键；不能用普通 JSON 覆盖首个 Initial 后宣称没有来源。
+
+审计入口独立枚举 5,253 条已准入 TLS/已认证 QUIC 记录，覆盖 4,967 次非空 context，
+也验证 138 条合法无新增 metadata 的记录。握手与 context 计数有重叠。94 个公开库
+语义负控全部拒绝，包括同步删除 Session/GetFields 的整个 context 和 aliases 后
+重新走入选流程，防止“字段不见了，审计也不检查”的漏检。
+
+普通重复 context 的记录/流连续性，明确组合此前完整原值证明，不用 frame-only
+猜测替代重组。metadata 阶段的 37 组导出共 292,070 个 SDK 记录；41,402,031 个既有标量值及类型、
+5,433,562 次既有 alias 及相对次序逐项保留，所有 CLI PDU 都绑定实际 SDK snapshot。
+不重写流、会话或 PDU 号来凑相等。原 94/39 清单再次全量复查，未分类为零；
+TLS 记录归属、已修 DNS 与无效 UTF8 的无损表示差异继续分别保留，不能称全部是
+新增 parser bug，也不能将合法表示差异抹掉。
+
+### VXLAN 的 native、bin-parser、目录与详情边界
+
+标准 VXLAN 要求完整八字节固定头、I 位与完整 Ethernet 前缀；reserved bits 按
+接收规则忽略。GBP 仅在 G 位存在时解释，A=0x08、D=0x40；修复依赖库把 A 当成
+0x80 的问题。只看源端口 4789 不能选择隧道，目的服务与 UDP/IP 的真实边界优先。
+坏 I 位的 SYN 不得替换已存在的合法 TCP 代际；VNI/外层端点隔离不会受 entropy
+源端口或 reserved bits 变化干扰。typed parent error 只计一次，不能再绕回外层 UDP
+并重新识别一个孩子。
+
+4790 的 VXLAN-GPE v0 仅准入已核验的八字节头；I/P/next-protocol 一致才命名
+VXLAN-GPE，payload/profile/session 均明确未准入。目录将标准 VXLAN 的 stateless
+内层子集和 GPE observed-header 都列 Partial，不能声称完整 overlay、policy 或 OAM。
+YAML 的默认 Package 入口保留历史标准 VXLAN 调用，不继续把流尾误读成第二个 GPE
+头；生成规则归档与所有 YAML 源字节一致。
+
+新增公开 [OISF #3348](https://redmine.openinfosecfoundation.org/issues/3348) 原始
+535 帧捕获：394 个实际 carrier，另 66 帧 ICMP 引用含 106 个 VXLAN 头、与 carrier
+有 33 帧重叠。引用不能拥有应用流。整份 SDK/flow/CLI 与旧基线逐字节一致。
+另 21 个真实 OS UDP 报文逐个对照双方收据；内层 payload 是明确编写的控制数据，
+不能称部署了真实 VTEP。31 个补充输入共 619 帧；来源/身份/CLI/worker 的 47 项
+负控分别列证书；最后另有七项 worker 端点负控，以及独立的 24 项整行语义负控、
+6 个 PCAPNG reader 正控和 50 个 selector 正/负预期，不拿数量替代覆盖范围。
+
+原始 Sharon frame48644 的源端口误分发，改为正确的 unknown UDP 观察，保留全部
+原始字节和身份。frame48568/98505/133116 保留既有 malformed UDP 拒绝，只去掉
+错误 VXLAN 域与冗余 marker。四行都从 IP/UDP literal extent 构建完整预期；其中
+48644 的帧还有十四字节 IP 之外尾部，不能当作 UDP 或 VXLAN payload。
+
+### Windows 实屏继续发现并修复来源错误
+
+新版本实际检查了 GBP、GPE、坏 I 位、TLS1.3 PSK、TLS1.2 ID 与 TLS1.3 ticket
+六个页面，字段/字节来源、鼠标切换、消息/证据、缩放、退出和 CP936 恢复均通过。
+紧凑列表按可见地址分配宽度，保留协议后的空格与 Info 最小空间。
+
+检查坏 I 位页面时发现：native 的有限拒绝没有 message endpoints，旧展示层却
+清空合法外层地址，并可能把 speculative child 当作 physical_source。现按 native
+实际已准入头部前缀，逐层验证 Source0 的完整版本/长度/外层 envelope，只显示
+已确认的 IP 地址；PhysicalSource 始终来自首个实际 IP。地址字段给出真实字节范围。
+未知 profile、坏版本、残头、fragment 或 ICMP 引用不能借用深层地址。
+
+实际全量 CLI 完整行复核纠正 Sharon 14,618 行、Weber 22 行；其它行、结束发布、
+所有 PDU/字段/类型/domain/会话/连接号逐值保留。不是对 endpoint 字段放行。
+补充 619 帧中仅 27 行端点展示改变，其余 592 行整行相同。消息历史被驱逐、IPC
+metadata 限制和无 Events worker 也不能重新显示 native 已拒绝的 DNS 子树；双层
+隧道分别验证了 native 保守外层范围与独立 fallback 已确认的较深前缀。
+
+### 最终验证范围与后续工作
+
+完整四包测试 276,857 通过、23 跳过；此前 236,376 个实际 native/CLI 测试运行项
+全部保留，每个开始项有唯一结束项。最后 CLI 改动完整复测 674 通过、2 跳过，
+七个新增测试只覆盖端点/来源修复，原生与规则源未改变。TLS 与 VXLAN fuzz 各配置
+40s，分别执行 160,685 与 104,885 次，完整保留日志与源码版本。
+
+原生、typed fields、目录、stateless YAML、连接上下文和 UI 各有不同证书，不能
+将本轮通过理解成所有 TOP30 或全部高级内容已完备。受控 TLS 整条记录丢失后，
+双方都不能完成该方向后续 response 的共同限制仍在；SSH authentication/channel/
+SFTP/rekey、完整 RPC NDR/authentication、PPTP 控制面/CallID 配对、QUIC 更广泛
+CID/QPACK/0-RTT 与完整 VXLAN-GPE payload 等继续保留为未完成范围。
+UI 下一小步整理显式会话观察分支与重复 DNS 树；只有同 PDU、同真实类型和完整等值
+的字段才能合并，不能按名字或截断字符串删掉不同来源的数据。
+
+本轮磁盘维护仅无损压缩旧 Go 归档及两个已结束测试日志，合计回收约 1.15 GiB
+分配空间，内容 SHA 与三个时间戳核验通过，没有删除、移动原包、密钥或证据。
+原包、完整导出、二进制、截图和日志仍全部留在仓库外。
