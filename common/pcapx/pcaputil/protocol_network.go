@@ -50,6 +50,27 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 	return networkCarrierProfileUntil(p, nil)
 }
 
+func unselectedEtherIPLayer(layer gopacket.Layer) bool {
+	switch v := layer.(type) {
+	case *layers.IPv4:
+		return v.Version == 4 && v.Protocol == layers.IPProtocol(97) && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0
+	case *layers.IPv6:
+		return v.Version == 6 && v.NextHeader == layers.IPProtocol(97)
+	case *layers.EtherIP:
+		return true // Also covers EtherIP after an IPv6 extension header.
+	}
+	return false
+}
+
+func hasUnselectedEtherIP(p gopacket.Packet) bool {
+	for _, layer := range p.Layers() {
+		if unselectedEtherIPLayer(layer) {
+			return true
+		}
+	}
+	return false
+}
+
 func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner gopacket.NetworkLayer, networks, tunnels int, unsupported bool) {
 	for _, l := range p.Layers() {
 		if stop != nil && l == stop {
@@ -59,6 +80,8 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 			inner = n
 			networks++
 		}
+		// ARP has no NetworkLayer; counting inner IP layers cannot gate it.
+		unsupported = unsupported || unselectedEtherIPLayer(l)
 		switch v := l.(type) {
 		case *capturePIM:
 			if v.Type == 1 && !v.NullRegister {
@@ -92,11 +115,6 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 				unsupported = true
 			}
 		case *layers.IPv4:
-			if v.Version == 4 && v.Protocol == layers.IPProtocol(97) && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
-				// EtherIP is not a selected carrier. An ARP child has no IP
-				// NetworkLayer, so the network-count gate alone cannot refuse it.
-				unsupported = true
-			}
 			if v.Version == 4 && v.Protocol == layers.IPProtocolIPv6HopByHop && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
 				// IPv4 HOPOPT is an unselected carrier profile. Its typed
 				// standalone-HBH refusal must not elevate any child identity or
@@ -109,9 +127,6 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 				tunnels++
 			}
 		case *layers.IPv6:
-			if v.Version == 6 && v.NextHeader == layers.IPProtocol(97) {
-				unsupported = true
-			}
 			if v.NextHeader == layers.IPProtocolIPv4 || v.NextHeader == layers.IPProtocolIPv6 {
 				tunnels++
 			}
@@ -265,6 +280,11 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		// Parent admission precedes every child observation, including ARP,
 		// topology/discovery codecs and errors in incomplete inner IP headers.
 		a.refuseUnselectedNetworkParent(p, e, ci)
+		if p.ErrorLayer() != nil && hasUnselectedEtherIP(p) {
+			// Refusal must not erase the captured decoder error. Existing
+			// transport ingress rejects this original error-bearing packet.
+			return p, false
+		}
 		return nil, true
 	}
 	if failure := p.ErrorLayer(); failure != nil {
