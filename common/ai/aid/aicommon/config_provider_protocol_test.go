@@ -11,6 +11,43 @@ import (
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
+func TestProviderFunctionCallDefaultDoesNotLoadGlobalConfig(t *testing.T) {
+	yakit.GuardConfigurationForTest(t)
+	wasLoaded := aiconfig.IsConfigLoaded()
+	t.Cleanup(func() {
+		if wasLoaded {
+			aiconfig.EnsureConfigLoaded()
+		} else {
+			aiconfig.ResetConfigLoaded()
+		}
+	})
+	for _, tc := range []struct {
+		name   string
+		tiered *consts.TieredAIConfig
+		want   bool
+	}{
+		{name: "no configured model", want: true},
+		{name: "script text", tiered: &consts.TieredAIConfig{IntelligentConfigs: []*ypb.AIModelConfig{
+			{ModelName: "text", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script"}},
+		}}},
+		{name: "script native", want: true, tiered: &consts.TieredAIConfig{IntelligentConfigs: []*ypb.AIModelConfig{
+			{ModelName: "native", Provider: &ypb.ThirdPartyApplicationConfig{Type: "yak-script", EnableNativeToolCalling: true}},
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			aiconfig.ResetConfigLoaded()
+			consts.SetTieredAIConfig(tc.tiered)
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			cfg := newConfig(ctx)
+			cfg.applyProviderFunctionCallDefault()
+			require.False(t, aiconfig.IsConfigLoaded(), "protocol selection must not initialize global model routing")
+			require.Same(t, tc.tiered, consts.GetTieredAIConfig(), "protocol selection must not replace the effective config")
+			require.Equal(t, tc.want, cfg.EnableFunctionCallMode)
+		})
+	}
+}
+
 func TestProviderFunctionCallDefault(t *testing.T) {
 	yakit.GuardConfigurationForTest(t)
 	aiconfig.EnsureConfigLoaded()

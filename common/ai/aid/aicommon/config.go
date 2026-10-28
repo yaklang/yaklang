@@ -2721,7 +2721,9 @@ func (c *Config) applyProviderFunctionCallDefault() {
 		return
 	}
 	provider := &ypb.ThirdPartyApplicationConfig{Type: c.AiServerName}
-	if model := aiconfig.GetGlobalManager().GetFirstConfigByTierAndProviderAndModel(consts.TierIntelligent, c.AiServerName, c.AiModelName); model != nil {
+	// Resolving a protocol must not bootstrap global routing: that can replace
+	// caller-supplied callbacks in subsequent configs or child agents.
+	if model := aiconfig.FindModelConfig(consts.GetIntelligentAIConfigs(), c.AiServerName, c.AiModelName); model != nil {
 		provider = model.GetProvider()
 	}
 	c.EnableFunctionCallMode = aispec.ProviderFunctionCallDefault(provider)
