@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"time"
@@ -601,12 +602,8 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDe
 		}
 		if n.IsValue() {
 			value := formatFieldValue(n.Name, n.Value)
-			if b, ok := n.Value.([]byte); ok {
-				if (section == "IP" || section == "IPv4" || section == "IPv6") && (n.Name == "Source" || n.Name == "Destination") && (len(b) == 4 || len(b) == 16) {
-					value = net.IP(b).String()
-				} else if section == "Ethernet" && (n.Name == "Source" || n.Name == "Destination") && len(b) == 6 {
-					value = net.HardwareAddr(b).String()
-				}
+			if address, ok := legacyAddressFieldValue(section, n.Name, n.Value); ok {
+				value = address
 			}
 			// Keep the existing full field text for filtering and byte selection.
 			add(path+n.Name+": "+value, false)
@@ -642,6 +639,45 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDe
 	if limited && len(*out) < 8192 {
 		*out = append(*out, field{text: "YAML field view limited: additional nodes or nesting omitted"})
 	}
+}
+
+func legacyAddressFieldValue(section, name string, value any) (string, bool) {
+	if name != "Source" && name != "Destination" {
+		return "", false
+	}
+	length := 0
+	switch section {
+	case "IP", "IPv4":
+		length = 4
+	case "IPv6":
+		length = 16
+	case "Ethernet":
+		length = 6
+	default:
+		return "", false
+	}
+	var wire []byte
+	switch v := value.(type) {
+	case []byte:
+		wire = v
+	case string:
+		if len(v) != length {
+			return "", false
+		}
+		wire = []byte(v)
+	default:
+		return "", false
+	}
+	if len(wire) != length {
+		return "", false
+	}
+	if section == "Ethernet" {
+		return net.HardwareAddr(wire).String(), true
+	}
+	// Addr retains the IPv6 identity of mapped addresses; net.IP.String would
+	// render the same sixteen captured bytes as a bare IPv4 address.
+	address, ok := netip.AddrFromSlice(wire)
+	return address.String(), ok
 }
 
 // quickDetail is safe to call at the display refresh rate. Even during a live
