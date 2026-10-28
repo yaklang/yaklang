@@ -1,9 +1,11 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
 	"fmt"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -63,6 +65,76 @@ func TestUnselectedEtherIPCannotAdmitAnARPChild(t *testing.T) {
 				require.Zero(t, e.FlowID)
 				require.Nil(t, a.udpSessions)
 			})
+		}
+	}
+}
+
+func TestUnselectedEtherIPFailureHasOneDiagnosticAndOneCaptureError(t *testing.T) {
+	for _, family := range []int{4, 6} {
+		for _, child := range []struct {
+			name string
+			wire []byte
+		}{
+			{"short-EtherIP-header", []byte{0x30}},
+			{"short-inner-Ethernet", []byte{0x30, 0, 1}},
+			{"unsupported-inner-EtherType", append(make([]byte, 14), 0xff, 0xff, 1)},
+			{"short-inner-IP", append(append(make([]byte, 14), 8, 0), 0x45)},
+		} {
+			for _, protocols := range []bool{false, true} {
+				for _, allowIncomplete := range []bool{false, true} {
+					t.Run(fmt.Sprintf("IPv%d/%s/protocols%t/allow%t", family, child.name, protocols, allowIncomplete), func(t *testing.T) {
+						payload := bytes.Clone(child.wire)
+						if len(payload) >= 16 {
+							payload[0] = 0x30
+						}
+						eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
+						var ip gopacket.SerializableLayer = &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocol(97), SrcIP: net.ParseIP("198.51.100.1"), DstIP: net.ParseIP("198.51.100.2")}
+						if family == 6 {
+							eth.EthernetType = layers.EthernetTypeIPv6
+							ip = &layers.IPv6{Version: 6, HopLimit: 64, NextHeader: layers.IPProtocol(97), SrcIP: net.ParseIP("2001:db8::1"), DstIP: net.ParseIP("2001:db8::2")}
+						}
+						b := gopacket.NewSerializeBuffer()
+						require.NoError(t, gopacket.SerializeLayers(b, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(payload)))
+						// Keep Ethernet's mandatory padding outside the declared IP
+						// extent. The rejected child must not consume that padding.
+						wire := bytes.Clone(b.Bytes())
+						decoded := gopacket.NewPacket(wire, protocolPacketDecoder{decoder: layers.LinkTypeEthernet}, gopacket.Default)
+						require.NotNil(t, decoded.ErrorLayer(), "the authored case must actually exercise a retained decoder failure")
+						var mu sync.Mutex
+						var stats TCPReassemblyStats
+						var events []*ProtocolEvent
+						observed, flows := 0, 0
+						opts := []CaptureOption{
+							WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: allowIncomplete, Stream: true}),
+							WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s }),
+							WithEveryPacket(func(gopacket.Packet) { mu.Lock(); observed++; mu.Unlock() }),
+							WithOnTrafficFlowCreated(func(*TrafficFlow) { mu.Lock(); flows++; mu.Unlock() }),
+						}
+						if protocols {
+							opts = append(opts, WithOnProtocolMessage(func(e *ProtocolEvent) { mu.Lock(); events = append(events, e); mu.Unlock() }))
+						}
+						err := ReplayPcap(bytes.NewReader(icmpFragmentCapture(t, [][]byte{wire})), opts...)
+						if allowIncomplete {
+							require.NoError(t, err)
+						} else {
+							require.Error(t, err)
+						}
+						require.EqualValues(t, 1, stats.DecodeErrors)
+						require.Equal(t, 1, observed)
+						require.Zero(t, flows)
+						if protocols {
+							require.Len(t, events, 1, "a retained error must not publish a second generic network diagnostic")
+							e := events[0]
+							require.Equal(t, "network-encapsulation-refusal", e.Profile)
+							require.Equal(t, "EncapsulationDepthOrProfile", e.ExpertCode)
+							require.Zero(t, e.FlowID)
+							require.Zero(t, e.TCPFlowID)
+							require.Empty(t, e.Raw)
+							require.Nil(t, e.Fields)
+						}
+					})
+				}
+			}
 		}
 	}
 }
