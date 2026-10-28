@@ -227,7 +227,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					}
 				}
 			}
-			if protocol == "dcerpc" || protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
+			if protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
 				if local, ok := x["Wire Field Ranges"]; ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -285,6 +285,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 						a = rank
 					}
 					if rank, ok := isisEntryPriority[keys[j]]; ok {
+						b = rank
+					}
+				}
+				if protocol == "icmpv6" || protocol == "igmp" {
+					priority := mldDetailPriority
+					if protocol == "igmp" {
+						priority = igmpDetailPriority
+					}
+					if rank, ok := priority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := priority[keys[j]]; ok {
 						b = rank
 					}
 				}
@@ -407,10 +419,29 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 				walk(name, rows, depth)
 				return
 			}
+			childDepth := depth
+			if (protocol == "icmpv6" || protocol == "igmp") && name == "Sources" {
+				add(name, true)
+				childDepth++
+			}
 			for i, r := range x {
-				walk(fmt.Sprintf("%s[%d]", name, i), r, depth)
+				walk(fmt.Sprintf("%s[%d]", name, i), r, childDepth)
 			}
 		default:
+			if protocol == "icmpv6" || protocol == "igmp" {
+				if name == "Sources" {
+					if list, ok := x.([]string); ok {
+						add(name, true)
+						for i, value := range list {
+							walk(fmt.Sprintf("%s[%d]", name, i), value, depth+1)
+						}
+						return
+					}
+				}
+				if name == "Auxiliary Data (uninterpreted)" || name == "Additional Data (uninterpreted)" {
+					x = bytesValue(x)
+				}
+			}
 			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
 				switch name {
 				case "DCID", "SCID", "CID", "Token", "Initial Token", "Retry Token", "Retry Integrity Tag", "Reset Token":
@@ -569,7 +600,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}

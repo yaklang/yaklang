@@ -6,3 +6,7 @@ Package:
     operator: |
       err = parseObservedSession("icmpv4-header")
       if err != nil { panic(err) }
+  MLDFields:
+    operator: |
+      err = parseObservedSession("mld")
+      if err != nil { panic(err) }

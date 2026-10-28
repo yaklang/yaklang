@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **622** 项：限定范围 `done` **199**，`partial` **31**，`todo` **392**。目录共 **511** 个入口：`stable` **14**，`partial` **330**，`new` **167**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **622** 项：限定范围 `done` **198**，`partial` **33**，`todo` **391**。目录共 **513** 个入口：`stable` **14**，`partial` **333**，`new` **166**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -53,6 +53,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P0 | QUIC | partial | [partial / ](rules/application-layer/quic.yaml) |
 | P1 | BGP | partial | [partial / ](rules/bgp.yaml) |
 | P1 | HSRP | partial | [partial / ](rules/hsrp.yaml) |
+| P1 | IGMP | partial | [partial / ](rules/igmp.yaml) |
 | P1 | IMAP SASL Challenge | partial | [partial / IMAPSASLChallenge](rules/application-layer/imap_sasl.yaml) |
 | P1 | IMAP SASL Initial Value | partial | [partial / IMAPSASLInitialValue](rules/application-layer/imap_sasl.yaml) |
 | P1 | IMAP SASL Response | partial | [partial / IMAPSASLResponse](rules/application-layer/imap_sasl.yaml) |
@@ -121,7 +122,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | IBM MQ | todo | 需核对别名/Fields 入口 |
 | P2 | ICE | todo | 需核对别名/Fields 入口 |
 | P2 | ICMP Timestamp | todo | [partial / ICMP](rules/internet_control_message_protocol.yaml) |
-| P2 | ICMPv6 MLD | todo | [partial / ICMPV6](rules/internet_control_message_protocol_v6.yaml) |
+| P2 | ICMPv6 MLD | partial | [partial / MLDFields](rules/network_icmp.yaml) |
 | P2 | IEC 60870-5-101 | todo | 需核对别名/Fields 入口 |
 | P2 | IEC 60870-5-104 | todo | [new / IEC104](rules/application-layer/extended_protocols.yaml) |
 | P2 | IEC 61850 GOOSE | todo | [partial / GOOSE](rules/iec61850.yaml) |
@@ -628,12 +629,12 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ieee_802_11.yaml](rules/ieee_802_11.yaml) | IEEE 802.11 (``, new) |
 | [ieee_802_1ad.yaml](rules/ieee_802_1ad.yaml) | IEEE 802.1ad QinQ (``, new) |
 | [ieee_802_1q.yaml](rules/ieee_802_1q.yaml) | IEEE 802.1Q (``, new) |
-| [igmp.yaml](rules/igmp.yaml) | IGMP (``, new) |
+| [igmp.yaml](rules/igmp.yaml) | IGMP (``, partial) |
 | [igrp.yaml](rules/igrp.yaml) | IGRP (`IGRP`, partial) |
 | [ike.yaml](rules/ike.yaml) | IKEv1 (`IKE`, new)<br>IKEv2 (``, new) |
 | [imap.yaml](rules/imap.yaml) | IMAP (``, new) |
 | [internet_control_message_protocol.yaml](rules/internet_control_message_protocol.yaml) | ICMP (``, new)<br>ICMP Timestamp (`ICMP`, partial) |
-| [internet_control_message_protocol_v6.yaml](rules/internet_control_message_protocol_v6.yaml) | ICMPv6 (``, new)<br>ICMPv6 MLD (`ICMPV6`, partial)<br>ICMPv6 NDP (`ICMPV6`, partial)<br>IPv6 RA (`ICMPV6`, partial) |
+| [internet_control_message_protocol_v6.yaml](rules/internet_control_message_protocol_v6.yaml) | ICMPv6 (``, new)<br>ICMPv6 NDP (`ICMPV6`, partial)<br>IPv6 RA (`ICMPV6`, partial) |
 | [internet_protocol.yaml](rules/internet_protocol.yaml) | 6in4 (`Internet Protocol`, new)<br>6to4 (`Internet Protocol`, partial)<br>IPIP (`Internet Protocol`, partial)<br>UDP-Lite (`Internet Protocol`, partial) |
 | [internet_protocol_version_6.yaml](rules/internet_protocol_version_6.yaml) | IPv6 Destination Options (`Internet Protocol Version 6`, partial)<br>IPv6 Fragment (`Internet Protocol Version 6`, partial)<br>IPv6 Hop-by-Hop (`Internet Protocol Version 6`, partial)<br>IPv6 Routing Header (`Internet Protocol Version 6`, partial) |
 | [ipfix.yaml](rules/ipfix.yaml) | IPFIX Observed Message Fields (`IPFIXFields`, partial) |
@@ -672,6 +673,8 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [netflow_v5.yaml](rules/netflow_v5.yaml) | NetFlow v5 Observed Message Fields (`NetFlowV5Fields`, partial) |
 | [netflow_v9.yaml](rules/netflow_v9.yaml) | NetFlow v9 Observed Message Fields (`NetFlowV9Fields`, partial) |
 | [network_control_fields.yaml](rules/network_control_fields.yaml) | IKE NAT-T Wire Message (`IKENATTMessage`, partial)<br>IKE Wire Message (`IKEMessage`, partial)<br>IPMI Wire Message (`IPMIMessage`, partial)<br>L2TP Wire Message (`L2TPMessage`, partial)<br>NetBIOS Datagram Wire Message (`NBTDGMessage`, partial)<br>NetBIOS Session Control (`NBSSControl`, partial)<br>ONC RPC Wire Message (`ONCRPCMessage`, partial)<br>OpenVPN Wire Message (`OpenVPNMessage`, partial)<br>RIP Wire Message (`RIPMessage`, partial)<br>Telnet Wire Message (`TelnetMessage`, partial)<br>WireGuard Wire Message (`WireGuardMessage`, partial) |
+| [network_icmp.yaml](rules/network_icmp.yaml) | ICMPv4 Header Fields (`ICMPv4HeaderFields`, partial)<br>ICMPv6 MLD (`MLDFields`, partial) |
+| [network_igmp.yaml](rules/network_igmp.yaml) | IGMP Membership Wire Fields (`IGMPFields`, partial) |
 | [network_samples.yaml](rules/network_samples.yaml) | IPcomp (`IPComp`, partial)<br>MPLS PW (`MPLSEthernetPW`, partial)<br>NVGRE (`NVGRE`, partial) |
 | [nhrp.yaml](rules/nhrp.yaml) | NHRP (`NHRP`, partial) |
 | [onc_rpc.yaml](rules/onc_rpc.yaml) | Mount (`ONCRPC`, partial)<br>NFS (`ONCRPC`, new)<br>ONC RPC (``, new)<br>Portmap/Rpcbind (`ONCRPC`, partial)<br>RPC (`ONCRPC`, partial) |

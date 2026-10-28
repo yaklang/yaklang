@@ -518,6 +518,13 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		return nil, true
 	}
 
+	if observed, preserveError := a.observeIGMP(p, e); observed {
+		if preserveError {
+			return &igmpObservedErrorPacket{p}, false
+		}
+		return nil, true
+	}
+
 	// Check native observation admission before constructing or cloning field trees,
 	// quoted packets, ND options or the captured Raw projection. Capture buffers
 	// retained by the driver/caller are outside this parser's resource contract.
@@ -566,6 +573,24 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		fields = map[string]any{"Type": icmp.TypeCode.Type(), "Code": icmp.TypeCode.Code()}
 		typ := icmp.TypeCode.Type()
+		if typ == 130 || typ == 131 || typ == 132 || typ == 143 {
+			result, _, selected, decodeErr := DecodeMLDPacketFields(p, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), a.budget.MaxCollectionElements)
+			if selected {
+				if result.Fields == nil {
+					result.Fields = fields // An exhausted input policy still owns its generic header.
+				}
+				status, code := "decoded", ""
+				if decodeErr != nil {
+					status, code = "limited", "MLDCollectionBudget"
+					var failure *stream_parser.MLDWireError
+					if errors.As(decodeErr, &failure) {
+						status, code = failure.Kind, failure.Code
+					}
+				}
+				a.emitNativeNetworkObservation(p, e, ci, protocol, result.Fields, status, code, &result)
+				return nil, true
+			}
+		}
 		b := icmp.Payload
 		fixed := 0
 		switch typ {
@@ -650,7 +675,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 // A complete generic header proves the observed family, not a complete body.
 // Preserve only available fields and their source on a refusal; quoted inner
 // decoder errors do not invalidate a complete outer ICMP message.
-func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo, protocol string, fields map[string]any, status, code string) {
+func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo, protocol string, fields map[string]any, status, code string, mld ...*stream_parser.MLDWireResult) {
 	if e.carrierOwned {
 		// The logical native network PDU can consume the packet before the
 		// transport callback. Preserve its actual full header path for the
@@ -704,6 +729,14 @@ func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvi
 	}
 	event.Structured = map[string]any{"fields": cloneSession(fields)}
 	event.retainNativeNetworkFields(p)
+	if len(mld) == 1 && mld[0] != nil {
+		event.Profile = "icmpv6-mld"
+		event.Summary = mld[0].Summary
+		if event.Summary == "" {
+			event.Summary = "MLD wire fields unavailable"
+		}
+		event.retainNativeMLDFields(p, mld[0])
+	}
 	switch status {
 	case "decoded":
 		a.messages.Add(1)

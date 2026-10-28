@@ -4385,3 +4385,29 @@ SSH authentication/channel/SFTP/rekey、广泛 QUIC CID/QPACK/0-RTT、完整 RPC
 以及整条受保护 TLS record 丢失后的共同恢复限制继续逐项审计。本检查点不将核心
 协议、TOP30 或 Wireshark 全部功能宣布完备。所有 PCAP、keylog、完整输出、程序、
 截图与日志继续留在 Git 外。
+
+
+## 2026-10-29 错误计数与历史 EOL 来源复核
+
+此前单列的 Sharon `DecodeErrors` 81,613→81,616 已定位到原始帧170197、
+221719、237079。前两种短头的实际输入分别为3/5字节 IPv4，另一条是第二层
+EtherIP 后仅剩4字节 Ethernet。旧分发在已有两个 NetworkLayer、没有已支持
+tunnel 时提前消费，吞掉了实际存在的 decoder error；保留原始错误后应各计一次。
+这不是新增流或把坏子包认成有效协议。
+
+6个单帧原始来源、12次新旧 flow 执行、12个实际 worker response 和6次 TShark
+诊断已经核对，另外3个对照来源仍各计一次。针对发生改变的3帧，仅把第一个尝试
+的内层 EtherType 从0x0800改成0xffff，构造外置判别对照包：328,127个 record
+的全部元数据与其它字节不变，共改变6字节。新旧完整 flow 对象在此对照下相等，
+也与原包的新输出除派生 capture SHA 外完整相等；10个来源/计数/类型篡改负控拒绝。
+Wireshark 在这些畸形父层下可能尝试不同子解码，因此没有声称错误文字或子身份
+完全相同。证书 `DecodeErrors-plus3-source-final-02/summary.json` 的 SHA256 为
+`4d3b7996a79c28216e50f716ea49aeace79a0f8211338769d3ff26a1e5b5c17d`。
+
+历史303条 EOL 调查逐条重新绑定原始 record：145条与完整 TCP 来源预期对应，
+14条与父层拒绝的完整预期对应，37条 ICMP 目前是字段/来源证据，其余107条仍
+需要相应正文或整个展示行证明。107条包括 SCTP46、PIM19、IGMP18、MPLS14、
+UDP2、IP-in-IP3、AH1、Routing2、GRE1和声明 TCP 但零正文1条。计数是来源分类，
+不能直接相减后宣布所有旧 EOL 已关闭；其中3条原本就没有外层 EOL。
+证书 `EOL-uncovered-source-classification-01/summary.json` 的 SHA256 为
+`290012c0eca1ea7419d462dd78b80cf0fe985bf06d9cf8ae4f9f3b29ce1bd9c1`。

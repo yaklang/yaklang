@@ -612,6 +612,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 			c.trafficPool.malformedPacket(failure.Error().Error())
 			return
 		}
+		if _, observedIGMP := packet.(*igmpObservedErrorPacket); observedIGMP {
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
 		var pptp *pptpHeaderError
 		var truncatedIP *ipHeaderTruncatedError
 		var vxlan *vxlanHeaderError

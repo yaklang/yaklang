@@ -45,7 +45,9 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("WPA/RSN", "ieee_802_11.yaml", 25, 15, 20, 20, 10, "L2",
 		"TestP1MiscAndAliases RSN IE; TestP1FailPaths RSN", ""),
 	alias("IEEE 802.1X", "EAPOL"),
-	p1card("ICMPv6 NDP", "internet_control_message_protocol_v6.yaml", 25, 25, 20, 20, 10, "L1",
+	// The shared legacy file now retains bounded, normative opaque MLD tails;
+	// the static YAML scanner cannot count them as fully expanded schema.
+	p1card("ICMPv6 NDP", "internet_control_message_protocol_v6.yaml", 20, 25, 20, 20, 10, "L1",
 		"icmpv6/mldv2-report RFC 3810 Type 143 MODE_IS_EXCLUDE ff02::1:ff00:1; icmpv6/mld-query RFC 2710 MRC 10000; TestP1FailPaths trunc-mldv2", ""),
 	p1card("IGMP", "igmp.yaml", 20, 25, 20, 20, 10, "L1",
 		"igmp/v1-report 224.0.1.60; igmp/v3-query RFC 3376 source 192.0.2.1; igmp/v3-report MODE_IS_EXCLUDE Ethernet+IP proto 2; TestP1FailPaths igmp", ""),

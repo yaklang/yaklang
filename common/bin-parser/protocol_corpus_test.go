@@ -256,6 +256,19 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				if netflowV9Scope && item.Name == "NetFlow v9" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
 					historicalPartial = true
 				}
+				if item.Name == "ICMPv6 MLD" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
+					// Keep this hash-pinned manifest's earlier backlog status. The
+					// current partial scope must execute its canonical/legacy exact
+					// records, auxiliary-byte and truncation checks before acceptance.
+					requireMLDCanonicalWireScope(t)
+					historicalPartial = true
+				}
+				if item.Name == "IGMP" && item.Status == stPartial && *capture.RoadmapStatus == stDone {
+					// Preserve the frozen historical claim while executing the
+					// narrower current profile's actual field and boundary contract.
+					requireIGMPCanonicalWireScope(t)
+					historicalPartial = true
+				}
 				if *capture.RoadmapFamily != item.Family || *capture.RoadmapPriority != item.Priority || *capture.RoadmapStatus != item.Status && !historicalPartial {
 					t.Fatalf("stale roadmap metadata: got %s/%s/%s, want %s/%s/%s", *capture.RoadmapFamily, *capture.RoadmapPriority, *capture.RoadmapStatus, item.Family, item.Priority, item.Status)
 				}

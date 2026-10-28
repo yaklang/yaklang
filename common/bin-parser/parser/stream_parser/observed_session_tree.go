@@ -41,6 +41,14 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 	switch profile {
 	case "icmpv4-header":
 		fields, err = DecodeICMPv4HeaderWire(wire, 1<<20)
+	case "mld":
+		var decoded MLDWireResult
+		decoded, err = DecodeMLDWire(wire, 1<<20, 4096)
+		fields = decoded.Fields
+	case "igmp":
+		var decoded IGMPWireResult
+		decoded, err = DecodeIGMPWire(wire, 1<<20, 4096)
+		fields = decoded.Fields
 	case "esp-header":
 		fields, err = DecodeESPHeaderWire(wire, 1<<20)
 	case "netflow-v5":

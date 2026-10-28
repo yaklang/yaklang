@@ -2,6 +2,7 @@ package bin_parser
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
@@ -73,10 +74,36 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 					}
 					require.NoError(t, err)
 					require.NotNil(t, node)
+					fieldName := func(name string) string { return name }
+					if (c.ID == "gen-icmpv6-mld" || c.ID == "pr5023-gen-icmpv6-mld") && e.Protocol == "ICMPv6 MLD" && !protocolCorpusHasNode(node, "Maximum Response Delay") {
+						// The sealed old label called the v2 code or Report/Done's
+						// unused word a response delay. Preserve its original numeric
+						// assertion under the corrected label, proving literal bytes
+						// and the exact old word position; never alter frozen answers.
+						require.GreaterOrEqual(t, len(input), 6)
+						corrected := "Unused Delay Word"
+						if input[0] == 130 {
+							require.GreaterOrEqual(t, len(input), 28)
+							corrected = "Maximum Response Code"
+						} else {
+							require.Contains(t, []byte{131, 132}, input[0])
+						}
+						word := protocolCorpusFindNode(node, corrected)
+						require.NotNil(t, word)
+						require.Equal(t, [2]uint64{32, 48}, stream_parser.GetNodeResultPos(word))
+						protocolCorpusRequireValue(t, node, corrected, uint64(binary.BigEndian.Uint16(input[4:6])))
+						fieldName = func(name string) string {
+							if name == "Maximum Response Delay" {
+								return corrected
+							}
+							return name
+						}
+					}
 					for _, name := range e.Expected.RequiredFields {
-						require.True(t, protocolCorpusHasNode(node, name), "missing frozen field %q", name)
+						require.True(t, protocolCorpusHasNode(node, fieldName(name)), "missing frozen field %q", name)
 					}
 					for name, raw := range e.Expected.Values {
+						name = fieldName(name)
 						var value any
 						require.NoError(t, json.Unmarshal(raw, &value))
 						switch v := value.(type) {

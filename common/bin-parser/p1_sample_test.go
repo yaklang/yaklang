@@ -578,7 +578,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		// Wireshark icmpv6.mld.mrc / icmpv6.mld.multicast_address.
 		unspec := make([]byte, 16)
 		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
-		n := parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6")
+		n := parseMLDLegacyComplete(t, q)
 		require.Equal(t, uint64(130), uintVal(t, n.Child("Type")))
 		query := mustChild(t, n, "Multicast Listener Query")
 		require.Equal(t, uint64(10000), uintVal(t, query.Child("Maximum Response Delay")))
@@ -608,7 +608,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(132), uintVal(t, n.Child("Type")))
 		require.Equal(t, ff02ones, bytesVal(t, mustChild(t, n, "Multicast Listener Done").Child("Multicast Address")))
 		eth := parseEthernet(t, ipv6ICMPBytes(t, d))
-		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Done").Child("Maximum Response Delay")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Done").Child("Unused Delay Word")))
 	})
 
 	t.Run("icmpv6/redirect", func(t *testing.T) {
@@ -3288,7 +3288,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	t.Run("igmp/v3-query", func(t *testing.T) {
 		// RFC 3376 §4.1 Membership Query with one source. Wireshark igmp.type / igmp.maddr.
 		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
-		n := parseRule(t, raw, "igmp", "IGMP")
+		n := parseIGMPLegacyComplete(t, raw)
 		require.Equal(t, uint64(0x11), uintVal(t, n.Child("Type")))
 		require.Equal(t, []byte{239, 1, 1, 1}, bytesVal(t, n.Child("Group Address")))
 		require.Equal(t, uint64(2), uintVal(t, n.Child("SQRV")))
