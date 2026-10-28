@@ -94,3 +94,36 @@ the 63 original-source failure objects and verifies every PDU field projection.
 Supply the original `--capture`, `--SDK-proof`, the 49b0-to-4c023 `--diff`,
 `--audit-modules` and a new external output directory. Its six semantic negative
 controls cannot alter a protocol, status, source, PDU, layer or value type.
+
+
+## ICMPv4, typed network fields and complete TCP diagnostics
+
+The `icmp4_expected_source.py` constructor and `icmpv4_whole_source_plan.py`
+rebuild original before/after ICMPv4 objects. `icmpv4_whole_sdk_bridge.py` and
+`partial_cli_bridge.py` verify entire generations, including every unchanged
+field and byte source. Their `--help` arguments select external captures,
+producer folders, binary receipts and a fresh external output directory.
+
+`network23_values.py` and `network23_carrier_source.py` locate and type the
+23 aliases from original bytes. `network23_whole_bridge.py` checks all37 SDK
+and CLI exports. `network23_ws_source_positions.py` binds actual TShark scalar
+values and raw positions to each proven own header. Supply this directory for
+the audit/constructor/helper directory arguments; no packet-value search is used.
+
+`bounded_etherip_refusal_expected.py` requires child namespace payloads to fit
+their declared current input. `bounded_etherip_whole_sdk_bridge.py` checks the
+37 SDK exports and an explicit, injective mapping of known generated references.
+Flow counters are reported separately, never normalized to force equality.
+`bounded_etherip_TCP_whole_cli_bridge.py` combines those original-source parent
+rows with the fresh705 TCP oracle and checks all384,518 CLI rows. Frame, flow,
+domain and ordinary numeric values are not reference substitutions.
+
+The portable `tcp-source/` directory contains a frozen full145 constructor,
+source-only discovery, the fresh705 row/worker constructor and its freeze/verify
+entry points. Use that same folder for `--source-parser` and `--contract145`.
+Discovery only supplies frame numbers and source hashes. It does not supply
+expected values, fields or ranges. The705 plan is explicitly post-discovery;
+the separate145 pre-candidate plan is not retroactively enlarged. Worker checks
+compare entire responses, require Source0 ranges within the actual frame, and
+reject invented fields, Source1 and connection state. A separate external quick
+API is unavailable; targeted Go and real console pages check quick/deep behavior.

@@ -1,5 +1,5 @@
 {
-  "scope": "Evidence metadata only. Captures, keys, complete exports, programs, images and logs remain external. This is not complete TOP30 or Wireshark parity.",
+  "scope": "Historical evidence plus latest_checkpoint. Captures, keys, complete exports, programs, images and logs remain external. Not complete TOP30 or Wireshark parity.",
   "native_source": "49b0a99102357d22ee6e6c935a2a3a8358503f7c",
   "CLI_source": "4c023fd47c2b940b509d08220a4576f525af33e6",
   "captures": [
@@ -100,11 +100,10 @@
     "final_document_head_checks": "Verify separately; do not attribute these earlier runs to a later commit."
   },
   "open_findings": [
-    "Typed ARP/ICMP/ICMPv6 display field namespaces absent in the current 667-field registry.",
-    "ICMPv4 type-specific header incorrectly shown as Identifier/Sequence for errors/Redirect; public MTU example1492 mislabeled Sequence.",
-    "18 public short ICMPv4 Timestamp messages still decoded; 198 error unions mislabeled and188 complete Timestamp messages lack time fields; native fix pending.",
-    "303 EOL physical projections and390 own-header tunnel/parent profiles remain uncovered.",
-    "Broader SSH channel/authentication/rekey, MLD records and QUIC CID/QPACK/0-RTT remain open."
+    "Sharon DecodeErrors differs by exactly3; source causes still being audited. No whole-flow equality or numeric normalization claimed.",
+    "Native MLD body fields/records are absent;237 source-bound observations include10 incorrectly decoded incomplete bodies. Canonical/native/legacy body alignment remains active work.",
+    "Historical303 EOL projection and390 own-header parent investigation entries are not automatically closed by newer scoped field certificates; remaining per-source semantics still need reconciliation.",
+    "Broader SSH authentication/channels/SFTP/rekey, QUIC CID/QPACK/0-RTT, full RPC/PPTP/GPE and protected-TLS-record-loss recovery retain their documented limits."
   ],
   "proofs": [
     {
@@ -192,9 +191,189 @@
     "free_bytes_observed": 35605950464
   },
   "quota": {
-    "primary_used_percent": 8,
+    "primary_used_percent": 13,
     "stop_expansion_at_remaining_percent": 50,
     "threshold_reached": false,
     "max_active_child_agents": 1
+  },
+  "latest_checkpoint": {
+    "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+    "SDK": {
+      "generations": 37,
+      "old_objects": 295123,
+      "new_objects": 306304,
+      "source_expected_parent_observations": 17532,
+      "retained_objects_equal_after_known_PDU_reference_bijection": 288772,
+      "whole_expected_differences": 0
+    },
+    "CLI": {
+      "generations": 37,
+      "rows": 384518,
+      "literal_rows": 150890,
+      "known_ref_only_rows": 215391,
+      "source_parent_rows": 17532,
+      "source_TCP_rows": 705,
+      "whole_expected_errors": 0
+    },
+    "ICMPv4": {
+      "source_objects": 5009,
+      "corrected_objects": 475,
+      "unchanged_objects": 4534,
+      "new_incomplete_timestamp_messages": 18,
+      "new_incomplete_mask_messages": 2,
+      "remaining_field_meaning_or_status_differences": 0
+    },
+    "typed_network_fields": {
+      "added_descriptors": 23,
+      "registry_size": 690,
+      "source_certificate_revision": "5403ffe55b219702af97a3422dd6d59996aadfbe",
+      "certificate_observations": 11475,
+      "certificate_values": 42823,
+      "Wireshark_original_offsets_and_bytes_checked": true,
+      "current_original_capture_snapshot": {
+        "weber": {
+          "observations": 5694,
+          "typed_values": 21549
+        },
+        "sharon": {
+          "observations": 5735,
+          "typed_values": 21221
+        }
+      },
+      "withdrawn_unselected_EtherIP_ARP_children": 46,
+      "note": "The earlier source-field certificate does not authorize an invalid parent. Retained objects keep their whole values under the explicit PDU-reference bridge."
+    },
+    "TCP": {
+      "source_bound_original_frames": 705,
+      "whole_CLI_rows_verified": 705,
+      "actual_whole_worker_responses_verified": 705,
+      "native_contributions": 0,
+      "negative_controls": 11,
+      "pre_candidate_plan_frames": 145,
+      "whole_705_plan_scope": "Post-discovery independent source oracle; not described as pre-candidate.",
+      "categories": {
+        "MPTCP-dimension": 14,
+        "fixed-header-incomplete": 57,
+        "header-options-incomplete": 159,
+        "invalid-data-offset": 8,
+        "option-TLV-bounds": 467
+      },
+      "external_quick_API": false,
+      "quick_validation": "Targeted Go quick/deep equality plus actual Windows initial/late pages; no independent external quick executable API."
+    },
+    "flow_comparison": {
+      "Weber_complete_file_literal": true,
+      "Sharon_all_flows_packets_closes_and_other_stats_literal": true,
+      "Sharon_DecodeErrors_before": 81613,
+      "Sharon_DecodeErrors_after": 81616,
+      "exact_three_source_causes": "Still under audit; not normalized or called whole-flow equality."
+    },
+    "Windows": {
+      "method": "PNG renders of actual Windows native console cells and attributes; not native Windows Terminal pixels.",
+      "final_TCP_pages": 4,
+      "TCP_buffers": 60,
+      "Source0_complete_lengths": [
+        68,
+        84,
+        69,
+        64
+      ],
+      "all_TCP_Source1_absent": true,
+      "CP936_restore_resize_quit": true,
+      "ICMPv4_complete_Source0_Source1_lengths": [
+        590,
+        47,
+        64
+      ],
+      "late_byte_pane_reset_fixed": true
+    },
+    "tests": {
+      "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+      "passed": 285229,
+      "skipped": 24,
+      "every_started_test_has_unique_terminal": true,
+      "log_SHA256": "d86d8e983b5817ebc8e8959cc932007560b0bce4b19cea8a601b0f377eb2ef20",
+      "receipt_SHA256": "7f3840c3c0f16f34c3a1c9db749f7799d5064a7e0b6adaeca4154c51978a0a79"
+    },
+    "CI": {
+      "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+      "manual_traffic_run": 40711396009,
+      "manual_traffic_conclusion": "success",
+      "essential_run": 40711308589,
+      "essential_conclusion": "success",
+      "diff_check": "success",
+      "path_case_check": "success",
+      "automatic_draft_traffic": "skipped; explicit manual traffic passed"
+    },
+    "MLD_next_source_inventory": {
+      "observations": 237,
+      "source_bound": 237,
+      "currently_decoded_but_body_incomplete": 10,
+      "body_fix_complete": false,
+      "notes": "Wire layout inventory only; timer-code/derived-value and bit-mask comparison remains separate from wire bytes and native implementation."
+    },
+    "binary_identity": {
+      "events": "1222d29c4c5909fdec053f81730d4a8be4a1e278b99a0bf192aee1bccdaeb446",
+      "flows": "ad7509f93590b6849def041ef43ece8db821b4a7a86fa28f9828b52c9092e566",
+      "yak": "73276d6da0e6c887ffafdb0b2253e0f120e6e5ea725d260d77ded92eca996f03"
+    },
+    "proofs": [
+      {
+        "external_relative_name": "ICMPv4-whole-source-expected-01/summary.json",
+        "SHA256": "f31b5739bac83b4d2f3ee45eccbe9eee1c60fc79990da6173a5d1a5a9f86598a"
+      },
+      {
+        "external_relative_name": "ICMPv4-whole-SDK-bridge-01/summary.json",
+        "SHA256": "8a660a1b7ab539b4370aaec112e5f425f25794bf9a3e0fd7e95caeacf67754b0"
+      },
+      {
+        "external_relative_name": "CLI-ICMP4-source-02/summary.json",
+        "SHA256": "13c3075c539935461f47101bcfc6d6d81acf671c567242d165ce5b48ae550ce5"
+      },
+      {
+        "external_relative_name": "network23-whole-bridge-01/summary.json",
+        "SHA256": "eb62ef03cc95056eaf84d2b22efb4747064cb0362b96145cc27ab574536e7be8"
+      },
+      {
+        "external_relative_name": "network23-WS-position-combined-02/summary.json",
+        "SHA256": "f4116c2ae378465ea4ba07309685bf45a36e18abcb0247bb505b3a885221cb02"
+      },
+      {
+        "external_relative_name": "EtherIP-bounded-whole-SDK-02/summary.json",
+        "SHA256": "b88866890b6f70391d4a48f00f9fa3b810efa212997859901c416742b6e7b7f1"
+      },
+      {
+        "external_relative_name": "EtherIP-TCP-whole-CLI-01/summary.json",
+        "SHA256": "0006ebb90ad6d6a65f00ca2eb6975c8e20acf8dc918fd89400e9728a2da5827a"
+      },
+      {
+        "external_relative_name": "TCP-CLI-whole-expected-before-candidate-01/summary.json",
+        "SHA256": "be3f7b4992560274b2f3e917cb53ea74d6891a8c8a21851cfdfacb510b510b0e"
+      },
+      {
+        "external_relative_name": "TCP-public-whole-source-expected705-01/summary.json",
+        "SHA256": "b2110eca660c2dffd698d6e77dede750d1e2d4d37df4b6340c366f024ae06171"
+      },
+      {
+        "external_relative_name": "TCP-public-whole-runtime13-01/summary.json",
+        "SHA256": "acd6233da95e2f6c4fc5b482fb8feb390cae704a6e03237c52d2250449c681e5"
+      },
+      {
+        "external_relative_name": "TCP-CLI-runtime13-01/summary.json",
+        "SHA256": "b017f8baad248378b526153e66bac20870e77f8aa7d234b81e8a5931ddac4c2d"
+      },
+      {
+        "external_relative_name": "windows-ICMPv4-scroll-5403-01/summary.json",
+        "SHA256": "fb2bb47e28685bbc34fbe70f5f2e2116e4556275110d5e7bbfdb5b3c5fdeb8de"
+      },
+      {
+        "external_relative_name": "windows-TCP-4e66413-source-01/summary.json",
+        "SHA256": "57a2e8cafccca346285d76a2f9294d4f0850d938cd7a2ed01b356277d5738825"
+      },
+      {
+        "external_relative_name": "MLD-source-before-fix-04/summary.json",
+        "SHA256": "3c865ba3c7d54267585ce4efdb7a457d5ba23a27ad54df82420105e13a7ef6c2"
+      }
+    ]
   }
 }
