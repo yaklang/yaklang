@@ -532,6 +532,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(m[spec.key])
 		}))
 	}
+	out = append(out, nativeNetworkDisplayBindings()...)
 	sort.Slice(out, func(i, j int) bool { return out[i].descriptor.Name < out[j].descriptor.Name })
 	seen := map[string]bool{}
 	for i, b := range out {
@@ -603,6 +604,14 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	s := DisplayFieldSnapshot{SchemaVersion: DisplayFieldSchemaVersion, Values: []DisplayFieldValue{}}
 	if e == nil {
 		return s
+	}
+	if n := e.nativeNetworkFields; n != nil && n.frozen {
+		owned := *e
+		owned.Protocol, owned.Status, owned.Completeness = n.protocol, n.status, n.completeness
+		owned.ID, owned.FlowID, owned.Length, owned.Domain = n.id, n.flow, n.length, n.domain
+		owned.Source, owned.Destination, owned.SourceBytes = n.source, n.destination, cloneNativeNetworkSource(n.bytes)
+		owned.Session = e.semanticSession
+		e = &owned
 	}
 	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation || e.nativeESPObservation {
 		owned := *e
@@ -720,6 +729,9 @@ func normalizeDisplayValue(value any, d DisplayFieldDescriptor) (any, bool) {
 			// A literal IPv6 wire field must retain all 128 bits, including
 			// mapped addresses; generic endpoint fields still use Unmap.
 			return a.String(), a.Is6()
+		}
+		if d.Bits == 32 && !a.Unmap().Is4() {
+			return nil, false
 		}
 		return a.Unmap().String(), true
 	case DisplayUnsigned:
@@ -871,6 +883,10 @@ func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displa
 }
 
 func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
+	if f, ok := e.ownedNativeNetworkField(key); ok {
+		span := f.span
+		return &span
+	}
 	if key == "" {
 		return nil
 	}
@@ -904,6 +920,9 @@ func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filt
 			return fail()
 		}
 		if d.Bits == 128 && !p.Addr().Is6() {
+			return fail()
+		}
+		if d.Bits == 32 && (!p.Addr().Unmap().Is4() || p.Addr().Is4In6() && p.Bits() < 96) {
 			return fail()
 		}
 		if d.Bits != 128 && p.Addr().Is4In6() && p.Bits() >= 96 {
@@ -942,6 +961,9 @@ func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filt
 	case DisplayAddress:
 		a, err := netip.ParseAddr(token.s)
 		if err != nil {
+			return fail()
+		}
+		if d.Bits == 32 && !a.Unmap().Is4() {
 			return fail()
 		}
 		if d.Bits == 128 {

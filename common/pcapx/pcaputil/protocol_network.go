@@ -675,6 +675,7 @@ func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvi
 		}
 	}
 	event.Structured = map[string]any{"fields": cloneSession(fields)}
+	event.retainNativeNetworkFields(p)
 	switch status {
 	case "decoded":
 		a.messages.Add(1)
