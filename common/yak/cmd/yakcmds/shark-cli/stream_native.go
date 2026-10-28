@@ -72,12 +72,23 @@ func (s *streamStore) nativePacket(flow *pcaputil.TrafficFlow, conn *pcaputil.Tr
 	// separate from whether the packet is admitted. Held SYN copies have no
 	// payload and need no retained packet headers to count them exactly once.
 	if current != nil && current.tcpFlowID == flow.Index && current.tcpFlowDomain == r.key.domain {
+		current.tcpUnconfirmed = r.unconfirmedAfterClose
 		// The core reports late packet ownership without feeding a closed
 		// direction again. Preserve that distinction in the immutable row.
 		if conn.IsClosed() {
 			current.tcpFlowState = "closed-direction-observation"
-			if flow.ClientConn.IsClosed() && flow.ServerConn.IsClosed() {
+			fullyClosed := flow.ClientConn.IsClosed() && flow.ServerConn.IsClosed()
+			if fullyClosed {
 				current.tcpFlowState = "closed-observation"
+			}
+			if view := current.transportView; view != nil && view.Protocol == "tcp" && view.PayloadLength > 0 {
+				// This payload was not admitted by the closed direction. Once
+				// both directions closed, later ACKs cannot prove that the
+				// observed application still owns this tuple's new traffic.
+				current.tcpUnconfirmed = true
+				if fullyClosed {
+					r.unconfirmedAfterClose = true
+				}
 			}
 		}
 		state := conn.SequenceObservation()
@@ -150,7 +161,7 @@ func (s *streamStore) nativeClosed(reason pcaputil.TrafficFlowCloseReason, flow 
 }
 
 func (s *streamStore) attachNative(raw *capturedPacket) {
-	if raw.tcpFlowID == 0 || raw.tcpFlowState == "closed-observation" {
+	if raw.tcpFlowID == 0 || raw.tcpUnconfirmed {
 		// The observer may retain a closed native namespace for an ambiguous
 		// late packet. Its copied TCP ID is useful evidence, but does not
 		// associate an application page with an unconfirmed generation.

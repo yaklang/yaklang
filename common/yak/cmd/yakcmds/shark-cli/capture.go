@@ -138,6 +138,7 @@ type capturedPacket struct {
 	tcpFlowID             uint64
 	tcpFlowDomain         pcaputil.CaptureDomain
 	tcpFlowState          string
+	tcpUnconfirmed        bool
 	messageTransport      string
 	messageSource         string
 	messageDestination    string

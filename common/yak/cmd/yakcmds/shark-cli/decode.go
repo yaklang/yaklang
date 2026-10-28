@@ -47,6 +47,7 @@ type packetSummary struct {
 	payloadBytes         int
 	opaqueTransport      bool
 	closedTCPPayload     bool
+	tcpUnconfirmed       bool
 	ProtocolScope        string    `json:"protocol_scope,omitempty"`
 	Transport            string    `json:"transport,omitempty"`
 	SourcePort           uint16    `json:"source_port,omitempty"`
@@ -72,6 +73,7 @@ func summarize(raw *capturedPacket) packetSummary {
 	row.CaptureDomain = raw.reference.Domain
 	row.TCPFlowID = raw.tcpFlowID
 	row.TCPFlowState = raw.tcpFlowState
+	row.tcpUnconfirmed = raw.tcpUnconfirmed
 	if raw.tcpFlowID != 0 {
 		d := raw.tcpFlowDomain
 		row.TCPFlowDomain = &d
