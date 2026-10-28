@@ -140,7 +140,7 @@ func TestUnadmittedUDPPayloadPreviewNamesItsActualCapturedExtent(t *testing.T) {
 		preview                            bool
 	}{
 		{"", "udp", "captured", "invalid UDP length", true},
-		{"", "udp", "captured", "", false},
+		{"", "udp", "captured", "", true},
 		{"", "tcp", "captured", "rejected", false},
 		{"", "udp", "decrypted", "rejected", false},
 		{"tls", "tcp", "captured", "rejected", false},
@@ -152,7 +152,12 @@ func TestUnadmittedUDPPayloadPreviewNamesItsActualCapturedExtent(t *testing.T) {
 		require.Len(t, sources, 1)
 		require.Equal(t, e.Raw, sources[0].Data)
 		if tc.preview {
-			require.Equal(t, "Unadmitted UDP payload preview · 64/111 captured bytes", sources[0].Name)
+			prefix := "Unadmitted"
+			if tc.failure == "" {
+				prefix = "Unidentified"
+				require.Contains(t, detailLines(fields), "UDP payload · application unrecognized")
+			}
+			require.Equal(t, prefix+" UDP payload preview · 64/111 captured bytes", sources[0].Name)
 			require.NotContains(t, sources[0].Name, " PDU")
 		} else {
 			require.NotContains(t, sources[0].Name, "preview")

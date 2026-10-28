@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 )
@@ -96,7 +97,9 @@ func TestLegacyAddressFieldsFormatRawStringsWithoutChangingFamilyOrSource(t *tes
 	}{
 		{"IP", "127.0.0.1", []byte{127, 0, 0, 1}},
 		{"IPv4", "192.0.2.1", []byte{192, 0, 2, 1}},
+		{"Internet Protocol", "127.0.0.1", []byte{127, 0, 0, 1}},
 		{"IPv6", "::ffff:192.0.2.1", netip.MustParseAddr("::ffff:192.0.2.1").AsSlice()},
+		{"Internet Protocol Version 6", "::ffff:192.0.2.1", netip.MustParseAddr("::ffff:192.0.2.1").AsSlice()},
 		{"Ethernet", "41:42:43:44:45:46", []byte("ABCDEF")},
 	} {
 		for _, value := range []any{tc.wire, string(tc.wire)} {
@@ -123,4 +126,27 @@ func TestLegacyAddressFieldsFormatRawStringsWithoutChangingFamilyOrSource(t *tes
 		_, ok := legacyAddressFieldValue(tc.section, tc.name, tc.wire)
 		require.False(t, ok, "only complete address words in the actual family are formatted")
 	}
+}
+
+func TestLegacyLoopbackParserRootFormatsActualIPv4Words(t *testing.T) {
+	ethernet := tcpPacket(t, 1, 100, "", false, true, false, false)
+	loopback := *ethernet
+	loopback.link = layers.LinkTypeNull
+	loopback.data = append([]byte{2, 0, 0, 0}, ethernet.data[14:]...)
+	loopback.ci.Length, loopback.ci.CaptureLength = len(loopback.data), len(loopback.data)
+	var expected [4]byte
+	copy(expected[:], loopback.data[16:20])
+	local := detail(&loopback)
+	require.Contains(t, detailLines(local.fields), "Source: "+netip.AddrFrom4(expected).String())
+	wire, err := marshalDecodeRequest(packetDecodeRequest(&loopback))
+	require.NoError(t, err)
+	var output bytes.Buffer
+	require.NoError(t, runDecodeWorker(bytes.NewReader(wire), &output))
+	worker, err := decodeWorkerOutput(output.Bytes(), &loopback)
+	require.NoError(t, err)
+	require.Equal(t, local.fields, worker.fields)
+	source := findField(t, worker, "Source")
+	require.Equal(t, 16, source.start)
+	require.Equal(t, 20, source.end)
+	require.True(t, source.hasRange)
 }

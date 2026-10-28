@@ -636,7 +636,7 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDe
 		if n.Name == "root" || n.Name == "Package" || n.Name == "Payload" {
 			// Parser-only wrappers are transparent. Real protocol layers remain
 			// sibling headings; their own records/options retain nesting below.
-		} else if applicationNodes[n.Name] != "" || n.Name == "Ethernet" || n.Name == "IP" || n.Name == "IPv6" || n.Name == "TCP" || n.Name == "UDP" || n.Name == "ARP" || section == "" {
+		} else if applicationNodes[n.Name] != "" || n.Name == "Ethernet" || legacyIPWordLength(n.Name) > 0 || n.Name == "TCP" || n.Name == "UDP" || n.Name == "ARP" || section == "" {
 			section, path, depth = n.Name, "", 0
 			add(n.Name, true)
 			depth++
@@ -665,19 +665,25 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDe
 	}
 }
 
+func legacyIPWordLength(section string) int {
+	switch section {
+	case "IP", "IPv4", "Internet Protocol":
+		return 4
+	case "IPv6", "Internet Protocol Version 6":
+		return 16
+	}
+	return 0
+}
+
 func legacyAddressFieldValue(section, name string, value any) (string, bool) {
 	if name != "Source" && name != "Destination" {
 		return "", false
 	}
-	length := 0
-	switch section {
-	case "IP", "IPv4":
-		length = 4
-	case "IPv6":
-		length = 16
-	case "Ethernet":
+	length := legacyIPWordLength(section)
+	if section == "Ethernet" {
 		length = 6
-	default:
+	}
+	if length == 0 {
 		return "", false
 	}
 	var wire []byte
