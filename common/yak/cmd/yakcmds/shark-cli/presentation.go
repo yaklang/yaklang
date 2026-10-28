@@ -1058,6 +1058,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		if p.priority <= 20 {
 			p.protocol, p.priority, p.status, p.visibility = label, 20, e.Status, "partial-message"
 			p.nativeMembership = membershipEventProtocol(e)
+			p.nativeHeaders = nil
+			if len(e.CarrierLayers) > 0 {
+				p.nativeHeaders = headerLayerNames(eventValues(e)["Observed Header Layers"])
+				p.nativeSource, p.nativeDestination, p.nativeDomain = e.Source, e.Destination, e.Domain
+			}
 			p.summary = applicationEventSummary(e)
 			p.scope = "captured multicast membership fields; complete message not admitted"
 			p.evidence = "wire prefix only; checksum, parent validity and membership state unverified"
