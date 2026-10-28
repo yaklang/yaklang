@@ -72,10 +72,11 @@ func withEvidence(ci gopacket.CaptureInfo, e captureEvidence) gopacket.CaptureIn
 }
 func packetEvidence(p gopacket.Packet) captureEvidence {
 	e := evidenceFrom(p.Metadata().CaptureInfo)
-	outer := ""
+	outer, directionalOuter := "", ""
 	for _, l := range p.Layers() {
 		if n, ok := l.(gopacket.NetworkLayer); ok {
 			a, b := n.NetworkFlow().Src().String(), n.NetworkFlow().Dst().String()
+			directionalOuter = a + ">" + b
 			if a > b {
 				a, b = b, a
 			}
@@ -109,7 +110,14 @@ func packetEvidence(p gopacket.Packet) captureEvidence {
 		case *layers.VXLAN:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/vxlan:%s:%d", outer, v.VNI)
 		case *layers.GRE:
-			e.Ref.Domain.Encapsulation += fmt.Sprintf("/gre:%s:%d", outer, v.Key)
+			if directionalOuter != "" && selectedPPTPGRE(v) {
+				// RFC 2637 divides Key into changing Payload Length and the
+				// receiver's Call ID. Missing call-control traffic does not
+				// authorize pairing the peers' independently assigned IDs.
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/pptp:%s:%d", directionalOuter, uint16(v.Key))
+			} else {
+				e.Ref.Domain.Encapsulation += fmt.Sprintf("/gre:%s:%d", outer, v.Key)
+			}
 		case *layers.Geneve:
 			e.Ref.Domain.Encapsulation += fmt.Sprintf("/geneve:%s:%d", outer, v.VNI)
 		case *layers.IPv4:
