@@ -569,7 +569,7 @@ func hasObservedTLS(raw *capturedPacket) bool {
 }
 
 func flattenFields(n *base.NodeValue, depth int, out *[]field) {
-	flatFields(n, "", "", out)
+	flatFields(n, "", "", out, depth)
 }
 
 func applicationProtocol(n *base.NodeValue) string {
@@ -583,32 +583,64 @@ func applicationProtocol(n *base.NodeValue) string {
 	}
 	return ""
 }
-func flatFields(n *base.NodeValue, section, path string, out *[]field) {
-	if len(*out) >= 8192 || len(path) > 1024 {
-		return
-	}
-	if n.IsValue() {
-		value := formatFieldValue(n.Name, n.Value)
-		if b, ok := n.Value.([]byte); ok {
-			if (section == "IP" || section == "IPv4" || section == "IPv6") && (n.Name == "Source" || n.Name == "Destination") && (len(b) == 4 || len(b) == 16) {
-				value = net.IP(b).String()
-			} else if section == "Ethernet" && (n.Name == "Source" || n.Name == "Destination") && len(b) == 6 {
-				value = net.HardwareAddr(b).String()
-			}
+func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDepth ...int) {
+	limited := false
+	var walk func(*base.NodeValue, string, string, string, int, int)
+	walk = func(n *base.NodeValue, section, path, label string, depth, traversed int) {
+		if n == nil {
+			return
 		}
-		*out = append(*out, nodeField(n, safeText(path+n.Name+": "+value), false))
-		return
+		if len(*out) >= 8191 || len(path) > 1024 || traversed > 32 {
+			limited = true
+			return
+		}
+		add := func(text string, branch bool) {
+			f := nodeField(n, safeText(text), branch)
+			f.depth = max(0, depth)
+			*out = append(*out, f)
+		}
+		if n.IsValue() {
+			value := formatFieldValue(n.Name, n.Value)
+			if b, ok := n.Value.([]byte); ok {
+				if (section == "IP" || section == "IPv4" || section == "IPv6") && (n.Name == "Source" || n.Name == "Destination") && (len(b) == 4 || len(b) == 16) {
+					value = net.IP(b).String()
+				} else if section == "Ethernet" && (n.Name == "Source" || n.Name == "Destination") && len(b) == 6 {
+					value = net.HardwareAddr(b).String()
+				}
+			}
+			// Keep the existing full field text for filtering and byte selection.
+			add(path+n.Name+": "+value, false)
+			return
+		}
+		if n.Name == "root" || n.Name == "Package" || n.Name == "Payload" {
+			// Parser-only wrappers are transparent. Real protocol layers remain
+			// sibling headings; their own records/options retain nesting below.
+		} else if applicationNodes[n.Name] != "" || n.Name == "Ethernet" || n.Name == "IP" || n.Name == "IPv6" || n.Name == "TCP" || n.Name == "UDP" || n.Name == "ARP" || section == "" {
+			section, path, depth = n.Name, "", 0
+			add(n.Name, true)
+			depth++
+		} else {
+			add(path+label, true)
+			path += n.Name + "."
+			depth++
+		}
+		for i, child := range n.Children() {
+			label := child.Name
+			if n.IsList() {
+				label = fmt.Sprintf("%s[%d]", label, i)
+			}
+			walk(child, section, path, label, depth, traversed+1)
+		}
 	}
-	if n.Name == "root" || n.Name == "Package" || n.Name == "Payload" {
-		// Structural containers do not become another level of indentation.
-	} else if applicationNodes[n.Name] != "" || n.Name == "Ethernet" || n.Name == "IP" || n.Name == "IPv6" || n.Name == "TCP" || n.Name == "UDP" || n.Name == "ARP" || section == "" {
-		section, path = n.Name, ""
-		*out = append(*out, nodeField(n, safeText(n.Name), true))
-	} else {
-		path += n.Name + "."
+	depth := 0
+	if len(initialDepth) > 0 {
+		depth = initialDepth[0]
 	}
-	for _, child := range n.Children() {
-		flatFields(child, section, path, out)
+	if n != nil {
+		walk(n, section, path, n.Name, depth, 0)
+	}
+	if limited && len(*out) < 8192 {
+		*out = append(*out, field{text: "YAML field view limited: additional nodes or nesting omitted"})
 	}
 }
 
