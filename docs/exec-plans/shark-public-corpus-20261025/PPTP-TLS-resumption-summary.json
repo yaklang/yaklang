@@ -3418,6 +3418,25 @@
       }
     ]
   },
+  "remaining_reference_inventory": {
+    "proof_SHA256": "2f2cabd22c10f116902af86f7552f34e7e265ddea3b85005c08870307291be6c",
+    "frames": 577,
+    "categories": {
+      "[{\"expert\": \"UnsupportedOrMalformedNetworkLayer\", \"protocol\": \"ip\", \"status\": \"unrecognized\"}]": 157,
+      "[{\"expert\": \"EncapsulationDepthOrProfile\", \"protocol\": \"ip\", \"status\": \"limited\"}]": 208,
+      "[{\"expert\": \"\", \"protocol\": \"icmpv6\", \"status\": \"decoded\"}]": 24,
+      "[]": 82,
+      "[{\"expert\": \"FragmentQuarantineBudget\", \"protocol\": \"ip\", \"status\": \"limited\"}]": 54,
+      "[{\"expert\": \"FragmentLength\", \"protocol\": \"ip\", \"status\": \"malformed\"}]": 19,
+      "[{\"expert\": \"NDOptionLength\", \"protocol\": \"ip\", \"status\": \"malformed\"}]": 3,
+      "[{\"expert\": \"IPHeaderTruncated\", \"protocol\": \"ip\", \"status\": \"incomplete\"}]": 10,
+      "[{\"expert\": \"\", \"protocol\": \"icmp\", \"status\": \"decoded\"}]": 15,
+      "[{\"expert\": \"PPTPHeaderAdmission\", \"protocol\": \"ip\", \"status\": \"limited\"}]": 4,
+      "[{\"expert\": \"MalformedMessage\", \"protocol\": \"pim\", \"status\": \"malformed\"}]": 1
+    },
+    "frames_without_published_native_contribution": 82,
+    "inventory_only_not_field_parity": true
+  },
   "real_TLS": {
     "final_summary_SHA256": "f305792a396376abd5c0aa65f317b4cef6e1db5cf202d130ed89f6fed4669864",
     "capture_SHA256": "80b46205a38a11f61f0698d01d953b04e6428cebf54989ce9925911497c2cfdb",
