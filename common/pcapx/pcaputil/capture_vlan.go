@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"encoding/binary"
 	"fmt"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -10,26 +11,65 @@ import (
 // A VLAN tag's final two bytes can be an IEEE 802.3 length rather than an
 // EtherType. gopacket's Dot1Q decoder only dispatches the EtherType form.
 // Preserve normal application decoding while fixing that local carrier edge.
-type captureCarrierDecoder struct{ inner gopacket.Decoder }
+type captureCarrierDecoder struct {
+	inner   gopacket.Decoder
+	network gopacket.NetworkLayer
+}
 type captureCarrierBuilder struct {
 	gopacket.PacketBuilder
-	pim gopacket.NetworkLayer
-	udp *layers.UDP
+	pim     gopacket.NetworkLayer
+	udp     *layers.UDP
+	last    gopacket.Layer
+	network gopacket.NetworkLayer
 }
 type captureVLANDecoder struct{}
 
 func (d captureCarrierDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
-	return d.inner.Decode(data, &captureCarrierBuilder{PacketBuilder: b})
+	wrapped := &captureCarrierBuilder{PacketBuilder: b, network: d.network}
+	if (d.inner == layers.LayerTypeIPv6 || d.inner == layers.IPProtocolIPv6 || d.inner == layers.EthernetTypeIPv6) && len(data) >= 40 && data[6] == 0 && binary.BigEndian.Uint16(data[4:6]) != 0 {
+		// First HBH options are decoded inside IPv6 by the dependency. Use the
+		// same bounded adapter for observers; retain legacy jumbo handling.
+		ip := &layers.IPv6{}
+		err := decodeProtocolIPv6(ip, data, wrapped)
+		wrapped.AddLayer(ip)
+		wrapped.SetNetworkLayer(ip)
+		if ip.HopByHop != nil {
+			wrapped.AddLayer(ip.HopByHop)
+		}
+		if err != nil {
+			return err
+		}
+		return wrapped.NextDecoder(ip.NextLayerType())
+	}
+	return d.inner.Decode(data, wrapped)
+}
+func (b *captureCarrierBuilder) AddLayer(layer gopacket.Layer) {
+	b.PacketBuilder.AddLayer(layer)
+	b.last = layer
 }
 func (b *captureCarrierBuilder) SetNetworkLayer(n gopacket.NetworkLayer) {
 	b.PacketBuilder.SetNetworkLayer(n)
 	b.pim = pimNetwork(n)
+	b.network = n
 }
 func (b *captureCarrierBuilder) SetTransportLayer(layer gopacket.TransportLayer) {
 	b.PacketBuilder.SetTransportLayer(layer)
 	b.udp, _ = layer.(*layers.UDP)
 }
 func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
+	if next == layers.LayerTypeIPSecESP || next == layers.IPProtocolESP {
+		next = captureESPDecoder{}
+	}
+	if next == layers.LayerTypeIPSecAH || next == layers.IPProtocolAH {
+		_, v6 := b.network.(*layers.IPv6)
+		next = captureAHDecoder{ipv6: v6}
+	}
+	if next == layers.LayerTypeIPv6Destination || next == layers.IPProtocolIPv6Destination {
+		next = captureIPv6OptionsDecoder{}
+	}
+	if next == layers.LayerTypeIPv6HopByHop || next == layers.IPProtocolIPv6HopByHop {
+		next = captureIPv6OptionsDecoder{hop: true}
+	}
 	if b.pim != nil {
 		next = capturePIMDecoder{network: b.pim}
 		b.pim = nil
@@ -58,7 +98,17 @@ func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
 	if next == layers.LayerTypeSNAP {
 		next = captureSNAPDecoder{}
 	}
-	return b.PacketBuilder.NextDecoder(captureCarrierDecoder{next})
+	if b.last != nil && len(b.last.LayerPayload()) == 0 {
+		switch d := next.(type) {
+		case captureESPDecoder:
+			return d.Decode(nil, b.PacketBuilder)
+		case captureAHDecoder:
+			return d.Decode(nil, b.PacketBuilder)
+		case captureIPv6OptionsDecoder:
+			return d.Decode(nil, b.PacketBuilder)
+		}
+	}
+	return b.PacketBuilder.NextDecoder(captureCarrierDecoder{inner: next, network: b.network})
 }
 
 type captureLLCDecoder struct{}

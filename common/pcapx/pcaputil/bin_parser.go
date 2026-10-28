@@ -27,6 +27,7 @@ type ProtocolEvent struct {
 	nativeENIPObservation              bool
 	nativeHARTIPObservation            bool
 	nativeTLSObservation               bool
+	nativeESPObservation               bool
 	nativeDTLSObservation              bool
 	nativeRADIUSObservation            bool
 	radiusApplicationRefusal           bool
@@ -190,7 +191,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	// A selected native SSH method refusal must not be retried as a successful
 	// generic packet grammar. Both accepted fields and errors are private facts,
 	// independent of caller edits to Protocol, Session and compatibility caches.
-	if e.nativeSSHObservation || e.nativeIMAPObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
 			return nil, &owned
@@ -436,7 +437,7 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
-	if e.nativeSSHObservation || e.nativeIMAPObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
 		return true
 	}
 	if e.nativeSessionMessage {

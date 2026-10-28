@@ -213,6 +213,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, netflowV9DisplayBindings()...)
 	out = append(out, ldpSessionDisplayBindings()...)
 	out = append(out, tlsResumptionDisplayBindings()...)
+	out = append(out, espDisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
 		typ       DisplayFieldType
@@ -603,11 +604,15 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	if e == nil {
 		return s
 	}
-	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation || e.nativeESPObservation {
 		owned := *e
 		owned.Protocol, owned.Session = "ssh", e.semanticSession
 		if e.nativeIMAPObservation {
 			owned.Protocol = "imap"
+		}
+		if e.nativeESPObservation {
+			owned.Protocol = "esp"
+			owned.Status = "limited"
 		}
 		if e.nativeDCERPCObservation {
 			owned.Protocol = "dcerpc"
@@ -870,7 +875,7 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 		return nil
 	}
 	m := e.Session
-	if e.nativeQUICObservation {
+	if e.nativeQUICObservation || e.nativeESPObservation {
 		m = e.semanticSession
 	}
 	ranges, _ := m["Wire Field Ranges"].(map[string]any)

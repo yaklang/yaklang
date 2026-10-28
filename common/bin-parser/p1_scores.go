@@ -54,7 +54,7 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("IPsec AH", "ipsec.yaml", 15, 25, 16, 20, 10, "L1",
 		"TestP1MiscAndAliases gopacket testPacketIPSecAHTransport Ethernet+IPv4+AH SPI 0x101; TestP1FailPaths AH", "ICV Ciphertext"),
 	p1card("IPsec ESP", "ipsec.yaml", 15, 25, 16, 20, 10, "L2",
-		"TestP1MiscAndAliases ESP proto 50; TestP1FailPaths ESP", "ICV Ciphertext"),
+		"TestP1MiscAndAliases ESP proto 50; TestP1FailPaths ESP; legacy structural score only, not SA/authentication/decryption coverage; ipsec_esp/ESPHeaderFields exposes the bounded opaque-body observation", "ICV Ciphertext"),
 	p1card("MPLS", "mpls.yaml", 20, 25, 20, 20, 10, "L1",
 		"mpls/bottom RFC 3032 Bottom=1 TTL 0xfe IPv4; mpls/stack two-label Bottom 0 then 1 EtherType 0x8847; TestP1FailPaths mpls", ""),
 	p1card("VXLAN", "vxlan.yaml", 15, 25, 20, 20, 10, "L1",

@@ -608,7 +608,10 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		var pptp *pptpHeaderError
 		var truncatedIP *ipHeaderTruncatedError
 		var vxlan *vxlanHeaderError
-		if errors.As(failure.Error(), &pptp) || errors.As(failure.Error(), &truncatedIP) || errors.As(failure.Error(), &vxlan) {
+		var esp *espHeaderTruncatedError
+		var ah *ahHeaderError
+		var options *ipv6OptionsHeaderError
+		if errors.As(failure.Error(), &pptp) || errors.As(failure.Error(), &truncatedIP) || errors.As(failure.Error(), &vxlan) || errors.As(failure.Error(), &esp) || errors.As(failure.Error(), &ah) || errors.As(failure.Error(), &options) {
 			// A selected UDP tunnel can retain its outer TransportLayer when an
 			// inner header fails. The precise native refusal already owns this
 			// packet; do not redispatch those bytes as an outer UDP application.
