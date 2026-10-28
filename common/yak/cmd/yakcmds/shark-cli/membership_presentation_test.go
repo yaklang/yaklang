@@ -33,3 +33,20 @@ func TestMembershipNativeVersionReplacesLegacyGuessOnlyInDisplayStack(t *testing
 		})
 	}
 }
+
+func TestMembershipPartialCarrierPreservesInnerPeersAndPhysicalCapture(t *testing.T) {
+	physical := []string{"Ethernet", "IPv4", "GRE", "IPv6", "ICMPv6", "MLDv2MulticastListenerReport"}
+	domain := pcaputil.CaptureDomain{Encapsulation: "/gre:key1"}
+	e := &pcaputil.ProtocolEvent{Protocol: "icmpv6", Profile: "icmpv6-mld", Transport: "network", Status: "incomplete", Completeness: "incomplete",
+		Source: "fe80::1", Destination: "ff02::16", Domain: domain, CarrierLayers: []string{"GRE"}, Summary: "MLDv2 Multicast Listener Report; record source address unavailable",
+		Session: map[string]any{"MLD": map[string]any{"Version": uint8(2)}, "Observed Header Layers": physical}}
+	row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{Source: "192.0.2.1", Destination: "198.51.100.1", Layers: physical})
+	require.Equal(t, "fe80::1", row.Source)
+	require.Equal(t, "ff02::16", row.Destination)
+	require.Equal(t, "192.0.2.1", row.PhysicalSource)
+	require.Equal(t, "198.51.100.1", row.PhysicalDestination)
+	require.Equal(t, &domain, row.MessageDomain)
+	require.Equal(t, physical, row.Layers)
+	require.Equal(t, []string{"Ethernet", "IPv4", "GRE", "IPv6", "ICMPv6", "MLDv2"}, row.ProtocolStack)
+	require.Equal(t, "incomplete", row.ProtocolStatus)
+}
