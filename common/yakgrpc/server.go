@@ -10,6 +10,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/reactservice"
 	"github.com/yaklang/yaklang/common/ai/aiforge"
+	"github.com/yaklang/yaklang/common/aibalanceclient"
 	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/imcontrol"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -378,7 +379,7 @@ func (s *Server) initBasicData() error {
 	if yakit.GetKey(s.GetProfileDatabase(), EngineVersionKey) != consts.GetYakVersion() {
 		yakit.SetKey(s.GetProfileDatabase(), EngineVersionKey, consts.GetYakVersion())
 		log.Info("yaklang core engine version changed... remove cache!")
-		_ = os.RemoveAll(consts.GetDefaultYakitBaseTempDir())
+		_ = aibalanceclient.ClearTempDirPreservingClientUserIDs(consts.GetDefaultYakitBaseTempDir())
 	} else {
 		log.Infof("yaklang core engine version: %v, cache is working!", consts.GetYakVersion())
 	}
