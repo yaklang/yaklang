@@ -70,6 +70,19 @@ func TestVXLANRuleReservedReceiveAndConditionalGBPFieldRanges(t *testing.T) {
 	}
 }
 
+func TestVXLANDefaultRuleDoesNotParseAnotherHeaderAfterItsEthernetPayload(t *testing.T) {
+	wire := append(vxlanRuleHeader(0x88, 0x48, 0x1234, 42, 0), vxlanRuleARP()...)
+	reader := newTransportTailExactReader(wire)
+	node, err := parser.ParseBinary(reader, "vxlan")
+	require.NoError(t, err)
+	require.Zero(t, reader.Len())
+	require.Equal(t, wire, NodeToBytes(node))
+	require.NotNil(t, base.GetNodeByPath(node, "@VXLAN.Inner.ARP"))
+	unused := base.GetNodeByPath(node, "@VXLANGPEHeader")
+	require.NotNil(t, unused, "the reusable rule template is still available to its explicit entry")
+	require.Nil(t, unused.Cfg.GetItem(base.CfgNodeResult), "the default standard profile must not consume a second header at EOF")
+}
+
 func TestVXLANRuleActualDestinationPrecedesSourceHints(t *testing.T) {
 	payload := append(vxlanRuleHeader(8, 0, 0, 42, 0), vxlanRuleARP()...)
 	for _, source := range []uint16{53, 4789, 55000} {

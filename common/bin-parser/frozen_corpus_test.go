@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
@@ -92,6 +94,21 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 							protocolCorpusRequireValue(t, node, name, data)
 						default:
 							t.Fatalf("unsupported frozen value for %s: %T", name, value)
+						}
+					}
+					if c.ID == "ndpi-vxlan" {
+						// The sealed old assertions above remain authoritative. New
+						// header fields have a separate literal-byte oracle, independent
+						// of the parser output and the default-entry choice.
+						require.GreaterOrEqual(t, len(input), 8)
+						values := map[string]uint64{"G": uint64(input[0] >> 7), "I": uint64(input[0] >> 3 & 1), "Reserved High": uint64(input[0] >> 4 & 7), "Reserved Low": uint64(input[0] & 7), "VNI": uint64(input[4])<<16 | uint64(input[5])<<8 | uint64(input[6])}
+						for field, want := range values {
+							protocolCorpusRequireValue(t, node, field, want)
+						}
+						for path, span := range map[string][2]uint64{"@VXLAN.G": {0, 1}, "@VXLAN.I": {4, 5}, "@VXLAN.VNI": {32, 56}} {
+							field := base.GetNodeByPath(node, path)
+							require.NotNil(t, field)
+							require.Equal(t, span, stream_parser.GetNodeResultPos(field))
 						}
 					}
 				})
