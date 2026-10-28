@@ -268,6 +268,17 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			return p, false
 		}
 		var truncated *ipHeaderTruncatedError
+		var options *ipv6OptionsHeaderError
+		var ah *ahHeaderError
+		if errors.As(failure.Error(), &options) || errors.As(failure.Error(), &ah) {
+			code := "IPv6OptionsHeaderBounds"
+			if ah != nil {
+				code = "AHHeaderBounds"
+			}
+			a.malformed.Add(1)
+			a.networkHeaderRefusal(p, e, ci, code, failure.Error().Error())
+			return p, false // Keep strict capture API and decoder-error accounting.
+		}
 		if errors.As(failure.Error(), &truncated) {
 			fields := map[string]any{"Expected IP Version": truncated.expected, "Available Header Bytes": truncated.available, "Required Header Bytes": truncated.required, "Header Observation Scope": "incomplete fixed header; declared carrier only"}
 			if truncated.hasVersion {
@@ -448,6 +459,15 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	if q, handled := a.observeL2TPv3(p, e); handled {
 		if q != nil {
 			return a.networkPacket(q)
+		}
+		return nil, true
+	}
+	if a.observeESP(p, e) {
+		if failure := p.ErrorLayer(); failure != nil {
+			var short *espHeaderTruncatedError
+			if errors.As(failure.Error(), &short) {
+				return p, false
+			}
 		}
 		return nil, true
 	}
@@ -679,6 +699,28 @@ func networkObservationSource(e captureEvidence) ByteSource {
 		return ByteSource{Kind: "reassembled", PacketRefs: append([]PacketReference(nil), e.refs...)}
 	}
 	return ByteSource{Kind: "captured", PacketRefs: []PacketReference{e.Ref}}
+}
+
+func (a *binParser) networkHeaderRefusal(p gopacket.Packet, evidence captureEvidence, ci gopacket.CaptureInfo, code, reason string) {
+	fields := map[string]any{"Observed Header Layers": outerNetworkHeaderNames(p), "Header Observation Scope": "validated network prefix before refused child header", "Child Header Identity": "unconfirmed", "Parent Header Refusal": code}
+	e := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-header-refusal", Domain: evidence.Ref.Domain, Status: "malformed", Completeness: "malformed", ExpertCode: code, Error: reason, Summary: reason + "; child identity not admitted", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(evidence), CarrierLayers: append([]string(nil), evidence.carrierLayers...)}
+	for _, layer := range p.Layers() {
+		if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == layers.LayerTypeICMPv4 || layer.LayerType() == layers.LayerTypeICMPv6 {
+			break
+		}
+		h := layer.LayerContents()
+		switch layer.(type) {
+		case *layers.IPv4:
+			if len(h) >= 20 && h[0]>>4 == 4 && int(h[0]&15)*4 == len(h) && int(binary.BigEndian.Uint16(h[2:4])) >= len(h) {
+				e.Source, e.Destination = net.IP(h[12:16]).String(), net.IP(h[16:20]).String()
+			}
+		case *layers.IPv6:
+			if len(h) == 40 && h[0]>>4 == 6 {
+				e.Source, e.Destination = net.IP(h[8:24]).String(), net.IP(h[24:40]).String()
+			}
+		}
+	}
+	a.emit(e)
 }
 
 func (a *binParser) networkDiagnostic(e captureEvidence, ci gopacket.CaptureInfo, status, code string) {

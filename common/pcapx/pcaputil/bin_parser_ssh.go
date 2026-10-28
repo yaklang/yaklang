@@ -431,8 +431,19 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
-		s.kex[dir] = lists
-		s.haveKEX[dir] = true
+		// Validate the complete candidate negotiation before publishing either
+		// sender's offers or pending-guess state. A refused second KEXINIT must
+		// not leave a half-committed connection that later packets can inherit.
+		offers, have := s.kex, s.haveKEX
+		offers[dir], have[dir] = lists, true
+		selected := s.selected
+		if have[0] && have[1] && s.clientKnown {
+			selected = sshNegotiate(offers[s.client], offers[1-s.client])
+			if err := sshNegotiationError(selected); err != nil {
+				return nil, err
+			}
+		}
+		s.kex, s.haveKEX, s.selected = offers, have, selected
 		info["Kex Algorithms"] = lists.Kex
 		info["Host Key Algorithms"] = lists.HostKey
 		// KEXINIT contains sender offers. Client-preference negotiation below
@@ -453,7 +464,6 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			}
 		}
 		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
-			s.selected = sshNegotiate(s.kex[s.client], s.kex[1-s.client])
 			for k, v := range s.selected {
 				info[k] = v
 			}
@@ -604,7 +614,7 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		}
 		return ""
 	}
-	return map[string]string{
+	selected := map[string]string{
 		"Kex Algorithm":      pick(sshRealKexNames(client.Kex), sshRealKexNames(server.Kex)),
 		"Host Key Algorithm": pick(client.HostKey, server.HostKey),
 		"Encryption C2S":     pick(client.EncC2S, server.EncC2S),
@@ -614,6 +624,27 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		"Compression C2S":    pick(client.CompC2S, server.CompC2S),
 		"Compression S2C":    pick(client.CompS2C, server.CompS2C),
 	}
+	// These explicit OpenSSH AEAD profiles negotiate integrity with the
+	// cipher. The offered MAC vectors remain wire facts, but are not selected
+	// algorithms and do not need an intersection. RFC 5647's older AEAD_AES_*
+	// identifiers have different negotiation rules; unknown names never imply
+	// this behavior merely because they contain "gcm" or "poly1305".
+	for _, direction := range []string{"C2S", "S2C"} {
+		switch selected["Encryption "+direction] {
+		case "aes128-gcm@openssh.com", "aes256-gcm@openssh.com", "chacha20-poly1305@openssh.com":
+			selected["MAC "+direction] = "<implicit>"
+		}
+	}
+	return selected
+}
+
+func sshNegotiationError(selected map[string]string) error {
+	for _, name := range []string{"Kex Algorithm", "Host Key Algorithm", "Encryption C2S", "Encryption S2C", "MAC C2S", "MAC S2C", "Compression C2S", "Compression S2C"} {
+		if selected[name] == "" {
+			return protocolError(ErrMalformedMessage, "SSH negotiation has no common "+name)
+		}
+	}
+	return nil
 }
 
 func sshRealKexNames(names string) string {
