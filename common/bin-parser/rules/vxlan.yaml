@@ -1,5 +1,10 @@
 endian: big
 Package:
+  # A direct/default rule call retains its historical standard VXLAN entry.
+  # GPE is selected explicitly by its separate UDP destination service.
+  operator: |
+    this.ProcessSubNode("VXLAN")
+    return
   VXLAN:
     operator: |
       this.ProcessSubNode("G")
