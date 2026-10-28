@@ -153,6 +153,12 @@ func summarize(raw *capturedPacket) packetSummary {
 			row.Info += " · header layer projection incomplete"
 		}
 		row.ProtocolStack = append([]string(nil), view.Layers...)
+		// The owned view can select an outer transport while the legacy
+		// decoder speculates below it. That speculative inner address is not
+		// a physical endpoint. Use only the complete matching captured prefix.
+		if headers := capturedNetworkPrefix(p, raw.data, view.Layers); len(headers) > 0 {
+			physicalSource, physicalDestination = headers[0].source, headers[0].destination
+		}
 		headerObservation = true
 	}
 	if raw.messageTransport != "" && transport == "" {
