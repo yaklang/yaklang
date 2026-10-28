@@ -138,6 +138,7 @@ func tlsCertificateBudgetCheckEvent(t *testing.T, e *ProtocolEvent, c tlsAlertCa
 		raw = wrapperWire(t, w.Wire)
 	}
 	want := tlsCertificateBudgetWant(t, "", w.Fields).(map[string]any)
+	want = tlsFrozenExpectedMetadata(t, c, w, want)
 	require.Equal(t, "tls", e.Protocol)
 	require.Equal(t, "tcp", e.Transport)
 	require.Equal(t, w.Direction, e.Direction)
