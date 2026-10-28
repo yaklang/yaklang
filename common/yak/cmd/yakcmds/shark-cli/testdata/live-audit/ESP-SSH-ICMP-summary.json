@@ -100,10 +100,9 @@
     "final_document_head_checks": "Verify separately; do not attribute these earlier runs to a later commit."
   },
   "open_findings": [
-    "Sharon DecodeErrors differs by exactly3; source causes still being audited. No whole-flow equality or numeric normalization claimed.",
-    "Native MLD body fields/records are absent;237 source-bound observations include10 incorrectly decoded incomplete bodies. Canonical/native/legacy body alignment remains active work.",
-    "Historical303 EOL projection and390 own-header parent investigation entries are not automatically closed by newer scoped field certificates; remaining per-source semantics still need reconciliation.",
-    "Broader SSH authentication/channels/SFTP/rekey, QUIC CID/QPACK/0-RTT, full RPC/PPTP/GPE and protected-TLS-record-loss recovery retain their documented limits."
+    "Historical303 EOL and390 parent investigation entries require per-source whole-row composition; multicast proofs do not silently close the entire inventories.",
+    "MLD/IGMP capture layout and field values do not establish parent validity, checksum validity or listener/querier membership state.",
+    "Broader SSH authentication/channels/SFTP/rekey, QUIC CID/QPACK/0-RTT, full RPC/PPTP/GPE and protected-TLS-record-loss application recovery retain their documented limits."
   ],
   "proofs": [
     {
@@ -197,183 +196,482 @@
     "max_active_child_agents": 1
   },
   "latest_checkpoint": {
-    "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+    "native_source": "66622e3efc9611eb65ddeb881613fd6eda0e671d",
+    "CLI_source": "41b88b146779559f39aa66891a85852ce697018f",
     "SDK": {
       "generations": 37,
-      "old_objects": 295123,
-      "new_objects": 306304,
-      "source_expected_parent_observations": 17532,
-      "retained_objects_equal_after_known_PDU_reference_bijection": 288772,
-      "whole_expected_differences": 0
+      "old_objects": 306304,
+      "new_objects": 306455,
+      "new_IGMP": 151,
+      "whole_source_expected_MLD_replacements": 237,
+      "whole_expected_differences": 0,
+      "identity": "Only explicit injective generated-PDU reference paths; frames/flows/domains/ordinary values retain exact types and values."
     },
     "CLI": {
       "generations": 37,
       "rows": 384518,
-      "literal_rows": 150890,
-      "known_ref_only_rows": 215391,
-      "source_parent_rows": 17532,
-      "source_TCP_rows": 705,
-      "whole_expected_errors": 0
-    },
-    "ICMPv4": {
-      "source_objects": 5009,
-      "corrected_objects": 475,
-      "unchanged_objects": 4534,
-      "new_incomplete_timestamp_messages": 18,
-      "new_incomplete_mask_messages": 2,
-      "remaining_field_meaning_or_status_differences": 0
-    },
-    "typed_network_fields": {
-      "added_descriptors": 23,
-      "registry_size": 690,
-      "source_certificate_revision": "5403ffe55b219702af97a3422dd6d59996aadfbe",
-      "certificate_observations": 11475,
-      "certificate_values": 42823,
-      "Wireshark_original_offsets_and_bytes_checked": true,
-      "current_original_capture_snapshot": {
-        "weber": {
-          "observations": 5694,
-          "typed_values": 21549
-        },
-        "sharon": {
-          "observations": 5735,
-          "typed_values": 21221
-        }
-      },
-      "withdrawn_unselected_EtherIP_ARP_children": 46,
-      "note": "The earlier source-field certificate does not authorize an invalid parent. Retained objects keep their whole values under the explicit PDU-reference bridge."
-    },
-    "TCP": {
-      "source_bound_original_frames": 705,
-      "whole_CLI_rows_verified": 705,
-      "actual_whole_worker_responses_verified": 705,
-      "native_contributions": 0,
-      "negative_controls": 11,
-      "pre_candidate_plan_frames": 145,
-      "whole_705_plan_scope": "Post-discovery independent source oracle; not described as pre-candidate.",
-      "categories": {
-        "MPTCP-dimension": 14,
-        "fixed-header-incomplete": 57,
-        "header-options-incomplete": 159,
-        "invalid-data-offset": 8,
-        "option-TLV-bounds": 467
-      },
-      "external_quick_API": false,
-      "quick_validation": "Targeted Go quick/deep equality plus actual Windows initial/late pages; no independent external quick executable API."
+      "whole_membership_source_rows": 388,
+      "whole_expected_differences": 0
     },
     "flow_comparison": {
-      "Weber_complete_file_literal": true,
-      "Sharon_all_flows_packets_closes_and_other_stats_literal": true,
-      "Sharon_DecodeErrors_before": 81613,
-      "Sharon_DecodeErrors_after": 81616,
-      "exact_three_source_causes": "Still under audit; not normalized or called whole-flow equality."
+      "Native15_to_17_two_complete_files_byte_identical": true,
+      "earlier_plus3_error_counter_causes": "Closed by literal per-source replay and whole-capture counterfactual; actual delta is retained, never normalized."
+    },
+    "IGMP": {
+      "sources": 151,
+      "decoded": 89,
+      "incomplete": 50,
+      "limited": 12,
+      "original_WS_equal_fields": 1394,
+      "WS_unavailable_short_prefix_fields": 14,
+      "unknown_protocol2_sources_unselected": 212,
+      "WS_only_nonadmitted_candidates": 189,
+      "authored_controls": 48,
+      "final_oracle_authored_WS_equal_fields": 1371,
+      "final_oracle_authored_WS_unavailable_fields": 37,
+      "final_oracle_authored_differences": 0
+    },
+    "MLD": {
+      "sources": 237,
+      "decoded": 220,
+      "incomplete": 11,
+      "limited": 6,
+      "original_wire_WS_selected_scalar_checks": 1863,
+      "typed_values_in_whole_native_expectation": 2107,
+      "unknown_declared_query_extent_does_not_infer_version_or_floating_units": true
+    },
+    "source_corrections": {
+      "MPacket_oracle_domain_correction": 38,
+      "native_literal_zero_IP_length_wrapper_fixes": 18,
+      "note": "MPacket correction is post-discovery and literal delimiter/CRC-bound; the18 original native expectations were not rewritten."
+    },
+    "fresh_Windows_capture": {
+      "records": 6,
+      "OS_generated_IGMPv3_reports": 3,
+      "OS_generated_MLDv2_reports": 3,
+      "pre_execution_WS_fields": 36,
+      "post_execution_source_recheck_WS_fields": 45,
+      "whole_native_semantic_and_typed_value_checks": 45,
+      "negative_controls": 5,
+      "no_membership_or_checksum_validity_claim": true
     },
     "Windows": {
-      "method": "PNG renders of actual Windows native console cells and attributes; not native Windows Terminal pixels.",
-      "final_TCP_pages": 4,
-      "TCP_buffers": 60,
-      "Source0_complete_lengths": [
-        68,
-        84,
-        69,
-        64
+      "source": "41b88b146779559f39aa66891a85852ce697018f",
+      "method": "Native console cells/attributes rendered to PNG; not Windows Terminal pixel screenshots.",
+      "main_pages": 7,
+      "main_buffers": 107,
+      "additional_second_source_click_pages": 2,
+      "click_buffers": 34,
+      "clicked_source_lengths": [
+        4,
+        16
       ],
-      "all_TCP_Source1_absent": true,
+      "exact_clicked_ranges_and_each_hex_background_checked": true,
+      "clicked_range_negative_controls": 8,
+      "entire_Source0_and_Source1_bytes_equal_original_or_SDK": true,
+      "actual_captured_native_caption_cycles_checked": 9,
       "CP936_restore_resize_quit": true,
-      "ICMPv4_complete_Source0_Source1_lengths": [
-        590,
-        47,
-        64
-      ],
-      "late_byte_pane_reset_fixed": true
+      "semantic_depth_preserved_and_drawn": true
     },
     "tests": {
-      "source": "4e664ebaed542ffb80024ad70d797695975cee77",
-      "passed": 285229,
-      "skipped": 24,
-      "every_started_test_has_unique_terminal": true,
-      "log_SHA256": "d86d8e983b5817ebc8e8959cc932007560b0bce4b19cea8a601b0f377eb2ef20",
-      "receipt_SHA256": "7f3840c3c0f16f34c3a1c9db749f7799d5064a7e0b6adaeca4154c51978a0a79"
+      "native_source": "66622e3efc9611eb65ddeb881613fd6eda0e671d",
+      "full_passed": 285295,
+      "full_skipped": 24,
+      "later_CLI_source": "41b88b146779559f39aa66891a85852ce697018f",
+      "later_CLI_passed": 836,
+      "later_CLI_skipped": 2,
+      "membership_codec_fuzz_source": "76e28b07808bdf98c3cac55689e9d433b89e4850",
+      "fuzz_executions": 124032,
+      "note": "Subsequent wrapper and CLI changes retain the shared codec. Test counts overlap and are not summed."
     },
     "CI": {
-      "source": "4e664ebaed542ffb80024ad70d797695975cee77",
-      "manual_traffic_run": 40711396009,
+      "source": "41b88b146779559f39aa66891a85852ce697018f",
+      "manual_traffic_run": 40745307631,
+      "essential_run": 40745297989,
+      "conclusion": "All four code-head checks succeeded for41b88b; automatic draft traffic skip remains separate. Later heads must be checked independently.",
       "manual_traffic_conclusion": "success",
-      "essential_run": 40711308589,
       "essential_conclusion": "success",
       "diff_check": "success",
-      "path_case_check": "success",
-      "automatic_draft_traffic": "skipped; explicit manual traffic passed"
+      "path_case_check": "success"
     },
-    "MLD_next_source_inventory": {
-      "observations": 237,
-      "source_bound": 237,
-      "currently_decoded_but_body_incomplete": 10,
-      "body_fix_complete": false,
-      "notes": "Wire layout inventory only; timer-code/derived-value and bit-mask comparison remains separate from wire bytes and native implementation."
+    "counts": {
+      "source_frame_identity_checks": 379455,
+      "reference": "Fresh isolated TShark4.6.9; explicit TCP out-of-order reassembly; no explicit keylog. Literal labels remain distinct from protocol correctness.",
+      "evidence_SHA256": "6b4dff95086aac53c04d94932af23d5c188278f02166c953caf10b676940972b"
     },
-    "binary_identity": {
-      "events": "1222d29c4c5909fdec053f81730d4a8be4a1e278b99a0bf192aee1bccdaeb446",
-      "flows": "ad7509f93590b6849def041ef43ece8db821b4a7a86fa28f9828b52c9092e566",
-      "yak": "73276d6da0e6c887ffafdb0b2253e0f120e6e5ea725d260d77ded92eca996f03"
-    },
+    "portable_auditors": [
+      {
+        "path": "IGMP-next/source-prep-05/igmp_expected.py",
+        "SHA256": "7547d7eaabd7e6ca6e53faee37a589514584081e739ac6db8404aba692c0eff0"
+      },
+      {
+        "path": "IGMP-next/source-prep-05/igmp_native_expected.py",
+        "SHA256": "df2b68bf4da54459b552f3495e2ccab5315b766af3b79c64d5c579e8938b0eb2"
+      },
+      {
+        "path": "IGMP-next/source-prep-05/igmp_carrier_source.py",
+        "SHA256": "0328a8cb037799d07bb8ae7ab313f93e9b7a973346c3241a7cf5596175617e43"
+      },
+      {
+        "path": "MLD-whole-native-prep-03/mld_expected.py",
+        "SHA256": "6274ba1f6b5a0e62ec7b77fe8c39fe581dfdf83d3116a0545b5ddde2619055df"
+      },
+      {
+        "path": "MLD-whole-native-prep-03/mld_native_expected.py",
+        "SHA256": "de34bfc12613d227fe1ff6a6e0601fcf6ee7a145e20260c4c40a132708acaa44"
+      },
+      {
+        "path": "mld_carrier_source.py",
+        "SHA256": "0ad418ffdb10e9f7d2d8107f35aa59a557108c8ef589236aad05d21053dd6079"
+      },
+      {
+        "path": "mld_literal_source.py",
+        "SHA256": "d54af07afb842088dc7ed7bcaf1bb7936dc32b9e03c009084f77975e54c80ff2"
+      },
+      {
+        "path": "membership-whole-bridge-prep-04/bridge.py",
+        "SHA256": "42a5e658f8253ce6f1e547a3fcf52baa06661c58537840e3ed89bd2167adc1fd"
+      },
+      {
+        "path": "membership-whole-bridge-prep-04/controls.py",
+        "SHA256": "e91be4c01efd60a8b5c8ca54414a431d2c8b9af3b85008de9c84c9c265b50854"
+      },
+      {
+        "path": "membership-whole-bridge-prep-04/literal_identity_controls.py",
+        "SHA256": "d603d34e15443c718e7382d429615c6158a3cad538b649b640ba8130146d254b"
+      },
+      {
+        "path": "membership-CLI-prep-01/membership_cli_expected.py",
+        "SHA256": "df4444eb5e80f2c5a53ad457e31f546949c30fa33e8bc889971bc95c09bbbb0c"
+      },
+      {
+        "path": "membership-CLI-prep-01/prepare.py",
+        "SHA256": "86f3a4e40b0bf34c9f70c3a82168c1bb5cfd46e43688ca881b71ea95b886d906"
+      },
+      {
+        "path": "membership-CLI-prep-01/verify.py",
+        "SHA256": "b0fb4e8a6fabd1a2f2b7bfd7f3bcf53bea2da118937dfcac5f704e38db8e594d"
+      },
+      {
+        "path": "membership-CLI-prep-01/controls02.py",
+        "SHA256": "3c57846e566bfc8c476ad40181bbeaab1ae50eae99a6822850cb1f2ac12cb688"
+      },
+      {
+        "path": "membership_live_source_recheck.py",
+        "SHA256": "288d2e2191b6db4a04d478b6bcdb11ee00bc4f1c0a32cdda00b945f3da53caa0"
+      },
+      {
+        "path": "verify_fresh_membership_runtime.py",
+        "SHA256": "aeb5132b30e0d610834f742b224896a325d13df50b0cbe21d54f1ef1409e2f62"
+      },
+      {
+        "path": "membership_windows_cells_audit.py",
+        "SHA256": "e121f5111d2b32b8001b5b20b4c820961514d1fdc84d1c9961657f84d6bdbeeb"
+      },
+      {
+        "path": "closed_protocol_label_audit.py",
+        "SHA256": "ebdc7e8665deae7ab37af0fdd3521755fc7ad370389ad656ea9cc061ff85fd50"
+      }
+    ],
     "proofs": [
       {
-        "external_relative_name": "ICMPv4-whole-source-expected-01/summary.json",
-        "SHA256": "f31b5739bac83b4d2f3ee45eccbe9eee1c60fc79990da6173a5d1a5a9f86598a"
+        "external_relative_name": "DecodeErrors-plus3-source-final-02/summary.json",
+        "SHA256": "4d3b7996a79c28216e50f716ea49aeace79a0f8211338769d3ff26a1e5b5c17d"
       },
       {
-        "external_relative_name": "ICMPv4-whole-SDK-bridge-01/summary.json",
-        "SHA256": "8a660a1b7ab539b4370aaec112e5f425f25794bf9a3e0fd7e95caeacf67754b0"
+        "external_relative_name": "EOL-uncovered-source-classification-01/summary.json",
+        "SHA256": "290012c0eca1ea7419d462dd78b80cf0fe985bf06d9cf8ae4f9f3b29ce1bd9c1"
       },
       {
-        "external_relative_name": "CLI-ICMP4-source-02/summary.json",
-        "SHA256": "13c3075c539935461f47101bcfc6d6d81acf671c567242d165ce5b48ae550ce5"
+        "external_relative_name": "IGMP-next/public-source-before-03/summary.json",
+        "SHA256": "d323dbfdb1dba6d75385726c14c47c0898a829443092cb3fab0757309c171cba"
       },
       {
-        "external_relative_name": "network23-whole-bridge-01/summary.json",
-        "SHA256": "eb62ef03cc95056eaf84d2b22efb4747064cb0362b96145cc27ab574536e7be8"
+        "external_relative_name": "MLD-whole-native-plan-before-03/summary.json",
+        "SHA256": "a67b6ed11f4ce262f0563eb964a8212c49f077b9574be72e35e1bf35034ad38e"
       },
       {
-        "external_relative_name": "network23-WS-position-combined-02/summary.json",
-        "SHA256": "f4116c2ae378465ea4ba07309685bf45a36e18abcb0247bb505b3a885221cb02"
+        "external_relative_name": "MLD-WS-source-04-weber/summary.json",
+        "SHA256": "f2283fd280103b280d1f82f0517bc6742b0b3e503499cb0b12361ff4fca4c500"
       },
       {
-        "external_relative_name": "EtherIP-bounded-whole-SDK-02/summary.json",
-        "SHA256": "b88866890b6f70391d4a48f00f9fa3b810efa212997859901c416742b6e7b7f1"
+        "external_relative_name": "MLD-WS-source-04-sharon/summary.json",
+        "SHA256": "dbe5c98f49de25a88da9a05f9dcc8de72f1c5f90cd089380b92d55403fd77327"
       },
       {
-        "external_relative_name": "EtherIP-TCP-whole-CLI-01/summary.json",
-        "SHA256": "0006ebb90ad6d6a65f00ca2eb6975c8e20acf8dc918fd89400e9728a2da5827a"
+        "external_relative_name": "membership-MPacket-correction-controls-01/result/summary.json",
+        "SHA256": "4580c918e3774cde09ccd1a14e0e184c45648ada48f1e0cf865bf50d496be2b3"
       },
       {
-        "external_relative_name": "TCP-CLI-whole-expected-before-candidate-01/summary.json",
-        "SHA256": "be3f7b4992560274b2f3e917cb53ea74d6891a8c8a21851cfdfacb510b510b0e"
+        "external_relative_name": "membership-whole-native-final17-01/result/summary.json",
+        "SHA256": "ced90d219184f0c6f039dc8dc1e0d46b1c437be7a82d617cde14c6acfdab071e"
       },
       {
-        "external_relative_name": "TCP-public-whole-source-expected705-01/summary.json",
-        "SHA256": "b2110eca660c2dffd698d6e77dede750d1e2d4d37df4b6340c366f024ae06171"
+        "external_relative_name": "membership-whole-flow15-17-01/summary.json",
+        "SHA256": "d0f679c7b769a3b9858c8e25f1873a16ff2329b9dc4f208f74ed27e11d46d83c"
       },
       {
-        "external_relative_name": "TCP-public-whole-runtime13-01/summary.json",
-        "SHA256": "acd6233da95e2f6c4fc5b482fb8feb390cae704a6e03237c52d2250449c681e5"
+        "external_relative_name": "membership-whole-CLI-plan-before-01/summary.json",
+        "SHA256": "d404a627d4dc196ce1ab04bcbda877b3407a3d3406f8aba4fefddc906de98a94"
       },
       {
-        "external_relative_name": "TCP-CLI-runtime13-01/summary.json",
-        "SHA256": "b017f8baad248378b526153e66bac20870e77f8aa7d234b81e8a5931ddac4c2d"
+        "external_relative_name": "membership-whole-CLI-final18-01/result/summary.json",
+        "SHA256": "4693c05500f0b649c7fb8d79cf08e590b7a1b54a5ddc8306ea303059a9fa30bc"
       },
       {
-        "external_relative_name": "windows-ICMPv4-scroll-5403-01/summary.json",
-        "SHA256": "fb2bb47e28685bbc34fbe70f5f2e2116e4556275110d5e7bbfdb5b3c5fdeb8de"
+        "external_relative_name": "membership-CLI-controls-before-02/summary.json",
+        "SHA256": "7d095f1e10a0a1f5b8a62ee5c4655da8b5126df5d1415207395d9fe8b4d6046a"
       },
       {
-        "external_relative_name": "windows-TCP-4e66413-source-01/summary.json",
-        "SHA256": "57a2e8cafccca346285d76a2f9294d4f0850d938cd7a2ed01b356277d5738825"
+        "external_relative_name": "owned-membership-live-source-before-03/summary.json",
+        "SHA256": "aefde0b9f8d99ca0860dc2fcfb47d3702f205406b7b0a47b7377897ef4fc9ebe"
       },
       {
-        "external_relative_name": "MLD-source-before-fix-04/summary.json",
-        "SHA256": "3c865ba3c7d54267585ce4efdb7a457d5ba23a27ad54df82420105e13a7ef6c2"
+        "external_relative_name": "owned-membership-live-source-recheck04/summary.json",
+        "SHA256": "85296e243922834acf820e47952cd4df3e23629faad6a56757218505a44fe6ed"
+      },
+      {
+        "external_relative_name": "owned-membership-live-native16-01/summary.json",
+        "SHA256": "443f624d84f248c00ba672149f4efec44ea15c4b0e7fe0a69c5f913b7b84c46a"
+      },
+      {
+        "external_relative_name": "windows-membership-41b88-01/runtime-summary.json",
+        "SHA256": "b8bd5c69dbee0f745f23f3d974fa902ff6845fb0479098189c9d5ee754e6ba93"
+      },
+      {
+        "external_relative_name": "windows-membership-bytes-41b88-01/summary.json",
+        "SHA256": "79cf63d39901c415242efb987efe98c1128d0773a1b3e3b80b6e27d376821a28"
+      },
+      {
+        "external_relative_name": "windows-membership-click-41b88-01/runtime-summary.json",
+        "SHA256": "d4c5e2591e84b84f2cf0a625978cbbe82ee1fa81d3a986d9d7008e1ca5f6902c"
+      },
+      {
+        "external_relative_name": "windows-membership-click-cells-audit01/summary.json",
+        "SHA256": "5d33af9544d15f1b25ea83df8d4c098a7faf9a088910040a2550f5d040db7d04"
+      },
+      {
+        "external_relative_name": "windows-membership-cycle-cells-audit01/summary.json",
+        "SHA256": "3ef091df303b6fd582699501d456b0fed3b23c5ba113d1ce1ea4bd2563f977bc"
+      },
+      {
+        "external_relative_name": "membership-fresh-label-counts-01/summary.json",
+        "SHA256": "6b4dff95086aac53c04d94932af23d5c188278f02166c953caf10b676940972b"
+      },
+      {
+        "external_relative_name": "MLD-IGMP-full14/receipt.json",
+        "SHA256": "1e2605f6a43461c0f2888fa7c320230eed65b3d4f6d0f1973ba87dd550bebf41"
+      },
+      {
+        "external_relative_name": "progressive-fields-CLI-full14/receipt.json",
+        "SHA256": "8a9439024c8676eb396e80525719f8eeec9675c180e873777265f535df3c1b20"
+      },
+      {
+        "external_relative_name": "MLD-IGMP-fuzz14/FuzzMulticastMembershipWireBounds-receipt.json",
+        "SHA256": "b1bebf34ce30f06dd77959c66c59af0d13ef3ff4592e58479fad8b2d9066374a"
+      },
+      {
+        "external_relative_name": "IGMP-next/authored-source-final05-01/summary.json",
+        "SHA256": "becde3314221cf1d507993fc0dc4459ad3ea46fa6dc68ff5ea9763025de8c77e"
+      },
+      {
+        "external_relative_name": "owned-membership-live-vendored-source05/summary.json",
+        "SHA256": "97c68da5ae8ca369c43f342cfe0e8f681ca8299c7baae27d7a98a5677ca555d1"
+      },
+      {
+        "external_relative_name": "owned-membership-live-vendored-native17-01/summary.json",
+        "SHA256": "5b52d26253eaee9ebd8e659f7f65ea4e7c9ecf6d85d7f1d623c1661984f3c7eb"
+      },
+      {
+        "external_relative_name": "SCTP-readonly-01/summary.json",
+        "SHA256": "314d9a2178a3b5f50905cbf817d5a775c378905561a6d5768d1be8233ce016ec"
+      },
+      {
+        "external_relative_name": "SCTP-readonly-01/legacy-checksum-inspection.json",
+        "SHA256": "60007d8eaa742baf5c1546cf67f4e42cd65e4fc4b4126e934e0aecc04bbcf9e1"
       }
     ]
-  }
+  },
+  "historical_checkpoints": [
+    {
+      "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+      "SDK": {
+        "generations": 37,
+        "old_objects": 295123,
+        "new_objects": 306304,
+        "source_expected_parent_observations": 17532,
+        "retained_objects_equal_after_known_PDU_reference_bijection": 288772,
+        "whole_expected_differences": 0
+      },
+      "CLI": {
+        "generations": 37,
+        "rows": 384518,
+        "literal_rows": 150890,
+        "known_ref_only_rows": 215391,
+        "source_parent_rows": 17532,
+        "source_TCP_rows": 705,
+        "whole_expected_errors": 0
+      },
+      "ICMPv4": {
+        "source_objects": 5009,
+        "corrected_objects": 475,
+        "unchanged_objects": 4534,
+        "new_incomplete_timestamp_messages": 18,
+        "new_incomplete_mask_messages": 2,
+        "remaining_field_meaning_or_status_differences": 0
+      },
+      "typed_network_fields": {
+        "added_descriptors": 23,
+        "registry_size": 690,
+        "source_certificate_revision": "5403ffe55b219702af97a3422dd6d59996aadfbe",
+        "certificate_observations": 11475,
+        "certificate_values": 42823,
+        "Wireshark_original_offsets_and_bytes_checked": true,
+        "current_original_capture_snapshot": {
+          "weber": {
+            "observations": 5694,
+            "typed_values": 21549
+          },
+          "sharon": {
+            "observations": 5735,
+            "typed_values": 21221
+          }
+        },
+        "withdrawn_unselected_EtherIP_ARP_children": 46,
+        "note": "The earlier source-field certificate does not authorize an invalid parent. Retained objects keep their whole values under the explicit PDU-reference bridge."
+      },
+      "TCP": {
+        "source_bound_original_frames": 705,
+        "whole_CLI_rows_verified": 705,
+        "actual_whole_worker_responses_verified": 705,
+        "native_contributions": 0,
+        "negative_controls": 11,
+        "pre_candidate_plan_frames": 145,
+        "whole_705_plan_scope": "Post-discovery independent source oracle; not described as pre-candidate.",
+        "categories": {
+          "MPTCP-dimension": 14,
+          "fixed-header-incomplete": 57,
+          "header-options-incomplete": 159,
+          "invalid-data-offset": 8,
+          "option-TLV-bounds": 467
+        },
+        "external_quick_API": false,
+        "quick_validation": "Targeted Go quick/deep equality plus actual Windows initial/late pages; no independent external quick executable API."
+      },
+      "flow_comparison": {
+        "Weber_complete_file_literal": true,
+        "Sharon_all_flows_packets_closes_and_other_stats_literal": true,
+        "Sharon_DecodeErrors_before": 81613,
+        "Sharon_DecodeErrors_after": 81616,
+        "exact_three_source_causes": "Still under audit; not normalized or called whole-flow equality."
+      },
+      "Windows": {
+        "method": "PNG renders of actual Windows native console cells and attributes; not native Windows Terminal pixels.",
+        "final_TCP_pages": 4,
+        "TCP_buffers": 60,
+        "Source0_complete_lengths": [
+          68,
+          84,
+          69,
+          64
+        ],
+        "all_TCP_Source1_absent": true,
+        "CP936_restore_resize_quit": true,
+        "ICMPv4_complete_Source0_Source1_lengths": [
+          590,
+          47,
+          64
+        ],
+        "late_byte_pane_reset_fixed": true
+      },
+      "tests": {
+        "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+        "passed": 285229,
+        "skipped": 24,
+        "every_started_test_has_unique_terminal": true,
+        "log_SHA256": "d86d8e983b5817ebc8e8959cc932007560b0bce4b19cea8a601b0f377eb2ef20",
+        "receipt_SHA256": "7f3840c3c0f16f34c3a1c9db749f7799d5064a7e0b6adaeca4154c51978a0a79"
+      },
+      "CI": {
+        "source": "4e664ebaed542ffb80024ad70d797695975cee77",
+        "manual_traffic_run": 40711396009,
+        "manual_traffic_conclusion": "success",
+        "essential_run": 40711308589,
+        "essential_conclusion": "success",
+        "diff_check": "success",
+        "path_case_check": "success",
+        "automatic_draft_traffic": "skipped; explicit manual traffic passed"
+      },
+      "MLD_next_source_inventory": {
+        "observations": 237,
+        "source_bound": 237,
+        "currently_decoded_but_body_incomplete": 10,
+        "body_fix_complete": false,
+        "notes": "Wire layout inventory only; timer-code/derived-value and bit-mask comparison remains separate from wire bytes and native implementation."
+      },
+      "binary_identity": {
+        "events": "1222d29c4c5909fdec053f81730d4a8be4a1e278b99a0bf192aee1bccdaeb446",
+        "flows": "ad7509f93590b6849def041ef43ece8db821b4a7a86fa28f9828b52c9092e566",
+        "yak": "73276d6da0e6c887ffafdb0b2253e0f120e6e5ea725d260d77ded92eca996f03"
+      },
+      "proofs": [
+        {
+          "external_relative_name": "ICMPv4-whole-source-expected-01/summary.json",
+          "SHA256": "f31b5739bac83b4d2f3ee45eccbe9eee1c60fc79990da6173a5d1a5a9f86598a"
+        },
+        {
+          "external_relative_name": "ICMPv4-whole-SDK-bridge-01/summary.json",
+          "SHA256": "8a660a1b7ab539b4370aaec112e5f425f25794bf9a3e0fd7e95caeacf67754b0"
+        },
+        {
+          "external_relative_name": "CLI-ICMP4-source-02/summary.json",
+          "SHA256": "13c3075c539935461f47101bcfc6d6d81acf671c567242d165ce5b48ae550ce5"
+        },
+        {
+          "external_relative_name": "network23-whole-bridge-01/summary.json",
+          "SHA256": "eb62ef03cc95056eaf84d2b22efb4747064cb0362b96145cc27ab574536e7be8"
+        },
+        {
+          "external_relative_name": "network23-WS-position-combined-02/summary.json",
+          "SHA256": "f4116c2ae378465ea4ba07309685bf45a36e18abcb0247bb505b3a885221cb02"
+        },
+        {
+          "external_relative_name": "EtherIP-bounded-whole-SDK-02/summary.json",
+          "SHA256": "b88866890b6f70391d4a48f00f9fa3b810efa212997859901c416742b6e7b7f1"
+        },
+        {
+          "external_relative_name": "EtherIP-TCP-whole-CLI-01/summary.json",
+          "SHA256": "0006ebb90ad6d6a65f00ca2eb6975c8e20acf8dc918fd89400e9728a2da5827a"
+        },
+        {
+          "external_relative_name": "TCP-CLI-whole-expected-before-candidate-01/summary.json",
+          "SHA256": "be3f7b4992560274b2f3e917cb53ea74d6891a8c8a21851cfdfacb510b510b0e"
+        },
+        {
+          "external_relative_name": "TCP-public-whole-source-expected705-01/summary.json",
+          "SHA256": "b2110eca660c2dffd698d6e77dede750d1e2d4d37df4b6340c366f024ae06171"
+        },
+        {
+          "external_relative_name": "TCP-public-whole-runtime13-01/summary.json",
+          "SHA256": "acd6233da95e2f6c4fc5b482fb8feb390cae704a6e03237c52d2250449c681e5"
+        },
+        {
+          "external_relative_name": "TCP-CLI-runtime13-01/summary.json",
+          "SHA256": "b017f8baad248378b526153e66bac20870e77f8aa7d234b81e8a5931ddac4c2d"
+        },
+        {
+          "external_relative_name": "windows-ICMPv4-scroll-5403-01/summary.json",
+          "SHA256": "fb2bb47e28685bbc34fbe70f5f2e2116e4556275110d5e7bbfdb5b3c5fdeb8de"
+        },
+        {
+          "external_relative_name": "windows-TCP-4e66413-source-01/summary.json",
+          "SHA256": "57a2e8cafccca346285d76a2f9294d4f0850d938cd7a2ed01b356277d5738825"
+        },
+        {
+          "external_relative_name": "MLD-source-before-fix-04/summary.json",
+          "SHA256": "3c865ba3c7d54267585ce4efdb7a457d5ba23a27ad54df82420105e13a7ef6c2"
+        }
+      ]
+    }
+  ]
 }

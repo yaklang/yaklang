@@ -4411,3 +4411,113 @@ UDP2、IP-in-IP3、AH1、Routing2、GRE1和声明 TCP 但零正文1条。计数�
 不能直接相减后宣布所有旧 EOL 已关闭；其中3条原本就没有外层 EOL。
 证书 `EOL-uncovered-source-classification-01/summary.json` 的 SHA256 为
 `290012c0eca1ea7419d462dd78b80cf0fe985bf06d9cf8ae4f9f3b29ce1bd9c1`。
+
+## 2026-10-29：完整组播字段、原始长度与 Windows 递进展示
+
+这轮原生最终源码为 `66622e3efc9611eb65ddeb881613fd6eda0e671d`，CLI 为
+`41b88b146779559f39aa66891a85852ce697018f`。后一个提交只改变详情层级与 TLS
+证据分组；重新构建的 events/flows 与前一个版本逐字节相同。实际执行、二进制
+和证书分别记录原生产者版本，不把较晚的文档或显示提交冒充早期执行。
+
+### 解析树、状态与字节来源
+
+原生、canonical bin-parser 和 legacy 规则已补齐 IGMPv1/v2/v3 与 MLDv1/v2 的
+所选 membership wire profile：查询、报告、离开、重复记录、重复源、辅助数据及
+明确未解释的尾部。auxiliary 长度按四字节字计算；记录和源共用元素预算，不再
+静默跳过大源列表或记录。只发布完整的已捕获字段，并为每一次重复字段保留独立
+来源范围。原始 timer code 与解码后的毫秒/秒分别命名。
+
+按 [RFC9776](https://www.rfc-editor.org/rfc/rfc9776.html) 和
+[RFC9777](https://www.rfc-editor.org/rfc/rfc9777.html) 保留扩展 flags 的原始值，
+不把所有扩展位都解释为已知 reserved。只有完整、可信的当前输入长度能区分查询
+版本；抓到足够长的前缀不能替代声明长度证据。无法确定版本的查询只展示原始
+response word 和已完整捕获的共同字段，不补造浮点 timer、源计数或协商状态。
+捕获布局不证明 IP 父层、校验和、Router Alert/hop limit 或 listener/querier 状态。
+
+| 公共原包所选来源 | 来源数 | decoded | incomplete | limited |
+|---|---:|---:|---:|---:|
+| IGMP membership | 151 | 89 | 50 | 12 |
+| MLD | 237 | 220 | 11 | 6 |
+
+IGMP 的最终冻结源预期与实际 Wireshark 有1,394项位置、长度、原字及标量相等，
+14项极短前缀的参考字段缺失单列，不能记为相等。212个其它 protocol2 来源未被
+强行认成 membership；189个参考侧在畸形或未准入父层下尝试的孩子也未强行准入。
+48个编写的边界控制用最终 oracle 和新运行的 Wireshark 重新检查，1,371项相等、
+37项参考字段不可用、零差异。编写控制不算真实操作系统抓包。
+
+MLD 的既有原始来源检查有1,863个所选 Wireshark 标量；新的完整原生预期包括
+2,107个 typed values。二者范围不同：原始 wire 可读取的事实，不自动授权未知
+父长度下的版本推断或完整消息状态。10条原先 body 不完整却称 decoded 的问题
+已经修正，未知 extent、残记录和资源限制分别保留实际诊断。
+
+逐对象验证又发现依赖库会把原始 IPv4 total-length=0 换成捕获长度。包装层现在
+读取线上原字：12个 IGMP 和6个 MLD 来源都保持 limited；三个 MLD 查询不再
+从捕获长度猜版本。对应18份原始预期没有改写。另38个 MPacket 的旧预期漏掉
+`/mpacket:express` 域，这是 oracle 的错误；从原始 delimiter、完整 Ethernet 与
+CRC32 重新证明后才修正，明确作为发现后的预期修正，不能算 native 修复。
+
+### 全部原生、CLI 和 flow 导出
+
+37组真实执行的完整原生导出从306,304变为306,455个对象：新增151条 IGMP、
+237条 MLD 按完整原始来源预期替换，其余全部对象完整相等。两个大包只允许
+明确、单射的已知生成 PDU 引用路径映射；帧、flow、domain、普通数值、类型、
+数组和状态都不归一化。35组小输入整个文件逐字节相同。整个桥零未解释差异，
+证书 `membership-whole-native-final17-01/result/summary.json` 的 SHA256 为
+`ced90d219184f0c6f039dc8dc1e0d46b1c437be7a82d617cde14c6acfdab071e`。
+
+CLI 的388行完整预期在执行新版前冻结。37组输出共384,518行逐行通过，其中
+388行从原始 carrier、域、时钟、内外地址、完整语义树和显示契约重新构建；
+其余整行只接受已知生成引用映射或整个文件字面相等，不按 changed path 放行。
+独立24个正控、91个负控另列。证书
+`membership-whole-CLI-final18-01/result/summary.json` 的 SHA256 为
+`4693c05500f0b649c7fb8d79cf08e590b7a1b54a5ddc8306ea303059a9fa30bc`。
+
+两个完整 flow 文件 Native15→17 均逐字节相同，流、包、关闭、错误和所有计数
+没有重编号或归一化；这与前一节已来源闭合的历史 DecodeErrors+3 是不同阶段。
+组播 wire 观察没有凭空创建 TCP/UDP 连接、listener membership 或会话成功。
+
+### 新抓 Windows 流量和实际页面
+
+本机 Npcap 捕获两个自建 Windows UDP socket 的真实 multicast join/leave，得到
+3条 IGMPv3 和3条 MLDv2 报告。没有注入伪造协议字节或改变网卡设置。原包 SHA256
+为 `bacec2cae83cd30172c978437c2d8df5325bbb8d760d456c35f47c0efd2b1f35`。
+首次执行前冻结36项参考字段，之后独立补查 ICMPv6 的 type/code/checksum 原字，
+共45项与实际 Wireshark 位置、长度、值相等；新原生实际重放也有45项 typed
+检查和5个负控。后来增加的9项参考检查明确标为执行后的复核，不冒称事前冻结。
+校验和数值相等不代表做过校验和有效性验证。
+
+Windows 实跑发现 native walker 保存了语义字段，却丢弃层级；绘制器也忽略了
+已有 depth。两个共享路径均已修正，真实页面现在逐层显示协议、记录、源列表。
+TLS 另加独立 record 分支，避免把实际 record 字段画成 retained hello metadata
+的子项。元数据仍不能制造新的线中字节或解密来源。
+
+7个主页面涵盖真实 IGMP/MLD、两条记录及辅助数据、残报告、浮点 timer 和公共
+未知查询 extent，共107个实际控制台 buffer。另两次实际点击第二个源地址，
+34个 buffer，分别精确高亮4/16字节；不只检查标题，还检查每一个 hex 单元的
+背景属性，范围、原值、名字的8个篡改负控全部拒绝。9页均核对 Captured/native
+来源名称确实切换，主7页的完整 Source0/Source1 字节分别等于原始帧/实际 SDK Raw。
+缩放、鼠标切换、退出及 CP936 恢复均通过。PNG 是实际 Windows 控制台 cells/
+attributes 的渲染，不能称 Windows Terminal 原生像素截图；图片仍不入库。
+
+### 最新计数、测试与剩余范围
+
+[当前 TOP30 逐字标签对照](shark-public-corpus-20261025/current-counts.md) 已用全新
+TShark4.6.9 重数。隔离个人配置、关闭名称解析，显式开启 TCP 乱序重组；本次
+参考统计没有显式提供 keylog，Shark 使用固定的原重放参数。解密设置和子协议
+标签会影响同名差值，因此不把这个表当成字段或协议正确性分数。379,455个原始帧
+的编号、captured/original length、接口及纳秒时间全部逐帧核对。新的 SDK 记录为
+Weber41,400、Sharon262,443；结束发布另计。完整逐帧/标签差别矩阵仍在仓库外。
+
+五包完整测试285,295通过、24跳过，每个开始项都有唯一终止结果；之后只改显示
+的 CLI 全包836通过、2跳过。共享 membership codec fuzz 执行124,032次；后续
+改动是包装层原始长度与 CLI，并未修改该 codec。数量有重叠，不能相加当新覆盖。
+CLI 提交 `41b88b1467` 的
+[Essential Tests](https://github.com/yaklang/yaklang/actions/runs/40745297989)、
+[显式流量 CI](https://github.com/yaklang/yaklang/actions/runs/40745307631)、diff 和
+路径大小写检查均已通过；草稿 PR 的自动 traffic skipped 不记成通过。
+
+源码审计入口见 `testdata/live-audit/membership-source/`，只提交 Python 源码和
+紧凑证据元数据。原包、keys、完整导出、程序、日志和图片继续留在仓库外。
+旧303 EOL/390 parent 调查不因本轮而整体归零。SSH authentication/channels/
+SFTP/rekey、广泛 QUIC CID/QPACK/0-RTT、完整 RPC/PPTP/GPE 与 TLS 整记录丢失后
+应用消息恢复等既有边界仍需继续工作；不能将核心协议或 TOP30 宣布为完备。

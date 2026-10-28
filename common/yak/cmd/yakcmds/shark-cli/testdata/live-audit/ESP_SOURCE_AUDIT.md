@@ -127,3 +127,57 @@ the separate145 pre-candidate plan is not retroactively enlarged. Worker checks
 compare entire responses, require Source0 ranges within the actual frame, and
 reject invented fields, Source1 and connection state. A separate external quick
 API is unavailable; targeted Go and real console pages check quick/deep behavior.
+
+## Membership, original lengths and actual console ranges
+
+`membership-source/` retains the certified helper basenames and versioned folders.
+The IGMP `source-prep-05` and MLD `MLD-whole-native-prep-03` modules construct
+complete typed expectations from literal wire bytes and declared input extents.
+They do not run a candidate parser to obtain expected values. The frozen source
+ledgers and plans are external inputs, alongside the original public captures.
+
+`membership-whole-bridge-prep-04/bridge.py` has separate `prepare` and `verify`
+modes. It pairs retained events in actual publisher order, source-binds new IGMP
+events and checks entire objects under an explicit injective generated-PDU
+reference map. It does not translate physical frame, flow, domain or ordinary
+numeric values. Its `controls.py` and `literal_identity_controls.py` reject
+source, type, order and identity corruption. The separate complete flow exports
+must still be checked literally; an event bridge alone is not a flow certificate.
+
+`membership-CLI-prep-01/prepare.py` freezes full row expectations before the new
+CLI exports exist. `verify.py` checks all37 closed executions and requires those
+frozen expectations, the actual native bridge, binary/build receipts and original
+captures. `controls02.py` tests source and whole-object corruption independently
+of a candidate CLI export. Run each script with `--help` for its external input
+folders; supply this live-audit folder for `--audit-modules`. Supply the retained
+version subfolders for the IGMP/MLD module arguments. A new run records its own
+paths, hashes and provenance; copying an auditor does not create a new execution
+or retroactively make an earlier post-discovery plan pre-candidate.
+
+`membership_live_source_recheck.py` is explicitly a post-execution independent
+Wireshark source recheck of the six owned Windows reports. The original36-field
+pre-execution freeze remains distinct from the later45-field reference check.
+`verify_fresh_membership_runtime.py` actually executes the supplied SDK binary
+and checks the complete selected semantic tree, typed values and byte ranges.
+These sources establish captured fields, not checksum validity or listener state.
+
+`membership_windows_cells_audit.py` reads closed native-console harness results.
+It checks actual captured/native source captions and each hex-cell background
+for a selected repeated field, in addition to its literal source bytes and range.
+It does not operate a desktop app or generate a design mockup. Console renders
+remain distinct from native Windows Terminal pixel screenshots.
+
+`closed_protocol_label_audit.py` reruns an explicit TShark executable with an
+isolated personal configuration. It checks every original physical frame's
+number, lengths, interface and nanosecond clock before counting literal labels.
+EOF publications and native messages remain separate. Its no-explicit-keylog
+reference mode and explicit TCP out-of-order setting are recorded; label counts
+are inspection leads and do not establish protocol correctness.
+
+`decode_error_source_audit.py` closes the three historical accounting changes
+using source replay and an optional explicitly byte-differenced counterfactual.
+`eol_remaining_source_inventory.py` classifies the original303 EOL investigation
+sources without claiming a whole-row certificate for every remaining profile.
+All captures, keys, complete exports, build programs, images and logs stay outside
+the repository; only these auditor sources and compact evidence metadata belong
+in Git.
