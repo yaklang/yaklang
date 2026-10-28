@@ -48,6 +48,7 @@ type packetSummary struct {
 	opaqueTransport      bool
 	closedTCPPayload     bool
 	tcpUnconfirmed       bool
+	tcpHeaderFailure     *tcpHeaderFailure
 	ProtocolScope        string    `json:"protocol_scope,omitempty"`
 	Transport            string    `json:"transport,omitempty"`
 	SourcePort           uint16    `json:"source_port,omitempty"`
@@ -90,6 +91,9 @@ func summarize(raw *capturedPacket) packetSummary {
 			row.ProtocolStatus = "incomplete"
 		}
 		return row
+	}
+	if boundary := inspectTCPHeaderFailure(raw, p); boundary != nil {
+		return boundary.apply(row)
 	}
 	network, selectedTransport := pcaputil.CaptureTransport(p)
 	if l := p.LinkLayer(); l != nil {
@@ -426,6 +430,10 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		// at index zero, which is excluded from network-header offset rebasing.
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
+	if row.tcpHeaderFailure != nil {
+		row.tcpHeaderFailure.appendFields(&d)
+		return d // Invalid TCP cannot enter legacy YAML or a partial option formatter.
+	}
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)
@@ -609,6 +617,10 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame #%d · %d bytes · %d captured", raw.number, raw.ci.Length, len(raw.data)), branch: true, hasRange: len(raw.data) > 0, end: len(raw.data)})
 	row := summarize(raw)
 	d.protocol = row.Protocol
+	if row.tcpHeaderFailure != nil {
+		row.tcpHeaderFailure.appendFields(&d)
+		return d
+	}
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)

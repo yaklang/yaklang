@@ -23,6 +23,9 @@ var applicationNodes = map[string]string{
 }
 
 func applyApplication(row packetSummary, protocol, evidence string, id uint64) packetSummary {
+	if row.tcpHeaderFailure != nil {
+		return row.tcpHeaderFailure.apply(row)
+	}
 	row.StreamID = id
 	if row.closedTCPPayload || row.tcpUnconfirmed {
 		row.StreamID = 0 // Keep the TCP namespace as evidence, not an old application-page association.

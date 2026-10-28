@@ -25,6 +25,9 @@ type captureCarrierBuilder struct {
 type captureVLANDecoder struct{}
 
 func (d captureCarrierDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
+	// Apply the same parent-envelope boundary in packet observers and native
+	// ingress. Dependency reslicing must not expose unused backing capacity.
+	data = data[:len(data):len(data)]
 	wrapped := &captureCarrierBuilder{PacketBuilder: b, network: d.network}
 	if d.inner == layers.LinkTypeRaw && len(data) > 0 {
 		switch data[0] >> 4 {
