@@ -725,6 +725,7 @@ LOOP:
 				return finalError
 			}
 			prompt = assembled.Prompt
+			aicommon.RecordTaskTrajectoryPrompt(task, prompt)
 			r.promptMode = assembled.Mode
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
@@ -824,6 +825,22 @@ LOOP:
 			r.recordModelThinkingTimeline(iterationModelThinking, decision, nonce, loopCalls[0].Action != nil)
 		}
 
+		// Pass the existing response receipt only to successful compression capture.
+		for i := range loopCalls {
+			if loopCalls[i].Action != nil && loopCalls[i].Action.Name() == aicommon.ContextCompressionAction {
+				descriptor := resultDescriptor
+				loopCalls[i].trajectoryResponse = func() string {
+					// Text-mode response finalization may still be running. Only
+					// the background trajectory writer waits for this receipt.
+					ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+					defer cancel()
+					if !descriptor.WaitComplete(ctx) {
+						return ""
+					}
+					return descriptor.Snapshot().ResponseJSON
+				}
+			}
+		}
 		batch := r.execCalls(loopCalls, iterationCount, task, prompt, done, eventSink)
 		// A maintenance action does not consume the preceding business action's
 		// next-action constraints, including while a rejected selection is retried.

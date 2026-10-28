@@ -31,9 +31,10 @@ type Timeline struct {
 	// Serializes runtime cache updates and their journal deltas across shared configs.
 	toolCacheMu sync.Mutex
 
-	extraMetaInfo func() string // extra meta info for timeline, like runtime id, etc.
-	config        AICallerConfigIf
-	ai            AICaller
+	extraMetaInfo    func() string // extra meta info for timeline, like runtime id, etc.
+	config           AICallerConfigIf
+	trajectoryConfig *Config // original persistent owner, never rebound to nested helpers
+	ai               AICaller
 
 	idToTs           *omap.OrderedMap[int64, int64]
 	tsToTimelineItem *omap.OrderedMap[int64, *TimelineItem]
@@ -197,6 +198,7 @@ func (m *Timeline) retireTimelineItemLocked(id int64) {
 func (m *Timeline) ClearRuntimeConfig() {
 	m.ai = nil
 	m.config = nil
+	m.trajectoryConfig = nil
 }
 
 func (m *Timeline) SetAICaller(ai AICaller) {
@@ -311,6 +313,9 @@ func (m *Timeline) SoftBindConfig(config AICallerConfigIf, aiCaller AICaller) {
 	m.mu.Lock()
 	if config != nil {
 		m.config = config
+		if owner, ok := config.(*Config); ok && m.trajectoryConfig == nil && !m.branchTimeline && !owner.DisableCreateDBRuntime && owner.PersistentSessionId != "" {
+			m.trajectoryConfig = owner
+		}
 	}
 	if utils.IsNil(m.ai) && !utils.IsNil(aiCaller) {
 		m.setAICaller(aiCaller)

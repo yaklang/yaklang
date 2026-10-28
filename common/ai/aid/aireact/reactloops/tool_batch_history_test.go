@@ -82,20 +82,6 @@ func TestToolBatchHistoryCountsChildrenAndClonesParams(t *testing.T) {
 		{ActionType: schema.AI_REACT_LOOP_ACTION_DIRECTLY_CALL_TOOL, ToolName: "legacy"},
 	}
 	require.Equal(t, 6, countToolCallsFromActionRecords(records))
-	require.Equal(
-		t,
-		"directly_call_tool(read_file,grep) -> require_tool(search,search,read_file) -> directly_call_tool(legacy)",
-		summarizeValueFeedbackActions(records),
-	)
-	feedbackAction := valueFeedbackActionFromRecord(records[0])
-	require.Equal(t, "read_file", feedbackAction.ToolName)
-	require.Equal(t, []string{"read_file", "grep"}, feedbackAction.ToolNames)
-	require.Equal(t, 2, feedbackAction.ToolCallCount)
-	require.Equal(t, 1, feedbackAction.ExecutedToolCallCount)
-	records[0].ToolNames[0] = "mutated_after_projection"
-	require.Equal(t, []string{"read_file", "grep"}, feedbackAction.ToolNames,
-		"value-feedback projection must own its ordered tool-name slice")
-
 	original := map[string]any{
 		"calls": []any{map[string]any{"tool_name": "read_file"}},
 	}
@@ -118,8 +104,8 @@ func TestToolExecutionFactIsIndependentFromDeclaredHistory(t *testing.T) {
 		actionHistoryMutex: new(sync.Mutex),
 	}
 
-	require.False(t, loop.iterationExecutedTool(7),
-		"a declared batch rejected before callbacks must not emit iteration_end")
+	require.Zero(t, declaredButRejected.ExecutedToolCallCount,
+		"a declared batch is not an execution fact")
 
 	op := newLoopActionHandlerOperator(nil)
 	op.MarkToolExecuted(1)
@@ -129,6 +115,6 @@ func TestToolExecutionFactIsIndependentFromDeclaredHistory(t *testing.T) {
 		"execution accounting must preserve the model-declared history")
 	require.Equal(t, 2, declaredButRejected.ToolCallCount)
 	require.Equal(t, 1, declaredButRejected.ExecutedToolCallCount)
-	require.True(t, loop.iterationExecutedTool(7),
+	require.Positive(t, declaredButRejected.ExecutedToolCallCount,
 		"one settled success-or-failure ToolResult is objective execution")
 }

@@ -125,6 +125,9 @@ func DeleteAISession(projectDB *gorm.DB, sessionId string) (deletedRuntimes int6
 	if err = DeleteAISessionPlanAndExecBySessionID(projectDB, sessionId); err != nil {
 		return deletedRuntimes, deletedEvents, err
 	}
+	if err = DeleteAITrajectories(projectDB, sessionId); err != nil {
+		return deletedRuntimes, deletedEvents, err
+	}
 
 	return deletedRuntimes, deletedEvents, nil
 }
@@ -161,6 +164,9 @@ func DeleteAllAISessionData(projectDB *gorm.DB) (deletedSessions int64, deletedR
 	deletedPlanExec, err = DeleteAllAISessionPlanAndExec(projectDB)
 	if err != nil {
 		return deletedSessions, deletedRuntimes, deletedEvents, 0, err
+	}
+	if err = DeleteAllAITrajectories(projectDB); err != nil {
+		return deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, err
 	}
 
 	return deletedSessions, deletedRuntimes, deletedEvents, deletedPlanExec, nil
