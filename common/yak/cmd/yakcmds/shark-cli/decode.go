@@ -229,6 +229,9 @@ func summarize(raw *capturedPacket) packetSummary {
 			actualIP115 = ip.NextHeader == 115
 		}
 		why := p.ErrorLayer().Error().Error()
+		if espIncompleteDecoderCovered(p, presentation, why) {
+			covered = true
+		}
 		if presentation.nativeIP115Bytes > 0 && actualIP115 && (why == "Unable to decode IPProtocol 115" || why == "Layer type not currently supported") {
 			wire := network.LayerPayload()
 			covered = len(wire) == presentation.nativeIP115Bytes && sha256.Sum256(wire) == presentation.nativeIP115SHA

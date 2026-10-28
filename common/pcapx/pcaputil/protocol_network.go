@@ -272,6 +272,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		var ah *ahHeaderError
 		if errors.As(failure.Error(), &options) || errors.As(failure.Error(), &ah) {
 			code := "IPv6OptionsHeaderBounds"
+			if options != nil && options.placement {
+				code = "IPv6OptionsHeaderOrder"
+			}
 			if ah != nil {
 				code = "AHHeaderBounds"
 			}
@@ -410,7 +413,13 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	if networks > 1 {
 		e.normalizedTunnels += tunnels
 		e.preserveNetworkPrefix(p, inner)
-		raw := append(bytes.Clone(inner.LayerContents()), inner.LayerPayload()...)
+		raw := bytes.Clone(inner.LayerContents())
+		if ip, ok := inner.(*layers.IPv6); ok && ip.HopByHop != nil {
+			// IPv6's Payload begins after its embedded first HBH. Keep that
+			// validated header when reconstructing the complete inner datagram.
+			raw = append(raw, ip.HopByHop.LayerContents()...)
+		}
+		raw = append(raw, inner.LayerPayload()...)
 		// Fragmentation of an outer carrier does not mean that the inner
 		// IPv6 ND message itself contained a Fragment header.
 		e.ipv6Fragment = false

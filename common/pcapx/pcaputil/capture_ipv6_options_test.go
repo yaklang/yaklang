@@ -196,6 +196,41 @@ func TestBadHopByHopKeepsValidatedFixedParentAndCapturedSource(t *testing.T) {
 	}
 }
 
+func TestHopByHopRequiresImmediatelyPrecedingIPv6FixedHeader(t *testing.T) {
+	esp := []byte{0x12, 0x34, 0x56, 0x78, 0, 0, 0, 1, 1, 2, 3, 4, 5, 6, 7, 8}
+	hop := append([]byte{50, 0, 0, 0, 0, 0, 0, 0}, esp...)
+	cases := map[string][]byte{
+		"IPv4-protocol-zero": espNativeFrame(t, hop, false, layers.IPProtocolIPv6HopByHop),
+		"after-destination":  espNativeFrame(t, append([]byte{0, 0, 0, 0, 0, 0, 0, 0}, hop...), true, layers.IPProtocolIPv6Destination),
+		"after-first-hop":    espNativeFrame(t, append([]byte{0, 0, 0, 0, 0, 0, 0, 0}, hop...), true, layers.IPProtocolIPv6HopByHop),
+		"after-IPv4-AH":      espNativeFrame(t, append([]byte{0, 1, 0, 0, 0, 0, 0, 7, 0, 0, 0, 8}, hop...), false, layers.IPProtocolAH),
+		"after-IPv6-AH":      espNativeFrame(t, append([]byte{0, 2, 0, 0, 0, 0, 0, 7, 0, 0, 0, 8, 0, 0, 0, 0}, hop...), true, layers.IPProtocolAH),
+	}
+	for name, frame := range cases {
+		t.Run(name, func(t *testing.T) {
+			observer := gopacket.NewPacket(frame, CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+			for _, packet := range []gopacket.Packet{observer, protocolAnalysisPacket(observer, nil)} {
+				require.NotNil(t, packet.ErrorLayer())
+				require.ErrorContains(t, packet.ErrorLayer().Error(), "must immediately follow")
+				require.Nil(t, packet.Layer(layers.LayerTypeIPSecESP))
+			}
+			events, _ := espNativeReplay(t, [][]byte{frame}, 0, false)
+			require.Len(t, events, 1)
+			require.Equal(t, "ip", events[0].Protocol)
+			require.Equal(t, "IPv6OptionsHeaderOrder", events[0].ExpertCode)
+			require.Zero(t, events[0].FlowID)
+			require.Zero(t, events[0].TCPFlowID)
+			require.NotContains(t, events[0].DisplayFields(), "esp.spi")
+		})
+	}
+	// An IPv6 tunnel starts its own legal extension sequence.
+	inner := espNativeFrame(t, hop, true, layers.IPProtocolIPv6HopByHop)
+	events, _ := espNativeReplay(t, [][]byte{espNativeFrame(t, inner[14:], false, layers.IPProtocolIPv6)}, 0, false)
+	require.Len(t, events, 1)
+	require.Equal(t, "esp", events[0].Protocol)
+	require.Equal(t, esp, events[0].Raw)
+}
+
 func FuzzIPv6OptionsHeaderBounds(f *testing.F) {
 	for _, w := range [][]byte{nil, {50}, {50, 0, 0, 0, 0, 0, 0, 0}, {50, 0, 1, 7, 0, 0, 0, 0, 0, 0, 0, 0}, {50, 0, 0x1e, 3, 1, 2, 3, 0}} {
 		f.Add(w)
