@@ -5,6 +5,7 @@ package runtime
 import (
 	"context"
 	"strings"
+	"sync/atomic"
 
 	"github.com/yaklang/yaklang/common/hids/model"
 	"github.com/yaklang/yaklang/common/hids/rule"
@@ -12,17 +13,20 @@ import (
 )
 
 type pipeline struct {
-	engine         *rule.Engine
-	scanSandbox    *yak.Sandbox
-	alerts         chan model.Alert
-	observations   chan model.Event
-	emitSnapshots  bool
-	evidencePolicy model.EvidencePolicy
-	processes      *processTracker
-	networks       *networkTracker
-	files          *fileTracker
-	artifacts      *artifactEnricher
-	baselineDrift  *baselineDriftDetector
+	engine             *rule.Engine
+	scanSandbox        *yak.Sandbox
+	alerts             chan model.Alert
+	observations       chan model.Event
+	emitSnapshots      bool
+	evidencePolicy     model.EvidencePolicy
+	processes          *processTracker
+	networks           *networkTracker
+	files              *fileTracker
+	artifacts          *artifactEnricher
+	baselineDrift      *baselineDriftDetector
+	alertQueue         queueHealth
+	observationQueue   queueHealth
+	snapshotSuppressed atomic.Uint64
 }
 
 func newPipeline(engine *rule.Engine) *pipeline {
@@ -106,18 +110,24 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 			if shouldPublishObservation(event, p.emitSnapshots) {
 				select {
 				case p.observations <- cloneEvent(event):
+					p.observationQueue.enqueued.Add(1)
 				case <-ctx.Done():
 					return
 				default:
+					p.observationQueue.dropped.Add(1)
 				}
+			} else {
+				p.snapshotSuppressed.Add(1)
 			}
 			if p.engine == nil || !shouldEvaluateRules(event) {
 				for _, alert := range p.evaluateBaselineDrift(event) {
 					select {
 					case p.alerts <- alert:
+						p.alertQueue.enqueued.Add(1)
 					case <-ctx.Done():
 						return
 					default:
+						p.alertQueue.dropped.Add(1)
 					}
 				}
 				continue
@@ -126,20 +136,33 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 				alert = p.enrichAlertEvidenceContext(ctx, event, alert)
 				select {
 				case p.alerts <- alert:
+					p.alertQueue.enqueued.Add(1)
 				case <-ctx.Done():
 					return
 				default:
+					p.alertQueue.dropped.Add(1)
 				}
 			}
 			for _, alert := range p.evaluateBaselineDrift(event) {
 				select {
 				case p.alerts <- alert:
+					p.alertQueue.enqueued.Add(1)
 				case <-ctx.Done():
 					return
 				default:
+					p.alertQueue.dropped.Add(1)
 				}
 			}
 		}
+	}
+}
+
+func (p *pipeline) queueStatusDetail() map[string]any {
+	observations := p.observationQueue.snapshot(len(p.observations), cap(p.observations))
+	observations["snapshot_suppressed"] = p.snapshotSuppressed.Load()
+	return map[string]any{
+		"observations": observations,
+		"alerts":       p.alertQueue.snapshot(len(p.alerts), cap(p.alerts)),
 	}
 }
 

@@ -17,12 +17,14 @@ type ApplyResult struct {
 const runtimeObservationBufferSize = 4096
 
 type Manager struct {
-	mu           sync.Mutex
-	fileScanMu   sync.Mutex
-	instance     *Instance
-	health       health
-	alerts       chan model.Alert
-	observations chan model.Event
+	mu               sync.Mutex
+	fileScanMu       sync.Mutex
+	instance         *Instance
+	health           health
+	alerts           chan model.Alert
+	observations     chan model.Event
+	alertQueue       queueHealth
+	observationQueue queueHealth
 }
 
 func NewManager() *Manager {
@@ -87,6 +89,13 @@ func (m *Manager) State() model.RuntimeState {
 	if m.instance != nil {
 		state = m.instance.runtimeState()
 	}
+	if state.Detail == nil {
+		state.Detail = make(map[string]any)
+	}
+	state.Detail["delivery"] = map[string]any{
+		"alerts":       m.alertQueue.snapshot(len(m.alerts), cap(m.alerts)),
+		"observations": m.observationQueue.snapshot(len(m.observations), cap(m.observations)),
+	}
 	return state
 }
 
@@ -135,7 +144,9 @@ func (m *Manager) forwardAlerts(alerts <-chan model.Alert) {
 	for alert := range alerts {
 		select {
 		case m.alerts <- alert:
+			m.alertQueue.enqueued.Add(1)
 		default:
+			m.alertQueue.dropped.Add(1)
 		}
 	}
 }
@@ -147,7 +158,9 @@ func (m *Manager) forwardObservations(observations <-chan model.Event) {
 	for observation := range observations {
 		select {
 		case m.observations <- observation:
+			m.observationQueue.enqueued.Add(1)
 		default:
+			m.observationQueue.dropped.Add(1)
 		}
 	}
 }

@@ -242,6 +242,11 @@ func (i *Instance) runtimeStatusDetail() map[string]any {
 	if rules := i.ruleStatusDetail(); len(rules) > 0 {
 		detail["rules"] = rules
 	}
+	if i.pipeline != nil {
+		queues := i.pipeline.queueStatusDetail()
+		queues["events"] = map[string]any{"queue_depth": len(i.events), "capacity": cap(i.events)}
+		detail["pipeline"] = queues
+	}
 	if len(detail) == 0 {
 		return nil
 	}
