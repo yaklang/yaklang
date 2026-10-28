@@ -102,3 +102,27 @@ func TestTruncatedIPSummaryKeepsOneSpecificNativeReason(t *testing.T) {
 	require.Empty(t, row.ConnectionProtocol)
 	require.Zero(t, row.StreamID)
 }
+
+func TestUnselectedGREParentSummaryKeepsSpecificReason(t *testing.T) {
+	wire := udpPacket(t, 53, []byte("unselected GRE child"))[:40]
+	wire[23] = byte(layers.IPProtocolGRE)
+	copy(wire[34:], []byte{0x0f, 0x2f, 0x08, 0x00, 0x46, 0x00})
+	packet := gopacket.NewPacket(wire, layers.LinkTypeEthernet, gopacket.Default)
+	require.NotNil(t, packet.ErrorLayer(), "the stateless child decode has an error to explain")
+	event := &pcaputil.ProtocolEvent{Protocol: "ip", Profile: "network-encapsulation-refusal", Status: "limited", Summary: "GRE version 7 not selected; inner identity unconfirmed", Session: map[string]any{"Child Header Identity": "unconfirmed", "Observed Header Layers": []string{"Ethernet", "IPv4"}, "Unselected Carrier": "GRE", "Observed GRE Version": uint8(7)}}
+	for _, originalLength := range []int{len(wire), 100} {
+		raw := &capturedPacket{number: 1, data: wire, ci: gopacket.CaptureInfo{Length: originalLength, CaptureLength: len(wire)}, link: layers.LinkTypeEthernet, events: []*pcaputil.ProtocolEvent{event}, presentation: presentEvents([]*pcaputil.ProtocolEvent{event})}
+		row := summarize(raw)
+		want := event.Summary
+		if originalLength > len(wire) {
+			want += " [truncated capture: 40/100 bytes]"
+		}
+		require.Equal(t, want, row.Info)
+		require.Equal(t, "IPv4", row.Protocol)
+		require.Equal(t, []string{"Ethernet", "IPv4"}, row.ProtocolStack)
+		require.Zero(t, row.StreamID)
+		require.Empty(t, row.ConnectionProtocol)
+		raw.events, raw.presentation = nil, packetPresentation{}
+		require.Contains(t, summarize(raw).Info, "[incomplete/undecoded]", "an unexplained stateless decode error must remain visible")
+	}
+}
