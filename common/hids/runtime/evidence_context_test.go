@@ -253,6 +253,52 @@ func TestFileEvidencePostFilterStopsRunningExpressionAtDeadline(t *testing.T) {
 	}
 }
 
+func TestConcurrentEvidencePostFiltersKeepIndependentDeadlines(t *testing.T) {
+	t.Parallel()
+	p := newPipeline(nil)
+	started, release, longDone := make(chan struct{}), make(chan struct{}), make(chan error, 1)
+	var releaseOnce sync.Once
+	releaseLong := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseLong)
+	go func() {
+		_, err := p.applyScanPostFiltersContext(context.Background(), map[string]any{
+			"metadata": map[string]any{"scan_match": "scan.block(); true"},
+		}, map[string]any{"block": func() { close(started); <-release }})
+		longDone <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("long filter did not enter its expression")
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+	defer cancel()
+	shortDone := make(chan error, 1)
+	go func() {
+		_, err := p.applyScanPostFiltersContext(ctx, map[string]any{
+			"metadata": map[string]any{"scan_match": "for { }; true"},
+		}, map[string]any{"path": "/sample"})
+		shortDone <- err
+	}()
+	select {
+	case err := <-shortDone:
+		if !errors.Is(err, context.DeadlineExceeded) {
+			t.Fatalf("short filter ignored its deadline: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("short filter waited for the unrelated long filter")
+	}
+	releaseLong()
+	select {
+	case err := <-longDone:
+		if err != nil {
+			t.Fatalf("independent long filter failed: %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("long filter did not finish after release")
+	}
+}
+
 func TestDirectoryEvidenceStopsAtEntryBudget(t *testing.T) {
 	t.Parallel()
 	root := t.TempDir()

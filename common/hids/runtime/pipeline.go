@@ -9,12 +9,10 @@ import (
 
 	"github.com/yaklang/yaklang/common/hids/model"
 	"github.com/yaklang/yaklang/common/hids/rule"
-	"github.com/yaklang/yaklang/common/yak"
 )
 
 type pipeline struct {
 	engine             *rule.Engine
-	scanSandbox        *yak.Sandbox
 	alerts             chan model.Alert
 	observations       chan model.Event
 	emitSnapshots      bool
@@ -49,7 +47,6 @@ func newPipelineWithConfig(
 ) *pipeline {
 	return &pipeline{
 		engine:        engine,
-		scanSandbox:   rule.NewSandbox(),
 		alerts:        make(chan model.Alert, 64),
 		observations:  make(chan model.Event, runtimeObservationBufferSize),
 		emitSnapshots: true,
