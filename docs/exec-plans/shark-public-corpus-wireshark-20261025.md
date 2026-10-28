@@ -4098,3 +4098,204 @@ UI 下一小步整理显式会话观察分支与重复 DNS 树；只有同 PDU�
 本轮磁盘维护仅无损压缩旧 Go 归档及两个已结束测试日志，合计回收约 1.15 GiB
 分配空间，内容 SHA 与三个时间戳核验通过，没有删除、移动原包、密钥或证据。
 原包、完整导出、二进制、截图和日志仍全部留在仓库外。
+
+## 2026-10-28 ESP、SSH AEAD 与 Windows 逐层展示复核
+
+这一阶段的代码已推至同一 PR #5353：原生与 Windows EOL 修复在
+`02d2e54263a8cc501ef9f278896da428379ddb52`，最终 ICMP 展示修复在
+`fef614bae17b2d9b12e337baa5eeebab09fead05`。本节仅陈述已经完成的验证；
+核心协议的剩余边界仍继续审计，不将 TOP30 宣布为完整实现。
+
+### 原包、协议数量与真实来源
+
+仍使用未改写的 Weber 51,328 帧和 Sharon 328,127 帧，共 379,455 帧。
+两个大包、TLS keylog、全部完整导出、程序和截图都保存在仓库外。
+新的 37 组实际 SDK 重放和 37 组实际 CLI 重放包含原包，以及已建立的
+TLS/QUIC 丢包、乱序、连接复用、异源时钟和 NTP/RPC 边界。
+
+| 原包 | 旧 SDK PDU | 新 SDK PDU | 新 ESP 观察 | 新父层拒绝观察 | 恢复的 ICMPv6 |
+|---|---:|---:|---:|---:|---:|
+| Weber | 39,740 | 41,343 | 1,593 | 0 | 10 |
+| Sharon | 249,718 | 251,168 | 1,003 | 437 | 10 |
+
+PDU 数量与帧数分别统计。同一帧可产生多个协议 PDU，关闭时也可能发布诊断。
+这两包共有 2,655 个 Wireshark ESP 候选；YAK 准入 2,596 个明确 IP50
+清头观察，其中 2,593 个有限头部观察、3 个不完整观察。差额 59 个逐来源
+拆分为 7 个 UDP4500 NAT-T、50 个未准入或错误父层、2 个另外的 IPv4
+options 错误来源。NAT-T 原生分发仍未实现，不能用端口提示计为 ESP 支持。
+
+所有 2,596 个新增 ESP SDK 完整对象及对应 CLI 完整行，均从原始字节重建
+预期：SPI、线上低 32 位序号、opaque body、字段类型、范围、原始帧/接口、
+域、SHA、状态及元数据全部相等。7 个 NAT-T 和 46 个既有父层观察保持整对象
+原值，仅对生成 PDU 引用进行来源绑定的映射。另两个新父层拒绝有完整字节预期；
+四个坏 IPv4 options 来源均不能准入孩子。EOF 的 26/552 个发布记录单独核查，
+不能作为物理帧或 ESP 字节贡献。
+
+ESP 的新 `ipsec_esp/ESPHeaderFields`、目录和原生入口保持 partial。SA、算法、
+认证、ESN、重放判定及解密没有从清头推断。旧 `ipsec.yaml` 的兼容入口保留，
+旧结构评分与新增入口的实际能力范围分别说明。
+
+GRE 内层 IPv6 重建原来丢失了第一个 HBH 的 8 字节，恢复了两包各 10 个
+ICMPv6 Type143/Code0 观察。20 个完整 SDK 对象逐原始 GRE/IPv6/HBH 来源
+重建，并新跑 Wireshark 核对接口、地址、Type/Code。当前只证明通用 ICMPv6
+头和完整原始字节来源，MLDv2 record/state 解码仍在此范围之外。
+
+### 误识别、引用与完整字段保留
+
+IPv6 options 被限制在本扩展声明长度内；合法末尾 Pad1 接受，越界 TLV 拒绝。
+独立 HBH 只允许紧接 IPv6 固定头；IPv4 HOPOPT 保持既有未选择载体范围。
+该判断要求 IPv4 已成功验证，防止失败的部分层把默认 Protocol=0 当作声明。
+AH 的零长度、短头和 IPv6 对齐分别检查，ESP 的 0–7 字节短头不再越界。
+
+另一个独立入口扫描 Sharon 全部原始帧，先从字节选择 443 个直接 IPv4 父层
+拒绝来源，再要求每处恰有一个完整预期观察且没有子 PDU。分解为 410 个未选择
+载体、14 个 AH、12 个 options bounds、1 个 ESP parent length 和 6 个 HBH order。
+152 个 literal IPv4 total-length=0 来源单列；它们不能证明有效线上长度或丢包原因。
+整条观察被删除也会被独立选择器发现。
+
+两个原包中 289,458 个旧 SDK PDU 均按源字节和原始 PacketRefs 一一对应；
+289,456 个完整对象在显式生成引用映射后原值、类型及数组次序相同。两个变化
+来自 Sharon146409 的父层拒绝细化和 293188 的错误 ICMP 子身份收窄，均由
+原始字节重建整对象预期。所有新增 PDU 分别由 ESP、443 父层来源和 20 个
+恢复的 ICMPv6 证书覆盖。
+
+PDU 引用映射只覆盖有写入点证据的自身 ID、response、transaction、NTP、
+FTP/media/RTSP 等明确生成引用。flow、帧号、interface、TCP sequence、长度
+以及线上协议 transaction 值保持原值。两包的完整 flow/packet/close 对象和
+错误结果均不变；DecodeErrors 单列为 Weber351→341、Sharon82017→81613，
+对应上述恢复与父层处理变化，不以降低计数代替正确性证明。
+
+### SSH、Windows 与真实 EOL 流量
+
+真实 OpenSSH/Paramiko 的三条连接分别使用 GCM128、GCM256 和 CTR，每条传输
+131,072 字节。24 个初始明文 PDU 对照实际 TCP 字节，18 个二进制 PDU及
+6 个 KEXINIT offers 对照 Wireshark 和双方日志。OpenSSH AEAD 的双向选中 MAC
+显示 `<implicit>`，线上 offered MAC 列表独立保留；修正了原有 20 个错误 HMAC
+标量。无共享 MAC offer 的 AEAD 仍可选中，失败的 KEXINIT 不提交部分状态。
+加密应用、SSH authentication/channel、SFTP 和 rekey 解密没有因此被实现。
+
+Windows 的 8 个实际页面包含 TLS1.2 session-ID、GBP DNS、SSH GCM、完整/
+不完整 ESP、真实 EOL、ICMP 和 MLD。120 个控制台 buffer 及截图通过 resize、
+标签、退出与 CP936 恢复验证；Source0/1 的控制台 hex 全部字节与原始来源相等。
+TLS 会话观察提前显示；同 PDU 的 DNS 重复树只在完整同类型等值时合并。
+231009 的不完整 ESP 保留 42 字节帧与 8 字节清头两个来源，去掉不适用的旧
+YAML 报错/结构 dump。ICMPv4/ICMP 及 ICMPv6 大小写别名只显示一次，真实
+重复 IP 隧道和 MLD 子层保留。
+
+IPv4 EOL 会令依赖库在填固定字段前提前返回，导致观察器出现 `<nil>` 地址、
+假 HBH 层，与原生解析不一致。修复共享已成功解码头的固定字段恢复；坏 options
+和坏版本保持拒绝，MF/offset 不得打开 UDP/DNS。Ethernet、RAW、显式 IPv4、
+Loopback 与 SLL 均有实际 ReplayPcap 回归，Raw IPv6 首 HBH 正/负边界也检查。
+
+额外从本机两个实际 Windows UDP 套接字抓到 6 个 NOP/EOL 选项报文；DNS body
+是明确编写的控制内容，并非部署的 resolver。双方收发收据与原始 payload一致，
+线上 IHL=24、选项 `01000000`，Wireshark 的 66 个头/DNS 标量检查通过。
+六个完整 SDK/PDU 对象不变，最终页面不再显示虚假 HBH 或 `<nil>`。
+套接字选项还经过 getsockopt 和实际原始头验证，符合
+[Windows IP_OPTIONS 的支持检查方式](https://learn.microsoft.com/en-us/windows/win32/winsock/ipproto-ip-socket-options)。
+
+### 验证入口及当前限制
+
+完整五包测试 284,808 通过、24 跳过，每个开始项都有唯一结束项；ICMP 展示的
+后续 CLI 全量复测 749 通过、2 跳过。ESP 和 IPv6 options fuzz 各配置 40s，
+实际执行分别 3,374 与 11,182 次；日志中后段执行计数停滞原样保留，不将其
+说成更高覆盖量。37 组原生导出和两个完整 flow 导出在 EOL 前后逐字节一致。
+
+可复现的 ESP 和父层原始来源审计位于
+`common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ESP_SOURCE_AUDIT.md`。
+原包、keylog、完整导出和程序依然必须在仓库外，调用方显式提供路径。
+
+Sharon16,342 行 EOL 物理变化已进一步核对，其中 16,039 行有完整原始来源
+预期：15,109 个直接 fragment 路径（无 body 时不虚构 Fragment 层）、654 个
+仅固定头端点修复、276 个完整 TCP 头观察。4,081 个 literal total-length=0
+单列，不能推断 offload 或抓包丢失。其余 303 个复杂子层/域投影明确未覆盖。
+12 个审计负控检查完整行，不能借“只改展示”豁免其他字段。
+
+## 2026-10-28 ICMP 固定体、字段语义与最终 Windows 页面
+
+原生代码版本为 `49b0a99102357d22ee6e6c935a2a3a8358503f7c`，后续纯 CLI
+版本为 `4c023fd47c2b940b509d08220a4576f525af33e6`。两版本的 events/flows
+程序逐字节相同；SDK 证书对应前者的实际重放，最终 CLI 与页面对应后者。
+这是一条显式验证链，不把文档提交描述为已经执行的程序。
+
+### 真实反例与原生修复
+
+[RFC 4443](https://www.rfc-editor.org/rfc/rfc4443.html) 中 Echo/错误报文还需要
+4 字节类型固定体；[RFC 4861](https://www.rfc-editor.org/rfc/rfc4861.html) 的
+Redirect 需要通用头之后的 36 字节固定体，再解析 ND options。原实现把
+`fixed=len(payload)` 当作长度验证，并遗漏了 Redirect，导致短报文被标为
+`decoded/message`，完整 Redirect 的非法选项也没被检查。
+
+32 个独立编写的原始字节控制包用旧/新程序和实际 TShark 分别重放。8 个自身
+短体不再被误报完整解码，Redirect 零长 option 改为 malformed；11 个完整
+自身头正控保留，其中两个含坏引用 IP 的完整外层 ICMP 仍正常解析。ARP、
+ICMPv4 和 ICMPv6 的通用头短包不产生虚构的成功解码层。它们是明确编写的
+控制内容，不能计成新抓到的真实业务流量。
+
+新失败观察保留已经存在的 ICMPv6 Type/Code、地址、Raw 和原始引用，标出
+Available/Required Bytes，不虚构尚未到达的 Identifier、Sequence、MTU 或
+Destination。Redirect 39 字节仍可显示已完整到达的 Target；非法 options
+保留完整固定字段和已验证的 options 前缀。它们不增加 decoded/message
+计数，也不建立连接或邻居信任。
+
+两个未改写公共大包的差异共 63 条：
+
+| 旧观察 | 新观察 | 数量 |
+|---|---|---:|
+| IP malformed 诊断 | 带可靠前缀的 ICMPv6 malformed | 57 |
+| IP incomplete 诊断 | 带可靠前缀的 ICMPv6 incomplete | 2 |
+| decoded 的自身短体 | ICMPv6 incomplete | 3 |
+| decoded 的 Redirect 坏 option | ICMPv6 malformed | 1 |
+
+最后一条来自 Sharon285780/PDU223795；前三个自身短体为 223884、268572、
+309597。这些来源含 IPv4→ICMPv6 跨族、错误声明长度或零长度兼容解释，
+均单独记录，不能称为合法 IPv6 父载体。
+
+完整 37 组 SDK 导出共 295,123 条，其中 295,060 条逐字节不变；上述 63 条
+完整导出对象均从原始字节重建，ID、域、值类型、数组、Raw、来源、状态和
+全部字段快照相等，没有 ID 或字段归一化。两个完整 flow 文件逐字节不变，
+9 个整对象语义负控拒绝通过。
+
+### Wireshark 字段与递进展示
+
+新跑 TShark 4.6.9，核对 11,085 个原始观察的 40,785 个选定关键标量：
+ARP1,524、ICMP18,784、ICMPv6 20,477，literal、SDK 与 Wireshark 无差异或
+缺字段；这些来源的时间、caplen 和 wirelen 也逐一对应。范围包含 10,679 个
+合法直接/简单载体、384 个明确的跨族观察、22 个明确的 IP 长度零兼容观察。
+其余 390 个 tunnel/parent 来源仍未覆盖。该证书只证明列出的字段；不证明
+所有历史字段命名、整个 ICMP 语义或全隧道支持都正确。
+
+另核对了 ICMP 别名改动的 37 组完整 CLI：10,971 个变化行有完整预期，
+12 个审计负控通过。ICMPv4/ICMP 与 ICMPv6 大小写别名只出现一次，真实
+重复 IP/ICMP 层及其他字段原值保留。
+
+最终 CLI 又实际重放全部 37 组、384,518 行。仅 60 个精确 ICMPv6 诊断去掉
+重复的 `[incomplete/undecoded]` 尾缀；每行和所有原生字段投影均有完整预期，
+其他行保持完整原值，6 个语义负控通过。不能仅凭 profile 标签隐藏报错：
+原始整帧、SHA、帧号、域、Type/Code、固定体不足或合法 options 前缀必须
+全部匹配，才能收起相应旧 YAML/struct dump。独立抓包截断提示始终保留。
+
+Windows 两个最终页面用真实原生控制台跑过 Echo 和 Redirect：30 个 buffer，
+CP936 恢复、resize、退出通过；Source0/1 分别为 58/58 和 102/102 字节，
+逐字节与实际来源相等。原生控制台 cells/attributes 渲染图中已没有矛盾的
+YAML 报错。这里的图片是**真实控制台缓冲区的渲染**；本轮窗口截图运行时
+初始化路径错误，未声称获取了 Windows Terminal 的原生窗口像素。
+
+### 验证与继续修复的范围
+
+完整五包测试 285,058 通过、24 跳过，285,082 个开始项均有唯一结束项。
+随后纯 CLI 全量 763 通过、2 跳过，12 个来源/元数据篡改回归也通过。完整
+流量 CI 已对原生版本显式运行；Essential 的 MITM/XSS 检测初次没有等到
+结果，保留日志后仅重跑失败项，原代码通过。最终提交仍继续检查 CI。
+
+这轮也发现下一批确切缺口：当前注册表 667 项中没有 `arp.*`、`icmp.*` 或
+`icmpv6.*` typed 字段；七个实际字段查询报 unknown field。ICMPv4 错误报文
+把类型专有字当成 Identifier/Sequence，Weber47791 的 1492 实为 MTU，
+却显示成 Sequence。后续 404 个原始来源的专门审计确认 198 个错误 union
+命名、188 个完整 Timestamp 缺失三个时间字段、18 个自身短 Timestamp 仍
+被称完整；另 10 个隧道来源单列未覆盖。
+这些没有被上述选定标量证书豁免，接下来继续修复并建立完整来源预期。
+
+TLS 整记录丢失的共同恢复限制、SSH authentication/channel/SFTP/rekey、完整
+MLD records、广泛 QUIC CID/QPACK/0-RTT，以及上述 303/390 个未覆盖来源仍
+开放。本报告不将核心协议、TOP30 或 Wireshark 全协议功能声明为完备。
