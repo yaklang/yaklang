@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -133,6 +135,47 @@ func createIncludeCache() *utils.Cache[Values] {
 	return utils.NewTTLCache[Values]()
 }
 
+// slowIncludeDuration is the wall-clock threshold after which a single lib
+// include sub-query is logged. It diagnoses rules stuck in include without
+// rule-perf profiling (e.g. 9 rules stuck 200-350s on include java-servlet-param).
+const slowIncludeDuration = 30 * time.Second
+
+// includeFlightEntry is one in-flight include computation under the flight
+// key (see nativeCallInclude). done is closed once the sub-query finishes
+// (successfully or not); values/err are read only after done closes.
+type includeFlightEntry struct {
+	done   chan struct{}
+	values Values
+	err    error
+}
+
+var includeFlights sync.Map // map[string]*includeFlightEntry
+
+// includeCycleKey marks include flight keys already being loaded by the
+// current (nested) sub-query chain; a repeat means a recursive include.
+type includeCycleKey struct{}
+
+func releaseIncludeFlight(key string, entry *includeFlightEntry, values Values, err error) {
+	entry.values, entry.err = values, err
+	close(entry.done)
+	// Delete only if this exact entry is still registered: between close(done)
+	// and Delete a re-entrant miss may already have installed a fresh entry.
+	includeFlights.CompareAndDelete(key, entry)
+}
+
+// acquireIncludeFlight returns the in-flight entry for key. The first caller
+// gets (entry, true) and must run the loader, then releaseIncludeFlight.
+// Later callers get (entry, false) and must wait on entry.done — bounded by
+// their own ctx so a runaway include cannot hang the waiting rules too.
+func acquireIncludeFlight(key string) (*includeFlightEntry, bool) {
+	entry := &includeFlightEntry{done: make(chan struct{})}
+	actual, loaded := includeFlights.LoadOrStore(key, entry)
+	if loaded {
+		return actual.(*includeFlightEntry), false
+	}
+	return entry, true
+}
+
 func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
 	parent, err := fetchProgram(v)
 	if err != nil {
@@ -171,47 +214,178 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	if bound != nil {
 		cacheKey = cacheKey + ":struct:" + bound.key
 	}
-	hash, ret, shouldCache := GetIncludeCacheValue(parent, cacheKey, inputs)
+	flightKey, ret := getIncludeCacheValueWithFlightKey(parent, cacheKey, inputs)
 	if ret != nil {
 		return true, ret, nil
 	}
-	var queryValue sfvm.Values
-	if len(inputs) == 0 {
-		queryValue = sfvm.ValuesOf(parent)
-	} else {
-		queryValue = ToSFVMValues(inputs)
+
+	// flightKey is the cache hash when the result is cacheable. When the
+	// program hash is unavailable it degenerates to a nocache: program-name
+	// key: still unique per lib/program, so two different libs or two
+	// different programs never share a flight entry, but the result is not
+	// cached. An empty flightKey (temp input values, or an unnamed program)
+	// means neither cache nor dedup is safe: compute directly.
+	//
+	// The lib include may be requested by many rules of the same program
+	// concurrently (e.g. 9+ rules include java-servlet-param on the same
+	// 1.6M-line program). Without coordination every cache miss re-runs the
+	// whole lib query in parallel — same result, N times the DB load, and the
+	// analyze phase crawls. Single-flight on the flight key: the first miss
+	// computes once, everyone else waits (bounded by its own rule ctx) and
+	// reuses the result.
+	config := frame.GetConfig()
+
+	// Recursive includes (a lib including itself, directly or through another
+	// lib) used to recurse until the stack died; on a flight entry they would
+	// deadlock the loader on itself. Detect the cycle via the nested
+	// sub-query ctx before anything else.
+	//
+	// The cycle key is the rule identity (cacheKey), NOT the flight key: a
+	// self-including lib that transforms its input values produces a fresh
+	// input hash each level, so keying the cycle on inputs would let the
+	// recursion slip past detection. Wrapped as CriticalError so the frame
+	// aborts the whole rule — an ordinary error is only a statement-level skip
+	// (frame exec skips to expression end) and the rule would silently
+	// "succeed" with empty results.
+	ctx := config.GetContext()
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	var active map[string]struct{}
+	if v, ok := ctx.Value(includeCycleKey{}).(map[string]struct{}); ok {
+		active = v
+		if _, cycling := active[cacheKey]; cycling {
+			return false, nil, utils.Wrapf(
+				sfvm.CriticalError,
+				"recursive include %q detected", ruleName,
+			)
+		}
+	}
+	nextActive := map[string]struct{}{cacheKey: {}}
+	for k := range active {
+		nextActive[k] = struct{}{}
+	}
+	ctx = context.WithValue(ctx, includeCycleKey{}, nextActive)
+
+	compute := func() (Values, error) {
+		var queryValue sfvm.Values
+		if len(inputs) == 0 {
+			queryValue = sfvm.ValuesOf(parent)
+		} else {
+			queryValue = ToSFVMValues(inputs)
+		}
+		opts := []QueryOption{
+			QueryWithSFConfig(config),
+			QueryWithContext(ctx),
+			QueryWithWorkBudget(config.GetWorkBudget()),
+			QueryWithInitInputValues(queryValue),
+			QueryWithRule(rule),
+		}
+		if bound != nil && rule.IsStructMode() {
+			opts = append(opts, QueryWithStruct(bound.compileUnit()))
+		} else {
+			opts = append(opts, QueryWithProgram(parent))
+		}
+		start := time.Now()
+		result, err := QuerySyntaxflow(opts...)
+		if took := time.Since(start); took > slowIncludeDuration {
+			log.Warnf("syntaxflow include %q on program %s took %s", ruleName, parent.GetProgramName(), took)
+		}
+		if err != nil {
+			return nil, err
+		}
+		var gotValues Values
+		for _, name := range result.GetAlertVariables() {
+			vs := result.GetValues(name)
+			gotValues = append(gotValues, vs...)
+		}
+		if len(gotValues) == 0 {
+			return nil, utils.Errorf("no value found")
+		}
+		return gotValues, nil
 	}
 
-	config := frame.GetConfig()
-	opts := []QueryOption{
-		QueryWithSFConfig(config),
-		QueryWithContext(config.GetContext()),
-		QueryWithWorkBudget(config.GetWorkBudget()),
-		QueryWithInitInputValues(queryValue),
-		QueryWithRule(rule),
+	if flightKey == "" {
+		gotValues, err := compute()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, CreateIncludeValue(gotValues), nil
 	}
-	if bound != nil && rule.IsStructMode() {
-		opts = append(opts, QueryWithStruct(bound.compileUnit()))
-	} else {
-		opts = append(opts, QueryWithProgram(parent))
+
+	entry, isLoader := acquireIncludeFlight(flightKey)
+	if !isLoader {
+		select {
+		case <-entry.done:
+		case <-ctx.Done():
+			return false, nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
+		}
+		if entry.err != nil {
+			return false, nil, entry.err
+		}
+		if len(entry.values) == 0 {
+			return false, nil, utils.Errorf("no value found")
+		}
+		return true, CreateIncludeValue(entry.values), nil
 	}
-	result, err := QuerySyntaxflow(opts...)
-	if err != nil {
-		return false, nil, err
+
+	// compute may panic; free the waiters first, then propagate.
+	var panicked any
+	gotValues, computeErr := func() (v Values, e error) {
+		defer func() {
+			if r := recover(); r != nil {
+				panicked = r
+				e = utils.Errorf("include %q panicked: %v", ruleName, r)
+			}
+		}()
+		return compute()
+	}()
+	if computeErr != nil {
+		releaseIncludeFlight(flightKey, entry, nil, computeErr)
+		if panicked != nil {
+			panic(panicked)
+		}
+		return false, nil, computeErr
 	}
-	var gotValues Values
-	for _, name := range result.GetAlertVariables() {
-		vs := result.GetValues(name)
-		gotValues = append(gotValues, vs...)
+	// Only the hash-derived flight key identifies a cacheable result; the
+	// nocache: variant must stay out of the shared include cache.
+	if !strings.HasPrefix(flightKey, "nocache:") {
+		includeCache.Set(flightKey, gotValues)
 	}
-	if len(gotValues) == 0 {
-		return false, nil, utils.Errorf("no value found")
+	releaseIncludeFlight(flightKey, entry, gotValues, nil)
+	return true, CreateIncludeValue(gotValues), nil
+}
+
+// getIncludeCacheValueWithFlightKey is the cache-read half of nativeCallInclude.
+// It returns (flightKey, cachedValues): a non-empty flightKey means the result
+// is cacheable under that key (and identical concurrent misses single-flight
+// on it), an empty one means the result must not be cached. cachedValues is
+// non-nil only on a hit.
+func getIncludeCacheValueWithFlightKey(program *Program, ruleName string, inputValues Values) (string, sfvm.Values) {
+	hash, ok := program.Hash()
+	if !ok {
+		// No program hash (unnamed program): the result must not be cached, but
+		// concurrent misses of the same lib still single-flight on the program
+		// name if there is one.
+		if name := program.GetProgramName(); name != "" {
+			return "nocache:" + utils.CalcSha256(name, ruleName), nil
+		}
+		return "", nil
 	}
-	if shouldCache {
-		includeCache.Set(hash, gotValues)
+	hash = utils.CalcSha256(hash + ruleName)
+	if inputValues != nil && len(inputValues) > 0 {
+		valueHash, ok := inputValues.Hash()
+		if !ok {
+			// input values contain temp values: the result is neither cacheable
+			// nor safe to dedup (same as legacy behavior).
+			return "", nil
+		}
+		hash = utils.CalcSha256(hash, valueHash)
 	}
-	val := CreateIncludeValue(gotValues)
-	return true, val, nil
+	if ret, ok := includeCache.Get(hash); ok {
+		return hash, CreateIncludeValue(ret)
+	}
+	return hash, nil
 }
 
 func CreateIncludeValue(vs Values) sfvm.Values {
