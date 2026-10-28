@@ -83,6 +83,14 @@ func summarize(raw *capturedPacket) packetSummary {
 		d := raw.messageDomain
 		row.MessageDomain = &d
 	}
+	if boundary := inspectionVXLANBoundary(p); boundary != nil && needsVXLANInspectionFallback(raw, raw.events) && !raw.presentation.networkRefused {
+		row = boundary.apply(row)
+		if raw.ci.Length > len(raw.data) {
+			row.Info += fmt.Sprintf(" [truncated capture: %d/%d bytes]", len(raw.data), raw.ci.Length)
+			row.ProtocolStatus = "incomplete"
+		}
+		return row
+	}
 	network, selectedTransport := pcaputil.CaptureTransport(p)
 	if l := p.LinkLayer(); l != nil {
 		row.Source, row.Destination = l.LinkFlow().Src().String(), l.LinkFlow().Dst().String()
@@ -342,6 +350,13 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
+		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
+		if boundary := inspectionVXLANBoundary(p); boundary != nil {
+			boundary.appendFields(&d, raw)
+			return d
+		}
+	}
 	if !networkRefused {
 		appendCapturedVXLANHeaders(&d, raw)
 	}
@@ -512,6 +527,13 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	row := summarize(raw)
 	d.protocol = row.Protocol
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
+		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
+		if boundary := inspectionVXLANBoundary(p); boundary != nil {
+			boundary.appendFields(&d, raw)
+			return d
+		}
+	}
 	if !networkRefused {
 		appendCapturedVXLANHeaders(&d, raw)
 	}

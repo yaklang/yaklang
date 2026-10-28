@@ -11,11 +11,16 @@ func tlsResumptionDisplayBindings() []displayFieldBinding {
 		b := displayCustom("tls", name, label, typ, bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 			root := "Handshake Messages"
 			session := e.Session
-			if e.Protocol == "quic" {
+			if e.nativeQUICObservation || e.Protocol == "quic" {
 				root = "TLS Handshakes"
 				if e.nativeQUICObservation {
 					session = e.semanticSession
 				}
+			} else if e.Protocol != "tls" {
+				// An application label alone is not QUIC/TLS evidence. Only
+				// the admitted native carrier may retain these observations
+				// after its protocol transitions to HTTP/3 or DNS over QUIC.
+				return
 			}
 			path := append([]string{root, "*"}, tail...)
 			p.walk(session, path, func(value any) {
@@ -28,7 +33,7 @@ func tlsResumptionDisplayBindings() []displayFieldBinding {
 				}
 			})
 		})
-		b.protocols = "|tls|quic|"
+		b.protocols = "|tls|quic|http3|doq|"
 		if strings.HasSuffix(name, ".sha256") {
 			b.descriptor.Origin = "derived"
 		}
@@ -70,10 +75,12 @@ func tlsResumptionDisplayBindings() []displayFieldBinding {
 			session := e.Session
 			if e.nativeQUICObservation {
 				session = e.semanticSession
+			} else if e.Protocol != "tls" && e.Protocol != "quic" {
+				return
 			}
 			p.walk(session, path, emit)
 		})
-		b.protocols = "|tls|quic|"
+		b.protocols = "|tls|quic|http3|doq|"
 		b.descriptor.Description = label + "; retained current-connection hello observation, not binder/certificate verification or ticket-cache confirmation"
 		out = append(out, b)
 	}

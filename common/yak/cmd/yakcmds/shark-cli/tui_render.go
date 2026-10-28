@@ -600,22 +600,17 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 	u.listTop = clamp(u.listTop, 0, max(0, len(u.visible)-count))
 	u.drawScrollbar(c, rect{r.x, r.y + 1, r.w, r.h - 1}, 0)
 	r.w -= 2
-	// Fit the endpoints first; the information column consumes the remaining width.
+	// Size the visible values together. Compact rows still need readable IPs
+	// and a real gap after a full protocol label, with room left for Info.
 	compact := r.w < 100
-	endpointLimit := clamp((r.w-67)/2, 12, 39)
-	sourceWidth, destinationWidth := 12, 12
+	protocolWidth, sourceWidth, destinationWidth := 8, 6, 11
 	for i := u.listTop; i < min(len(u.visible), u.listTop+count); i++ {
 		row := u.packetRow(u.visible[i])
+		protocolWidth = max(protocolWidth, terminalWidth.StringWidth(row.Protocol))
 		sourceWidth = max(sourceWidth, terminalWidth.StringWidth(row.Source))
 		destinationWidth = max(destinationWidth, terminalWidth.StringWidth(row.Destination))
 	}
-	widths := []int{7, 12, 12, min(endpointLimit, sourceWidth), min(endpointLimit, destinationWidth), 6}
-	if compact {
-		// Reserve an Info column even at 70 columns. The former endpoint
-		// allocation consumed every compact row before Info could be drawn.
-		endpoint := clamp((r.w-57)/2, 10, 18)
-		widths = []int{5, 8, 10, endpoint, endpoint, 4}
-	}
+	widths := packetTableColumnWidths(r.w, protocolWidth, sourceWidth, destinationWidth)
 	labels := []string{"No.", "Time", "Protocol", "Source", "Destination", "Bytes"}
 	c.fill(r.x, r.y, r.w, inkHeader)
 	x := r.x
@@ -666,12 +661,35 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 				colStyle = inkMuted
 			}
 			c.text(x, y, min(widths[j], r.x+r.w-x), value, colStyle)
+			if x+widths[j] < r.x+r.w {
+				c.put(x+widths[j], y, " ", style)
+			}
 			x += widths[j] + 1
 		}
 		if x < r.x+r.w {
 			c.text(x, y, r.x+r.w-x, row.Info, style)
 		}
 	}
+}
+
+func packetTableColumnWidths(width, protocol, source, destination int) []int {
+	widths, infoMin := []int{7, 12, max(12, protocol), min(39, source), min(39, destination), 6}, 20
+	if width < 100 {
+		widths, infoMin = []int{5, 8, max(8, protocol), min(39, source), min(39, destination), 4}, 10
+	}
+	// Avoid letting one long protocol name consume both endpoint columns.
+	widths[2] = min(widths[2], max(8, min(24, width-widths[0]-widths[1]-widths[5]-6-infoMin-16)))
+	budget := max(0, width-widths[0]-widths[1]-widths[2]-widths[5]-6-infoMin)
+	for widths[3]+widths[4] > budget {
+		if widths[3] > widths[4] {
+			widths[3]--
+		} else if widths[4] > 0 {
+			widths[4]--
+		} else {
+			break
+		}
+	}
+	return widths
 }
 func (u *tui) drawFields(c *canvas, r rect) {
 	u.setTop(1, u.fieldTop)
