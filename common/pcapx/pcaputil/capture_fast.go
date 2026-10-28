@@ -18,7 +18,7 @@ import (
 // type and avoiding process-wide changes to the dependency's metadata table.
 func captureLinkDecoder(link layers.LinkType) gopacket.Decoder {
 	switch link {
-	case layers.LinkTypeEthernet, layers.LinkTypeLinuxSLL:
+	case layers.LinkTypeEthernet, layers.LinkTypeLinuxSLL, layers.LinkTypeRaw, layers.LinkTypeNull, layers.LinkTypeLoop:
 		return captureCarrierDecoder{inner: link}
 	case layers.LinkType(274): // LINKTYPE_ETHERNET_MPACKET
 		return captureMPacketDecoder{}
@@ -27,9 +27,9 @@ func captureLinkDecoder(link layers.LinkType) gopacket.Decoder {
 	case layers.LinkType(227): // LINKTYPE_CAN_SOCKETCAN
 		return socketCANDecoder{}
 	case layers.LinkTypeIPv4:
-		return layers.LayerTypeIPv4
+		return captureCarrierDecoder{inner: layers.LayerTypeIPv4}
 	case layers.LinkTypeIPv6:
-		return layers.LayerTypeIPv6
+		return captureCarrierDecoder{inner: layers.LayerTypeIPv6}
 	default:
 		return link
 	}
@@ -158,7 +158,8 @@ func (d *offlineDecoder) feedWithEvidence(ctx context.Context, raw []byte, ci go
 	if network != nil && transport == layers.IPProtocolUDP && d.conf.binParser != nil {
 		if err := d.udp.DecodeFromBytes(network.(gopacket.NetworkLayer).LayerPayload(), d); err == nil {
 			selected := d.conf.binParser.datagramDecodeAs[uint16(d.udp.DstPort)] != "" || d.conf.binParser.datagramDecodeAs[uint16(d.udp.SrcPort)] != ""
-			if !selected && udpEncapsulation(d.udp.NextLayerType()) {
+			gpe := d.udp.DstPort == 4790 && d.udp.DstPort.LayerType() == gopacket.LayerTypePayload && observedVXLANGPE(d.udp.LayerPayload())
+			if !selected && (udpEncapsulation(d.udp.NextLayerType()) || gpe) {
 				return fallback()
 			}
 			if d.conf.binParser.l2tp3UDPNeedsPacket(network.(gopacket.NetworkLayer), &d.udp, evidence.Ref.Domain) {

@@ -46,7 +46,14 @@ type fragmentStore struct {
 }
 
 func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, networks, tunnels int, unsupported bool) {
+	return networkCarrierProfileUntil(p, nil)
+}
+
+func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner gopacket.NetworkLayer, networks, tunnels int, unsupported bool) {
 	for _, l := range p.Layers() {
+		if stop != nil && l == stop {
+			break
+		}
 		if n, ok := l.(gopacket.NetworkLayer); ok {
 			inner = n
 			networks++
@@ -70,6 +77,12 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 			}
 		case *layers.VXLAN:
 			tunnels++
+			if !selectedVXLAN(v) {
+				unsupported = true
+			}
+		case *captureVXLANGPE:
+			tunnels++
+			unsupported = true // only its complete header is observed
 		case *layers.Geneve:
 			tunnels++
 			// Only option-free v0 Ethernet data is selected for normalization.
@@ -88,6 +101,50 @@ func networkCarrierProfile(p gopacket.Packet) (inner gopacket.NetworkLayer, netw
 		}
 	}
 	return
+}
+
+func selectedVXLANEnclosingParent(p gopacket.Packet, layer gopacket.Layer, normalized int) bool {
+	found := false
+	for _, candidate := range p.Layers() {
+		if candidate == layer {
+			found = true
+			break
+		}
+	}
+	if !found {
+		return false
+	}
+	_, networks, tunnels, unsupported := networkCarrierProfileUntil(p, layer)
+	return !unsupported && tunnels+normalized+1 <= 4 && (networks <= 1 || tunnels > 0 && networks == tunnels+1)
+}
+
+func (a *binParser) refuseVXLANHeader(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo, failure *vxlanHeaderError) {
+	fields := map[string]any{"Observed Header Layers": outerNetworkHeaderNames(p), "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile", "Unselected Carrier": "VXLAN", "Parent Admission Reason": failure.reason, "Available VXLAN Bytes": failure.available, "Required VXLAN Header Bytes": 8, "Reserved Receive Rule": "ignored per RFC 7348"}
+	h := failure.layer.LayerContents()
+	if len(h) > 0 {
+		fields["Observed VXLAN Flags"], fields["VXLAN I Bit"] = h[0], failure.layer.ValidIDFlag
+	}
+	if len(h) >= 7 {
+		fields["Observed VXLAN VNI"] = failure.layer.VNI
+	}
+	if failure.truncated {
+		if failure.innerTruncated {
+			fields["Header Observation Scope"] = "validated VXLAN fixed header; incomplete Ethernet child prefix"
+			fields["Available Ethernet Header Bytes"] = len(failure.layer.LayerPayload())
+			fields["Required Ethernet Header Bytes"] = 14
+		} else {
+			fields["VXLAN Header Truncated"] = true
+		}
+	}
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "VXLANHeaderAdmission", Error: failure.Error(), Summary: failure.Error() + "; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+}
+
+func (a *binParser) observeVXLANGPEHeader(p gopacket.Packet, e captureEvidence, ci gopacket.CaptureInfo, layer *captureVXLANGPE) {
+	h := layer.LayerContents()
+	vni := uint32(h[4])<<16 | uint32(h[5])<<8 | uint32(h[6])
+	fields := map[string]any{"Observed Header Layers": outerNetworkHeaderNames(p), "Header Observation Scope": "validated VXLAN-GPE v0 header only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected payload profile", "Unselected Carrier": "VXLAN-GPE", "VXLAN-GPE Version": uint8(0), "VXLAN-GPE Flags": h[0], "VXLAN-GPE VNI": vni, "VXLAN-GPE Next Protocol Present": h[0]&4 != 0, "VXLAN-GPE Next Protocol": h[3], "VXLAN-GPE OAM": h[0]&1 != 0, "VXLAN-GPE Replicated BUM": h[0]&2 != 0, "Reserved Receive Rule": "ignored", "Payload Profile Implemented": false}
+	summary := fmt.Sprintf("VXLAN-GPE v0 header VNI=%d next=%d; payload profile not selected; inner identity unconfirmed", vni, h[3])
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "headers", ExpertCode: "VXLANProfileUnselected", Summary: summary, Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
 }
 
 func outerNetworkHeaderNames(p gopacket.Packet) []string {
@@ -170,6 +227,21 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			for i := range e.refs {
 				e.refs[i].Domain = e.Ref.Domain
 			}
+		}
+	}
+	if failure := p.ErrorLayer(); failure != nil {
+		var vxlan *vxlanHeaderError
+		if errors.As(failure.Error(), &vxlan) && selectedVXLANEnclosingParent(p, vxlan.layer, e.normalizedTunnels) {
+			a.refuseVXLANHeader(p, e, ci, vxlan)
+			// Retain the typed decoder error for strict API/accounting. The UDP
+			// ingress guard prevents redispatch as an outer application.
+			return p, false
+		}
+	}
+	for _, layer := range p.Layers() {
+		if gpe, ok := layer.(*captureVXLANGPE); ok && selectedVXLANEnclosingParent(p, gpe, e.normalizedTunnels) {
+			a.observeVXLANGPEHeader(p, e, ci, gpe)
+			return nil, true
 		}
 	}
 	if unsupportedTunnel || networks > 1 && (tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {

@@ -48,6 +48,9 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 	if decoder == layers.LayerTypeGRE {
 		decoder = captureGREDecoder{}
 	}
+	if decoder == layers.LayerTypeVXLAN {
+		decoder = captureVXLANDecoder{}
+	}
 	if decoder == layers.EthernetType(0x22eb) {
 		decoder = captureERSPAN3Decoder{}
 	}
@@ -135,6 +138,11 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 	if carrier, ok := next.(captureCarrierDecoder); ok {
 		next = carrier.inner
 	}
+	if _, observerVXLAN := next.(captureVXLANObserverDecoder); observerVXLAN {
+		// The observer fixes field bits without imposing native admission.
+		// Recover the literal carrier kind for bounds and strict I validation.
+		next = layers.LayerTypeVXLAN
+	}
 	// These complete Ethernet PDUs have bounded native codecs. Do not invoke
 	// gopacket's unknown-EtherType decoder before their ingress can run.
 	if kind, ok := next.(layers.EthernetType); ok && (kind == 0x88ba || kind == 0x88a4) {
@@ -148,7 +156,11 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 	if b.udp != nil {
 		layer, ok := next.(gopacket.LayerType)
 		selected := b.datagramDecodeAs[uint16(b.udp.DstPort)] != "" || b.datagramDecodeAs[uint16(b.udp.SrcPort)] != ""
-		if selected || !ok || !udpEncapsulation(layer) || b.network != nil && udpCarrierError(b.network, b.udp, gopacket.CaptureInfo{}, b.captureTruncated) != nil {
+		gpe := b.udp.DstPort == 4790 && b.udp.DstPort.LayerType() == gopacket.LayerTypePayload && observedVXLANGPE(b.udp.LayerPayload())
+		// Source-port fallback is a hint, not a configured tunnel receiver.
+		// Honor real registered destination ports, including custom VXLAN ports.
+		sourceOnlyVXLAN := !gpe && ok && layer == layers.LayerTypeVXLAN && b.udp.DstPort.LayerType() != layers.LayerTypeVXLAN
+		if selected || sourceOnlyVXLAN || !gpe && (!ok || !udpEncapsulation(layer)) || b.network != nil && udpCarrierError(b.network, b.udp, gopacket.CaptureInfo{}, b.captureTruncated) != nil {
 			// A user-selected native codec owns the complete UDP payload before
 			// a legacy tunnel port can substitute an inner network/transport.
 			// Its own grammar and carrier checks still decide acceptance.
@@ -157,6 +169,8 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 			// layer so normal dispatch can publish its precise typed refusal and
 			// invalidate owned protocol state. Observer packets stay unchanged.
 			next = gopacket.LayerTypePayload
+		} else if gpe {
+			next = captureVXLANGPEDecoder{}
 		}
 	}
 	decoder := protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated, datagramDecodeAs: b.datagramDecodeAs}
@@ -171,6 +185,9 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 			// The dependency normally stops at any empty payload. A declared
 			// fixed IP header still requires bytes: report the zero-byte case
 			// with the same typed truncation path as other incomplete prefixes.
+			return decoder.Decode(nil, b.PacketBuilder)
+		}
+		if layer == layers.LayerTypeVXLAN {
 			return decoder.Decode(nil, b.PacketBuilder)
 		}
 	}

@@ -14,6 +14,7 @@ type captureCarrierDecoder struct{ inner gopacket.Decoder }
 type captureCarrierBuilder struct {
 	gopacket.PacketBuilder
 	pim gopacket.NetworkLayer
+	udp *layers.UDP
 }
 type captureVLANDecoder struct{}
 
@@ -24,6 +25,10 @@ func (b *captureCarrierBuilder) SetNetworkLayer(n gopacket.NetworkLayer) {
 	b.PacketBuilder.SetNetworkLayer(n)
 	b.pim = pimNetwork(n)
 }
+func (b *captureCarrierBuilder) SetTransportLayer(layer gopacket.TransportLayer) {
+	b.PacketBuilder.SetTransportLayer(layer)
+	b.udp, _ = layer.(*layers.UDP)
+}
 func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
 	if b.pim != nil {
 		next = capturePIMDecoder{network: b.pim}
@@ -31,6 +36,15 @@ func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
 	}
 	if next == layers.LayerTypeGRE {
 		next = captureGREDecoder{}
+	}
+	if next == layers.LayerTypeVXLAN {
+		if b.udp != nil && b.udp.DstPort.LayerType() != layers.LayerTypeVXLAN {
+			// A source-port fallback must not present an unselected inner
+			// Ethernet/application view to packet observers either.
+			next = gopacket.LayerTypePayload
+		} else {
+			next = captureVXLANObserverDecoder{}
+		}
 	}
 	if next == layers.EthernetType(0x22eb) {
 		next = captureERSPAN3Decoder{}

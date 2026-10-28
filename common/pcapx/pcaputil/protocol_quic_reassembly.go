@@ -190,6 +190,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 	if len(messages) > 0 {
 		info["TLS Handshakes"] = messages
 	}
+	q.tls.resumption.project(info)
 	info["CRYPTO Incomplete"] = at < len(a.data) || len(a.pending) > 0
 	if len(q.tls.random) == 32 {
 		info["Client Random"] = hex.EncodeToString(q.tls.random)

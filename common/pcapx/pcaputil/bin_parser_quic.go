@@ -191,6 +191,13 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		"Connection State":    q.state,
 		"Header Form":         "long",
 	}
+	defer func() {
+		// Only the authenticated packet's own selected QUIC connection may
+		// repeat earlier TLS observations. CID text alone is not a match.
+		if q.tls != nil && info["Authentication Verified"] == true {
+			q.tls.resumption.project(info)
+		}
+	}()
 	if values, _ := quicHeaderTokenFacts(h, raw); values != nil {
 		for key, value := range values {
 			info[key] = value
@@ -1307,6 +1314,9 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 // (including slice capacities). STREAM admission requires application keys.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
+	if q.tls != nil {
+		n += q.tls.resumption.storage()
+	}
 	if q.h3Fault != nil {
 		n += 128
 	}
