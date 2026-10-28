@@ -181,10 +181,18 @@ func FuzzInvalidIPVersionCannotMutateFragmentState(f *testing.F) {
 }
 
 func TestUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T) {
+	for _, childVersion := range []byte{4, 6} {
+		t.Run(fmt.Sprintf("child-version%d", childVersion), func(t *testing.T) {
+			testUnselectedCarrierCannotConfirmAChildIPVersion(t, childVersion)
+		})
+	}
+}
+
+func testUnselectedCarrierCannotConfirmAChildIPVersion(t *testing.T, childVersion byte) {
 	for _, profile := range []string{"EtherIP-version0", "EtherIP-version3", "IPv4-HOPOPT"} {
 		t.Run(profile, func(t *testing.T) {
 			inner := versionAdmissionWire(t, 4)
-			inner[14] = 0x65
+			inner[14] = childVersion<<4 | 5
 			protocol := layers.IPProtocol(97)
 			payload := append([]byte{0, 0}, inner...)
 			if profile == "EtherIP-version3" {

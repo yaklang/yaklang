@@ -112,6 +112,12 @@ func outerNetworkObservation(p gopacket.Packet) (captureEvidence, []string) {
 	return e, names
 }
 
+func (a *binParser) refuseUnselectedNetworkParent(p gopacket.Packet, ci gopacket.CaptureInfo) {
+	outer, names := outerNetworkObservation(p)
+	fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile"}
+	a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: outer.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(outer)})
+}
+
 func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
@@ -120,9 +126,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		if errors.As(failure.Error(), &version) {
 			_, networks, tunnels, unsupported := networkCarrierProfile(p)
 			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
-				outer, names := outerNetworkObservation(p)
-				fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "outer network prefix only", "Child Header Identity": "unconfirmed", "Encapsulation Admission": "unselected profile"}
-				a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: outer.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "EncapsulationDepthOrProfile", Error: "EncapsulationDepthOrProfile", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(outer)})
+				a.refuseUnselectedNetworkParent(p, ci)
 				return nil, true
 			}
 			// A decoder's partial layer cannot admit a fragment/tunnel/native
@@ -220,7 +224,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 			}
 		}
 		if unsupportedTunnel || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1 {
-			a.networkDiagnostic(e, ci, "limited", "EncapsulationDepthOrProfile")
+			a.refuseUnselectedNetworkParent(p, ci)
 			return nil, true
 		}
 		e.normalizedTunnels += tunnels
