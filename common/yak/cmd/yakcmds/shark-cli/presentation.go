@@ -769,6 +769,13 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	if validVXLANGPEHeaderObservation(e) {
+		// This is a verified tunnel header, even though its payload profile
+		// is unavailable. Keep the concrete identity and the admission limit
+		// together; no inner protocol or application connection is implied.
+		*p = packetPresentation{networkRefused: true, protocol: "VXLAN-GPE", summary: safeText(e.Summary), status: "limited", visibility: "tunnel-header", scope: "VXLAN-GPE v0 header; inner payload profile unselected", evidence: "validated VXLAN-GPE header; inner identity unconfirmed", stack: []string{"VXLAN-GPE"}, priority: 1000}
+		return
+	}
 	if e.Protocol == "ip" && e.Profile == "pptp-acknowledgment" && e.Status == "limited" && e.Completeness == "headers" && e.ExpertCode == "PPTPAcknowledgment" && number(e.Session["Observed GRE Version"]) == 1 && number(e.Session["PPTP Payload Length"]) == 0 && e.Session["Child Header Identity"] == "not present" {
 		// A validated enhanced-GRE ACK is a concrete header observation. It
 		// has no PPP payload or application identity to inherit or dissect.

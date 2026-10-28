@@ -85,6 +85,7 @@ type binTLS struct {
 	version, suite                         uint16
 	sni, alpn                              string
 	handshake                              [2][]byte
+	handshakeAuthenticated                 [2]bool
 	alert                                  [2]byte
 	alertPending                           [2]bool
 	seq                                    [2]uint64
@@ -99,11 +100,12 @@ type binTLS struct {
 	firstHello, retryCookie                []byte
 	retrySeen, retryClientSeen, finalHello bool
 	retrySuite, retryGroup                 uint16
+	resumption                             tlsResumptionState
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
 func (t *binTLS) storage() int64 {
-	return 2048 + t.extraStorage + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
+	return 2048 + t.extraStorage + t.resumption.storage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
 }
 func tlsU24(b []byte) int { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
 func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) {
@@ -133,6 +135,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		info["ALPN"] = t.alpn
 	}
 	e.Session = info
+	defer func() { t.resumption.project(info) }()
 	if t.version == 0x304 && typ == 22 && t.finalHello {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 cleartext handshake after ServerHello")
 	}
@@ -217,6 +220,13 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		if err := f.reserveSession(t.storage() + int64(len(plain))); err != nil {
 			return nil, err
 		}
+		if len(plain) > 0 {
+			if len(t.handshake[dir]) == 0 {
+				t.handshakeAuthenticated[dir] = encrypted
+			} else {
+				t.handshakeAuthenticated[dir] = t.handshakeAuthenticated[dir] && encrypted
+			}
+		}
 		t.handshake[dir] = append(t.handshake[dir], plain...)
 		var messages []map[string]any
 		for len(t.handshake[dir]) >= 4 {
@@ -237,12 +247,15 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 					return nil, err
 				}
 			}
-			m, err := t.handshakeMessage(dir, b[:n], encrypted, f.a.budget.MaxCollectionElements)
+			m, err := t.handshakeMessage(dir, b[:n], t.handshakeAuthenticated[dir], f.a.budget.MaxCollectionElements)
 			if err != nil {
 				return nil, err
 			}
 			messages = append(messages, m)
 			t.handshake[dir] = b[n:]
+			// Any remainder was contributed by this record; earlier records
+			// ended inside the message just consumed.
+			t.handshakeAuthenticated[dir] = encrypted
 		}
 		if len(t.handshake[dir]) == 0 {
 			t.handshake[dir] = nil
@@ -288,6 +301,21 @@ func (t *binTLS) prfHash() func() hash.Hash {
 }
 
 func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
+	if dir < 0 || dir > 1 || len(b) < 4 || tlsU24(b[1:4]) != len(b)-4 {
+		return nil, protocolError(ErrMalformedMessage, "TLS handshake framing")
+	}
+	// Hello/extension validation and Finished/KeyUpdate transitions commit
+	// together. A rejected message cannot retain half-applied peer state.
+	// Retained slices and metadata are immutable or replaced, never edited.
+	trial := *t
+	m, err := trial.applyHandshakeMessage(dir, b, authenticated, limits...)
+	if err == nil {
+		*t = trial
+	}
+	return m, err
+}
+
+func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
 	typ, body := b[0], b[4:]
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
 	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
@@ -295,6 +323,19 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	}
 	switch typ {
 	case 1, 2:
+		h, err := tlsHello(body, typ == 1, limits...)
+		if err != nil {
+			return nil, err
+		}
+		if err = tlsHelloExtensionStructure(h, typ == 1); err != nil {
+			return nil, err
+		}
+		if typ == 1 && t.client >= 0 && (!t.retrySeen || t.retryClientSeen) || typ == 2 && t.finalHello {
+			return nil, protocolError(ErrUnsupportedFeature, "TLS repeated hello or renegotiation requires a new epoch")
+		}
+		if err = t.observeResumptionHello(dir, typ, body, h, m, limits...); err != nil {
+			return nil, err
+		}
 		retry, err := t.observeHello(dir, typ, body, limits...)
 		if err != nil {
 			return nil, err
@@ -350,6 +391,12 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 				return nil, err
 			}
 		}
+	case 4:
+		ticket, err := t.newSessionTicket(dir, body, authenticated, limits...)
+		if err != nil {
+			return nil, err
+		}
+		m["New Session Ticket"] = ticket
 	case 8:
 		if !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS EncryptedExtensions")
