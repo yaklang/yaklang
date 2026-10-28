@@ -1,39 +1,55 @@
+# Legacy field labels retained. "Max Resp Time" is a raw wire octet, not a
+# decoded duration; network_igmp/IGMPFields exposes unambiguous time fields.
 endian: big
 Package:
   IGMP:
     operator: |
+      originalBounded = this.HasMaxLength()
+      maximum = 1048576
+      if originalBounded {
+        maximum = this.GetMaxLength()
+        if maximum > 1048576 { panic("igmp: message byte budget exceeded") }
+      }
       this.ProcessSubNode("Type")
       typ = getNodeResult("Type").Value
-      if typ != 0x11 && typ != 0x12 && typ != 0x16 && typ != 0x17 && typ != 0x22 {
-        panic("igmp: unknown type")
-      }
+      if typ != 0x11 && typ != 0x12 && typ != 0x16 && typ != 0x17 && typ != 0x22 { panic("igmp: unselected membership type") }
       this.ProcessSubNode("Max Resp Time")
       this.ProcessSubNode("Checksum")
       if typ == 0x22 {
         this.ProcessSubNode("Reserved")
         this.ProcessSubNode("Number of Group Records")
         nrec = getNodeResult("Number of Group Records").Value
-        if nrec > 0 && nrec < 256 {
-          this.ProcessSubNode("Records")
+        remaining = maximum-this.Length()
+        if nrec * 8 > remaining { panic("igmp: record fixed headers unavailable") }
+        if nrec > 4096 { panic("igmp: collection budget exceeded") }
+        if nrec > 0 {
+          records = this.GetSubNode("Records")
+          records.SetCfg("IGMP Record Count", nrec)
+          records.SetMaxLength(remaining)
+          records.Process()
         }
-        return
-      }
-      this.ProcessSubNode("Group Address")
-      if typ == 0x11 {
-        res, op = this.TryProcessSubNode("SQRV")
-        if op.OK {
-          op.Save()
+      } else {
+        this.ProcessSubNode("Group Address")
+        if typ == 0x11 && !originalBounded {
+          this.AddInfo("Query Version", "unconfirmed without bounded enclosing length")
+          return
+        }
+        if typ == 0x11 && maximum != 8 {
+          if maximum < 12 { panic("igmp: query length selects no membership version") }
+          this.ProcessSubNode("SQRV")
           this.ProcessSubNode("QQIC")
           this.ProcessSubNode("Number of Sources")
           nsrc = getNodeResult("Number of Sources").Value
-          if nsrc > 0 && nsrc < 64 {
-            this.ProcessSubNode("Sources")
-          }
-        } else {
-          op.Recovery()
+          if nsrc * 4 > maximum-this.Length() { panic("igmp: query sources unavailable") }
+          if nsrc > 4096 { panic("igmp: source collection budget exceeded") }
+          if nsrc > 0 { this.ProcessSubNode("Sources") }
         }
       }
-      return
+      remaining = maximum-this.Length()
+      if originalBounded && remaining > 0 {
+        this.GetSubNode("Additional Data").SetMaxLength(remaining)
+        this.ProcessSubNode("Additional Data")
+      }
     Type: uint8
     Max Resp Time: uint8
     Checksum: uint16
@@ -45,12 +61,24 @@ Package:
       list: true
       list-length-from-field: "../Number of Sources"
       Source Address: raw,4
+    # Historical label: RFC9776 section4.2.3 now calls this Report Flags.
     Reserved: uint16
     Number of Group Records: uint16
     Records:
       list: true
-      list-length-from-field: "../Number of Group Records"
       Record: IGMPGroupRecord
+      operator: |
+        budget = 4096
+        count = this.GetCfg("IGMP Record Count")
+        for i = 0; i < count; i++ {
+          if budget < 1 { panic("igmp: collection budget exceeded") }
+          record = this.NewElement()
+          record.SetMaxLength(this.GetMaxLength()-this.Length())
+          record.SetCfg("IGMP Source Budget", budget-1)
+          record.Process()
+          budget -= 1+record.GetSubNode("Number of Sources").Result().Value
+        }
+    Additional Data: raw
 IGMPGroupRecord:
   operator: |
     this.ProcessSubNode("Record Type")
@@ -58,10 +86,16 @@ IGMPGroupRecord:
     this.ProcessSubNode("Number of Sources")
     this.ProcessSubNode("Multicast Address")
     nsrc = getNodeResult("Number of Sources").Value
-    if nsrc > 0 && nsrc < 64 {
-      this.ProcessSubNode("Sources")
+    aux = getNodeResult("Aux Data Len").Value * 4
+    if nsrc * 4 + aux > this.GetMaxLength()-this.Length() { panic("igmp: source or auxiliary bytes unavailable") }
+    budget = this.GetCfg("IGMP Source Budget")
+    if budget == nil { budget = 4096 }
+    if nsrc > budget { panic("igmp: source collection budget exceeded") }
+    if nsrc > 0 { this.ProcessSubNode("Sources") }
+    if aux > 0 {
+      this.GetSubNode("Auxiliary Data").SetMaxLength(aux)
+      this.ProcessSubNode("Auxiliary Data")
     }
-    return
   Record Type: uint8
   Aux Data Len: uint8
   Number of Sources: uint16
@@ -70,3 +104,4 @@ IGMPGroupRecord:
     list: true
     list-length-from-field: "../Number of Sources"
     Source Address: raw,4
+  Auxiliary Data: raw

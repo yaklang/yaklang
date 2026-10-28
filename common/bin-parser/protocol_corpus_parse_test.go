@@ -1285,7 +1285,7 @@ var protocolCorpusRequiredNodes = map[string][]string{
 	"Ethernet 802.3":            {"Destination", "Source", "Type", "DSAP", "SSAP", "Control", "OUI", "SNAP Payload"},
 	"EAP":                       {"Protocol Version", "Packet Type", "Body Length", "Code", "Identifier", "Length", "Type", "Identity"},
 	"ICMPv6 NDP":                {"Type", "Code", "Checksum", "Target Address", "Options", "Link Layer"},
-	"ICMPv6 MLD":                {"Type", "Code", "Checksum", "Maximum Response Delay", "Multicast Address"},
+	"ICMPv6 MLD":                {"Type", "Code", "Checksum", "MLD", "Version", "Multicast Address"},
 	"IPv6 RA":                   {"Type", "Code", "Checksum", "Hop Limit", "Router Lifetime", "Reachable Time", "Retrans Timer"},
 	"ICMP Timestamp":            {"Type", "Code", "Checksum", "Identifier", "Sequence Number", "Originate", "Receive", "Transmit"},
 	"SNTP":                      {"Version", "Mode", "Transmit Timestamp"},
@@ -1974,8 +1974,28 @@ func TestProtocolCorpusDirectRuleParsing(t *testing.T) {
 			require.NoError(t, err, "%s failed to parse %s bytes with %s", capture.ID, info.Layer, ruleFile)
 			require.NotNil(t, node)
 			require.NotEmpty(t, item.requiredNodes, "%s has no semantic field contract", item.name)
+			var observedMLD map[string]any
+			if item.name == "ICMPv6 MLD" {
+				// This canonical entry has one byte-backed Message node whose
+				// result is a semantic tree. Check the entire value, including
+				// ranges, rather than mistaking it for an opaque raw-field pass.
+				message := protocolCorpusFindNode(node, "Message")
+				require.NotNil(t, message)
+				value, valueErr := message.Result()
+				require.NoError(t, valueErr)
+				var ok bool
+				observedMLD, ok = value.Value.(map[string]any)
+				require.True(t, ok)
+				expected, decodeErr := stream_parser.DecodeMLDWire(input, 1<<20, 4096)
+				require.NoError(t, decodeErr)
+				require.Equal(t, expected.Fields, observedMLD)
+			}
 			for _, requiredNode := range item.requiredNodes {
-				require.True(t, protocolCorpusHasNode(node, requiredNode), "%s did not produce required node %q; processed terminal fields: %s", capture.ID, requiredNode, strings.Join(protocolCorpusProcessedTerminalNames(node), ", "))
+				present := protocolCorpusHasNode(node, requiredNode)
+				if observedMLD != nil {
+					present = protocolCorpusSemanticKey(observedMLD, requiredNode)
+				}
+				require.True(t, present, "%s did not produce required node %q; processed terminal fields: %s", capture.ID, requiredNode, strings.Join(protocolCorpusProcessedTerminalNames(node), ", "))
 			}
 			for fieldName, expected := range protocolCorpusExactValues[capture.ID+"/"+item.name] {
 				protocolCorpusRequireValue(t, node, fieldName, expected)
@@ -2456,6 +2476,27 @@ func protocolCorpusNodeHasResult(node *base.Node) bool {
 	for _, child := range node.Children {
 		if protocolCorpusNodeHasResult(child) {
 			return true
+		}
+	}
+	return false
+}
+
+func protocolCorpusSemanticKey(value any, name string) bool {
+	switch v := value.(type) {
+	case map[string]any:
+		for key, child := range v {
+			if key == "Wire Field Ranges" {
+				continue // Offset metadata is not a decoded semantic field.
+			}
+			if key == name || protocolCorpusSemanticKey(child, name) {
+				return true
+			}
+		}
+	case []map[string]any:
+		for _, child := range v {
+			if protocolCorpusSemanticKey(child, name) {
+				return true
+			}
 		}
 	}
 	return false

@@ -292,15 +292,53 @@ Parameter Problem:
   Pointer: uint32
   Original Datagram: string
 Multicast Listener Query:
+  operator: |
+    bounded = this.HasMaxLength()
+    size = this.GetMaxLength()
+    if bounded && size != 20 && size < 24 { panic("MLD query length selects neither v1 nor v2") }
+    if bounded && size > 1048576 { panic("MLD query byte budget") }
+    if !bounded {
+      this.ProcessSubNode("Response Code/Delay Word")
+    } else if size == 20 {
+      this.ProcessSubNode("Maximum Response Delay")
+    } else {
+      this.ProcessSubNode("Maximum Response Code")
+    }
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("Multicast Address")
+    if !bounded || size == 20 { return }
+    this.ProcessSubNode("Flags")
+    this.ProcessSubNode("Query Interval Code")
+    this.ProcessSubNode("Number of Sources")
+    nsrc = getNodeResult("Number of Sources").Value
+    available = this.GetMaxLength() - this.Length()
+    if nsrc * 16 > available { panic("MLD query sources unavailable") }
+    if nsrc > 4096 { panic("MLD query collection budget") }
+    if nsrc > 0 { this.ProcessSubNode("Sources") }
+    rest = this.GetMaxLength() - this.Length()
+    if rest > 0 {
+      this.GetSubNode("Additional Data").SetMaxLength(rest)
+      this.ProcessSubNode("Additional Data")
+    }
   Maximum Response Delay: uint16
+  Maximum Response Code: uint16
+  Response Code/Delay Word: uint16
   Reserved: uint16
   Multicast Address: raw,16
+  Flags: uint8
+  Query Interval Code: uint8
+  Number of Sources: uint16
+  Sources:
+    list: true
+    list-length-from-field: "../Number of Sources"
+    Source Address: raw,16
+  Additional Data: raw
 Multicast Listener Report:
-  Maximum Response Delay: uint16
+  Unused Delay Word: uint16
   Reserved: uint16
   Multicast Address: raw,16
 Multicast Listener Done:
-  Maximum Response Delay: uint16
+  Unused Delay Word: uint16
   Reserved: uint16
   Multicast Address: raw,16
 Redirect:
@@ -336,19 +374,45 @@ Redirect:
       }
 Multicast Listener Report v2:
   operator: |
+    bounded = this.HasMaxLength()
+    if !bounded { this.SetMaxLength(1048576) }
     this.ProcessSubNode("Reserved")
     this.ProcessSubNode("Number of Mcast Address Records")
     nrec = getNodeResult("Number of Mcast Address Records").Value
-    if nrec > 0 && nrec < 256 {
-      this.ProcessSubNode("Records")
+    available = this.GetMaxLength() - this.Length()
+    if this.GetMaxLength() > 1048576 { panic("MLD report byte budget") }
+    if nrec * 20 > available { panic("MLD address records unavailable") }
+    if nrec > 4096 { panic("MLD record collection budget") }
+    if nrec > 0 {
+      records = this.GetSubNode("Records")
+      records.SetCfg("MLD Record Count", nrec)
+      records.SetMaxLength(available)
+      records.Process()
+    }
+    rest = this.GetMaxLength() - this.Length()
+    if bounded && rest > 0 {
+      this.GetSubNode("Additional Data").SetMaxLength(rest)
+      this.ProcessSubNode("Additional Data")
     }
     return
+  # Historical label: RFC9777 section5.2.3 now calls this Report Flags.
   Reserved: uint16
   Number of Mcast Address Records: uint16
   Records:
     list: true
-    list-length-from-field: "../Number of Mcast Address Records"
     Record: MLDAddressRecord
+    operator: |
+      budget = 4096
+      count = this.GetCfg("MLD Record Count")
+      for i = 0; i < count; i++ {
+        if budget < 1 { panic("MLD record collection budget") }
+        record = this.NewElement()
+        record.SetMaxLength(this.GetMaxLength()-this.Length())
+        record.SetCfg("MLD Source Budget", budget-1)
+        record.Process()
+        budget -= 1+record.GetSubNode("Number of Sources").Result().Value
+      }
+  Additional Data: raw
 MLDAddressRecord:
   operator: |
     this.ProcessSubNode("Record Type")
@@ -356,8 +420,18 @@ MLDAddressRecord:
     this.ProcessSubNode("Number of Sources")
     this.ProcessSubNode("Multicast Address")
     nsrc = getNodeResult("Number of Sources").Value
-    if nsrc > 0 && nsrc < 64 {
+    aux = getNodeResult("Aux Data Len").Value * 4
+    available = this.GetMaxLength() - this.Length()
+    if nsrc * 16 + aux > available { panic("MLD source or auxiliary bytes unavailable") }
+    budget = this.GetCfg("MLD Source Budget")
+    if budget == nil { budget = 4096 }
+    if nsrc > budget { panic("MLD source collection budget") }
+    if nsrc > 0 {
       this.ProcessSubNode("Sources")
+    }
+    if aux > 0 {
+      this.GetSubNode("Auxiliary Data").SetMaxLength(aux)
+      this.ProcessSubNode("Auxiliary Data")
     }
     return
   Record Type: uint8
@@ -368,3 +442,4 @@ MLDAddressRecord:
     list: true
     list-length-from-field: "../Number of Sources"
     Source Address: raw,16
+  Auxiliary Data: raw
