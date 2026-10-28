@@ -32,6 +32,7 @@ type packet struct {
 	Direction int                        `json:"direction"`
 	Refs      []pcaputil.PacketReference `json:"refs"`
 	Captured  string                     `json:"captured"`
+	State     string                     `json:"state,omitempty"`
 }
 type closed struct {
 	Flow        uint64 `json:"flow"`
@@ -42,6 +43,7 @@ type closed struct {
 func main() {
 	workers := flag.Int("workers", 1, "capture workers")
 	maxCapture := flag.Int64("max-capture-bytes", 32<<20, "explicit input limit (at most 256 MiB)")
+	packetState := flag.Bool("packet-state", false, "include the native connection state at each packet callback")
 	flag.Parse()
 	if flag.NArg() != 1 {
 		panic("usage: flow-observer [-workers N] CAPTURE")
@@ -83,7 +85,17 @@ func main() {
 			if c != f.ClientConn {
 				direction = 1
 			}
-			packets = append(packets, packet{f.Index, direction, append([]pcaputil.PacketReference(nil), refs...), ts.UTC().Format(time.RFC3339Nano)})
+			state := ""
+			if *packetState {
+				state = "observed"
+				if c.IsClosed() {
+					state = "closed-direction-observation"
+					if f.ClientConn.IsClosed() && f.ServerConn.IsClosed() {
+						state = "closed-observation"
+					}
+				}
+			}
+			packets = append(packets, packet{f.Index, direction, append([]pcaputil.PacketReference(nil), refs...), ts.UTC().Format(time.RFC3339Nano), state})
 		}), pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, f *pcaputil.TrafficFlow) {
 			mu.Lock()
 			defer mu.Unlock()
