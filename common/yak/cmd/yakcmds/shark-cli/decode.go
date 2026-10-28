@@ -207,7 +207,7 @@ func summarize(raw *capturedPacket) packetSummary {
 		row.ConnectionProtocol, row.ConnectionEvidence = row.ConnectionStack[0], "protocol session association"
 	}
 	if p.ErrorLayer() != nil {
-		covered := false
+		covered := presentation.visibility == "truncated-network-header"
 		actualIP115 := false
 		switch ip := network.(type) {
 		case *layers.IPv4:
