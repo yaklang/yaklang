@@ -48,6 +48,23 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 	if decoder == layers.LayerTypeGRE {
 		decoder = captureGREDecoder{}
 	}
+	if decoder == layers.LayerTypeIPSecESP || decoder == layers.IPProtocolESP {
+		decoder = captureESPDecoder{}
+	}
+	if decoder == layers.LayerTypeIPSecAH || decoder == layers.IPProtocolAH {
+		_, v6 := d.network.(*layers.IPv6)
+		decoder = captureAHDecoder{ipv6: v6}
+	}
+	if _, ah := decoder.(captureAHDecoder); ah {
+		_, v6 := d.network.(*layers.IPv6)
+		decoder = captureAHDecoder{ipv6: v6}
+	}
+	if decoder == layers.LayerTypeIPv6Destination || decoder == layers.IPProtocolIPv6Destination {
+		decoder = captureIPv6OptionsDecoder{}
+	}
+	if decoder == layers.LayerTypeIPv6HopByHop || decoder == layers.IPProtocolIPv6HopByHop {
+		decoder = captureIPv6OptionsDecoder{hop: true}
+	}
 	if decoder == layers.LayerTypeVXLAN {
 		decoder = captureVXLANDecoder{}
 	}
@@ -187,7 +204,7 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 			// with the same typed truncation path as other incomplete prefixes.
 			return decoder.Decode(nil, b.PacketBuilder)
 		}
-		if layer == layers.LayerTypeVXLAN {
+		if layer == layers.LayerTypeVXLAN || layer == layers.LayerTypeIPSecESP || layer == layers.LayerTypeIPSecAH || layer == layers.LayerTypeIPv6Destination || layer == layers.LayerTypeIPv6HopByHop || next == layers.IPProtocolESP || next == layers.IPProtocolAH {
 			return decoder.Decode(nil, b.PacketBuilder)
 		}
 	}
@@ -281,6 +298,25 @@ func decodeProtocolIPv6(ip *layers.IPv6, data []byte, feedback gopacket.DecodeFe
 		end = len(data)
 	}
 	bounded := data[:end]
+	if data[6] == byte(layers.IPProtocolIPv6HopByHop) {
+		// Preserve the complete, validated fixed parent even if an option is
+		// malformed. Only a successful extension may strip its payload prefix.
+		ip.Version, ip.TrafficClass, ip.FlowLabel = data[0]>>4, uint8(binary.BigEndian.Uint16(data[:2])>>4), binary.BigEndian.Uint32(data[:4])&0xfffff
+		ip.Length, ip.NextHeader, ip.HopLimit = uint16(declared), layers.IPProtocol(data[6]), data[7]
+		ip.SrcIP, ip.DstIP = net.IP(data[8:24]), net.IP(data[24:40])
+		ip.Contents, ip.Payload = bounded[:40], bounded[40:]
+		hop, err := decodeBoundedIPv6HopByHop(bounded[40:], feedback)
+		if err != nil {
+			return err
+		}
+		for _, option := range hop.Options {
+			if option.OptionType == layers.IPv6HopByHopOptionJumbogram {
+				return fmt.Errorf("IPv6 jumbo option requires an unsupported zero-length carrier profile")
+			}
+		}
+		ip.Payload, ip.HopByHop = hop.Payload, hop
+		return nil
+	}
 	var local protocolDecodeFeedback
 	if err := ip.DecodeFromBytes(bounded, &local); err != nil {
 		if local.truncated {
