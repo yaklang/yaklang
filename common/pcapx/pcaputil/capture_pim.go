@@ -15,12 +15,13 @@ var capturePIMType = gopacket.RegisterLayerType(200004, gopacket.LayerTypeMetada
 // RFC 7761 section 4.9.3: Null-Registers contain dummy IP headers and must
 // never admit their contents as captured application traffic.
 type capturePIM struct {
-	Version, Type        uint8
-	Checksum             uint16
-	NullRegister, Border bool
-	ChecksumVerified     bool
-	ChecksumScope        string
-	contents, payload    []byte
+	Version, Type         uint8
+	Checksum              uint16
+	NullRegister, Border  bool
+	ChecksumVerified      bool
+	ChecksumScope         string
+	MessageExtentComplete bool
+	contents, payload     []byte
 }
 
 func (*capturePIM) LayerType() gopacket.LayerType { return capturePIMType }
@@ -42,6 +43,34 @@ func pimNetwork(n gopacket.NetworkLayer) gopacket.NetworkLayer {
 }
 
 type capturePIMDecoder struct{ network gopacket.NetworkLayer }
+
+// Read the original enclosing length words. In particular, gopacket's IPv4
+// compatibility path may have replaced total length zero with captured bytes.
+// This profile selects direct PIM, without an IPv6 extension/jumbogram context.
+func pimDeclaredPayloadBytes(network gopacket.NetworkLayer) int {
+	if network == nil {
+		return -1
+	}
+	h := network.LayerContents()
+	switch ip := network.(type) {
+	case *layers.IPv4:
+		if len(h) < 20 || h[0]>>4 != 4 || h[0]&15 < 5 || int(h[0]&15)*4 != len(h) || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 {
+			return -1
+		}
+		total := int(binary.BigEndian.Uint16(h[2:4]))
+		if total >= len(h) {
+			return total - len(h)
+		}
+	case *layers.IPv6:
+		if len(h) != 40 || h[0]>>4 != 6 || ip.NextHeader != 103 {
+			return -1
+		}
+		if payload := int(binary.BigEndian.Uint16(h[4:6])); payload > 0 {
+			return payload
+		}
+	}
+	return -1
+}
 
 func pimChecksum(w []byte, network gopacket.NetworkLayer) uint16 {
 	var sum uint32
@@ -87,8 +116,21 @@ func (d capturePIMDecoder) Decode(w []byte, b gopacket.PacketBuilder) error {
 	}
 	p.NullRegister, p.Border = w[4]&0x40 != 0, w[4]&0x80 != 0
 	p.contents, p.payload = w[:8], w[8:]
+	p.MessageExtentComplete = pimDeclaredPayloadBytes(d.network) == len(w)
 	p.ChecksumScope = "header"
-	if pimChecksum(w[:8], d.network) != 0 {
+	p.ChecksumVerified = pimChecksum(w[:8], d.network) == 0
+	if !p.MessageExtentComplete {
+		if !p.ChecksumVerified {
+			// Preserve a real decoder failure instead of silently dropping it
+			// from capture accounting. The unavailable interop fallback is not
+			// itself a failed whole-message checksum.
+			return fmt.Errorf("PIM Register: header checksum failed; enclosing IP message extent unavailable or incomplete")
+		}
+		// Header integrity does not authorize an apparent inner IP packet.
+		b.AddLayer(p)
+		return b.NextDecoder(gopacket.LayerTypePayload)
+	}
+	if !p.ChecksumVerified {
 		if pimChecksum(w, d.network) != 0 {
 			return fmt.Errorf("PIM Register: checksum failed")
 		}
