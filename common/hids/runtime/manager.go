@@ -18,6 +18,7 @@ const runtimeObservationBufferSize = 4096
 
 type Manager struct {
 	mu           sync.Mutex
+	fileScanMu   sync.Mutex
 	instance     *Instance
 	health       health
 	alerts       chan model.Alert

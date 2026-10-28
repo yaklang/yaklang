@@ -57,7 +57,7 @@ func collectProcessInventoryEvents(ctx context.Context, processes []*gopsprocess
 		}
 		// Collect each visible PID once. Parent details and children are derived
 		// from this same inventory instead of re-scanning /proc for every PID.
-		snapshot, _ := loadProcessInventorySnapshot(ctx, process, bootID, false)
+		snapshot, _ := loadProcessInventorySnapshot(ctx, process, bootID)
 		if snapshot != nil {
 			// Keep the relationship even when a process disappears before its
 			// image can be read; it may still be another process's child.
@@ -87,7 +87,9 @@ func (systemInventoryProvider) ListNetworkEvents(ctx context.Context) ([]model.E
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	connections, err := gopsnet.ConnectionsWithContext(ctx, "all")
+	// Identity comes from the per-PID snapshot below. Reading socket UIDs here
+	// repeats the same /proc/<pid>/status lookup for every socket.
+	connections, err := gopsnet.ConnectionsWithoutUidsWithContext(ctx, "all")
 	if err != nil {
 		return nil, fmt.Errorf("list network connections: %w", err)
 	}
@@ -144,6 +146,7 @@ type processInventorySnapshot struct {
 	bootID                    string
 	startTimeUnixMillis       int64
 	parentStartTimeUnixMillis int64
+	parentDetailsLoaded       bool
 	cpuPercent                float64
 	memoryPercent             float64
 	rssBytes                  int64
@@ -261,19 +264,43 @@ func lookupProcessInventorySnapshot(
 	bootID string,
 	processCache map[int32]*processInventorySnapshot,
 ) *processInventorySnapshot {
-	if pid <= 0 {
+	if pid <= 0 || ctx.Err() != nil {
 		return nil
 	}
-	if snapshot, ok := processCache[pid]; ok {
+	snapshot := lookupNetworkProcessIdentity(ctx, pid, bootID, processCache)
+	if snapshot == nil || snapshot.parentDetailsLoaded {
+		return snapshot
+	}
+	if snapshot.parentPID > 0 {
+		parent := lookupNetworkProcessIdentity(ctx, int32(snapshot.parentPID), bootID, processCache)
+		if parent != nil {
+			snapshot.parentName = parent.name
+			snapshot.parentImage = parent.image
+			snapshot.parentCommand = parent.command
+			snapshot.parentStartTimeUnixMillis = parent.startTimeUnixMillis
+		}
+	}
+	snapshot.parentDetailsLoaded = true
+	return snapshot
+}
+
+func lookupNetworkProcessIdentity(
+	ctx context.Context,
+	pid int32,
+	bootID string,
+	processCache map[int32]*processInventorySnapshot,
+) *processInventorySnapshot {
+	if pid <= 0 || ctx.Err() != nil {
+		return nil
+	}
+	if snapshot, exists := processCache[pid]; exists {
 		return snapshot
 	}
 
-	process, err := gopsprocess.NewProcessWithContext(ctx, pid)
-	if err != nil {
-		processCache[pid] = nil
-		return nil
-	}
-	snapshot, ok := loadProcessInventorySnapshot(ctx, process, bootID, true)
+	// The PID came from the same proc socket inventory. Read its identity there
+	// directly: NewProcess's kill(pid, 0) checks the caller's PID namespace rather
+	// than a selected HOST_PROC view and does not establish snapshot identity.
+	snapshot, ok := loadProcessIdentitySnapshot(ctx, &gopsprocess.Process{Pid: pid}, bootID)
 	if !ok {
 		processCache[pid] = nil
 		return nil
@@ -282,7 +309,10 @@ func lookupProcessInventorySnapshot(
 	return snapshot
 }
 
-func loadProcessInventorySnapshot(ctx context.Context, process *gopsprocess.Process, bootID string, individual bool) (*processInventorySnapshot, bool) {
+// Network observations use identity and parent display fields only. Keeping
+// those separate avoids process-wide metrics, FD enumeration, and Children's
+// full /proc scan for every distinct network PID.
+func loadProcessIdentitySnapshot(ctx context.Context, process *gopsprocess.Process, bootID string) (*processInventorySnapshot, bool) {
 	if process == nil || ctx.Err() != nil {
 		return nil, false
 	}
@@ -297,19 +327,7 @@ func loadProcessInventorySnapshot(ctx context.Context, process *gopsprocess.Proc
 	image, _ := process.ExeWithContext(ctx)
 	command, _ := process.CmdlineWithContext(ctx)
 	username, _ := process.UsernameWithContext(ctx)
-	statuses, _ := process.StatusWithContext(ctx)
 	createTime, _ := process.CreateTimeWithContext(ctx)
-	cpuPercent, _ := process.CPUPercentWithContext(ctx)
-	memoryPercent, _ := process.MemoryPercentWithContext(ctx)
-	threadCount, _ := process.NumThreadsWithContext(ctx)
-	fdCount, _ := process.NumFDsWithContext(ctx)
-
-	var rssBytes int64
-	var vszBytes int64
-	if memoryInfo, err := process.MemoryInfoWithContext(ctx); err == nil && memoryInfo != nil {
-		rssBytes = int64(memoryInfo.RSS)
-		vszBytes = int64(memoryInfo.VMS)
-	}
 
 	uid := ""
 	if uids, err := process.UidsWithContext(ctx); err == nil && len(uids) > 0 {
@@ -320,65 +338,49 @@ func loadProcessInventorySnapshot(ctx context.Context, process *gopsprocess.Proc
 		gid = strconv.FormatUint(uint64(gids[0]), 10)
 	}
 
-	parentName := ""
-	parentImage := ""
-	parentCommand := ""
-	parentStartTimeUnixMillis := int64(0)
-	if individual && parentPID > 0 {
-		if parent, err := gopsprocess.NewProcessWithContext(ctx, parentPID); err == nil {
-			parentName, _ = parent.NameWithContext(ctx)
-			parentImage, _ = parent.ExeWithContext(ctx)
-			parentCommand, _ = parent.CmdlineWithContext(ctx)
-			parentStartTimeUnixMillis, _ = parent.CreateTimeWithContext(ctx)
-		}
-	}
-
-	childrenPIDs := make([]int, 0)
-	// The network inventory also looks up individual processes without a full
-	// process inventory. Preserve its best-effort relationship fields there.
-	if individual {
-		if children, err := process.ChildrenWithContext(ctx); err == nil {
-			for _, child := range children {
-				childrenPIDs = append(childrenPIDs, int(child.Pid))
-			}
-		}
-	}
-
 	if image == "" {
 		image = name
 	}
 	if command == "" {
 		command = image
 	}
-	status := ""
-	if len(statuses) > 0 {
-		status = strings.Join(statuses, ",")
+	if ctx.Err() != nil {
+		return nil, false
 	}
 
 	return &processInventorySnapshot{
-		pid:                       pid,
-		parentPID:                 int(parentPID),
-		name:                      name,
-		image:                     image,
-		command:                   command,
-		parentName:                parentName,
-		parentImage:               parentImage,
-		parentCommand:             parentCommand,
-		username:                  username,
-		uid:                       uid,
-		gid:                       gid,
-		status:                    status,
-		bootID:                    bootID,
-		startTimeUnixMillis:       createTime,
-		parentStartTimeUnixMillis: parentStartTimeUnixMillis,
-		cpuPercent:                cpuPercent,
-		memoryPercent:             float64(memoryPercent),
-		rssBytes:                  rssBytes,
-		vszBytes:                  vszBytes,
-		threadCount:               int(threadCount),
-		fdCount:                   int(fdCount),
-		childrenPIDs:              childrenPIDs,
+		pid:                 pid,
+		parentPID:           int(parentPID),
+		name:                name,
+		image:               image,
+		command:             command,
+		username:            username,
+		uid:                 uid,
+		gid:                 gid,
+		bootID:              bootID,
+		startTimeUnixMillis: createTime,
 	}, image != "" || command != ""
+}
+
+func loadProcessInventorySnapshot(ctx context.Context, process *gopsprocess.Process, bootID string) (*processInventorySnapshot, bool) {
+	snapshot, readable := loadProcessIdentitySnapshot(ctx, process, bootID)
+	if snapshot == nil {
+		return nil, false
+	}
+	statuses, _ := process.StatusWithContext(ctx)
+	snapshot.status = strings.Join(statuses, ",")
+	snapshot.cpuPercent, _ = process.CPUPercentWithContext(ctx)
+	memoryPercent, _ := process.MemoryPercentWithContext(ctx)
+	snapshot.memoryPercent = float64(memoryPercent)
+	threadCount, _ := process.NumThreadsWithContext(ctx)
+	snapshot.threadCount = int(threadCount)
+	fdCount, _ := process.NumFDsWithContext(ctx)
+	snapshot.fdCount = int(fdCount)
+	if memoryInfo, err := process.MemoryInfoWithContext(ctx); err == nil && memoryInfo != nil {
+		snapshot.rssBytes = int64(memoryInfo.RSS)
+		snapshot.vszBytes = int64(memoryInfo.VMS)
+	}
+	return snapshot, readable && ctx.Err() == nil
 }
 
 // A parent can start after the PID enumeration. Only those missing parents

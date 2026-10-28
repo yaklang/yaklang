@@ -99,7 +99,7 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 			if !ok {
 				return
 			}
-			event = p.prepareEvent(event)
+			event = p.prepareEventContext(ctx, event)
 			if !shouldProcessEvent(event) {
 				continue
 			}
@@ -123,7 +123,7 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 				continue
 			}
 			for _, alert := range p.engine.Evaluate(event) {
-				alert = p.enrichAlertEvidence(event, alert)
+				alert = p.enrichAlertEvidenceContext(ctx, event, alert)
 				select {
 				case p.alerts <- alert:
 				case <-ctx.Done():
@@ -144,6 +144,10 @@ func (p *pipeline) Run(ctx context.Context, events <-chan model.Event) {
 }
 
 func (p *pipeline) prepareEvent(event model.Event) model.Event {
+	return p.prepareEventContext(context.Background(), event)
+}
+
+func (p *pipeline) prepareEventContext(ctx context.Context, event model.Event) model.Event {
 	if p == nil {
 		return event
 	}
@@ -157,7 +161,7 @@ func (p *pipeline) prepareEvent(event model.Event) model.Event {
 		event = p.files.Apply(event)
 	}
 	if p.artifacts != nil {
-		event = p.artifacts.Apply(event)
+		event = p.artifacts.ApplyContext(ctx, event)
 	}
 	return event
 }
