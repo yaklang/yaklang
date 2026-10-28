@@ -605,6 +605,13 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 		h(packet)
 	}
 	if failure := packet.ErrorLayer(); failure != nil {
+		if hasUnselectedEtherIP(packet) {
+			// networkPacket already published the parent refusal. Keep the
+			// original decoder failure for strict capture/error accounting, but
+			// do not publish a second generic diagnostic or admit a child.
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
 		var pptp *pptpHeaderError
 		var truncatedIP *ipHeaderTruncatedError
 		var vxlan *vxlanHeaderError
@@ -615,8 +622,8 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 			// A selected UDP tunnel can retain its outer TransportLayer when an
 			// inner header fails. The precise native refusal already owns this
 			// packet; do not redispatch those bytes as an outer UDP application.
-			// Unselected parents returned above, so speculative child failures
-			// cannot add capture errors behind their admission boundary.
+			// Other unselected parents returned above; an EtherIP failure has
+			// already retained its original accounting without redispatch.
 			c.trafficPool.malformedPacket(failure.Error().Error())
 			return
 		}
