@@ -769,6 +769,19 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	if e.Protocol == "ip" && e.Status == "incomplete" && e.ExpertCode == "IPHeaderTruncated" {
+		expected := number(e.Session["Expected IP Version"])
+		available, required := number(e.Session["Available Header Bytes"]), number(e.Session["Required Header Bytes"])
+		if available >= 0 && available < required && (expected == 4 && required == 20 || expected == 6 && required == 40) {
+			label := fmt.Sprintf("IPv%d", expected)
+			names := headerLayerNames(e.Session["Observed Header Layers"])
+			if len(names) == 0 || names[len(names)-1] != label {
+				names = []string{label}
+			}
+			*p = packetPresentation{networkRefused: true, protocol: label, summary: safeText(e.Summary), status: "incomplete", visibility: "truncated-network-header", scope: "incomplete network header; transport not admitted", evidence: "declared carrier and available fixed-header prefix; no transport state admitted", nativeHeaders: names, nativeDomain: e.Domain, priority: 1000}
+			return
+		}
+	}
 	if e.Protocol == "ip" && e.Profile == "network-encapsulation-refusal" && e.Status == "limited" && e.Session["Child Header Identity"] == "unconfirmed" {
 		names := headerLayerNames(e.Session["Observed Header Layers"])
 		label := "IP"

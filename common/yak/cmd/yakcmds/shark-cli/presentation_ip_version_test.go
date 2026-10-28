@@ -14,9 +14,10 @@ import (
 func TestNetworkRefusalAppliesToBothInspectorsAndStaleChildEvents(t *testing.T) {
 	bad := &pcaputil.ProtocolEvent{Protocol: "ip", Transport: "network", Status: "malformed", ExpertCode: "IPVersionMismatch", Summary: "invalid IPv4 version 6", Session: map[string]any{"Expected IP Version": uint8(4), "Observed IP Version": uint8(6), "Observed Header Layers": []string{"Ethernet", "IPv4"}}}
 	parent := &pcaputil.ProtocolEvent{Protocol: "ip", Profile: "network-encapsulation-refusal", Status: "limited", Summary: "Encapsulation profile unavailable; inner identity unconfirmed", Session: map[string]any{"Child Header Identity": "unconfirmed", "Observed Header Layers": []string{"Ethernet", "IPv4"}}}
+	truncated := &pcaputil.ProtocolEvent{Protocol: "ip", Transport: "network", Status: "incomplete", ExpertCode: "IPHeaderTruncated", Summary: "IPv4 header incomplete: 4 of 20 fixed bytes available; transport not admitted", Session: map[string]any{"Expected IP Version": uint8(4), "Observed IP Version": uint8(6), "Available Header Bytes": 4, "Required Header Bytes": 20, "Observed Header Layers": []string{"Ethernet", "IPv4"}}}
 	child := &pcaputil.ProtocolEvent{Protocol: "dns", Status: "decoded", Session: map[string]any{"QNAME": "unproved.invalid"}}
 	wire := udpPacket(t, 53, []byte("unproved.invalid"))
-	for _, refusal := range []*pcaputil.ProtocolEvent{bad, parent} {
+	for _, refusal := range []*pcaputil.ProtocolEvent{bad, parent, truncated} {
 		for _, events := range [][]*pcaputil.ProtocolEvent{{refusal}, {refusal, child}, {child, refusal}} {
 			raw := &capturedPacket{number: 1, data: wire, ci: gopacket.CaptureInfo{Length: len(wire), CaptureLength: len(wire)}, link: layers.LinkTypeEthernet, events: events, presentation: presentEvents(events)}
 			request, err := marshalDecodeRequest(decodeRequest{Number: raw.number, Events: events, Data: raw.data, Length: len(wire), Link: raw.link})
