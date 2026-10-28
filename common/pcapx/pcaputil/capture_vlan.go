@@ -26,6 +26,30 @@ type captureVLANDecoder struct{}
 
 func (d captureCarrierDecoder) Decode(data []byte, b gopacket.PacketBuilder) error {
 	wrapped := &captureCarrierBuilder{PacketBuilder: b, network: d.network}
+	if d.inner == layers.LinkTypeRaw && len(data) > 0 {
+		switch data[0] >> 4 {
+		case 4:
+			d.inner = layers.LayerTypeIPv4
+		case 6:
+			d.inner = layers.LayerTypeIPv6
+		}
+	}
+	if typed, ok := d.inner.(interface{ LayerType() gopacket.LayerType }); ok && (typed.LayerType() == layers.LayerTypeIPv4 || typed.LayerType() == layers.LayerTypeIPv6) {
+		d.inner = typed.LayerType()
+	}
+	if d.inner == layers.LayerTypeIPv4 || d.inner == layers.IPProtocolIPv4 || d.inner == layers.EthernetTypeIPv4 {
+		ip := &layers.IPv4{}
+		err := ip.DecodeFromBytes(data, wrapped)
+		if err == nil {
+			restoreIPv4FixedFieldsAfterOptions(ip, data)
+		}
+		wrapped.AddLayer(ip)
+		wrapped.SetNetworkLayer(ip)
+		if err != nil {
+			return err
+		}
+		return wrapped.NextDecoder(ip.NextLayerType())
+	}
 	if (d.inner == layers.LayerTypeIPv6 || d.inner == layers.IPProtocolIPv6 || d.inner == layers.EthernetTypeIPv6) && len(data) >= 40 && data[6] == 0 && binary.BigEndian.Uint16(data[4:6]) != 0 {
 		// First HBH options are decoded inside IPv6 by the dependency. Use the
 		// same bounded adapter for observers; retain legacy jumbo handling.
