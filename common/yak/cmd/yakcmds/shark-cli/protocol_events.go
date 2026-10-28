@@ -167,6 +167,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			fieldViewLimited = true
 			return
 		}
+		// Retain semantic nesting in both local details and isolated workers.
+		// The outer add function is reserved for PDU headings and metadata.
+		add := func(text string, branch bool) {
+			out = append(out, field{text: clipText(text, 2048), branch: branch, depth: max(0, depth+1)})
+		}
 		if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
 			if octets, ok := fieldOctetList(v); ok {
 				v = octets
@@ -752,6 +757,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 				fieldViewLimited = fieldViewLimited || limited
 				delete(values, "Session Establishment")
 			}
+		}
+		if e.Protocol == "tls" {
+			// Retained hello metadata and this record are separate evidence
+			// scopes. End the metadata branch before publishing wire ranges.
+			add("TLS record and observed context", true)
 		}
 		if e.Protocol == "dcerpc" {
 			add("DCE/RPC message and observed association", true)
