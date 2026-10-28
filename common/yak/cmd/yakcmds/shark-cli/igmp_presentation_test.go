@@ -65,6 +65,7 @@ func TestIGMPInspectorNativeAndWorkerPreserveRecordHierarchyAndByteSources(t *te
 			}
 		}
 		require.Equal(t, [][2]int{{46, 50}, {66, 70}}, ranges)
+		assertMembershipFieldDepths(t, got.fields, "IGMP", "Group Records[0]", "Sources", "Sources[1]: 192.0.2.2")
 	}
 }
 

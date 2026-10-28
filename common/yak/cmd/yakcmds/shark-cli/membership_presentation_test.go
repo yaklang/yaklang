@@ -1,11 +1,40 @@
 package sharkcli
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
+
+func assertMembershipFieldDepths(t *testing.T, fields []field, names ...string) {
+	t.Helper()
+	previous := -1
+	for _, name := range names {
+		found := false
+		for _, value := range fields {
+			if value.text == name {
+				require.Greater(t, value.depth, previous, "nested field %q must be deeper than its parent", name)
+				previous, found = value.depth, true
+				break
+			}
+		}
+		require.True(t, found, "missing semantic field %q", name)
+	}
+}
+
+func TestFieldPaneRendersRecordedSemanticDepth(t *testing.T) {
+	u := browsingFixture(t)
+	u.fields = packetDetail{fields: []field{{text: "Protocol", branch: true}, {text: "Record", branch: true, depth: 1}, {text: "Address: 239.1.2.3", depth: 2}}}
+	frame := u.view(&captureSession{}, &captureSource{}, captureConfig{})
+	require.Contains(t, frame, "  ── Record")
+	require.Contains(t, frame, "    Address: 239.1.2.3")
+	// The indentation is drawn separately; filtering and byte selection retain
+	// the complete, unprefixed field text and its original index.
+	require.Equal(t, "Address: 239.1.2.3", u.fields.fields[2].text)
+	require.False(t, strings.HasPrefix(u.fields.fields[2].text, " "))
+}
 
 func TestMembershipNativeVersionReplacesLegacyGuessOnlyInDisplayStack(t *testing.T) {
 	for _, tc := range []struct {

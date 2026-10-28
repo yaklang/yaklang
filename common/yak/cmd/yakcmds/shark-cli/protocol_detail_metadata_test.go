@@ -70,15 +70,23 @@ func TestConnectionObservationPrecedesWireTreesWithoutInventingByteSources(t *te
 				require.Contains(t, text, "no new handshake or authentication result implied")
 				require.Contains(t, text, "ZZZ remainder: still visible")
 				if protocol == "tls" {
+					wire := -1
 					found := false
-					for _, f := range got.fields {
+					for i, f := range got.fields {
+						if f.text == "TLS record and observed context" {
+							wire = i
+							require.Zero(t, f.depth, "wire record is a sibling of retained connection metadata")
+						}
 						if strings.HasPrefix(f.text, "Record Version:") && f.hasRange {
 							found = true
+							require.Greater(t, i, wire)
+							require.Positive(t, f.depth, "actual record fields are nested below the wire heading")
 							require.Equal(t, 1, f.source)
 							require.Equal(t, 1, f.start)
 							require.Equal(t, 3, f.end)
 						}
 					}
+					require.Greater(t, wire, start)
 					require.True(t, found, "actual TLS record header spans remain available")
 				}
 			}
