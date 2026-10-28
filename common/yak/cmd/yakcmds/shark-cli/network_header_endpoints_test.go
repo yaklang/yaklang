@@ -26,6 +26,45 @@ func endpointVXLANWire(t *testing.T, source, destination string, flags byte, vni
 	return buffer.Bytes()
 }
 
+func TestObservedOuterTransportDoesNotPublishSpeculativeGTPPhysicalEndpoints(t *testing.T) {
+	for _, ipv6 := range []bool{false, true} {
+		eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
+		outer := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolUDP, SrcIP: net.ParseIP("1.2.3.4"), DstIP: net.ParseIP("4.3.2.1")}
+		outerUDP := &layers.UDP{SrcPort: 9999, DstPort: 2152}
+		require.NoError(t, outerUDP.SetNetworkLayerForChecksum(outer))
+		innerUDP := &layers.UDP{SrcPort: 1234, DstPort: 5678}
+		var inner gopacket.SerializableLayer
+		if ipv6 {
+			ip := &layers.IPv6{Version: 6, HopLimit: 64, NextHeader: layers.IPProtocolUDP, SrcIP: net.ParseIP("2001:db8::1"), DstIP: net.ParseIP("2001:db8::2")}
+			require.NoError(t, innerUDP.SetNetworkLayerForChecksum(ip))
+			inner = ip
+		} else {
+			ip := &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocolUDP, SrcIP: net.ParseIP("203.0.113.1"), DstIP: net.ParseIP("203.0.113.2")}
+			require.NoError(t, innerUDP.SetNetworkLayerForChecksum(ip))
+			inner = ip
+		}
+		buffer := gopacket.NewSerializeBuffer()
+		require.NoError(t, gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, outer, outerUDP, &layers.GTPv1U{Version: 1, ProtocolType: 1, MessageType: 255, TEID: 7}, inner, innerUDP, gopacket.Payload([]byte("opaque"))))
+		wire := buffer.Bytes()
+		decoded := gopacket.NewPacket(wire, pcaputil.CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+		require.Nil(t, decoded.ErrorLayer())
+		network, _ := pcaputil.CaptureTransport(decoded)
+		require.NotEqual(t, "1.2.3.4", network.NetworkFlow().Src().String(), "control must exercise an independently decoded inner network")
+		view := &packetTransportView{Protocol: "udp", Source: "1.2.3.4", Destination: "4.3.2.1", SourcePort: 9999, DestinationPort: 2152, Header: bytes.Clone(wire[34:42]), HeaderLength: 8, PayloadLength: len(wire) - 42, Layers: []string{"Ethernet", "IPv4", "UDP"}, LayersComplete: true, Info: "observed outer UDP header"}
+		raw := &capturedPacket{number: 1, data: wire, link: layers.LinkTypeEthernet, ci: gopacket.CaptureInfo{Length: len(wire), CaptureLength: len(wire)}, transportView: view}
+		row := summarize(raw)
+		require.Equal(t, "1.2.3.4", row.Source)
+		require.Equal(t, "4.3.2.1", row.Destination)
+		require.Empty(t, row.PhysicalSource, "identical real physical endpoints are omitted, not replaced with speculative children")
+		require.Empty(t, row.PhysicalDestination)
+		require.Equal(t, "observed transport header", row.ProtocolScope)
+		require.Equal(t, view.Layers, row.ProtocolStack)
+		require.Contains(t, row.Layers, "GTPv1U", "decoder inventory is retained separately from selected protocol scope")
+		require.Zero(t, row.StreamID)
+		require.Empty(t, row.ConnectionProtocol)
+	}
+}
+
 func nativeEndpointRefusal(t *testing.T, wire []byte) *capturedPacket {
 	return nativeEndpointRefusalOnLink(t, wire, layers.LinkTypeEthernet)
 }
