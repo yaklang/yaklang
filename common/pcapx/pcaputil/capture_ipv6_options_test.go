@@ -192,6 +192,11 @@ func TestBadHopByHopKeepsValidatedFixedParentAndCapturedSource(t *testing.T) {
 		require.Equal(t, "IPv6OptionsHeaderBounds", events[0].ExpertCode)
 		require.Equal(t, "2001:db8::1", events[0].Source)
 		require.Equal(t, "2001:db8::2", events[0].Destination)
+		want := []string{"Ethernet", "IPv6"}
+		if nested {
+			want = []string{"Ethernet", "IPv4", "IPv6"}
+		}
+		require.Equal(t, want, events[0].Session["Observed Header Layers"], "the physical prefix must retain every validated parent before the failed child")
 		require.Equal(t, []PacketReference{{Number: 1, Domain: events[0].Domain}}, events[0].SourceBytes.PacketRefs)
 	}
 }
@@ -217,7 +222,12 @@ func TestHopByHopRequiresImmediatelyPrecedingIPv6FixedHeader(t *testing.T) {
 			events, _ := espNativeReplay(t, [][]byte{frame}, 0, false)
 			require.Len(t, events, 1)
 			require.Equal(t, "ip", events[0].Protocol)
-			require.Equal(t, "IPv6OptionsHeaderOrder", events[0].ExpertCode)
+			if name == "IPv4-protocol-zero" {
+				require.Equal(t, "EncapsulationDepthOrProfile", events[0].ExpertCode)
+				require.Equal(t, "limited", events[0].Status)
+			} else {
+				require.Equal(t, "IPv6OptionsHeaderOrder", events[0].ExpertCode)
+			}
 			require.Zero(t, events[0].FlowID)
 			require.Zero(t, events[0].TCPFlowID)
 			require.NotContains(t, events[0].DisplayFields(), "esp.spi")

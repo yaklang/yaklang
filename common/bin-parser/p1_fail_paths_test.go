@@ -13,6 +13,9 @@ type p1FailCase struct {
 }
 
 var p1FailCases = []p1FailCase{
+	// A plausible ESP header does not authorize an unbounded root reader.
+	// Its malformed bounded inputs are separately exercised via ParseStructured.
+	{"ipsec_esp", []string{"ESPHeaderFields"}, []byte{0, 0, 0, 1, 0, 0, 0, 1}, "requires-caller-boundary"},
 	// Valid-looking values still require an explicit caller-owned boundary;
 	// these are boundary-refusal cases, not credited malformed-base64 branches.
 	{"application-layer.imap_sasl", []string{"IMAPSASLResponse"}, []byte("ZHVtbXk=\r\n"), "response-requires-caller-boundary"},

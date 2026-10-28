@@ -110,6 +110,8 @@ func assertESPIncompleteInspectors(t *testing.T, raw *capturedPacket, w []byte) 
 			require.Equal(t, w, got.sources[0].Data)
 		}
 		spiRange, sequenceRange := false, false
+		require.NotContains(t, detailLines(got.fields), "YAML dissector incomplete")
+		require.NotContains(t, detailLines(got.fields), "IPSecESP {Contents=")
 		for _, f := range got.fields {
 			if strings.HasPrefix(f.text, "SPI:") && f.hasRange {
 				spiRange = true
@@ -126,6 +128,18 @@ func assertESPIncompleteInspectors(t *testing.T, raw *capturedPacket, w []byte) 
 		}
 		require.Equal(t, len(w) >= 4, spiRange)
 		require.Equal(t, len(w) >= 8, sequenceRange)
+	}
+	for _, got := range []packetDetail{detail(raw), quickDetail(raw), workerMetadataDetailForPacket(t, raw)} {
+		require.Contains(t, detailLines(got.fields), "Captured network prefix")
+		found := false
+		for _, f := range got.fields {
+			if strings.HasPrefix(f.text, "Source: ") && f.hasRange && f.source == 0 {
+				found = true
+				require.GreaterOrEqual(t, f.start, 14)
+				require.LessOrEqual(t, f.end, len(raw.data))
+			}
+		}
+		require.True(t, found, "confirmed fixed IP bytes remain independently selectable from Source0")
 	}
 	stream := workerMetadataDetail(t, raw.events, true)
 	for _, f := range stream.fields {
@@ -248,4 +262,41 @@ func TestESPIncompleteDecoderMarkerRequiresExactPhysicalPrefix(t *testing.T) {
 	other := refusalPresentationWire(t, 4, layers.IPProtocolTCP, w)
 	packet = gopacket.NewPacket(other, pcaputil.CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
 	require.False(t, espIncompleteDecoderCovered(packet, presentation, why), "an ESP label cannot cover a different child decoder failure")
+}
+
+func TestESPIncompleteInspectorSkipsLegacyOnlyForItsPhysicalNativePrefix(t *testing.T) {
+	w := espPresentationEvent().Raw[:3]
+	valid := espIncompleteNativePacket(t, 4, w, 0)
+	for _, control := range []struct {
+		name   string
+		change func(*capturedPacket)
+	}{
+		{"false-contract", func(p *capturedPacket) { p.events[0].Profile = "port-hint" }},
+		{"different-captured-prefix", func(p *capturedPacket) { p.data[len(p.data)-1] ^= 1 }},
+		{"other-decoder", func(p *capturedPacket) {
+			p.data = refusalPresentationWire(t, 4, layers.IPProtocolTCP, w)
+			p.data = p.data[:14+20+len(w)]
+			p.ci.Length, p.ci.CaptureLength = len(p.data), len(p.data)
+		}},
+	} {
+		t.Run(control.name, func(t *testing.T) {
+			copy := *valid
+			copy.data = bytes.Clone(valid.data)
+			event := *valid.events[0]
+			copy.events = []*pcaputil.ProtocolEvent{&event}
+			control.change(&copy)
+			var view packetDetail
+			require.False(t, appendESPIncompleteCapturedPrefix(&view, &copy, copy.events))
+			require.Empty(t, view.fields, "an unrelated error is not converted into a native captured-prefix view")
+			require.Contains(t, detailLines(detail(&copy).fields), "YAML dissector incomplete", "the strict skip must not hide an unrelated legacy failure")
+		})
+	}
+	// Even exact quoted ESP bytes are not the physical selected IP50 carrier.
+	quote := refusalPresentationWire(t, 4, layers.IPProtocolESP, w)[14:]
+	icmp := append([]byte{3, 1, 0, 0, 0, 0, 0, 0}, quote...)
+	wire := refusalPresentationWire(t, 4, layers.IPProtocolICMPv4, icmp)
+	copy := *valid
+	copy.data, copy.ci.Length, copy.ci.CaptureLength = wire, len(wire), len(wire)
+	var view packetDetail
+	require.False(t, appendESPIncompleteCapturedPrefix(&view, &copy, copy.events))
 }

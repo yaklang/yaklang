@@ -116,6 +116,31 @@ func TestNetworkHeaderRefusalPreservesFullValidatedPrefixAndIgnoresEventAddresse
 	inner := refusalPresentationWire(t, 6, layers.IPProtocolIPv6Destination, body)
 	wire := endpointVXLANWire(t, "203.0.113.1", "203.0.113.2", 8, 42, inner)
 	names := []string{"Ethernet", "IPv4", "UDP", "VXLAN", "Ethernet", "IPv6", "IPv6Destination"}
+	var input bytes.Buffer
+	writer := pcapgo.NewWriter(&input)
+	require.NoError(t, writer.WriteFileHeader(65535, layers.LinkTypeEthernet))
+	require.NoError(t, writer.WritePacket(gopacket.CaptureInfo{Timestamp: time.Unix(1, 0), Length: len(wire), CaptureLength: len(wire)}, wire))
+	var actual []*pcaputil.ProtocolEvent
+	require.NoError(t, pcaputil.ReplayPcap(bytes.NewReader(input.Bytes()), pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { actual = append(actual, e) })))
+	require.Len(t, actual, 1)
+	require.Equal(t, names, actual[0].Session["Observed Header Layers"])
+	require.Equal(t, "2001:db8::1", actual[0].Source)
+	actualRaw := &capturedPacket{number: 1, data: wire, ci: gopacket.CaptureInfo{Length: len(wire), CaptureLength: len(wire)}, link: layers.LinkTypeEthernet, events: actual, presentation: presentEvents(actual)}
+	actualRow := summarize(actualRaw)
+	require.Equal(t, "2001:db8::1", actualRow.Source)
+	require.Equal(t, "203.0.113.1", actualRow.PhysicalSource)
+	for _, got := range []packetDetail{detail(actualRaw), workerMetadataDetailForPacket(t, actualRaw)} {
+		found := false
+		for _, field := range got.fields {
+			if field.text == "Source: 2001:db8::1" && field.hasRange {
+				found = true
+				require.Zero(t, field.source)
+				require.Equal(t, 72, field.start)
+				require.Equal(t, 88, field.end)
+			}
+		}
+		require.True(t, found)
+	}
 	e := refusalPresentationEvent("AHHeaderBounds", names)
 	child := &pcaputil.ProtocolEvent{ID: 2, Protocol: "dns", Status: "decoded", Session: map[string]any{"QNAME": "unproved.invalid"}}
 	for _, events := range [][]*pcaputil.ProtocolEvent{{e, child}, {child, e}} {

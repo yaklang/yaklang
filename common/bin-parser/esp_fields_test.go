@@ -15,6 +15,13 @@ func TestESPCanonicalHeaderEntryAndLegacyCompatibility(t *testing.T) {
 	require.Equal(t, uint32(0), m["Sequence"])
 	require.Equal(t, w[8:], m["Opaque Body"])
 	require.Equal(t, false, m["Authentication Verified"])
+	require.NotContains(t, m, "Ciphertext")
+	require.Equal(t, false, m["Algorithm Context Available"])
+	require.Equal(t, false, m["Extended Sequence Reconstructed"])
+	zeroSPI := append([]byte(nil), w...)
+	clear(zeroSPI[:4])
+	_, err = ParseStructured(zeroSPI, "ipsec_esp", "ESPHeaderFields")
+	require.Error(t, err, "reserved SPI cannot become a successful ESP observation")
 	for cut := 0; cut < 8; cut++ {
 		_, err = ParseStructured(w[:cut], "ipsec_esp", "ESPHeaderFields")
 		require.Error(t, err)

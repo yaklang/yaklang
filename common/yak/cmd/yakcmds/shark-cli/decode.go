@@ -341,6 +341,74 @@ func protocolDetailEvents(events []*pcaputil.ProtocolEvent) ([]*pcaputil.Protoco
 	return events, false
 }
 
+// A validated incomplete ESP observation already describes every available
+// child byte. Keep its physical IP prefix, but do not retry a legacy grammar
+// which requires bytes outside this captured carrier. A matching label alone
+// cannot suppress an unrelated decoder failure or an ICMP quotation.
+func appendESPIncompleteCapturedPrefix(d *packetDetail, raw *capturedPacket, events []*pcaputil.ProtocolEvent) bool {
+	p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
+	esp, ok := p.Layer(layers.LayerTypeIPSecESP).(*layers.IPSecESP)
+	if !ok {
+		return false
+	}
+	matched := false
+	for _, event := range events {
+		if validESPIncompleteObservation(event) && bytes.Equal(event.Raw, esp.LayerContents()) {
+			matched = true // The strict contract also verifies the complete raw hash.
+			break
+		}
+	}
+	if !matched {
+		return false
+	}
+	var names []string
+	var parent gopacket.Layer
+	offset, lastNetwork := 0, -1
+	for _, layer := range p.Layers() {
+		if layer == esp {
+			break
+		}
+		if layer.LayerType() == layers.LayerTypeICMPv4 || layer.LayerType() == layers.LayerTypeICMPv6 || layer.LayerType() == layers.LayerTypeTCP {
+			return false
+		}
+		if _, network := layer.(gopacket.NetworkLayer); network {
+			lastNetwork = offset
+		}
+		names = append(names, layer.LayerType().String())
+		offset += len(layer.LayerContents())
+		parent = layer
+	}
+	var next layers.IPProtocol
+	switch parent := parent.(type) {
+	case *layers.IPv4:
+		next = parent.Protocol
+	case *layers.IPv6:
+		next = parent.NextHeader
+	case *layers.IPv6HopByHop:
+		next = parent.NextHeader
+	case *layers.IPv6Destination:
+		next = parent.NextHeader
+	case *layers.IPv6Routing:
+		next = parent.NextHeader
+	case *layers.IPSecAH:
+		next = parent.NextHeader
+	default:
+		return false
+	}
+	if next != layers.IPProtocolESP || !bytes.Equal(parent.LayerPayload(), esp.LayerContents()) {
+		return false
+	}
+	headers := capturedNetworkPrefix(p, raw.data, names)
+	if len(headers) == 0 || headers[len(headers)-1].start != lastNetwork {
+		return false // A failed/unselected outer carrier cannot confirm this child.
+	}
+	d.fields = append(d.fields, field{text: "Captured network prefix", branch: true})
+	for _, header := range headers {
+		d.fields = append(d.fields, field{text: header.label + " header", branch: true, start: header.start, end: header.end, hasRange: true}, field{depth: 1, text: "Source: " + header.source, start: header.sourceStart, end: header.sourceEnd, hasRange: true}, field{depth: 1, text: "Destination: " + header.destination, start: header.destStart, end: header.destEnd, hasRange: true})
+	}
+	return true
+}
+
 func detail(raw *capturedPacket) (d packetDetail) {
 	d.number = raw.number
 	row := summarize(raw)
@@ -359,6 +427,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)
 	}
+	espIncomplete := !networkRefused && appendESPIncompleteCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -377,7 +446,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			d.protocol = presentEvents(events).protocol
 		}
 	}
-	if networkRefused {
+	if networkRefused || espIncomplete {
 		return d
 	}
 	appendTransportObservation(&d, row)
@@ -539,6 +608,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)
 	}
+	espIncomplete := !networkRefused && appendESPIncompleteCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -554,7 +624,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 	}
-	if networkRefused {
+	if networkRefused || espIncomplete {
 		return d
 	}
 	appendTransportObservation(&d, row)
