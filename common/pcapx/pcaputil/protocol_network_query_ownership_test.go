@@ -27,6 +27,26 @@ type networkOwnershipControl struct {
 	Error       string         `json:"error"`
 }
 
+// Preserve the immutable earlier wire/answers while explicitly superseding
+// their two error-union field names in the current runtime contract.
+func networkOwnershipFieldsCurrent(t *testing.T, c networkOwnershipControl) map[string]any {
+	t.Helper()
+	if c.Protocol != "icmp" {
+		return c.Fields
+	}
+	wire := doipDiscoveryWire(t, c.Frame)
+	start := 14 + int(wire[14]&15)*4
+	typ := wire[start]
+	if typ != 3 && typ != 11 {
+		return c.Fields
+	}
+	want := cloneSession(c.Fields)
+	delete(want, "Identifier")
+	delete(want, "Sequence")
+	want["Rest of Header"] = bytes.Clone(wire[start+4 : start+8])
+	return want
+}
+
 func corruptNetworkObservation(v any) {
 	switch x := v.(type) {
 	case map[string]any:
@@ -77,6 +97,7 @@ func testNetworkObservationQueryOwnership(t *testing.T, arp bool) {
 		require.Equal(t, want, got)
 	}
 	for _, c := range doc.Cases {
+		c.Fields = networkOwnershipFieldsCurrent(t, c)
 		if (c.Protocol == "arp") != arp {
 			continue
 		}
