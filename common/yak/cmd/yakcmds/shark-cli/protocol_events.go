@@ -926,7 +926,7 @@ func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 		if e == nil {
 			continue
 		}
-		if e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) {
+		if e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) && !validESPIncompleteObservation(e) {
 			continue
 		}
 		name := eventProtocolName(e)

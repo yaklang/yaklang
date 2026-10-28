@@ -33,6 +33,9 @@ type packetPresentation struct {
 	rejectedTLS                           bool
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
+	nativeESPIncomplete                   bool
+	nativeESPBytes                        int
+	nativeESPSHA                          [32]byte
 }
 
 var protocolDisplayNames = map[string]string{
@@ -773,7 +776,7 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 		return nil, "", false
 	}
 	switch e.ExpertCode {
-	case "IPv6OptionsHeaderBounds", "AHHeaderBounds", "ESPParentLengthInvalid":
+	case "IPv6OptionsHeaderBounds", "IPv6OptionsHeaderOrder", "AHHeaderBounds", "ESPParentLengthInvalid":
 	default:
 		return nil, "", false
 	}
@@ -808,6 +811,21 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			p.scope = "observed clear ESP header and opaque remainder"
 			p.evidence = "SA context unavailable; authentication, decryption and replay not verified"
 			p.summary = safeText(e.Summary)
+		}
+		return
+	}
+	if validESPIncompleteObservation(e) {
+		p.addLayer("ESP")
+		if p.priority <= 5 {
+			p.protocol, p.priority, p.status, p.visibility = "ESP", 5, "incomplete", "partial-header"
+			p.scope = "declared ESP; clear header incomplete"
+			p.summary = fmt.Sprintf("ESP clear header incomplete · %d/8 bytes observed; SA context unavailable", len(e.Raw))
+			if len(e.Raw) >= 8 {
+				p.scope = "ESP clear header observed; declared carrier extent incomplete"
+				p.summary = "ESP clear header observed · declared carrier extent incomplete; SA context unavailable"
+			}
+			p.evidence = "captured prefix only; no complete ESP PDU, SA, authentication or replay verdict"
+			p.nativeESPIncomplete, p.nativeESPBytes, p.nativeESPSHA = true, len(e.Raw), sha256.Sum256(e.Raw)
 		}
 		return
 	}
@@ -1256,7 +1274,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
-			if semantic == "ESP" && physical == "IPSecESP" && p.status == "limited" && p.visibility == "headers" {
+			if semantic == "ESP" && physical == "IPSecESP" && (p.status == "limited" && p.visibility == "headers" || p.nativeESPIncomplete && p.status == "incomplete") {
 				row.ProtocolStack[i], present = "ESP", true
 				break
 			}
