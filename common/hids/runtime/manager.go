@@ -117,14 +117,9 @@ func (m *Manager) ReplayInventory(ctx context.Context) error {
 }
 
 func (m *Manager) CollectCurrentState(ctx context.Context, collectType string) error {
-	if m == nil {
-		return nil
-	}
-	m.mu.Lock()
-	instance := m.instance
-	m.mu.Unlock()
-	if instance == nil {
-		return nil
+	instance, err := m.currentStateInstance()
+	if err != nil {
+		return err
 	}
 	if err := instance.collectCurrentState(ctx, collectType); err != nil {
 		return fmt.Errorf("collect hids current state: %w", err)

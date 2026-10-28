@@ -38,32 +38,55 @@ func newSystemInventoryProvider() inventoryProvider {
 }
 
 func (systemInventoryProvider) ListProcessEvents(ctx context.Context) ([]model.Event, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	processes, err := gopsprocess.ProcessesWithContext(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("list processes: %w", err)
 	}
+	return collectProcessInventoryEvents(ctx, processes, readBootID())
+}
 
-	bootID := readBootID()
+func collectProcessInventoryEvents(ctx context.Context, processes []*gopsprocess.Process, bootID string) ([]model.Event, error) {
 	now := time.Now().UTC()
 	snapshots := make([]*processInventorySnapshot, 0, len(processes))
 	for _, process := range processes {
-		snapshot, ok := loadProcessInventorySnapshot(process, bootID)
-		if !ok {
-			continue
+		if err := ctx.Err(); err != nil {
+			return nil, err
 		}
-		snapshots = append(snapshots, snapshot)
+		// Collect each visible PID once. Parent details and children are derived
+		// from this same inventory instead of re-scanning /proc for every PID.
+		snapshot, _ := loadProcessInventorySnapshot(ctx, process, bootID, false)
+		if snapshot != nil {
+			// Keep the relationship even when a process disappears before its
+			// image can be read; it may still be another process's child.
+			snapshots = append(snapshots, snapshot)
+		}
 	}
 
 	enrichProcessInventoryTree(snapshots)
+	if err := enrichMissingProcessInventoryParents(ctx, snapshots); err != nil {
+		return nil, err
+	}
 
 	events := make([]model.Event, 0, len(snapshots))
 	for _, snapshot := range snapshots {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		if snapshot.image == "" && snapshot.command == "" {
+			continue
+		}
 		events = append(events, buildProcessInventoryEventFromSnapshot(now, snapshot))
 	}
-	return events, nil
+	return events, ctx.Err()
 }
 
 func (systemInventoryProvider) ListNetworkEvents(ctx context.Context) ([]model.Event, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	connections, err := gopsnet.ConnectionsWithContext(ctx, "all")
 	if err != nil {
 		return nil, fmt.Errorf("list network connections: %w", err)
@@ -74,13 +97,16 @@ func (systemInventoryProvider) ListNetworkEvents(ctx context.Context) ([]model.E
 	now := time.Now().UTC()
 	events := make([]model.Event, 0, len(connections))
 	for _, connection := range connections {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		event, ok := buildNetworkInventoryEvent(ctx, now, bootID, connection, processCache)
 		if !ok {
 			continue
 		}
 		events = append(events, event)
 	}
-	return events, nil
+	return events, ctx.Err()
 }
 
 func (systemInventoryProvider) ListHostUserEvents(_ context.Context) ([]model.Event, error) {
@@ -125,23 +151,6 @@ type processInventorySnapshot struct {
 	threadCount               int
 	fdCount                   int
 	childrenPIDs              []int
-}
-
-func buildProcessInventoryEvent(
-	now time.Time,
-	bootID string,
-	process *gopsprocess.Process,
-) (model.Event, bool) {
-	if process == nil {
-		return model.Event{}, false
-	}
-
-	snapshot, ok := loadProcessInventorySnapshot(process, bootID)
-	if !ok {
-		return model.Event{}, false
-	}
-
-	return buildProcessInventoryEventFromSnapshot(now, snapshot), true
 }
 
 func buildProcessInventoryEventFromSnapshot(
@@ -264,7 +273,7 @@ func lookupProcessInventorySnapshot(
 		processCache[pid] = nil
 		return nil
 	}
-	snapshot, ok := loadProcessInventorySnapshot(process, bootID)
+	snapshot, ok := loadProcessInventorySnapshot(ctx, process, bootID, true)
 	if !ok {
 		processCache[pid] = nil
 		return nil
@@ -273,41 +282,41 @@ func lookupProcessInventorySnapshot(
 	return snapshot
 }
 
-func loadProcessInventorySnapshot(process *gopsprocess.Process, bootID string) (*processInventorySnapshot, bool) {
-	if process == nil {
+func loadProcessInventorySnapshot(ctx context.Context, process *gopsprocess.Process, bootID string, individual bool) (*processInventorySnapshot, bool) {
+	if process == nil || ctx.Err() != nil {
 		return nil, false
 	}
 
 	pid := int(process.Pid)
-	name, err := process.Name()
+	name, err := process.NameWithContext(ctx)
 	if err != nil && pid <= 0 {
 		return nil, false
 	}
 
-	parentPID, _ := process.Ppid()
-	image, _ := process.Exe()
-	command, _ := process.Cmdline()
-	username, _ := process.Username()
-	statuses, _ := process.Status()
-	createTime, _ := process.CreateTime()
-	cpuPercent, _ := process.CPUPercent()
-	memoryPercent, _ := process.MemoryPercent()
-	threadCount, _ := process.NumThreads()
-	fdCount, _ := process.NumFDs()
+	parentPID, _ := process.PpidWithContext(ctx)
+	image, _ := process.ExeWithContext(ctx)
+	command, _ := process.CmdlineWithContext(ctx)
+	username, _ := process.UsernameWithContext(ctx)
+	statuses, _ := process.StatusWithContext(ctx)
+	createTime, _ := process.CreateTimeWithContext(ctx)
+	cpuPercent, _ := process.CPUPercentWithContext(ctx)
+	memoryPercent, _ := process.MemoryPercentWithContext(ctx)
+	threadCount, _ := process.NumThreadsWithContext(ctx)
+	fdCount, _ := process.NumFDsWithContext(ctx)
 
 	var rssBytes int64
 	var vszBytes int64
-	if memoryInfo, err := process.MemoryInfo(); err == nil && memoryInfo != nil {
+	if memoryInfo, err := process.MemoryInfoWithContext(ctx); err == nil && memoryInfo != nil {
 		rssBytes = int64(memoryInfo.RSS)
 		vszBytes = int64(memoryInfo.VMS)
 	}
 
 	uid := ""
-	if uids, err := process.Uids(); err == nil && len(uids) > 0 {
+	if uids, err := process.UidsWithContext(ctx); err == nil && len(uids) > 0 {
 		uid = strconv.FormatUint(uint64(uids[0]), 10)
 	}
 	gid := ""
-	if gids, err := process.Gids(); err == nil && len(gids) > 0 {
+	if gids, err := process.GidsWithContext(ctx); err == nil && len(gids) > 0 {
 		gid = strconv.FormatUint(uint64(gids[0]), 10)
 	}
 
@@ -315,19 +324,23 @@ func loadProcessInventorySnapshot(process *gopsprocess.Process, bootID string) (
 	parentImage := ""
 	parentCommand := ""
 	parentStartTimeUnixMillis := int64(0)
-	if parentPID > 0 {
-		if parent, err := gopsprocess.NewProcess(parentPID); err == nil {
-			parentName, _ = parent.Name()
-			parentImage, _ = parent.Exe()
-			parentCommand, _ = parent.Cmdline()
-			parentStartTimeUnixMillis, _ = parent.CreateTime()
+	if individual && parentPID > 0 {
+		if parent, err := gopsprocess.NewProcessWithContext(ctx, parentPID); err == nil {
+			parentName, _ = parent.NameWithContext(ctx)
+			parentImage, _ = parent.ExeWithContext(ctx)
+			parentCommand, _ = parent.CmdlineWithContext(ctx)
+			parentStartTimeUnixMillis, _ = parent.CreateTimeWithContext(ctx)
 		}
 	}
 
 	childrenPIDs := make([]int, 0)
-	if children, err := process.Children(); err == nil {
-		for _, child := range children {
-			childrenPIDs = append(childrenPIDs, int(child.Pid))
+	// The network inventory also looks up individual processes without a full
+	// process inventory. Preserve its best-effort relationship fields there.
+	if individual {
+		if children, err := process.ChildrenWithContext(ctx); err == nil {
+			for _, child := range children {
+				childrenPIDs = append(childrenPIDs, int(child.Pid))
+			}
 		}
 	}
 
@@ -337,10 +350,6 @@ func loadProcessInventorySnapshot(process *gopsprocess.Process, bootID string) (
 	if command == "" {
 		command = image
 	}
-	if image == "" && command == "" {
-		return nil, false
-	}
-
 	status := ""
 	if len(statuses) > 0 {
 		status = strings.Join(statuses, ",")
@@ -369,7 +378,50 @@ func loadProcessInventorySnapshot(process *gopsprocess.Process, bootID string) (
 		threadCount:               int(threadCount),
 		fdCount:                   int(fdCount),
 		childrenPIDs:              childrenPIDs,
-	}, true
+	}, image != "" || command != ""
+}
+
+// A parent can start after the PID enumeration. Only those missing parents
+// require a separate lookup, shared by all their children.
+func enrichMissingProcessInventoryParents(ctx context.Context, snapshots []*processInventorySnapshot) error {
+	byPID := make(map[int]*processInventorySnapshot, len(snapshots))
+	for _, snapshot := range snapshots {
+		byPID[snapshot.pid] = snapshot
+	}
+	for _, snapshot := range snapshots {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		if snapshot.parentPID <= 0 {
+			continue
+		}
+		parent, exists := byPID[snapshot.parentPID]
+		if !exists {
+			if process, err := gopsprocess.NewProcessWithContext(ctx, int32(snapshot.parentPID)); err == nil {
+				name, _ := process.NameWithContext(ctx)
+				image, _ := process.ExeWithContext(ctx)
+				command, _ := process.CmdlineWithContext(ctx)
+				started, _ := process.CreateTimeWithContext(ctx)
+				parent = &processInventorySnapshot{name: name, image: image, command: command, startTimeUnixMillis: started}
+			}
+			byPID[snapshot.parentPID] = parent
+		}
+		if parent != nil {
+			if snapshot.parentName == "" {
+				snapshot.parentName = parent.name
+			}
+			if snapshot.parentImage == "" {
+				snapshot.parentImage = parent.image
+			}
+			if snapshot.parentCommand == "" {
+				snapshot.parentCommand = parent.command
+			}
+			if snapshot.parentStartTimeUnixMillis == 0 {
+				snapshot.parentStartTimeUnixMillis = parent.startTimeUnixMillis
+			}
+		}
+	}
+	return ctx.Err()
 }
 
 func enrichProcessInventoryTree(snapshots []*processInventorySnapshot) {
@@ -552,20 +604,21 @@ func collectProcessInventoryObservations(
 	if !spec.Collectors.Process.Enabled {
 		return
 	}
-	collectProcessCurrentStateObservations(ctx, provider, sink)
+	if err := collectProcessCurrentStateObservations(ctx, provider, sink); err != nil {
+		log.Warnf("seed hids process inventory failed: %v", err)
+	}
 }
 
 func collectProcessCurrentStateObservations(
 	ctx context.Context,
 	provider inventoryProvider,
 	sink chan<- model.Event,
-) {
+) error {
 	processEvents, err := provider.ListProcessEvents(ctx)
 	if err != nil {
-		log.Warnf("seed hids process inventory failed: %v", err)
-		return
+		return fmt.Errorf("list process inventory: %w", err)
 	}
-	publishInventoryEvents(ctx, sink, processEvents)
+	return publishInventoryEvents(ctx, sink, processEvents)
 }
 
 func collectNetworkInventoryObservations(
@@ -577,20 +630,21 @@ func collectNetworkInventoryObservations(
 	if !spec.Collectors.Network.Enabled {
 		return
 	}
-	collectNetworkCurrentStateObservations(ctx, provider, sink)
+	if err := collectNetworkCurrentStateObservations(ctx, provider, sink); err != nil {
+		log.Warnf("seed hids network inventory failed: %v", err)
+	}
 }
 
 func collectNetworkCurrentStateObservations(
 	ctx context.Context,
 	provider inventoryProvider,
 	sink chan<- model.Event,
-) {
+) error {
 	networkEvents, err := provider.ListNetworkEvents(ctx)
 	if err != nil {
-		log.Warnf("seed hids network inventory failed: %v", err)
-		return
+		return fmt.Errorf("list network inventory: %w", err)
 	}
-	publishInventoryEvents(ctx, sink, networkEvents)
+	return publishInventoryEvents(ctx, sink, networkEvents)
 }
 
 func collectHostUserInventoryObservations(
@@ -604,7 +658,9 @@ func collectHostUserInventoryObservations(
 		if err != nil {
 			log.Warnf("seed hids host user inventory failed: %v", err)
 		} else {
-			publishInventoryEvents(ctx, sink, userEvents)
+			if err := publishInventoryEvents(ctx, sink, userEvents); err != nil {
+				log.Warnf("seed hids host user inventory failed: %v", err)
+			}
 		}
 	}
 }
@@ -620,14 +676,21 @@ func publishInventoryEvents(
 	ctx context.Context,
 	sink chan<- model.Event,
 	events []model.Event,
-) {
+) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	for _, event := range events {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		select {
 		case sink <- event:
 		case <-ctx.Done():
-			return
+			return ctx.Err()
 		}
 	}
+	return ctx.Err()
 }
 
 type groupInventory struct {
