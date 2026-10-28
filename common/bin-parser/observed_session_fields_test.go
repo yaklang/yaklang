@@ -16,6 +16,22 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 	t.Helper()
 	covered := map[string]bool{}
 	if priority == priP1 {
+		boundedESP := t.Run("ESPHeaderCanonicalBoundedScope", TestESPCanonicalHeaderEntryAndLegacyCompatibility)
+		for _, name := range []string{"IPsec ESP", "IPsec ESP Header Fields"} {
+			for _, c := range ProtocolCatalog {
+				if c.Name == name {
+					require.Equal(t, statusPartial, c.Status)
+					require.NotEmpty(t, c.Notes)
+				}
+			}
+			for _, r := range ProtocolRoadmap {
+				if r.Name == name {
+					require.Equal(t, stPartial, r.Status)
+					require.NotEmpty(t, r.Notes)
+				}
+			}
+			covered[name] = boundedESP
+		}
 		// This is an explicit historical false-completion correction. It
 		// certifies the boundary of outer SSH support, not an SFTP grammar.
 		covered["SFTP"] = t.Run("SFTPOuterSSHScope", TestSFTPOuterSSHScopeDoesNotClaimSubsystem)

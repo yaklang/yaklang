@@ -221,6 +221,7 @@ func p1InventoryMarkdown() string {
 	childNames := p1MustChildNames()
 	var b strings.Builder
 	b.WriteString("# P1 协议交付打分\n\n")
+	b.WriteString("ESP Header Fields 只观察 SPI、线上低 32 位序号和不透明剩余字节，保持 partial；SA、算法、认证、重放判断和解密均不在此范围。新入口的原生字段与仓库外实流量证据不计入历史 YAML 静态评分，保守记为 0/F（L4）。原 ESP 的 86/B 只代表旧结构合同，不代表完整 IPsec 实现。\n\n")
 	b.WriteString("IMAP SASL Response / Challenge / Initial Value 是有边界传输值子集，保持 partial；不继承历史 IMAP greeting 的 100/A。当前静态评分不核算原生字段和仓库外实流量证据，均保守记为 0/F（L4）。SASL 机制认证、身份与安全层验证未实现；实流量验证另记，不以静态评分替代运行证据。\n\n")
 	b.WriteString("对照 [PROTOCOL_DELIVERY.md](PROTOCOL_DELIVERY.md)。机器可读记录在 `p1_scores.go`，由 `TestP1ScorecardsCovered` 校验：每个 P1 名称都有计分卡；`Status: done` 必须是 **B**（总分 ≥ 75）。A 级（≥ 90）留给 Wireshark 级主 PDU。\n\n")
 	b.WriteString("维度（满分 100）：Schema 25 / 真实流量 25 / 测试 20 / 分支覆盖 20 / 栈集成 10。硬门槛 G1–G8 全过才计分。\n\n")

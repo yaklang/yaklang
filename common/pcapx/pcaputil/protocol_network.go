@@ -91,6 +91,14 @@ func networkCarrierProfileUntil(p gopacket.Packet, stop gopacket.Layer) (inner g
 				unsupported = true
 			}
 		case *layers.IPv4:
+			if v.Version == 4 && v.Protocol == layers.IPProtocolIPv6HopByHop && v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 {
+				// IPv4 HOPOPT is an unselected carrier profile. Its typed
+				// standalone-HBH refusal must not elevate any child identity or
+				// advance fragment/session clocks before this existing gate.
+				// Failed IPv4 decodes leave Protocol at its zero default; only a
+				// successfully validated IPv4 may select this parent policy.
+				unsupported = true
+			}
 			if v.FragOffset == 0 && v.Flags&layers.IPv4MoreFragments == 0 && (v.Protocol == layers.IPProtocolIPv4 || v.Protocol == layers.IPProtocolIPv6) {
 				tunnels++
 			}
@@ -711,7 +719,22 @@ func networkObservationSource(e captureEvidence) ByteSource {
 }
 
 func (a *binParser) networkHeaderRefusal(p gopacket.Packet, evidence captureEvidence, ci gopacket.CaptureInfo, code, reason string) {
-	fields := map[string]any{"Observed Header Layers": outerNetworkHeaderNames(p), "Header Observation Scope": "validated network prefix before refused child header", "Child Header Identity": "unconfirmed", "Parent Header Refusal": code}
+	names := make([]string, 0, len(evidence.networkPrefix)+8)
+	for _, kind := range evidence.networkPrefix {
+		names = append(names, kind.String())
+	}
+	for _, layer := range p.Layers() {
+		kind := layer.LayerType()
+		if kind == gopacket.LayerTypeDecodeFailure || kind == gopacket.LayerTypePayload || kind == layers.LayerTypeICMPv4 || kind == layers.LayerTypeICMPv6 || kind == layers.LayerTypeIPSecESP {
+			break
+		}
+		if len(names) >= maxCaptureTransportLayers {
+			names = nil
+			break
+		}
+		names = append(names, kind.String())
+	}
+	fields := map[string]any{"Observed Header Layers": names, "Header Observation Scope": "validated network prefix before refused child header", "Child Header Identity": "unconfirmed", "Parent Header Refusal": code}
 	e := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-header-refusal", Domain: evidence.Ref.Domain, Status: "malformed", Completeness: "malformed", ExpertCode: code, Error: reason, Summary: reason + "; child identity not admitted", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(evidence), CarrierLayers: append([]string(nil), evidence.carrierLayers...)}
 	for _, layer := range p.Layers() {
 		if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == layers.LayerTypeICMPv4 || layer.LayerType() == layers.LayerTypeICMPv6 {
