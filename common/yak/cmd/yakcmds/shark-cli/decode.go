@@ -232,6 +232,9 @@ func summarize(raw *capturedPacket) packetSummary {
 		if espIncompleteDecoderCovered(p, presentation, why) {
 			covered = true
 		}
+		if !covered && icmpv6PartialDecoderCovered(p, raw.protocolEvents(), raw.number, raw.reference.Domain) {
+			covered = true
+		}
 		if presentation.nativeIP115Bytes > 0 && actualIP115 && (why == "Unable to decode IPProtocol 115" || why == "Layer type not currently supported") {
 			wire := network.LayerPayload()
 			covered = len(wire) == presentation.nativeIP115Bytes && sha256.Sum256(wire) == presentation.nativeIP115SHA
@@ -428,6 +431,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		appendCapturedNetworkPrefix(&d, raw, events)
 	}
 	espIncomplete := !networkRefused && appendESPIncompleteCapturedPrefix(&d, raw, events)
+	icmpv6Partial := !networkRefused && appendICMPv6PartialCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -446,7 +450,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			d.protocol = presentEvents(events).protocol
 		}
 	}
-	if networkRefused || espIncomplete {
+	if networkRefused || espIncomplete || icmpv6Partial {
 		return d
 	}
 	appendTransportObservation(&d, row)
