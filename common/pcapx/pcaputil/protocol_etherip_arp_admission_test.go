@@ -13,9 +13,13 @@ import (
 )
 
 func TestUnselectedEtherIPCannotAdmitAnARPChild(t *testing.T) {
-	for _, family := range []int{4, 6} {
+	for _, carrier := range []struct {
+		name   string
+		family int
+		hop    bool
+	}{{"IPv4", 4, false}, {"IPv6", 6, false}, {"IPv6-HBH", 6, true}} {
 		for _, word := range []uint16{0, 0x3000, 0x3001, 0xf000} {
-			t.Run(fmt.Sprintf("IPv%d/header-%04x", family, word), func(t *testing.T) {
+			t.Run(fmt.Sprintf("%s/header-%04x", carrier.name, word), func(t *testing.T) {
 				innerEth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 3}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 4}, EthernetType: layers.EthernetTypeARP}
 				arp := &layers.ARP{AddrType: layers.LinkTypeEthernet, Protocol: layers.EthernetTypeIPv4, HwAddressSize: 6, ProtAddressSize: 4, Operation: 1, SourceHwAddress: innerEth.SrcMAC, DstHwAddress: make([]byte, 6), SourceProtAddress: []byte{192, 0, 2, 1}, DstProtAddress: []byte{192, 0, 2, 2}}
 				inner := gopacket.NewSerializeBuffer()
@@ -26,10 +30,14 @@ func TestUnselectedEtherIPCannotAdmitAnARPChild(t *testing.T) {
 				eth := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeIPv4}
 				var ip gopacket.SerializableLayer = &layers.IPv4{Version: 4, TTL: 64, Protocol: layers.IPProtocol(97), SrcIP: net.ParseIP("198.51.100.1"), DstIP: net.ParseIP("198.51.100.2")}
 				prefix := []string{"Ethernet", "IPv4"}
-				if family == 6 {
+				if carrier.family == 6 {
 					eth.EthernetType = layers.EthernetTypeIPv6
 					ip = &layers.IPv6{Version: 6, HopLimit: 64, NextHeader: layers.IPProtocol(97), SrcIP: net.ParseIP("2001:db8::1"), DstIP: net.ParseIP("2001:db8::2")}
 					prefix[1] = "IPv6"
+					if carrier.hop {
+						ip.(*layers.IPv6).NextHeader = layers.IPProtocolIPv6HopByHop
+						payload = append([]byte{97, 0, 0, 0, 0, 0, 0, 0}, payload...)
+					}
 				}
 				wire := gopacket.NewSerializeBuffer()
 				require.NoError(t, gopacket.SerializeLayers(wire, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(payload)))
