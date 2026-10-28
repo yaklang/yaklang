@@ -50,8 +50,8 @@ func TestPPTPV1RefusesWrongParentGrammarBeforeEveryChild(t *testing.T) {
 				var events []*ProtocolEvent
 				a := coreFragmentParser(&events, 1<<20, 16)
 				out, consumed := a.networkPacket(packet)
-				require.True(t, consumed)
-				require.Nil(t, out)
+				require.False(t, consumed)
+				require.Same(t, packet, out, "the capture API still owns decoder-error accounting")
 				require.Len(t, events, 1)
 				e := events[0]
 				require.Equal(t, "network-encapsulation-refusal", e.Profile)
@@ -88,10 +88,45 @@ func TestPPTPV1WrongEtherTypeCannotPublishARP(t *testing.T) {
 	var events []*ProtocolEvent
 	a := coreFragmentParser(&events, 1<<20, 16)
 	_, consumed := a.networkPacket(packet)
-	require.True(t, consumed)
+	require.False(t, consumed)
 	require.Len(t, events, 1)
 	require.Equal(t, "ip", events[0].Protocol)
 	require.Equal(t, "PPTPHeaderAdmission", events[0].ExpertCode)
+}
+
+func TestPPTPV1RefusalPreservesCaptureErrorsAndStrictAPI(t *testing.T) {
+	inner := pptpV1TestInner(t, false, 0, false, nil)
+	wire := pptpV1TestOuter(t, pptpV1TestGRE(0x2001, 0x0800, 0, 42, 0, 0, inner), false)
+	for _, protocols := range []bool{false, true} {
+		for _, allowIncomplete := range []bool{false, true} {
+			t.Run(fmt.Sprintf("protocols%t/allow%t", protocols, allowIncomplete), func(t *testing.T) {
+				var stats TCPReassemblyStats
+				var mu sync.Mutex
+				flows, observed, diagnostics := 0, 0, 0
+				opts := []CaptureOption{WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: allowIncomplete, Stream: true}), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { stats = s }), WithOnTrafficFlowCreated(func(*TrafficFlow) { mu.Lock(); defer mu.Unlock(); flows++ }), WithEveryPacket(func(gopacket.Packet) { mu.Lock(); defer mu.Unlock(); observed++ })}
+				if protocols {
+					opts = append(opts, WithOnProtocolMessage(func(e *ProtocolEvent) {
+						mu.Lock()
+						defer mu.Unlock()
+						require.Equal(t, "PPTPHeaderAdmission", e.ExpertCode)
+						diagnostics++
+					}))
+				}
+				err := ReplayPcap(bytes.NewReader(pptpV1TestCapture(t, [][]byte{wire}, false)), opts...)
+				if allowIncomplete {
+					require.NoError(t, err)
+				} else {
+					require.Error(t, err)
+				}
+				require.EqualValues(t, 1, stats.DecodeErrors)
+				require.Equal(t, 1, observed)
+				require.Zero(t, flows)
+				if protocols {
+					require.Equal(t, 1, diagnostics)
+				}
+			})
+		}
+	}
 }
 
 func TestPPTPV1ACKOnlyIsAHeaderObservationWithoutChildState(t *testing.T) {

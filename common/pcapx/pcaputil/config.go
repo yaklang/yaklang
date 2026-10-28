@@ -604,6 +604,19 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	for _, h := range c.beforeTransportPacket {
 		h(packet)
 	}
+	if failure := packet.ErrorLayer(); failure != nil {
+		var pptp *pptpHeaderError
+		var truncatedIP *ipHeaderTruncatedError
+		if errors.As(failure.Error(), &pptp) || errors.As(failure.Error(), &truncatedIP) {
+			// A selected UDP tunnel can retain its outer TransportLayer when an
+			// inner header fails. The precise native refusal already owns this
+			// packet; do not redispatch those bytes as an outer UDP application.
+			// Unselected parents returned above, so speculative child failures
+			// cannot add capture errors behind their admission boundary.
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
+	}
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
 	if !isOk && packet.TransportLayer() != nil {

@@ -191,7 +191,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 				fields["Declared GRE Bytes Unavailable"] = true
 			}
 			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "network-encapsulation-refusal", Domain: e.Ref.Domain, Status: "limited", Completeness: "limited", ExpertCode: "PPTPHeaderAdmission", Error: pptp.Error(), Summary: pptp.Error() + "; inner identity unconfirmed", Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
-			return nil, true
+			// The error-bearing packet preserves capture decoder-error accounting
+			// and the strict API result; its child decoder has never run.
+			return p, false
 		}
 		var truncated *ipHeaderTruncatedError
 		if errors.As(failure.Error(), &truncated) {
