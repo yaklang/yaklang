@@ -226,7 +226,7 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("internet_control_message_protocol_v6/mld-query", func(t *testing.T) {
 		unspec := make([]byte, 16)
 		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
-		require.Equal(t, uint64(10000), uintVal(t, mustChild(t, parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6"), "Multicast Listener Query").Child("Maximum Response Delay")))
+		require.Equal(t, uint64(10000), uintVal(t, mustChild(t, parseMLDLegacyComplete(t, q), "Multicast Listener Query").Child("Maximum Response Delay")))
 		require.Equal(t, unspec, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, q)), "IPv6", "ICMPv6", "Multicast Listener Query").Child("Multicast Address")))
 	})
 	t.Run("internet_control_message_protocol_v6/redirect", func(t *testing.T) {
@@ -1129,7 +1129,7 @@ func TestP1BranchRows(t *testing.T) {
 	})
 	t.Run("igmp/v3-query", func(t *testing.T) {
 		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
-		n := parseRule(t, raw, "igmp", "IGMP")
+		n := parseIGMPLegacyComplete(t, raw)
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Number of Sources")))
 		require.Equal(t, []byte{192, 0, 2, 1}, bytesVal(t, n.Child("Sources").Children()[0]))
 	})

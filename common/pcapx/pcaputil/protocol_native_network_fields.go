@@ -8,6 +8,7 @@ import (
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 type nativeNetworkField struct {
@@ -24,7 +25,32 @@ type nativeNetworkObservation struct {
 	domain                                              CaptureDomain
 	bytes                                               ByteSource
 	values                                              map[string]nativeNetworkField
+	mldValues                                           map[string][]nativeNetworkField
+	igmpValues                                          map[string][]nativeNetworkField
 	frozen                                              bool
+}
+
+func (e *ProtocolEvent) retainNativeMLDFields(p gopacket.Packet, result *stream_parser.MLDWireResult) {
+	n := e.nativeNetworkFields
+	if n == nil || n.frozen || n.protocol != "icmpv6" {
+		return
+	}
+	layer := p.Layer(layers.LayerTypeICMPv6)
+	if layer == nil {
+		return
+	}
+	offset, ok := nativeNetworkLayerOffset(p, layer)
+	if !ok {
+		return
+	}
+	available := len(layer.LayerContents()) + len(layer.LayerPayload())
+	n.mldValues = map[string][]nativeNetworkField{}
+	for _, f := range result.Values {
+		if f.Name == "" || f.Offset < 0 || f.Length <= 0 || f.Offset > available || f.Length > available-f.Offset {
+			continue
+		}
+		n.mldValues[f.Name] = append(n.mldValues[f.Name], nativeNetworkField{value: f.Value, span: DisplayFieldRange{Offset: offset + f.Offset, Length: f.Length}})
+	}
 }
 
 func nativeNetworkLayerOffset(p gopacket.Packet, target gopacket.Layer) (int, bool) {

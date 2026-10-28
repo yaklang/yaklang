@@ -19,6 +19,7 @@ type packetPresentation struct {
 	nativeHeaders                   []string
 	nativeSource, nativeDestination string
 	nativeDomain                    pcaputil.CaptureDomain
+	nativeMembership                string
 	// A verified native IP115 PDU may cover gopacket's specific unsupported
 	// protocol error. Bind that proof to bytes, not merely a protocol label.
 	nativeIP115SHA                        [32]byte
@@ -138,6 +139,22 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" {
+		if m, ok := eventValues(e)["MLD"].(map[string]any); ok {
+			if version := number(m["Version"]); version == 1 || version == 2 {
+				return fmt.Sprintf("MLDv%d", version)
+			}
+		}
+		return "MLD"
+	}
+	if e.Protocol == "igmp" && e.Profile == "igmp-membership-wire" {
+		if m, ok := eventValues(e)["IGMP"].(map[string]any); ok {
+			if version := number(m["Version"]); version >= 1 && version <= 3 {
+				return fmt.Sprintf("IGMPv%d", version)
+			}
+		}
+		return "IGMP"
+	}
 	if e.Protocol == "isis" {
 		if name := textValue(eventValues(e)["Protocol Name"]); name == "IS-IS Hello" || name == "IS-IS LSP" || name == "IS-IS CSNP" || name == "IS-IS PSNP" {
 			return name
@@ -385,6 +402,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && e.Summary != "" {
+		return membershipEventSummary(e)
+	}
 	if summary, ok := dcerpcEventSummary(e); ok {
 		return summary
 	}
@@ -1029,6 +1049,21 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("RTSP")
 		return
 	}
+	if e.Transport == "network" && (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && (e.Status == "incomplete" || e.Status == "malformed" || e.Status == "limited") && e.Completeness == e.Status {
+		label := eventProtocolName(e)
+		if e.Protocol == "icmpv6" {
+			p.addLayer("ICMPv6")
+		}
+		p.addLayer(label)
+		if p.priority <= 20 {
+			p.protocol, p.priority, p.status, p.visibility = label, 20, e.Status, "partial-message"
+			p.nativeMembership = membershipEventProtocol(e)
+			p.summary = applicationEventSummary(e)
+			p.scope = "captured multicast membership fields; complete message not admitted"
+			p.evidence = "wire prefix only; checksum, parent validity and membership state unverified"
+		}
+		return
+	}
 	icmpPartial := e.Protocol == "icmp" && e.Profile == "icmp-header-observation" && e.Status == "incomplete" && e.ExpertCode == "ICMPHeaderTruncated"
 	icmpv6Partial := e.Protocol == "icmpv6" && e.Profile == "icmpv6-header-observation" &&
 		(e.Status == "incomplete" && e.ExpertCode == "ICMPv6HeaderTruncated" || e.Status == "malformed" && e.ExpertCode == "NDOptionLength" || e.Status == "limited" && e.ExpertCode == "NDOptionBudget")
@@ -1135,6 +1170,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		}
 	}
 	p.protocol, p.priority, p.status = label, rank, e.Status
+	p.nativeMembership = membershipEventProtocol(e)
 	p.nativeHeaders = nil
 	if e.Transport == "network" && len(e.CarrierLayers) > 0 {
 		if names := headerLayerNames(eventValues(e)["Observed Header Layers"]); len(names) > 0 {
@@ -1149,6 +1185,10 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	}
 	p.evidence = ""
 	p.scope = ""
+	if p.nativeMembership != "" {
+		p.scope = "captured membership wire fields"
+		p.evidence = "bounded message fields; checksum, parent validity and membership state unverified"
+	}
 	p.visibility = e.SourceBytes.Kind
 	if v := textValue(eventValues(e)["Content Visibility"]); v != "" {
 		p.visibility = v
@@ -1286,6 +1326,25 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 			}
 			row.ProtocolStack = append(row.ProtocolStack, network, carrier)
 		}
+	}
+	if p.nativeMembership != "" {
+		// Preserve Layers literally. Only the display stack replaces the
+		// legacy decoder's child/version guess with the selected native
+		// profile, including a query whose version cannot be established.
+		stack := row.ProtocolStack[:0:0]
+		for _, physical := range row.ProtocolStack {
+			if p.nativeMembership == "IGMP" && physical == "IGMP" {
+				continue
+			}
+			if p.nativeMembership == "MLD" {
+				switch physical {
+				case "MLDv1MulticastListenerQuery", "MLDv1MulticastListenerReport", "MLDv1MulticastListenerDone", "MLDv2MulticastListenerQuery", "MLDv2MulticastListenerReport":
+					continue
+				}
+			}
+			stack = append(stack, physical)
+		}
+		row.ProtocolStack = stack
 	}
 	// A native control event can describe a layer already exposed by capture
 	// decoding (PIM, ARP, etc.). Do not append it a second time. Preserve the

@@ -85,6 +85,7 @@ type displayFieldBinding struct {
 	protocols  string
 	path       []string
 	rangeKey   string
+	rangeFor   func(*ProtocolEvent, int) *DisplayFieldRange
 	custom     func(*ProtocolEvent, func(any), *displayProjection)
 }
 
@@ -533,6 +534,8 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}))
 	}
 	out = append(out, nativeNetworkDisplayBindings()...)
+	out = append(out, nativeMLDDisplayBindings()...)
+	out = append(out, nativeIGMPDisplayBindings()...)
 	sort.Slice(out, func(i, j int) bool { return out[i].descriptor.Name < out[j].descriptor.Name })
 	seen := map[string]bool{}
 	for i, b := range out {
@@ -667,7 +670,9 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 			if b.protocols != "" && !strings.Contains(b.protocols, "|"+e.Protocol+"|") {
 				continue
 			}
+			ordinal := -1
 			emit := func(value any) {
+				ordinal++
 				if value == nil || value == "" && !b.descriptor.AllowEmpty {
 					return
 				}
@@ -690,7 +695,11 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 					item.ExactValue = strconv.FormatUint(v.(uint64), 10)
 				}
 				if b.descriptor.Origin == "pdu" {
-					item.Range = e.displayPDUFieldRange(b.rangeKey)
+					if b.rangeFor != nil {
+						item.Range = b.rangeFor(e, ordinal)
+					} else {
+						item.Range = e.displayPDUFieldRange(b.rangeKey)
+					}
 				}
 				s.Values = append(s.Values, item)
 			}

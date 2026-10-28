@@ -16,6 +16,18 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 	t.Helper()
 	covered := map[string]bool{}
 	if priority == priP1 {
+		covered["IGMP"] = t.Run("IGMPMembershipCanonicalBoundedScope", func(t *testing.T) {
+			requireIGMPCanonicalWireScope(t)
+			TestIGMPLegacyOpenQueryCannotSelectAnEightByteVersion(t)
+			TestIGMPLegacyLargeVectorsAreConsumedOrExplicitlyRefused(t)
+			TestIGMPLegacyReportCollectionBudgetIncludesEveryRecordsSources(t)
+			for _, row := range ProtocolRoadmap {
+				if row.Name == "IGMP" {
+					require.Equal(t, stPartial, row.Status)
+					require.NotEmpty(t, row.Notes)
+				}
+			}
+		})
 		boundedESP := t.Run("ESPHeaderCanonicalBoundedScope", TestESPCanonicalHeaderEntryAndLegacyCompatibility)
 		for _, name := range []string{"IPsec ESP", "IPsec ESP Header Fields"} {
 			for _, c := range ProtocolCatalog {
