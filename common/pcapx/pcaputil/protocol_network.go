@@ -13,6 +13,7 @@ import (
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 type fragmentKey struct {
@@ -601,9 +602,14 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 	} else if icmp, ok := p.Layer(layers.LayerTypeICMPv4).(*layers.ICMPv4); ok {
 		protocol = "icmp"
-		fields = map[string]any{"Type": icmp.TypeCode.Type(), "Code": icmp.TypeCode.Code(), "Identifier": icmp.Id, "Sequence": icmp.Seq}
-		if icmp.TypeCode.Type() == 3 || icmp.TypeCode.Type() == 11 {
-			fields["Quoted Packet"] = bytes.Clone(icmp.Payload)
+		// Native frame admission and its byte budget were checked above. Use
+		// the same union codec as the explicit canonical stateless entry.
+		wire := append(bytes.Clone(icmp.LayerContents()), icmp.LayerPayload()...)
+		var decodeErr error
+		fields, decodeErr = stream_parser.DecodeICMPv4HeaderWire(wire, len(wire))
+		if decodeErr != nil {
+			a.emitNativeNetworkObservation(p, e, ci, protocol, fields, "incomplete", "ICMPHeaderTruncated")
+			return nil, true
 		}
 	}
 	if protocol != "" {
@@ -642,11 +648,16 @@ func (a *binParser) emitNativeNetworkObservation(p gopacket.Packet, e captureEvi
 	}
 	event := &ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: protocol, Domain: e.Ref.Domain, Length: len(p.Data()), Raw: bytes.Clone(p.Data()), Status: status, Completeness: completeness, ExpertCode: code, Error: code, Session: cloneSession(fields), SourceBytes: networkObservationSource(e), semanticFields: cloneSession(fields), semanticSession: cloneSession(fields)}
 	if code != "" {
-		event.Profile = "icmpv6-header-observation"
+		event.Profile = protocol + "-header-observation"
+		family, availableKey, requiredKey := "ICMPv6", "Available ICMPv6 Bytes", "Required ICMPv6 Header Bytes"
 		name := layers.CreateICMPv6TypeCode(fields["Type"].(uint8), fields["Code"].(uint8)).String()
-		event.Summary = "ICMPv6 " + name + "; " + code
-		if code == "ICMPv6HeaderTruncated" {
-			event.Summary = fmt.Sprintf("ICMPv6 %s; incomplete fixed header (%v/%v bytes)", name, fields["Available ICMPv6 Bytes"], fields["Required ICMPv6 Header Bytes"])
+		if protocol == "icmp" {
+			family, availableKey, requiredKey = "ICMP", "Available ICMP Bytes", "Required ICMP Header Bytes"
+			name = layers.CreateICMPv4TypeCode(fields["Type"].(uint8), fields["Code"].(uint8)).String()
+		}
+		event.Summary = family + " " + name + "; " + code
+		if code == "ICMPv6HeaderTruncated" || code == "ICMPHeaderTruncated" {
+			event.Summary = fmt.Sprintf("%s %s; incomplete fixed header (%v/%v bytes)", family, name, fields[availableKey], fields[requiredKey])
 		} else if code == "NDOptionLength" {
 			event.Summary = "ICMPv6 " + name + "; invalid ND option length"
 		}

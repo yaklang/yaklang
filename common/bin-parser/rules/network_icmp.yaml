@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("ICMPv4HeaderFields")
+  ICMPv4HeaderFields:
+    operator: |
+      err = parseObservedSession("icmpv4-header")
+      if err != nil { panic(err) }
