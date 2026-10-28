@@ -210,6 +210,9 @@ func summarize(raw *capturedPacket) packetSummary {
 	if presentation.protocol == "" && raw.history == nil {
 		presentation = presentEvents(raw.events)
 	}
+	if presentation.networkRefused {
+		row = applyCapturedNetworkEndpoints(row, &presentation, p, raw.data, presentationNetworkHeaders(presentation, raw.protocolEvents()))
+	}
 	row = presentation.apply(row)
 	row.ConnectionStack = append([]string(nil), raw.connectionStack...)
 	row.ConversationID = raw.conversationID
@@ -350,6 +353,9 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	}()
 	d.fields = append(d.fields, field{text: fmt.Sprintf("Frame %d: %d bytes on wire, %d captured", raw.number, raw.ci.Length, len(raw.data)), hasRange: len(raw.data) > 0, end: len(raw.data)})
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if networkRefused {
+		appendCapturedNetworkPrefix(&d, raw, events)
+	}
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -527,6 +533,9 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	row := summarize(raw)
 	d.protocol = row.Protocol
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	if networkRefused {
+		appendCapturedNetworkPrefix(&d, raw, events)
+	}
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
