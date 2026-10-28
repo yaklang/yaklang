@@ -52,6 +52,7 @@ type streamSide struct {
 type tcpStream struct {
 	nativeFlowID                                    uint64
 	nativeClosed                                    bool
+	unconfirmedAfterClose                           bool
 	retentionNotice                                 string
 	protocolStack                                   []string
 	nativeIdentity                                  bool

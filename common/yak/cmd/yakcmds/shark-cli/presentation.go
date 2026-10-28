@@ -769,6 +769,12 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	if e.Protocol == "ip" && e.Profile == "pptp-acknowledgment" && e.Status == "limited" && e.Completeness == "headers" && e.ExpertCode == "PPTPAcknowledgment" && number(e.Session["Observed GRE Version"]) == 1 && number(e.Session["PPTP Payload Length"]) == 0 && e.Session["Child Header Identity"] == "not present" {
+		// A validated enhanced-GRE ACK is a concrete header observation. It
+		// has no PPP payload or application identity to inherit or dissect.
+		*p = packetPresentation{networkRefused: true, protocol: "PPTP", summary: safeText(e.Summary), status: "limited", visibility: "acknowledgment-header", scope: "PPTP acknowledgment header; call-control association unavailable", evidence: "validated enhanced GRE acknowledgment; no PPP payload", stack: []string{"PPTP"}, priority: 1000}
+		return
+	}
 	if e.Protocol == "ip" && e.Status == "incomplete" && e.ExpertCode == "IPHeaderTruncated" {
 		expected := number(e.Session["Expected IP Version"])
 		available, required := number(e.Session["Available Header Bytes"]), number(e.Session["Required Header Bytes"])

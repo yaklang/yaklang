@@ -11,6 +11,7 @@ func TestClosedTCPHeaderDoesNotBorrowPreviousApplicationOnRedraw(t *testing.T) {
 	row := packetSummary{
 		Protocol: "TCP", Transport: "tcp", packetProtocol: "TCP",
 		TCPFlowID: 17, TCPFlowState: "closed-observation", Info: "443 → 45000 [ACK] Seq=50000 Ack=60000 Payload=0",
+		tcpUnconfirmed:  true,
 		Layers:          []string{"Loopback", "IPv4", "TCP"},
 		ConnectionStack: []string{"TLSv1.3", "HTTP/1.1"},
 	}
@@ -29,10 +30,26 @@ func TestClosedTCPHeaderDoesNotBorrowPreviousApplicationOnRedraw(t *testing.T) {
 	require.NotContains(t, first.Info, "HTTP")
 	require.Equal(t, first, applyApplication(first, "TLSv1.3", "validated protocol events", 7))
 	row.TCPFlowState = "closed-direction-observation"
+	row.tcpUnconfirmed = false
 	halfClosed := applyApplication(row, "TLSv1.3", "validated protocol events", 7)
 	require.Equal(t, "TLSv1.3", halfClosed.ConnectionProtocol, "one closed direction does not close the active reverse direction")
 	require.Contains(t, halfClosed.Info, "connection #7")
 	require.NotContains(t, halfClosed.Info, "generation unconfirmed")
+}
+
+func TestNormalClosedTCPHeaderRetainsObservedApplicationHistory(t *testing.T) {
+	row := packetSummary{
+		Protocol: "TCP", Transport: "tcp", packetProtocol: "TCP",
+		TCPFlowID: 17, TCPFlowState: "closed-observation", Info: "443 → 45000 [ACK] Seq=200 Ack=300 Payload=0",
+		Layers: []string{"Loopback", "IPv4", "TCP"}, ConnectionStack: []string{"TLSv1.3", "HTTP/1.1"},
+	}
+	projected := applyApplication(row, "TLSv1.3", "validated protocol events", 7)
+	require.Equal(t, "TCP", projected.Protocol)
+	require.EqualValues(t, 17, projected.TCPFlowID)
+	require.EqualValues(t, 7, projected.StreamID, "a legitimate final ACK keeps its existing forensic page")
+	require.Equal(t, "TLSv1.3", projected.ConnectionProtocol)
+	require.Contains(t, projected.Info, "connection #7")
+	require.NotContains(t, projected.Info, "generation unconfirmed")
 }
 
 func TestClosedTupleACKAndResetStayUnconfirmedUntilObservedOpening(t *testing.T) {
@@ -68,6 +85,7 @@ func TestClosedTupleACKAndResetStayUnconfirmedUntilObservedOpening(t *testing.T)
 	for index := 4; index <= 7; index++ {
 		packet := captured[index]
 		require.Equal(t, "closed-observation", packet.tcpFlowState)
+		require.True(t, packet.tcpUnconfirmed)
 		require.Equal(t, captured[0].tcpFlowID, packet.tcpFlowID, "no new generation is invented without its opening")
 		require.Zero(t, packet.streamID, "the old application's stream page is not associated")
 		for _, row := range []packetSummary{summarize(packet), u.packetRow(&packetEntry{packet: packet})} {
@@ -86,6 +104,7 @@ func TestClosedTupleACKAndResetStayUnconfirmedUntilObservedOpening(t *testing.T)
 	require.Equal(t, []string{"HTTP/1.1"}, old.protocolStack)
 	require.EqualValues(t, 2, session.streams.next)
 	last := captured[len(captured)-1]
+	require.False(t, last.tcpUnconfirmed, "a proved new opening starts with fresh association state")
 	require.NotEqual(t, captured[0].tcpFlowID, last.tcpFlowID)
 	for _, row := range []packetSummary{summarize(last), u.packetRow(&packetEntry{packet: last})} {
 		require.Equal(t, "Redis", row.Protocol)
