@@ -274,7 +274,9 @@ func TestESPIncompleteInspectorSkipsLegacyOnlyForItsPhysicalNativePrefix(t *test
 		{"false-contract", func(p *capturedPacket) { p.events[0].Profile = "port-hint" }},
 		{"different-captured-prefix", func(p *capturedPacket) { p.data[len(p.data)-1] ^= 1 }},
 		{"other-decoder", func(p *capturedPacket) {
-			p.data = refusalPresentationWire(t, 4, layers.IPProtocolTCP, w)
+			// Keep an unrelated legacy decoder failure: a short TCP header now
+			// has its own source-backed display and correctly skips legacy too.
+			p.data = refusalPresentationWire(t, 4, layers.IPProtocolUDP, w)
 			p.data = p.data[:14+20+len(w)]
 			p.ci.Length, p.ci.CaptureLength = len(p.data), len(p.data)
 		}},
@@ -291,6 +293,30 @@ func TestESPIncompleteInspectorSkipsLegacyOnlyForItsPhysicalNativePrefix(t *test
 			require.Contains(t, detailLines(detail(&copy).fields), "YAML dissector incomplete", "the strict skip must not hide an unrelated legacy failure")
 		})
 	}
+	t.Run("other-TCP-header-observation", func(t *testing.T) {
+		copy := *valid
+		copy.data = refusalPresentationWire(t, 4, layers.IPProtocolTCP, w)
+		copy.data = copy.data[:14+20+len(w)]
+		copy.ci.Length, copy.ci.CaptureLength = len(copy.data), len(copy.data)
+		event := *valid.events[0]
+		copy.events = []*pcaputil.ProtocolEvent{&event}
+		var espView packetDetail
+		require.False(t, appendESPIncompleteCapturedPrefix(&espView, &copy, copy.events))
+		require.Empty(t, espView.fields, "the ESP contract cannot claim TCP bytes")
+		row := summarize(&copy)
+		require.Equal(t, "TCP", row.Protocol)
+		require.Equal(t, "incomplete", row.ProtocolStatus)
+		require.NotNil(t, row.tcpHeaderFailure)
+		deep, quick := detail(&copy), quickDetail(&copy)
+		require.Equal(t, deep.fields[1:], quick.fields[1:])
+		require.Empty(t, deep.sources, "the foreign ESP PDU is not the TCP prefix's logical source")
+		text := detailLines(deep.fields)
+		require.Contains(t, text, "TCP fixed header incomplete (3/20 bytes)")
+		require.Contains(t, text, "Source Port: 4660")
+		require.NotContains(t, text, "Destination Port:", "only three own bytes are captured")
+		require.NotContains(t, text, "YAML dissector incomplete")
+		require.NotContains(t, text, "Dissector failed")
+	})
 	// Even exact quoted ESP bytes are not the physical selected IP50 carrier.
 	quote := refusalPresentationWire(t, 4, layers.IPProtocolESP, w)[14:]
 	icmp := append([]byte{3, 1, 0, 0, 0, 0, 0, 0}, quote...)
