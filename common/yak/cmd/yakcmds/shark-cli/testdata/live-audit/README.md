@@ -429,3 +429,46 @@ proof across the parent correction and rechecks complete-source exclusivity.
 `network_reason_projection_audit.py` permits only removal of an explained
 network error's generic suffix; every other CLI value and JSON type stays
 literal. None of these preservation checks certifies every protocol feature.
+
+`discovery/gre_v1_controls.py --help` authors GRE-v0 and PPTP-v1 grammar, length,
+Call-ID and split-HTTP controls; no public capture bytes are bundled. The
+separate `pptp_parent_source_audit.py` checks original wire/checksums/reference
+descriptors, precise single refusals, stable single-direction Call IDs and the
+complete child message. It also audits the original direct-v1 public witnesses.
+Permissive Wireshark child labels cannot validate a rejected RFC 2637 parent.
+PPTP control-plane pairing, PPP negotiation and full PPP conformance remain
+outside this profile. ACK-only is explicitly a limited header observation.
+`discovery/pptp_negative_controls.py` requires source/profile/flow forgeries to
+fail. `pptp_public_preservation_audit.py` pairs complete public SDK records and
+builds an actual generated-PDU reference bijection, independently recomputes the
+271 parent corrections, then delegates the remaining CLI differences to the
+closed-TCP projection auditor. Its intermediate JSONL is replayable without
+persisting another complete public export. No wire integer, physical packet
+number, domain or connection ID is normalized as a PDU alias.
+
+`discovery/tls_resumption_live.py OUTPUT_DIRECTORY TSHARK` runs owned loopback
+TLS1.2/TLS1.3 full/resumed/resumed/fresh peers with key logs, true endpoint reuse
+receipts, bounded capture and complete HTTP byte digests. Captures and secrets
+must stay outside the checkout. `tls_resumption_audit.py --help` checks every
+record, source reference, handshake and HTTP message against peers/reference.
+`discovery/tls_resumption_controls.py --help` derives explicitly declared
+capture omissions and reordering, including a separate capture-start profile;
+these are not claimed live network losses. `tls_resumption_control_audit.py`
+retains every unaffected value/reference, separately reports ambiguous closed
+namespaces and requires appropriate out-of-order TCP preferences in TShark.
+The baseline/control negative-control drivers reject forged actual evidence.
+Missing native PSK/resumption metadata and common protected-record gap limits
+must remain explicit even when decryption succeeds.
+
+`closed_tcp_projection_audit.py --help` permits only source-bound removal of
+stale application/page associations after an actual unadmitted-payload witness
+in the retained closed namespace. A normal final ACK keeps its valid history.
+It preserves native TCP IDs, source domains, PDUs, typed fields and every other
+CLI value; it is not an independent TCP close algorithm.
+`closed_tcp_projection_negative_controls.py` tests both altered values and
+restoration of an entire stale row. The native `flow-observer -packet-state`
+option adds callback-time connection states for independently checking packet
+ownership. Its default export schema stays unchanged. The general TCP binding
+audit accepts a missing application page only with that actual closed hook
+state and the explicit unconfirmed CLI projection; a closed state alone is not
+a reason to erase a normal final ACK's page.

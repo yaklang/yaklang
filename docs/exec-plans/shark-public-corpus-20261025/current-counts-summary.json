@@ -1,6 +1,6 @@
 {
-  "scope": "Literal physical label and SDK counts after source-bound short-header/parent admission. Equal labels are not protocol/field parity.",
-  "generator_sha256": "f046673655e66035b7f56355983f015c1cf332e1a5e534baf545fc69f3b3508a",
+  "scope": "Literal physical label/SDK counts after PPTP parent framing and closed-connection projection; equal labels do not prove protocol/field parity.",
+  "generator_sha256": "c716b80e643d34bac32a3fbbb225b2c23ab080524af3ae04e1dd80400169e58e",
   "inputs": {
     "weber": {
       "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
@@ -1237,7 +1237,7 @@
       ],
       "reference_summary_sha256": "d1dabd7495793f96e274db82128fc33be849e561d0dda75b2995ffad2840558d",
       "SDK_export_sha256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
-      "CLI_export_sha256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+      "CLI_export_sha256": "88e35960b5bdbfe92967b739d5baab091e79487d341272451bdfc7cc8d96731a",
       "header_certificate_sha256": "04ce9ca2521e0c6ae6fa138bd446829a32eea471e421723e0725ca7bd654e5bd",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
@@ -1248,12 +1248,12 @@
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 19,
       "previous_Edwards_inner_field_expansions": 1,
-      "source_preservation_certificate_sha256": "72b2f0b27f87d295b0e3b9e58d935920f0db91d9a715aba4823314b0f60d2ed9"
+      "source_preservation_certificate_sha256": "41000092ba7c80cea2ab6eaceee25b2a5991280a2131089bbbb0e09e89dd2561"
     },
     "sharon": {
       "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
       "physical_frames": 328127,
-      "native_message_records": 249618,
+      "native_message_records": 249718,
       "reference_labels": {
         "IPv4": 26586,
         "TCP": 20096,
@@ -3128,7 +3128,7 @@
         "RTSP": 176,
         "PPPoE": 11,
         "PPP": 35,
-        "IPv4": 65310,
+        "IPv4": 65579,
         "IPSecAH": 4,
         "IMAP": 32,
         "Fragment": 51606,
@@ -3137,7 +3137,7 @@
         "TLSv1.3": 302,
         "WHOIS": 24,
         "NetFlow v9": 196,
-        "GRE": 7711,
+        "GRE": 7442,
         "MLDv2MulticastListenerReport": 10,
         "Telnet": 129,
         "IPP": 84,
@@ -3201,7 +3201,7 @@
         "ssdp": 73,
         "mdns": 396,
         "rtsp": 132,
-        "ip": 114617,
+        "ip": 114717,
         "imap": 44,
         "sip": 23,
         "rtp": 6462,
@@ -3230,8 +3230,8 @@
         {
           "label": "IPv4",
           "reference_frames": 26586,
-          "same_label_native_frames": 65310,
-          "same_label_delta": 38724
+          "same_label_native_frames": 65579,
+          "same_label_delta": 38993
         },
         {
           "label": "TCP",
@@ -5012,8 +5012,8 @@
         {
           "label": "GRE",
           "reference_frames": 121,
-          "same_label_native_frames": 7711,
-          "same_label_delta": 7590
+          "same_label_native_frames": 7442,
+          "same_label_delta": 7321
         },
         {
           "label": "MTP3MG (Int. ITU)",
@@ -14419,8 +14419,8 @@
         }
       ],
       "reference_summary_sha256": "88e582b8f94b1a2c548fa9feabef2bcd00a0e4df963de52998ccd5bc37fdbd6b",
-      "SDK_export_sha256": "d5923dec14e574028763b489889953effb5b3609ebf2c7c5a3f58edd2db40f8e",
-      "CLI_export_sha256": "a620bfa630d88b922e65e4e032e2d7eeabc91ba50c09db516a1012ebe61b69cc",
+      "SDK_export_sha256": "520ec6f8512ae00d7fe50ed410986a8a6d1583bc239cf893432b4422b629ac7a",
+      "CLI_export_sha256": "661059eb459cc6a015379cbc195736667414d522f1e58818f17e02077c8a8dde",
       "header_certificate_sha256": "dc6ad7d541f67be63e01a370170ea78a1f81389225f821ca6ebcc4a4f2d178e7",
       "exact_capture_digest_rechecked": true,
       "reference_counts_reused_for_same_immutable_capture": true,
@@ -14431,7 +14431,7 @@
       "exact_SDK_ordered_export_equality_without_normalization": true,
       "native_diagnostic_projection_restorations": 2,
       "previous_Edwards_inner_field_expansions": 1,
-      "source_preservation_certificate_sha256": "66f217817c7abaf1760ee8defa035ab546acaaac4fcae7eabf95d636fa78d5b7"
+      "source_preservation_certificate_sha256": "63b0584a895539b0127ef562b4a1146f08be4664d324baa96346998b6552cd8b"
     }
   },
   "prior_count_snapshot_sha256": "98a05dc1be92dd89860da7d58d76d69a5d8d797ee3166e6cd1c7c69c885c2f7a",
@@ -14439,7 +14439,8 @@
   "refresh_audit_source": "2097181736",
   "refresh_generator_sha256": "8bde82259b0b4be125919c562d43b8963faa0cea409ed9888adae1c28e6a3aa1",
   "native_SDK_source": "2154ab1dac",
-  "source_native": "31142ae0c8a697a7119a9579d94f585d37464f09",
-  "source_Windows_CLI": "81b486343c93d46f7b66ad72580e5a314901029d",
-  "latest_evidence_sha256": "2d4678e98245d139a4b51323cf3c3859bf38e309a35a60cff8380a43677c7528"
+  "source_native": "fcbddc4956",
+  "source_Windows_CLI": "15fe385a4c",
+  "latest_evidence_sha256": "79f40fa8e869d67d1a40c552f9009c88be653b730f51e72bf4d002155f4f8745",
+  "source_and_audit_harness_commit": "0c2d5fc439e48f3a10039358d207813e98a8dcee"
 }
