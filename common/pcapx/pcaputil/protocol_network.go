@@ -111,6 +111,45 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 	e := packetEvidence(p)
 	ci := p.Metadata().CaptureInfo
 	if failure := p.ErrorLayer(); failure != nil {
+		var truncated *ipHeaderTruncatedError
+		if errors.As(failure.Error(), &truncated) {
+			_, networks, tunnels, unsupported := networkCarrierProfile(p)
+			if networks > 1 && (unsupported || tunnels == 0 || tunnels+e.normalizedTunnels > 4 || networks != tunnels+1) {
+				a.refuseUnselectedNetworkParent(p, e, ci)
+				return nil, true
+			}
+			fields := map[string]any{"Expected IP Version": truncated.expected, "Available Header Bytes": truncated.available, "Required Header Bytes": truncated.required, "Header Observation Scope": "incomplete fixed header; declared carrier only"}
+			if truncated.hasVersion {
+				fields["Observed IP Version"] = truncated.observed
+			}
+			names := make([]string, 0, len(e.networkPrefix)+8)
+			for _, typ := range e.networkPrefix {
+				names = append(names, typ.String())
+			}
+			for _, layer := range p.Layers() {
+				if layer.LayerType() == gopacket.LayerTypeDecodeFailure || layer.LayerType() == gopacket.LayerTypePayload {
+					break
+				}
+				if len(names) >= maxCaptureTransportLayers {
+					names = nil
+					fields["Header Layer Projection Limited"] = true
+					break
+				}
+				names = append(names, layer.LayerType().String())
+			}
+			if e.networkPrefixLimited {
+				fields["Header Layer Projection Limited"] = true
+			}
+			if len(names) > 0 {
+				fields["Observed Header Layers"] = names
+			}
+			summary := fmt.Sprintf("IPv%d header incomplete: %d of %d fixed bytes available; transport not admitted", truncated.expected, truncated.available, truncated.required)
+			a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Domain: e.Ref.Domain, Status: "incomplete", Completeness: "incomplete", ExpertCode: "IPHeaderTruncated", Error: failure.Error().Error(), Summary: summary, Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(e)})
+			// Keep the original error-bearing packet for capture-level accounting.
+			// No normalization, fragment clock or application parser sees it here;
+			// the existing transport ingress rejects its decoder error as before.
+			return p, false
+		}
 		var version *ipVersionError
 		if errors.As(failure.Error(), &version) {
 			_, networks, tunnels, unsupported := networkCarrierProfile(p)

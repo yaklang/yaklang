@@ -101,6 +101,12 @@ type protocolPacketBuilder struct {
 	captureTruncated bool
 	datagramDecodeAs map[uint16]string
 	pim              gopacket.NetworkLayer
+	lastLayer        gopacket.Layer
+}
+
+func (b *protocolPacketBuilder) AddLayer(layer gopacket.Layer) {
+	b.PacketBuilder.AddLayer(layer)
+	b.lastLayer = layer
 }
 
 func (b *protocolPacketBuilder) SetNetworkLayer(n gopacket.NetworkLayer) {
@@ -153,13 +159,47 @@ func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
 			next = gopacket.LayerTypePayload
 		}
 	}
-	return b.PacketBuilder.NextDecoder(protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated, datagramDecodeAs: b.datagramDecodeAs})
+	decoder := protocolPacketDecoder{decoder: next, network: b.network, captureTruncated: b.captureTruncated, datagramDecodeAs: b.datagramDecodeAs}
+	if b.lastLayer != nil && len(b.lastLayer.LayerPayload()) == 0 {
+		layer, ok := next.(gopacket.LayerType)
+		if !ok {
+			if typed, found := next.(interface{ LayerType() gopacket.LayerType }); found {
+				layer = typed.LayerType()
+			}
+		}
+		if layer == layers.LayerTypeIPv4 || layer == layers.LayerTypeIPv6 {
+			// The dependency normally stops at any empty payload. A declared
+			// fixed IP header still requires bytes: report the zero-byte case
+			// with the same typed truncation path as other incomplete prefixes.
+			return decoder.Decode(nil, b.PacketBuilder)
+		}
+	}
+	return b.PacketBuilder.NextDecoder(decoder)
 }
 
 type ipVersionError struct{ observed, expected uint8 }
 
 func (e *ipVersionError) Error() string {
 	return fmt.Sprintf("invalid IPv%d version %d", e.expected, e.observed)
+}
+
+type ipHeaderTruncatedError struct {
+	expected            uint8
+	available, required int
+	observed            uint8
+	hasVersion          bool
+	cause               error
+}
+
+func (e *ipHeaderTruncatedError) Error() string { return e.cause.Error() }
+func (e *ipHeaderTruncatedError) Unwrap() error { return e.cause }
+
+func truncatedIPHeader(data []byte, expected uint8, required int, cause error) error {
+	e := &ipHeaderTruncatedError{expected: expected, available: len(data), required: required, cause: cause}
+	if len(data) > 0 {
+		e.observed, e.hasVersion = data[0]>>4, true
+	}
+	return e
 }
 
 // gopacket 1.3.1 returns at the IPv4 end-of-options marker before assigning
@@ -175,6 +215,9 @@ func decodeProtocolIPv4(ip *layers.IPv4, data []byte, feedback gopacket.DecodeFe
 		return &ipVersionError{observed: data[0] >> 4, expected: 4}
 	}
 	if err := ip.DecodeFromBytes(data, feedback); err != nil {
+		if len(data) < 20 {
+			return truncatedIPHeader(data, 4, 20, err)
+		}
 		return err
 	}
 	if ip.Version == 0 && data[0]>>4 == 4 {
@@ -204,7 +247,7 @@ func decodeProtocolIPv6(ip *layers.IPv6, data []byte, feedback gopacket.DecodeFe
 	*ip = layers.IPv6{}
 	if len(data) < 40 {
 		feedback.SetTruncated()
-		return fmt.Errorf("IPv6 header truncated: %d of 40 bytes", len(data))
+		return truncatedIPHeader(data, 6, 40, fmt.Errorf("IPv6 header truncated: %d of 40 bytes", len(data)))
 	}
 	if data[0]>>4 != 6 {
 		return &ipVersionError{observed: data[0] >> 4, expected: 6}
