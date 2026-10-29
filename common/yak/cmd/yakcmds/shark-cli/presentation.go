@@ -40,6 +40,7 @@ type packetPresentation struct {
 }
 
 var protocolDisplayNames = map[string]string{
+	"gtpv2":      "GTPv2-C",
 	"netflow-v9": "NetFlow v9",
 	"ipfix":      "IPFIX",
 	"netflow-v5": "NetFlow v5",
@@ -434,7 +435,7 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 	if e.Protocol == "quic" && (e.Admission == "unparsed-datagram-remainder" || e.Admission == "observed-datagram-padding") && e.Summary != "" {
 		return safeText(e.Summary)
 	}
-	if (e.Protocol == "ntp" || e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix") && e.Summary != "" && e.Summary != e.Protocol {
+	if (e.Protocol == "ntp" || e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix" || e.Protocol == "gtpv2") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {

@@ -212,6 +212,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, pimDisplayBindings()...)
 	out = append(out, ospfv3DisplayBindings()...)
 	out = append(out, ospfv2DisplayBindings()...)
+	out = append(out, gtpv2DisplayBindings()...)
 	out = append(out, l2tp3DisplayBindings()...)
 	out = append(out, stpDisplayBindings()...)
 	out = append(out, ripngDisplayBindings()...)

@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("GTPv2ControlFields")
+  GTPv2ControlFields:
+    operator: |
+      err = parseObservedSession("gtpv2-control")
+      if err != nil { panic(err) }
