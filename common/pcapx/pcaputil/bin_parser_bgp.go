@@ -60,7 +60,7 @@ func observedWireError(err error) error {
 	if err == nil {
 		return nil
 	}
-	if errors.Is(err, stream_parser.ErrOSPFv3WireIntegrity) {
+	if errors.Is(err, stream_parser.ErrOSPFv3WireIntegrity) || errors.Is(err, stream_parser.ErrOSPFv2WireIntegrity) || errors.Is(err, stream_parser.ErrOSPFv2WireFormat) {
 		return protocolError(ErrMalformedMessage, "%s", err)
 	}
 	if errors.Is(err, stream_parser.ErrObservedWireBudget) {

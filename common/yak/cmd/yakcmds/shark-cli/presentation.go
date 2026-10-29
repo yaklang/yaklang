@@ -139,6 +139,9 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
+		return "OSPFv2"
+	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv3-bounded-control" {
 		return "OSPFv3"
 	}
@@ -409,6 +412,11 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
+		v := eventValues(e)
+		h, _ := v["Header"].(map[string]any)
+		return fmt.Sprintf("OSPFv2 %s · router=%s area=%s instance=%d", textValue(v["Packet Name"]), textValue(h["Router ID"]), textValue(h["Area ID"]), number(h["Instance ID"]))
+	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv3-bounded-control" {
 		v := eventValues(e)
 		h, _ := v["Header"].(map[string]any)
@@ -839,7 +847,7 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 		return nil, "", false
 	}
 	switch e.ExpertCode {
-	case "IPv6OptionsHeaderBounds", "IPv6OptionsHeaderOrder", "AHHeaderBounds", "ESPParentLengthInvalid":
+	case "IPv6OptionsHeaderBounds", "IPv6OptionsHeaderOrder", "AHHeaderBounds", "ESPParentLengthInvalid", "OSPFv2ParentLengthInvalid", "OSPFv3ParentLengthInvalid":
 	default:
 		return nil, "", false
 	}
@@ -860,6 +868,19 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 }
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
+	if e == nil || p.networkRefused {
+		return
+	}
+	if e.Protocol == "ospf" && e.Transport == "network" && e.Profile == "ospfv2-bounded-control" && e.Rule == "ospfv2_observed" && e.Entry == "OSPFv2ControlFields" && len(e.Raw) > 0 && e.Raw[0] == 2 {
+		p.protocol, p.priority, p.status, p.visibility = "OSPFv2", 20, e.Status, "message"
+		p.evidence, p.scope = "declared IPv4 protocol/version and bounded OSPFv2 wire observations", "observed control message; advertisements only"
+		p.summary = applicationEventSummary(e)
+		if e.Error != "" {
+			p.summary += " · " + e.Error
+		}
+		p.addLayer("OSPFv2")
+		return
+	}
 	if e != nil && e.Protocol == "ospf" && e.Transport == "network" && e.Profile == "ospfv3-bounded-control" && e.Rule == "ospfv3_observed" && e.Entry == "OSPFv3ControlFields" && len(e.Raw) > 0 && e.Raw[0] == 3 {
 		p.protocol, p.priority, p.status, p.visibility = "OSPFv3", 20, e.Status, "message"
 		p.evidence, p.scope = "declared IPv6 next-header and bounded OSPFv3 wire observations", "observed control message; advertisements only"
@@ -868,9 +889,6 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			p.summary += " · " + e.Error
 		}
 		p.addLayer("OSPFv3")
-		return
-	}
-	if e == nil || p.networkRefused {
 		return
 	}
 	if names, label, ok := networkHeaderRefusalPresentation(e); ok {
@@ -1412,8 +1430,8 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
-			if semantic == "OSPFv3" && physical == "OSPF" {
-				row.ProtocolStack[i], present = "OSPFv3", true
+			if (semantic == "OSPFv3" || semantic == "OSPFv2") && physical == "OSPF" {
+				row.ProtocolStack[i], present = semantic, true
 				break
 			}
 			if semantic == "ICMP" && physical == "ICMPv4" {
