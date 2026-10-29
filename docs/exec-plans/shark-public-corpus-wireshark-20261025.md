@@ -4767,3 +4767,28 @@ Windows证据见 [缺失详情显示摘要](shark-public-corpus-20261025/unavail
 位数/字节步进错误吻合；全部417个v3包、182个完整LSA和128个前缀已有来源核验，
 但源码模型还不是修复后的Go实跑。这两个生产缺口、旧303/390调查和其它高级边界
 继续开放；核心协议与TOP30没有因此被宣布完备。
+
+## NAT-T 实接入与 UDP 端口复用（2026-10-29）
+
+`a82acd0fff97ae50dfc1bbb403c16af359d7bf8f` 为七条完整 UDP4500 ESP 接入共享
+bin-parser 头部、原生字段和递进页面；SPI、sequence 与 opaque body 的载体和
+字节范围分别验证，不推断 SA、认证或解密。完整 native/session grammar 优先于
+自动 NAT-T；显式 decode-as 保持终止语义。修复 TFTP 在未确认对端时抢占相同
+客户端端口流量的问题，并用同一有界计费历史区分当前拒绝候选和已退役代。
+残余 UDP 不能拼成旧 OACK/DATA，后来完整的当前对端 OACK 可恢复；确认/退役
+对端的旧拒绝及预算原因不变。
+
+五包全回归285542通过、24跳过；两项 UDP/QUIC ownership fuzz 合计172032次。
+37组新原生执行保留306455事件与两个独立flow对象，CLI为384518行；七个完整
+对象按预先冻结来源修正，其余完整输出字面不变。独立八包交错控制的十个native
+对象/CLI行包括两个真实结束发布，ID、流和完整字段均精确核验。默认 Wireshark
+把其中两条4500端口 CoAP 标作ESP；明确 decode-as 后核验 CoAP 语法，差异保留。
+
+默认20000/64MiB Windows 实跑选中 frame46978/PDU37903，完整138字节物理来源
+和96字节ESP来源独立，SPI高亮精确对应。保留真实的全局部分历史提示，未提高
+预算；旧 checker 对该页脚的误拒绝也保留。a82 的 Essential、显式完整SHA流量、
+Diff与大小写 CI 均通过。原始捕获、密钥、完整对象、日志、程序和页面图仍在仓库外。
+
+详见 [阶段报告与准确范围](shark-public-corpus-20261025/natt-udp-ownership-a82.md)
+和 [计数证据](shark-public-corpus-20261025/natt-udp-ownership-a82-summary.json)。
+22条OSPFv3缺失、417帧来源的原生接入、旧调查清单和其它高级边界仍未关闭。
