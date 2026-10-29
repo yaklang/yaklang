@@ -234,3 +234,26 @@ The assertions bind the selected owned capture profiles described in the
 manifests; they are not generalized TOP30 certification. Original captures,
 keys, PDML, full expectations/exports, plaintext, binaries and console images
 remain outside Git.
+
+## Compact history and Windows recovered QUIC views
+
+`native_replay_literal_continuity.py --before OLD --after NEW --plan PLAN
+--out FRESH` binds each entire replay file to both original execution receipts,
+the original input plan, captures, keys, binary and build. It compares actual
+bytes without PDU renumbering or JSON normalization. Preservation does not
+certify the interpretation of unchanged fields.
+
+`quic_windows_recovery_cells_audit.py --manifest CASES --runtime CLOSED
+--native CLOSED_NATIVE --requirements FROZEN_REQUIREMENTS
+--audit-modules THIS_FOLDER --out FRESH` checks the actual default-budget
+Windows console cells against physical wire, encrypted PDU, independently
+authenticated STREAM bytes and extracted wire remainder. A short viewport
+certifies its visible prefix only; the full source is separately hash-bound.
+
+`quic_windows_context_cells_audit.py --manifest CASES --runtime CLOSED
+--source-proof FOUR_SOURCES_SUMMARY --audit-modules THIS_FOLDER --out FRESH`
+checks key-update recovery facts and QPACK refusal, including actual selection
+attributes. Derived counts must not acquire an invented ciphertext interval or
+hex highlight. These two auditors explicitly bind the historical `24ca25d1`
+producer. New producer verification needs its own source checkpoint; do not
+relabel those historical console executions.

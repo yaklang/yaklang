@@ -251,7 +251,7 @@ func runPlainDisplay(ctx context.Context, s *captureSession, out io.Writer, asJS
 				if packet.fieldsAtObservation {
 					result = filter.EvaluateSnapshots(packet.observedFields)
 				} else {
-					result = filter.EvaluateEvents(events)
+					result = filter.EvaluateSnapshots(packet.protocolQuerySnapshots(events))
 				}
 				if !result.Complete {
 					return fmt.Errorf("display filter unavailable for frame %d: %s", row.Number, result.Reason)
