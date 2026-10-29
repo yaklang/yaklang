@@ -1,5 +1,175 @@
 # coremail jsp+jar：249 条逐文件错误台账
 
+## coremail stub 清零台账（连续线，2026-10-23 起）
+
+一行一轮**全量**。数字优先原样取自该轮 `verification.json`；`证据` 列写清这一轮现在还能不能复核。
+口径：`exit` 只由 gate 决定——`StubMethods > 0 || SyntaxFailures > 0 || MaterializationErrors > 0` 就是 exit 1，不许改。
+`stub_methods` 是 `verification.json` 里按文件累加的 stub 标记数；`emitting stub:` 行数是**发生次数**（同一方法可能在分析期被多次尝试），两者不等是正常的，见下文「原因分布」。
+
+| 时间 (+08) | yaklang HEAD | javajive HEAD | binary sha256 | files | checked | syntax_failures | decompiler_refusals | materialization_errors | empty_units | frontend_failures | read_failures | stub_methods | stub_files | suppressed | prepare_s | verify_s | exit | run 目录 | 证据 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| 2026-10-23 16:12 | `8c594953` | `23c6221` | `c6a0def3…` | 41765 | 41765 | 0 | 0 | 0 | 0 | 0 | — | 1639 | 1288 | 2887 | 1490.160 | 643.328 | 1 | `/mnt/data/scan-outputs/coremail-2b-v2-20261023-161229` | **已删**（2026-10-29 16:08 清理）；数值来自本文件「全量运行记录」当时记录 |
+| 2026-10-24 17:05 | — | `30d3bd60` | — | 41765 | 41765 | 0 | 0 | 0 | 0 | 0 | — | 985 | 641 | — | — | — | 1 | `/mnt/data/scan-outputs/coremail-2b-stubs-20261024/run-2` | **已删**；仅存运行记录，bin/时间/耗时未留档 |
+| 2026-10-25 19:49 | — | — | — | 41765 | 41765 | 1 | — | 0 | — | 0 | — | 674 | — | — | — | — | 1 | `/mnt/data/scan-outputs/coremail-2b-stubs-20261025/run-2` | **已删**（清理记录的末次活动 19:49）；syntax_failures=1 与 10-26 同一个文件（见下节） |
+| 2026-10-26 15:25 | `e9004bb7` | `c8a94f8` | `8a2944f8…` | 41765 | 41765 | 1 | 1 | 0 | 0 | 0 | 0 | 672 | 526 | 3239 | 144.482 | 1531.138 | 1 | `/mnt/data/scan-outputs/current-branch-20261026/coremail-audit` | **现存** `verification.json`（本轮逐字段复核） |
+| 2026-10-29 19:36 | `1a2bd13c75` | `69bac5b0` | `e653a2b0…` | 41765 | 41765 | 0 | 0 | 0 | 0 | 0 | 0 | 672 | 526 | 3243 | 138.439 | 915.162 | 1 | `/mnt/data/scan-outputs/coremail-full-20261029` | **现存** `verification.json`/`sources.jsonl`/`stdout.log`（本轮逐字段复核） |
+
+字段来源：`files/checked/unique_checks/reused_checks/materialization_errors/syntax_failures/stub_methods/stub_files/suppressed/prepare_seconds/verify_seconds/empty_units/frontend_failures/read_failures/decompiler_refusals` 全部是 `verification.json` 的顶层键；`exit` 是 `exit.txt`；`binary sha256` 在 `notes.txt`。
+
+### 2026-10-26 的 `syntax_failures=1` 与 `decompiler_refusals=1` 是同一个文件
+
+`materialize` 的计数口径（`common/yak/ssaapi/cmd/materialize/main.go`）：
+
+```go
+if check.Error != "" { result.SyntaxFailures++ }
+```
+
+`check.Error != ""` 对所有 `kind` 都自增，所以一个 `decompiler_refusal` 同时计入 `syntax_failures` 和 `decompiler_refusals`。10-26 的两个 1 不是两个 bug，而是同一件事：
+
+- 文件：`webapp/WEB-INF/lib/wmsvr.jar/a/ci.java`
+- 原文：`// decompile dump failed for a/ci.class: source method a.ci.a(...)V: static owner a.ci$a.a(La/ci$a;)Ljava/lang/String; cannot be bound: lexical declaration importability unknown`
+- 佐证：`frontend_covered_files=41764`（= 41765 − 1），即这个文件没有进入 FrontendRaw。
+
+根因与修复（javajive `69bac5b`）：`a.ci` 有字段 `a`，它要调用的静态方法属于扁平化兄弟类 `a.ci$a`；`DeclarationSourceName` 把该声明报成扁平二进制拼写 `a.ci$a`，`ShortTypeName` 原样返回，于是渲染 `a.ci$a.a(x)`——包根 `a` 被同名字段遮蔽（JLS 6.5.5.1），任何源码都拼不出来，静态所有者证明于是拒绝整个文件。修复后按同包简单名渲染 `ci$a.a(x)`。
+
+真实 javac 证据（`/mnt/data/scan-outputs/coremail-ci-fix-20261029/`）：
+
+```
+$ javac -d out a/ci.java a/ci$a.java          # 用 ci$a.a(value)
+（通过，JDK 21 与 JDK 8 都是 0 error）
+
+$ javac -d out a/ci.java a/ci$a.java          # 用 a.ci$a.a(value)
+a/ci.java:13: error: non-static variable a cannot be referenced from a static context
+a/ci.java:13: error: cannot find symbol
+  symbol:   variable ci$a
+  location: variable a of type Map<String,ci$a>
+```
+
+端到端：用修复后的代码把 `wmsvr.jar` 全部 1770 个类重新反编译（`0 dump 失败`，此前 1 个），再把产出的 `a/ci.java`+`a/ci$a.java`+`a/ci$b.java` 以 `-cp 原始 wmsvr.jar` 交给 javac 21 和 javac 8，均 0 error。
+
+### 2026-10-29 轮：只修门禁，stub 未动
+
+这一轮（javajive `69bac5b` = 10-26 的 `c8a94f8` 重基后 + `1e608ca` + `a80e9af` + `69bac5b`）把两个 1 压回 0，但 `stub_methods` 仍是 **672**、`stub_files` 仍是 **526**，逐文件对比**完全一致**（新增 0、消失 0、计数变化 0）。`sources.jsonl` 的 `kind` 只有 5 处变化：
+
+| 变化 | 文件 | 说明 |
+|---|---|---|
+| `decompiler_refusal` → `java` | `webapp/WEB-INF/lib/wmsvr.jar/a/ci.java` | 本轮修复；恢复成正常编译单元，且 0 stub |
+| `java` → `ownership_suppressed` | `cn/mailtech/webadmin/db/DataDict$STAT_COL_ARRAY.java` ×3（icmagent/gtadmin/webadmin 各一份） | 上游 65 提交重基带来的枚举常量体折叠标记，两次都是 0 stub |
+| `java` → `ownership_suppressed` | `tebie/applib/client/UDException$ErrorInfo.java` | 同上 |
+
+`emitting stub:` 发生次数 734 → 733（只少一条 `implicit constructor prefix lacks receiver-observation proof`），`suppressed` 3239 → 3243（就是上面那 4 个文件）。
+
+结论：本轮是**门禁修复轮**，不是 stub 收敛轮。下一轮要真正压 672，必须动两类：
+`checked escape helper requires complete inherited member names`（354）与
+`constructor prefix has escaping local or control flow`（164，另加同源的
+`implicit constructor prefix lacks receiver-observation proof` 161）。
+两者的共同阻塞点已定位：构造器链证明要求父类在每个受支持 JDK 版本上都有原始字节码，
+而 `classparser/jdk_constructor_code.zip` 只索引了 `major == release+44` 的类；
+`org/xml/sax/helpers/DefaultHandler` 这类父类在 6 个版本里是 6 份不同字节
+（`6e1551a3…/beb0130d…/68850d81…/6f95d5b3…/129f4a8e…/b29e1547…`），
+所以只能补 JDK 9/11/16/17 的原版归档重新生成，不能靠「回退到最近版本」——
+按哈希校验的回退一条也修不掉，不校验就是无证据放宽。
+
+### 行间归因
+
+- **10-23 16:12 → 10-24 17:05：1639 → 985（−654）**。这一段的 javajive 提交（`23c6221..30d3bd6`，18 个）集中在两类：构造器前缀/合成捕获（`7916232 keep synthetic captures after super`、`30d3bd6 keep dead constructor prefix calls`、`cb2db63 restore closed finalizer proof`）与渲染健壮性（`e8048b5 clinit 静态块`、`2aa5be7/d63b20c switch case 花括号`、`6f617df 多 catch 联合类型`、`0d0e265 ECJ enum`、`b786fc4 裸 $ 标识符`、`39e94b5/113e666/73f9fdf ReplaceVar 有界`、`c484228 三元环`）。10-24 的 run 目录已删，**没有留下原因直方图**，所以 −654 在两大类之间的分配无法用 artifacts 复核，只能按提交面归到「构造器前缀」为主。这一点是本台账目前最大的证据缺口。
+- **10-24 → 10-26：985 → 672（−313）**。新增提交三个：`dce22ff`（前缀自增不再多发括号，修的是 406 个 syntax_failures，不减 stub）、`4719dec`（保留 checked 构造器实参桥接）、`c8a94f8`（T20/T21 record/pattern 完成标记、`jdecPolicyMap` 缓存身份、switch case 只在必要时加括号、retain 模式下未证明参数名不再 stub）。stub 的 −313 主要来自 `c8a94f8` 的 retain 模式放开与 `4719dec` 的构造器桥接。
+- **两类大头现在各剩多少**（按该轮 `stdout.log` 的 `emitting stub:` 行计，括号内为涉及文件数）：
+
+| 原因 | 10-24（用户口径） | 10-26 | 10-29 |
+|---|---:|---:|---:|
+| `constructor prefix has escaping local or control flow` | 854 | 164（130 文件） | 164（130 文件） |
+| `checked escape helper requires complete inherited member names` | 630 | 354（67 文件） | 354（67 文件） |
+
+  10-24 列是当时记录值（run 目录已删，无法复核）。两类合计从 1484 降到 518，但**都没有清零**，仍是最大两块。
+
+### 剩余 stub 原因分布（按 `stdout.log` 的 `emitting stub:`）
+
+不使用 `verification.json.issues`：那里只有 `path/stubs/error`，没有 reason。
+
+10-26 全量（734 条发生次数，`verification.json.stub_methods=672`）：
+
+| 发生次数 | 文件数 | 原因 |
+|---:|---:|---|
+| 354 | 67 | `checked escape helper requires complete inherited member names` |
+| 164 | 130 | `constructor prefix has escaping local or control flow` |
+| 161 | 116 | `implicit constructor prefix lacks receiver-observation proof` |
+| 27 | 19 | `checked constructor delegation requires original declared throws` |
+| 13 | 2 | `ParseBytesCode failed: has circle` |
+| 7 | 5 | `unproved constructor argument effect graph` |
+| 4 | 3 | `unproved constructor boundary for original instance initializer` |
+| 1 | 1 | `exception-handler structuring failed: caught-throwable sentinel leaked into method body` |
+| 1 | 1 | `original capture identity snapshots are not closed` |
+| 1 | 1 | `ParseBytesCode failed: enum regeneration: original backing source packet is not closed` |
+| 1 | 1 | `unsupported protected or zero-argument constructor prefix` |
+
+复现命令（任何一轮都适用）：
+
+```sh
+python3 - <<'PY'
+import re, collections
+pat = re.compile(r'emitting stub: (.*?) class=(\S+)')
+c, files = collections.Counter(), collections.defaultdict(set)
+for line in open('stdout.log', encoding='utf-8', errors='replace'):
+    m = pat.search(line)
+    if m:
+        c[m.group(1).strip()] += 1
+        files[m.group(1).strip()].add(m.group(2))
+for r, n in c.most_common():
+    print(f'{n:6d} {len(files[r]):6d}  {r}')
+print('total', sum(c.values()))
+PY
+```
+
+### 判据（不许改）
+
+`StubMethods > 0 || SyntaxFailures > 0 || MaterializationErrors > 0` → `exit 1`。
+`materialize` 的这段判断在 `run()` 末尾，任何一轮都直接照此读数，不做「stub 降级为 warning」「按比例放行」「只统计新增」等变通。
+已证不可表达的情形也必须走受控抑制（`suppressed`），不能靠删文件、跳用例或放宽断言。
+
+### 回归操作清单
+
+1. 选 run 目录，必须在 `/mnt/data/scan-outputs/` 下（`materialize` 会拒绝其他前缀）：
+   ```sh
+   RUN=/mnt/data/scan-outputs/coremail-full-$(date +%Y%m%d-%H%M%S)
+   mkdir -p "$RUN/yakit" "$RUN/tmp"
+   ```
+2. 确认 javajive 本地 replace 只在本工作区、且**不提交**：
+   ```sh
+   cd ~/Developer/yaklang-workspace/fix-ssa-unit-plan-perf
+   grep -n 'replace github.com/yaklang/javajive' go.mod    # 必须指到 javajive-coremail-fix 工作区
+   git status --short go.mod                               # 允许出现 ' M go.mod'
+   ```
+3. 记 provenance 并构建（构建与运行都必须在 yaklang 工作区内执行，`go.mod` 的 replace 才会生效）：
+   ```sh
+   { echo "started=$(date -Iseconds)"; echo "yaklang=$(git rev-parse HEAD)";
+     echo "javajive=$(git -C ~/Developer/work/javajive-coremail-fix rev-parse HEAD)";
+     sha256sum "$RUN/materialize"; git diff -- go.mod; } > "$RUN/notes.txt"
+   go build -p 8 -o "$RUN/materialize" ./common/yak/ssaapi/cmd/materialize
+   ```
+4. 跑全量（32 核、22 GiB 软上限；启动前 `MemAvailable` 必须 ≥ 20 GiB）：
+   ```sh
+   export GOMAXPROCS=32 GOGC=100 GOMEMLIMIT=22GiB
+   export YAKIT_HOME="$RUN/yakit" TMPDIR="$RUN/tmp" YAK_SSA_SOURCE_CACHE=0
+   export GOCACHE=/mnt/data/cache/go-build GOTMPDIR="$RUN/tmp"
+   awk '/MemAvailable/{print}' /proc/meminfo
+   "$RUN/materialize" --debug "$RUN" /home/wlz/Target/coremail > "$RUN/stdout.log" 2>&1
+   printf '%s\n' $? > "$RUN/exit.txt"
+   ```
+5. 结果只从这几处读：
+   - `$RUN/verification.json` —— 台账所有计数字段；
+   - `$RUN/exit.txt` —— gate 结果；
+   - `$RUN/stdout.log` —— `prepared files=…`、`verify N/41765 syntax_failures=… stubs=…` 进度、`emitting stub:` 原因行、末行 `finished files=…`；
+   - `$RUN/notes.txt` —— yaklang/javajive HEAD、binary sha256、`go.mod` 差异。
+6. 分类原因：用上面那段 Python（只认 `emitting stub: <reason> class=<cls>`），再按 `reason → 涉及文件 → 首个文件` 定位样本。
+7. 把这一轮写成台账的一行；`syntax_failures` 或 `decompiler_refusals` 变化时，先按「同一个文件」口径确认是不是同一件事（`check.Error != ""` 会同时计数），再决定是不是回归。
+8. 与上一轮对比时，**先比 `stub_methods`，再比原因直方图**；总数下降但某类上升要单独说明，不允许只看总数。
+
+---
+
+## 以下为 2026-10-23 归档（历史明细，未随台账更新）
+
+
 ## 当前结论（2026-10-23 审计修正）
 
 **语法失败已清零，整体仍未验收。** 最近全量为 `161229`：`syntax_failures=0`、`decompiler_refusals=0`、`frontend_failures=0`、`empty_units=0`、`materialization_errors=0`，但 `stub_methods=1639`，exit=1。`materialize` 在 stub 大于 0 时返回 1。131834 的 20 条整文件拒绝里，18 条不再出现在问题清单；`CompilePhaseAdapter` 与 `NestingType` 已被 FrontendRaw 接受，但各留下 1 个构造器 stub，所以 stub 从 1637 增到 1639、stub 文件从 1286 增到 1288。没有新增 suppression。未跑 ekp、未 push。
