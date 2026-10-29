@@ -1,0 +1,58 @@
+package main
+
+import (
+	"bufio"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"os"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
+)
+
+type input struct {
+	Sourcecase string `json:"sourcecase"`
+	Path       string `json:"input_path"`
+	Offset     int64  `json:"byte_offset"`
+	Length     int    `json:"byte_length"`
+	RawSHA     string `json:"rawSHA"`
+	Budget     int    `json:"budget"`
+	Depth      int    `json:"depth_limit"`
+}
+
+func main() {
+	scanner := bufio.NewScanner(os.Stdin)
+	scanner.Buffer(make([]byte, 4096), 1<<20)
+	encoder := json.NewEncoder(os.Stdout)
+	for scanner.Scan() {
+		var in input
+		if err := json.Unmarshal(scanner.Bytes(), &in); err != nil {
+			panic(err)
+		}
+		data, err := os.ReadFile(in.Path)
+		if err != nil {
+			panic(err)
+		}
+		if in.Offset < 0 || in.Length < 0 || in.Offset > int64(len(data)) || int64(in.Length) > int64(len(data))-in.Offset || in.Depth != 8 {
+			panic("source input boundary/depth differs")
+		}
+		raw := data[in.Offset : in.Offset+int64(in.Length)]
+		rawSHA := fmt.Sprintf("%x", sha256.Sum256(raw))
+		if rawSHA != in.RawSHA {
+			panic("source payload differs")
+		}
+		fields, decodeErr := stream_parser.DecodeGTPv2Wire(raw, in.Budget)
+		message := ""
+		if decodeErr != nil {
+			message = decodeErr.Error()
+		}
+		row := map[string]any{"sourcecase": in.Sourcecase, "rawSHA": rawSHA, "budget": in.Budget, "fields": fields, "error": message, "is_context": errors.Is(decodeErr, stream_parser.ErrObservedWireContext), "is_budget": errors.Is(decodeErr, stream_parser.ErrObservedWireBudget), "is_format": errors.Is(decodeErr, stream_parser.ErrGTPv2WireFormat)}
+		if err := encoder.Encode(row); err != nil {
+			panic(err)
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+}
