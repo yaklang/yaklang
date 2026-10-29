@@ -106,9 +106,9 @@ type protocolCorpusPacketReader interface {
 
 func TestProtocolCorpusIntegrity(t *testing.T) {
 	const corpusDir = "testdata/protocol-corpus"
-	// The immutable corpus records its historical roadmap scores. These three
-	// rows now honestly advertise bounded partial native coverage; validate
-	// their executable scopes before accepting that exact historical transition.
+	// The immutable corpus records its historical roadmap scores. Selected
+	// rows now advertise bounded partial coverage; execute their concrete
+	// scopes before accepting those exact historical transitions.
 	observedScopes := requireObservedSessionScopes(t, priP0)
 	for name, passed := range requireObservedSessionScopes(t, priP1) {
 		observedScopes[name] = passed

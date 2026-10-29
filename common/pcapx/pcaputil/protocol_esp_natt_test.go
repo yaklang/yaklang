@@ -246,3 +246,73 @@ func TestESPNATTCompetingServiceGrammarBeforePortHint(t *testing.T) {
 		}
 	}
 }
+
+func TestESPNATTPostRegistryGrammarsAndReusedClientPort(t *testing.T) {
+	stun := []byte{0, 1, 0, 0, 0x21, 0x12, 0xa4, 0x42, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}
+	coap := []byte{0x40, 1, 0, 1, 0xb7, 's', 'e', 'n', 's', 'o', 'r', 's', 4, 't', 'e', 'm', 'p'}
+	tftp := []byte("\x00\x01example.txt\x00octet\x00")
+	radius := []byte{1, 7, 0, 32, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 1, 6, 't', 'e', 's', 't', 4, 6, 192, 0, 2, 1}
+	types := []string{"stun", "coap", "tftp", "radius"}
+	ports := []uint16{3478, 5683, 69, 1812}
+	wires := [][]byte{stun, coap, tftp, radius}
+	for _, v6 := range []bool{false, true} {
+		var mixed [][]byte
+		for i, w := range wires {
+			frame := espNATTFrame(t, w, v6, 4500, ports[i])
+			mixed = append(mixed, frame)
+			t.Run(fmt.Sprintf("v6=%v/%s", v6, types[i]), func(t *testing.T) {
+				events, _ := espNATTReplay(t, [][]byte{frame})
+				if types[i] == "radius" {
+					require.Len(t, events, 2)
+					require.Equal(t, "radius", events[1].Protocol)
+					require.Equal(t, "incomplete", events[1].Status, "an unanswered request still publishes its capture-close observation")
+				} else {
+					require.Len(t, events, 1)
+				}
+				require.Equal(t, types[i], events[0].Protocol)
+				require.NotContains(t, events[0].DisplayFields(), "esp.spi")
+			})
+		}
+		t.Run(fmt.Sprintf("v6=%v/reused-client-port", v6), func(t *testing.T) {
+			events, _ := espNATTReplay(t, mixed)
+			require.Len(t, events, 5)
+			require.Equal(t, "radius", events[4].Protocol)
+			require.Equal(t, "incomplete", events[4].Status)
+			for i, e := range events[:4] {
+				require.Equal(t, types[i], e.Protocol)
+				require.Empty(t, e.Error)
+				require.NotContains(t, e.DisplayFields(), "esp.spi")
+			}
+		})
+	}
+	for _, oversized := range []bool{false, true} {
+		t.Run(fmt.Sprintf("TFTP-stays-usable/oversized=%v", oversized), func(t *testing.T) {
+			alien := bytes.Clone(radius)
+			if oversized {
+				alien = append(alien, bytes.Repeat([]byte{1}, 100)...)
+			}
+			events, _ := tftpPublicPackets(t, []tftpPublicStep{
+				{0, 4500, 69, tftp}, {0, 4500, 1812, alien},
+				{0, 4500, 5683, coap},
+				{0, 4500, 4500, []byte{0xf4, 0x87, 0xbf, 0xcf, 0, 0, 0, 8, 1, 2, 3, 4}},
+				{1, 50000, 4500, []byte{0, 3, 0, 1, 'o', 'k'}}, {0, 4500, 50000, []byte{0, 4, 0, 1}},
+			}, WithProtocolBudget(64, 1<<20))
+			if oversized {
+				require.Len(t, events, 6)
+			} else {
+				require.Len(t, events, 7)
+				require.Equal(t, "radius", events[6].Protocol)
+				require.Equal(t, "incomplete", events[6].Status)
+			}
+			require.NotEqual(t, "tftp", events[1].Protocol, "an unrelated service cannot poison the pending TFTP transfer")
+			require.Equal(t, "coap", events[2].Protocol)
+			require.Equal(t, "esp", events[3].Protocol)
+			require.Zero(t, events[3].FlowID)
+			require.Equal(t, events[0].FlowID, events[4].FlowID)
+			require.Equal(t, events[0].FlowID, events[5].FlowID)
+			require.Empty(t, events[4].Error)
+			require.Empty(t, events[5].Error)
+			require.Equal(t, true, events[5].Session["Transfer Complete"])
+		})
+	}
+}

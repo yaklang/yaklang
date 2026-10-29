@@ -221,10 +221,7 @@ var nativeDatagrams = []nativeDatagramProfile{
 }
 
 func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst uint16) bool {
-	explicit := a.datagramDecodeAs[dst]
-	if explicit == "" {
-		explicit = a.datagramDecodeAs[src]
-	}
+	explicit := a.protocolDatagramSelection(src, dst)
 	if explicit == "esp-natt" {
 		return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
 	}
@@ -524,8 +521,12 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		return true
 	}
-	// A source port is also a possible ephemeral/NAT allocation. Do not let
-	// the weak nonzero-SPI envelope swallow a complete DNS, IKE, or other
-	// registered grammar, even when either endpoint happens to use 4500.
-	return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
+	return false
+}
+
+func (a *binParser) protocolDatagramSelection(src, dst uint16) string {
+	if selected := a.datagramDecodeAs[dst]; selected != "" {
+		return selected
+	}
+	return a.datagramDecodeAs[src]
 }

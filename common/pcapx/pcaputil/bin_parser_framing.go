@@ -689,6 +689,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Error = e.sessionError.Message
 		a.limited.Add(uint64(len(wire)))
 	} else {
+		explicit := a.protocolDatagramSelection(uint16(udp.SrcPort), uint16(udp.DstPort))
 		if events, ok := a.decodeMAVLinkDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)); ok {
 			for _, event := range events {
 				a.emit(event)
@@ -722,11 +723,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			return
 		}
 		var spec *binSpec
-		if len(wire) >= 2 && kerberosTag(wire[0]) && ((udp.SrcPort == 88 || udp.DstPort == 88) || kerberosWireEvidence(wire, a.config.MaxMessageBytes)) {
+		if explicit != "esp-natt" && len(wire) >= 2 && kerberosTag(wire[0]) && ((udp.SrcPort == 88 || udp.DstPort == 88) || kerberosWireEvidence(wire, a.config.MaxMessageBytes)) {
 			e.Protocol = "kerberos"
 			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
 		}
-		if spec == nil && a.decodeSessionDatagram(e, wire) {
+		if spec == nil && explicit != "esp-natt" && a.decodeSessionDatagram(e, wire) {
 			var children []*ProtocolEvent
 			if e.Protocol == "radius" {
 				if e.ID == 0 {
@@ -755,7 +756,10 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 				e.Status, e.Structured = "decoded", result
 				a.decoded.Add(1)
 			}
-		} else {
+		} else if !a.decodeESPNATTDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort), explicit) {
+			// A service port and nonzero SPI provide only a clear-header
+			// observation. Try it after every existing complete-message and
+			// session codec, once each, without bypassing another DecodeAs.
 			a.unknown.Add(1)
 			a.unclassified.Add(uint64(len(wire)))
 		}

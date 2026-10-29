@@ -16,6 +16,31 @@ func requireObservedSessionScopes(t *testing.T, priority string) map[string]bool
 	t.Helper()
 	covered := map[string]bool{}
 	if priority == priP1 {
+		covered["NAT-T"] = t.Run("NATTCanonicalBoundedScope", func(t *testing.T) {
+			// Execute literal fields, unknown/truncated envelopes and resource
+			// boundaries before accepting the narrower modern declaration.
+			TestProtocolCorpusNATTLiteralFieldsAndPublicPaths(t)
+			TestProtocolCorpusNATTTruncationChainAndTransactions(t)
+			TestProtocolCorpusNATTResourceBounds(t)
+			catalog, roadmap := false, false
+			for _, row := range ProtocolCatalog {
+				if row.Name == "NAT-T" {
+					catalog = true
+					require.Equal(t, statusPartial, row.Status)
+					require.Equal(t, "nat_t.yaml", row.RuleFile)
+					require.NotEmpty(t, row.Notes)
+				}
+			}
+			for _, row := range ProtocolRoadmap {
+				if row.Name == "NAT-T" {
+					roadmap = true
+					require.Equal(t, stPartial, row.Status)
+					require.NotEmpty(t, row.Notes)
+				}
+			}
+			require.True(t, catalog)
+			require.True(t, roadmap)
+		})
 		covered["IGMP"] = t.Run("IGMPMembershipCanonicalBoundedScope", func(t *testing.T) {
 			requireIGMPCanonicalWireScope(t)
 			TestIGMPLegacyOpenQueryCannotSelectAnEightByteVersion(t)

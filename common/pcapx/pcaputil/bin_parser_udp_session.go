@@ -145,6 +145,9 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	if !request && el == nil {
 		return false
 	}
+	if !request && !tftpUDPHasPeerEvidence(el.Value.(*binUDPEntry).flow, e, w, dir) {
+		return false
+	}
 	e.nativeTFTPObservation = true
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
@@ -162,7 +165,8 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		f := el.Value.(*binUDPEntry).flow
 		t := f.tftp
 		count := len(t.retired)
-		if t.server != "" && !t.retiredTID(t.server) {
+		_, serverObserved := t.retired[t.server]
+		if t.server != "" && !serverObserved {
 			count++
 		}
 		target := int64(512 + len(w)*3 + count*128)
@@ -181,10 +185,13 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		} else {
 			history := t.retired
 			if history == nil && t.server != "" {
-				history = make(map[string]struct{}, count)
+				history = make(map[string]tftpPeerState, count)
+			}
+			for peer := range history {
+				history[peer] = tftpRetiredPeer
 			}
 			if t.server != "" {
-				history[t.server] = struct{}{}
+				history[t.server] = tftpRetiredPeer
 			}
 			f.tftp = &binTFTP{retired: history, file: a.newTFTPFile(e.Destination), ambiguous: t.futureAmbiguous, futureAmbiguous: t.futureAmbiguous}
 			f.id = a.flows.Add(1)
@@ -257,6 +264,13 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 					}
 				}
 				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements), tftpFileEvidence{ID: e.ID, Refs: e.SourceBytes.PacketRefs})
+				if err != nil && dir == 1 && t.server == "" && tftpCandidatePrefix(w) {
+					// A partial OACK/DATA identifies this exact candidate port,
+					// without committing the server or joining UDP datagrams.
+					if historyErr := f.rememberTFTPPeer(peer, tftpRefusedCandidate); historyErr != nil {
+						err = historyErr
+					}
+				}
 				if err != nil && t.file != nil {
 					t.file.abort()
 					t.ambiguous = true
