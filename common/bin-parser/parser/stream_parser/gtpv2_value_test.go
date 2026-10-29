@@ -201,6 +201,88 @@ func TestGTPv2GroupedOpaqueSiblingSelectedValuesAndBounds(t *testing.T) {
 	require.False(t, errors.Is(err, ErrGTPv2WireFormat))
 }
 
+func TestGTPv2SelectedIEReceiveLengthRules(t *testing.T) {
+	// TS29.274 7.7.7 permits unknown extensions to known extendable prefixes.
+	// The complete TLIV envelope still cannot excuse a missing mandatory octet.
+	for _, tc := range []struct {
+		name            string
+		typ             byte
+		value           []byte
+		format, context bool
+		key             string
+		want            any
+	}{
+		{"ebi-extension", 73, []byte{0xa5, 0xee}, false, false, "EPS Bearer ID", uint64(5)},
+		{"ebi-empty", 73, nil, true, false, "", nil},
+		{"recovery-empty", 3, nil, true, false, "", nil},
+		{"recovery-variable-tail", 3, []byte{7, 0xee}, false, true, "Recovery Counter", uint64(7)},
+		{"cause-empty", 2, nil, true, false, "", nil},
+		{"cause-one-byte", 2, []byte{16}, true, false, "Cause", uint64(16)},
+		{"cause-three-bytes", 2, []byte{16, 0, 0xee}, true, false, "Cause", uint64(16)},
+		{"cause-seven-bytes", 2, []byte{16, 0, 73, 0, 0, 0, 0xee}, true, false, "Cause Flags", uint64(0)},
+		{"fteid-no-address", 87, []byte{0, 1, 2, 3, 4}, true, false, "TEID", uint64(0x01020304)},
+		{"fteid-short-prefix", 87, []byte{0x80, 1, 2, 3}, true, false, "F-TEID Flags", uint64(128)},
+		{"fteid-v4-short", 87, []byte{0x80, 1, 2, 3, 4, 192, 0, 2}, true, false, "TEID", uint64(0x01020304)},
+		{"fteid-v4-extension", 87, []byte{0x80, 1, 2, 3, 4, 192, 0, 2, 9, 0xee}, false, false, "IPv4 Address", "192.0.2.9"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := gtpv2TestMessage(32, 0x48, 1, 1, gtpv2TestIE(tc.typ, tc.value, 0))
+			fields, err := DecodeGTPv2Wire(w, 64)
+			require.Equal(t, tc.format, errors.Is(err, ErrGTPv2WireFormat), err)
+			require.Equal(t, tc.context, errors.Is(err, ErrObservedWireContext), err)
+			if !tc.format && !tc.context {
+				require.NoError(t, err)
+			}
+			require.Equal(t, !tc.format && !tc.context, fields["Wire Grammar Complete"])
+			ie := fields["Messages"].([]map[string]any)[0]["IEs"].([]map[string]any)[0]
+			body := ie["Body"].(map[string]any)
+			if tc.key != "" {
+				require.Equal(t, tc.want, body[tc.key])
+			}
+			if tc.typ == 2 && len(tc.value) != 6 {
+				require.NotContains(t, body, "Offending IE Type")
+			}
+			if tc.name == "ebi-extension" || tc.name == "fteid-v4-extension" {
+				require.Equal(t, []byte{0xee}, body["Ignored Extension Bytes"])
+				span := body["Wire Field Ranges"].(map[string]any)["Ignored Extension Bytes"].([]any)
+				require.Equal(t, []any{uint64(len(w) - 1), uint64(len(w))}, span)
+				w[len(w)-1] = 0
+				require.Equal(t, []byte{0xee}, body["Ignored Extension Bytes"])
+			}
+		})
+	}
+}
+
+func TestGTPv2FTEIDIPv6AndDualAddressExtensionsKeepExactRanges(t *testing.T) {
+	for _, both := range []bool{false, true} {
+		value := []byte{0x4d, 1, 2, 3, 4}
+		if both {
+			value[0] |= 0x80
+			value = append(value, 192, 0, 2, 9)
+		}
+		value = append(value, []byte{0x20, 1, 0x0d, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}...)
+		value = append(value, 0xee, 0xff)
+		w := gtpv2TestMessage(32, 0x48, 1, 1, gtpv2TestIE(87, value, 0))
+		f, err := DecodeGTPv2Wire(w, 64)
+		require.NoError(t, err)
+		body := f["Messages"].([]map[string]any)[0]["IEs"].([]map[string]any)[0]["Body"].(map[string]any)
+		require.Equal(t, "2001:db8::1", body["IPv6 Address"])
+		require.Equal(t, uint64(13), body["Interface Type"])
+		ranges := body["Wire Field Ranges"].(map[string]any)
+		start := uint64(21)
+		if both {
+			require.Equal(t, "192.0.2.9", body["IPv4 Address"])
+			require.Equal(t, []any{uint64(21), uint64(25)}, ranges["IPv4 Address"])
+			start += 4
+		} else {
+			require.NotContains(t, body, "IPv4 Address")
+		}
+		require.Equal(t, []any{start, start + 16}, ranges["IPv6 Address"])
+		require.Equal(t, []any{start + 16, start + 18}, ranges["Ignored Extension Bytes"])
+		require.Equal(t, []byte{0xee, 0xff}, body["Ignored Extension Bytes"])
+	}
+}
+
 func FuzzGTPv2BoundedOccurrences(f *testing.F) {
 	f.Add(gtpv2TestMessage(1, 0x40, 0, 1, gtpv2TestIE(3, []byte{7}, 0)), uint8(1))
 	f.Add(gtpv2TestMessage(32, 0x48, 0, 1, gtpv2TestIE(93, gtpv2TestIE(73, []byte{5}, 0), 0)), uint8(32))
