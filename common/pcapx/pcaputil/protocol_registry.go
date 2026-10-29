@@ -59,6 +59,8 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"radius", "udp", "complete RADIUS header and attributes", "service routing plus exact length/type/attribute validation; authenticators unverified"},
 		{"ntp", "udp", "RFC1059 v1 time header with reserved low bits and distinct distance/drift; v2-v4 modes1..5; service-hinted v2..4 mode6 control and bounded response fragments", "literal seconds/fraction without era inference; capture-domain/endpoints/version/sequence request ownership, local30-second capture-time lease, reorder/overlap/final-size checks and capture-lifetime reuse quarantine; system variable responses may report a selected peer ID; timestamps/status are observations, optional authenticator is never verified; time extensions and private mode7 remain unselected"},
 		{"ike", "udp", "IKEv1/v2 payload chain, NAT-T non-ESP marker", "exact length, payload boundaries; encrypted bodies opaque; no SA/authentication success inference"},
+		{"esp", "network", "explicit IP Next Header50 clear SPI/low sequence words and opaque remainder", "independent bounded header observations; capture prefixes stay incomplete; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
+		{"esp-natt", "udp", "RFC3948 UDP4500 or explicit DecodeAs; nonzero SPI, complete eight-byte ESP header and at least one opaque word", "validated UDP carrier; independent per-datagram observations, marked IKE and keepalives never inherit ESP; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
 		{"wireguard", "udp", "exact initiation/response/cookie/transport envelope", "observed endpoint/domain/receiver-index association; no crypto or peer identity verification"},
 		{"rip", "udp", "RIPv1/v2 request/response entries", "complete entries, metric checks and v2 clear password; no routing or authentication success"},
 		{"nbt-dg", "udp", "RFC1002 datagram/query/error", "encoded source/destination names; fragments remain explicit without reassembly"},
@@ -149,7 +151,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix":
+		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix", "esp-natt":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
@@ -222,6 +224,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	explicit := a.datagramDecodeAs[dst]
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
+	}
+	if a.decodeESPNATTDatagram(e, w, src, dst, explicit) {
+		return true
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
