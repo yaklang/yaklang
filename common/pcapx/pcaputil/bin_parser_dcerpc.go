@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
+	binparser "github.com/yaklang/yaklang/common/bin-parser/parser"
 )
 
 // binDCERPC is the M0 session state for connection-oriented DCE/RPC v5.
@@ -251,7 +253,17 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 		if err := d.reserveMemory(d.retainedBytes()); err != nil {
 			return nil, err
 		}
-		return dcerpcSecurityEnvelope(raw, info)
+		info, err := dcerpcSecurityEnvelope(raw, info)
+		if err != nil {
+			return info, err
+		}
+		authTrailer := raw[len(raw)-8-authLength:]
+		if authTrailer[0] == 10 {
+			if ntlm, ok := binparser.ParseNTLMSSPFields(authTrailer[8:]); ok {
+				info["NTLMSSP"] = ntlm
+			}
+		}
+		return info, nil
 	}
 	d.peerMessages[dir] = true
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
