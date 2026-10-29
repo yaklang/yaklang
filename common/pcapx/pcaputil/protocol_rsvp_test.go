@@ -207,3 +207,52 @@ func TestRSVPCompleteParentLengthIsNotCaptureLoss(t *testing.T) {
 	require.Len(t, es, 1)
 	require.Equal(t, "context-required", es[0].Status)
 }
+
+func TestRSVPIPv6ExtensionsCannotBorrowIPv4Parent(t *testing.T) {
+	for _, next := range []byte{0, 43, 60} {
+		wire := append([]byte{46, 0, 0, 0, 0, 0, 0, 0}, rsvpNativeWire(7)...)
+		for _, validParent := range []bool{true, false} {
+			frame := rsvpNativeFrame(t, wire, false)
+			frame[23] = next
+			if !validParent {
+				binary.BigEndian.PutUint16(frame[16:18], 0)
+			}
+			frame[24], frame[25] = 0, 0
+			var sum uint32
+			for at := 14; at < 34; at += 2 {
+				sum += uint32(binary.BigEndian.Uint16(frame[at:]))
+			}
+			for sum>>16 != 0 {
+				sum = sum&65535 + sum>>16
+			}
+			binary.BigEndian.PutUint16(frame[24:26], ^uint16(sum))
+			captured := gopacket.NewPacket(frame, CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+			require.Nil(t, captured.Layer(captureRSVPType), "IPv4 protocol %d is not an IPv6 parent", next)
+			private := protocolAnalysisPacket(captured, nil)
+			require.Nil(t, private.Layer(captureRSVPType))
+			if captured.ErrorLayer() != nil {
+				require.NotNil(t, private.ErrorLayer(), "RSVP selection must not erase an unselected carrier's decoder error")
+			}
+			var es []*ProtocolEvent
+			var captureStats TCPReassemblyStats
+			err := ReplayPcap(bytes.NewReader(icmpFragmentCapture(t, [][]byte{frame})), WithOnProtocolMessage(func(e *ProtocolEvent) { es = append(es, e) }), WithOnTCPReassemblyStats(func(s TCPReassemblyStats) { captureStats = s }))
+			if captured.ErrorLayer() != nil && next != 0 {
+				require.Error(t, err, "IPv4 protocol %d, valid parent %t: preserve the strict capture error", next, validParent)
+				require.Positive(t, captureStats.DecodeErrors)
+			} else if captured.ErrorLayer() == nil {
+				require.NoError(t, err)
+			}
+			for _, e := range es {
+				require.NotEqual(t, "rsvp", e.Protocol, "IPv4 protocol %d cannot select an IPv6 extension's child", next)
+				require.NotEqual(t, "RSVPParentLengthInvalid", e.ExpertCode)
+			}
+		}
+		frame := rsvpNativeFrame(t, wire, true)
+		frame[20] = next
+		es, _ := espNATTReplay(t, [][]byte{frame})
+		require.Len(t, es, 1)
+		require.Equal(t, "rsvp", es[0].Protocol)
+		require.Equal(t, "decoded", es[0].Status, es[0].Error)
+		require.Equal(t, []any{uint64(7)}, es[0].DisplayFields()["rsvp.refresh_interval"])
+	}
+}
