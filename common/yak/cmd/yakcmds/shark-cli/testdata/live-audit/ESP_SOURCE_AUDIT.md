@@ -290,3 +290,19 @@ intended condition rather than a missing unrelated heading.
 both margins of the exact label-pair matrices and renders reference TOP30
 cohorts. It preserves every label and each physical frame's single membership;
 it does not turn spelling, visibility or conservative refusal into a score.
+
+## NAT-T header source and exact datagram ownership
+
+`natt-source/source-manifest.json` preserves38 literal historical source files,
+with their original paths, hashes and external certificate links. See its README
+before adapting any entry point. Complete source-built native/API/CLI objects,
+all stats fields and the eight-packet interleaving control retain actual EOF
+publications and distinct flow identities. The source verifier accepts no
+generic ID translation, label aliases or type normalization. Default Wireshark's
+CoAP-on4500 disagreement remains explicit.
+
+The actual Windows checker binds separate physical-frame and ESP sources and
+the selected SPI interval. Its corrected detail-scoped assertion allows the
+truthful global partial-history footer; old failed auditor and producer runs
+remain separate evidence. This is a UDP4500 bounded-header and ownership scope,
+not SA authentication, native keepalive completeness or OSPFv3 certification.

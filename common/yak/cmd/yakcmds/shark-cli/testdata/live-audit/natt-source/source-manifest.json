@@ -1,0 +1,723 @@
+{
+  "scope": "Copy exactly the 38 reviewed source files to a fresh external bundle.\n\nNo repository write, Go execution, archive creation or data payload copy.\nAll source bytes are rechecked against the frozen registration; metadata only\ncontains paths, hashes, aggregate counts, limitations and closed-result links.\n",
+  "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f",
+  "source_copy_authorized_after_local_Go_runtime_fuzz_closure": true,
+  "builder_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\build_NATT_source_only_bundle_a82_01.py",
+  "builder_SHA256": "0b9e82681894cb01916d85ebdc25bd1f8d9db5397c7b8b0c66b50292af50c198",
+  "original_registration_manifest_SHA256": "6e1abfe0cc0ecde9a5d5f4e60f11b47effafbdbb75f5140fbb1d52ff8126376f",
+  "source_files": [
+    {
+      "path": "sources/phase-source/ESP-OSPFv3-source-readonly30-01/audit_source02.py",
+      "bytes": 13525,
+      "SHA256": "ea677534a0f25d41f4bebacf56a2800c7ed00afe21ed959447c64f98c1f85e8d",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\audit_source02.py",
+      "role": "Read original source extents, ESP headers and OSPF parents independently",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\source03\\summary.json",
+          "SHA256": "bf9ebd9b90b8c370d9e7df4871d343609c2c613a24242883fa645f18a178298a",
+          "scope": "Independent original ESP/NAT-T carrier source; OSPF gaps remain separate/open",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-OSPFv3-source-readonly30-01/extend_source03.py",
+      "bytes": 7720,
+      "SHA256": "a14f583b884c10cf9460412367158e2d1f97f7d7e9a5d9996bf33c2229db1a4a",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\extend_source03.py",
+      "role": "Extend seven NAT-T source witnesses and retain source-wide observations",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\source03\\summary.json",
+          "SHA256": "bf9ebd9b90b8c370d9e7df4871d343609c2c613a24242883fa645f18a178298a",
+          "scope": "Independent original ESP/NAT-T carrier source; OSPF gaps remain separate/open",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-OSPFv3-source-readonly30-01/run_tshark03.py",
+      "bytes": 3158,
+      "SHA256": "360b6cd336a5a2f2b73239d78e94269581da466ef430b2f3b7faba9e8a9c2ffa",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\run_tshark03.py",
+      "role": "Literal Wireshark extraction controller; never normalizes protocol names",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\source03\\summary.json",
+          "SHA256": "bf9ebd9b90b8c370d9e7df4871d343609c2c613a24242883fa645f18a178298a",
+          "scope": "Independent original ESP/NAT-T carrier source; OSPF gaps remain separate/open",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\pdml-source-verification01\\summary.json",
+          "SHA256": "f48f28a0418715f5cbd09656a0abb6ea54843abdb0912a4a0cd2cd7a75fd3dd7",
+          "scope": "Independent source fields/ranges against retained Wireshark PDML",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-OSPFv3-source-readonly30-01/verify_pdml_source01.py",
+      "bytes": 8469,
+      "SHA256": "567929547838cba5c1d4965daa25f85a019870a58b0039c64433db6de78f9bef",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\verify_pdml_source01.py",
+      "role": "Compare source fields/ranges with literal Wireshark PDML",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\pdml-source-verification01\\summary.json",
+          "SHA256": "f48f28a0418715f5cbd09656a0abb6ea54843abdb0912a4a0cd2cd7a75fd3dd7",
+          "scope": "Independent source fields/ranges against retained Wireshark PDML",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/natt_expected.py",
+      "bytes": 6358,
+      "SHA256": "7548d6205dc016665592bf62e31fc4782f222758be24e60b647b043b5dce18ad",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\natt_expected.py",
+      "role": "Complete source constructor for seven native/API objects and exact stats delta",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-693-01\\summary.json",
+          "SHA256": "2578e79542ec12173a1a357653b14ecb46dfcfda5659788dffc6fd6dd0587a14",
+          "scope": "37 input SDK whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/prepare_plan.py",
+      "bytes": 11805,
+      "SHA256": "99db8d8a24b388c4a611db4e1927ca942e8238f226cfcf5411a542224521cd78",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\prepare_plan.py",
+      "role": "Freeze original seven whole SDK objects and unchanged-public-export digests",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-693-01\\summary.json",
+          "SHA256": "2578e79542ec12173a1a357653b14ecb46dfcfda5659788dffc6fd6dd0587a14",
+          "scope": "37 input SDK whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/verify_whole.py",
+      "bytes": 8892,
+      "SHA256": "9f25dfaa8bab22ac8074827ee2f57ed8158c872e2207a341152d704ec5240353",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\verify_whole.py",
+      "role": "Whole public37 SDK verifier; no IDs mapped or extra paths allowed",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-693-01\\summary.json",
+          "SHA256": "2578e79542ec12173a1a357653b14ecb46dfcfda5659788dffc6fd6dd0587a14",
+          "scope": "37 input SDK whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/selfcheck.py",
+      "bytes": 3790,
+      "SHA256": "067fab8d618bbb1a744d4893b5790248374b1823c120ce91c8561b232fbd9af5",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\selfcheck.py",
+      "role": "Source constructor and typed-whole negative controls, not native replay",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-693-01\\summary.json",
+          "SHA256": "2578e79542ec12173a1a357653b14ecb46dfcfda5659788dffc6fd6dd0587a14",
+          "scope": "37 input SDK whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/stats_api_probe.go",
+      "bytes": 4268,
+      "SHA256": "73e0e7f75edd2af00b04ae8c5440a806e958ccf33d4a0526b51e42154da3f9f9",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\stats_api_probe.go",
+      "role": "Actual external Go probe for full stats and seven API contracts; register only, copy deferred",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-api-before-e41-actual01\\producer.json",
+          "SHA256": "0b1b78762f6a4a4a4c0a304afdb08782fc06ef57644b106f317efebe6e6c71e3",
+          "scope": "Closed old stats/API probe; exact Go source bytes bound",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+          "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+          "scope": "Eight complete stats/API objects against the before-frozen source expectation",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Go",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-whole-plan-before-01/run_probe.py",
+      "bytes": 2589,
+      "SHA256": "5a263bbce5546b291a6eb16ff52f18d05e95b1d623c54f21a7173d98c9a30f75",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-whole-plan-before-01\\run_probe.py",
+      "role": "Closed probe execution and source/binary/input pre/post hash controller",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-api-before-e41-actual01\\producer.json",
+          "SHA256": "0b1b78762f6a4a4a4c0a304afdb08782fc06ef57644b106f317efebe6e6c71e3",
+          "scope": "Closed old stats/API probe; exact Go source bytes bound",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+          "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+          "scope": "Eight complete stats/API objects against the before-frozen source expectation",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-stats-plan-e41-before-02/freeze_source_equivalence.py",
+      "bytes": 1932,
+      "SHA256": "3e09e7c124aec3877a47289d0530bf13cfee55ff6c8fc9915296ba0dbd0283bb",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-plan-e41-before-02\\freeze_source_equivalence.py",
+      "role": "Prove docs-only checkpoint did not change relevant parser/producer source",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-api-before-e41-actual01\\producer.json",
+          "SHA256": "0b1b78762f6a4a4a4c0a304afdb08782fc06ef57644b106f317efebe6e6c71e3",
+          "scope": "Closed old stats/API probe; exact Go source bytes bound",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+          "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+          "scope": "Eight complete stats/API objects against the before-frozen source expectation",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-stats-plan-e41-before-02/prepare_stats_expectation02.py",
+      "bytes": 6480,
+      "SHA256": "a45b4fed81c0f61bfe59d8d7a5bee17d8d8359e39bc7e0850ff16d84519cb409",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-plan-e41-before-02\\prepare_stats_expectation02.py",
+      "role": "Freeze complete stats/API expectations from closed old producer only",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-api-before-e41-actual01\\producer.json",
+          "SHA256": "0b1b78762f6a4a4a4c0a304afdb08782fc06ef57644b106f317efebe6e6c71e3",
+          "scope": "Closed old stats/API probe; exact Go source bytes bound",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+          "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+          "scope": "Eight complete stats/API objects against the before-frozen source expectation",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-stats-plan-e41-before-02/verify_stats_probe02.py",
+      "bytes": 3505,
+      "SHA256": "65c4f3a6a07d627ce4c007b5312c000fe3faedc855cfaba40c64dcd973776290",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-plan-e41-before-02\\verify_stats_probe02.py",
+      "role": "Compare all eight complete expected stats/API objects",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-api-before-e41-actual01\\producer.json",
+          "SHA256": "0b1b78762f6a4a4a4c0a304afdb08782fc06ef57644b106f317efebe6e6c71e3",
+          "scope": "Closed old stats/API probe; exact Go source bytes bound",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+          "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+          "scope": "Eight complete stats/API objects against the before-frozen source expectation",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-CLI-whole-plan-before-02/prepare_CLI.py",
+      "bytes": 7252,
+      "SHA256": "e67de2e5040503664de16a3c7fc7a2b46e26230eb94297010658029558a25e23",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI-whole-plan-before-02\\prepare_CLI.py",
+      "role": "Freeze complete seven CLI row/source-stack corrections",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI37-whole-693-01\\summary.json",
+          "SHA256": "6ca5615dd74d25836162cc26cd0f0603788504ff9dc212637611399a55daa34e",
+          "scope": "37 input CLI whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/ESP-NATT-CLI-whole-plan-before-02/verify_CLI.py",
+      "bytes": 4045,
+      "SHA256": "d91d8ad7bbf889991198ac2ecbf19ae9bd43a505e32df4388a83cc9e830a7b3b",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI-whole-plan-before-02\\verify_CLI.py",
+      "role": "Whole public37 CLI comparison, every other row literal",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI37-whole-693-01\\summary.json",
+          "SHA256": "6ca5615dd74d25836162cc26cd0f0603788504ff9dc212637611399a55daa34e",
+          "scope": "37 input CLI whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/NATT-session-competition-source-01/source_control02.py",
+      "bytes": 6933,
+      "SHA256": "8d311c422f37437228f17fc96d6772936d53ab43852cd49f9d430c170a02ae5e",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-competition-source-01\\source_control02.py",
+      "role": "Original synthetic eight controls with preserved missing-NAS and automatic-CoAP/ESP limitation",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-source-02\\actual01\\summary.json",
+          "SHA256": "0553ca7f5c9c89caa7d7865590160d19c25e3810c0d8e8905c4e98585b70baa2",
+          "scope": "Valid NAS-bearing C8/A2/B8 source construction; no native oracle",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/NATT-session-isolation-source-02/frozen-inputs/prepare_isolation.py",
+      "bytes": 8422,
+      "SHA256": "bf9fd9c62c9f3837a6bbdcda19310eb87d5a7be545c8262e9ea19c485de71746",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-source-02\\frozen-inputs\\prepare_isolation.py",
+      "role": "Byte-identical source reader and RRQ isolation; synthetic controls only",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-source-02\\actual01\\summary.json",
+          "SHA256": "0553ca7f5c9c89caa7d7865590160d19c25e3810c0d8e8905c4e98585b70baa2",
+          "scope": "Valid NAS-bearing C8/A2/B8 source construction; no native oracle",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/NATT-session-isolation-source-02/prepare_valid_isolation.py",
+      "bytes": 7885,
+      "SHA256": "973fb06b06a1f47fa240576e4c1998a9c86618a205cafa913e270900e768fde6",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-source-02\\prepare_valid_isolation.py",
+      "role": "Append required observed NAS identity and recompute exact carrier lengths/checksums",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-source-02\\actual01\\summary.json",
+          "SHA256": "0553ca7f5c9c89caa7d7865590160d19c25e3810c0d8e8905c4e98585b70baa2",
+          "scope": "Valid NAS-bearing C8/A2/B8 source construction; no native oracle",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/run_natt_session_isolation_valid04_old.py",
+      "bytes": 3637,
+      "SHA256": "9cd7578acebc642329498b34e6207922f4dc5e142e05bbed4241bce8f24acbea",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_natt_session_isolation_valid04_old.py",
+      "role": "Actual closed old A2/B8 execution retaining both capture-close publications",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-valid02-old5c-actual03\\summary.json",
+          "SHA256": "242b3e7b5ecf341b195222ec9af99843e7770f6e073f52b5a8d2a84cd16555a5",
+          "scope": "Old A2/B8 complete grammar isolation including both RADIUS EOF publications",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/run_natt_c8_fixed.py",
+      "bytes": 3292,
+      "SHA256": "14a80292edc8da5afc0115490f30b34d2f1bcd47c1947dd5ee3adeaeee7abf5b",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_natt_c8_fixed.py",
+      "role": "Actual fixed C8 execution with binary/capture/reference/controller pre/post hashes",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-C8-whole-a82-audit01\\summary.json",
+          "SHA256": "801befcd575ebb7bb55b09a4bbc09e38cffdf1c1f5a7f7a7a276010c62000024",
+          "scope": "Actual a82 C8, ten native complete objects and ten CLI rows, zero differences",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/NATT-session-whole-plan-before-valid02-01/prepare_expected02.py",
+      "bytes": 13339,
+      "SHA256": "25239f0175135e0317611391be85bf6782b401f327a6caaf21d01b91bfbec2e1",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-whole-plan-before-valid02-01\\prepare_expected02.py",
+      "role": "Freeze complete C8 ten native/ten CLI rows from closed old A2/B8 before fixed output",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-valid02-old5c-actual03\\summary.json",
+          "SHA256": "242b3e7b5ecf341b195222ec9af99843e7770f6e073f52b5a8d2a84cd16555a5",
+          "scope": "Old A2/B8 complete grammar isolation including both RADIUS EOF publications",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-C8-whole-a82-audit01\\summary.json",
+          "SHA256": "801befcd575ebb7bb55b09a4bbc09e38cffdf1c1f5a7f7a7a276010c62000024",
+          "scope": "Actual a82 C8, ten native complete objects and ten CLI rows, zero differences",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/NATT-session-whole-plan-before-valid02-01/verify_whole02.py",
+      "bytes": 8766,
+      "SHA256": "e6b99e501feb943ceb2a1d6856e86a4fd1156b159cc50dcb4abaed032ac65189",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-whole-plan-before-valid02-01\\verify_whole02.py",
+      "role": "Whole fixed C8 validator including two EOF records; no output repair",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-whole-plan-before-valid02-01\\validator-selftest02-01\\summary.json",
+          "SHA256": "2c6b4ab09c8c694396482e689d926e218e175bf63e8bbe9bffdd015075811858",
+          "scope": "Thirteen validator negative controls only; not producer correctness",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-C8-whole-a82-audit01\\summary.json",
+          "SHA256": "801befcd575ebb7bb55b09a4bbc09e38cffdf1c1f5a7f7a7a276010c62000024",
+          "scope": "Actual a82 C8, ten native complete objects and ten CLI rows, zero differences",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/TFTP-refused-peer-source-01/extract_source.py",
+      "bytes": 7939,
+      "SHA256": "d53403c09addf8d5ad1c68357726d0d47319cd7a57195201bea1ca066087dc97",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\extract_source.py",
+      "role": "Python equivalent of existing sealed pack reader; verify physical/logical member hashes",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\actual01\\summary.json",
+          "SHA256": "ba585f705abc3a13a466d20145245383ffe14550c17367fc64e40df56c8a0a1d",
+          "scope": "Existing packed fixture/member hashes; only selected original controls/captures",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/TFTP-refused-peer-source-01/audit_steps.py",
+      "bytes": 6230,
+      "SHA256": "4d469b1d7bd927c32433729aa95823a987aff841c67b5255e91397be062cd3fe",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\audit_steps.py",
+      "role": "Independent UDP bytes/ports/time/domain/ref check of the eleven sealed source steps",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\physical01\\summary.json",
+          "SHA256": "efc492bce2d10aeaea34c15e4734324c79518b0cb1b505527092d5d282bf6c44",
+          "scope": "Eleven original UDP frame payloads/ports/time/domain/refs equal sealed controls",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/TFTP-public-admission-readonly34-01/scan_tftp.py",
+      "bytes": 5269,
+      "SHA256": "92f7766409ece2d093d093ec158507f3b3fc849b589af911a7b3dd88e5898772",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-public-admission-readonly34-01\\scan_tftp.py",
+      "role": "Read-only old public TFTP observation inventory; no correctness oracle",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-public-admission-readonly34-01\\actual01\\summary.json",
+          "SHA256": "02105808be51b93b0c61e9de89ff7ac8d9a3a9d164f76b2e33005499745b4201",
+          "scope": "Old native30/34 each expose 44 decoded TFTP events; not overall TFTP correctness",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-01/prepare_windows_plan.py",
+      "bytes": 4401,
+      "SHA256": "a73c78f9a1f2cfba8e401e8270d18d12368a217b46500a12e51447ddea9470ac",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-01\\prepare_windows_plan.py",
+      "role": "Generate external Windows plan/cases from original sources; generated JSON is excluded",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-01/run_windows_NATT.py",
+      "bytes": 5980,
+      "SHA256": "47cb2770b342eeba456f3edbbba11928774e6603b07e9d88caae43707070dcf3",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-01\\run_windows_NATT.py",
+      "role": "Original actual Windows controller, including preserved old checker failure",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-01/verify_cells.py",
+      "bytes": 5637,
+      "SHA256": "c07713b9c601a78291526a6956b7e047e7faa5dbc304ab98340daf18f3820f54",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-01\\verify_cells.py",
+      "role": "Original overbroad full-screen checker, historical failure reproduction only",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-02/verify_cells.py",
+      "bytes": 6691,
+      "SHA256": "1268288292a910e843d614c2d2ebfdf9bf489e79558ed5de69911aa1d3fd7fa5",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-02\\verify_cells.py",
+      "role": "Scoped selected-pane/source/highlight checker requiring truthful global partial footer",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-02/close_runtime.py",
+      "bytes": 4007,
+      "SHA256": "29f23e8c11b308e397049831dff8d48881e419860d1311deded38c1ae9334ee9",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-02\\close_runtime.py",
+      "role": "Close source/binary/cell binding for original actual Windows source02 proof",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-03/run_windows_NATT03.py",
+      "bytes": 8303,
+      "SHA256": "3618464e16602ff02b77b9059e4e74236aa1a3b3abb093eb3e3a93776251b960",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-03\\run_windows_NATT03.py",
+      "role": "Fresh a82-only Windows controller using exact source02 checker bytes, fixed default budgets",
+      "result_certificates": [],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/Windows-ESPNATT-source-plan-before-03/prepare_driver03_manifest.py",
+      "bytes": 4465,
+      "SHA256": "e4e410e28cd45035771d88348f3b4d075cf70089e95f6dbec7894d6c602e82e2",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-source-plan-before-03\\prepare_driver03_manifest.py",
+      "role": "Freeze exact source01/source02 Windows inputs without running app or Go",
+      "result_certificates": [],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/windows-replay-parameterized-01/windows_console_qa.py",
+      "bytes": 3668,
+      "SHA256": "23e03e5680bc1596752efb09465f2dfbf0f933cd2f4e7b4ecc5287445b251639",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-replay-parameterized-01\\windows_console_qa.py",
+      "role": "Existing Windows parameter-driver source dependency",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/phase-source/windows-identity-1MiB-5c88a-02/frozen-inputs/renderer.py",
+      "bytes": 972,
+      "SHA256": "427379a3b9c1ac7e8257a81d3d6e478904fd96659468f231bbec57a55e336e83",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-identity-1MiB-5c88a-02\\frozen-inputs\\renderer.py",
+      "role": "Actual frozen native-cell renderer; requires Pillow, renders external PNGs only",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/repository-dependencies/common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/vxlan_endpoint_projection_audit.py",
+      "bytes": 15774,
+      "SHA256": "ee8248c78b9be42f8a3c4c2517c5c149a0dd009dc7cd5a1571f13e66644f5feb",
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\vxlan_endpoint_projection_audit.py",
+      "role": "Existing versioned PCAP/NG source-record reader",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\source03\\summary.json",
+          "SHA256": "bf9ebd9b90b8c370d9e7df4871d343609c2c613a24242883fa645f18a178298a",
+          "scope": "Independent original ESP/NAT-T carrier source; OSPF gaps remain separate/open",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\physical01\\summary.json",
+          "SHA256": "efc492bce2d10aeaea34c15e4734324c79518b0cb1b505527092d5d282bf6c44",
+          "scope": "Eleven original UDP frame payloads/ports/time/domain/refs equal sealed controls",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/repository-dependencies/common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/pptp_parent_source_audit.py",
+      "bytes": 27623,
+      "SHA256": "dddcdcdf2d557c115272ccc5808a1266dd44cf1b55e8156e761f97722ddbf9b6",
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\pptp_parent_source_audit.py",
+      "role": "Existing versioned source-clock dependency",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-OSPFv3-source-readonly30-01\\source03\\summary.json",
+          "SHA256": "bf9ebd9b90b8c370d9e7df4871d343609c2c613a24242883fa645f18a178298a",
+          "scope": "Independent original ESP/NAT-T carrier source; OSPF gaps remain separate/open",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TFTP-refused-peer-source-01\\physical01\\summary.json",
+          "SHA256": "efc492bce2d10aeaea34c15e4734324c79518b0cb1b505527092d5d282bf6c44",
+          "scope": "Eleven original UDP frame payloads/ports/time/domain/refs equal sealed controls",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Python",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/repository-dependencies/common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/events/main.go",
+      "bytes": 2252,
+      "SHA256": "384b934071d956dd5caac5d7ac8e44d7de13954df0d4dd12dc8555151e28ce32",
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\events\\main.go",
+      "role": "Existing versioned full native event replay exporter; register only, no Go copy",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-693-01\\summary.json",
+          "SHA256": "2578e79542ec12173a1a357653b14ecb46dfcfda5659788dffc6fd6dd0587a14",
+          "scope": "37 input SDK whole comparison, seven complete ESP corrections; all other output literal",
+          "included_in_source_archive": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-C8-whole-a82-audit01\\summary.json",
+          "SHA256": "801befcd575ebb7bb55b09a4bbc09e38cffdf1c1f5a7f7a7a276010c62000024",
+          "scope": "Actual a82 C8, ten native complete objects and ten CLI rows, zero differences",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Go",
+      "byte_identical": true
+    },
+    {
+      "path": "sources/repository-dependencies/common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/discovery/console/main_windows.go",
+      "bytes": 19812,
+      "SHA256": "aa0f00677d0330dde993a9006e78ea1109aace3fda863ed6ad9ebf9ff6c8391d",
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\discovery\\console\\main_windows.go",
+      "role": "Existing exact native-console source, matches original helper source SHA; register only",
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-ESPNATT-693-runtime-close02-01\\summary.json",
+          "SHA256": "1807af1834ef905a427e9754e5e144c851a0aeb9995541040b2f2a26f3a7196c",
+          "scope": "Original Windows693 actual cells, corrected scoped checker; original failure preserved",
+          "included_in_source_archive": false
+        }
+      ],
+      "language": "Go",
+      "byte_identical": true
+    }
+  ],
+  "copied_files": 38,
+  "copied_Go": 3,
+  "copied_Python": 35,
+  "all_source_bytes_equal_registration": true,
+  "data_files_copied": 0,
+  "allowed_source_extensions": [
+    ".py",
+    ".go"
+  ],
+  "only_added_metadata_files": [
+    "counts-report.json",
+    "bundle-manifest.json"
+  ],
+  "counts_report_SHA256": "078800d8e7b09c90e373a9f8fc3cffe361731c9f1ea13e78f23d0acb3ebd13be",
+  "no_case_plan_expected_JSON_capture_key_export_image_log_EXE_or_archive_included": true
+}

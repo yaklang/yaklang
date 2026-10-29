@@ -1,4 +1,4 @@
-最新逐帧分布见 [6b704 的 TOP30 原始标签分组](label-cohorts6b.md)。下面保留 `66622e3efc9611eb65ddeb881613fd6eda0e671d` 原生源码与 `41b88b146779559f39aa66891a85852ce697018f` Windows CLI 的历史计数。
+最新完整逐帧标签分布见 [6b704 的 TOP30 原始标签分组](label-cohorts6b.md)。随后 a82 对七条 UDP4500 ESP 的完整来源修正、UDP 连接归属和 Windows 实测见 [NAT-T 阶段报告](natt-udp-ownership-a82.md)；这不是重跑后的新 TOP30 标签普查。下面保留 `66622e3efc9611eb65ddeb881613fd6eda0e671d` 原生源码与 `41b88b146779559f39aa66891a85852ce697018f` Windows CLI 的历史计数。
 
 使用新运行的 TShark4.6.9，隔离个人配置，关闭名称解析，显式开启 TCP 乱序重组；参考统计没有显式提供 keylog，Shark 使用此前固定重放参数。解密设置、协议子层、大小写、分片和保守拒绝均可能改变显示标签。同名计数不是字段或协议正确性证明。
 
