@@ -13,6 +13,33 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
+// Keep the literal integer in fields/filters. Human-readable type names add
+// context in the inspector without changing the original two-byte span.
+func ospfv3FieldValue(name string, value any) (string, bool) {
+	if name != "Type" && name != "LS Type" && name != "Referenced LS Type" {
+		return "", false
+	}
+	n, ok := detailRangeOffset(value)
+	if !ok || n > 65535 || name == "Type" && n > 255 {
+		return "", false
+	}
+	if name == "Type" {
+		label := stream_parser.OSPFv3MessageName(uint64(n))
+		if label == "Unknown" {
+			label = "unselected message type"
+		}
+		return fmt.Sprintf("%d (%s)", n, label), true
+	}
+	label := map[int]string{0x2001: "Router-LSA", 0x2002: "Network-LSA", 0x2003: "Inter-Area-Prefix-LSA", 0x2004: "Inter-Area-Router-LSA", 0x4005: "AS-External-LSA", 0x2007: "NSSA-LSA", 0x0008: "Link-LSA", 0x2009: "Intra-Area-Prefix-LSA"}[n]
+	if name == "Referenced LS Type" && n == 0 {
+		label = "no referenced LSA"
+	}
+	if label == "" {
+		label = "unselected LSA type"
+	}
+	return fmt.Sprintf("0x%04x (%s)", n, label), true
+}
+
 // The source-reproduced native tree replaces the failed legacy LSA walker.
 // Physical IPv6/AH fields remain separate from logical (possibly reassembled)
 // OSPF bytes. A protocol label or an editable event map is insufficient.
