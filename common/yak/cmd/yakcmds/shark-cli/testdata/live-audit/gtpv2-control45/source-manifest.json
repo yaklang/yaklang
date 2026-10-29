@@ -1,0 +1,321 @@
+{
+  "scope": "Archive exact audit/controller source only, never captures or proof data.",
+  "production_sources": [
+    "f1068e2fbaa44d59f7ab82ee6109505bac5b3af1",
+    "df30fc4bd909d6489844f8e0d1cd0ab03826f35c"
+  ],
+  "files": [
+    {
+      "path": "census_GTP_family_source43.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\census_GTP_family_source43.py",
+      "bytes": 11236,
+      "SHA256": "06f9b82ccef520957c2fda69a7e7990df91a1b59c7bcfd3d6849e23eb7c39368",
+      "language": "Python"
+    },
+    {
+      "path": "audit_GTP_parent_refusals43.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\audit_GTP_parent_refusals43.py",
+      "bytes": 7252,
+      "SHA256": "859d830c23cbb372db87542dcb162b05d32950577feb236154267d0d9164d85f",
+      "language": "Python"
+    },
+    {
+      "path": "audit_GTP_parent_refusals43_diagnostic01.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\audit_GTP_parent_refusals43_diagnostic01.py",
+      "bytes": 7388,
+      "SHA256": "ca975a02c58aaf5ed339a6d95fd422619f0a910acf9e92692ec1539c654364b6",
+      "language": "Python"
+    },
+    {
+      "path": "audit_GTP_parent_refusals43_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\audit_GTP_parent_refusals43_v02.py",
+      "bytes": 7574,
+      "SHA256": "9cf3ae77806e187e6b2bb5150f89ff2121441ec47a454f2d95230d196838d172",
+      "language": "Python"
+    },
+    {
+      "path": "finish_GTP_source43.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\finish_GTP_source43.py",
+      "bytes": 9863,
+      "SHA256": "09edc80ffdbd4809c121e9aa97b9cfd1174549d6c8be4b572aedf5538ad3c404",
+      "language": "Python"
+    },
+    {
+      "path": "finish_GTP_source43_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\finish_GTP_source43_v02.py",
+      "bytes": 10507,
+      "SHA256": "ffd7564a665b062d040424c71869ed87bf54082db397a7d612148a6a70abf3e3",
+      "language": "Python"
+    },
+    {
+      "path": "build_GTPv2_boundaries43_v03.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\build_GTPv2_boundaries43_v03.py",
+      "bytes": 16333,
+      "SHA256": "7d4e88c79412a853f9cc2e33af42d3a19a952f35d168d3031ef98684d3914d24",
+      "language": "Python"
+    },
+    {
+      "path": "audit_GTPv2_authored_reference43.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\audit_GTPv2_authored_reference43.py",
+      "bytes": 5143,
+      "SHA256": "0eaecf30bc9c1d95a10b3d2599802fb7fc8603b29abc7a8304e0354415b350e0",
+      "language": "Python"
+    },
+    {
+      "path": "extract_GTPv2_IE_names43.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\extract_GTPv2_IE_names43.py",
+      "bytes": 4629,
+      "SHA256": "9e9210dd07c194b44e6d67409c01ec4636383563b18b2f38b5c232d91f93e0b8",
+      "language": "Python"
+    },
+    {
+      "path": "write_GTPv2_name_tables44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\write_GTPv2_name_tables44.py",
+      "bytes": 1870,
+      "SHA256": "9ea7a9839e8c40040ae70c10ddf7cf41eca7c5c8a5d7bf28bd2dc179519845ba",
+      "language": "Python"
+    },
+    {
+      "path": "gtpv2_api_source_checker43_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\gtpv2_api_source_checker43_v02.py",
+      "bytes": 21802,
+      "SHA256": "0a526831d4bd9e2e41faba4b1f519c24cae6f69bbf8361fa19620084de82ef10",
+      "language": "Python"
+    },
+    {
+      "path": "gtpv2_native_cli_controller44_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\gtpv2_native_cli_controller44_v02.py",
+      "bytes": 23092,
+      "SHA256": "54f090d8908242191c18ade93bf79682c31c60e88a0717253a109d4148e37cca",
+      "language": "Python"
+    },
+    {
+      "path": "selftest_GTPv2_controller44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\selftest_GTPv2_controller44.py",
+      "bytes": 8593,
+      "SHA256": "ecf219f938380d5b35affbd2ba4283b119e99f982c0dc5d653b3734e88a9f025",
+      "language": "Python"
+    },
+    {
+      "path": "build_GTPv2_guarded44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\build_GTPv2_guarded44.py",
+      "bytes": 532,
+      "SHA256": "5286ed3b1c9cfb09cd16c847f01a2d3bae1467076635ede073cc5aca81cbe779",
+      "language": "Python"
+    },
+    {
+      "path": "build_OSPFv2_guarded41.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\build_OSPFv2_guarded41.py",
+      "bytes": 2298,
+      "SHA256": "b4d6993a32743587855e880f2c65d7dd4e75bae4eeb0f5f310347a66ebe68404",
+      "language": "Python"
+    },
+    {
+      "path": "run_GTPv2_direct44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_GTPv2_direct44.py",
+      "bytes": 2178,
+      "SHA256": "c48dd364ef72bf125cc8b98ebb56a80ddca349096f00d51e153e246512f716c1",
+      "language": "Python"
+    },
+    {
+      "path": "run_GTPv2_direct44_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_GTPv2_direct44_v02.py",
+      "bytes": 398,
+      "SHA256": "f2309d8facf85d0cd19335eb842d36d9e284d646740495fa598f9175cfb6bd2a",
+      "language": "Python"
+    },
+    {
+      "path": "run_GTPv2_direct45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_GTPv2_direct45.py",
+      "bytes": 393,
+      "SHA256": "e716c4c7369993e0e5a0d6b41fac834aa574cda575a96d909eac930b6b5577ce",
+      "language": "Python"
+    },
+    {
+      "path": "prepare_Windows_GTPv2_44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_GTPv2_44.py",
+      "bytes": 4040,
+      "SHA256": "2ee160f24200866539c29e1398ee89e6445b6ef59fce93f4a3120be75614f8de",
+      "language": "Python"
+    },
+    {
+      "path": "prepare_Windows_GTPv2_helper45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_GTPv2_helper45.py",
+      "bytes": 1590,
+      "SHA256": "104aa822ba0819481c846b851a47d1e1cf6e5b184afdacfeefa7c512d03f8a66",
+      "language": "Python"
+    },
+    {
+      "path": "build_console_guarded45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\build_console_guarded45.py",
+      "bytes": 544,
+      "SHA256": "7891693c4e3d96ce4a45a2aecde56b9334ea17390177f11b5fcb0732c738a8f5",
+      "language": "Python"
+    },
+    {
+      "path": "run_Windows_GTPv2_44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_GTPv2_44.py",
+      "bytes": 306,
+      "SHA256": "b817a9fb98d7ff317049b55ae5a40f6bc24530ceea5fa70bb49caa42114dcd21",
+      "language": "Python"
+    },
+    {
+      "path": "run_Windows_OSPFv2_42.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_OSPFv2_42.py",
+      "bytes": 5702,
+      "SHA256": "a5cb9f558a167fb755ce0fb9c62b3c031c4463838c0565d1f0c18fe00d54a4fa",
+      "language": "Python"
+    },
+    {
+      "path": "verify_Windows_OSPFv3_36.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\verify_Windows_OSPFv3_36.py",
+      "bytes": 3527,
+      "SHA256": "a8b5f9b91f6a766b02d41789cb1f91aa3bb4e4ce3939160d328318389d2aa95d",
+      "language": "Python"
+    },
+    {
+      "path": "close_Windows_GTPv2_45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_GTPv2_45.py",
+      "bytes": 4881,
+      "SHA256": "3ce09642e150a406198bcb1cd3e61dcc8abd0d8a81716fe452a58287788de098",
+      "language": "Python"
+    },
+    {
+      "path": "close_Windows_GTPv2_45_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_GTPv2_45_v02.py",
+      "bytes": 728,
+      "SHA256": "7108e241996d87ff0a1bf5d8cbbe851742d6a1f18922214819f2855533c21de4",
+      "language": "Python"
+    },
+    {
+      "path": "run_fuzz_GTPv2_44.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_fuzz_GTPv2_44.py",
+      "bytes": 567,
+      "SHA256": "b537aa6e79b2ba6fca23635279431b69f88cd219376b828aab11470e99c1761d",
+      "language": "Python"
+    },
+    {
+      "path": "run_fuzz_membership.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_fuzz_membership.py",
+      "bytes": 1968,
+      "SHA256": "7654545f5d0516acf3399ae3f4c6ccca33d25c399b2a9efde2c27628f0e8faa4",
+      "language": "Python"
+    },
+    {
+      "path": "run_go_temp.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_go_temp.py",
+      "bytes": 780,
+      "SHA256": "ca7af577ce7d557c365d19eb114df0826e37f5401163ca3b4c785677b5a5ca6d",
+      "language": "Python"
+    },
+    {
+      "path": "run_build_temp.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_build_temp.py",
+      "bytes": 895,
+      "SHA256": "b79807ee65bca1edcfe5413b16b0c7efcd3e055d567aee62a52f48e6929c691e",
+      "language": "Python"
+    },
+    {
+      "path": "replay_public_resume.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\replay_public_resume.py",
+      "bytes": 3694,
+      "SHA256": "2bd3ca500a3b186eecc018b40bc7db780bffd95801534ad4d85617fd45e88402",
+      "language": "Python"
+    },
+    {
+      "path": "import_GTPv2_source45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_GTPv2_source45.py",
+      "bytes": 4274,
+      "SHA256": "3379ad08ee15d75a5467a36b77824bd71b85e432f4448c3bcd719b00d9bfbe35",
+      "language": "Python"
+    },
+    {
+      "path": "run_GTPv2_official_before45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_GTPv2_official_before45.py",
+      "bytes": 1947,
+      "SHA256": "5218dfffda01a88951421d5ac9e071b637315896d7a24a0e18047d7497c97050",
+      "language": "Python"
+    },
+    {
+      "path": "write_GTPv2_report45.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\write_GTPv2_report45.py",
+      "bytes": 9651,
+      "SHA256": "138e19a3b56e43366902f6b436acd83a8f0950c71ba995d47dd27258b57454f5",
+      "language": "Python"
+    },
+    {
+      "path": "gtpv2_direct_probe44.go.txt",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\gtpv2_direct_probe44.go",
+      "bytes": 1747,
+      "SHA256": "581cb1c3c6d54544cdf82e4152fcb5ecd898d6ab8597b2c8042414e23f629272",
+      "language": "Go"
+    },
+    {
+      "path": "source-reader/scan_source37.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan_source37.py",
+      "bytes": 19877,
+      "SHA256": "b763eb276f7a5fbda191207ef031edbf5a44ecab89090655b2ec8886706f8a58",
+      "language": "Python"
+    },
+    {
+      "path": "source-reader/ospf_source_codec.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\ospf_source_codec.py",
+      "bytes": 12783,
+      "SHA256": "fb45475fec822b21989d398541c51ec5d62841db4ce75d2e76737fbf1bffb662",
+      "language": "Python"
+    },
+    {
+      "path": "runner-dependencies/run_go_phase.py",
+      "original_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\run_go_phase.py",
+      "bytes": 2787,
+      "SHA256": "6f9256f30a05450cd459e2bb60c0a2d7376680cc90cf3fe7322b76bd56be0b4a",
+      "language": "Python"
+    },
+    {
+      "path": "runner-dependencies/run_build.py",
+      "original_path": "C:\\tmp\\yak-shark-TLS-metadata-20261028\\run_build.py",
+      "bytes": 2169,
+      "SHA256": "b21cecf46a7fc5c21483697d6dd533c26b8c8b4821699a2a1c34c6ebb84bef9b",
+      "language": "Python"
+    }
+  ],
+  "source_files": 39,
+  "source_bytes": 225538,
+  "existing_repository_dependencies": [
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_native_literal_continuity.py",
+      "bytes": 4356,
+      "SHA256": "cea420bb3cc200cbddd8c023cb9ea25f4a756a2f857f606cbf77f440edfa955d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_cli_literal_continuity.py",
+      "bytes": 3362,
+      "SHA256": "f8b8091be03624f2434adc674da0d6d83e4c73dea429002e25d96dee3f1b9e01"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/vxlan_endpoint_projection_audit.py",
+      "bytes": 15774,
+      "SHA256": "ee8248c78b9be42f8a3c4c2517c5c149a0dd009dc7cd5a1571f13e66644f5feb"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/pptp_parent_source_audit.py",
+      "bytes": 27623,
+      "SHA256": "dddcdcdf2d557c115272ccc5808a1266dd44cf1b55e8156e761f97722ddbf9b6"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/discovery/console/main_windows.go",
+      "bytes": 20054,
+      "SHA256": "fad8b983db5786a995aa80612d7f87a5fa8ad73e9c37ffc7f4e9262411b04701"
+    }
+  ],
+  "excluded": [
+    "captures/PCAP/PCAPNG/keylogs",
+    "complete per-case source facts/plans/expected objects/matrices",
+    "native and CLI exports/PDML/reference fields",
+    "proof JSONs/logs",
+    "console cells/images",
+    "binaries/primary PDF or RFC contents"
+  ],
+  "historical_failed_controller_sources_retained": true,
+  "Go_probe_text_preserves_compiled_bytes": true
+}

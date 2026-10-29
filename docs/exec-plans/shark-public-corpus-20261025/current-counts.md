@@ -1,3 +1,5 @@
+df30新增部分EPC GTPv2-C canonical/native/private字段与递进页面，官方6帧及20场景24帧独立核验、接收扩展长度修复、37输入整对象/行/flow保留和两张Windows页见[GTPv2报告](gtpv2-df30.md)。不是新TOP30全量统计，也未证明完整承载会话。
+
 cd7af新增OSPFv2原生/canonical/字段/页面，556条真实来源与参考、16220个typed字段和完整native/CLI对象已核验；47项后续检查、598个direct及三张Windows页也有明确范围。37输入旧307262个native对象及383962条非目标CLI行在显式生成编号账本之外保持；两份flow逐字节不变。见[OSPFv2报告](ospfv2-cd7af.md)。不是新TOP30全量标签普查。
 
 7e修复两处h3缺失开头的标签退化及QPACK恢复字段投影，真实Windows页面、四项CI和新回放已闭合；5c又修复LSA checksum字段零值误接受，两个实际反例和37输入完整输出均核验。见[恢复与完整性报告](recovery-http3-7e022.md)。其中47个保护QUIC对象是来源支持的身份修正，不把它们冒称字面不变。
