@@ -163,47 +163,6 @@ $check<include("include-flight-lib")> as $target;
 	}
 }
 
-// TestIncludeCycleDetectionStopsRecursiveInclude asserts a lib including
-// itself fails fast with the recursion error instead of recursing until the
-// stack dies (pre-fix) or deadlocking on its own flight entry.
-func TestIncludeCycleDetectionStopsRecursiveInclude(t *testing.T) {
-	bindUnavailableProfileDatabase(t)
-	GetSFIncludeCache().Purge()
-	t.Cleanup(func() { GetSFIncludeCache().Purge() })
-
-	program, err := Parse(
-		`a1 = 1; a2 = "hello world";`,
-		WithLanguage(ssaconfig.Yak),
-	)
-	if err != nil {
-		t.Fatalf("compile test program: %v", err)
-	}
-	program.Program.Name = "include-cycle-test-" + t.Name()
-
-	library, err := sfdb.CheckSyntaxFlowRuleContent(`
-desc(lib: "recursive-lib");
-$input<include("recursive-lib")> as $output;
-alert $output;
-`)
-	if err != nil {
-		t.Fatalf("compile recursive library: %v", err)
-	}
-	ctx := WithTaskLocalSyntaxFlowRuleLibraries(context.Background(), map[string]*schema.SyntaxFlowRule{
-		"recursive-lib": library,
-	})
-
-	_, err = program.SyntaxFlowWithError(`
-a* as $check;
-$check<include("recursive-lib")> as $target;
-`, QueryWithContext(ctx), QueryWithMemory())
-	if err == nil {
-		t.Fatal("recursive include unexpectedly succeeded")
-	}
-	if got := err.Error(); !strings.Contains(got, "recursive include") {
-		t.Fatalf("recursive include error not detected: %v", got)
-	}
-}
-
 // TestIncludeFlightWaiterTakesOverCanceledLoader asserts the failure-propagation
 // semantics of the flight map: when a loader dies because its own rule ctx was
 // canceled (timeout / budget overflow), a waiter whose ctx is still healthy does

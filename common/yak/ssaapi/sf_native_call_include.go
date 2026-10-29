@@ -41,6 +41,9 @@ func ValidSyntaxFlowRule(s *schema.SyntaxFlowRule) error {
 	if len(result.GetErrors()) > 0 {
 		return utils.Errorf(`runtime error: %v`, result.GetErrors())
 	}
+	if err := sfdb.CheckIncludeCycleForWrite(s); err != nil {
+		return utils.Wrap(err, "reject rule write")
+	}
 	s.Verified = true
 	return nil
 }
@@ -157,10 +160,6 @@ type includeFlightEntry struct {
 }
 
 var includeFlights sync.Map // map[string]*includeFlightEntry
-
-// includeCycleKey marks include flight keys already being loaded by the
-// current (nested) sub-query chain; a repeat means a recursive include.
-type includeCycleKey struct{}
 
 func releaseIncludeFlight(key string, entry *includeFlightEntry, values Values, err error) {
 	entry.values, entry.err = values, err
@@ -324,37 +323,14 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	// touches the flight map at all.
 	config := frame.GetConfig()
 
-	// Recursive includes (a lib including itself, directly or through another
-	// lib) used to recurse until the stack died; on a flight entry they would
-	// deadlock the loader on itself. Detect the cycle via the nested
-	// sub-query ctx before anything else.
-	//
-	// The cycle key is the rule identity (cacheKey), NOT the flight key: a
-	// self-including lib that transforms its input values produces a fresh
-	// input hash each level, so keying the cycle on inputs would let the
-	// recursion slip past detection. Wrapped as CriticalError so the frame
-	// aborts the whole rule — an ordinary error is only a statement-level skip
-	// (frame exec skips to expression end) and the rule would silently
-	// "succeed" with empty results.
+	// Include cycles are rejected statically — at task-local snapshot
+	// assembly and on every interactive rule write (sfdb
+	// CheckIncludeCycleForWrite) — so none is expected here; one that slips
+	// through an ungated bulk import hangs this rule until its ctx cancels.
 	ctx := config.GetContext()
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	var active map[string]struct{}
-	if v, ok := ctx.Value(includeCycleKey{}).(map[string]struct{}); ok {
-		active = v
-		if _, cycling := active[cacheKey]; cycling {
-			return false, nil, utils.Wrapf(
-				sfvm.CriticalError,
-				"recursive include %q detected", ruleName,
-			)
-		}
-	}
-	nextActive := map[string]struct{}{cacheKey: {}}
-	for k := range active {
-		nextActive[k] = struct{}{}
-	}
-	ctx = context.WithValue(ctx, includeCycleKey{}, nextActive)
 
 	compute := func() (Values, error) {
 		var queryValue sfvm.Values

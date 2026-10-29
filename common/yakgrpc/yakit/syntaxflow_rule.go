@@ -300,6 +300,9 @@ func UpdateSyntaxFlowRule(db *gorm.DB, rule *ypb.SyntaxFlowRuleInput) (*schema.S
 	updateRule.NeedUpdate = true
 
 	groups := sfdb.GetOrCreateGroups(consts.GetGormProfileDatabase(), rule.GetGroupNames())
+	if err := sfdb.CheckIncludeCycleForWrite(updateRule); err != nil {
+		return nil, utils.Wrap(err, "update syntaxFlow rule failed")
+	}
 	if err := db.Model(&schema.SyntaxFlowRule{}).Update(&updateRule).Error; err != nil {
 		return nil, utils.Errorf("update syntaxFlow rule failed: %s", err)
 	}
