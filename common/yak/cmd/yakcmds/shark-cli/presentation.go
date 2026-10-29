@@ -139,6 +139,9 @@ func tlsVersion(v any) string {
 }
 
 func eventProtocolName(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ospf" && e.Profile == "ospfv3-bounded-control" {
+		return "OSPFv3"
+	}
 	if e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" {
 		if m, ok := eventValues(e)["MLD"].(map[string]any); ok {
 			if version := number(m["Version"]); version == 1 || version == 2 {
@@ -402,6 +405,11 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if e.Protocol == "ospf" && e.Profile == "ospfv3-bounded-control" {
+		v := eventValues(e)
+		h, _ := v["Header"].(map[string]any)
+		return fmt.Sprintf("OSPFv3 %s · router=%s area=%s instance=%d", textValue(v["Packet Name"]), textValue(h["Router ID"]), textValue(h["Area ID"]), number(h["Instance ID"]))
+	}
 	if (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && e.Summary != "" {
 		return membershipEventSummary(e)
 	}
@@ -848,6 +856,16 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 }
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
+	if e != nil && e.Protocol == "ospf" && e.Transport == "network" && e.Profile == "ospfv3-bounded-control" && e.Rule == "ospfv3_observed" && e.Entry == "OSPFv3ControlFields" && len(e.Raw) > 0 && e.Raw[0] == 3 {
+		p.protocol, p.priority, p.status, p.visibility = "OSPFv3", 20, e.Status, "message"
+		p.evidence, p.scope = "declared IPv6 next-header and bounded OSPFv3 wire observations", "observed control message; advertisements only"
+		p.summary = applicationEventSummary(e)
+		if e.Error != "" {
+			p.summary += " · " + e.Error
+		}
+		p.addLayer("OSPFv3")
+		return
+	}
 	if e == nil || p.networkRefused {
 		return
 	}
@@ -1387,6 +1405,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	for _, semantic := range p.stack {
 		present := false
 		for i, physical := range row.ProtocolStack {
+			if semantic == "OSPFv3" && physical == "OSPF" {
+				row.ProtocolStack[i], present = "OSPFv3", true
+				break
+			}
 			if semantic == "ICMP" && physical == "ICMPv4" {
 				row.ProtocolStack[i], present = "ICMP", true
 				break
