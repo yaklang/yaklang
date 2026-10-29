@@ -67,13 +67,25 @@ func requireOnDemandCompiled(t *testing.T, prog *ssaapi.Program, content string)
 // unit (a self edge is dropped, so the topological order cannot help), and
 // the skeleton pass only predeclares def/class shells — a module-level
 // variable export does not exist until settings.py's deferred file task
-// runs. File tasks execute in registration order, so main.py's import runs
-// first and binds a placeholder that would only be patched by
+// runs. File tasks execute in registration order — pinned to main.py first
+// by the padding below — so main.py's import runs first and binds a
+// placeholder that would only be patched by
 // fixImportCallback after the whole project finishes. The need-driven
 // fallback instead compiles settings.py on demand right there: main.py sees
 // the real string and the file's hash lands in the UpStream cache.
 func TestPythonImportFallback_CompilesModuleOnDemand(t *testing.T) {
-	settings := "SECRET = \"s3cret\"\n"
+	// The batch pipeline hands files to the pre-handler as their ASTs finish
+	// parsing — "file completion order inside the batch is not part of that
+	// contract" (ssa_compile_fs.go) — and deferred file tasks run in that
+	// delivery order. With two near-instant parses the order races: when
+	// settings.py's AST is ready first, its task publishes SECRET before
+	// main.py's import executes, the import resolves without the fallback,
+	// and the hash assertion below fails even though SECRET still binds the
+	// real value (CI run 40838722220 failed 2/2 this way). The comment
+	// padding makes settings.py's parse reliably slower than main.py's, so
+	// the importer's AST is always ready first and the fallback
+	// deterministically engages.
+	settings := "# " + strings.Repeat("padding ", 30000) + "\nSECRET = \"s3cret\"\n"
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("main.py", "from settings import SECRET\n")
 	vf.AddFile("settings.py", settings)
