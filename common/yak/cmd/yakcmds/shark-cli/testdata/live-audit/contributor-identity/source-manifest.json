@@ -1,0 +1,58 @@
+{
+  "scope": "Literal source copies for the source-frozen native typed replay probe and actual Windows driver; captures, keys, exports, executables, logs and screenshots remain external.",
+  "files": {
+    "mixed_identity_replay.go": {
+      "bytes": 8657,
+      "SHA256": "9746f26abfcbb207b28722ba11e9ed93b1b5da518f81e627fc126716b1a68ff9"
+    },
+    "plan.json": {
+      "bytes": 1473,
+      "SHA256": "82f43e40a72ae8daf0ee8f7b8b64a35f9fb9ec45a53ec1e9697e5c5502d90638"
+    },
+    "run_mixed_identity.py": {
+      "bytes": 3822,
+      "SHA256": "0dff04fb98ec4c91fe024674ef28c2806d752c64550650da4e08284eb59f6616"
+    },
+    "windows-v2/manifest.json": {
+      "bytes": 878,
+      "SHA256": "b26e54692a701dad7a17885ffc94a48f41ea39a86032fdc800102b8960965389"
+    },
+    "windows-v2/mixed_identity_replay.go": {
+      "bytes": 8657,
+      "SHA256": "9746f26abfcbb207b28722ba11e9ed93b1b5da518f81e627fc126716b1a68ff9"
+    },
+    "windows-v2/plan.json": {
+      "bytes": 1982,
+      "SHA256": "f32bab633b787e5df821f71af6cefe695b6403c6f5af3175edc7ddca41dbdf36"
+    },
+    "windows-v2/RUN-PLAN.txt": {
+      "bytes": 1916,
+      "SHA256": "3b510633d2c89f29ba090d3b9f190ca525b37a3296ad8a5d32dc5a8167edae3b"
+    },
+    "windows-v2/run_mixed_identity.py": {
+      "bytes": 3881,
+      "SHA256": "a42a474d9f22df716b059d8740a74c37a98b7b05298be95bff58d44c0b74c426"
+    },
+    "windows-v2/run_windows_identity.py": {
+      "bytes": 8886,
+      "SHA256": "82c704e3c20d5da3041bc759b76b80bcc0106c25c45a8138b5487622b67a5230"
+    }
+  },
+  "actual_native_execution": {
+    "external_relative_name": "CLI-identity-mixed-actual30-01/receipt.json",
+    "SHA256": "bf927fd473c5af8431162ae1cfa5110296a027354b2b62a8186e3dd715671102"
+  },
+  "actual_native_build": {
+    "external_relative_name": "CLI-identity-mixed-helper30-01/producer.json",
+    "SHA256": "122e4a831baf3f6331600476548f7a80cd46cbedd25f2be4f5eaa37f2b29f6dc"
+  },
+  "actual_Windows_driver_v2": {
+    "external_relative_name": "windows-identity-1MiB-5c88a-02/proof.json",
+    "SHA256": "8e32bd6e51e2e1cc0fa96a92b26fbfbee50f6e161da243b157c1a2daa89bae4a"
+  },
+  "notes": [
+    "Root compared all copied source bytes to the exact external originals.",
+    "The Windows helper keeps its original bb636 producer; it is not the current application producer.",
+    "Native probe source is portable through explicit --capture/--keylog arguments for this immutable selected profile; old full snapshots are reference only."
+  ]
+}

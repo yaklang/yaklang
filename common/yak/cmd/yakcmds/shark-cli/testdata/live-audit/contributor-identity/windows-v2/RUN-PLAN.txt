@@ -1,0 +1,29 @@
+Prepared-only v02. No binaries or UI have been executed by preparation.
+
+Old01 is immutable and its passed query/unavailability run remains valid:
+- old manifest SHA e4dc664135c0c0b452fd4f0ab8b8f5a5bb3a31305e2842e0006fd0cf7177c8e6
+- its plan member SHA82f43e40a72ae8daf0ee8f7b8b64a35f9fb9ec45a53ec1e9697e5c5502d90638
+These are different files; there was no plan mutation or failed source proof.
+The no_production_API_added_for_Yak_conversion member was present at creation.
+
+v02 adds native-console input source snapshots and before/after exact-byte hashes:
+small driver/plan/manifest/app and helper receipts/Go helper/renderer are copied
+under runtime frozen-inputs; large binaries/pcap/keylog are streaming hashes only.
+Actual console helper source bytes must match that old helper producer's SHA.
+Helper sourcebb636 remains a helper source, never relabeled as application source.
+Timeout retains output/cells and a negative receipt. Source changes forbid closure.
+
+Additional UI assertions are NEW scope: field title HTTP3, no fabricatedPDU0,
+no MESSAGE-protocol rendering for retention placeholders, one missing-detail reason.
+The old01 UI result is not retroactively called failing against these new checks.
+The production UI fix must receive its own source/bins; do not rerun31 claims on30.
+The old complete-HTTP3-details harness is still not used to claim absent fields.
+Query/row identity/partial status/physical294 and CP936 checks remain strict.
+
+Root command after its source/build is closed:
+python run_windows_identity.py --binary NEW_BINS/yak.exe --source NEW_SOURCE
+ --out NEW_RUN_DIR [--renderer KNOWN_RENDERER.py] [--helper-source SAME_HELPER_GO]
+
+The external mixed Go source is copied byte-identically from01. The v02 build
+runner fixes clean-status parsing to preserve leading porcelain status columns.
+Do not run helper builds while root Go/source freeze is active.
