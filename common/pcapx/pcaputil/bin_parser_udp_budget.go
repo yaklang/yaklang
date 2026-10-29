@@ -276,7 +276,7 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	v := el.Value.(*binUDPEntry)
 	f := v.flow
 	t := f.tftp
-	if t == nil || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
+	if t == nil || !tftpUDPHasPeerEvidence(f, e, w, dir) || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
 		return false
 	}
 	peer := e.Source
