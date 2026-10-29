@@ -306,3 +306,9 @@ the selected SPI interval. Its corrected detail-scoped assertion allows the
 truthful global partial-history footer; old failed auditor and producer runs
 remain separate evidence. This is a UDP4500 bounded-header and ownership scope,
 not SA authentication, native keepalive completeness or OSPFv3 certification.
+
+The later636/685 OSPFv3 checkpoint and independent MLD recheck are indexed in
+[the scoped report](../../../../../../../docs/exec-plans/shark-public-corpus-20261025/ospfv3-636-685.md).
+Its39 exact historical source files are in `ospfv3-mld-source36/`; prior NATT
+helpers remain hash references. Full packets, keys, plans, expected objects and
+outputs are excluded. This checkpoint does not certify TOP30 or core completeness.

@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"net/netip"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -129,7 +131,7 @@ func TestOSPFv3UnknownLSAAndTrailerStayExplicit(t *testing.T) {
 
 func TestOSPFv3ExternalTruncationCannotShiftPrefixIntoMetric(t *testing.T) {
 	// All three bytes of the metric are required before any prefix header.
-	for _, typ := range []uint16{0x4005, 0x2007} {
+	for _, typ := range []uint16{0x2003, 0x4005, 0x2007} {
 		for _, body := range [][]byte{{0}, {0, 64}, {0, 64, 0}} {
 			lsa := ospfv3TestLSA(body, typ)
 			m, err := DecodeOSPFv3Wire(ospfv3TestPacket(4, append([]byte{0, 0, 0, 1}, lsa...)), OSPFv3WireContext{}, 32)
@@ -177,16 +179,184 @@ func TestOSPFv3InterAreaAndExternalOptionalFieldBoundaries(t *testing.T) {
 	}
 }
 
+func ospfv3TestContext() OSPFv3WireContext {
+	return OSPFv3WireContext{Source: netip.MustParseAddr("fe80::1"), Destination: netip.MustParseAddr("ff02::5")}
+}
+
+// Independent one's-complement insertion: do not use the candidate checksum
+// helper to manufacture its own expected checksum.
+func ospfv3TestSign(w []byte) []byte {
+	w = bytes.Clone(w)
+	w[12], w[13] = 0, 0
+	c := ospfv3TestContext()
+	pseudo := append(c.Source.AsSlice(), c.Destination.AsSlice()...)
+	n := int(binary.BigEndian.Uint16(w[2:4]))
+	pseudo = append(pseudo, 0, 0, byte(n>>8), byte(n), 0, 0, 0, 89)
+	pseudo = append(pseudo, w[:n]...)
+	if len(pseudo)%2 != 0 {
+		pseudo = append(pseudo, 0)
+	}
+	sum := uint32(0)
+	for at := 0; at < len(pseudo); at += 2 {
+		sum += uint32(pseudo[at])<<8 | uint32(pseudo[at+1])
+	}
+	for sum > 65535 {
+		sum = sum&65535 + sum>>16
+	}
+	binary.BigEndian.PutUint16(w[12:14], ^uint16(sum))
+	return w
+}
+
+func TestOSPFv3UnsupportedLSADoesNotHideBoundedSiblingOrIntegrity(t *testing.T) {
+	unknown := ospfv3TestLSA([]byte{3, 4, 0, 24}, 0xa123)
+	known := ospfv3TestLSA([]byte{0, 0, 0, 0x13, 192, 0, 2, 9}, 0x2002)
+	w := ospfv3TestSign(ospfv3TestPacket(4, append([]byte{0, 0, 0, 2}, append(bytes.Clone(unknown), known...)...)))
+	m, err := DecodeOSPFv3Wire(w, ospfv3TestContext(), 32)
+	require.ErrorIs(t, err, ErrObservedWireContext)
+	require.Equal(t, true, m["Checksum Verified"])
+	rows := m["LSAs"].([]map[string]any)
+	require.Len(t, rows, 2)
+	require.Equal(t, unknown[20:], rows[0]["Body"].(map[string]any)["Opaque Body"])
+	for _, row := range rows {
+		require.Equal(t, true, row["Checksum Verified"])
+	}
+	router := rows[1]["Body"].(map[string]any)["Attached Routers"].([]map[string]any)[0]
+	require.Equal(t, "192.0.2.9", router["Attached Router"])
+	require.Equal(t, []any{uint64(68), uint64(72)}, router["Wire Field Ranges"].(map[string]any)["Attached Router"])
+	require.NotContains(t, m, "Unparsed Body")
+	badPacket := bytes.Clone(w)
+	badPacket[12] ^= 1
+	m, err = DecodeOSPFv3Wire(badPacket, ospfv3TestContext(), 32)
+	require.ErrorContains(t, err, "checksum failed")
+	require.False(t, errors.Is(err, ErrObservedWireContext), "a proven bad sum outranks soft unsupported semantics")
+	require.Equal(t, false, m["Checksum Verified"])
+	require.Len(t, m["LSAs"], 2, "bad packet integrity does not fabricate missing wire observations")
+	badLSA := bytes.Clone(w)
+	badLSA[43] ^= 1
+	badLSA = ospfv3TestSign(badLSA)
+	m, err = DecodeOSPFv3Wire(badLSA, ospfv3TestContext(), 32)
+	require.ErrorContains(t, err, "Fletcher checksum failed")
+	require.False(t, errors.Is(err, ErrObservedWireContext))
+	require.Equal(t, true, m["Checksum Verified"], "packet and LSA checksums have different scopes")
+	require.Equal(t, false, m["LSAs"].([]map[string]any)[0]["Checksum Verified"])
+	require.Len(t, m["LSAs"], 1, "hard LSA integrity failure stops the body parser")
+	for _, packet := range [][]byte{w, badPacket} {
+		m, err = DecodeOSPFv3Wire(packet, ospfv3TestContext(), 1)
+		require.ErrorIs(t, err, ErrObservedWireBudget)
+		require.Equal(t, packet[12] == w[12], m["Checksum Verified"])
+		if packet[12] != w[12] {
+			require.ErrorContains(t, err, "checksum failed")
+			require.ErrorIs(t, err, ErrOSPFv3WireIntegrity)
+		} else {
+			require.False(t, errors.Is(err, ErrOSPFv3WireIntegrity))
+		}
+	}
+	// The declared envelope, not a plausible later header, owns the bytes.
+	truncated := bytes.Clone(w)
+	truncated[38], truncated[39] = 0xff, 0xff
+	truncated = ospfv3TestSign(truncated)
+	m, err = DecodeOSPFv3Wire(truncated, ospfv3TestContext(), 32)
+	require.Error(t, err)
+	require.False(t, errors.Is(err, ErrObservedWireContext))
+	require.Len(t, m["LSAs"], 1)
+}
+
+func TestOSPFv3IndependentPacketChecksumContexts(t *testing.T) {
+	hello := make([]byte, 20)
+	hello[6] = 2 // LLS-only, AT clear. The LLS block is outside Packet Length.
+	for _, tail := range [][]byte{{0xff, 0xfe, 0, 1}, {0, 0, 0, 1}} {
+		w := append(ospfv3TestSign(ospfv3TestPacket(1, hello)), tail...)
+		m, err := DecodeOSPFv3Wire(w, ospfv3TestContext(), 32)
+		require.ErrorIs(t, err, ErrObservedWireContext, "LLS semantics are not decoded")
+		require.Equal(t, true, m["Checksum Verified"], "LLS checksum cannot change the OSPF packet sum")
+		require.Equal(t, true, m["LLS Bit"])
+		require.Equal(t, false, m["Authentication Trailer Bit"])
+		require.Contains(t, m["LLS Scope"], "unverified")
+		require.Contains(t, m, "Hello")
+	}
+	hello[6] = 6 // AT+LLS: even a nonzero packet checksum must be ignored.
+	w := ospfv3TestPacket(1, hello)
+	w[12], w[13] = 0x12, 0x34
+	m, err := DecodeOSPFv3Wire(append(w, 0, 0, 0, 1), ospfv3TestContext(), 32)
+	require.ErrorIs(t, err, ErrObservedWireContext)
+	require.Equal(t, false, m["Checksum Verified"])
+	require.True(t, strings.HasPrefix(m["Checksum Scope"].(string), "omitted:"))
+	short := ospfv3TestSign(ospfv3TestPacket(1, hello[:6]))
+	m, err = DecodeOSPFv3Wire(short, ospfv3TestContext(), 32)
+	require.Error(t, err)
+	require.Contains(t, m["Checksum Scope"], "Options unavailable")
+	require.Equal(t, false, m["Checksum Verified"])
+	unknownAF := ospfv3TestPacket(3, nil)
+	unknownAF[14] = 64
+	m, err = DecodeOSPFv3Wire(ospfv3TestSign(unknownAF), ospfv3TestContext(), 32)
+	require.ErrorIs(t, err, ErrObservedWireContext)
+	require.Equal(t, true, m["Checksum Verified"], "AF body semantics do not change the IPv6 pseudo-header")
+	cut := ospfv3TestSign(ospfv3TestPacket(1, make([]byte, 20)))
+	cut[14] = 64
+	m, err = DecodeOSPFv3Wire(cut[:len(cut)-1], ospfv3TestContext(), 32)
+	require.Error(t, err)
+	require.False(t, errors.Is(err, ErrObservedWireContext), "declared truncation outranks unknown AF")
+	require.Contains(t, m["Checksum Scope"], "not completely captured")
+	context := ospfv3TestContext()
+	context.PseudoHeaderUnavailable = true
+	m, err = DecodeOSPFv3Wire(ospfv3TestSign(unknownAF), context, 32)
+	require.ErrorIs(t, err, ErrObservedWireContext)
+	require.Equal(t, false, m["Checksum Verified"])
+	require.Contains(t, m["Checksum Scope"], "final IPv6 pseudo-header destination unavailable")
+}
+
+func TestOSPFv3ShortLSAHeaderRetainsOnlyCompleteScalarPrefix(t *testing.T) {
+	unknown := ospfv3TestLSA([]byte{1, 2, 3, 4}, 0xa123)
+	known := ospfv3TestLSA([]byte{0, 0, 0, 0x13, 192, 0, 2, 9}, 0x2002)
+	w := ospfv3TestSign(ospfv3TestPacket(4, append([]byte{0, 0, 0, 2}, append(bytes.Clone(unknown), known...)...)))
+	for captured := 0; captured < 20; captured++ {
+		m, err := DecodeOSPFv3Wire(w[:44+captured], ospfv3TestContext(), 32)
+		require.Error(t, err)
+		rows := m["LSAs"].([]map[string]any)
+		if captured < 2 {
+			require.Len(t, rows, 1, "no observation slot without a complete scalar")
+			continue
+		}
+		require.Len(t, rows, 2)
+		row := rows[1]
+		require.NotNil(t, row)
+		require.NotContains(t, row, "Body")
+		require.NotContains(t, row, "Length", "uncaptured Length cannot license continuation")
+		require.Equal(t, false, row["Checksum Verified"])
+		for _, f := range []struct {
+			name     string
+			at, size int
+		}{
+			{"LS Age", 0, 2}, {"LS Type", 2, 2}, {"Link State ID", 4, 4},
+			{"Advertising Router", 8, 4}, {"Sequence", 12, 4}, {"Checksum", 16, 2},
+		} {
+			if captured >= f.at+f.size {
+				require.Contains(t, row, f.name)
+				require.Equal(t, []any{uint64(44 + f.at), uint64(44 + f.at + f.size)}, row["Wire Field Ranges"].(map[string]any)[f.name])
+			} else {
+				require.NotContains(t, row, f.name)
+			}
+		}
+	}
+	// Exhaustion before the first prefix cannot invent a nil prefix child.
+	link := ospfv3TestLSA(append(make([]byte, 23), 1, 64, 0, 0, 0), 8)
+	m, err := DecodeOSPFv3Wire(ospfv3TestPacket(4, append([]byte{0, 0, 0, 1}, link...)), OSPFv3WireContext{}, 1)
+	require.ErrorIs(t, err, ErrObservedWireBudget)
+	body := m["LSAs"].([]map[string]any)[0]["Body"].(map[string]any)
+	require.Empty(t, body["Prefixes"])
+}
+
 func FuzzOSPFv3BoundedOccurrences(f *testing.F) {
 	f.Add(ospfv3TestPacket(1, make([]byte, 20)), uint8(32))
 	f.Add(ospfv3TestPacket(4, []byte{0, 0, 0, 0}), uint8(1))
+	unknown := ospfv3TestLSA([]byte{1, 2, 3, 4}, 0xa123)
+	known := ospfv3TestLSA([]byte{0, 0, 0, 0x13}, 0x2001)
+	f.Add(ospfv3TestSign(ospfv3TestPacket(4, append([]byte{0, 0, 0, 2}, append(bytes.Clone(unknown), known...)...))), uint8(8))
 	f.Fuzz(func(t *testing.T, w []byte, b uint8) {
 		if len(w) > 65536 {
 			return
 		}
 		original := bytes.Clone(w)
-		m, _ := DecodeOSPFv3Wire(w, OSPFv3WireContext{}, int(b%64)+1)
-		require.Equal(t, original, w)
 		var walk func(any)
 		walk = func(v any) {
 			switch x := v.(type) {
@@ -205,10 +375,15 @@ func FuzzOSPFv3BoundedOccurrences(f *testing.F) {
 				}
 			case []map[string]any:
 				for _, v := range x {
+					require.NotNil(t, v, "a refused child is not an observed occurrence")
 					walk(v)
 				}
 			}
 		}
-		walk(m)
+		for _, context := range []OSPFv3WireContext{{}, ospfv3TestContext()} {
+			m, _ := DecodeOSPFv3Wire(w, context, int(b%64)+1)
+			require.Equal(t, original, w)
+			walk(m)
+		}
 	})
 }

@@ -28,6 +28,9 @@ func (d captureOSPFv3Decoder) Decode(w []byte, b gopacket.PacketBuilder) error {
 	if len(w) < 16 || len(w) >= 4 && int(binary.BigEndian.Uint16(w[2:4])) > len(w) {
 		b.SetTruncated()
 	}
+	if errors.Is(err, stream_parser.ErrOSPFv3WireIntegrity) {
+		return err // A resource/context limit cannot hide proven wire corruption.
+	}
 	if errors.Is(err, stream_parser.ErrObservedWireContext) || errors.Is(err, stream_parser.ErrObservedWireBudget) {
 		// Unselected semantics and a local parser budget are not proof of a
 		// malformed captured packet. Native events retain the precise refusal.

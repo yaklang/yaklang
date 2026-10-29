@@ -4792,3 +4792,28 @@ Diff与大小写 CI 均通过。原始捕获、密钥、完整对象、日志、
 详见 [阶段报告与准确范围](shark-public-corpus-20261025/natt-udp-ownership-a82.md)
 和 [计数证据](shark-public-corpus-20261025/natt-udp-ownership-a82-summary.json)。
 22条OSPFv3缺失、417帧来源的原生接入、旧调查清单和其它高级边界仍未关闭。
+
+## OSPFv3 来源、原生字段与 Windows 页面（2026-10-29）
+
+636 的共享有界 codec、canonical observed rule、IPv6 原生分发和字段来源已
+接通，685 又加入具体 LSA 类型名称。两大包实际范围为807个 v3消息（390/417），
+并非此前只查 Weber 的417个；21/22条旧硬解码错误与三个静默错误前缀均有
+独立原字节模型。新鲜隔离 TShark 的28344个值/范围检查覆盖完整/仅头LSA、
+309个前缀与191个AH观察；AH认证、LSDB和邻居状态均未推断。
+
+636实际37输入的307262个完整事件和两个flow对象只允许807个来源构造插入、
+明确生成ID引用映射和DecodeErrors的-21/-22修正；CLI全384518行逐项验证。
+685又实际回放37输入，384518行与636完整字面一致，不作ID映射。685的
+OSPFv3 fuzz为264656次、60秒、0失败。旧full36的285554通过/24跳过/3失败
+保留原结论，后续657通过和636四个CI通过分别记录。
+
+默认20000/64MiB的真实Windows控制台选中frame48906/PDU40097，物理334字节、
+OSPF240字节与选中前缀8字节分别逐字节核对；685已显示Intra-Area-Prefix-LSA
+及Router-LSA引用，root已亲自查看实际cells渲染图。不是Windows Terminal像素
+截图，未提高预算隐藏全局历史部分提示。
+
+MLD复核纠正旧清单：10条不完整body全部来自17条IPv4/Protocol58异常输入，
+不能当正常MLD缺失强制识别。220条完整IPv6来源和高级已有控制共7340+69项
+检查无差异；这不是新原生MLD执行。未知LSA、AT/LLS等新边界和其它TOP30工作
+仍需继续。详见[阶段报告](shark-public-corpus-20261025/ospfv3-636-685.md)及
+[准确证据索引](shark-public-corpus-20261025/ospfv3-636-685-summary.json)。

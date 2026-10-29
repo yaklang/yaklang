@@ -3,6 +3,7 @@ package stream_parser
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"net/netip"
 )
@@ -13,6 +14,10 @@ type OSPFv3WireContext struct {
 	Source, Destination     netip.Addr
 	PseudoHeaderUnavailable bool
 }
+
+// ErrOSPFv3WireIntegrity marks independently proven invalid wire integrity.
+// It may coexist with a local collection budget; neither cause is erased.
+var ErrOSPFv3WireIntegrity = errors.New("OSPFv3 wire integrity failure")
 
 func OSPFv3MessageName(typ uint64) string {
 	if typ >= 1 && typ <= 5 {
@@ -96,7 +101,7 @@ func ospfv3LSAChecksum(w []byte) bool {
 // DecodeOSPFv3Wire observes RFC5340's five bounded envelopes and base LSAs.
 // Every advertisement is independent: no LSDB, elected router, verified
 // neighbor, replay verdict or installed route is inferred from an ID/sequence.
-func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[string]any, error) {
+func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (observed map[string]any, resultErr error) {
 	if len(w) > 65535 {
 		return nil, ErrObservedWireBudget
 	}
@@ -121,13 +126,19 @@ func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[stri
 	r.info["Checksum Verified"] = false
 	r.info["Checksum Scope"] = "unverified: enclosing IPv6 pseudo-header not supplied"
 	if h.err != nil {
+		r.info["Checksum Scope"] = "unverified: OSPFv3 header incomplete or invalid"
 		return r.info, h.err
 	}
 	if n < 16 {
+		r.info["Checksum Scope"] = "unverified: declared OSPFv3 length is below header"
 		return r.info, fmt.Errorf("ospfv3: declared packet length is below header")
 	}
 	truncated := n > uint64(len(w))
 	r.w, r.at = w[:min(int(n), len(w))], 16
+	// Wire integrity does not depend on understanding every body. In particular,
+	// an unknown LSA or a local collection budget must not claim that supplied
+	// IPv6 addresses were absent, or conceal a proven checksum failure.
+	defer func() { resultErr = ospfv3PacketIntegrity(r.info, w, context, resultErr) }()
 	if h.info["Instance ID"].(uint64) >= 64 {
 		// RFC5838 assigns these instances other/unassigned address families;
 		// old RFC5340 configurations can also use them for base IPv6. Without
@@ -135,13 +146,13 @@ func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[stri
 		r.info["Unparsed Body"] = bytes.Clone(r.w[16:])
 		return r.info, fmt.Errorf("%w: OSPFv3 non-base instance needs address-family context", ErrObservedWireContext)
 	}
-	var options uint64
+	var unsupported error
 	switch typ {
 	case 1:
 		r.info["Hello"] = ospfv3Child(r, len(r.w), func(c *controlReader) {
 			c.num("Interface ID", 4, false)
 			c.num("Router Priority", 1, false)
-			options = c.num("Options", 3, false)
+			c.num("Options", 3, false)
 			c.num("Hello Interval", 2, false)
 			c.num("Router Dead Interval", 2, false)
 			routingAddress(c, "Designated Router", 4)
@@ -155,7 +166,7 @@ func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[stri
 	case 2:
 		r.info["Database Description"] = ospfv3Child(r, len(r.w), func(c *controlReader) {
 			c.num("Reserved 1", 1, false)
-			options = c.num("Options", 3, false)
+			c.num("Options", 3, false)
 			c.num("Interface MTU", 2, false)
 			c.num("Reserved 2", 1, false)
 			c.num("Flags", 1, false)
@@ -177,7 +188,13 @@ func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[stri
 		count := r.num("LSA Count", 4, false)
 		var lsas []map[string]any
 		for i := uint64(0); i < count && r.err == nil && ospfv3Charge(r, &budget); i++ {
-			lsas = append(lsas, ospfv3LSA(r, &budget))
+			row, softErr := ospfv3LSA(r, &budget)
+			if row != nil {
+				lsas = append(lsas, row)
+			}
+			if unsupported == nil {
+				unsupported = softErr
+			}
 		}
 		r.info["LSAs"] = lsas
 	case 5:
@@ -196,27 +213,88 @@ func DecodeOSPFv3Wire(w []byte, context OSPFv3WireContext, budget int) (map[stri
 		}
 		return r.info, r.err
 	}
-	// RFC7166 suppresses this checksum when AT is negotiated. A stateless
-	// observer cannot infer the AT state for the other three packet types.
-	if options&0x400 != 0 || len(w) != int(n) {
-		r.info["Authentication Trailer Bit"] = options&0x400 != 0
-		r.info["LLS Bit"] = options&0x200 != 0
-		r.info["Checksum Scope"] = "unverified: trailer/LLS or neighbor authentication context required"
-		r.info["Trailing Bytes"] = bytes.Clone(w[int(n):])
-		return r.info, fmt.Errorf("%w: OSPFv3 trailer/LLS authentication context not supplied", ErrObservedWireContext)
+	return r.info, unsupported
+}
+
+// A malformed wire proof outranks unsupported semantics. Preserve a hard
+// parser/resource error and its identity, while retaining both diagnostics.
+func ospfv3IntegrityFailure(err error, message string) error {
+	if err == nil {
+		return fmt.Errorf("ospfv3: %s: %w", message, ErrOSPFv3WireIntegrity)
 	}
-	if context.PseudoHeaderUnavailable {
-		r.info["Checksum Scope"] = "unverified: final IPv6 pseudo-header destination unavailable"
-		return r.info, fmt.Errorf("%w: OSPFv3 final IPv6 pseudo-header destination unavailable", ErrObservedWireContext)
+	if errors.Is(err, ErrObservedWireContext) {
+		return fmt.Errorf("ospfv3: %s; body observation: %v: %w", message, err, ErrOSPFv3WireIntegrity)
 	}
-	if context.Source.Is6() && context.Destination.Is6() {
-		valid := OSPFv3Checksum(r.w, context) == 0
-		r.info["Checksum Verified"], r.info["Checksum Scope"] = valid, "OSPF packet and IPv6 pseudo-header; authentication unverified"
-		if !valid {
-			return r.info, fmt.Errorf("ospfv3: checksum failed")
+	return fmt.Errorf("%w; ospfv3: %s: %w", err, message, ErrOSPFv3WireIntegrity)
+}
+
+func ospfv3PacketIntegrity(info map[string]any, w []byte, context OSPFv3WireContext, bodyErr error) error {
+	n := int(binary.BigEndian.Uint16(w[2:4])) // Caller already validated the header.
+	if n > len(w) {
+		info["Checksum Scope"] = "unverified: declared OSPFv3 message is not completely captured"
+		return ospfv3IntegrityFailure(bodyErr, "declared packet exceeds captured message")
+	}
+	var options uint64
+	optionsEnd := 0
+	switch w[1] {
+	case 1:
+		optionsEnd = 24
+	case 2:
+		optionsEnd = 20
+	}
+	if optionsEnd != 0 {
+		if n < optionsEnd {
+			info["Checksum Scope"] = "unverified: Hello/Database Description Options unavailable"
+			return bodyErr // The parser retains the specific truncated-field cause.
+		}
+		for _, value := range w[optionsEnd-3 : optionsEnd] {
+			options = options<<8 | uint64(value)
 		}
 	}
-	return r.info, nil
+	// RFC7166 suppresses verification under AT, including a nonzero checksum.
+	// LLS alone is different: RFC5613 puts it outside Packet Length, so the
+	// complete OSPF packet can still have independently verified integrity.
+	if options&0x400 != 0 {
+		info["Authentication Trailer Bit"] = options&0x400 != 0
+		info["LLS Bit"] = options&0x200 != 0
+		info["Checksum Scope"] = "omitted: observed OSPFv3 Authentication Trailer bit; authentication unverified"
+		info["Trailing Bytes"] = bytes.Clone(w[n:])
+		if bodyErr == nil {
+			return fmt.Errorf("%w: OSPFv3 trailer/LLS authentication context not supplied", ErrObservedWireContext)
+		}
+		return bodyErr
+	}
+	if options&0x200 != 0 {
+		info["Authentication Trailer Bit"], info["LLS Bit"] = false, true
+		info["Trailing Bytes"] = bytes.Clone(w[n:])
+		info["LLS Scope"] = "unverified: observed LLS bit; block semantics and authentication not supplied"
+		if bodyErr == nil {
+			bodyErr = fmt.Errorf("%w: OSPFv3 LLS block not decoded", ErrObservedWireContext)
+		}
+	} else if len(w) != n {
+		info["Authentication Trailer Bit"], info["LLS Bit"] = false, false
+		info["Trailing Bytes"] = bytes.Clone(w[n:])
+		info["Checksum Scope"] = "unverified: unexplained trailing bytes; neighbor authentication context unavailable"
+		if bodyErr == nil {
+			return fmt.Errorf("%w: OSPFv3 trailer/LLS authentication context not supplied", ErrObservedWireContext)
+		}
+		return bodyErr
+	}
+	if context.PseudoHeaderUnavailable {
+		info["Checksum Scope"] = "unverified: final IPv6 pseudo-header destination unavailable"
+		if bodyErr == nil {
+			return fmt.Errorf("%w: OSPFv3 final IPv6 pseudo-header destination unavailable", ErrObservedWireContext)
+		}
+		return bodyErr
+	}
+	if context.Source.Is6() && context.Destination.Is6() {
+		valid := OSPFv3Checksum(w[:n], context) == 0
+		info["Checksum Verified"], info["Checksum Scope"] = valid, "OSPF packet and IPv6 pseudo-header; authentication unverified"
+		if !valid {
+			return ospfv3IntegrityFailure(bodyErr, "checksum failed")
+		}
+	}
+	return bodyErr
 }
 
 func ospfv3LSAHeader(r *controlReader) {
@@ -234,31 +312,43 @@ func ospfv3Headers(r *controlReader, budget *int) []map[string]any {
 	var rows []map[string]any
 	for r.err == nil && r.at < len(r.w) && ospfv3Charge(r, budget) {
 		row := ospfv3Child(r, min(r.at+20, len(r.w)), ospfv3LSAHeader)
-		if row != nil {
+		if row != nil && len(row["Wire Field Ranges"].(map[string]any)) != 0 {
 			row["Checksum Verified"] = false
 			row["Checksum Scope"] = "unverified: advertised LSA header without body"
+			rows = append(rows, row)
 		}
-		rows = append(rows, row)
 	}
 	return rows
 }
 
-func ospfv3LSA(r *controlReader, budget *int) map[string]any {
+func ospfv3LSA(r *controlReader, budget *int) (map[string]any, error) {
 	start := r.at
 	if len(r.w)-start < 20 {
-		r.need(false, "OSPFv3 LSA header truncated")
-		return nil
+		// A short header has no declared boundary for a body or sibling, but
+		// its completely captured scalar prefix is still useful evidence.
+		row := ospfv3Child(r, len(r.w), ospfv3LSAHeader)
+		if row == nil || len(row["Wire Field Ranges"].(map[string]any)) == 0 {
+			return nil, nil
+		}
+		row["Checksum Verified"] = false
+		row["Checksum Scope"] = "unverified: complete LSA body unavailable"
+		return row, nil
 	}
 	n := int(binary.BigEndian.Uint16(r.w[start+18 : start+20]))
 	truncated := n > len(r.w)-start
 	end := min(start+max(20, n), len(r.w))
+	var unsupported error
 	row := ospfv3Child(r, end, func(c *controlReader) {
 		ospfv3LSAHeader(c)
 		if c.err != nil {
 			return
 		}
 		typ := uint16(c.info["LS Type"].(uint64))
-		c.info["Body"] = ospfv3Child(c, len(c.w), func(b *controlReader) { ospfv3LSABody(b, typ, budget) })
+		c.info["Body"] = ospfv3Child(c, len(c.w), func(b *controlReader) {
+			if ospfv3LSABody(b, typ, budget) {
+				unsupported = fmt.Errorf("%w: unselected OSPFv3 LSA type 0x%04x", ErrObservedWireContext, typ)
+			}
+		})
 	})
 	if row != nil {
 		row["Checksum Verified"] = false
@@ -270,7 +360,7 @@ func ospfv3LSA(r *controlReader, budget *int) map[string]any {
 		}
 	}
 	r.need(!truncated, "OSPFv3 LSA length exceeds packet")
-	return row
+	return row, unsupported
 }
 
 // The prefix representation occupies ceil(PrefixLength/32) words, not
@@ -303,18 +393,23 @@ func ospfv3Prefix(r *controlReader, metric bool, budget *int) map[string]any {
 	if c.err != nil {
 		r.err = c.err
 	}
+	if len(c.fields) == 0 {
+		return nil
+	}
 	return ospfv3Ranges(c)
 }
 
 func ospfv3Prefixes(r *controlReader, n uint64, metric bool, budget *int) []map[string]any {
 	var rows []map[string]any
 	for i := uint64(0); i < n && r.err == nil; i++ {
-		rows = append(rows, ospfv3Prefix(r, metric, budget))
+		if row := ospfv3Prefix(r, metric, budget); row != nil {
+			rows = append(rows, row)
+		}
 	}
 	return rows
 }
 
-func ospfv3LSABody(r *controlReader, typ uint16, budget *int) {
+func ospfv3LSABody(r *controlReader, typ uint16, budget *int) (unsupported bool) {
 	switch typ {
 	case 0x2001: // Router-LSA: one fixed16-byte record per described link.
 		r.num("Flags", 1, false)
@@ -342,7 +437,9 @@ func ospfv3LSABody(r *controlReader, typ uint16, budget *int) {
 	case 0x2003: // Inter-Area-Prefix-LSA.
 		r.num("Reserved", 1, false)
 		r.num("Metric", 3, false)
-		r.info["Prefixes"] = []map[string]any{ospfv3Prefix(r, false, budget)}
+		if r.err == nil {
+			r.info["Prefixes"] = ospfv3Prefixes(r, 1, false, budget)
+		}
 	case 0x2004: // Inter-Area-Router-LSA.
 		r.num("Reserved 1", 1, false)
 		r.num("Options", 3, false)
@@ -353,7 +450,7 @@ func ospfv3LSABody(r *controlReader, typ uint16, budget *int) {
 		flags := r.num("Flags", 1, false)
 		r.num("Metric", 3, false)
 		if !ospfv3Charge(r, budget) {
-			return
+			return false
 		}
 		// This prefix's last word is a referenced LS type, not reserved.
 		c := &controlReader{w: r.w, at: r.at, info: map[string]any{}}
@@ -374,7 +471,11 @@ func ospfv3LSABody(r *controlReader, typ uint16, budget *int) {
 				}
 			}
 		}
-		r.info["Prefixes"] = []map[string]any{ospfv3Ranges(c)}
+		var prefixes []map[string]any
+		if len(c.fields) != 0 {
+			prefixes = append(prefixes, ospfv3Ranges(c))
+		}
+		r.info["Prefixes"] = prefixes
 		r.at, r.err = c.at, c.err
 		if flags&2 != 0 {
 			routingAddress(r, "Forwarding Address", 16)
@@ -399,6 +500,7 @@ func ospfv3LSABody(r *controlReader, typ uint16, budget *int) {
 		r.info["Prefixes"] = ospfv3Prefixes(r, n, true, budget)
 	default:
 		r.rest("Opaque Body")
-		r.err = fmt.Errorf("%w: unselected OSPFv3 LSA type 0x%04x", ErrObservedWireContext, typ)
+		return true // Exact LSA Length owns this body; no scanning for a sibling.
 	}
+	return false
 }

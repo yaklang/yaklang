@@ -54,6 +54,7 @@ def run(out,tshark):
     cert=x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key()).serial_number(x509.random_serial_number()).not_valid_before(now-datetime.timedelta(minutes=1)).not_valid_after(now+datetime.timedelta(hours=1)).add_extension(x509.SubjectAlternativeName([x509.DNSName('audit.invalid')]),False).sign(key,hashes.SHA256())
     (out/'cert.pem').write_bytes(cert.public_bytes(serialization.Encoding.PEM));(out/'key.pem').write_bytes(key.private_bytes(serialization.Encoding.PEM,serialization.PrivateFormat.PKCS8,serialization.NoEncryption()))
     nonce=secrets.token_hex(12);receipts=[];operations=[];failures=[];threads=[];listeners=[];profiles=[]
+    close_barriers={(profile,generation):threading.Barrier(2)for profile in('tls12','tls13')for generation in range(4)}
     for profile,version in[('tls12',ssl.TLSVersion.TLSv1_2),('tls13',ssl.TLSVersion.TLSv1_3)]:
         listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen(4);listener.settimeout(15);listeners.append(listener)
         ctx=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER);ctx.load_cert_chain(out/'cert.pem',out/'key.pem');ctx.minimum_version=ctx.maximum_version=version;ctx.set_alpn_protocols(['http/1.1'])
@@ -74,7 +75,7 @@ def run(out,tshark):
                             body=response_body(nonce,profile,generation,index);response=f'HTTP/1.1 200 OK\r\nContent-Length: {len(body)}\r\nContent-Type: application/octet-stream\r\nX-Generation: {generation}\r\n\r\n'.encode()+body
                             s.sendall(response);operations.append(dict(profile=profile,generation=generation,index=index,request_SHA256=sha(request),response_SHA256=sha(response),body_SHA256=sha(body),body_bytes=len(body),server_peer=list(remote)))
                         receipts.append(dict(profile=profile,generation=generation,peer='server',endpoint=list(s.getsockname()),remote=list(s.getpeername()),**session_receipt(s)))
-                        transport=s.unwrap();transport.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('HH',1,0));transport.close()
+                        transport=s.unwrap();close_barriers[(profile,generation)].wait(timeout=5);transport.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('HH',1,0));transport.close()
             except Exception as exc:failures.append(dict(profile=profile,peer='server',error=repr(exc)))
             finally:listener.close()
         thread=threading.Thread(target=serve,daemon=True);thread.start();threads.append(thread)
@@ -103,7 +104,7 @@ def run(out,tshark):
                     assert s.selected_alpn_protocol()=='http/1.1'and s.session.has_ticket
                     receipts.append(dict(profile=profile,generation=generation,peer='client',endpoint=list(s.getsockname()),remote=list(s.getpeername()),session_argument_supplied=supplied is not None,**session_receipt(s)))
                     saved=s.session
-                    transport=s.unwrap();transport.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('HH',1,0));transport.close()
+                    transport=s.unwrap();close_barriers[(profile,generation)].wait(timeout=5);transport.setsockopt(socket.SOL_SOCKET,socket.SO_LINGER,struct.pack('HH',1,0));transport.close()
                 time.sleep(.08)
             item['reused_client_port']=client_port
         for thread in threads:thread.join(timeout=5)

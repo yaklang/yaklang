@@ -1,0 +1,2190 @@
+{
+  "scope": "Copy reviewed OSPF/MLD audit sources only, with raw-byte provenance.\n\nNo capture/key/complete case, plan, expectation, export, PDML, image, executable\nor log is copied. Prior38-source NATT dependencies are referenced by manifest\nand exact SHA, never duplicated. No production source or Go command is used.\n",
+  "frozen_at_UTC": "2026-10-29T09:05:35.669507+00:00",
+  "source_scope": "636816f1da7c97228a6adf11cbc363a41c53c33f",
+  "builder_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPF-MLD-source-bundle-prep36-01\\build_source_bundle.py",
+  "builder_SHA256": "835ec3158da5d9081006392f2d7bc47d1a4c546e8d09f35314b936c7321d7fe6",
+  "prior_NATT_manifest": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\bundle-manifest.json",
+  "prior_NATT_manifest_SHA256": "c206f729e4ead2430be02b297f86c833fa9820aad736598a8b9ccbe9ff0002e7",
+  "prior_NATT38_source_files_duplicated": 0,
+  "source_files": [
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\inventory_inputs.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/inventory_inputs.py",
+      "SHA256": "5f9bf13f6b574a791eb1a42709a60040c731102ef3d186bae5c049d74b275fea",
+      "bytes": 3391,
+      "role": "Inventory37 original capture inputs and physical source domains",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\inputs01\\inputs.json",
+          "SHA256": "d7f1ce273e976e2a37193cdf3c27dd50bb6d95a3717c62f96f473af105e13aa4",
+          "scope": "Original37 input inventory, not copied",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan01\\summary.json",
+          "SHA256": "78bb8a45668758d38f31e9c3a77a0a3ed15a9cbb23f9065328553e59d167fb2b",
+          "scope": "Original383936 records;807 source-complete OSPFv3 observations",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "5f9bf13f6b574a791eb1a42709a60040c731102ef3d186bae5c049d74b275fea",
+        "literal_byte_candidates": 1,
+        "unique_literal_byte_candidates": 1,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\ospf_source_codec.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/ospf_source_codec.py",
+      "SHA256": "fb45475fec822b21989d398541c51ec5d62841db4ce75d2e76737fbf1bffb662",
+      "bytes": 12783,
+      "role": "Independent RFC5340 source scalar/prefix/checksum codec",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan01\\summary.json",
+          "SHA256": "78bb8a45668758d38f31e9c3a77a0a3ed15a9cbb23f9065328553e59d167fb2b",
+          "scope": "Original383936 records;807 source-complete OSPFv3 observations",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\reference-field-audit01\\summary.json",
+          "SHA256": "795071791d702ccedbe9ad48dfbcd0302675019e9412cd0fe6ac33f114d2019e",
+          "scope": "28344 named source/reference field checks;11 literal semantic presentation notes retained",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "fb45475fec822b21989d398541c51ec5d62841db4ce75d2e76737fbf1bffb662",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "ipaddress",
+        "struct"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan_source37.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/scan_source37.py",
+      "SHA256": "b763eb276f7a5fbda191207ef031edbf5a44ecab89090655b2ec8886706f8a58",
+      "bytes": 19877,
+      "role": "Bounded original L2/IP/extension/tunnel census and explicit parent refusals",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan01\\summary.json",
+          "SHA256": "78bb8a45668758d38f31e9c3a77a0a3ed15a9cbb23f9065328553e59d167fb2b",
+          "scope": "Original383936 records;807 source-complete OSPFv3 observations",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "b763eb276f7a5fbda191207ef031edbf5a44ecab89090655b2ec8886706f8a58",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "ipaddress",
+        "json",
+        "ospf_source_codec",
+        "pathlib",
+        "struct",
+        "sys",
+        "traceback",
+        "zlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\audit_fragment_sources.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/audit_fragment_sources.py",
+      "SHA256": "4bd95e92feb5bcef827fe541e337b286ff03d79b930e9fd24f6fd91104587456",
+      "bytes": 7161,
+      "role": "Independent IPv6 fragment reconstruction and terminal protocol census",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\fragments01\\summary.json",
+          "SHA256": "ad5acdb0b6fd17574e0b77fe81c2636d8badfab3532426d6f8840d388fd83b95",
+          "scope": "136 IPv6 fragments,68 reconstructed groups;no added OSPF source",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "4bd95e92feb5bcef827fe541e337b286ff03d79b930e9fd24f6fd91104587456",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "scan_source37",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\run_reference.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/run_reference.py",
+      "SHA256": "9bf404d85a165b325fbffc7f853160687c4659a1ddd198a5ee90522241d6ebac",
+      "bytes": 3925,
+      "role": "Fresh closed TShark37 reference execution",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\wireshark01\\summary.json",
+          "SHA256": "3783c568cc131493b3b6afea2ab76e8d8ac24e68ac98e62ce803c735843aaaae",
+          "scope": "Fresh37 closed TShark reference runs",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "9bf404d85a165b325fbffc7f853160687c4659a1ddd198a5ee90522241d6ebac",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "hashlib",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "time",
+        "traceback",
+        "xml.etree.ElementTree"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\verify_reference_fields01.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/verify_reference_fields01.py",
+      "SHA256": "742d044cd1d11695a52a6a02c3e6415a821ecde96805dd7a66f9d20c8fec9384",
+      "bytes": 15799,
+      "role": "Exact source-vs-PDML field/value/span checks and literal notes",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\reference-field-audit01\\summary.json",
+          "SHA256": "795071791d702ccedbe9ad48dfbcd0302675019e9412cd0fe6ac33f114d2019e",
+          "scope": "28344 named source/reference field checks;11 literal semantic presentation notes retained",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "742d044cd1d11695a52a6a02c3e6415a821ecde96805dd7a66f9d20c8fec9384",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib",
+        "traceback",
+        "xml.etree.ElementTree"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\summarize_sources.py",
+      "relative": "sources/phase-source/OSPFv3-independent-source37-a82-01/summarize_sources.py",
+      "SHA256": "89dffbf03f8ae1919a2b715898e00e7775dadc42240d1df943ad5205ecfa7916",
+      "bytes": 11901,
+      "role": "Counts/RFC applicability and immutable a82 canonical review",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captures and source proofs external;reader via prior NATT manifest",
+        "Local ospf_source_codec/scan_source37 when imported"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\counts-and-canonical01\\summary.json",
+          "SHA256": "b13ac164680fb56aedc80ecb32d7da27ae312a4d080c316591e3f7a75830e819",
+          "scope": "Counts/RFC applicability and immutable a82 canonical source review",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "89dffbf03f8ae1919a2b715898e00e7775dadc42240d1df943ad5205ecfa7916",
+        "literal_byte_candidates": 1,
+        "unique_literal_byte_candidates": 1,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "csv",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-legacy-errors-source-a82-01\\audit_legacy.py",
+      "relative": "sources/phase-source/OSPFv3-legacy-errors-source-a82-01/audit_legacy.py",
+      "SHA256": "41fe28519f10705f413e4710ec413a6402057313e4f51f1ddcd4133385055983",
+      "bytes": 13309,
+      "role": "Immutable gopacket1.3.1 prefix-access model;old-a82 error attribution",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Pinned gopacket1.3.1 layers/ospf.go external,not copied",
+        "Old a82 CLI/native exports external"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-legacy-errors-source-a82-01\\actual01\\summary.json",
+          "SHA256": "2da5bf2fcee195f10e294afbcecfdd2298420186d2ca5e30f2b30113266ee14e",
+          "scope": "Pinned gopacket1.3.1 access model and old a82 CLI43 failures",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "41fe28519f10705f413e4710ec413a6402057313e4f51f1ddcd4133385055983",
+        "literal_byte_candidates": 3,
+        "unique_literal_byte_candidates": 3,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\build_source_field_plan.py",
+      "relative": "sources/phase-source/OSPFv3-field-plan-before-native-01/build_source_field_plan.py",
+      "SHA256": "97c71fca3b4f12f75c8022c4feb2332031d33b2f01faf3689c8ee4f6612a55a8",
+      "bytes": 22881,
+      "role": "Independent complete field/session/typed source construction or strict field-only validation;contract correction preserved",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "Pure contract01/02 external hashes;complete source grids/plans excluded"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\frozen01\\plan.json",
+          "SHA256": "e88420197a8d6c9e403c56c31d129608604cfa481136e6fdd2acbc9c98783e5b",
+          "scope": "Historical field-only source plan,external only",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\validator-selftest01\\summary.json",
+          "SHA256": "b7bec1310c8ff356225f54970444453c6fad9bfb73b85ccf75864df3a68a63c8",
+          "scope": "Historical controller controls,not production pass",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "97c71fca3b4f12f75c8022c4feb2332031d33b2f01faf3689c8ee4f6612a55a8",
+        "literal_byte_candidates": 6,
+        "unique_literal_byte_candidates": 6,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "base64",
+        "collections",
+        "copy",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\verify_field_exports.py",
+      "relative": "sources/phase-source/OSPFv3-field-plan-before-native-01/verify_field_exports.py",
+      "SHA256": "ab67c4b1ac9d6857326b336cec391f543abeb2b9a1ef30bc01c63d7cf67921db",
+      "bytes": 10290,
+      "role": "Independent complete field/session/typed source construction or strict field-only validation;contract correction preserved",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "Pure contract01/02 external hashes;complete source grids/plans excluded"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\frozen01\\plan.json",
+          "SHA256": "e88420197a8d6c9e403c56c31d129608604cfa481136e6fdd2acbc9c98783e5b",
+          "scope": "Historical field-only source plan,external only",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\validator-selftest01\\summary.json",
+          "SHA256": "b7bec1310c8ff356225f54970444453c6fad9bfb73b85ccf75864df3a68a63c8",
+          "scope": "Historical controller controls,not production pass",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "ab67c4b1ac9d6857326b336cec391f543abeb2b9a1ef30bc01c63d7cf67921db",
+        "literal_byte_candidates": 2,
+        "unique_literal_byte_candidates": 2,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "copy",
+        "hashlib",
+        "json",
+        "pathlib",
+        "traceback"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\build_source_field_plan02.py",
+      "relative": "sources/phase-source/OSPFv3-field-plan-before-native-02/build_source_field_plan02.py",
+      "SHA256": "4711238e1a310627344de25116e8789d4033bf79d0ce4d09cb98906ce3971c97",
+      "bytes": 22919,
+      "role": "Independent complete field/session/typed source construction or strict field-only validation;contract correction preserved",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Pure contract01/02 external hashes;complete source grids/plans excluded"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\frozen02\\plan.json",
+          "SHA256": "0f7caa92c06cf6971fe13cae804810b6cab4bbda38235d1f7cd78dd7a3326036",
+          "scope": "Current807 exact source fields/session and typed occurrence plan,external only",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\bridge02.json",
+          "SHA256": "cfd1afd01eb9c40f91362468466849a32f8c353966e743880155bbb0f9dd7157",
+          "scope": "Contract correction only;807 fields/session trees literal,13846 dedicated exact_value removals",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\validator-selftest02\\summary.json",
+          "SHA256": "169e9ffc4183aa94ca0e60a2da909345cc890c7269b80f41e860f6be865bf457",
+          "scope": "15 current verifier controls;reject fabricated32bit exact_value",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "4711238e1a310627344de25116e8789d4033bf79d0ce4d09cb98906ce3971c97",
+        "literal_byte_candidates": 6,
+        "unique_literal_byte_candidates": 6,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "base64",
+        "collections",
+        "copy",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\verify_field_exports02.py",
+      "relative": "sources/phase-source/OSPFv3-field-plan-before-native-02/verify_field_exports02.py",
+      "SHA256": "8c454d4be0d07bf5d6a0b307d2eb1a3359c4540c099e554530da63d30c2badb0",
+      "bytes": 10316,
+      "role": "Independent complete field/session/typed source construction or strict field-only validation;contract correction preserved",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Pure contract01/02 external hashes;complete source grids/plans excluded"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\frozen02\\plan.json",
+          "SHA256": "0f7caa92c06cf6971fe13cae804810b6cab4bbda38235d1f7cd78dd7a3326036",
+          "scope": "Current807 exact source fields/session and typed occurrence plan,external only",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\bridge02.json",
+          "SHA256": "cfd1afd01eb9c40f91362468466849a32f8c353966e743880155bbb0f9dd7157",
+          "scope": "Contract correction only;807 fields/session trees literal,13846 dedicated exact_value removals",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\validator-selftest02\\summary.json",
+          "SHA256": "169e9ffc4183aa94ca0e60a2da909345cc890c7269b80f41e860f6be865bf457",
+          "scope": "15 current verifier controls;reject fabricated32bit exact_value",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "8c454d4be0d07bf5d6a0b307d2eb1a3359c4540c099e554530da63d30c2badb0",
+        "literal_byte_candidates": 2,
+        "unique_literal_byte_candidates": 2,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "copy",
+        "hashlib",
+        "json",
+        "pathlib",
+        "traceback"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\bridge_contract_correction02.py",
+      "relative": "sources/phase-source/OSPFv3-field-plan-before-native-02/bridge_contract_correction02.py",
+      "SHA256": "bd6c39091997dd957348c252fd60bbb895e2aa2ce8c23af39f829658b3e33f18",
+      "bytes": 4949,
+      "role": "Independent complete field/session/typed source construction or strict field-only validation;contract correction preserved",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Pure contract01/02 external hashes;complete source grids/plans excluded"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\frozen02\\plan.json",
+          "SHA256": "0f7caa92c06cf6971fe13cae804810b6cab4bbda38235d1f7cd78dd7a3326036",
+          "scope": "Current807 exact source fields/session and typed occurrence plan,external only",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\bridge02.json",
+          "SHA256": "cfd1afd01eb9c40f91362468466849a32f8c353966e743880155bbb0f9dd7157",
+          "scope": "Contract correction only;807 fields/session trees literal,13846 dedicated exact_value removals",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\validator-selftest02\\summary.json",
+          "SHA256": "169e9ffc4183aa94ca0e60a2da909345cc890c7269b80f41e860f6be865bf457",
+          "scope": "15 current verifier controls;reject fabricated32bit exact_value",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "bd6c39091997dd957348c252fd60bbb895e2aa2ce8c23af39f829658b3e33f18",
+        "literal_byte_candidates": 6,
+        "unique_literal_byte_candidates": 6,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "copy",
+        "hashlib",
+        "json",
+        "pathlib",
+        "subprocess"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\frozen\\bridge.py",
+      "relative": "sources/phase-source/OSPFv3-native-whole-plan-before36-02/frozen/bridge.py",
+      "SHA256": "5afbcab6b337018824d3500247241763c1ef6ff2973a9aec38b42d514c3c4cfe",
+      "bytes": 12798,
+      "role": "Full native source constructor/verifier or explicit generated-PDU reference schema",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External fieldplan02/source grid/closed exports;local frozen constructor/reference helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+          "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+          "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+          "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+          "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+          "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+          "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "5afbcab6b337018824d3500247241763c1ef6ff2973a9aec38b42d514c3c4cfe",
+        "literal_byte_candidates": 7,
+        "unique_literal_byte_candidates": 6,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "base64",
+        "collections",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "shutil",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\frozen\\ospfv3_native_expected36.py",
+      "relative": "sources/phase-source/OSPFv3-native-whole-plan-before36-02/frozen/ospfv3_native_expected36.py",
+      "SHA256": "e469da4d18ad142ee46b5c9dfde25825373a16ebc6273a2c4e2a688a5341d5cd",
+      "bytes": 4177,
+      "role": "Full native source constructor/verifier or explicit generated-PDU reference schema",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External fieldplan02/source grid/closed exports;local frozen constructor/reference helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+          "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+          "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+          "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+          "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+          "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+          "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "e469da4d18ad142ee46b5c9dfde25825373a16ebc6273a2c4e2a688a5341d5cd",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "base64",
+        "copy",
+        "hashlib",
+        "ipaddress",
+        "pathlib",
+        "zlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\frozen\\known_pdu_reference_paths.py",
+      "relative": "sources/phase-source/OSPFv3-native-whole-plan-before36-02/frozen/known_pdu_reference_paths.py",
+      "SHA256": "3d895308ab555eb0dcebe821f9f0ea7fba4fc266b133d76dc8ebfb166a38d8b6",
+      "bytes": 3580,
+      "role": "Full native source constructor/verifier or explicit generated-PDU reference schema",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External fieldplan02/source grid/closed exports;local frozen constructor/reference helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+          "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+          "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+          "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+          "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+          "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+          "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "3d895308ab555eb0dcebe821f9f0ea7fba4fc266b133d76dc8ebfb166a38d8b6",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "copy"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\frozen\\known_pdu_reference_paths_v2.py",
+      "relative": "sources/phase-source/OSPFv3-native-whole-plan-before36-02/frozen/known_pdu_reference_paths_v2.py",
+      "SHA256": "4267558d0e1f99c6faad8a3bb15c96d991220b1d7458e554fc9e650cabeb89f3",
+      "bytes": 2375,
+      "role": "Full native source constructor/verifier or explicit generated-PDU reference schema",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External fieldplan02/source grid/closed exports;local frozen constructor/reference helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+          "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+          "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+          "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+          "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+          "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+          "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "4267558d0e1f99c6faad8a3bb15c96d991220b1d7458e554fc9e650cabeb89f3",
+        "literal_byte_candidates": 2,
+        "unique_literal_byte_candidates": 2,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "importlib.util",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-01\\frozen\\bridge.py",
+      "relative": "sources/phase-source/OSPFv3-native-whole-plan-before36-01/frozen/bridge.py",
+      "SHA256": "52761f0249b890eb78dac6c33429d79ed636a0324306c65f642f62e726b04bf0",
+      "bytes": 11491,
+      "role": "Preserved original verifier candidate before source-proved flow DecodeErrors delta",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "Original native plan01 external;superseded by02"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-legacy-errors-source-a82-01\\actual01\\summary.json",
+          "SHA256": "2da5bf2fcee195f10e294afbcecfdd2298420186d2ca5e30f2b30113266ee14e",
+          "scope": "Pinned gopacket1.3.1 access model and old a82 CLI43 failures",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+          "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+          "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "52761f0249b890eb78dac6c33429d79ed636a0324306c65f642f62e726b04bf0",
+        "literal_byte_candidates": 5,
+        "unique_literal_byte_candidates": 4,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "base64",
+        "collections",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "shutil",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_OSPFv3_native_ledgers36.py",
+      "relative": "sources/phase-source/close_OSPFv3_native_ledgers36.py",
+      "SHA256": "672431c77f3a5a519bd488e30c25fd7fcc734021bca7ab66ae524e05ffd3b868",
+      "bytes": 3246,
+      "role": "Reconstruct and hash-bind74 exact ID ledger files from closed native exports",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External37 before/after exports and native full proof"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+          "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+          "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+          "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+          "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "672431c77f3a5a519bd488e30c25fd7fcc734021bca7ab66ae524e05ffd3b868",
+        "literal_byte_candidates": 6,
+        "unique_literal_byte_candidates": 6,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "itertools",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\frozen\\cli_source_plan.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/cli_source_plan.py",
+      "SHA256": "57d5ea0794160c3b08e1f712951f68c0feb87b06ebc9746f33974f7d853a555a",
+      "bytes": 20552,
+      "role": "Complete CLI source construction/strict whole-row verification/closed-producer binding",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External old CLI35/fieldplan02/native ledger closure;local same-directory helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+          "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+          "scope": "Current37 whole-row source plan;no candidate values used",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "57d5ea0794160c3b08e1f712951f68c0feb87b06ebc9746f33974f7d853a555a",
+        "literal_byte_candidates": 7,
+        "unique_literal_byte_candidates": 7,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys",
+        "traceback"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\frozen\\cli_source_expected.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/cli_source_expected.py",
+      "SHA256": "912eba8c16135720db4d5d83dda6ea8099a648501f1197b76ff0a831a8decdc8",
+      "bytes": 4282,
+      "role": "Complete CLI source construction/strict whole-row verification/closed-producer binding",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External old CLI35/fieldplan02/native ledger closure;local same-directory helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+          "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+          "scope": "Current37 whole-row source plan;no candidate values used",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "912eba8c16135720db4d5d83dda6ea8099a648501f1197b76ff0a831a8decdc8",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "copy",
+        "hashlib",
+        "native_source_schema",
+        "pathlib",
+        "zlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\frozen\\cli_pdu_references.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/cli_pdu_references.py",
+      "SHA256": "ad94d6840cfa8311dbf34bf6bb2701d3a24ca2379c240684d6da82f93bac7bb3",
+      "bytes": 2179,
+      "role": "Complete CLI source construction/strict whole-row verification/closed-producer binding",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External old CLI35/fieldplan02/native ledger closure;local same-directory helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+          "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+          "scope": "Current37 whole-row source plan;no candidate values used",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "ad94d6840cfa8311dbf34bf6bb2701d3a24ca2379c240684d6da82f93bac7bb3",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "cli_source_expected",
+        "copy"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\frozen\\native_source_schema.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/native_source_schema.py",
+      "SHA256": "e469da4d18ad142ee46b5c9dfde25825373a16ebc6273a2c4e2a688a5341d5cd",
+      "bytes": 4177,
+      "role": "Complete CLI source construction/strict whole-row verification/closed-producer binding",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External old CLI35/fieldplan02/native ledger closure;local same-directory helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+          "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+          "scope": "Current37 whole-row source plan;no candidate values used",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "e469da4d18ad142ee46b5c9dfde25825373a16ebc6273a2c4e2a688a5341d5cd",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "base64",
+        "copy",
+        "hashlib",
+        "ipaddress",
+        "pathlib",
+        "zlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\frozen\\public_cli_literal_continuity.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/public_cli_literal_continuity.py",
+      "SHA256": "f8b8091be03624f2434adc674da0d6d83e4c73dea429002e25d96dee3f1b9e01",
+      "bytes": 3362,
+      "role": "Complete CLI source construction/strict whole-row verification/closed-producer binding",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External old CLI35/fieldplan02/native ledger closure;local same-directory helpers"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+          "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+          "scope": "Current37 whole-row source plan;no candidate values used",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "f8b8091be03624f2434adc674da0d6d83e4c73dea429002e25d96dee3f1b9e01",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-01\\frozen\\cli_source_plan.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-01/frozen/cli_source_plan.py",
+      "SHA256": "66a2bb1a51af24a71f2bb99448ef8fb7085c9f7867748d3ef213bedf4523d2a9",
+      "bytes": 17408,
+      "role": "Preserved original controller with Windows relative-case-key mismatch,noticed before candidate verification",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "Original CLI plan01 external;not current verifier"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-01\\plan.json",
+          "SHA256": "2c2a6434c79c9266a6892e3a4a249b84fa21b3178748ddcdabdf08eee22b3614",
+          "scope": "Historical source plan before verifier-only Windows case-key correction",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+          "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+          "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "66a2bb1a51af24a71f2bb99448ef8fb7085c9f7867748d3ef213bedf4523d2a9",
+        "literal_byte_candidates": 5,
+        "unique_literal_byte_candidates": 5,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "shutil",
+        "subprocess",
+        "sys",
+        "traceback"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-01\\auditor-controls\\selftest_cli_verifier.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-01/auditor-controls/selftest_cli_verifier.py",
+      "SHA256": "bef6df4b40092ed801f9175ef6323e1819e2e5ff58e4205ef3f132a00d296b41",
+      "bytes": 5866,
+      "role": "Historical controller negative controls before relative-path ingress control",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "External original source templates;not production test"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-01\\plan.json",
+          "SHA256": "2c2a6434c79c9266a6892e3a4a249b84fa21b3178748ddcdabdf08eee22b3614",
+          "scope": "Historical source plan before verifier-only Windows case-key correction",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "bef6df4b40092ed801f9175ef6323e1819e2e5ff58e4205ef3f132a00d296b41",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\auditor-controls\\selftest_cli_verifier.py",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/auditor-controls/selftest_cli_verifier.py",
+      "SHA256": "a6ce45f5293f11372465369750d16dca439665b9bde37a17f8746768a87ab829",
+      "bytes": 6319,
+      "role": "16 whole-row controls and collision/path-key checks",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External source templates;not production test"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\validator-selftest02\\summary.json",
+          "SHA256": "6cb3520768632ed1fdf3fd13a897a601533e54f8c56c94a90c4a3219c4aa1437",
+          "scope": "16 auditor controls plus narrow numeric-collision control",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "a6ce45f5293f11372465369750d16dca439665b9bde37a17f8746768a87ab829",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "pathlib",
+        "sys"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\verify_closed_cli36.ps1",
+      "relative": "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/verify_closed_cli36.ps1",
+      "SHA256": "0750f7e80d513e113d7cb49926971b3919de125f062fd8ac1579c1cc282f7ab5",
+      "bytes": 1060,
+      "role": "Exact636 strict verifier invocation with pinned closed native summary/ledger SHA",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Python;current CLI verifier;closed37 producers external"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+          "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+          "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "0750f7e80d513e113d7cb49926971b3919de125f062fd8ac1579c1cc282f7ab5",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_OSPFv3_36.py",
+      "relative": "sources/phase-source/prepare_Windows_OSPFv3_36.py",
+      "SHA256": "3d4773562f244d394bfaa92951e0bb8d1fb705b53f4acfb24a6fb33102ed0224",
+      "bytes": 3908,
+      "role": "Source-frozen636 Windows preparation/execution/byte-source and exact prefix-highlight checking",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External636 binary/build and original captures/keys/source case;renderer+native console source via prior NATT manifest"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-OSPFv3-source-plan-before36-01\\plan.json",
+          "SHA256": "5b87ce29fbd8befebc90b867073fbce4bc2e24ab73692fff3ec4aabca5a40b02",
+          "scope": "Source-frozen636 Windows byte/highlight plan;case not copied",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-OSPFv3-636-default01\\proof.json",
+          "SHA256": "e2013402e53275abc3c9c98111132dcf688c1e88af5ddfff36bb0dec9fc5d8f4",
+          "scope": "Actual636 automatic default-budget Windows proof;old visual_review_pending remains untouched",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "3d4773562f244d394bfaa92951e0bb8d1fb705b53f4acfb24a6fb33102ed0224",
+        "literal_byte_candidates": 7,
+        "unique_literal_byte_candidates": 7,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_OSPFv3_36.py",
+      "relative": "sources/phase-source/run_Windows_OSPFv3_36.py",
+      "SHA256": "60e03655d0cb87f8f4601d38a3a12935cbe419d07c17587419a176a671b749b9",
+      "bytes": 4273,
+      "role": "Source-frozen636 Windows preparation/execution/byte-source and exact prefix-highlight checking",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External636 binary/build and original captures/keys/source case;renderer+native console source via prior NATT manifest"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-OSPFv3-source-plan-before36-01\\plan.json",
+          "SHA256": "5b87ce29fbd8befebc90b867073fbce4bc2e24ab73692fff3ec4aabca5a40b02",
+          "scope": "Source-frozen636 Windows byte/highlight plan;case not copied",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-OSPFv3-636-default01\\proof.json",
+          "SHA256": "e2013402e53275abc3c9c98111132dcf688c1e88af5ddfff36bb0dec9fc5d8f4",
+          "scope": "Actual636 automatic default-budget Windows proof;old visual_review_pending remains untouched",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "60e03655d0cb87f8f4601d38a3a12935cbe419d07c17587419a176a671b749b9",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "traceback"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\verify_Windows_OSPFv3_36.py",
+      "relative": "sources/phase-source/verify_Windows_OSPFv3_36.py",
+      "SHA256": "a8b5f9b91f6a766b02d41789cb1f91aa3bb4e4ce3939160d328318389d2aa95d",
+      "bytes": 3527,
+      "role": "Source-frozen636 Windows preparation/execution/byte-source and exact prefix-highlight checking",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "External636 binary/build and original captures/keys/source case;renderer+native console source via prior NATT manifest"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-OSPFv3-source-plan-before36-01\\plan.json",
+          "SHA256": "5b87ce29fbd8befebc90b867073fbce4bc2e24ab73692fff3ec4aabca5a40b02",
+          "scope": "Source-frozen636 Windows byte/highlight plan;case not copied",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-OSPFv3-636-default01\\proof.json",
+          "SHA256": "e2013402e53275abc3c9c98111132dcf688c1e88af5ddfff36bb0dec9fc5d8f4",
+          "scope": "Actual636 automatic default-budget Windows proof;old visual_review_pending remains untouched",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "a8b5f9b91f6a766b02d41789cb1f91aa3bb4e4ce3939160d328318389d2aa95d",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "json",
+        "pathlib",
+        "re"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\mld_source_layout.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/mld_source_layout.py",
+      "SHA256": "4e10de5a53d3ae87c7b9abf40f1c342dbd491e4ae025169adbcc2482f32326fa",
+      "bytes": 6305,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "4e10de5a53d3ae87c7b9abf40f1c342dbd491e4ae025169adbcc2482f32326fa",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "hashlib",
+        "ipaddress"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\audit_mld_sources.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/audit_mld_sources.py",
+      "SHA256": "a169361a0b65fcdec780d20965b7717720bcc1f07cf545b1317098dddeee898e",
+      "bytes": 9847,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": false,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "a169361a0b65fcdec780d20965b7717720bcc1f07cf545b1317098dddeee898e",
+        "literal_byte_candidates": 3,
+        "unique_literal_byte_candidates": 3,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "mld_source_layout",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "urllib.request"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\audit_mld_sources02.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/audit_mld_sources02.py",
+      "SHA256": "5aef8e48de4caeaaf92972d909ed44e8d29a6b7648d193cdf0ad5f091eff4608",
+      "bytes": 9982,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "5aef8e48de4caeaaf92972d909ed44e8d29a6b7648d193cdf0ad5f091eff4608",
+        "literal_byte_candidates": 3,
+        "unique_literal_byte_candidates": 3,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "mld_source_layout",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "urllib.request"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\verify_mld_source_fields.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/verify_mld_source_fields.py",
+      "SHA256": "5eb76ca5c4fa54f2c20aba881b2cbd2ab8c40c52d22653a80f7805c896f08714",
+      "bytes": 10112,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "5eb76ca5c4fa54f2c20aba881b2cbd2ab8c40c52d22653a80f7805c896f08714",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "base64",
+        "collections",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib",
+        "xml.etree.ElementTree"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\audit_existing_mld_controls.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/audit_existing_mld_controls.py",
+      "SHA256": "a31d742abf35776f0024d1052def4d216409bc9483873859ac9b992a8d13fe5c",
+      "bytes": 6479,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "a31d742abf35776f0024d1052def4d216409bc9483873859ac9b992a8d13fe5c",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "collections",
+        "hashlib",
+        "importlib.util",
+        "json",
+        "mld_source_layout",
+        "os",
+        "pathlib",
+        "subprocess",
+        "sys",
+        "time",
+        "verify_mld_source_fields",
+        "xml.etree.ElementTree"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\audit_mld_envelopes.py",
+      "relative": "sources/phase-source/MLD-independent-source-recheck36-01/audit_mld_envelopes.py",
+      "SHA256": "45a0054555171193813dd87c50257bd82ed0f3375957418d2c4f6cdea869e36f",
+      "bytes": 3117,
+      "role": "Independent MLD source layout/timers/advanced record extents/reference/envelope audit;no future full object oracle",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original inputs/old-a82 diagnostics external;capture readers via prior NATT;local MLD modules"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+          "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+          "scope": "7340 source/private/typed/PDML checks,0differences",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+          "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+          "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+          "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+          "scope": "220 independent source checksum/envelope observations,not native authentication",
+          "copied": false
+        },
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+          "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+          "scope": "Preserved initial display-filter controller failure;not parser failure",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "45a0054555171193813dd87c50257bd82ed0f3375957418d2c4f6cdea869e36f",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "hashlib",
+        "ipaddress",
+        "json",
+        "pathlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-source-before-fix-04\\frozen-tools\\mld_carrier_source.py",
+      "relative": "sources/phase-source/MLD-source-before-fix-04/frozen-tools/mld_carrier_source.py",
+      "SHA256": "0ad418ffdb10e9f7d2d8107f35aa59a557108c8ef589236aad05d21053dd6079",
+      "bytes": 8147,
+      "role": "Existing independent literal parent/source position helper",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "Original captured record,not future Native.Raw"
+      ],
+      "result_certificates": [
+        {
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+          "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+          "scope": "Independent source/old-a82 comparison,not a new native run",
+          "copied": false
+        }
+      ],
+      "payload_sensitive_scan": {
+        "source_SHA256": "0ad418ffdb10e9f7d2d8107f35aa59a557108c8ef589236aad05d21053dd6079",
+        "literal_byte_candidates": 0,
+        "unique_literal_byte_candidates": 0,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "base64",
+        "hashlib",
+        "ipaddress",
+        "struct",
+        "zlib"
+      ],
+      "byte_identical": true
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPF-MLD-source-bundle-prep36-01\\build_source_bundle.py",
+      "relative": "sources/phase-source/OSPF-MLD-source-bundle-prep36-01/build_source_bundle.py",
+      "SHA256": "835ec3158da5d9081006392f2d7bc47d1a4c546e8d09f35314b936c7321d7fe6",
+      "bytes": 26092,
+      "role": "Review/copy/payload-scan/counts registration controller for this source-only package",
+      "recommended_entrypoint": true,
+      "dependencies": [
+        "All registered source originals and historical proof metadata external"
+      ],
+      "result_certificates": [],
+      "payload_sensitive_scan": {
+        "source_SHA256": "835ec3158da5d9081006392f2d7bc47d1a4c546e8d09f35314b936c7321d7fe6",
+        "literal_byte_candidates": 79,
+        "unique_literal_byte_candidates": 79,
+        "full_original_packet_literal_matches": 0,
+        "NSS_secret_line_matches": 0,
+        "private_key_block_matches": 0,
+        "complete_static_event_object_literals": 0,
+        "safe": true,
+        "result_scope": "Counts/hashes only. AST literals plus exact full-original-frame containment; source code manually reviewed for dynamic source loading, not embedded packet/secret material."
+      },
+      "declared_imports": [
+        "argparse",
+        "ast",
+        "base64",
+        "collections",
+        "datetime",
+        "hashlib",
+        "json",
+        "pathlib",
+        "re",
+        "shutil",
+        "sys"
+      ],
+      "byte_identical": true
+    }
+  ],
+  "source_dependencies": [
+    {
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\vxlan_endpoint_projection_audit.py",
+      "prior_bundle_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\sources\\repository-dependencies\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\vxlan_endpoint_projection_audit.py",
+      "SHA256": "ee8248c78b9be42f8a3c4c2517c5c149a0dd009dc7cd5a1571f13e66644f5feb",
+      "role": "Existing versioned PCAP/NG source-record reader",
+      "copied_again": false
+    },
+    {
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\pptp_parent_source_audit.py",
+      "prior_bundle_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\sources\\repository-dependencies\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\pptp_parent_source_audit.py",
+      "SHA256": "dddcdcdf2d557c115272ccc5808a1266dd44cf1b55e8156e761f97722ddbf9b6",
+      "role": "Existing versioned source-clock dependency",
+      "copied_again": false
+    },
+    {
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-identity-1MiB-5c88a-02\\frozen-inputs\\renderer.py",
+      "prior_bundle_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\sources\\phase-source\\windows-identity-1MiB-5c88a-02\\frozen-inputs\\renderer.py",
+      "SHA256": "427379a3b9c1ac7e8257a81d3d6e478904fd96659468f231bbec57a55e336e83",
+      "role": "Actual frozen native-cell renderer; requires Pillow, renders external PNGs only",
+      "copied_again": false
+    },
+    {
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\discovery\\console\\main_windows.go",
+      "prior_bundle_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\sources\\repository-dependencies\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\discovery\\console\\main_windows.go",
+      "SHA256": "aa0f00677d0330dde993a9006e78ea1109aace3fda863ed6ad9ebf9ff6c8391d",
+      "role": "Existing exact native-console source, matches original helper source SHA; register only",
+      "copied_again": false
+    },
+    {
+      "original_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\events\\main.go",
+      "prior_bundle_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-source-only-bundle-a82-01\\sources\\repository-dependencies\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\events\\main.go",
+      "SHA256": "384b934071d956dd5caac5d7ac8e44d7de13954df0d4dd12dc8555151e28ce32",
+      "role": "Existing versioned full native event replay exporter; register only, no Go copy",
+      "copied_again": false
+    },
+    {
+      "original_path": "C:\\Users\\V\\go\\pkg\\mod\\github.com\\gopacket\\gopacket@v1.3.1\\layers\\ospf.go",
+      "SHA256": "0826cd79d42667dce99c621da84d432345eefd484314d4f3dae130cfe934d2a5",
+      "role": "Immutable legacy source model dependency,version1.3.1",
+      "copied_again": false
+    }
+  ],
+  "proof_bindings": {
+    "inputs": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\inputs01\\inputs.json",
+      "SHA256": "d7f1ce273e976e2a37193cdf3c27dd50bb6d95a3717c62f96f473af105e13aa4",
+      "scope": "Original37 input inventory, not copied",
+      "copied": false
+    },
+    "census": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\scan01\\summary.json",
+      "SHA256": "78bb8a45668758d38f31e9c3a77a0a3ed15a9cbb23f9065328553e59d167fb2b",
+      "scope": "Original383936 records;807 source-complete OSPFv3 observations",
+      "copied": false
+    },
+    "WS": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\wireshark01\\summary.json",
+      "SHA256": "3783c568cc131493b3b6afea2ab76e8d8ac24e68ac98e62ce803c735843aaaae",
+      "scope": "Fresh37 closed TShark reference runs",
+      "copied": false
+    },
+    "fieldsWS": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\reference-field-audit01\\summary.json",
+      "SHA256": "795071791d702ccedbe9ad48dfbcd0302675019e9412cd0fe6ac33f114d2019e",
+      "scope": "28344 named source/reference field checks;11 literal semantic presentation notes retained",
+      "copied": false
+    },
+    "fragments": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\fragments01\\summary.json",
+      "SHA256": "ad5acdb0b6fd17574e0b77fe81c2636d8badfab3532426d6f8840d388fd83b95",
+      "scope": "136 IPv6 fragments,68 reconstructed groups;no added OSPF source",
+      "copied": false
+    },
+    "canonical": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-independent-source37-a82-01\\counts-and-canonical01\\summary.json",
+      "SHA256": "b13ac164680fb56aedc80ecb32d7da27ae312a4d080c316591e3f7a75830e819",
+      "scope": "Counts/RFC applicability and immutable a82 canonical source review",
+      "copied": false
+    },
+    "legacy": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-legacy-errors-source-a82-01\\actual01\\summary.json",
+      "SHA256": "2da5bf2fcee195f10e294afbcecfdd2298420186d2ca5e30f2b30113266ee14e",
+      "scope": "Pinned gopacket1.3.1 access model and old a82 CLI43 failures",
+      "copied": false
+    },
+    "contract01": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-contract36.json",
+      "SHA256": "6d7e5d649ecdd224eea1d081692a6a721d38471488494b3aac39adec40d6af4e",
+      "scope": "Original pure naming/type contract;historical incorrect dedicated exact_value assumption",
+      "copied": false
+    },
+    "contract02": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-contract36-v02.json",
+      "SHA256": "ae0359a175fdf9fe8350f37284a1398ca85904fce75b5153c08aec9f9c601a7d",
+      "scope": "Corrected public Bits>53 exact_value contract;no packet values",
+      "copied": false
+    },
+    "field01": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\frozen01\\plan.json",
+      "SHA256": "e88420197a8d6c9e403c56c31d129608604cfa481136e6fdd2acbc9c98783e5b",
+      "scope": "Historical field-only source plan,external only",
+      "copied": false
+    },
+    "field02": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\frozen02\\plan.json",
+      "SHA256": "0f7caa92c06cf6971fe13cae804810b6cab4bbda38235d1f7cd78dd7a3326036",
+      "scope": "Current807 exact source fields/session and typed occurrence plan,external only",
+      "copied": false
+    },
+    "fieldCorrection": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\bridge02.json",
+      "SHA256": "cfd1afd01eb9c40f91362468466849a32f8c353966e743880155bbb0f9dd7157",
+      "scope": "Contract correction only;807 fields/session trees literal,13846 dedicated exact_value removals",
+      "copied": false
+    },
+    "fieldControl01": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-01\\validator-selftest01\\summary.json",
+      "SHA256": "b7bec1310c8ff356225f54970444453c6fad9bfb73b85ccf75864df3a68a63c8",
+      "scope": "Historical controller controls,not production pass",
+      "copied": false
+    },
+    "fieldControl02": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-field-plan-before-native-02\\validator-selftest02\\summary.json",
+      "SHA256": "169e9ffc4183aa94ca0e60a2da909345cc890c7269b80f41e860f6be865bf457",
+      "scope": "15 current verifier controls;reject fabricated32bit exact_value",
+      "copied": false
+    },
+    "nativePlan": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-whole-plan-before36-02\\plan.json",
+      "SHA256": "cdd52b2aa22d1a1d67b363cbf605932a123b5ccc911706ca47c0a631d4ee1e01",
+      "scope": "Source-frozen full native plan with explicit43 DecodeErrors source delta",
+      "copied": false
+    },
+    "native": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native37-whole-636-01\\summary.json",
+      "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+      "scope": "Actual636 closed native37 full objects,307262 events+2 flows",
+      "copied": false
+    },
+    "ledger": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-native-ledger-closure36-01.json",
+      "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+      "scope": "74 explicit ID ledgers reconstructed from37 hash-bound exports",
+      "copied": false
+    },
+    "CLI01": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-01\\plan.json",
+      "SHA256": "2c2a6434c79c9266a6892e3a4a249b84fa21b3178748ddcdabdf08eee22b3614",
+      "scope": "Historical source plan before verifier-only Windows case-key correction",
+      "copied": false
+    },
+    "CLI02": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\plan.json",
+      "SHA256": "db59536b0b55a0d6f2f76676031f1b8459eee09d19c2dc866fe6a1567710f804",
+      "scope": "Current37 whole-row source plan;no candidate values used",
+      "copied": false
+    },
+    "CLICorrection": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\source-expectation-bridge01-to02.json",
+      "SHA256": "f306c0f89737e6991caf10d14ed9290ca856863ed7ab8aa07ff1561174f2bab6",
+      "scope": "807 whole source rows,37cases and old ID bindings remain byte-literal",
+      "copied": false
+    },
+    "CLIControl": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI-whole-plan-before36-02\\validator-selftest02\\summary.json",
+      "SHA256": "6cb3520768632ed1fdf3fd13a897a601533e54f8c56c94a90c4a3219c4aa1437",
+      "scope": "16 auditor controls plus narrow numeric-collision control",
+      "copied": false
+    },
+    "CLI": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-CLI37-whole-636-01\\summary.json",
+      "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+      "scope": "Actual636 full384518 rows;807 source-built changes;known ID references only",
+      "copied": false
+    },
+    "WinPlan": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-OSPFv3-source-plan-before36-01\\plan.json",
+      "SHA256": "5b87ce29fbd8befebc90b867073fbce4bc2e24ab73692fff3ec4aabca5a40b02",
+      "scope": "Source-frozen636 Windows byte/highlight plan;case not copied",
+      "copied": false
+    },
+    "Win": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-OSPFv3-636-default01\\proof.json",
+      "SHA256": "e2013402e53275abc3c9c98111132dcf688c1e88af5ddfff36bb0dec9fc5d8f4",
+      "scope": "Actual636 automatic default-budget Windows proof;old visual_review_pending remains untouched",
+      "copied": false
+    },
+    "full36": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-all-five-full36\\receipt.json",
+      "SHA256": "348a8f56bc1f7cc0beb0b6529c418c9a760ea4c65d058410cba271cfd11de663",
+      "scope": "Historical285554pass24skip3fail,not relabeled as full pass",
+      "copied": false
+    },
+    "target657": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPFv3-observer36-06\\receipt.json",
+      "SHA256": "91c6490a02443014b0f2e0723349668cf352b59eb35c9541c67c6de1943b0d40",
+      "scope": "Later targeted657pass;separate scope,not a full-suite rerun",
+      "copied": false
+    },
+    "MLD": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\manifest01.json",
+      "SHA256": "20ec65922245cc92a33c9862d37f04fbe0a77063702857cbd54a1c9fd8905e3a",
+      "scope": "Independent source/old-a82 comparison,not a new native run",
+      "copied": false
+    },
+    "MLDfields": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\field-audit01\\summary.json",
+      "SHA256": "83be4fe75d8bb4629f048bb5c4168e72162b77cbe8abc954ec2e8d10747d2519",
+      "scope": "7340 source/private/typed/PDML checks,0differences",
+      "copied": false
+    },
+    "MLDadvanced": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\advanced-source01\\summary.json",
+      "SHA256": "b487bb0acc4d4f1f7362cf6dc820dfcb934d2bf26c96b5500d91f568a22d29ea",
+      "scope": "5 existing inputs/7 observations,69 source/PDML checks,not new production execution",
+      "copied": false
+    },
+    "MLDenvelope": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\independent-envelope-source02\\summary.json",
+      "SHA256": "5a1b798f7dacbb070d1af2403cf09bb431ca05150a4fb481e953af606ddbbe90",
+      "scope": "220 independent source checksum/envelope observations,not native authentication",
+      "copied": false
+    },
+    "MLDfailure": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\MLD-independent-source-recheck36-01\\source01\\failure.json",
+      "SHA256": "6f9aaf51dde72ba1c9815d2b484e64afc016b0436b300adfeab0644c3b99d8fe",
+      "scope": "Preserved initial display-filter controller failure;not parser failure",
+      "copied": false
+    },
+    "CIconnector": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPF-MLD-source-bundle-prep36-01\\CI-connector636-readonly01.json",
+      "SHA256": "baccce10abc301ce8bf00d43f5856ae76147cc3a9694c1d8b5fd05e0d24583fb",
+      "scope": "Read-only connector statuses;PR automatic traffic skip retained",
+      "copied": false
+    },
+    "CIexplicit": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\OSPF-MLD-source-bundle-prep36-01\\CI-explicit-traffic636-readonly01.json",
+      "SHA256": "9a3344d68fc967a2a6e0390c6cf5f72d6d653444f18535e88ece501e73df0941",
+      "scope": "Explicit workflow_dispatch success with head_sha636 verified",
+      "copied": false
+    }
+  },
+  "duplicate_new_source_content_groups": [
+    {
+      "SHA256": "e469da4d18ad142ee46b5c9dfde25825373a16ebc6273a2c4e2a688a5341d5cd",
+      "paths": [
+        "sources/phase-source/OSPFv3-native-whole-plan-before36-02/frozen/ospfv3_native_expected36.py",
+        "sources/phase-source/OSPFv3-CLI-whole-plan-before36-02/frozen/native_source_schema.py"
+      ]
+    }
+  ],
+  "external_sensitive_original_frame_count_for_scan": 357,
+  "counts_report_SHA256": "d9163d77edeb9c6fe0a9da98051a1e10c24a5c2d2fca13c9369083388f8bc79f",
+  "only_added_metadata_files": [
+    "source-manifest.json",
+    "counts-report.json"
+  ],
+  "allowed_source_extensions": [
+    ".py",
+    ".ps1"
+  ],
+  "excluded": [
+    "pcap",
+    "keylog",
+    "complete cases",
+    "complete plans",
+    "complete expectations",
+    "exports",
+    "PDML",
+    "images",
+    "executables",
+    "logs",
+    "Go snapshots"
+  ],
+  "all_copied_source_bytes_literal": true,
+  "payload_sensitive_output_is_counts_and_hashes_only": true
+}
