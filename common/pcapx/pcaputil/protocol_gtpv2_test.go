@@ -166,3 +166,44 @@ func TestGTPv2AutomaticFallbackPreservesAnExistingIKEEnvelope(t *testing.T) {
 	binary.BigEndian.PutUint16(reserved[2:], 8)
 	require.False(t, a.decodeGTPv2Datagram(&ProtocolEvent{Transport: "udp"}, reserved, 40000, 2123, ""), "a named reserved code point is not a selected message type")
 }
+
+func TestGTPv2NativeKnownIEPrefixesExtensionsAndInvalidValues(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		ie    []byte
+		admit bool
+		key   string
+		want  uint64
+	}{
+		{"extendable-ebi", []byte{73, 0, 2, 0, 0xa5, 0xee}, true, "gtpv2.ebi", 5},
+		{"extendable-fteid", []byte{87, 0, 10, 0, 0x80, 1, 2, 3, 4, 192, 0, 2, 9, 0xee}, true, "gtpv2.f_teid.teid", 0x01020304},
+		{"empty-recovery", []byte{3, 0, 0, 0}, false, "", 0},
+		{"invalid-cause-length", []byte{2, 0, 3, 0, 16, 0, 0xee}, false, "gtpv2.cause", 16},
+		{"fteid-no-address", []byte{87, 0, 5, 0, 0, 1, 2, 3, 4}, false, "gtpv2.f_teid.teid", 0x01020304},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			w := append(bytes.Clone(gtpv2NativeWire(1, 7)[:12]), tc.ie...)
+			binary.BigEndian.PutUint16(w[2:], uint16(len(w)-4))
+			frame := espNATTFrame(t, w, false, 40000, 2123)
+			automatic, _ := espNATTReplay(t, [][]byte{frame})
+			admitted := false
+			for _, e := range automatic {
+				admitted = admitted || e.Protocol == "gtpv2"
+			}
+			require.Equal(t, tc.admit, admitted)
+			// Private field evidence is sealed by the actual publication path.
+			// A call to the low-level decoder alone is not a published event.
+			explicit, _ := espNATTReplay(t, [][]byte{frame}, WithProtocolDecodeAs("udp", 2123, "gtpv2"))
+			require.Len(t, explicit, 1)
+			selected := explicit[0]
+			require.Equal(t, "gtpv2", selected.Protocol)
+			require.Equal(t, tc.admit, selected.Status == "decoded", selected.Error)
+			if tc.key != "" {
+				require.Equal(t, []any{tc.want}, selected.DisplayFields()[tc.key])
+			}
+			if !tc.admit {
+				require.NotEmpty(t, selected.Error)
+			}
+		})
+	}
+}

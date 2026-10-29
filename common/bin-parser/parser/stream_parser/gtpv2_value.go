@@ -210,14 +210,23 @@ func gtpv2IEs(r *controlReader, budget *int, depth int) []map[string]any {
 
 func gtpv2IEValue(r *controlReader, typ uint64, n int) {
 	switch {
-	case typ == 3 && n == 1:
+	case typ == 3:
 		r.num("Recovery Counter", 1, false)
-	case typ == 73 && n == 1:
+		if r.err == nil && n > 1 {
+			// Table8.1 calls Recovery variable-length while 8.5 specifies a
+			// one-octet counter. Do not invent semantics for the remaining bytes.
+			r.rest("Unselected Value Tail")
+			r.err = fmt.Errorf("%w: Recovery counter observed; additional variable-length octets unselected", ErrObservedWireContext)
+		}
+	case typ == 73:
 		v := r.num("Bearer ID Octet", 1, false)
 		if r.err == nil {
 			r.info["EPS Bearer ID"], r.info["Ignored Value Spare"] = v&15, v>>4
+			if r.at < len(r.w) {
+				r.rest("Ignored Extension Bytes")
+			}
 		}
-	case typ == 2 && (n == 2 || n == 6):
+	case typ == 2:
 		r.num("Cause", 1, false)
 		r.num("Cause Flags", 1, false)
 		if n == 6 {
@@ -228,7 +237,13 @@ func gtpv2IEValue(r *controlReader, typ uint64, n int) {
 				r.info["Offending IE Instance"] = v & 15
 			}
 		}
-	case typ == 87 && n >= 5:
+		if n != 2 && n != 6 {
+			if r.err == nil && r.at < len(r.w) {
+				r.rest("Unselected Value Tail")
+			}
+			r.err = gtpv2Format(r.err, "Cause value length must be two or six")
+		}
+	case typ == 87:
 		flags := r.num("F-TEID Flags", 1, false)
 		if r.err == nil {
 			r.info["Interface Type"] = flags & 63
@@ -243,8 +258,16 @@ func gtpv2IEValue(r *controlReader, typ uint64, n int) {
 			expected += 16
 			routingAddress(r, "IPv6 Address", 16)
 		}
-		if n != expected {
-			r.err = gtpv2Format(r.err, "F-TEID address flags and value length disagree")
+		if _, present := r.info["F-TEID Flags"]; present && flags&0xc0 == 0 {
+			r.err = gtpv2Format(r.err, "F-TEID must indicate IPv4, IPv6 or both")
+		}
+		if n < expected {
+			r.err = gtpv2Format(r.err, "F-TEID address flags require more value octets")
+		}
+		if r.err == nil && r.at < len(r.w) {
+			// TS29.274 7.7.7 and Table8.1: receive-compatible extension
+			// octets do not invalidate the observed fixed address prefix.
+			r.rest("Ignored Extension Bytes")
 		}
 	default:
 		r.rest("Opaque Value")
