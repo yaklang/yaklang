@@ -1,0 +1,239 @@
+{
+  "scope": "Closed7e022 recovery/UI work with separate5c608 Fletcher fix; aggregate provenance, not core/TOP30 completeness",
+  "recovery_source": "7e0220ccfe53268077444318295e8aa6cda900d7",
+  "Fletcher_source": "5c608d4a642731a665feab7acbcd1feb8439461b",
+  "fresh": {
+    "actual": {
+      "external_relative_name": "fresh-TLS-QUIC-7e022-actual40-01/summary.json",
+      "SHA256": "8d11953b41dc234d2526b8357eccb82cfc0c8e7340b54465af58d9d822e2b1c4",
+      "copied": false
+    },
+    "SDK_core": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/SDK-7e022-source40-audit01/summary.json",
+      "SHA256": "b535facd376604f27e4cbb71b288a512192eb2ef34f7e2d327ac85ef02445831",
+      "copied": false
+    },
+    "CLI": {
+      "external_relative_name": "fresh-CLI-source40-audit02/summary.json",
+      "SHA256": "7499bf0cbf9cc99310e4e4339a9c8eef6dc21b61980edd7df59232f384c6132c",
+      "copied": false
+    },
+    "physical_rows": 2245,
+    "PDUs": 2220,
+    "private_field_occurrences": 41700,
+    "label_differences": 0,
+    "whole_objects": {
+      "external_relative_name": "HTTP3-prefix-whole-7e022-40-02/summary.json",
+      "SHA256": "b5e9b03f785b21cfa820cc55c07a6d337c7c6c79a51305ca20b83df2605acf8e",
+      "copied": false
+    },
+    "source_bound_whole_event_corrections": 2,
+    "unplanned_differences": 0,
+    "ID_mapping": false,
+    "boundary": "Authenticated h3 connection plus client bidi stream role; missing prefix does not prove HTTP request, selected extension or decoded HEADERS/DATA. No request/transaction invented."
+  },
+  "QPACK": {
+    "independent_source": {
+      "external_relative_name": "HTTP3-QPACK-resumed-source-plan40-02/source.json",
+      "SHA256": "5494a409b210d949c4d008fb579861a6cb989f01168d5478ee44e97de9b68ae2",
+      "copied": false
+    },
+    "original_red_test": {
+      "external_relative_name": "HTTP3-QPACK-red40-01/receipt.json",
+      "SHA256": "95ceb7fb381823d3042e2112df2debaa8872bcf038277f2c16a007f225494c86",
+      "copied": false
+    },
+    "method": "Newly decoded resumed header method becomes one current-PDU field occurrence; original wire block ownership remains distinct from encoder dependency. No cached method on later duplicates.",
+    "scope": "Independent pylsqpack plus actual parser reassembly tests; not newly captured dynamic-QPACK live traffic"
+  },
+  "Windows": {
+    "proof": {
+      "external_relative_name": "windows-HTTP3-prefix-7e022-default40-01/proof.json",
+      "SHA256": "cea51609ba94b45a6d61f5389070e7b128a2286ec474db692df0625533012319",
+      "copied": false
+    },
+    "root_review": {
+      "external_relative_name": "Windows-HTTP3-prefix-root-review40-01.json",
+      "SHA256": "cc77d604f6785127ad1c654ed97365d05fe19f8912d2463f2d6835f3e7837d4b",
+      "copied": false
+    },
+    "frame": 1011,
+    "PDU": 1021,
+    "default_packet_cache": 20000,
+    "default_history_mib": 64,
+    "source_visible_prefixes_verified": true,
+    "DCID_PDU_range": [
+      1,
+      9
+    ],
+    "DCID_physical_range": [
+      33,
+      41
+    ],
+    "full_source_visible_claim": false,
+    "root_personally_viewed_native_cells": true,
+    "Terminal_pixel_screenshot": false,
+    "original_visual_review_pending_flag_not_rewritten": true
+  },
+  "tests": {
+    "original_full": {
+      "external_relative_name": "HTTP3-prefix-QPACK-all-five40-01/receipt.json",
+      "SHA256": "9bbde266a3143edf4b16a671210e429f211b958bbca7e117f4424493a8f366ed",
+      "copied": false
+    },
+    "original_full_pass": 285571,
+    "original_full_skip": 24,
+    "original_full_fail": 3,
+    "original_full_failure": "One prior fuzz contract and its two seeds rejected even a freshly authenticated h3 connection role; not relabelled as a pass",
+    "corrected_focused": {
+      "external_relative_name": "HTTP3-prefix-QPACK-focused40-03/receipt.json",
+      "SHA256": "a79922970065a2d325c556e6d3e1395486a84d04228c9f1157ac59404bf2eae4",
+      "copied": false
+    },
+    "corrected_focused_pass": 90,
+    "Fletcher_focused": {
+      "external_relative_name": "OSPF-Fletcher-zero-focused41-02/receipt.json",
+      "SHA256": "c86c94a4437ce8ca94d3a7d04bd247e3b22e9f413c52e6fcaf1135088e7b386a",
+      "copied": false
+    },
+    "Fletcher_focused_pass": 113,
+    "fuzz": {
+      "external_relative_name": "HTTP3-prefix-fuzz-7e022-40-01/summary.json",
+      "SHA256": "b8e56247100d7c43daf67f92e1c6e6a071a70644f9c0f80833c24aff21d3028c",
+      "copied": false
+    },
+    "fuzz_executions": 136113,
+    "fuzz_seconds": 60,
+    "fuzz_failures": 0
+  },
+  "public7e": {
+    "inputs": 37,
+    "native_events": 307262,
+    "whole_flow_files": 2,
+    "CLI_rows": 384518,
+    "differences": 0,
+    "ID_mapping": false,
+    "native": {
+      "external_relative_name": "HTTP3-native-literal-d677-7e022-40-01/summary.json",
+      "SHA256": "637fbf6cf1e058267565708895554073863564938069a21deba2290d96c6fb7f",
+      "copied": false
+    },
+    "CLI": {
+      "external_relative_name": "HTTP3-CLI-literal-d677-7e022-40-01/summary.json",
+      "SHA256": "956d6409393edbfdf8312b7aba182ff3f8d67fd7a9d35099dc47b84f89228f84",
+      "copied": false
+    }
+  },
+  "protected7e": {
+    "actual": {
+      "external_relative_name": "protected-TLS-QUIC-7e022-40-01/summary.json",
+      "SHA256": "913fc3bdba47535ed2af507348084799cf91662b1300c81156ce6028d7ab6de0",
+      "copied": false
+    },
+    "source_only_slots": {
+      "external_relative_name": "protected-QUIC-prefix-independent-source40-01/summary.json",
+      "SHA256": "be9f00e95819f280c887c6ab98f9c16f5f274f503fbc77b392316665db93a8b6",
+      "copied": false
+    },
+    "source_bound_whole_objects": {
+      "external_relative_name": "protected-QUIC-prefix-source-bound-whole40-02/summary.json",
+      "SHA256": "3aea8e360a2e3c5b344474b6986d7632e7ba6e470fcfd2c18d7209ea4ab3d100",
+      "copied": false
+    },
+    "QUIC_events": 7693,
+    "source_bound_identity_corrections": 47,
+    "other_literal_events": 7646,
+    "counterexamples_rejected": 10,
+    "unplanned_differences": 0,
+    "TLS_events": 360,
+    "TLS_literal": {
+      "external_relative_name": "protected-TLS-loss-literal-7e022-40-01/summary.json",
+      "SHA256": "1ab7557dc76f507ddfee99ffa0a17321df04fc87644fc295d7825d89dc89219a",
+      "copied": false
+    },
+    "source": "Original real traffic and explicitly source-exact offline omission/corruption controls; not six newly captured live faults",
+    "dependencies": {
+      "external_relative_name": "protected-QUIC-prefix-source-only-closure40-01/source-only-import-manifest.json",
+      "SHA256": "de8ffb436c5155f0caa2b5c433196abaea5d6dbd24cb0c5dd302cd5d48ee2c92",
+      "copied": false
+    }
+  },
+  "Fletcher": {
+    "independent_source": {
+      "external_relative_name": "OSPF-Fletcher-zero-field-source39-01/summary.json",
+      "SHA256": "e27093563920e23e67dc0ccf223ab0cbcb775a40ba21feacaa657577c3c66403",
+      "copied": false
+    },
+    "before": {
+      "external_relative_name": "OSPF-Fletcher-zero-7e022-before40-02/producer.json",
+      "SHA256": "f7d670bc3b92ec3993a78c04481d9c26b79285ae348ecdbcd6d71702a8627ac5",
+      "copied": false
+    },
+    "after": {
+      "external_relative_name": "OSPF-Fletcher-zero-5c608-after41-01/producer.json",
+      "SHA256": "e7de1e1e1b8e29ea02f4c0824f5fe24bd28d0d996f12c139d3041b673e742442",
+      "copied": false
+    },
+    "controls": 2,
+    "synthetic_not_live": true,
+    "all_existing_full_source_LSAs": 339,
+    "all_existing_full_LSAs_nonzero_and_zero_residues": true,
+    "correction": "Reject checksum field0000 even with C0=C1=0; retain validffff. Both parent packet checksums remain independently valid.",
+    "fuzz": {
+      "external_relative_name": "OSPF-Fletcher-fuzz-5c608-41-01/summary.json",
+      "SHA256": "fc3df07c548ddd6cb7711557f505197cdeb9da195610d1dff70c05c27a4cf927",
+      "copied": false
+    },
+    "fuzz_executions": 145457,
+    "fuzz_seconds": 60,
+    "fuzz_failures": 0
+  },
+  "CI7e": {
+    "Essential": 40868209040,
+    "explicit_complete_SHA_traffic": 40868252006,
+    "Diff": 40868209044,
+    "case_paths": 40868209058,
+    "all_success": true,
+    "draft_auto_traffic": "40868209077 skipped, not a pass",
+    "claim": "These CI receipts certify7e022, not a later documentation head or subsequent Fletcher commit"
+  },
+  "archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/http3-recovery40",
+    "sources": 16,
+    "manifest_SHA256": "2ad834b9d6e5d9340465b1a42abb430cdb99b7542eabaa4dcb6592177e339082"
+  },
+  "remaining": "OSPFv2 native/canonical/typed presentation integration remains separate from its556-frame source/reference audit. Other TOP30 boundaries remain open.",
+  "normalization": false,
+  "exclusions": "All complete plans/expected objects, captures, keys, actual outputs, logs, programs and screenshots stay external",
+  "public5c": {
+    "inputs": 37,
+    "native_events": 307262,
+    "whole_flow_files": 2,
+    "CLI_rows": 384518,
+    "differences": 0,
+    "ID_mapping": false,
+    "native": {
+      "external_relative_name": "OSPF-Fletcher-native-literal-7e022-5c608-41-01/summary.json",
+      "SHA256": "2d5c3f3fc1a728869a36d504119124a02353951aa474cc3c0d540478ba96158c",
+      "copied": false
+    },
+    "CLI": {
+      "external_relative_name": "OSPF-Fletcher-CLI-literal-7e022-5c608-41-01/summary.json",
+      "SHA256": "0196b0fed841a72366ee78d0d93d9e44ac94099a633f6864913038abc11746e5",
+      "copied": false
+    }
+  },
+  "disk_health": {
+    "proof": {
+      "external_relative_name": "disk-health-closed-testlogs-noop40-01.json",
+      "SHA256": "963ad796e2b8440094e512798b1a6836dbeffea2c02aaf5bf77443f551cccacc",
+      "copied": false
+    },
+    "operation": "No operation:141 closed logs already NTFS compressed",
+    "free_GiB": 37.581,
+    "deleted": 0,
+    "moved": 0,
+    "compressed": 0,
+    "log_content_SHA_remeasured": false
+  }
+}

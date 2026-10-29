@@ -1,0 +1,108 @@
+{
+  "scope": "Unmodified actual audit source only; historical failed constructors retained as source, not relabelled as passes",
+  "sources": 16,
+  "source_bytes": 90319,
+  "immutable_sources": [
+    {
+      "path": "run_fresh_TLS_QUIC40.py",
+      "original_external_relative_name": "run_fresh_TLS_QUIC40.py",
+      "bytes": 3207,
+      "SHA256": "5dcf8528a2c0f1767427b114e4edaf4a0dd860dd691905cc45af142c0b53fc77"
+    },
+    {
+      "path": "verify_fresh_SDK40.py",
+      "original_external_relative_name": "verify_fresh_SDK40.py",
+      "bytes": 3290,
+      "SHA256": "d3c9af566d7d14f04b4b7d4235ae6e3b0a54b1369f82513938ef72b654b21b72"
+    },
+    {
+      "path": "prepare_fresh_CLI40.py",
+      "original_external_relative_name": "prepare_fresh_CLI40.py",
+      "bytes": 1762,
+      "SHA256": "b13ee9540f74dfc6ab6477d98e14b9ba2c5bdc7f45cecd30329b621df5570b47"
+    },
+    {
+      "path": "audit_fresh_CLI40_02.py",
+      "original_external_relative_name": "audit_fresh_CLI40_02.py",
+      "bytes": 9021,
+      "SHA256": "f14ec4197aea54f91cf5ec377f2d73bcde00bc8e93b661e5037c1c10a2fd59fe"
+    },
+    {
+      "path": "verify_prefix_whole40.py",
+      "original_external_relative_name": "verify_prefix_whole40.py",
+      "bytes": 3210,
+      "SHA256": "d8cf28ccd61e4e6095b1f3fc3cd81b219656ab1c01a2d93100e065841c69b5f6"
+    },
+    {
+      "path": "verify_prefix_whole40_02.py",
+      "original_external_relative_name": "verify_prefix_whole40_02.py",
+      "bytes": 3453,
+      "SHA256": "72acbd5a0f80441c66af6f6a0c94bdf7bec9cfd594a88857e109790c0f5e7444"
+    },
+    {
+      "path": "prepare_HTTP3_prefix_UI40.py",
+      "original_external_relative_name": "prepare_HTTP3_prefix_UI40.py",
+      "bytes": 2858,
+      "SHA256": "d62632e06a898ba84b5fb0210750a6a844b62376f5e84d03aa439fb79f5401b5"
+    },
+    {
+      "path": "run_Windows_HTTP3_prefix40.py",
+      "original_external_relative_name": "run_Windows_HTTP3_prefix40.py",
+      "bytes": 5175,
+      "SHA256": "e625e2fcedc928176075898afa44ee9605bbfba208a8fa797969d0bfdabd0749"
+    },
+    {
+      "path": "qpack_resumed_source40.py",
+      "original_external_relative_name": "qpack_resumed_source40.py",
+      "bytes": 1867,
+      "SHA256": "c403469dd3f7411374b08bbbee4487c1057e3747d6568cb14d406cf938325f81"
+    },
+    {
+      "path": "run_fuzz_HTTP3_prefix40.py",
+      "original_external_relative_name": "run_fuzz_HTTP3_prefix40.py",
+      "bytes": 1965,
+      "SHA256": "ac958837139e5cf362b4fb7cc83202e77be4907a094643fc57fd97c08fe49ede"
+    },
+    {
+      "path": "run_OSPF_Fletcher_pair40.py",
+      "original_external_relative_name": "run_OSPF_Fletcher_pair40.py",
+      "bytes": 2116,
+      "SHA256": "753c26e2d04377c04d40038928f67a38b3dc1acc3b0ac4f495d7de7791b87bc3"
+    },
+    {
+      "path": "build_OSPF_Fletcher_zero_field39.py",
+      "original_external_relative_name": "build_OSPF_Fletcher_zero_field39.py",
+      "bytes": 6364,
+      "SHA256": "fa119ba2bf58b76ed1e80b8c988e9f567947a0f6399fbc7c32835d0545f43f8f"
+    },
+    {
+      "path": "audit_protected_QUIC_prefix_source40.py",
+      "original_external_relative_name": "audit_protected_QUIC_prefix_source40.py",
+      "bytes": 12747,
+      "SHA256": "b398ccb9c22afb12c5c210eca28d9785c53aab2dad33ccaf56d876065cf3a5b0"
+    },
+    {
+      "path": "verify_protected_QUIC_prefix_identity40.py",
+      "original_external_relative_name": "verify_protected_QUIC_prefix_identity40.py",
+      "bytes": 12911,
+      "SHA256": "b0384caaf7d66770ee74527d24ab57da2d81a9a24eefb2cd3539f2465871e58b"
+    },
+    {
+      "path": "verify_protected_QUIC_prefix_identity40_v02.py",
+      "original_external_relative_name": "verify_protected_QUIC_prefix_identity40_v02.py",
+      "bytes": 13484,
+      "SHA256": "22b8fa5360524bb87d06f4078c8d5dd7e6e5eff655467819a189c8a7e42a3e40"
+    },
+    {
+      "path": "close_protected_QUIC_prefix_stage40.py",
+      "original_external_relative_name": "close_protected_QUIC_prefix_stage40.py",
+      "bytes": 6889,
+      "SHA256": "f78a15cf42801e7c04ac281217525654713918150f18f87f0935f558919c5443"
+    }
+  ],
+  "external_dependencies": "Original source39/40 grids, external captures/keys, build/runtime receipts and shared audit helpers must be supplied separately; not a self-contained suite",
+  "excluded": "No capture, key, complete case/plan/expected object, actual export, PDML, image, binary or log",
+  "controller_SHA256": "cf2bd747da248d3e106ae5a210af95eb4df9f2d7a907c354bb69cc52c2ab8ba4",
+  "protected_source_dependency_manifest_SHA256": "de8ffb436c5155f0caa2b5c433196abaea5d6dbd24cb0c5dd302cd5d48ee2c92",
+  "protected_source_dependency_manifest_external_relative_name": "protected-QUIC-prefix-source-only-closure40-01/source-only-import-manifest.json"
+}

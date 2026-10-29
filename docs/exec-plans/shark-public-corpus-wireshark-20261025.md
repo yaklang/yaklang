@@ -4828,3 +4828,22 @@ MLD复核纠正旧清单：10条不完整body全部来自17条IPv4/Protocol58异
 物理和私有字段桥接正确，但d677检查点仍有两条缺失流开头的h3标签退回QUIC；
 不将它们算作通过。完整源范围、参考遗漏及后续需要补测的QPACK字段投影见
 [新抓流量报告](shark-public-corpus-20261025/tls-quic-fresh-d677.md)。
+
+## HTTP/3 缺失开头、QPACK 恢复与 LSA 零校验值
+
+7e为已认证h3连接的客户端双向流保留身份，明确展示prefix missing与等待重组，
+不虚构请求头/事务，也不排除未观察到的扩展。QPACK解阻塞后新解出的method/status
+字段现在正确投影一次。新流量2245物理记录/2220 PDU/41700私有字段occurrence
+核验无标签差异；默认Windows实际页面和CID高亮正确，四个7e CI通过。
+
+4个QUIC保护输入的7693事件中，47个身份变化有独立Initial/Handshake AEAD、EE
+ALPN、CID及STREAM区间来源，其余7646字面保持；10个伪造反例全拒绝。2个TLS
+丢记录控制360事件保持。37输入307262原生事件/2flow、384518 CLI行分别在7e
+及后续5c重新执行并逐字面核验；不将语料保持等同于所有旧协议都正确。
+
+5c另修复LSA checksum字段0000但Fletcher残数为0仍误接受的问题，实际旧二进制
+接受的反例在新二进制为malformed，ffff对照仍decoded。父包checksum为true与
+LSA独立失败分别保留；113项检查、145457次OSPFv3 fuzz通过。HTTP/3粘性fuzz
+为136113次。旧本地完整回归的3个旧fuzz合同失败保留原结论，未改记为成功。
+详见[准确范围与证据](shark-public-corpus-20261025/recovery-http3-7e022.md)及
+[计数摘要](shark-public-corpus-20261025/recovery-http3-7e022-summary.json)。
