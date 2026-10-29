@@ -1,5 +1,5 @@
 {
-  "scope": "Historical evidence plus latest_checkpoint. Captures, keys, complete exports, programs, images and logs remain external. Not complete TOP30 or Wireshark parity.",
+  "scope": "Historical producer-bound evidence. Use current_phase_index for the newest scoped checkpoints; old checkpoint objects and producer names are preserved. Not complete TOP30 or Wireshark parity.",
   "native_source": "49b0a99102357d22ee6e6c935a2a3a8358503f7c",
   "CLI_source": "4c023fd47c2b940b509d08220a4576f525af33e6",
   "captures": [
@@ -672,6 +672,28 @@
           "SHA256": "3c865ba3c7d54267585ce4efdb7a457d5ba23a27ad54df82420105e13a7ef6c2"
         }
       ]
+    }
+  ],
+  "current_phase_index": [
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/compact-history-Windows24ca-summary.json",
+      "source": "24ca25d193994e8911c6fed7076bd4be1b8a69ac",
+      "scope": "Immutable historical compaction/Windows checkpoint; not a claim of protocol completeness or closure of overbudget identity filtering."
+    },
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/contributor-identity6b-summary.json",
+      "source": "6b704e2f55a44483e47754d40fd93725100d9666",
+      "scope": "Source-bound contributor identity survives payload eviction; no recovery of absent protocol fields and no blanket protocol completeness."
+    },
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/unavailable-detail5c-summary.json",
+      "source": "5c88aed7aa9ee8c7438aca30a6bfaa114fff85d9",
+      "scope": "Actual Windows identity filtering and unavailable-detail presentation, with source-bound physical bytes; not restored evicted protocol fields."
+    },
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/label-cohorts6b-summary.json",
+      "source": "6b704e2f55a44483e47754d40fd93725100d9666",
+      "scope": "Render literal TOP30 reference-label cohorts from a closed physical census.\n\nOne frame contributes exactly once. The Shark label distribution is preserved,\nwithout aliases, inferred protocol families or a protocol-correctness score.\n"
     }
   ]
 }

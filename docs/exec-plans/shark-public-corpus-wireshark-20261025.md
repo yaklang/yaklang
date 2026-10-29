@@ -4697,3 +4697,73 @@ datagram padding 只保留后一条详情时，首次查询只返回 `[2]` 却�
 
 本阶段详细来源见 [紧凑历史与 Windows 摘要](shark-public-corpus-20261025/compact-history-Windows24ca-summary.json)。
 1181的恢复摘要和更早的全局协议计数保持历史来源；后续证据不能反向覆盖它们。
+
+## 独立贡献者身份、缺失字段与 Windows 标题（2026-10-29）
+
+`6b704e2f55a44483e47754d40fd93725100d9666` 将真实回调的 PDU ID/arrival/原始
+PacketReference 保存在独立的有界索引。详情逐出与来源身份丢失分别处理，拒绝
+超大详情的早退分支也记录实际身份；手填 eventIDs、已逐出的占位消息及无编号引用
+不能制造可信 ID 字段。索引拥有自己的1..8MiB逻辑存储预算，计算基座、ring、链接
+和独立封装字符串；这不是进程堆上限。索引自身丢失后用单一帧号水位保守标记部分
+覆盖，旧的其它域可能因此未知，不能伪称没有字段。详情的长封装字符串也补上计费
+与独立复制。
+
+同一 public ID 的不同 arrival 不能借用最老 Details 的字段；一条无引用的旧详情
+也不能靠新包的同号关联串入错误字段。首次查询、迟到 TCP 贡献者、129个引用/
+PDU、精确域与物理域、输入及查询上限、元数据自身逐出、64位ID和稳定重绘均有
+回归。新 typed identity-only 证据始终是部分投影：已观察到的 ID 正向判断可确定，
+缺字段的否定/通用比较仍保持未知；它不恢复丢失的 token、TLS 或其它协议字段。
+
+真实1865帧/1880PDU重放中，frame1的两条实际回调是 PDU1 Initial 与 PDU2 padding。
+只保留后一条详情后，首次 retained window `[2]` 已正确报告 incomplete；独立
+来源索引仍有两个 ID。真实完整快照只用作参考，没有回填缺失的 token-length。
+typed union 的 `pdu.id==1` 是 true/complete/partial，`not(pdu.id==1)` 是
+false/complete/partial；`not quic.token_length` 和 `quic.token_length==0`
+则未知。全局1MiB预算实际逐出1835条、保留45条详情后，PDU299详情确已不存在，
+原frame294的 ID关联仍可查；exact/physical retained window 都正确报告不完整。
+
+该提交五包完整回归285419通过、24跳过，392项定向回归另列，不相加为新覆盖。
+新来源/覆盖 fuzz 完成9550次、29个新样本，60秒设置下日志从第6秒起没有新增完成
+计数，保留该事实，不将它描述成持续吞吐量。37组新执行的306455个完整原生事件、
+两份完整 flow 文件和384518行CLI逐字节保持。两组 QUIC恢复/控制共3931/3762条、
+TLS丢整记录控制360条完整对象也保持，比较实际 source/build/binary/input 收据，
+不重编号、不排序数组。[Essential](https://github.com/yaklang/yaklang/actions/runs/40813824057)、
+[显式流量](https://github.com/yaklang/yaklang/actions/runs/40813814367)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/40813824229) 和
+[大小写](https://github.com/yaklang/yaklang/actions/runs/40813824225) 全部成功。
+详见 [身份索引阶段摘要](shark-public-corpus-20261025/contributor-identity6b-summary.json)。
+
+随后 `5c88aed7aa9ee8c7438aca30a6bfaa114fff85d9` 修正实际1MiB页面发现的显示错误。
+worker 的 UDP fallback 不再覆盖父捕获已观察到的 HTTP/3 标题；缺失状态与协议名
+分开，标题明确 detail unavailable。ID0覆盖提示是上下文，不再画成 MESSAGE协议
+或 PDU0；相同缺失原因只显示一次。完整晚到 response 仍可前进到较具体协议，
+不会被早期 transport 标题降级；已失效占位中的旧认证/连接故障也不再发布。
+
+新版862项CLI通过、2跳过。实际 Windows 新运行保存全部输入前后摘要及小源码快照，
+7份console buffer核对已提交筛选、恰好一个frame294、标题HTTP/3、单次原因、缺失
+提示、缩放及CP936恢复。独立来源核验还检查每个视口的416字节物理前缀、1232字节
+完整来源摘要和五个故障变体；没有声称整个来源都出现在视口，也没有制造已逐出
+的明文来源。原先查询通过但标题/PDU0不正确的页面仍作为6b历史结果保留。
+
+CLI31再次真实执行37组、384518整行与CLI30字面一致；events/flows程序与bins30
+字节相同，原生实际执行仍注明6b生产者，没有冒称它们在5c重跑。该5c提交的
+[Essential](https://github.com/yaklang/yaklang/actions/runs/40816831362)、
+[显式流量](https://github.com/yaklang/yaklang/actions/runs/40816825679)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/40816831325) 和
+[大小写](https://github.com/yaklang/yaklang/actions/runs/40816831332) 全部成功。
+Windows证据见 [缺失详情显示摘要](shark-public-corpus-20261025/unavailable-detail5c-summary.json)。
+
+### 新 TOP30 逐帧分布及下一批缺口
+
+[原始标签分组表](shark-public-corpus-20261025/label-cohorts6b.md) 来自新隔离 TShark
+运行与6b的实际导出，379455个物理帧的编号、接口、原始/捕获长度和纳秒时间逐帧
+一致。每个参考标签分组直接列出同一批帧的 Shark 标签，不合并别名、不把名称差值
+当正确率。参考无显式keylog、Shark保留原参数，解密可见性继续明确区分。
+
+复核排除了 CoAP版本3、无效UDP声明长度、错误IP版本及未选择载体等假缺口。
+仍有7条完整 UDP4500 ESP 仅做未识别UDP，需补独立NAT-T原生头部观察，同时保持
+24条IKE和3条keepalive分类独立；[RFC3948](https://www.rfc-editor.org/rfc/rfc3948.html)
+的载体选择不能代替SA、密码算法、认证或解密。另22条OSPFv3的底层解码失败与前缀
+位数/字节步进错误吻合；全部417个v3包、182个完整LSA和128个前缀已有来源核验，
+但源码模型还不是修复后的Go实跑。这两个生产缺口、旧303/390调查和其它高级边界
+继续开放；核心协议与TOP30没有因此被宣布完备。
