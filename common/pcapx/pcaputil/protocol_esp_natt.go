@@ -14,7 +14,7 @@ import (
 // cannot establish an SA, algorithm, authenticated identity or replay result.
 func (a *binParser) decodeESPNATTDatagram(e *ProtocolEvent, wire []byte, src, dst uint16, explicit string) bool {
 	selected := explicit == "esp-natt"
-	if !selected && (explicit != "" || src != 4500 && dst != 4500) {
+	if src == 0 || dst == 0 || !selected && (explicit != "" || src != 4500 && dst != 4500) {
 		return false
 	}
 	// Match nat_t.yaml's selected ESP envelope, including one opaque word.

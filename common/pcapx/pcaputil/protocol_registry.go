@@ -60,7 +60,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"ntp", "udp", "RFC1059 v1 time header with reserved low bits and distinct distance/drift; v2-v4 modes1..5; service-hinted v2..4 mode6 control and bounded response fragments", "literal seconds/fraction without era inference; capture-domain/endpoints/version/sequence request ownership, local30-second capture-time lease, reorder/overlap/final-size checks and capture-lifetime reuse quarantine; system variable responses may report a selected peer ID; timestamps/status are observations, optional authenticator is never verified; time extensions and private mode7 remain unselected"},
 		{"ike", "udp", "IKEv1/v2 payload chain, NAT-T non-ESP marker", "exact length, payload boundaries; encrypted bodies opaque; no SA/authentication success inference"},
 		{"esp", "network", "explicit IP Next Header50 clear SPI/low sequence words and opaque remainder", "independent bounded header observations; capture prefixes stay incomplete; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
-		{"esp-natt", "udp", "RFC3948 UDP4500 or explicit DecodeAs; nonzero SPI, complete eight-byte ESP header and at least one opaque word", "validated UDP carrier; independent per-datagram observations, marked IKE and keepalives never inherit ESP; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
+		{"esp-natt", "udp", "RFC3948 UDP4500 or explicit DecodeAs with nonzero ports; nonzero SPI, complete eight-byte ESP header and at least one opaque word", "validated UDP carrier; automatic header fallback follows registered complete-message grammars; independent per-datagram observations, marked IKE and keepalives never inherit ESP; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
 		{"wireguard", "udp", "exact initiation/response/cookie/transport envelope", "observed endpoint/domain/receiver-index association; no crypto or peer identity verification"},
 		{"rip", "udp", "RIPv1/v2 request/response entries", "complete entries, metric checks and v2 clear password; no routing or authentication success"},
 		{"nbt-dg", "udp", "RFC1002 datagram/query/error", "encoded source/destination names; fragments remain explicit without reassembly"},
@@ -225,8 +225,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	if explicit == "" {
 		explicit = a.datagramDecodeAs[src]
 	}
-	if a.decodeESPNATTDatagram(e, w, src, dst, explicit) {
-		return true
+	if explicit == "esp-natt" {
+		return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
@@ -524,5 +524,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		return true
 	}
-	return false
+	// A source port is also a possible ephemeral/NAT allocation. Do not let
+	// the weak nonzero-SPI envelope swallow a complete DNS, IKE, or other
+	// registered grammar, even when either endpoint happens to use 4500.
+	return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
 }

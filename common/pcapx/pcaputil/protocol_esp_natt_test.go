@@ -206,3 +206,43 @@ func TestESPNATTFragmentLossReorderAndDuplicateDoNotCreateSA(t *testing.T) {
 		}
 	}
 }
+
+func TestESPNATTCompetingServiceGrammarBeforePortHint(t *testing.T) {
+	dns := dnsQuery(0x1234, "example.test", 1)[2:]
+	ike := make([]byte, 28)
+	ike[0], ike[7], ike[17], ike[18], ike[19] = 0xa1, 1, 32, 34, 8
+	binary.BigEndian.PutUint32(ike[24:], 28)
+	for _, v6 := range []bool{false, true} {
+		for _, tc := range []struct {
+			name, protocol string
+			src, dst       uint16
+			wire           []byte
+		}{
+			{"DNS-source4500", "dns", 4500, 53, dns},
+			{"DNS-destination4500", "dns", 53, 4500, dns},
+			{"IKE-source4500", "ike", 4500, 500, ike},
+		} {
+			t.Run(fmt.Sprintf("v6=%v/%s", v6, tc.name), func(t *testing.T) {
+				events, _ := espNATTReplay(t, [][]byte{espNATTFrame(t, tc.wire, v6, tc.src, tc.dst)})
+				require.Len(t, events, 1)
+				require.Equal(t, tc.protocol, events[0].Protocol)
+				require.Equal(t, "decoded", events[0].Status)
+				require.NotContains(t, events[0].DisplayFields(), "esp.spi")
+				// A caller's explicit ESP choice is distinct from the automatic
+				// weak service hint; it still provides only header observations.
+				events, _ = espNATTReplay(t, [][]byte{espNATTFrame(t, tc.wire, v6, tc.src, tc.dst)}, WithProtocolDecodeAs("udp", tc.dst, "esp-natt"))
+				require.Equal(t, "esp", events[0].Protocol)
+				require.Equal(t, "explicit-decode-as", events[0].Admission)
+			})
+		}
+		for _, ports := range [][2]uint16{{0, 4500}, {4500, 0}} {
+			t.Run(fmt.Sprintf("v6=%v/zero-port-%v", v6, ports), func(t *testing.T) {
+				wire := []byte{0xf4, 0x87, 0xbf, 0xcf, 0, 0, 0, 8, 1, 2, 3, 4}
+				events, _ := espNATTReplay(t, [][]byte{espNATTFrame(t, wire, v6, ports[0], ports[1])})
+				for _, e := range events {
+					require.NotEqual(t, "esp", e.Protocol, "the selected NAT-T profile requires nonzero IKE/translated ports")
+				}
+			})
+		}
+	}
+}
