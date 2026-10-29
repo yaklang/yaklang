@@ -254,16 +254,79 @@ func TestContextCompressionHandlerParsesSelection(t *testing.T) {
 }
 
 func TestContextCompressionExamplesSupportScatteredRanges(t *testing.T) {
-	examples := regexp.MustCompile(`(?m)^\{.*\}$`).FindAllString(compressContextDynamicText, -1)
-	require.Len(t, examples, 5)
-	var selections []string
-	for _, example := range examples {
-		var params aitool.InvokeParams
-		require.NoError(t, json.Unmarshal([]byte(example), &params))
-		require.Equal(t, aicommon.ContextCompressionAction, params["@action"])
-		selections = append(selections, params["retain_timeline"].(string))
+	for _, native := range []bool{false, true} {
+		t.Run(fmt.Sprintf("native=%v", native), func(t *testing.T) {
+			prompt, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
+				map[string]any{"FunctionCallMode": native})
+			require.NoError(t, err)
+			if native {
+				require.NotContains(t, prompt, "@action", "native compression must not teach the text action protocol")
+				require.Contains(t, prompt, "content")
+			}
+			examples := regexp.MustCompile(`(?m)^\{.*\}$`).FindAllString(prompt, -1)
+			require.Len(t, examples, 5)
+			var selections []string
+			for _, example := range examples {
+				var params aitool.InvokeParams
+				require.NoError(t, json.Unmarshal([]byte(example), &params))
+				if native {
+					require.NotContains(t, params, "@action")
+				} else {
+					require.Equal(t, aicommon.ContextCompressionAction, params["@action"])
+				}
+				selections = append(selections, params["retain_timeline"].(string))
+			}
+			require.Contains(t, selections, "3-8,20-26,41-45")
+			require.Contains(t, selections, "3-8,12,20-26,37,41-45")
+			require.Contains(t, selections, "")
+		})
 	}
-	require.Contains(t, selections, "3-8,20-26,41-45")
-	require.Contains(t, selections, "3-8,12,20-26,37,41-45")
-	require.Contains(t, selections, "")
+}
+
+// A provider may still write an internal compression action to content. It
+// remains diagnostic data even when validation rejects the missing native call.
+func TestContextCompressionNativeContentStaysInternal(t *testing.T) {
+	const content = `{"@action":"compress_context","summary":"internal memory"}`
+	for _, toolCall := range []bool{false, true} {
+		t.Run(fmt.Sprintf("toolCall=%v", toolCall), func(t *testing.T) {
+			loop := newCallAILoopTransactionTestLoop(t, true, func(_ *aicommon.AIRequest, wire *aispec.AIConfig) (*aicommon.AIResponse, error) {
+				resp := aicommon.NewAIResponse(nil)
+				resp.EmitOutputStream(strings.NewReader(content))
+				resp.EmitReasonStream(strings.NewReader(compressionReasoningMarker))
+				if toolCall {
+					wire.ToolCallCallback([]*aispec.ToolCall{{ID: "compression", Type: "function", Function: aispec.FuncReturn{
+						Name:      aicommon.ContextCompressionAction,
+						Arguments: `{"summary":"internal memory","retain_timeline":"","retire_skill_names":[],"retire_evidence_ids":[]}`,
+					}}})
+					wire.FinishReasonCallback("tool_calls", nil)
+				} else {
+					wire.FinishReasonCallback("stop", nil)
+				}
+				resp.Close()
+				return resp, nil
+			})
+			loop.actions.Set(aicommon.ContextCompressionAction, loopAction_CompressContext)
+			loop.promptMode = aicommon.LoopPromptModeCompressContext
+			capture := captureActivityStatus(loop)
+			calls, _, descriptor, err := loop.callAILoopTransaction(&sync.WaitGroup{}, "prompt", "nonce", nil,
+				loop.emitLoopGeneralOutput, loop.emitLoopFunctionCallOutput)
+			if toolCall {
+				require.NoError(t, err)
+				require.Len(t, calls, 1)
+			} else {
+				require.Error(t, err)
+				require.Empty(t, calls, "content must never execute as a native call")
+			}
+			var response map[string]any
+			require.NoError(t, json.Unmarshal([]byte(descriptor.Snapshot().ResponseJSON), &response))
+			require.Equal(t, content, response["content"], "retain the provider response for diagnostics")
+			capture.mu.Lock()
+			defer capture.mu.Unlock()
+			for _, event := range capture.events {
+				if event.IsStream {
+					require.Empty(t, event.StreamDelta, "internal compression output must not become chat content")
+				}
+			}
+		})
+	}
 }

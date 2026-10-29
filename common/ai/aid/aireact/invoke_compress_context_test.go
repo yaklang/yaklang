@@ -184,6 +184,14 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 					if req.GetCallerLabel() == aicommon.CallerLabelContextCompress {
 						require.Equal(t, int32(1), compressionTurns.Add(1), "one compression restores the prompt below the limit")
 						compressionPrompt.Store(req.GetPrompt())
+						_, instructions, found := strings.Cut(req.GetPrompt(), "# 压缩 Timeline")
+						require.True(t, found)
+						require.NotContains(t, instructions, "{{", "compression instructions must be rendered before assembly")
+						if native {
+							require.NotContains(t, instructions, "@action", "native compression must only describe native calls")
+						} else {
+							require.Contains(t, instructions, `"@action":"compress_context"`)
+						}
 						options := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 						require.Equal(t, "none", options.ThinkingLevel, "compression turns do not spend model thinking")
 						if native {

@@ -564,8 +564,13 @@ func (r *ReActLoop) generateLoopPromptFromInput(input *loopPromptBuildInput) (*L
 		if guideErr != nil {
 			return nil, guideErr
 		}
+		instructions, err := aicommon.RenderPromptTemplate("timeline-compression", compressContextDynamicText,
+			map[string]any{"FunctionCallMode": r.functionCallMode})
+		if err != nil {
+			return nil, err
+		}
 		assembly.PromptMode = aicommon.LoopPromptModeCompressContext
-		assembly.CompressionGuide = strings.TrimSpace(compressContextDynamicText) + "\n\n" + guide
+		assembly.CompressionGuide = strings.TrimSpace(instructions) + "\n\n" + guide
 		if compressionSelectionErr != nil {
 			assembly.CompressionGuide += "\n\n# 上次压缩选择未通过校验\n请修正以下错误，重新提交 compress_context；当前历史尚未按这次无效选择修改。\n" +
 				utils.ShrinkString(compressionSelectionErr.Error(), 2048)

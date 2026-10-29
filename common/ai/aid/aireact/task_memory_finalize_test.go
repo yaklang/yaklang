@@ -87,6 +87,7 @@ func TestUserTaskMemoryCompletionWithoutCandidatesDoesNotExtract(t *testing.T) {
 	task := aicommon.NewStatefulTaskBase("no-candidates", source, ctx, r.Emitter, true)
 	r.persistTaskUserInput(task)
 	r.completeUserTaskMemory(task)
+	r.waitMemoryFinalization()
 	require.Zero(t, calls.Load())
 	require.Zero(t, memory.triage.Load())
 	require.Zero(t, memory.saved.Load())
@@ -150,15 +151,16 @@ func TestUserTaskMemoryNormalCompletionAndFailedSave(t *testing.T) {
 				case <-ctx.Done():
 					t.Fatal("final memory save did not start")
 				}
-				require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus(), "completion must wait for the final save")
-				require.NoError(t, task.GetContext().Err())
-				close(memory.release)
 				select {
 				case <-done:
 				case <-ctx.Done():
-					t.Fatal("full task did not finish")
+					t.Fatal("task completion must not wait for memory indexing")
 				}
 				require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
+				require.ErrorIs(t, task.GetContext().Err(), context.Canceled)
+				require.Zero(t, memory.saved.Load(), "task finishes while the memory backend is still blocked")
+				close(memory.release)
+				r.waitMemoryFinalization()
 				require.Zero(t, compressionCalls.Load(), "completion only persists existing candidates")
 				require.Zero(t, memory.triage.Load(), "completion must not start another memory extraction")
 				require.True(t, r.config.Timeline.HasPendingMemoryFinalization(), "the unextracted live tail must remain pending")
@@ -233,18 +235,19 @@ func TestUserTaskMemoryAsyncIncludesFinalHostRecords(t *testing.T) {
 			case <-ctx.Done():
 				t.Fatal("async final save did not start")
 			}
-			require.Equal(t, aicommon.AITaskState_Processing, task.GetStatus())
+			select {
+			case <-done:
+			case <-ctx.Done():
+				t.Fatal("async task completion must not wait for memory indexing")
+			}
+			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
+			require.Zero(t, memory.saved.Load())
 			archive, err := aicommon.MarshalTimeline(r.config.Timeline)
 			require.NoError(t, err)
 			require.Contains(t, archive, "plan: "+taskName+" is finished")
 			require.Contains(t, archive, artifact, "host records must be present before final persistence")
 			close(memory.release)
-			select {
-			case <-done:
-			case <-ctx.Done():
-				t.Fatal("async task did not finish")
-			}
-			require.Equal(t, aicommon.AITaskState_Completed, task.GetStatus())
+			r.waitMemoryFinalization()
 			require.Zero(t, calls.Load())
 			require.EqualValues(t, 1, memory.saved.Load())
 			require.Zero(t, memory.triage.Load())

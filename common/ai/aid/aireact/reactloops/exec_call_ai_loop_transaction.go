@@ -266,6 +266,11 @@ func (r *ReActLoop) emitLoopGeneralOutput(outputReader, reasonReader io.Reader) 
 		taskIndex = task.GetIndex()
 	}
 	emitter := r.GetEmitter()
+	if r.promptMode == aicommon.LoopPromptModeCompressContext {
+		// Compression is internal bookkeeping. Drain accidental content/reasoning
+		// without displaying it; the transaction still captures both for diagnostics.
+		emitter = nil
+	}
 	consume := func(reader io.Reader, node string, system bool) {
 		if emitter == nil {
 			_, _ = io.Copy(io.Discard, reader)
