@@ -427,7 +427,7 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 				e.fieldKnownIDs = nil
 			}
 			events, known := p.protocolEventSnapshot(e.fieldKnownIDs)
-			result = u.search.fields.EvaluateEvents(events)
+			result = u.search.fields.EvaluateSnapshots(p.protocolQuerySnapshots(events))
 			if p.history != nil {
 				// Use the pre-evaluation token. A concurrent arrival/eviction must
 				// invalidate this result on the next redraw, never be absorbed by it.
@@ -440,9 +440,14 @@ func (u *tui) matchesSearch(e *packetEntry, c *packetSearchContext) bool {
 			}
 		}
 		if result.Partial || !result.Complete {
-			u.notice = fieldFilterPartialNoticePrefix + result.Reason
+			suffix := ""
 			if strings.Contains(result.Reason, "retained history") {
-				u.notice += "; replay with a larger --protocol-history-mib budget"
+				suffix = "; replay with a larger --protocol-history-mib budget"
+			}
+			start := len(fieldFilterPartialNoticePrefix)
+			end := start + len(result.Reason)
+			if len(u.notice) != end+len(suffix) || !strings.HasPrefix(u.notice, fieldFilterPartialNoticePrefix) || u.notice[start:end] != result.Reason || u.notice[end:] != suffix {
+				u.notice = fieldFilterPartialNoticePrefix + result.Reason + suffix
 			}
 		}
 		return result.Complete && result.Matched

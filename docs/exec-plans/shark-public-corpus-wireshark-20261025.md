@@ -4660,3 +4660,40 @@ Windows 默认配置的实跑还暴露了独立问题：1.3MiB 的1865帧因逐�
 恢复数据、适用边界和源码重现入口见
 [TLS/QUIC 来源摘要](shark-public-corpus-20261025/TLS-QUIC-key-recovery-summary.json)。
 原94/39清单、其他载体及 TOP30/高级协议完备性不因这两个范围证书自动通过。
+
+## QUIC 紧凑历史与 Windows 默认预算证据（2026-10-29）
+
+`24ca25d193994e8911c6fed7076bd4be1b8a69ac`（bins-29）将已接收 QUIC wire
+保留为私有紧凑副本，查询时恢复原有字段形状。默认详情预算仍为64MiB，同一份
+1880个 PDU 的真实流量重放，累计 `RetainedBytes` 从81,025,155降为39,702,734
+字节，0条逐出，PDU1..1880全部保留。这是逻辑证据存储成本，不是进程 RSS 测量。
+
+37组输入实跑39次原生导出：306455条完整事件及两份完整 flow 文件逐字节相同；
+CLI 的37份384518整行同样零差异。原始 QUIC 和删除中间密钥代的两份输入又单独
+比较3931个完整 PDU，仍零差异。所有比较核验真实执行、原始输入、build 和 binary
+收据，没有改写 ID、排序数组或归一化 JSON。保持性不等于所有未变字段均已正确。
+
+Windows 默认配置实际选中 frame294/PDU299。22份 buffer 的来源核验分别绑定
+1232字节物理帧、1200字节 QUIC 密文、1169字节经独立 AEAD 验证的 STREAM 明文
+和1199字节 wire remainder。四个视口各实际显示并核验前416字节；没有把屏幕外
+内容称为已显示。另一轮23份 buffer 确认选中的 Key Update Steps=2、一个未观察
+密钥代和 QPACK Blocked；派生上下文没有伪造密文范围或高亮，缺失动态表的请求头
+也没有被声称完整解码。两个入库 auditor 重跑与外部证书完全相同，包含八个拒绝
+错误来源、值、范围和高亮的负控。
+
+该提交的 [Essential](https://github.com/yaklang/yaklang/actions/runs/40805015591)、
+[显式完整 SHA 流量测试](https://github.com/yaklang/yaklang/actions/runs/40805011053)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/40805015577) 和
+[路径大小写](https://github.com/yaklang/yaklang/actions/runs/40805015625) 均成功。
+自动跳过的 draft 流量任务未计为通过。这里的737项定向本地回归属于紧凑存储改动，
+没有将1181的285397项全回归重新标作24ca执行。
+
+24ca仍存在详情逐出后的独立身份缺口：真实 frame1 的 PDU1 Initial 与 PDU2
+datagram padding 只保留后一条详情时，首次查询只返回 `[2]` 却称 complete。
+`not quic.token_length` 和 `not(pdu.id==1)` 错误变成 true/complete；另一次
+1MiB 重放逐出1835条、仅留末45条后，也无法按原 frame294 查找 PDU299。
+这些失败结果保留为历史来源，不能因默认预算页面已正常而抹除。后续独立身份
+索引修复必须使用新的源、真实运行和 CI 证据。
+
+本阶段详细来源见 [紧凑历史与 Windows 摘要](shark-public-corpus-20261025/compact-history-Windows24ca-summary.json)。
+1181的恢复摘要和更早的全局协议计数保持历史来源；后续证据不能反向覆盖它们。

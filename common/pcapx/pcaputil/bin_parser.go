@@ -2096,6 +2096,7 @@ type ProtocolInspector struct {
 	byPhysical                   map[PacketReference][]*protocolHistoryEntry
 	packetIndexLinks, unindexed  int
 	packetIndexLimit             int
+	identities                   *protocolIdentityIndex
 	head, count, bytes, maxBytes int
 	evicted                      uint64
 	received                     uint64
@@ -2114,7 +2115,7 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
 		return nil, errors.New("inspector requires positive bounded message/byte limits")
 	}
-	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(256<<10, max(1, bytes/128))}, nil
+	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(256<<10, max(1, bytes/128)), identities: newProtocolIdentityIndex(min(8<<20, max(1<<20, bytes/8)))}, nil
 }
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
@@ -2125,6 +2126,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 		v.mu.Lock()
 		v.received++
 		v.evicted++
+		v.identities.observe(e, v.received)
 		v.mu.Unlock()
 		return
 	}
@@ -2135,12 +2137,22 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 	row.Session = cloneSession(e.Session)
 	cloneEvidence(&row.BinParserEvent)
+	// A short substring must not pin an uncharged caller-owned domain backing
+	// string. Detail and identity ledgers own and charge their separate copies.
+	row.Domain.Encapsulation = strings.Clone(row.Domain.Encapsulation)
+	for i := range row.SourceBytes.PacketRefs {
+		row.SourceBytes.PacketRefs[i].Domain.Encapsulation = strings.Clone(row.SourceBytes.PacketRefs[i].Domain.Encapsulation)
+	}
+	if row.SourceBytes.CompletedIn != nil {
+		row.SourceBytes.CompletedIn.Domain.Encapsulation = strings.Clone(row.SourceBytes.CompletedIn.Domain.Encapsulation)
+	}
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
 	row.Raw = append([]byte(nil), e.Raw...)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.received++
 	row.historySequence = v.received
+	v.identities.observe(&row.BinParserEvent, v.received)
 	for v.count > 0 && (v.count == len(v.rows) || row.retainedCost > v.maxBytes-v.bytes) {
 		v.unindex(v.rows[v.head])
 		v.bytes -= v.rows[v.head].retainedCost
