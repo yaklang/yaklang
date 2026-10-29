@@ -694,6 +694,11 @@
       "document": "docs/exec-plans/shark-public-corpus-20261025/label-cohorts6b-summary.json",
       "source": "6b704e2f55a44483e47754d40fd93725100d9666",
       "scope": "Render literal TOP30 reference-label cohorts from a closed physical census.\n\nOne frame contributes exactly once. The Shark label distribution is preserved,\nwithout aliases, inferred protocol families or a protocol-correctness score.\n"
+    },
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/natt-udp-ownership-a82-summary.json",
+      "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f",
+      "scope": "Bounded UDP4500 ESP headers, complete datagram priority, exact refused/retired TFTP peers and actual Windows/source validation; OSPFv3 and broader protocol coverage remain open."
     }
   ]
 }
