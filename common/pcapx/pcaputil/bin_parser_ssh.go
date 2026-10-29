@@ -373,23 +373,13 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("ssh: empty payload")
 	}
 	msg := payload[0]
-	profile := "transport"
 	kex := s.selected["Kex Algorithm"]
-	switch {
-	case strings.HasPrefix(kex, "diffie-hellman-group-exchange-"):
-		profile = "dh-gex"
-	case strings.HasPrefix(kex, "diffie-hellman-group"):
-		profile = "dh"
-	case kex == "ecdh-sha2-nistp256":
-		profile = "ecdh-nistp256"
-	case kex == "curve25519-sha256" || kex == "curve25519-sha256@libssh.org":
-		profile = "ecdh-curve25519"
-	}
+	profile := sshKexProfile(kex)
 	ignoredGuess := false
 	if msg != 20 && s.guessPending[dir] {
 		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
 			own := s.kex[dir]
-			ignoredGuess = strings.Split(own.Kex, ",")[0] != kex || strings.Split(own.HostKey, ",")[0] != s.selected["Host Key Algorithm"]
+			ignoredGuess = strings.Split(sshRealKexNames(own.Kex), ",")[0] != kex || strings.Split(own.HostKey, ",")[0] != s.selected["Host Key Algorithm"]
 			if ignoredGuess {
 				profile = "transport"
 			}
@@ -482,7 +472,7 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			info["Context Level"] = "partial"
 		}
 	case 31, 33:
-		if kex == "" || msg == 31 && profile == "dh-gex" || msg == 33 && profile != "dh-gex" {
+		if !sshSelectedReply(profile, msg) || initial["Payload Layout Decoded"] != true {
 			info["Kex Family"] = sshKexFamily(kex)
 			break
 		}
@@ -538,18 +528,19 @@ func sshExchangeMessageName(msg byte, kex string) string {
 	if msg < 30 || msg > 49 {
 		return sshMsgName(msg)
 	}
-	if strings.HasPrefix(kex, "diffie-hellman-group-exchange-") {
+	switch sshKexProfile(kex) {
+	case "dh-gex":
 		if name := map[byte]string{30: "KEX_DH_GEX_REQUEST_OLD", 31: "KEX_DH_GEX_GROUP", 32: "KEX_DH_GEX_INIT", 33: "KEX_DH_GEX_REPLY", 34: "KEX_DH_GEX_REQUEST"}[msg]; name != "" {
 			return name
 		}
-	} else if strings.Contains(kex, "curve25519") || strings.HasPrefix(kex, "ecdh-") {
+	case "ecdh-curve25519", "ecdh-nistp256":
 		if msg == 30 {
 			return "KEX_ECDH_INIT"
 		}
 		if msg == 31 {
 			return "KEX_ECDH_REPLY"
 		}
-	} else if strings.HasPrefix(kex, "diffie-hellman-group") {
+	case "dh":
 		if msg == 30 {
 			return "KEXDH_INIT"
 		}
@@ -650,7 +641,10 @@ func sshNegotiationError(selected map[string]string) error {
 func sshRealKexNames(names string) string {
 	var out []string
 	for _, n := range strings.Split(names, ",") {
-		if !strings.HasPrefix(n, "ext-info-") && !strings.HasPrefix(n, "kex-strict-") {
+		switch n {
+		case "ext-info-c", "ext-info-s", "kex-strict-c-v00@openssh.com", "kex-strict-s-v00@openssh.com":
+			// Capability indicators are exact names, not algorithm prefixes.
+		default:
 			out = append(out, n)
 		}
 	}
@@ -658,14 +652,39 @@ func sshRealKexNames(names string) string {
 }
 
 func sshKexFamily(name string) string {
-	switch {
-	case strings.Contains(name, "curve25519") || strings.HasPrefix(name, "ecdh-"):
+	switch sshKexProfile(name) {
+	case "ecdh-curve25519", "ecdh-nistp256":
 		return "ECDH"
-	case strings.Contains(name, "diffie-hellman"):
+	case "dh", "dh-gex":
 		return "DH"
 	default:
 		return ""
 	}
+}
+
+// Select only the exact RFC4253/4419/5656/8268/8731 method names whose
+// complete initial packet layouts this codec implements. A private @domain
+// name can contain any of these words without defining the same wire format.
+func sshKexProfile(name string) string {
+	switch name {
+	case "diffie-hellman-group1-sha1", "diffie-hellman-group14-sha1", "diffie-hellman-group14-sha256", "diffie-hellman-group15-sha512", "diffie-hellman-group16-sha512", "diffie-hellman-group17-sha512", "diffie-hellman-group18-sha512":
+		return "dh"
+	case "diffie-hellman-group-exchange-sha1", "diffie-hellman-group-exchange-sha256":
+		return "dh-gex"
+	case "ecdh-sha2-nistp256":
+		return "ecdh-nistp256"
+	case "curve25519-sha256", "curve25519-sha256@libssh.org":
+		return "ecdh-curve25519"
+	default:
+		return "transport"
+	}
+}
+
+func sshSelectedReply(profile string, msg byte) bool {
+	if profile == "dh-gex" {
+		return msg == 33
+	}
+	return msg == 31 && (profile == "dh" || profile == "ecdh-nistp256" || profile == "ecdh-curve25519")
 }
 
 func sshMsgName(msg byte) string {
