@@ -175,9 +175,12 @@ func releaseIncludeFlight(key string, entry *includeFlightEntry, values Values, 
 // releaseIncludeFlight. Later callers get (entry, false) and must wait on
 // entry.done — bounded by their own ctx so a runaway include cannot hang the
 // waiting rules too. loaderCtx is only recorded when the caller becomes the
-// loader: the published entry always carries the loader's ctx, not a
-// waiter's.
+// loader: the published entry always carries the loader's ctx, never nil
+// (normalized here), not a waiter's.
 func acquireIncludeFlight(key string, loaderCtx context.Context) (*includeFlightEntry, bool) {
+	if loaderCtx == nil {
+		loaderCtx = context.Background()
+	}
 	entry := &includeFlightEntry{done: make(chan struct{}), loaderCtx: loaderCtx}
 	actual, loaded := includeFlights.LoadOrStore(key, entry)
 	if loaded {
@@ -248,7 +251,7 @@ func includeFlightValues(
 		if ctx.Err() != nil {
 			return nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
 		}
-		if entry.loaderCtx == nil || entry.loaderCtx.Err() == nil {
+		if entry.loaderCtx.Err() == nil {
 			// Deterministic failure of the include itself: inherit it.
 			return nil, entry.err
 		}
@@ -307,11 +310,18 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	//
 	// The lib include may be requested by many rules of the same program
 	// concurrently (e.g. 9+ rules include java-servlet-param on the same
-	// 1.6M-line program). Without coordination every cache miss re-runs the
-	// whole lib query in parallel — same result, N times the DB load, and the
-	// analyze phase crawls. Single-flight on the flight key: the first miss
-	// computes once, everyone else waits (bounded by its own rule ctx) and
-	// reuses the result.
+	// 1.6M-line program). A cache entry only exists after the first
+	// computation completes, so on a cold cache every miss re-runs the whole
+	// lib query in parallel — same result, N times the DB load, and later
+	// arrivals join the stampede until one of the copies finishes; the analyze
+	// phase crawls. Single-flight on the flight key closes that window: the
+	// first miss atomically claims the loader role and computes once, while
+	// identical concurrent misses park on the loader's done channel instead of
+	// starting their own sub-queries (each waiter still bounded by its own
+	// rule ctx). When the loader finishes it caches the result under the same
+	// key and closes done, releasing the waiters with the value — and any rule
+	// arriving after that hits the cache at the top of this function and never
+	// touches the flight map at all.
 	config := frame.GetConfig()
 
 	// Recursive includes (a lib including itself, directly or through another
