@@ -38,6 +38,7 @@ type decodeRequest struct {
 	Events             []*pcaputil.ProtocolEvent
 	Stream             *streamDecodeRequest
 	Number             uint64
+	Reference          pcaputil.PacketReference
 	Data               []byte
 	Length             int
 	Link               layers.LinkType
@@ -88,6 +89,9 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 	if len(req.Data) > 262144 {
 		return fmt.Errorf("packet exceeds decoder limit")
 	}
+	if req.Reference.Number != 0 && req.Reference.Number != req.Number {
+		return fmt.Errorf("captured reference does not match decoder packet number")
+	}
 	events := req.Events
 	if req.Stream != nil {
 		events = req.Stream.Events
@@ -100,7 +104,7 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 		req.Stream.fieldsProjected = true
 		d = decodeStream(*req.Stream)
 	} else {
-		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw := &capturedPacket{events: req.Events, number: req.Number, reference: req.Reference, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
 		raw.workerFieldProjection = true
 		if req.TransportView != nil {
 			v := req.TransportView
@@ -144,7 +148,7 @@ func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, 
 }
 
 func packetDecodeRequest(raw *capturedPacket) decodeRequest {
-	req := decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport, TransportView: raw.transportView}
+	req := decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Reference: raw.reference, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport, TransportView: raw.transportView}
 	if raw.transportView != nil {
 		req.TransportHeader = raw.transportView.Header
 	}

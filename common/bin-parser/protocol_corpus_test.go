@@ -256,6 +256,13 @@ func TestProtocolCorpusIntegrity(t *testing.T) {
 				if netflowV9Scope && item.Name == "NetFlow v9" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
 					historicalPartial = true
 				}
+				if item.Name == "OSPFv3" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
+					// Preserve the hash-pinned historical backlog. Execute all five
+					// canonical envelopes, AH, truncation and collection boundaries
+					// before accepting this specific modern partial declaration.
+					requireOSPFv3CanonicalWireScope(t)
+					historicalPartial = true
+				}
 				if item.Name == "ICMPv6 MLD" && item.Status == stPartial && *capture.RoadmapStatus == stTodo {
 					// Keep this hash-pinned manifest's earlier backlog status. The
 					// current partial scope must execute its canonical/legacy exact

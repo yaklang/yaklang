@@ -48,6 +48,14 @@ func (d protocolPacketDecoder) Decode(data []byte, builder gopacket.PacketBuilde
 	data = data[:len(data):len(data)]
 	b := &protocolPacketBuilder{PacketBuilder: builder, network: d.network, captureTruncated: d.captureTruncated, datagramDecodeAs: d.datagramDecodeAs}
 	decoder := d.decoder
+	if _, observed := decoder.(captureOSPFv3Decoder); observed {
+		decoder = gopacket.LayerTypePayload
+	}
+	if _, ipv6 := d.network.(*layers.IPv6); ipv6 && (decoder == layers.LayerTypeOSPF || decoder == layers.IPProtocolOSPF) {
+		// Native admission owns the complete bounded OSPFv3 codec. The
+		// dependency's LSA prefix walker mixes bit counts and byte offsets.
+		decoder = gopacket.LayerTypePayload
+	}
 	if decoder == layers.LayerTypeGRE {
 		decoder = captureGREDecoder{}
 	}
