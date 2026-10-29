@@ -385,6 +385,14 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			}
 		}
 	}
+	expectedClient, roleBound := sshMethodClientSender(profile, msg)
+	roleMismatch := !ignoredGuess && roleBound && s.clientKnown && (dir == s.client) != expectedClient
+	if roleMismatch {
+		// The complete transport envelope is still owned, but an observed
+		// sender contradiction cannot establish client key or server host-key
+		// fields. A missing earlier message alone is not such a contradiction.
+		profile = "transport"
+	}
 	initial, err := stream_parser.DecodeSSHInitialPacket(raw, profile)
 	if err != nil {
 		return nil, protocolError(ErrMalformedMessage, err.Error())
@@ -411,6 +419,17 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			info["Payload Interpretation"] = "discarded after algorithm mismatch"
 			return info, nil
 		}
+	}
+	if roleMismatch {
+		expected, observed := "server", "client"
+		if expectedClient {
+			expected, observed = "client", "server"
+		}
+		info["Packet Name"] = fmt.Sprintf("KEY_EXCHANGE_%d (unexpected sender)", msg)
+		info["Expected Sender Role"], info["Observed Sender Role"] = expected, observed
+		info["Payload Interpretation"] = "not decoded: sender contradicts observed TCP role"
+		info["Error Scope"] = "message"
+		return info, protocolError(ErrMalformedMessage, "SSH %s requires the observed %s, received from the observed %s", sshExchangeMessageName(msg, kex), expected, observed)
 	}
 	switch msg {
 	case 20:
@@ -685,6 +704,26 @@ func sshSelectedReply(profile string, msg byte) bool {
 		return msg == 33
 	}
 	return msg == 31 && (profile == "dh" || profile == "ecdh-nistp256" || profile == "ecdh-curve25519")
+}
+
+// RFC4253 section8, RFC4419 sections3/5 and RFC5656 section4 bind these
+// method messages to an endpoint role. Unknown private method numbers have
+// no such contract. This does not infer missing handshake order from absence.
+func sshMethodClientSender(profile string, msg byte) (client, known bool) {
+	switch profile {
+	case "dh", "ecdh-nistp256", "ecdh-curve25519":
+		if msg == 30 || msg == 31 {
+			return msg == 30, true
+		}
+	case "dh-gex":
+		switch msg {
+		case 30, 32, 34:
+			return true, true
+		case 31, 33:
+			return false, true
+		}
+	}
+	return false, false
 }
 
 func sshMsgName(msg byte) string {
