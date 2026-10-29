@@ -4876,3 +4876,18 @@ f1068/df30接入共享canonical/native EPC GTPv2-C观察、私有字段与具体
 归一化。两张Windows默认预算页的完整来源、第二消息高亮和CP936已核对；修复了
 截图helper空request与半写JSON竞争，原失败保留。范围和纯源归档详见
 [报告](shark-public-corpus-20261025/gtpv2-df30.md)与[聚合摘要](shark-public-corpus-20261025/gtpv2-df30-summary.json)。
+
+
+## RSVP基础对象、父层与完整回放
+
+4d/55b接入RSVP canonical/native/34私有字段和递进详情，官方9帧及authored24帧来源
+核验通过。direct34评估685literal/68derived，默认native/CLI33帧688literal/66derived，
+795alias occurrence及33个snapshot/物理层级桥通过，GetFields不与Session相加充覆盖。
+真实大包发现IPv4 Protocol43误借IPv6 Routing.NextHeader46，已补实际父族约束及88项检查。
+修后936个IP父拒绝有独立完整DTO，935旧诊断改写+1真实空payload新增；其余306883完整
+native对象和383582完整CLI行仅限已审生成ID路径外保持，两个flow/session对象及其他统计
+不变，Sharon DecodeErrors81595→80660的唯一语义差值单列。两张默认Windows页及其完整
+字节/精确高亮、55b fuzz168940次、四项CI均过。五包285647通过/24跳过是初始源码快照，
+后续58/88项分开记录。47纯源文件归档，PCAP/完整数据不进仓库。
+范围、旧失败与尚未实现的Intserv等见[报告](shark-public-corpus-20261025/rsvp-55b.md)
+和[证据摘要](shark-public-corpus-20261025/rsvp-55b-summary.json)。

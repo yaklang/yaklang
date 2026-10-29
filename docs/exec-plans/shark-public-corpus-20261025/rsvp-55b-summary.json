@@ -1,0 +1,309 @@
+{
+  "scope": "Save aggregate RSVP results and repository documentation, never full cases or exports.",
+  "production_source": "55b29ade06b2201e8be8e40b25920226038df2e1",
+  "all_core_or_TOP30_complete": false,
+  "official": {
+    "physical_frames": 9,
+    "distinct_PDU_bytes": 3,
+    "objects": 55,
+    "selected_base_objects": 39,
+    "opaque_Intserv_objects": 16,
+    "source_and_reference_counts": {
+      "physical_frames": 9,
+      "objects": 55,
+      "literal_wire_leaves": 332,
+      "derived_bit_fields": 18,
+      "source_checksum_verified": 9,
+      "selected_baseline_objects": 39,
+      "opaque_Intserv_objects": 16,
+      "distinct_PDU_SHA256": 3,
+      "reference_literal_value_and_span_matches": 289,
+      "reference_derived_bit_value_and_span_matches": 18,
+      "unrendered_source_leaves_not_reference_passes": 43,
+      "reference_object_envelope_owners": 55,
+      "reference_correct_checksum_annotations": 9,
+      "checker_only_negative_mutations_rejected": 3
+    },
+    "proof": {
+      "external_proof": "RSVP-baseline-source45-01/summary.json",
+      "SHA256": "a87a3d3290b74994b74a2df6ee1bd38a7b243e049ddab652a816d94b644c0e12"
+    },
+    "before_actual": {
+      "external_proof": "RSVP-official-before-df30-46-01/summary.json",
+      "SHA256": "6309eac4ee3d0485dc9245837232796c13322f850dd5f7e6820dedafb9cf246a"
+    }
+  },
+  "direct": {
+    "evaluations": 34,
+    "unique_physical_frames": 33,
+    "authored_scenes": 20,
+    "authored_physical_frames": 24,
+    "counts": {
+      "literal_wire_leaves": 685,
+      "derived_bit_values": 68,
+      "unverified_metadata_keys": 629,
+      "error_contracts": 34
+    },
+    "proof": {
+      "external_proof": "RSVP-direct-source-audit46-02/summary.json",
+      "SHA256": "883b0d314ae0bf4ead5c5c84aea74eb18f9b2cb1b8cd62f060bc06dd848ab9c1"
+    },
+    "frozen_plan": {
+      "external_proof": "RSVP-direct-API-source-plan46-02/manifest.json",
+      "SHA256": "beef22165958b504c2f2bcbdeec194227fa92dd86f949918c7c20fe873d44781"
+    },
+    "old_API_failure_preserved": {
+      "external_proof": "RSVP-direct-source-audit46-01/summary.json",
+      "SHA256": "2f614d68fbb867db1fe459fb88bd8834671c44b4d326d7c64f3e0810917a39e4"
+    },
+    "source_policy_erratum": {
+      "external_proof": "RSVP-direct-API-source-plan46-02/source-policy-erratum.json",
+      "SHA256": "c8bcf03a14233cf87fdefd54c2d3db35a7f448be7ac520daa88eb3704491e6e0"
+    },
+    "codec_SHA256": "0dc4fd44394bb72705aa74cc0eec5bdffcaf5358e68debd0ffa68b880bb9d0e5"
+  },
+  "native_CLI": {
+    "source_frames": 33,
+    "contexts": [
+      {
+        "context": "official",
+        "counts": {
+          "session_literal_wire_leaves": 332,
+          "session_derived_bit_values": 18,
+          "session_unverified_metadata_keys": 271,
+          "fields_literal_wire_leaves": 332,
+          "fields_derived_bit_values": 18,
+          "fields_unverified_metadata_keys": 271,
+          "private_aliases": 352,
+          "SDK_CLI_source_snapshot_bridges": 9,
+          "physical_sources_and_progressive_stacks": 9,
+          "decoded_wire_messages": 9,
+          "registered_RSVP_descriptors": 34
+        },
+        "summary_SHA256": "01ed5debf202c395b4044119bde581439d74477f2c71b7564fbbda0fa9913e90"
+      },
+      {
+        "context": "authored",
+        "counts": {
+          "session_literal_wire_leaves": 356,
+          "session_derived_bit_values": 48,
+          "session_unverified_metadata_keys": 356,
+          "nondecoded_prefix_observations": 12,
+          "private_aliases": 443,
+          "SDK_CLI_source_snapshot_bridges": 24,
+          "physical_sources_and_progressive_stacks": 24,
+          "other_wire_outcomes": 12,
+          "fields_literal_wire_leaves": 236,
+          "fields_derived_bit_values": 24,
+          "fields_unverified_metadata_keys": 212,
+          "decoded_wire_messages": 12,
+          "registered_RSVP_descriptors": 34
+        },
+        "summary_SHA256": "5bd7ecb99041a7f94a1d3b6e15ebbdbc07f1dc5f83a9c5d1e3bcdb0b7c8c2a1f"
+      }
+    ],
+    "private_descriptors": 34,
+    "private_alias_occurrences": 795,
+    "Session_and_GetFields_not_additive_wire_coverage": true,
+    "proof": {
+      "external_proof": "RSVP-native-CLI-55b-actual47-01/summary.json",
+      "SHA256": "f3c0771785227bbe67ee51b9ea33cb29a0e511befe1ec36cace67a2756b393bf"
+    },
+    "frozen_plan": {
+      "external_proof": "RSVP-native-CLI-source-plan46-01/manifest.json",
+      "SHA256": "1f291b0e4bf9ad0db09b12d1cd952f3fe69be41b40d9261598d96a63bdb1305c"
+    }
+  },
+  "public_replay": {
+    "inputs": 37,
+    "physical_records": 383936,
+    "native_before": 307818,
+    "native_after": 307819,
+    "CLI_records": 384518,
+    "CLI_physical_records": 383936,
+    "CLI_nonphysical_publications": 582,
+    "native_counts": {
+      "retained_whole_native_objects": 306883,
+      "whole_literal_native_exports": 36,
+      "source_new_whole_diagnostic": 1,
+      "source_changed_whole_old_diagnostics": 935,
+      "source_whole_diagnostics_checked": 936,
+      "whole_flow_objects_checked": 2,
+      "explicit_source_explained_capture_counter_delta": 1,
+      "whole_literal_flow_exports": 1
+    },
+    "CLI_counts": {
+      "retained_whole_CLI_rows": 383582,
+      "whole_literal_CLI_exports": 36,
+      "source_whole_CLI_rows": 936
+    },
+    "unplanned_differences": 0,
+    "source_changed_old_IP_diagnostics": 935,
+    "source_new_IP_diagnostic": 1,
+    "source_frame_new": 279605,
+    "source_wrong_family_frame_removed": 218724,
+    "flow_session_and_other_statistics_literal": true,
+    "whole_flow_export_literal": false,
+    "capture_DecodeErrors": {
+      "before": 81595,
+      "after": 80660,
+      "delta": -935,
+      "meaning": "old unsupported child decoder no longer invoked; malformed parents remain refused"
+    },
+    "wire_values_frame_numbers_flow_IDs_not_normalized": true,
+    "only_explicit_generated_PDU_reference_schema_mapped": true,
+    "native": {
+      "external_proof": "RSVP-whole-native-source-actual47-02/summary.json",
+      "SHA256": "060298ff21aaf92597a6d45754a6f5359dd9e237e5bed3f513d68d404bfc8b6f"
+    },
+    "CLI": {
+      "external_proof": "RSVP-whole-CLI-source-actual47-01/summary.json",
+      "SHA256": "20ffdc8d88f8b38ad54390a249eb4fc7e04d6adb90e31bc732940daeb2d85f3b"
+    },
+    "parent_source": {
+      "external_proof": "RSVP-parent-diagnostic-source47-02/summary.json",
+      "SHA256": "f7834ca37248cbeeb9d7c8b545d9356c46ff7f016c0e69c44d62d4bb5771005b"
+    },
+    "pre_fix_generation_not_success": {
+      "external_proof": "RSVP-public-native-ledger46-04/summary.json",
+      "SHA256": "9834a74e2363157db7cceb408118521b1cced2f3d569fc52200b2d53796b00fc"
+    }
+  },
+  "tests": {
+    "full_base_pass": 285647,
+    "full_base_skip": 24,
+    "full_base_fail": 0,
+    "full": {
+      "external_proof": "test-RSVP-full46-05/receipt.json",
+      "SHA256": "3f9e46cbc146c32f7b11fd5bb062d8e9622751af89d6e54267abd621f1833e04"
+    },
+    "later_diagnostic_pass": 58,
+    "later_diagnostic": {
+      "external_proof": "test-RSVP-diagnostic-green46-07/receipt.json",
+      "SHA256": "6f5380baf7e93e5f9bd09de439b598ef6098ae5df1a679b4a5784dd68769c5d0"
+    },
+    "later_family_pass": 88,
+    "later_family": {
+      "external_proof": "test-RSVP-parent-family-green46-11/receipt.json",
+      "SHA256": "f20d924abd6fd4f6e58ee398c1f97ab79dfebd25d48fe54e1ac55ccb4eb0d180"
+    },
+    "latest_not_claimed_as_new_full_5_package_run": true
+  },
+  "fuzz": {
+    "source": "55b29ade06b2201e8be8e40b25920226038df2e1",
+    "seconds": 60,
+    "workers": 2,
+    "executions": 168940,
+    "failures": 0,
+    "proof": {
+      "external_proof": "RSVP-fuzz-55b-47-01/summary.json",
+      "SHA256": "d6195c022590205fa543e024cee0f9e431396e3b941585095a15b4e036c104e0"
+    }
+  },
+  "Windows": {
+    "cases": 2,
+    "default_packet_cache": 20000,
+    "default_history_mib": 64,
+    "entire_Source0_and_Source1_exact": true,
+    "selected_ranges_exact": true,
+    "root_viewed_actual_images": true,
+    "console_cells_not_Terminal_pixels": true,
+    "only_navigation_adjusted": true,
+    "proof": {
+      "external_proof": "Windows-RSVP-root-closure47-01/summary.json",
+      "SHA256": "0f893e5f28ed0129362b46f527069ba6abab75a6536eaa26110fcf8d2c00ca2b"
+    }
+  },
+  "CI": {
+    "exact_production_source_all_four_green": true,
+    "runs": [
+      {
+        "id": 40927625316,
+        "name": "Bin Parser Traffic Tests",
+        "head_sha": "55b29ade06b2201e8be8e40b25920226038df2e1",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40927625316",
+        "created_at": "2026-10-29T18:06:16Z",
+        "updated_at": "2026-10-29T18:23:37Z"
+      },
+      {
+        "id": 40927636718,
+        "name": "Essential Tests",
+        "head_sha": "55b29ade06b2201e8be8e40b25920226038df2e1",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40927636718",
+        "created_at": "2026-10-29T18:06:21Z",
+        "updated_at": "2026-10-29T18:33:57Z"
+      },
+      {
+        "id": 40927636795,
+        "name": "Diff-Code-Check",
+        "head_sha": "55b29ade06b2201e8be8e40b25920226038df2e1",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40927636795",
+        "created_at": "2026-10-29T18:06:21Z",
+        "updated_at": "2026-10-29T18:10:21Z"
+      },
+      {
+        "id": 40927636648,
+        "name": "Check Git path case collisions",
+        "head_sha": "55b29ade06b2201e8be8e40b25920226038df2e1",
+        "status": "completed",
+        "conclusion": "success",
+        "run_attempt": 1,
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40927636648",
+        "created_at": "2026-10-29T18:06:21Z",
+        "updated_at": "2026-10-29T18:06:43Z"
+      }
+    ],
+    "proof": {
+      "external_proof": "RSVP-CI-55b-summary47-01.json",
+      "SHA256": "1e179d0db25bc53f9142c01f3d7e64a3193eb56d31e7f52d44e2f1ed4a6e6672"
+    },
+    "later_archive_HEAD_CI_separately_required": true
+  },
+  "source_archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/source-manifest.json",
+    "SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce",
+    "files": 47,
+    "bytes": 356662
+  },
+  "Intserv_source_only": {
+    "product_support": false,
+    "counts": {
+      "objects": 16,
+      "literal_wire_leaves": 285,
+      "derived_bit_values": 152,
+      "service_headers": 23,
+      "parameter_headers": 37,
+      "IEEE32_literals": 34,
+      "distinct_body_SHA256": 3,
+      "reference_exact-literal-span": 181,
+      "reference_exact-derived-bit-span": 30,
+      "reference_aggregate-parameter-owner-span": 9,
+      "reference_unrendered_not_passes": 189,
+      "reference_aggregate-header-plus-value-span": 28
+    },
+    "proof": {
+      "external_proof": "RSVP-Intserv-source46-01/summary.json",
+      "SHA256": "59accc296172bbeee5c7f05bc3b409efca116410dbf593f4d3eba91859f1c2a8"
+    },
+    "semantic_issues": {
+      "minimum-policed-unit-zero-explicitly-illegal": 9,
+      "maximum-packet-size-not-positive": 2
+    }
+  },
+  "not_proved": [
+    "complete mandatory-object/procedure grammar",
+    "installed reservations/authentication/INTEGRITY/replay",
+    "Bundle/reduction and complete Intserv semantics",
+    "all TOP30 or core protocols complete"
+  ],
+  "captures_keylogs_full_cases_outputs_images_binaries_not_repository": true
+}
