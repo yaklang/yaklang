@@ -15,7 +15,12 @@ type binQUIC struct {
 	eventID         uint64
 	eventRefs       []PacketReference
 	keyPhase        [2]int
-	previousKey     [2]*quicTrafficKeys
+	previousKeys    [2][]quicPriorKey
+	keyFloor        [2]uint64
+	keyFloorSet     [2]bool
+	keyFirst        [2]uint64
+	keyLast         [2]uint64
+	keyFirstSet     [2]bool
 	controlSeen     [2]bool
 	qpackSeen       [2][2]bool
 	h3Fault         *h3ConnectionFault
@@ -262,18 +267,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Key Reason"] = reason
 		return info, protocolError(ErrEncrypted, "QUIC payload is protected; keys were not provided")
 	}
-	var phaseKeys [2]*quicTrafficKeys
-	if q.keys != nil && !h.long {
-		phaseKeys = candidate.keys.app[dir]
-	}
-	plain, pn, pnLen, first, phase, uerr := quicUnprotect(raw, h, tk, phaseKeys, q.space(dir, h.space).largest)
-	previous := false
-	if uerr != nil && !h.long && q.previousKey[dir] != nil {
-		old := phaseKeys
-		old[1-q.keyPhase[dir]] = q.previousKey[dir]
-		plain, pn, pnLen, first, phase, uerr = quicUnprotect(raw, h, tk, old, q.space(dir, h.space).largest)
-		previous = uerr == nil
-	}
+	protection, uerr := q.unprotectEpochs(dir, raw, h, tk, candidate.keys)
 
 	if uerr != nil {
 		info["Encrypted"] = true
@@ -282,6 +276,7 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		info["Authentication Failure"] = "packet-protection-failed"
 		return info, protocolError(ErrAuthenticationFailed, "QUIC packet protection authentication failed")
 	}
+	plain, pn, pnLen, first, phase := protection.plain, protection.pn, protection.pnLen, protection.first, protection.phase
 	info["Decrypted"] = true
 	info["Authentication Verified"] = true
 	info["Peer Identity Verified"] = false
@@ -292,7 +287,15 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	info["Cipher"] = tk.aead
 	if !h.long {
 		info["Key Phase"] = phase
-		_ = first
+		if protection.unboundPhase {
+			quicRetainUndeliveredPayload(info, plain)
+			return info, protocolError(ErrContextRequired, "QUIC authenticated packet key phase has no configured traffic key")
+		}
+		maximum, observed := q.acceptedEpochMaximum(dir)
+		if protection.invalidOrder || protection.steps > 0 && observed && pn <= maximum || protection.steps == 0 && !protection.previous && q.keyFloorSet[dir] && pn <= q.keyFloor[dir] {
+			quicRetainUndeliveredPayload(info, plain)
+			return info, protocolError(ErrMalformedMessage, "QUIC key epoch contradicts authenticated packet number order")
+		}
 	}
 	if h.long && first&0x0c != 0 || !h.long && first&0x18 != 0 {
 		return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, protocolError(ErrMalformedMessage, "QUIC nonzero reserved bits"))
@@ -328,14 +331,15 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if oldInitial {
 		return info, protocolError(ErrContextRequired, "QUIC unseen pre-Retry Initial cannot advance the post-Retry connection")
 	}
-	if !h.long && !previous && phase != q.keyPhase[dir] {
-		next, err := quicNextPhase(candidate.keys.app[dir][phase])
-		if err != nil {
+	if !h.long {
+		if q.native && protection.steps > 0 {
+			if err := q.validateFutureTransportFrames(dir, h.space, frames, max); err != nil {
+				return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, err)
+			}
+		}
+		if err := q.commitProtectionEpoch(dir, &candidate, protection, info); err != nil {
 			return info, err
 		}
-		q.previousKey[dir] = candidate.keys.app[dir][q.keyPhase[dir]]
-		candidate.keys.app[dir][1-phase] = next
-		q.keyPhase[dir] = phase
 	}
 	q.keys, q.initialDCID, q.version = candidate.keys, candidate.initialDCID, candidate.version
 	if q.native && h.typeName == "Initial" && dir == 0 && len(q.originalDCID) == 0 {
