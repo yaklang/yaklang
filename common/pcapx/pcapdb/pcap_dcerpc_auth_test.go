@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -50,6 +51,34 @@ func TestPCAPDBDcerpcAuthTrailerKeepsFollowingCalls(t *testing.T) {
 	require.True(t, foundAuth3, "NTLM AUTH3 must be indexed")
 	require.True(t, foundRequest, "svcctl OpenSCManager request must be indexed")
 	require.True(t, foundResponse, "svcctl response must be matched and indexed")
+
+	var sawOpen, sawCreate bool
+	for _, message := range messages {
+		switch message.Session["Packet Name"] {
+		case "svcctl.ROpenSCManagerW":
+			sawOpen = true
+		case "svcctl.RCreateServiceWOW64W":
+			sawCreate = true
+		}
+		require.NotContains(t, message.Summary, "unknown.op_")
+	}
+	require.True(t, sawOpen)
+	require.True(t, sawCreate)
+
+	smb, err := db.QueryProtocols(QueryProtocol("smb2"), QueryLimit(200))
+	require.NoError(t, err)
+	var sawAdmin, sawIPC, sawExe, sawPipe, sawRead, sawWrite bool
+	for _, message := range smb {
+		summary := message.Summary
+		sawAdmin = sawAdmin || strings.Contains(summary, `ADMIN$`)
+		sawIPC = sawIPC || strings.Contains(summary, `IPC$`)
+		sawExe = sawExe || strings.Contains(summary, "PSEXESVC.exe")
+		sawPipe = sawPipe || strings.Contains(summary, "PSEXESVC")
+		sawRead = sawRead || strings.Contains(summary, "SMB2 READ") && strings.Contains(summary, "len=")
+		sawWrite = sawWrite || strings.Contains(summary, "SMB2 WRITE") && strings.Contains(summary, "len=")
+		require.NotContains(t, summary, "\\x")
+	}
+	require.True(t, sawAdmin && sawIPC && sawExe && sawPipe && sawRead && sawWrite)
 }
 
 func testSessionUint(v any) (uint64, bool) {
