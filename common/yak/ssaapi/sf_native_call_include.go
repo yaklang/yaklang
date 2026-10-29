@@ -143,10 +143,17 @@ const slowIncludeDuration = 30 * time.Second
 // includeFlightEntry is one in-flight include computation under the flight
 // key (see nativeCallInclude). done is closed once the sub-query finishes
 // (successfully or not); values/err are read only after done closes.
+// loaderCtx is the loader rule's ctx, set before the entry is published;
+// a waiter reads it after done closes to tell a loader canceled by its own
+// rule (timeout / budget overflow — worth taking over) from a deterministic
+// content failure (no value found, rule error — every waiter would fail
+// identically, so re-running would just serialize the herd the flight map
+// exists to collapse).
 type includeFlightEntry struct {
-	done   chan struct{}
-	values Values
-	err    error
+	done      chan struct{}
+	loaderCtx context.Context
+	values    Values
+	err       error
 }
 
 var includeFlights sync.Map // map[string]*includeFlightEntry
@@ -164,16 +171,91 @@ func releaseIncludeFlight(key string, entry *includeFlightEntry, values Values, 
 }
 
 // acquireIncludeFlight returns the in-flight entry for key. The first caller
-// gets (entry, true) and must run the loader, then releaseIncludeFlight.
-// Later callers get (entry, false) and must wait on entry.done — bounded by
-// their own ctx so a runaway include cannot hang the waiting rules too.
-func acquireIncludeFlight(key string) (*includeFlightEntry, bool) {
-	entry := &includeFlightEntry{done: make(chan struct{})}
+// gets (entry, true) and must run the loader (see includeFlightValues), then
+// releaseIncludeFlight. Later callers get (entry, false) and must wait on
+// entry.done — bounded by their own ctx so a runaway include cannot hang the
+// waiting rules too. loaderCtx is only recorded when the caller becomes the
+// loader: the published entry always carries the loader's ctx, not a
+// waiter's.
+func acquireIncludeFlight(key string, loaderCtx context.Context) (*includeFlightEntry, bool) {
+	entry := &includeFlightEntry{done: make(chan struct{}), loaderCtx: loaderCtx}
 	actual, loaded := includeFlights.LoadOrStore(key, entry)
 	if loaded {
 		return actual.(*includeFlightEntry), false
 	}
 	return entry, true
+}
+
+// loadIncludeFlight is the loader half of an include flight: compute, cache
+// on success, and always release the waiters. A panicking compute is first
+// converted to the release error — the waiters must not stay parked — then
+// re-panicked to preserve legacy propagation.
+func loadIncludeFlight(
+	flightKey string,
+	entry *includeFlightEntry,
+	compute func() (Values, error),
+) (values Values, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			releaseIncludeFlight(flightKey, entry, nil, utils.Errorf("include panicked: %v", r))
+			panic(r)
+		}
+	}()
+	values, err = compute()
+	if err != nil {
+		releaseIncludeFlight(flightKey, entry, nil, err)
+		return nil, err
+	}
+	includeCache.Set(flightKey, values)
+	releaseIncludeFlight(flightKey, entry, values, nil)
+	return values, nil
+}
+
+// includeFlightValues resolves one cacheable include through the flight map:
+// the first miss becomes the loader and runs compute; identical concurrent
+// misses wait on the loader's entry, bounded by their own ctx.
+//
+// A loader failure is not automatically the waiters' verdict. The loader's
+// own rule ctx may have been canceled (timeout / work-budget overflow) while
+// the waiting rules are still within theirs; inheriting that error would
+// turn a statement-level skip into a silent empty-result "success" for
+// healthy rules. So when the failed loader was ctx-canceled, every waiter
+// with a live ctx re-acquires — the first becomes the new loader, the rest
+// wait on it (at most one extra compute per flight). Any other loader
+// failure (no value found, rule error, panic) is deterministic content-wise:
+// waiters inherit it, because re-running would serialize the very herd the
+// flight map collapses. A waiter whose own ctx is done bails with its own
+// cancellation error.
+func includeFlightValues(
+	flightKey string,
+	ruleName string,
+	ctx context.Context,
+	compute func() (Values, error),
+) (Values, error) {
+	entry, isLoader := acquireIncludeFlight(flightKey, ctx)
+	for {
+		if isLoader {
+			return loadIncludeFlight(flightKey, entry, compute)
+		}
+		select {
+		case <-entry.done:
+		case <-ctx.Done():
+			return nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
+		}
+		if entry.err == nil {
+			return entry.values, nil
+		}
+		if ctx.Err() != nil {
+			return nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
+		}
+		if entry.loaderCtx == nil || entry.loaderCtx.Err() == nil {
+			// Deterministic failure of the include itself: inherit it.
+			return nil, entry.err
+		}
+		// The loader died with its own rule (canceled ctx); this waiter is
+		// still healthy — take over.
+		entry, isLoader = acquireIncludeFlight(flightKey, ctx)
+	}
 }
 
 func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
@@ -219,11 +301,8 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 		return true, ret, nil
 	}
 
-	// flightKey is the cache hash when the result is cacheable. When the
-	// program hash is unavailable it degenerates to a nocache: program-name
-	// key: still unique per lib/program, so two different libs or two
-	// different programs never share a flight entry, but the result is not
-	// cached. An empty flightKey (temp input values, or an unnamed program)
+	// flightKey is the cache hash. An empty flightKey (temp input values, or
+	// an unnamed program, which is the only case where the hash is unavailable)
 	// means neither cache nor dedup is safe: compute directly.
 	//
 	// The lib include may be requested by many rules of the same program
@@ -313,46 +392,10 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 		return true, CreateIncludeValue(gotValues), nil
 	}
 
-	entry, isLoader := acquireIncludeFlight(flightKey)
-	if !isLoader {
-		select {
-		case <-entry.done:
-		case <-ctx.Done():
-			return false, nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
-		}
-		if entry.err != nil {
-			return false, nil, entry.err
-		}
-		if len(entry.values) == 0 {
-			return false, nil, utils.Errorf("no value found")
-		}
-		return true, CreateIncludeValue(entry.values), nil
+	gotValues, err := includeFlightValues(flightKey, ruleName, ctx, compute)
+	if err != nil {
+		return false, nil, err
 	}
-
-	// compute may panic; free the waiters first, then propagate.
-	var panicked any
-	gotValues, computeErr := func() (v Values, e error) {
-		defer func() {
-			if r := recover(); r != nil {
-				panicked = r
-				e = utils.Errorf("include %q panicked: %v", ruleName, r)
-			}
-		}()
-		return compute()
-	}()
-	if computeErr != nil {
-		releaseIncludeFlight(flightKey, entry, nil, computeErr)
-		if panicked != nil {
-			panic(panicked)
-		}
-		return false, nil, computeErr
-	}
-	// Only the hash-derived flight key identifies a cacheable result; the
-	// nocache: variant must stay out of the shared include cache.
-	if !strings.HasPrefix(flightKey, "nocache:") {
-		includeCache.Set(flightKey, gotValues)
-	}
-	releaseIncludeFlight(flightKey, entry, gotValues, nil)
 	return true, CreateIncludeValue(gotValues), nil
 }
 
@@ -362,14 +405,11 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 // on it), an empty one means the result must not be cached. cachedValues is
 // non-nil only on a hit.
 func getIncludeCacheValueWithFlightKey(program *Program, ruleName string, inputValues Values) (string, sfvm.Values) {
+	// No program hash happens only when the program is unnamed, in which case
+	// GetProgramName is empty too (see Program.Hash): no flight key, so the
+	// result is neither cached nor deduped. It is computed directly.
 	hash, ok := program.Hash()
 	if !ok {
-		// No program hash (unnamed program): the result must not be cached, but
-		// concurrent misses of the same lib still single-flight on the program
-		// name if there is one.
-		if name := program.GetProgramName(); name != "" {
-			return "nocache:" + utils.CalcSha256(name, ruleName), nil
-		}
 		return "", nil
 	}
 	hash = utils.CalcSha256(hash + ruleName)
@@ -398,32 +438,11 @@ func CreateIncludeValue(vs Values) sfvm.Values {
 	return sfvm.NewValues(list)
 }
 
+// GetIncludeCacheValue reports the include cache identity for (program, lib
+// rule): the cache key and whether the result belongs in the cache. Kept for
+// tests that assert cache-key derivation; production code goes through
+// getIncludeCacheValueWithFlightKey.
 func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.Values, shouldCache bool) {
-	getRetFromCache := func(hash string) sfvm.Values {
-		if ret, ok := includeCache.Get(hash); ok {
-			return CreateIncludeValue(ret)
-		}
-		return nil
-	}
-
-	if programHash, ok := program.Hash(); ok {
-		// Use program hash and rule name to generate a unique hash
-		hash = utils.CalcSha256(programHash + ruleName)
-		shouldCache = true
-		if inputValues != nil && len(inputValues) > 0 {
-			if valueHash, ok := inputValues.Hash(); ok {
-				hash = utils.CalcSha256(hash, valueHash)
-			} else {
-				// if input param values not empty but have temp value,
-				// then the result should not be cached
-				shouldCache = false
-			}
-		}
-		if !shouldCache {
-			return
-		}
-		value = getRetFromCache(hash)
-		return
-	}
-	return
+	hash, value = getIncludeCacheValueWithFlightKey(program, ruleName, inputValues)
+	return hash, value, hash != ""
 }
