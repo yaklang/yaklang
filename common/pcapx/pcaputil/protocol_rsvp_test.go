@@ -3,12 +3,14 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
 	"net"
 	"testing"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 func rsvpNativeWire(value byte) []byte {
@@ -34,6 +36,105 @@ func rsvpNativeFrame(t *testing.T, wire []byte, v6 bool) []byte {
 	b := gopacket.NewSerializeBuffer()
 	require.NoError(t, gopacket.SerializeLayers(b, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(wire)))
 	return b.Bytes()
+}
+
+func rsvpIntservNativeWire(rate uint32) []byte {
+	w := make([]byte, 44)
+	copy(w, []byte{0x10, 1, 0, 0, 64, 0, 0, 44, 0, 36, 12, 2, 0, 0, 0, 7, 1, 0, 0, 6, 127, 0, 0, 5})
+	binary.BigEndian.PutUint32(w[24:], rate)
+	binary.BigEndian.PutUint32(w[28:], 0x45bb8000)
+	binary.BigEndian.PutUint32(w[32:], 0x7f800000)
+	binary.BigEndian.PutUint32(w[36:], 1)
+	binary.BigEndian.PutUint32(w[40:], 1500)
+	return w
+}
+
+func TestRSVPIntservNativePrivateTypedRangesWithoutConnectionStickiness(t *testing.T) {
+	for _, v6 := range []bool{false, true} {
+		var frames [][]byte
+		for _, rate := range []uint32{0x45bb8000, 0x3f800000, 0x45bb8000} {
+			frames = append(frames, rsvpNativeFrame(t, rsvpIntservNativeWire(rate), v6))
+		}
+		events, stats := espNATTReplay(t, frames)
+		require.Len(t, events, 3)
+		require.Zero(t, stats.Flows)
+		for i, e := range events {
+			require.Equal(t, "decoded", e.Status, e.Error)
+			require.Zero(t, e.FlowID)
+			require.Zero(t, e.TCPFlowID)
+			require.Zero(t, e.TransactionID)
+			require.Zero(t, e.ResponseTo)
+			require.Equal(t, []any{[]string{"6000", "1", "6000"}[i]}, e.DisplayFields()["rsvp.intserv.token_bucket_rate"])
+			require.Equal(t, []any{"+Infinity"}, e.DisplayFields()["rsvp.intserv.peak_data_rate"])
+			snapshot := e.DisplayFieldValues()
+			require.False(t, snapshot.Incomplete)
+			var seen bool
+			for _, f := range snapshot.Values {
+				if f.Name == "rsvp.intserv.token_bucket_rate" {
+					seen = true
+					require.Equal(t, &DisplayFieldRange{Offset: 24, Length: 4}, f.Range)
+				}
+			}
+			require.True(t, seen)
+			filter, err := CompileDisplayFilter(`rsvp.intserv.token_bucket_rate == "6000"`)
+			require.NoError(t, err)
+			require.Equal(t, i != 1, filter.Match(e))
+			before, err := e.GetFields()
+			require.NoError(t, err)
+			e.Raw[24] ^= 255
+			e.Session = map[string]any{}
+			after, err := e.GetFields()
+			require.NoError(t, err)
+			require.Equal(t, before, after)
+			require.Equal(t, snapshot, e.DisplayFieldValues())
+		}
+	}
+}
+
+func TestRSVPIntservContextAndIndependentWireFailuresStayDistinct(t *testing.T) {
+	future := rsvpIntservNativeWire(0x45bb8000)
+	future[12] = 0x10
+	for _, badChecksum := range []bool{false, true} {
+		w := bytes.Clone(future)
+		if badChecksum {
+			w[3] = 1
+		}
+		frame := rsvpNativeFrame(t, w, false)
+		packet := gopacket.NewPacket(frame, CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.DecodeOptions{NoCopy: true})
+		events, _ := espNATTReplay(t, [][]byte{frame})
+		require.Len(t, events, 1)
+		if badChecksum {
+			require.NotNil(t, packet.ErrorLayer())
+			require.ErrorIs(t, packet.ErrorLayer().Error(), stream_parser.ErrRSVPWireIntegrity)
+			require.Equal(t, "malformed", events[0].Status)
+		} else {
+			require.Nil(t, packet.ErrorLayer())
+			require.Equal(t, "context-required", events[0].Status)
+		}
+	}
+	// Exhaust a nested collection with independent checksum evidence. A soft
+	// budget reason must never hide the bad wire in capture or native ingress.
+	w := make([]byte, 24+4095*4)
+	copy(w, []byte{0x10, 1, 0, 1, 64, 0, 0, 0, 0, 0, 13, 2, 0, 0, 0, 0, 5, 0, 0, 0})
+	// Intserv body starts12; parameters start20. The extra last word is a
+	// second zero-length service, also bounded by this same collection budget.
+	for at := 20; at < len(w)-4; at += 4 {
+		w[at] = 250
+	}
+	binary.BigEndian.PutUint16(w[6:], uint16(len(w)))
+	binary.BigEndian.PutUint16(w[8:], uint16(len(w)-8))
+	binary.BigEndian.PutUint16(w[14:], uint16((len(w)-16)/4))
+	binary.BigEndian.PutUint16(w[18:], uint16((len(w)-24)/4))
+	_, err := stream_parser.DecodeRSVPWire(w, 4096)
+	require.ErrorIs(t, err, stream_parser.ErrObservedWireBudget)
+	require.ErrorIs(t, err, stream_parser.ErrRSVPWireIntegrity)
+	frame := rsvpNativeFrame(t, w, false)
+	packet := gopacket.NewPacket(frame, CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.DecodeOptions{NoCopy: true})
+	require.NotNil(t, packet.ErrorLayer())
+	require.True(t, errors.Is(packet.ErrorLayer().Error(), stream_parser.ErrRSVPWireIntegrity))
+	events, _ := espNATTReplay(t, [][]byte{frame})
+	require.Len(t, events, 1)
+	require.Equal(t, "malformed", events[0].Status)
 }
 
 func TestRSVPNativeIndependentAdvertisementsAndPrivateFields(t *testing.T) {
@@ -71,9 +172,14 @@ func TestRSVPNativeIndependentAdvertisementsAndPrivateFields(t *testing.T) {
 
 func TestRSVPParentBoundsUnknownLayoutAndChecksumEvidence(t *testing.T) {
 	w := rsvpNativeWire(7)
-	w[10], w[11] = 9, 2 // Intserv body remains opaque, not a confirmed flow.
+	w[10], w[11] = 9, 2 // Existing scalar bytes contradict the newly selected Intserv header.
 	w[2], w[3] = 0, 0
 	es, _ := espNATTReplay(t, [][]byte{rsvpNativeFrame(t, w, false)})
+	require.Len(t, es, 1)
+	require.Equal(t, "malformed", es[0].Status)
+	require.Contains(t, es[0].Error, "Intserv message word length")
+	w[11] = 99 // An unselected C-Type remains opaque, not a confirmed flow.
+	es, _ = espNATTReplay(t, [][]byte{rsvpNativeFrame(t, w, false)})
 	require.Len(t, es, 1)
 	e := es[0]
 	require.Equal(t, "rsvp", e.Protocol)

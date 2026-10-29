@@ -64,6 +64,10 @@ func rsvpObservedBudget(session map[string]any) (int, bool) {
 		count++
 		if body, ok := row["Body"].(map[string]any); ok {
 			count += len(mapList(body["Addresses"]))
+			for _, service := range mapList(body["Services"]) {
+				count++
+				count += len(mapList(service["Parameters"]))
+			}
 		}
 		if count > 4096 {
 			return 0, false

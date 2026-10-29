@@ -30,8 +30,16 @@ func rsvpRanges(r *controlReader) map[string]any {
 	if ranges == nil {
 		ranges = map[string]any{}
 	}
+	for key, span := range rsvpRangeMap(r.info["Wire Field Ranges"]) {
+		ranges[key] = span
+	}
 	r.info["Wire Field Ranges"] = ranges
 	return r.info
+}
+
+func rsvpRangeMap(value any) map[string]any {
+	m, _ := value.(map[string]any)
+	return m
 }
 func rsvpFormat(prior error, text string) error {
 	return errors.Join(prior, fmt.Errorf("%w: %s", ErrRSVPWireFormat, text))
@@ -61,8 +69,8 @@ func RSVPChecksum(w []byte) uint16 {
 	return ospfv2Sum(w[:n])
 }
 
-// DecodeRSVPWire observes v1 messages1..7 and selected base object layouts.
-// Unknown/Intserv objects retain owned bytes. Advertised SESSION selectors and
+// DecodeRSVPWire observes v1 messages1..7 and selected base/Intserv layouts.
+// Unknown objects retain owned bytes. Advertised SESSION selectors and
 // HOP handles never create captured transports, confirmed reservations or peers.
 func DecodeRSVPWire(w []byte, budget int) (map[string]any, error) {
 	if len(w) > 65535 || budget < 0 {
@@ -159,7 +167,7 @@ func DecodeRSVPWire(w []byte, budget int) (map[string]any, error) {
 				if end > len(r.w) && c.err == nil {
 					c.need(false, "object extent exceeds captured message")
 				}
-				if c.err != nil && end <= len(r.w) && !errors.Is(c.err, ErrObservedWireBudget) && !errors.Is(c.err, ErrRSVPWireFormat) {
+				if c.err != nil && end <= len(r.w) && !errors.Is(c.err, ErrObservedWireBudget) && !errors.Is(c.err, ErrObservedWireContext) && !errors.Is(c.err, ErrRSVPWireFormat) {
 					c.err = rsvpFormat(c.err, "complete object contradicts selected value layout")
 				}
 			}
@@ -170,7 +178,7 @@ func DecodeRSVPWire(w []byte, budget int) (map[string]any, error) {
 		r.at, r.err = c.at, c.err
 	}
 	result["Objects"] = objects
-	if r.err != nil && n <= len(w) && !errors.Is(r.err, ErrObservedWireBudget) && !errors.Is(r.err, ErrRSVPWireFormat) {
+	if r.err != nil && n <= len(w) && !errors.Is(r.err, ErrObservedWireBudget) && !errors.Is(r.err, ErrObservedWireContext) && !errors.Is(r.err, ErrRSVPWireFormat) {
 		r.err = rsvpFormat(r.err, "complete message contains an incomplete object")
 	}
 	if n > len(w) {
@@ -186,6 +194,9 @@ func DecodeRSVPWire(w []byte, budget int) (map[string]any, error) {
 }
 
 func rsvpObjectValue(r *controlReader, class, ctype uint64, n int, budget *int) bool {
+	if ctype == 2 && (class == 9 || class == 12 || class == 13) {
+		return rsvpIntservValue(r, n, class, budget)
+	}
 	width := 4
 	if ctype == 2 {
 		width = 16
