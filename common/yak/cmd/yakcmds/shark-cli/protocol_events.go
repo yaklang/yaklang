@@ -763,7 +763,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 				label = "TLS · record framing only"
 			}
 		}
-		add(fmt.Sprintf("%s · PDU #%d · %s", label, e.ID, kind), true)
+		unit := "PDU"
+		opaqueSSH := protectedSSHEvent(e)
+		if opaqueSSH {
+			// NEWKEYS establishes opaque stream context. Neither a complete
+			// retained arrival nor its bounded preview proves a decoded PDU.
+			unit = "observation"
+		}
+		add(fmt.Sprintf("%s · %s #%d · %s", label, unit, e.ID, kind), true)
 		if len(e.Raw) > 0 {
 			name := eventProtocolName(e)
 			if e.Protocol == "dcerpc" {
@@ -790,6 +797,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			sourceName := name + " · " + kind + " PDU"
 			if udpPreview {
 				sourceName = name // A bounded preview is not a complete application PDU.
+			}
+			if opaqueSSH {
+				sourceName = fmt.Sprintf("%s · encrypted stream bytes · %d observed bytes", name, len(e.Raw))
+				if e.Length > len(e.Raw) {
+					sourceName = fmt.Sprintf("%s · encrypted stream preview · %d/%d observed bytes", name, len(e.Raw), e.Length)
+				}
 			}
 			sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(e.Raw)})
 			currentSource = len(sources)
