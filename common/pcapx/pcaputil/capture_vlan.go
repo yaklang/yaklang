@@ -84,6 +84,9 @@ func (b *captureCarrierBuilder) SetTransportLayer(layer gopacket.TransportLayer)
 	b.udp, _ = layer.(*layers.UDP)
 }
 func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
+	if _, ipv6 := b.network.(*layers.IPv6); ipv6 && (next == layers.LayerTypeOSPF || next == layers.IPProtocolOSPF) {
+		next = captureOSPFv3Decoder{network: b.network}
+	}
 	if next == layers.LayerTypeIPSecESP || next == layers.IPProtocolESP {
 		next = captureESPDecoder{}
 	}
@@ -127,6 +130,8 @@ func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
 	}
 	if b.last != nil && len(b.last.LayerPayload()) == 0 {
 		switch d := next.(type) {
+		case captureOSPFv3Decoder:
+			return d.Decode(nil, b.PacketBuilder)
 		case captureESPDecoder:
 			return d.Decode(nil, b.PacketBuilder)
 		case captureAHDecoder:

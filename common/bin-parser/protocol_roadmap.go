@@ -133,7 +133,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "ISATAP", Family: "internet", Sources: src(srcWireshark), Status: stTodo, Priority: priP4},
 
 	{Name: "OSPF", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
-	{Name: "OSPFv3", Family: "routing", Sources: src(srcWireshark), Status: stTodo, Priority: priP2},
+	{Name: "OSPFv3", Family: "routing", Sources: src(srcWireshark), Status: stPartial, Priority: priP2, Notes: "bounded shared five-message/native IPv6 and base-LSA wire fields; authentication/LLS trailers and unknown LSA bodies need context; no LSDB, verified adjacency or installed route"},
 	{Name: "BGP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP1, Notes: "Native bounded messages and observed negotiation; unselected AFI/SAFI and unavailable AS width remain opaque"},
 	{Name: "RIP", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
 	{Name: "RIPng", Family: "routing", Sources: src(srcWireshark, srcColasoft), Status: stPartial, Priority: priP2, Notes: "Bounded shared v1 wire and native IPv6 datagram entries; message-local next-hop advisories, no routing table/neighbor authentication or cross-message association"},

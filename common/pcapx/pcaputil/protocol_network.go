@@ -524,6 +524,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		return nil, true
 	}
+	if a.observeOSPFv3(p, e) {
+		return nil, true
+	}
 
 	// Check native observation admission before constructing or cloning field trees,
 	// quoted packets, ND options or the captured Raw projection. Capture buffers

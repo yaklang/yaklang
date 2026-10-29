@@ -210,6 +210,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	path("dns|mdns|llmnr|dot|doh|doq", "dns", "dns.qry.name.escaped", "Lossless escaped DNS question name", DisplayString, 0, "pdu", "DNS", "Questions", "*", "Name")
 	out = append(out, routingDisplayBindings()...)
 	out = append(out, pimDisplayBindings()...)
+	out = append(out, ospfv3DisplayBindings()...)
 	out = append(out, l2tp3DisplayBindings()...)
 	out = append(out, stpDisplayBindings()...)
 	out = append(out, ripngDisplayBindings()...)
