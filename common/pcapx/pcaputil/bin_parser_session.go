@@ -811,6 +811,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "ssh":
 		e.nativeSSHObservation = true
 		e.Session, err = f.ssh.consume(dir, e.Raw)
+		if err != nil && e.Session["Error Scope"] == "message" {
+			// Only the SSH codec can establish this complete cleartext boundary.
+			// Keep its role diagnostic privately; the refused method publishes
+			// no successful fields and cannot retire the next complete message.
+			e.nativeSessionMessage = true
+			e.semanticSession = cloneSession(e.Session)
+		}
 	case "telnet":
 		e.Session, err = stream_parser.DecodeNetworkControl(e.Raw, "telnet")
 	case "nfs":
