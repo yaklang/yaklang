@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"encoding/binary"
 	"errors"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -82,20 +83,126 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 		require.Equal(t, uint16(3), info["OpNum"])
 	})
 
-	t.Run("authenticated-stub-is-opaque-and-auth-length-is-bounded", func(t *testing.T) {
+	t.Run("authenticated-stub-is-published-with-auth-metadata", func(t *testing.T) {
 		d := newReviewDCERPC()
-		bodyWithVerifier := append(make([]byte, 8), 0x11, 0x22)
-		wire := dcerpcPDU(0, dcerpcFirst|dcerpcLast, call, bodyWithVerifier)
-		binary.LittleEndian.PutUint16(wire[10:12], 2)
+		wire := dcerpcTestAuth(dcerpcRequest(call, 0, 3, nil), 2, 0, 0)
 		info, err := d.consumeFrom(0, wire, max)
-		require.Nil(t, info)
-		require.Equal(t, ErrUnsupportedFeature, reviewProtocolKind(t, err))
+		require.NoError(t, err)
+		require.Equal(t, true, info["Authenticated"])
+		require.Equal(t, uint8(10), info["Auth Type"])
+		require.Equal(t, uint8(0), info["Auth Level"])
+		require.Equal(t, 2, info["Auth Value Bytes"])
+		require.Equal(t, uint16(3), info["OpNum"])
 
 		bad := append([]byte(nil), wire...)
 		binary.LittleEndian.PutUint16(bad[10:12], 100)
 		_, err = d.consumeFrom(0, bad, max)
 		require.ErrorContains(t, err, "authentication verifier length exceeds fragment payload")
 	})
+}
+
+func dcerpcTestAuth(pdu []byte, authLen, pad int, level byte) []byte {
+	pdu = append([]byte(nil), pdu...)
+	body := append([]byte(nil), pdu[16:]...)
+	body = append(body, make([]byte, pad)...)
+	trailer := make([]byte, 8+authLen)
+	trailer[0] = 10 // NTLMSSP
+	trailer[1] = level
+	trailer[2] = byte(pad)
+	body = append(body, trailer...)
+	binary.LittleEndian.PutUint16(pdu[8:10], uint16(16+len(body)))
+	binary.LittleEndian.PutUint16(pdu[10:12], uint16(authLen))
+	return append(pdu[:16], body...)
+}
+
+func TestProtocolSessionDCERPCAuthenticatedCallsContinue(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	ts := time.Unix(1, 0)
+
+	bind := dcerpcTestAuth(dcerpcBindContexts(11, 1,
+		dcerpcBindContext{uuid: dcerpcEPM, id: 0},
+	), 40, 0, 6)
+	r := s.Feed(0, ts, bind)
+	require.Nil(t, r.Err)
+	require.Equal(t, true, r.Events[0].Session["Authenticated"])
+	require.Equal(t, uint8(6), r.Events[0].Session["Auth Level"])
+
+	ack := dcerpcBindAckResults(12, 1, dcerpcBindAckEntry{result: 0, syntax: dcerpcNDR, version: 2})
+	r = s.Feed(1, ts, ack)
+	require.Nil(t, r.Err)
+	require.Equal(t, []uint16{0}, r.Events[0].Session["Accepted Context IDs"])
+
+	request := dcerpcTestAuth(dcerpcRequest(2, 0, 15, []byte{1, 2, 3, 4}), 16, 8, 6)
+	r = s.Feed(0, ts, request)
+	require.Nil(t, r.Err)
+	require.Equal(t, uint16(15), r.Events[0].Session["OpNum"])
+	require.Equal(t, 4, r.Events[0].Session["Stub Bytes"], "auth padding must not be counted as stub data")
+	require.Equal(t, true, r.Events[0].Session["Stub Opaque"])
+
+	response := dcerpcTestAuth(dcerpcResponse(2, 0, []byte{9, 9}), 16, 8, 6)
+	r = s.Feed(1, ts, response)
+	require.Nil(t, r.Err)
+	require.Equal(t, "matched", r.Events[0].Session["Association Status"])
+}
+
+func TestProtocolSessionDCERPCBindAckNegotiateResult(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	ts := time.Unix(1, 0)
+
+	bind := dcerpcBindContexts(11, 1,
+		dcerpcBindContext{uuid: dcerpcEPM, id: 0},
+		dcerpcBindContext{uuid: dcerpcSRVSVC, id: 1},
+	)
+	require.Nil(t, s.Feed(0, ts, bind).Err)
+	ack := dcerpcBindAckResults(12, 1,
+		dcerpcBindAckEntry{result: 0, syntax: dcerpcNDR, version: 2},
+		dcerpcBindAckEntry{result: 3, syntax: dcerpcNDR, version: 2},
+	)
+	r := s.Feed(1, ts, ack)
+	require.Nil(t, r.Err)
+	require.Equal(t, []uint16{0}, r.Events[0].Session["Accepted Context IDs"])
+	require.Equal(t, []uint16{1}, r.Events[0].Session["Negotiated Context IDs"])
+}
+
+func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
+	raw, err := os.ReadFile("../../../testdata/enterprise-traffic-analysis/lateral-movement-psexec/capture.pcapng")
+	require.NoError(t, err)
+	events, _, err := binReplay(t, raw, 1)
+	require.NoError(t, err)
+
+	var dcerpcEvents []*BinParserEvent
+	for _, event := range events {
+		if event.Protocol == "dcerpc" {
+			dcerpcEvents = append(dcerpcEvents, event)
+		}
+	}
+	require.NotEmpty(t, dcerpcEvents)
+
+	var foundAuth3, foundRequest, foundResponse bool
+	for _, event := range dcerpcEvents {
+		require.Empty(t, event.Error, "DCE/RPC authentication must not stop the stream: %s", event.Error)
+		ptype, _ := event.Session["PType"].(byte)
+		switch ptype {
+		case 16:
+			foundAuth3 = true
+			require.Equal(t, true, event.Session["Authenticated"])
+		case 0:
+			if op, ok := event.Session["OpNum"].(uint16); ok && op == 15 {
+				foundRequest = true
+				require.Equal(t, true, event.Session["Stub Opaque"])
+			}
+		case 2:
+			foundResponse = true
+			require.Equal(t, "matched", event.Session["Association Status"])
+		}
+	}
+	require.True(t, foundAuth3, "NTLM AUTH3 must be framed and retained")
+	require.True(t, foundRequest, "svcctl request after authenticated bind must be decoded")
+	require.True(t, foundResponse, "svcctl response after authenticated bind must be decoded")
 }
 
 func TestProtocolSessionDCERPCResponseContextMustMatchRequest(t *testing.T) {

@@ -184,17 +184,31 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		"Last Frag":     flags&dcerpcLast != 0,
 	}
 	if authLength > 0 {
-		// A security trailer contains an 8-byte verifier header before the
-		// auth_value. We do not decode authenticated stub data, so reject the
-		// whole PDU as opaque rather than counting verifier bytes as stub.
+		// The security trailer is fixed at the end of the PDU:
+		// 8-byte sec_trailer + auth_length bytes of verifier data. The stub
+		// before it may be encrypted or signed; retain that boundary without
+		// pretending to decode it.
 		if len(body) < 8 || authLength > len(body)-8 {
 			return nil, fmt.Errorf("dcerpc: authentication verifier length exceeds fragment payload")
 		}
-		d.discardFragment(fragmentKeyFor(dir, call))
-		if err := d.reserveMemory(d.retainedBytes()); err != nil {
-			return nil, err
+		authTrailer := body[len(body)-(8+authLength):]
+		authPad := int(authTrailer[2])
+		info["Authenticated"] = true
+		info["Auth Type"] = authTrailer[0]
+		info["Auth Level"] = authTrailer[1]
+		info["Auth Pad Length"] = authPad
+		info["Auth Context ID"] = binary.LittleEndian.Uint32(authTrailer[4:8])
+		info["Auth Value Bytes"] = authLength
+		if authTrailer[1] >= 6 {
+			info["Stub Opaque"] = true
 		}
-		return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC authentication verifier is not supported")
+		body = body[:len(body)-(8+authLength)]
+		if authPad > len(body) {
+			return nil, fmt.Errorf("dcerpc: authentication padding exceeds fragment payload")
+		}
+		if authPad > 0 {
+			body = body[:len(body)-authPad]
+		}
 	}
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
 	parseFlags := flags
@@ -329,6 +343,12 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		if err := d.consumeBindAck(call, "AlterContext", "AlterContextResp", dir, body, info, max); err != nil {
 			return nil, err
 		}
+	case 16:
+		if len(body) < 4 {
+			return nil, fmt.Errorf("dcerpc: truncated auth3")
+		}
+		info["Max Xmit Frag"] = binary.LittleEndian.Uint16(body[0:2])
+		info["Max Recv Frag"] = binary.LittleEndian.Uint16(body[2:4])
 	}
 	return info, nil
 }
@@ -467,6 +487,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	var accepted []dcerpcProposal
 	var rejected []uint16
+	var negotiated []uint16
 	for i, result := range results {
 		proposal := proposals[i]
 		switch result.result {
@@ -480,6 +501,11 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 			accepted = append(accepted, proposal)
 		case 1, 2:
 			rejected = append(rejected, proposal.id)
+		case 3:
+			// negotiate_ack is a valid per-context outcome. The server is
+			// offering a different transfer syntax; keep it out of the active
+			// context map instead of invalidating the complete BindAck.
+			negotiated = append(negotiated, proposal.id)
 		default:
 			return fmt.Errorf("dcerpc: invalid bind result %d", result.result)
 		}
@@ -517,6 +543,9 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	if len(rejected) > 0 {
 		info["Rejected Context IDs"] = rejected
+	}
+	if len(negotiated) > 0 {
+		info["Negotiated Context IDs"] = negotiated
 	}
 	return nil
 }
@@ -779,6 +808,8 @@ func dcerpcPTypeName(p byte) string {
 		return "AlterContext"
 	case 15:
 		return "AlterContextResp"
+	case 16:
+		return "Auth3"
 	}
 	return fmt.Sprintf("PType %d", p)
 }

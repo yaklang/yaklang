@@ -43,6 +43,11 @@ func ParseStructuredWithConfig(data []byte, rule string, config map[string]any, 
 			return value, nil
 		}
 	}
+	if rule == "application-layer.dcerpc" && len(keys) == 1 && keys[0] == "DCERPC" && base.ParserRegistration("default") == defaultParserRegistration {
+		if value, ok := captureDCERPCStructured(data); ok {
+			return map[string]any{"fields": value, "metadata": nil}, nil
+		}
+	}
 	r := &structuredReader{Reader: bytes.NewReader(data), bits: uint64(len(data)) * 8}
 	node, err := ParseBinaryWithConfig(r, rule, config, keys...)
 	if err != nil {

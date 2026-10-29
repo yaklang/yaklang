@@ -70,6 +70,10 @@ Package:
           this.ProcessSubNode("Fault")
           return
         }
+        if ptype == 16 {
+          this.ProcessSubNode("Auth3")
+          return
+        }
       Bind:
         operator: |
           this.ProcessSubNode("Max Xmit Frag")
@@ -161,6 +165,12 @@ Package:
         Reserved: uint8
         Status: uint32
         Reserved2: uint32
+      Auth3:
+        operator: |
+          this.ProcessSubNode("Max Xmit Frag")
+          this.ProcessSubNode("Max Recv Frag")
+        Max Xmit Frag: uint16
+        Max Recv Frag: uint16
       BindAck:
         operator: |
           this.ProcessSubNode("Max Xmit Frag")
