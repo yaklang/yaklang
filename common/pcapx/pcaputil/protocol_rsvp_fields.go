@@ -32,15 +32,48 @@ func rsvpScopedRows(root map[string]any, scope string) []map[string]any {
 			out = append(out, h)
 			continue
 		}
+		body, _ := row["Body"].(map[string]any)
+		if class == 9 || class == 12 || class == 13 {
+			out = append(out, rsvpIntservScopedRows(body, scope)...)
+			continue
+		}
 		match := map[string]uint64{"session": 1, "hop": 3, "time": 5, "error": 6, "scope": 7, "style": 8, "filter": 10, "sender": 11, "confirm": 15}[scope]
 		if match != class {
 			continue
 		}
-		body, _ := row["Body"].(map[string]any)
 		if scope == "scope" {
 			out = append(out, rsvpRows(body["Addresses"])...)
 		} else if body != nil {
 			out = append(out, body)
+		}
+	}
+	return out
+}
+
+func rsvpIntservScopedRows(body map[string]any, scope string) []map[string]any {
+	if scope == "intserv-header" {
+		return rsvpRows(body["Intserv Header"])
+	}
+	var out []map[string]any
+	for _, service := range rsvpRows(body["Services"]) {
+		if scope == "intserv-service" {
+			out = append(out, rsvpRows(service["Header"])...)
+			continue
+		}
+		for _, parameter := range rsvpRows(service["Parameters"]) {
+			if scope == "intserv-parameter" {
+				out = append(out, rsvpRows(parameter["Header"])...)
+				continue
+			}
+			value, _ := parameter["Body"].(map[string]any)
+			if scope == "intserv-value" {
+				out = append(out, value)
+				continue
+			}
+			key := map[string]string{"intserv-rate": "Token Bucket Rate", "intserv-bucket": "Token Bucket Size", "intserv-peak": "Peak Data Rate", "intserv-bandwidth": "Composed Available Path Bandwidth"}[scope]
+			if key != "" {
+				out = append(out, rsvpRows(value[key])...)
+			}
 		}
 	}
 	return out
@@ -109,6 +142,31 @@ func rsvpDisplayBindings() []displayFieldBinding {
 	}
 	add("rsvp.checksum_omitted", "Checksum Omitted", "root", DisplayBoolean, 0, true)
 	add("rsvp.checksum_verified", "Checksum Verified", "root", DisplayBoolean, 0, true)
+	for _, s := range []struct {
+		name, key, scope string
+		bits             int
+	}{
+		{"rsvp.intserv.version_and_unused", "Version and Unused", "intserv-header", 16}, {"rsvp.intserv.message_length_words", "Message Length Words", "intserv-header", 16},
+		{"rsvp.intserv.service", "Service Number", "intserv-service", 8}, {"rsvp.intserv.service_flags", "Flags", "intserv-service", 8}, {"rsvp.intserv.service_length_words", "Data Length Words", "intserv-service", 16},
+		{"rsvp.intserv.parameter", "Parameter Number", "intserv-parameter", 8}, {"rsvp.intserv.parameter_flags", "Flags", "intserv-parameter", 8}, {"rsvp.intserv.parameter_length_words", "Data Length Words", "intserv-parameter", 16},
+		{"rsvp.intserv.minimum_policed_unit", "Minimum Policed Unit", "intserv-value", 32}, {"rsvp.intserv.maximum_packet_size", "Maximum Packet Size", "intserv-value", 32},
+		{"rsvp.intserv.composed_hop_count", "Composed IS Hop Count", "intserv-value", 32}, {"rsvp.intserv.composed_minimum_latency", "Composed Minimum Path Latency", "intserv-value", 32}, {"rsvp.intserv.composed_mtu", "Composed Path MTU", "intserv-value", 32},
+	} {
+		add(s.name, s.key, s.scope, DisplayUnsigned, s.bits, false)
+	}
+	add("rsvp.intserv.version", "Version", "intserv-header", DisplayUnsigned, 4, true)
+	add("rsvp.intserv.unused", "Unused Bits", "intserv-header", DisplayUnsigned, 12, true)
+	add("rsvp.intserv.service_break", "Break Bit Observed", "intserv-service", DisplayBoolean, 0, true)
+	add("rsvp.intserv.service_reserved", "Reserved Flag Bits", "intserv-service", DisplayUnsigned, 7, true)
+	add("rsvp.intserv.parameter_invalid_observed", "Invalid Bit Observed", "intserv-parameter", DisplayBoolean, 0, true)
+	add("rsvp.intserv.parameter_reserved", "Reserved Flag Bits", "intserv-parameter", DisplayUnsigned, 7, true)
+	for _, s := range []struct{ name, scope string }{{"token_bucket_rate", "intserv-rate"}, {"token_bucket_size", "intserv-bucket"}, {"peak_data_rate", "intserv-peak"}, {"available_path_bandwidth", "intserv-bandwidth"}} {
+		// These private aliases expose exact decimal text and IEEE32 bits
+		// separately. They are deliberately not Wireshark float aliases.
+		add("rsvp.intserv."+s.name+"_bits", "IEEE754 Bits", s.scope, DisplayUnsigned, 32, false)
+		add("rsvp.intserv."+s.name, "Value", s.scope, DisplayString, 0, false)
+		add("rsvp.intserv."+s.name+"_classification", "Classification", s.scope, DisplayString, 0, true)
+	}
 	return out
 }
 func (e *ProtocolEvent) retainNativeRSVPFields(wire []byte) {

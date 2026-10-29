@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"math"
+	"math/big"
 	"net"
 	"testing"
 
@@ -157,6 +159,8 @@ func TestRSVPWrongLengthRetainsCapturedPrefixAndOwnTrailingRange(t *testing.T) {
 func FuzzRSVPBoundedOccurrences(f *testing.F) {
 	f.Add(rsvpTestMessage(1, rsvpTestObject(5, 1, []byte{0, 0, 0x75, 0x30})), uint8(2))
 	f.Add(rsvpTestMessage(1, rsvpTestObject(7, 1, []byte{192, 0, 2, 1, 192, 0, 2, 2})), uint8(2))
+	f.Add(rsvpTestMessage(1, rsvpTestObject(12, 2, rsvpIntservTestBody(rsvpIntservTestWords(1, 0, rsvpIntservTestToken())))), uint8(3))
+	f.Add(rsvpTestMessage(1, rsvpTestObject(13, 2, rsvpIntservTestBody(rsvpIntservTestWords(5, 0x80, nil)))), uint8(2))
 	f.Fuzz(func(t *testing.T, w []byte, budget uint8) {
 		if len(w) > 65535 {
 			return
@@ -187,6 +191,16 @@ func FuzzRSVPBoundedOccurrences(f *testing.F) {
 							}
 							require.Equal(t, actual, literal)
 						case string:
+							if key == "Value" && v["IEEE754 Bits"] != nil {
+								bits := binary.BigEndian.Uint32(w[a:b])
+								if bits&0x7f800000 != 0x7f800000 {
+									got, ok := new(big.Rat).SetString(literal)
+									require.True(t, ok)
+									want := new(big.Rat).SetFloat64(float64(math.Float32frombits(bits)))
+									require.Zero(t, got.Cmp(want))
+								}
+								continue
+							}
 							require.Contains(t, []uint64{4, 16}, b-a)
 							require.Equal(t, net.IP(w[a:b]).String(), literal)
 						case []byte:

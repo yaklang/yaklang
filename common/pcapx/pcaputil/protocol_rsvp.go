@@ -31,6 +31,9 @@ func (captureRSVPDecoder) Decode(w []byte, b gopacket.PacketBuilder) error {
 	if len(w) < 8 {
 		b.SetTruncated()
 	}
+	if errors.Is(err, stream_parser.ErrRSVPWireFormat) || errors.Is(err, stream_parser.ErrRSVPWireIntegrity) {
+		return &RSVPObservedWireError{Cause: err}
+	}
 	if errors.Is(err, stream_parser.ErrObservedWireContext) || errors.Is(err, stream_parser.ErrObservedWireBudget) {
 		return nil
 	}

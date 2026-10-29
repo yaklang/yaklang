@@ -27,6 +27,45 @@ func rsvpPresentationFrame(t *testing.T, wire []byte, v6 bool) []byte {
 	require.NoError(t, gopacket.SerializeLayers(b, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(wire)))
 	return b.Bytes()
 }
+
+func TestRSVPIntservProgressiveParameterDecimalAndCapturedPrefix(t *testing.T) {
+	w := make([]byte, 44)
+	copy(w, []byte{0x10, 1, 0, 0, 64, 0, 0, 44, 0, 36, 12, 2, 0, 0, 0, 7, 1, 0, 0, 6, 127, 0, 0, 5})
+	for _, offset := range []int{24, 28, 32} {
+		binary.BigEndian.PutUint32(w[offset:], 0x45bb8000)
+	}
+	binary.BigEndian.PutUint32(w[36:], 0)
+	binary.BigEndian.PutUint32(w[40:], 1500)
+	for _, v6 := range []bool{false, true} {
+		raw := replayPIMPresentationPacket(t, rsvpPresentationFrame(t, w, v6))
+		require.Len(t, raw.events, 1)
+		raw.reference = raw.events[0].SourceBytes.PacketRefs[0]
+		budget, ok := rsvpObservedBudget(raw.events[0].Session)
+		require.True(t, ok)
+		require.Equal(t, 3, budget, "object, service and parameter consume the same shared budget")
+		for _, d := range []packetDetail{detail(raw), quickDetail(raw), workerMetadataDetailForPacket(t, raw)} {
+			text := detailLines(d.fields)
+			require.Contains(t, text, "Captured network prefix")
+			require.Contains(t, text, "Intserv Header")
+			require.Contains(t, text, "Global Sender Traffic Specification")
+			require.Contains(t, text, "Token Bucket TSpec")
+			require.Contains(t, text, "minimum-policed-unit-must-be-positive")
+			require.NotContains(t, text, "<nil>")
+			require.NotContains(t, text, "YAML dissector incomplete")
+			var offsets []int
+			for _, f := range d.fields {
+				if f.text == "Value: 6000" {
+					require.True(t, f.hasRange)
+					require.Equal(t, 1, f.source)
+					require.Equal(t, 4, f.end-f.start)
+					require.Equal(t, uint32(0x45bb8000), binary.BigEndian.Uint32(d.sources[0].Data[f.start:f.end]))
+					offsets = append(offsets, f.start)
+				}
+			}
+			require.Equal(t, []int{24, 28, 32}, offsets)
+		}
+	}
+}
 func TestRSVPProgressiveNamesSourcesAndAdvertisedSelectors(t *testing.T) {
 	w := []byte{0x10, 1, 0, 0, 64, 0, 0, 36, 0, 12, 1, 1, 203, 0, 113, 9, 17, 0, 0, 53, 0, 8, 5, 1, 0, 0, 0x75, 0x30, 0, 8, 5, 1, 0, 0, 0x75, 0x30}
 	for _, v6 := range []bool{false, true} {
