@@ -1,0 +1,26 @@
+{
+  "status": "prepared_only_not_executed",
+  "parent_manifest_SHA256": "e4dc664135c0c0b452fd4f0ab8b8f5a5bb3a31305e2842e0006fd0cf7177c8e6",
+  "files": {
+    "mixed_identity_replay.go": {
+      "bytes": 8657,
+      "SHA256": "9746f26abfcbb207b28722ba11e9ed93b1b5da518f81e627fc126716b1a68ff9"
+    },
+    "plan.json": {
+      "bytes": 1982,
+      "SHA256": "f32bab633b787e5df821f71af6cefe695b6403c6f5af3175edc7ddca41dbdf36"
+    },
+    "RUN-PLAN.txt": {
+      "bytes": 1916,
+      "SHA256": "3b510633d2c89f29ba090d3b9f190ca525b37a3296ad8a5d32dc5a8167edae3b"
+    },
+    "run_mixed_identity.py": {
+      "bytes": 3881,
+      "SHA256": "a42a474d9f22df716b059d8740a74c37a98b7b05298be95bff58d44c0b74c426"
+    },
+    "run_windows_identity.py": {
+      "bytes": 8886,
+      "SHA256": "82c704e3c20d5da3041bc759b76b80bcc0106c25c45a8138b5487622b67a5230"
+    }
+  }
+}

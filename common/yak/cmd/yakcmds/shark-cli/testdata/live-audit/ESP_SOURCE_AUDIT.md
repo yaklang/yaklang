@@ -257,3 +257,36 @@ attributes. Derived counts must not acquire an invented ciphertext interval or
 hex highlight. These two auditors explicitly bind the historical `24ca25d1`
 producer. New producer verification needs its own source checkpoint; do not
 relabel those historical console executions.
+
+## Contributor identity and bounded-detail availability
+
+`contributor-identity/source-manifest.json` preserves the literal external Go
+replay probe, its build/run controller and the separately frozen Windows v2
+driver. The Go probe uses actual callbacks from the selected immutable capture.
+It keeps full snapshots only as a reference; its partial witness contains only
+IDs returned by the inspector's source-reference index, never omitted fields.
+It checks same-frame Initial/padding after actual detail eviction and the
+global1MiB replay's actual PDU299/frame294 association. No production API was
+added to work around Yak's inability to construct that Go snapshot value.
+
+Build/run with `contributor-identity/run_mixed_identity.py build|run --repo ROOT
+--source FULL_SHA --out FRESH`, supplying the closed build `--producer` for run
+and explicit `--capture`/`--keylog` locations where needed. These are selected
+source-profile proofs, not arbitrary-capture assertions. The Windows v2 driver
+additionally freezes small source files and hashes all inputs before/after.
+Its console helper retains its original producer independently of the current
+application. The earlier page's successful identity query still had visual
+caption/PDU0 defects; its historical execution is not rewritten as a UI pass.
+
+`history_windows_cells_audit.py --runtime CLOSED --source FULL_SHA
+--audit-modules THIS_FOLDER --out FRESH` independently verifies that the
+unavailable-detail page keeps its observed caption, prints no fake PDU0, and
+does not duplicate the reason or manufacture plaintext. It checks every visible
+physical-frame octet and five negative mutations. The strengthened duplicate
+reason control preserves the heading and byte source, so it fails on the
+intended condition rather than a missing unrelated heading.
+
+`protocol_label_cohorts.py --census CLOSED_LABEL_SUMMARY --out FRESH` verifies
+both margins of the exact label-pair matrices and renders reference TOP30
+cohorts. It preserves every label and each physical frame's single membership;
+it does not turn spelling, visibility or conservative refusal into a score.
