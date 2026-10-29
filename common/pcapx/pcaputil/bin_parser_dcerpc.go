@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
+	binparser "github.com/yaklang/yaklang/common/bin-parser/parser"
 )
 
 // binDCERPC is the M0 session state for connection-oriented DCE/RPC v5.
@@ -199,6 +201,11 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		info["Auth Pad Length"] = authPad
 		info["Auth Context ID"] = binary.LittleEndian.Uint32(authTrailer[4:8])
 		info["Auth Value Bytes"] = authLength
+		if authTrailer[0] == 10 {
+			if ntlm, ok := binparser.ParseNTLMSSPFields(authTrailer[8:]); ok {
+				info["NTLMSSP"] = ntlm
+			}
+		}
 		if authTrailer[1] >= 6 {
 			info["Stub Opaque"] = true
 		}

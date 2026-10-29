@@ -33,6 +33,9 @@ func TestPCAPDBDcerpcAuthTrailerKeepsFollowingCalls(t *testing.T) {
 			}
 		case 16:
 			foundAuth3 = true
+			ntlm, ok := message.Session["NTLMSSP"].(map[string]any)
+			require.True(t, ok, "NTLM Type3 identity fields must be indexed")
+			require.NotEmpty(t, ntlm["User"])
 		case 0:
 			if op, ok := testSessionUint(message.Session["OpNum"]); ok && op == 15 {
 				foundRequest = true

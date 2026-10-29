@@ -109,7 +109,7 @@ func captureDCERPCStructured(w []byte) (map[string]any, bool) {
 		return nil, false
 	}
 
-	pdu["Auth Verifier"] = map[string]any{
+	authVerifier := map[string]any{
 		"Auth Type":       uint64(trailer[0]),
 		"Auth Level":      uint64(trailer[1]),
 		"Auth Pad Length": uint64(trailer[2]),
@@ -117,6 +117,12 @@ func captureDCERPCStructured(w []byte) (map[string]any, bool) {
 		"Auth Context ID": uint64(binary.LittleEndian.Uint32(trailer[4:8])),
 		"Auth Value":      append([]byte(nil), trailer[8:]...),
 	}
+	if trailer[0] == 10 {
+		if ntlm, ok := ParseNTLMSSPFields(trailer[8:]); ok {
+			authVerifier["NTLMSSP"] = ntlm
+		}
+	}
+	pdu["Auth Verifier"] = authVerifier
 	fields["PDU"] = pdu
 	return fields, true
 }

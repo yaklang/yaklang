@@ -190,6 +190,9 @@ func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
 		case 16:
 			foundAuth3 = true
 			require.Equal(t, true, event.Session["Authenticated"])
+			ntlm, ok := event.Session["NTLMSSP"].(map[string]any)
+			require.True(t, ok, "NTLM Type3 identity fields must be structured")
+			require.NotEmpty(t, ntlm["User"])
 		case 0:
 			if op, ok := event.Session["OpNum"].(uint16); ok && op == 15 {
 				foundRequest = true
