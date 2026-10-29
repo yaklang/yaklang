@@ -58,10 +58,11 @@ type decodeField struct {
 	Source     int
 }
 type decodeResponse struct {
-	Protocol string
-	Number   uint64
-	Fields   []decodeField
-	Sources  []detailSource
+	Protocol          string
+	DetailUnavailable bool `json:",omitempty"`
+	Number            uint64
+	Fields            []decodeField
+	Sources           []detailSource
 }
 
 var WorkerCommand = &cli.Command{
@@ -111,7 +112,7 @@ func runDecodeWorker(input io.Reader, output io.Writer) error {
 		}
 		d = detail(raw)
 	}
-	response := decodeResponse{Number: d.number, Protocol: d.protocol, Sources: d.sources}
+	response := decodeResponse{Number: d.number, Protocol: d.protocol, DetailUnavailable: d.unavailable, Sources: d.sources}
 	for _, f := range d.fields {
 		response.Fields = append(response.Fields, decodeField{Depth: f.depth, Text: f.text, Branch: f.branch, Start: f.start, End: f.end, HasRange: f.hasRange, Source: f.source})
 	}
@@ -317,10 +318,21 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 	}
 	d := quickDetail(raw)
 	d.protocol = response.Protocol
-	// Native packet identity is frozen before IPC. The child receives public
-	// field snapshots, not the private authentication/ALPN proof; its raw UDP
-	// fallback must not overwrite that observed HTTP3 identity on a diagnostic.
-	if raw.presentation.protocol == "HTTP/3" && (raw.presentation.scope == "authenticated application bytes" || raw.presentation.scope == "connection protocol violation observed") {
+	d.unavailable = response.DetailUnavailable
+	// The parent freezes classification at capture time. IPC receives public
+	// snapshots, so its carrier fallback can lose the original private proof.
+	// Preserve that caption without restoring any fields, bytes or authentication.
+	if d.unavailable {
+		observed := raw.presentation
+		if late := presentEvents(raw.protocolEvents()); late.protocol != "" {
+			observed = late
+		}
+		if observed.protocol != "" {
+			d.protocol = observed.protocol
+		}
+	} else if raw.presentation.protocol == "HTTP/3" {
+		// Complete public IPC fields can still omit the native ALPN proof,
+		// including authenticated STREAM observations blocked on QPACK.
 		d.protocol = raw.presentation.protocol
 	}
 	d.fields = nil
@@ -344,6 +356,7 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
 	if req.Events != nil {
+		d.unavailable = protocolDetailsUnavailable(req.Events)
 		for _, event := range req.Events {
 			if _, _, refused := networkHeaderRefusalPresentation(event); refused {
 				// There is no captured frame in a stream-only request. Retain the
