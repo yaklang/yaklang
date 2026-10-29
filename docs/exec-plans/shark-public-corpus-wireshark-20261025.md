@@ -4861,3 +4861,18 @@ checksum API增加声明长度守卫，47项检查通过，598个direct完整结
 没有将后者冒称重跑native/UI。cd7af四项CI成功，后续提交另跟踪。参考缺口、保留
 的检查器/导航失败及未覆盖的SA/LSDB/扩展范围见[报告](shark-public-corpus-20261025/ospfv2-cd7af.md)
 和[证据摘要](shark-public-corpus-20261025/ospfv2-cd7af-summary.json)。
+
+## GTPv2-C 有界接入、字段与接收长度
+
+f1068/df30接入共享canonical/native EPC GTPv2-C观察、私有字段与具体消息名称。
+官方六帧与20场景24帧的独立source/API检查、30个typed descriptor及54条SDK/CLI
+桥通过。旧官方六帧SDK为缺ChannelBind的TURN context-required、CLI为UDP；新六帧
+均为decoded GTPv2-C。未将端口提示或原始大包的5535条越界UDP当成GTP正样本。
+
+接收扩展保留可证EBI/F-TEID前缀，短值/非法Cause长度/无F-TEID地址类型有错误；
+非EPC余体和Recovery歧义尾明确未选。五包285612通过/24跳过是f1068基线，后续
+59项相关检查及IPv6/双地址1项通过；df30 fuzz150375次无失败。37输入307818个
+完整native对象、384518条完整CLI行及两个flow在df30实际重跑后均字节一致，无ID
+归一化。两张Windows默认预算页的完整来源、第二消息高亮和CP936已核对；修复了
+截图helper空request与半写JSON竞争，原失败保留。范围和纯源归档详见
+[报告](shark-public-corpus-20261025/gtpv2-df30.md)与[聚合摘要](shark-public-corpus-20261025/gtpv2-df30-summary.json)。
