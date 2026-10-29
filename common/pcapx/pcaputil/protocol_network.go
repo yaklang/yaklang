@@ -524,7 +524,7 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		return nil, true
 	}
-	if a.observeOSPFv2(p, e) || a.observeOSPFv3(p, e) {
+	if a.observeOSPFv2(p, e) || a.observeOSPFv3(p, e) || a.observeRSVP(p, e) {
 		return nil, true
 	}
 

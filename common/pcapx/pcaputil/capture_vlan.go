@@ -84,6 +84,16 @@ func (b *captureCarrierBuilder) SetTransportLayer(layer gopacket.TransportLayer)
 	b.udp, _ = layer.(*layers.UDP)
 }
 func (b *captureCarrierBuilder) NextDecoder(next gopacket.Decoder) error {
+	if rsvpNextLayer(b.last) {
+		// Observer admission cannot know later capture-record metadata. Keep
+		// incomplete parents opaque; native ingress has the actual snaplen and
+		// may retain bounded partial fields after its own parent checks.
+		if espParentLengthBounded(b.network, false) {
+			next = captureRSVPDecoder{}
+		} else {
+			next = gopacket.LayerTypePayload
+		}
+	}
 	if _, ipv4 := b.network.(*layers.IPv4); ipv4 && (next == layers.LayerTypeOSPF || next == layers.IPProtocolOSPF) {
 		next = captureOSPFv2Decoder{}
 	}
