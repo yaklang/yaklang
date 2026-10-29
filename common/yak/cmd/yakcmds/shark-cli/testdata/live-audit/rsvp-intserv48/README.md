@@ -19,6 +19,10 @@ values. Reference mapping01 preparation and comparator01 classification errors
 are also preserved. The separate source48 model and its original source46
 observations were never rewritten to match candidate or reference outputs.
 
+The exact executed API checker contains one tab-only blank line. Its narrow
+whitespace attribute preserves that historical source byte and its SHA rather
+than rewriting the executed checker for formatting. Other source checks remain.
+
 See the Intserv report for direct49 versus default38 scope, literal/derived
 counts, full-record preservation, precise Windows source/highlight proof and
 Wireshark display differences. No complete RSVP procedure, Guaranteed-service
