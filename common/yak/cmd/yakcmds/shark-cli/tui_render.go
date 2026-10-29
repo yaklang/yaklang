@@ -485,6 +485,9 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		if u.fields.protocol != "" {
 			title = "2 " + u.fields.protocol + " FIELDS"
 		}
+		if u.fields.unavailable {
+			title += " · detail unavailable"
+		}
 		r := c.box(l.fields, title, fmt.Sprintf("#%d", u.fields.number), u.pane == 1)
 		u.drawFields(c, r)
 	}

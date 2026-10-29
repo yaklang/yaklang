@@ -102,7 +102,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	add := func(text string, branch bool) { out = append(out, field{text: clipText(text, 2048), branch: branch}) }
 	verified, rejected := 0, 0
 	for _, e := range ordered {
-		if e == nil || e.Protocol != "tls" {
+		if e == nil || e.Completeness == "evicted" || e.Protocol != "tls" {
 			continue
 		}
 		if e.Session["Authentication Verified"] == true {
@@ -114,7 +114,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	}
 	seenH3Fault := map[uint64]bool{}
 	for _, e := range ordered {
-		if e == nil {
+		if e == nil || e.Completeness == "evicted" {
 			continue
 		}
 		fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any)
@@ -134,7 +134,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	// Packet authentication never covers an unparsed datagram neighbour. Put
 	// this range warning before possibly large authenticated CRYPTO/STREAM trees.
 	for _, e := range ordered {
-		if e != nil && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
+		if e != nil && e.Completeness != "evicted" && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 			add(fmt.Sprintf("QUIC remainder #%d: %d bytes · authentication not verified", e.ID, e.Length), false)
 			add(e.Summary, false)
 		}
@@ -655,6 +655,26 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 		if e == nil {
 			continue
 		}
+		if e.Completeness == "evicted" {
+			// Coverage markers are context, not decoded protocol PDUs. In
+			// particular, ID zero must never look like an observed PDU #0.
+			label := "Contributor coverage · detail unavailable"
+			if e.ID != 0 {
+				label = fmt.Sprintf("PDU #%d · detail unavailable", e.ID)
+			}
+			add(label, true)
+			reason := e.Summary
+			if reason == "" {
+				reason = e.Error
+			}
+			if reason != "" {
+				add(reason, false)
+			}
+			if e.Error != "" && e.Error != reason {
+				add("Error: "+e.Error, false)
+			}
+			continue
+		}
 		protocol, currentSource = e.Protocol, 0
 		quicHeaderForm = textValue(e.Session["Header Form"])
 		routingVersion = number(e.Session["Protocol Version"])
@@ -978,6 +998,15 @@ func retainedStreamEvents(history *pcaputil.ProtocolInspector, stream *streamSna
 		}
 	}
 	return out
+}
+
+func protocolDetailsUnavailable(events []*pcaputil.ProtocolEvent) bool {
+	for _, e := range events {
+		if e != nil && e.Completeness == "evicted" {
+			return true
+		}
+	}
+	return false
 }
 func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 	var names []string

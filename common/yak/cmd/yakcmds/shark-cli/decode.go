@@ -336,11 +336,12 @@ type detailSource struct {
 	Data []byte
 }
 type packetDetail struct {
-	protocol string
-	number   uint64
-	fields   []field
-	hex      []string
-	sources  []detailSource
+	protocol    string
+	unavailable bool
+	number      uint64
+	fields      []field
+	hex         []string
+	sources     []detailSource
 }
 
 // The same admission barrier applies to both the summary and every inspector.
@@ -442,6 +443,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 		return d // Invalid TCP cannot enter legacy YAML or a partial option formatter.
 	}
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	d.unavailable = protocolDetailsUnavailable(events)
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)
 	}
@@ -723,6 +725,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		return d
 	}
 	events, networkRefused := protocolDetailEvents(raw.protocolEvents())
+	d.unavailable = protocolDetailsUnavailable(events)
 	if networkRefused {
 		appendCapturedNetworkPrefix(&d, raw, events)
 	}
