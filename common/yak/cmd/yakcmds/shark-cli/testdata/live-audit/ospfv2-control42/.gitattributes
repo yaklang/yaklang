@@ -1,0 +1,4 @@
+*.py -text
+*.go.txt -text
+*.json text eol=lf
+*.md text eol=lf

@@ -4847,3 +4847,17 @@ LSA独立失败分别保留；113项检查、145457次OSPFv3 fuzz通过。HTTP/3
 为136113次。旧本地完整回归的3个旧fuzz合同失败保留原结论，未改记为成功。
 详见[准确范围与证据](shark-public-corpus-20261025/recovery-http3-7e022.md)及
 [计数摘要](shark-public-corpus-20261025/recovery-http3-7e022-summary.json)。
+
+## OSPFv2 五类消息、字段和实际页面
+
+cd7af接入共享canonical/native OSPFv2观察及私有字段。两大原包556帧的五类消息
+数量、15506个wire字段、16220个typed字段均有独立来源核验；新增556个完整原生
+对象和556条CLI行符合来源构造。37输入旧307262个完整native对象和383962条非目标
+CLI行在明确生成编号引用账本之外保持，两个flow文件逐字节不变。三张默认预算
+Windows页核对具体消息/LSA/LLS名称、递进树、来源和高亮；不是新抓流量或像素截图。
+
+完整五包285594通过/24跳过/0失败，OSPFv2 fuzz243255次/60秒无失败。随后公共
+checksum API增加声明长度守卫，47项检查通过，598个direct完整结果仍字面一致，
+没有将后者冒称重跑native/UI。cd7af四项CI成功，后续提交另跟踪。参考缺口、保留
+的检查器/导航失败及未覆盖的SA/LSDB/扩展范围见[报告](shark-public-corpus-20261025/ospfv2-cd7af.md)
+和[证据摘要](shark-public-corpus-20261025/ospfv2-cd7af-summary.json)。

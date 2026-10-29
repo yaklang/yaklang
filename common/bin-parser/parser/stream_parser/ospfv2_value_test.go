@@ -71,6 +71,17 @@ func ospfv2TestLSA(typ byte, body []byte) []byte {
 	return w
 }
 
+func TestOSPFv2ChecksumHelperOwnsOnlyTheDeclaredPacket(t *testing.T) {
+	w := ospfv2TestHello(false, 2)
+	require.Zero(t, OSPFv2Checksum(w))
+	withTrailer := append(bytes.Clone(w), 0x99, 1, 2, 3, 4)
+	require.Zero(t, OSPFv2Checksum(withTrailer), "opaque appended bytes are outside the packet checksum extent")
+	require.Equal(t, uint16(0xffff), OSPFv2Checksum(w[:len(w)-1]), "missing declared bytes cannot supply a checksum proof")
+	invalid := bytes.Clone(w)
+	binary.BigEndian.PutUint16(invalid[2:], 23)
+	require.Equal(t, uint16(0xffff), OSPFv2Checksum(invalid))
+}
+
 func TestOSPFv2AllFiveEnvelopesAndHeaderOnlyIntegrity(t *testing.T) {
 	lsa := ospfv2TestLSA(2, []byte{255, 255, 255, 0, 192, 0, 2, 1})
 	for typ, body := range map[byte][]byte{
