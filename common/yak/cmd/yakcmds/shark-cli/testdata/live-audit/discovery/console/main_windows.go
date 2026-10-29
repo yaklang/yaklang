@@ -67,6 +67,9 @@ func saveScreen(path string, out *os.File) {
 	b, err := json.MarshalIndent(s, "", "  ")
 	fail(err)
 	fail(os.WriteFile(path, b, 0600))
+	// Publish completion only after the cell JSON has been written and closed.
+	// A reader observing the newly created JSON file may otherwise race its write.
+	fail(os.WriteFile(path+".ready", []byte("complete\n"), 0600))
 }
 func child() {
 	dir, binary := os.Args[2], os.Args[3]
@@ -116,7 +119,7 @@ func child() {
 			return
 		case <-tick.C:
 			b, e := os.ReadFile(filepath.Join(dir, "snapshot.request"))
-			if e == nil {
+			if e == nil && len(b) != 0 {
 				_ = os.Remove(filepath.Join(dir, "snapshot.request"))
 				saveScreen(filepath.Join(dir, string(b)+".json"), out)
 			}
@@ -258,7 +261,7 @@ func main() {
 		fail(os.WriteFile(filepath.Join(dir, "snapshot.request"), []byte(name), 0600))
 		until := time.Now().Add(3 * time.Second)
 		for {
-			if _, e := os.Stat(filepath.Join(dir, name+".json")); e == nil {
+			if _, e := os.Stat(filepath.Join(dir, name+".json.ready")); e == nil {
 				break
 			}
 			if time.Now().After(until) {
