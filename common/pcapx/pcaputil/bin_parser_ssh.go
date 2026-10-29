@@ -341,7 +341,7 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			}
 			s.preLines++
 			s.preBytes += len(raw)
-			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server"}, nil
+			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server", "Wire Field Ranges": map[string]any{"Text": []any{uint64(0), uint64(len(line))}}}, nil
 		}
 		line, ver, warning, err := sshObservedIdentification(raw)
 		if err != nil {
@@ -357,6 +357,10 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			"Identification": line,
 			"Version":        ver,
 			"Context Level":  "observed",
+			"Wire Field Ranges": map[string]any{
+				"Identification": []any{uint64(0), uint64(len(line))},
+				"Version":        []any{uint64(4), uint64(4 + len(ver))},
+			},
 		}, nil
 	}
 	if len(raw) < 6 {
@@ -403,6 +407,7 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 		"Context Level":  "observed",
 		"Identification": s.ident[dir],
 	}
+	sshCurrentMessageRanges(info, initial, false)
 	if msg != 20 {
 		for key, value := range s.selected {
 			info[key] = value
@@ -478,6 +483,7 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 			}
 			info["Kex Family"] = sshKexFamily(s.selected["Kex Algorithm"])
 		}
+		sshCurrentMessageRanges(info, initial, true)
 	case 21:
 		s.newkeys[dir] = true
 		if s.newkeys[0] && s.newkeys[1] {
@@ -501,6 +507,14 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 		}
 		sum := sha256.Sum256(host)
 		info["Host Key Format"] = sshHostKeyFormat(host)
+		if wire, ok := initial["Wire Fields"].(map[string]any); ok {
+			payload, _ := wire["Payload"].(map[string]any)
+			key, _ := payload["Host Key"].(map[string]any)
+			ranges, _ := key["Wire Field Ranges"].(map[string]any)
+			if span, ok := ranges["Host Key Format"]; ok {
+				info["Wire Field Ranges"].(map[string]any)["Host Key Format"] = cloneSessionValue(span)
+			}
+		}
 		info["Host Key Fingerprint"] = "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])
 		info["Host Key SHA256"] = fmt.Sprintf("%x", sum[:])
 		info["Signature Verified"], info["Peer Identity Verified"] = false, false
@@ -511,6 +525,36 @@ func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 		info["Signature Verified"], info["Peer Identity Verified"] = false, false
 	}
 	return info, nil
+}
+
+// Only aliases of this PDU's literal payload fields inherit wire positions.
+// Negotiated algorithms, carried identification and computed key fingerprints
+// remain connection context, even when their values equal a current offer.
+func sshCurrentMessageRanges(info, initial map[string]any, kexInit bool) {
+	wire, _ := initial["Wire Fields"].(map[string]any)
+	payload, _ := wire["Payload"].(map[string]any)
+	owned, _ := payload["Wire Field Ranges"].(map[string]any)
+	ranges, _ := info["Wire Field Ranges"].(map[string]any)
+	if ranges == nil {
+		ranges = map[string]any{}
+	}
+	copyRange := func(source, target string) {
+		if span, ok := owned[source]; ok {
+			ranges[target] = cloneSessionValue(span)
+		}
+	}
+	copyRange("Message Number", "Message Number")
+	if kexInit {
+		for _, key := range []string{"Kex Algorithms", "Host Key Algorithms", "Languages C2S", "Languages S2C", "First Kex Packet Follows", "Reserved"} {
+			copyRange(key, key)
+		}
+		for _, key := range []string{"Encryption C2S", "Encryption S2C", "MAC C2S", "MAC S2C", "Compression C2S", "Compression S2C"} {
+			copyRange(key, "Offered "+key)
+		}
+	}
+	if len(ranges) > 0 {
+		info["Wire Field Ranges"] = ranges
+	}
 }
 
 func sshParseKexInit(body []byte) (sshKexLists, error) {

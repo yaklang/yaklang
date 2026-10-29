@@ -53,7 +53,10 @@ func TestProtocolSessionSSHPrelineRoleTaxonomy(t *testing.T) {
 						} else {
 							require.Nil(t, first)
 							require.Len(t, es, 2)
-							want := []map[string]any{{"Packet Name": "pre-identification line", "Text": "Maintenance notice", "Line Number": 1, "Context Level": "observed-server"}, {"Packet Name": "identification", "Identification": "SSH-2.0-ReviewEndpoint", "Version": "2.0", "Context Level": "observed"}}
+							want := []map[string]any{
+								{"Packet Name": "pre-identification line", "Text": "Maintenance notice", "Line Number": 1, "Context Level": "observed-server", "Wire Field Ranges": map[string]any{"Text": []any{uint64(0), uint64(18)}}},
+								{"Packet Name": "identification", "Identification": "SSH-2.0-ReviewEndpoint", "Version": "2.0", "Context Level": "observed", "Wire Field Ranges": map[string]any{"Identification": []any{uint64(0), uint64(len("SSH-2.0-ReviewEndpoint"))}, "Version": []any{uint64(4), uint64(7)}}},
+							}
 							raw := [][]byte{[]byte("Maintenance notice\r\n"), sshIdent("SSH-2.0-ReviewEndpoint")}
 							for i, e := range es {
 								require.Equal(t, raw[i], e.Raw)
@@ -196,6 +199,7 @@ func TestProtocolSessionSSHDirectionKeysPreservePeerNEWKEYS(t *testing.T) {
 					require.Equal(t, byte(21), e.Raw[5])
 					require.Equal(t, int(binary.BigEndian.Uint32(e.Raw[:4]))+4, len(e.Raw))
 					want := map[string]any{"Packet Name": "NEWKEYS", "Message Number": 21, "Context Level": "observed", "Identification": "SSH-2.0-Go"}
+					want["Wire Field Ranges"] = map[string]any{"Message Number": []any{uint64(5), uint64(6)}}
 					// Literal algorithms configured by the independent SSH pair above.
 					// Later handshake PDUs retain this observed negotiation context.
 					want["Kex Algorithm"] = "diffie-hellman-group14-sha256"

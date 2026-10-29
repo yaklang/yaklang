@@ -294,6 +294,8 @@ func decodeSSHPlaintextPacket(wire []byte, profile string) ([]tlsCertificateFiel
 // DecodeSSHInitialPacket validates exactly the grammar used by the public
 // bounded YAML entry. The caller must supply the initial, unencrypted boundary.
 // It does not authenticate a host key, signature, or negotiated session.
+// Wire Fields maps retain their direct literal fields' half-open byte ranges
+// relative to this owned PDU, not to a contributing captured frame.
 func DecodeSSHInitialPacket(wire []byte, profile string) (map[string]any, error) {
 	fields, info, err := decodeSSHPlaintextPacket(wire, profile)
 	if err != nil {
@@ -302,6 +304,7 @@ func DecodeSSHInitialPacket(wire []byte, profile string) (map[string]any, error)
 	var values func([]tlsCertificateField) map[string]any
 	values = func(fs []tlsCertificateField) map[string]any {
 		out := map[string]any{}
+		ranges := map[string]any{}
 		for _, f := range fs {
 			if len(f.Children) > 0 {
 				out[f.Name] = values(f.Children)
@@ -318,7 +321,12 @@ func DecodeSSHInitialPacket(wire []byte, profile string) (map[string]any, error)
 			default:
 				out[f.Name] = bytes.Clone(b)
 			}
+			// The staged grammar already owns these positions. Keep each
+			// occurrence in its immediate map, including zero-width strings;
+			// equal values elsewhere cannot establish its wire location.
+			ranges[f.Name] = []any{uint64(f.Start), uint64(f.End)}
 		}
+		out["Wire Field Ranges"] = ranges
 		return out
 	}
 	info["Wire Fields"] = values(fields)
