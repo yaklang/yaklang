@@ -1,3 +1,9 @@
+7fcb完成SSH加密字节来源的Windows三场景闭合：整段48B仍是opaque流，截余64/192明确preview，原始帧/角色诊断/来源切换不变。CLI895通过，后台exporter/flow二进制及115帧完整SDK/CLI导出与26f同字节；[实际页面与口径](ssh-preview-7fcb.md)。这不实现SSH叶子范围或声称TOP30完备。
+
+26f按已观察TCP角色拒绝SSH错误方向的方法消息，保留SSH身份/具体诊断并允许后续完整合法消息恢复。独立115物理帧、645字段、37输入完整输出、285825全量、两项fuzz和四项CI见[角色报告](ssh-role-26f.md)。旧加密预览标题缺陷单列，未夸大成物理帧损坏；UI51另行验证。
+
+cc9d修正SSH私名误选标准方法与假主机密钥指纹；独立76 payload+11 FIN诊断、Windows真实控制台、37输入整输出和四项CI已闭合。详情见[SSH报告](ssh-cc9d.md)及[聚合证据](ssh-cc9d-summary.json)。这是初始方法布局身份检查点，不是新TOP30标签普查或完整SSH认证证明。
+
 c04a接入RSVP Intserv分层字段与65项私有字段，修复未知版本误Format、混合错误被掩盖及残余归属。独立direct49、默认38物理帧、Windows精确高亮、37输入完整字面保留、285664全量/100837fuzz和四项CI已通过；参考的11类边界/呈现/能力差别分开记录。见[Intserv报告](rsvp-intserv-c04a.md)。这是受限布局支持，没有证明完整预留过程或TOP30完备。
 
 55b接入RSVP基础对象、私有字段与递进页，并修复IPv4载荷借IPv6扩展头误分发。官方9帧与33物理来源、37输入完整native/CLI、936个父拒绝来源、默认Windows页和四项CI已闭合，见[RSVP报告](rsvp-55b.md)。流/会话数据保留，唯一DecodeErrors差值单列；不是新TOP30全量标签统计，也未证明完整RSVP过程或Intserv产品支持。

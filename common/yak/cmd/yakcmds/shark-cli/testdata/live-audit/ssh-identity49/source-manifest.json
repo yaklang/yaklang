@@ -1,0 +1,219 @@
+{
+  "scope": "Archive exact SSH audit code; captures, expected plans and outputs stay external.",
+  "production_source": "cc9d84079d455a64b57365e143b9e5ee641a7997",
+  "source_files": 23,
+  "source_bytes": 200620,
+  "files": [
+    {
+      "path": "run_SSH_before49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_SSH_before49.py",
+      "bytes": 2189,
+      "SHA256": "ee2d0b59c80ea6d865e8f27c7d24d559712b56721300202b2d67c06f3520e114",
+      "language": "Python"
+    },
+    {
+      "path": "run_SSH_before_CLI49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_SSH_before_CLI49.py",
+      "bytes": 2100,
+      "SHA256": "b70481709be9db34e1c87d538c94a16d68d43c161a9f89fab7cde067935c20b5",
+      "language": "Python"
+    },
+    {
+      "path": "inspect_SSH_before49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\inspect_SSH_before49.py",
+      "bytes": 810,
+      "SHA256": "e111b4fbb2044c6921d9998e077e8631b5acba48237b29eeaea881d60e8fd43b",
+      "language": "Python"
+    },
+    {
+      "path": "run_SSH_native49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_SSH_native49.py",
+      "bytes": 3543,
+      "SHA256": "5b5bd80db87a217068b8e7ac3a3f9b4f0bfd13145181277c0f98099912957526",
+      "language": "Python"
+    },
+    {
+      "path": "stage_SSH_kex49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\stage_SSH_kex49.py",
+      "bytes": 1355,
+      "SHA256": "c98b3b52d80525c1aec56d98d931fc054f71b56f6485a27518376fee11116b3d",
+      "language": "Python"
+    },
+    {
+      "path": "run_Windows_SSH49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_SSH49.py",
+      "bytes": 4753,
+      "SHA256": "02d6910ea9638f35ea40acd54b4bf80ee9dab496885fe701307ba320efa48819",
+      "language": "Python"
+    },
+    {
+      "path": "close_Windows_SSH49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH49.py",
+      "bytes": 4150,
+      "SHA256": "51297eff30725e0cfc7065e8c7ba2911030fed428cb8f1c8526210367fab34d1",
+      "language": "Python"
+    },
+    {
+      "path": "close_SSH_source_delta49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_SSH_source_delta49.py",
+      "bytes": 3393,
+      "SHA256": "65a13b279a19f0220edcb78e0bf1ca7c3e33cddf5fa673304d991b847db73632",
+      "language": "Python"
+    },
+    {
+      "path": "import_SSH_sources49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_SSH_sources49.py",
+      "bytes": 4951,
+      "SHA256": "0796accd01a31388c4f853d306539edae03906e47e86d37fef365cc6da8c5633",
+      "language": "Python"
+    },
+    {
+      "path": "source/build_ssh_source49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-source49-audit01\\build_ssh_source49.py",
+      "bytes": 24030,
+      "SHA256": "c8f7d30e7d057544432b26cbafe92ceac184c0f9d9cddde789665bee1ee4dfb8",
+      "language": "Python"
+    },
+    {
+      "path": "source/check_ssh_source49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-source49-audit01\\check_ssh_source49.py",
+      "bytes": 10305,
+      "SHA256": "6a1ba9fc9d84b3882015f4453cb0bbfa49a517782fea93f706a2720a67932865",
+      "language": "Python"
+    },
+    {
+      "path": "source/close_ssh_source49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-source49-audit01\\close_ssh_source49.py",
+      "bytes": 8526,
+      "SHA256": "dfbe9741334c272769659a4734c917a26fa9786471221e55e51fc839a483b3ae",
+      "language": "Python"
+    },
+    {
+      "path": "native/ssh_source_API49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-SDK-CLI-source49-01\\ssh_source_API49.py",
+      "bytes": 12192,
+      "SHA256": "061ba6afdb24cd78c07302b89c406d3d507889c9f78e851258d1418de5a3ff68",
+      "language": "Python"
+    },
+    {
+      "path": "native/ssh_native_cli49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-SDK-CLI-source49-01\\ssh_native_cli49.py",
+      "bytes": 25052,
+      "SHA256": "70b86676bddbd93420693421be2e8d454fc177b51af3ff5dec3c9fd8ab7eb63a",
+      "language": "Python"
+    },
+    {
+      "path": "native/ssh_native_cli49_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-SDK-CLI-source49-02\\ssh_native_cli49_v02.py",
+      "bytes": 18036,
+      "SHA256": "f46c02edfc292b61a4df9339eec7001799a5ba08e776a6ed6683466de52718ae",
+      "language": "Python"
+    },
+    {
+      "path": "native/ssh_native_cli49_v03.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-SDK-CLI-source49-03\\ssh_native_cli49_v03.py",
+      "bytes": 7713,
+      "SHA256": "f36697efc6d78eb5a89f2bd77d72b86dca1a416865290ebadac72c83fbc7c8a8",
+      "language": "Python"
+    },
+    {
+      "path": "reference/prepare_ssh_reference49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\prepare_ssh_reference49.py",
+      "bytes": 10906,
+      "SHA256": "5382aff8f323673bdeadb9ffcf8267e9bd40f41c6da0189281f3b077293b99da",
+      "language": "Python"
+    },
+    {
+      "path": "reference/run_ssh_reference49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\run_ssh_reference49.py",
+      "bytes": 4476,
+      "SHA256": "8f7b6b7aad314ba72468d261a97c5d836eaece8471587715dc269ec9a1b25bfc",
+      "language": "Python"
+    },
+    {
+      "path": "reference/compare_ssh_reference49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\compare_ssh_reference49.py",
+      "bytes": 11201,
+      "SHA256": "ac1ab0a1bf3504284b1fa03dfebb00883b383f291c06f41e84ceea496d58a03a",
+      "language": "Python"
+    },
+    {
+      "path": "reference/compare_ssh_reference49_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\compare_ssh_reference49_v02.py",
+      "bytes": 13396,
+      "SHA256": "20d7222b383640bb4a4f79b41da1c9384cb04b0530f3d0a1266285a029f073aa",
+      "language": "Python"
+    },
+    {
+      "path": "reference/close_ssh_reference49.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\close_ssh_reference49.py",
+      "bytes": 12605,
+      "SHA256": "24b9ea76850ebecbcd86754372a73b9a1eb8417ce7dc9c149169536a73aba117",
+      "language": "Python"
+    },
+    {
+      "path": "reference/close_ssh_reference49_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-Wireshark-source49-01\\close_ssh_reference49_v02.py",
+      "bytes": 13966,
+      "SHA256": "7a40a51d55ebb15bb846118e9b53442e14801270f2be0d0adde18ef2847df17f",
+      "language": "Python"
+    },
+    {
+      "path": "windows/renderer.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-identity-1MiB-5c88a-02\\frozen-inputs\\renderer.py",
+      "bytes": 972,
+      "SHA256": "427379a3b9c1ac7e8257a81d3d6e478904fd96659468f231bbec57a55e336e83",
+      "language": "Python"
+    }
+  ],
+  "existing_repository_dependencies": [
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_go_temp.py",
+      "bytes": 780,
+      "SHA256": "ca7af577ce7d557c365d19eb114df0826e37f5401163ca3b4c785677b5a5ca6d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_build_temp.py",
+      "bytes": 895,
+      "SHA256": "b79807ee65bca1edcfe5413b16b0c7efcd3e055d567aee62a52f48e6929c691e"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/replay_public_resume.py",
+      "bytes": 3694,
+      "SHA256": "2bd3ca500a3b186eecc018b40bc7db780bffd95801534ad4d85617fd45e88402"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_native_literal_continuity.py",
+      "bytes": 4356,
+      "SHA256": "cea420bb3cc200cbddd8c023cb9ea25f4a756a2f857f606cbf77f440edfa955d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_cli_literal_continuity.py",
+      "bytes": 3362,
+      "SHA256": "f8b8091be03624f2434adc674da0d6d83e4c73dea429002e25d96dee3f1b9e01"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/discovery/console/main_windows.go",
+      "bytes": 20054,
+      "SHA256": "fad8b983db5786a995aa80612d7f87a5fa8ad73e9c37ffc7f4e9262411b04701"
+    }
+  ],
+  "source_plan_hashes": {
+    "SSH-source49-audit01/plan01/manifest.json": "37e004f4266ed3ce1bf3fd65c0df789ef2d16a11f0691713471ea8c69a2ab4b0",
+    "SSH-SDK-CLI-source49-01/plan01/manifest.json": "6152f55c293920a466756dcc090e1b4d0627f8ca7379d33e21cb175c37c2d85d",
+    "SSH-SDK-CLI-source49-02/plan02/manifest.json": "ee5e2f1d7daa26c859064f36e83aa5f25c2361e0f8ed8c56f9aae642928f0480",
+    "SSH-SDK-CLI-source49-03/contract.json": "5de2a91f843b8c3871df54f4dfce1a50c9ff7a0157e84334f5ae7549670dc0c7"
+  },
+  "excluded": [
+    "captures/keylogs",
+    "raw wire blobs",
+    "full source plans/expected facts",
+    "actual SDK/CLI/PDML/TSV outputs",
+    "logs/proof receipts",
+    "images/cells/binaries",
+    "full RFC or vendor C source"
+  ],
+  "failed_versions_preserved": true,
+  "exact_source_bytes_not_normalized": true,
+  "scope_limits": "Authored wire controls and exact selected SSH initial layouts, not new live peers, cryptographic authentication or all SSH states."
+}

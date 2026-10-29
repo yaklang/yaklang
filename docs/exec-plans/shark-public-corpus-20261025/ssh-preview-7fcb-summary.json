@@ -1,0 +1,208 @@
+{
+  "source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+  "scope": "SSH encrypted byte-source captions only; no backend grammar/SDK identity change.",
+  "all_core_or_TOP30_complete": false,
+  "actual_console": {
+    "source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+    "source_plan_SHA256": "d595f04fc3afebe6381ed7f3bb847062e41c677adbf2c9bf580edc25e7f05a54",
+    "SDK_audit_SHA256": "fc8bc20ebc39591a212db76a6fef5f2262bce90e2ba02d865f5f6325c79a239a",
+    "cases": [
+      {
+        "name": "wrong-client-reply",
+        "physical_frame": 36,
+        "generated_event_id": 22,
+        "entire_physical_bytes": 246,
+        "logical_bytes": 192,
+        "retained_bytes": 192,
+        "whole_physical_and_retained_sources_exact": true,
+        "source_caption": "SSH \u00b7 reassembled PDU",
+        "caption_and_group_scope_correct": true,
+        "derived_role_metadata_has_no_false_highlight": true,
+        "producer_SHA256": "8727580f49e05ebab1ec913b13404e0172d4e142b24cb214b1a8f12f5c7ed002"
+      },
+      {
+        "name": "protected-preview",
+        "physical_frame": 13,
+        "generated_event_id": 10,
+        "entire_physical_bytes": 246,
+        "logical_bytes": 192,
+        "retained_bytes": 64,
+        "whole_physical_and_retained_sources_exact": true,
+        "source_caption": "SSH \u00b7 encrypted stream preview \u00b7 64/192 observed bytes",
+        "caption_and_group_scope_correct": true,
+        "derived_role_metadata_has_no_false_highlight": false,
+        "producer_SHA256": "e37f7e4588241a7dae73d0a3888bd7880cb67b3ab0ed01b759e4502eca225976"
+      },
+      {
+        "name": "protected-full-slice",
+        "physical_frame": 11,
+        "generated_event_id": 8,
+        "entire_physical_bytes": 102,
+        "logical_bytes": 48,
+        "retained_bytes": 48,
+        "whole_physical_and_retained_sources_exact": true,
+        "source_caption": "SSH \u00b7 encrypted stream bytes \u00b7 48 observed bytes",
+        "caption_and_group_scope_correct": true,
+        "derived_role_metadata_has_no_false_highlight": false,
+        "producer_SHA256": "48702cd42181d9f9b8986c991886e4a81a11b7c11b204437864c15b8653666e4"
+      }
+    ],
+    "physical_frames": 115,
+    "actual_console_cases": 3,
+    "passed": true,
+    "all_original_frame_metadata_preserved": true,
+    "opaque_arrivals_never_named_complete_PDU": true,
+    "root_viewed_all_three_actual_case_images": true,
+    "console_cells_not_Terminal_pixels": true,
+    "CP936_mouse_tabs_resize_checked": true,
+    "default_cache_packets": 20000,
+    "default_history_mib": 64,
+    "native_binary_bridges": [
+      {
+        "kind": "events",
+        "SHA256": "a7f264264c3e9be13710528c6b54578b79780817dcc6ef0638448e87e5dbab95",
+        "byte_identical": true
+      },
+      {
+        "kind": "flows",
+        "SHA256": "c5dd8f6c253fc9303e3f2c44ae13a23bd040180369bced683ae713050092cd68",
+        "byte_identical": true
+      }
+    ],
+    "closed_SDK_CLI_export_bridges": [
+      {
+        "name": "events.jsonl",
+        "SHA256": "8dc734870f9e48a18b5c068c6d896f7632ff0879c44c575e6128db6751762df9",
+        "byte_identical": true
+      },
+      {
+        "name": "yak.jsonl",
+        "SHA256": "75950cd460179ea5da3e3da4024a4db5e5c763e8720582a06aa5b3a4adfbbcdd",
+        "byte_identical": true
+      },
+      {
+        "name": "field-descriptors.json",
+        "SHA256": "21380facdffcc7772bf6e0e79bfab516831cf2e715a4fc144deb9008774480c9",
+        "byte_identical": true
+      }
+    ],
+    "backend_Go_and_rules_unchanged_from_26f": true,
+    "fresh37_case_execution_for_UI51_not_claimed": true,
+    "physical_tail_not_in_retained_preview_hash": true,
+    "checker_SHA256": "6740cb2e4c89cf0a66c955c5f65e0e700865c2282766158d4b99497935cc6596"
+  },
+  "tests": {
+    "package": "common/yak/cmd/yakcmds/shark-cli",
+    "pass_count": 895,
+    "skip_count": 2,
+    "fail_count": 0,
+    "test_models_JSON_roundtrip_not_full_worker_pipeline": true,
+    "receipt": {
+      "external_proof": "test-SSH-preview-green51-03/receipt.json",
+      "SHA256": "1b1fdbd6f4b6eb6a6000ba72b78416eba97c45a25ac3af5368d20642b3ae55eb"
+    },
+    "source_index_bridge": {
+      "external_proof": "SSH-preview-stage51-01.json",
+      "SHA256": "1de4ba7072d7345f59aaa9113b198b02214c4005a1867252d9f256b72ff6dfda"
+    },
+    "red_regression": {
+      "external_proof": "test-SSH-preview-red51-01/receipt.json",
+      "SHA256": "54ffe215576011d75f62ae3650e584104639b38c23094ede7a7b624a6d2d96a9"
+    }
+  },
+  "SDK_CLI": {
+    "source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+    "all_source50_trees_and_snapshots_passed": true,
+    "counts": {
+      "API_literal_occurrences": 645,
+      "SDK_callbacks": 71,
+      "SDK_full_tail_coverage_claimed": false,
+      "SDK_opaque_retained_bytes": 112,
+      "SSH_descriptors": 12,
+      "TCP_generations": 9,
+      "close_DTOs": 7,
+      "close_SDK_CLI_bridges": 7,
+      "payload_SDK_CLI_bridges": 64,
+      "payload_callbacks": 64,
+      "payload_rows": 64,
+      "physical_frames": 115,
+      "private_SSH_occurrences": 243,
+      "published_close_entries": 7,
+      "role_diagnostics": 4,
+      "source_opaque_consumed_bytes": 240,
+      "status_counts": {
+        "context-required": 2,
+        "decoded": 58,
+        "malformed": 4
+      },
+      "unretained_source_tail_bytes": 128
+    },
+    "proof": {
+      "external_proof": "SSH-role-native-7fcb51-01/independent-audit03/summary.json",
+      "SHA256": "fc8bc20ebc39591a212db76a6fef5f2262bce90e2ba02d865f5f6325c79a239a"
+    }
+  },
+  "public_suite_basis": {
+    "checked_source": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+    "fresh_UI51_37_suite_not_claimed": true,
+    "unchanged_native_exporter_and_flow_binaries": [
+      {
+        "kind": "events",
+        "SHA256": "a7f264264c3e9be13710528c6b54578b79780817dcc6ef0638448e87e5dbab95",
+        "byte_identical": true
+      },
+      {
+        "kind": "flows",
+        "SHA256": "c5dd8f6c253fc9303e3f2c44ae13a23bd040180369bced683ae713050092cd68",
+        "byte_identical": true
+      }
+    ],
+    "all115_frame_SDK_CLI_descriptors_exports_byte_identical": [
+      {
+        "name": "events.jsonl",
+        "SHA256": "8dc734870f9e48a18b5c068c6d896f7632ff0879c44c575e6128db6751762df9",
+        "byte_identical": true
+      },
+      {
+        "name": "yak.jsonl",
+        "SHA256": "75950cd460179ea5da3e3da4024a4db5e5c763e8720582a06aa5b3a4adfbbcdd",
+        "byte_identical": true
+      },
+      {
+        "name": "field-descriptors.json",
+        "SHA256": "21380facdffcc7772bf6e0e79bfab516831cf2e715a4fc144deb9008774480c9",
+        "byte_identical": true
+      }
+    ],
+    "native37": {
+      "external_proof": "SSH-role-public-native-bridge50-01/summary.json",
+      "SHA256": "b6dd0f1b8839af02c8eeace623f0c05e211b268f1ca7cf4f129585d760bdd639"
+    },
+    "CLI37": {
+      "external_proof": "SSH-role-public-CLI-bridge50-01/summary.json",
+      "SHA256": "9883de2105e5ce7b1f02a0c90441e8800d822542128ab2c77c55dd4720c790ef"
+    }
+  },
+  "old_frame_length_misread_was_not_product_corruption": true,
+  "old_caption_gap": {
+    "external_proof": "Windows-SSH-role-root-closure50-01/summary.json",
+    "SHA256": "6643515ce3661822cafbc81116bfa26360886946384179276fed2489dd05bcbf"
+  },
+  "closure": {
+    "external_proof": "Windows-SSH-preview-root-closure51-01/summary.json",
+    "SHA256": "8da6a65bbfb461bc744b1ef4fef51247fcf64bf90c27e283fcd41de18899d279"
+  },
+  "source_archive": {
+    "source_files": 8,
+    "source_bytes": 30129,
+    "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-preview51",
+    "SHA256": "9e67e9c98ac21a4de2fb6f23f3c553af257c01e6d169664b85c9d4381968cbdd"
+  },
+  "CI": "Consult exact latest PR checks; no future/superseded CI result is manufactured in this source checkpoint.",
+  "limits": [
+    "No authenticated SSH plaintext or SFTP decode is claimed.",
+    "Opaque bytes are synthetic controls, not new live SSH.",
+    "SSH GetFields/typed/UI leaf wire ranges remain a separate future task.",
+    "Actual images reconstruct console cells/attributes, not Terminal pixels."
+  ]
+}

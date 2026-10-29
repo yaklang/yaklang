@@ -4905,3 +4905,18 @@ c04a新增TSpec/受控负载FlowSpec/通用Adspec的分层字段与65项私有�
 四项c04a CI首次全绿。范围、原失败、纯源码与外部proof哈希见
 [报告](shark-public-corpus-20261025/rsvp-intserv-c04a.md)和
 [摘要](shark-public-corpus-20261025/rsvp-intserv-c04a-summary.json)。
+
+
+## SSH具体方法、未知布局与Windows检查点
+
+cc9d按精确方法及完整reply约束SSH字段与主机密钥派生。独立76 payload+11条FIN诊断、37组完整输出连续性、Windows真实控制台和四项CI已闭合；参考未知私名/猜测包/方向差别、自测修正与尚未证明范围见[SSH报告](shark-public-corpus-20261025/ssh-cc9d.md)。本节不把标签相同或同字节回归等同于全部协议正确。
+
+
+## SSH已观察发送端角色与恢复
+
+26f修复DH/ECDH/GEX错误方向的字段和主机密钥误解析。独立115物理帧/64payload加7FIN诊断、source49兼容、两项fuzz、全量285825及四项CI已闭合。source50的bad流只有FIN，后续合法消息恢复由单独144项拆包正反控验证；旧预览标题保留为已知UI差别，见[报告](shark-public-corpus-20261025/ssh-role-26f.md)。
+
+
+## SSH加密预览与来源页面
+
+7fcb将NEWKEYS后观察改称observation，明确encrypted stream bytes或保留/消费preview计数。三张Windows真实控制台与字节源闭合、895项CLI检查及不变的SDK/flow二进制和小来源完整导出见[报告](shark-public-corpus-20261025/ssh-preview-7fcb.md)。原始帧未损坏；完整消息和不透明流的来源层次分开。
