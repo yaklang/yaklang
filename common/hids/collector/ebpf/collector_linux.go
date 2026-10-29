@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"os"
 	"sync"
 
 	"github.com/cilium/ebpf"
@@ -310,7 +311,7 @@ func (c *Collector) tracepointSpecs(eventsFD int) []tracepointProgramSpec {
 			{
 				group: "syscalls",
 				name:  "sys_enter_close",
-				spec:  buildNetworkCloseProgramSpec("hids_close", eventsFD),
+				spec:  buildNetworkCloseProgramSpec("hids_close", eventsFD, uint32(os.Getpid())),
 			},
 			{
 				group:    "sock",

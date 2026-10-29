@@ -252,9 +252,20 @@ func buildNetworkConnectProgramSpec(name string, eventsFD int) *ebpf.ProgramSpec
 	}
 }
 
-func buildNetworkCloseProgramSpec(name string, eventsFD int) *ebpf.ProgramSpec {
+func buildNetworkCloseProgramSpec(name string, eventsFD int, collectorTGID uint32) *ebpf.ProgramSpec {
 	insns := asm.Instructions{
 		asm.Mov.Reg(asm.R9, asm.R1),
+
+		// Enrichment reads /proc and closes its own file descriptors. Do not
+		// turn that IO into more network close records. Compare the TGID, not
+		// the thread ID, so every thread of the collector is excluded before
+		// allocating a record or writing to the ring buffer. Other processes'
+		// close events keep the same format and enrichment path.
+		asm.FnGetCurrentPidTgid.Call(),
+		asm.Mov.Reg(asm.R8, asm.R0),
+		asm.Mov.Reg(asm.R7, asm.R0),
+		asm.RSh.Imm(asm.R7, 32),
+		asm.JEq.Imm(asm.R7, int32(collectorTGID), "exit"),
 
 		asm.Mov.Reg(asm.R6, asm.RFP),
 		asm.Add.Imm(asm.R6, -networkRecordSize),
@@ -265,11 +276,8 @@ func buildNetworkCloseProgramSpec(name string, eventsFD int) *ebpf.ProgramSpec {
 		asm.Mov.Imm(asm.R1, recordKindNetworkClose),
 		asm.StoreMem(asm.R6, networkFieldKindOffset, asm.R1, asm.Word),
 
-		asm.FnGetCurrentPidTgid.Call(),
-		asm.StoreMem(asm.R6, networkFieldPIDOffset, asm.R0, asm.Word),
-		asm.Mov.Reg(asm.R1, asm.R0),
-		asm.RSh.Imm(asm.R1, 32),
-		asm.StoreMem(asm.R6, networkFieldTGIDOffset, asm.R1, asm.Word),
+		asm.StoreMem(asm.R6, networkFieldPIDOffset, asm.R8, asm.Word),
+		asm.StoreMem(asm.R6, networkFieldTGIDOffset, asm.R7, asm.Word),
 
 		asm.LoadMem(asm.R1, asm.R9, closeFDArgOffset, asm.DWord),
 		asm.StoreMem(asm.R6, networkFieldFDOffset, asm.R1, asm.Word),
@@ -285,7 +293,7 @@ func buildNetworkCloseProgramSpec(name string, eventsFD int) *ebpf.ProgramSpec {
 		asm.Mov.Imm(asm.R4, 0),
 		asm.FnRingbufOutput.Call(),
 
-		asm.Mov.Imm(asm.R0, 0),
+		asm.Mov.Imm(asm.R0, 0).WithSymbol("exit"),
 		asm.Return(),
 	)
 
