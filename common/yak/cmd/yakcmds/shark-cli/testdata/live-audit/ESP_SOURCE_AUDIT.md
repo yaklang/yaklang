@@ -181,3 +181,56 @@ sources without claiming a whole-row certificate for every remaining profile.
 All captures, keys, complete exports, build programs, images and logs stay outside
 the repository; only these auditor sources and compact evidence metadata belong
 in Git.
+
+## Whole CLI continuity and actual Windows transport sources
+
+`public_cli_literal_continuity.py --before OLD --after NEW --out FRESH` verifies
+all37 closed CLI executions, build/binary/capture bindings and every full export.
+It requires literal byte equality and accepts no generated-ID translations.
+Use this for display-only changes; a semantic correction instead needs an
+independent source-frozen whole-object expectation.
+
+`transport_windows_source_audit.py --manifest CASES --runtime CLOSED_WINDOWS
+--audit-modules THIS_FOLDER --out FRESH` consumes actual console cells. It binds
+the full frame, bounded unadmitted payload preview and observed UDP header to
+their separate exact source bytes, titles, ranges and original metadata. It
+also checks real loopback address text, TCP option indentation, and rejects
+range/SHA/source-order mutations. It neither drives the desktop nor substitutes
+a generated mockup for a run. A new run keeps its own provenance; earlier
+failed harness/alias runs remain distinct external evidence.
+
+## PIM prefixes, ranges and protected-transport recovery
+
+`pim-source/source-manifest.json` lists16 literal source constructors and strict
+whole native verifiers. Each stage has its own producer and full expected
+objects; the prefix oracle's explicit API batch-order correction is retained.
+`pim_cli_boundary_audit.py`, `pim_cli_prefix_audit.py` and
+`pim_cli_ranges_audit.py` expose `prepare` and `verify`; prepare an independent
+source plan before running a new CLI producer, then verify all37 complete files.
+No ID translation, type coercion or array sorting is an accepted shortcut.
+
+`pim_windows_cells_audit.py` consumes closed console executions and independently
+locates Source1 as the PIM body, not the entire Source0 frame. It verifies the
+selected occurrence by native cell attributes, including two equal addresses
+at distinct offsets, and keeps opaque extracted values explicitly unmapped.
+Its CLI is `--manifest CASES --runtime CLOSED --audit-modules THIS_FOLDER --out FRESH`.
+
+`public_native_literal_continuity.py --before OLD --after NEW --out FRESH`
+binds37 event files and two complete flow files to their original execution,
+build and capture receipts. Literal continuity proves preservation, not blanket
+correctness of unchanged records.
+
+`tls-quic-source/recovery-02/source-manifest.json` binds13 deployed entry points,
+their exact original proof sources in `frozen/`, explicit path-only adapters,
+CLI commands and external result hashes. The four adapted sources have distinct
+producer hashes; do not relabel older certificates as their executions.
+The independent AEAD/frame verifiers retain TCP holes, missing STREAM intervals,
+QPACK blocks and malformed tags. Source-only correction of the first wrong
+bridge expectation remains separate from its preserved failure.
+
+Always use `python -B`, a new external output directory, the declared original
+capture/key-provider/reference settings, and the complete native/CLI producer.
+The assertions bind the selected owned capture profiles described in the
+manifests; they are not generalized TOP30 certification. Original captures,
+keys, PDML, full expectations/exports, plaintext, binaries and console images
+remain outside Git.
