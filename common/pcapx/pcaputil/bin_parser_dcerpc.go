@@ -329,6 +329,12 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 		if err := d.consumeBindAck(call, "AlterContext", "AlterContextResp", dir, body, info, max); err != nil {
 			return nil, err
 		}
+	case 16:
+		if len(body) < 4 {
+			return nil, fmt.Errorf("dcerpc: truncated auth3")
+		}
+		info["Max Xmit Frag"] = binary.LittleEndian.Uint16(body[0:2])
+		info["Max Recv Frag"] = binary.LittleEndian.Uint16(body[2:4])
 	}
 	return info, nil
 }
@@ -524,6 +530,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	var accepted []dcerpcProposal
 	var rejected []uint16
+	var negotiated []uint16
 	for i, result := range results {
 		proposal := proposals[i]
 		views[i]["Proposed Context ID"] = proposal.id
@@ -547,6 +554,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 			}
 			info["Observed Bind Time Feature Bits"] = result.reason
 			info["Bind Time Feature Endpoint State Verified"] = false
+			negotiated = append(negotiated, proposal.id)
 		default:
 			return fmt.Errorf("dcerpc: invalid bind result %d", result.result)
 		}
@@ -584,6 +592,9 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	if len(rejected) > 0 {
 		info["Rejected Context IDs"] = rejected
+	}
+	if len(negotiated) > 0 {
+		info["Negotiated Context IDs"] = negotiated
 	}
 	return nil
 }
@@ -881,6 +892,8 @@ func dcerpcPTypeName(p byte) string {
 		return "AlterContext"
 	case 15:
 		return "AlterContextResp"
+	case 16:
+		return "Auth3"
 	}
 	return fmt.Sprintf("PType %d", p)
 }
