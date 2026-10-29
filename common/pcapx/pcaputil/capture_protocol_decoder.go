@@ -162,7 +162,7 @@ func udpEncapsulation(next gopacket.LayerType) bool {
 }
 
 func (b *protocolPacketBuilder) NextDecoder(next gopacket.Decoder) error {
-	if rsvpNextLayer(b.lastLayer) {
+	if rsvpNextLayer(b.lastLayer, b.network) {
 		next = gopacket.LayerTypePayload
 	}
 	if b.pim != nil {
