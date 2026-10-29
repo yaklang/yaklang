@@ -1,0 +1,3 @@
+*.py -text whitespace=cr-at-eol
+*.json -text whitespace=cr-at-eol
+*.md text eol=lf

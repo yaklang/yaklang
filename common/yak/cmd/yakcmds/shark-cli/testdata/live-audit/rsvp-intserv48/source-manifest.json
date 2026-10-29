@@ -1,0 +1,274 @@
+{
+  "scope": "Archive exact Intserv audit source only; never plans, captures or outputs.",
+  "production_source": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+  "source_files": 21,
+  "source_bytes": 176382,
+  "files": [
+    {
+      "path": "rsvp_intserv_API48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\rsvp_intserv_API48.py",
+      "bytes": 15021,
+      "SHA256": "b18b5db316075483c5917e139b8fea1dd5ff8804ba74db5fabcb2c81c43a7070",
+      "language": "Python"
+    },
+    {
+      "path": "run_RSVP_Intserv_direct48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_RSVP_Intserv_direct48.py",
+      "bytes": 3193,
+      "SHA256": "80d824638bb0c257d05ea52b4f9304452003e4a6b5951826c1bad3930493df87",
+      "language": "Python"
+    },
+    {
+      "path": "prepare_Windows_Intserv48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_Intserv48.py",
+      "bytes": 3756,
+      "SHA256": "16e4b1cff467774689d2c5908d32509af5e1ef83d282bf38d2dc9c477bb839fb",
+      "language": "Python"
+    },
+    {
+      "path": "run_RSVP_Intserv_native48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_RSVP_Intserv_native48.py",
+      "bytes": 1480,
+      "SHA256": "6bebb5bb0c7ae08aa2972f6f28210b4362364bb29d6f3d46fbb1139ae699b24a",
+      "language": "Python"
+    },
+    {
+      "path": "run_RSVP_Intserv_native48_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_RSVP_Intserv_native48_v02.py",
+      "bytes": 1526,
+      "SHA256": "47296b0b0ff8795d8c0e5497a91b04c3e6b13517b7a53ff77bbf641e40a11756",
+      "language": "Python"
+    },
+    {
+      "path": "close_Windows_Intserv48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_Intserv48.py",
+      "bytes": 1300,
+      "SHA256": "22be50df3a3df4f0409ccb121efec2291cac2abc7b6e9ce571003859f1108d9c",
+      "language": "Python"
+    },
+    {
+      "path": "close_RSVP_Intserv_commit48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_RSVP_Intserv_commit48.py",
+      "bytes": 2589,
+      "SHA256": "c24a1fda5055ff347e9dcfe7dac46c12cc7410ebdc17c543be6df6fa193d7267",
+      "language": "Python"
+    },
+    {
+      "path": "run_fuzz_Intserv48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_fuzz_Intserv48.py",
+      "bytes": 925,
+      "SHA256": "3d36a2de31c105c6606ef1b53ae9e30c8172f07dd7d6a8a5361602a85a6ac9e4",
+      "language": "Python"
+    },
+    {
+      "path": "stage_RSVP_Intserv48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\stage_RSVP_Intserv48.py",
+      "bytes": 1730,
+      "SHA256": "1e9c1075244bb7be7e9f7990ce4c2c8186f126f8ff79bc584a343a7cce89eebd",
+      "language": "Python"
+    },
+    {
+      "path": "import_RSVP_Intserv_sources48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_RSVP_Intserv_sources48.py",
+      "bytes": 5913,
+      "SHA256": "1ae43c07a5119c11211339a902436299d1de1301748a1a1900559079b97031d9",
+      "language": "Python"
+    },
+    {
+      "path": "source/intserv_neutral_source48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-source48-01\\intserv_neutral_source48.py",
+      "bytes": 12272,
+      "SHA256": "6e02fad6a342b32ac2d6c6d3fd5d0270cbddec62e723af71e274850a7549b44f",
+      "language": "Python"
+    },
+    {
+      "path": "source/build_intserv_source48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-source48-01\\build_intserv_source48.py",
+      "bytes": 14955,
+      "SHA256": "4a7c1a6adf665f5eb6c7a28a0241842da9be8d7daf54f23800f4d144ce2537fe",
+      "language": "Python"
+    },
+    {
+      "path": "native/intserv_native_schema48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-native-CLI-source48-01\\intserv_native_schema48.py",
+      "bytes": 8921,
+      "SHA256": "9ff4b3681b2981911eec6e3977c004908dc0e784b9a7e32f88b88d8360691044",
+      "language": "Python"
+    },
+    {
+      "path": "native/intserv_native_cli48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-native-CLI-source48-01\\intserv_native_cli48.py",
+      "bytes": 20836,
+      "SHA256": "b0853f0a704235dc8b8bb0ea91e201c2e17aa492ed6ff461d22f593130d4c5a3",
+      "language": "Python"
+    },
+    {
+      "path": "native/intserv_native_cli48_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-native-CLI-source48-01\\intserv_native_cli48_v02.py",
+      "bytes": 21740,
+      "SHA256": "6ea649c4425b3f3c0771d020e809c4ed72d5ba8d5cd0110e007e6f3176421fae",
+      "language": "Python"
+    },
+    {
+      "path": "reference/prepare_mapping48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\prepare_mapping48.py",
+      "bytes": 10778,
+      "SHA256": "21318e07b5df7f5b931f64f7dc92d097350d3d6f7f977f14895523b36e1fc688",
+      "language": "Python"
+    },
+    {
+      "path": "reference/prepare_mapping48_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\prepare_mapping48_v02.py",
+      "bytes": 10877,
+      "SHA256": "2692fe43b99a9aeb671866b8657b5c23f1e0025054ea1611021b27225e875965",
+      "language": "Python"
+    },
+    {
+      "path": "reference/run_reference48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\run_reference48.py",
+      "bytes": 3094,
+      "SHA256": "9956213401269b755f92a26ae37960fd0e200b9246f0888cf8ffc3eea59a5b38",
+      "language": "Python"
+    },
+    {
+      "path": "reference/compare_reference48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\compare_reference48.py",
+      "bytes": 12734,
+      "SHA256": "3cbdfede3fdc5195b26dba9c64cdf479c5719f916a559e676102a5538bd7760a",
+      "language": "Python"
+    },
+    {
+      "path": "reference/compare_reference48_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\compare_reference48_v02.py",
+      "bytes": 13361,
+      "SHA256": "f332a64ebcd966d3ac3b49ec18ceed51f6057aee5500313bb7a0dc856d177d48",
+      "language": "Python"
+    },
+    {
+      "path": "reference/close_reference48.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Intserv-Wireshark-source48-01\\close_reference48.py",
+      "bytes": 9381,
+      "SHA256": "559ee2fcd940a00eb1d9f80917016b0f2e0334fefc3f25bb32e288d54fb62a1d",
+      "language": "Python"
+    }
+  ],
+  "existing_repository_dependencies": [
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/rsvp_intserv_source46.py",
+      "bytes": 8281,
+      "SHA256": "f345e62afbedc80a4d53ef4dc0077403ea08d9a57b147ffb944c3300a11a99ef"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/build_RSVP_Intserv_source46.py",
+      "bytes": 11620,
+      "SHA256": "2b011b893b3c78738becd394c67428e244401cc2c285cb582c09e7074fabee49"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/rsvp_boundary_source45.py",
+      "bytes": 9808,
+      "SHA256": "460e536387e37ccd733e2bf0c1ceb506e198002bee515703c4b0b21f4b80be5d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/rsvp_native_cli_checker46.py",
+      "bytes": 28267,
+      "SHA256": "24124ac22523e73b72fa43191b8bf35505312b6f16cd76b36bf7bb03b6c3ae7e"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_RSVP_native_CLI46.py",
+      "bytes": 3797,
+      "SHA256": "bf21e210f1c4a5a0a43122241468837e10b87110857e16af72bd01c9050913d6"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_fuzz_RSVP46.py",
+      "bytes": 579,
+      "SHA256": "27f86183bd8b42d33439126dc891cc06e72d5040c81f85e21c4cb172656500be"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_fuzz_membership.py",
+      "bytes": 1968,
+      "SHA256": "7654545f5d0516acf3399ae3f4c6ccca33d25c399b2a9efde2c27628f0e8faa4"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_Windows_RSVP46.py",
+      "bytes": 319,
+      "SHA256": "27069d1457fb38797039450db0044e6bdf3e9d2a544b07926bf3a0447b9eb7eb"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_Windows_OSPFv2_42.py",
+      "bytes": 5702,
+      "SHA256": "a5cb9f558a167fb755ce0fb9c62b3c031c4463838c0565d1f0c18fe00d54a4fa"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/verify_Windows_OSPFv3_36.py",
+      "bytes": 3527,
+      "SHA256": "a8b5f9b91f6a766b02d41789cb1f91aa3bb4e4ce3939160d328318389d2aa95d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/close_Windows_RSVP47.py",
+      "bytes": 4604,
+      "SHA256": "e8a8a8c99c004dc900d08774887f394690297ac76b6fc6081797d26aba456a36"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_go_temp.py",
+      "bytes": 780,
+      "SHA256": "ca7af577ce7d557c365d19eb114df0826e37f5401163ca3b4c785677b5a5ca6d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_build_temp.py",
+      "bytes": 895,
+      "SHA256": "b79807ee65bca1edcfe5413b16b0c7efcd3e055d567aee62a52f48e6929c691e"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/replay_public_resume.py",
+      "bytes": 3694,
+      "SHA256": "2bd3ca500a3b186eecc018b40bc7db780bffd95801534ad4d85617fd45e88402"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/build_RSVP_guarded46.py",
+      "bytes": 480,
+      "SHA256": "083e6ff385adda8af4cb44e05fcff7850feaef4eaf67504ebf310592dfae4920"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/build_OSPFv2_guarded41.py",
+      "bytes": 2298,
+      "SHA256": "b4d6993a32743587855e880f2c65d7dd4e75bae4eeb0f5f310347a66ebe68404"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/rsvp_direct_probe46.go.txt",
+      "bytes": 1731,
+      "SHA256": "fbbedccffd7483e41a2b8f168e3891da86b7e4299aca8be016942995298424d7"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_native_literal_continuity.py",
+      "bytes": 4356,
+      "SHA256": "cea420bb3cc200cbddd8c023cb9ea25f4a756a2f857f606cbf77f440edfa955d"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/public_cli_literal_continuity.py",
+      "bytes": 3362,
+      "SHA256": "f8b8091be03624f2434adc674da0d6d83e4c73dea429002e25d96dee3f1b9e01"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/discovery/console/main_windows.go",
+      "bytes": 20054,
+      "SHA256": "fad8b983db5786a995aa80612d7f87a5fa8ad73e9c37ffc7f4e9262411b04701"
+    }
+  ],
+  "prior_source_manifest_SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce",
+  "source_plan_hashes": {
+    "Intserv-source48-01/frozen-plan01/manifest.json": "1b57dd45ed6ea226d62569a1f9c6f06981bc85bef2210d115e30d68fc3e7ad66",
+    "RSVP-Intserv-API-plan48-03/manifest.json": "1ee14f677769da754b5dcd0b37bfd9e30dc2e0cdfce50791696b5021d2e73227",
+    "Intserv-native-CLI-source48-01/plan02/manifest.json": "fc3a502c4eb4d7e8b54679901510b72afe9fa5af8ed6ad53c666d16b4e2e831b",
+    "Intserv-Wireshark-source48-01/plan02/manifest.json": "07f9652a93da40a5cd768251e82cdc8c50e79462ca124f14004cbed2175ae6c7"
+  },
+  "excluded": [
+    "captures/keylogs",
+    "full source facts/plans/expected",
+    "native/CLI/PDML/TSV outputs",
+    "logs/proof JSONs",
+    "images/cells/binaries",
+    "full RFC text"
+  ],
+  "failed_source_versions_preserved": true,
+  "exact_raw_source_bytes_not_normalized": true
+}
