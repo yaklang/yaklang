@@ -41,18 +41,19 @@ func (captureRSVPDecoder) Decode(w []byte, b gopacket.PacketBuilder) error {
 }
 
 // Select only a literal next-header46, before a quote or application decoder.
-func rsvpNextLayer(layer gopacket.Layer) bool {
+func rsvpNextLayer(layer gopacket.Layer, network gopacket.NetworkLayer) bool {
+	_, ipv6Parent := network.(*layers.IPv6)
 	switch l := layer.(type) {
 	case *layers.IPv4:
 		return l.Protocol == 46 && l.FragOffset == 0 && l.Flags&layers.IPv4MoreFragments == 0
 	case *layers.IPv6:
 		return l.NextHeader == 46
 	case *layers.IPv6HopByHop:
-		return l.NextHeader == 46
+		return ipv6Parent && l.NextHeader == 46
 	case *layers.IPv6Destination:
-		return l.NextHeader == 46
+		return ipv6Parent && l.NextHeader == 46
 	case *layers.IPv6Routing:
-		return l.NextHeader == 46
+		return ipv6Parent && l.NextHeader == 46
 	case *layers.IPSecAH:
 		return l.NextHeader == 46
 	}
@@ -81,7 +82,7 @@ func declaredRSVPWire(p gopacket.Packet) ([]byte, gopacket.NetworkLayer, bool) {
 		default:
 			continue
 		}
-		if network != nil && rsvpNextLayer(layer) {
+		if network != nil && rsvpNextLayer(layer, network) {
 			return layer.LayerPayload(), network, true
 		}
 	}

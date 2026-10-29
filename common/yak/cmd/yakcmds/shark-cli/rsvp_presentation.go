@@ -86,28 +86,31 @@ func appendRSVPCapturedPrefix(d *packetDetail, raw *capturedPacket, events []*pc
 	offset, networks, start := 0, 0, -1
 	var wire []byte
 	var names []string
+	ipv6Parent := false
 	short := raw.ci.CaptureLength < raw.ci.Length
 	for _, layer := range p.Layers() {
 		selected := false
 		switch l := layer.(type) {
 		case *layers.IPv4:
 			networks++
+			ipv6Parent = false
 			if l.IHL < 5 || int(l.Length) < int(l.IHL)*4 || !short && int(l.Length) > len(raw.data)-offset || l.FragOffset != 0 || l.Flags&layers.IPv4MoreFragments != 0 {
 				return false
 			}
 			selected = l.Protocol == 46
 		case *layers.IPv6:
 			networks++
+			ipv6Parent = true
 			if l.Length == 0 || !short && 40+int(l.Length) > len(raw.data)-offset {
 				return false
 			}
 			selected = l.NextHeader == 46
 		case *layers.IPv6HopByHop:
-			selected = l.NextHeader == 46
+			selected = ipv6Parent && l.NextHeader == 46
 		case *layers.IPv6Destination:
-			selected = l.NextHeader == 46
+			selected = ipv6Parent && l.NextHeader == 46
 		case *layers.IPv6Routing:
-			selected = l.NextHeader == 46
+			selected = ipv6Parent && l.NextHeader == 46
 		case *layers.IPSecAH:
 			selected = l.NextHeader == 46
 		case *layers.IPv6Fragment:
