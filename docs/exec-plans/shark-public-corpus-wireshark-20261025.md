@@ -4891,3 +4891,17 @@ native对象和383582完整CLI行仅限已审生成ID路径外保持，两个flo
 后续58/88项分开记录。47纯源文件归档，PCAP/完整数据不进仓库。
 范围、旧失败与尚未实现的Intserv等见[报告](shark-public-corpus-20261025/rsvp-55b.md)
 和[证据摘要](shark-public-corpus-20261025/rsvp-55b-summary.json)。
+
+
+## Intserv嵌套字段与参考边界
+
+c04a新增TSpec/受控负载FlowSpec/通用Adspec的分层字段与65项私有字段，三个word-length
+层和对象各自守父范围，IEEE32保留精确bits/十进制文本，参数域问题不丢字段。修复Context
+误Format、capture混合错被软原因掩盖及partial归属；direct49的583literal/326derived、
+默认38物理1250个Session API ranges/1696alias、两张Windows页、最新五包285664/24skip
+与100837 fuzz均通过。37输入307819完整native对象/2flow与384518CLI记录和55b逐字节同，
+无ID映射。参考831literal/143derived精确匹配，53 aggregate、8未渲染、4范围不同、469
+未选映射分开；11类差别含TIME兄弟误作TSpec parameter及仅高亮越界两种独立证据。
+四项c04a CI首次全绿。范围、原失败、纯源码与外部proof哈希见
+[报告](shark-public-corpus-20261025/rsvp-intserv-c04a.md)和
+[摘要](shark-public-corpus-20261025/rsvp-intserv-c04a-summary.json)。
