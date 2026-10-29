@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/netip"
 
 	"github.com/gopacket/gopacket"
@@ -102,14 +103,47 @@ func appendPIMCapturedPrefix(d *packetDetail, raw *capturedPacket, events []*pca
 			continue
 		}
 		headers := capturedNetworkPrefix(p, raw.data, names)
+		if len(headers) == 0 && context.DeclaredBytes < 0 {
+			// The original IPv4 length may be zero or smaller than its
+			// captured header. It does not validate a complete IP message,
+			// but must not discard the already reproduced PIM prefix.
+			if observed, ok := pimUnboundedIPv4Header(p, raw.data); ok {
+				headers = append(headers, observed)
+			}
+		}
 		if len(headers) == 0 {
 			return false
 		}
 		d.fields = append(d.fields, field{text: "Captured network prefix", branch: true})
 		for _, header := range headers {
 			d.fields = append(d.fields, field{text: header.label + " header", branch: true, start: header.start, end: header.end, hasRange: true}, field{depth: 1, text: "Source: " + header.source, start: header.sourceStart, end: header.sourceEnd, hasRange: true}, field{depth: 1, text: "Destination: " + header.destination, start: header.destStart, end: header.destEnd, hasRange: true})
+			if context.DeclaredBytes < 0 && network.LayerType() == layers.LayerTypeIPv4 {
+				d.fields = append(d.fields, field{depth: 1, text: fmt.Sprintf("Message extent: unavailable (original Total Length: %d)", binary.BigEndian.Uint16(h[2:4])), start: header.start + 2, end: header.start + 4, hasRange: true})
+			}
 		}
 		return true
 	}
 	return false
+}
+
+// This is only an observed header prefix, after appendPIMCapturedPrefix has
+// reproduced the complete native observation. Keep the general endpoint
+// validator strict: an unknown parent extent cannot admit another child.
+func pimUnboundedIPv4Header(p gopacket.Packet, wire []byte) (capturedNetworkHeader, bool) {
+	var offset int
+	for _, layer := range p.Layers() {
+		h := layer.LayerContents()
+		if offset > len(wire) || len(h) > len(wire)-offset || !bytes.Equal(h, wire[offset:offset+len(h)]) {
+			return capturedNetworkHeader{}, false
+		}
+		if layer == p.NetworkLayer() {
+			ip, ok := layer.(*layers.IPv4)
+			if !ok || len(h) < 20 || h[0]>>4 != 4 || int(h[0]&15)*4 != len(h) || int(binary.BigEndian.Uint16(h[2:4])) >= len(h) || ip.Protocol != 103 || binary.BigEndian.Uint16(h[6:8])&0x3fff != 0 || !bytes.Equal(layer.LayerPayload(), wire[offset+len(h):]) {
+				return capturedNetworkHeader{}, false
+			}
+			return capturedNetworkHeader{label: "IPv4 observed", source: net.IP(h[12:16]).String(), destination: net.IP(h[16:20]).String(), start: offset, end: offset + len(h), sourceStart: offset + 12, sourceEnd: offset + 16, destStart: offset + 16, destEnd: offset + 20}, true
+		}
+		offset += len(h)
+	}
+	return capturedNetworkHeader{}, false
 }

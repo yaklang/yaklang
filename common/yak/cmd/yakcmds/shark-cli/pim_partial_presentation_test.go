@@ -3,6 +3,7 @@ package sharkcli
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"net"
 	"net/netip"
@@ -28,6 +29,11 @@ func pimPartialPresentationPacket(t *testing.T) *capturedPacket {
 	buffer := gopacket.NewSerializeBuffer()
 	require.NoError(t, gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, eth, ip, gopacket.Payload(body)))
 	wire := bytes.Clone(buffer.Bytes())
+	return replayPIMPresentationPacket(t, wire)
+}
+
+func replayPIMPresentationPacket(t *testing.T, wire []byte) *capturedPacket {
+	t.Helper()
 	ci := gopacket.CaptureInfo{Timestamp: time.Unix(42, 0), CaptureLength: len(wire), Length: len(wire)}
 	var capture bytes.Buffer
 	writer := pcapgo.NewWriter(&capture)
@@ -37,6 +43,47 @@ func pimPartialPresentationPacket(t *testing.T) *capturedPacket {
 	require.NoError(t, pcaputil.ReplayPcap(bytes.NewReader(capture.Bytes()), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) { events = append(events, e) })))
 	require.Len(t, events, 1)
 	return &capturedPacket{number: 1, data: wire, ci: ci, link: layers.LinkTypeEthernet, events: events, presentation: presentEvents(events)}
+}
+
+func TestPIMUnknownParentLengthKeepsOnlyItsObservedHeaderAndExactTree(t *testing.T) {
+	// Original Sharon frame 141789: IPv4 IHL=6, original Total Length=0,
+	// followed by a Bootstrap BSR with captured but unsupported encoding 1.
+	wire, err := hex.DecodeString("563412efcdababcdef12345608004602000000930000b167030000011f01000010000000235d245d0d310d00000a010100100d000000b100670300000d010000000000000000000000010004a5c2b00ac6ffcd")
+	require.NoError(t, err)
+	raw := replayPIMPresentationPacket(t, wire)
+	require.Equal(t, "context-required", raw.events[0].Status)
+	for _, got := range []packetDetail{detail(raw), quickDetail(raw), workerMetadataDetailForPacket(t, raw)} {
+		text := detailLines(got.fields)
+		require.Contains(t, text, "IPv4 observed header")
+		require.Contains(t, text, "Message extent: unavailable (original Total Length: 0)")
+		require.Contains(t, text, "BSR=unavailable")
+		require.Contains(t, text, "Encoding: 1")
+		require.NotContains(t, text, "YAML dissector incomplete")
+		require.NotContains(t, text, "Ethernet {Contents=")
+		require.NotContains(t, text, "<nil>")
+		require.NotContains(t, text, "BSR=0.0.0.0")
+		var address, encoding bool
+		for _, f := range got.fields {
+			switch f.text {
+			case "Source: 0.1.31.1":
+				address = true
+				require.True(t, f.hasRange)
+				require.Equal(t, 0, f.source)
+				require.Equal(t, []byte{0, 1, 31, 1}, raw.data[f.start:f.end])
+			case "Encoding: 1":
+				encoding = true
+				require.True(t, f.hasRange)
+				require.Equal(t, 1, f.source)
+				require.Equal(t, []byte{1}, got.sources[0].Data[f.start:f.end])
+			}
+		}
+		require.True(t, address)
+		require.True(t, encoding)
+	}
+	var detached packetDetail
+	copy := *raw.events[0]
+	copy.SourceBytes.SHA256 = "forged"
+	require.False(t, appendPIMCapturedPrefix(&detached, raw, []*pcaputil.ProtocolEvent{&copy}))
 }
 
 func TestPIMPartialNativeQuickAndWorkerKeepTheirExactSourceTree(t *testing.T) {
