@@ -1,0 +1,106 @@
+{
+  "production_source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+  "scope": "Archive exact UI51 controllers and closed aggregate caption/source evidence.",
+  "source_files": 8,
+  "source_bytes": 30129,
+  "files": [
+    {
+      "path": "run_go_CLI51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_go_CLI51.py",
+      "bytes": 1341,
+      "SHA256": "ac00644e5a2169c632c01e31f2f25dc62132991edb45b364bcebb6c2ab5de4c7",
+      "language": "Python"
+    },
+    {
+      "path": "stage_SSH_preview51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\stage_SSH_preview51.py",
+      "bytes": 1825,
+      "SHA256": "4b93bbc1a37813ad54d71fb4ca6f52eceaa8596ddb8c07c44a2ccb13a3b3924b",
+      "language": "Python"
+    },
+    {
+      "path": "prepare_Windows_SSH_preview51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_SSH_preview51.py",
+      "bytes": 2614,
+      "SHA256": "d0d421e89895c51c968f36326768248a037984406c627ee09d9cf0a2fc618e90",
+      "language": "Python"
+    },
+    {
+      "path": "run_Windows_SSH_preview51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_SSH_preview51.py",
+      "bytes": 1095,
+      "SHA256": "d99126ad0f7edce50da59773e2ca4b15dbbaab4d7d569b923fbd7f627e58f105",
+      "language": "Python"
+    },
+    {
+      "path": "close_Windows_SSH_preview51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH_preview51.py",
+      "bytes": 5574,
+      "SHA256": "6740cb2e4c89cf0a66c955c5f65e0e700865c2282766158d4b99497935cc6596",
+      "language": "Python"
+    },
+    {
+      "path": "import_SSH_role_sources50.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_SSH_role_sources50.py",
+      "bytes": 5337,
+      "SHA256": "ac1969e11144fa0f37aaf84d3f71f31f37aad96c3b705191ad98bcd9f73ada88",
+      "language": "Python"
+    },
+    {
+      "path": "import_SSH_role_sources50_v02.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_SSH_role_sources50_v02.py",
+      "bytes": 1729,
+      "SHA256": "27779894be982472f8950bf6b6a938e6fff801147dbf0b2ade40308825d53511",
+      "language": "Python"
+    },
+    {
+      "path": "write_SSH_preview_report51.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\write_SSH_preview_report51.py",
+      "bytes": 10614,
+      "SHA256": "45ab5691eecf765c58bd951b1614ff161e772c2f7329def522162050cfccbf81",
+      "language": "Python"
+    }
+  ],
+  "existing_repository_dependencies": [
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-role50/run_Windows_SSH_role50.py",
+      "SHA256": "ac12226b99f25bf3c39ce39c5685d105d5ebaa54c6364856c6bddb144d968bfa",
+      "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-role50/source-manifest.json",
+      "manifest_SHA256": "2b52719496d379824626c6ec8a9c539aa94312f1f17ba6f03430e30bad3b02ba"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-role50/run_SSH_role_native50.py",
+      "SHA256": "d4aa363c6269b7641150805d4ed831958b8b09fbe815ed2a561eee6fe0fa295c",
+      "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-role50/source-manifest.json",
+      "manifest_SHA256": "2b52719496d379824626c6ec8a9c539aa94312f1f17ba6f03430e30bad3b02ba"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_go_temp.py",
+      "SHA256": "ca7af577ce7d557c365d19eb114df0826e37f5401163ca3b4c785677b5a5ca6d",
+      "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/source-manifest.json",
+      "manifest_SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/run_build_temp.py",
+      "SHA256": "b79807ee65bca1edcfe5413b16b0c7efcd3e055d567aee62a52f48e6929c691e",
+      "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/source-manifest.json",
+      "manifest_SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/verify_Windows_OSPFv3_36.py",
+      "SHA256": "a8b5f9b91f6a766b02d41789cb1f91aa3bb4e4ce3939160d328318389d2aa95d",
+      "manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/source-manifest.json",
+      "manifest_SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce"
+    }
+  ],
+  "exact_source_bytes_not_normalized": true,
+  "excludes": [
+    "packet captures/keylogs/raw data",
+    "whole source plans/expected/export files",
+    "runtime receipts/logs",
+    "images/cells/binaries",
+    "full RFC/vendor sources"
+  ],
+  "historical_failed_importer_retained": true,
+  "future_wire_range_ledger_not_included": true
+}

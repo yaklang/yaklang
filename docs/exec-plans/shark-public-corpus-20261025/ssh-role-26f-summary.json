@@ -1,0 +1,436 @@
+{
+  "CI": {
+    "four_exact_source_first_attempts_success": true,
+    "no_UI51_CI_claim": true,
+    "runs": [
+      {
+        "attempt": 1,
+        "conclusion": "success",
+        "head": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+        "id": 40954741876,
+        "name": "Essential Tests",
+        "status": "completed",
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40954741876"
+      },
+      {
+        "attempt": 1,
+        "conclusion": "success",
+        "head": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+        "id": 40954741831,
+        "name": "Diff-Code-Check",
+        "status": "completed",
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40954741831"
+      },
+      {
+        "attempt": 1,
+        "conclusion": "success",
+        "head": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+        "id": 40954741828,
+        "name": "Check Git path case collisions",
+        "status": "completed",
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40954741828"
+      },
+      {
+        "attempt": 1,
+        "conclusion": "success",
+        "head": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+        "id": 40955120040,
+        "name": "Bin Parser Traffic Tests",
+        "status": "completed",
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40955120040"
+      }
+    ],
+    "source": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+    "verified_UTC": "2026-10-29 21:32:44 UTC"
+  },
+  "SDK": {
+    "API_literal_occurrences": 645,
+    "SDK_callbacks": 71,
+    "SDK_full_tail_coverage_claimed": false,
+    "SDK_opaque_retained_bytes": 112,
+    "SSH_descriptors": 12,
+    "TCP_generations": 9,
+    "close_DTOs": 7,
+    "close_SDK_CLI_bridges": 7,
+    "payload_SDK_CLI_bridges": 64,
+    "payload_callbacks": 64,
+    "payload_rows": 64,
+    "physical_frames": 115,
+    "private_SSH_occurrences": 243,
+    "published_close_entries": 7,
+    "role_diagnostics": 4,
+    "source_opaque_consumed_bytes": 240,
+    "status_counts": {
+      "context-required": 2,
+      "decoded": 58,
+      "malformed": 4
+    },
+    "unretained_source_tail_bytes": 128
+  },
+  "UI51": {
+    "no_runtime_pass_claim": true,
+    "scope": "display-only protectedSSHEvent observation/encrypted stream bytes orpreview wording; API/private pdu.id/physical metadata unchanged",
+    "source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+    "state_at_role50_staging": "source fix and read-only review recorded; bins51 build/runtime results are outside this report"
+  },
+  "Windows26f": {
+    "actual_frame_length_labels": [
+      246,
+      246
+    ],
+    "closed_cases": 2,
+    "full_physical_bytes_each": 246,
+    "physical_capture_data_corruption": false,
+    "remaining_actual_defect": "64-byte opaque slice called SSH reassembled PDU; even fully retained48-byte encrypted stream chunk has no proven SSH packet boundary",
+    "root_corrected_visual_misread": "64 onwire/64 captured was not present; all original frame13 views retained246/246",
+    "source_frames": [
+      36,
+      13
+    ],
+    "source_preview_frame13": {
+      "not_retained_by_SDK_bytes": 128,
+      "observed_stream_bytes": 192,
+      "remaining_tail_only_proven_by_physical_capture_and_input_SHA": true,
+      "retained_Raw_bytes": 64
+    },
+    "whole_byte_inspections": 7,
+    "wrong_client_reply": "SSH/malformed, expectedserver/observedclient; no successful method field or fingerprint claim"
+  },
+  "Windows26f_root_closure": {
+    "all_physical_frame_lengths_and_bytes_preserved": true,
+    "default_cache_packets": 20000,
+    "default_history_mib": 64,
+    "encrypted_preview_caption_passed": false,
+    "known_UI_caption_gap_preserved": true,
+    "role_diagnostic_page_passed": true,
+    "role_metadata_selection_does_not_change_right_byte_attributes": true,
+    "root_viewed_actual_images": true
+  },
+  "certificates": {
+    "CI": {
+      "SHA256": "a2ec45b9b6a4554985c5a3b88346879281bb99d4a1770d22a086fbc12685802c",
+      "bytes": 1326,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-CI-26f50-01.json"
+    },
+    "CLI_preservation": {
+      "SHA256": "9883de2105e5ce7b1f02a0c90441e8800d822542128ab2c77c55dd4720c790ef",
+      "bytes": 14576,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-public-CLI-bridge50-01\\summary.json"
+    },
+    "SDK_identity49_compatibility": {
+      "SHA256": "33039bef7d037b1c4a744b71d0d467529e70203200c16a55408c28a470adf495",
+      "bytes": 1936,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-identity-native-26f50-01\\independent-audit\\summary.json"
+    },
+    "SDK_plan03": {
+      "SHA256": "5492fa27bcd060eb22d82163aec99349336be3a9e0af9b2822f7aa5e3269455f",
+      "bytes": 3433,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-API-CLI-source50-03\\plan03\\manifest.json"
+    },
+    "SDK_role50": {
+      "SHA256": "e2f0fedafe84c55714d2ab24d4343f527436a927c88a85528f5d1d06ded163dd",
+      "bytes": 5001,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-native-26f50-01\\independent-audit03\\summary.json"
+    },
+    "SDK_selftest03": {
+      "SHA256": "23b7d88d15ffa34df3df2128bbe9b5040f52ea5cd1257de5d7e128c464ac9264",
+      "bytes": 1274,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-API-CLI-source50-03\\selftest03\\summary.json"
+    },
+    "Windows_child_readonly_inspection": {
+      "SHA256": "ad7bb6033514147b5609b1122565ffd19d6ab8fa4ba8a0e4c963f80aea083200",
+      "bytes": 6211,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-preview-UI-readonly50-01\\summary.json"
+    },
+    "Windows_producers": {
+      "SHA256": "fc1e72137a6702a1efd5567ddcdbd606fcebd126354ed774186940af71426547",
+      "bytes": 13631,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-SSH-role-26f50-01\\producer-summary.json"
+    },
+    "Windows_root_closure": {
+      "SHA256": "6643515ce3661822cafbc81116bfa26360886946384179276fed2489dd05bcbf",
+      "bytes": 1806,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-SSH-role-root-closure50-01\\summary.json"
+    },
+    "Windows_root_source_inspection": {
+      "SHA256": "28b11eeffcf791ddb277dc602ac7b3a1422ac659c7d77ace0f9d4412561ac357",
+      "bytes": 7341,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\Windows-SSH-role-scope-discovery50-01\\observations.json"
+    },
+    "full": {
+      "SHA256": "1cb4ce936c1fe004d09cae2ac0413cd210196f04498c249c69a3420b178621f4",
+      "bytes": 1873,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\test-SSH-26f-full50-03\\receipt.json"
+    },
+    "fuzz": {
+      "SHA256": "9163373da411aede8adea21777b82ecb945485d508058db16d702ddb5b1d7a9f",
+      "bytes": 1506,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-fuzz-26f50-01\\summary.json"
+    },
+    "native_preservation": {
+      "SHA256": "b6dd0f1b8839af02c8eeace623f0c05e211b268f1ca7cf4f129585d760bdd639",
+      "bytes": 17346,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-public-native-bridge50-01\\summary.json"
+    },
+    "preview_policy02": {
+      "SHA256": "5b8d9e30b01e416e27a1d0ff1cfdffbce8e0932147df7392145cfb08a7f2f93e",
+      "bytes": 2871,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-API-CLI-source50-02\\plan02\\opaque-preview-policy.json"
+    },
+    "reference50": {
+      "SHA256": "a904f03eb6e799a5a51d4bcf7755bd3d0b5ef8d46f8d815bc9585bc1e31e31e0",
+      "bytes": 5008,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-reference50-01\\closure01\\summary.json"
+    },
+    "reference_comparison02": {
+      "SHA256": "c00918902a0d86539f4555462c37fbd7eb3fcc98cfb495da63d63ca1428e999b",
+      "bytes": 2030,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-reference50-01\\comparison02\\summary.json"
+    },
+    "reference_erratum": {
+      "SHA256": "3357089f81588b7cedc0ff96b082366b7ea331632a8ade0fdc8d964af8a1e3cf",
+      "bytes": 654,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-reference50-01\\closure01\\erratum.json"
+    },
+    "source50": {
+      "SHA256": "ae73e1329488cc159cb0958f483c529e7dd50e270b53249dae8521324a2553af",
+      "bytes": 15137,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-source50-01\\plan02\\manifest.json"
+    },
+    "source_selftest": {
+      "SHA256": "6091b41a5367d68d7a4bed4faa559c18a4cfd4edb9edfe7793902797e19ac7bc",
+      "bytes": 1021,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-source50-01\\selftest02\\summary.json"
+    },
+    "summary_metadata_supplement03": {
+      "SHA256": "736b7829a8d0668355f800a8bb78dcf9180a3e8985bede050cf92104834c277c",
+      "bytes": 1453,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-API-CLI-source50-03\\plan03\\Summary-metadata-supplement.json"
+    },
+    "targeted_green": {
+      "SHA256": "9146e203153b3d885d84532c47deb1ab64893e3b1f302e6e8a5bc8f4857bc80f",
+      "bytes": 2256,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\test-SSH-role-green50-02\\receipt.json"
+    },
+    "targeted_red": {
+      "SHA256": "f02cfe948c1ef7ec477d3a72c95af898bc67ee7f3c3f2c66ab7dbee310a7c3f3",
+      "bytes": 46156,
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\test-SSH-role-red50-01\\receipt.json"
+    }
+  },
+  "checker_corrections": {
+    "all_original_field_trees_preserved": true,
+    "original64_source_rows_SHA256": "fbbcda79bd880324bfc541649f271580b626a764e88af14cd554e39eee5eac77",
+    "runtime_stats_API_executed_for_preview_accounting": false,
+    "v02": "only opaque frame13 retained source prefix64 of192; complete source wire stays frozen; whole-tail SDK coverage expresslyfalse",
+    "v03": "four Summary strings from immutable consumeSession source formula SSH plusfrozenPacketName, not candidate field values"
+  },
+  "disk_free_bytes_at_stage": 23595982848,
+  "historical_failures": [
+    {
+      "certificate": {
+        "SHA256": "7f6a0339e2cf6befdb361dccefc64d9d0c9fca4c8e7b984cb7e89704f5665734",
+        "bytes": 576,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-source50-01\\plan01\\failure.json"
+      },
+      "interpretation": "source guard typo before any packet construction; kept, v02 derives the existing pinned49 hash"
+    },
+    {
+      "certificate": {
+        "SHA256": "13331fb9544204a6d100d841952a5edd99b4b276a4d4e2a617791d956fad0577",
+        "bytes": 2030,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-reference50-01\\comparison01\\summary.json"
+      },
+      "interpretation": "original missing generated direction alias all([]) bug; comparator02 only corrects unknown-role evidence,726 field rows unchanged"
+    },
+    {
+      "certificate": {
+        "SHA256": "714d80496d01904023866171cb2b904a53edb8c46dc717f80f9733d280087cf9",
+        "bytes": 2694,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-native-26f50-01\\independent-audit01\\summary.json"
+      },
+      "interpretation": "checker01 incorrectly required complete192-byte SDK Raw for a preexisting64-byte opaque preview"
+    },
+    {
+      "certificate": {
+        "SHA256": "f63e8a6abc174e6e816972609585c6996e61374916f21e0cff599c932abca2b5",
+        "bytes": 3814,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-native-26f50-01\\independent-audit02\\summary.json"
+      },
+      "interpretation": "checker02 static Summary conditional misread, not a codec regression"
+    },
+    {
+      "certificate": {
+        "SHA256": "a3bf12be85824041bfb68708129fa325ae50e42045b407a0c22c6e857819bf5c",
+        "bytes": 3821,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-before-cc9d50-01\\independent-audit02\\summary.json"
+      },
+      "interpretation": "old product still fails source role status atframe24 after preview schema correction"
+    },
+    {
+      "certificate": {
+        "SHA256": "98c12a462dd4daf2c2677b48089b060a76d2d0d1fedea666b3b27f05a12e86d8",
+        "bytes": 414,
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-preview-UI-readonly50-01\\audit01-failure.json"
+      },
+      "interpretation": "read-only inspector used policy path without plan02; v02 fixes only path"
+    }
+  ],
+  "open_boundaries": [
+    "SSH GetFields/typed/UI wire ranges are not implemented by26f orUI51; independent source51 ledger stays external and is not archived here",
+    "complete SSH message ordering/rekey ornegotiated hostkey/signature conformance beyond selected scope remains open",
+    "no encrypted SFTP plaintext orcryptographic authentication/host trust claim",
+    "not a live SSH capture campaign; source50 only authored9 and source49 retained12"
+  ],
+  "production_source": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+  "public_preservation": {
+    "CLI_whole_rows": 384518,
+    "ID_mapping": false,
+    "after_source": "26f01f4baa5fd39b88deadf901257a70bc5c1dfe",
+    "all_exports_byte_identical": true,
+    "before_source": "cc9d84079d455a64b57365e143b9e5ee641a7997",
+    "differences": 0,
+    "inputs": 37,
+    "limitation": "preservation proves unchanged whole exports, not correctness of every existing protocol interpretation",
+    "mix": "frozen public/owned/matrix preservation suite; not37 newly captured live inputs",
+    "native_event_rows": 307819,
+    "whole_flow_objects": 2
+  },
+  "reference": {
+    "decode_as": "tcp.port==2222,ssh only explicit reference adapter; not a product content-identification proof",
+    "natural_direction_labels_disagree_with_SYN": 10,
+    "per_dissection_context_counts": {
+      "matched-aggregate-owner": 6,
+      "matched-primitive": 671,
+      "matched-zero-width-no-highlight": 36,
+      "not-matched": 1,
+      "optional-owned-blob-not-rendered": 12,
+      "protected_sentinels_without_clear_fields": 2,
+      "source_wrong_role_packets": 4,
+      "wrong_role_with_hostkey_fields": 2,
+      "wrong_role_without_reference_role_expert": 4
+    },
+    "physical_frames": 115,
+    "primary_RFC_links": [
+      "https://www.rfc-editor.org/rfc/rfc4253#section-8",
+      "https://www.rfc-editor.org/rfc/rfc5656#section-4",
+      "https://www.rfc-editor.org/rfc/rfc4419#section-3"
+    ],
+    "primitive_vs_owner_scope": "671 exact rendered primitives,36 zero-width observations with no nonempty highlight proof,6 aggregate owners,12 optional whole blobs not rendered,1 padding not rendered; not726 exact primitive matches",
+    "private_method_padding_unrendered_frame": 47,
+    "tool": "Wireshark TShark4.6.9",
+    "vendor_source_copied": false,
+    "vendor_source_external_SHA256": "74d36757fec72106de832989afae8d72ae9bd928f379ff6467a339bedf8b0fe2",
+    "vendor_source_external_URL": "https://raw.githubusercontent.com/wireshark/wireshark/v4.6.9/epan/dissectors/packet-ssh.c",
+    "wrong_role_no_reference_role_expert": [
+      24,
+      36,
+      89,
+      103
+    ],
+    "wrong_role_reference_hostkey_fields": [
+      36,
+      103
+    ]
+  },
+  "scope": "SSH known-method sender-role correctness at source26f. All nine source50 connections are authored, not live. This counts-only document does not close all SSH conformance or cryptographic correctness.",
+  "separate_UI51_source": "7fcbf0ac931c6881fd5a3baf4eba8d5c9c9889f8",
+  "source49_compatibility": {
+    "API_literal_occurrences": 842,
+    "SDK_total_callbacks": 87,
+    "SSH_descriptors": 12,
+    "all_original_payload_fields_unchanged": true,
+    "close_diagnostics": 11,
+    "passed": true,
+    "payload_callbacks": 76,
+    "physical_rows": 148,
+    "private_alias_occurrences": 275
+  },
+  "source50": {
+    "authored_connections": 9,
+    "bad_then_correct_same_connection_evidence": "root144 method-role/direction/deferred/chunk unit variants; bad source50 capture flows end withFIN and do not independently prove next-correct-packet recovery",
+    "noSYN_role_unknown_generations": 1,
+    "observed_SYN_generations": 8,
+    "payload_callbacks": 64,
+    "physical_frames": 115,
+    "real_captures": 0,
+    "same_tuple_reuse_evidence": "retained source49 case06 tocase07, independently revalidated with26f",
+    "same_tuple_reuse_in_source50": false
+  },
+  "source_archive": {
+    "manifest_SHA256": "2b52719496d379824626c6ec8a9c539aa94312f1f17ba6f03430e30bad3b02ba",
+    "manifest_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-report-stage50-03\\source-archive\\source-manifest.json",
+    "scan": {
+      "base64_string_literals_ge256": 0,
+      "forbidden_file_suffixes": 0,
+      "hex_string_literals_ge128": 0,
+      "literal_bytes_ge64": 0,
+      "parsed_Python_sources": 23,
+      "private_key_markers": 0
+    },
+    "source_bytes": 194175,
+    "source_bytes_unchanged": true,
+    "source_files": 23
+  },
+  "staging_did_not_invoke": [
+    "Git",
+    "Go",
+    "SDK",
+    "TShark",
+    "native UI helper"
+  ],
+  "staging_history": {
+    "previous_stage": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-report-stage50-02\\staging-manifest.json",
+    "previous_stage_SHA256": "5e5e7ece6c51f25c04f2bca952dc8a6a06bfdd5028b318cba4ebf2aa2a7d2d80",
+    "reason": "report prose reviewed; same closed evidence and scope asstage02; earlier stages preserved"
+  },
+  "tests": {
+    "full": {
+      "all_runs_have_unique_terminal": true,
+      "fail": 0,
+      "log_SHA256": "dcdd291115b50bd8568e773331377477d2edb7d78126e5652d53443c99a0cb27",
+      "pass": 285825,
+      "runs": 285849,
+      "seconds": 698.594,
+      "skip": 24
+    },
+    "fuzz": [
+      {
+        "configured_fuzz_seconds": 60,
+        "executions": 104687,
+        "exit_code": 0,
+        "failures": 0,
+        "log_SHA256": "84355304af02488baa7638637cf41d9dc972f3c4aa1c15983fdb016ed4023369",
+        "parallel_workers": 2,
+        "receipt": {
+          "SHA256": "09dda2ad4b7bf18985b9fe06f2e564066aceded467a6b406353b8a6e84d10626",
+          "bytes": 609,
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-fuzz-26f50-01\\FuzzSSHClientRoleNegotiationIsolation-receipt.json"
+        },
+        "target": "FuzzSSHClientRoleNegotiationIsolation"
+      },
+      {
+        "configured_fuzz_seconds": 60,
+        "executions": 84705,
+        "exit_code": 0,
+        "failures": 0,
+        "log_SHA256": "8dffc9ebccd031c0c29125d68e6f26a3009570e4431d374b5a8bc7d46cccf412",
+        "parallel_workers": 2,
+        "receipt": {
+          "SHA256": "26dc3f507d34db0f33cb4b3f04cea53e5b88996958922b41baca817bcba22f6f",
+          "bytes": 604,
+          "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-role-fuzz-26f50-01\\FuzzSSHNativeRefusalFieldIsolation-receipt.json"
+        },
+        "target": "FuzzSSHNativeRefusalFieldIsolation"
+      }
+    ],
+    "historical_red_actions": {
+      "fail": 145,
+      "pass": 2
+    },
+    "role_direction_deferred_chunk_leaf_variants": 144,
+    "targeted_green_actions": {
+      "pass": 543
+    }
+  }
+}

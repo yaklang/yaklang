@@ -1,0 +1,322 @@
+{
+  "scope": "Save aggregate closed SSH identity49 evidence; no runtime payloads are copied.",
+  "production_source": "cc9d84079d455a64b57365e143b9e5ee641a7997",
+  "all_core_or_TOP30_complete": false,
+  "fixes": [
+    "Only four exact capability markers are removed from the KEX preference list.",
+    "Only twelve exact implemented method names select DH/GEX/P256/Curve25519 layouts.",
+    "Only a fully decoded selected reply owns a host-key blob/fingerprint; unknown methods stay opaque.",
+    "The first actual KEX preference, excluding exact markers, decides guessed-packet handling."
+  ],
+  "source_controls": {
+    "authored_cases": 12,
+    "physical_frames": 148,
+    "live_captures": 0,
+    "payload_callbacks": 76,
+    "decoded_callbacks": 74,
+    "protected_context_callbacks": 2,
+    "FIN_diagnostic_callbacks": 11,
+    "total_native_callbacks": 87,
+    "physical_CLI_rows": 148,
+    "FIN_published_entries": 11,
+    "standalone_nonphysical_CLI_rows": 0,
+    "source_field_observations": 608,
+    "API_literal_observations": 842,
+    "private_alias_occurrences": 275,
+    "descriptors": 12,
+    "before_source_exact_payloads": 60,
+    "after_source_exact_payloads": 76,
+    "cases": {
+      "01-ext-info-private-prefix": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          7,
+          8,
+          9
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session",
+          "entire source-built Session",
+          "entire source-built Session"
+        ],
+        "before_pass": 3,
+        "payloads": 6
+      },
+      "02-kex-strict-private-prefix": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          19,
+          20,
+          21
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session",
+          "entire source-built Session",
+          "entire source-built Session"
+        ],
+        "before_pass": 3,
+        "payloads": 6
+      },
+      "03-dh-private-prefix": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          31,
+          32,
+          33
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session",
+          "entire source-built Session",
+          "entire source-built Session"
+        ],
+        "before_pass": 3,
+        "payloads": 6
+      },
+      "04-gex-private-prefix": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          43,
+          44,
+          45
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session",
+          "entire source-built Session",
+          "entire source-built Session"
+        ],
+        "before_pass": 3,
+        "payloads": 6
+      },
+      "05-curve-substring-private": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          55,
+          56,
+          57
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session",
+          "entire source-built Session",
+          "entire source-built Session"
+        ],
+        "before_pass": 3,
+        "payloads": 6
+      },
+      "06-unknown-reply-no-hostkey": {
+        "after_pass": 6,
+        "before_failure_frames": [
+          69
+        ],
+        "before_failure_predicates": [
+          "entire source-built Session"
+        ],
+        "before_pass": 5,
+        "payloads": 6
+      },
+      "07-standard-curve-markers-and-reuse": {
+        "after_pass": 10,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 10,
+        "payloads": 10
+      },
+      "08-libssh-correct-guess-server-first": {
+        "after_pass": 6,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 6,
+        "payloads": 6
+      },
+      "09-nistp256-reverse-endpoints": {
+        "after_pass": 6,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 6,
+        "payloads": 6
+      },
+      "10-dh14-sha256": {
+        "after_pass": 6,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 6,
+        "payloads": 6
+      },
+      "11-gex-sha256-request": {
+        "after_pass": 5,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 5,
+        "payloads": 5
+      },
+      "12-first-guess-wrong-then-correct": {
+        "after_pass": 7,
+        "before_failure_frames": [],
+        "before_failure_predicates": [],
+        "before_pass": 7,
+        "payloads": 7
+      }
+    },
+    "source": {
+      "external_proof": "SSH-source49-audit01/plan01/manifest.json",
+      "SHA256": "37e004f4266ed3ce1bf3fd65c0df789ef2d16a11f0691713471ea8c69a2ab4b0"
+    },
+    "EOF_supplement": {
+      "external_proof": "SSH-SDK-CLI-source49-02/plan02/manifest.json",
+      "SHA256": "ee5e2f1d7daa26c859064f36e83aa5f25c2361e0f8ed8c56f9aae642928f0480"
+    },
+    "caption_supplement": {
+      "external_proof": "SSH-SDK-CLI-source49-03/contract.json",
+      "SHA256": "5de2a91f843b8c3871df54f4dfce1a50c9ff7a0157e84334f5ae7549670dc0c7"
+    },
+    "whole_audit": {
+      "external_proof": "SSH-native-cc9d49-01/independent-audit03/summary.json",
+      "SHA256": "2df5f3fa3b369170b8a01212b8b8ae7a23e035c3eb2c46e32f0d9cb95c23c275"
+    },
+    "source_delta": {
+      "external_proof": "SSH-source-delta49-01/summary.json",
+      "SHA256": "20efb5902680606a92f6deac3f34b42e5e567380b06c276ca2f27bbc199b0e43"
+    }
+  },
+  "public_replay": {
+    "inputs": 37,
+    "physical_records": 383936,
+    "CLI_records": 384518,
+    "CLI_nonphysical_records": 582,
+    "native_events": 307819,
+    "whole_flow_files": 2,
+    "complete_exports_byte_identical": true,
+    "ID_or_field_normalization": false,
+    "unplanned_differences": 0,
+    "does_not_certify_all_existing_interpretations": true,
+    "native": {
+      "external_proof": "SSH-public-native-bridge49-01/summary.json",
+      "SHA256": "6f5247a07acff2b8541f6b8a9754b360ce624b322f77e7e7434ef0a726098a28"
+    },
+    "CLI": {
+      "external_proof": "SSH-public-CLI-bridge49-01/summary.json",
+      "SHA256": "369c188aa75053202204e8f3504a155eaf4f89a0f9d5fcbda530d1e4f7a3ccc5"
+    }
+  },
+  "reference": {
+    "version": "4.6.9",
+    "physical_frames": 148,
+    "TCP_generations": 12,
+    "reference_modes": [
+      "natural heuristic",
+      "explicit decode-as"
+    ],
+    "source_primitive_matches_per_mode": 762,
+    "empty_string_observations_per_mode": 48,
+    "identification_content_matches_per_mode": 24,
+    "aggregate_observations_per_mode": 16,
+    "aggregate_owners_per_mode": 7,
+    "unmapped_observations_per_mode": 13,
+    "source_aliases_not_rendered_per_mode": 3,
+    "literal_value_conflicts": 0,
+    "overlapping_semantic_differences": {
+      "natural_server_first_wrong_direction": [
+        92,
+        93,
+        94,
+        95,
+        96,
+        97
+      ],
+      "private_body_reference_exception": [
+        45,
+        57,
+        69
+      ],
+      "unselected_method_fields": [
+        8,
+        9,
+        20,
+        21,
+        32,
+        33,
+        56,
+        68,
+        143
+      ],
+      "unselected_standard_captions": [
+        8,
+        9,
+        20,
+        21,
+        32,
+        33,
+        45,
+        56,
+        57,
+        68,
+        69,
+        143
+      ]
+    },
+    "empty_or_generated_fields_do_not_prove_highlight_ranges": true,
+    "closure": {
+      "external_proof": "SSH-Wireshark-source49-01/closure02/summary.json",
+      "SHA256": "5d63d665a3ba9951c91bb365b2d4e0a5ef279d93deac356b6e2e61d045294f98"
+    },
+    "evidence": {
+      "external_proof": "SSH-Wireshark-source49-01/closure02/reference-difference-evidence.json",
+      "SHA256": "152a0554d2650018aa6dbd17072b0b62350d9e431bd6dce6b3091126af6514e2"
+    }
+  },
+  "windows": {
+    "physical_frame": 69,
+    "whole_frame_bytes": 86,
+    "whole_PDU_bytes": 32,
+    "selected_owned_value_bytes": 18,
+    "exact_selected_bytes": true,
+    "protocol_stack": [
+      "Ethernet",
+      "IPv4",
+      "TCP",
+      "SSH"
+    ],
+    "source": "unknown private method reply",
+    "no_false_hostkey": true,
+    "no_frame_or_PDU_offsets_in_current_SSH_API": true,
+    "actual_console_cells_not_Terminal_pixels": true,
+    "default_cache_packets": 20000,
+    "CP936_mouse_tabs_resize_checked": true,
+    "closure": {
+      "external_proof": "Windows-SSH-root-closure49-01/summary.json",
+      "SHA256": "2985f077fbd3ae94bac5d8cbad66a72105ba01ff3581a897d3c8b4cdcfeddbb0"
+    }
+  },
+  "validation": {
+    "targeted_pass_count": 396,
+    "targeted_fail_count": 0,
+    "full_latest_five_package_run_not_claimed_for_cc9": true,
+    "tests": {
+      "external_proof": "test-SSH-exact-name-green49-03/receipt.json",
+      "SHA256": "555aab394d3c3dd9728f7492e5ea057f55ba1d25749c873bab6bf5db4e019c9a"
+    },
+    "CI": {
+      "external_proof": "SSH-CI-cc9d49-01.json",
+      "SHA256": "79e8385630193a288f7735c11fd6a59830b3ded812f18ce94b9551aaa55b7f31"
+    },
+    "all_four_exact_source_CI_success": true,
+    "selftest_negatives": {
+      "original_payload": 16,
+      "strict_FIN_supplement": 12,
+      "caption_supplement": 7
+    }
+  },
+  "source_archive": {
+    "repository_manifest": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-identity49/source-manifest.json",
+    "SHA256": "b7606b655feb69e3a4bb52e826674f7f30c5b52cdc5f2c8eec7748b1fabaf188",
+    "source_files": 23,
+    "source_bytes": 200620,
+    "existing_repository_dependencies": 6
+  },
+  "limits": [
+    "No new live SSH peer capture or authenticated cryptography is claimed.",
+    "P384/P521/Curve448 and unknown private method bodies remain opaque until full codecs exist.",
+    "SSH native leaf aliases currently supply no byte ranges; source ledgers are not manufactured API offsets.",
+    "Initial-message role/order and hostkey-negotiation conformance are separate follow-up audits.",
+    "Same public output bytes demonstrate continuity, not correctness of all unchanged protocol fields."
+  ]
+}
