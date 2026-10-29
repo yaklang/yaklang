@@ -1,0 +1,78 @@
+{
+  "scope": "Package only portable source files and a literal dependency/CLI manifest.",
+  "files": [
+    {
+      "name": "recovery_probe.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\recovery_probe.py",
+      "SHA256": "8fc1c3c6a0f299e2ddd4491a37d27fef7264343c4d9888c15a23c5aae7e27248",
+      "AST_parse_pass": true
+    },
+    {
+      "name": "reference_probe.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\reference_probe.py",
+      "SHA256": "3d724c6327510bb2c1aee87b3ed399dcd431fb6319a59f3f34035de6c68e55e3",
+      "AST_parse_pass": true
+    },
+    {
+      "name": "quic_sparse_epoch.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\quic_sparse_epoch.py",
+      "SHA256": "a11d3358f342298810ca38d10ceb9057e9e66600587c79c8e4930569d3337fef",
+      "AST_parse_pass": true
+    },
+    {
+      "name": "sparse_epoch_packet_audit.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\sparse_epoch_packet_audit.py",
+      "SHA256": "e1bc3f51a21f823efbcb433bd215867f4f9795e86e6d36ed97e06774ee79a1e5",
+      "AST_parse_pass": true
+    },
+    {
+      "name": "freeze_sparse_forward_expectations.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\freeze_sparse_forward_expectations.py",
+      "SHA256": "97db2b52fbae9ec81e76de6b3786825ce0fc6797b5b8b601e93d8574b187a8df",
+      "AST_parse_pass": true
+    },
+    {
+      "name": "tls_whole_loss_audit.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\TLS-QUIC-recovery-prep-01\\tls_whole_loss_audit.py",
+      "SHA256": "aa9a67ac97eff5dcace6543d1ec3a6714e6c5a19267914cca904b0364803316a",
+      "AST_parse_pass": true
+    }
+  ],
+  "runtime": "Python 3 with cryptography (AESGCM, ChaCha20Poly1305, AES ECB/ChaCha20 HP); no Go or native decoder imports",
+  "external_audit_modules": {
+    "vxlan_endpoint_projection_audit.py": {
+      "path_relative_to_live_audit": "vxlan_endpoint_projection_audit.py",
+      "SHA256": "ee8248c78b9be42f8a3c4c2517c5c149a0dd009dc7cd5a1571f13e66644f5feb"
+    },
+    "pptp_parent_source_audit.py": {
+      "path_relative_to_live_audit": "pptp_parent_source_audit.py",
+      "SHA256": "dddcdcdf2d557c115272ccc5808a1266dd44cf1b55e8156e761f97722ddbf9b6"
+    },
+    "tls_resumption_audit.py": {
+      "path_relative_to_live_audit": "tls_resumption_audit.py",
+      "SHA256": "74a2e946e64854373d24577616885ca4592c5332823d53cc75a63d64b917aa5c"
+    },
+    "capture_clock_wire_audit.py": {
+      "path_relative_to_live_audit": "capture_clock_wire_audit.py",
+      "SHA256": "d38e3e13aac63c73fbf7a7d70888ff13568076d62c210b57ccdd9c5d48fa19f7"
+    },
+    "owned_quic_clock_audit.py": {
+      "path_relative_to_live_audit": "owned_quic_clock_audit.py",
+      "SHA256": "b25abfed766f0e2fb028145df7960861fb5df9ea4cbc1e14dcccdb6a302a2763"
+    }
+  },
+  "commands": [
+    "recovery_probe.py prepare-tls --root OWNED_TLS_CAPTURE_ROOT --audit LIVE_AUDIT --out NEW_TLS_PLAN",
+    "recovery_probe.py execute --plan FROZEN_PLAN/plan-before.json --binary EVENTS_EXE --receipt EVENTS_BUILD_RECEIPT --out NEW_ACTUAL",
+    "reference_probe.py --tshark TSHARK_EXE --capture CAPTURE --keylog KEYLOG --quic-port 65088 --out NEW_REFERENCE",
+    "quic_sparse_epoch.py --capture OWNED_QUIC_CAPTURE --manifest PEER_MANIFEST --keylog KEYLOG --reference ORIGINAL_PDML --audit LIVE_AUDIT --out NEW_QUIC_PLAN",
+    "sparse_epoch_packet_audit.py --plan FROZEN_QUIC_PLAN --actual CLOSED_ACTUAL --audit LIVE_AUDIT --original-reference CLOSED_ORIGINAL_REFERENCE --sparse-reference CLOSED_SPARSE_REFERENCE --out NEW_AUDIT",
+    "freeze_sparse_forward_expectations.py --plan FROZEN_QUIC_PLAN --actual CLOSED_ACTUAL --certificate CLOSED_SOURCE_AUDIT --audit LIVE_AUDIT --out NEW_REQUIREMENTS",
+    "tls_whole_loss_audit.py --plan FROZEN_TLS_PLAN --actual CLOSED_ACTUAL --audit LIVE_AUDIT --reference CLOSED_TLS_REFERENCE_PARENT --out NEW_AUDIT"
+  ],
+  "hard_coded_selected_profile_limits": [
+    "TLS 226 physical source frames, 8 SYN generations,136records,94AEAD records; each omission retains225frames and132complete TLS+45HTTP+1gap; reference 24 actual GET methods/21responses",
+    "QUIC 2036 physical source frames,2051packet views,3source connections with2027 authenticated short packets; source-plan ownership and epochs are independent AEAD inputs; decoded HTTP3 full feature parity is not claimed"
+  ],
+  "data_policy": "Captures, keylogs, PDML/TSV, events and full expected objects remain external. No secrets or plaintext are in this source bundle."
+}

@@ -4521,3 +4521,142 @@ CLI 提交 `41b88b1467` 的
 旧303 EOL/390 parent 调查不因本轮而整体归零。SSH authentication/channels/
 SFTP/rekey、广泛 QUIC CID/QPACK/0-RTT、完整 RPC/PPTP/GPE 与 TLS 整记录丢失后
 应用消息恢复等既有边界仍需继续工作；不能将核心协议或 TOP30 宣布为完备。
+
+## Windows 递进展示、来源边界与 PIM 再审计（2026-10-29）
+
+以下保留各阶段实际生产者：transport Windows 页面 `764f9de7bdec1f868fad58c3c2d7326a518e062f`，
+CLI19→20 保持检查 `6b5c5d64c352d7f93723bb9b7dca11dd6af4cec6`，PIM 最小修复
+`928cd01d8820f4fb264bdce50a3900cebf7c6338`。PIM 父长度、前缀和范围现已分别完成
+整对象验证；新版 PIM Windows 执行固定到 `b76d88b3504c7857e69b4ad09388df1e29cb42c6`。
+后续源码使用自己的构建凭据，不能重标早期证书的生产者。
+
+### 实际字段页和三种字节来源
+
+旧式 bin-parser 字段现在也保存真实层级，TCP Options 下面的各个 Option 分别编号，
+叶子仍保留原路径和字节范围。遍历深度与显示层级分别计数，过深或过多字段有明确
+限制提示。完整 IP/MAC 原字显示为可读地址；实际 loopback 页面又发现旧根名
+`Internet Protocol` 没有走格式化，已用真实解析器测试和 Windows 再执行修正。
+
+407 个已有 owned transport view 的原始来源普查找到三个错误 physical 地址：
+Sharon 75002、97159、98754 行把未准入的更深解码结果当成物理端点。修复使用首个
+实际捕获且完整的 IP 前缀，三个来源都证明线上端点为 `1.2.3.4 → 4.3.2.1`；其余
+404 view 保持整对象字面相等。该结论只涵盖现有 owned view 替换路径，不能推广为
+所有普通隧道物理地址均已核验。37 组 CLI 共384,518行通过完整来源预期；后续仅
+显示改动的 CLI19→20 又以相同参数实跑37组，整个导出逐字节相同，没有 ID 映射。
+
+新 Windows 程序实际执行5个页面，共77个 console buffer：真实 Windows socket
+readiness UDP、真实 TCP SYN，以及上述三个公共包原始帧摘录。独立检查器核对
+原始整帧、实际64字节预览、实际8字节 UDP 头的每一个可见字节和来源标题；
+三个预览的捕获 payload extent 分别为111、166、70，不能把64字节预览称完整 PDU。
+12个范围、SHA、预览和来源次序篡改负控全部拒绝，地址和 TCP options 缩进也从实际
+buffer 核对。缩放、来源切换、退出和 CP936 恢复通过。图片来自真实 Windows
+控制台 cells/attributes 渲染，仍不称 Windows Terminal 原生像素截图，且不提交图片。
+
+完整证据索引见 [Windows 展示与来源摘要](shark-public-corpus-20261025/windows-progressive-source-summary.json)。
+该 Windows 提交的 [Essential Tests](https://github.com/yaklang/yaklang/actions/runs/40758059684)、
+[显式流量测试](https://github.com/yaklang/yaklang/actions/runs/40758062836)、diff 和大小写检查均已通过；
+自动 draft traffic 的 skipped 仍不记为通过。
+
+### PIM 的错误零值、失败前缀和父长度
+
+两个公共包共有464条原生 PIM：Weber333、Sharon131。Sharon131条的 caplen 均等于
+原始长度；其中58条原始 IPv4 声明边界未知，73条声明消息比可得字节更长，不能统称
+为抓包丢失。315条完整 Weber 消息独立通过语法与 checksum 来源核验；这不证明路由
+已安装、邻居可信或 Bootstrap RP-set 已重组。
+
+六个失败来源在定位下一字段已经失败后，仍把 reader 返回的零值变成 Metric
+Preference/RPT/State Refresh flags，共21个凭空的 Session 字段和21个 typed values。
+修复要求源词完整存在；合法零值和 false 继续保留。原始来源和六个完整预期先冻结，
+再执行新原生：37组、39次执行、306,455条事件中306,449条整对象字面不变，六条
+只接受精确完整预期，两个完整 flow 文件逐字节相同。66个语义负控全部拒绝，无 ID
+映射。证书 SHA256 为 `00f11e99f63646dd134a2102691db0baae9531581eeba5c4c56a422213c98253`。
+
+这次检查还确认143条失败观察过度声称 complete、部分 Hello/地址/记录在后续失败
+时丢掉已读前缀，6,102个原有来源有效的 typed aliases 缺少各自范围。它们与已移除
+的21项不同，现已分阶段修复。Register 的八字节头完整性与整个父消息完整性分别处理：
+[RFC7761 §4.9.3](https://www.rfc-editor.org/rfc/rfc7761.html#section-4.9.3) 的头 checksum
+不能授权未知或残缺父包中的内层流量，whole-message 兼容校验也需要完整消息边界。
+公开 Weber 的10个合法子观察已逐一绑定来源，父边界修复不能误撤；四个编写控制
+用于复现失效准入，不混作新抓真实流量。阶段范围见 [PIM 来源边界摘要](shark-public-corpus-20261025/pim-source-boundary-summary.json)。
+
+父边界阶段 `b82a9db459` 对143条只接受预先冻结的完整预期，其余306,312条原生
+事件整对象字面相等。前缀阶段 `52566374c6` 保留失败之前完整的 Hello TLV、地址
+AF/encoding、flags/mask、组和源字段；142条按完整来源预期改变，其余306,313条
+字面相等。最初的前缀 oracle 错把两批 API 快照全局排序，失败结果仍保留；独立重建
+464份旧 API 快照和458个反例后，显式修正预期顺序，未归一化实际输出。
+
+范围阶段 `8d80395572` 从入站时冻结的原始词位置生成 typed snapshots，避免在
+重复值或可变 Session/Raw 中搜索位置。7,898个线上字段出现位置逐一验证，316个
+上下文值不伪造范围；1,739对同名同值但位置不同的字段提供反例。433条完整事件
+按来源预期改变，其余306,022条字面相等。三个阶段每次都实跑37组、306,455条
+原生事件，两个完整 flow 文件逐字节不变，无 ID 映射或数组排序豁免。
+
+对应 CLI23/24/25 每次37组、384,518行，分别只接受7/142/433条冻结的完整行
+预期，其余整行字面相等。随后两次 UI 改动又实际执行37组，CLI25→26、26→27
+整个导出逐字节相同。入库的16个 PIM 来源构造/核验脚本通过原 SHA 和 AST 检查，
+入库版本重新核验完整 native25/CLI25，证书和外部版本完全相同。
+
+Windows 再执行两个公共原始帧摘录及一个编写的重复地址控制，共51个 console
+buffer。实际点击分别精确高亮原生 PIM 的 `[9,10)` encoding、`[8,9)` IP version
+所在字节及第二个相同地址的 `[38,42)`；18个范围、值、出现次序和来源标题篡改
+负控均拒绝。完整 Source0 等于原始帧，Source1 等于独立定位的 PIM body；未知
+encoding 的 opaque suffix 仍明确显示 extracted value、frame offsets unavailable。
+这三个来源不能互换，IP version 的单字节范围不意味着整字节值就是 version。
+
+该实际页面又找到原 IPv4 Total Length=0 时残留的 YAML 错误和结构体输出。
+`b76d88b350` 保留逐字复现的 PIM 字段，同时显示 observed IPv4 header 和消息
+extent unavailable；一般 IP 准入校验没有放宽，未准入内层 transport。新版851项
+CLI 测试通过、2项跳过，三页实际鼠标、来源切换、缩放、退出及 CP936 恢复通过。
+PIM 原生阶段五包全回归285,328通过、24跳过，共享前缀 fuzz149,642次通过；这些
+计数有重叠，也不冒称覆盖之后的 QUIC 生产改动。PIMv1、未选择的封装、邻接状态、
+路由安装和 Bootstrap fragment reassembly 仍未因此成为已完成能力。
+
+## TLS 整记录缺失与 QUIC 跨密钥代恢复（2026-10-29）
+
+生产者 `1181d95ed954fef8389bbb90acadb88612c5f9c3`。使用已实抓的自有 TLS 八次
+连接和 aioquic 三条连接，再构造保留原始 wire/纳秒时钟/长度的离线观察控制。
+这些控制不是新的线上故障注入。源计划先冻结，独立 Python AEAD 与 RFC 帧读取器
+重新验证原字；Wireshark4.6.9 使用新的隔离配置逐包对照。不能以端口、标签或参考
+程序是否能解密作为认证依据。
+
+TLS1.2/1.3 各删除一个完整 server record 后，各保留225帧。新程序输出的132个
+完整 TLS 记录及396个头字段均绑定原始来源，45个 HTTP 明文同时符合独立 AEAD
+与实际 peer receipt，逆向三个请求仍保留。目标方向确有未补 TCP 洞，分别留下
+2440/2419 buffered bytes；三个后来可认证的原记录并不授权跨洞扫描或应用交付。
+Wireshark 同样保留24个真实 GET/21个 response，并报告缺口。参考在 response
+附加的 request URI 关联字段没有误算成额外请求。
+
+QUIC 原始真实流量2051个 PDU 整份新旧导出逐字节相同。删掉连接0客户端整代
+epoch1 后，原程序和 Wireshark 都无法解开后来105个 epoch2 包；独立 AEAD 却
+逐包验证成功。新实现共享无提交的 ownership/delivery 候选搜索，最多向前四代，
+只在 AEAD、保留位、帧语法/发送角色、已接受密钥代的 PN 顺序和 CID/STREAM/
+CRYPTO transport preflight 后安装密钥。最多保留四个旧代，其上下序号界限随
+已接受的迟到观察收紧；旧包不能回滚或借当前相同 phase bit 冒充新代。
+该处理依据 [RFC9001 §6](https://www.rfc-editor.org/rfc/rfc9001.html#section-6)，
+不是对发送端 ACK/密钥更新合规或 peer identity 的额外认证。
+
+稀疏输入仍为1880个 PDU：1722个完整对象字面不变，105个恢复包通过独立 AEAD、
+完整 wire 帧字段与315个精确 query 值核验，53个反向对象只接受独立来源推导的
+完整关联变化；无 ID、类型或数组次序归一化。全部1856个成功短包合计11523项
+RFC 帧字段正确，原三个损坏 tag 继续拒绝。另两个真实来源控制分别验证首个新代
+tag 损坏后104个后续包恢复，以及迟到 epoch1 PN58、epoch0 PN57 重复不重交付。
+
+第一次桥预期错误地把整个 source_bytes 和 transaction=0 冻结。失败证书保留，
+随后只读原始密文及旧基线，显式重建 CompletedIn、client bidi16/20 从0连续的
+HEADERS wire 锚点及两向 FIN，再核对其完整预期。PDU299/408 的 transaction
+只代表真实 STREAM/HEADERS wire 锚点；43次客户端观察仍 QPACK Blocked，缺的
+uni QPACK decoder stream10 `[1,4)` 没有被虚构填补，未新增可解的动态请求头。
+
+37组公共/自有输入再次实跑，306455条原生事件、两个完整 flow 文件、384518行
+CLI 整份导出保持逐字节相同。五包完整回归285397通过、24跳过；新跨代认证状态
+fuzz131369次/60秒通过。流量 CI、diff 和大小写检查通过；同提交 Essential Gate
+在无本轮改动的 SSA `TestParseProject` 出现重复 Ref，失败日志保留并继续处理，
+不能据流量 CI 单独声称全部门禁通过。
+
+Windows 默认配置的实跑还暴露了独立问题：1.3MiB 的1865帧因逐字节 `[]any` wire
+树和私有快照产生81025155 bytes 的逻辑历史成本，64MiB预算逐出323个详情，
+早期 PDU299 的字段筛选也随详情丢失。原始失败 buffer 和实际成本 probe 均保留。
+显式256MiB配置下已实际显示该包，但不能据此关闭默认缓存/身份索引问题。
+恢复数据、适用边界和源码重现入口见
+[TLS/QUIC 来源摘要](shark-public-corpus-20261025/TLS-QUIC-key-recovery-summary.json)。
+原94/39清单、其他载体及 TOP30/高级协议完备性不因这两个范围证书自动通过。

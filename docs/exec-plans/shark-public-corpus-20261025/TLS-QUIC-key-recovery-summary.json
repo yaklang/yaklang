@@ -1,0 +1,323 @@
+{
+  "scope": "Bounded forward QUIC key recovery and source-proved TLS loss observations; full protocol, TOP30 and dynamic QPACK parity remain open.",
+  "source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+  "binaries": {
+    "events": "4983a768badb0adaea3469b128954c185474a4c97acb4fb04885bc01ac0c2dc8",
+    "flows": "eb37b7837c92d33c67a09004bc2627ca1bf8422a72585f3fca71e6d5be1ba889",
+    "yak": "d2dac44420e07eed0a50d7ad8cd677b26e012cee2b8926fe8c2566a3727c2cb6"
+  },
+  "QUIC": {
+    "forward_key_update_limit": 4,
+    "retained_previous_epoch_limit": 4,
+    "shared_noncommitting_ownership_probe": true,
+    "checks_before_key_install": [
+      "AEAD",
+      "reserved bits",
+      "frame grammar and sender role",
+      "accepted epoch PN order",
+      "CID and STREAM/CRYPTO transport-state preflight"
+    ],
+    "packet_source_results": [
+      {
+        "case": "original-real-network-loss",
+        "counts": {
+          "all_packets": 2051,
+          "source_authenticated_native_short": 2027,
+          "native_and_WS_source_short_exact": 2027
+        },
+        "independently_checked_wire_frame_fields": 12563,
+        "flow_to_source_connection": {
+          "1": 0,
+          "2": 1,
+          "3": 2
+        },
+        "rejected_controls": [
+          "Raw",
+          "direction",
+          "domain",
+          "reference",
+          "frame-value"
+        ],
+        "producer_SHA256": "376fe3cc58db183a0f130ab1645bc5d3da62f37b3567c367a35535639196334a",
+        "reference_producer_SHA256": "b63a49f78f6b28ae9e5155e9cbce39570f8fdd7def4ac38bf1f8d8a556132382"
+      },
+      {
+        "case": "all-client-middle-epoch-omitted",
+        "counts": {
+          "all_packets": 1880,
+          "source_authenticated_native_short": 1856,
+          "native_and_WS_source_short_exact": 1751,
+          "native_recovered_but_WS_failed": 105
+        },
+        "independently_checked_wire_frame_fields": 11523,
+        "flow_to_source_connection": {
+          "1": 0,
+          "2": 1,
+          "3": 2
+        },
+        "rejected_controls": [
+          "Raw",
+          "direction",
+          "domain",
+          "reference",
+          "frame-value"
+        ],
+        "producer_SHA256": "2845393f41b0fbf10bb1ae153681f720e45ed9c88b78437cb1ae2c7931a5101a",
+        "reference_producer_SHA256": "a8ad28ac45a56f6aecdb49c80181a9d7da1d246517e5a37515cfdb0e6082829d"
+      }
+    ],
+    "sparse_bridge": {
+      "original_real_network_2051_entire_export_byte_identical": true,
+      "sparse_packets": 1880,
+      "unchanged_original_literal_objects": 1658,
+      "source_recovered_packets": 105,
+      "source_recovered_core_frame_fields": 615,
+      "recovered_exact_query_fields": 315,
+      "recovered_QPACK_blocked_observations": 43,
+      "remaining_whole_expected_events": 117,
+      "remaining_whole_changed_objects": 53,
+      "remaining_whole_literal_objects": 64,
+      "whole_changed_remaining_differences": 0,
+      "sparse_whole_literal_objects_total": 1722,
+      "ID_mapping": false,
+      "key_or_type_or_array_order_normalization": false,
+      "correction_reads_candidate_output": false,
+      "source_completion_and_STREAM_anchors_explicitly_corrected": true,
+      "decoded_dynamic_request_header_semantics_or_full_HTTP3_recovery_claim": false
+    },
+    "source_completion_and_STREAM_anchors": "PDU299/408 bind client bidi streams16/20, contiguous from0 with actual HEADERS wire envelopes; no decoded dynamic header semantics claim.",
+    "source_missing_interval": "Unidirectional QPACK decoder stream10 still lacks [1,4). Authenticated later packets cannot fill omitted STREAM bytes.",
+    "controls": [
+      {
+        "case": "first-epoch2-tag-damaged",
+        "source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+        "producer_SHA256": "c4030834f3130f2388f933cc702021e98e5a1abb0181c262ccd506bb91f9e6e5",
+        "packets": 1880,
+        "counts": {
+          "independent_AEAD_short_packets": 1855,
+          "original_bad_tags_refused": 3,
+          "declared_bad_tag_refused": 1,
+          "target_epoch2_authenticated": 104
+        },
+        "exact_independent_frame_fields": 11517,
+        "late_source_observations": [],
+        "native_flow_to_source_connection": {
+          "1": 0,
+          "2": 1,
+          "3": 2
+        }
+      },
+      {
+        "case": "late-epoch1-and-old-epoch0-duplicate",
+        "source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+        "producer_SHA256": "cf6f25e0f2e798dcf7c02bc97795592648737c876f7605b5fb831ec1efc3c0e6",
+        "packets": 1882,
+        "counts": {
+          "independent_AEAD_short_packets": 1858,
+          "original_bad_tags_refused": 3,
+          "target_epoch2_authenticated": 105,
+          "late_epoch0_duplicate_without_redelivery": 1
+        },
+        "exact_independent_frame_fields": 11534,
+        "late_source_observations": [
+          {
+            "PDU": 300,
+            "frame": 295,
+            "source_frame": 110,
+            "PN": 58,
+            "wire_phase": 1,
+            "Duplicate": false
+          },
+          {
+            "PDU": 301,
+            "frame": 296,
+            "source_frame": 108,
+            "PN": 57,
+            "wire_phase": 0,
+            "Duplicate": true
+          }
+        ],
+        "native_flow_to_source_connection": {
+          "1": 0,
+          "2": 1,
+          "3": 2
+        }
+      }
+    ],
+    "reference": "Isolated Wireshark4.6.9 also failed the105 source-authenticatable packets after the whole intermediate epoch was omitted. Native recovery is checked against independent RFC AEAD, not approved by a reference label.",
+    "original_bridge_failure": {
+      "external_relative_name": "QUIC-sparse-forward-bridge28-01/failed-auditor-receipt.json",
+      "SHA256": "d3125770384e771da754470ad1eeef85edbe26c351827e762eee024766eb7d48"
+    },
+    "explicit_source_correction": {
+      "external_relative_name": "QUIC-sparse-forward-source-correction-02/summary.json",
+      "SHA256": "515392573d71fa9a11bddcb0a7a39d01e2e4a8ec063bd3472675a88ae19e5fe1"
+    },
+    "note": "The original oracle incorrectly froze all source_bytes and zero transactions. The explicit correction reads only original ciphertext and the old baseline, reconstructs CompletedIn/STREAM anchors/FINs, and preserves the failed result. No candidate arrays, IDs or value types were normalized."
+  },
+  "TLS": {
+    "checks": [
+      {
+        "case": "tls12-missing-one-server-record",
+        "actual_source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+        "producer_SHA256": "aaf61eb82f7ecd5359d25bebe706c77646de4894b7d7456145442bbe72f4d043",
+        "reference_producer_SHA256": "a290cc742cd24a84f9c9133ee818f0ce1998375fdbb0abdda05b0338d7231463",
+        "literal_retained_physical_frames": 225,
+        "complete_source_TLS_records": 132,
+        "exact_TLS_header_fields": 396,
+        "authenticated_HTTP_plaintexts_matching_actual_peers": 45,
+        "HTTP_parent_sources_exact": 45,
+        "reverse_requests_preserved": 3,
+        "source_valid_later_records_blocked_by_TCP_hole": 3,
+        "native_gap": {
+          "PDU": 41,
+          "flow": 2,
+          "direction": 1,
+          "summary": "TCP stream closed with an unfilled sequence gap (2440 buffered bytes)"
+        },
+        "WS_requests": 24,
+        "WS_responses": 21,
+        "WS_gap_frames": [
+          44
+        ],
+        "missing_range_not_repaired": true,
+        "record_boundary_recovery_or_random_ciphertext_scanning_claim": false
+      },
+      {
+        "case": "tls13-missing-one-server-record",
+        "actual_source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+        "producer_SHA256": "a2a68ecac72d3c3e0a39c8556421eb33753c5294ac464f60b70aa4e25f87cb2f",
+        "reference_producer_SHA256": "28cc405d9e2287a67368e61ab9bc6e0a2bae42c95c563886a8013df464fdb8c6",
+        "literal_retained_physical_frames": 225,
+        "complete_source_TLS_records": 132,
+        "exact_TLS_header_fields": 396,
+        "authenticated_HTTP_plaintexts_matching_actual_peers": 45,
+        "HTTP_parent_sources_exact": 45,
+        "reverse_requests_preserved": 3,
+        "source_valid_later_records_blocked_by_TCP_hole": 3,
+        "native_gap": {
+          "PDU": 133,
+          "flow": 6,
+          "direction": 1,
+          "summary": "TCP stream closed with an unfilled sequence gap (2419 buffered bytes)"
+        },
+        "WS_requests": 24,
+        "WS_responses": 21,
+        "WS_gap_frames": [
+          156
+        ],
+        "missing_range_not_repaired": true,
+        "record_boundary_recovery_or_random_ciphertext_scanning_claim": false
+      }
+    ],
+    "scope": "Each complete record/header and45 HTTP plaintexts bind literal source and independent AEAD/actual peer receipt. Both actual TCP sequence holes remain unrepaired; no ciphertext scan or application delivery through a hole is certified."
+  },
+  "public_preservation": {
+    "inputs": 37,
+    "native_events": 306455,
+    "complete_flow_files": 2,
+    "CLI_rows": 384518,
+    "native_and_CLI_exports_byte_identical": true,
+    "native_proof": {
+      "external_relative_name": "Native25-to-28-whole-source-audit01/summary.json",
+      "SHA256": "631d04241dcab3ea9c4edd09ad2a21d1dc714b45ee36032986065a77a8b19f69"
+    },
+    "CLI_proof": {
+      "external_relative_name": "CLI27-to-28-whole-source-audit01/summary.json",
+      "SHA256": "3621929f07fa0a4357f771cf01b75369a8f41bf9ee6a7a4300ee39cce80f6cc1"
+    },
+    "note": "Preservation is not a claim that every unchanged interpretation is correct."
+  },
+  "tests": {
+    "focused_regex_pass": 400,
+    "full_five_packages_pass": 285397,
+    "full_five_packages_skip": 24,
+    "fuzz_executions": 131369,
+    "fuzz_active_seconds": 60,
+    "full_proof": {
+      "external_relative_name": "QUIC-all-five-full28/receipt.json",
+      "SHA256": "7c9104edf2e53b57d940d8cf020766415ccd78629f5c7b5a9bf5b64a1adc8f10"
+    },
+    "fuzz_proof": {
+      "external_relative_name": "QUIC-missed-epoch-fuzz28-01/FuzzQUICMissedEpochAuthenticationAndStateIsolation-receipt.json",
+      "SHA256": "0d7f8c96f74e4217c6e5947eb05af521a9bd53726541d91a1f549727742cf72a"
+    }
+  },
+  "portable_sources": {
+    "manifest": {
+      "external_relative_name": "TLS-QUIC-portable-source-02/manifest.json",
+      "SHA256": "6f6ad8ae6a8fa72204bcae47896e3341d1d1036a6ec398166c1cdd769c2c4f83"
+    },
+    "explicit_path_adapters_reexecuted": {
+      "external_relative_name": "TLS-QUIC-portable-source02-execution-proof-01/summary.json",
+      "SHA256": "5a5c5bfd7f76262bba7671a53f364474d4d13f1e992e79dfd0519d12ba138ea2"
+    }
+  },
+  "proof_index": [
+    {
+      "relative_to_phase": "QUIC-sparse-epoch-source-audit26-01/summary.json",
+      "SHA256": "5d75c79a66ee136c9f35395027b92a228079e28f33103a599b9726395e8bb8ea"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-forward-plan-before-01/summary.json",
+      "SHA256": "0bd781c2a2bf380276e3724a6835b7c1086871de070a87ce70a1dd5200816b5f"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-application-boundaries-before-01/summary.json",
+      "SHA256": "1ea2b227f99d0312d962e5a4c24045ae27b6c2898d36ba4d68a1dc7bd206448d"
+    },
+    {
+      "relative_to_phase": "TLS-whole-record-source-audit26-03/summary.json",
+      "SHA256": "0458db8c0553e2946316748201f7fb802e9cca60ef7bdf916095d1d82a6bf306"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-recovery-controls-before-01/plan-before.json",
+      "SHA256": "37d5185d73d6bf44de5463da8fce9c92fcc322692f6e462cf35c75d9a1f1755f"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-recovery-controls-source-before-01/summary.json",
+      "SHA256": "13ee2e490fe259bd1d13d6188d54640f41b911b14b7d9f6f39438857f7dd6c69"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-epoch-actual28-01/summary.json",
+      "SHA256": "414e5db2b09aec0ea26d373c4f3267720904eda6ab8fefcc5add09dd13c0ee39"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-epoch-source-audit28-01/summary.json",
+      "SHA256": "9b2da6461738d2e60b6789dd0e897fe5fceeaed72065a83ab8ee116c1b8f1237"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-forward-bridge28-01/failed-auditor-receipt.json",
+      "SHA256": "d3125770384e771da754470ad1eeef85edbe26c351827e762eee024766eb7d48"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-forward-source-correction-02/summary.json",
+      "SHA256": "515392573d71fa9a11bddcb0a7a39d01e2e4a8ec063bd3472675a88ae19e5fe1"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-forward-corrected-bridge28-02/summary.json",
+      "SHA256": "93d698ed8faebef613f7741e9c26063c933e96bbdb0bf02ec2d414adf0d2a9ae"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-recovery-controls-actual28-01/summary.json",
+      "SHA256": "7cfc3f0b6a943a70292974ea3403b02a9e9aa976bfae0550ad1fd4670c306c1f"
+    },
+    {
+      "relative_to_phase": "QUIC-sparse-recovery-controls-audit28-01/summary.json",
+      "SHA256": "17db8c7b243d3ec9babb6dd08c0f774d718b7518dfa6bc570dd8ef85ba5d094a"
+    },
+    {
+      "relative_to_phase": "TLS-whole-record-actual28-01/summary.json",
+      "SHA256": "3c1ab263548ce8214074adcde970477f7073413f3e420a3e8708a73befb81453"
+    },
+    {
+      "relative_to_phase": "TLS-whole-record-source-audit28-01/summary.json",
+      "SHA256": "d87b8a7001081fa60a1fcd3c975685f9a27de7ae6d507e76deff116b2f83b1b6"
+    }
+  ],
+  "open_findings": [
+    "Default Windows detail-history retention loses early PDU299 on this small physical capture; stable identity filtering and retained wire representation are being audited separately.",
+    "Full TLS protected-record recovery after an actual unrepaired TCP hole is not certified.",
+    "Dynamic QPACK semantics, broad CID/0RTT/reuse profiles, SSH encrypted subsystems, all common protocols and the broader report remain under continued review."
+  ]
+}
