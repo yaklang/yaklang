@@ -5,10 +5,12 @@ package pcaputil
 // Evictions invalidate availability (including duplicate-ID replacement).
 // Reference-index overflow deliberately falls back to the global revision.
 type ProtocolPacketRevision struct {
-	Contributions uint64
-	InitialIDs    uint64
-	Evictions     uint64
-	Fallback      uint64
+	Contributions  uint64
+	InitialIDs     uint64
+	Evictions      uint64
+	Fallback       uint64
+	Identities     uint64
+	IdentityLosses uint64
 }
 
 // PacketQueryRevision avoids decoding/copying event trees on UI redraws. The
@@ -21,6 +23,7 @@ func (v *ProtocolInspector) PacketQueryRevision(ref PacketReference, initialIDs 
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	r := ProtocolPacketRevision{Evictions: v.evicted}
+	r.Identities, r.IdentityLosses = v.identities.revision(ref, physical)
 	if physical {
 		ref = physicalReference(ref)
 	}

@@ -329,8 +329,9 @@ func (v *ProtocolInspector) packetEventIDs(ref PacketReference, limit int, physi
 }
 
 // PacketEventWindow returns up to 128 retained arrival IDs and whether the
-// reference query fit that window. Consumers evaluating a union of fields must
-// preserve false completeness instead of interpreting omitted PDUs as absence.
+// window covers the known contributor arrivals and their Details binding.
+// Detail eviction, identity-index loss and duplicate-ID ambiguity are partial,
+// even on a packet's first query. Consumers must not infer absent fields.
 // physical has the same globally unique record contract as PhysicalPacketEventIDs.
 func (v *ProtocolInspector) PacketEventWindow(ref PacketReference, physical bool) (ids []uint64, complete bool) {
 	return v.packetEventWindow(ref, 128, physical)
@@ -357,7 +358,7 @@ func (v *ProtocolInspector) packetEventWindow(ref PacketReference, limit int, ph
 				break
 			}
 		}
-		return ids, len(entries) <= limit
+		return ids, len(entries) <= limit && v.packetDetailCoverageLocked(ref, physical)
 	}
 	for i := 0; i < v.count; i++ {
 		row := v.rows[(v.head+i)%len(v.rows)]
@@ -377,7 +378,7 @@ func (v *ProtocolInspector) packetEventWindow(ref PacketReference, limit int, ph
 			}
 		}
 	}
-	return ids, true
+	return ids, v.packetDetailCoverageLocked(ref, physical)
 }
 
 // CapturePacketEvidence includes the packet's observed encapsulation domain.

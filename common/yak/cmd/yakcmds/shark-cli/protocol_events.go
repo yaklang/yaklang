@@ -1054,7 +1054,7 @@ func (p *capturedPacket) protocolEventSnapshot(known []uint64) ([]*pcaputil.Prot
 		}
 	}
 	if !complete {
-		unavailable(0, "Packet PDU reference window exceeded; omitted fields are unavailable")
+		unavailable(0, "Packet contributor detail coverage incomplete; omitted fields are unavailable")
 	}
 	if len(ids) == 0 && p.history.Evicted() > 0 {
 		unavailable(0, "No retained contributor details; message history has evictions")
@@ -1067,6 +1067,20 @@ func (p *capturedPacket) retainedEventContributes(e *pcaputil.ProtocolEvent) boo
 		return true
 	} // Legacy caller-supplied associations.
 	if len(e.SourceBytes.PacketRefs) == 0 {
+		if p.history != nil {
+			w := p.history.PacketContributorWindow(p.reference, p.physicalRecord, 4096)
+			if !w.Complete {
+				return false
+			}
+			for _, proof := range w.Identities {
+				if proof.ID == e.ID {
+					// A real source-indexed arrival supersedes the legacy ID
+					// association. Its older, unbound duplicate's fields do
+					// not belong here merely because the public IDs match.
+					return false
+				}
+			}
+		}
 		for _, id := range p.eventIDs {
 			if id == e.ID {
 				return true

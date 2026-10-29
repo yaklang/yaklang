@@ -67,12 +67,18 @@ func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldS
 snapshots:
 	for i := 0; i < length; i++ {
 		snapshot := at(i)
-		if snapshot.Completeness == "evicted" || snapshot.Completeness == "limited" {
+		if snapshot.Completeness == "evicted" || snapshot.Completeness == "detail-unavailable" || snapshot.Completeness == "limited" {
 			if snapshot.Completeness == "evicted" {
 				partial("protocol detail unavailable in retained history")
 				continue
 			}
-			partial("protocol field coverage limited")
+			if snapshot.Completeness == "detail-unavailable" {
+				// Independently retained scalar witnesses remain usable even
+				// when the PDU's payload/field detail is unavailable.
+				partial("protocol detail unavailable in retained history")
+			} else {
+				partial("protocol field coverage limited")
+			}
 		}
 		if snapshot.Truncated {
 			partial("field projection budget exceeded")
