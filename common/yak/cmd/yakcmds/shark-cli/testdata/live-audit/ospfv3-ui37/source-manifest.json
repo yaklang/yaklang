@@ -1,0 +1,37 @@
+{
+  "scope": "Five original685 UI/fuzz controller sources only;no case,plan,expected,packet,key or output copies.",
+  "sources": [
+    {
+      "name": "prepare_OSPF_UI37_controllers.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_OSPF_UI37_controllers.py",
+      "bytes": 1674,
+      "SHA256": "f3ff51b8a3f3a84c2b00b23286c45427f6cffba4303d56cca9c28c6a9cae1dda"
+    },
+    {
+      "name": "prepare_Windows_OSPFv3_37.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_OSPFv3_37.py",
+      "bytes": 4029,
+      "SHA256": "31761e1de35b32b91fa077f70f9824ff910da84fc9c5e2ee7fabb34894fa8a64"
+    },
+    {
+      "name": "run_Windows_OSPFv3_37.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_OSPFv3_37.py",
+      "bytes": 4273,
+      "SHA256": "b08e61bb2df09056bb4d753526a751a9fa524452315f46f47bc734f1726924e5"
+    },
+    {
+      "name": "verify_Windows_OSPFv3_37.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\verify_Windows_OSPFv3_37.py",
+      "bytes": 3676,
+      "SHA256": "f89b66e894391924efc3a609844be73efdd4c7e5ada2cf38fdaf484b1ecd5f11"
+    },
+    {
+      "name": "run_fuzz_OSPF37.py",
+      "original_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_fuzz_OSPF37.py",
+      "bytes": 580,
+      "SHA256": "0f2a22262933d299debf2fa4d98b93f5648cc9d00898e7fa6098d97d3bfcb43b"
+    }
+  ],
+  "stage_summary": "docs/exec-plans/shark-public-corpus-20261025/ospfv3-636-685-summary.json",
+  "external_dependencies": "Original636 source-grid/ledger,helper/renderer and685 build/proof paths remain external."
+}

@@ -699,6 +699,11 @@
       "document": "docs/exec-plans/shark-public-corpus-20261025/natt-udp-ownership-a82-summary.json",
       "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f",
       "scope": "Bounded UDP4500 ESP headers, complete datagram priority, exact refused/retired TFTP peers and actual Windows/source validation; OSPFv3 and broader protocol coverage remain open."
+    },
+    {
+      "document": "docs/exec-plans/shark-public-corpus-20261025/ospfv3-636-685-summary.json",
+      "source": "68527c4d9355d2df37c5c0c9b8bc19f7766ca9c6",
+      "scope": "807 source-built OSPFv3 observations,full636 native and636/685 CLI,actual685 Windows,independent MLD correction;new boundaries and broader TOP30 remain open."
     }
   ]
 }

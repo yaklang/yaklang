@@ -152,6 +152,16 @@ func TestOSPFv3NativeBudgetAndRoutingChecksumContext(t *testing.T) {
 	f, err := CompileDisplayFilter("not ospfv3.prefix")
 	require.NoError(t, err)
 	require.False(t, f.EvaluateEvents(es).Complete)
+	bad := bytes.Clone(w)
+	bad[12] ^= 1
+	p = protocolAnalysisPacket(gopacket.NewPacket(ospfv3NativeFrame(bad, 89, nil), CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default), nil)
+	_, handled = c.binParser.networkPacket(p)
+	require.True(t, handled)
+	require.Len(t, es, 2)
+	require.Equal(t, "malformed", es[1].Status)
+	require.Contains(t, es[1].Error, "observed wire collection budget")
+	require.Contains(t, es[1].Error, "checksum failed")
+	require.Equal(t, false, es[1].Session["Checksum Verified"])
 	c.binParser.closeUDPSessions()
 	// Unknown active Routing Type cannot be called a failed checksum.
 	rh := make([]byte, 8)
@@ -165,7 +175,10 @@ func TestOSPFv3NativeBudgetAndRoutingChecksumContext(t *testing.T) {
 }
 
 func TestOSPFv3ObserverContextAndLocalBudgetAreNotCaptureErrors(t *testing.T) {
-	unknown := []byte{3, 6, 0, 16, 192, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0}
+	// Independent one's-complement residue for fe80::1 -> ff02::5, NH89,
+	// length16 is zero with checksum0x3cf5. Unknown semantics do not excuse
+	// a bad checksum: the previous all-zero checksum was an invalid fixture.
+	unknown := []byte{3, 6, 0, 16, 192, 0, 2, 1, 0, 0, 0, 0, 0x3c, 0xf5, 0, 0}
 	for _, w := range [][]byte{unknown, ospfv3NativeHello(0, bytes.Repeat([]byte{2}, 4097)...)} {
 		p := gopacket.NewPacket(ospfv3NativeFrame(w, 89, nil), CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
 		require.Nil(t, p.ErrorLayer(), "unknown semantics/resource policy must stay separate from malformed wire")
@@ -175,4 +188,18 @@ func TestOSPFv3ObserverContextAndLocalBudgetAreNotCaptureErrors(t *testing.T) {
 	require.Len(t, es, 1)
 	require.Equal(t, "context-required", es[0].Status)
 	require.Equal(t, false, es[0].Session["Authentication Verified"])
+	bad := bytes.Clone(unknown)
+	bad[12] = 0
+	p := gopacket.NewPacket(ospfv3NativeFrame(bad, 89, nil), CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+	require.NotNil(t, p.ErrorLayer(), "unsupported semantics cannot hide independently proven wire corruption")
+	es, _ = espNATTReplay(t, [][]byte{ospfv3NativeFrame(bad, 89, nil)})
+	require.Len(t, es, 1)
+	require.Equal(t, "malformed", es[0].Status)
+	require.Equal(t, false, es[0].Session["Checksum Verified"])
+	badBudget := ospfv3NativeHello(0, bytes.Repeat([]byte{2}, 4097)...)
+	badBudget[12] ^= 1
+	p = gopacket.NewPacket(ospfv3NativeFrame(badBudget, 89, nil), CaptureLinkDecoder(layers.LinkTypeEthernet), gopacket.Default)
+	require.NotNil(t, p.ErrorLayer())
+	require.Contains(t, p.ErrorLayer().Error().Error(), "observed wire collection budget")
+	require.Contains(t, p.ErrorLayer().Error().Error(), "checksum failed")
 }
