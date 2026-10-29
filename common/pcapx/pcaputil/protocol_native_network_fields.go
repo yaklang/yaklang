@@ -29,6 +29,7 @@ type nativeNetworkObservation struct {
 	igmpValues                                          map[string][]nativeNetworkField
 	pimValues                                           map[string][]nativeNetworkField
 	ospfValues                                          map[string][]nativeNetworkField
+	gtpv2Values                                         map[string][]nativeNetworkField
 	frozen                                              bool
 }
 

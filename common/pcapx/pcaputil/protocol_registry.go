@@ -13,6 +13,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 	// Native ingress requires an observed wire grammar and directional state;
 	// legacy YAML availability alone does not imply a registered receiver.
 	return []ProtocolProfile{
+		{"gtpv2", "udp", "bounded EPC GTPv2-C conditional header, up to two indicated messages and exact TLIV/group93 envelopes", "service hint plus complete selected wire grammar or explicit DecodeAs; private observed fields, receive-ignored spares and selected Recovery/EBI/Cause/F-TEID values; other IE layouts opaque, no mandatory procedure, NAS, bearer/TEID ownership, captured connection or authenticated peer inference"},
 		{"ospf", "network", "bounded IPv4 OSPFv2 and IPv6 OSPFv3 five control messages and base LSAs", "declared IP protocol/version, private repeated occurrence spans and independent packet/LSA integrity; OSPFv2 instance/auth octets, digest-before-LLS and padded TLVs; AH/digests are not SA authentication, unselected authentication/address families/extensions retain explicit context; no LSDB, verified adjacency, installed route or inherited fields across instance/router/domain reuse"},
 		{"igmp", "network", "RFC1112/2236/9776 membership types over bounded direct IPv4; record/source/auxiliary envelopes and raw/version-specific timer codes", "independent wire observations and private per-occurrence ranges; incomplete and unknown-extent prefixes stay explicit, unknown protocol2 types and normalized tunnel parents unselected in this initial ingress; no listener/querier state, checksum, TTL, Router Alert, sender trust or membership validation"},
 		{"netflow-v5", "udp", "complete 24-byte version-5 header and one to thirty fixed 48-byte records", "independent exports with no template or captured connection state; loss/reordering/reused engine cannot inherit fields; sequence counts reported flows, all captured endpoints and transport IDs remain separate; exact record bounds and residual nanoseconds, literal conformance warnings; no uptime-derived absolute time, delivery or authenticated sender claim"},
@@ -152,7 +153,7 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix", "esp-natt":
+		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix", "esp-natt", "gtpv2":
 		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
@@ -223,6 +224,9 @@ var nativeDatagrams = []nativeDatagramProfile{
 
 func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst uint16) bool {
 	explicit := a.protocolDatagramSelection(src, dst)
+	if explicit == "gtpv2" {
+		return a.decodeGTPv2Datagram(e, w, src, dst, explicit)
+	}
 	if explicit == "esp-natt" {
 		return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
 	}
@@ -522,7 +526,9 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		return true
 	}
-	return false
+	// A broad opaque-IE envelope plus source port2123 must not preempt a
+	// complete existing native grammar or an observed media/session owner.
+	return a.decodeGTPv2Datagram(e, w, src, dst, explicit)
 }
 
 func (a *binParser) protocolDatagramSelection(src, dst uint16) string {
