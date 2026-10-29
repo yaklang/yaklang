@@ -87,7 +87,9 @@ func OSPFv3Checksum(w []byte, context OSPFv3WireContext) uint16 {
 }
 
 func ospfv3LSAChecksum(w []byte) bool {
-	if len(w) < 20 {
+	// RFC 2328 section 12.1.7, retained by RFC 5340: zero is forbidden
+	// even if the two Fletcher residues happen to be zero.
+	if len(w) < 20 || binary.BigEndian.Uint16(w[16:18]) == 0 {
 		return false
 	}
 	var c0, c1 uint32

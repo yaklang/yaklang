@@ -3,6 +3,7 @@ package stream_parser
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"net/netip"
 	"strings"
@@ -40,6 +41,39 @@ func ospfv3TestPacket(typ byte, body []byte) []byte {
 	w := append([]byte{3, typ, 0, 0, 192, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0}, body...)
 	binary.BigEndian.PutUint16(w[2:], uint16(len(w)))
 	return w
+}
+
+func TestOSPFv3ZeroLSAChecksumIsRejectedEvenWithZeroFletcherResidues(t *testing.T) {
+	// Independently authored Network-LSA. Both 0000 and ffff in the checksum
+	// slot give C0=C1=0, but RFC2328 forbids the former. The enclosing OSPF
+	// checksum remains valid for both, and cannot substitute for LSA validity.
+	zero, err := hex.DecodeString("0001200200000001c0000201800000010000001c00000013c0001592")
+	require.NoError(t, err)
+	for _, checksum := range []uint16{0, 0xffff} {
+		lsa := bytes.Clone(zero)
+		binary.BigEndian.PutUint16(lsa[16:18], checksum)
+		c0, c1 := 0, 0
+		for _, octet := range lsa[2:] {
+			c0 = (c0 + int(octet)) % 255
+			c1 = (c1 + c0) % 255
+		}
+		require.Zero(t, c0)
+		require.Zero(t, c1)
+		require.Equal(t, checksum != 0, ospfv3LSAChecksum(lsa))
+		wire := ospfv3TestSign(ospfv3TestPacket(4, append([]byte{0, 0, 0, 1}, lsa...)))
+		fields, err := DecodeOSPFv3Wire(wire, ospfv3TestContext(), 32)
+		require.Equal(t, true, fields["Checksum Verified"], "packet and LSA checksums prove different extents")
+		rows := fields["LSAs"].([]map[string]any)
+		require.Len(t, rows, 1)
+		require.Equal(t, uint64(checksum), rows[0]["Checksum"])
+		require.Equal(t, checksum != 0, rows[0]["Checksum Verified"])
+		require.Equal(t, []any{uint64(36), uint64(38)}, rows[0]["Wire Field Ranges"].(map[string]any)["Checksum"])
+		if checksum == 0 {
+			require.Error(t, err)
+		} else {
+			require.NoError(t, err)
+		}
+	}
 }
 
 func TestOSPFv3PrefixWordWidthsAndIndependentLSAs(t *testing.T) {
