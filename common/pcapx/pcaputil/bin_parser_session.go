@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -1078,7 +1079,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
 		case "smb2":
-			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
+			e.Summary = smb2SessionSummary(e.Session)
 		case "dcerpc":
 			e.Summary = fmt.Sprintf("DCE/RPC %v call %v", e.Session["Packet Name"], e.Session["Call ID"])
 		case "ssh":
@@ -1144,6 +1145,69 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	}
 	return err
+}
+
+func smb2SessionSummary(session map[string]any) string {
+	name := fmt.Sprint(session["Packet Name"])
+	summary := "SMB2 " + name
+	if target := smb2SummaryTarget(session); target != "" {
+		summary += " " + target
+	}
+	if value, ok := smb2SummaryQuantity(session); ok {
+		summary += " " + value
+	}
+	if status, ok := session["Status"].(uint32); ok {
+		summary += fmt.Sprintf(" status=0x%08x", status)
+	}
+	summary += fmt.Sprintf(" mid %v", session["Message ID"])
+	return limitSummary(summary, 240)
+}
+
+func smb2SummaryTarget(session map[string]any) string {
+	for _, key := range []string{"Path", "Request Path", "File Name", "Request File Name", "File Context"} {
+		value, ok := session[key].(string)
+		if ok && value != "" {
+			return sanitizeSummaryText(value, 96)
+		}
+	}
+	return ""
+}
+
+func smb2SummaryQuantity(session map[string]any) (string, bool) {
+	if length, ok := session["Length"].(uint32); ok {
+		return fmt.Sprintf("len=%d", length), true
+	}
+	if count, ok := session["Count"].(uint32); ok {
+		return fmt.Sprintf("count=%d", count), true
+	}
+	return "", false
+}
+
+func sanitizeSummaryText(value string, maxRunes int) string {
+	var b strings.Builder
+	runes := 0
+	for _, r := range value {
+		if runes == maxRunes {
+			b.WriteString("...")
+			break
+		}
+		switch {
+		case r < 0x20 || r == 0x7f:
+			b.WriteByte('?')
+		default:
+			b.WriteRune(r)
+		}
+		runes++
+	}
+	return b.String()
+}
+
+func limitSummary(value string, maxRunes int) string {
+	runes := []rune(value)
+	if len(runes) <= maxRunes {
+		return value
+	}
+	return string(runes[:maxRunes-3]) + "..."
 }
 
 func (f *binFlow) invalidateSession(dir int) {

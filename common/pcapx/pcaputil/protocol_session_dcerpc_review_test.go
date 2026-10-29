@@ -206,6 +206,21 @@ func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
 	require.True(t, foundAuth3, "NTLM AUTH3 must be framed and retained")
 	require.True(t, foundRequest, "svcctl request after authenticated bind must be decoded")
 	require.True(t, foundResponse, "svcctl response after authenticated bind must be decoded")
+
+	var sawOpen, sawCreate bool
+	for _, event := range dcerpcEvents {
+		switch event.Session["Packet Name"] {
+		case "svcctl.ROpenSCManagerW":
+			sawOpen = true
+			require.Equal(t, uint16(15), event.Session["OpNum"])
+		case "svcctl.RCreateServiceWOW64W":
+			sawCreate = true
+			require.Equal(t, uint16(45), event.Session["OpNum"])
+		}
+		require.NotContains(t, event.Summary, "unknown.op_")
+	}
+	require.True(t, sawOpen)
+	require.True(t, sawCreate)
 }
 
 func TestProtocolSessionDCERPCResponseContextMustMatchRequest(t *testing.T) {
