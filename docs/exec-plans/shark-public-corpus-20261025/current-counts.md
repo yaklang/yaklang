@@ -1,3 +1,5 @@
+c04a接入RSVP Intserv分层字段与65项私有字段，修复未知版本误Format、混合错误被掩盖及残余归属。独立direct49、默认38物理帧、Windows精确高亮、37输入完整字面保留、285664全量/100837fuzz和四项CI已通过；参考的11类边界/呈现/能力差别分开记录。见[Intserv报告](rsvp-intserv-c04a.md)。这是受限布局支持，没有证明完整预留过程或TOP30完备。
+
 55b接入RSVP基础对象、私有字段与递进页，并修复IPv4载荷借IPv6扩展头误分发。官方9帧与33物理来源、37输入完整native/CLI、936个父拒绝来源、默认Windows页和四项CI已闭合，见[RSVP报告](rsvp-55b.md)。流/会话数据保留，唯一DecodeErrors差值单列；不是新TOP30全量标签统计，也未证明完整RSVP过程或Intserv产品支持。
 
 df30新增部分EPC GTPv2-C canonical/native/private字段与递进页面，官方6帧及20场景24帧独立核验、接收扩展长度修复、37输入整对象/行/flow保留和两张Windows页见[GTPv2报告](gtpv2-df30.md)。不是新TOP30全量统计，也未证明完整承载会话。
