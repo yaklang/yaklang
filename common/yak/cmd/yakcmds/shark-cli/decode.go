@@ -452,6 +452,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	igmpObserved := !networkRefused && appendIGMPCapturedPrefix(&d, raw, events)
 	pimObserved := !networkRefused && appendPIMCapturedPrefix(&d, raw, events)
 	ospfObserved := !networkRefused && (appendOSPFv2CapturedPrefix(&d, raw, events) || appendOSPFv3CapturedPrefix(&d, raw, events))
+	gtpv2Observed := !networkRefused && appendGTPv2CapturedPrefix(&d, raw, events)
 	icmpv6Partial := !networkRefused && appendICMPv6PartialCapturedPrefix(&d, raw, events)
 	icmpv4Partial := !networkRefused && appendICMPv4PartialCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
@@ -472,7 +473,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			d.protocol = presentEvents(events).protocol
 		}
 	}
-	if networkRefused || espIncomplete || mldObserved || igmpObserved || pimObserved || ospfObserved || icmpv6Partial || icmpv4Partial {
+	if networkRefused || espIncomplete || mldObserved || igmpObserved || pimObserved || ospfObserved || gtpv2Observed || icmpv6Partial || icmpv4Partial {
 		return d
 	}
 	appendTransportObservation(&d, row)
@@ -735,6 +736,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	igmpObserved := !networkRefused && appendIGMPCapturedPrefix(&d, raw, events)
 	pimObserved := !networkRefused && appendPIMCapturedPrefix(&d, raw, events)
 	ospfObserved := !networkRefused && (appendOSPFv2CapturedPrefix(&d, raw, events) || appendOSPFv3CapturedPrefix(&d, raw, events))
+	gtpv2Observed := !networkRefused && appendGTPv2CapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {
@@ -750,7 +752,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		d.fields = append(d.fields, fields...)
 		d.sources = sources
 	}
-	if networkRefused || espIncomplete || mldObserved || igmpObserved || pimObserved || ospfObserved {
+	if networkRefused || espIncomplete || mldObserved || igmpObserved || pimObserved || ospfObserved || gtpv2Observed {
 		return d
 	}
 	appendTransportObservation(&d, row)
