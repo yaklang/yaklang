@@ -1,0 +1,15 @@
+*.py -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+*.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
+# Preserve the exact historical trailing blank lines of these executed sources.
+native/ssh_native_cli49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+native/ssh_native_cli49_v02.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+native/ssh_source_API49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/close_ssh_reference49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/close_ssh_reference49_v02.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/compare_ssh_reference49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/compare_ssh_reference49_v02.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/prepare_ssh_reference49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+reference/run_ssh_reference49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+source/build_ssh_source49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+source/check_ssh_source49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol
+source/close_ssh_source49.py whitespace=blank-at-eol,-blank-at-eof,space-before-tab,cr-at-eol

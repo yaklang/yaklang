@@ -1,0 +1,2 @@
+# Aggregate SSH certificates retain their recorded byte hashes on every host.
+ssh-*-summary.json -text whitespace=blank-at-eol,blank-at-eof,space-before-tab,cr-at-eol
