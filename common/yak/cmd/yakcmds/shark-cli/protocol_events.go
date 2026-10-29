@@ -165,7 +165,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	}]int{}
 	var walk func(string, any, int)
 	walk = func(name string, v any, depth int) {
-		if (protocol == "pim" || protocol == "ospf" || protocol == "gtpv2") && v == nil {
+		if (protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp") && v == nil {
 			return // An unread sibling or collection has no scalar wire value.
 		}
 		if len(out) >= 4096 || depth > 32 {
@@ -237,7 +237,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					}
 				}
 			}
-			if protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
+			if protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "ntp" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix") {
 				if local, ok := x["Wire Field Ranges"]; ok {
 					previous := wireRanges
 					defer func() { wireRanges = previous }()
@@ -274,7 +274,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			}
 			sort.Slice(keys, func(i, j int) bool {
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
-				if protocol == "ospf" || protocol == "gtpv2" {
+				if protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" {
 					// Wire children lead; checksum/authentication context follows
 					// them. Equal values still keep their own nested occurrence.
 					sa, sb := wireRanges[keys[i]], wireRanges[keys[j]]
@@ -283,6 +283,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					}
 					if (len(sa) == 2) != (len(sb) == 2) {
 						return len(sa) == 2
+					}
+				}
+				if protocol == "rsvp" {
+					order := map[string]int{"Object Name": 0, "Header": 1, "Body": 2, "Addresses": 3}
+					if rank, ok := order[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := order[keys[j]]; ok {
+						b = rank
 					}
 				}
 				if protocol == "gtpv2" {
@@ -624,6 +633,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					value = display
 				}
 			}
+			if protocol == "rsvp" {
+				if display, ok := rsvpFieldValue(name, x); ok {
+					value = display
+				}
+			}
 			if protocol == "gtpv2" {
 				if display, ok := gtpv2FieldValue(name, x); ok {
 					value = display
@@ -645,7 +659,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -911,6 +925,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
 				if v, ok := values[key]; ok {
 					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+		}
+		if e.Protocol == "rsvp" {
+			for _, key := range []string{"Message Name", "Header", "Objects", "Unparsed Body", "Trailing Bytes", "Checksum Omitted", "Checksum Verified", "Wire Grammar Complete", "Field Layouts Complete", "Procedure Semantics Verified", "Reservation State Inferred", "Authentication Verified", "Observation Scope"} {
+				if value, ok := values[key]; ok {
+					walk(key, value, 0)
 					delete(values, key)
 				}
 			}

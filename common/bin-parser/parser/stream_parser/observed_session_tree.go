@@ -77,6 +77,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 		fields, err = DecodeOSPFv2Wire(wire, 4096)
 	case "gtpv2-control":
 		fields, err = DecodeGTPv2Wire(wire, 4096)
+	case "rsvp-control":
+		fields, err = DecodeRSVPWire(wire, 4096)
 	case "ldp-session":
 		fields, err = DecodeLDPSessionPDU(wire, 4096)
 	case "ldp-discovery":

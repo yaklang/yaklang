@@ -40,6 +40,7 @@ type packetPresentation struct {
 }
 
 var protocolDisplayNames = map[string]string{
+	"rsvp":       "RSVP",
 	"gtpv2":      "GTPv2-C",
 	"netflow-v9": "NetFlow v9",
 	"ipfix":      "IPFIX",
@@ -435,7 +436,7 @@ func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
 	if e.Protocol == "quic" && (e.Admission == "unparsed-datagram-remainder" || e.Admission == "observed-datagram-padding") && e.Summary != "" {
 		return safeText(e.Summary)
 	}
-	if (e.Protocol == "ntp" || e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix" || e.Protocol == "gtpv2") && e.Summary != "" && e.Summary != e.Protocol {
+	if (e.Protocol == "ntp" || e.Protocol == "isis" || e.Protocol == "netflow-v9" || e.Protocol == "netflow-v5" || e.Protocol == "ipfix" || e.Protocol == "gtpv2" || e.Protocol == "rsvp") && e.Summary != "" && e.Summary != e.Protocol {
 		return safeText(e.Summary)
 	}
 	if e.Protocol == "ripng" && textValue(eventValues(e)["Packet Name"]) != "" {
@@ -848,7 +849,7 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 		return nil, "", false
 	}
 	switch e.ExpertCode {
-	case "IPv6OptionsHeaderBounds", "IPv6OptionsHeaderOrder", "AHHeaderBounds", "ESPParentLengthInvalid", "OSPFv2ParentLengthInvalid", "OSPFv3ParentLengthInvalid":
+	case "IPv6OptionsHeaderBounds", "IPv6OptionsHeaderOrder", "AHHeaderBounds", "ESPParentLengthInvalid", "OSPFv2ParentLengthInvalid", "OSPFv3ParentLengthInvalid", "RSVPParentLengthInvalid":
 	default:
 		return nil, "", false
 	}
@@ -870,6 +871,18 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
+		return
+	}
+	if validRSVPControlObservation(e) {
+		p.protocol, p.priority, p.status, p.visibility = "RSVP", 20, e.Status, "message"
+		p.evidence = "declared IP next-header46 and byte-bound RSVP observation; grammar status is separate"
+		p.scope = "observed control bytes; advertised selectors only; reservation/authentication unverified"
+		p.summary = applicationEventSummary(e)
+		if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
+			p.visibility = "partial-message"
+			p.summary = clipText("RSVP · "+e.Status+" · "+e.Error, 384)
+		}
+		p.addLayer("RSVP")
 		return
 	}
 	if e.Protocol == "ospf" && e.Transport == "network" && e.Profile == "ospfv2-bounded-control" && e.Rule == "ospfv2_observed" && e.Entry == "OSPFv2ControlFields" && len(e.Raw) > 0 && e.Raw[0] == 2 {

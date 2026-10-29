@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("RSVPControlFields")
+  RSVPControlFields:
+    operator: |
+      err = parseObservedSession("rsvp-control")
+      if err != nil { panic(err) }
