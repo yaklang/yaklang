@@ -20,6 +20,7 @@ type DisplayFilterResult struct {
 
 // Match evaluates one PDU. MatchEvents evaluates the union of fields from a
 // caller-supplied packet's PDUs, never from unrelated connections or packets.
+// Field absence concerns these observations, not all content of their streams.
 // Retained witnesses can decide a predicate on a partial projection. Missing
 // fields cannot prove absence, and universal comparisons require complete input.
 func (f *DisplayFilter) Match(e *ProtocolEvent) bool {

@@ -327,7 +327,11 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 			}
 		}
 		if v["HTTP3 Wire Only"] == true {
-			parts = append(parts, "HTTP/3 "+textValue(v["HTTP3 Wire Observation"])+" · no application frames replayed")
+			observation := textValue(v["HTTP3 Wire Observation"])
+			if observation == "prefix-missing" {
+				observation = "stream prefix missing · awaiting reassembly"
+			}
+			parts = append(parts, "HTTP/3 "+observation+" · no application frames replayed")
 		} else if len(frames) == 0 && textValue(v["HTTP3 Stream Kind"]) == "request" {
 			parts = append(parts, "HTTP/3 frame reassembly")
 		}
@@ -955,6 +959,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			p.protocol, p.priority, p.status, p.visibility = "HTTP/3", 20, e.Status, "authenticated-plaintext"
 			p.scope = "authenticated STREAM observation"
 			p.evidence = "selected h3 ALPN and known stream; no application frame replayed"
+			if e.Session["HTTP3 Wire Observation"] == "prefix-missing" {
+				p.evidence = "selected h3 ALPN and client bidirectional stream; prefix unavailable; message and extension unknown"
+			}
 			p.summary = clipText(applicationEventSummary(e), 384)
 		}
 		return

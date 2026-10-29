@@ -4817,3 +4817,14 @@ MLD复核纠正旧清单：10条不完整body全部来自17条IPv4/Protocol58异
 检查无差异；这不是新原生MLD执行。未知LSA、AT/LLS等新边界和其它TOP30工作
 仍需继续。详见[阶段报告](shark-public-corpus-20261025/ospfv3-636-685.md)及
 [准确证据索引](shark-public-corpus-20261025/ospfv3-636-685-summary.json)。
+
+后续d677补齐未知LSA继续解析、独立完整性优先级及短头已捕获字段。20项人工
+控制明确分为17次native/CLI与3次直接parser；两张实际默认预算Windows页面已
+亲自查看。37输入原生307262事件/2flow、CLI384518行及6项TLS/QUIC恢复控制8053
+事件逐字面保持。该提交四个CI成功，详见[边界报告](shark-public-corpus-20261025/ospfv3-boundaries-d677.md)。
+
+新Windows TLS/QUIC另有独立source-first核验：136TLS记录、94认证记录、48完整HTTP
+消息；2025受保护QUIC包、2022认证成功、3真实坏tag，36完整HTTP/3 HEADERS/body。
+物理和私有字段桥接正确，但d677检查点仍有两条缺失流开头的h3标签退回QUIC；
+不将它们算作通过。完整源范围、参考遗漏及后续需要补测的QPACK字段投影见
+[新抓流量报告](shark-public-corpus-20261025/tls-quic-fresh-d677.md)。
