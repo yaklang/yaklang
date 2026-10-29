@@ -141,6 +141,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 	}
 	var protocol string
 	var ospfv3Display bool
+	var ospfv2Display bool
 	var quicHeaderForm string
 	var routingVersion uint64
 	var currentSource int
@@ -609,6 +610,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					value = display
 				}
 			}
+			if protocol == "ospf" && ospfv2Display {
+				if display, ok := ospfv2FieldValue(name, x); ok {
+					value = display
+				}
+			}
 			add(label+": "+value, false)
 			if len(generated) > 0 {
 				sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(generated)})
@@ -694,6 +700,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 		}
 		protocol, currentSource = e.Protocol, 0
 		ospfv3Display = e.Profile == "ospfv3-bounded-control"
+		ospfv2Display = e.Profile == "ospfv2-bounded-control"
 		quicHeaderForm = textValue(e.Session["Header Form"])
 		routingVersion = number(e.Session["Protocol Version"])
 		wireRanges = detailWireRanges(e.Session["Wire Field Ranges"])
@@ -895,7 +902,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			}
 		}
 		if e.Protocol == "ospf" {
-			for _, key := range []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"} {
+			keys := []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+			if ospfv2Display {
+				// Keep the authentication field next to its declaring header,
+				// then the packet body and independently bounded LLS trailer.
+				keys = []string{"Packet Name", "Header", "Authentication", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "LLS", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+			}
+			for _, key := range keys {
 				if value, ok := values[key]; ok {
 					walk(key, value, 0)
 					delete(values, key)

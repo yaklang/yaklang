@@ -73,6 +73,8 @@ func parseObservedSession(node *base.Node, process func(*base.Node) (func(bool),
 		fields, err = DecodePIMControl(wire, PIMWireContext{}, 4096)
 	case "ospfv3-control":
 		fields, err = DecodeOSPFv3Wire(wire, OSPFv3WireContext{}, 4096)
+	case "ospfv2-control":
+		fields, err = DecodeOSPFv2Wire(wire, 4096)
 	case "ldp-session":
 		fields, err = DecodeLDPSessionPDU(wire, 4096)
 	case "ldp-discovery":

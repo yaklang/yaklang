@@ -451,7 +451,7 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	mldObserved := !networkRefused && appendMLDCapturedPrefix(&d, raw, events)
 	igmpObserved := !networkRefused && appendIGMPCapturedPrefix(&d, raw, events)
 	pimObserved := !networkRefused && appendPIMCapturedPrefix(&d, raw, events)
-	ospfObserved := !networkRefused && appendOSPFv3CapturedPrefix(&d, raw, events)
+	ospfObserved := !networkRefused && (appendOSPFv2CapturedPrefix(&d, raw, events) || appendOSPFv3CapturedPrefix(&d, raw, events))
 	icmpv6Partial := !networkRefused && appendICMPv6PartialCapturedPrefix(&d, raw, events)
 	icmpv4Partial := !networkRefused && appendICMPv4PartialCapturedPrefix(&d, raw, events)
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
@@ -734,7 +734,7 @@ func quickDetail(raw *capturedPacket) packetDetail {
 	mldObserved := !networkRefused && appendMLDCapturedPrefix(&d, raw, events)
 	igmpObserved := !networkRefused && appendIGMPCapturedPrefix(&d, raw, events)
 	pimObserved := !networkRefused && appendPIMCapturedPrefix(&d, raw, events)
-	ospfObserved := !networkRefused && appendOSPFv3CapturedPrefix(&d, raw, events)
+	ospfObserved := !networkRefused && (appendOSPFv2CapturedPrefix(&d, raw, events) || appendOSPFv3CapturedPrefix(&d, raw, events))
 	if !networkRefused && needsVXLANInspectionFallback(raw, events) {
 		p := gopacket.NewPacket(raw.data, pcaputil.CaptureLinkDecoder(raw.link), gopacket.DecodeOptions{NoCopy: true})
 		if boundary := inspectionVXLANBoundary(p); boundary != nil {

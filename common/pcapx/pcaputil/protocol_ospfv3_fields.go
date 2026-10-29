@@ -1,5 +1,7 @@
 package pcaputil
 
+import "strings"
+
 // OSPF IDs are advertised values, never trusted adjacency/session keys.
 // Repeated LSAs/prefixes use their own source spans, even for equal values.
 func ospfv3DisplayBindings() []displayFieldBinding {
@@ -42,7 +44,10 @@ func ospfv3DisplayBindings() []displayFieldBinding {
 			}
 			return &span
 		}
-		b.descriptor.Description = "Private observed OSPFv3 wire occurrence; exact logical-PDU span. No raw-byte search, LSDB, verified neighbor, authenticated sender or installed-route inference."
+		b.descriptor.Description = "Private observed OSPF wire occurrence; exact logical-PDU span. No raw-byte search, LSDB, verified neighbor, authenticated sender or installed-route inference."
+		if strings.HasPrefix(name, "ospf.") {
+			b.descriptor.Label = key + " (observed OSPF)"
+		}
 		out = append(out, b)
 	}
 	for _, spec := range []struct {
@@ -82,14 +87,25 @@ func ospfv3DisplayBindings() []displayFieldBinding {
 }
 
 func (e *ProtocolEvent) retainNativeOSPFv3Fields(wire []byte) {
+	e.retainNativeOSPFFields(wire, 3)
+}
+
+func (e *ProtocolEvent) retainNativeOSPFFields(wire []byte, version byte) {
 	n := &nativeNetworkObservation{protocol: "ospf", values: map[string]nativeNetworkField{}, ospfValues: map[string][]nativeNetworkField{}}
 	owned := *e
 	owned.Raw, owned.Session = wire, e.semanticSession
+	if len(wire) == 0 || wire[0] != version {
+		e.nativeNetworkFields = n
+		return
+	}
 	for _, binding := range displayFieldBindings {
 		if binding.protocols != "|ospf|" || binding.collectWireFields == nil {
 			continue
 		}
 		name := binding.descriptor.Name
+		if version == 2 && strings.HasPrefix(name, "ospfv3.") || version == 3 && strings.HasPrefix(name, "ospfv2.") {
+			continue
+		}
 		binding.collectWireFields(&owned, func(value any, span *DisplayFieldRange) {
 			field := nativeNetworkField{value: value}
 			if span != nil {
