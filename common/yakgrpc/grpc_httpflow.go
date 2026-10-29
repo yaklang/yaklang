@@ -1047,61 +1047,48 @@ func (s *Server) HTTPFlowsFromOnline(req *ypb.HTTPFlowsFromOnlineRequest, stream
 	return nil
 }
 
-func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.BatchSetHTTPFlowIssueFieldsRequest) (*ypb.BatchSetHTTPFlowIssueFieldsResponse, error) {
-	updates := map[string]interface{}{}
-	if v := strings.TrimSpace(req.SetIssueType); v != "" {
-		updates["issue_type"] = v
-	}
-	if v := strings.TrimSpace(req.SetSeverity); v != "" {
-		updates["severity"] = v
-	}
-	if v := strings.TrimSpace(req.SetStatus); v != "" {
-		updates["status"] = v
-	}
-	if v := strings.TrimSpace(req.StatusReason); v != "" {
-		updates["status_reason"] = v
-	}
-	if len(updates) == 0 {
-		return nil, utils.Errorf("all issue fields are empty")
+func (s *Server) BatchSetHTTPFlowIssueFields(_ context.Context, req *ypb.BatchSetHTTPFlowIssueFieldsRequest) (*ypb.BatchSetHTTPFlowIssueFieldsResponse, error) {
+	issueType := strings.TrimSpace(req.SetIssueType)
+	severity := strings.TrimSpace(req.SetSeverity)
+	setStatus := strings.TrimSpace(req.SetStatus)
+	statusReason := strings.TrimSpace(req.StatusReason)
+	updates := map[string]interface{}{
+		"issue_type":    issueType,
+		"severity":      severity,
+		"status":        setStatus,
+		"status_reason": statusReason,
 	}
 
 	db := s.GetProjectDatabase().Model(&schema.HTTPFlow{})
 
-	// 优先级：Ids > Hashes > Filter，均无则全量更新
 	switch {
 	case len(req.GetIds()) > 0:
 		db = bizhelper.ExactQueryInt64ArrayOr(db, "id", req.GetIds())
 	case len(req.GetHashes()) > 0:
 		db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", req.GetHashes())
 	case req.GetFilter() != nil:
-		// 复用 QueryHTTPFlow 的过滤条件，仅用筛选不取数据
-		queryDB := yakit.BuildHTTPFlowQuery(db, req.Filter)
-		// 禁用分页，避免只更新第一页
-		queryDB = queryDB.Limit(-1).Offset(-1)
-		db = queryDB
-	default:
-		// 全量更新
+		db = yakit.FilterHTTPFlow(db, req.Filter)
 	}
 
-	// 批量上限校验
-	const batchMaxLimit = 1000
-	var count int64
-	if err := db.Count(&count).Error; err != nil {
-		return nil, utils.Errorf("count httpflow for batch limit failed: %s", err)
-	}
-	if count == 0 {
-		return nil, utils.Errorf("未匹配到任何数据")
-	}
-	if count > batchMaxLimit {
-		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
+	paged, err := applyBatchSetPage(db, req.GetFilter().GetPagination())
+	if err != nil {
+		return nil, err
 	}
 
 	var affected []*schema.HTTPFlow
-	if err := db.Select("id, hash").Find(&affected).Error; err != nil {
+	if err := paged.Select("id, hash").Find(&affected).Error; err != nil {
 		return nil, utils.Errorf("collect affected httpflow keys failed: %s", err)
 	}
+	if len(affected) == 0 {
+		return nil, utils.Errorf("未匹配到任何数据")
+	}
 
-	result := db.Updates(updates)
+	ids := make([]uint, 0, len(affected))
+	for _, flow := range affected {
+		ids = append(ids, flow.ID)
+	}
+
+	result := s.GetProjectDatabase().Model(&schema.HTTPFlow{}).Where("id in (?)", ids).Updates(updates)
 	if result.Error != nil {
 		return nil, utils.Errorf("batch set httpflow issue fields failed: %s", result.Error)
 	}
@@ -1115,16 +1102,32 @@ func (s *Server) BatchSetHTTPFlowIssueFields(ctx context.Context, req *ypb.Batch
 		for _, flow := range affected {
 			syncHashes = append(syncHashes, flow.Hash)
 		}
-		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		if err := client.SetHTTPFlowTagsToOnline(ctx, req.GetToken(), syncHashes,
-			req.SetIssueType, req.SetSeverity, req.SetStatus, req.StatusReason); err != nil {
-			log.Errorf("sync httpflow tags to online failed: %s", err)
-		}
+		syncHTTPFlowTagsToOnlineAsync(req.GetToken(), syncHashes, issueType, severity, setStatus, statusReason)
 	}
 
 	return &ypb.BatchSetHTTPFlowIssueFieldsResponse{
 		UpdatedCount: result.RowsAffected,
 	}, nil
+}
+
+func syncHTTPFlowTagsToOnlineAsync(token string, hashes []string, issueType, severity, status, statusReason string) {
+	if token == "" || len(hashes) == 0 {
+		return
+	}
+	copied := append([]string(nil), hashes...)
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Errorf("sync httpflow tags to online panic: %v", rec)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		if err := client.SetHTTPFlowTagsToOnline(ctx, token, copied, issueType, severity, status, statusReason); err != nil {
+			log.Errorf("sync httpflow tags to online failed: %s", err)
+		}
+	}()
 }
 
 func (s *Server) doUpdateHTTPFlowIssueFields(ctx context.Context, db *gorm.DB, items []*yaklib.OnlineHTTPFlowItem) (updated int64, skipped int64) {
