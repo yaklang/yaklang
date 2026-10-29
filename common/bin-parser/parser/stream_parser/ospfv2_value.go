@@ -69,6 +69,11 @@ func OSPFv2Checksum(w []byte) uint16 {
 	if len(w) < 24 {
 		return 0xffff
 	}
+	n := int(binary.BigEndian.Uint16(w[2:4]))
+	if n < 24 || n > len(w) {
+		return 0xffff
+	}
+	w = w[:n]
 	b := make([]byte, 0, len(w)-8)
 	b = append(b, w[:16]...)
 	b = append(b, w[24:]...)

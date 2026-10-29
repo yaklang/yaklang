@@ -1,0 +1,256 @@
+{
+  "scope": "Aggregate closed evidence only; raw captures/cases/exports/proofs stay external.",
+  "native_CLI_UI_source": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+  "all_core_or_TOP30_complete": false,
+  "sources": {
+    "real_packets": 556,
+    "each_capture_packets": 278,
+    "message_type_counts_each": {
+      "1": 204,
+      "2": 29,
+      "3": 7,
+      "4": 28,
+      "5": 10
+    },
+    "wire_leaves": 15506,
+    "unexported_reference_reserved_leaves": 202,
+    "reference_value_span_checks": 15332,
+    "reference_differences": 0,
+    "grid": {
+      "external_relative_name": "OSPFv2-independent-source39-01/source-grid03/summary.json",
+      "SHA256": "2aaf89759d9b4a2e44ff1b075778694d2b2c9eea8db3a3f12b19bae0ffdbbc65",
+      "copied": false
+    },
+    "reference": {
+      "external_relative_name": "OSPFv2-independent-source39-01/reference-field-comparison01/summary.json",
+      "SHA256": "d22dc5b1be7af7a6237e9eb39c9103b475a85e6da48eb4495e06c270ea400c7e",
+      "copied": false
+    }
+  },
+  "direct": {
+    "scenarios": 598,
+    "physical_source_inputs": 597,
+    "counts": {
+      "wire_unsigned_leaves": 11651,
+      "wire_leaves": 16446,
+      "wire_ID_or_IPv4_bits_leaves": 4073,
+      "wire_opaque_leaves": 722,
+      "metadata_checks_not_wire_coverage": 4132,
+      "error_contract_checks": 598,
+      "collections_without_nil_rows": 1091,
+      "scenarios": 598,
+      "derived_not_wire_checks": 31,
+      "owned_residual_checks_not_wire_coverage": 2
+    },
+    "proof": {
+      "external_relative_name": "OSPFv2-direct-field-audit41-01/summary.json",
+      "SHA256": "b100ea02e64c09d3d354ff0eb21cd6b27ec2a1005eed44c6fc32949d0375784e",
+      "copied": false
+    },
+    "producer": {
+      "external_relative_name": "OSPFv2-direct-probe-candidate41-01/producer.json",
+      "SHA256": "03e07b8ffa89ba6f7e12bf0c7bfead866f1f47fafa06214a9dceaacfc8d7c9dc",
+      "copied": false
+    },
+    "frozen_manifest": {
+      "external_relative_name": "OSPFv2-direct-source-plan41-01/manifest.json",
+      "SHA256": "507507c8edb1a1e234e2fe5a5379edc7d2573a9113f4dbffbb3675e0201a1680",
+      "copied": false
+    },
+    "synthetic_verifier_selftest": {
+      "external_relative_name": "OSPFv2-direct-validator-selftest41-01/summary.json",
+      "SHA256": "ce22536e0847453f6ba658735f091b00c2df33db88f94c84f2c5576b751be524",
+      "copied": false
+    },
+    "no_598_native_or_UI_boundary_claim": true
+  },
+  "typed": {
+    "literal": 14620,
+    "derived": 1600,
+    "total": 16220,
+    "source_contract_audit": {
+      "external_relative_name": "OSPFv2-pure-contract-independent-audit41-01.json",
+      "SHA256": "ed4e3870b6283ae7cb776a493cad396b2f77ac2698f7b752b91c5e0cfd0c2807",
+      "copied": false
+    }
+  },
+  "complete_public_replay": {
+    "inputs": 37,
+    "physical_records": 383936,
+    "native_events_after": 307818,
+    "CLI_rows": 384518,
+    "counts": {
+      "retained_native_whole_objects": 307262,
+      "whole_literal_native_exports": 35,
+      "source_new_native_objects": 556,
+      "whole_literal_flow_files": 2,
+      "retained_CLI_whole_rows": 383962,
+      "whole_literal_CLI_exports": 35,
+      "source_new_CLI_rows": 556
+    },
+    "unplanned_differences": 0,
+    "proof": {
+      "external_relative_name": "OSPFv2-whole-cd7af-42-02/summary.json",
+      "SHA256": "631ca67636668a92967411fd2d920cfa4b32039f4669fbb5d0d29d6a44dcf8af",
+      "copied": false
+    },
+    "frozen_plan_before_candidate": {
+      "external_relative_name": "OSPFv2-whole-source-plan41-01/plan.json",
+      "SHA256": "bde795e998f963d818c92569cbb09950bff28c704c2b30998b527718c6ebb4c3",
+      "copied": false
+    },
+    "verifier_only_fix_plan": {
+      "external_relative_name": "OSPFv2-whole-source-plan42-02/plan.json",
+      "SHA256": "09b57f843343898a1b0f250da0624ce04444a89511d187af2c5648eba3d24f4d",
+      "copied": false
+    },
+    "native_actual": {
+      "external_relative_name": "runtime-public-native-42/summary.json",
+      "SHA256": "b7ffb7e9bcb475b80083ec897501b1d4fb10447e4c5e6af42d6d5907d2086dc0",
+      "copied": false
+    },
+    "CLI_actual": {
+      "external_relative_name": "runtime-public-CLI-42/summary.json",
+      "SHA256": "9095b51206495cadd7198be31fb3aa71c8e21a8bf58debcf367c8b38e688c5d4",
+      "copied": false
+    },
+    "builds": {
+      "external_relative_name": "bins-42/summary.json",
+      "SHA256": "f722989e0b37087c4b2a624ee45712487fdcacc8516e1e356c311e82e553f226",
+      "copied": false
+    },
+    "normalization": "Only explicit generated-PDU references in affected two-public-input schema follow one injective ledger; no arbitrary integer/frame/flow/wire/session normalization. Unaffected35 input exports are entire-file byte literal."
+  },
+  "tests": {
+    "full": {
+      "external_relative_name": "test-OSPFv2-full-41-03/receipt.json",
+      "SHA256": "c7c2e67e1c0fbc221127ab045c270a25581f8cb5376a4311e89bb7663fad3810",
+      "copied": false
+    },
+    "full_pass": 285594,
+    "full_skip": 24,
+    "full_fail": 0,
+    "page_followup": {
+      "external_relative_name": "test-OSPFv2-page-41-04/receipt.json",
+      "SHA256": "e5c73b8349ff61a5f60a597353b248b73bca1993213a9fa6acbca16dbf5b30e1",
+      "copied": false
+    },
+    "page_followup_pass": 45,
+    "helper_and_registry_followup": {
+      "external_relative_name": "test-OSPFv2-registry-43-02/receipt.json",
+      "SHA256": "eb5c6f12ee4c805a291746ef9415918a9cd6204a9e3e7d51722fcc4b85d6ec5a",
+      "copied": false
+    },
+    "helper_and_registry_pass": 47
+  },
+  "fuzz": {
+    "target": "FuzzOSPFv2BoundedOccurrences",
+    "executions": 243255,
+    "seconds": 60,
+    "failures": 0,
+    "proof": {
+      "external_relative_name": "OSPFv2-fuzz-cd7af-42-01/summary.json",
+      "SHA256": "02b7a81d195024e9232d77353ced3c2db41204f025ac76ccd87009abb41ab698",
+      "copied": false
+    }
+  },
+  "public_checksum_helper_followup": {
+    "proof": {
+      "external_relative_name": "OSPFv2-helper-closure43-01/summary.json",
+      "SHA256": "ea978eb9916d22740768c5c75a5762238c85782009ba7d4414bbca05be72b3cb",
+      "copied": false
+    },
+    "new_direct_producer": {
+      "external_relative_name": "OSPFv2-helper-direct-probe43-01/producer.json",
+      "SHA256": "be096eb74d643b26fa375ee469b00a334c35f9fcc04f571b15bb366d17737e5c",
+      "copied": false
+    },
+    "independent_audit": {
+      "external_relative_name": "OSPFv2-helper-direct-field-audit43-01/summary.json",
+      "SHA256": "1fc156769385ba3ac6eac7d5b35a0bec10b6f5cb83c823cfc6c98dda1393c269",
+      "copied": false
+    },
+    "whole598_result_lines_byte_literal": true,
+    "packet_integrity_caller_already_passes_validated_w_slice_n": true,
+    "new_native_CLI_UI_execution_claim": false
+  },
+  "Windows": {
+    "proof": {
+      "external_relative_name": "Windows-OSPFv2-root-closure42-01/summary.json",
+      "SHA256": "d7e24d99e1ea6664a1915b2fe0ba4885e035c955e6ed8c27dd3a5d3e311220d1",
+      "copied": false
+    },
+    "cases": 3,
+    "original_public_frames": [
+      25,
+      849,
+      11240
+    ],
+    "default_packet_cache": 20000,
+    "default_history_MiB": 64,
+    "exact_original_packet_extractions": true,
+    "new_live_capture_claim": false,
+    "root_viewed_actual_images": true,
+    "console_cells_not_terminal_pixels": true,
+    "entire_physical_and_PDU_sources_and_highlights_verified": true,
+    "first_crypto_navigation_failure_preserved": true
+  },
+  "CI_checkpoint": {
+    "source": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+    "proof": {
+      "external_relative_name": "CI-cd7af-closed43-01.json",
+      "SHA256": "7e3800b302613e9ce3bad1c3ac8c5b6a217b36cf1536030767af424d26efafd9",
+      "copied": false
+    },
+    "checks": [
+      {
+        "id": 40886652682,
+        "name": "Essential Tests",
+        "head_sha": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40886652682"
+      },
+      {
+        "id": 40886638891,
+        "name": "Bin Parser Traffic Tests",
+        "head_sha": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40886638891"
+      },
+      {
+        "id": 40886652650,
+        "name": "Diff-Code-Check",
+        "head_sha": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40886652650"
+      },
+      {
+        "id": 40886652809,
+        "name": "Check Git path case collisions",
+        "head_sha": "cd7af6a67e998ed1a6466a11f2b37c66fad742a8",
+        "status": "completed",
+        "conclusion": "success",
+        "html_url": "https://github.com/yaklang/yaklang/actions/runs/40886652809"
+      }
+    ],
+    "skipped_draft_not_counted": true,
+    "later_HEAD_status_not_inferred_from_this_checkpoint": true
+  },
+  "source_archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ospfv2-control42",
+    "source_files": 43,
+    "source_bytes": 244793,
+    "manifest_SHA256": "53fca3202d9d73f3526c6a2e8eb6b746c7f46fb94913f4739d0320311ac445d4",
+    "full_cases_or_expected_objects_included": false
+  },
+  "limits": [
+    "No MAC/SA/peer authentication, replay protection, elected topology, LSDB or installed route claim.",
+    "Real556 sources cover complete Ethernet/IPv4 auth0/2 only; authored/direct boundaries are separate.",
+    "202 reserved source leaves have no exported Wireshark counterpart.",
+    "Summary/NSSA/optional selectors rely mainly on explicitly authored controls.",
+    "No claim that unrelated unchanged protocol interpretations are all correct."
+  ]
+}
