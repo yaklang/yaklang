@@ -1,3 +1,5 @@
+d677 的20项 OSPFv3 边界、37输入逐字面回归与两张实际 Windows 页面见 [边界报告](ospfv3-boundaries-d677.md)；新抓 TLS/QUIC 的独立来源、复用/乱序核验及该检查点保留的两处 CLI 标签差异见 [新抓流量报告](tls-quic-fresh-d677.md)。这些是已闭合历史执行，不冒称后续修复已完成新二进制或页面验证。
+
 OSPFv3 的后续807条来源接入、43条旧硬解码错误、完整字段与新版 Windows 页面见 [636/685 阶段报告](ospfv3-636-685.md)。MLD 旧清单的10条不完整body已确认全部属于跨IP族异常来源。以下各版本标签计数仍为历史统计，不冒称重跑的新 TOP30 普查。
 
 最新完整逐帧标签分布见 [6b704 的 TOP30 原始标签分组](label-cohorts6b.md)。随后 a82 对七条 UDP4500 ESP 的完整来源修正、UDP 连接归属和 Windows 实测见 [NAT-T 阶段报告](natt-udp-ownership-a82.md)；这不是重跑后的新 TOP30 标签普查。下面保留 `66622e3efc9611eb65ddeb881613fd6eda0e671d` 原生源码与 `41b88b146779559f39aa66891a85852ce697018f` Windows CLI 的历史计数。

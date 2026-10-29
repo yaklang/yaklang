@@ -55,6 +55,33 @@ func TestDisplayFilterOwnedSnapshotPreservesValuesAndCompleteness(t *testing.T) 
 	require.Equal(t, "limited", e.DisplayFieldValues().Completeness)
 }
 
+func TestDisplayFilterHTTP3FieldsBelongToSectionsDecodedInSuppliedPDUs(t *testing.T) {
+	headers := []map[string]any{{"Name": ":method", "Value": "POST"}}
+	wire := &ProtocolEvent{Protocol: "http3", Completeness: "envelope", Session: map[string]any{
+		"HTTP3 Wire Only": true, "HTTP3 Wire Observation": "buffered-range", "Headers": headers,
+	}}
+	decoded := &ProtocolEvent{Protocol: "http3", Completeness: "envelope", Session: map[string]any{
+		"Frames": []map[string]any{{"HTTP3": true, "HTTP3 Frames": []map[string]any{{"Headers": headers}}}},
+	}}
+	positive, err := CompileDisplayFilter(`http.request.method == "POST"`)
+	require.NoError(t, err)
+	negative, err := CompileDisplayFilter(`not http.request.method`)
+	require.NoError(t, err)
+	require.Empty(t, wire.DisplayFields()["http.request.method"], "cached stream headers are not a new PDU occurrence")
+	require.Equal(t, DisplayFilterResult{Complete: true}, positive.EvaluateEvents([]*ProtocolEvent{wire}))
+	require.Equal(t, DisplayFilterResult{Matched: true, Complete: true}, negative.EvaluateEvents([]*ProtocolEvent{wire}))
+	require.True(t, positive.Match(decoded))
+	require.False(t, negative.Match(decoded))
+	require.True(t, positive.MatchEvents([]*ProtocolEvent{wire, decoded}))
+	require.False(t, negative.MatchEvents([]*ProtocolEvent{wire, decoded}))
+	wire.Completeness = "limited"
+	require.False(t, negative.EvaluateEvents([]*ProtocolEvent{wire}).Complete, "lost projection coverage cannot prove even PDU-scoped absence")
+	for _, unknown := range []string{"http3.request.method", "http3.request_pdu"} {
+		_, err := CompileDisplayFilter(unknown)
+		require.ErrorContains(t, err, "unknown display field")
+	}
+}
+
 func TestDisplayFilterPartialWitnessesAndUnknownAbsence(t *testing.T) {
 	known := DisplayFieldSnapshot{Incomplete: true, Values: []DisplayFieldValue{{Name: "dns.qry.type", Value: uint64(1)}}}
 	for _, tc := range []struct {

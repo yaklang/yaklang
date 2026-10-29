@@ -221,11 +221,98 @@ func TestHTTP3KnownStreamRetransmissionKeepsIdentityWithoutReplayingFrames(t *te
 	unknown := h3FINStream(4, 10, []byte("unseen-prefix"), false)
 	info, err = h3FINFrameFeed(q, 0, unknown)
 	require.NoError(t, err)
-	require.Nil(t, info["HTTP3"], "another stream has not supplied its own application prefix")
-	fresh := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	require.Equal(t, true, info["HTTP3 Wire Only"], "current h3 ALPN identifies a client bidi wire observation, not another stream's message")
+	require.Equal(t, "client-bidirectional", info["HTTP3 Stream Kind"])
+	require.Nil(t, q.streams[4].h3, "connection identity must not fabricate framing state")
+	fresh := &binQUIC{native: true, byteLimit: 65536}
 	info, err = h3FINFrameFeed(fresh, 0, h3FINStream(0, 10, []byte("new-generation"), false))
 	require.NoError(t, err)
 	require.Nil(t, info["HTTP3"], "a different connection generation does not inherit stream identity")
+}
+
+func TestHTTP3MissingPrefixKeepsOnlyAuthenticatedConnectionAndStreamRole(t *testing.T) {
+	for _, dir := range []int{0, 1} {
+		q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		fr := h3FINStream(12, 100, []byte("suffix"), true)
+		info, err := h3FINFrameFeed(q, dir, fr)
+		require.NoError(t, err)
+		require.Equal(t, true, info["HTTP3 Wire Only"])
+		require.Equal(t, "prefix-missing", info["HTTP3 Wire Observation"])
+		require.Equal(t, "client-bidirectional", fr["HTTP3 Stream Kind"])
+		require.Equal(t, 0, fr["Delivered Bytes"])
+		require.Equal(t, false, fr["Stream Complete"], "FIN above a hole does not deliver an application ending")
+		require.Nil(t, q.streams[12].h3)
+		require.Zero(t, q.streams[12].requestPDU)
+		for _, key := range []string{"HTTP3 Frames", "Headers", "Request PDU ID", "Transaction ID"} {
+			require.Nil(t, fr[key], key)
+			require.Nil(t, info[key], key)
+		}
+	}
+	for _, tt := range []struct {
+		name string
+		alpn string
+		sid  uint64
+		dir  int
+		data []byte
+	}{
+		{"new-generation-without-ALPN", "", 12, 0, []byte("suffix")},
+		{"other-application", "doq", 12, 0, []byte("suffix")},
+		{"client-unidirectional-type-unknown", "h3", 2, 0, []byte("suffix")},
+		{"server-unidirectional-type-unknown", "h3", 3, 1, []byte("suffix")},
+		{"server-bidirectional-extension-unknown", "h3", 1, 1, []byte("suffix")},
+		{"empty-STREAM", "h3", 12, 0, nil},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			q := &binQUIC{native: true, alpn: tt.alpn, byteLimit: 65536}
+			info, err := h3FINFrameFeed(q, tt.dir, h3FINStream(tt.sid, 100, tt.data, false))
+			require.NoError(t, err)
+			require.Nil(t, info["HTTP3"])
+			require.Nil(t, q.streams[tt.sid].h3)
+		})
+	}
+}
+
+func TestHTTP3MissingPrefixRecoveryDeliversFramesAndRequestAnchorOnce(t *testing.T) {
+	q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+	wire := append(h3BodyRequest("POST", "3"), h3Data([]byte("abc"))...)
+	split := len(wire) - 3
+	_, err := h3FINFrameFeed(q, 0, h3FINStream(12, uint64(split), bytes.Clone(wire[split:]), true))
+	require.NoError(t, err)
+	fr := h3FINStream(12, 0, bytes.Clone(wire[:split]), false)
+	info, err := h3FINFrameFeed(q, 0, fr)
+	require.NoError(t, err)
+	require.Equal(t, uint64(2), fr["Request PDU ID"], "the request anchor starts on delivery, not its earlier buffered suffix")
+	require.Len(t, info["HTTP3 Frames"], 2)
+	require.Equal(t, uint64(3), q.streams[12].h3.body[0].observed)
+	require.Equal(t, 1, q.streams[12].h3.reqHeaders)
+	require.Equal(t, true, fr["Stream Complete"])
+	require.Nil(t, info["HTTP3 Wire Only"])
+	info, err = h3FINFrameFeed(q, 0, h3FINStream(12, uint64(split), bytes.Clone(wire[split:]), true))
+	require.NoError(t, err)
+	require.Equal(t, "retransmission", info["HTTP3 Wire Observation"])
+	require.Equal(t, true, info["HTTP3 Wire Only"])
+	require.Empty(t, info["HTTP3 Frames"])
+	require.Equal(t, uint64(3), q.streams[12].h3.body[0].observed)
+	require.Equal(t, 1, q.streams[12].h3.reqHeaders)
+}
+
+func TestHTTP3MissingPrefixCannotReplaceAnotherStreamsDecodedMetadata(t *testing.T) {
+	for _, missingFirst := range []bool{false, true} {
+		q := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		missing := h3FINStream(12, 100, []byte("suffix"), false)
+		decoded := h3FINStream(0, 0, h3RequestHeaders(), true)
+		frames := []map[string]any{decoded, missing}
+		if missingFirst {
+			frames[0], frames[1] = frames[1], frames[0]
+		}
+		info, err := h3FINFrameFeed(q, 0, frames...)
+		require.NoError(t, err)
+		require.Equal(t, false, info["HTTP3 Wire Only"])
+		require.Equal(t, uint64(0), info["HTTP3 Stream ID"])
+		require.Equal(t, "request", info["HTTP3 Stream Kind"])
+		require.Equal(t, "prefix-missing", missing["HTTP3 Wire Observation"])
+		require.Nil(t, q.streams[12].h3)
+	}
 }
 
 func TestHTTP3MixedPacketWireObservationCannotReplaceApplicationMetadata(t *testing.T) {
@@ -317,10 +404,16 @@ func FuzzHTTP3RetransmissionDoesNotReplayApplication(f *testing.F) {
 		if err != nil || info["HTTP3 Wire Only"] != true || fr["HTTP3 Frames"] != nil || q.streams[0].h3.body[0].observed != uint64(n%96) {
 			t.Fatal("retransmission changed semantic delivery", err)
 		}
-		fresh := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		fresh := &binQUIC{native: true, byteLimit: 65536}
 		info, err = h3FINFrameFeed(fresh, 0, h3FINStream(0, uint64(off), bytes.Clone(wire[off:]), false))
 		if err != nil || info["HTTP3"] != nil {
 			t.Fatal("new generation borrowed a missing application prefix", err)
+		}
+		confirmed := &binQUIC{native: true, alpn: "h3", byteLimit: 65536}
+		suffix := h3FINStream(0, uint64(off), bytes.Clone(wire[off:]), false)
+		info, err = h3FINFrameFeed(confirmed, 0, suffix)
+		if err != nil || info["HTTP3 Wire Only"] != true || info["HTTP3 Stream Kind"] != "client-bidirectional" || confirmed.streams[0].h3 != nil || confirmed.streams[0].requestPDU != 0 || suffix["HTTP3 Frames"] != nil {
+			t.Fatal("h3 connection identity fabricated stream content", err)
 		}
 	})
 }
