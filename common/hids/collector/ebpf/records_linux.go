@@ -14,7 +14,6 @@ import (
 	"time"
 
 	gopsnet "github.com/shirou/gopsutil/v4/net"
-	gopsprocess "github.com/shirou/gopsutil/v4/process"
 	"golang.org/x/sys/unix"
 
 	"github.com/yaklang/yaklang/common/hids/model"
@@ -364,6 +363,12 @@ type networkEventInfo struct {
 }
 
 func enrichProcessEvent(pid int, options processEventOptions) (model.Process, map[string]any) {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	return enrichProcessEventWithContext(ctx, pid, options)
+}
+
+func enrichProcessEventWithContext(ctx context.Context, pid int, options processEventOptions) (model.Process, map[string]any) {
 	processInfo := model.Process{
 		PID:     pid,
 		Name:    strings.TrimSpace(options.fallbackName),
@@ -378,31 +383,14 @@ func enrichProcessEvent(pid int, options processEventOptions) (model.Process, ma
 		return processInfo, nil
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
-
-	process, err := gopsprocess.NewProcessWithContext(ctx, int32(pid))
-	if err != nil {
-		ppid, parentName := readParentProcessInfo(pid)
-		processInfo.ParentPID = ppid
-		processInfo.ParentName = parentName
+	metadata, ok := readProcessEventMetadata(ctx, pid)
+	if !ok {
 		return processInfo, nil
 	}
-
-	parentPID, _ := process.Ppid()
-	processInfo.ParentPID = int(parentPID)
-	if parentPID > 0 {
-		if parent, err := gopsprocess.NewProcessWithContext(ctx, parentPID); err == nil {
-			parentName, _ := parent.NameWithContext(ctx)
-			processInfo.ParentName = strings.TrimSpace(parentName)
-		}
-	}
-
-	name, _ := process.NameWithContext(ctx)
-	username, _ := process.UsernameWithContext(ctx)
-	exe, _ := process.ExeWithContext(ctx)
-	cmdline, _ := process.CmdlineWithContext(ctx)
-	statuses, _ := process.StatusWithContext(ctx)
+	processInfo.ParentPID = metadata.parentPID
+	processInfo.ParentName = metadata.parentName
+	name, username := metadata.name, metadata.username
+	exe, cmdline := metadata.image, metadata.command
 
 	if strings.TrimSpace(name) != "" {
 		processInfo.Name = strings.TrimSpace(name)
@@ -438,9 +426,7 @@ func enrichProcessEvent(pid int, options processEventOptions) (model.Process, ma
 	if processInfo.Name != "" {
 		data["process_name"] = processInfo.Name
 	}
-	if len(statuses) > 0 {
-		data["process_status"] = strings.Join(statuses, ",")
-	}
+	data["process_status"] = metadata.status
 
 	return processInfo, data
 }
@@ -494,18 +480,34 @@ func enrichNetworkEvent(
 }
 
 func enrichNetworkCloseEvent(pid int, fd int32) networkEventInfo {
+	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
+	defer cancel()
+	return enrichNetworkCloseEventWithLookup(ctx, pid, fd, lookupConnectionByFD)
+}
+
+func enrichNetworkCloseEventWithLookup(
+	ctx context.Context,
+	pid int,
+	fd int32,
+	lookup func(context.Context, int, uint32) (gopsnet.ConnectionStat, bool),
+) networkEventInfo {
 	info := networkEventInfo{
 		protocol:        "unknown",
 		connectionState: "closed",
 	}
-	if pid <= 0 || fd < 0 {
+	if pid <= 0 || fd < 0 || ctx.Err() != nil {
 		return info
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 300*time.Millisecond)
-	defer cancel()
+	// close(2) also covers ordinary files, and the FD may already be gone by
+	// the time we consume its record. gopsutil only includes socket FD links;
+	// neither case can yield a matching socket, so avoid scanning all of this
+	// process's socket tables. Keep the raw close event for lifecycle tracking.
+	if !closeFDIsSocket(ctx, pid, fd) {
+		return info
+	}
 
-	connection, ok := lookupConnectionByFD(ctx, pid, uint32(fd))
+	connection, ok := lookup(ctx, pid, uint32(fd))
 	if !ok {
 		return info
 	}
@@ -528,6 +530,14 @@ func enrichNetworkCloseEvent(pid int, fd int32) networkEventInfo {
 		"previous_state":   strings.TrimSpace(connection.Status),
 	}
 	return info
+}
+
+func closeFDIsSocket(ctx context.Context, pid int, fd int32) bool {
+	// Match gopsutil's proc-root selection, including a context-selected host
+	// proc mount. Checking the caller's /proc instead could discard a valid FD
+	// belonging to the selected host view.
+	target, err := os.Readlink(filepath.Join(procRootWithContext(ctx), strconv.Itoa(pid), "fd", strconv.FormatInt(int64(fd), 10)))
+	return err == nil && strings.HasPrefix(target, "socket:[")
 }
 
 func enrichNetworkAcceptEvent(pid int, fd int32) networkEventInfo {
@@ -570,7 +580,7 @@ func enrichNetworkAcceptEvent(pid int, fd int32) networkEventInfo {
 }
 
 func lookupConnectionByFD(ctx context.Context, pid int, fd uint32) (gopsnet.ConnectionStat, bool) {
-	if pid <= 0 || fd == 0 {
+	if pid <= 0 {
 		return gopsnet.ConnectionStat{}, false
 	}
 
@@ -742,38 +752,6 @@ func readCurrentProcessImageAndCommand(pid int, fallback string) (string, string
 	default:
 		return image, fallback
 	}
-}
-
-func readParentProcessInfo(pid int) (int, string) {
-	if pid <= 0 {
-		return 0, ""
-	}
-
-	raw, err := os.ReadFile(fmt.Sprintf("/proc/%d/status", pid))
-	if err != nil {
-		return 0, ""
-	}
-
-	for _, line := range strings.Split(string(raw), "\n") {
-		if !strings.HasPrefix(line, "PPid:") {
-			continue
-		}
-		fields := strings.Fields(line)
-		if len(fields) < 2 {
-			return 0, ""
-		}
-		ppid, err := strconv.Atoi(fields[1])
-		if err != nil || ppid <= 0 {
-			return 0, ""
-		}
-		parentNameRaw, err := os.ReadFile(fmt.Sprintf("/proc/%d/comm", ppid))
-		if err != nil {
-			return ppid, ""
-		}
-		return ppid, strings.TrimSpace(string(parentNameRaw))
-	}
-
-	return 0, ""
 }
 
 func readProcessCmdline(pid int) string {
