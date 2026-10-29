@@ -110,6 +110,56 @@ func TestOSPFv3WorkerPreservesExactCaptureDomainAndRejectsWrongNumber(t *testing
 	require.ErrorContains(t, err, "reference does not match")
 }
 
+func TestOSPFv3UnsupportedSiblingRemainsProgressiveAcrossWorker(t *testing.T) {
+	// Literal Fletcher bytes independently checked over LSAs excluding Age:
+	// unknown0xa123=0x943e; Router-LSA0x2001=0x4924. No full-body decoder is
+	// needed to determine the exact24-byte boundary of the unknown LSA.
+	w := []byte{3, 4, 0, 68, 192, 0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2}
+	w = append(w, []byte{0, 1, 0xa1, 0x23, 0, 0, 0, 1, 192, 0, 2, 1, 0x80, 0, 0, 1, 0x94, 0x3e, 0, 24, 1, 2, 3, 4}...)
+	w = append(w, []byte{0, 1, 0x20, 1, 0, 0, 0, 1, 192, 0, 2, 1, 0x80, 0, 0, 1, 0x49, 0x24, 0, 24, 0, 0, 0, 0x13}...)
+	context := stream_parser.OSPFv3WireContext{Source: netip.MustParseAddr("fe80::1"), Destination: netip.MustParseAddr("ff02::5")}
+	binary.BigEndian.PutUint16(w[12:], stream_parser.OSPFv3Checksum(w, context))
+	base := ospfv3PresentationPacket(t, false)
+	for _, corrupt := range []bool{false, true} {
+		wire := bytes.Clone(w)
+		wantStatus := "context-required"
+		if corrupt {
+			wire[12] ^= 1
+			wantStatus = "malformed"
+		}
+		frame := append(bytes.Clone(base.data[:54]), wire...)
+		binary.BigEndian.PutUint16(frame[18:], uint16(len(wire)))
+		raw := replayPIMPresentationPacket(t, frame)
+		require.Len(t, raw.events, 1)
+		raw.reference = raw.events[0].SourceBytes.PacketRefs[0]
+		require.Equal(t, wantStatus, raw.events[0].Status)
+		require.Zero(t, raw.events[0].FlowID)
+		require.Zero(t, raw.events[0].ResponseTo)
+		require.Equal(t, "OSPFv3", summarize(raw).Protocol)
+		for _, d := range []packetDetail{detail(raw), quickDetail(raw), workerMetadataDetailForPacket(t, raw)} {
+			text := detailLines(d.fields)
+			require.Contains(t, text, "LSAs[1]")
+			require.Contains(t, text, "LS Type: 0xa123 (unselected LSA type)")
+			require.Contains(t, text, "LS Type: 0x2001 (Router-LSA)")
+			require.Contains(t, text, "Options: 19")
+			require.NotContains(t, text, "YAML dissector incomplete")
+			require.NotContains(t, text, "enclosing IPv6 pseudo-header not supplied")
+			found := 0
+			for _, f := range d.fields {
+				if f.text == "LS Type: 0x2001 (Router-LSA)" {
+					require.True(t, f.hasRange)
+					require.Equal(t, 1, f.source)
+					require.Equal(t, 46, f.start)
+					require.Equal(t, 48, f.end)
+					require.Equal(t, []byte{0x20, 1}, d.sources[0].Data[f.start:f.end])
+					found++
+				}
+			}
+			require.Equal(t, 1, found, "no duplicate legacy tree or lost known sibling")
+		}
+	}
+}
+
 func TestOSPFv3ReadableTypeNamesPreserveIntegerFieldsAndWireOccurrences(t *testing.T) {
 	w := make([]byte, 56)
 	w[0], w[1] = 3, 5

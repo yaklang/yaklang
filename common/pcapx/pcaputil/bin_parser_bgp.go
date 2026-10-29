@@ -60,6 +60,9 @@ func observedWireError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if errors.Is(err, stream_parser.ErrOSPFv3WireIntegrity) {
+		return protocolError(ErrMalformedMessage, "%s", err)
+	}
 	if errors.Is(err, stream_parser.ErrObservedWireBudget) {
 		return protocolError(ErrResourceExceeded, "%s", err)
 	}
