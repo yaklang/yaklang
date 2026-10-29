@@ -636,7 +636,16 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 		var decoded map[string]any
 		decoded, err = e.Decode()
 		if err == nil {
-			e.semanticFields = cloneSession(protocolFields(decoded))
+			if e.nativeQUICWire {
+				// Retaining one interface{} per ciphertext byte multiplies the
+				// inspector budget and evicts otherwise small captures. Preserve
+				// accepted original wire privately; Decode reconstructs the same
+				// public envelope shape without trusting editable Raw/Fields.
+				e.nativeQUICWireBytes = append([]byte(nil), w...)
+				e.semanticFields = nil
+			} else {
+				e.semanticFields = cloneSession(protocolFields(decoded))
+			}
 			if !a.config.Deferred {
 				e.Structured = decoded
 			}

@@ -56,6 +56,7 @@ type ProtocolEvent struct {
 	ownedRuleEnvelope, hasRuleMetadata bool
 	nativeQUICObservation              bool
 	nativeQUICWire                     bool
+	nativeQUICWireBytes                []byte // immutable accepted envelope; expand byte leaves only on query
 	nativeDoIPObservation              bool
 	doipAssociationRefusal             bool // private complete-frame refusal scope
 	nativeCANRecord                    bool
@@ -231,6 +232,10 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		if e.sessionError != nil {
 			owned := *e.sessionError
 			return nil, &owned
+		}
+		if e.nativeQUICWireBytes != nil {
+			fields, err := quicWireEnvelope(e.nativeQUICWireBytes)
+			return map[string]any{"fields": fields, "metadata": nil}, err
 		}
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields), "metadata": nil}, nil
@@ -2127,6 +2132,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row.semanticFields = cloneSession(e.semanticFields)
 	row.semanticSession = cloneSession(e.semanticSession)
 	row.semanticMetadata = cloneSessionValue(e.semanticMetadata)
+	row.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 	row.Session = cloneSession(e.Session)
 	cloneEvidence(&row.BinParserEvent)
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
@@ -2161,6 +2167,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 			row := *e
 			cloneEvidence(&row)
 			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+			row.nativeQUICWireBytes = nil
 			row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 			rows = append(rows, &row)
 		}
@@ -2186,6 +2193,7 @@ func (v *ProtocolInspector) TCPFlowRows(domain CaptureDomain, tcpFlow uint64) []
 		row := *e
 		cloneEvidence(&row)
 		row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+		row.nativeQUICWireBytes = nil
 		row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 		rows = append(rows, &row)
 	}
@@ -2203,6 +2211,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		copyEvent.semanticFields = cloneSession(e.semanticFields)
 		copyEvent.semanticSession = cloneSession(e.semanticSession)
 		copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
+		copyEvent.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 		copyEvent.Session = cloneSession(e.Session)
 		copyEvent.Raw = append([]byte(nil), e.Raw...)
 		row = &copyEvent
@@ -2211,7 +2220,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 	if row == nil {
 		return nil, fmt.Errorf("message %d is absent or evicted", id)
 	}
-	if row.Rule != "" || row.semanticFields != nil {
+	if row.Rule != "" || row.semanticFields != nil || row.nativeQUICWireBytes != nil {
 		result, err := row.Decode()
 		if err != nil {
 			return row, err
@@ -2255,6 +2264,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 				row := *e
 				cloneEvidence(&row)
 				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+				row.nativeQUICWireBytes = nil
 				row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 				rows = append(rows, &row)
 			}
