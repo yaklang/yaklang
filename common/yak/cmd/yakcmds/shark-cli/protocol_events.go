@@ -78,10 +78,10 @@ func protocolEventFields(events []*pcaputil.ProtocolEvent) []field {
 	return fields
 }
 
-func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...bool) ([]field, []detailSource) {
+func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ...bool) ([]field, []detailSource) {
 	var out []field
 	var sources []detailSource
-	allowDNSDedup := len(deduplicateDNS) == 0 || deduplicateDNS[0]
+	allowSessionDedup := len(deduplicateSession) == 0 || deduplicateSession[0]
 	ordered := append([]*pcaputil.ProtocolEvent(nil), events...)
 	sort.SliceStable(ordered, func(i, j int) bool {
 		if ordered[i] == nil {
@@ -863,7 +863,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			values[k] = v
 		}
 		for k, v := range e.Session {
-			if k == "DNS" && allowDNSDedup && duplicateDNSSessionFields(e) {
+			if allowSessionDedup && (k == "DNS" && duplicateDNSSessionFields(e) || k == "Initial Packet Fields" && duplicateSSHInitialFields(e)) {
 				continue // A complete typed copy of this same PDU is already in Fields.
 			}
 			values[k] = v

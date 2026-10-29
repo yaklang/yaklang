@@ -9,9 +9,8 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
-// Only the direct DNS semantic map has this known same-PDU duplication. The
-// captured-frame YAML tree and decrypted/encapsulated application sources are
-// rendered separately and are never candidates for this comparison.
+// These are known same-PDU copies. Captured-frame trees and separate
+// decrypted/encapsulated sources are never candidates for this comparison.
 func duplicateDNSSessionFields(e *pcaputil.ProtocolEvent) bool {
 	if e == nil || len(e.Fields) == 0 || (e.Protocol != "dns" && e.Protocol != "mdns" && e.Protocol != "llmnr") {
 		return false
@@ -20,17 +19,31 @@ func duplicateDNSSessionFields(e *pcaputil.ProtocolEvent) bool {
 	return ok && reflect.DeepEqual(e.Fields, dns)
 }
 
+func duplicateSSHInitialFields(e *pcaputil.ProtocolEvent) bool {
+	if e == nil || e.Protocol != "ssh" || len(e.Fields) == 0 {
+		return false
+	}
+	initial, ok := e.Session["Initial Packet Fields"].(map[string]any)
+	return ok && reflect.DeepEqual(e.Fields, initial)
+}
+
 // IPC collapses Go integer widths into JSON numbers. Make the exact typed
 // equality decision in the parent, while both original maps are still owned
 // Go values. Only the outgoing display copy loses its redundant subtree.
 func protocolDisplayEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
-	if !duplicateDNSSessionFields(e) {
+	redundant := ""
+	if duplicateDNSSessionFields(e) {
+		redundant = "DNS"
+	} else if duplicateSSHInitialFields(e) {
+		redundant = "Initial Packet Fields"
+	}
+	if redundant == "" {
 		return e
 	}
 	projected := *e
 	projected.Session = make(map[string]any, len(e.Session)-1)
 	for key, value := range e.Session {
-		if key != "DNS" {
+		if key != redundant {
 			projected.Session[key] = value
 		}
 	}
