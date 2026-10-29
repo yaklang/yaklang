@@ -109,3 +109,62 @@ func TestOSPFv3WorkerPreservesExactCaptureDomainAndRejectsWrongNumber(t *testing
 	err = runDecodeWorker(bytes.NewReader(wire), &output)
 	require.ErrorContains(t, err, "reference does not match")
 }
+
+func TestOSPFv3ReadableTypeNamesPreserveIntegerFieldsAndWireOccurrences(t *testing.T) {
+	w := make([]byte, 56)
+	w[0], w[1] = 3, 5
+	binary.BigEndian.PutUint16(w[2:], 56)
+	for i, typ := range []uint16{0x2009, 0xa123} {
+		at := 16 + 20*i
+		binary.BigEndian.PutUint16(w[at+2:], typ)
+		binary.BigEndian.PutUint16(w[at+18:], 20)
+	}
+	m, err := stream_parser.DecodeOSPFv3Wire(w, stream_parser.OSPFv3WireContext{}, 32)
+	require.NoError(t, err)
+	before, err := json.Marshal(m)
+	require.NoError(t, err)
+	e := &pcaputil.ProtocolEvent{ID: 1, Protocol: "ospf", Profile: "ospfv3-bounded-control", Status: "decoded", Raw: w, Session: m}
+	fs, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	seen := 0
+	for _, f := range fs {
+		if f.text == "LS Type: 0x2009 (Intra-Area-Prefix-LSA)" {
+			require.True(t, f.hasRange)
+			require.Equal(t, 18, f.start)
+			require.Equal(t, 20, f.end)
+			require.Equal(t, []byte{0x20, 9}, sources[f.source-1].Data[f.start:f.end])
+			seen++
+		}
+		if f.text == "LS Type: 0xa123 (unselected LSA type)" {
+			require.True(t, f.hasRange)
+			require.Equal(t, 38, f.start)
+			require.Equal(t, 40, f.end)
+			seen++
+		}
+	}
+	require.Equal(t, 2, seen)
+	after, err := json.Marshal(m)
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+	for _, c := range []struct {
+		name string
+		v    any
+		want string
+	}{
+		{"Type", uint64(4), "4 (Link State Update)"},
+		{"Referenced LS Type", uint64(0), "0x0000 (no referenced LSA)"},
+		{"Referenced LS Type", uint64(0x2001), "0x2001 (Router-LSA)"},
+	} {
+		v, ok := ospfv3FieldValue(c.name, c.v)
+		require.True(t, ok)
+		require.Equal(t, c.want, v)
+	}
+	for _, v := range []any{"bogus", -1, uint64(65536), 1.5} {
+		_, ok := ospfv3FieldValue("LS Type", v)
+		require.False(t, ok)
+	}
+	other := *e
+	other.Profile = "unselected-ospf-layout"
+	plain, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{&other})
+	require.Contains(t, detailLines(plain), "LS Type: 8201")
+	require.NotContains(t, detailLines(plain), "Intra-Area-Prefix-LSA", "a shared protocol label cannot select the v3 field layout")
+}

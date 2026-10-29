@@ -140,6 +140,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 		}
 	}
 	var protocol string
+	var ospfv3Display bool
 	var quicHeaderForm string
 	var routingVersion uint64
 	var currentSource int
@@ -603,6 +604,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					label = "Record AEAD verified"
 				}
 			}
+			if protocol == "ospf" && ospfv3Display {
+				if display, ok := ospfv3FieldValue(name, x); ok {
+					value = display
+				}
+			}
 			add(label+": "+value, false)
 			if len(generated) > 0 {
 				sources = append(sources, detailSource{Name: sourceName, Data: bytes.Clone(generated)})
@@ -687,6 +693,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 			continue
 		}
 		protocol, currentSource = e.Protocol, 0
+		ospfv3Display = e.Profile == "ospfv3-bounded-control"
 		quicHeaderForm = textValue(e.Session["Header Form"])
 		routingVersion = number(e.Session["Protocol Version"])
 		wireRanges = detailWireRanges(e.Session["Wire Field Ranges"])
