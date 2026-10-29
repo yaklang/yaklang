@@ -417,8 +417,8 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		typ         DisplayFieldType
 		bits        int
 	}{
-		{"http.request.method", "HTTP request method", DisplayString, 0},
-		{"http.response.code", "HTTP response status", DisplayUnsigned, 16},
+		{"http.request.method", "HTTP request method decoded in this PDU; not inherited stream context", DisplayString, 0},
+		{"http.response.code", "HTTP response status decoded in this PDU; not inherited stream context", DisplayUnsigned, 16},
 	} {
 		request := f.typ == DisplayString
 		b := displayCustom("http", f.name, f.label, f.typ, f.bits, "pdu", func(e *ProtocolEvent, emit func(any), p *displayProjection) { displayHTTPValues(e, request, emit, p) })
@@ -861,12 +861,10 @@ func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displa
 		})
 	}
 	if e.Protocol == "http3" {
-		p.maps(e.Session["Frames"], func(fr map[string]any) {
-			if fr["HTTP3"] != true {
-				return
-			}
-			p.maps(fr["HTTP3 Frames"], func(f map[string]any) { headers(f["Headers"]) })
-		})
+		// QPACK encoder data can complete a different stream's blocked field
+		// section. Project that newly decoded section once, like frame scalars,
+		// without copying cached method/status into subsequent wire observations.
+		displayHTTP3FrameValues(e, p, func(f map[string]any) { headers(f["Headers"]) })
 		return
 	}
 	if _, h2 := e.Session["Stream ID"]; h2 {

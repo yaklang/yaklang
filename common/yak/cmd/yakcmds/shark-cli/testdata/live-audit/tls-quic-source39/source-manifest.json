@@ -1,0 +1,154 @@
+{
+  "scope": "Unmodified historical source only; complete frozen plans, expected objects and results stay external",
+  "source_files": 24,
+  "source_bytes": 206960,
+  "immutable_sources": [
+    {
+      "path": "source/close_fresh_source39.py",
+      "bytes": 7188,
+      "SHA256": "31346858d116167f626ebd4d2a48117ae62d4734d145e1e1c7e478a0e6c37840",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/close_fresh_source39.py"
+    },
+    {
+      "path": "source/quic_crypto_raw_reference39.py",
+      "bytes": 4479,
+      "SHA256": "16d17d4d5564db13d842ad8ca152cbe0460070a8b3666316de492384592d420a",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_crypto_raw_reference39.py"
+    },
+    {
+      "path": "source/quic_missing_DATA_owner39.py",
+      "bytes": 7566,
+      "SHA256": "6648fc6713b7408110937f19efe4a424f733cdc653d22b8d2302a53cef87c219",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_missing_DATA_owner39.py"
+    },
+    {
+      "path": "source/quic_reference_fields39.py",
+      "bytes": 12326,
+      "SHA256": "4c819da78cde02e1aaf9650683581ce2d0446ded54bd746e3655ef6eb1cd6272",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_reference_fields39.py"
+    },
+    {
+      "path": "source/quic_reference_fields39_v02.py",
+      "bytes": 13112,
+      "SHA256": "ba4e86a94643e87c4bdff6987fd9a47c9440f3138e559d056dfa677780d00b9b",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_reference_fields39_v02.py"
+    },
+    {
+      "path": "source/quic_source39.py",
+      "bytes": 22072,
+      "SHA256": "02deb2a59e97b2264438bc1d3828df3732100c60e77929729e6bc9c2e3d58f46",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_source39.py"
+    },
+    {
+      "path": "source/quic_source_negative39.py",
+      "bytes": 4127,
+      "SHA256": "9410693cc50eead7e02b5a43e3e5382ae474e284c4dbeebfefd78bd3ecbdc70c",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/quic_source_negative39.py"
+    },
+    {
+      "path": "source/run_isolated_reference39.py",
+      "bytes": 4315,
+      "SHA256": "b6653c2e6a6e45c6217b8377953463e21d866e0af668d0fe6da81314ab40942a",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/run_isolated_reference39.py"
+    },
+    {
+      "path": "source/run_wire_only_filter_contract39.py",
+      "bytes": 6526,
+      "SHA256": "6f69c5b9798ee3ac7ca3476a17637fad4338b82cf5becad702d7f8dbc91128ab",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/run_wire_only_filter_contract39.py"
+    },
+    {
+      "path": "source/tls_metadata_SDK39.py",
+      "bytes": 5701,
+      "SHA256": "457e88771b0f47819fb85a32e7f56d44d42a9bd71f2bc3c65c91818b9a0b3f42",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/tls_metadata_SDK39.py"
+    },
+    {
+      "path": "source/tls_source39.py",
+      "bytes": 12936,
+      "SHA256": "a50ff4e2c357b8aa7f4f28c8e602d824894fddea9002404ae7379773066933b6",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/tls_source39.py"
+    },
+    {
+      "path": "source/tls_source39_v02.py",
+      "bytes": 13016,
+      "SHA256": "d6d0a93ea365c8ffbfe0b1ce329063db95641ae0587e39d832100e6177e5c0e9",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/tls_source39_v02.py"
+    },
+    {
+      "path": "source/verify_fresh_SDK39.py",
+      "bytes": 22314,
+      "SHA256": "f9f6517067f129b34f9d376fbd4f88de48dd553b031605cf9002f0852b833c8f",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/verify_fresh_SDK39.py"
+    },
+    {
+      "path": "source/verify_QUIC_links_control39.py",
+      "bytes": 7079,
+      "SHA256": "e3b3c13828f3f6503aab4a3cc3e8907017b71ede1f38a89a72681f684a87fa11",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/verify_QUIC_links_control39.py"
+    },
+    {
+      "path": "source/verify_QUIC_links_control39_v02.py",
+      "bytes": 8623,
+      "SHA256": "c24b614218abba9af67b3e4007622c47c39adce021a18b4c2580af66b6050d04",
+      "original_external_relative_name": "fresh-TLS-QUIC-source39-01/verify_QUIC_links_control39_v02.py"
+    },
+    {
+      "path": "audit_fresh_CLI39.py",
+      "bytes": 8373,
+      "SHA256": "ccf66d1ac95f264d5dcb6deff7efc5fea89229aab78b085ad2fb47ebaed5d31a",
+      "original_external_relative_name": "audit_fresh_CLI39.py"
+    },
+    {
+      "path": "audit_fresh_CLI39_02.py",
+      "bytes": 8482,
+      "SHA256": "c5515d2770d6ea3564378d5e05859164edcff24e11603212687d854e1c371899",
+      "original_external_relative_name": "audit_fresh_CLI39_02.py"
+    },
+    {
+      "path": "audit_fresh_CLI39_03.py",
+      "bytes": 8939,
+      "SHA256": "72488f725ee0751cb09186b62a6d18630b0649cd757fd815a249729bfef55d53",
+      "original_external_relative_name": "audit_fresh_CLI39_03.py"
+    },
+    {
+      "path": "prepare_fresh_CLI39_02.py",
+      "bytes": 1642,
+      "SHA256": "f484a2090d4a4f7a1a79af332addfbffc46861aa762c35d737435f08960c0dd0",
+      "original_external_relative_name": "prepare_fresh_CLI39_02.py"
+    },
+    {
+      "path": "prepare_fresh_CLI39_03.py",
+      "bytes": 2190,
+      "SHA256": "4cf6237d14e3fe6124ad7ade3e4f0c94f6bd244858c79701881972a954d92946",
+      "original_external_relative_name": "prepare_fresh_CLI39_03.py"
+    },
+    {
+      "path": "prepare_fresh_quic39.py",
+      "bytes": 2667,
+      "SHA256": "2bff0eb7088ad22e019780741e121c33332d63d68de536bca3c1cac8d93988e6",
+      "original_external_relative_name": "prepare_fresh_quic39.py"
+    },
+    {
+      "path": "quic_epochs_ready39.py",
+      "bytes": 9574,
+      "SHA256": "c990355c1b7eb677956254fdf78c55a7ddf80069a23ecd44c920ad35893acd25",
+      "original_external_relative_name": "quic_epochs_ready39.py"
+    },
+    {
+      "path": "run_fresh_TLS_QUIC39.py",
+      "bytes": 2916,
+      "SHA256": "d5ff95fb87f540a3f8049faf62592ef9e22efa4febdca746ec2c8ddb488fd679",
+      "original_external_relative_name": "run_fresh_TLS_QUIC39.py"
+    },
+    {
+      "path": "tls_resumption_live_barrier39.py",
+      "bytes": 10797,
+      "SHA256": "32d187809f4004f83a2857d393405078025d1cacb0f58c49e06bd5d21f3258ca",
+      "original_external_relative_name": "tls_resumption_live_barrier39.py"
+    }
+  ],
+  "controller_SHA256": "0ce4dabb1ee4cd2571a29f0444f2d2f77450a303b1acdd862ad1e26988b108fd",
+  "external_dependencies": "Original capture/key logs, frozen source39/OSPF source grids, build/execution receipts and shared recovery/audit helpers must be separately supplied; archive is not self-contained",
+  "exclusion": "No capture, key, complete case/plan/expected object, export, PDML, image, binary or log"
+}

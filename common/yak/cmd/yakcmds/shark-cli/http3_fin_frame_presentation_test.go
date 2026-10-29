@@ -69,6 +69,15 @@ func TestHTTP3PartialFrameIPCUsesItsOwnByteArena(t *testing.T) {
 			require.Equal(t, "authenticated STREAM observation", row.ProtocolScope)
 			require.Contains(t, row.Info, "no application frames replayed")
 			require.False(t, bytes.Equal(sources[0].Data, []byte{0x40}))
+			native.Session["HTTP3 Wire Observation"] = "prefix-missing"
+			native.Session["HTTP3 Stream Kind"] = "client-bidirectional"
+			live = packetPresentation{}
+			live.add(native)
+			row = live.apply(packetSummary{Protocol: "UDP", Transport: "udp"})
+			require.Equal(t, "HTTP/3", row.Protocol)
+			require.Contains(t, row.Info, "stream prefix missing")
+			require.Contains(t, row.Info, "awaiting reassembly")
+			require.Contains(t, row.ProtocolEvidence, "message and extension unknown")
 			return
 		}
 	}

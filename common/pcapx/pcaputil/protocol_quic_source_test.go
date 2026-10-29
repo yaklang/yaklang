@@ -134,4 +134,19 @@ func TestHTTP3BlockedHeaderKeepsOriginalWireSourceAfterQPACKRecovery(t *testing.
 	require.Equal(t, block[2:], hf["QPACK Block"])
 	require.Empty(t, q.streams[0].sources[0].ranges)
 	require.Empty(t, q.streams[6].sources[0].ranges)
+	// The encoder PDU completes decompression of the original field section.
+	// Its newly decoded method is a PDU occurrence, not inherited stream state.
+	e := &ProtocolEvent{ID: 13, Protocol: "http3", Completeness: "envelope", Raw: []byte("ciphertext"), Session: info}
+	snapshot := e.DisplayFieldValues()
+	require.Equal(t, []any{"GET"}, snapshot.FieldMap()["http.request.method"])
+	for _, value := range snapshot.Values {
+		if value.Name == "http.request.method" {
+			require.Nil(t, value.Range, "a recovered header has no invented method span in encoder ciphertext")
+		}
+	}
+	filter, err := CompileDisplayFilter(`http.request.method == "GET"`)
+	require.NoError(t, err)
+	require.True(t, filter.Match(e))
+	duplicate := feed(14, 0, 6, 0, encoder[:8], false)
+	require.Empty(t, (&ProtocolEvent{Protocol: "http3", Session: duplicate}).DisplayFields()["http.request.method"])
 }

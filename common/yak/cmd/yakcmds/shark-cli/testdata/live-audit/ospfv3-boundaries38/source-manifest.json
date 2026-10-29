@@ -1,0 +1,178 @@
+{
+  "scope": "Unmodified historical source only; complete frozen plans, expected objects and results stay external",
+  "source_files": 28,
+  "source_bytes": 177304,
+  "immutable_sources": [
+    {
+      "path": "boundary/build_boundary_field_grid.py",
+      "bytes": 10917,
+      "SHA256": "e8d4bdd05b0ba953b2f5d1b6349630f2db4050c0e9f9fdbf76429b44d89b75c2",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/build_boundary_field_grid.py"
+    },
+    {
+      "path": "boundary/close_boundary_results04.py",
+      "bytes": 6100,
+      "SHA256": "86b0e6b87579bf73831d23bd4fd8937e4e3337b666fedbdd1dc3c46fce23e998",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/close_boundary_results04.py"
+    },
+    {
+      "path": "boundary/close_boundary_sources03.py",
+      "bytes": 7539,
+      "SHA256": "88775f498ecfedfad5a70b8aed4f3c44616edf1bf079f48dcb431ff9b74d29ed",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/close_boundary_sources03.py"
+    },
+    {
+      "path": "boundary/close_source_revisions01.py",
+      "bytes": 2354,
+      "SHA256": "7278ef8b7e06ada02419f273341e2aae536d7de1299785de6d7636505f551615",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/close_source_revisions01.py"
+    },
+    {
+      "path": "boundary/correct_snapshot_metadata_policy02.py",
+      "bytes": 5098,
+      "SHA256": "e312edb3be81f65a34d52f9711c8acfedb75841b53cb91dc10b428d4ebfb7faf",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/correct_snapshot_metadata_policy02.py"
+    },
+    {
+      "path": "boundary/prepare_controls.py",
+      "bytes": 12734,
+      "SHA256": "339b7b173149498955a19c1360dd9080847d9c931549d039a454894bd7cdef00",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/prepare_controls.py"
+    },
+    {
+      "path": "boundary/prepare_controls02.py",
+      "bytes": 13294,
+      "SHA256": "8b2fca76963ac98f1751c7a62b34ea2baa7d955d0d8a250ee3ff14b3537ccb59",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/prepare_controls02.py"
+    },
+    {
+      "path": "boundary/prepare_controls03.py",
+      "bytes": 13960,
+      "SHA256": "502035007fa50130908fc96cc5675e349b6844e8762b1528e095ca2e04db415f",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/prepare_controls03.py"
+    },
+    {
+      "path": "boundary/prepare_direct_metadata_adapter02.py",
+      "bytes": 3605,
+      "SHA256": "22f858426e5dcb96f71d1ffd1e9ec1e5a6e0f6a7be6e7015c16139f5506276a6",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/prepare_direct_metadata_adapter02.py"
+    },
+    {
+      "path": "boundary/run_native_CLI_source03.py",
+      "bytes": 4035,
+      "SHA256": "967568bb114deb986fca65460cc24cacced485f1d9b7f8d80b8e1613b5e7bbba",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/run_native_CLI_source03.py"
+    },
+    {
+      "path": "boundary/run_prefix_reference03.py",
+      "bytes": 4649,
+      "SHA256": "ef93a5d1d307bc12ac959c25b08eb5516b260d2a48e80449f780bd1fd892a1d4",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/run_prefix_reference03.py"
+    },
+    {
+      "path": "boundary/run_reference02.py",
+      "bytes": 5570,
+      "SHA256": "e9df0c4323c69b301d68f749f08a623824685d807dcff4c1e6f73fee4b8b22a7",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/run_reference02.py"
+    },
+    {
+      "path": "boundary/selftest_boundary_verifier01.py",
+      "bytes": 6256,
+      "SHA256": "7c9438647eedd038d63e14054a3242d2cf3b86a8f40c6d6929ada0f2012ae937",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/selftest_boundary_verifier01.py"
+    },
+    {
+      "path": "boundary/verify_boundary_fields01.py",
+      "bytes": 15737,
+      "SHA256": "a4604d3ef75563bd619bcb8afaf11ad82917e484e94d5bc84249f2dacc0b3804",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/verify_boundary_fields01.py"
+    },
+    {
+      "path": "boundary/verify_boundary_fields02.py",
+      "bytes": 16177,
+      "SHA256": "1eedc0cd7367b2ba2556de9d7e30ea51a3f4e6c850bff3e044c538b1e186d5f3",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/verify_boundary_fields02.py"
+    },
+    {
+      "path": "boundary/verify_direct_fields01.py",
+      "bytes": 5235,
+      "SHA256": "1a0b6ed40459384baf3574a0aee2c3412e3a7ffd848a186888c4032334d437fc",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/verify_direct_fields01.py"
+    },
+    {
+      "path": "boundary/verify_direct_fields02.py",
+      "bytes": 6121,
+      "SHA256": "3b909196890535c2704ce17a195ad4b6c273f4762558e75b0ba23075dbaebae9",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/verify_direct_fields02.py"
+    },
+    {
+      "path": "boundary/verify_reference_checksum_owners.py",
+      "bytes": 5681,
+      "SHA256": "9fb72b4698e028bddd12066646d1269eb86a5745f5d606ef0a331f1dfd39e77c",
+      "original_external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/verify_reference_checksum_owners.py"
+    },
+    {
+      "path": "build_OSPF_direct38.py",
+      "bytes": 561,
+      "SHA256": "429451083e9da75c1998d8367dafb60709d3e7dcb88c3f42413fa860f899eb55",
+      "original_external_relative_name": "build_OSPF_direct38.py"
+    },
+    {
+      "path": "ospfv3_direct_boundary_probe38.go",
+      "bytes": 2840,
+      "SHA256": "76060b1a7acc8df79205dda87045fced03ae50d1877771c2cd7751fe631fa9bd",
+      "original_external_relative_name": "ospfv3_direct_boundary_probe38.go"
+    },
+    {
+      "path": "run_OSPF_direct38.py",
+      "bytes": 2661,
+      "SHA256": "5c9ba70952b170371eedd2d6265657ec6d067ef6d023602e9a84109a6758e083",
+      "original_external_relative_name": "run_OSPF_direct38.py"
+    },
+    {
+      "path": "prepare_OSPF_boundary_UI38.py",
+      "bytes": 4069,
+      "SHA256": "4ff137aa3c7dd7ae68defd875607c7dc6f103410722ad0558c2e1dccaddfa34c",
+      "original_external_relative_name": "prepare_OSPF_boundary_UI38.py"
+    },
+    {
+      "path": "prepare_Windows_OSPFv3_38.py",
+      "bytes": 4061,
+      "SHA256": "59df7763ef4ca7c87df78f422ff3afabb67be022f7d4fe4ddc4f648de4379469",
+      "original_external_relative_name": "prepare_Windows_OSPFv3_38.py"
+    },
+    {
+      "path": "run_Windows_OSPFv3_38.py",
+      "bytes": 4316,
+      "SHA256": "c1555f6fbdc98958874fab50242c0f19a26c33ff85e36c89f37eeea78912efae",
+      "original_external_relative_name": "run_Windows_OSPFv3_38.py"
+    },
+    {
+      "path": "run_Windows_OSPFv3_boundary38.py",
+      "bytes": 4281,
+      "SHA256": "2b144166662ab6a461552e493886bfaed35f2dc82d9c560479c8e851d4622b93",
+      "original_external_relative_name": "run_Windows_OSPFv3_boundary38.py"
+    },
+    {
+      "path": "verify_Windows_OSPFv3_38.py",
+      "bytes": 3728,
+      "SHA256": "2f8fa4e03e6f6ce74f9bd41a5c62b48800a0d1973885159737531075fa0f86d2",
+      "original_external_relative_name": "verify_Windows_OSPFv3_38.py"
+    },
+    {
+      "path": "verify_Windows_OSPFv3_boundary38.py",
+      "bytes": 2413,
+      "SHA256": "bcb0c34c661d0f1010508f375ba949353fc912a04d5df867c1314e83483a5afb",
+      "original_external_relative_name": "verify_Windows_OSPFv3_boundary38.py"
+    },
+    {
+      "path": "replay_protected_TLS_QUIC38.py",
+      "bytes": 3312,
+      "SHA256": "7b46573b0cfa7207d25a87550394a60daabc285a82a4ad3aacc5e5302b4a0861",
+      "original_external_relative_name": "replay_protected_TLS_QUIC38.py"
+    }
+  ],
+  "controller_SHA256": "0ce4dabb1ee4cd2571a29f0444f2d2f77450a303b1acdd862ad1e26988b108fd",
+  "external_dependencies": "Original capture/key logs, frozen source39/OSPF source grids, build/execution receipts and shared recovery/audit helpers must be separately supplied; archive is not self-contained",
+  "exclusion": "No capture, key, complete case/plan/expected object, export, PDML, image, binary or log"
+}

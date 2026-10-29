@@ -1,20 +1,30 @@
 package pcaputil
 
-// Preserve a stream's observed application identity when reassembly delivers no
-// new contiguous bytes. This is a wire observation, never another decoded frame.
-// Missing prefixes on a new stream/connection cannot borrow another's identity.
+// Preserve application identity when reassembly delivers no new contiguous
+// bytes. Authenticated h3 ALPN also identifies a client bidirectional stream's
+// connection before its prefix arrives, but not its HTTP message or extension.
+// This projection never creates framing state or replays an application frame.
 func (q *binQUIC) observeKnownHTTP3Wire(st *quicStream, dir int, sid, off uint64, length int, fr, info map[string]any) {
-	if q.alpn != "h3" || st.h3 == nil || length == 0 {
+	if q.alpn != "h3" || length == 0 {
 		return
 	}
 	h3 := st.h3
-	known := h3.kind == "request" || h3.kind == "control" || h3.kind == "encoder" || h3.kind == "decoder" || h3.blocked[dir] || h3.framingFailure[dir] || h3.fieldFailure[dir] != ""
-	if !known {
-		return
-	}
+	known := h3 != nil && (h3.kind == "request" || h3.kind == "control" || h3.kind == "encoder" || h3.kind == "decoder" || h3.blocked[dir] || h3.framingFailure[dir] || h3.fieldFailure[dir] != "")
 	kind := "buffered-range"
-	if off+uint64(length) <= uint64(len(st.reassembly[dir].data)) {
+	streamKind := "client-bidirectional"
+	if !known {
+		// RFC 9114 section 6.1 defines the base request-stream role. Missing
+		// bytes cannot distinguish its framing from an extension such as
+		// WebTransport, nor identify an unidirectional stream's type.
+		if !q.native || sid&3 != 0 || len(st.reassembly[dir].data) != 0 {
+			return
+		}
+		kind = "prefix-missing"
+	} else if off+uint64(length) <= uint64(len(st.reassembly[dir].data)) {
 		kind = "retransmission"
+	}
+	if known {
+		streamKind = h3.kind
 	}
 	fr["HTTP3"], info["HTTP3"] = true, true
 	fr["HTTP3 Wire Observation"] = kind
@@ -23,11 +33,11 @@ func (q *binQUIC) observeKnownHTTP3Wire(st *quicStream, dir int, sid, off uint64
 	} else {
 		info["HTTP3 Wire Observation"] = kind
 	}
-	fr["HTTP3 Stream Kind"] = h3.kind
+	fr["HTTP3 Stream Kind"] = streamKind
 	// A later duplicate or buffered range must not replace metadata belonging
 	// to a newly decoded application frame elsewhere in this packet.
 	if _, exists := info["HTTP3 Stream ID"]; !exists {
-		info["HTTP3 Stream ID"], info["HTTP3 Stream Kind"] = sid, h3.kind
+		info["HTTP3 Stream ID"], info["HTTP3 Stream Kind"] = sid, streamKind
 	}
 	info["Protocol Transition"] = "quic->http3"
 }
