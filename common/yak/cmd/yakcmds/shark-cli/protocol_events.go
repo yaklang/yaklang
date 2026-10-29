@@ -286,7 +286,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateDNS ...boo
 					}
 				}
 				if protocol == "rsvp" {
-					order := map[string]int{"Object Name": 0, "Header": 1, "Body": 2, "Addresses": 3}
+					order := map[string]int{"Object Name": 0, "Service Name": 0, "Parameter Name": 0, "Header": 1, "Intserv Header": 1, "Body": 2, "Addresses": 3, "Services": 3, "Parameters": 3, "Value": 0, "IEEE754 Bits": 1, "Classification": 2, "Units": 3}
 					if rank, ok := order[keys[i]]; ok {
 						a = rank
 					}

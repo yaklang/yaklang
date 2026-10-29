@@ -28,3 +28,15 @@ func TestRSVPObservedCanonicalAndCatalog(t *testing.T) {
 	}
 	require.True(t, found)
 }
+
+func TestRSVPIntservCanonicalRetainsExactFloatStructure(t *testing.T) {
+	w := []byte{0x10, 1, 0, 0, 64, 0, 0, 44, 0, 36, 12, 2, 0, 0, 0, 7, 1, 0, 0, 6, 127, 0, 0, 5, 0x45, 0xbb, 0x80, 0, 0x45, 0xbb, 0x80, 0, 0x7f, 0x80, 0, 0, 0, 0, 0, 1, 0, 0, 5, 0xdc}
+	v, err := ParseStructured(w, "rsvp_observed", "RSVPControlFields")
+	require.NoError(t, err)
+	want, err := stream_parser.DecodeRSVPWire(w, 4096)
+	require.NoError(t, err)
+	require.Equal(t, want, v["fields"].(map[string]any)["Message"])
+	services := want["Objects"].([]map[string]any)[0]["Body"].(map[string]any)["Services"].([]map[string]any)
+	parameter := services[0]["Parameters"].([]map[string]any)[0]["Body"].(map[string]any)
+	require.Equal(t, "+Infinity", parameter["Peak Data Rate"].(map[string]any)["Value"])
+}
