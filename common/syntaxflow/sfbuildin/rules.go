@@ -222,21 +222,12 @@ func syncRuleFromFileSystemToDB(db *gorm.DB, fsInstance filesys_interface.FileSy
 		files[res.index].rule = res.rule
 	}
 	compileCost := time.Since(compileStart)
-	// The whole internal rule set is in memory here: reused stored rules plus
-	// freshly compiled ones. Reject a cyclic <include(...)> graph before
-	// deleting or writing any rule; when replacing the builtin snapshot, a
-	// compile failure aborts the sync too.
-	syncRules := make([]*schema.SyntaxFlowRule, 0, len(files))
-	for i := range files {
-		if err := compileErrs[i]; replaceBuiltins && err != nil {
-			return utils.Wrapf(err, "compile builtin rule %s", files[i].name)
+	if replaceBuiltins && firstErr != nil {
+		for i := range files {
+			if err := compileErrs[i]; err != nil {
+				return utils.Wrapf(err, "compile builtin rule %s", files[i].name)
+			}
 		}
-		if files[i].rule != nil {
-			syncRules = append(syncRules, files[i].rule)
-		}
-	}
-	if err := sfdb.CheckIncludeCycles(syncRules); err != nil {
-		return utils.Wrap(err, "check builtin rule include graph")
 	}
 	if replaceBuiltins {
 		if err := sfdb.DeleteBuildInRuleWithDB(db); err != nil {

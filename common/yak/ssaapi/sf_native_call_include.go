@@ -200,10 +200,6 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	// is computed directly; otherwise identical concurrent misses share one
 	// computation through includeFlight.
 	config := frame.GetConfig()
-
-	// Cycles are rejected when the built-in rule set is synced
-	// (sfdb.CheckIncludeCycles). A cycle that reaches a scan another way
-	// (user/task-local/bulk rules) waits here until the rule ctx is canceled.
 	ctx := config.GetContext()
 	if ctx == nil {
 		ctx = context.Background()
