@@ -14,7 +14,7 @@ import (
 // connection state, rather than hoping random bytes discover an SMB signature.
 func FuzzSMB2StatefulBodySources(f *testing.F) {
 	fid := bytes.Repeat([]byte{1}, 16)
-	for kind, wire := range [][]byte{smb2NegotiateResp(0x0202), smb2CreateResp(3, 17, 7, fid), smb2CloseResp(4, 17, 7, nil)} {
+	for kind, wire := range [][]byte{smb2NegotiateResp(0x0202), smb2CreateResp(3, 17, 7, fid), smb2CloseResp(4, 17, 7, nil), smb2QueryResponse(5, 17, 7, 0, []byte{1, 2, 3, 4})} {
 		f.Add(uint8(kind), bytes.Clone(wire[68:]), uint8(7))
 	}
 	f.Add(uint8(1), []byte{89, 0}, uint8(1))
@@ -27,7 +27,7 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		smb2ChainFeed(t, session, 1, smb2NegotiateResp(0x0202))
 		command, mid, sid, tid := uint16(0), uint64(1), uint64(0), uint32(0)
-		switch kind % 3 {
+		switch kind % 4 {
 		case 0:
 			smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		case 1:
@@ -38,6 +38,9 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 			smb2ChainFeed(t, session, 0, smb2Create(3, 17, 7, "fuzz.txt"))
 			smb2ChainFeed(t, session, 1, smb2CreateResp(3, 17, 7, fid))
 			smb2ChainFeed(t, session, 0, smb2Close(4, 17, 7, fid))
+		case 3:
+			command, mid, sid, tid = 16, 5, 17, 7
+			smb2ChainFeed(t, session, 0, smb2QueryRequest(5, 17, 7, 1, 0x22, nil))
 		}
 		wire := smb2TCP(append(smb2Hdr(command, smb2FlagResp, mid, sid, tid), body...))
 		for at := 0; at < len(wire); {
@@ -72,7 +75,7 @@ func smb2FuzzOwnedRanges(t *testing.T, value any, size int) {
 	switch value := value.(type) {
 	case map[string]any:
 		if ranges, ok := value["Wire Field Ranges"].(map[string]any); ok {
-			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID"} {
+			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID", "Request Info Type", "Request File Info Class", "Request Additional Information", "Request Query Flags", "Request Output Buffer Length", "Request Message ID"} {
 				require.NotContains(t, ranges, forbidden)
 			}
 			for _, span := range ranges {

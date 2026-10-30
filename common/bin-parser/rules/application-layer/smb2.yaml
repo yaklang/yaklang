@@ -2,6 +2,16 @@ endian: little
 Package:
   SMB2:
     operator: |
+      // Select the header union from observed flags, then recover the peek.
+      // No temporary field, reader movement or guessed Status is published.
+      probe, trial = this.TryProcessByType("SMB2HeaderFlags")
+      if !trial.OK {
+        trial.Recovery()
+        panic("smb2: incomplete header flags")
+      }
+      observedFlags = probe.Child("Flags").Value
+      err = trial.Recovery()
+      if err != nil { panic(err) }
       this.ProcessSubNode("ProtocolId")
       magic = getNodeResult("ProtocolId").Value
       if magic != 0x424d53fe {
@@ -12,14 +22,24 @@ Package:
         panic("smb2: header StructureSize must be 64")
       }
       this.ProcessSubNode("CreditCharge")
-      this.ProcessSubNode("Status")
+      if observedFlags & 0x1 != 0 {
+        this.ProcessSubNode("Status")
+      } else {
+        this.ProcessSubNode("ChannelSequence")
+        this.ProcessSubNode("Reserved")
+      }
       this.ProcessSubNode("Command")
       this.ProcessSubNode("Credit")
       this.ProcessSubNode("Flags")
       this.ProcessSubNode("NextCommand")
       this.ProcessSubNode("MessageId")
-      this.ProcessSubNode("ProcessId")
-      this.ProcessSubNode("TreeId")
+      flags = getNodeResult("Flags").Value
+      if flags & 0x2 != 0 {
+        this.ProcessSubNode("AsyncId")
+      } else {
+        this.ProcessSubNode("ProcessId")
+        this.ProcessSubNode("TreeId")
+      }
       this.ProcessSubNode("SessionId")
       this.ProcessSubNode("Signature")
       cmd = getNodeResult("Command").Value
@@ -82,6 +102,19 @@ Package:
       if cmd == 13 {
         this.ProcessByType("Echo")
       }
+      if cmd == 16 {
+        if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("smb2 query info: explicit command boundary required") }
+        end = this.GetMaxLength()
+        next = int(getNodeResult("NextCommand").Value)
+        if next != 0 {
+          if next < 64 || next % 8 != 0 || next > end - 64 { panic("smb2 query info: invalid compound boundary") }
+          end = next
+        }
+        if end <= 64 { panic("smb2 query info: missing body") }
+        query = this.GetSubNode("Query Info")
+        query.SetMaxLength(end - 64)
+        query.Process()
+      }
       next = getNodeResult("NextCommand").Value
       if next != 0 && this.HasMaxLength() && this.GetMaxLength() > this.Length() {
         rest = this.GetMaxLength() - this.Length()
@@ -94,16 +127,32 @@ Package:
     StructureSize: uint16
     CreditCharge: uint16
     Status: uint32
+    ChannelSequence: uint16
+    Reserved: uint16
     Command: uint16
     Credit: uint16
     Flags: uint32
     NextCommand: uint32
     MessageId: uint64
+    AsyncId: uint64
     ProcessId: uint32
     TreeId: uint32
     SessionId: uint64
     Signature: raw,16
+    Query Info:
+      operator: |
+        flags = int(getNodeResult("../Flags").Value)
+        status = 0
+        if flags & 1 != 0 { status = getNodeResult("../Status").Value }
+        err = parseSMB2QueryInfoBody((flags & 1) != 0, status)
+        if err != nil { panic(err) }
     Compound Tail: raw
+SMB2HeaderFlags:
+  operator: |
+    this.ProcessSubNode("Prefix")
+    this.ProcessSubNode("Flags")
+  Prefix: raw,16
+  Flags: uint32
 Negotiate Request:
   operator: |
     this.ProcessSubNode("StructureSize")

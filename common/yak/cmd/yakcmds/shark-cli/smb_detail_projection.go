@@ -1,7 +1,9 @@
 package sharkcli
 
 import (
+	"bytes"
 	"encoding/binary"
+	"encoding/hex"
 	"reflect"
 	"sort"
 	"strings"
@@ -181,6 +183,9 @@ func smbDisplayPruneAliases(values map[string]any, raw []byte, depth int) map[st
 			}
 		}
 	}
+	if smbDisplayQueryFileIDAlias(values, raw) {
+		omitted["FileId"] = true
+	}
 	out := smbDisplayWithout(values, omitted)
 	if len(commands) > 0 {
 		out = smbDisplayCopy(out)
@@ -200,6 +205,29 @@ func smbDisplayPruneAliases(values map[string]any, raw []byte, depth int) map[st
 		}
 	}
 	return out
+}
+
+// QUERY_INFO retains the SDK's historical hex FileId alongside its shared
+// codec's raw body leaf. This explicit lossless bridge is restricted to that
+// request field and its exact command-relative location; arbitrary text/bytes
+// equality, different types or another PDU cannot authorize deduplication.
+func smbDisplayQueryFileIDAlias(values map[string]any, raw []byte) bool {
+	header, _ := values["Header"].(map[string]any)
+	if header["Command"] != uint16(16) || values["Response"] != false {
+		return false
+	}
+	body, _ := values["Body"].(map[string]any)
+	fid, ok := body["File ID"].([]byte)
+	legacy, text := values["FileId"].(string)
+	if !ok || !text || len(fid) != 16 || legacy != hex.EncodeToString(fid) {
+		return false
+	}
+	if !reflect.DeepEqual(smbDisplayRange(values, "FileId"), smbDisplayRange(body, "File ID")) || !smbDisplayOwnedRange(body, "File ID", len(raw)) {
+		return false
+	}
+	base := detailWireRanges(header["Wire Field Ranges"])["Protocol ID"]
+	span := detailWireRanges(body["Wire Field Ranges"])["File ID"]
+	return len(base) == 2 && span[0] == base[0]+88 && span[1] == base[0]+104 && bytes.Equal(fid, raw[span[0]:span[1]])
 }
 
 // Called only while the parent owns the original Go types. In particular a
