@@ -51,9 +51,10 @@ func (u *tui) streamEvidenceRows() []streamLine {
 			}
 			add("Validation: complete start line + syntactically valid HTTP headers; body bytes are not proof of HTTP.", inkMuted)
 		} else {
-			add("No complete, valid HTTP header at this captured prefix.", inkMuted)
 			if name := sniffStreamPayload(data, v.ports[d], v.ports[1-d]); name != "" {
 				add("Prefix signature: "+name, style)
+			} else {
+				add("Protocol at captured offset 0 is not identified.", inkMuted)
 			}
 		}
 		add("Raw first 32 bytes (hex):", inkMuted)
