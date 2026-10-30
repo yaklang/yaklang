@@ -42,7 +42,11 @@ canonical 的旧 `Compound Tail` 仍是 raw；本批共享正文 codec 对首命
 `0e182897e8fdb484a346ddad10b08ae4f99230b19e7d6bf57b7fe3da4b696a3f`；
 contract SHA256 `cf41b8a9afbdfa916dc406c3c6c754d8ccb29bbafec6f3d4ed4dfdbf731dc6af`。
 同一冻结 checker 对 dd63 实际导出的基线为 93/93 来源、0 实际值错误、113 个正文
-未发布缺口；新候选尚须独立执行，不能把 checker 控制或基线来源匹配算成产品验收。
+未发布缺口。`60c87b9ec540d434b81696a53e8045bc9dad3a95` 的新构建 SDK 实际回放后，
+93/93 PDU、113 个唯一命令和731个唯一固定字段通过，0值/范围错误、0选定正文缺口。
+8382个断言包含兼容根副本；125次命令检查/809次字段检查不能当作唯一数量。
+仅关闭选定 envelope，七种高级类型化内容仍未验收。外部审计为 `M2-QI-audit62-01`，
+事件文件 SHA256 `a2b3ecea69faa522017b39819019d4a4202be195a3c856b65cf92fea52f1323b`。
 
 请求全部 VLAN81，响应全部 VLAN80。原完整 Wireshark 参考中的 112 个响应 selector
 装饰来自跨域请求，不是响应字面字段；即使 PDML 带 pos/size，也不能伪造对应范围。
@@ -77,9 +81,39 @@ Flags 值后，SMB/canonical/embed 矩阵319项通过，日志 SHA256
 `f77780f164bb6413397c0490873fc0f1e9778c849bad3b6b538c0bfe6c0eacee`；
 原调整前994项结果亦保留。最终提交仍需新 CI，不作最新提交完整通过的替代。
 
-待闭合：本批精确 SHA CI；新构建大包113命令/731字段和原281来源门；新的 Windows
-QUERY_INFO body 选择/高亮；新增 fuzz 入口的实际覆盖引导执行。来源资料、单测和旧 SHA
-成功均不能替代这些实际执行。M2-04 的完整字段、连接/会话、TLS/QUIC 高级恢复继续开放。
+## 新构建实际闭合及保留差异
+
+60c87b9 的 SDK/flow/CLI 都重新构建并完整执行 Weber 捕获，三个进程均 exit0。
+同一旧 checker04 的5个offer、107个focus记录/121头和全部281来源门通过；仍保留
+1400个原始缺口（1353未发表/47范围未映射）。独立复核其中392个旧 QUERY_INFO
+映射缺口：56请求×7字段均已发表、拥有字节/Go类型/范围正确；434发表副本包含42次
+兼容重复。原报告不改写，另列392项适配映射闭合及剩余1008项（961未发表/47范围）。
+此修正没有关闭高级内容、其余命令或会话差异。独立闭合 SHA256
+`99fdf6f3eef5de2cb9ba93935027188164a2d11ba307a81f77c84c967c75a3d6`。
+
+dd63→60的42223个SDK事件逐对象比较：42130完全相同、93个仅SMB2字段变化；
+每个事件的ID、原字节、捕获域、流及端点/来源保持。两个完整CLI/flow文件分别逐字节相同。
+M1→60的51328个物理CLI行保持数量，42865行相同、8463行变化（包含PDU/parent ID）；
+NTLMSSP 5→9、SMB 10→39、SMB2 156→269、TCP 8890→8728。输出差异账本不替代字段正确性，
+完整语义ID归因仍开放。摘要 SHA256
+`6c74f3c6b3cde9e987cf00efe2a651c370159ba594c8b7b425c45d71e235983f`。
+
+实际Windows页使用原捕获无损1391帧窗口，原41363帧对应窗口1389，三命令PDU保留316字节。
+选择第二个QUERY_INFO的InfoType时，仅拥有的 `[174,175)`/0xAE高亮，不能借第一个70或
+第三个278处的相同字段。Header→Body→上下文、raw/hex FileID消重、完整物理/PDU字节、
+鼠标/Tab/resize/CP936恢复通过。主线程实际查看生成的控制台cells/attributes页面；
+没有把该渲染图描述成Windows Terminal像素截图。闭合 SHA256
+`a84418f15f2eaa705bd13979de599099c69f088283c885c5b63b4694f21845a3`。
+
+新QUERY_INFO入口的覆盖插桩fuzz实际90秒、86654次/38新覆盖输入、0fail，
+日志 SHA256 `3465673a69a5010673f4441c89cf04f2daed1b56d1ced30cb56843e9923259a4`。
+源码、规则与HEAD在各次Go/回放/控制台执行中冻结；全部外部输出继续不入库。
+
+60c87b9的[完整traffic CI](https://github.com/yaklang/yaklang/actions/runs/41006822029)
+实际checkout和full v191已核对：312229 pass/25历史skip/0fail，131084必需测试全部通过；
+artifact SHA256 `2930c8f5a0c1a36cebb6b50e523dec36e4194f0a50668b5cd3487d6d1e016dea`。
+该提交的Essential仍失败于SSA `TestParseProject/parse_project_with_entry`，**不算CI全绿**。
+该问题及后续精确提交门归M2-28/M2-11。M2-04完整字段、连接/会话、TLS/QUIC高级恢复继续开放。
 
 规范：[MS-SMB2 QUERY_INFO request](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/d623b2f7-a5cd-4639-8cc9-71fa7d9f9ba9)、
 [response](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/3b1b3598-a898-44ca-bfac-2dcae065247f)、
