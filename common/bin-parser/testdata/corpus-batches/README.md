@@ -1,3 +1,21 @@
+# M1 physical storage
+
+The original batch index, logical paths, hashes, licenses, provenance and expected
+answers below remain unchanged. The 36 physical storage ZIPs now live as
+byte-identical members of `internal/trafficfixture/testdata/captures.zip`, together
+with the two formerly loose repository captures. The adjacent manifest preserves
+their full original repository paths, sizes and SHA256 hashes. Normal tests read
+the single central store through `internal/trafficfixture`; `ExportTools` restores
+old physical paths only inside a caller-owned temporary compatibility workspace.
+No large external audit capture or local keylog is added by this migration.
+
+Reproduce into a new private directory and compare both files:
+
+```sh
+python3 -B internal/trafficfixture/build_capture_store.py --output /tmp/new-capture-store/captures.zip
+go run ./internal/trafficfixture/cmd/corpus verify
+```
+
 # Versioned traffic corpus
 
 The current gate is **`required-tests-traffic-unified-v191.json`**. Chronological
