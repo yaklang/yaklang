@@ -387,12 +387,11 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByPatch(
 	loop *reactloops.ReActLoop,
 	action *aicommon.Action,
 	op *reactloops.LoopActionHandlerOperator,
-	actionName, filename, fullCodeVar, codeVar string,
+	actionName, filename, fullCodeVar, patchBody string,
 ) {
 	runtime := f.GetRuntime()
 	invoker := loop.GetInvoker()
 	reason := action.GetString("modify_code_reason")
-	patchBody := loop.Get(codeVar)
 
 	_, _, codeSegment, fixedCode := f.PrettifyCode(patchBody)
 	if fixedCode {
@@ -483,7 +482,7 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	loop *reactloops.ReActLoop,
 	action *aicommon.Action,
 	op *reactloops.LoopActionHandlerOperator,
-	actionName, filename, fullCodeVar, codeVar string,
+	actionName, filename, fullCodeVar, newCode string,
 ) {
 	runtime := f.GetRuntime()
 	invoker := loop.GetInvoker()
@@ -491,7 +490,6 @@ func (f *SingleFileModificationSuiteFactory) handleModifyByOldSnippet(
 	oldSnippet := action.GetString("old_snippet")
 	replaceAll := action.GetBool("replace_all")
 	reason := action.GetString("modify_code_reason")
-	newCode := loop.Get(codeVar)
 
 	_, _, codeSegment, fixedCode := f.PrettifyCode(newCode)
 	if fixedCode {
@@ -614,9 +612,9 @@ func (f *SingleFileModificationSuiteFactory) GetAITagOption() reactloops.ReActLo
 // GetActions returns all the file modification actions as ReActLoopOptions
 func (f *SingleFileModificationSuiteFactory) GetActions() []reactloops.ReActLoopOption {
 	return []reactloops.ReActLoopOption{
-		f.buildWriteAction(),
-		f.buildModifyAction(),
-		f.buildInsertAction(),
+		f.withNativeContent(f.buildWriteAction(), "write"),
+		f.withNativeContent(f.buildModifyAction(), "modify"),
+		f.withNativeContent(f.buildInsertAction(), "insert"),
 		f.buildDeleteAction(),
 	}
 }

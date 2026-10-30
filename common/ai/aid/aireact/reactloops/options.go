@@ -197,7 +197,7 @@ func WithRegisterLoopActionFromToolCustomized(tool *aitool.Tool, customize func(
 		}
 		name := tool.GetName()
 		if r.actions.Have(name) {
-			log.Errorf("loop action %s already registered", name)
+			r.actionRegistrationErr = utils.Errorf("loop action %q already registered; use WithOverrideLoopAction for an intentional replacement", name)
 			return
 		}
 		action := ConvertAIToolToLoopAction(tool)
@@ -214,7 +214,7 @@ func WithRegisterLoopActionFromToolCustomized(tool *aitool.Tool, customize func(
 func WithRegisterLoopActionWithStreamField(actionName string, desc string, opts []aitool.ToolOption, fields []*LoopStreamField, verifier LoopActionVerifierFunc, handler LoopActionHandlerFunc, customize ...func(*LoopAction)) ReActLoopOption {
 	return func(r *ReActLoop) {
 		if r.actions.Have(actionName) {
-			log.Errorf("loop action %s already registered", actionName)
+			r.actionRegistrationErr = utils.Errorf("loop action %q already registered; use WithOverrideLoopAction for an intentional replacement", actionName)
 			return
 		}
 		action := &LoopAction{

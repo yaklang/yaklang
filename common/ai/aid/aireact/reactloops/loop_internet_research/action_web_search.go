@@ -30,9 +30,9 @@ func makeWebSearchAction(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption 
 			aitool.WithParam_Description("最大搜索结果数，默认 5")),
 	}
 
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"web_search",
-		desc, toolOpts,
+		desc, toolOpts, nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action) error {
 			loop.UserStatus("正在确认搜索方向", "Confirming the search direction", aicommon.WithStatusCode("research.search.preparing"))
 			searchQuery := action.GetString("search_query")
@@ -187,6 +187,7 @@ Time: %s
 				op.Continue()
 			}
 		},
+		func(action *reactloops.LoopAction) { action.SourceToolName = "web_search" },
 	)
 }
 

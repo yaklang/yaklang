@@ -1,5 +1,5 @@
 // yak common/ai/aismoking/liteforge.yak
-// Default text and explicit dual protocols, plus isolated aim/public helpers.
+// Standalone text defaults, explicit dual protocols, and session-inheriting aim helpers.
 include "common/ai/aismoking/mock.inc"
 schema = `{"type":"object","properties":{"summary":{"type":"string"},"payload":{}},"required":["summary","payload"],"additionalProperties":true}`
 started = make(chan bool, 8)
@@ -19,7 +19,7 @@ func capture(reader) {
 }
 smokeHandler = func(w, body) {
     native = len(body.tools) == 1
-    assert native == expectedNative, "LiteForge protocol leaked from the parent or ignored an explicit option"
+    assert native == expectedNative, "LiteForge did not honor the session protocol or an explicit option"
     prompt = smokePrompt(body)
     assert body.model == "ai-smoking"
     assert body.messages[0].role == "system"
@@ -86,7 +86,7 @@ for task in ["extract", "classify", "summarize"] {
             c.Stateless = true
         })~
         fields = [jsonschema.paramString("summary",jsonschema.required(true)),jsonschema.paramRaw("payload",{},jsonschema.required(true))]
-        expectedNative = false
+        expectedNative = native
         action = engine.GetOperator().InvokeLiteForge(smokeCtx,"result",task + " 输入材料",fields)~
         assert action.GetString("summary") == "材料处理完成"
         assert action.GetInvokeParams("payload")["items"][1] == true

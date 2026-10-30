@@ -68,7 +68,11 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 
 			// 确定报告输出路径
 			reportPath := filepath.Join(auditDirPath, "security_audit_report.md")
-			_ = os.WriteFile(reportPath, []byte(""), 0o644)
+			state.SetFinalReport("")
+			if err := os.WriteFile(reportPath, []byte(""), 0o644); err != nil {
+				op.Failed(fmt.Errorf("initialize audit report: %w", err))
+				return
+			}
 			state.SetFinalReportPath(reportPath)
 
 			// 构建报告写作任务提示词
@@ -101,46 +105,64 @@ func BuildReportLoop(r aicommon.AIInvokeRuntime, state *model.AuditState, opts .
 			if err != nil {
 				log.Warnf("[CodeAudit/Phase4] Failed to create report_generating loop: %v", err)
 				r.AddToTimeline("[PHASE4_ERROR]", fmt.Sprintf("报告 loop 创建失败: %v", err))
-				op.Done()
+				op.Failed(err)
 				return
 			}
+			defer reportLoop.Release()
 
 			subTask := aicommon.NewSubTaskBase(task, "phase4-audit-report", writePrompt, true)
 			if err := reportLoop.ExecuteWithExistedTask(subTask); err != nil {
 				log.Warnf("[CodeAudit/Phase4] Report loop returned error: %v", err)
+				op.Failed(fmt.Errorf("generate audit report: %w", err))
+				return
+			}
+			if reportLoop.Get("report_finished") != "true" {
+				op.Failed("report loop ended without successfully finishing the report")
+				return
 			}
 
 			// 读取写入结果，同步到 state，并 Go 层校验报告是否覆盖全部应写入的 finding
-			if content, err := os.ReadFile(reportPath); err == nil && len(content) > 0 {
-				reportText := string(content)
-				repaired, missingIDs := model.RepairAuditReportCoverage(reportText, state.ReportableVerifiedVulns())
-				if len(missingIDs) > 0 {
-					if err := os.WriteFile(reportPath, []byte(repaired), 0o644); err != nil {
-						log.Warnf("[CodeAudit/Phase4] Failed to write repaired report: %v", err)
-					} else {
-						reportText = repaired
-						r.AddToTimeline("[PHASE4_REPORT_REPAIR]",
-							fmt.Sprintf("报告正文遗漏 %d 个 verified finding，已自动补录附录: %s",
-								len(missingIDs), strings.Join(missingIDs, ", ")))
-						log.Warnf("[CodeAudit/Phase4] Repaired report %s with %d missing findings: %v", reportPath, len(missingIDs), missingIDs)
-					}
-				}
-				// 覆盖状态兜底披露：存在未完成类别时强制追加机器准确的覆盖附录
-				// （AI 可能忽略 prompt 中的覆盖表；这一步不依赖 AI 自觉）。
-				if withAppendix, appended := model.AppendMissingCoverageAppendix(reportText, state); appended {
-					if err := os.WriteFile(reportPath, []byte(withAppendix), 0o644); err != nil {
-						log.Warnf("[CodeAudit/Phase4] Failed to write coverage appendix: %v", err)
-					} else {
-						reportText = withAppendix
-						r.AddToTimeline("[PHASE4_COVERAGE_APPENDIX]",
-							fmt.Sprintf("存在 %d 个未完整完成的类别扫描，已自动追加覆盖状态附录",
-								len(model.IncompleteScanObservations(state))))
-						log.Warnf("[CodeAudit/Phase4] Appended coverage appendix for %d incomplete categories", len(model.IncompleteScanObservations(state)))
-					}
-				}
-				state.SetFinalReport(reportText)
-				log.Infof("[CodeAudit/Phase4] Report saved: %s (%d bytes)", reportPath, len(reportText))
+			content, err := os.ReadFile(reportPath)
+			if err != nil {
+				op.Failed(fmt.Errorf("read completed audit report: %w", err))
+				return
 			}
+			if strings.TrimSpace(string(content)) == "" {
+				op.Failed("completed audit report is empty")
+				return
+			}
+			reportText := string(content)
+			repaired, missingIDs := model.RepairAuditReportCoverage(reportText, state.ReportableVerifiedVulns())
+			if len(missingIDs) > 0 {
+				if err := os.WriteFile(reportPath, []byte(repaired), 0o644); err != nil {
+					log.Warnf("[CodeAudit/Phase4] Failed to write repaired report: %v", err)
+					op.Failed(err)
+					return
+				} else {
+					reportText = repaired
+					r.AddToTimeline("[PHASE4_REPORT_REPAIR]",
+						fmt.Sprintf("报告正文遗漏 %d 个 verified finding，已自动补录附录: %s",
+							len(missingIDs), strings.Join(missingIDs, ", ")))
+					log.Warnf("[CodeAudit/Phase4] Repaired report %s with %d missing findings: %v", reportPath, len(missingIDs), missingIDs)
+				}
+			}
+			// 覆盖状态兜底披露：存在未完成类别时强制追加机器准确的覆盖附录
+			// （AI 可能忽略 prompt 中的覆盖表；这一步不依赖 AI 自觉）。
+			if withAppendix, appended := model.AppendMissingCoverageAppendix(reportText, state); appended {
+				if err := os.WriteFile(reportPath, []byte(withAppendix), 0o644); err != nil {
+					log.Warnf("[CodeAudit/Phase4] Failed to write coverage appendix: %v", err)
+					op.Failed(err)
+					return
+				} else {
+					reportText = withAppendix
+					r.AddToTimeline("[PHASE4_COVERAGE_APPENDIX]",
+						fmt.Sprintf("存在 %d 个未完整完成的类别扫描，已自动追加覆盖状态附录",
+							len(model.IncompleteScanObservations(state))))
+					log.Warnf("[CodeAudit/Phase4] Appended coverage appendix for %d incomplete categories", len(model.IncompleteScanObservations(state)))
+				}
+			}
+			state.SetFinalReport(reportText)
+			log.Infof("[CodeAudit/Phase4] Report saved: %s (%d bytes)", reportPath, len(reportText))
 
 			stats2 := state.GetStats()
 			emit.Phase4ReportComplete(loop, reportPath, stats2)

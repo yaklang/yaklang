@@ -51,6 +51,8 @@
 
 当报告内容很大（超过约 30KB）时，系统会自动分页显示。使用 `change_view_offset` action 导航：
 
+文本协议示例（原生模式调用同名工具，参数为 `offset_line=51`）：
+
 ```json
 {"@action": "change_view_offset", "offset_line": 51, "human_readable_thought": "查看第51行之后的内容"}
 ```
@@ -68,11 +70,25 @@
 
 检查和完善报告内容，直到满足质量要求后调用 `finish`。
 
-## AITAG 输出规则
+## 调用协议与正文传递
 
-**关键规则：写作类 Action 必须使用 AITAG！**
+报告循环继承会话的 `FunctionCallMode`，持久提示词和每轮动态提示词按此配置渲染。原生模式使用 function call 模板；文本模式使用 `@action` 模板。
 
-当使用 `write_section`、`modify_section`、`insert_section` 时，必须在 JSON 后输出 AITAG 包裹的内容：
+### 原生 function call 模式
+
+`write_section`、`modify_section`、`insert_section` 的正文通过每次调用的 `arguments.content` 传递，不展示 AITAG 输出规则、标签示例或文本协议的输出示例。工具 schema 将 `content` 声明为必填参数，执行器直接读取该参数。
+
+例如调用 `write_section`，解码后的 arguments 为：
+
+```json
+{"identifier":"write_report","content":"# 报告标题\n\n## 第一章\n报告内容...\n"}
+```
+
+修改时在 `content` 中传递补丁，或配合 `old_snippet` / 行号定位替换；插入时另传 `insert_line`。同轮多个编辑调用各自携带自己的 `content`。文件保存并核对后调用 `finish`。
+
+### 文本 @action 模式
+
+当使用 `write_section`、`modify_section`、`insert_section` 时，必须在 action JSON 后输出 AITAG 包裹的内容：
 
 ```
 {"@action": "write_section", "human_readable_thought": "创建报告初稿"}
