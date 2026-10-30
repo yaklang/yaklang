@@ -29,6 +29,21 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	// Response identity is checked against its hard format bound. Configured
+	// parser budgets still refuse it with a typed error before Node allocation;
+	// an otherwise valid over-budget response is not an unknown protocol.
+	if p := probeSMB1NegotiateExtendedResponse(wire, 65608); p.Verdict == ProbeAccept {
+		f.protocol, f.smb2 = "smb", &binSMB2{client: 1 - dir}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		// Complete fixed words and ByteCount can prove this finite prefix
+		// exceeds the caller's byte budget. Route it to a private resource
+		// refusal without buffering or decoding its unavailable payload.
+		if len(wire) >= 73 && (smb2DirectLength(wire)+4 > f.a.budget.MaxFrameBytes || smb2DirectLength(wire)+4 > f.a.config.MaxMessageBytes) {
+			f.protocol, f.smb2 = "smb", &binSMB2{client: 1 - dir}
+		}
+		return
+	}
 	// SMB2's fixed header is 68 bytes including Direct TCP, four more than
 	// the default generic probe window. Check that bounded header before
 	// clipping; a signature alone cannot establish this protocol.
@@ -800,14 +815,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb":
-		e.Session, err = decodeSMB1NegotiateFields(e.Raw, f.a.budget)
-		if err == nil {
-			e.Profile, e.Completeness = "cifs-negotiate-request", "message"
-			e.nativeSessionMessage = true
-			e.semanticFields, e.semanticSession = cloneSession(e.Session), cloneSession(e.Session)
-		}
+		err = f.consumeSMB1Negotiate(dir, e)
 	case "smb2":
 		err = f.consumeSMB2(dir, e)
+		if err == nil && f.smb2 != nil {
+			// A successfully accepted modern carrier makes any old legacy
+			// offer ineligible. Do not reuse its MID or infer an SMB2 dialect.
+			f.smb2.smb1Modern, f.smb2.smb1 = true, nil
+			err = f.smb2.reserveState(0)
+		}
 		if err == nil && f.nbss {
 			e.Session["Carrier"] = "NetBIOS Session Service"
 		}
@@ -1282,9 +1298,24 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
 		case "smb":
-			e.Summary = "SMB1 SMB_COM_NEGOTIATE · dialect offers"
-			if e.Session["SMB2 Upgrade Offered"] == true {
-				e.Summary += " · SMB2 upgrade offered"
+			if e.Session["Response"] == true {
+				body, _ := e.Session["Body"].(map[string]any)
+				blob, _ := body["Security Blob"].([]byte)
+				e.Summary = "SMB1 NEGOTIATE response"
+				if name, ok := e.Session["Selected Dialect Name"].(string); ok {
+					e.Summary += " · " + name
+				}
+				e.Summary += fmt.Sprintf(" · opaque security blob %d B · dialect index %v", len(blob), body["Dialect Index"])
+				if _, matched := e.Session["Selected Dialect Name"]; !matched {
+					if reason, ok := e.Session["Selection Status"].(string); ok {
+						e.Summary += " · " + reason
+					}
+				}
+			} else {
+				e.Summary = "SMB1 SMB_COM_NEGOTIATE · dialect offers"
+				if e.Session["SMB2 Upgrade Offered"] == true {
+					e.Summary += " · SMB2 upgrade offered"
+				}
 			}
 		case "smb2":
 			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])

@@ -1277,6 +1277,27 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		}
 	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
+	if f.protocol == "smb" && f.binding == nil && f.smb2 != nil {
+		// The native carrier was identified independently of the resource
+		// refusal. Keep that refusal private before any public cache/status.
+		// A clipped diagnostic is not an accepted response body.
+		e.nativeSessionMessage = true
+		e.Profile, e.Completeness = "smb-record-diagnostic", status
+		if status == "limited" {
+			e.Profile = "smb-record-resource-diagnostic"
+		}
+		e.SourceBytes.CompletedIn = nil
+		if e.sessionError == nil {
+			kind := ErrMalformedMessage
+			if status == "limited" {
+				kind = ErrResourceExceeded
+			} else if status == "context-required" {
+				kind = ErrContextRequired
+			}
+			e.sessionError = &ProtocolError{Kind: kind, Message: reason}
+		}
+		e.Error = e.sessionError.Error()
+	}
 	if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
@@ -1516,6 +1537,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}
+					// A response can be structurally identifiable yet exceed its
+					// parser frame budget. Keep only this finite format prefix so
+					// the completed record is refused as limited, not unrecognized.
+					if len(wire) < 65608 && len(wire) < a.config.MaxMessageBytes && probeSMB1NegotiateExtendedResponse(wire, 65608).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
@@ -1562,6 +1589,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		if n < 0 || n > a.config.MaxMessageBytes || f.protocol != "http2" && n > a.budget.MaxFrameBytes {
 			reason := fmt.Sprintf("declared message exceeds limit: message_bytes=%d max_message_bytes=%d", n, a.config.MaxMessageBytes)
+			if f.protocol == "smb" {
+				reason += fmt.Sprintf(" max_frame_bytes=%d", a.budget.MaxFrameBytes)
+			}
 			if h := d.http; f.protocol == "http" && h != nil && h.declared > 0 {
 				reason = fmt.Sprintf("HTTP declared message exceeds limit: message_bytes=%d max_message_bytes=%d; increase pcap_protocolBudget to decode the body", h.declared, a.config.MaxMessageBytes)
 			}
