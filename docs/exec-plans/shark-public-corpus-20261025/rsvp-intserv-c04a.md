@@ -102,8 +102,8 @@ c04a的四项CI全部首次通过：traffic40940218890、Essential40940153618、
 后续文档/源码归档提交的CI单独跟踪，不借c04a冒称新的HEAD已通过。
 
 [聚合证据](rsvp-intserv-c04a-summary.json)保存范围、版本和外部proof哈希。
-[纯源归档](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-intserv48/README.md)
-保留21个模型、适配器与检查器的原始源码，以及现有依赖。PCAP、密钥、完整来源/期望、
+[冻结归档](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)
+内的 `live-audit/rsvp-intserv48/` 保留21个模型、适配器与检查器的原始源码，以及现有依赖。PCAP、密钥、完整来源/期望、
 输出、日志、截图和二进制不进入仓库。
 
 旧原生 runner 的构建预检/检查器参数顺序失败、参考 mapping01 准备错误和 comparator01

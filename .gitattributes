@@ -17,21 +17,5 @@ common/bin-parser/testdata/protocol-native/** -text
 common/pcapx/pcaputil/testdata/protocol-sessions/**/*.keys -text
 # Independent TShark exports preserve empty trailing columns.
 scripts/protocol-tests/generate-dcerpc-session/*.tsv -text whitespace=-blank-at-eol
-# Audit helper hashes include source bytes and must survive Windows checkouts.
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/known_pdu_reference_paths*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/known_cli_pdu_reference_paths.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/esp_*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ip_refusal_*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/icmp_alias_cli_projection_audit.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ipv4_eol_cli_source_audit.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/whole_cli_generation_diff.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/icmpv6_*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/literal_own_header.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-
-# Source auditors whose exact bytes are pinned by public-corpus receipts.
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/icmp4_expected_source.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/icmpv4_*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/partial_cli_bridge.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/network23_*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/bounded_etherip*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
-common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/tcp-source/*.py -text whitespace=trailing-space,space-before-tab,cr-at-eol
+# Historical audit sources retain their exact bytes inside one frozen archive.
+common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip binary
