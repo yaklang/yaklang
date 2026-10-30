@@ -271,6 +271,11 @@ func (c *Config) parseProjectWithFSUnits(
 	handlerTotal := scanResult.HandlerTotal
 	preHandlerFileSet := scanResult.PreHandlerFileSet
 	handlerFiles := scanResult.HandlerFiles
+	handlerFiles, err = c.yakRootFiles(handlerFiles)
+	if err != nil {
+		return nil, err
+	}
+	handlerTotal = len(handlerFiles)
 	handlerFileSet := make(map[string]struct{}, len(handlerFiles))
 	for _, handlerFile := range handlerFiles {
 		handlerFileSet[handlerFile] = struct{}{}
@@ -747,6 +752,11 @@ func (c *Config) parseProjectWithFSLegacy(
 	folder2Save = append(folder2Save, scanResult.Folders...)
 	handlerTotal = scanResult.HandlerTotal
 	handlerFiles = scanResult.HandlerFiles
+	handlerFiles, err = c.yakRootFiles(handlerFiles)
+	if err != nil {
+		return nil, err
+	}
+	handlerTotal = len(handlerFiles)
 	handlerFileSet = make(map[string]struct{}, len(handlerFiles))
 	for _, handlerFile := range handlerFiles {
 		handlerFileSet[handlerFile] = struct{}{}
@@ -913,6 +923,11 @@ func (c *Config) parseProjectWithFSLegacy(
 							}
 						})
 					case !needsCompile && fileContent.Editor != nil:
+						if c.hasYakEntryFiles() {
+							// Registered source is available to include, but has not
+							// executed. Do not mark it visited through PopEditor.
+							break
+						}
 						rootEditor := fileContent.Editor
 						prog.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
 							prog.PushEditor(rootEditor)

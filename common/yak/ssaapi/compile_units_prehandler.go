@@ -237,6 +237,11 @@ func (env *prehandleBatchEnv) prehandleFile(fileContent *ssareducer.FileContent)
 				}
 			})
 		case !needsCompile && fileContent.Editor != nil:
+			if env.c.hasYakEntryFiles() {
+				// CreateEditor already retained this source. An unexecuted
+				// include target must not enter the compiled FileList.
+				break
+			}
 			rootEditor := fileContent.Editor
 			owner.RegisterDeferredBuild(ssa.DeferredBuildKindHelper, "extra-file:"+rootEditor.GetUrl(), func() {
 				owner.PushEditor(rootEditor)
