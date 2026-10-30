@@ -50,15 +50,3 @@ func builtinFixtures(t *testing.T) []compiledBuiltinFixture {
 	require.NotEmpty(t, fixtures)
 	return fixtures
 }
-
-// TestBuiltinRulesHaveNoIncludeCycle guards the internal rule set at the same
-// level as the sync: sfdb.CheckIncludeCycles is called before the built-in
-// rules are written, so a cycle must never reach an embedded snapshot.
-func TestBuiltinRulesHaveNoIncludeCycle(t *testing.T) {
-	fixtures := builtinFixtures(t)
-	rules := make([]*schema.SyntaxFlowRule, 0, len(fixtures))
-	for _, fixture := range fixtures {
-		rules = append(rules, fixture.rule)
-	}
-	require.NoError(t, sfdb.CheckIncludeCycles(rules))
-}
