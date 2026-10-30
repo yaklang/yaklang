@@ -1,4 +1,4 @@
-__DESC__ = "A unified text file (Absolute File Path) reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.) or Python scripts."
+__DESC__ = "A unified text file (Absolute File Path) reader that supports line-based and byte-chunk reading modes. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, query_excel_data, read_word_structure, parse_office_to_text, zip_viewer, load_pcapfile/query_pcapdb, etc.) or Python scripts."
 __VERBOSE_NAME__ = "File Reader"
 __VERBOSE_NAME_ZH__ = "文件读取"
 __KEYWORDS__ = "memory management,file reading,large file,file handling,reading,data processing,buffer,performance,offset,chunk size,streaming,line reading,binary detection,mimetype,excel,xlsx,pdf,docx,zip,pcap,office,read_excel_info,query_excel_data,parse_office_to_text"
@@ -300,11 +300,12 @@ if isBinaryFile {
     } else if ext == ".pcap" || ext == ".pcapng" || ext == ".cap" {
         suggestion = sprintf(
             "[Built-in Tool (Recommended)]\n" +
-            "  analyze_pcap - Analyze network packet capture:\n" +
-            "  Call tool \"analyze_pcap\" with params: {\"file\": \"%s\"}\n\n" +
-            "[Alternative: bash]\n" +
-            "  tcpdump -r '%s' -c 50",
-            t, t,
+            "  pcapdb traffic analysis system:\n" +
+            "  Call tool \"load_pcapfile\" with params: {\"pcapfile\": \"%s\"}\n" +
+            "  Use the returned dataset_id as id for \"query_pcapdb\" (metadata/protocols/fields/sessions/streams/details).\n" +
+            "  Or call \"query_pcapdb\" with pcapfile and query_type=metadata for automatic import.\n" +
+            "  Use \"manage_pcapdb\" to list, validate, export or delete datasets.",
+            t,
         )
     } else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" {
         suggestion = sprintf(

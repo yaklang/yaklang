@@ -43,6 +43,9 @@ func CreateAISearchTools[T AISearchable](searcher AISearcher[T], searchListGette
 				}
 				result := []any{}
 				for _, tool := range rspTools {
+					if toolName == SearchToolName && schema.AIToolDeprecationError(tool.GetName()) != nil {
+						continue
+					}
 					result = append(result, map[string]string{
 						"Name":        tool.GetName(),
 						"Description": tool.GetDescription(),
@@ -238,6 +241,9 @@ func searchTools(cfg *SearchCapabilitiesConfig, query string) string {
 		if err == nil && len(rspTools) > 0 {
 			buf.WriteString("### Matched Tools\n")
 			for _, tool := range rspTools {
+				if schema.AIToolDeprecationError(tool.GetName()) != nil {
+					continue
+				}
 				name := tool.GetName()
 				if vn := tool.GetVerboseName(); vn != "" {
 					name = vn + " (" + tool.GetName() + ")"

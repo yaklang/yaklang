@@ -81,17 +81,30 @@ func pcapAnalysisLeaves(value any, path string, leaves map[string]any) {
 }
 
 func TestPCAPAnalysisTools(t *testing.T) {
-	home := t.TempDir()
+	previous := schema.GetGormProfileDatabase()
+	previousPath := ""
+	if previous != nil {
+		previousPath = consts.GetCurrentProfileDatabasePath()
+	}
+	var previousProject consts.ProjectDatabaseBinding
+	if schema.GetGormProjectDatabase() != nil {
+		previousProject = consts.CaptureProjectDatabaseBinding()
+	}
+	home := filepath.Join(t.TempDir(), "流量分析 space #100% &")
+	require.NoError(t, os.MkdirAll(home, 0700))
 	t.Setenv("YAKIT_HOME", home)
 	consts.ResetYakitHomeOnce()
 	profile, err := gorm.Open("sqlite3", filepath.Join(home, "profile.sqlite"))
 	require.NoError(t, err)
-	previous, previousPath := schema.GetGormProfileDatabase(), consts.GetCurrentProfileDatabasePath()
 	require.NoError(t, pcapdb.ClosePCAPDatabases())
-	consts.BindProfileDatabase(profile, "")
+	consts.BindProfileDatabase(profile, filepath.Join(home, "profile.sqlite"))
+	// Bind both globals explicitly: lazy project initialization would otherwise
+	// open default-yakit.db inside the fixture and leak its handle on Windows.
+	consts.BindProjectDatabaseWithReader(profile, nil, filepath.Join(home, "profile.sqlite"))
 	t.Cleanup(func() {
 		require.NoError(t, pcapdb.ClosePCAPDatabases())
 		consts.BindProfileDatabase(previous, previousPath)
+		consts.BindProjectDatabaseWithReader(previousProject.Database, previousProject.ReadDatabase, previousProject.Path)
 		profile.Close()
 		consts.ResetYakitHomeOnce()
 	})
@@ -175,6 +188,19 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.Equal(t, id, same["dataset_id"])
 		meta := object(invoke("query_pcapdb", map[string]any{"pcapfile": copyPath, "query_type": "metadata"}))
 		require.Equal(t, id, meta["dataset_id"])
+		forwardSlash := object(invoke("load_pcapfile", map[string]any{"pcapfile": filepath.ToSlash(copyPath)}))
+		require.Equal(t, id, forwardSlash["dataset_id"])
+		// Keep this input in the process working directory so its name is truly
+		// relative even when the repository and TempDir are on different drives.
+		relative, err := os.CreateTemp(".", "pcapdb-relative-*.pcap")
+		require.NoError(t, err)
+		t.Cleanup(func() { _ = os.Remove(relative.Name()) })
+		_, err = relative.Write(capture)
+		require.NoError(t, err)
+		require.NoError(t, relative.Close())
+		require.False(t, filepath.IsAbs(relative.Name()))
+		relativeMeta := object(invoke("query_pcapdb", map[string]any{"pcapfile": relative.Name(), "query_type": "metadata"}))
+		require.Equal(t, id, relativeMeta["dataset_id"])
 		count, err := pcapdb.CountPCAPDatabases()
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)

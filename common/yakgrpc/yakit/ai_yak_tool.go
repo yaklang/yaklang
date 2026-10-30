@@ -15,6 +15,9 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	if tool == nil {
 		return 0, utils.Error("ai tool is nil")
 	}
+	if err := schema.AIToolDeprecationError(tool.Name); err != nil {
+		return 0, err
+	}
 	if db := db.Where("name = ?", tool.Name).Assign(tool.ToUpdateMap()).FirstOrCreate(tool); db.Error != nil {
 		return 0, utils.Errorf("create/update AIYakTool failed: %s", db.Error)
 	}
@@ -22,6 +25,12 @@ func SaveAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 }
 
 func CreateAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
+	if tool == nil {
+		return 0, utils.Error("ai tool is nil")
+	}
+	if err := schema.AIToolDeprecationError(tool.Name); err != nil {
+		return 0, err
+	}
 	db = db.Model(&schema.AIYakTool{})
 	if db := db.Create(tool); db.Error != nil {
 		return 0, utils.Errorf("create/update AIYakTool failed: %s", db.Error)
@@ -32,6 +41,9 @@ func CreateAIYakTool(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 	if tool == nil {
 		return 0, utils.Error("ai tool is nil")
+	}
+	if err := schema.AIToolDeprecationError(tool.Name); err != nil {
+		return 0, err
 	}
 
 	// 先查询获取现有记录的 CreatedAt
@@ -50,6 +62,9 @@ func UpdateAIYakToolByID(db *gorm.DB, tool *schema.AIYakTool) (int64, error) {
 }
 
 func GetAIYakTool(db *gorm.DB, name string) (*schema.AIYakTool, error) {
+	if err := schema.AIToolDeprecationError(name); err != nil {
+		return nil, err
+	}
 	db = db.Model(&schema.AIYakTool{})
 	var tool schema.AIYakTool
 	if err := db.Where("name = ?", name).First(&tool).Error; err != nil {
@@ -64,11 +79,20 @@ func GetAIYakToolByID(db *gorm.DB, id uint) (*schema.AIYakTool, error) {
 	if err := db.Where("id = ?", id).First(&tool).Error; err != nil {
 		return nil, err
 	}
+	if err := schema.AIToolDeprecationError(tool.Name); err != nil {
+		return nil, err
+	}
 	return &tool, nil
 }
 
+// Filter before pagination/ranking so retired rows never consume result slots,
+// even when builtin synchronization is skipped or an old database is restored.
+func activeAIYakTools(db *gorm.DB) *gorm.DB {
+	return db.Model(&schema.AIYakTool{}).Where("ai_yak_tools.name NOT IN (?)", schema.DeprecatedAIToolNames())
+}
+
 func FilterAIYakTool(db *gorm.DB, filter *ypb.AIToolFilter) *gorm.DB {
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 	if filter == nil {
 		return db
 	}
@@ -87,7 +111,7 @@ func FilterAIYakTool(db *gorm.DB, filter *ypb.AIToolFilter) *gorm.DB {
 }
 
 func SearchAIYakToolByPath(db *gorm.DB, path string) ([]*schema.AIYakTool, error) {
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 	var tools []*schema.AIYakTool
 	db = bizhelper.FuzzSearchEx(db, []string{"path"}, path, false)
 	if err := db.Find(&tools).Error; err != nil {
@@ -96,7 +120,7 @@ func SearchAIYakToolByPath(db *gorm.DB, path string) ([]*schema.AIYakTool, error
 	return tools, nil
 }
 func SearchAIYakTool(db *gorm.DB, keywords string) ([]*schema.AIYakTool, error) {
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 	var tools []*schema.AIYakTool
 	if keywords != "" {
 		db = bizhelper.FuzzSearchEx(db, []string{"name", "verbose_name", "verbose_name_zh", "keywords", "description", "path"}, keywords, false)
@@ -145,7 +169,7 @@ func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, onlyFavorites b
 	page := int(paging.GetPage())
 	limit := int(paging.GetLimit())
 
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 
 	// Apply fuzzy search if keywords provided
 	if keywords != "" {
@@ -178,6 +202,9 @@ func SearchAIYakToolWithPagination(db *gorm.DB, keywords string, onlyFavorites b
 
 // ToggleAIYakToolFavorite toggles the favorite status of an AI tool
 func ToggleAIYakToolFavorite(db *gorm.DB, toolName string) (bool, error) {
+	if err := schema.AIToolDeprecationError(toolName); err != nil {
+		return false, err
+	}
 	db = db.Model(&schema.AIYakTool{})
 
 	var tool schema.AIYakTool
@@ -203,6 +230,9 @@ func ToggleAIYakToolFavoriteByID(db *gorm.DB, toolID uint) (bool, error) {
 	if err := db.Where("id = ?", toolID).First(&tool).Error; err != nil {
 		return false, utils.Errorf("AI tool not found: %s", err)
 	}
+	if err := schema.AIToolDeprecationError(tool.Name); err != nil {
+		return false, err
+	}
 
 	// Toggle the favorite status
 	tool.IsFavorite = !tool.IsFavorite
@@ -216,6 +246,6 @@ func ToggleAIYakToolFavoriteByID(db *gorm.DB, toolID uint) (bool, error) {
 
 // YieldAllAITools yields all AI tools from the database
 func YieldAllAITools(ctx context.Context, db *gorm.DB) chan *schema.AIYakTool {
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 	return bizhelper.YieldModel[*schema.AIYakTool](ctx, db)
 }
