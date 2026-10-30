@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"net"
 	"os"
 	"path/filepath"
@@ -451,7 +452,10 @@ func TestPCAPDBConcurrentDeduplicationAndStartupBusy(t *testing.T) {
 	require.EqualValues(t, 1, count)
 	resolved, err := m.Metadata(alias)
 	require.NoError(t, err)
-	require.Contains(t, resolved.SourceAliases, alias)
+	var aliases []string
+	require.NoError(t, json.Unmarshal([]byte(resolved.SourceAliases), &aliases))
+	require.Equal(t, input, resolved.SourcePath)
+	require.ElementsMatch(t, []string{alias}, aliases)
 }
 
 func TestPCAPDBCancellationRecoveryAndDurableCounts(t *testing.T) {
