@@ -11,7 +11,6 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
-	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
@@ -381,13 +380,6 @@ func (m *scanManager) initByConfig() error {
 		parsedRules, libraries, err := config.preparedRuleInputs()
 		if err != nil {
 			return err
-		}
-		// Task-local resolution never falls back to the shared profile
-		// database, and include has no runtime cycle detector, so a cyclic
-		// snapshot would hang the scan. Reject it here, where the complete
-		// library set is known.
-		if err := sfvm.CheckRuleIncludeCycles(libraries); err != nil {
-			return utils.Wrap(err, "reject task-local syntaxflow library snapshot")
 		}
 		parsedRules = filterTaskLocalSyntaxFlowRulesByMode(parsedRules, ruleFilterModes(config))
 		parsedRules = filterTaskLocalSyntaxFlowRulesByNames(parsedRules, config.SyntaxFlowRule)

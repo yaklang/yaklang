@@ -323,10 +323,10 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	// touches the flight map at all.
 	config := frame.GetConfig()
 
-	// Include cycles are rejected statically — at task-local snapshot
-	// assembly and on every interactive rule write (sfdb
-	// CheckIncludeCycleForWrite) — so none is expected here; one that slips
-	// through an ungated bulk import hangs this rule until its ctx cancels.
+	// Include cycles are rejected statically, at rule-write time only
+	// (sfdb.CheckIncludeCycleForWrite), so none is expected here; one that
+	// slips through an ungated bulk import or task-local rule input hangs
+	// this rule until its ctx cancels.
 	ctx := config.GetContext()
 	if ctx == nil {
 		ctx = context.Background()
