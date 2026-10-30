@@ -1909,6 +1909,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 			// 内置高危凭证检测(TrafficGuard): 默认随 MITM 开启, 不可关闭。复用上面过滤前已扫描的
 			// tgFindings(命中即把流量标红并生成"高危/中危" Risk), 避免二次扫描。
 			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
+			if identity, ok := httpctx.GetBrowserInstance(req); ok {
+				yakit.ApplyBrowserInstanceToHTTPFlow(flow, identity)
+			}
 			tags := flow.Tags
 			var err error
 			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
@@ -1983,6 +1986,9 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {
 		opts = append(opts, crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()))
 	}
+	browserIngressOption, browserIngressReady, browserIngressCleanup := s.prepareBrowserMITMIngress(streamCtx, addr, proxyUsername != "" && proxyPassword != "")
+	defer browserIngressCleanup()
+	opts = append(opts, browserIngressOption)
 	mServer, err = crep.NewMITMServer(opts...)
 	if err != nil {
 		log.Error(err)
@@ -1997,6 +2003,7 @@ func (s *Server) MITM(stream ypb.Yak_MITMServer) error {
 	log.Infof("start serve mitm server for %s", addr)
 	// err = mServer.Run(ctx)
 	err = mServer.ServeWithListenedCallback(streamCtx, utils.HostPort(host, port), func() {
+		browserIngressReady()
 		feedbackToUser("MITM 服务器已启动 / starting mitm server")
 	})
 	if err != nil {

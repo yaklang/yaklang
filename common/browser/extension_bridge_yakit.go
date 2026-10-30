@@ -52,6 +52,8 @@ func (s *ExtensionBridgeServer) handleExtensionClientRequest(ctx context.Context
 	default:
 	}
 	switch method {
+	case "yakit.mitm.ingress":
+		return s.acquireMITMIngress(deviceID, params)
 	case "yakit.web_fuzzer.open":
 		return openCapturedRequestInWebFuzzer(params)
 	case "yakit.poc.generate":

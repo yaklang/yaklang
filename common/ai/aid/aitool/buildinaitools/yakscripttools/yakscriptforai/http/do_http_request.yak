@@ -44,6 +44,8 @@ HTTP 请求测试：`url` 与 `packet` 二选一。URL 模式由工具生成请�
 
 参数要点：URL 模式的 `query`/`form` 是 JSON 对象，传原始未转义值，由工具各编码一次；不要先编码 `%`、`&` 等字符。`body` 是原始请求体，覆盖 `form`；Packet 模式的路径和查询必须自行编码。`headers` 可传对象或逐行的 `Key: Value`。默认 `timeout=10` 秒、`redirect-times=3`；仅在结果可能涉及漏洞或确需完整报文复核时设置 `save-packet=true` 保存请求和响应，普通探测保持默认，大报文内联输出会截断。
 
+浏览器实例归属：使用 A/B 等已连接实例的凭据或请求上下文测试时，每次调用都传 `browser_ref`（例如 `"A"`、`"B"`），由引擎核实 Bridge 身份并自动给所有保存的流量打标签、染色，无需 MITM。归属按发起请求使用的身份判断，跨用户修改资源 ID 时仍保留原实例。多个实例分开调用，同一批不要混合 A/B 凭据；只有一个 @浏览器附件时可自动绑定。刻意去掉认证的对照请求用 `browser_ref="none"`。该参数不修改请求或自动注入 Cookie。
+
 先看 `RESULT.request_built`、`request_sent`、`response_received`、`status_code` 和 `transport_error`：HTTP 404/500 仍是已收到响应；连接、TLS、代理等失败则没有响应。POST JSON 请求遇到包含 required/invalid/missing 的 HTTP 400 时，工具可能自动改为表单编码再请求一次；核对输出中的 retry request packet 和 content-type hint，不能把重试响应当作原 JSON 请求的结果。
 
 测试时先留正常基线，再一次改变一个变量并比较状态、内容、响应头和耗时。参数校验失败、超时、空响应或一次未命中都需要修正请求或换一个可区分的实验；响应揭示的新入口应记录到待办。
@@ -183,6 +185,7 @@ yakit.AutoInitYakit()
 
 // --- parse parameters ---
 // URL mode params
+browserRef = cli.String("browser_ref", cli.setHelp("browser whose credentials/request context this test uses (A, B, etc.); required when multiple browsers are attached. Automatically labels/colors every saved flow without MITM; does not change cookies or request bytes. Use none for an unauthenticated control; split batches by browser"), cli.setRequired(false))
 urlStr = cli.String("url", cli.setHelp("target URL for URL mode"), cli.setRequired(false))
 method = cli.String("method", cli.setHelp("HTTP method"), cli.setJsonSchema(`{"type":"string","pattern":"^[!#$%&'*+.^_~\u00600-9A-Za-z|-]+$"}`), cli.setDefault("GET"))
 headers = cli.String("headers", cli.setHelp("custom headers; accept 'Key: Value' per line OR a JSON object {key:value} (AI may pass either); omit when empty"), cli.setJsonSchema(`{

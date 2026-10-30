@@ -109,12 +109,13 @@ func (d *AttachedBrowserResourceData) ToAttachData(ReActLoopIF) string {
 - Name: %q
 - Reference: %q
 - Resource semantics: this is an already-open external browser connected through the Yakit browser extension. It is not a Rod-managed browser session.
-- Mandatory routing: for every operation on this reference, use only browser.capability.catalog, browser.capability.call, browser.crypto.inspect, browser.transform.prepare, browser.handoff.request, and browser.http.test. When more than one browser is attached, pass this exact Reference as browser_ref; the runtime securely maps it to the attached Device ID. Never generate or pass device_id yourself.
+- Mandatory routing: for browser tab/page/crypto operations on this reference, use only browser.capability.catalog, browser.capability.call, browser.crypto.inspect, browser.transform.prepare, browser.handoff.request, and browser.http.test. Ordinary HTTP replay uses do_http_request as described below. When more than one browser is attached, pass this exact Reference as browser_ref; the runtime securely maps it to the attached Device ID. Never generate or pass device_id yourself.
 - Stable wrapper parameters: call browser.capability.call directly with the top-level object {"browser_ref":"...","method":"browser.*","params":{...}}. The method and params keys are always required. Do not invoke parameter generation merely to construct this stable wrapper; query browser.capability.catalog only when the needed method or its inner params are genuinely unknown.
 - Current-page inspection: call method browser.tabs with params {} through browser.capability.call. Prefer the returned tab with active=true, and use its tab/frame/document target to call browser.context with includeDom=true. Refreshes, navigations, and newly opened HTTP(S) tabs remain part of this paired browser instance; fetch a new page context only when the document changed or a returned node is stale.
 - Open a website: call browser.capability.call with method browser.tab.open and params {"url":"https://..."}. This opens a foreground tab inside this exact attached instance; never use use_browser or Eval merely to navigate.
 - Page cryptography inspection: after browser.context returns a fresh captureId and visible trigger nodeId, call browser.crypto.inspect once. It atomically triggers that node, handles modal dialogs, captures crypto/encoding/network evidence, and returns postAction with the current document and fresh node references. A captured dialog does not imply navigation, reload, or logout; trust postAction.sameDocument and authentication instead. Continue from postAction without another context call unless it is absent or the selected node is stale. For advanced investigation, discover recording, callable, debugger, and Profile tools through the capability catalog.
 - Plaintext HTTP testing (domain=transform): when browser.crypto.inspect returns gatewayPreparation.state=ready or capture-required, call browser.transform.prepare with its candidateId and a complete plaintext request. It automatically captures missing directions without plugin UI. If the original trigger changed, get browser.context and pass fresh captureId/nodeId to prepare. Pass validationDraft.id to browser.http.test without permanently saving a Profile; omitted direction flags follow the validated gateway, including response decryption. Use a saved profile_id when an appropriate Profile already exists. Prefer automatic preparation; advanced recording/callable/debugger/profile capabilities remain available through the signed catalog. Never reopen the website just because a dialog appeared or send the same plaintext request through another HTTP tool.
+- Ordinary HTTP replay and authorization testing: when no page crypto transform is needed, use do_http_request with browser_ref set to this Reference. This identifies the browser whose credentials or request context are being tested, including cross-user resource IDs. The engine automatically labels and colors every saved request. With multiple attached browsers, browser_ref is required; split A/B requests into separate calls and do not mix credentials from different browsers in one batch. For a deliberately unauthenticated control, pass browser_ref="none". This sends the supplied request unchanged and does not fetch cookies or require a MITM proxy.
 - Login and human verification: when the user asks to scan a QR code, log in, complete MFA/CAPTCHA, or confirm a device, make the relevant page UI visible and then MUST call browser.handoff.request. The tool renders the local handoff card and waits. Never finish the task by merely telling the user to scan or operate in the browser.
 - Prohibited fallback: do not use use_browser, generic browser automation, a browser session parameter, op=open, or create a replacement browser. Only do that if the user explicitly asks for a separate automation browser instead of this attached instance.
 - Capability names do not change after reconnect. If a method is rejected, query its relevant catalog domain once and use the returned exact name; never invent a renamed method or attribute the mismatch to reconnecting.
@@ -158,10 +159,10 @@ func attachedBrowserDeviceID(task AITask, browserRef string) (string, bool, erro
 	if err != nil || !attached {
 		return "", attached, err
 	}
-	if len(resources) == 1 {
+	browserRef = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(browserRef), "@"))
+	if len(resources) == 1 && browserRef == "" {
 		return resources[0].DeviceID, true, nil
 	}
-	browserRef = strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(browserRef), "@"))
 	if browserRef == "" {
 		return "", true, utils.Error("multiple browser instances are attached; browser_ref is required")
 	}
@@ -251,11 +252,20 @@ func CheckAttachedBrowserToolRoute(task AITask, toolName string) (bool, string) 
 // the final ToolCaller boundary. Model output cannot select or override a
 // different browser once the user has attached an instance.
 func BindAttachedBrowserToolParams(task AITask, toolName string, params aitool.InvokeParams) (aitool.InvokeParams, error) {
-	if !isAttachedBrowserBridgeTool(toolName) {
+	isHTTPRequest := toolName == attachedBrowserHTTPRequestToolName
+	if !isAttachedBrowserBridgeTool(toolName) && !isHTTPRequest {
 		return params, nil
 	}
 	if params == nil {
 		params = make(aitool.InvokeParams)
+	}
+	if isHTTPRequest {
+		// A generic HTTP tool must not accept a model-supplied device ID.
+		delete(params, "device_id")
+		if strings.EqualFold(strings.TrimSpace(params.GetString("browser_ref")), "none") {
+			delete(params, "browser_ref")
+			return params, nil
+		}
 	}
 	deviceID, attached, err := attachedBrowserDeviceID(task, params.GetString("browser_ref"))
 	if err != nil {
@@ -264,7 +274,9 @@ func BindAttachedBrowserToolParams(task AITask, toolName string, params aitool.I
 	if !attached {
 		return params, nil
 	}
-	delete(params, "browser_ref")
+	if !isHTTPRequest {
+		delete(params, "browser_ref")
+	}
 	params["device_id"] = deviceID
 	return params, nil
 }
