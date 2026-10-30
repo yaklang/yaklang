@@ -557,7 +557,7 @@ Finding 不允许：
 
 现有模式可以完成小规模、明确问题的查询和证据回溯，但仍有以下问题：
 
-- 旧 `analyze_pcap` 与新工具并存，入口和责任不统一。
+- 旧 `analyze_pcap` 已退役；当前入口统一为 `load_pcapfile → query_pcapdb → manage_pcapdb`，需要避免文档或测试重新引入旧工具名。
 - 模型必须使用底层 `query_type` 组合查询。
 - 缺少确定性总览，模型可能尝试逐页统计。
 - 缺少 Finding/Report，结构化结果无法沉淀。
@@ -569,7 +569,7 @@ Finding 不允许：
 
 | 差距 | 当前情况 | 目标 |
 | --- | --- | --- |
-| 统一入口 | 新旧 PCAP 工具并存 | 默认使用导入 -> 总览 -> 搜索 -> 证据 -> Finding -> 报告 |
+| 统一入口 | 旧 PCAP 工具已退役，当前链路为 `load_pcapfile → query_pcapdb → manage_pcapdb` | 保持单一入口，并按导入 -> 总览 -> 搜索 -> 证据 -> Finding -> 报告组织调查 |
 | 确定性总览 | 只有元数据和分页查询 | 协议、端点、会话、错误、截断、加密聚合 |
 | 有界组合搜索 | 主要是等值、exists、missing | 时间、范围、子串、正则、OR、数组和 Session 条件 |
 | 完整流搜索 | 预览截断后无法补回字节 | 安全扫描完整流并返回偏移和上下文 |
@@ -602,12 +602,12 @@ Finding 不允许：
 
 ### 阶段 0：统一入口和质量门禁
 
-目标：确保 AI 不再混用新旧工具，并在错误或能力不足时停止分析。
+目标：确保文档、Skill、测试和 AI 都只使用当前结构化工具链，并在错误或能力不足时停止分析。
 
 交付：
 
 - 明确 `load_pcapfile + query_pcapdb + manage_pcapdb` 为默认调查链路。
-- 旧 `analyze_pcap` 降级为兼容入口或内部适配器。
+- 确认 `analyze_pcap`、`decrypt_pcap` 和 `analyze_challenge_pcap` 保持退役，不新增兼容入口；所有使用说明只引用 `load_pcapfile`、`query_pcapdb` 和 `manage_pcapdb`。
 - 统一 Dataset 状态、能力、完整性和分析代际字段。
 - 统一空结果、失败、部分完成和未命中语义。
 
