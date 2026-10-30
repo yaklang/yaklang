@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -412,6 +413,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(typ)
 		}
 	})
+	b.rangeKey = "Record Type"
 	out = append(out, b)
 	path("rip", "rip", "rip.metric", "RIP route metric", DisplayUnsigned, 32, "pdu", "Entries", "*", "Metric")
 	path("http2|grpc|doh", "http2", "http2.streamid", "HTTP/2 stream ID", DisplayUnsigned, 31, "pdu", "Stream ID")
@@ -898,6 +900,9 @@ func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displa
 }
 
 func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
+	if e.nativeTLSObservation {
+		return e.displayTLSRecordHeaderRange(key)
+	}
 	if f, ok := e.ownedNativeNetworkField(key); ok {
 		span := f.span
 		return &span
@@ -920,6 +925,34 @@ func (e *ProtocolEvent) displayPDUFieldRange(key string) *DisplayFieldRange {
 		return nil
 	}
 	return &DisplayFieldRange{Offset: int(lo), Length: int(hi - lo)}
+}
+
+// Native TLS already freezes literal record words, including on codec refusals.
+// Publish their occurrence spans without adding metadata to the established
+// GetFields tree. Public edits cannot grant spans to a different visible header;
+// negotiated values and authenticated inner types have separate provenance.
+func (e *ProtocolEvent) displayTLSRecordHeaderRange(key string) *DisplayFieldRange {
+	if len(e.Raw) < 5 || e.semanticFields == nil {
+		return nil
+	}
+	typ, typeOK := displayUint(e.semanticFields["Record Type"])
+	version, versionOK := displayUint(e.semanticFields["Record Version"])
+	length, lengthOK := displayUint(e.semanticFields["Record Length"])
+	if !typeOK || !versionOK || !lengthOK || typ != uint64(e.Raw[0]) ||
+		version != uint64(binary.BigEndian.Uint16(e.Raw[1:3])) ||
+		length != uint64(binary.BigEndian.Uint16(e.Raw[3:5])) || length+5 != uint64(len(e.Raw)) {
+		return nil
+	}
+	switch key {
+	case "Record Type":
+		return &DisplayFieldRange{Offset: 0, Length: 1}
+	case "Record Version":
+		return &DisplayFieldRange{Offset: 1, Length: 2}
+	case "Record Length":
+		return &DisplayFieldRange{Offset: 3, Length: 2}
+	default:
+		return nil
+	}
 }
 
 func validateDisplayFieldLiteral(d DisplayFieldDescriptor, op string, token filterToken) (any, error) {
