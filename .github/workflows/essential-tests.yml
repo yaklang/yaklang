@@ -20,6 +20,7 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
     paths:
       - "common/**"
+      - "internal/trafficfixture/**"
       - "embed/**"
       - "scannode/**"
       - ".github/workflows/essential-tests.yml"

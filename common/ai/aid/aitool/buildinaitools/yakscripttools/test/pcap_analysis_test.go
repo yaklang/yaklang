@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 // Keep the oracle independent of the parser: one TCP conversation, a request
@@ -81,18 +82,31 @@ func pcapAnalysisLeaves(value any, path string, leaves map[string]any) {
 }
 
 func TestPCAPAnalysisTools(t *testing.T) {
+	previous, previousPath := schema.GetGormProfileDatabase(), ""
+	if previous != nil {
+		previousPath = consts.GetCurrentProfileDatabasePath()
+	}
+	var previousProject consts.ProjectDatabaseBinding
+	if schema.GetGormProjectDatabase() != nil {
+		previousProject = consts.CaptureProjectDatabaseBinding()
+	}
 	home := t.TempDir()
 	t.Setenv("YAKIT_HOME", home)
 	consts.ResetYakitHomeOnce()
 	profile, err := gorm.Open("sqlite3", filepath.Join(home, "profile.sqlite"))
 	require.NoError(t, err)
-	previous, previousPath := schema.GetGormProfileDatabase(), consts.GetCurrentProfileDatabasePath()
+	projectPath := filepath.Join(home, "project.sqlite")
+	project, err := consts.CreateProjectDatabase(projectPath)
+	require.NoError(t, err)
 	require.NoError(t, pcapdb.ClosePCAPDatabases())
 	consts.BindProfileDatabase(profile, "")
+	consts.BindProjectDatabaseWithReader(project, nil, projectPath)
 	t.Cleanup(func() {
 		require.NoError(t, pcapdb.ClosePCAPDatabases())
 		consts.BindProfileDatabase(previous, previousPath)
-		profile.Close()
+		consts.BindProjectDatabaseWithReader(previousProject.Database, previousProject.ReadDatabase, previousProject.Path)
+		require.NoError(t, profile.Close())
+		require.NoError(t, project.Close())
 		consts.ResetYakitHomeOnce()
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -144,7 +158,7 @@ func TestPCAPAnalysisTools(t *testing.T) {
 	}
 	capture := pcapAnalysisCapture(t, "skill.example")
 	// The live-model harness consumes the exact same bytes and known answers.
-	liveFixture, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "aismoking", "live", "testdata", "pcap_analysis.pcap"))
+	liveFixture, err := trafficfixture.ReadFile(filepath.Join("..", "..", "..", "..", "..", "aismoking", "live", "testdata", "pcap_analysis.pcap"))
 	require.NoError(t, err)
 	require.Equal(t, capture, liveFixture)
 	path := filepath.Join(home, "proof.pcap")
