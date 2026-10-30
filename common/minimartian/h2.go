@@ -55,6 +55,7 @@ func (p *Proxy) proxyH2(closing chan bool, cc net.Conn, url *url.URL, ctx *Conte
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToPort)
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ConnectedToHost)
 		inherit(httpctx.REQUEST_CONTEXT_KEY_ViaConnect)
+		applyBrowserInstance(req, ctx)
 		// HTTP/2 均在 CONNECT 隧道内，必为 HTTPS；直接 SetRequestHTTPS，无需 inherit ConnectToHTTPS
 		httpctx.SetRequestHTTPS(req, true)
 		httpctx.SetPluginContext(req, consts.NewPluginContext())

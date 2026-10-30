@@ -1028,7 +1028,7 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 	}
 	var transformCaller browserTransformCaller
 	if s.browserBridge != nil {
-		transformCaller = s.browserBridge
+		transformCaller = serverBrowserExtensionBridge{server: s}
 	}
 	browserTransform, err := prepareBrowserTransform(
 		stream.Context(),
@@ -1593,6 +1593,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 			}
 
 			if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() && result.LowhttpResponse != nil {
+				if browserTransform != nil {
+					result.LowhttpResponse.Tags = yakit.AppendBrowserInstanceHTTPFlowTags(result.LowhttpResponse.Tags, browserTransform.instance)
+				}
 				ensureLowhttpHiddenIndex(result.LowhttpResponse)
 				yakit.SaveLowHTTPFlow(result.LowhttpResponse, false)
 			}
@@ -1804,6 +1807,9 @@ func (r *httpFuzzerRun) handleExecutionMode() error {
 					}
 
 					if consts.GLOBAL_HTTP_FLOW_SAVE.IsSet() {
+						if browserTransform != nil {
+							redirectRes.Tags = yakit.AppendBrowserInstanceHTTPFlowTags(redirectRes.Tags, browserTransform.instance)
+						}
 						ensureLowhttpHiddenIndex(redirectRes)
 						yakit.SaveLowHTTPFlow(redirectRes, false)
 					}

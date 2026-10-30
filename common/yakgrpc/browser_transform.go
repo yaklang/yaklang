@@ -18,9 +18,11 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aitool"
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/browsertools"
+	"github.com/yaklang/yaklang/common/browser"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 )
 
@@ -29,6 +31,21 @@ const browserTransformFailureRequestPrefix = "YAKIT_BROWSER_TRANSFORM_FAILED\n"
 
 type browserTransformCaller interface {
 	CallDevice(context.Context, string, string, interface{}) (json.RawMessage, error)
+}
+
+func browserHTTPFlowInstance(caller browserTransformCaller, deviceID string) httpctx.BrowserInstance {
+	bridge, ok := caller.(interface {
+		Connections() []browser.ExtensionBridgeConnection
+	})
+	if !ok {
+		return httpctx.BrowserInstance{}
+	}
+	for _, connection := range bridge.Connections() {
+		if connection.DeviceID == deviceID {
+			return connection.BrowserInstance()
+		}
+	}
+	return httpctx.BrowserInstance{}
 }
 
 type browserTransformProfileDescriptor struct {
@@ -120,6 +137,7 @@ type browserTransformTrace struct {
 type browserTransformRuntime struct {
 	caller          browserTransformCaller
 	deviceID        string
+	instance        httpctx.BrowserInstance
 	profileID       string
 	validationID    string
 	profileName     string
@@ -164,6 +182,7 @@ func prepareBrowserValidationTransform(
 	return &browserTransformRuntime{
 		caller:          caller,
 		deviceID:        deviceID,
+		instance:        browserHTTPFlowInstance(caller, deviceID),
 		profileID:       "transient-" + validationID,
 		validationID:    validationID,
 		profileName:     "Validated temporary transform",
@@ -228,6 +247,7 @@ func prepareBrowserTransform(
 	return &browserTransformRuntime{
 		caller:          caller,
 		deviceID:        deviceID,
+		instance:        browserHTTPFlowInstance(caller, deviceID),
 		profileID:       profileID,
 		profileName:     selected.Name,
 		origin:          selected.Origin,
@@ -574,6 +594,7 @@ func executeBrowserAgentHTTPRequest(
 	if response.TraceInfo != nil {
 		duration = response.TraceInfo.TotalTime
 	}
+	flowTags := yakit.AppendBrowserInstanceHTTPFlowTags([]string{yakit.HTTPFlowTagBrowserPlaintext}, runtime.instance)
 	savedFlow, err := yakit.CreateHTTPFlowFromHTTPWithBodySavedFromRaw(
 		isHTTPS,
 		plainRequest,
@@ -583,7 +604,7 @@ func executeBrowserAgentHTTPRequest(
 		response.RemoteAddr,
 		yakit.CreateHTTPFlowWithRuntimeID(runtimeID),
 		yakit.CreateHTTPFlowWithDuration(duration),
-		yakit.CreateHTTPFlowWithTags(yakit.HTTPFlowTagBrowserPlaintext),
+		yakit.CreateHTTPFlowWithTags(strings.Join(flowTags, "|")),
 		yakit.CreateHTTPFlowWithBarePacketsRaw(wireRequest, wireResponse),
 	)
 	if err != nil {
