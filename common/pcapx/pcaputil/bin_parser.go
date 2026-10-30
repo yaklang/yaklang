@@ -1510,6 +1510,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
+					if len(wire) < 4+smb2HeaderSize && probeSMB2(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}

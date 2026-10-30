@@ -5,20 +5,21 @@
 `codex/shark-m2-protocol-correctness`。此表按可验收工作项计数，不按协议数量、
 代码量或测试数量估算完成度。M1 尚未合并时，M2 PR 以 M1 分支为基线，避免重复展示 M1。
 
-当前状态：**22 项，已完成 6，进行中 3，未开始 13；剩余 16 项**。
-完成项为来源定位 M2-01 和五个有限修复合同 M2-12..15、20，不代表整个 SMB profile
-验收完成。首批 canonical/native/session/展示矩阵 **80 pass /0 skip /0 fail**，
-原停放 22 个 Go 文件已恢复并纳入测试。M2-02/03/05 仍需大捕获与域隔离证据，不由
-单元通过提前关闭。新增问题单列，不进入 M1。以下 AI 时间是继续执行所需的粗估区间，
+当前状态：**22 项，已完成 11，进行中 4，未开始 7；剩余 11 项**。
+完成项为来源定位 M2-01 和十个有限修复合同 M2-12..21，不代表整个 SMB profile
+验收完成。首批矩阵 80 pass；正文、头部、上下文和探测边界扩展后为
+**167 pass /0 skip /0 fail**。原停放 22 个 Go 文件已恢复并纳入测试。
+M2-02/03/05/22 仍需最终构建的大捕获与域隔离证据，不由单元通过提前关闭。
+新增问题单列，不进入 M1。以下 AI 时间是继续执行所需的粗估区间，
 不含 CI 排队、下载及新发现问题；与宽范围条目重叠的实现时间不重复相加。
 
 | ID | 验收条目 | 状态 | 必需证据 | 剩余 AI 实施粗估 |
 |---|---|---|---|---|
 | M2-01 | 定位 SMB1→SMB2 丢失记录并冻结独立来源 | 已完成 | 5 个 offer、107 个完整记录/121 命令头；6 个真实三段重组；VLAN81/80 分离，参考关联仅作跨域参考 | 0 |
-| M2-02 | 复用 canonical CIFS，保留全部重复方言/OEM/空名称/字节范围 | 进行中（已恢复，未运行） | 两显式入口、owned Node 投影、原 YAML/旧 SMB/Carrier 兼容、边界与预算正反例 | 30–90 分钟 |
-| M2-03 | 修复原生探测停止及 SMB1→SMB2 完整记录接续 | 进行中（已恢复，未运行） | 1/7/64-byte 拆分、合并记录、完整性拒绝、offer≠选定版本、02ff≠最终协商、原生/API 一致 | 45–120 分钟 |
+| M2-02 | 复用 canonical CIFS，保留全部重复方言/OEM/空名称/字节范围 | 进行中（矩阵通过） | 两显式入口、owned Node 投影、原 YAML/旧 SMB/Carrier 兼容、边界与预算正反例；f613 实际 5 个 offer 字段验值 | 15–45 分钟复验 |
+| M2-03 | 修复原生探测停止及 SMB1→SMB2 完整记录接续 | 进行中（实际恢复，待新构建复验） | 1/7/64-byte 拆分、合并记录、完整性拒绝、offer≠选定版本、02ff≠最终协商；f613 的 107/121 来源门通过，不代表完整字段通过 | 15–45 分钟复验 |
 | M2-04 | 121 命令的 header/body/compound 字段逐一正确 | 未开始 | 来源先冻结的值/位置/边界；原始 IDs 与关联/继承信息分开；未选布局显式保留，不仅补标签 | 2–4 小时 |
-| M2-05 | SMB 乱序/丢失/重传/四元组复用/接口/VLAN 隔离 | 进行中（已恢复，未运行） | 实际 TCP 路径 eager/deferred、多个 workers、重传不重复拥有字节；跨域不关联、不继承 dialect | 1–2 小时 |
+| M2-05 | SMB 乱序/丢失/重传/四元组复用/接口/VLAN 隔离 | 进行中（矩阵与来源分区通过） | 实际 TCP 路径 eager/deferred、多个 workers；Weber 12 个域与实际 flow 双向对应、6 个三段重组、4 次完整重传不重复；全部 pending/dialect/file 上下文隔离仍需验收 | 1–2 小时 |
 | M2-06 | SMB Windows 递进页面和字段来源 | 未开始 | 实际新版页面、同值不同位置、原始帧/完整 PDU/opaque 区分、来源切换/缩放/编码 | 45–90 分钟 |
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 未开始 | 107/121 实际恢复；新增 PDU/flow 编号有来源账本；旧整对象与行保持、差异逐条解释 | 1–2 小时 |
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 未开始 | 逐方向/版本/密钥代际及缺开头矩阵，真实流量与独立负控；不伪造协商/身份/明文 | 2–4 小时 |
@@ -29,13 +30,13 @@
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
 | M2-14 | SMB1 status 格式与 NTSTATUS alias 正确 | 已完成（alias 合同） | `TestSMB1AliasContract*`：请求/响应四组合，NTSTATUS 仅响应且 bit 置位；raw Status 与请求格式偏好分开，保留范围 | 0 |
 | M2-15 | SMB1 PID 保留两 literal 半部和正确 32-bit 值 | 已完成（alias 合同） | `TestSMB1AliasContract*`：高/低边界、11227788、JSON、范围/缺值/越界、原生分片与拥有值；实际 Windows 页仍归 M2-06 | 0 |
-| M2-16 | NEGOTIATE 的失败/残缺正文不污染连接状态 | 未开始 | 完整声明方言列表、成功结构和边界；错误 envelope 的 ByteCount 不充当 dialect；错误/截断正反例 | 45–90 分钟 |
-| M2-17 | 失败 CREATE 不建立虚假文件上下文 | 未开始 | 长错误正文和残缺成功不打开文件；合法成功仍能关联 READ；pending/status/预算与方向检查 | 30–60 分钟 |
-| M2-18 | CLOSE 响应时间字段不作为 literal FileId | 未开始 | 响应时间不产生 FileId；匹配成功关闭请求 handle、失败不关闭、未匹配不伪关联 | 30–60 分钟 |
-| M2-19 | related compound 保留 literal SID/TID | 未开始 | 全 1 literal 与 effective/context 分开；只用 effective 做关联；首个 related 拒绝，不能跨 PDU/flow/域继承 | 45–90 分钟 |
+| M2-16 | NEGOTIATE 的失败/残缺正文不污染连接状态 | 已完成（结构/边界合同） | `TestSMB2NegotiateErrorAndTruncationCannotSelectDialect`、`*DeclaredCollectionsAndBuffersAreComplete`、`*ContextAlignmentAndOwnedBounds`：完整列表、成功结构、安全缓冲与上下文边界；错误 ByteCount≠dialect，残缺不消费 pending；未声明认证或全部协商语义完成 | 0 |
+| M2-17 | 失败 CREATE 不建立虚假文件上下文 | 已完成（有限合同） | `TestSMB2FailedCreateDoesNotOpenFile`、`*CreateContextBoundsBeforeOpening`：长错误正文、完整 fixed body、上下文 Next/名称/数据边界和预算；错误无 FileId/打开状态 | 0 |
+| M2-18 | CLOSE 响应时间字段不作为 literal FileId | 已完成（有限合同） | `TestSMB2CloseResponseTimesAreNotFileID`：真实 60-byte 响应时间/大小，独立 Request File ID；成功关闭、失败保留、未匹配不伪关联；修正历史 24-byte request-shaped response 测试构造器 | 0 |
+| M2-19 | related compound 保留 literal SID/TID | 已完成（有限合同） | `TestSMB2RelatedLiteralAndContextHaveSeparateSources`、`*IgnoresConcreteIDsWithoutChangingLiterals`、`*CannotInventIDsOrInheritUnmatchedFile`：全 1/具体 literal 均保留；request effective 用前项，response 不套占位符；首 related 拒绝，不跨 PDU；完整 TCP 域隔离仍归 M2-05 | 0 |
 | M2-20 | 未匹配/同向 NEGOTIATE 不选定连接 dialect | 已完成（有限合同） | `TestSMB2UnmatchedOrSameDirectionCannotSelectDialect`：当前 wire 保留、cache 不变、pending 不被同向消耗，随后反向可匹配；坏正文仍归 M2-16 | 0 |
-| M2-21 | SMB2 probe 的固定头完整性与探测窗口 | 未开始 | 当前 8-byte prefix 会在 StructureSize 尚未检查时 accept；核验完整头与 ProbeBytes=64 的交互、误识别/拒绝后的恢复，不能只依赖四字节 magic | 30–90 分钟 |
-| M2-22 | SMB2 请求/响应头 union 与完整 literal 来源 | 未开始 | request ChannelSequence/Reserved 不当 Status；Credit、同步/异步 ID、signature/NextCommand 与每个 compound 头范围，逐包对照 | 45–90 分钟 |
+| M2-21 | SMB2 probe 的固定头完整性与探测窗口 | 已完成（固定头合同） | `TestSMB2ProbeRequiresFixedHeaderBeyondGenericWindow`：8/9/32/63/64/67 字节均需更多，68-byte 头才可 admit；StructureSize/NextCommand/transform 头检查，公开 Probe 与 Feed 均在通用窗口裁剪前验证 | 0 |
+| M2-22 | SMB2 请求/响应头 union 与完整 literal 来源 | 进行中（原生矩阵通过） | `TestSMB2HeaderUnionAndOwnedLiteralRanges`：request ChannelSequence/Reserved≠Status；Credit、同步/异步 ID、owned signature/NextCommand、每个 compound 头独立范围；待新版与逐包参考复验 | 15–45 分钟 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。账户剩余额度到 50% 时停止新增范围，提交、推送并确认最新提交 CI 后暂停；最多 1 个子 agent，主 agent 负责关键路径。
 
@@ -49,4 +50,15 @@ TLS 归属解释、1 个参考限制、2 个无损显示差异，未分类 0。�
 此前 58-01 的 10 个 fail action（8 个叶/2 个父）保留：新测试错误要求所有分片 Feed
 返回 nil，而接口明示返回 `ErrNeedMore`。修正为逐片精确 Consumed、非空错误仅允许
 NeedMore 且标志一致、最后片必须完整，原最终字段/范围/拥有值断言全部保留后通过。
-当前大包 107/121、Windows 页面、完整 body、fuzz 和最终 M2 SHA CI 尚未验收。
+f613 大包第一次独立闭合：3 个实际 SDK/flow/CLI 回放 exit0；盲计划03对 5/5 legacy、
+107/107 target records、121 headers 和全部 281 source records 的字节/贡献/完成位置/
+捕获域通过。选定字段验收仍失败：**0 已映射值错误，3255 coverage gaps**（2463 字段未发布、
+792 范围未映射），不是全部字段正确。复用的完整 TShark 4.6.9 PDML 与输入哈希固定，
+此次未重新运行 Wireshark。大包 14 条 related 命令没有全 1 SID/TID，不能把它们描述成
+14 次实际覆盖；上述 authored 原生测试才触发该边界。外部大包和完整导出继续不入库。
+
+正文修复的闭合矩阵为 `test-M2-SMB59-03/receipt.json`，日志 SHA256
+`9c87aeb09ba23a87ccdeeca87ed4ae59891485200f476eb073e6f3dab2182895`。
+59-01 保留公开 Probe 在 64 字节截断造成的真实失败，59-02 的 163 pass 后又补了
+related 具体 ID、响应 ID 和未匹配前项文件上下文检查，最终为 167 pass。完整 body、
+新版大包字段验收、Windows 页面、fuzz 和最终 M2 SHA CI 仍未关闭。
