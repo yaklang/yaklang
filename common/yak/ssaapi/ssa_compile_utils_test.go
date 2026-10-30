@@ -276,6 +276,12 @@ func TestResolveLargeProjectGCPercent_DisabledByEnv(t *testing.T) {
 
 func TestResolveCompileProjectGCPercent_TunesMediumProjectWithMemoryHeadroom(t *testing.T) {
 	t.Setenv("GOGC", "")
+	// Exercise the automatic decision for the supplied machine budget without
+	// inheriting the runner's explicit limit. This does not change Go's active
+	// runtime/debug memory limit.
+	t.Setenv("GOMEMLIMIT", "")
+	t.Setenv(ssaCompileMemLimitEnv, "")
+	t.Setenv("YAK_SSA_GC_PERCENT", "")
 	t.Setenv(ssaCompileAdaptiveGCEnv, "")
 	t.Setenv(ssaCompileGOGCEnv, "")
 	cfg := newASTWindowTestConfig(t, ssaconfig.PHP, 12, 339173, true)
@@ -286,6 +292,10 @@ func TestResolveCompileProjectGCPercent_TunesMediumProjectWithMemoryHeadroom(t *
 	require.True(t, decision.eligible)
 	require.Equal(t, 100, decision.percent)
 	require.Equal(t, "auto:ssa-compile", decision.source)
+
+	// An explicit runner limit must still suppress automatic tuning.
+	t.Setenv("GOMEMLIMIT", "2GiB")
+	require.False(t, cfg.resolveCompileProjectGCPercent(32<<30).eligible)
 }
 
 func TestResolveCompileProjectGCPercent_KeepsLowMemoryAndTinyProjects(t *testing.T) {
