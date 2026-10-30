@@ -12,6 +12,17 @@ Package:
   CIFSDirectTCP: CIFSDirectRecord
   CIFSNegotiateExtendedResponse: CIFSExtendedResponse
   CIFSDirectTCPNegotiateExtendedResponse: CIFSDirectExtendedResponse
+  # MS-SMB 2.2.4.6.1/2: Unicode, extended security, terminal AndX only.
+  # Tokens and post-string capture extensions remain opaque. No authentication
+  # or session-establishment proof is inferred from the server's status.
+  CIFSDirectTCPSessionSetupExtendedRequest:
+    operator: |
+      err = parseCIFSSessionSetup(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPSessionSetupExtendedResponse:
+    operator: |
+      err = parseCIFSSessionSetup(true)
+      if err != nil { panic(err) }
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }
