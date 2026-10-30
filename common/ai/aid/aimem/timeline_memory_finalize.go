@@ -22,16 +22,21 @@ func CompleteTimelineMemory(cfg *aicommon.Config, ctx context.Context, userInput
 		return nil
 	}
 	cfg.SyncSessionEvidenceTimeline()
-	return finalizeTimelineMemory(cfg.Timeline, persister, ctx, userInput)
-}
-
-func finalizeTimelineMemory(tl *aicommon.Timeline, persister TimelineMemoryPersister, ctx context.Context, userInput string) error {
+	tl := cfg.Timeline
 	if !tl.NeedsMemoryFinalization() {
 		return nil
 	}
 	if err := tl.RequestMemoryFinalization(); err != nil {
 		return err
 	}
+	return PersistPendingTimelineMemory(tl, persister, ctx)
+}
+
+// PersistPendingTimelineMemory drains an already journaled task boundary. The
+// caller must RequestMemoryFinalization before publishing task completion, but
+// may run this slow part in the background with the session context. No model
+// extraction is requested, and cancellation/failure retains recoverable work.
+func PersistPendingTimelineMemory(tl *aicommon.Timeline, persister TimelineMemoryPersister, ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
