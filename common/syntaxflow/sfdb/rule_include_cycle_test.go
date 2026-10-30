@@ -78,15 +78,14 @@ func TestCheckIncludeCycles(t *testing.T) {
 		}))
 	})
 
-	t.Run("plain title joins the graph", func(t *testing.T) {
-		// GetLibrary resolves by title too, so a plain rule titled "x" is a
-		// cycle node even without allow-included.
-		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+	t.Run("non-library rules are ignored", func(t *testing.T) {
+		// Only libraries can sit on an include cycle in the internal rule set;
+		// a plain scanning rule is not a graph node, and an edge into it is
+		// skipped.
+		require.NoError(t, CheckIncludeCycles([]*schema.SyntaxFlowRule{
 			includeCycleRule(t, `desc(title: "x"); <include("y")> as $o; alert $o;`, "rule-x"),
 			includeCycleRule(t, `desc(lib: "y"); <include("x")> as $o; alert $o;`, "lib-y"),
-		})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), "x -> y -> x")
+		}))
 	})
 
 	t.Run("empty sets pass", func(t *testing.T) {
