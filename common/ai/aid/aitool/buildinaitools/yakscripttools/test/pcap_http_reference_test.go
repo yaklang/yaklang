@@ -85,7 +85,7 @@ func TestPCAPHTTPDGAFixtureUsesStructuredWorkflow(t *testing.T) {
 	}
 	bodyPage := invoke("query_pcapdb", map[string]any{
 		"id": page.DatasetID, "query_type": "body_summary", "record_id": 7, "result_bytes": 65536,
-	}).(*pcapdb.ResultPage[pcapdb.ProtocolBodySummary])
+	}).(*pcapdb.ResultPage[pcapdb.HTTPBodyProfile])
 	require.Nil(t, bodyPage.Error)
 	require.Len(t, bodyPage.Items, 1)
 	body := bodyPage.Items[0]
