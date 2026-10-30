@@ -119,7 +119,7 @@ var loopAction_Finish = &LoopAction{
 func NativeDirectlyAnswerOptions() []aitool.ToolOption {
 	return []aitool.ToolOption{
 		aitool.WithStringParam("answer_payload",
-			aitool.WithParam_Description("Complete answer to hand over formally to the user, including long Markdown or code when needed. When choosing directly_answer, leave ordinary content empty; do not preview, repeat or paraphrase this answer there. Do not use an external AITAG."),
+			aitool.WithParam_Description("Complete answer to hand over formally to the user, including long Markdown or code when needed. When choosing directly_answer, leave ordinary content empty; do not preview, repeat or paraphrase this answer there."),
 			aitool.WithParam_Required(true),
 		),
 	}

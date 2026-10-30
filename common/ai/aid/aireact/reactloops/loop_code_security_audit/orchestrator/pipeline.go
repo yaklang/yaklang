@@ -77,7 +77,13 @@ func BuildInitTask(r aicommon.AIInvokeRuntime, state *model.AuditState) func(loo
 
 		runPhase3(loop, r, task, state, auditDirPath)
 
-		runPhase4(loop, r, task, state, auditDirPath)
+		if err := runPhase4(loop, r, task, state, auditDirPath); err != nil {
+			if persistErr := persist.PersistToAuditDir(state, auditDirPath); persistErr != nil {
+				log.Warnf("[CodeAudit] Failed to persist incomplete audit: %v", persistErr)
+			}
+			op.Failed(fmt.Errorf("审计报告生成未完成（已保存的数据和基础报告可用于恢复）: %w", err))
+			return
+		}
 
 		reportPath := state.GetFinalReportPath()
 		if reportPath == "" {
@@ -262,7 +268,7 @@ func runPhase3(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	emit.VerifyComplete(loop, "", state.GetStats())
 }
 
-func runPhase4(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string) {
+func runPhase4(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aicommon.AIStatefulTask, state *model.AuditState, auditDirPath string) error {
 	log.Infof("[CodeAudit] Starting Phase 4 (Report)")
 	reactloops.EmitActionLog(loop, util.ReportNodeID, "Phase 4：审计报告 / Phase 4: Audit report")
 	reactloops.EmitStatusI18n(loop, "正在整理安全审计报告", "Preparing the security audit report")
@@ -271,22 +277,28 @@ func runPhase4(loop *reactloops.ReActLoop, r aicommon.AIInvokeRuntime, task aico
 	reportLoop, err := phase4.BuildReportLoop(r, state)
 	if err != nil {
 		log.Errorf("[CodeAudit] Failed to build Phase 4 loop: %v", err)
-		return
-	}
-	if err := reportLoop.ExecuteWithExistedTask(util.NewSubTask(task, "phase4")); err != nil {
-		log.Warnf("[CodeAudit] Phase 4 returned error: %v (continuing)", err)
+	} else {
+		defer reportLoop.Release()
+		err = reportLoop.ExecuteWithExistedTask(util.NewSubTask(task, "phase4"))
+		if err != nil {
+			log.Warnf("[CodeAudit] Phase 4 returned error: %v", err)
+		}
 	}
 	if state.GetFinalReport() == "" {
+		if err == nil {
+			err = fmt.Errorf("report phase produced no completed report")
+		}
 		log.Warnf("[CodeAudit] Phase 4 did not produce report, generating fallback")
 		fallbackReport := GenerateFallbackReport(state)
-		state.SetFinalReport(fallbackReport)
 		savePath := filepath.Join(auditDirPath, "security_audit_report.md")
-		if err := reactloops.SaveAndPinFile(loop, savePath, []byte(fallbackReport)); err != nil {
-			log.Warnf("[CodeAudit] Failed to write fallback report: %v", err)
+		if saveErr := reactloops.SaveAndPinFile(loop, savePath, []byte(fallbackReport)); saveErr != nil {
+			return fmt.Errorf("%w; save fallback report: %v", err, saveErr)
 		} else {
+			state.SetFinalReport(fallbackReport)
 			state.SetFinalReportPath(savePath)
 			r.AddToTimeline("[REPORT_FALLBACK]", "已自动生成基础审计报告: "+savePath)
 			emit.ReportFallback(loop, savePath)
 		}
 	}
+	return err
 }

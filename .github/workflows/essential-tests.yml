@@ -677,6 +677,8 @@ jobs:
               ]
 
           - name: "Test AI Aid / React"
+            # Includes reactinit/TestFocusActionAndBuiltinToolNames and audit
+            # protocol contracts: native/text forks, streaming reports, finish.
             # 34 packages ran serially for ~8m of test time (plus compile), making
             # this the single longest job and therefore the critical path. Each
             # package already runs with -parallel 1, so two at a time matches the

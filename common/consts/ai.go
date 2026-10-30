@@ -55,7 +55,10 @@ const (
 
 // TieredAIConfig stores the tiered AI model configuration
 type TieredAIConfig struct {
-	SingleModelMode bool
+	RetryForever           bool
+	NetworkDebug           bool
+	ModelRequestsPerMinute int64
+	SingleModelMode        bool
 	// Enabled is retained for persisted-config compatibility. Runtime routing is
 	// enabled by the presence of TieredAIConfig and no longer reads this field.
 	Enabled bool
@@ -86,11 +89,26 @@ func SetTieredAIConfig(config *TieredAIConfig) {
 	tieredAIConfigLock.Lock()
 	defer tieredAIConfigLock.Unlock()
 	tieredAIConfig = config
+	close(modelRequestLimitChanged)
+	modelRequestLimitChanged = make(chan struct{})
 	if config != nil {
 		log.Debugf("Tiered AI config set: enabled=%v, policy=%s, intelligent=%d, lightweight=%d, vision=%d",
 			config.Enabled, config.RoutingPolicy,
 			len(config.IntelligentConfigs), len(config.LightweightConfigs), len(config.VisionConfigs))
 	}
+}
+
+var modelRequestLimitChanged = make(chan struct{})
+
+// ModelRequestLimit returns the engine-wide admission limit and a wake-up signal
+// so queued calls can immediately observe configuration changes. Zero is unlimited.
+func ModelRequestLimit() (int64, <-chan struct{}) {
+	tieredAIConfigLock.RLock()
+	defer tieredAIConfigLock.RUnlock()
+	if tieredAIConfig == nil {
+		return 0, modelRequestLimitChanged
+	}
+	return tieredAIConfig.ModelRequestsPerMinute, modelRequestLimitChanged
 }
 
 // GetTieredAIConfig returns the global tiered AI configuration
@@ -191,22 +209,24 @@ func thirdPartyConfigToModelConfig(cfg *ypb.ThirdPartyApplicationConfig) *ypb.AI
 	}
 
 	provider := &ypb.ThirdPartyApplicationConfig{
-		Type:           cfg.GetType(),
-		APIKey:         cfg.GetAPIKey(),
-		UserIdentifier: cfg.GetUserIdentifier(),
-		UserSecret:     cfg.GetUserSecret(),
-		Namespace:      cfg.GetNamespace(),
-		Domain:         cfg.GetDomain(),
-		BaseURL:        cfg.GetBaseURL(),
-		Endpoint:       cfg.GetEndpoint(),
-		EnableEndpoint: cfg.GetEnableEndpoint(),
-		EnableThinking: cfg.GetEnableThinking(),
-		WebhookURL:     cfg.GetWebhookURL(),
-		Disabled:       cfg.GetDisabled(),
-		Proxy:          cfg.GetProxy(),
-		NoHttps:        cfg.GetNoHttps(),
-		APIType:        cfg.GetAPIType(),
-		Headers:        cloneHTTPHeadersForAIConfig(cfg.GetHeaders()),
+		Script:                  cfg.GetScript(),
+		EnableNativeToolCalling: cfg.GetEnableNativeToolCalling(),
+		Type:                    cfg.GetType(),
+		APIKey:                  cfg.GetAPIKey(),
+		UserIdentifier:          cfg.GetUserIdentifier(),
+		UserSecret:              cfg.GetUserSecret(),
+		Namespace:               cfg.GetNamespace(),
+		Domain:                  cfg.GetDomain(),
+		BaseURL:                 cfg.GetBaseURL(),
+		Endpoint:                cfg.GetEndpoint(),
+		EnableEndpoint:          cfg.GetEnableEndpoint(),
+		EnableThinking:          cfg.GetEnableThinking(),
+		WebhookURL:              cfg.GetWebhookURL(),
+		Disabled:                cfg.GetDisabled(),
+		Proxy:                   cfg.GetProxy(),
+		NoHttps:                 cfg.GetNoHttps(),
+		APIType:                 cfg.GetAPIType(),
+		Headers:                 cloneHTTPHeadersForAIConfig(cfg.GetHeaders()),
 	}
 	if cfg.MaxTokens != nil {
 		v := *cfg.MaxTokens
@@ -270,3 +290,18 @@ const (
 	ModelExtraParamKey        = "model"
 	BuildinModelExtraParamKey = "isBuildin"
 )
+
+// IsAIRetryForeverEnabled reads the engine-wide recovery setting.
+func IsAIRetryForeverEnabled() bool {
+	tieredAIConfigLock.RLock()
+	defer tieredAIConfigLock.RUnlock()
+	return tieredAIConfig != nil && tieredAIConfig.RetryForever
+}
+
+// IsAINetworkDebugEnabled enables diagnostics only at model-call boundaries,
+// never for unrelated tool or application HTTP traffic.
+func IsAINetworkDebugEnabled() bool {
+	tieredAIConfigLock.RLock()
+	defer tieredAIConfigLock.RUnlock()
+	return tieredAIConfig != nil && tieredAIConfig.NetworkDebug
+}

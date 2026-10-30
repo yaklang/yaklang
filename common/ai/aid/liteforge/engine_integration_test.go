@@ -46,7 +46,7 @@ func liteForgeResponse(c aicommon.AICallerConfigIf, req *aicommon.AIRequest, nat
 	return resp
 }
 
-func TestLiteForgeAIMDefaultsToTextAndPublicBothProtocols(t *testing.T) {
+func TestLiteForgeAIMInheritsSessionAndPublicBothProtocols(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		for _, task := range []string{"extract", "classify", "summarize"} {
 			t.Run(fmt.Sprintf("%s/native_%v", task, native), func(t *testing.T) {
@@ -60,8 +60,8 @@ func TestLiteForgeAIMDefaultsToTextAndPublicBothProtocols(t *testing.T) {
 					wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 					require.Empty(t, wire.Tools, "tools must be supplied by projection")
 					projected := aiprojection.ProjectAndObserve("liteforge-yak-test", req.GetPrompt())
-					// ReAct's helper stays text even when the parent loop is native.
-					wantNative := calls == 2 && native
+					// ReAct helpers and standalone explicit calls use the selected protocol.
+					wantNative := native
 					require.Equal(t, wantNative, len(projected.Tools) == 1)
 					require.Equal(t, "system", projected.Messages[0].Role)
 					return liteForgeResponse(c, req, wantNative, value), nil
@@ -148,12 +148,12 @@ func TestLiteForgePublicDefaultAndProtocolOverride(t *testing.T) {
 	}
 }
 
-func TestLiteForgeConfigAndAuxiliaryDoNotInheritProtocol(t *testing.T) {
+func TestLiteForgeConfigAndAuxiliaryInheritProtocol(t *testing.T) {
 	for _, parentNative := range []bool{false, true} {
 		t.Run(fmt.Sprint(parentNative), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			wantNative, calls := false, 0
+			wantNative, calls := parentNative, 0
 			cfg := aicommon.NewConfig(ctx, aicommon.WithEnableFunctionCallMode(parentNative),
 				aicommon.WithDisableCreateDBRuntime(true), aicommon.WithDisableAutoSkills(true),
 				aicommon.WithNoOpMemoryTriage(), aicommon.WithSingleAIModelMode(false), aicommon.WithAITransactionAutoRetry(1),

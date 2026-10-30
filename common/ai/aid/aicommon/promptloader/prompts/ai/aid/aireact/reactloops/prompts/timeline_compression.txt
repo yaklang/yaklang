@@ -32,28 +32,30 @@
 
 ## 输出
 
-文本输出模式只输出一个 @action 为 compress_context 的 JSON 对象，不加解释，不用 Markdown 围栏。原生工具调用模式只调用一次 compress_context 函数，填写同样的参数，不额外调用其他动作；函数参数无需包含 @action。
+{{ if .FunctionCallMode }}本轮使用原生工具调用。只调用一次 compress_context 函数，不额外调用其他动作。下面的 JSON 仅展示函数参数，必须通过 tool_calls 提交；不要写入 content，不输出正文、解释或 Markdown 围栏。
+{{ else }}本轮使用文本输出。只输出一个 @action 为 compress_context 的 JSON 对象，不加解释，不用 Markdown 围栏。
+{{ end }}
 
 retain_timeline 是逗号分隔的选择字符串，不限于一个 ID 或一段范围。可以同时保留多个互不连续的段，例如 "3-8,20-26,41-45"；也可以混合散落的单个 ID 和多个段，例如 "3-8,12,20-26,37,41-45"。每段都是闭区间，起止必须是上文普通历史里实际存在的 timeline item ID。未选中的普通历史交给 summary，不能用最小到最大 ID 的一个大范围代替散落选择。空字符串 "" 表示普通历史全部由 summary 概括。
 
 例如上文普通历史中 ID=12 的记录仍需原样引用，旧技能已经不用：
 
-{"@action":"compress_context","summary":"旧扫描路径已失败并被放弃。刚刚的验证确认认证绕过仍成立，证据 auth-bypass 继续作为下一步依据。\n本次淘汰的 promoted\n- skill legacy-scan：后续任务不再使用。","retain_timeline":"12","retire_skill_names":["legacy-scan"],"retire_evidence_ids":[],"memory_entities":[]}
+{{ if .FunctionCallMode }}{ {{ else }}{"@action":"compress_context",{{ end }}"summary":"旧扫描路径已失败并被放弃。刚刚的验证确认认证绕过仍成立，证据 auth-bypass 继续作为下一步依据。\n本次淘汰的 promoted\n- skill legacy-scan：后续任务不再使用。","retain_timeline":"12","retire_skill_names":["legacy-scan"],"retire_evidence_ids":[],"memory_entities":[]}
 
 另一轮里，上文 ID=18 到 ID=23 的测试记录仍关系到未完成的验证，技能和证据都还要用，工具 Schema 虽然很长也不能删：
 
-{"@action":"compress_context","summary":"配置合并的显式空值已修复；嵌套配置的验证仍未完成，保留这一段测试记录作为继续修改的依据。","retain_timeline":"18-23","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
+{{ if .FunctionCallMode }}{ {{ else }}{"@action":"compress_context",{{ end }}"summary":"配置合并的显式空值已修复；嵌套配置的验证仍未完成，保留这一段测试记录作为继续修改的依据。","retain_timeline":"18-23","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
 
 多个散落段：ID=3-8 是问题复现，ID=20-26 是修复验证，ID=41-45 是尚未完成的回归。中间的探索记录已经过时，不应连成 "3-45" 一起保留：
 
-{"@action":"compress_context","summary":"初始复现已经定位边界条件，修复验证已通过；最后一段回归尚未完成。保留复现、验证和待完成回归三个原文段，中间重复探索及被替代的方案已合并到此摘要。","retain_timeline":"3-8,20-26,41-45","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
+{{ if .FunctionCallMode }}{ {{ else }}{"@action":"compress_context",{{ end }}"summary":"初始复现已经定位边界条件，修复验证已通过；最后一段回归尚未完成。保留复现、验证和待完成回归三个原文段，中间重复探索及被替代的方案已合并到此摘要。","retain_timeline":"3-8,20-26,41-45","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
 
 散落段与单个 ID 混合：除上述三个段以外，ID=12 是后续必须遵守的失败约束，ID=37 是仍需引用的独立验证结论：
 
-{"@action":"compress_context","summary":"已确认问题边界并完成主要修复，剩余回归仍需继续；保留三个关键原文段、失败约束 12 和独立验证结论 37，其余普通历史已经合并。\n本次淘汰的 promoted\n- evidence old-probe：其结论已被后续验证覆盖。","retain_timeline":"3-8,12,20-26,37,41-45","retire_skill_names":[],"retire_evidence_ids":["old-probe"],"memory_entities":[]}
+{{ if .FunctionCallMode }}{ {{ else }}{"@action":"compress_context",{{ end }}"summary":"已确认问题边界并完成主要修复，剩余回归仍需继续；保留三个关键原文段、失败约束 12 和独立验证结论 37，其余普通历史已经合并。\n本次淘汰的 promoted\n- evidence old-probe：其结论已被后续验证覆盖。","retain_timeline":"3-8,12,20-26,37,41-45","retire_skill_names":[],"retire_evidence_ids":["old-probe"],"memory_entities":[]}
 
 全部普通历史都已完成，只需摘要承接时：
 
-{"@action":"compress_context","summary":"配置修复和回归验证均已完成；当前等待用户确认下一步。","retain_timeline":"","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
+{{ if .FunctionCallMode }}{ {{ else }}{"@action":"compress_context",{{ end }}"summary":"配置修复和回归验证均已完成；当前等待用户确认下一步。","retain_timeline":"","retire_skill_names":[],"retire_evidence_ids":[],"memory_entities":[]}
 
 memory_entities 不是另一份 summary。没有以后仍会改变判断的长期偏好、稳定约束或已验证知识时返回 []。当前进度和一次性路径不要写进去。

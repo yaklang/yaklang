@@ -1,6 +1,7 @@
 package reactloops
 
 // WithFunctionCallActionVariants selects static native variants for this loop.
+// New loops enable these by default; the option remains for existing callers.
 // It does not register names or bypass visibility/policy. Selection happens
 // after options, so an explicit text-mode override works in either option order.
 func WithFunctionCallActionVariants() ReActLoopOption {

@@ -282,11 +282,13 @@ func TestBatchSetRiskTags(t *testing.T) {
 		SetSeverity     string   `json:"setSeverity"`
 		SeverityScore   float64  `json:"severityScore"`
 	}
+	synced := make(chan struct{}, 1)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/set/risk/tags", r.URL.Path)
 		require.Equal(t, "test-token", r.Header.Get("Authorization"))
 		require.NoError(t, json.NewDecoder(r.Body).Decode(&gotRiskReq))
 		_, _ = w.Write([]byte(`{}`))
+		synced <- struct{}{}
 	}))
 	defer ts.Close()
 	oldBase := consts.GetOnlineBaseUrl()
@@ -312,6 +314,11 @@ func TestBatchSetRiskTags(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Greater(t, resp.UpdatedCount, int64(0))
+	select {
+	case <-synced:
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for online sync")
+	}
 
 	assert.NotEmpty(t, gotRiskReq.Hash)
 	assert.Contains(t, gotRiskReq.Hash, risk.Hash)

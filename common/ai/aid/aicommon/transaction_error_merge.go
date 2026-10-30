@@ -32,6 +32,8 @@ func isAICallbackInfrastructureError(err error) bool {
 	}
 	msg := strings.ToLower(err.Error())
 	markers := []string{
+		"yak-script:",
+		"yak-script execution failed:",
 		"context deadline exceeded",
 		"context canceled",
 		"i/o timeout",

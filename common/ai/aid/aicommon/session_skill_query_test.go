@@ -41,7 +41,7 @@ func TestBuildSessionSkillListsSplitLoadedAndAvailable(t *testing.T) {
 	require.Equal(t, CapabilityInventoryStageLoaded, loaded.Skills[0].Stage)
 	require.Equal(t, CapabilityInventorySkillLoadLoaded, loaded.Skills[0].Data.(map[string]any)["skill_load_state"])
 
-	available, err := BuildSessionAvailableSkillInventory(mgr, 1, 100)
+	available, err := BuildSessionAvailableSkillInventory(mgr, "", 1, 100)
 	require.NoError(t, err)
 	require.Equal(t, 1, available.Total)
 	require.Len(t, available.Skills, 1)
@@ -57,7 +57,7 @@ func TestBuildSessionSkillListsSplitLoadedAndAvailable(t *testing.T) {
 
 	require.True(t, mgr.UnloadSkill("loaded"))
 	require.Empty(t, BuildSessionLoadedSkillInventory(mgr).Skills)
-	available, err = BuildSessionAvailableSkillInventory(mgr, 1, 100)
+	available, err = BuildSessionAvailableSkillInventory(mgr, "", 1, 100)
 	require.NoError(t, err)
 	require.Equal(t, 2, available.Total)
 }
@@ -80,7 +80,7 @@ func TestBuildSessionSkillInventoryPaginatesWithoutPromptBudget(t *testing.T) {
 	require.Len(t, loaded.Skills, 1)
 	require.Equal(t, "loaded", loaded.Skills[0].Name)
 
-	first, err := BuildSessionAvailableSkillInventory(mgr, 1, 40)
+	first, err := BuildSessionAvailableSkillInventory(mgr, "", 1, 40)
 	require.NoError(t, err)
 	require.Len(t, first.Skills, 40)
 	require.Equal(t, 100, first.Total)
@@ -88,7 +88,7 @@ func TestBuildSessionSkillInventoryPaginatesWithoutPromptBudget(t *testing.T) {
 	require.Equal(t, 1, first.Page)
 	require.Equal(t, 40, first.PageSize)
 
-	last, err := BuildSessionAvailableSkillInventory(mgr, 3, 40)
+	last, err := BuildSessionAvailableSkillInventory(mgr, "", 3, 40)
 	require.NoError(t, err)
 	require.Len(t, last.Skills, 20)
 	require.Equal(t, 100, last.Total)
@@ -120,7 +120,7 @@ func TestBuildSessionSkillInventoryIncludesLazyDatabaseSkills(t *testing.T) {
 	require.Len(t, metas, 3)
 	mgr := aiskillloader.NewSkillsContextManager(loader)
 
-	inventory, err := BuildSessionAvailableSkillInventory(mgr, 1, 100)
+	inventory, err := BuildSessionAvailableSkillInventory(mgr, "", 1, 100)
 	require.NoError(t, err)
 	require.Equal(t, 3, inventory.Total)
 	require.Len(t, inventory.Skills, 3)
@@ -160,13 +160,13 @@ func TestBuildSessionAvailableSkillInventoryMergesLocalAndDatabaseSources(t *tes
 	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
 	require.NoError(t, mgr.LoadSkill("local-mid"))
 
-	first, err := BuildSessionAvailableSkillInventory(mgr, 1, 2)
+	first, err := BuildSessionAvailableSkillInventory(mgr, "", 1, 2)
 	require.NoError(t, err)
 	require.Equal(t, 4, first.Total)
 	require.Equal(t, []string{"db-alpha", "db-omega"}, []string{first.Skills[0].Name, first.Skills[1].Name})
 	require.True(t, first.HasMore)
 
-	second, err := BuildSessionAvailableSkillInventory(mgr, 2, 2)
+	second, err := BuildSessionAvailableSkillInventory(mgr, "", 2, 2)
 	require.NoError(t, err)
 	require.Equal(t, 4, second.Total)
 	require.Equal(t, []string{"local-alpha", "local-omega"}, []string{second.Skills[0].Name, second.Skills[1].Name})
@@ -175,6 +175,97 @@ func TestBuildSessionAvailableSkillInventoryMergesLocalAndDatabaseSources(t *tes
 	loaded := BuildSessionLoadedSkillInventory(mgr)
 	require.Equal(t, 1, loaded.Total)
 	require.Equal(t, "local-mid", loaded.Skills[0].Name)
+}
+
+func TestBuildSessionAvailableSkillSearchFiltersFullCatalog(t *testing.T) {
+	db := newAutoloadTestDB(t)
+	defer db.Close()
+	dbVFS := filesys.NewVirtualFs()
+	dbVFS.AddFile("db-scan/SKILL.md", buildSkillMD("db-scan", "Database vulnerability scan", "DB_SCAN"))
+	dbVFS.AddFile("db-other/SKILL.md", buildSkillMD("db-other", "Database unrelated guide", "DB_OTHER"))
+	dbSource, err := aiskillloader.NewAutoSkillLoader(aiskillloader.WithAutoLoad_FileSystem(dbVFS))
+	require.NoError(t, err)
+	persisted, err := aiskillloader.ImportAISkillsToDB(db, dbSource)
+	require.NoError(t, err)
+	require.Equal(t, 2, persisted)
+
+	localVFS := filesys.NewVirtualFs()
+	for i := 0; i < 60; i++ {
+		name := fmt.Sprintf("scan-%03d", i)
+		localVFS.AddFile(name+"/SKILL.md", buildSkillMD(name, "Local vulnerability scan", "LOCAL_SCAN"))
+	}
+	localVFS.AddFile("loaded-scan/SKILL.md", buildSkillMD("loaded-scan", "Loaded vulnerability scan", "LOADED_SCAN"))
+	localVFS.AddFile("plain-note/SKILL.md", buildSkillMD("plain-note", "Unrelated guide", "PLAIN"))
+	loader, err := aiskillloader.NewAutoSkillLoader(
+		aiskillloader.WithAutoLoad_FileSystem(localVFS),
+		aiskillloader.WithAutoLoad_Database(db),
+	)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
+	require.NoError(t, mgr.LoadSkill("loaded-scan"))
+
+	first, err := BuildSessionAvailableSkillInventory(mgr, "scan", 1, 50)
+	require.NoError(t, err)
+	require.Equal(t, "scan", first.Query)
+	require.Equal(t, 61, first.Total)
+	require.Len(t, first.Skills, 50)
+	require.True(t, first.HasMore)
+	require.Equal(t, "db-scan", first.Skills[0].Name)
+	for _, item := range first.Skills {
+		require.NotEqual(t, "loaded-scan", item.Name)
+		require.Equal(t, CapabilityInventoryStageMetadata, item.Stage)
+	}
+
+	second, err := BuildSessionAvailableSkillInventory(mgr, "scan", 2, 50)
+	require.NoError(t, err)
+	require.Equal(t, 61, second.Total)
+	require.Len(t, second.Skills, 11)
+	require.False(t, second.HasMore)
+	require.Equal(t, "scan-059", second.Skills[len(second.Skills)-1].Name)
+	repeated, err := BuildSessionAvailableSkillInventory(mgr, "scan", 2, 50)
+	require.NoError(t, err)
+	require.Equal(t, second.Skills[0].Name, repeated.Skills[0].Name)
+	require.Equal(t, second.Skills[len(second.Skills)-1].Name, repeated.Skills[len(repeated.Skills)-1].Name)
+
+	databaseOnly, err := BuildSessionAvailableSkillInventory(mgr, "database", 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, 2, databaseOnly.Total)
+	require.Equal(t, []string{"db-other", "db-scan"}, []string{databaseOnly.Skills[0].Name, databaseOnly.Skills[1].Name})
+
+	blank, err := BuildSessionAvailableSkillInventory(mgr, "  ", 1, 100)
+	require.NoError(t, err)
+	require.Empty(t, blank.Query)
+	require.Equal(t, 63, blank.Total)
+	for _, item := range blank.Skills {
+		require.NotEqual(t, "loaded-scan", item.Name)
+	}
+}
+
+func TestBuildSessionAvailableSkillSearchUsesGenericLoaderMetadata(t *testing.T) {
+	vfs := filesys.NewVirtualFs()
+	vfs.AddFile("archive-only/SKILL.md", buildSkillMD(
+		"archive-only",
+		"Archived security guide",
+		"ARCHIVE_ONLY",
+	))
+	vfs.AddFile("loaded-archive/SKILL.md", buildSkillMD(
+		"loaded-archive",
+		"Archived security notes",
+		"LOADED_ARCHIVE",
+	))
+	loader, err := aiskillloader.NewFSSkillLoader(vfs)
+	require.NoError(t, err)
+	mgr := aiskillloader.NewSkillsContextManager(loader)
+	bindTestTimeline(mgr, NewConfig(context.Background(), WithDisableAutoSkills(true)))
+	require.NoError(t, mgr.LoadSkill("loaded-archive"))
+
+	result, err := BuildSessionAvailableSkillInventory(mgr, "archived security", 1, 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, result.Total)
+	require.Len(t, result.Skills, 1)
+	require.Equal(t, "archive-only", result.Skills[0].Name)
+	require.Equal(t, CapabilityInventoryStageMetadata, result.Skills[0].Stage)
 }
 
 func TestBuildSessionSkillDetailUsesSkillMDBeforeLoading(t *testing.T) {
@@ -257,7 +348,7 @@ func TestBuildSessionSkillDetailUnknownAndEmptyName(t *testing.T) {
 	_, err = BuildSessionSkillDetail(mgr, "missing")
 	require.ErrorContains(t, err, `skill "missing" not found`)
 	require.Empty(t, BuildSessionLoadedSkillInventory(nil).Skills)
-	inventory, err := BuildSessionAvailableSkillInventory(nil, 1, 100)
+	inventory, err := BuildSessionAvailableSkillInventory(nil, "", 1, 100)
 	require.NoError(t, err)
 	require.Empty(t, inventory.Skills)
 }

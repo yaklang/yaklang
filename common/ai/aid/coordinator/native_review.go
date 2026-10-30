@@ -17,6 +17,9 @@ import (
 // events. AI risk judging is one native call, not another ReAct loop or JSON
 // response-format transaction. Ordinary response text never authorizes a tool.
 func NativeRiskReview(ctx context.Context, cfg *aicommon.Config, ep *aicommon.Endpoint) (*aicommon.Action, error) {
+	if !cfg.EnableFunctionCallMode {
+		return aicommon.DefaultAIAssistantRiskControl(ctx, cfg, ep)
+	}
 	materials, _ := json.Marshal(ep.GetReviewMaterials())
 	tool := aispec.Tool{Type: "function", Function: aispec.ToolFunction{Name: "review_risk", Description: "Judge the requested operation using actual review materials. risk_score is 0 (low) to 1 (high).", Parameters: map[string]any{
 		"type": "object", "properties": map[string]any{"risk_score": map[string]any{"type": "number", "minimum": 0, "maximum": 1}, "reason": map[string]any{"type": "string"}}, "required": []string{"risk_score", "reason"}, "additionalProperties": false,

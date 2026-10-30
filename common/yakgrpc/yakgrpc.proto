@@ -2356,6 +2356,8 @@ message AIStartParams {
   bool DisableMemoryTriage = 49;
   // Session-local opt-in; a globally enabled single-model mode still wins.
   bool SingleModelMode = 50;
+  // Opt-in complete model HTTP diagnostics. Includes credentials/prompts, stored locally and exported with AI logs.
+  optional bool NetworkDebug = 52;
 }
 
 message AIExecutionStrategy {
@@ -3454,6 +3456,10 @@ message ThirdPartyApplicationConfig {
   optional double FrequencyPenalty = 22;
   optional string ReasoningEffort = 23;
   optional bool EnableThinkingOpt = 24;
+  // yak-script: the complete provider implementation; connection and model options live in the source.
+  string Script = 25;
+  // yak-script: opt into native tool_calls; false uses text actions.
+  bool EnableNativeToolCalling = 26;
 }
 
 message DiagnoseNetworkRequest {
@@ -9612,6 +9618,12 @@ message AIGlobalConfig {
   string AIPlanPrompt = 10;
   // Single-model routing takes precedence over tier selection without deleting tier lists.
   bool SingleModelMode = 11;
+  // Retry failed model calls and invalid model output until recovery or cancellation.
+  bool RetryForever = 12;
+  // Opt-in complete HTTP diagnostics for subsequent model calls on this engine.
+  bool NetworkDebug = 13;
+  // Engine-wide model attempts per minute; zero disables proactive rate limiting.
+  int64 ModelRequestsPerMinute = 14;
 }
 
 // Local Model Messages

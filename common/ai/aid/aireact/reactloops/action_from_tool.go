@@ -63,6 +63,7 @@ func ConvertAIToolToLoopAction(tool *aitool.Tool) *LoopAction {
 		VerboseNameI18n:   &label,
 		AsyncMode:         false,
 		ActionType:        tool.GetName(),
+		SourceToolName:    tool.GetName(),
 		Description:       tool.GetDescription(),
 		NativeDescription: tool.GetDescription(),
 		Options:           options,

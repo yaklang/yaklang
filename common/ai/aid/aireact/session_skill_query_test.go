@@ -73,6 +73,28 @@ func TestSessionSkillLoadedSyncReturnsAllWithoutPagination(t *testing.T) {
 	require.Equal(t, aicommon.CapabilityInventoryStageLoaded, inventory.Skills[0].Stage)
 }
 
+func TestSessionSkillAvailableSyncSearchPagination(t *testing.T) {
+	react, events := newSessionSkillTestRuntime(t, false)
+	require.NoError(t, react.HandleSyncTypeLoadSkillEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_LOAD_SKILL, SyncID: "load-before-search",
+		SyncJsonInput: `{"skill_names":["session"]}`,
+	}))
+	require.NoError(t, react.HandleSyncTypeSkillAvailableEvent(&ypb.AIInputEvent{
+		SyncType: aicommon.SYNC_TYPE_SKILL_AVAILABLE, SyncID: "search-available",
+		SyncJsonInput: `{"keyword":"guide","page":1,"page_size":1}`,
+	}))
+	var page aicommon.SessionSkillAvailablePage
+	events.read(t, "skill_available", &page)
+	require.Equal(t, "guide", page.Query)
+	require.Equal(t, 1, page.Total)
+	require.Equal(t, 1, page.Page)
+	require.Equal(t, 1, page.PageSize)
+	require.Len(t, page.Skills, 1)
+	require.Equal(t, "available", page.Skills[0].Name)
+	require.Equal(t, aicommon.CapabilityInventoryStageMetadata, page.Skills[0].Stage)
+	require.False(t, page.HasMore)
+}
+
 func TestSessionSkillDetailSyncLoadedAndAvailable(t *testing.T) {
 	react, events := newSessionSkillTestRuntime(t, false)
 	request := func(syncID, body string) aicommon.SessionSkillDetail {

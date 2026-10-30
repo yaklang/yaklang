@@ -94,10 +94,11 @@ func TestMUSTPASS_Fp_GMTls(t *testing.T) {
 		opts   []fp.ConfigOption
 	}
 	tests := []struct {
-		name    string
-		args    args
-		want    fp.PortState
-		wantErr assert.ErrorAssertionFunc
+		name        string
+		args        args
+		want        fp.PortState
+		wantService string
+		wantErr     assert.ErrorAssertionFunc
 	}{
 		{
 			name: "GM Tls 站点启用 all() 时，应当返回 OPEN",
@@ -112,8 +113,9 @@ func TestMUSTPASS_Fp_GMTls(t *testing.T) {
 					fp.WithProbeTimeoutHumanRead(2.0), // 添加2秒probe超时
 				},
 			},
-			want:    fp.OPEN,
-			wantErr: assert.NoError,
+			want:        fp.OPEN,
+			wantService: "ssl",
+			wantErr:     assert.NoError,
 		},
 		{
 			name: "GM Tls 站点启用 only web() 时，应当返回 CLOSE",
@@ -140,6 +142,9 @@ func TestMUSTPASS_Fp_GMTls(t *testing.T) {
 			}
 			for v := range got {
 				assert.Equalf(t, tt.want, v.State, "scanFingerprint(%v, %v)", tt.args.target, tt.args.port)
+				if tt.wantService != "" {
+					assert.Equal(t, tt.wantService, v.GetServiceName(), "all() must fall back to service fingerprinting when HTTP fails")
+				}
 			}
 		})
 	}

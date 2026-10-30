@@ -28,10 +28,11 @@ func makeToolForwardAction(
 	toolOpts []aitool.ToolOption,
 ) func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
 	return func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-		return reactloops.WithRegisterLoopAction(
+		return reactloops.WithRegisterLoopActionWithStreamField(
 			actionName,
 			desc,
 			toolOpts,
+			nil,
 			nil,
 			func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 				invoker := loop.GetInvoker()
@@ -63,17 +64,19 @@ func makeToolForwardAction(
 				reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", actionName, len(content), targetToolName, len(content)))
 				op.Continue()
 			},
+			func(action *reactloops.LoopAction) { action.SourceToolName = targetToolName },
 		)
 	}
 }
 
 var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOption {
-	return reactloops.WithRegisterLoopAction(
+	return reactloops.WithRegisterLoopActionWithStreamField(
 		"web_search",
 		"OSINT web search for exposed docs, tech stack, or related assets (authorized use only).",
 		[]aitool.ToolOption{
 			aitool.WithStringParam("query", aitool.WithParam_Required(true), aitool.WithParam_Description("Search query.")),
 		},
+		nil,
 		nil,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			invoker := loop.GetInvoker()
@@ -106,6 +109,7 @@ var webSearchAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActLoopOptio
 			reactloops.EmitActionLog(loop, infosecReconToolNodeID, fmt.Sprintf("完成: %s (%d bytes) / Done: %s (%d bytes)", query, len(content), query, len(content)))
 			op.Continue()
 		},
+		func(action *reactloops.LoopAction) { action.SourceToolName = "web_search" },
 	)
 }
 

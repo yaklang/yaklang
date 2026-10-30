@@ -39,40 +39,19 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	}
 	var inspectResults []*netx.TLSInspectResult
 	var tlsChecked bool
-	isOpen, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	_, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 	if err != nil {
-		if !isOpen {
-			f.log("port is closed: %v", err)
-			return &MatchResult{
-				Target:         host,
-				Port:           port,
-				State:          result.State,
-				Reason:         err.Error(),
-				ProtocolFields: result.ProtocolFields,
-				Fingerprint: &FingerprintInfo{
-					IP:                ip.String(),
-					Port:              port,
-					CheckedTLS:        tlsChecked,
-					TLSInspectResults: inspectResults,
-				},
-			}, nil
+		// TCP reachability alone is not a successful web probe. Preserve the
+		// incoming state and fingerprints so only_web keeps its classification
+		// and web-first scans can still fall back to service fingerprinting.
+		f.log("web probe failed: %v", err)
+		result.Reason = err.Error()
+		if result.Fingerprint == nil {
+			result.Fingerprint = &FingerprintInfo{IP: ip.String(), Port: port}
 		}
-		f.log("error occurred but port is open: %v", err)
-		fastResult := &MatchResult{
-			Target:         host,
-			Port:           port,
-			State:          OPEN,
-			Reason:         "",
-			ProtocolFields: result.ProtocolFields,
-			Fingerprint: &FingerprintInfo{
-				IP:                ip.String(),
-				Port:              port,
-				CheckedTLS:        tlsChecked,
-				TLSInspectResults: inspectResults,
-			},
-		}
-		f.reportOpen(fastResult)
-		return fastResult, nil
+		result.Fingerprint.CheckedTLS = tlsChecked
+		result.Fingerprint.TLSInspectResults = inspectResults
+		return result, nil
 	}
 	if redirectInfos == nil {
 		f.log("no redirect info found")
@@ -179,14 +158,11 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 			CPEs:           currentCPE,
 		}
 		httpflows = append(httpflows, flow)
-		f.matcher.Route = func(ctx context.Context, webPath string) ([]byte, error) {
+		route := func(ctx context.Context, webPath string) ([]byte, error) {
 			target := utils2.HostPort(host, port)
 			packet := buildWebPathRequestPacket(webPath, target)
 			f.log("sending request to path: %s", webPath)
-			var ok bool
-			var flow []*lowhttp.RedirectFlow
-			var err error
-			ok, tlsChecked, inspectResults, flow, err = f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked, ctx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+			ok, _, _, flow, err := f.fetchBannerFromHostPortWithTLSSkipped(tlsChecked, ctx, packet, inspectResults, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 			if err != nil {
 				return nil, err
 			}
@@ -202,20 +178,17 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 				Port:     port,
 				Path:     path,
 			}
-			cached := map[string][]byte{}
 			if path == "" || path == "/" {
 				res.Data = info.Response
 				return res, nil
 			}
-			if v, ok := cached[path]; ok {
-				res.Data = v
-				return res, nil
+			if !config.ActiveMode {
+				return nil, fmt.Errorf("%w: %s", fingerprint.ErrActiveProbeDisabled, path)
 			}
-			data, err := f.matcher.Route(ctx, path)
+			data, err := route(ctx, path)
 			if err != nil {
 				return nil, err
 			}
-			cached[path] = data
 			return rule.NewHttpResource(data), nil
 		})
 
@@ -294,17 +267,10 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 	_ error,
 ) {
 	f.log("start to fetch banner from host: %v port: %v", host, port)
-	ctx, cancel := context.WithTimeout(baseCtx, f.Config.ProbeTimeout)
-	defer cancel()
-
-	connectTimeout := 10 * time.Second
-	if ddl, ok := ctx.Deadline(); ok {
-		connectTimeout = ddl.Sub(time.Now())
-		if connectTimeout <= 0 {
-			connectTimeout = 10 * time.Second
-		}
+	tlsChecked = checkedTls
+	if err := baseCtx.Err(); err != nil {
+		return checkedTls, checkedTls, tlsInspectResults, nil, err
 	}
-	f.log("fetchBannerFromHostPort timeout set to: %v", connectTimeout)
 
 	portInt, _ := strconv.Atoi(fmt.Sprint(port))
 	target := utils2.HostPort(host, port)
@@ -315,7 +281,9 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 	var isTls bool = len(tlsInspectResults) > 0
 	if !isTls && !checkedTls {
 		var inspectErr error
-		tlsInspectResults, inspectErr = netx.TLSInspectContext(ctx, target)
+		tlsCtx, cancel := context.WithTimeout(baseCtx, f.Config.ProbeTimeout)
+		tlsInspectResults, inspectErr = netx.TLSInspectContext(tlsCtx, target)
+		cancel()
 		if inspectErr != nil {
 			// TLS 探测自己会拨号. 拨号失败说明端口关闭, 不再做 HTTP, 也不再换一种 TLS 握手.
 			f.log("tls inspect dial %v failed, skip http: %v", target, inspectErr)
@@ -324,6 +292,17 @@ func (f *Matcher) fetchBannerFromHostPortWithTLSSkipped(checkedTls bool, baseCtx
 		isTls = len(tlsInspectResults) > 0
 		tlsChecked = true
 	}
+	// TLS detection and the HTTP request are separate probes. A plaintext
+	// service can consume the TLS budget and must still get an HTTP attempt.
+	// Redirects share this HTTP context, so each hop cannot restart the budget.
+	ctx, cancel := context.WithTimeout(baseCtx, f.Config.ProbeTimeout)
+	defer cancel()
+	if err := ctx.Err(); err != nil {
+		return tlsChecked, tlsChecked, tlsInspectResults, nil, err
+	}
+	deadline, _ := ctx.Deadline()
+	connectTimeout := time.Until(deadline)
+	f.log("fetchBannerFromHostPort timeout set to: %v", connectTimeout)
 
 	cost := time.Since(start)
 	f.log("target: %v isTls: %v cost: %v", target, tlsInspectResults, cost)
@@ -336,9 +315,13 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		f.log("using custom packet")
 		packet = packet2
 	}
-	var isOpen bool
+	// Successful TLS inspection includes a successful TCP dial, even when
+	// the service does not speak TLS or its HTTP response later times out.
+	isOpen := tlsChecked
 	f.log("sending HTTP request to target")
 	rspDetail, err := lowhttp.HTTP(
+		lowhttp.WithContext(ctx),
+		lowhttp.WithTimeout(connectTimeout),
 		lowhttp.WithRuntimeId(runtimeId),
 		lowhttp.WithHttps(isTls),
 		lowhttp.WithHost(host),
@@ -350,11 +333,13 @@ Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/w
 		lowhttp.WithConnectTimeout(connectTimeout),
 		lowhttp.WithConnPool(f.Config.WebScanDisableConnPool),
 	)
+	if rspDetail != nil {
+		isOpen = isOpen || rspDetail.PortIsOpen
+	}
 	if err != nil {
 		f.log("HTTP request failed: %v", err)
 		return isOpen, tlsChecked, tlsInspectResults, nil, utils2.Errorf("lowhttp.HTTP failed: %s", err)
 	}
-	isOpen = rspDetail.PortIsOpen
 	f.log("port open status: %v", isOpen)
 	return isOpen, tlsChecked, tlsInspectResults, rspDetail.RedirectRawPackets, nil
 }

@@ -409,6 +409,10 @@ func TestAsyncGUISessionReplay(t *testing.T) {
 						}
 					}()
 					if strings.Contains(req.GetPrompt(), "Runtime supports detachment:") {
+						wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+						if (wire.ToolCallCallback != nil) != native {
+							return nil, errors.New("interval review did not inherit the session protocol")
+						}
 						if reviews.Add(1) > 1 {
 							reviewInFlightOnce.Do(func() { close(reviewInFlight) })
 							<-req.GetContext().Done()
@@ -417,7 +421,7 @@ func TestAsyncGUISessionReplay(t *testing.T) {
 						if err := guiAwait(ctx, g.started); err != nil {
 							return nil, err
 						}
-						return guiRespond(c, req, false, guiReplayStep{"interval-toolcall-review", aitool.InvokeParams{"decision": "detach", "reason": "healthy independent background work", "progress_summary": "started", "estimated_remaining_time": "unknown"}})
+						return guiRespond(c, req, native, guiReplayStep{"interval-toolcall-review", aitool.InvokeParams{"decision": "detach", "reason": "healthy independent background work", "progress_summary": "started", "estimated_remaining_time": "unknown"}})
 					}
 					if aicommon.IsVerifySatisfactionPrompt(req.GetPrompt()) {
 						return guiRespond(c, req, false, guiReplayStep{"verify-satisfaction", aitool.InvokeParams{"user_satisfied": false, "reasoning": "Continue the recorded scenario"}})

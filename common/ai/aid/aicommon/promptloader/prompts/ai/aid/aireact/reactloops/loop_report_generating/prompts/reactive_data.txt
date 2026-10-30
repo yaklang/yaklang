@@ -1,3 +1,7 @@
+{{ if .FunctionCallMode }}
+## 报告编辑协议
+通过原生工具调用执行动作。write_section、modify_section、insert_section 必须在 arguments.content 中提供完整正文或补丁。每个调用使用自己的正文参数。报告保存且核对完成后调用 finish。
+{{ else }}
 ## 写报告时必须使用以下格式
 
 当你使用 `write_section` 时，必须这样输出：
@@ -10,6 +14,8 @@
 ```
 
 **注意：Nonce 是 `{{ .Nonce }}`，你必须使用 `<|GEN_REPORT_{{ .Nonce }}|>` 和 `<|GEN_REPORT_END_{{ .Nonce }}|>` 包裹内容！**
+
+{{ end }}
 
 ---
 
@@ -89,9 +95,9 @@
 
 ### 大报告导航（重要！）
 当报告内容很大时，只会显示部分内容。使用 `change_view_offset` 来导航：
-- **查看开头**: `{"@action": "change_view_offset", "offset_line": 1}`
-- **继续往下看**: `{"@action": "change_view_offset", "offset_line": {{ .EndLine }}}`
-- **跳转到指定行**: `{"@action": "change_view_offset", "offset_line": 目标行号}`
+- 查看开头：调用 change_view_offset，offset_line=1。
+- 继续往下看：调用 change_view_offset，offset_line={{ .EndLine }}。
+- 跳转到指定行：调用 change_view_offset，offset_line=目标行号。
 
 ### 修改操作说明
 - 行号从 1 开始计数

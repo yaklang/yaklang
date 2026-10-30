@@ -182,6 +182,7 @@ func (rl *http2ClientConnReadLoop) applyResponseHeaders(cs *http2ClientStream, f
 			return
 		}
 		cs.resp.Trailer = header
+		traceAdditionalHeaders(cs.option, "trailers", 0, header)
 		rl.endResponse(cs)
 		return
 	}
@@ -191,6 +192,7 @@ func (rl *http2ClientConnReadLoop) applyResponseHeaders(cs *http2ClientStream, f
 		return
 	}
 	if code < 200 {
+		traceAdditionalHeaders(cs.option, "informational", code, header)
 		cs.interimResponses++
 		if endStream || cs.interimResponses > 16 {
 			rl.failStream(cs, http2.ErrCodeProtocol, "invalid or excessive informational responses")

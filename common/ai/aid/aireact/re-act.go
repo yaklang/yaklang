@@ -97,6 +97,10 @@ type ReAct struct {
 	memoryTriage        aicommon.MemoryTriage
 	memoryContinuations sync.Map // planning/handoff boundaries, runtime-only task IDs
 
+	memoryFinalizationMu      sync.Mutex
+	memoryFinalizationPending func() error // coalesced: each drain reads the session ledger
+	memoryFinalizationDone    chan struct{}
+
 	taskHandoffMu      sync.Mutex
 	taskHandoffs       int
 	taskHandoffVersion uint64
@@ -940,14 +944,15 @@ func (r *ReAct) Wait() {
 	r.wg.Wait()
 }
 
-// WaitLifecycleStopped waits for the long-lived input and task-queue loops to
-// exit after their context is cancelled. It is separate from Wait so existing
+// WaitLifecycleStopped waits for the input, task queue and background memory
+// persistence to exit after their context is cancelled. It is separate from Wait so existing
 // AIEngine/ReAct callers keep the original Wait behavior.
 func (r *ReAct) WaitLifecycleStopped() {
 	if r == nil || r.lifecycleWG == nil {
 		return
 	}
 	r.lifecycleWG.Wait()
+	r.waitMemoryFinalization()
 	if r.config != nil {
 		r.config.WaitHotPatchLoopStopped()
 	}

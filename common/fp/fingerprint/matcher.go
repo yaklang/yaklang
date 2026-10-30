@@ -2,14 +2,18 @@ package fingerprint
 
 import (
 	"context"
-	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/utils"
+	"errors"
 	"regexp"
 	"sync"
 
 	"github.com/yaklang/yaklang/common/fp/fingerprint/rule"
 	"github.com/yaklang/yaklang/common/log"
+	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/common/utils"
 )
+
+// ErrActiveProbeDisabled lets passive scans skip rules that require another request.
+var ErrActiveProbeDisabled = errors.New("active fingerprint probe disabled")
 
 type (
 	MatchFun func(data []byte) (bool, error)
@@ -30,8 +34,8 @@ func NewMatcher() *Matcher {
 }
 
 func (m *Matcher) MatchResource(ctx context.Context, concurrency int, rules []*rule.FingerPrintRule, getter func(path string) (*rule.MatchResource, error)) []*schema.CPE {
+	getter = cachingGetter(getter)
 	if paths := rootRegexpPaths(rules); len(paths) > 0 {
-		getter = cachingGetter(getter, paths)
 		pages := make(map[string][]byte, len(paths))
 		failed := make(map[string]bool, len(paths))
 		for _, path := range paths {
@@ -53,14 +57,16 @@ func (m *Matcher) MatchResource(ctx context.Context, concurrency int, rules []*r
 		r := r
 		err := swg.AddWithContext(ctx)
 		if err != nil {
-			log.Errorf("failed to run rule %v: %v", r, err)
-			return result
+			// Join rules already running before returning their results.
+			break
 		}
 		go func(r *rule.FingerPrintRule) {
 			defer swg.Done()
 			info, err := rule.Execute(getter, r)
 			if err != nil {
-				log.Errorf("execute rule failed: %v", err)
+				if !errors.Is(err, ErrActiveProbeDisabled) {
+					log.Errorf("execute rule failed: %v", err)
+				}
 				return
 			}
 			if info != nil {
@@ -76,18 +82,13 @@ func (m *Matcher) MatchResource(ctx context.Context, concurrency int, rules []*r
 
 func (m *Matcher) Match(ctx context.Context, data []byte, rules []*rule.FingerPrintRule) []*schema.CPE {
 	return m.MatchResource(ctx, 1, rules, func(path string) (*rule.MatchResource, error) {
-		cached := map[string][]byte{}
 		if path == "" || path == "/" {
 			return rule.NewHttpResource(data), nil
-		}
-		if v, ok := cached[path]; ok {
-			return rule.NewHttpResource(v), nil
 		}
 		data, err := m.Route(ctx, path)
 		if err != nil {
 			return nil, err
 		}
-		cached[path] = data
 		return rule.NewHttpResource(data), nil
 	})
 }

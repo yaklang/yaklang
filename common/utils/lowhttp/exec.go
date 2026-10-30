@@ -21,6 +21,7 @@ import (
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 	"github.com/yaklang/yaklang/common/yak/yaklib/codec"
 )
 
@@ -433,6 +434,13 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	if reqIns != nil {
 		*reqIns = *reqIns.WithContext(ctx)
 	}
+	// Model network diagnostics are file-only, even if a script forgot poc.save(false).
+	// Tool HTTP traffic has no diagnostic context and keeps its existing behavior.
+	if httptrace.Enabled(ctx) {
+		saveHTTPFlow = false
+		saveHTTPFlowHandlerList = nil
+		afterSaveHTTPFlowList = nil
+	}
 	// fix some field
 	response.Source = source
 	response.Payloads = payloads
@@ -449,7 +457,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 		httpctx.SetNoBodyBuffer(reqIns, true)
 	}
 
-	if option.UseMITMRule && mitmReplacerLabelingHTTPFlowFunc != nil {
+	if !httptrace.Enabled(ctx) && option.UseMITMRule && mitmReplacerLabelingHTTPFlowFunc != nil {
 		saveHTTPFlowHandlerList = append(saveHTTPFlowHandlerList, mitmReplacerLabelingHTTPFlowFunc)
 	}
 	/*
@@ -920,7 +928,7 @@ func HTTPWithoutRetry(option *LowhttpExecConfig) (*LowhttpResponse, error) {
 	maxDowngrades := 1 // H2→H1 at most once
 	downgrades := 0
 RECONNECT:
-	tResult, err := activeTransport.RoundTrip(ctx, tr)
+	tResult, err := roundTripWithNetworkTrace(ctx, activeTransport, tr)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			err = ctxErr

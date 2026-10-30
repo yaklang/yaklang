@@ -42,8 +42,71 @@ func (r *ReAct) completeUserTaskMemory(task aicommon.AIStatefulTask) {
 	if loop, ok := task.GetReActLoop().(interface{ IsMaxIterationInterrupted() bool }); ok && loop.IsMaxIterationInterrupted() {
 		return
 	}
-	if err := aimem.CompleteTimelineMemory(r.config, r.config.GetContext(), task.GetOriginUserInput()); err != nil {
-		log.Warnf("user task memory finalization failed; source retained for recovery: %v", err)
+	tl := r.config.Timeline
+	persister, enabled := r.config.MemoryTriage.(aimem.TimelineMemoryPersister)
+	if !enabled || tl == nil || tl.IsBranchTimeline() {
+		return
+	}
+	r.config.SyncSessionEvidenceTimeline()
+	if !tl.NeedsMemoryFinalization() {
+		return
+	}
+	// Only the local recovery checkpoint holds task completion. Waiting for
+	// memory tails, backend initialization and embedding/index writes belongs
+	// to the session, so the next queued task can use the live timeline now.
+	if err := tl.RequestMemoryFinalization(); err != nil {
+		log.Warnf("checkpoint user task memory failed: %v", err)
+		return
+	}
+	ctx := r.config.GetContext()
+	r.memoryFinalizationMu.Lock()
+	defer r.memoryFinalizationMu.Unlock()
+	if ctx.Err() != nil {
+		return // The checkpoint will be replayed by the next runtime.
+	}
+	r.memoryFinalizationPending = func() error {
+		return aimem.PersistPendingTimelineMemory(tl, persister, ctx)
+	}
+	if r.memoryFinalizationDone == nil {
+		r.memoryFinalizationDone = make(chan struct{})
+		go r.runMemoryFinalization()
+	}
+}
+
+// One worker and at most one queued drain per runtime. A task ending during a
+// save requests another pass, which snapshots the newest candidates; bursts do
+// not create unbounded goroutines or retain completed task objects.
+func (r *ReAct) runMemoryFinalization() {
+	for {
+		r.memoryFinalizationMu.Lock()
+		pending := r.memoryFinalizationPending
+		r.memoryFinalizationPending = nil
+		if pending == nil || r.config.GetContext().Err() != nil {
+			close(r.memoryFinalizationDone)
+			r.memoryFinalizationDone = nil
+			r.memoryFinalizationMu.Unlock()
+			return
+		}
+		r.memoryFinalizationMu.Unlock()
+		func() {
+			defer func() {
+				if err := recover(); err != nil {
+					log.Errorf("user task memory persistence panic; source retained for recovery: %v", err)
+				}
+			}()
+			if err := pending(); err != nil {
+				log.Warnf("user task memory persistence failed; source retained for recovery: %v", err)
+			}
+		}()
+	}
+}
+
+func (r *ReAct) waitMemoryFinalization() {
+	r.memoryFinalizationMu.Lock()
+	done := r.memoryFinalizationDone
+	r.memoryFinalizationMu.Unlock()
+	if done != nil {
+		<-done
 	}
 }
 

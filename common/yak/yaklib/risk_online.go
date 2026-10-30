@@ -198,6 +198,10 @@ func (s *OnlineClient) downloadRiskPage(token string, page, limit int64) ([]*Dow
 }
 
 type setRiskTagsRequest struct {
+	Page            int64    `json:"page"`
+	Limit           int64    `json:"limit"`
+	OrderBy         string   `json:"order_by"`
+	Order           string   `json:"order"`
 	Hash            []string `json:"hash"`
 	SetTags         []string `json:"setTags"`
 	VerifierUid     string   `json:"verifierUid,omitempty"`
@@ -224,6 +228,10 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 	}
 
 	raw, err := json.Marshal(setRiskTagsRequest{
+		Page:            1,
+		Limit:           int64(len(hashes)),
+		OrderBy:         "created_at",
+		Order:           "desc",
 		Hash:            hashes,
 		SetTags:         tagsSlice,
 		VerifierUid:     verifierUid,
@@ -245,6 +253,8 @@ func (s *OnlineClient) SetRiskTagsToOnline(ctx context.Context, token string, ha
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
 		poc.WithSave(false),
+		poc.WithContext(ctx),
+		poc.WithTimeout(30),
 	)
 	if err != nil {
 		return utils.Errorf("set risk tags to online failed: %s", err)

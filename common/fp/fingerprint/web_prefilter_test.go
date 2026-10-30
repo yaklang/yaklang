@@ -3,6 +3,8 @@ package fingerprint
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -110,4 +112,40 @@ func TestWebPrefilterDropsMissesAndKeepsVersion(t *testing.T) {
 
 	kept := filterRootWebRules(rules, nil, map[string]bool{"": true})
 	require.Len(t, kept, len(rules))
+}
+
+func TestMatchResourceReusesPathResponses(t *testing.T) {
+	for _, failed := range []bool{false, true} {
+		t.Run(fmt.Sprintf("failed=%v", failed), func(t *testing.T) {
+			var calls atomic.Int32
+			var rules []*rule.FingerPrintRule
+			for i := 0; i < 32; i++ {
+				rules = append(rules, webRegexpRule(fmt.Sprint(i), "icon-token", "/favicon.ico"))
+			}
+			matcher := NewMatcher()
+			got := matcher.MatchResource(context.Background(), 8, rules, func(path string) (*rule.MatchResource, error) {
+				calls.Add(1)
+				if path != "/favicon.ico" {
+					t.Errorf("unexpected resource path: %s", path)
+					return nil, fmt.Errorf("unexpected resource path: %s", path)
+				}
+				if failed {
+					return nil, errors.New("slow or unavailable icon")
+				}
+				return rule.NewHttpResource([]byte("icon-token")), nil
+			})
+			require.Equal(t, int32(1), calls.Load(), "rules must share both successful and failed path requests")
+			if failed {
+				require.Empty(t, got)
+			} else {
+				require.Len(t, got, len(rules), "response reuse must preserve every matching product")
+			}
+			got = matcher.MatchResource(context.Background(), 8, rules, func(string) (*rule.MatchResource, error) {
+				calls.Add(1)
+				return rule.NewHttpResource([]byte("another target")), nil
+			})
+			require.Equal(t, int32(2), calls.Load(), "response cache must be scoped to one match")
+			require.Empty(t, got)
+		})
+	}
 }

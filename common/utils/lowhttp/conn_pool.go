@@ -16,9 +16,9 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 
-	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/netx"
+	utls "github.com/yaklang/yaklang/common/third_party/utls"
 	"github.com/yaklang/yaklang/common/utils"
 )
 
@@ -776,6 +776,9 @@ func (pc *persistConn) readLoop() {
 			}
 		}
 
+		if rc.option != nil && rc.option.networkTraceWriter != nil {
+			mirrorWriter = io.MultiWriter(mirrorWriter, rc.option.networkTraceWriter)
+		}
 		httpResponseReader := io.TeeReader(pc.br, mirrorWriter)
 		if rc.option != nil && rc.option.ExtendReadDeadline {
 			httpResponseReader = &deadlineExtendingReader{

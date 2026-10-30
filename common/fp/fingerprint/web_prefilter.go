@@ -43,22 +43,19 @@ var (
 	webPrefilterBuilds atomic.Int32
 )
 
-type rootGetterSlot struct {
+type resourceGetterSlot struct {
 	once sync.Once
 	res  *rule.MatchResource
 	err  error
 }
 
-func cachingGetter(getter func(string) (*rule.MatchResource, error), paths []string) func(string) (*rule.MatchResource, error) {
-	slots := make(map[string]*rootGetterSlot, len(paths))
-	for _, path := range paths {
-		slots[path] = &rootGetterSlot{}
-	}
+func cachingGetter(getter func(string) (*rule.MatchResource, error)) func(string) (*rule.MatchResource, error) {
+	var slots sync.Map
 	return func(path string) (*rule.MatchResource, error) {
-		slot := slots[path]
-		if slot == nil {
-			return getter(path)
-		}
+		cached, _ := slots.LoadOrStore(path, &resourceGetterSlot{})
+		slot := cached.(*resourceGetterSlot)
+		// Cache failures too: hundreds of favicon rules must not each retry
+		// the same slow or unavailable path on a single target.
 		slot.once.Do(func() {
 			slot.res, slot.err = getter(path)
 		})

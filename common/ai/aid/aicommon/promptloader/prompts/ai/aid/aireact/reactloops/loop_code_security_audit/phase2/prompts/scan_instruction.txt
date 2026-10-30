@@ -18,7 +18,7 @@ Phase 2 的目标是**尽可能广地覆盖可疑点并提交 finding**；精确
 本 loop **禁止** `require_tool` / `directly_call_tool` 及一切未列出的工具（含 `cybersecurity-risk`、`bash`、`do_http_request` 等）。
 
 **仅可使用**：
-- **内置 FS 工具**（直接作为 `@action`）：`grep`、`read_file`、`find_file`
+- **内置 FS 工具**（{{ if .FunctionCallMode }}直接通过原生工具调用{{ else }}直接作为 `@action`{{ end }}）：`grep`、`read_file`、`find_file`
 - **本 loop 专用 action**：`fast_context`、`lock_target_files`、`add_finding`、`mark_file_done`、`read_recon_notes`、`complete_scan`
 
 阶段B 确认漏洞后**必须**调用 `add_finding` 写入扫描流水线；**禁止**用 `cybersecurity-risk` 代替 `add_finding` 或 `mark_file_done`。
@@ -109,9 +109,11 @@ fast_context / grep / find_file  →  得到候选路径列表
 
 一次调用在隔离子 loop 内通过 `grep_files_batch` 并行多组 `files_with_matches` 搜索，返回精简**候选**文件索引（**不会自动写入目标列表**；运行时登记为待处理候选）。
 
+{{ if .FunctionCallMode }}调用 fast_context，arguments 为 {"identifier":"find_sinks","query":"定位与本类别相关的 sink 与数据流代码"}。{{ else }}
 ```json
 {"@action": "fast_context", "human_readable_thought": "并行搜索本类别全部 Sink 模式", "query": "定位与本类别相关的 sink 与数据流代码"}
 ```
+{{ end }}
 
 收到候选列表后：**优先**对每个候选 read→lock；时间紧时可批量 lock 或 `done=true` 自动纳入全部候选后进阶段B。
 

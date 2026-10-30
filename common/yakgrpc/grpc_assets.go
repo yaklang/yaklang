@@ -1172,7 +1172,27 @@ func (s *Server) RisksFromOnline(req *ypb.RisksFromOnlineRequest, stream ypb.Yak
 	return nil
 }
 
-func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTagsRequest) (*ypb.BatchSetRiskTagsResponse, error) {
+const batchSetPageMax int64 = 1000
+
+func applyBatchSetPage(db *gorm.DB, paging *ypb.Paging) (*gorm.DB, error) {
+	page := int64(1)
+	limit := int64(30)
+	if paging != nil {
+		if paging.GetPage() > 0 {
+			page = paging.GetPage()
+		}
+		if paging.GetLimit() > 0 {
+			limit = paging.GetLimit()
+		}
+	}
+	if limit > batchSetPageMax {
+		return nil, utils.Errorf("单页不能超过 %d 条", batchSetPageMax)
+	}
+	offset := (page - 1) * limit
+	return db.Order("updated_at desc, id desc").Offset(int(offset)).Limit(int(limit)), nil
+}
+
+func (s *Server) BatchSetRiskTags(_ context.Context, req *ypb.BatchSetRiskTagsRequest) (*ypb.BatchSetRiskTagsResponse, error) {
 	tags := strings.Join(utils.RemoveRepeatStringSlice(req.SetTags), "|")
 	verifierUid := strings.TrimSpace(req.VerifierUid)
 	fixTime := time.Unix(req.FixTime, 0)
@@ -1190,35 +1210,23 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 	case len(req.GetHashes()) > 0:
 		db = bizhelper.ExactOrQueryStringArrayOr(db, "hash", req.GetHashes())
 	case req.GetFilter() != nil:
-		queryDB := yakit.FilterByQueryRisks(db, req.Filter)
-		queryDB = queryDB.Limit(-1).Offset(-1)
-		db = queryDB
-	default:
-		// 全量更新
+		db = yakit.FilterByQueryRisks(db, req.Filter)
 	}
 
-	// 批量上限校验
-	const batchMaxLimit = 1000
-	var count int64
-	if err := db.Count(&count).Error; err != nil {
-		return nil, utils.Errorf("count risk for batch limit failed: %s", err)
+	paged, err := applyBatchSetPage(db, req.GetFilter().GetPagination())
+	if err != nil {
+		return nil, err
 	}
-	if count == 0 {
+
+	var hashes []string
+	if err := paged.Pluck("hash", &hashes).Error; err != nil {
+		return nil, utils.Errorf("collect affected risk keys failed: %s", err)
+	}
+	if len(hashes) == 0 {
 		return nil, utils.Errorf("未匹配到任何 risk")
 	}
-	if count > batchMaxLimit {
-		return nil, utils.Errorf("匹配 %d 条，超过批量上限 %d，请缩小筛选条件", count, batchMaxLimit)
-	}
 
-	// 查出受影响的 hash，用于同步到 online
-	var syncHashes []string
-	if req.GetToken() != "" {
-		if err := db.Pluck("hash", &syncHashes).Error; err != nil {
-			log.Errorf("pluck risk hashes for online sync failed: %s", err)
-		}
-	}
-
-	result := db.Updates(map[string]interface{}{
+	result := s.GetProjectDatabase().Model(&schema.Risk{}).Where("hash in (?)", hashes).Updates(map[string]interface{}{
 		"tags":              tags,
 		"verifier_uid":      verifierUid,
 		"fix_time":          fixTime,
@@ -1232,14 +1240,31 @@ func (s *Server) BatchSetRiskTags(ctx context.Context, req *ypb.BatchSetRiskTags
 		return nil, result.Error
 	}
 
-	if req.GetToken() != "" && len(syncHashes) > 0 {
-		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
-		if err := client.SetRiskTagsToOnline(ctx, req.GetToken(), syncHashes, tags, req.VerifierUid, req.FixSuggestion, tagReason, req.RiskTypeVerbose, req.SetSeverity, req.FixTime, req.SeverityScore); err != nil {
-			log.Errorf("set risk tags to online failed: %s", err)
-		}
+	if req.GetToken() != "" && len(hashes) > 0 {
+		syncRiskTagsToOnlineAsync(req.GetToken(), hashes, tags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, severity, req.FixTime, severityScore)
 	}
 
 	return &ypb.BatchSetRiskTagsResponse{
 		UpdatedCount: result.RowsAffected,
 	}, nil
+}
+
+func syncRiskTagsToOnlineAsync(token string, hashes []string, tags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, severity string, fixTime int64, severityScore float64) {
+	if token == "" || len(hashes) == 0 {
+		return
+	}
+	copied := append([]string(nil), hashes...)
+	go func() {
+		defer func() {
+			if rec := recover(); rec != nil {
+				log.Errorf("sync risk tags to online panic: %v", rec)
+			}
+		}()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		client := yaklib.NewOnlineClient(consts.GetOnlineBaseUrl())
+		if err := client.SetRiskTagsToOnline(ctx, token, copied, tags, verifierUid, fixSuggestion, tagReason, riskTypeVerbose, severity, fixTime, severityScore); err != nil {
+			log.Errorf("set risk tags to online failed: %s", err)
+		}
+	}()
 }

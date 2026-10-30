@@ -10,6 +10,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 )
 
 func TestCleanupAISpaceWorkDirsForSessions_RemovesReferencedDirs(t *testing.T) {
@@ -56,4 +57,10 @@ func TestRemoveAISpaceWorkDirs_DedupesPaths(t *testing.T) {
 	require.Equal(t, 1, removed)
 	_, err := os.Stat(workDir)
 	require.True(t, os.IsNotExist(err))
+}
+
+func TestRemoveAISpaceWorkDirsPreservesNetworkDebugRoot(t *testing.T) {
+	require.False(t, isDeletableAISpaceWorkDir(httptrace.DefaultDirectory()))
+	require.False(t, isDeletableAISpaceWorkDir(filepath.Join(httptrace.DefaultDirectory(), "session-bucket")))
+	require.Zero(t, RemoveAISpaceWorkDirs([]string{httptrace.DefaultDirectory()}))
 }
