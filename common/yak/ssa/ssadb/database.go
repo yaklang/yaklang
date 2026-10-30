@@ -21,7 +21,6 @@ var SSAProjectTables = []any{
 	// source code
 	&IrSource{},
 	// type
-	&IrType{},
 	&IrTypeID{},
 	&IrTypePayload{},
 	// program
@@ -135,7 +134,6 @@ func patchIrCodeIndex(db *gorm.DB) {
 	// duplicate instruction INSERTs from race conditions in the async
 	// persist pipeline. This is a hard database invariant.
 	ensureUniqueIrCodesProgramCodeIndex(db)
-	ensureUniqueIrTypesProgramTypeIndex(db)
 	ensureUniqueIrOffsetsIndex(db)
 	ensureConstLookupIndex(db)
 
@@ -144,23 +142,6 @@ func patchIrCodeIndex(db *gorm.DB) {
 	// dialect-specific drop path is available.
 	pruneRedundantIRIndexes(db)
 
-	// The canonical UNIQUE keys already provide these lookup orders. Removing
-	// redundant indexes keeps writes small on both fresh and reused databases.
-	// If a legacy database cannot establish the UNIQUE key, retain its old
-	// non-unique lookup coverage while batch writes use the existing fallback.
-	for _, lookup := range []struct {
-		table, unique, legacySQL string
-	}{
-		{TableIrCodes, "ux_ir_codes_program_code", `CREATE INDEX IF NOT EXISTS "idx_ir_codes_program_code" ON "` + TableIrCodes + `" ("program_name", "code_id");`},
-		{TableIrTypes, "ux_ir_types_program_type", `CREATE INDEX IF NOT EXISTS "idx_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`},
-	} {
-		if hasNamedIndex(db, lookup.table, lookup.unique) {
-			continue
-		}
-		if err := db.Exec(lookup.legacySQL).Error; err != nil {
-			log.Warnf("failed to preserve fallback lookup index for %s: %v", lookup.table, err)
-		}
-	}
 }
 
 // irCodeConstLookupIndex is the covering lookup for ConstType searches.
@@ -274,48 +255,6 @@ func ensureUniqueIrCodesProgramCodeIndex(db *gorm.DB) {
 		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
 	} else {
 		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_codes (program_name, code_id)", indexName)
-	}
-}
-
-// deleteDuplicateIrTypes removes every row except the oldest (MIN id) per
-// (program_name, type_id) so a UNIQUE index can be created on legacy databases.
-func deleteDuplicateIrTypes(db *gorm.DB) (int64, error) {
-	res := db.Exec(`DELETE FROM ` + TableIrTypes + ` WHERE id IN (
-		SELECT id FROM (
-			SELECT id, ROW_NUMBER() OVER (PARTITION BY program_name, type_id ORDER BY id) AS rn
-			FROM ` + TableIrTypes + `
-		) WHERE rn > 1
-	)`)
-	if res.Error != nil {
-		return 0, res.Error
-	}
-	return res.RowsAffected, nil
-}
-
-// ensureUniqueIrTypesProgramTypeIndex creates UNIQUE (program_name, type_id).
-// SaveIrTypeBatch uses that conflict target for in-place upserts. The older
-// non-unique idx_ir_types_program_type is left in place; it does not conflict.
-func ensureUniqueIrTypesProgramTypeIndex(db *gorm.DB) {
-	if !db.HasTable(TableIrTypes) {
-		return
-	}
-	indexName := "ux_ir_types_program_type"
-	if db.Dialect().HasIndex(TableIrTypes, indexName) {
-		return
-	}
-	removed, err := deleteDuplicateIrTypes(db)
-	if err != nil {
-		log.Warnf("[unique-constraint] failed to remove duplicate ir_types rows: %v", err)
-		return
-	}
-	if removed > 0 {
-		log.Infof("[unique-constraint] removed %d duplicate ir_types rows (kept MIN(id) per (program_name, type_id))", removed)
-	}
-	query := `CREATE UNIQUE INDEX IF NOT EXISTS "ux_ir_types_program_type" ON "` + TableIrTypes + `" ("program_name", "type_id");`
-	if err := db.Exec(query).Error; err != nil {
-		log.Errorf("[unique-constraint] failed to create UNIQUE INDEX %s: %v", indexName, err)
-	} else {
-		log.Infof("[unique-constraint] created UNIQUE INDEX %s on ir_types (program_name, type_id)", indexName)
 	}
 }
 
@@ -443,9 +382,8 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "folder_path = ? AND file_name = ?", "/", program),
-		deleteProgramRows(db, TableIrTypes, "program_name = ?", program),
-		deleteOptionalProgramRows(db, TableIrTypeIDs, "program_name = ?", program),
-		deleteOptionalProgramRows(db, TableIrTypePayloads, "program_name = ?", program),
+		deleteProgramRows(db, TableIrTypeIDs, "program_name = ?", program),
+		deleteProgramRows(db, TableIrTypePayloads, "program_name = ?", program),
 		deleteProgramRows(db, TableIrOffsets, "program_name = ?", program),
 	)
 }
@@ -481,15 +419,6 @@ func deleteProgramRows(db *gorm.DB, table, condition string, args ...any) error 
 	})
 }
 
-// Dedupe tables are additive, so a legacy project database may not have them.
-// Deleting the owning program must remain safe on those older schemas.
-func deleteOptionalProgramRows(db *gorm.DB, table, condition string, args ...any) error {
-	if db == nil || !IrTypeDedupeAvailable(db) {
-		return nil
-	}
-	return deleteProgramRows(db, table, condition, args...)
-}
-
 const programDeleteAttempts = 3
 
 func retryProgramDelete(name string, deleteFn func() error) error {
@@ -518,7 +447,6 @@ var redundantIRIndexes = []struct{ table, index string }{
 	{TableIrCodes, "idx_ir_codes_version"},                // version lives on ir_programs
 	{TableIrCodes, "idx_ir_codes_program_compile_hash"},   // never a predicate
 	{TableIrCodes, "idx_ir_codes_const_type"},             // const lookups use idx_ir_codes_const_lookup
-	{TableIrTypes, "idx_ir_types_type_id"},                // lookups bind program_name too
 	{TableIrOffsets, "idx_ir_offsets_program_name"},       // ux_ir_offsets_program_value_file_range prefix
 	{TableIrOffsets, "idx_ir_offsets_value_id"},           // the same UNIQUE index covers (program_name, value_id)
 	{TableIrOffsets, "idx_ir_offsets_start_offset"},       // never a predicate
@@ -554,46 +482,16 @@ func pruneRedundantIRIndexes(db *gorm.DB) {
 	}
 }
 
-// patchIrTypeDedupe installs the two UNIQUE keys the dedupe writes conflict
-// on. Additive: databases that already have ir_types rows keep them.
+// patchIrTypeDedupe installs the two UNIQUE keys the type writes conflict on.
 func patchIrTypeDedupe(db *gorm.DB) {
 	if db == nil || db.Dialect() == nil {
 		return
 	}
-	if !db.HasTable(TableIrTypeIDs) || !db.HasTable(TableIrTypePayloads) {
-		return
-	}
-	invalidateIrTypeDedupeAvailability(db)
 	if damenggorm.IsDM(db) {
 		// installDMIRIndexes creates these keys for the DM dialect.
 		return
 	}
 	if err := ensureIrTypeDedupeIndexes(db); err != nil {
 		log.Warnf("[ir-type-dedupe] index patch: %v", err)
-	}
-	backfillIrTypePayloadIDs(db)
-}
-
-// backfillIrTypePayloadIDs upgrades a database written by the first revision
-// of the dedupe layout, whose id rows stored the 64-character payload hash
-// instead of the payload row id. The payload rows are still there, so the
-// reference is resolved in place; rows that cannot be resolved are left for a
-// recompile rather than deleted.
-func backfillIrTypePayloadIDs(db *gorm.DB) {
-	if db == nil || db.Dialect() == nil || !db.Dialect().HasColumn(TableIrTypeIDs, "type_hash") {
-		return
-	}
-	if !db.Dialect().HasColumn(TableIrTypeIDs, "payload_id") {
-		return
-	}
-	result := db.Exec(`UPDATE ` + TableIrTypeIDs + ` SET payload_id = (SELECT p.id FROM ` +
-		TableIrTypePayloads + ` AS p WHERE p.program_name = ` + TableIrTypeIDs + `.program_name` +
-		` AND p.type_hash = ` + TableIrTypeIDs + `.type_hash) WHERE payload_id = 0`)
-	if result.Error != nil {
-		log.Warnf("[ir-type-dedupe] backfill payload ids: %v", result.Error)
-		return
-	}
-	if result.RowsAffected > 0 {
-		log.Infof("[ir-type-dedupe] resolved %d legacy type id rows to payload ids", result.RowsAffected)
 	}
 }

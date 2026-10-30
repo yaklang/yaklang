@@ -67,54 +67,6 @@ func NativeConstTypeIDQueries() int64 {
 //
 // All native queries run through bindSQLPlaceholdersDB so Postgres gets $n
 // placeholders (database/sql rejects raw "?").
-func nativeGetIrTypeItemById(db *gorm.DB, progName string, id int64) *IrType {
-	ir, _ := nativeGetIrTypeItemByIdErr(db, progName, id)
-	return ir
-}
-
-func nativeGetIrTypeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrType, error) {
-	if db == nil || id < 0 {
-		return nil, nil
-	}
-	const q = `SELECT id, created_at, updated_at, deleted_at, type_id, kind, program_name, "string", extra_information ` +
-		`FROM ` + TableIrTypes + ` WHERE type_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
-	started := time.Now()
-	ctx, cancel := nativeQueryContext(context.Background())
-	defer cancel()
-	bound := bindSQLPlaceholdersDB(db, q)
-	row := nativeQueryRowContext(db, ctx, bound, id, progName)
-	if row == nil {
-		RecordDBRead(time.Since(started), true)
-		return nil, sql.ErrConnDone
-	}
-	ir := &IrType{}
-	var (
-		deletedAt sql.NullTime
-		createdAt time.Time
-		updatedAt time.Time
-	)
-	if err := row.Scan(&ir.ID, &createdAt, &updatedAt, &deletedAt,
-		&ir.TypeId, &ir.Kind, &ir.ProgramName, &ir.String, &ir.ExtraInformation); err != nil {
-		logNativeSQL(bound, time.Since(started), err)
-		if errors.Is(err, sql.ErrNoRows) {
-			// Miss is a normal lookup result, not a DB failure.
-			RecordDBRead(time.Since(started), false)
-			return nil, nil
-		}
-		RecordDBRead(time.Since(started), true)
-		return nil, err
-	}
-	RecordDBRead(time.Since(started), false)
-	logNativeSQL(bound, time.Since(started), nil)
-	ir.CreatedAt = createdAt
-	ir.UpdatedAt = updatedAt
-	if deletedAt.Valid {
-		t := deletedAt.Time
-		ir.DeletedAt = &t
-	}
-	return ir, nil
-}
-
 func nativeGetIrCodeItemById(db *gorm.DB, progName string, id int64) *IrCode {
 	ir, _ := nativeGetIrCodeItemByIdErr(db, progName, id)
 	return ir
@@ -135,16 +87,6 @@ func nativeGetIrCodeItemByIdErr(db *gorm.DB, progName string, id int64) (*IrCode
 		`FROM ` + TableIrCodes + ` `
 	q := columns + `WHERE code_id = ? AND program_name = ? AND deleted_at IS NULL LIMIT 1`
 	args := []any{id, progName}
-	if irCodeIdentitySuspended.Load() {
-		// The unique code_id index is absent. A miss is not persisted; scanning
-		// the table would cost more than the index we dropped.
-		rowID, ok := lookupIrCodeRowID(progName, id)
-		if !ok {
-			return nil, nil
-		}
-		q = columns + `WHERE id = ? AND program_name = ? AND code_id = ? AND deleted_at IS NULL LIMIT 1`
-		args = []any{rowID, progName, id}
-	}
 	started := time.Now()
 	ctx, cancel := nativeQueryContext(context.Background())
 	defer cancel()
@@ -252,13 +194,6 @@ func nativeGetIrCodesByIds(db *gorm.DB, progName string, ids []int64) ([]*IrCode
 		chunk := clean[start:end]
 		lookupIDs := chunk
 		idColumn := "code_id"
-		if irCodeIdentitySuspended.Load() {
-			lookupIDs = lookupIrCodeRowIDs(progName, chunk)
-			idColumn = "id"
-			if len(lookupIDs) == 0 {
-				continue
-			}
-		}
 		placeholders := make([]string, len(lookupIDs))
 		args := make([]interface{}, 0, len(lookupIDs)+1)
 		args = append(args, progName)

@@ -15,8 +15,8 @@ func TestTypePersistenceBlueprintJSONAndMutableFields(t *testing.T) {
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "types.db"))
 	require.NoError(t, err)
 	t.Cleanup(func() { db.Close() })
-	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
-	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`).Error)
+	require.NoError(t, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
+	require.NoError(t, ssadb.EnsureIrTypeDedupeIndexesForTest(db))
 	store := &typeStore{mode: ProgramCacheDBWrite, db: db, programName: "test",
 		saveSize: 512, resident: utils.NewSafeMapWithKey[int64, Type]()}
 	bp := NewBlueprint("A")
@@ -29,9 +29,11 @@ func TestTypePersistenceBlueprintJSONAndMutableFields(t *testing.T) {
 	bp.ParentBlueprints, bp.InterfaceBlueprints = []*Blueprint{parent}, []*Blueprint{iface}
 	store.remember(bp)
 	require.NoError(t, store.flush())
-	load := func() *ssadb.IrType {
-		r := new(ssadb.IrType)
-		require.NoError(t, db.Where("program_name = ? AND type_id = ?", "test", 1).First(r).Error)
+	load := func() *ssadb.IrTypePayload {
+		var id ssadb.IrTypeID
+		require.NoError(t, db.Where("program_name = ? AND type_id = ?", "test", 1).First(&id).Error)
+		r := new(ssadb.IrTypePayload)
+		require.NoError(t, db.Where("id = ?", id.PayloadID).First(r).Error)
 		return r
 	}
 	first := load()
@@ -58,11 +60,11 @@ func TestTypePersistenceFailedWriteCanRetry(t *testing.T) {
 	// Missing table causes the initial write to fail. The next flush must
 	// still encode and save the type once storage becomes available.
 	require.Error(t, store.flush())
-	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
-	require.NoError(t, db.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`).Error)
+	require.NoError(t, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
+	require.NoError(t, ssadb.EnsureIrTypeDedupeIndexesForTest(db))
 	require.NoError(t, store.flush())
 	var count int
-	require.NoError(t, db.Model(&ssadb.IrType{}).Count(&count).Error)
+	require.NoError(t, db.Model(&ssadb.IrTypeID{}).Count(&count).Error)
 	require.Equal(t, 1, count)
 }
 

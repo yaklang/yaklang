@@ -177,15 +177,44 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if db == nil || len(items) == 0 {
 		return nil
 	}
-	// Without the unique (program_name, code_id) index, ON CONFLICT has no
-	// target. Inserts append by rowid and updates use the remembered rowid.
-	if irCodeIdentitySuspended.Load() {
-		return saveIrCodesWithoutIdentityIndex(db, items)
+	// One call keeps the batch in a single transaction, so a rejected row
+	// rolls back the earlier chunks too. PostgreSQL rejects a statement that
+	// names the same conflict key twice, so the batch keeps the last row per
+	// (program_name, code_id) before SaveInBatches splits it.
+	deduped := dedupeIrCodeConflictKeys(items)
+	if len(deduped) == 0 {
+		return nil
 	}
-	if err := db.New().SaveInBatches(items, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
+	if err := db.New().SaveInBatches(deduped, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
 	}
+	irCodeUpdateStatements.Add(int64((len(deduped) + irCodeBatchChunk - 1) / irCodeBatchChunk))
+	irCodeUpdateRows.Add(int64(len(deduped)))
 	return nil
+}
+
+// dedupeIrCodeConflictKeys keeps the last row for a repeated
+// (program_name, code_id) so one upsert chunk cannot name a conflict key twice.
+func dedupeIrCodeConflictKeys(items []*IrCode) []*IrCode {
+	type conflictKey struct {
+		program string
+		codeID  int64
+	}
+	seen := make(map[conflictKey]int, len(items))
+	out := items[:0]
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		key := conflictKey{program: item.ProgramName, codeID: item.CodeID}
+		if index, ok := seen[key]; ok {
+			out[index] = item
+			continue
+		}
+		seen[key] = len(out)
+		out = append(out, item)
+	}
+	return out
 }
 
 var hash = []string{

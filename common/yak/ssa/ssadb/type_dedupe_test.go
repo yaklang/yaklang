@@ -14,19 +14,21 @@ func setupDedupeDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "dedupe.db"))
 	require.NoError(t, err)
-	t.Cleanup(func() {
-		resetIrTypeDedupeAvailability()
-		_ = db.Close()
-	})
-	require.NoError(t, db.AutoMigrate(&IrType{}, &IrTypeID{}, &IrTypePayload{},
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&IrTypeID{}, &IrTypePayload{},
 		&IrCode{}, &IrIndex{}, &IrNamePool{}, &IrSource{}, &IrOffset{}).Error)
 	require.NoError(t, ensureIrTypeDedupeIndexes(db))
-	require.NoError(t, db.Exec(
-		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
-	).Error)
-	resetIrTypeDedupeAvailability()
-	require.True(t, IrTypeDedupeAvailable(db))
 	return db
+}
+
+// loadTypePayload returns the stored body for one type id.
+func loadTypePayload(t *testing.T, db *gorm.DB, program string, typeID uint64) *IrTypePayload {
+	t.Helper()
+	var id IrTypeID
+	require.NoError(t, db.Where("program_name = ? AND type_id = ?", program, typeID).First(&id).Error)
+	var payload IrTypePayload
+	require.NoError(t, db.Where("id = ?", id.PayloadID).First(&payload).Error)
+	return &payload
 }
 
 func countRows(t *testing.T, db *gorm.DB, model any, where string, args ...any) int64 {
@@ -58,7 +60,7 @@ func TestIrTypeDedupeReadPathSurvivesScopedHandle(t *testing.T) {
 	db := setupDedupeDB(t)
 	require.NoError(t, SaveIrTypeBatch(db, []*IrType{dedupeItem("scoped", 7, "number")}))
 
-	scoped := db.Model(&IrType{}).Where("program_name = ?", "scoped")
+	scoped := db.Model(&IrTypeID{}).Where("program_name = ?", "scoped")
 	loaded := GetIrTypeItemById(scoped, "scoped", 7)
 	require.NotNil(t, loaded, "a scoped handle must still resolve the deduped type")
 	require.Equal(t, uint64(7), loaded.TypeId)
@@ -66,7 +68,7 @@ func TestIrTypeDedupeReadPathSurvivesScopedHandle(t *testing.T) {
 
 	var count int64
 	require.NoError(t, scoped.Count(&count).Error)
-	require.Equal(t, int64(0), count, "the caller's scope must not be consumed by the read")
+	require.Equal(t, int64(1), count, "the caller's scope must not be consumed by the read")
 }
 
 // The point of the layout: 500 ids that share a payload store one payload.
@@ -80,7 +82,7 @@ func TestIrTypeDedupeStoresPayloadOnce(t *testing.T) {
 
 	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"))
 	require.Equal(t, int64(500), countRows(t, db, &IrTypeID{}, "program_name = ?", "p"))
-	require.Zero(t, countRows(t, db, &IrType{}, ""), "deduped databases keep ir_types empty")
+	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, ""), "one payload serves every id")
 
 	for _, id := range []int64{1, 250, 500} {
 		got := GetIrTypeItemById(db, "p", id)
@@ -118,21 +120,6 @@ func TestIrTypeDedupeWorksInsideTransaction(t *testing.T) {
 		return nil
 	}))
 	require.Equal(t, "inside", GetIrTypeItemById(db, "p", 21).String)
-}
-
-// Payload rows are shared, so DeleteIrType must not remove a payload another
-// id still references.
-func TestDeleteIrTypeKeepsReferencedPayloads(t *testing.T) {
-	db := setupDedupeDB(t)
-	require.NoError(t, SaveIrTypeBatch(db, []*IrType{
-		dedupeItem("p", 31, "shared"),
-		dedupeItem("p", 32, "shared"),
-	}))
-	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"))
-	require.NoError(t, DeleteIrType(db, []int64{1}))
-	require.Equal(t, int64(1), countRows(t, db, &IrTypePayload{}, "program_name = ?", "p"),
-		"a payload still referenced by type 32 must survive")
-	require.NotNil(t, GetIrTypeItemById(db, "p", 32))
 }
 
 // A payload that is not stored yet must be added, and an id that changes
@@ -173,42 +160,6 @@ func TestIrTypeDedupeDoesNotRewriteUnchangedPayloads(t *testing.T) {
 	require.NoError(t, db.Model(&IrTypePayload{}).Where("program_name = ?", "p").Pluck("id", &after).Error)
 	require.ElementsMatch(t, before, after, "payload row ids must stay stable")
 	require.Equal(t, int64(4), countRows(t, db, &IrTypeID{}, "program_name = ?", "p"))
-}
-
-// Databases compiled by older binaries have ir_types rows and no dedupe rows.
-// The reader must keep answering from ir_types.
-func TestIrTypeLegacyRowsRemainReadable(t *testing.T) {
-	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "legacy.db"))
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		resetIrTypeDedupeAvailability()
-		_ = db.Close()
-	})
-	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
-	require.NoError(t, db.Exec(
-		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
-	).Error)
-	require.NoError(t, db.Create(&IrType{
-		ProgramName: "legacy", TypeId: 7, Kind: 2, String: "legacy-body", ExtraInformation: "{}",
-	}).Error)
-
-	// Without the dedupe tables the write path keeps the legacy layout.
-	resetIrTypeDedupeAvailability()
-	require.False(t, IrTypeDedupeAvailable(db))
-	require.NoError(t, SaveIrTypeBatch(db, []*IrType{dedupeItem("legacy", 8, "kept")}))
-	require.Equal(t, int64(2), countRows(t, db, &IrType{}, "program_name = ?", "legacy"))
-
-	require.Equal(t, "legacy-body", GetIrTypeItemById(db, "legacy", 7).String)
-	require.Equal(t, "kept", GetIrTypeItemById(db, "legacy", 8).String)
-
-	// Adding the tables (a new binary opening the same database) must not hide
-	// the rows written before them.
-	require.NoError(t, db.AutoMigrate(&IrTypeID{}, &IrTypePayload{}).Error)
-	require.NoError(t, ensureIrTypeDedupeIndexes(db))
-	resetIrTypeDedupeAvailability()
-	require.True(t, IrTypeDedupeAvailable(db))
-	require.Equal(t, "legacy-body", GetIrTypeItemById(db, "legacy", 7).String)
-	require.Equal(t, "kept", GetIrTypeItemById(db, "legacy", 8).String)
 }
 
 // Deleting a program must take its dedupe rows with it, or a recompile would

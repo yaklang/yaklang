@@ -20,7 +20,7 @@ func newTypeFlushDedupeStore(b *testing.B, typeCount int) *typeStore {
 	db, err := gorm.Open("sqlite3", filepath.Join(b.TempDir(), "types-dedupe.db"))
 	require.NoError(b, err)
 	b.Cleanup(func() { db.Close() })
-	require.NoError(b, db.AutoMigrate(&ssadb.IrType{}, &ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
+	require.NoError(b, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
 	require.NoError(b, db.Exec(
 		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
 	).Error)
@@ -51,10 +51,8 @@ func newTypeFlushBenchStore(b *testing.B, typeCount int) *typeStore {
 	db, err := gorm.Open("sqlite3", filepath.Join(b.TempDir(), "types.db"))
 	require.NoError(b, err)
 	b.Cleanup(func() { db.Close() })
-	require.NoError(b, db.AutoMigrate(&ssadb.IrType{}).Error)
-	require.NoError(b, db.Exec(
-		`CREATE UNIQUE INDEX IF NOT EXISTS ux_ir_types_program_type ON ir_types (program_name, type_id)`,
-	).Error)
+	require.NoError(b, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
+	require.NoError(b, ssadb.EnsureIrTypeDedupeIndexesForTest(db))
 	store := &typeStore{mode: ProgramCacheDBWrite, db: db, programName: "bench",
 		saveSize: 512, resident: utils.NewSafeMapWithKey[int64, Type]()}
 	for i := 1; i <= typeCount; i++ {

@@ -1,26 +1,29 @@
 package ssadb
 
 import (
-	"strings"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/gorm"
+	_ "github.com/yaklang/gorm/dialects/sqlite"
 )
 
-func TestSuspendIrCodeIdentityIndexOnEmptyTable(t *testing.T) {
-	t.Cleanup(func() {
-		clearIrCodeRowIDs()
-		irCodeIdentitySuspended.Store(false)
-	})
-	db := setupA2LoaderDB(t)
-	patchIrCodeIndex(db)
-	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
-
-	ddl, err := SuspendIrCodeIdentityIndex(db)
+func setupIdentityDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "identity.db"))
 	require.NoError(t, err)
-	require.Contains(t, strings.ToUpper(ddl), "UNIQUE")
-	require.False(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
-	require.True(t, IrCodeIdentityIndexSuspended())
+	t.Cleanup(func() { _ = db.Close() })
+	require.NoError(t, db.AutoMigrate(&IrCode{}).Error)
+	patchIrCodeIndex(db)
+	return db
+}
+
+// The unique code_id index is a schema invariant: it is never dropped for a
+// bulk load, so a second row for the same instruction cannot appear.
+func TestIrCodeIdentityIndexIsAlwaysPresent(t *testing.T) {
+	db := setupIdentityDB(t)
+	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
 
 	prog := t.Name()
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{
@@ -29,14 +32,9 @@ func TestSuspendIrCodeIdentityIndexOnEmptyTable(t *testing.T) {
 		OpcodeName:  "ConstInst",
 		String:      "kept",
 	}}))
-	got := nativeGetIrCodeItemById(db, prog, 7)
-	require.NotNil(t, got, "a compile-time read must use the remembered rowid, not scan")
-	require.Equal(t, "kept", got.String)
-	require.Nil(t, nativeGetIrCodeItemById(db, prog, 8))
-	batch, err := nativeGetIrCodesByIds(db, prog, []int64{8, 7, 7})
-	require.NoError(t, err)
-	require.Len(t, batch, 1)
-	require.Equal(t, int64(7), batch[0].CodeID)
+	first := nativeGetIrCodeItemById(db, prog, 7)
+	require.NotNil(t, first)
+	require.Equal(t, "kept", first.String)
 
 	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{
 		ProgramName: prog,
@@ -47,28 +45,15 @@ func TestSuspendIrCodeIdentityIndexOnEmptyTable(t *testing.T) {
 	updated := nativeGetIrCodeItemById(db, prog, 7)
 	require.NotNil(t, updated)
 	require.Equal(t, "changed", updated.String)
-	require.Equal(t, got.ID, updated.ID, "updating an existing code keeps its rowid")
+	require.Equal(t, first.ID, updated.ID, "an upsert keeps the row id")
 
-	require.NoError(t, RestoreIrCodeIdentityIndex(db, ddl))
-	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
-	require.False(t, IrCodeIdentityIndexSuspended())
-	restored := nativeGetIrCodeItemById(db, prog, 7)
-	require.NotNil(t, restored)
-	require.Equal(t, "changed", restored.String)
-}
+	var total int64
+	require.NoError(t, db.Model(&IrCode{}).Where("program_name = ?", prog).Count(&total).Error)
+	require.Equal(t, int64(1), total)
 
-func TestSuspendIrCodeIdentityIndexKeepsExistingRows(t *testing.T) {
-	t.Cleanup(func() {
-		clearIrCodeRowIDs()
-		irCodeIdentitySuspended.Store(false)
-	})
-	db := setupA2LoaderDB(t)
-	patchIrCodeIndex(db)
-	require.NoError(t, db.Create(&IrCode{ProgramName: "other", CodeID: 1, String: "stay"}).Error)
-
-	ddl, err := SuspendIrCodeIdentityIndex(db)
-	require.NoError(t, err)
-	require.Empty(t, ddl)
-	require.True(t, hasNamedIndex(db, TableIrCodes, "ux_ir_codes_program_code"))
-	require.False(t, IrCodeIdentityIndexSuspended())
+	require.Error(t, InsertIrCodes(db, []*IrCode{{
+		ProgramName: prog,
+		CodeID:      7,
+		OpcodeName:  "ConstInst",
+	}}, 1), "a plain insert must be rejected by the unique index")
 }

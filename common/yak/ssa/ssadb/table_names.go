@@ -5,7 +5,6 @@ const (
 	TableIrIndices  = "ir_indices_v1"
 	TableIrNamePool = "ir_name_pool_v1"
 	TableIrSources  = "ir_sources"
-	TableIrTypes    = "ir_types"
 	TableIrPrograms = "ir_programs"
 	TableIrOffsets  = "ir_offsets"
 

@@ -234,34 +234,32 @@ func TestSearchVariableConstType_A3_Equivalence(t *testing.T) {
 func setupNativeReadTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrTypeID{}, &IrTypePayload{}).Error)
+	require.NoError(t, ensureIrTypeDedupeIndexes(db))
 	return db
 }
 
-func TestNativeGetIrTypeItemById_Equivalent(t *testing.T) {
+func TestGetIrTypeItemById_ReadsPayloadJoin(t *testing.T) {
 	db := setupNativeReadTestDB(t)
 	prog := "native-type-prog"
-	item := &IrType{
+	require.NoError(t, SaveIrTypeBatch(db, []*IrType{{
 		TypeId:           42,
 		Kind:             3,
 		ProgramName:      prog,
 		String:           "java/lang/String",
 		ExtraInformation: `{"name":"x"}`,
-	}
-	require.NoError(t, db.Create(item).Error)
+	}}))
 
-	native := nativeGetIrTypeItemById(db, prog, 42)
-	require.NotNil(t, native)
-	require.Equal(t, item.TypeId, native.TypeId)
-	require.Equal(t, item.Kind, native.Kind)
-	require.Equal(t, item.ProgramName, native.ProgramName)
-	require.Equal(t, item.String, native.String)
-	require.Equal(t, item.ExtraInformation, native.ExtraInformation)
+	got := GetIrTypeItemById(db, prog, 42)
+	require.NotNil(t, got)
+	require.Equal(t, uint64(42), got.TypeId)
+	require.Equal(t, 3, got.Kind)
+	require.Equal(t, prog, got.ProgramName)
+	require.Equal(t, "java/lang/String", got.String)
+	require.Equal(t, `{"name":"x"}`, got.ExtraInformation)
 
-	// nonexistent id
-	require.Nil(t, nativeGetIrTypeItemById(db, prog, 999))
-	// negative id
-	require.Nil(t, nativeGetIrTypeItemById(db, prog, -1))
+	require.Nil(t, GetIrTypeItemById(db, prog, 999))
+	require.Nil(t, GetIrTypeItemById(db, prog, -1))
 }
 
 func TestNativeGetIrCodeItemById_Equivalent(t *testing.T) {
