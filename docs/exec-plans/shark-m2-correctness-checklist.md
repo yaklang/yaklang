@@ -6,8 +6,8 @@
 代码量或测试数量估算完成度。M1 尚未合并时，M2 PR 以 M1 分支为基线，避免重复展示 M1。
 
 后续分支 `codex/shark-m2-smb-query-info-types` 从已全绿的 M2 `f9faae9f82c0dbe6a657bfaa94d7d6acdc845380` 开始。
-当前状态：**29 项，已完成 21，进行中 5，未开始 3；剩余 8 项**。
-M2-29 的来源计数审计已经开始，未预先认定为产品漏解析。
+当前状态：**31 项，已完成 22，进行中 6，未开始 3；剩余 9 项**。
+M2-29的来源计数及原生一一对应已闭合，M2-30/31为实际回放和审查新发现，不能藏入旧完成项。
 完成项为 M2-01/02/03、06、12..28 的有限合同，不含进行中的 M2-11；不代表整个 SMB profile 验收完成。
 新增 QUERY_INFO 和源码 oracle 见[本批范围与证据](shark-m2-smb-query-info-20261030.md)。
 M2-04 的19个子项另计：QUERY_INFO envelope .08和正文来源补充 .19已完成
@@ -50,7 +50,9 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-26 | SMB2 前移探测不抢占短 DLMS Wrapper | 已完成（跨协议回归合同） | e7 全 traffic 12 叶/14 fail actions 暴露 `<8` 字节时仅 00 前缀被提前拦截；前移路径现须完整签名，原 `TestDLMSWrapperSealedReplayMatrix/wrapper-short-header` 全 workers/eager/deferred/order 断言和样本原样通过 | 0 |
 | M2-27 | Windows 杀进程检查点不得在原子发布期间误报共享锁 | 已完成（本地有限合同，整批CI归11） | 首次完整traffic实际失败保留；只在现有20秒期限内重试Windows sharing/lock，权限/坏JSON仍失败；真实独占Win32句柄控制和原8场景WAL/事务/完整导出断言均通过，未改生产数据库代码 | 0 |
 | M2-28 | Yak SSA 入口与include不受AST完成顺序影响 | 已完成（本地有限合同，整批CI归11） | 60原断言本地40轮5次失败，中间候选仍9次失败均保留；自身editor/显式可执行根/保留未visited来源及路径优先级合同通过，受影响包合并682 pass/11历史skip/0fail；[完整证据与行为边界](shark-m2-ssa-entry-20261030.md)，精确整批CI仍归11 | 0 |
-| M2-29 | 官方 peter 捕获 raw110/PDML70 QUERY_INFO 观测计数归因 | 进行中（来源审计） | 冻结 physical/PDU/command/direction 单位，逐条解释重传、重组和 display-filter；差40尚未分类为产品错误，必须先冻结独立源预期，再验候选 | 来源归因0.5–1小时；修复未估 |
+| M2-29 | 官方 peter 捕获 raw110/PDML70 QUERY_INFO 观测计数归因 | 已完成（有限来源/固定头合同） | 两独立raw/stream源110=55+55；baseline70的40个响应均保留tcp.segment_data，三个独立重组配置反事实各恢复110；原生300构建110原PDU/固定头/包号/域/流逐一匹配，0缺失/重复/已映射差异、10join负控通过；未证明参考内部C状态或全部body/session一致 | 0 |
+| M2-30 | 完整记录的body错误不得停止后续可识别SMB2流量 | 进行中（422项矩阵通过，真实回放/页面待验） | 官方两个旧捕获首SESSION_SETUP为17/80历史布局，不能假读现代PreviousSessionId；只body失败+完整DirectTCP/全compound头可恢复，raw/header/错误保留、无state提交；header/framing/资源/关联冲突仍fatal；成功/continuation/ERROR正文与canonical对齐 | 1–2小时实施及验证；CI等待另计 |
+| M2-31 | AsyncId的pending建立、唯一性、固定身份与MID复用 | 进行中（422项矩阵通过，最终回归待验） | PENDING按literalMID绑定；final按已观察非零AsyncId；同ID幂等，换ID/他请求占用/同compound两类冲突拒绝；完成后删唯一alias，MID复用后的late99不借新selector；native/canonical/恢复预检0/1/max ID反例 | 0.5–1小时实施及验证；CI等待另计 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。上次在账户已用50%时暂停；本轮用户追加20个百分点，账户已用70%时停止，并提前留出提交和精确SHA CI收尾空间。最多 1 个子 agent，主 agent 负责关键路径。
 
