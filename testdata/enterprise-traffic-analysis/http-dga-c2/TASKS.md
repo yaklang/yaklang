@@ -43,7 +43,7 @@ query_pcapdb(id=..., query_type=body_summary, record_id=7)
 
 `protocols` 摘要应直接提供 `id`、`transaction_id`、`response_to`、时间、源/目的和字节数。8 条 HTTP 消息应有 4 组关联，响应 ID 分别为 2/4/6/8，其 `response_to` 分别为 1/3/5/7。
 
-不要因为 `tshark` 未安装而自行拆分 pcapng。若 AI 只能使用旧 `analyze_pcap`，应明确报告应用层字段不可用，而不是把包级 `Payload` 当作 HTTP 解析结果。
+不要因为 `tshark` 未安装而自行拆分 pcapng。结构化分析只使用 `load_pcapfile + query_pcapdb`；旧 `analyze_pcap` 已退役且不再作为后备入口。若结构化工具调用失败，应报告具体错误，而不是把包级 `Payload` 当作 HTTP 解析结果。
 
 POST Body 任务应使用 `body_summary`，不要用 `protocol_data` 的截断预览算哈希，也不要导出到 shell。预期摘要包括 4464 字节完整 Body、表单/百分号编码、非二进制、敏感候选，以及消息/wire body/decoded body 的 SHA256；返回结果不得包含 `IEUser` 或正文片段。
 
