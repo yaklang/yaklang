@@ -3,6 +3,7 @@ package fp
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -177,6 +178,43 @@ func TestWebDetector_HTTPWaitHonorsProbeContext(t *testing.T) {
 				}
 			})
 		}
+	}
+}
+
+func TestWebDetector_HTTPFailurePreservesPriorResult(t *testing.T) {
+	for _, state := range []PortState{CLOSED, OPEN} {
+		t.Run(string(state), func(t *testing.T) {
+			release := make(chan struct{})
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				select {
+				case <-release:
+				case <-r.Context().Done():
+				}
+			}))
+			defer server.Close()
+			defer close(release)
+			host, port, err := utils.ParseStringToHostPort(server.URL)
+			require.NoError(t, err)
+			matcher := &Matcher{Config: NewConfig(WithOnlyEnableWebFingerprint(true), WithProbeTimeout(200*time.Millisecond))}
+			prior := &MatchResult{Target: host, Port: port, State: state}
+			if state == OPEN {
+				prior.Fingerprint = &FingerprintInfo{IP: host, Port: port, Proto: TCP,
+					ServiceName: "fixture-service", Banner: "fixture-banner"}
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			result, err := matcher.webDetector(prior, ctx, matcher.Config, host, net.ParseIP(host), port)
+			require.NoError(t, err)
+			require.Equal(t, state, result.State, "TCP reachability alone must not change the web scan result")
+			require.NotEmpty(t, result.Reason)
+			require.NotNil(t, result.Fingerprint)
+			require.True(t, result.Fingerprint.CheckedTLS, "retain TLS probe metadata for service fingerprint fallback")
+			require.Empty(t, result.Fingerprint.HttpFlows)
+			if state == OPEN {
+				require.Equal(t, "fixture-service", result.Fingerprint.ServiceName)
+				require.Equal(t, "fixture-banner", result.Fingerprint.Banner)
+			}
+		})
 	}
 }
 

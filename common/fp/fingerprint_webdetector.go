@@ -39,40 +39,19 @@ func (f *Matcher) webDetector(result *MatchResult, ctx context.Context, config *
 	}
 	var inspectResults []*netx.TLSInspectResult
 	var tlsChecked bool
-	isOpen, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
+	_, tlsChecked, inspectResults, redirectInfos, err := f.fetchBannerFromHostPort(ctx, nil, nil, h, port, int64(config.FingerprintDataSize), config.RuntimeId, config.Proxies...)
 	if err != nil {
-		if !isOpen {
-			f.log("port is closed: %v", err)
-			return &MatchResult{
-				Target:         host,
-				Port:           port,
-				State:          result.State,
-				Reason:         err.Error(),
-				ProtocolFields: result.ProtocolFields,
-				Fingerprint: &FingerprintInfo{
-					IP:                ip.String(),
-					Port:              port,
-					CheckedTLS:        tlsChecked,
-					TLSInspectResults: inspectResults,
-				},
-			}, nil
+		// TCP reachability alone is not a successful web probe. Preserve the
+		// incoming state and fingerprints so only_web keeps its classification
+		// and web-first scans can still fall back to service fingerprinting.
+		f.log("web probe failed: %v", err)
+		result.Reason = err.Error()
+		if result.Fingerprint == nil {
+			result.Fingerprint = &FingerprintInfo{IP: ip.String(), Port: port}
 		}
-		f.log("error occurred but port is open: %v", err)
-		fastResult := &MatchResult{
-			Target:         host,
-			Port:           port,
-			State:          OPEN,
-			Reason:         "",
-			ProtocolFields: result.ProtocolFields,
-			Fingerprint: &FingerprintInfo{
-				IP:                ip.String(),
-				Port:              port,
-				CheckedTLS:        tlsChecked,
-				TLSInspectResults: inspectResults,
-			},
-		}
-		f.reportOpen(fastResult)
-		return fastResult, nil
+		result.Fingerprint.CheckedTLS = tlsChecked
+		result.Fingerprint.TLSInspectResults = inspectResults
+		return result, nil
 	}
 	if redirectInfos == nil {
 		f.log("no redirect info found")
