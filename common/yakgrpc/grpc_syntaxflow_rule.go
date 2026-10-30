@@ -44,9 +44,6 @@ func (s *Server) CreateSyntaxFlowRuleEx(ctx context.Context, req *ypb.CreateSynt
 	if err != nil {
 		return nil, err
 	}
-	if err := sfdb.CheckIncludeCycleForWrite(rule); err != nil {
-		return nil, err
-	}
 	// 不再自动添加默认分组（语言、严重性等）
 	_, err = sfdb.CreateRule(rule, input.GetGroupNames()...)
 	if err != nil {

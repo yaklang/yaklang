@@ -242,11 +242,6 @@ func (s *OnlineClient) SaveSyntaxFlowRule(db *gorm.DB, rule ...*OnlineSyntaxFlow
 			Version:       i.Version,
 		}
 
-		if err := sfdb.CheckIncludeCycleForWrite(y); err != nil {
-			log.Errorf("save [%s] to local failed: %s", i.RuleName, err)
-			return err
-		}
-
 		err := db.Where("rule_name = ? or rule_id = ?", i.RuleName, i.RuleId).Unscoped().Delete(&schema.SyntaxFlowRule{}).Error
 		if err != nil {
 			log.Errorf("save [%s] to local failed: %s", i.RuleName, err)

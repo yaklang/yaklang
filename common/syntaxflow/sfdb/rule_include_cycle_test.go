@@ -1,16 +1,14 @@
 package sfdb
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfvm"
-	"github.com/yaklang/yaklang/common/utils"
 )
 
-func cycleGateLib(t *testing.T, content, ruleName string) *schema.SyntaxFlowRule {
+func includeCycleRule(t *testing.T, content, ruleName string) *schema.SyntaxFlowRule {
 	t.Helper()
 	rule, err := CheckSyntaxFlowRuleContent(content)
 	require.NoError(t, err)
@@ -18,67 +16,83 @@ func cycleGateLib(t *testing.T, content, ruleName string) *schema.SyntaxFlowRule
 	return rule
 }
 
-// TestCheckIncludeCycleForWriteDB exercises the write-time include-cycle gate
-// against an isolated database: a candidate closing a cycle is rejected, an
-// acyclic one passes, the candidate overlays the stored same-named rule
-// (update semantics), and plain rules join the graph by title the way
-// GetLibrary resolves them at runtime.
-func TestCheckIncludeCycleForWriteDB(t *testing.T) {
-	db, err := utils.CreateTempTestDatabaseInMemory()
-	require.NoError(t, err)
-	t.Cleanup(func() { require.NoError(t, db.Close()) })
-	require.NoError(t, db.AutoMigrate(&schema.SyntaxFlowRule{}).Error)
-
-	a := cycleGateLib(t, "desc(lib: \"a\");\n$input<include(\"b\")> as $o; alert $o;", "cycle-lib-a")
-	require.NoError(t, db.Create(a).Error)
-	t.Cleanup(func() {
-		require.NoError(t, db.Where("rule_name = ?", "cycle-lib-a").Unscoped().Delete(&schema.SyntaxFlowRule{}).Error)
+// TestCheckIncludeCycles covers the internal-rule-set dependency analysis:
+// the whole supplied set is keyed by title / included_name, and a cycle in
+// the resulting <include(...)> graph is rejected with its path.
+func TestCheckIncludeCycles(t *testing.T) {
+	t.Run("detects mutual cycle", func(t *testing.T) {
+		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(lib: "a"); <include("b")> as $o; alert $o;`, "lib-a"),
+			includeCycleRule(t, `desc(lib: "b"); <include("a")> as $o; alert $o;`, "lib-b"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "include cycle")
+		require.Contains(t, err.Error(), "a -> b -> a")
 	})
 
-	t.Run("rejects closing a cycle", func(t *testing.T) {
-		b := cycleGateLib(t, "desc(lib: \"b\");\n$input<include(\"a\")> as $o; alert $o;", "cycle-lib-b")
-		err := CheckIncludeCycleForWriteDB(db, b)
+	t.Run("detects self include", func(t *testing.T) {
+		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(lib: "self"); <include("self")> as $o; alert $o;`, "lib-self"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "self -> self")
+	})
+
+	t.Run("detects indirect cycle", func(t *testing.T) {
+		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(lib: "a"); <include("b")> as $o; alert $o;`, "lib-a"),
+			includeCycleRule(t, `desc(lib: "b"); <include("c")> as $o; alert $o;`, "lib-b"),
+			includeCycleRule(t, `desc(lib: "c"); <include("a")> as $o; alert $o;`, "lib-c"),
+		})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "a -> b -> c -> a")
+	})
+
+	t.Run("allows acyclic rule set", func(t *testing.T) {
+		rules := []*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(lib: "a"); <include("b")> as $o; alert $o;`, "lib-a"),
+			includeCycleRule(t, `desc(lib: "b"); <include("c")> as $o; alert $o;`, "lib-b"),
+			includeCycleRule(t, `desc(lib: "c"); a* as $x; alert $x;`, "lib-c"),
+			// diamond: two independent edges into the same chain
+			includeCycleRule(t, `desc(lib: "d"); <include("b")> as $one; <include("c")> as $two; alert $one;`, "lib-d"),
+			// target outside the set has no known content and is skipped
+			includeCycleRule(t, `desc(lib: "e"); <include("missing-library")> as $o; alert $o;`, "lib-e"),
+		}
+		require.NoError(t, CheckIncludeCycles(rules))
+	})
+
+	t.Run("detects cycle through embedded sub-rule", func(t *testing.T) {
+		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(lib: "a"); <include("b")> as $o; alert $o;`, "lib-a"),
+			includeCycleRule(t, "desc(lib: \"b\");\na* as $x; $x-{ check: `<include(a)> as $o` }-> as $out; alert $out;", "lib-b"),
+		})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "a -> b -> a")
 	})
 
-	t.Run("allows acyclic candidate", func(t *testing.T) {
-		c := cycleGateLib(t, "desc(lib: \"c\");\n$input<include(\"a\")> as $o; alert $o;", "cycle-lib-c")
-		require.NoError(t, CheckIncludeCycleForWriteDB(db, c))
+	t.Run("skips uncompilable rule", func(t *testing.T) {
+		require.NoError(t, CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			{Title: "broken", Content: "((("},
+			includeCycleRule(t, `desc(lib: "a"); <include("b")> as $o; alert $o;`, "lib-a"),
+			includeCycleRule(t, `desc(lib: "b"); a* as $x; alert $x;`, "lib-b"),
+		}))
 	})
 
-	t.Run("candidate overlays the stored same-named rule", func(t *testing.T) {
-		b := cycleGateLib(t, "desc(lib: \"b\");\n$input<include(\"a\")> as $o; alert $o;", "cycle-lib-b")
-		require.NoError(t, db.Create(b).Error)
-		t.Cleanup(func() {
-			require.NoError(t, db.Where("rule_name = ?", "cycle-lib-b").Unscoped().Delete(&schema.SyntaxFlowRule{}).Error)
-		})
-		// The stored graph is cyclic (a -> b -> a), but the candidate replaces
-		// a's node with an include-free version, so the write must pass.
-		a2 := cycleGateLib(t, "desc(lib: \"a\");\na* as $o; alert $o;", "cycle-lib-a")
-		require.NoError(t, CheckIncludeCycleForWriteDB(db, a2))
-	})
-
-	t.Run("non-library title joins the graph", func(t *testing.T) {
+	t.Run("plain title joins the graph", func(t *testing.T) {
 		// GetLibrary resolves by title too, so a plain rule titled "x" is a
 		// cycle node even without allow-included.
-		x := cycleGateLib(t, "desc(title: \"x\");\n$input<include(\"y\")> as $o; alert $o;", "cycle-rule-x")
-		require.NoError(t, db.Create(x).Error)
-		t.Cleanup(func() {
-			require.NoError(t, db.Where("rule_name = ?", "cycle-rule-x").Unscoped().Delete(&schema.SyntaxFlowRule{}).Error)
+		err := CheckIncludeCycles([]*schema.SyntaxFlowRule{
+			includeCycleRule(t, `desc(title: "x"); <include("y")> as $o; alert $o;`, "rule-x"),
+			includeCycleRule(t, `desc(lib: "y"); <include("x")> as $o; alert $o;`, "lib-y"),
 		})
-
-		y := cycleGateLib(t, "desc(lib: \"y\");\n$input<include(\"x\")> as $o; alert $o;", "cycle-lib-y")
-		err := CheckIncludeCycleForWriteDB(db, y)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "x -> y -> x")
 	})
 
-	require.NoError(t, CheckIncludeCycleForWriteDB(db, nil))
-}
-
-func includeCycleLib(content string) *schema.SyntaxFlowRule {
-	return &schema.SyntaxFlowRule{Content: content}
+	t.Run("empty sets pass", func(t *testing.T) {
+		require.NoError(t, CheckIncludeCycles(nil))
+		require.NoError(t, CheckIncludeCycles([]*schema.SyntaxFlowRule{nil}))
+	})
 }
 
 func mustCompileRuleForInclude(t *testing.T, content string) *sfvm.SFFrame {
@@ -156,70 +170,6 @@ alert $two;
 	}
 }
 
-func TestCheckRuleIncludeCyclesDetectsMutualCycle(t *testing.T) {
-	err := checkRuleIncludeCycles(map[string]*schema.SyntaxFlowRule{
-		"a": includeCycleLib(`<include("b")> as $out; alert $out;`),
-		"b": includeCycleLib(`<include("a")> as $out; alert $out;`),
-	})
-	if err == nil {
-		t.Fatal("mutual include rule set unexpectedly accepted")
-	}
-	if msg := err.Error(); !strings.Contains(msg, "include cycle") || !strings.Contains(msg, "a -> b -> a") {
-		t.Fatalf("cycle error does not name the path: %v", msg)
-	}
-}
-
-func TestCheckRuleIncludeCyclesDetectsSelfInclude(t *testing.T) {
-	err := checkRuleIncludeCycles(map[string]*schema.SyntaxFlowRule{
-		"self": includeCycleLib(`<include("self")> as $out; alert $out;`),
-	})
-	if err == nil {
-		t.Fatal("self-including rule set unexpectedly accepted")
-	}
-	if msg := err.Error(); !strings.Contains(msg, "self -> self") {
-		t.Fatalf("cycle error does not name the path: %v", msg)
-	}
-}
-
-func TestCheckRuleIncludeCyclesDetectsIndirectCycle(t *testing.T) {
-	err := checkRuleIncludeCycles(map[string]*schema.SyntaxFlowRule{
-		"a": includeCycleLib(`<include("b")> as $out; alert $out;`),
-		"b": includeCycleLib(`<include("c")> as $out; alert $out;`),
-		"c": includeCycleLib(`<include("a")> as $out; alert $out;`),
-	})
-	if err == nil {
-		t.Fatal("indirect cycle rule set unexpectedly accepted")
-	}
-	if msg := err.Error(); !strings.Contains(msg, "a -> b -> c -> a") {
-		t.Fatalf("cycle error does not name the path: %v", msg)
-	}
-}
-
-// TestCheckRuleIncludeCyclesAllowsAcyclicRuleSet covers the shapes that must
-// NOT trip the check: chains, diamonds, edges to libraries outside the set
-// (no known content — skipped), and an empty set.
-func TestCheckRuleIncludeCyclesAllowsAcyclicRuleSet(t *testing.T) {
-	ruleSet := map[string]*schema.SyntaxFlowRule{
-		"a": includeCycleLib(`<include("b")> as $out; alert $out;`),
-		"b": includeCycleLib(`<include("c")> as $out; alert $out;`),
-		"c": includeCycleLib(`a* as $x; alert $x;`),
-		// diamond: two independent edges into the chain
-		"d": includeCycleLib(`
-<include("b")> as $one;
-<include("c")> as $two;
-alert $one;
-`),
-		// target outside the set cannot close a cycle here
-		"e": includeCycleLib(`<include("missing-library")> as $out; alert $out;`),
-	}
-	if err := checkRuleIncludeCycles(ruleSet); err != nil {
-		t.Fatalf("acyclic rule set rejected: %v", err)
-	}
-	if err := checkRuleIncludeCycles(nil); err != nil {
-		t.Fatalf("empty rule set rejected: %v", err)
-	}
-}
-
 // TestExtractIncludeTargetsWalksEmbeddedSubRules covers include calls inside
 // config values that are themselves filter statements (SyntaxFlowRule items):
 // extracted through real syntax, only walked when the compile-time flag is
@@ -244,32 +194,4 @@ func TestExtractIncludeTargetsWalksEmbeddedSubRules(t *testing.T) {
 		},
 	}}}
 	assertStringSliceEqual(t, extractIncludeTargets(frame), []string{"synthetic-embedded"})
-}
-
-func TestCheckRuleIncludeCyclesDetectsCycleThroughEmbeddedSubRule(t *testing.T) {
-	err := checkRuleIncludeCycles(map[string]*schema.SyntaxFlowRule{
-		"a": includeCycleLib("a* as $x; $x-{ check: `<include(b)> as $o` }-> as $out; alert $out;"),
-		"b": includeCycleLib(`<include("a")> as $out; alert $out;`),
-	})
-	if err == nil {
-		t.Fatal("cycle through embedded sub-rule unexpectedly accepted")
-	}
-	if msg := err.Error(); !strings.Contains(msg, "a -> b -> a") {
-		t.Fatalf("cycle error does not name the path: %v", msg)
-	}
-}
-
-// TestCheckRuleIncludeCyclesSkipsUncompilableRules: a rule that cannot
-// compile cannot execute includes at scan time either, so it contributes no
-// edges — and must not fail the whole check (one legacy broken row would
-// otherwise block every later write through the gate).
-func TestCheckRuleIncludeCyclesSkipsUncompilableRules(t *testing.T) {
-	err := checkRuleIncludeCycles(map[string]*schema.SyntaxFlowRule{
-		"broken": includeCycleLib("((("),
-		"a":      includeCycleLib(`<include("b")> as $out; alert $out;`),
-		"b":      includeCycleLib(`a* as $x; alert $x;`),
-	})
-	if err != nil {
-		t.Fatalf("rule set with uncompilable rule rejected: %v", err)
-	}
 }
