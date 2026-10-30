@@ -149,7 +149,7 @@ func includeFlightValues(
 	ruleName string,
 	compute func() (Values, error),
 ) (Values, error) {
-	values, err := includeFlight.DoChan(ctx, flightKey, compute)
+	values, err := includeFlight.Do(ctx, flightKey, compute)
 	if err != nil && ctx.Err() != nil {
 		return nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
 	}

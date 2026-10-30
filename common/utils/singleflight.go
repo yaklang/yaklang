@@ -21,49 +21,13 @@ func NewSingleFlightCache[K comparable, V any](cache *CacheExWithKey[K, V]) *Sin
 	}
 }
 
-// Do executes the loader function only once for the same key, even with concurrent requests.
-func (s *SingleFlightCache[K, V]) Do(key K, loader func() (V, error)) (V, error) {
-	if s.cache != nil {
-		if value, ok := s.cache.Get(key); ok {
-			return value, nil
-		}
-	}
-
-	keyStr := fmt.Sprintf("%v", key)
-	result, err, _ := s.sf.Do(keyStr, func() (interface{}, error) {
-		if s.cache != nil {
-			if value, ok := s.cache.Get(key); ok {
-				return value, nil
-			}
-		}
-
-		data, err := loader()
-		if err == nil && s.cache != nil {
-			s.cache.Set(key, data)
-		}
-
-		return data, err
-	})
-
-	if err != nil {
-		var zero V
-		return zero, err
-	}
-
-	if res, ok := result.(V); ok {
-		return res, nil
-	}
-
-	var zero V
-	return zero, Errorf("unexpected result type from singleflight")
-}
-
-// DoChan is the context-aware variant of Do. The loader still runs once per
-// key, but a caller can stop waiting when ctx is done; the flight itself keeps
-// running under the loader's own cancellation and a successful result is still
-// cached. A panicking loader is reported as an error to every caller instead of
-// crashing the process from singleflight's internal goroutine.
-func (s *SingleFlightCache[K, V]) DoChan(ctx context.Context, key K, loader func() (V, error)) (V, error) {
+// Do executes the loader function only once for the same key, even with
+// concurrent requests, and caches the successful result. ctx bounds only this
+// caller's wait: the flight keeps running under the loader's own cancellation
+// and a successful result is still cached. A panicking loader is reported as an
+// error to every caller instead of crashing the process from singleflight's
+// internal goroutine.
+func (s *SingleFlightCache[K, V]) Do(ctx context.Context, key K, loader func() (V, error)) (V, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}

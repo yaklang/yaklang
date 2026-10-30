@@ -1,6 +1,7 @@
 package ssaapi
 
 import (
+	"context"
 	"io"
 	"strings"
 	"time"
@@ -104,7 +105,7 @@ func ParseFromReader(input io.Reader, opts ...ssaconfig.Option) (*Program, error
 
 	if config.EnableCache {
 		hash := config.CalcHash()
-		result, err := parseSingleFlightCache.Do(hash, func() (*programResult, error) {
+		result, err := parseSingleFlightCache.Do(context.Background(), hash, func() (*programResult, error) {
 			ret, err := config.parseFile()
 			return &programResult{
 				prog: ret,
