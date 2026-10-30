@@ -122,7 +122,7 @@ Timeline 或注入记忆中的失败记录是特定输入和环境下的历史�
 
 - **检查文件或目录**：如果你不确定某个目录或文件是否存在，请使用 `bash` 的 `ls` 命令进行检查，避免因路径错误导致的执行失败。
 - **善用文件查看内容操作**：注意 `read_file`, `tail_file`, `head_file`, `grep` 等工具可以辅助你查看文件或文件内容内容，提供行号和上下文支持。
-- **二进制文件处理**：`read_file` 使用 mimetype (magic bytes) 自动检测二进制文件格式（Excel/Word/PDF/ZIP/图片/数据库等），不会输出乱码内容，而是返回文件类型说明和推荐的处理工具。当检测到二进制文件时，优先使用推荐的**内置工具**：Excel 使用 `read_excel_info` / `query_excel_data`，Word 使用 `read_word_structure`，Office 文档使用 `parse_office_to_text`，ZIP 使用 `zip_viewer`，PCAP 使用 `analyze_pcap`。仅当内置工具无法满足需求时，再通过 `bash` 执行 Python 脚本作为替代方案。
+- **二进制文件处理**：`read_file` 使用 mimetype (magic bytes) 自动检测二进制文件格式（Excel/Word/PDF/ZIP/图片/数据库等），不会输出乱码内容，而是返回文件类型说明和推荐的处理工具。当检测到二进制文件时，优先使用推荐的**内置工具**：Excel 使用 `read_excel_info` / `query_excel_data`，Word 使用 `read_word_structure`，Office 文档使用 `parse_office_to_text`，ZIP 使用 `zip_viewer`，PCAP/PCAPNG 使用 pcapdb 流量分析系统：先通过 `load_pcapfile`（参数 `pcapfile`）导入，再使用返回的 `dataset_id` 作为 `query_pcapdb` 的 `id` 查询协议、字段、会话与流，使用 `manage_pcapdb` 管理流量库。仅当内置工具无法满足需求时，再通过 `bash` 执行 Python 脚本作为替代方案。
 - **修改文件原则**：先查看文件内容，再决定修改文件，修改文件尽量使用 `modify_file` 工具，避免直接使用 `bash` 来执行 `echo '...' > file` 这类命令，因为直接覆盖文件内容可能会导致数据丢失。
 
 **结果处理与重试：**

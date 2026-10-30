@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/mattn/go-sqlite3"
 	"github.com/yaklang/gorm"
@@ -43,7 +44,18 @@ func openIndex(path string, write, create bool) (*gorm.DB, error) {
 		query.Set("_query_only", "true")
 		query.Set("_cache_size", "-2048")
 	}
-	u := url.URL{Scheme: "file", Path: filepath.ToSlash(path), RawQuery: query.Encode()}
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(absPath)
+	// A Windows drive belongs in the URI path (/C:/...), not its authority.
+	// Root relative paths before URL encoding, and keep escaping centralized so
+	// spaces, Unicode, '#' and '%' remain literal filesystem characters.
+	if !strings.HasPrefix(uriPath, "/") {
+		uriPath = "/" + uriPath
+	}
+	u := url.URL{Scheme: "file", Path: uriPath, RawQuery: query.Encode()}
 	db, err := gorm.Open("sqlite3", pcapSQLiteDriver, u.String())
 	if err != nil {
 		return nil, err

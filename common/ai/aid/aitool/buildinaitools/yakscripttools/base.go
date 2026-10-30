@@ -244,6 +244,9 @@ func loadAllYakScriptFromEmbedFS() ([]*schema.AIYakTool, error) {
 			return nil
 		}
 		toolname := strings.TrimSuffix(filename, ".yak")
+		if schema.AIToolDeprecationError(toolname) != nil {
+			return nil
+		}
 
 		content, err := efs.ReadFile(s)
 		if err != nil {
@@ -341,7 +344,13 @@ func covertTools(tools []*schema.AIYakTool) []*aitool.Tool {
 	if toolCovertHandle == nil {
 		return nil
 	}
-	return toolCovertHandle(tools)
+	active := make([]*schema.AIYakTool, 0, len(tools))
+	for _, tool := range tools {
+		if tool != nil && schema.AIToolDeprecationError(tool.Name) == nil {
+			active = append(active, tool)
+		}
+	}
+	return toolCovertHandle(active)
 }
 
 // ConvertTools 将 AIYakTool 转换为 aitool.Tool (公开接口)

@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils/omap"
 
 	"github.com/davecgh/go-spew/spew"
@@ -179,6 +180,9 @@ func (t *Tool) InvokeWithRaw(raw string, opts ...ToolInvokeOptions) (*ToolResult
 
 // InvokeWithParams 使用参数映射调用工具
 func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions) (*ToolResult, error) {
+	if err := schema.AIToolDeprecationError(t.Name); err != nil {
+		return &ToolResult{Name: t.Name, Success: false, Error: err.Error()}, err
+	}
 	// Temporarily remove runtime_id (injected by ToolCaller.invoke) before validation,
 	// since it's not part of the tool's declared schema.
 	runtimeID, hasRuntimeID := params["runtime_id"]
@@ -247,6 +251,9 @@ func (t *Tool) InvokeWithParams(params map[string]any, opts ...ToolInvokeOptions
 
 // InvokeWithOrderedParams 使用 OrderedMap 参数调用工具
 func (t *Tool) InvokeWithOrderedParams(params *omap.OrderedMap[string, any], opts ...ToolInvokeOptions) (*ToolResult, error) {
+	if err := schema.AIToolDeprecationError(t.Name); err != nil {
+		return &ToolResult{Name: t.Name, Success: false, Error: err.Error()}, err
+	}
 	// 验证参数
 	valid, validationErrors := t.ValidateOrderedParams(params)
 	if !valid {

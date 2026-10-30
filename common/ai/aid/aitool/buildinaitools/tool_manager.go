@@ -301,7 +301,9 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 	if m.onlyTools != nil {
 		var result []*aitool.Tool
 		for _, tool := range m.onlyTools {
-			result = append(result, tool)
+			if tool != nil && schema.AIToolDeprecationError(tool.Name) == nil {
+				result = append(result, tool)
+			}
 		}
 		sort.Slice(result, func(i, j int) bool { return result[i].Name < result[j].Name })
 		return result
@@ -310,6 +312,9 @@ func (m *AiToolManager) safeToolsGetter() []*aitool.Tool {
 		return []*aitool.Tool{}
 	}
 	allTools := m.toolsGetter()
+	allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
+		return tool != nil && schema.AIToolDeprecationError(tool.Name) == nil
+	})
 	if m.disallowMCPServers.Load() {
 		allTools = lo.Filter(allTools, func(tool *aitool.Tool, _ int) bool {
 			return !IsMCPRelatedToolName(tool.Name)
@@ -400,6 +405,9 @@ func (m *AiToolManager) getSearchTools() ([]*aitool.Tool, error) {
 
 // GetToolByName 通过工具名获取特定工具
 func (m *AiToolManager) GetToolByName(name string) (*aitool.Tool, error) {
+	if err := schema.AIToolDeprecationError(name); err != nil {
+		return nil, err
+	}
 	if m.onlyTools != nil {
 		if tool, ok := m.onlyTools[name]; ok {
 			return tool, nil
@@ -477,7 +485,9 @@ func (m *AiToolManager) SearchTools(method string, query string) ([]*aitool.Tool
 	if err != nil {
 		return nil, err
 	}
-	return res, nil
+	return lo.Filter(res, func(tool *aitool.Tool, _ int) bool {
+		return tool != nil && schema.AIToolDeprecationError(tool.Name) == nil
+	}), nil
 }
 
 // EnableTool 开启单个工具
@@ -641,6 +651,9 @@ func (m *AiToolManager) addRecentlyUsedToolLocked(tool *aitool.Tool, native bool
 func (m *AiToolManager) addRecentToolEntryLocked(newEntry *RecentToolEntry) RecentToolCacheMutation {
 	var mutation RecentToolCacheMutation
 	name := newEntry.Name
+	if schema.AIToolDeprecationError(name) != nil {
+		return mutation
+	}
 
 	// remove existing entry with same name (will be re-appended at tail)
 	filtered := make([]*RecentToolEntry, 0, len(m.recentToolsCache))

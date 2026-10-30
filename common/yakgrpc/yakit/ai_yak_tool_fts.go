@@ -25,7 +25,7 @@ type AIYakToolFilter struct {
 }
 
 func FilterAIYakTools(db *gorm.DB, filter *AIYakToolFilter) *gorm.DB {
-	db = db.Model(&schema.AIYakTool{})
+	db = activeAIYakTools(db)
 	if filter == nil {
 		return db
 	}
