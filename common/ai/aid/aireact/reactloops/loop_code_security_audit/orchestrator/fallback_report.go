@@ -14,6 +14,7 @@ func GenerateFallbackReport(state *model.AuditState) string {
 	now := time.Now().Format("2006-01-02 15:04:05")
 
 	sb.WriteString(fmt.Sprintf("# %s 安全审计报告\n\n", state.ProjectName))
+	sb.WriteString("> 报告生成阶段未完成。本文件是根据已保存审计数据生成的基础报告，不能视为完整报告生成成功。\n\n")
 	sb.WriteString(fmt.Sprintf("> 审计时间: %s  \n", now))
 	sb.WriteString(fmt.Sprintf("> 项目路径: %s  \n", state.ProjectPath))
 	sb.WriteString(fmt.Sprintf("> 技术栈: %s  \n\n", state.TechStack))

@@ -10,5 +10,5 @@
 {{ .TaskInstruction }}
 <|PERSISTENT_END|>{{ end }}
 
-原生函数只选择请求 tools 中声明的 action；业务工具名称写在 action 参数中。执行所需内容放入对应 arguments，不输出外置 AITAG。
+原生函数只选择请求 tools 中声明的 action；业务工具名称写在 action 参数中。执行所需内容完整放入对应调用的 arguments。
 {{ .FunctionCallSchemas }}

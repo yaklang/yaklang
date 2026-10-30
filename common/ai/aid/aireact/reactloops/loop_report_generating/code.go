@@ -45,9 +45,6 @@ func init() {
 
 			// 创建预设选项
 			preset := []reactloops.ReActLoopOption{
-				// Report edits read their body from GEN_REPORT; the native action schema
-				// has no content field, so keep this loop on the text/tag protocol.
-				reactloops.WithFunctionCallMode(false),
 				reactloops.WithAllowToolCall(true),
 				reactloops.WithInitTask(buildInitTask(r)),
 				reactloops.WithMaxIterations(int(r.GetConfig().GetMaxIterationCount())),
@@ -121,6 +118,7 @@ func init() {
 					feedbacks := feedbacker.String()
 
 					renderMap := map[string]any{
+						"FunctionCallMode":            loop.FunctionCallModeEnabled(),
 						"UserRequirements":            userRequirements,
 						"Filename":                    loop.Get(modSuite.GetFilenameVariableName()),
 						"CurrentReportWithLineNumber": reportWithLine,

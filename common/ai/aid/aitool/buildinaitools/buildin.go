@@ -73,6 +73,16 @@ func getAllAIToolsSnapshot() []*aitool.Tool {
 
 // GetAllToolsDynamically returns all built-in AI tools, dynamically get from the database
 func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
+	return publishAllAITools(deduplicateTools(collectBuiltinTools(yakscripttools.GetAllYakScriptAiToolsByDB(db))))
+}
+
+// GetBuiltinGoTools returns the Go catalog before name deduplication. Catalog
+// validation must inspect this list so a shadowed registration cannot disappear.
+func GetBuiltinGoTools() []*aitool.Tool {
+	return collectBuiltinTools(nil)
+}
+
+func collectBuiltinTools(yakscriptTools []*aitool.Tool) []*aitool.Tool {
 	var tools []*aitool.Tool
 
 	// Add basic tools
@@ -87,7 +97,6 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	}
 
 	// Add yakscripttools from yakscripttools package
-	yakscriptTools := yakscripttools.GetAllYakScriptAiToolsByDB(db)
 	tools = append(tools, yakscriptTools...)
 
 	// Add SSA + SyntaxFlow tools from ssatools package
@@ -111,7 +120,11 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 	// tools = append(tools, GetFilesystemTools()...)  // From filesystem_tools.go
 	// tools = append(tools, GetExampleTools()...)  // From example_tools.go
 
-	// Deduplicate tools by name: later entries (yakscript) override earlier ones (go builtin).
+	return tools
+}
+
+func deduplicateTools(tools []*aitool.Tool) []*aitool.Tool {
+	// Deduplicate tools by name: later entries override earlier ones.
 	seen := make(map[string]int) // name -> index of last occurrence
 	for i, t := range tools {
 		if utils.IsNil(t) {
@@ -140,7 +153,7 @@ func GetAllToolsDynamically(db *gorm.DB) []*aitool.Tool {
 		}
 		return true
 	})
-	return publishAllAITools(tools)
+	return tools
 }
 
 // GetAllTools returns all built-in AI tools, including generated ones

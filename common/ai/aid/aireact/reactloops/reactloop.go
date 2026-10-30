@@ -63,6 +63,8 @@ type ActionRecord struct {
 }
 
 type ReActLoop struct {
+	actionRegistrationErr error
+
 	// planStatusProvider reads owner-managed PLAN state for Timeline Open.
 	planStatusProvider func() string
 	invoker            aicommon.AIInvokeRuntime
@@ -676,6 +678,8 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 	config := invoker.GetConfig()
 
 	r := &ReActLoop{
+		useFunctionCallActionVariants: true,
+
 		invoker:                      invoker,
 		loopName:                     name,
 		config:                       config,
@@ -728,6 +732,9 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 
 	for _, opt := range options {
 		opt(r)
+	}
+	if r.actionRegistrationErr != nil {
+		return nil, r.actionRegistrationErr
 	}
 	if r.functionCallMode {
 		if r.actions.Have(nativeAdjustTodolistActionName) || r.loopActions.Have(nativeAdjustTodolistActionName) {

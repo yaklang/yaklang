@@ -423,10 +423,11 @@ func buildSingleCategoryScanLoop(r aicommon.AIInvokeRuntime, state *model.AuditS
 	preset = append(preset,
 		reactloops.WithPersistentContextProvider(func(loop *reactloops.ReActLoop, nonce string) (string, error) {
 			vars := map[string]any{
-				"Nonce":       nonce,
-				"ReconFile":   state.GetReconFilePath(),
-				"TechStack":   state.TechStack,
-				"EntryPoints": state.EntryPoints,
+				"Nonce":            nonce,
+				"FunctionCallMode": loop.FunctionCallModeEnabled(),
+				"ReconFile":        state.GetReconFilePath(),
+				"TechStack":        state.TechStack,
+				"EntryPoints":      state.EntryPoints,
 			}
 			for k, v := range reactloops.FocusPromptVars(state.GetFocusFilePath(), state.GetSelection()) {
 				vars[k] = v

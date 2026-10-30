@@ -2815,9 +2815,9 @@ func WithSingleAIModelMode(enable bool) ConfigOption {
 }
 
 // WithEnableFunctionCallMode enables native functioncall (tool_calls) mode for
-// ReAct loops created from this config. When enabled, each ReAct loop iteration
-// uses a single "execute_action" tool whose arguments are a complete action
-// protocol JSON, instead of the text-based @action JSON parsing.
+// ReAct loops created from this config, including nested focus modes and forks.
+// Native mode exposes each available action as a provider function. Text mode
+// uses the framework's @action JSON protocol without provider tool schemas.
 func WithEnableFunctionCallMode(enable bool) ConfigOption {
 	return func(c *Config) error {
 		if c.m == nil {
@@ -4648,9 +4648,9 @@ func (c *Config) invokeSpeedPriorityLiteForge(prompt string, opts ...any) (*Forg
 }
 
 func (c *Config) invokeLiteForgeWithCallback(prompt string, callback AICallbackType, opts ...any) (*ForgeResult, error) {
-	// Retain bounded supporting context without inheriting the parent's protocol.
-	// LiteForge defaults to text; explicit invocation options may select native.
-	opts = append([]any{WithEnableFunctionCallMode(false),
+	// Supporting structured calls inherit the session protocol, just like child
+	// loops. Standalone LiteForge invocations retain their own default.
+	opts = append([]any{WithEnableFunctionCallMode(c.EnableFunctionCallMode),
 		WithTimeline(c.Timeline), WithAppendPersistentContext(c.PersistentMemory...)}, opts...)
 	opts = append(opts, WithFastAICallback(callback))
 	opts = append(opts, WithDisableCreateDBRuntime(true)) // Avoid creating runtime records for lite forge calls

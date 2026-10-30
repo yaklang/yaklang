@@ -10,6 +10,27 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 )
 
+func TestTimelineLongNativeReportReplayRemainsComplete(t *testing.T) {
+	arguments, err := json.Marshal(map[string]string{"content": strings.Repeat("中文报告\\n", 20000)})
+	require.NoError(t, err)
+	payload, err := json.Marshal([]any{
+		map[string]any{"role": "assistant", "content": "", "tool_calls": []any{map[string]any{"id": "long_report", "type": "function", "function": map[string]any{"name": "write_section", "arguments": string(arguments)}}}},
+		map[string]any{"role": "tool", "tool_call_id": "long_report", "content": "accepted"},
+	})
+	require.NoError(t, err)
+	marker, err := aiprojection.CreateActionResponse(payload)
+	require.NoError(t, err)
+	timeline := NewTimeline(nil, nil)
+	timeline.PushTextWithPromptProjection(1, "[FUNCTION_CALL_ACTION_RESPONSE]:\naccepted", "[FUNCTION_CALL_ACTION_RESPONSE]:\n"+marker)
+	for _, freeze := range []bool{false, true} {
+		if freeze {
+			timeline.FreezeAll()
+		}
+		view := RenderTimelineFrozenOpenWithLatestModelReplay(timeline)
+		require.Contains(t, view.PromptText(), marker, "native replay is atomic in both open and frozen timeline blocks")
+	}
+}
+
 func TestTimelinePromptProjectionPreservesRawBucketTopology(t *testing.T) {
 	base := time.Date(2026, 7, 18, 11, 0, 0, 0, time.UTC)
 	tl := NewTimeline(nil, nil)

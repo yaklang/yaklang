@@ -31,7 +31,6 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 		},
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, operator *reactloops.LoopActionHandlerOperator) {
 			filenameVar := f.GetFilenameVariableName()
-			codeVar := f.GetCodeVariableName()
 			runtime := f.GetRuntime()
 
 			filename := loop.Get(filenameVar)
@@ -49,7 +48,7 @@ func (f *SingleFileModificationSuiteFactory) buildWriteAction() reactloops.ReAct
 				"正在写入文件", "Writing file…")
 
 			invoker.AddToTimeline("initialize", "AI decided to initialize the code file: "+filename)
-			code := loop.Get(codeVar)
+			code := f.actionContent(loop, action)
 
 			log.Infof("write_code: extracted code length=%d", len(code))
 			if code == "" {
@@ -187,7 +186,6 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			filenameVar := f.GetFilenameVariableName()
 			fullCodeVar := f.GetFullCodeVariableName()
-			codeVar := f.GetCodeVariableName()
 			runtime := f.GetRuntime()
 			actionName := f.GetActionName("modify")
 
@@ -202,12 +200,12 @@ Never emit a full file or complete function body in non-patch modify_code.`,
 			// Preferred path: Apply Patch inside GEN_CODE (ignores old_snippet / line range).
 			// When patch-fallback mode is on, still accept a correct patch (compatible), but
 			// prefer line-range / old_snippet after repeated apply failures.
-			if LooksLikeCodePatch(loop.Get(codeVar)) {
-				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+			if LooksLikeCodePatch(f.actionContent(loop, action)) {
+				f.handleModifyByPatch(loop, action, op, actionName, filename, fullCodeVar, f.actionContent(loop, action))
 				return
 			}
 
-			generatedCode := loop.Get(codeVar)
+			generatedCode := f.actionContent(loop, action)
 			oldSnippet := strings.TrimSpace(action.GetString("old_snippet"))
 			modifyStartParam := action.GetInt("modify_start_line")
 			modifyEndParam := action.GetInt("modify_end_line")
@@ -245,7 +243,7 @@ GEN_CODE 预览：
 			}
 
 			if oldSnippet != "" {
-				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, codeVar)
+				f.handleModifyByOldSnippet(loop, action, op, actionName, filename, fullCodeVar, f.actionContent(loop, action))
 				return
 			}
 
@@ -253,7 +251,9 @@ GEN_CODE 预览：
 			end := modifyEndParam
 			if start <= 0 || end <= 0 || end < start {
 				var msg string
-				if IsPatchFallbackMode(loop, actionName) {
+				if loop.FunctionCallModeEnabled() {
+					msg = fmt.Sprintf("%s requires a patch in arguments.content, or old_snippet / modify_start_line + modify_end_line to locate the replacement. Supply the replacement in arguments.content.", actionName)
+				} else if IsPatchFallbackMode(loop, actionName) {
 					msg = fmt.Sprintf(`【modify_code 失败】Patch 降级模式：必须提供 old_snippet 或有效行号 modify_start_line/modify_end_line。
 
 示例：
@@ -286,7 +286,7 @@ GEN_CODE 预览：
 			invoker := loop.GetInvoker()
 
 			fullCode := loop.Get(fullCodeVar)
-			partialCode := loop.Get(codeVar)
+			partialCode := f.actionContent(loop, action)
 
 			editor := memedit.NewMemEditor(fullCode)
 			modifyStartLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("modify_start_line"))
@@ -468,7 +468,6 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 		func(loop *reactloops.ReActLoop, action *aicommon.Action, op *reactloops.LoopActionHandlerOperator) {
 			filenameVar := f.GetFilenameVariableName()
 			fullCodeVar := f.GetFullCodeVariableName()
-			codeVar := f.GetCodeVariableName()
 			runtime := f.GetRuntime()
 
 			filename := loop.Get(filenameVar)
@@ -481,7 +480,7 @@ func (f *SingleFileModificationSuiteFactory) buildInsertAction() reactloops.ReAc
 
 			invoker := loop.GetInvoker()
 			fullCode := loop.Get(fullCodeVar)
-			partialCode := loop.Get(codeVar)
+			partialCode := f.actionContent(loop, action)
 			editor := memedit.NewMemEditor(fullCode)
 			insertLine := NormalizeActionLineNumber(loop, fullCodeVar, action.GetInt("insert_line"))
 

@@ -266,7 +266,7 @@ func TestCoordinatorLoopRejectsJSONResponseActions(t *testing.T) {
 	require.Nil(t, c.Snapshot().Plan)
 }
 
-func TestCoordinatorLoopAuxiliaryDefaultsToText(t *testing.T) {
+func TestCoordinatorLoopAuxiliaryInheritsSessionProtocol(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("parent_function_call_%v", native), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -275,15 +275,13 @@ func TestCoordinatorLoopAuxiliaryDefaultsToText(t *testing.T) {
 			cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
 				require.Empty(t, wire.Tools)
-				require.Nil(t, wire.ToolChoice)
-				require.Nil(t, wire.ToolCallCallback)
+				require.Equal(t, native, wire.ToolCallCallback != nil)
 				projected := aiprojection.ProjectAndObserve("coordinator-helper-test", req.GetPrompt())
-				require.Empty(t, projected.Tools, "auxiliary calls must not inherit the parent protocol")
+				require.Equal(t, native, len(projected.Tools) > 0, "auxiliary calls inherit the parent protocol")
 				require.NotEmpty(t, projected.Messages)
 				require.Equal(t, "system", projected.Messages[0].Role)
-				require.Contains(t, fmt.Sprint(projected.Messages[0].Content), "# 文本提交协议")
 				calls.Add(1)
-				return protocolResponse(c, req, false, "coordinator-summary", map[string]any{"summary": "infrastructure summary"})
+				return protocolResponse(c, req, native, "coordinator-summary", map[string]any{"summary": "infrastructure summary"})
 			}))
 			for _, option := range coordinator.NativeOptions() {
 				require.NoError(t, option(cfg))
@@ -327,7 +325,7 @@ func TestCoordinatorLoopRiskReviewNativeRequiredFields(t *testing.T) {
 		t.Run(fmt.Sprint(valid), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 			defer cancel()
-			cfg := aicommon.NewConfig(ctx, aicommon.WithAITransactionAutoRetry(1), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			cfg := aicommon.NewConfig(ctx, aicommon.WithEnableFunctionCallMode(true), aicommon.WithAITransactionAutoRetry(1), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				require.Equal(t, "auto", aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...).ToolChoice)
 				args := map[string]any{"reason": "Read-only authorized exploration"}
 				if valid {
@@ -346,6 +344,25 @@ func TestCoordinatorLoopRiskReviewNativeRequiredFields(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCoordinatorRiskReviewRespectsTextSession(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	cfg := aicommon.NewConfig(ctx, aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			wire := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
+			require.Empty(t, wire.Tools)
+			require.Nil(t, wire.ToolCallCallback)
+			require.Empty(t, aiprojection.ProjectAndObserve("text-review", req.GetPrompt()).Tools)
+			resp := c.NewAIResponse()
+			resp.EmitOutputStream(strings.NewReader(`{"@action":"risk_assessment","risk_score":0.1,"reason":"Read-only operation"}`))
+			resp.Close()
+			return resp, nil
+		}))
+	action, err := coordinator.NativeRiskReview(ctx, cfg, cfg.Epm.CreateEndpoint())
+	require.NoError(t, err)
+	require.Equal(t, 0.1, action.GetFloat("risk_score"))
 }
 
 func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
@@ -376,7 +393,7 @@ func TestCoordinatorLoopRejectsMalformedFunctionArguments(t *testing.T) {
 	require.Nil(t, c.Snapshot().Plan)
 }
 
-func TestCoordinatorLoopKeywordSearchDefaultsToText(t *testing.T) {
+func TestCoordinatorLoopKeywordSearchInheritsSessionProtocol(t *testing.T) {
 	for _, native := range []bool{false, true} {
 		t.Run(fmt.Sprintf("parent_function_call_%v", native), func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -384,11 +401,10 @@ func TestCoordinatorLoopKeywordSearchDefaultsToText(t *testing.T) {
 			var calls atomic.Int64
 			c, err := coordinator.NewSession(ctx, "Find a reading tool", aicommon.WithDisableCreateDBRuntime(true), aicommon.WithWorkdir(t.TempDir()), aicommon.WithEnableFunctionCallMode(native), aicommon.WithAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 				projected := aiprojection.ProjectAndObserve("coordinator-keyword-search-test", req.GetPrompt())
-				require.Empty(t, projected.Tools)
+				require.Equal(t, native, len(projected.Tools) > 0)
 				require.NotEmpty(t, projected.Messages)
-				require.Contains(t, fmt.Sprint(projected.Messages[0].Content), "# 文本提交协议")
 				calls.Add(1)
-				return protocolResponse(c, req, false, "keyword_search", map[string]any{"matches": []any{map[string]any{"tool": "read_file", "matched_keywords": []string{"read"}}}})
+				return protocolResponse(c, req, native, "keyword_search", map[string]any{"matches": []any{map[string]any{"tool": "read_file", "matched_keywords": []string{"read"}}}})
 			}))
 			require.NoError(t, err)
 			catalog := omap.NewOrderedMap[string, []string](nil)
