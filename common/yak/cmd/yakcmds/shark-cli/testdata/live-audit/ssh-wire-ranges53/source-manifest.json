@@ -1,0 +1,141 @@
+{
+  "schema": "ssh-owned-wire-range-audit-source-v1",
+  "scope": "Only authored Python controllers and aggregate dependency/hash metadata; no PCAP, keylog, raw bytes, source rows, expected grids, SDK/CLI/PDML exports, runtime receipts, logs, binaries or images.",
+  "files": [
+    {
+      "path": "wire-plan/prepare_ssh_wire_ranges51.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-wire-ranges-source51-01\\prepare_ssh_wire_ranges51.py",
+      "bytes": 16508,
+      "SHA256": "357b9cd582fb2b7d9b4b98cb69a4de5c1c8289933657c23abe9c469b77105f16"
+    },
+    {
+      "path": "API-plan/ssh_wire_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-wire-ranges-API-CLI-source53-01\\ssh_wire_ranges53.py",
+      "bytes": 20232,
+      "SHA256": "5ed477cbf7a8a94244f68f7f89695b5316facbdcfff6e67cadcd27f535586784"
+    },
+    {
+      "path": "API-plan/ssh_wire_ranges53_v02.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-wire-ranges-API-CLI-source53-01\\ssh_wire_ranges53_v02.py",
+      "bytes": 20689,
+      "SHA256": "b977c41698a0f103abe2aab577a02a22da18dad3998d9988789305362dc0308c"
+    },
+    {
+      "path": "public-preservation/inventory_old50_ssh53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-ranges-public-preservation53-01\\inventory_old50_ssh53.py",
+      "bytes": 3424,
+      "SHA256": "fea561f5d4b6ab33760de838e0b9fcfd89e0c34b6781536ffd97d620a8956c79"
+    },
+    {
+      "path": "public-preservation/ssh_old_wire53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-ranges-public-preservation53-01\\ssh_old_wire53.py",
+      "bytes": 10362,
+      "SHA256": "b7464754c72dd4c5febd4ac9edf7b619b4090ada9dbbc7866e5a7b1515021e6d"
+    },
+    {
+      "path": "public-preservation/ssh_public_ranges53_v02.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-ranges-public-preservation53-01\\ssh_public_ranges53_v02.py",
+      "bytes": 16941,
+      "SHA256": "3fb595be5b84a89b6ee55a09f000d06f0feb62fad598c88c732d2b2d01876708"
+    },
+    {
+      "path": "public-preservation/summarize_public_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\SSH-ranges-public-preservation53-01\\summarize_public_ranges53.py",
+      "bytes": 4888,
+      "SHA256": "ec9d21df5e2fc9cb3c2d1ea2ad7afbce32cf1f608b097fbfd278779b3c51a0bb"
+    },
+    {
+      "path": "run_SSH_ranges_native53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_SSH_ranges_native53.py",
+      "bytes": 2980,
+      "SHA256": "ba8ff693b5a4ce092298a3d0208c9baa0c8b33d34732ac5d7133148a861de649"
+    },
+    {
+      "path": "prepare_Windows_SSH_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\prepare_Windows_SSH_ranges53.py",
+      "bytes": 2536,
+      "SHA256": "301a513f01cc0d4ef1ea6d4136b1be0b406c4e91cd4197637b4d12a138d076c6"
+    },
+    {
+      "path": "run_Windows_SSH_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_Windows_SSH_ranges53.py",
+      "bytes": 4603,
+      "SHA256": "778ed69661eb6a329931562b387fcd190ed5916c90e5150218acf383846cd59b"
+    },
+    {
+      "path": "close_Windows_SSH_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH_ranges53.py",
+      "bytes": 4315,
+      "SHA256": "a7e8566a8d84bb309cf3212d87491f412e107db53771c2a65ac382d3d86c57b6"
+    },
+    {
+      "path": "close_Windows_SSH_ranges53_v02.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH_ranges53_v02.py",
+      "bytes": 1276,
+      "SHA256": "2c299f8eb1259dfed090dadb1c97544977ff500e319201c502c6ba7120787476"
+    },
+    {
+      "path": "close_Windows_SSH_ranges53_v03.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH_ranges53_v03.py",
+      "bytes": 2201,
+      "SHA256": "4f7650fd659e47e68431cc5cee5cf3d7c66798b18a75b1803d185b27c8682b52"
+    },
+    {
+      "path": "close_Windows_SSH_ranges53_v04.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\close_Windows_SSH_ranges53_v04.py",
+      "bytes": 1139,
+      "SHA256": "5501d8c36546db3d86eae327f557a6d858de4e04a5851d3a14410a94d84d15fb"
+    },
+    {
+      "path": "run_fuzz_SSH_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_fuzz_SSH_ranges53.py",
+      "bytes": 2081,
+      "SHA256": "c5f2a1f895b5b2468608318d4a6af237caa0562fb1df6fe34fb79317e9c91d76"
+    },
+    {
+      "path": "run_current_label_census53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\run_current_label_census53.py",
+      "bytes": 849,
+      "SHA256": "f5980f314688cded2a58f6249f3acf77330fbd1a4fc445f65c4afb4e5cf89d32"
+    },
+    {
+      "path": "stage_SSH_wire_ranges53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\stage_SSH_wire_ranges53.py",
+      "bytes": 1885,
+      "SHA256": "849b8cdf41c4832d89fc68b5096083c8471a2d5c68d1994db862b2a3345b7125"
+    },
+    {
+      "path": "import_SSH_range_sources53.py",
+      "source": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\import_SSH_range_sources53.py",
+      "bytes": 5053,
+      "SHA256": "44472364a2db27b21772560222bd4acdfb294a359dfbd494ac1ceb1e63f71dfb"
+    }
+  ],
+  "files_count": 18,
+  "source_bytes": 121962,
+  "AST_parse_passed": true,
+  "exact_original_bytes": true,
+  "dependencies": [
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-identity49/source-manifest.json",
+      "SHA256": "b7606b655feb69e3a4bb52e826674f7f30c5b52cdc5f2c8eec7748b1fabaf188"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-role50/source-manifest.json",
+      "SHA256": "2b52719496d379824626c6ec8a9c539aa94312f1f17ba6f03430e30bad3b02ba"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ssh-preview51/source-manifest.json",
+      "SHA256": "9e67e9c98ac21a4de2fb6f23f3c553af257c01e6d169664b85c9d4381968cbdd"
+    },
+    {
+      "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/source-manifest.json",
+      "SHA256": "61e94c2263e9d725cd758599fba9cb86bba117e6b619bd50a86657e7fcd14cce"
+    }
+  ],
+  "source_wire_range_plan_SHA256": "8739f8fed549047f117efbda6b38c0a8914f6d94cf2269a5e8c658fac28f6de3",
+  "source_API_range_plan_SHA256": "30a5ee3060b3bb4678e6bfb355324a0ba3a3f404fffbaff1b402e127d9b6d436",
+  "public_preservation_plan_SHA256": "8ecf8aaf15f14d940cbbd27647746ce0eeb55927241c60435fe8b0307886187e",
+  "historical_versions_preserved": "API first prepare and Windows closure1/2/3 failures are controller assumptions, not rewrites of source bytes or facts; Windows closure4 passes with literal-selection-aware source cycling and fixed packet-row identity.",
+  "all_original_archived_sources_unmodified": true
+}
