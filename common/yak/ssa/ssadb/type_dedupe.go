@@ -8,26 +8,25 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/yaklang/gorm"
 )
 
 // Large projects persist millions of type rows that share a handful of
-// payloads: Hue writes 3.47M ir_types rows for 106K distinct payloads. The
-// payload is what makes a row wide, so the identity rows live in their own
-// narrow table and each payload is stored once.
+// payloads: Hue wrote 3.47M type rows for 106K distinct payloads. The payload
+// is what makes a row wide, so the identity rows live in their own narrow
+// table and each payload is stored once.
 //
-//	ir_type_ids_v1     (program_name, type_id, type_hash)   -- one row per type id
-//	ir_type_payloads_v1(program_name, type_hash, kind, string, extra)
+//	ir_type_ids     (program_name, type_id, payload_id)  -- one row per type id
+//	ir_type_payloads(program_name, type_hash, kind, string, extra)
 //
-// A database written this way has no ir_types rows. Readers resolve the id
-// through the join below and fall back to ir_types for databases compiled by
-// older binaries; a database is never rewritten just to change layout.
+// The payload table is the only place a type body is stored. There is no
+// second layout and no migration: a database written by an older binary is
+// not read.
 const (
-	TableIrTypeIDs      = "ir_type_ids_v1"
-	TableIrTypePayloads = "ir_type_payloads_v1"
+	TableIrTypeIDs      = "ir_type_ids"
+	TableIrTypePayloads = "ir_type_payloads"
 )
 
 // IrTypeID maps one type id to its shared payload. It deliberately carries no
@@ -70,69 +69,6 @@ func typePayloadHash(kind int, text, extra string) string {
 	payload = append(payload, extra...)
 	sum := sha256.Sum256(payload)
 	return hex.EncodeToString(sum[:])
-}
-
-// dedupeReady caches per connection pool whether the dedupe tables exist, so a
-// legacy database does not pay a failed query on every type read. The tables
-// are part of the SSA schema, so a database created by this binary has them
-// before the first write; the cache only skips repeated sqlite_master probes.
-var (
-	dedupeMu    sync.Mutex
-	dedupeReady = map[*sql.DB]bool{}
-)
-
-// IrTypeDedupeAvailable reports whether this pool stores types in the dedupe
-// layout. It never migrates: an in-transaction write path must not run DDL.
-func IrTypeDedupeAvailable(db *gorm.DB) bool {
-	if db == nil {
-		return false
-	}
-	// A transaction handle cannot expose its *sql.DB for caching, but it can
-	// verify the schema with direct zero-row queries. Use database/sql here:
-	// GORM's Raw.Rows can add model scopes left on a cloned transaction handle.
-	if tx, inTx := db.CommonDB().(*sql.Tx); inTx {
-		for _, table := range []string{TableIrTypeIDs, TableIrTypePayloads} {
-			rows, err := tx.QueryContext(context.Background(), "SELECT 1 FROM "+table+" LIMIT 0")
-			if err != nil {
-				return false
-			}
-			_ = rows.Close()
-		}
-		return true
-	}
-	if db.DB() == nil {
-		return false
-	}
-	pool := db.DB()
-	dedupeMu.Lock()
-	defer dedupeMu.Unlock()
-	if ready, ok := dedupeReady[pool]; ok {
-		return ready
-	}
-	ready := db.HasTable(TableIrTypeIDs) && db.HasTable(TableIrTypePayloads)
-	dedupeReady[pool] = ready
-	return ready
-}
-
-// resetIrTypeDedupeAvailability drops the cached layout decision. Tests that
-// build the schema after a first probe use it.
-func resetIrTypeDedupeAvailability() {
-	dedupeMu.Lock()
-	defer dedupeMu.Unlock()
-	dedupeReady = map[*sql.DB]bool{}
-}
-
-func invalidateIrTypeDedupeAvailability(db *gorm.DB) {
-	if db == nil {
-		return
-	}
-	pool := db.DB()
-	if pool == nil {
-		return
-	}
-	dedupeMu.Lock()
-	delete(dedupeReady, pool)
-	dedupeMu.Unlock()
 }
 
 // ensureIrTypeDedupeIndexes installs the two conflict targets the batch writes
@@ -348,14 +284,10 @@ func missingTypePayloads(db *gorm.DB, payloads []*IrTypePayload) ([]*IrTypePaylo
 	return missing, nil
 }
 
-// getIrTypeFromDedupe resolves one type id. It returns (nil, nil) when the id
-// is not stored in the dedupe tables, which is the signal to read ir_types.
-func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error) {
+// getIrTypeByID resolves one type id through the payload join. It returns
+// (nil, nil) when the id is not stored.
+func getIrTypeByID(db *gorm.DB, progName string, id int64) (*IrType, error) {
 	if db == nil || id < 0 {
-		return nil, nil
-	}
-	// A legacy database must not pay a failing JOIN on every type read.
-	if !IrTypeDedupeAvailable(db) {
 		return nil, nil
 	}
 	var kind int
@@ -376,9 +308,6 @@ func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error
 		return nil, nil
 	}
 	if err != nil {
-		// Keep the cached layout decision: a transient query failure must not
-		// silently redirect later writes to ir_types, which would split one
-		// program across two layouts.
 		return nil, err
 	}
 	return &IrType{
@@ -390,17 +319,8 @@ func getIrTypeFromDedupe(db *gorm.DB, progName string, id int64) (*IrType, error
 	}, nil
 }
 
-// HasIrTypeDedupeRows reports whether a program uses the dedupe layout. Callers
-// that need a count of persisted types use it instead of counting ir_types.
-// It reads through database/sql for the same reason as getIrTypeFromDedupe: a
-// caller may pass a handle that still carries model scopes.
-func HasIrTypeDedupeRows(db *gorm.DB, program string) bool {
-	if db == nil || !IrTypeDedupeAvailable(db) {
-		return false
-	}
-	ctx, cancel := nativeQueryContext(context.Background())
-	defer cancel()
-	query := bindSQLPlaceholdersDB(db, `SELECT 1 FROM `+TableIrTypeIDs+` WHERE program_name = ? LIMIT 1`)
-	var one int
-	return nativeQueryRowContext(db, ctx, query, program).Scan(&one) == nil
+// EnsureIrTypeDedupeIndexesForTest installs the type conflict indexes on a bare
+// test database that migrated the two models directly.
+func EnsureIrTypeDedupeIndexesForTest(db *gorm.DB) error {
+	return ensureIrTypeDedupeIndexes(db)
 }

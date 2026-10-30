@@ -25,7 +25,8 @@ func TestNewIRDatabaseOmitsRedundantIndexes(t *testing.T) {
 		{TableIrCodes, "ux_ir_codes_program_code"},
 		{TableIrCodes, "idx_ir_codes_program_opcode"},
 		{TableIrCodes, irCodeConstLookupIndex},
-		{TableIrTypes, "ux_ir_types_program_type"},
+		{TableIrTypeIDs, "ux_ir_type_ids_program_type"},
+		{TableIrTypePayloads, "ux_ir_type_payloads_program_hash"},
 		{TableIrOffsets, "ux_ir_offsets_program_value_file_range"},
 		{TableIrIndices, "idx_ir_indices_program_value"},
 		{TableIrNamePool, "idx_ir_name_pool_program_name_name"},
@@ -60,7 +61,7 @@ func TestPruneRedundantIndexesPreservesPopulatedRows(t *testing.T) {
 func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 	db := newProductionIRSchema(t)
 	seedIRRows(t, db, 3000)
-	for _, table := range []string{TableIrCodes, TableIrTypes, TableIrOffsets, TableIrIndices, TableIrNamePool} {
+	for _, table := range []string{TableIrCodes, TableIrTypeIDs, TableIrTypePayloads, TableIrOffsets, TableIrIndices, TableIrNamePool} {
 		require.NoError(t, db.Exec("ANALYZE "+quoteSQLIdent(table)).Error)
 	}
 
@@ -87,9 +88,11 @@ func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 			index: []string{irCodeConstLookupIndex},
 		},
 		{
-			name:  "ir_types by program and type id",
-			query: `SELECT * FROM "ir_types" WHERE program_name = 'p0' AND type_id = 7 AND deleted_at IS NULL`,
-			index: []string{"ux_ir_types_program_type"},
+			name: "ir_type_ids by program and type id",
+			query: `SELECT p.kind, p."string", p.extra_information FROM "ir_type_ids" AS t ` +
+				`JOIN "ir_type_payloads" AS p ON p.id = t.payload_id AND p.program_name = t.program_name ` +
+				`WHERE t.program_name = 'p0' AND t.type_id = 7 AND p.deleted_at IS NULL`,
+			index: []string{"ux_ir_type_ids_program_type"},
 		},
 		{
 			name:  "ir_offsets by program and value id",
@@ -116,7 +119,7 @@ func TestIRQueryPlansUseRetainedIndexes(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			plan := queryPlan(t, db, testCase.query)
 			require.NotContains(t, plan, "SCAN ir_codes")
-			require.NotContains(t, plan, "SCAN ir_types")
+			require.NotContains(t, plan, "SCAN ir_type_payloads")
 			require.NotContains(t, plan, "SCAN ir_offsets")
 			require.NotContains(t, plan, "SCAN ir_indices_v1")
 			require.NotContains(t, plan, "SCAN ir_name_pool_v1")
@@ -171,7 +174,7 @@ func seedIRRows(t *testing.T, db *gorm.DB, rows int) {
 		names = append(names, &IrNamePool{ProgramName: program, NameID: int64(i + 1), Name: fmt.Sprintf("v%d", i+1)})
 	}
 	require.NoError(t, db.CreateInBatches(codes, 500).Error)
-	require.NoError(t, db.CreateInBatches(types, 500).Error)
+	require.NoError(t, SaveIrTypeBatch(db, types))
 	require.NoError(t, db.CreateInBatches(offsets, 500).Error)
 	require.NoError(t, db.CreateInBatches(indices, 500).Error)
 	require.NoError(t, db.CreateInBatches(names, 500).Error)

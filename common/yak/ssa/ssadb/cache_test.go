@@ -3,9 +3,9 @@ package ssadb
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/yaklang/gorm"
 	_ "github.com/yaklang/gorm/dialects/sqlite"
-	"github.com/stretchr/testify/assert"
 )
 
 func setupTestDB() *gorm.DB {
@@ -16,7 +16,10 @@ func setupTestDB() *gorm.DB {
 	}
 
 	// 自动迁移表结构
-	db.AutoMigrate(&IrCode{}, &IrType{}, &IrProgram{})
+	db.AutoMigrate(&IrCode{}, &IrTypeID{}, &IrTypePayload{}, &IrProgram{})
+	if err := ensureIrTypeDedupeIndexes(db); err != nil {
+		panic(err)
+	}
 	return db
 }
 
@@ -106,7 +109,7 @@ func TestGetIrTypeById(t *testing.T) {
 		String:      "test_string",
 	}
 
-	err := db.Create(testType).Error
+	err := SaveIrTypeBatch(db, []*IrType{testType})
 	assert.NoError(t, err)
 
 	// 测试从数据库获取并缓存

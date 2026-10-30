@@ -242,22 +242,21 @@ func TestTypeStoreUsesDedupeSchemaFromSSADatabase(t *testing.T) {
 	require.NoError(t, err)
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
 	require.NotNil(t, prog.Cache.types.db)
-	require.True(t, ssadb.IrTypeDedupeAvailable(prog.Cache.types.db), "ProgramCache must use the migrated SSA database")
 	typ := CreateStringType()
 	typ.AddFullTypeName("dedupe.integration")
 	prog.Cache.rememberType(typ)
 	require.NoError(t, prog.Cache.types.flush())
-	require.Equal(t, int64(0), countIrTypesForProgram(t, db, programName))
+	require.Equal(t, int64(1), countIrTypePayloadsForProgram(t, db, programName))
 	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, db, programName))
 	loaded := ssadb.GetIrTypeItemById(db, programName, typ.GetId())
 	require.NotNil(t, loaded)
 	require.Contains(t, loaded.ExtraInformation, "dedupe.integration")
 }
 
-func countIrTypesForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
+func countIrTypePayloadsForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
 	t.Helper()
 	var count int64
-	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name = ?", programName).Count(&count).Error)
+	require.NoError(t, db.Model(&ssadb.IrTypePayload{}).Where("program_name = ?", programName).Count(&count).Error)
 	return count
 }
 
@@ -278,7 +277,6 @@ func TestTypeFlushUpsertsExistingTypeIDs(t *testing.T) {
 
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
 	storeDB := ssadb.GetDB()
-	require.True(t, ssadb.IrTypeDedupeAvailable(storeDB))
 	typ := CreateStringType()
 	typ.AddFullTypeName("string")
 	prog.Cache.rememberType(typ)
@@ -291,7 +289,6 @@ func TestTypeFlushUpsertsExistingTypeIDs(t *testing.T) {
 	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
 	require.Equal(t, first.PayloadID, unchanged.PayloadID, "an unchanged type id must keep its payload")
 	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, storeDB, programName))
-	require.Zero(t, countIrTypesForProgram(t, storeDB, programName))
 
 	typ.AddFullTypeName("java.lang.String")
 	require.NoError(t, prog.Cache.types.flush())

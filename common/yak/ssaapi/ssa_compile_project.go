@@ -252,7 +252,6 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	// Non-unique IR indexes are rebuilt once, after the inserts, instead of
 	// being maintained row by row. The captured DDL is what gets replayed.
 	var suspendedIndexes []string
-	var identityDDL string
 	defer func() {
 		c.Cleanup()
 
@@ -271,15 +270,7 @@ func (c *Config) parseProject() (progs Programs, err error) {
 			}
 		}
 		// Rebuild after a failed compile's cleanup so a shared database is not
-		// left without the indexes other programs are queried through. The
-		// identity index comes back before the secondary indexes so a code_id
-		// lookup never has to scan the table.
-		if restoreErr := ssadb.RestoreIrCodeIdentityIndex(ssadb.GetDB(), identityDDL); restoreErr != nil {
-			log.Errorf("restore ir_codes identity index: %v", restoreErr)
-			if err == nil {
-				err = restoreErr
-			}
-		}
+		// left without the indexes other programs are queried through.
 		if restoreErr := ssadb.RestoreSecondaryIndexes(ssadb.GetDB(), suspendedIndexes); restoreErr != nil {
 			log.Errorf("restore secondary indexes: %v", restoreErr)
 			if err == nil {
@@ -313,12 +304,6 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	if suspendErr != nil {
 		log.Warnf("suspend secondary indexes: %v", suspendErr)
 	}
-	identityDDL, suspendErr = ssadb.SuspendIrCodeIdentityIndex(ssadb.GetDB())
-	if suspendErr != nil {
-		log.Warnf("suspend ir_codes identity index: %v", suspendErr)
-		identityDDL = ""
-	}
-
 	c.Processf(0, "recompile project, start compile")
 
 	if mode != compileModeFull {

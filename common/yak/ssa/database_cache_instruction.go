@@ -1163,17 +1163,6 @@ func (s *instructionStore) saveInstructionPersistRecords(records []*instructionP
 		}
 		return saveErr
 	}
-	// Rowids are assigned inside the transaction. Remember them only after
-	// commit so a rolled-back attempt cannot point a later read at a dead row.
-	noted := make([]*ssadb.IrCode, 0, len(records))
-	for _, record := range records {
-		if record != nil && record.IrCode != nil {
-			noted = append(noted, record.IrCode)
-		}
-	}
-	if err := ssadb.NoteIrCodeRowIDs(noted); err != nil {
-		return err
-	}
 	s.persistCompleted.Add(int64(recordCount))
 	s.writeOperations.Add(int64(recordCount))
 	if s.residentFingerprints != nil {

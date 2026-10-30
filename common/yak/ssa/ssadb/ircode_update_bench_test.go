@@ -11,20 +11,14 @@ import (
 )
 
 // setupSuspendedIdentityDB builds a fresh project DB with the compile-time
-// schema, then drops the ir_codes identity index the way a full compile does.
+// schema.
 func setupSuspendedIdentityDB(b *testing.B, rows int, program string) (*gorm.DB, []*IrCode) {
 	b.Helper()
 	db, err := gorm.Open("sqlite3", filepath.Join(b.TempDir(), "identity.db"))
 	require.NoError(b, err)
-	b.Cleanup(func() {
-		clearIrCodeRowIDs()
-		irCodeIdentitySuspended.Store(false)
-		_ = db.Close()
-	})
+	b.Cleanup(func() { _ = db.Close() })
 	require.NoError(b, db.AutoMigrate(&IrCode{}).Error)
 	patchIrCodeIndex(db)
-	_, err = SuspendIrCodeIdentityIndex(db)
-	require.NoError(b, err)
 
 	items := make([]*IrCode, 0, rows)
 	for i := 1; i <= rows; i++ {
@@ -36,14 +30,14 @@ func setupSuspendedIdentityDB(b *testing.B, rows int, program string) (*gorm.DB,
 			String:      "v0",
 		})
 	}
-	require.NoError(b, saveIrCodesWithoutIdentityIndex(db, items))
+	require.NoError(b, SaveIrCodeBatch(db, items))
 	return db, items
 }
 
 // A compile revisits instructions: with the identity index suspended those
 // saves are updates keyed by the remembered rowid. Measure that path on its
 // own so the per-row cost is visible without a full scan.
-func BenchmarkSaveIrCodeUpdatesWithoutIdentityIndex(b *testing.B) {
+func BenchmarkSaveIrCodeBatchUpsert(b *testing.B) {
 	const rows = 20000
 	db, items := setupSuspendedIdentityDB(b, rows, "bench-updates")
 	b.ReportAllocs()
@@ -52,7 +46,7 @@ func BenchmarkSaveIrCodeUpdatesWithoutIdentityIndex(b *testing.B) {
 		for _, item := range items {
 			item.String = fmt.Sprintf("v%d", i+1)
 		}
-		if err := saveIrCodesWithoutIdentityIndex(db, items); err != nil {
+		if err := SaveIrCodeBatch(db, items); err != nil {
 			b.Fatal(err)
 		}
 	}
