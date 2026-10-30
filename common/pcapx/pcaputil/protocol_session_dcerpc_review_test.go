@@ -3,12 +3,12 @@ package pcaputil
 import (
 	"encoding/binary"
 	"errors"
-	"os"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/testutil/enterprisefixtures"
 )
 
 func newReviewDCERPC() *binDCERPC {
@@ -169,8 +169,7 @@ func TestProtocolSessionDCERPCBindAckNegotiateResult(t *testing.T) {
 }
 
 func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
-	raw, err := os.ReadFile("../../../testdata/enterprise-traffic-analysis/lateral-movement-psexec/capture.pcapng")
-	require.NoError(t, err)
+	raw := enterprisefixtures.ReadFile(t, "lateral-movement-psexec/capture.pcapng")
 	events, _, err := binReplay(t, raw, 1)
 	require.NoError(t, err)
 

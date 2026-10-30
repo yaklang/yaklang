@@ -5,8 +5,13 @@
 在仓库根目录运行，使用隔离环境分析恶意流量。
 
 ```sh
+python3 scripts/enterprise-traffic-fixtures.py extract
 go build -o /tmp/pcap-inspect ./common/pcapx/cmd/pcap-inspect
 ```
+
+捕获、keylog、manifest 和 `TASKS.md` 从 `fixtures.tar.gz` 恢复；本地已有
+相同展开文件时 `extract` 会保留它们。压缩包本身不代替来源 hash 和
+manifest 校验。
 
 ## 推荐顺序
 

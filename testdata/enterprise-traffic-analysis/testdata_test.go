@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/yaklang/yaklang/common/testutil/enterprisefixtures"
 )
 
 type sourceManifest struct {
@@ -38,7 +40,7 @@ type multiManifest struct {
 // public-corpus scenario fixtures and the instructions that explain how to use
 // them, without loading or executing any capture content.
 func TestEnterpriseTrafficAnalysisManifests(t *testing.T) {
-	root := "."
+	root := enterprisefixtures.Root(t)
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
@@ -149,7 +151,8 @@ func fileSHA256(path string) (string, error) {
 }
 
 func TestTaskCardsHaveSafetyAndEvidenceBoundaries(t *testing.T) {
-	entries, err := os.ReadDir(".")
+	root := enterprisefixtures.Root(t)
+	entries, err := os.ReadDir(root)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -157,7 +160,7 @@ func TestTaskCardsHaveSafetyAndEvidenceBoundaries(t *testing.T) {
 		if !entry.IsDir() || entry.Name() == "public-corpus-index" {
 			continue
 		}
-		path := filepath.Join(entry.Name(), "TASKS.md")
+		path := filepath.Join(root, entry.Name(), "TASKS.md")
 		data, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("%s: %v", path, err)
@@ -172,7 +175,8 @@ func TestTaskCardsHaveSafetyAndEvidenceBoundaries(t *testing.T) {
 }
 
 func TestKeyLogFixtureMatchesManifest(t *testing.T) {
-	data, err := os.ReadFile(filepath.Join("https-keylog-dridex", "manifest.json"))
+	root := enterprisefixtures.Root(t)
+	data, err := os.ReadFile(filepath.Join(root, "https-keylog-dridex", "manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +184,7 @@ func TestKeyLogFixtureMatchesManifest(t *testing.T) {
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		t.Fatal(err)
 	}
-	actual, err := fileSHA256(filepath.Join("https-keylog-dridex", manifest.KeyLog))
+	actual, err := fileSHA256(filepath.Join(root, "https-keylog-dridex", manifest.KeyLog))
 	if err != nil {
 		t.Fatal(err)
 	}
