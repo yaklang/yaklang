@@ -115,6 +115,25 @@ artifact SHA256 `2930c8f5a0c1a36cebb6b50e523dec36e4194f0a50668b5cd3487d6d1e016de
 该提交的Essential仍失败于SSA `TestParseProject/parse_project_with_entry`，**不算CI全绿**。
 该问题及后续精确提交门归M2-28/M2-11。M2-04完整字段、连接/会话、TLS/QUIC高级恢复继续开放。
 
+## SSA修复提交的最终运行
+
+`9c01caa081d0b3cbbbcb60d9eeebf488d85a3e86`的Go1.22.12 Windows新构建及三个完整
+Weber回放均exit0；源码、中央ZIP/index和所有声明输入在执行中冻结。
+独立QUERY_INFO checker再次匹配93个PDU，选定envelope的值/范围错误和缺口均为0。
+三个完整输出与60版本分别逐字节一致，未归一化ID、排序、删字段或剥离元数据。
+此连续性与字段审计分开，不据此宣称全部Wireshark协议/会话一致。
+
+最终Windows实际控制台21份状态快照和主线程图像复核通过：第二条InfoType只有
+`[174,175)`高亮；394字节物理帧/316字节PDU完整，mouse/tabs/resize/CP936恢复通过。
+控制台cells/attributes渲染不作为Terminal像素截图。根闭合SHA256
+`07f2331a6e1ec73629e4943feeb02d18cfb3136122b6f288633882aaecefc486`；
+完整运行闭合SHA256 `1551521bab7e79f1f619979905352dcddd3b3ad0cc925bf665bf02f97f8a8cf8`。
+
+首次两个手动CI误传短SHA，actions/checkout将它当作branch ref，均在测试前失败
+（41011017156/41011020963）；此为执行器触发错误，失败日志保留，不记为测试通过。
+本收尾记录后的最终提交使用完整40位SHA重跑全部CI，旧成功、失败前跳过和本地结果
+都不能代替最终提交的实际checkout、完整traffic inventory和必需CI门。
+
 规范：[MS-SMB2 QUERY_INFO request](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/d623b2f7-a5cd-4639-8cc9-71fa7d9f9ba9)、
 [response](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/3b1b3598-a898-44ca-bfac-2dcae065247f)、
 [部分返回的服务器行为](https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb2/d64e0451-64a2-425a-848e-52a7dddab7b9)。
