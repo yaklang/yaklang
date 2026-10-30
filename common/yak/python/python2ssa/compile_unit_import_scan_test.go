@@ -232,3 +232,15 @@ func TestScanPyImportEdgesCorpusParity(t *testing.T) {
 		t.Fatalf("corpus parity broken: missing=%d extra=%d", missing, extra)
 	}
 }
+
+// Two dynamic imports on one line are two statements. A package= argument
+// belongs to the call it is written in; the scanner must not reach across the
+// ';' and attach it to the previous call.
+func TestScanPyImportEdgesDynamicImportStopsAtStatementBoundary(t *testing.T) {
+	requireScan(t, `a = import_module("alpha"); b = import_module("beta", package="pkg")`,
+		"dynamic||alpha|", "dynamic||beta|pkg")
+	requireScan(t, `a = import_module(".local"); b = import_module(".other", package="pkg")`,
+		"dynamic||.local|", "dynamic||.other|pkg")
+	requireScan(t, `a = __import__("alpha"); b = __import__("beta", globals(), locals(), [], 0); c = import_module("gamma")`,
+		"dynamic||alpha|", "dynamic||beta|", "dynamic||gamma|")
+}

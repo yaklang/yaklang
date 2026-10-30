@@ -46,8 +46,36 @@ type typePersistenceSnapshot struct {
 type typePersistIdentity struct {
 	namesGen, relationGen uint64
 	container             int64
-	kind, extraKind       int
-	name, extra           string
+	// relationIDs covers the ids of the parent/interface blueprints. They are
+	// part of the persisted body, so a blueprint that only receives its id
+	// after the child row was written must invalidate this key too.
+	relationIDs     uint64
+	kind, extraKind int
+	name, extra     string
+}
+
+// blueprintRelationIDs mixes the ids of the blueprints a class points at. The
+// order participates so a reordering is not mistaken for no change.
+func blueprintRelationIDs(t *Blueprint) uint64 {
+	const (
+		offset64 uint64 = 14695981039346656037
+		prime64  uint64 = 1099511628211
+	)
+	h := offset64
+	for _, p := range t.ParentBlueprints {
+		if p == nil {
+			continue
+		}
+		h = (h ^ uint64(p.GetId())) * prime64
+	}
+	h = (h ^ 0x9e3779b97f4a7c15) * prime64
+	for _, p := range t.InterfaceBlueprints {
+		if p == nil {
+			continue
+		}
+		h = (h ^ uint64(p.GetId())) * prime64
+	}
+	return h
 }
 
 func typePersistIdentityOf(typ Type) (typePersistIdentity, bool) {
@@ -80,7 +108,8 @@ func typePersistIdentityOf(typ Type) (typePersistIdentity, bool) {
 		}
 		return typePersistIdentity{
 			namesGen: t.fullTypeName.generation(), relationGen: t.relationGen.Load(), container: container,
-			kind: int(t.GetTypeKind()), name: t.Name, extra: string(t.Kind),
+			relationIDs: blueprintRelationIDs(t),
+			kind:        int(t.GetTypeKind()), name: t.Name, extra: string(t.Kind),
 		}, true
 	default:
 		return typePersistIdentity{}, false

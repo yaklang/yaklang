@@ -313,3 +313,32 @@ func TestReleaseDropsPersistedPackageEntryValues(t *testing.T) {
 	require.Equal(t, value.GetId(), reloaded.GetId())
 	require.False(t, reloaded == value)
 }
+
+// Late import/member fixups call ReplaceAllValue on a placeholder retained
+// outside the scope. Releasing the persisted value must keep the lexical
+// binding attached to the placeholder, so the later replacement is visible
+// through the variable instead of being dropped.
+func TestReleasedBindingFollowsLateReplacement(t *testing.T) {
+	for _, release := range []bool{false, true} {
+		t.Run(map[bool]string{false: "keep", true: "release"}[release], func(t *testing.T) {
+			prog := newResidentDeltaProgram(t)
+			defer closeUnsavedFlushFixture(t, prog)()
+			first := prog.GetAndCreateFunctionBuilder("", "First")
+			placeholder := first.EmitUndefined("late_export")
+			variable := first.CreateVariable("binding")
+			first.AssignVariable(variable, placeholder)
+			first.Finish()
+			require.NoError(t, prog.Cache.instructions.residentCache.Flush(false))
+			if release {
+				require.Greater(t, prog.ReleasePersistedOrdinaryValues(), 0)
+				require.Nil(t, variable.Value)
+			}
+			later := prog.GetAndCreateFunctionBuilder("", "Later")
+			actual := later.EmitConstInst(42)
+			ReplaceAllValue(placeholder, actual)
+			got := variable.GetValue()
+			require.NotNil(t, got)
+			require.Equal(t, actual.GetId(), got.GetId(), "late replacement must also update the retained lexical binding")
+		})
+	}
+}

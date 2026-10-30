@@ -228,3 +228,41 @@ func TestVariableRegisteredAfterSettledReleaseIsSaved(t *testing.T) {
 	builder.Finish()
 	prog.Cache.CloseWithoutSave()
 }
+
+// A value that was flushed and then settled can still gain a new alias and a
+// new source range inside a later compile unit. Neither relationship is a
+// duplicate: ReleaseSettled must only trim resident membership, so both rows
+// and every offset must reach the saver.
+func TestSettledReleaseKeepsLateIndexAndOffsetRows(t *testing.T) {
+	for _, settle := range []bool{false, true} {
+		t.Run(map[bool]string{false: "keep", true: "settle"}[settle], func(t *testing.T) {
+			prog := newResidentDeltaProgram(t)
+			defer closeUnsavedFlushFixture(t, prog)()
+			first := prog.GetAndCreateFunctionBuilder("", "First")
+			value := first.EmitUndefined("shared")
+			original := first.CreateVariable("original")
+			ed := memedit.NewMemEditor("original\nalias\nuse")
+			original.SetDefRange(memedit.NewRangeFromOffsets(ed, 0, 8))
+			first.AssignVariable(original, value)
+			first.Finish()
+			require.NoError(t, prog.Cache.indexes.Flush())
+			if settle {
+				require.Greater(t, prog.Cache.indexes.ReleaseSettled(prog.Name), 0)
+			}
+			later := prog.GetAndCreateFunctionBuilder("", "Later")
+			alias := later.CreateVariable("later_alias")
+			alias.SetDefRange(memedit.NewRangeFromOffsets(ed, 9, 14))
+			later.AssignVariable(alias, value)
+			original.AddRange(memedit.NewRangeFromOffsets(ed, 15, 18), true)
+			later.Finish()
+			require.NoError(t, prog.Cache.indexes.Flush())
+
+			var indexRows []ssadb.IrIndex
+			require.NoError(t, ssadb.GetDB().Where("program_name = ? AND value_id = ?", prog.Name, value.GetId()).Find(&indexRows).Error)
+			var offsets []ssadb.IrOffset
+			require.NoError(t, ssadb.GetDB().Where("program_name = ? AND value_id = ?", prog.Name, value.GetId()).Find(&offsets).Error)
+			require.Len(t, indexRows, 2, "both original and later_alias must remain queryable after reload")
+			require.Len(t, offsets, 3, "the new alias declaration and later use are distinct source locations")
+		})
+	}
+}

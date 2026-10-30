@@ -68,3 +68,46 @@ func TestSuspendSecondaryIndexesSkipsNonSQLite(t *testing.T) {
 	require.NoError(t, RestoreSecondaryIndexes(nil, nil))
 	_ = context.Background()
 }
+
+// A scan can read one project while another project is between the suspend and
+// restore stages of a compile. The const lookup must not depend on an index
+// that is temporarily absent: SQLite rejects the statement instead of falling
+// back, and the search would silently return no rows.
+func TestConstSearchSurvivesSecondaryIndexSuspension(t *testing.T) {
+	db := setupA3ConstDB(t)
+	prog := t.Name()
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{{
+		ProgramName: prog,
+		CodeID:      7,
+		Opcode:      irCodeConstOpcode,
+		ConstType:   irCodeConstTypeNormal,
+		String:      "needle",
+	}}))
+	search := func() ([]int64, error) {
+		var queryErr error
+		ctx := WithQueryErrorHandler(context.Background(), func(err error) { queryErr = err })
+		var ids []int64
+		for row := range SearchVariable(db, ctx, prog, NewNameCache(prog, false), ExactCompare, ConstType, "needle") {
+			ids = append(ids, row.CodeID)
+		}
+		return ids, queryErr
+	}
+
+	before, err := search()
+	require.NoError(t, err)
+	require.Equal(t, []int64{7}, before)
+
+	ddls, err := SuspendSecondaryIndexes(db)
+	require.NoError(t, err)
+	require.NotEmpty(t, ddls)
+	require.False(t, hasNamedIndex(db, TableIrCodes, irCodeConstLookupIndex))
+
+	during, duringErr := search()
+	require.NoError(t, duringErr, "a readable project must stay readable while another compile suspends indexes")
+	require.Equal(t, before, during)
+
+	require.NoError(t, RestoreSecondaryIndexes(db, ddls))
+	after, err := search()
+	require.NoError(t, err)
+	require.Equal(t, before, after)
+}
