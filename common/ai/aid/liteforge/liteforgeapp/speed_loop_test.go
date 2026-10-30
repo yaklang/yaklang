@@ -30,7 +30,8 @@ func (i *speedLoopProjectedInvoker) AddToTimelineWithPromptProjection(entry, dis
 func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 	for _, mode := range []string{"text", "functioncall", "single-model", "retry", "cancel"} {
 		t.Run(mode, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			type taskContextKey struct{}
+			ctx, cancel := context.WithTimeout(context.WithValue(context.Background(), taskContextKey{}, mode), 10*time.Second)
 			defer cancel()
 			var speedCalls, qualityCalls, verifications, handled atomic.Int32
 			var observed *aicommon.Action
@@ -51,11 +52,14 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 				aicommon.WithSpeedPriorityAICallback(func(c aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
 					attempt := speedCalls.Add(1)
 					require.Equal(t, "react-loop:auxiliary-integration", req.GetCallerLabel())
-					if mode == "single-model" {
-						require.Equal(t, activeTask.GetContext().Done(), req.GetContext().Done())
-					} else {
-						require.Same(t, activeTask.GetContext(), req.GetContext())
-					}
+					// The request executor adds attempt/trace values and combines the
+					// task and session lifetimes; context pointer identity is not a contract.
+					require.Equal(t, mode, req.GetContext().Value(taskContextKey{}))
+					deadline, hasDeadline := activeTask.GetContext().Deadline()
+					requestDeadline, hasRequestDeadline := req.GetContext().Deadline()
+					require.Equal(t, hasDeadline, hasRequestDeadline)
+					require.Equal(t, deadline, requestDeadline)
+					require.NoError(t, req.GetContext().Err())
 					require.False(t, req.IsToolCallArgumentsStreamEnabled())
 					var opts aispec.AIConfig
 					for _, option := range req.GetExtraSpecOpts() {
@@ -81,6 +85,11 @@ func TestSpeedLoopLiteForgeIntegration(t *testing.T) {
 					}
 					if mode == "cancel" {
 						cancel()
+						select {
+						case <-req.GetContext().Done():
+						case <-time.After(time.Second):
+							t.Fatal("task cancellation did not reach the provider")
+						}
 						return nil, req.GetContext().Err()
 					}
 					response := c.NewAIResponse()

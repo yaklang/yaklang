@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aiprojection"
 	"io"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/yaklang/yaklang/common/ai/aid/aiddb"
@@ -118,7 +119,14 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 	outConfig := c
 	return func(config AICallerConfigIf, request *AIRequest) (rsp *AIResponse, err error) {
 		requestCtx, stopRequestCtx := combineAIRequestAndConfigContext(c.Ctx, request.GetContext())
-		defer stopRequestCtx()
+		var contextOwners atomic.Int32
+		contextOwners.Store(1)
+		releaseContext := func() {
+			if contextOwners.Add(-1) == 0 {
+				stopRequestCtx()
+			}
+		}
+		defer releaseContext()
 		// check if callback is nil before calling
 		if i == nil {
 			return nil, utils.Error("AI callback is not set, please configure AI service first")
@@ -176,7 +184,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 			}
 			rsp.SetTaskIndex(request.GetTaskIndex())
 			origRsp := rsp
+			contextOwners.Add(1)
 			rsp = TeeAIResponse(config, rsp, nil, func() {
+				defer releaseContext()
 				c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 			})
 			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
@@ -270,6 +280,9 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 
 		origRsp := rsp
+		// Returning a stream does not end its HTTP request. Release the merged
+		// context after the source is consumed, including for custom callbacks.
+		contextOwners.Add(1)
 		rsp = TeeAIResponse(config, rsp, func(teeResp *AIResponse) {
 			now := time.Now()
 			du := now.Sub(start)
@@ -292,6 +305,7 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 				"caller_label":  callerLabel,
 			})
 		}, func() {
+			defer releaseContext()
 			usageMetrics := c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
 			du := time.Since(start)
 			provider := origRsp.GetProviderName()

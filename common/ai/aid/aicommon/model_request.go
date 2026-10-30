@@ -18,9 +18,10 @@ func (c *Config) callModelRequest(ctx context.Context, callback AICallbackType, 
 	policy := aispec.ModelRetryOptions{MaxAttempts: int(c.AiAutoRetry), Wait: c.aiRetryWaitFunc,
 		Notify: func(message string) { c.EmitInfo("%s", message) }}
 	return aispec.RunModelCall(ctx, policy, func(attemptCtx context.Context) (*AIResponse, error) {
-		attemptRequest := *request
-		attemptRequest.ctx = attemptCtx
-		response, err := callback(caller, &attemptRequest)
+		// Callbacks can set request metadata (e.g. the owning task index).
+		// Preserve that request identity while attaching this attempt's context.
+		request.ctx = attemptCtx
+		response, err := callback(caller, request)
 		if err != nil {
 			if overflow := ClassifyPromptTooLong(response, err); overflow != nil {
 				return response, &aispec.ModelCallFailure{Kind: "configuration", Cause: overflow}

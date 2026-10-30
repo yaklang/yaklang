@@ -10,7 +10,7 @@ import (
 )
 
 // ModelCallFailure describes a failed provider attempt, before Agent action validation.
-// Kind is network, http, protocol, business, configuration, or script.
+// Kind is network, http, protocol, business, configuration, script, or unknown.
 type ModelCallFailure struct {
 	Kind       string
 	StatusCode int
@@ -63,9 +63,13 @@ func ClassifyModelFailure(err error, status int, retryAfter string) *ModelCallFa
 		clone := *failure
 		return &clone
 	}
-	kind := "network"
+	// An arbitrary callback error is not evidence that the shared endpoint is
+	// unavailable. Only transport failures may put unrelated calls in cooldown.
+	kind := "unknown"
 	if status >= 400 {
 		kind = "http"
+	} else if IsTransientError(err) {
+		kind = "network"
 	}
 	return &ModelCallFailure{Kind: kind, StatusCode: status, RetryAfter: retryAfter, Cause: err}
 }

@@ -151,6 +151,24 @@ func TestModelFailurePolicy(t *testing.T) {
 	}
 }
 
+func TestUnknownCallbackFailureDoesNotCoolDownOtherRequests(t *testing.T) {
+	globalRecovery(t, false)
+	queue := &modelRequestQueue{changed: make(chan struct{})}
+	policy := ModelRetryOptions{MaxAttempts: 1, acquire: queue.acquire}
+	_, err := RunModelCall(context.Background(), policy, func(context.Context) (string, error) {
+		return "", errors.New("local provider failed")
+	})
+	require.Error(t, err)
+	require.Equal(t, "unknown", ClassifyModelFailure(err, 0, "").Kind)
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	result, err := RunModelCall(ctx, policy, func(context.Context) (string, error) { return "healthy", nil })
+	require.NoError(t, err, "an unrelated callback error must not block a healthy model")
+	require.Equal(t, "healthy", result)
+	require.Equal(t, "network", ClassifyModelFailure(io.ErrUnexpectedEOF, 0, "").Kind)
+	require.Equal(t, "http", ClassifyModelFailure(errors.New("rate limit"), 429, "60").Kind)
+}
+
 func TestModelCallFiniteBudgetAndNestedAdmission(t *testing.T) {
 	globalRecovery(t, false)
 	calls, admitted, reports := 0, 0, 0
