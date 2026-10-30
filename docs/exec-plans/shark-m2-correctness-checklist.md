@@ -19,7 +19,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-01 | 定位 SMB1→SMB2 丢失记录并冻结独立来源 | 已完成 | 5 个 offer、107 个完整记录/121 命令头；6 个真实三段重组；VLAN81/80 分离，参考关联仅作跨域参考 | 0 |
 | M2-02 | 复用 canonical CIFS，保留全部重复方言/OEM/空名称/字节范围 | 已完成（选定请求 profile） | 两显式入口、owned Node 投影、原 YAML/旧 SMB/Carrier 兼容、边界与预算正反例；f613/e7 实际 5 个 offer 的字段、范围和拥有字节验值 | 0 |
 | M2-03 | 修复原生探测停止及 SMB1→SMB2 完整记录接续 | 已完成（记录/来源门） | 1/7/64-byte 拆分、合并记录、完整性拒绝、offer≠选定版本、02ff≠最终协商；f613/e7 的 107/121 和 281 全记录来源门通过，完整 body 仍归 M2-04 | 0 |
-| M2-04 | 121 命令的 header/body/compound 字段逐一正确 | 进行中（仍有覆盖缺口） | e7 选定原生 header 和部分正文值/范围已验；同一 checker04 对比从 3376 降到 1568 gaps，其中 1521 未发表字段/47 未映射范围；缺项不视为已正确 | 4–8 小时 |
+| M2-04 | 121 命令的 header/body/compound 字段逐一正确 | 进行中（仍有覆盖缺口） | e7/e5 选定原生 header 和部分正文值/范围已验；同一 checker04 对比从 3376 降到 1568 gaps，1521 未发表/47 范围未映射；另拆 19 个来源验收子项，静态 129 个可能为适配缺口，不能全部当成原生未实现 | 19 子项合计 18.75–37.5 小时；等待另计 |
 | M2-05 | SMB 乱序/丢失/重传/四元组复用/接口/VLAN 隔离 | 进行中（矩阵与来源分区通过） | 实际 TCP 路径 eager/deferred、多个 workers；12 域双向对应、6 个三段重组、4 次完整重传不重复；全部 pending/dialect/file 隔离、异步 compound 缺前驱/晚到恢复及新 SID/TID 分配仍需验收 | 3–5 小时 |
 | M2-06 | SMB Windows 递进页面和字段来源 | 进行中 | 实际 e7 页确认排序问题，导航失败保留；新版 Header/Body/compound/worker 矩阵已过，实际窗口/高亮、来源切换/缩放/编码待复验 | 30–60 分钟 |
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 进行中 | 107/121 实际恢复和 3 个 e7 回放闭合；新旧全部对象/行的差异来源账本、新版本字段/会话/Windows 仍需闭合 | 1–3 小时 |
@@ -40,7 +40,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-22 | SMB2 请求/响应头 union 与完整 literal 来源 | 已完成（literal 头部合同） | `TestSMB2HeaderUnionAndOwnedLiteralRanges`；e7 的 121 头与来源先冻结值/范围逐包比较，top-level header 缺项/差异为 0；signature 仅拥有字节，未声明认证通过 | 0 |
 | M2-23 | 异步 CREATE 以匹配请求的域建立文件上下文 | 已完成（有限合同） | `TestSMB2AsyncCreate*`：pending→final AsyncId 精确关联，使用 request TID7，不伪造响应 TreeID；错误/错方向/未知 AsyncId/另一 SID 不开户，同 FileId 的 TID8 独立 | 0 |
 | M2-24 | related 文件上下文经过无 FileId 的 READ/WRITE 响应仍接续 | 已完成（顺序完成合同） | `TestSMB2RelatedFileContextSurvivesNoFileIDResponses`：WRITE+CLOSE、CREATE+READ+CLOSE，完整或按序分开的响应；私有请求链身份/ordinal、来源 MID、范围不伪造、预算先计入；失败 CREATE/未匹配/他链不借用，失败 READ 仍保留已用 ID；高级缺前驱晚到归 M2-05 | 0 |
-| M2-25 | SMB 页面 Header→Body→上下文、兼容副本消重与范围归属 | 进行中（CLI 矩阵通过） | 12 个 `TestSMB*` 入口：真实 session/compound，原事件不变，typed/值/范围/owner 反例，父 IPC 决策、worker 不重判、不同 PDU 同值独立；新版 Windows 实际页待闭合 | 30–60 分钟 |
+| M2-25 | SMB 页面 Header→Body→上下文、兼容副本消重与范围归属 | 进行中（完整 CLI 通过，最终 CI 待验） | 真实 session/compound、typed/值/范围/owner、父 IPC 决策和独立 PDU 反例；e5 两个真实 Windows 页通过；全 CI 又发现嵌套认证语义排序回归，保留原断言修复后完整 CLI 985 pass/2 历史 skip；新增真实 Type3 与两种 worker 的原始/语义来源测试 | 30–60 分钟 |
 | M2-26 | SMB2 前移探测不抢占短 DLMS Wrapper | 已完成（跨协议回归合同） | e7 全 traffic 12 叶/14 fail actions 暴露 `<8` 字节时仅 00 前缀被提前拦截；前移路径现须完整签名，原 `TestDLMSWrapperSealedReplayMatrix/wrapper-short-header` 全 workers/eager/deferred/order 断言和样本原样通过 | 0 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。账户剩余额度到 50% 时停止新增范围，提交、推送并确认最新提交 CI 后暂停；最多 1 个子 agent，主 agent 负责关键路径。
@@ -88,3 +88,20 @@ Body 类型适配仍逐一保留 typed 子字段缺口，不把完整 opaque Dat
 `053d7f7d3d2fca32427dceac0495fd5c6f157297df069f12743edd20afab9806`。
 两轮都从仓库外 cwd 运行，失败 corpus 和 cache 亦在仓库外；正文/范围 fuzz 不代表全部
 协议状态序列或 TLS/QUIC 高级恢复已完成。
+
+e5 完整 CI 的 pcap/parser 包已通过，失败集中在原有
+`TestAuthenticationDetailsPrioritizeMeaningBeforeRawTree`：SMB 排序器错误地把无 wire-range
+的认证元数据全按字母排序，使 raw Decoded Fields 早于 User Name。修复复用原有
+`fieldPriority`，不隐藏 raw tree、不修改原测试；新增本地/packet/stream worker 的真实
+AUTHENTICATE 来源、MIC/认证未验证和 SDK 事件不变断言。完整 CLI 本地复跑
+`test-M2-full-CLI61-01` 为 **985 pass/2 skip/0 fail**，日志 SHA256
+`5e7a161ff4784bf6f12e54d27e059b2ae57e3c2fcffe6d6121556025d7a2ded0`。
+两 skip 为可选外部预览审计与控制台子进程入口；本阶段大包和真实 Windows 运行另有独立证据。
+e5 的失败、两份全 CI artifact 和已通过的本地输入全部保留；最终提交仍须重新完成全部 CI。
+
+来源盘点把 M2-04 拆成 19 个稳定子项（10 个已有部分实现、9 个未开始、功能验收完成 0），
+与主表大项分别计数。原 1568 个缺口唯一分配；129 个仅是静态映射候选，不算修好。
+另有 12 条完整记录尚未进入 269-record 正文中立 oracle，不能从 281 来源门通过推导
+其全部字段正确。原始 PDML 的部分 QI/QD 响应 class 信息是跨 VLAN 请求继承装饰，
+即使没有 generated 标记也不可当作响应 literal/range。保持 VLAN81 请求和 VLAN80 响应
+隔离，原始整体差异保留；同域解码和类型化内容要另有同域正例与跨域负控。
