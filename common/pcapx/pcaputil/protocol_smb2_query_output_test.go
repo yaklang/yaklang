@@ -137,6 +137,22 @@ func TestSMB2QueryOutputFixedGrammarBoundaries(t *testing.T) {
 	}
 }
 
+func TestSMB2QueryOutputBooleanLiteralTable(t *testing.T) {
+	for _, deleted := range []byte{0, 1, 2, 255} {
+		for _, directory := range []byte{0, 1, 2, 255} {
+			wire := smb2StandardOutput()
+			wire[20], wire[21] = deleted, directory
+			decoded, err := stream_parser.DecodeSMB2QueryInfoOutput(wire, 1, 5)
+			require.NoError(t, err)
+			require.Equal(t, deleted, decoded["Delete Pending"])
+			require.Equal(t, directory, decoded["Directory"])
+			require.Equal(t, deleted != 0, decoded["Delete Pending State"])
+			require.Equal(t, directory != 0, decoded["Directory State"])
+			require.Equal(t, uint16(0xcafe), decoded["Reserved"])
+		}
+	}
+}
+
 func TestSMB2QueryOutputRequestIdentityReuseAndAsync(t *testing.T) {
 	for _, width := range []int{1, 7, 64, 4096} {
 		t.Run(fmt.Sprint(width), func(t *testing.T) {
@@ -278,15 +294,29 @@ func TestSMB2QueryOutputTCPRecoveryAndGenerationReuse(t *testing.T) {
 	lost := []tcpStep{{seq: 99, syn: true}, {seq: 999, reverse: true, syn: true}, {seq: 100, data: string(request)},
 		{seq: 1000, reverse: true, data: string(response[:80])}, {seq: 1090, reverse: true, data: string(response[90:])},
 		{seq: 1000 + uint32(len(response)), reverse: true, fin: true}}
-	for _, allowIncomplete := range []bool{false, true} {
-		events, _, err := binReplay(t, binTestPcap(t, lost, 445, false, false), 1, WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: allowIncomplete}))
-		if allowIncomplete {
-			require.NoError(t, err)
-		} else {
-			require.ErrorContains(t, err, "TCP stream closed with an unfilled sequence gap (14 buffered bytes)")
-		}
-		for _, event := range events {
-			require.NotContains(t, event.Session, "Output Information Type", "a gap cannot be filled with guessed file values")
+	for _, workers := range []int{1, 3} {
+		for _, deferred := range []bool{false, true} {
+			for _, allowIncomplete := range []bool{false, true} {
+				events, stats, err := binReplay(t, binTestPcap(t, lost, 445, false, false), workers, WithBinParserDeferred(deferred), WithTCPReassemblyOptions(TCPReassemblyOptions{AllowIncomplete: allowIncomplete}))
+				if allowIncomplete {
+					require.NoError(t, err)
+				} else {
+					require.ErrorContains(t, err, "TCP stream closed with an unfilled sequence gap (14 buffered bytes)")
+				}
+				require.Len(t, events, 3, "retain the request, exact incomplete prefix and separate TCP gap diagnostic")
+				require.Equal(t, "incomplete", events[1].Status)
+				require.Equal(t, response[:80], events[1].Raw)
+				require.Contains(t, events[1].Summary, "exact message boundary was not reached")
+				require.Nil(t, events[1].SourceBytes.CompletedIn)
+				require.NotEmpty(t, events[1].SourceBytes.PacketRefs)
+				require.Equal(t, "incomplete", events[2].Status)
+				require.Empty(t, events[2].Raw, "undelivered pending TCP bytes are not fabricated as a contiguous PDU")
+				require.Equal(t, "TCP stream closed with an unfilled sequence gap (14 buffered bytes)", events[2].Summary)
+				require.EqualValues(t, 2, stats.Incomplete)
+				for _, event := range events {
+					require.NotContains(t, event.Session, "Output Information Type", "a gap cannot be filled with guessed file values")
+				}
+			}
 		}
 	}
 }
