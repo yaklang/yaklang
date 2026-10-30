@@ -38,9 +38,11 @@ type SessionSkillList struct {
 }
 
 // SessionSkillAvailablePage 只分页可加载且尚未加载的技能。已加载技能由
-// skill_loaded_sync 独立返回，不占用这里的页码。
+// skill_loaded_sync 独立返回，不占用这里的页码。Query 非空时表示本次结果经过
+// 名称和描述过滤。
 type SessionSkillAvailablePage struct {
 	Skills   []CapabilityInventoryItem `json:"skills"`
+	Query    string                    `json:"query,omitempty"`
 	Page     int                       `json:"page"`
 	PageSize int                       `json:"page_size"`
 	Total    int                       `json:"total"`
@@ -66,9 +68,13 @@ func BuildSessionLoadedSkillInventory(mgr *aiskillloader.SkillsContextManager) *
 	return result
 }
 
-// BuildSessionAvailableSkillInventory 分页返回可加载且未加载的技能。查询不使用
-// prompt registry 的 token 预算，数据库来源在首次加载前也会出现。
-func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager, page, pageSize int) (*SessionSkillAvailablePage, error) {
+// BuildSessionAvailableSkillInventory 分页返回可加载且未加载的技能。query 为空时
+// 返回全部未加载技能；非空时只保留名称或描述匹配的技能。过滤发生在完整目录上，
+// 不使用 prompt token 预算，也不使用数据库搜索的默认条数上限。文件系统、压缩包、
+// 自定义 loader 和数据库 skillmd 先合并、去重、排除已加载，再按名称排序切片。
+// 目录不变时同一页稳定；加载、卸载或技能源变化后，前端应回到第 1 页。
+func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager, query string, page, pageSize int) (*SessionSkillAvailablePage, error) {
+	query = strings.TrimSpace(query)
 	if page <= 0 {
 		page = 1
 	}
@@ -78,7 +84,9 @@ func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager
 	if pageSize > MaxSessionSkillAvailablePageSize {
 		pageSize = MaxSessionSkillAvailablePageSize
 	}
-	result := &SessionSkillAvailablePage{Page: page, PageSize: pageSize, Skills: []CapabilityInventoryItem{}}
+	result := &SessionSkillAvailablePage{
+		Skills: []CapabilityInventoryItem{}, Query: query, Page: page, PageSize: pageSize,
+	}
 	if mgr == nil {
 		return result, nil
 	}
@@ -94,6 +102,9 @@ func BuildSessionAvailableSkillInventory(mgr *aiskillloader.SkillsContextManager
 			continue
 		}
 		if _, isLoaded := loaded[meta.Name]; isLoaded {
+			continue
+		}
+		if query != "" && !aiskillloader.SkillMetaMatchesQuery(meta, query) {
 			continue
 		}
 		available[meta.Name] = skillMetaToInventoryItem(meta, CapabilityInventorySkillLoadMetadata)

@@ -3,8 +3,8 @@ package aiskillloader
 import (
 	"strings"
 
-	"github.com/yaklang/gorm"
 	_ "github.com/mattn/go-sqlite3"
+	"github.com/yaklang/gorm"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
@@ -24,40 +24,9 @@ func SearchSkillMetasByStructure(query string, metas []*SkillMeta, limit int) []
 		limit = len(metas)
 	}
 
-	queryLower := strings.ToLower(query)
-	queryTokens := strings.Fields(queryLower)
-
 	var matched []*SkillMeta
 	for _, meta := range metas {
-		if meta == nil || strings.TrimSpace(meta.Name) == "" {
-			continue
-		}
-		searchText := strings.ToLower(meta.Name + " " + meta.Description)
-
-		if strings.Contains(searchText, queryLower) {
-			matched = append(matched, meta)
-			if len(matched) >= limit {
-				break
-			}
-			continue
-		}
-
-		if len(queryTokens) <= 1 {
-			continue
-		}
-
-		meaningfulTokens := 0
-		matchCount := 0
-		for _, token := range queryTokens {
-			if len(token) < 2 {
-				continue
-			}
-			meaningfulTokens++
-			if strings.Contains(searchText, token) {
-				matchCount++
-			}
-		}
-		if meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2 {
+		if SkillMetaMatchesQuery(meta, query) {
 			matched = append(matched, meta)
 			if len(matched) >= limit {
 				break
@@ -65,6 +34,37 @@ func SearchSkillMetasByStructure(query string, metas []*SkillMeta, limit int) []
 		}
 	}
 	return matched
+}
+
+// SkillMetaMatchesQuery applies the loader's structural fuzzy matching rule to
+// one metadata record. Session available search uses the same name and
+// description rule, so filesystem and database skills match the same way.
+func SkillMetaMatchesQuery(meta *SkillMeta, query string) bool {
+	query = strings.TrimSpace(query)
+	if meta == nil || query == "" || strings.TrimSpace(meta.Name) == "" {
+		return false
+	}
+	queryLower := strings.ToLower(query)
+	searchText := strings.ToLower(meta.Name + " " + meta.Description)
+	if strings.Contains(searchText, queryLower) {
+		return true
+	}
+	queryTokens := strings.Fields(queryLower)
+	if len(queryTokens) <= 1 {
+		return false
+	}
+	meaningfulTokens := 0
+	matchCount := 0
+	for _, token := range queryTokens {
+		if len(token) < 2 {
+			continue
+		}
+		meaningfulTokens++
+		if strings.Contains(searchText, token) {
+			matchCount++
+		}
+	}
+	return meaningfulTokens > 0 && matchCount > 0 && matchCount >= (meaningfulTokens+1)/2
 }
 
 // SearchSkillMetasBM25 performs BM25 skill search against the current in-memory
