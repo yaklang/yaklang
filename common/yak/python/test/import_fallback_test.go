@@ -62,18 +62,36 @@ func requireOnDemandCompiled(t *testing.T, prog *ssaapi.Program, content string)
 		upstreamFileHashKeys(prog), upstreamKeys(prog))
 }
 
+// pySlowParsePrefix, prepended to a fixture file, makes its parse reliably
+// slower than an unpadded peer's (a ~240KB comment the lexer must scan).
+// This pins the racy as-ready AST delivery order — see
+// TestPythonImportFallback_CompilesModuleOnDemand for why that matters.
+var pySlowParsePrefix = "# " + strings.Repeat("padding ", 30000)
+
 // TestPythonImportFallback_CompilesModuleOnDemand covers the ordering gap no
 // other mechanism bridges: main.py and settings.py share the root compile
 // unit (a self edge is dropped, so the topological order cannot help), and
 // the skeleton pass only predeclares def/class shells — a module-level
 // variable export does not exist until settings.py's deferred file task
-// runs. File tasks execute in registration order, so main.py's import runs
-// first and binds a placeholder that would only be patched by
+// runs. File tasks execute in registration order — pinned to main.py first
+// by the padding below — so main.py's import runs first and binds a
+// placeholder that would only be patched by
 // fixImportCallback after the whole project finishes. The need-driven
 // fallback instead compiles settings.py on demand right there: main.py sees
 // the real string and the file's hash lands in the UpStream cache.
 func TestPythonImportFallback_CompilesModuleOnDemand(t *testing.T) {
-	settings := "SECRET = \"s3cret\"\n"
+	// The batch pipeline hands files to the pre-handler as their ASTs finish
+	// parsing — "file completion order inside the batch is not part of that
+	// contract" (ssa_compile_fs.go) — and deferred file tasks run in that
+	// delivery order. With two near-instant parses the order races: when
+	// settings.py's AST is ready first, its task publishes SECRET before
+	// main.py's import executes, the import resolves without the fallback,
+	// and the hash assertion below fails even though SECRET still binds the
+	// real value (CI run 40838722220 failed 2/2 this way). The comment
+	// padding makes settings.py's parse reliably slower than main.py's, so
+	// the importer's AST is always ready first and the fallback
+	// deterministically engages.
+	settings := pySlowParsePrefix + "\nSECRET = \"s3cret\"\n"
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("main.py", "from settings import SECRET\n")
 	vf.AddFile("settings.py", settings)
@@ -97,6 +115,38 @@ func TestPythonImportFallback_CompilesModuleOnDemand(t *testing.T) {
 	for _, v := range secrets {
 		require.False(t, v.IsUndefined(),
 			"SECRET must be the real value from the on-demand compile, got placeholder: %s", v.String())
+	}
+}
+
+// TestPythonImportFallback_ModuleBuiltFirstNeedsNoFallback pins the OTHER
+// delivery order of the same racy pipeline: main.py's parse is padded so
+// settings.py's AST is ready first, its deferred task publishes SECRET
+// before main.py's import executes, and the import resolves from the
+// already-published export. The on-demand fallback correctly stays out of
+// the way (no file-hash key), and the value is still the real one. Together
+// with the test above this locks in that BOTH orders of the non-contractual
+// file delivery produce a correct compile: neither order is a defect, the
+// fallback only bridges the importer-first one.
+func TestPythonImportFallback_ModuleBuiltFirstNeedsNoFallback(t *testing.T) {
+	settings := "SECRET = \"s3cret\"\n"
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("main.py", pySlowParsePrefix+"\nfrom settings import SECRET\n")
+	vf.AddFile("settings.py", settings)
+
+	prog := parsePythonProject(t, vf)
+
+	// The module was built by its own batch task; no on-demand compile.
+	require.Empty(t, upstreamFileHashKeys(prog),
+		"batch-built module must not trigger an on-demand compile: %v", upstreamKeys(prog))
+
+	// And the import still binds the real value, not a placeholder.
+	res, err := prog.SyntaxFlowWithError(`SECRET as $secret`)
+	require.NoError(t, err)
+	secrets := res.GetValues("secret")
+	require.NotEmpty(t, secrets, "SECRET from the batch-built module must bind")
+	for _, v := range secrets {
+		require.False(t, v.IsUndefined(),
+			"SECRET must be the real value from the batch build, got placeholder: %s", v.String())
 	}
 }
 
