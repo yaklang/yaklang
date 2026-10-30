@@ -105,6 +105,9 @@ func SetAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) (*ypb.AIGlobalConfi
 		return nil, utils.Error("config is nil")
 	}
 
+	if cfg.GetModelRequestsPerMinute() < 0 || cfg.GetModelRequestsPerMinute() > 60000 {
+		return nil, utils.Error("model requests per minute must be between 0 and 60000")
+	}
 	if cfg.GetSingleModelMode() {
 		if err := consts.ValidateSingleAIModel(consts.FirstIntelligentModel(cfg.GetIntelligentModels())); err != nil {
 			return nil, err
@@ -186,12 +189,15 @@ func ApplyAIGlobalConfig(db *gorm.DB, cfg *ypb.AIGlobalConfig) error {
 	}
 
 	tiered := &consts.TieredAIConfig{
-		SingleModelMode: cfg.GetSingleModelMode(),
-		Enabled:         cfg.GetEnabled(),
-		DisableFallback: cfg.GetDisableFallback(),
-		RoutingPolicy:   routing,
-		DefaultModelID:  cfg.GetDefaultModelId(),
-		GlobalWeight:    cfg.GetGlobalWeight(),
+		SingleModelMode:        cfg.GetSingleModelMode(),
+		RetryForever:           cfg.GetRetryForever(),
+		NetworkDebug:           cfg.GetNetworkDebug(),
+		ModelRequestsPerMinute: cfg.GetModelRequestsPerMinute(),
+		Enabled:                cfg.GetEnabled(),
+		DisableFallback:        cfg.GetDisableFallback(),
+		RoutingPolicy:          routing,
+		DefaultModelID:         cfg.GetDefaultModelId(),
+		GlobalWeight:           cfg.GetGlobalWeight(),
 	}
 
 	tiered.IntelligentConfigs = buildModels(cfg.IntelligentModels)
@@ -208,17 +214,20 @@ func cloneAIGlobalConfig(cfg *ypb.AIGlobalConfig) *ypb.AIGlobalConfig {
 		return nil
 	}
 	return &ypb.AIGlobalConfig{
-		SingleModelMode:   cfg.GetSingleModelMode(),
-		Enabled:           cfg.GetEnabled(),
-		RoutingPolicy:     cfg.GetRoutingPolicy(),
-		DisableFallback:   cfg.GetDisableFallback(),
-		DefaultModelId:    cfg.GetDefaultModelId(),
-		GlobalWeight:      cfg.GetGlobalWeight(),
-		IntelligentModels: cloneAIModelConfigs(cfg.GetIntelligentModels()),
-		LightweightModels: cloneAIModelConfigs(cfg.GetLightweightModels()),
-		VisionModels:      cloneAIModelConfigs(cfg.GetVisionModels()),
-		AIPresetPrompt:    cfg.GetAIPresetPrompt(),
-		AIPlanPrompt:      cfg.GetAIPlanPrompt(),
+		SingleModelMode:        cfg.GetSingleModelMode(),
+		RetryForever:           cfg.GetRetryForever(),
+		NetworkDebug:           cfg.GetNetworkDebug(),
+		ModelRequestsPerMinute: cfg.GetModelRequestsPerMinute(),
+		Enabled:                cfg.GetEnabled(),
+		RoutingPolicy:          cfg.GetRoutingPolicy(),
+		DisableFallback:        cfg.GetDisableFallback(),
+		DefaultModelId:         cfg.GetDefaultModelId(),
+		GlobalWeight:           cfg.GetGlobalWeight(),
+		IntelligentModels:      cloneAIModelConfigs(cfg.GetIntelligentModels()),
+		LightweightModels:      cloneAIModelConfigs(cfg.GetLightweightModels()),
+		VisionModels:           cloneAIModelConfigs(cfg.GetVisionModels()),
+		AIPresetPrompt:         cfg.GetAIPresetPrompt(),
+		AIPlanPrompt:           cfg.GetAIPlanPrompt(),
 	}
 }
 
@@ -357,6 +366,9 @@ func modelNeedsLegacyRecovery(model *ypb.AIModelConfig) bool {
 	if provider == nil {
 		return true
 	}
+	if provider.GetType() == "yak-script" {
+		return false // Script providers do not use API keys or legacy provider recovery.
+	}
 	if strings.TrimSpace(provider.GetType()) == "" {
 		return true
 	}
@@ -481,7 +493,7 @@ func migrateAIGlobalConfigBaseURLs(cfg *ypb.AIGlobalConfig) bool {
 }
 
 func migrateThirdPartyConfigBaseURL(cfg *ypb.ThirdPartyApplicationConfig) bool {
-	if cfg == nil || strings.TrimSpace(cfg.GetBaseURL()) != "" {
+	if cfg == nil || cfg.GetType() == "yak-script" || strings.TrimSpace(cfg.GetBaseURL()) != "" {
 		return false
 	}
 	rootURL, defaultURI := aiProviderDefaultEndpoint(cfg.GetType())

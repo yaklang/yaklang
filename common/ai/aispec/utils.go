@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -247,7 +248,19 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	if provider == nil {
 		return opts
 	}
-
+	if provider.GetType() == "yak-script" {
+		// A script provider has one configuration source. ModelName is only its
+		// routing/display label; connection settings and ExtraParams do not apply.
+		return []AIConfigOption{WithType(provider.GetType()), WithModel(modelName), WithScript(provider.GetScript()), WithNativeToolCalling(provider.GetEnableNativeToolCalling())}
+	}
+	for _, params := range [][]*ypb.KVPair{provider.GetExtraParams(), modelExtra} {
+		for _, param := range params {
+			if param.GetKey() == "network_debug" {
+				enabled, _ := strconv.ParseBool(param.GetValue())
+				opts = append(opts, WithNetworkDebug(enabled))
+			}
+		}
+	}
 	// Set API key
 	if provider.APIKey != "" {
 		opts = append(opts, WithAPIKey(provider.APIKey))
@@ -366,4 +379,10 @@ func buildOptionsFromProviderAndModel(provider *ypb.ThirdPartyApplicationConfig,
 	}
 
 	return opts
+}
+
+// ProviderFunctionCallDefault selects the Agent protocol for a configured provider.
+// Existing providers keep their native default; script providers explicitly opt in.
+func ProviderFunctionCallDefault(provider *ypb.ThirdPartyApplicationConfig) bool {
+	return provider.GetType() != "yak-script" || provider.GetEnableNativeToolCalling()
 }

@@ -911,10 +911,10 @@ func ExtractValidActionFromStream(ctx context.Context, reader io.Reader, actionN
 	parseErr := action.WaitParseResult(ctx)
 	action.WaitStream(ctx)
 	if parseErr != nil {
-		return nil, parseErr
+		return nil, NewModelOutputValidationError(parseErr)
 	}
 	if !action.ValidCheck(append(maker.alias, actionName)...) {
-		return nil, utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: %v", action.ObservedActionType(), append(maker.alias, actionName))
+		return nil, NewModelOutputValidationError(utils.Errorf("action @action or action not found or invalid, requested=%q, expect one of: %v", action.ObservedActionType(), append(maker.alias, actionName)))
 	}
 	return action, nil
 }

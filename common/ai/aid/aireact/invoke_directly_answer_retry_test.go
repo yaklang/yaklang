@@ -10,10 +10,40 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	aicommon_testutil "github.com/yaklang/yaklang/common/ai/aid/aicommon/testutil"
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 )
+
+func TestReAct_DirectlyAnswerPersistentRecoveryBeyondBudget(t *testing.T) {
+	old := consts.GetTieredAIConfig()
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{RetryForever: true})
+	t.Cleanup(func() { consts.SetTieredAIConfig(old) })
+	var attempts atomic.Int32
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	ins, err := NewTestReAct(
+		aicommon.WithAIAutoRetry(1), aicommon.WithAITransactionAutoRetry(1),
+		aicommon.WithAIRetryWaitFunc(func(ctx context.Context, _ time.Duration) error { return ctx.Err() }),
+		aicommon.WithAICallback(func(i aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			rsp := i.NewAIResponse()
+			if attempts.Add(1) < 8 {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"directly_answer"}`))
+			} else {
+				rsp.EmitOutputStream(strings.NewReader(`{"@action":"directly_answer","answer_payload":"recovered"}`))
+			}
+			rsp.Close()
+			return rsp, nil
+		}),
+	)
+	require.NoError(t, err)
+	answer, err := ins.DirectlyAnswer(ctx, "local recovery fixture", nil)
+	require.NoError(t, err)
+	require.Equal(t, "recovered", answer)
+	require.EqualValues(t, 8, attempts.Load())
+}
 
 func TestReAct_DirectlyAnswerBindsProviderRequestToCallerContext(t *testing.T) {
 	requestStarted := make(chan context.Context, 1)

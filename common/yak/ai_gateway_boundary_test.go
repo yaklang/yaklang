@@ -31,7 +31,13 @@ func (g *rawScriptGateway) Chat(string, ...any) (string, error) {
 		g.config.FinishReasonCallback("tool_calls", nil)
 		return "", nil
 	}
-	return g.config.Model, nil
+	// Structured output can also use the text JSON protocol. Match the real
+	// provider contract instead of returning a bare model name to its parser.
+	data, _ := json.Marshal(map[string]any{"model": g.config.Model})
+	if g.config.StreamHandler != nil {
+		g.config.StreamHandler(strings.NewReader(string(data)))
+	}
+	return string(data), nil
 }
 func (g *rawScriptGateway) ExtractData(string, string, map[string]any) (map[string]any, error) {
 	return map[string]any{"model": g.config.Model}, nil
@@ -54,11 +60,11 @@ func TestScriptAIKeepsRawGatewayBehavior(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		_, err := NewScriptEngine(1).ExecuteExWithContext(ctx, `
 explicit = ai.Chat("direct", ai.type("script-raw-gateway"), ai.model("explicit-model"))~
-assert explicit == "explicit-model"
+assert json.loads(explicit).model == "explicit-model"
 speed = ai.Chat("normal tier selection", ai.speedPriority())~
-assert speed == "speed-model"
+assert json.loads(speed).model == "speed-model"
 named = ai.LightweightChat("unchanged entry")~
-assert named == "speed-model"
+assert json.loads(named).model == "speed-model"
 data = ai.FunctionCall("direct", {"model":"string"}, ai.type("script-raw-gateway"), ai.model("explicit-model"))~
 assert data.model == "explicit-model"
 `, nil)

@@ -92,6 +92,11 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			defer resp.Close()
 			var isStream atomic.Bool
 			optList := []aispec.AIConfigOption{
+				aispec.WithModelRequestStatus(func(message string) {
+					if emitter := aicf.GetEmitter(); emitter != nil {
+						_, _ = emitter.EmitInfo("%s", message)
+					}
+				}),
 				aispec.WithStreamHandler(func(reader io.Reader) {
 					isStream.Store(true)
 					resp.EmitOutputStream(reader)
@@ -137,9 +142,8 @@ func AIChatToAICallbackType(cb func(prompt string, opts ...aispec.AIConfigOption
 			if ctx == nil {
 				ctx = aicf.GetContext()
 			}
-			if ctx != nil {
-				optList = append(optList, aispec.WithContext(ctx))
-			}
+			ctx = modelNetworkDebugContext(ctx, aicf, req.GetSeqId())
+			optList = append(optList, aispec.WithContext(ctx))
 			optList = append(optList, extractUserUsageCallbackOpts(aicf)...)
 			// 上报本次请求的模型用途类型(tier)，供 aibalance gateway 注入
 			// X-Yak-AI-Model-Usage-Type 头给中转层做用量保护降级。空 tier 不上报。

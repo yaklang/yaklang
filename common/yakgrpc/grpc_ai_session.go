@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 	"github.com/yaklang/yaklang/common/yakgrpc/aisessioncleanup"
 	"github.com/yaklang/yaklang/common/yakgrpc/yakit"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
@@ -164,6 +165,10 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 	projectDB := s.GetProjectDatabase()
 
 	if req.GetDeleteAll() {
+		sessionIDs, err := yakit.QueryAISessionIDsForDelete(projectDB, filter, true)
+		if err != nil {
+			return nil, err
+		}
 		attachedScheduleUUIDs, err := yakit.QueryAllAttachedAIReActScheduleUUIDs(projectDB)
 		if err != nil {
 			return nil, err
@@ -177,6 +182,9 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 			s.cancelAIReActScheduleExecution(scheduleUUID)
 		}
 		if _, err := yakit.DeleteAllAttachedAIReActSchedules(projectDB); err != nil {
+			return nil, err
+		}
+		if err := httptrace.RemoveSessions(sessionIDs); err != nil {
 			return nil, err
 		}
 		deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForAllSessions(projectDB)
@@ -240,6 +248,9 @@ func (s *Server) DeleteAISession(ctx context.Context, req *ypb.DeleteAISessionRe
 		return nil, err
 	}
 
+	if err := httptrace.RemoveSessions(targetSessionIDs); err != nil {
+		return nil, err
+	}
 	deletedWorkDirs, err := yakit.CleanupAISpaceWorkDirsForSessions(projectDB, targetSessionIDs)
 	if err != nil {
 		return nil, err

@@ -13,6 +13,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 
+	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/jsonextractor"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -1263,6 +1264,10 @@ func executeChatBaseRequest(
 		poc.WithAppendHeader("Accept-Encoding", "gzip, deflate, br"), // enable compression for better network performance
 	}
 	opts = append(defaultOpts, opts...) // User options come AFTER defaults, so they can override
+	if rpm, _ := consts.ModelRequestLimit(); rpm > 0 || consts.IsAIRetryForeverEnabled() {
+		// The host admits every retry; transport retries must not bypass its queue.
+		opts = append(opts, poc.WithRetryTimes(0), poc.WithRedirectTimes(0))
+	}
 	opts = append(opts, poc.WithReplaceHttpPacketBody(raw, false))
 
 	var pr, reasonPr, toolCallArgsReader io.Reader

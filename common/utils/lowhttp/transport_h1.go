@@ -357,6 +357,9 @@ func (t *h1Transport) roundTripDirect(ctx context.Context, tr *transportRequest,
 		}
 	}
 
+	if option.networkTraceWriter != nil {
+		mirrorWriter = io.MultiWriter(mirrorWriter, option.networkTraceWriter)
+	}
 	httpResponseReader := bufio.NewReaderSize(io.TeeReader(conn, mirrorWriter), option.DefaultBufferSize)
 	if timeout > 0 && option != nil && !option.ExtendReadDeadline {
 		hardTimeoutTimer := time.AfterFunc(timeout, func() {

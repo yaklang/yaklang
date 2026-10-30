@@ -274,12 +274,12 @@ func actionTypeResolutionError(requested string, availableActions []string, reas
 	if requested == "" {
 		requested = "<missing>"
 	}
-	return utils.Errorf(
+	return aicommon.NewModelOutputValidationError(utils.Errorf(
 		"action resolution failed: requested=%q; matcher=exact registered action or alias; available_actions=%v; reason=%s",
 		requested,
 		availableActions,
 		reason,
-	)
+	))
 }
 
 func (r *ReActLoop) Execute(taskId string, ctx context.Context, userInput string) error {

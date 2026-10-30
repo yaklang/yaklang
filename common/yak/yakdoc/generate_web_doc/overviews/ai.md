@@ -29,3 +29,15 @@ options = [
 ]
 qualityConfig = aim.qualityPriorityAIConfig("openai", options...)
 ```
+
+## Yak 脚本模型适配
+
+`yak-script` Provider 使用普通 Yak 运行时，通过 `chat(req, emit)` 接收调用数据。
+以下函数由正式 ai 库导出，沿用普通 Yak 编辑器的补全、悬浮说明与函数签名：
+
+- `ai.ReadSSE(reader, callback)` 只解析 SSE 事件信封，JSON 与业务字段由回调解析。
+- `ai.Retry(req, reason, retryAfter)` 标记本次可恢复失败并返回 error，宿主按既有策略等待和重试。
+- `ai.IsTransientError(err)` 识别 EOF、网络超时和连接重置等临时传输错误。
+
+一次 `chat` 应只发起一次模型请求；不要在脚本中自行循环重试。完整示例见
+`common/ai/yakscript/example.yak`。

@@ -24,6 +24,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/openai"
 	"github.com/yaklang/yaklang/common/ai/tongyi"
 	"github.com/yaklang/yaklang/common/ai/volcengine"
+	"github.com/yaklang/yaklang/common/ai/yakscript"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -82,6 +83,9 @@ func init() {
 	})
 	aispec.Register("yakit-plugin-search", func() aispec.AIClient {
 		return dashscopebase.CreateDashScopeGateway("e8be1ba351dc44568728bcb46e36aac2")
+	})
+	aispec.Register(yakscript.ProviderType, func() aispec.AIClient {
+		return &yakscript.GatewayClient{}
 	})
 }
 
@@ -489,7 +493,7 @@ func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		}
 		invokeModelInfoCallback(gateway, typ)
 		log.Infof("start to chat completions by %v", typ)
-		responseRsp, err = gateway.Chat(msg)
+		responseRsp, err = aispec.ChatWithGlobalRetry(gateway, msg)
 		if err != nil {
 			log.Warnf("chat by %s failed: %s", typ, err)
 			return false, err
@@ -564,7 +568,7 @@ func chatWithModelConfig(msg string, cfg *ypb.AIModelConfig, opts ...aispec.AICo
 
 	invokeModelInfoCallback(agent, providerType)
 	log.Debugf("Start tiered chat with type=%s", providerType)
-	result, err := agent.Chat(msg)
+	result, err := aispec.ChatWithGlobalRetry(agent, msg)
 	if err != nil {
 		return "", err
 	}
@@ -1092,7 +1096,7 @@ func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.Gener
 			return "", err
 		}
 		invokeModelInfoCallback(gateway, name)
-		result, err := gateway.Chat(msg)
+		result, err := aispec.ChatWithGlobalRetry(gateway, msg)
 		if err != nil {
 			return "", err
 		}
@@ -1111,9 +1115,13 @@ func LoadAiGatewayConfig(name string) (*aispec.AIConfig, error) {
 }
 
 var Exports = map[string]any{
-	"OpenAI":   OpenAI,
-	"ChatGLM":  ChatGLM,
-	"Moonshot": Moonshot,
+	"ReadSSE":          yakscript.ReadSSE,
+	"Retry":            yakscript.Retry,
+	"IsTransientError": yakscript.IsTransientError,
+	"script":           aispec.WithScript,
+	"OpenAI":           OpenAI,
+	"ChatGLM":          ChatGLM,
+	"Moonshot":         Moonshot,
 
 	"Chat":                    Chat,
 	"IntelligentChat":         IntelligentChat,
@@ -1136,6 +1144,7 @@ var Exports = map[string]any{
 	"topK":                           aispec.WithTopK,
 	"frequencyPenalty":               aispec.WithFrequencyPenalty,
 	"timeout":                        aispec.WithTimeout,
+	"networkDebug":                   aispec.WithNetworkDebug,
 	"proxy":                          aispec.WithProxy,
 	"model":                          aispec.WithModel,
 	"apiKey":                         aispec.WithAPIKey,

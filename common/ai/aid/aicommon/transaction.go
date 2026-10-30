@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils"
 )
@@ -103,6 +104,7 @@ func callAITransaction(
 	}
 	var postHandlerErr error
 	var retryCorrectionErr error
+	var outputRecoveryAttempts int
 	var lastErr error
 	var lastCallAiErr error // 保留 API 调用错误，防止被 postHandler 错误覆盖
 	var lastRsp *AIResponse
@@ -260,6 +262,20 @@ func callAITransaction(
 		// 归一化空响应错误，再与 rsp 的回调错误（由 AIChatToAICallbackType 等设置）合并
 		postHandlerErr = normalizeTransactionPostHandlerError(rsp, postHandlerErr)
 		postHandlerErr = mergePostHandlerAndCallbackError(postHandlerErr, rsp.GetError())
+		if postHandlerErr != nil && consts.IsAIRetryForeverEnabled() && rsp.GetError() == nil &&
+			rsp.GetHTTPStatusCode() < 400 && IsModelOutputValidationError(postHandlerErr) {
+			// This path rejects model protocol output before action execution.
+			// Retain only the latest bounded correction, not an unbounded history.
+			rec := recordAttempt(i+1, nil, rsp)
+			rec.PostHandlerErr = postHandlerErr
+			retryCorrectionErr = &retryCorrectionError{cause: postHandlerErr, attempt: rec}
+			bindEmitter(rsp).EmitInfo("模型响应格式不符合要求，等待重新生成；任务仍在运行，可随时停止")
+			outputRecoveryAttempts++
+			if err := waitBeforeAIRetry(transactionCtx, c, aispec.RetryDelay(outputRecoveryAttempts, "", time.Now())); err != nil {
+				return err
+			}
+			continue
+		}
 		if postHandlerErr != nil {
 			lastErr = postHandlerErr
 			i++

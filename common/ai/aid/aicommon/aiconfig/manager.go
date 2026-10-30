@@ -95,11 +95,13 @@ func (m *AIConfigManager) GetFirstConfig(tier consts.ModelTier) *ypb.AIModelConf
 // modelName maps to AIModelConfig.ModelName or the `model` key in ExtraParams.
 // Empty providerName or modelName means no filtering on that dimension.
 func (m *AIConfigManager) GetFirstConfigByTierAndProviderAndModel(tier consts.ModelTier, providerName, modelName string) *ypb.AIModelConfig {
-	configs := m.GetConfigsByTier(tier)
-	if len(configs) == 0 {
-		return nil
-	}
+	return FindModelConfig(m.GetConfigsByTier(tier), providerName, modelName)
+}
 
+// FindModelConfig selects from the supplied configs without loading or changing
+// global configuration. Empty providerName or modelName means no filtering on
+// that dimension, using the same matching rules as the tiered model router.
+func FindModelConfig(configs []*ypb.AIModelConfig, providerName, modelName string) *ypb.AIModelConfig {
 	providerName = strings.TrimSpace(providerName)
 	modelName = strings.TrimSpace(modelName)
 

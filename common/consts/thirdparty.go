@@ -15,25 +15,30 @@ import (
 var thirdPartyConfig = new(sync.Map)
 
 type thirdPartyApplicationConfig struct {
-	Type           string
-	APIKey         string `app:"name:api_key"`
-	UserIdentifier string `app:"name:user_identifier"`
-	UserSecret     string `app:"name:user_secret"`
-	Namespace      string `app:"name:namespace"`
-	Domain         string `app:"name:domain"`
-	BaseURL        string `app:"name:base_url"`
-	Endpoint       string `app:"name:endpoint"`
-	EnableEndpoint bool   `app:"name:enable_endpoint"`
-	EnableThinking bool   `app:"name:enable_thinking"`
-	WebhookURL     string `app:"name:webhook_url"`
-	Proxy          string `app:"name:proxy"`
-	NoHttps        bool   `app:"name:no_https"`
-	APIType        string `app:"name:api_type"`
-	Headers        []*ypb.KVPair
-	ExtraParams    map[string]string
+	Script                  string
+	EnableNativeToolCalling bool
+	Type                    string
+	APIKey                  string `app:"name:api_key"`
+	UserIdentifier          string `app:"name:user_identifier"`
+	UserSecret              string `app:"name:user_secret"`
+	Namespace               string `app:"name:namespace"`
+	Domain                  string `app:"name:domain"`
+	BaseURL                 string `app:"name:base_url"`
+	Endpoint                string `app:"name:endpoint"`
+	EnableEndpoint          bool   `app:"name:enable_endpoint"`
+	EnableThinking          bool   `app:"name:enable_thinking"`
+	WebhookURL              string `app:"name:webhook_url"`
+	Proxy                   string `app:"name:proxy"`
+	NoHttps                 bool   `app:"name:no_https"`
+	APIType                 string `app:"name:api_type"`
+	Headers                 []*ypb.KVPair
+	ExtraParams             map[string]string
 }
 
 func ConvertCompatibleConfig(config *ypb.ThirdPartyApplicationConfig) {
+	if config.GetType() == "yak-script" {
+		return // Script is self-contained; do not flatten connection fields into ExtraParams.
+	}
 	c := &thirdPartyApplicationConfig{
 		Type:           config.Type,
 		APIKey:         config.APIKey,
@@ -117,6 +122,8 @@ func GetCommonThirdPartyApplicationConfig(t string) (*ypb.ThirdPartyApplicationC
 		rawCfg := v.(*thirdPartyApplicationConfig)
 		utils.ImportAppConfigToStruct(rawCfg, rawCfg.ToMap())
 		config := &ypb.ThirdPartyApplicationConfig{}
+		config.Script = rawCfg.Script
+		config.EnableNativeToolCalling = rawCfg.EnableNativeToolCalling
 		config.APIKey = rawCfg.APIKey
 		config.UserIdentifier = rawCfg.UserIdentifier
 		config.UserSecret = rawCfg.UserSecret
@@ -166,22 +173,24 @@ func AllThirdPartyApplicationConfig() []*ypb.ThirdPartyApplicationConfig {
 	thirdPartyConfig.Range(func(key, value interface{}) bool {
 		rawConfig := value.(*thirdPartyApplicationConfig)
 		config := &ypb.ThirdPartyApplicationConfig{
-			Type:           rawConfig.Type,
-			APIKey:         rawConfig.APIKey,
-			UserIdentifier: rawConfig.UserIdentifier,
-			UserSecret:     rawConfig.UserSecret,
-			Namespace:      rawConfig.Namespace,
-			Domain:         rawConfig.Domain,
-			BaseURL:        rawConfig.BaseURL,
-			Endpoint:       rawConfig.Endpoint,
-			EnableEndpoint: rawConfig.EnableEndpoint,
-			EnableThinking: rawConfig.EnableThinking,
-			WebhookURL:     rawConfig.WebhookURL,
-			Proxy:          rawConfig.Proxy,
-			NoHttps:        rawConfig.NoHttps,
-			APIType:        rawConfig.APIType,
-			Headers:        cloneHTTPHeaders(rawConfig.Headers),
-			ExtraParams:    make([]*ypb.KVPair, 0, len(rawConfig.ExtraParams)),
+			Script:                  rawConfig.Script,
+			EnableNativeToolCalling: rawConfig.EnableNativeToolCalling,
+			Type:                    rawConfig.Type,
+			APIKey:                  rawConfig.APIKey,
+			UserIdentifier:          rawConfig.UserIdentifier,
+			UserSecret:              rawConfig.UserSecret,
+			Namespace:               rawConfig.Namespace,
+			Domain:                  rawConfig.Domain,
+			BaseURL:                 rawConfig.BaseURL,
+			Endpoint:                rawConfig.Endpoint,
+			EnableEndpoint:          rawConfig.EnableEndpoint,
+			EnableThinking:          rawConfig.EnableThinking,
+			WebhookURL:              rawConfig.WebhookURL,
+			Proxy:                   rawConfig.Proxy,
+			NoHttps:                 rawConfig.NoHttps,
+			APIType:                 rawConfig.APIType,
+			Headers:                 cloneHTTPHeaders(rawConfig.Headers),
+			ExtraParams:             make([]*ypb.KVPair, 0, len(rawConfig.ExtraParams)),
 		}
 		for k, v := range rawConfig.ExtraParams {
 			config.ExtraParams = append(config.ExtraParams, &ypb.KVPair{Key: k, Value: v})
@@ -206,22 +215,24 @@ func UpdateThirdPartyApplicationConfig(config *ypb.ThirdPartyApplicationConfig) 
 	}
 	ConvertCompatibleConfig(config)
 	c := &thirdPartyApplicationConfig{
-		Type:           config.Type,
-		APIKey:         config.APIKey,
-		UserIdentifier: config.UserIdentifier,
-		UserSecret:     config.UserSecret,
-		Namespace:      config.Namespace,
-		Domain:         config.Domain,
-		BaseURL:        config.BaseURL,
-		Endpoint:       config.Endpoint,
-		EnableEndpoint: config.EnableEndpoint,
-		EnableThinking: config.EnableThinking,
-		WebhookURL:     config.WebhookURL,
-		Proxy:          config.Proxy,
-		NoHttps:        config.NoHttps,
-		APIType:        config.APIType,
-		Headers:        cloneHTTPHeaders(config.Headers),
-		ExtraParams:    make(map[string]string, len(config.ExtraParams)),
+		Script:                  config.GetScript(),
+		EnableNativeToolCalling: config.GetEnableNativeToolCalling(),
+		Type:                    config.Type,
+		APIKey:                  config.APIKey,
+		UserIdentifier:          config.UserIdentifier,
+		UserSecret:              config.UserSecret,
+		Namespace:               config.Namespace,
+		Domain:                  config.Domain,
+		BaseURL:                 config.BaseURL,
+		Endpoint:                config.Endpoint,
+		EnableEndpoint:          config.EnableEndpoint,
+		EnableThinking:          config.EnableThinking,
+		WebhookURL:              config.WebhookURL,
+		Proxy:                   config.Proxy,
+		NoHttps:                 config.NoHttps,
+		APIType:                 config.APIType,
+		Headers:                 cloneHTTPHeaders(config.Headers),
+		ExtraParams:             make(map[string]string, len(config.ExtraParams)),
 	}
 	for _, kv := range config.ExtraParams {
 		c.ExtraParams[kv.Key] = kv.Value
@@ -259,7 +270,15 @@ func applyThirdPartyNonAppFields(target any, source *thirdPartyApplicationConfig
 	if elem.Kind() != reflect.Struct {
 		return nil
 	}
-	field := elem.FieldByName("Headers")
+	field := elem.FieldByName("Script")
+	if field.IsValid() && field.CanSet() && field.Kind() == reflect.String {
+		field.SetString(source.Script)
+	}
+	field = elem.FieldByName("EnableNativeToolCalling")
+	if field.IsValid() && field.CanSet() && field.Kind() == reflect.Bool {
+		field.SetBool(source.EnableNativeToolCalling)
+	}
+	field = elem.FieldByName("Headers")
 	if field.IsValid() && field.CanSet() && field.Type() == reflect.TypeOf([]*ypb.KVPair(nil)) {
 		field.Set(reflect.ValueOf(cloneHTTPHeaders(source.Headers)))
 	}
