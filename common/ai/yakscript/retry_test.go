@@ -1,17 +1,36 @@
 package yakscript
 
 import (
-	"github.com/stretchr/testify/require"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"net/http"
+	"syscall"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
-func TestModelErrorSurvivesWrapper(t *testing.T) {
+func TestRetryHints(t *testing.T) {
+	now := time.Now().UTC().Truncate(time.Second)
+	require.Equal(t, 90*time.Second, parseRetryAfter(" 90 ", now))
+	require.Equal(t, 15*time.Minute, parseRetryAfter(now.Add(15*time.Minute).Format(http.TimeFormat), now))
+	for _, bad := range []string{"", "-1", "invalid", now.Add(-time.Minute).Format(http.TimeFormat)} {
+		require.Zero(t, parseRetryAfter(bad, now))
+	}
 	req := &Request{}
-	require.Error(t, ModelError(req, "http", 429, "busy", "retry later", "900"))
-	f := req.Failure()
-	require.Equal(t, "900", f.RetryAfter)
-	require.Equal(t, 429, f.StatusCode)
-	require.True(t, f.CanRetry())
-	require.Error(t, ModelError(req, "invalid", 0, "", "", ""))
-	require.False(t, req.Failure().CanRetry())
+	require.Error(t, Retry(req, "busy", "900"))
+	require.Equal(t, 15*time.Minute, req.retry.delay)
+	require.Equal(t, "busy", req.retry.reason)
+}
+
+func TestTransientFailureClassification(t *testing.T) {
+	for _, err := range []error{io.EOF, io.ErrUnexpectedEOF, context.DeadlineExceeded, syscall.ECONNRESET} {
+		require.True(t, IsTransientError(fmt.Errorf("request: %w", err)))
+	}
+	for _, err := range []error{nil, context.Canceled, errors.New("unknown business failure")} {
+		require.False(t, IsTransientError(err))
+	}
 }

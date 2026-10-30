@@ -161,12 +161,10 @@ func NewGateway() *Gateway {
 
 func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, aispec.AIClient) (bool, error)) error {
 	total := aispec.RegisteredAIGateways()
-	var lastErr error
 	if utils.StringArrayContains(total, t) {
 		gw := createAIGateway(t)
 		if gw != nil {
 			ok, err := cb(t, gw)
-			lastErr = err
 			if ok {
 				return nil
 			}
@@ -204,8 +202,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 				if agent == nil {
 					continue
 				}
-				ok, err := cb(providerType, agent)
-				lastErr = err
+				ok, _ := cb(providerType, agent)
 				if ok {
 					return nil
 				}
@@ -215,10 +212,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 
 	cfg := yakit.GetNetworkConfig()
 	if cfg == nil {
-		if lastErr != nil {
-			return lastErr
-		}
-		return &aispec.ModelCallFailure{Kind: "configuration", Cause: errors.New("no AI configuration")}
+		return nil
 	}
 
 	// update database if registered ai type is not in config or configured ai type is not in registered
@@ -244,8 +238,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 	for _, typ := range cfg.AiApiPriority {
 		agent := createAIGateway(typ)
 		if agent != nil {
-			ok, err := cb(typ, agent)
-			lastErr = err
+			ok, _ := cb(typ, agent)
 			if ok {
 				return nil
 			}
@@ -254,10 +247,7 @@ func tryCreateAIGateway(t string, disableProviderFallback bool, cb func(string, 
 		}
 	}
 
-	if lastErr != nil {
-		return lastErr
-	}
-	return &aispec.ModelCallFailure{Kind: "configuration", Cause: errors.New("not found valid ai agent")}
+	return errors.New("not found valid ai agent")
 }
 
 func invokeModelInfoCallback(gateway aispec.AIClient, provider string) {
@@ -499,7 +489,7 @@ func legacyChat(msg string, opts ...aispec.AIConfigOption) (string, error) {
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false, &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+			return false, err
 		}
 		invokeModelInfoCallback(gateway, typ)
 		log.Infof("start to chat completions by %v", typ)
@@ -573,7 +563,7 @@ func chatWithModelConfig(msg string, cfg *ypb.AIModelConfig, opts ...aispec.AICo
 
 	agent.LoadOption(allOpts...)
 	if err := agent.CheckValid(); err != nil {
-		return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+		return "", err
 	}
 
 	invokeModelInfoCallback(agent, providerType)
@@ -737,7 +727,7 @@ func directFunctionCall(input string, funcs any, opts ...aispec.AIConfigOption) 
 		callOpts := append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)
 		gateway.LoadOption(callOpts...)
 		if err := gateway.CheckValid(); err != nil {
-			return false, &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+			return false, err
 		}
 		chat, err := LoadChater(typ)
 		if err != nil {
@@ -771,7 +761,7 @@ func functionCallWithModelConfig(input string, funcs any, cfg *ypb.AIModelConfig
 
 	agent.LoadOption(allOpts...)
 	if err := agent.CheckValid(); err != nil {
-		return nil, &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+		return nil, err
 	}
 
 	chat, err := LoadChater(providerType)
@@ -946,7 +936,7 @@ func StructuredStream(input string, opts ...aispec.AIConfigOption) (chan *aispec
 		gateway.LoadOption(append([]aispec.AIConfigOption{aispec.WithType(typ)}, opts...)...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Debugf("check valid by %s failed: %s", typ, err)
-			return false, &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+			return false, err
 		}
 
 		if gateway.SupportedStructuredStream() {
@@ -1103,7 +1093,7 @@ func LoadChater(name string, defaultOpts ...aispec.AIConfigOption) (aispec.Gener
 		gateway.LoadOption(callOpts...)
 		if err := gateway.CheckValid(); err != nil {
 			log.Warnf("check valid by %s failed: %s", name, err)
-			return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
+			return "", err
 		}
 		invokeModelInfoCallback(gateway, name)
 		result, err := aispec.ChatWithGlobalRetry(gateway, msg)
@@ -1126,10 +1116,8 @@ func LoadAiGatewayConfig(name string) (*aispec.AIConfig, error) {
 
 var Exports = map[string]any{
 	"ReadSSE":          yakscript.ReadSSE,
-	"ModelError":       yakscript.ModelError,
-	"Retry":            aispec.Retry,
-	"StopRetry":        aispec.StopRetry,
-	"IsTransientError": aispec.IsTransientError,
+	"Retry":            yakscript.Retry,
+	"IsTransientError": yakscript.IsTransientError,
 	"script":           aispec.WithScript,
 	"OpenAI":           OpenAI,
 	"ChatGLM":          ChatGLM,

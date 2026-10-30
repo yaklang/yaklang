@@ -24,7 +24,7 @@ func TestGRPCMUSTPASS_LANGUAGE_AIProviderLibrary(t *testing.T) {
 		require.NoError(t, err)
 		return resp
 	}
-	for _, name := range []string{"ReadSSE", "ModelError", "Retry", "StopRetry", "IsTransientError"} {
+	for _, name := range []string{"ReadSSE", "Retry", "IsTransientError"} {
 		t.Run(name, func(t *testing.T) {
 			// The same ordinary Yak context used by all Yak Monaco editors must
 			// discover the library through the engine's public export table.

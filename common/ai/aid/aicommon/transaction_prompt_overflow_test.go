@@ -145,16 +145,16 @@ func TestTransactionPromptOverflowWaitsForAsyncCallback(t *testing.T) {
 	require.Equal(t, "async-model", ev.Model)
 }
 
-func TestTransactionPromptOverflowSupersedesEarlierValidationFailure(t *testing.T) {
+func TestTransactionPromptOverflowSupersedesEarlierTransientFailure(t *testing.T) {
 	cfg := newTransactionTestConfig(context.Background())
 	calls := 0
 	err := CallAITransaction(cfg, "large prompt", func(*AIRequest) (*AIResponse, error) {
 		calls++
 		if calls == 1 {
-			return make200Response(), nil
+			return promptOverflowTestResponse(502, `{"error":{"message":"bad gateway"}}`), errors.New("bad gateway")
 		}
 		return promptOverflowTestResponse(400, transactionPromptOverflowBody), nil
-	}, func(*AIResponse) error { require.Equal(t, 1, calls); return errors.New("invalid action") })
+	}, func(*AIResponse) error { t.Error("must not parse provider errors"); return nil })
 	require.ErrorIs(t, err, ErrPromptTooLong)
 	require.Equal(t, 2, calls)
 }

@@ -76,6 +76,12 @@ func (g *modelRequestQueue) acquire(ctx context.Context, notify func(string)) (M
 		rpm, updated := consts.ModelRequestLimit()
 		now := time.Now()
 		next := g.windowReady(now, rpm)
+		// Disabling proactive limiting does not erase already observed cooldown.
+		if rpm == 0 && g.backoff == 0 {
+			remove()
+			g.mu.Unlock()
+			return nil, nil
+		}
 		var timer *time.Timer
 		var ready <-chan time.Time
 		if g.queue[0] == ticket && !g.probeActive {

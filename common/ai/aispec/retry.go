@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 )
 
 // RetryDelay bounds exponential backoff, never the server's Retry-After.
@@ -42,12 +43,19 @@ func WaitModelRetry(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-// ChatWithGlobalRetry executes every provider through the same request policy.
+// ChatWithGlobalRetry is shared by explicit providers and all model tiers,
+// including LiteForge's chatter. Configuration validation happens before here.
+// The opt-in recovery path buffers one attempt's callbacks: failed HTTP bodies,
+// reasoning, partial tool arguments and finish events must not enter an Agent.
+// Yak scripts own their admission queue and retain their stable RequestID.
 func ChatWithGlobalRetry(client AIClient, prompt string) (string, error) {
-	return chatWithRecovery(client, prompt, ModelRetryOptions{})
+	return chatWithGlobalRetry(client, prompt, WaitModelRetry)
 }
 
-func chatWithRecovery(client AIClient, prompt string, policy ModelRetryOptions) (string, error) {
+func chatWithGlobalRetry(client AIClient, prompt string, wait func(context.Context, time.Duration) error) (string, error) {
+	if managed, ok := client.(interface{ ManagesModelRetries() bool }); ok && managed.ManagesModelRetries() {
+		return client.Chat(prompt)
+	}
 	cfg := client.GetConfig()
 	original := *cfg
 	defer func() { *cfg = original }()
@@ -60,18 +68,26 @@ func chatWithRecovery(client AIClient, prompt string, policy ModelRetryOptions) 
 		ctx, cancel = context.WithDeadline(ctx, original.Deadline)
 		defer cancel()
 	}
-	policy.Notify = original.ModelRequestStatus
-	return RunModelCall(ctx, policy, func(attemptCtx context.Context) (string, error) {
+	for attempt := 1; ; attempt++ {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+		reportResult, admissionErr := AcquireModelRequest(ctx, original.ModelRequestStatus)
+		if admissionErr != nil {
+			return "", admissionErr
+		}
 		bufferOutput := consts.IsAIRetryForeverEnabled()
 		*cfg = original
-		// Script source owns its HTTP timeout; keep only the caller deadline.
-		if original.Type != "yak-script" && original.Timeout > 0 {
-			var cancel context.CancelFunc
+		scope := httptrace.GetScope(ctx)
+		scope.Attempt = attempt
+		attemptCtx := httptrace.WithScope(ctx, scope)
+		var cancel context.CancelFunc
+		if original.Timeout > 0 {
 			attemptCtx, cancel = context.WithTimeout(attemptCtx, time.Duration(original.Timeout*float64(time.Second)))
-			defer cancel()
+		} else {
+			attemptCtx, cancel = context.WithCancel(attemptCtx)
 		}
 		cfg.Context = attemptCtx
-
 		var mu sync.Mutex
 		var deliveries []func()
 		var headers []byte
@@ -153,6 +169,7 @@ func chatWithRecovery(client AIClient, prompt string, policy ModelRetryOptions) 
 		if err == nil {
 			err = attemptCtx.Err()
 		}
+		cancel()
 		mu.Lock()
 		if err == nil {
 			err = callbackErr
@@ -170,12 +187,33 @@ func chatWithRecovery(client AIClient, prompt string, policy ModelRetryOptions) 
 			}
 			response.Body.Close()
 		}
-		if err != nil {
-			return "", ClassifyModelFailure(err, status, retryAfter)
+		delay := RetryDelay(attempt, retryAfter, time.Now())
+		if reportResult != nil {
+			transient := err != nil && (bufferOutput || status == 408 || status == 429 || status >= 500)
+			delay = reportResult(err == nil, transient, delay)
 		}
-		for _, deliver := range pending {
-			deliver()
+		if ctx.Err() != nil {
+			return "", ctx.Err()
 		}
-		return text, nil
-	})
+		if err == nil {
+			for _, deliver := range pending {
+				deliver()
+			}
+			return text, nil
+		}
+		if !consts.IsAIRetryForeverEnabled() {
+			return "", err
+		}
+		if original.ModelRequestStatus != nil {
+			original.ModelRequestStatus(fmt.Sprintf("模型调用失败，全局无限重试已开启；%.1f 秒后进行第 %d 次尝试，可随时停止任务", delay.Seconds(), attempt+1))
+		}
+		if reportResult == nil {
+			if err := wait(ctx, delay); err != nil {
+				return "", err
+			}
+		}
+		if !consts.IsAIRetryForeverEnabled() {
+			return "", err
+		}
+	}
 }

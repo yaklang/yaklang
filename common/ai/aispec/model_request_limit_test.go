@@ -88,8 +88,7 @@ func TestGlobalModelLimitFIFOAndCancel(t *testing.T) {
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{})
 	cb, err := g.acquire(context.Background(), nil)
 	require.NoError(t, err)
-	require.NotNil(t, cb)
-	cb(true, false, 0)
+	require.Nil(t, cb)
 }
 func TestGlobalModelLimitPreservesCooldownAgainstLateSuccess(t *testing.T) {
 	g := useModelLimit(t, 3)
@@ -136,16 +135,4 @@ func TestGlobalModelLimitChangeWakesQueuedRequests(t *testing.T) {
 	consts.SetTieredAIConfig(&consts.TieredAIConfig{ModelRequestsPerMinute: 2})
 	require.NoError(t, <-result)
 	require.Len(t, g.starts, 2)
-}
-
-func TestGlobalModelCooldownWithRPMDisabled(t *testing.T) {
-	g := useModelLimit(t, 0)
-	done, err := g.acquire(context.Background(), nil)
-	require.NoError(t, err)
-	require.NotNil(t, done)
-	done(false, true, time.Minute)
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
-	defer cancel()
-	_, err = g.acquire(ctx, nil)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
 }

@@ -8,41 +8,80 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/consts"
 )
+
+func TestProviderFailureQuotaPreservesCauseAndRetryBudgets(t *testing.T) {
+	for _, detached := range []bool{true, false} {
+		t.Run(fmt.Sprint(detached), func(t *testing.T) {
+			cfg := NewTestConfig(context.Background())
+			cfg.AiAutoRetry = 3
+			cfg.aiRetryWaitFunc = func(context.Context, time.Duration) error { return nil }
+			calls := 0
+			callback := cfg.wrapper(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) {
+				calls++
+				rsp := NewUnboundAIResponse()
+				rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 429 Too Many Requests\r\n\r\n"), []byte(`{"error":{"message":"Rate limit exceeded: free-models-per-day"}}`))
+				return rsp, nil
+			}, consts.TierIntelligent)
+			tc := newTransactionTestConfig(context.Background())
+			tc.retryMax = 3
+			tc.retryWait = cfg.aiRetryWaitFunc
+			err := CallAITransaction(tc, "quota", func(req *AIRequest) (*AIResponse, error) {
+				req.SetDetachCheckpoint(detached)
+				return callback(cfg, req)
+			}, func(*AIResponse) error { t.Fatal("quota must not reach model parser"); return nil })
+			require.ErrorContains(t, err, "free-models-per-day")
+			require.NotContains(t, err.Error(), "%!w")
+			require.Equal(t, 9, calls)
+		})
+	}
+}
 
 func TestProviderFailureIndependentRetryBudgets(t *testing.T) {
 	cfg := NewTestConfig(context.Background())
 	cfg.AiAutoRetry = 3
 	cfg.aiRetryWaitFunc = func(context.Context, time.Duration) error { return nil }
 	calls := 0
-	callback := cfg.wrapper(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) {
-		calls++
-		return nil, &aispec.ModelCallFailure{Kind: "protocol", Cause: io.ErrUnexpectedEOF}
-	}, consts.TierIntelligent)
+	callback := cfg.wrapper(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) { calls++; return nil, io.ErrUnexpectedEOF }, consts.TierIntelligent)
 	tc := newTransactionTestConfig(context.Background())
 	tc.retryMax = 5
 	tc.retryWait = cfg.aiRetryWaitFunc
 	err := CallAITransaction(tc, "stream", func(req *AIRequest) (*AIResponse, error) { req.SetDetachCheckpoint(true); return callback(cfg, req) }, func(*AIResponse) error { return nil })
 	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	require.Equal(t, 3, calls)
+	require.Equal(t, 15, calls)
 }
 
-func TestProviderFailureAsyncStreamIsNotAgentValidation(t *testing.T) {
-	cfg := newTransactionTestConfig(context.Background())
-	cfg.retryMax = 3
-	calls := 0
-	err := CallAITransaction(cfg, "stream", func(*AIRequest) (*AIResponse, error) {
-		calls++
-		rsp := NewAIResponse(nil)
-		rsp.SetError(io.ErrUnexpectedEOF)
-		rsp.Close()
-		return rsp, nil
-	}, func(*AIResponse) error { t.Fatal("incomplete stream must not enter action parsing"); return nil })
-	require.ErrorIs(t, err, io.ErrUnexpectedEOF)
-	require.Equal(t, 1, calls)
-	require.NotContains(t, err.Error(), "missing action")
+func TestProviderFailureAsyncStreamRetryBound(t *testing.T) {
+	for _, recover := range []bool{true, false} {
+		t.Run(fmt.Sprint(recover), func(t *testing.T) {
+			cfg := newTransactionTestConfig(context.Background())
+			cfg.retryMax = 3
+			cfg.retryWait = func(context.Context, time.Duration) error { return nil }
+			calls := 0
+			err := CallAITransaction(cfg, "stream", func(*AIRequest) (*AIResponse, error) {
+				calls++
+				rsp := NewAIResponse(nil)
+				if !recover || calls == 1 {
+					rsp.SetError(io.ErrUnexpectedEOF)
+				}
+				rsp.Close()
+				return rsp, nil
+			}, func(rsp *AIResponse) error {
+				if rsp.GetError() != nil {
+					return fmt.Errorf("missing action")
+				}
+				return nil
+			})
+			if recover {
+				require.NoError(t, err)
+				require.Equal(t, 2, calls)
+			} else {
+				require.ErrorIs(t, err, io.ErrUnexpectedEOF)
+				require.Equal(t, 3, calls)
+			}
+		})
+	}
 }
 
 func TestProviderFailureQuotaWithoutRequestWrapper(t *testing.T) {
@@ -58,10 +97,10 @@ func TestProviderFailureQuotaWithoutRequestWrapper(t *testing.T) {
 		return rsp, nil
 	}, func(*AIResponse) error { t.Fatal("quota is not model output"); return nil })
 	require.ErrorContains(t, err, "free-models-per-day")
-	require.Equal(t, 1, calls)
+	require.Equal(t, 5, calls)
 }
 
-func TestProviderFailureHTTPPreservesTransportCause(t *testing.T) {
+func TestProviderFailure429PreservesTransportCause(t *testing.T) {
 	for _, mode := range []string{"direct", "detached", "checkpoint"} {
 		for _, responseError := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/responseError=%v", mode, responseError), func(t *testing.T) {
@@ -70,7 +109,7 @@ func TestProviderFailureHTTPPreservesTransportCause(t *testing.T) {
 				cfg.aiRetryWaitFunc = func(context.Context, time.Duration) error { return nil }
 				cb := AICallbackType(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) {
 					rsp := NewAIResponse(nil)
-					rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 401 Unauthorized\r\n\r\n"), []byte(`{"error":{"message":"daily quota"}}`))
+					rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 429 Too Many Requests\r\n\r\n"), []byte(`{"error":{"message":"daily quota"}}`))
 					if responseError {
 						rsp.SetError(io.ErrUnexpectedEOF)
 					}

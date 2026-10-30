@@ -1,5 +1,61 @@
 package aicommon
 
+import (
+	"context"
+	"encoding/json"
+	"sync"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/yaklang/yaklang/common/schema"
+)
+
+func newTestConfigForHandle429WithEvents(ctx context.Context) (*Config, func() []*schema.AiOutputEvent) {
+	var mu sync.Mutex
+	events := make([]*schema.AiOutputEvent, 0)
+	emitter := NewEmitter("test-429", func(e *schema.AiOutputEvent) (*schema.AiOutputEvent, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		events = append(events, e)
+		return e, nil
+	})
+	return &Config{
+			Ctx:     ctx,
+			Emitter: emitter,
+		}, func() []*schema.AiOutputEvent {
+			mu.Lock()
+			defer mu.Unlock()
+			return append([]*schema.AiOutputEvent(nil), events...)
+		}
+}
+
+func newTestConfigForHandle429(ctx context.Context) *Config {
+	cfg, _ := newTestConfigForHandle429WithEvents(ctx)
+	return cfg
+}
+
+func collectEvents(cfg *Config) []*schema.AiOutputEvent {
+	cfg.Emitter.WaitForStream()
+	return nil
+}
+
+func requireNotifyPayload(t *testing.T, events []*schema.AiOutputEvent) map[string]any {
+	t.Helper()
+	for _, event := range events {
+		if event.Type != schema.EVENT_TYPE_NOTIFY {
+			continue
+		}
+		var payload map[string]any
+		require.NoError(t, json.Unmarshal(event.Content, &payload))
+		return payload
+	}
+	t.Fatalf("notify event not found in %d events", len(events))
+	return nil
+}
+
 func make429Response(headers ...string) *AIResponse {
 	header := "HTTP/1.1 429 Too Many Requests\r\n"
 	for _, h := range headers {
@@ -8,7 +64,6 @@ func make429Response(headers ...string) *AIResponse {
 	header += "\r\n"
 	rsp := NewUnboundAIResponse()
 	rsp.SetRawHTTPResponseData([]byte(header), []byte(`{"error":"rate limited"}`))
-	rsp.Close()
 	return rsp
 }
 
@@ -18,6 +73,352 @@ func make200Response() *AIResponse {
 		[]byte("HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"),
 		[]byte(`{"choices":[]}`),
 	)
-	rsp.Close()
 	return rsp
+}
+
+func TestHandle429_NilResponse(t *testing.T) {
+	cfg := newTestConfigForHandle429(context.Background())
+	is429, _, ctxDone := cfg.handle429RateLimit(nil)
+	assert.False(t, is429)
+	assert.False(t, ctxDone)
+}
+
+func TestHandle429_Non429StatusCode(t *testing.T) {
+	cfg := newTestConfigForHandle429(context.Background())
+
+	rsp200 := make200Response()
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp200)
+	assert.False(t, is429)
+	assert.False(t, ctxDone)
+
+	rsp500 := NewUnboundAIResponse()
+	rsp500.SetRawHTTPResponseData(
+		[]byte("HTTP/1.1 500 Internal Server Error\r\n\r\n"),
+		nil,
+	)
+	is429, _, ctxDone = cfg.handle429RateLimit(rsp500)
+	assert.False(t, is429)
+	assert.False(t, ctxDone)
+}
+
+func TestHandle429_Generic429_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := make429Response()
+
+	start := time.Now()
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	elapsed := time.Since(start)
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	assert.Less(t, elapsed, 2*time.Second, "should return immediately when context is already cancelled")
+}
+
+func TestHandle429_AIBalance_ParseableQueue_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := make429Response("X-AIBalance-Info: 3")
+
+	start := time.Now()
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	elapsed := time.Since(start)
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	assert.Less(t, elapsed, 2*time.Second, "should return immediately on cancelled context")
+}
+
+func TestHandle429_AIBalance_UnparseableQueue_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := make429Response("X-AIBalance-Info: abc")
+
+	start := time.Now()
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	elapsed := time.Since(start)
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	assert.Less(t, elapsed, 2*time.Second, "should return immediately on cancelled context")
+}
+
+func TestHandle429_AIBalance_ZeroQueue_ContextCancelled(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := make429Response("X-AIBalance-Info: 0")
+
+	start := time.Now()
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	elapsed := time.Since(start)
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+	assert.Less(t, elapsed, 2*time.Second)
+}
+
+func TestHandle429_AIBalance_EmitsNotifyEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	rsp := make429Response("X-AIBalance-Info: 2")
+
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+
+	payload := requireNotifyPayload(t, snapshot())
+	require.Equal(t, "rate_limited", payload["type"])
+	require.Equal(t, "rate_limited", payload["warning_type"])
+	require.Contains(t, payload["content"], "此刻有 2 位用户正在与我深度对话中")
+	require.Equal(t, float64(6), payload["duration"])
+	require.Equal(t, float64(6000), payload["duration_ms"])
+	require.Equal(t, float64(6), payload["duration_seconds"])
+}
+
+func TestHandle429_Generic429_EmitsNotifyEvent(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+	// make429Response() has no Retry-After → quota-exceeded notify type
+	rsp := make429Response()
+
+	is429, _, ctxDone := cfg.handle429RateLimit(rsp)
+	cfg.Emitter.WaitForStream()
+
+	assert.True(t, is429)
+	assert.True(t, ctxDone)
+
+	payload := requireNotifyPayload(t, snapshot())
+	// No Retry-After → quota-exceeded type
+	require.Equal(t, "quota_exceeded", payload["type"])
+	require.Equal(t, "quota_exceeded", payload["warning_type"])
+	require.Contains(t, payload["content"], "HTTP 429")
+	require.GreaterOrEqual(t, payload["duration"].(float64), float64(5))
+	require.LessOrEqual(t, payload["duration"].(float64), float64(15))
+}
+
+func TestHandle429_Generic429_WaitsWhenContextAlive(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	var waits []time.Duration
+	require.NoError(t, WithAIRetryWaitFunc(func(ctx context.Context, delay time.Duration) error {
+		waits = append(waits, delay)
+		return ctx.Err()
+	})(cfg))
+	rsp := make429Response()
+
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
+
+	assert.True(t, is429)
+	assert.False(t, shouldRetry, "a generic 429 without Retry-After must not auto-retry")
+	assert.False(t, ctxDone)
+	require.Len(t, waits, 1)
+	require.GreaterOrEqual(t, waits[0], 5*time.Second)
+	require.LessOrEqual(t, waits[0], 15*time.Second, "generic cooldown must include bounded jitter")
+}
+
+func TestHandle429_AIBalance_ParseableQueue_WaitDuration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	var waits []time.Duration
+	require.NoError(t, WithAIRetryWaitFunc(func(ctx context.Context, delay time.Duration) error {
+		waits = append(waits, delay)
+		return ctx.Err()
+	})(cfg))
+	rsp := make429Response("X-AIBalance-Info: 1")
+
+	is429, shouldRetry, ctxDone := cfg.handle429RateLimit(rsp)
+
+	assert.True(t, is429)
+	assert.True(t, shouldRetry)
+	assert.False(t, ctxDone)
+	require.Equal(t, []time.Duration{5 * time.Second}, waits, "queue=1 => waitSec=max(3,5)=5")
+}
+
+func TestWait429_DefaultWait(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cfg := newTestConfigForHandle429(ctx)
+	start := time.Now()
+	require.False(t, cfg.wait429(ctx, 20*time.Millisecond))
+	require.GreaterOrEqual(t, time.Since(start), 20*time.Millisecond, "the default waiter must still honor cooldowns")
+}
+
+func TestHandle429_ContextCancelDuringSleep(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := make429Response("X-AIBalance-Info: 100")
+
+	done := make(chan struct{})
+	var is429, _, ctxDone bool
+	go func() {
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		assert.True(t, is429)
+		assert.True(t, ctxDone, "should detect context cancellation")
+	case <-time.After(3 * time.Second):
+		t.Fatal("handle429RateLimit did not return after context cancellation")
+	}
+}
+
+func TestHandle429_AsyncHeaderSet_429Detected(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan struct{})
+	var is429, _, ctxDone bool
+	go func() {
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	header429 := "HTTP/1.1 429 Too Many Requests\r\nX-AIBalance-Info: 2\r\n\r\n"
+	rsp.SetRawHTTPResponseData([]byte(header429), []byte(`{"error":"rate limited"}`))
+
+	time.Sleep(200 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		assert.True(t, is429, "should detect 429 even when headers arrive asynchronously")
+		assert.True(t, ctxDone, "should exit via context cancel during wait")
+	case <-time.After(5 * time.Second):
+		t.Fatal("handle429RateLimit blocked too long after async header set")
+	}
+}
+
+func TestHandle429_AsyncHeaderSet_Non429(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan struct{})
+	var is429, _, ctxDone bool
+	go func() {
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	header200 := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n"
+	rsp.SetRawHTTPResponseData([]byte(header200), []byte(`{"choices":[]}`))
+
+	select {
+	case <-done:
+		assert.False(t, is429, "should not detect 429 for 200 response")
+		assert.False(t, ctxDone)
+	case <-time.After(3 * time.Second):
+		t.Fatal("handle429RateLimit blocked too long")
+	}
+}
+
+func TestHandle429_ContextCancelBeforeHeaders(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cfg := newTestConfigForHandle429(ctx)
+	rsp := NewUnboundAIResponse()
+
+	done := make(chan struct{})
+	var is429, _, ctxDone bool
+	go func() {
+		is429, _, ctxDone = cfg.handle429RateLimit(rsp)
+		close(done)
+	}()
+
+	time.Sleep(100 * time.Millisecond)
+	cancel()
+
+	select {
+	case <-done:
+		assert.False(t, is429, "should not detect 429 when context cancelled before headers")
+		assert.True(t, ctxDone)
+	case <-time.After(3 * time.Second):
+		t.Fatal("handle429RateLimit did not return after context cancellation")
+	}
+}
+
+// requireNotifyEvent 返回第一个 notify 事件，便于断言 NodeId 等 meta 字段。
+func requireNotifyEvent(t *testing.T, events []*schema.AiOutputEvent) *schema.AiOutputEvent {
+	t.Helper()
+	for _, event := range events {
+		if event.Type == schema.EVENT_TYPE_NOTIFY {
+			return event
+		}
+	}
+	t.Fatalf("notify event not found in %d events", len(events))
+	return nil
+}
+
+// TestHandle429_NotifyNodeIdIsEnglishEnum 验证 429 通知事件的 NodeId 使用英文
+// 稳定枚举标识（而非中文字符串），以便 schema.NodeIdAndTypeToI18n 正确翻译。
+func TestHandle429_NotifyNodeIdIsEnglishEnum(t *testing.T) {
+	t.Run("rate_limited", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+		rsp := make429ResponseWithBody(
+			[]string{"Retry-After: 10"},
+			`{"error":{"message":"too many requests"}}`,
+		)
+		_, _, _ = cfg.handle429RateLimit(rsp)
+		cfg.Emitter.WaitForStream()
+
+		event := requireNotifyEvent(t, snapshot())
+		// NodeId 应为英文枚举，而非中文
+		require.Equal(t, "rate_limited", event.NodeId)
+
+		// i18n 翻译应返回中英双语
+		i18n := schema.NodeIdAndTypeToI18n(event.NodeId, event.Type, event.IsStream)
+		require.NotNil(t, i18n)
+		require.Equal(t, "限流", i18n.Zh)
+		require.Equal(t, "Rate Limited", i18n.En)
+	})
+
+	t.Run("quota_exceeded", func(t *testing.T) {
+		ctx, cancel := context.WithCancel(context.Background())
+		cancel()
+		cfg, snapshot := newTestConfigForHandle429WithEvents(ctx)
+		// 无 Retry-After → quota_exceeded
+		rsp := make429ResponseWithBody(
+			nil,
+			`{"error":{"message":"token exhausted"}}`,
+		)
+		_, _, _ = cfg.handle429RateLimit(rsp)
+		cfg.Emitter.WaitForStream()
+
+		event := requireNotifyEvent(t, snapshot())
+		require.Equal(t, "quota_exceeded", event.NodeId)
+
+		i18n := schema.NodeIdAndTypeToI18n(event.NodeId, event.Type, event.IsStream)
+		require.NotNil(t, i18n)
+		require.Equal(t, "额度耗尽", i18n.Zh)
+		require.Equal(t, "Quota Exceeded", i18n.En)
+	})
 }

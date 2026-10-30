@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
 
@@ -48,22 +47,7 @@ func TestProviderStreamHTTPTruncationBounded(t *testing.T) {
 			cfg, captured := newHTTPFailureEmitHarness(t, callback)
 			cfg.retryMax = 3
 			cfg.retryWait = func(context.Context, time.Duration) error { return nil }
-			// This harness bypasses Config.wrapper. Put its HTTP attempts through
-			// the real request executor: the Agent budget now only retries validation.
-			call := func(req *AIRequest) (*AIResponse, error) {
-				return aispec.RunModelCall(cfg.GetContext(), aispec.ModelRetryOptions{MaxAttempts: 3, Wait: cfg.retryWait}, func(ctx context.Context) (*AIResponse, error) {
-					req.ctx = ctx
-					rsp, err := cfg.CallAI(req)
-					if err == nil && rsp != nil {
-						if !rsp.WaitForCallbackDone(ctx) {
-							return rsp, ctx.Err()
-						}
-						err = rsp.GetError()
-					}
-					return rsp, err
-				})
-			}
-			err = CallAITransaction(cfg, "stream truncation", call, func(rsp *AIResponse) error {
+			err = CallAITransaction(cfg, "stream truncation", cfg.CallAI, func(rsp *AIResponse) error {
 				data, readErr := io.ReadAll(rsp.GetOutputStreamReader("test", false, cfg.GetEmitter()))
 				if readErr != nil {
 					return readErr

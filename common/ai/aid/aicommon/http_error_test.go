@@ -42,6 +42,6 @@ func TestAIHTTPResponseBodyAlreadyDecoded(t *testing.T) {
 	rsp := NewAIResponse(nil)
 	defer rsp.Close()
 	rsp.SetRawHTTPResponseData([]byte("HTTP/1.1 429 Error\r\nTransfer-Encoding: chunked\r\n\r\n"), []byte(`{"error":{"message":"quota"}}`))
-	require.Contains(t, aiHTTPResponseError(rsp).Error(), "quota")
+	require.Equal(t, "quota", parse429Body(rsp).Error.Message)
 	require.EqualError(t, aiHTTPResponseError(rsp), "AI provider returned HTTP 429: quota")
 }

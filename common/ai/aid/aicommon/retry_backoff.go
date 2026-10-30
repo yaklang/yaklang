@@ -83,3 +83,13 @@ func (c *Config) waitBeforeAIRetry(ctx context.Context, delay time.Duration) err
 	}
 	return waitBeforeAIRetryDefault(ctx, delay)
 }
+
+func (c *Config) waitBeforeNextAIRequestRetry(ctx context.Context, err error, failedAttempt, maxAttempts int) error {
+	if failedAttempt >= maxAttempts {
+		c.EmitWarning("ai request err: %v, retry auto time: [%v/%v]", err, failedAttempt, maxAttempts)
+		return nil
+	}
+	retryDelay := aiRetryBackoff(int64(failedAttempt))
+	c.EmitWarning("ai request err: %v, retry auto time: [%v/%v], retrying in %s", err, failedAttempt, maxAttempts, retryDelay)
+	return waitBeforeAIRetry(ctx, c, retryDelay)
+}

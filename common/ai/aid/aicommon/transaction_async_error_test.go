@@ -82,7 +82,8 @@ func TestCallAITransaction_AsyncCallbackErrorSurfacesOverParseFailure(t *testing
 
 	assert.True(t, strings.Contains(errMsg, "context deadline exceeded"),
 		"expected timeout error to surface, got: %s", errMsg)
-	assert.NotContains(t, errMsg, "action type is empty", "transport failure must bypass action parsing")
+	assert.True(t, strings.Contains(errMsg, "action type is empty"),
+		"parse error should remain as context, got: %s", errMsg)
 }
 
 func TestAIResponse_WaitForCallbackDone(t *testing.T) {

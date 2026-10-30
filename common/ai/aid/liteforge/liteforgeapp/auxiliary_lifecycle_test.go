@@ -153,7 +153,7 @@ func TestPR5128_AuxiliaryLifecycle_ErrorWhileParentAlive(t *testing.T) {
 				response.EmitOutputStream(strings.NewReader(`{"@action":"wrong","text":"ignored"}`))
 				response.Close()
 				return response, nil
-			}, aicommon.WithEnableFunctionCallMode(false), aicommon.WithAIAutoRetry(2), aicommon.WithAITransactionAutoRetry(2))
+			}, aicommon.WithEnableFunctionCallMode(false), aicommon.WithAITransactionAutoRetry(2))
 			label := "error-" + failure
 			baseEvents, baseHotpatches, _ := pr5128LabeledLoops(t, label)
 			var gotError error
