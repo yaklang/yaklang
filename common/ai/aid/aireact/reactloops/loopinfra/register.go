@@ -5,6 +5,11 @@ import (
 )
 
 func init() {
+	reactloops.RegisterAction(loadUIComponentsAction)
+	reactloops.RegisterAction(searchUIComponentsAction)
+	reactloops.RegisterAction(renderUIAction)
+	reactloops.RegisterAction(userQuestionsAction(false))
+	loopAction_AskForClarification.ClientQuestionsAction = userQuestionsAction(true)
 	reactloops.RegisterAction(loopAction_toolRequireAndCall)
 	reactloops.RegisterAction(loopAction_directlyCallTool)
 	reactloops.RegisterAction(loopAction_AskForClarification)

@@ -120,6 +120,10 @@ type ReActLoop struct {
 	// provider accepted. Overflow compression rebuilds only through this ID.
 	lastFittingTimelineThroughID *int64
 
+	// Task-local model projection. Never persist full UI definitions in history.
+	uiComponentsMu sync.Mutex
+	uiComponents   *uiComponentView
+
 	// Lazily bound to the owning task; guarded by onReleaseMutex.
 	// Direct calls and individual batch children can dispatch asynchronously.
 	asyncExecutionManager      *asyncexecmanager.Manager
@@ -337,6 +341,7 @@ func (r *ReActLoop) Release() {
 	if r == nil {
 		return
 	}
+	r.clearUIComponents()
 	r.shutdownSubAgents()
 	r.onReleaseMutex.Lock()
 	if r.released {
@@ -458,12 +463,16 @@ func (r *ReActLoop) getRenderValues() (string, map[string]any, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	if r.allowUserInteract != nil && r.allowUserInteract() {
-		info["AllowAskForClarification"] = true
-	} else {
-		info["AllowAskForClarification"] = false
+	info["AllowAskForClarification"] = r.CheckClarificationAllowed(false) == nil
+	info["AllowBlockingClarification"] = r.CheckClarificationAllowed(true) == nil
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok {
+		info["StructuredQuestions"] = cfg.UIQuestionsEnabled()
+		info["AllowAskForClarification"] = r.CheckClarificationAllowed(true) == nil || (cfg.UIQuestionsEnabled() && r.CheckClarificationAllowed(false) == nil)
+		info["AskForClarificationCurrentTime"], info["AskForClarificationMaxTimes"] = cfg.ClarificationUsage(r.clarificationTaskID())
+		if catalog := cfg.UICatalog(); len(catalog.Components) > 0 {
+			info["UIComponentIndex"] = catalog.PromptIndex()
+		}
 	}
-	info["AskForClarificationCurrentTime"] = r.GetInt("ask_for_clarification_call_count")
 
 	allowPlanRaw, ok := info["AllowPlan"]
 	if ok && utils.InterfaceToBoolean(allowPlanRaw) {
@@ -525,6 +534,9 @@ func (r *ReActLoop) SetCurrentTask(t aicommon.AIStatefulTask) {
 	r.ensureTaskMutex()
 	r.taskMutex.Lock()
 	defer r.taskMutex.Unlock()
+	if r.currentTask == nil || r.currentTask.GetId() != t.GetId() {
+		r.clearUIComponents()
+	}
 	r.currentTask = t
 	t.SetReActLoop(r)
 	// Also set on invoker to keep task state centralized
@@ -866,10 +878,30 @@ func NewReActLoop(name string, invoker aicommon.AIInvokeRuntime, options ...ReAc
 		if err != nil {
 			return nil, err
 		}
+		if cfg, ok := r.GetConfig().(*aicommon.Config); ok && cfg.UIQuestionsEnabled() {
+			if ac.ClientQuestionsAction != nil {
+				ac = ac.ClientQuestionsAction
+			}
+			async, err := requireRegisteredLoopAction("ask_for_clarification_async", "structured user interaction enabled")
+			if err != nil {
+				return nil, err
+			}
+			r.actions.Set(async.ActionType, async)
+		}
 		r.actions.Set(ac.ActionType, ac)
 	}
 
-	// Register skills actions conditionally
+	// UI schemas are loaded on demand; the complete catalog remains in Config.
+	if cfg, ok := r.GetConfig().(*aicommon.Config); ok && len(cfg.UICatalog().Components) > 0 {
+		for _, name := range []string{"load_ui_components", "search_ui_components", "render_ui"} {
+			action, err := requireRegisteredLoopAction(name, "client UI catalog available")
+			if err != nil {
+				return nil, err
+			}
+			r.actions.Set(action.ActionType, action)
+		}
+	}
+
 	if r.skillsContextManager != nil {
 		if r.allowSkillLoading == nil || r.allowSkillLoading() {
 			loadSkill, err := requireRegisteredLoopAction(schema.AI_REACT_LOOP_ACTION_LOADING_SKILLS, "registered skills are available")
@@ -1002,7 +1034,7 @@ func (r *ReActLoop) FinishAsyncTask(t aicommon.AIStatefulTask, err error) {
 }
 
 func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
-	if !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+	if !r.actionAllowed(actionName) {
 		return nil, utils.Errorf("action[%s] denied by runtime policy", actionName)
 	}
 	ac, ok := r.actions.Get(actionName)
@@ -1023,12 +1055,12 @@ func (r *ReActLoop) GetActionHandler(actionName string) (*LoopAction, error) {
 func (r *ReActLoop) GetAllActionNames() []string {
 	var actionNames []string
 	for _, name := range r.actions.Keys() {
-		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, name) {
+		if r.actionAllowed(name) {
 			actionNames = append(actionNames, name)
 		}
 	}
 	for _, actionName := range r.loopActions.Keys() {
-		if !r.actions.Have(actionName) && aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		if !r.actions.Have(actionName) && r.actionAllowed(actionName) {
 			actionNames = append(actionNames, actionName)
 		}
 	}
@@ -1042,12 +1074,12 @@ func (r *ReActLoop) NoActions() bool {
 func (r *ReActLoop) GetAllActions() []*LoopAction {
 	var actions []*LoopAction
 	for _, action := range r.actions.Values() {
-		if aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, action.ActionType) {
+		if r.actionAllowed(action.ActionType) {
 			actions = append(actions, r.actionForProtocol(action))
 		}
 	}
 	for _, actionName := range r.loopActions.Keys() {
-		if r.actions.Have(actionName) || !aicommon.IsReActActionAllowed(r.GetConfig(), r.loopName, actionName) {
+		if r.actions.Have(actionName) || !r.actionAllowed(actionName) {
 			continue
 		}
 		actionFac, ok := r.loopActions.Get(actionName)

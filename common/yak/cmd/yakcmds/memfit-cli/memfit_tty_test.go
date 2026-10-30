@@ -156,6 +156,30 @@ func TestMemfitTTYCommandsAndErrorRecoverySnapshot(t *testing.T) {
 	h.AssertSnapshot("commands-error-recovery")
 }
 
+func TestMemfitTTYSnapshotWaitsForCompleteFrame(t *testing.T) {
+	t.Setenv("YAK_MEMFIT_UPDATE_TTY_GOLDEN", "")
+	golden, err := os.ReadFile(filepath.Join("testdata", "tty", "commands-error-recovery.golden"))
+	require.NoError(t, err)
+	frame := strings.TrimSuffix(strings.ReplaceAll(string(golden), "\r\n", "\n"), "\n")
+	footer := strings.LastIndex(frame, "\n") + 1
+	h := &memfitTTYHarness{t: t, screen: newMemfitTestScreen(68, 28)}
+	h.screen.Write([]byte(strings.ReplaceAll(frame[:footer], "\n", "\r\n")))
+	require.NotContains(t, h.screen.Snapshot(), "○ Ready")
+
+	// A PTY can deliver the transcript and composer before the final footer.
+	// The snapshot must wait for that remaining output without changing the golden.
+	done := make(chan struct{})
+	t.Cleanup(func() { <-done })
+	go func() {
+		defer close(done)
+		time.Sleep(50 * time.Millisecond)
+		h.mu.Lock()
+		h.screen.Write([]byte(frame[footer:]))
+		h.mu.Unlock()
+	}()
+	h.AssertSnapshot("commands-error-recovery")
+}
+
 func TestMemfitTTYMultilineStreamReturnsToColumnZero(t *testing.T) {
 	h := newMemfitTTYHarness(t, 60, 14)
 	defer h.Close()
@@ -768,10 +792,11 @@ func (h *memfitTTYHarness) WaitForScreen(wants ...string) string {
 
 func (h *memfitTTYHarness) AssertSnapshot(name string) {
 	h.t.Helper()
-	h.mu.Lock()
-	got := h.screen.Snapshot()
-	h.mu.Unlock()
-	assertMemfitTTYGolden(h.t, name, got)
+	assertMemfitTTYGolden(h.t, name, func() string {
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		return h.screen.Snapshot()
+	})
 }
 
 func (h *memfitTTYHarness) Raw() string {
@@ -798,9 +823,11 @@ func (h *memfitTTYHarness) Close() {
 	_ = h.pty.Close()
 }
 
-func assertMemfitTTYGolden(t *testing.T, name, got string) {
+func assertMemfitTTYGolden(t *testing.T, name string, snapshot func() string) {
 	t.Helper()
-	got = regexp.MustCompile(`\b\d+(?:\.\d+)?(?:ms|s)\b`).ReplaceAllString(got, "<elapsed>")
+	elapsed := regexp.MustCompile(`\b\d+(?:\.\d+)?(?:ms|s)\b`)
+	readSnapshot := func() string { return elapsed.ReplaceAllString(snapshot(), "<elapsed>") }
+	got := readSnapshot()
 	path := filepath.Join("testdata", "tty", name+".golden")
 	if os.Getenv("YAK_MEMFIT_UPDATE_TTY_GOLDEN") == "1" {
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
@@ -808,8 +835,16 @@ func assertMemfitTTYGolden(t *testing.T, name, got string) {
 	}
 	want, err := os.ReadFile(path)
 	require.NoError(t, err, "run with YAK_MEMFIT_UPDATE_TTY_GOLDEN=1 to create terminal snapshots")
-	wantText := strings.ReplaceAll(string(want), "\r\n", "\n")
-	require.Equal(t, strings.TrimSuffix(wantText, "\n"), got)
+	wantText := strings.TrimSuffix(strings.ReplaceAll(string(want), "\r\n", "\n"), "\n")
+	// Seeing a transcript marker does not mean the PTY has delivered the whole
+	// redraw. Wait for the exact expected screen; a persistent mismatch still
+	// fails below with the full diff, using the same timeout as WaitForScreen.
+	deadline := time.Now().Add(4 * time.Second)
+	for got != wantText && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+		got = readSnapshot()
+	}
+	require.Equal(t, wantText, got)
 	if artifactDir := os.Getenv("YAK_MEMFIT_TTY_ARTIFACT_DIR"); artifactDir != "" {
 		require.NoError(t, os.MkdirAll(artifactDir, 0o755))
 		require.NoError(t, os.WriteFile(filepath.Join(artifactDir, name+".txt"), []byte(got+"\n"), 0o644))

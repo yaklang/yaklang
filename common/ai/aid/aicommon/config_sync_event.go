@@ -434,6 +434,7 @@ func (c *Config) HandleSyncMemoryContextEvent(event *ypb.AIInputEvent) error {
 }
 
 func (c *Config) RegisterBasicSyncHandlers() {
+	c.InputEventManager.RegisterSyncCallback(SyncUIInteraction, c.HandleUIControl)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_CONSUMPTION, c.HandleSyncConsumptionEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_PING, c.HandleSyncPongEvent)
 	c.InputEventManager.RegisterSyncCallback(SYNC_TYPE_USER_INTERVENTION, c.HandleSyncUserIntervention)

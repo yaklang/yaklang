@@ -59,7 +59,11 @@ var modifyHTTPRequestAction = func(r aicommon.AIInvokeRuntime) reactloops.ReActL
 			isHTTPS := inferGeneratedPacketHTTPS(loop, string(fixedPacket))
 			reviewDecision := "auto_applied"
 
-			if requireManualReview && loop.GetConfig().GetAllowUserInteraction() {
+			if requireManualReview {
+				if err := loop.CheckClarificationAllowed(true); err != nil {
+					operator.Feedback("Manual approval is required but unavailable; the original packet is unchanged. " + err.Error())
+					return
+				}
 				question := fmt.Sprintf("请审核这次数据包修改是否应用。目标：%s\n修改原因：%s\n%s", modificationTarget, modificationReason, utils.ShrinkTextBlock(compareRequestsForPrompt(previousRequest, string(fixedPacket)), 600))
 				suggestion := r.AskForClarification(getLoopTaskContext(loop), question, []string{"接受修改并继续使用新数据包", "拒绝修改并保留旧数据包"})
 				if reviewSuggestionApproved(suggestion) {

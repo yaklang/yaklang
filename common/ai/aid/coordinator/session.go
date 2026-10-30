@@ -170,6 +170,10 @@ func fromRuntime(ctx context.Context, r aicommon.AIInvokeRuntime, task aicommon.
 	key := "coordinator-input-" + id
 	if !forge {
 		parent.InputEventManager.RegisterMirrorOfAIInputEvent(key, func(e *ypb.AIInputEvent) {
+			// The outer runtime validates and routes UI replies to their origin.
+			if e.GetUserInteraction() != "" || e.SyncType == aicommon.SyncUIInteraction {
+				return
+			}
 			switch e.SyncType {
 			case aicommon.SYNC_TYPE_USER_INTERVENTION, "queue_info", "react_cancel_task", "react_cancel_current_task":
 				// The outer runtime owns queue cancellation. Its context already
@@ -488,7 +492,7 @@ func (s *Session) Execute(ctx context.Context, a Attempt) (result Result, retErr
 	}
 	aicommon.WithStatefulTaskBaseContext(ctx)(task)
 	task.SetName(a.Task.Name)
-	opts = append(opts, aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithAICallbacks(s.GetRawAICallbacks()), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
+	opts = append(opts, aicommon.WithAllowRequireForUserInteract(false), aicommon.WithDisableToolCallerIntervalReview(true), aicommon.WithContext(ctx), aicommon.WithID(s.Id), aicommon.WithAICallbacks(s.GetRawAICallbacks()), aicommon.WithEventInputChanx(input), aicommon.WithHotPatchOptionChan(hotpatch), aicommon.WithDisableCreateDBRuntime(true), aicommon.WithEnablePlanAndExec(false), aicommon.WithEmitter(s.GetEmitter().PushEventProcesser(func(e *schema.AiOutputEvent) *schema.AiOutputEvent {
 		e.TaskUUID = task.GetUUID()
 		e.TaskId = task.GetId()
 		return e
