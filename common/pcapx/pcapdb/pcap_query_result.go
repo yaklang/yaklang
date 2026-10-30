@@ -163,6 +163,9 @@ type PacketSummary struct {
 	CapturedLength   int    `json:"captured_length"`
 	OriginalLength   int    `json:"original_length"`
 	LinkType         int    `json:"link_type"`
+	SourceMAC        string `json:"source_mac,omitempty"`
+	DestinationMAC   string `json:"destination_mac,omitempty"`
+	VLANStack        string `json:"vlan_stack,omitempty"`
 	SourceIP         string `json:"source_ip"`
 	DestinationIP    string `json:"destination_ip"`
 	SourcePort       int    `json:"source_port"`
@@ -244,7 +247,7 @@ func queryResult[S, T any](d *Database, options []QueryOption, messages bool, qu
 
 func (d *Database) QueryPacketsPage(options ...QueryOption) (*ResultPage[PacketSummary], error) {
 	return queryResult(d, options, false, d.QueryPackets, func(p Packet) PacketSummary {
-		return PacketSummary{ID: p.ID, Section: p.Section, Interface: p.Interface, TimestampNS: p.TimestampNS, CapturedLength: p.CapturedLength, OriginalLength: p.OriginalLength, LinkType: p.LinkType, SourceIP: shortText(p.SourceIP, 64), DestinationIP: shortText(p.DestinationIP, 64), SourcePort: p.SourcePort, DestinationPort: p.DestinationPort, Transport: shortText(p.Transport, 32), DecodeError: shortText(p.DecodeError, 512), PreviewTruncated: len(p.DecodeError) > 512}
+		return PacketSummary{ID: p.ID, Section: p.Section, Interface: p.Interface, TimestampNS: p.TimestampNS, CapturedLength: p.CapturedLength, OriginalLength: p.OriginalLength, LinkType: p.LinkType, SourceMAC: shortText(p.SourceMAC, 64), DestinationMAC: shortText(p.DestinationMAC, 64), VLANStack: shortText(p.VLANStack, 128), SourceIP: shortText(p.SourceIP, 64), DestinationIP: shortText(p.DestinationIP, 64), SourcePort: p.SourcePort, DestinationPort: p.DestinationPort, Transport: shortText(p.Transport, 32), DecodeError: shortText(p.DecodeError, 512), PreviewTruncated: len(p.DecodeError) > 512}
 	}, func(p PacketSummary) int64 { return int64(p.ID) })
 }
 func (d *Database) QueryProtocolsPage(options ...QueryOption) (*ResultPage[ProtocolSummary], error) {
