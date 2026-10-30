@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -301,7 +302,30 @@ func constLookupSQL(operator, indexName string) string {
 	)
 }
 
-var constLookupHintCache sync.Map
+// constLookupHintCache remembers whether the partial const index exists. The
+// answer changes whenever a compile drops or rebuilds the IR secondary indexes,
+// so it is tagged with an epoch instead of being cached forever.
+var (
+	constLookupHintCache sync.Map
+	constLookupHintEpoch atomic.Uint64
+)
+
+type constLookupHintEntry struct {
+	epoch uint64
+	hint  string
+}
+
+// invalidateConstLookupIndexHint makes the next const lookup probe sqlite_master
+// again. Called when the IR secondary indexes are dropped or restored.
+func invalidateConstLookupIndexHint() {
+	constLookupHintEpoch.Add(1)
+}
+
+// constLookupIndexMissing reports the error SQLite raises when an INDEXED BY
+// clause names an index that no longer exists.
+func constLookupIndexMissing(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "no such index")
+}
 
 func constLookupIndexHint(ctx context.Context, db *gorm.DB) (string, error) {
 	if db == nil || db.Dialect() == nil || db.CommonDB() == nil {
@@ -313,8 +337,11 @@ func constLookupIndexHint(ctx context.Context, db *gorm.DB) (string, error) {
 		return "", nil
 	}
 	key := db.CommonDB()
+	epoch := constLookupHintEpoch.Load()
 	if v, ok := constLookupHintCache.Load(key); ok {
-		return v.(string), nil
+		if entry, ok := v.(constLookupHintEntry); ok && entry.epoch == epoch {
+			return entry.hint, nil
+		}
 	}
 	if ctx == nil {
 		ctx = context.Background()
@@ -331,7 +358,7 @@ func constLookupIndexHint(ctx context.Context, db *gorm.DB) (string, error) {
 	if err == nil {
 		hint = indexName
 	}
-	constLookupHintCache.Store(key, hint)
+	constLookupHintCache.Store(key, constLookupHintEntry{epoch: epoch, hint: hint})
 	return hint, nil
 }
 
@@ -362,21 +389,30 @@ func nativeGetIrCodeIDsByConstTypeContext(parent context.Context, db *gorm.DB, p
 		logNativeSQL(query, time.Since(started), err)
 		return nil, err
 	}
-	var q string
-	var args []interface{}
-	if compareMode == ExactCompare {
-		q = bindSQLPlaceholdersDB(db, constLookupSQL("=", hint))
-		args = []interface{}{progName, value}
-	} else {
-		operator := "REGEXP"
+	operator := "="
+	if compareMode != ExactCompare {
+		operator = "REGEXP"
 		switch db.Dialect().GetName() {
 		case "postgres", "postgresql", "cloudsqlpostgres":
 			operator = "~"
 		}
-		q = bindSQLPlaceholdersDB(db, constLookupSQL(operator, hint))
-		args = []interface{}{progName, value}
 	}
+	queryFor := func(hint string) string {
+		return bindSQLPlaceholdersDB(db, constLookupSQL(operator, hint))
+	}
+	args := []interface{}{progName, value}
+	q := queryFor(hint)
 	rows, err := nativeQueryContextDB(db, ctx, q, args...)
+	if err != nil && hint != "" && constLookupIndexMissing(err) && ctx.Err() == nil {
+		// Another project's compile can drop the index between the probe and
+		// the query. SQLite rejects the statement instead of ignoring the
+		// hint, so reprobe and retry without a stale INDEXED BY.
+		invalidateConstLookupIndexHint()
+		if currentHint, hintErr := constLookupIndexHint(ctx, db); hintErr == nil {
+			q = queryFor(currentHint)
+			rows, err = nativeQueryContextDB(db, ctx, q, args...)
+		}
+	}
 	if err != nil {
 		RecordDBRead(time.Since(started), true)
 		logNativeSQL(q, time.Since(started), err)

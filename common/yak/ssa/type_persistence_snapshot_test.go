@@ -122,3 +122,30 @@ func TestTypePersistenceFingerprintDistinguishesFields(t *testing.T) {
 	nilNames.fullNames, emptyNames.fullNames = nil, []string{}
 	require.NotEqual(t, nilNames.fingerprint(), emptyNames.fingerprint(), "null and [] have different persisted JSON")
 }
+
+// A class can name a parent that has not been emitted yet. The parent then
+// receives its id after the child row was written, and nothing else about the
+// child changes. The identity fast path must notice that id and rewrite the
+// child, otherwise the stored parent list is permanently unresolvable.
+func TestTypePersistenceUpdatesLateParentID(t *testing.T) {
+	db, err := gorm.Open("sqlite3", filepath.Join(t.TempDir(), "late-parent.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { db.Close() })
+	require.NoError(t, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
+	require.NoError(t, ssadb.EnsureIrTypeDedupeIndexesForTest(db))
+	store := &typeStore{mode: ProgramCacheDBWrite, db: db, programName: "late-parent",
+		saveSize: 512, resident: utils.NewSafeMapWithKey[int64, Type]()}
+	child, parent := NewBlueprint("Child"), NewBlueprint("Parent")
+	child.SetId(1)
+	require.True(t, child.setBlueprintRelation(parent, BlueprintRelationParents))
+	store.remember(child)
+	require.NoError(t, store.flush())
+	require.Equal(t, int64(-1), parent.GetId(), "the parent is still unemitted after the first flush")
+
+	parent.SetId(2)
+	require.NoError(t, store.flush())
+	row := ssadb.GetIrTypeItemById(db, "late-parent", 1)
+	require.NotNil(t, row)
+	require.Contains(t, row.ExtraInformation, `"parentBlueprints":[2]`,
+		"a parent's late id must be persisted without changing any other field")
+}

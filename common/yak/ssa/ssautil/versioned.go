@@ -284,10 +284,40 @@ func (v *Versioned[T]) GetValue() (ret T) {
 	return val
 }
 
+// Replace swaps val for to on this version. A released version replays its
+// value as a new object, so the caller's val no longer matches by pointer: the
+// retained instruction id identifies the same value and must be accepted too.
 func (v *Versioned[T]) Replace(val, to T) {
-	if v.Value == val {
-		v.Value = to
+	if v == nil {
+		return
 	}
+	v.lock.Lock()
+	defer v.lock.Unlock()
+	if !v.binds(val) {
+		return
+	}
+	v.retainedID = 0
+	v.reload = nil
+	v.Value = to
+}
+
+// binds reports whether val is the value this version currently holds. The
+// caller must hold v.lock.
+func (v *Versioned[T]) binds(val T) bool {
+	if v.Value == val {
+		return true
+	}
+	if isZeroValue(val) {
+		return false
+	}
+	id := val.GetId()
+	if id == 0 {
+		return false
+	}
+	if !isZeroValue(v.Value) {
+		return v.Value.GetId() == id
+	}
+	return v.retainedID == id
 }
 
 func (v *Versioned[T]) Assign(val T) error {

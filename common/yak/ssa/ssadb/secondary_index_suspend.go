@@ -91,6 +91,7 @@ func SuspendSecondaryIndexes(db *gorm.DB) ([]string, error) {
 		ddls = append(ddls, item.sql)
 	}
 	if len(ddls) > 0 {
+		invalidateConstLookupIndexHint()
 		log.Infof("suspended %d secondary IR indexes for the compile write", len(ddls))
 	}
 	return ddls, nil
@@ -133,6 +134,7 @@ func RestoreSecondaryIndexes(db *gorm.DB, ddls []string) error {
 		}
 	}
 	log.Infof("restored %d secondary IR indexes in %s", len(ddls), time.Since(started))
+	invalidateConstLookupIndexHint()
 	return nil
 }
 
