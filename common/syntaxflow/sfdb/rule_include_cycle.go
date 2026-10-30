@@ -9,24 +9,25 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// CheckIncludeCycles rejects a rule set whose <include(...)> edges form a
-// cycle, reporting the cycle path (e.g. "a -> b -> a"). The built-in rule
-// sync calls it once with the complete in-memory built-in rule set before
-// writing anything: the dependency graph is built from the rules about to be
-// stored, with no database scan and no per-rule-write check.
+// CheckIncludeCycles rejects a library rule set whose <include(...)> edges
+// form a cycle, reporting the cycle path (e.g. "a -> b -> a"). The built-in
+// rule sync calls it once with the complete in-memory built-in rule set
+// before writing anything: the dependency graph is built from the library
+// rules about to be stored, with no database scan and no per-rule-write check.
 //
-// Every supplied rule is a node keyed by title / included_name, mirroring
-// GetLibrary resolution — a lib does not have to be allow-included to be
-// reached by <include(...)>. A target outside the set has no known content
-// and is skipped; a rule that fails to compile contributes no edges (it
-// cannot execute includes at scan time either).
+// Only library rules (allow-included, i.e. desc(lib: ...)) participate: an
+// include edge can only enter a library, so an ordinary scanning rule cannot
+// be part of a cycle even though GetLibrary would resolve its title. Library
+// nodes are keyed by title / included_name; a target outside the library set
+// has no known content and is skipped, and a library that fails to compile
+// contributes no edges.
 func CheckIncludeCycles(rules []*schema.SyntaxFlowRule) error {
 	if len(rules) == 0 {
 		return nil
 	}
 	libraries := make(map[string]*schema.SyntaxFlowRule, len(rules))
 	for _, rule := range rules {
-		if rule == nil {
+		if rule == nil || !rule.AllowIncluded {
 			continue
 		}
 		for _, name := range []string{rule.Title, rule.IncludedName} {
