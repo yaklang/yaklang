@@ -20,7 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 )
 
-const maxHTTPBodySummaryBytes = 16 << 20
+const maxHTTPBodyProfileBytes = 16 << 20
 
 var (
 	httpPercentEscape  = regexp.MustCompile(`%[0-9A-Fa-f]{2}`)
@@ -30,9 +30,9 @@ var (
 	httpSensitiveField = regexp.MustCompile(`(?i)["']?(password|passwd|pwd|secret|token|access_token|refresh_token|api[_-]?key|authorization|cookie|session|card[_-]?number|pan|cvv|pin|ssn|user(name)?|account|email)["']?\s*[:=]`)
 )
 
-// ProtocolBodySummary is a non-reversible summary of one complete HTTP/1
+// HTTPBodyProfile is a non-reversible profile of one complete HTTP/1
 // message. It deliberately contains no body bytes or body prefixes.
-type ProtocolBodySummary struct {
+type HTTPBodyProfile struct {
 	ID                  uint     `json:"id"`
 	Protocol            string   `json:"protocol"`
 	Method              string   `json:"method,omitempty"`
@@ -66,11 +66,11 @@ type ProtocolBodySummary struct {
 	Limitations         []string `json:"limitations,omitempty"`
 }
 
-// BodySummaryPage summarizes one HTTP/1 request or response without returning
+// HTTPBodyProfilePage profiles one HTTP/1 request or response without returning
 // its body. Hashes cover transfer-decoded and content-decoded representations
 // separately; incomplete bodies never receive a body hash.
-func (d *Database) BodySummaryPage(id uint, options ...QueryOption) (*ResultPage[ProtocolBodySummary], error) {
-	page := emptyPage[ProtocolBodySummary](d.ID, 0, "record_id")
+func (d *Database) HTTPBodyProfilePage(id uint, options ...QueryOption) (*ResultPage[HTTPBodyProfile], error) {
+	page := emptyPage[HTTPBodyProfile](d.ID, 0, "record_id")
 	c, err := parseDetailQuery(options)
 	if err != nil {
 		return failPage(page, err)
@@ -120,19 +120,19 @@ func (d *Database) BodySummaryPage(id uint, options ...QueryOption) (*ResultPage
 			limitations = append(limitations, "request method unavailable; response body framing follows observed headers")
 		}
 	}
-	summary, err := summarizeHTTPBody(message, responseMethod)
+	profile, err := profileHTTPBody(message, responseMethod)
 	if err != nil {
 		return failPage(page, err)
 	}
-	summary.Limitations = appendUniqueStrings(summary.Limitations, limitations...)
+	profile.Limitations = appendUniqueStrings(profile.Limitations, limitations...)
 	page.State = StateReady
-	return pageItems(page, []ProtocolBodySummary{summary}, 1, c.resultBytes, func(row ProtocolBodySummary) int64 { return int64(row.ID) })
+	return pageItems(page, []HTTPBodyProfile{profile}, 1, c.resultBytes, func(row HTTPBodyProfile) int64 { return int64(row.ID) })
 }
 
-func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (ProtocolBodySummary, error) {
+func profileHTTPBody(message PCAPProtocolMessage, responseMethod string) (HTTPBodyProfile, error) {
 	raw := message.Data
 	messageSum := sha256.Sum256(raw)
-	summary := ProtocolBodySummary{
+	summary := HTTPBodyProfile{
 		ID:            message.ID,
 		Protocol:      message.Protocol,
 		MessageBytes:  len(raw),
@@ -150,7 +150,7 @@ func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (Prot
 	if bytes.HasPrefix(raw, []byte("HTTP/")) {
 		response, err := http.ReadResponse(reader, &http.Request{Method: responseMethod})
 		if err != nil {
-			return summary, fmt.Errorf("pcapdb: parse HTTP response body summary: %w", err)
+			return summary, fmt.Errorf("pcapdb: parse HTTP response body profile: %w", err)
 		}
 		summary.StatusCode = response.StatusCode
 		body, headers = response.Body, response.Header
@@ -159,7 +159,7 @@ func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (Prot
 	} else {
 		request, err := http.ReadRequest(reader)
 		if err != nil {
-			return summary, fmt.Errorf("pcapdb: parse HTTP request body summary: %w", err)
+			return summary, fmt.Errorf("pcapdb: parse HTTP request body profile: %w", err)
 		}
 		summary.Method = request.Method
 		summary.URI = request.RequestURI
@@ -176,9 +176,9 @@ func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (Prot
 	summary.TransferEncoding = transferEncoding
 	summary.ContentType = headers.Get("Content-Type")
 	summary.ContentEncoding = strings.TrimSpace(headers.Get("Content-Encoding"))
-	wireBody, readErr := io.ReadAll(io.LimitReader(body, maxHTTPBodySummaryBytes+1))
-	if len(wireBody) > maxHTTPBodySummaryBytes {
-		readErr = fmt.Errorf("body exceeds %d bytes", maxHTTPBodySummaryBytes)
+	wireBody, readErr := io.ReadAll(io.LimitReader(body, maxHTTPBodyProfileBytes+1))
+	if len(wireBody) > maxHTTPBodyProfileBytes {
+		readErr = fmt.Errorf("body exceeds %d bytes", maxHTTPBodyProfileBytes)
 		wireBody = nil
 	}
 	if readErr != nil {
@@ -193,7 +193,7 @@ func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (Prot
 		wireSum := sha256.Sum256(wireBody)
 		summary.WireBodySHA256 = hex.EncodeToString(wireSum[:])
 	}
-	decodedBody, decodeErr := pcaputil.DecodeBody(wireBody, summary.ContentEncoding, maxHTTPBodySummaryBytes)
+	decodedBody, decodeErr := pcaputil.DecodeBody(wireBody, summary.ContentEncoding, maxHTTPBodyProfileBytes)
 	if decodeErr != nil {
 		summary.Limitations = append(summary.Limitations, "content decoding failed: "+decodeErr.Error())
 		decodedBody = nil
@@ -217,7 +217,7 @@ func summarizeHTTPBody(message PCAPProtocolMessage, responseMethod string) (Prot
 	return summary, nil
 }
 
-func analyzeBodyStatistics(summary *ProtocolBodySummary, body []byte) {
+func analyzeBodyStatistics(summary *HTTPBodyProfile, body []byte) {
 	summary.Magic = detectBodyMagic(body)
 	summary.Compressed = summary.ContentEncoding != "" && !strings.EqualFold(summary.ContentEncoding, "identity") || summary.Magic == "gzip" || summary.Magic == "zlib" || summary.Magic == "zip"
 	mediaType, _, _ := mime.ParseMediaType(summary.ContentType)
