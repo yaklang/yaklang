@@ -18,6 +18,11 @@ assert again.ID == library.ID, "exact captures must deduplicate"
 metadata = library.Metadata()~
 assert metadata.State == "ready" && metadata.PacketCount == 8
 assert metadata.StreamsIndexed && metadata.ProtocolsIndexed
+overview = library.CaptureOverview()~
+assert overview.ProtocolKindCount == 1
+assert len(overview.Protocols) == 1 && overview.Protocols[0].Protocol == "http"
+assert len(overview.Statuses) == 1 && overview.Statuses[0].Status == "decoded"
+assert len(overview.Transports) == 1 && overview.Transports[0].Transport == "tcp"
 assert len(libraryTools.ListPCAPDatabases()~) >= 1
 assert libraryTools.CountPCAPDatabases()~ >= 1
 assert libraryTools.ValidatePCAPDatabase(library.ID, true)~.Valid
@@ -29,6 +34,17 @@ nextPackets = library.QueryPackets(libraryTools.after(packets[1].ID), libraryToo
 assert nextPackets[0].ID == 3
 packetBytes = library.ReadPacket(4)~
 assert len(packetBytes) > 0
+
+macs = library.QueryMACSummariesPage(libraryTools.limit(10))~
+assert len(macs.Items) == 1 && !macs.HasMore && macs.Error == nil
+assert macs.Items[0].SourceMAC == "66:77:88:99:aa:bb"
+assert macs.Items[0].SourceIPCount == 2
+assert macs.Items[0].PacketCount == 8
+assert macs.Items[0].FirstPacketID == 1 && macs.Items[0].LastPacketID == 8
+bindings = library.QueryEndpointBindingsPage(libraryTools.sourceMAC("66:77:88:99:aa:bb"), libraryTools.limit(10))~
+assert len(bindings.Items) == 2 && !bindings.HasMore && bindings.Error == nil
+assert bindings.Items[0].SourceMAC == "66:77:88:99:aa:bb"
+assert bindings.Items[0].PacketCount + bindings.Items[1].PacketCount == 8
 
 sessions = library.QuerySessions(libraryTools.transport("tcp"), libraryTools.limit(2))~
 assert len(sessions) == 1 && sessions[0].Complete

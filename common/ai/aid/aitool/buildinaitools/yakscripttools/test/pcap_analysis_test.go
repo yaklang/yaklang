@@ -205,6 +205,43 @@ func TestPCAPAnalysisTools(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, 1, count)
 	})
+	t.Run("mac_endpoint_summaries", func(t *testing.T) {
+		macs := query("macs", map[string]any{"limit": 10}).(*pcapdb.ResultPage[pcapdb.MACSummary])
+		require.Nil(t, macs.Error)
+		require.Len(t, macs.Items, 1)
+		require.Equal(t, "01:02:03:04:05:06", macs.Items[0].SourceMAC)
+		require.EqualValues(t, 2, macs.Items[0].SourceIPCount)
+		require.EqualValues(t, 8, macs.Items[0].PacketCount)
+
+		bindings := query("endpoint_bindings", map[string]any{
+			"source_mac": "01:02:03:04:05:06",
+			"limit":      10,
+		}).(*pcapdb.ResultPage[pcapdb.EndpointBindingSummary])
+		require.Nil(t, bindings.Error)
+		require.Len(t, bindings.Items, 2)
+		require.Equal(t, "01:02:03:04:05:06", bindings.Items[0].SourceMAC)
+		require.EqualValues(t, 8, bindings.Items[0].PacketCount+bindings.Items[1].PacketCount)
+	})
+	t.Run("metadata_capture_overview", func(t *testing.T) {
+		meta := object(query("metadata", nil))
+		require.EqualValues(t, 8, meta["packet_count"])
+		require.EqualValues(t, 2, meta["protocol_message_count"])
+		require.EqualValues(t, 1, meta["protocol_kind_count"])
+		require.Equal(t, false, meta["summary_truncated"])
+		protocols := meta["protocols"].([]any)
+		require.Len(t, protocols, 1)
+		protocol := protocols[0].(map[string]any)
+		require.Equal(t, "http", protocol["protocol"])
+		require.EqualValues(t, 2, protocol["count"])
+		statuses := meta["statuses"].([]any)
+		require.Len(t, statuses, 1)
+		require.Equal(t, "decoded", statuses[0].(map[string]any)["status"])
+		transports := meta["transports"].([]any)
+		require.Len(t, transports, 1)
+		require.Equal(t, "tcp", transports[0].(map[string]any)["transport"])
+		require.NotNil(t, meta["first_timestamp_ns"])
+		require.NotNil(t, meta["last_timestamp_ns"])
+	})
 	var messageID uint
 	t.Run("protocol_pagination_and_fields", func(t *testing.T) {
 		page := query("protocols", map[string]any{"limit": 1, "protocol": "http"}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])
