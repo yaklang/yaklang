@@ -4,6 +4,29 @@
 
 每个案例包含稳定 PCAP/PCAPNG、来源与 SHA256、调查任务、预期观察点和答案边界。公共样本答案只用于复核，不作为工具输入。
 
+## 压缩包与本地展开
+
+为了避免在 Git 中逐个展开大型捕获和任务文件，远端只跟踪一个
+`fixtures.tar.gz`。本地开发目录默认保持展开；展开后的案例目录已被
+`.gitignore` 忽略，不影响现有命令和真实 agent 测试。
+
+全新 checkout 首次分析前执行：
+
+```sh
+python3 scripts/enterprise-traffic-fixtures.py extract
+```
+
+本地修改案例文件后，重新生成压缩包并核对内容：
+
+```sh
+python3 scripts/enterprise-traffic-fixtures.py pack
+python3 scripts/enterprise-traffic-fixtures.py verify
+```
+
+`extract` 默认拒绝覆盖与压缩包内容不同的本地文件，避免误删未提交修改；
+确认备份后再使用 `--force`。Go 测试在展开目录存在时直接读取本地文件，
+否则自动从归档解压到临时目录。
+
 ## 目录
 
 | 目录 | 场景 | 规模 |
