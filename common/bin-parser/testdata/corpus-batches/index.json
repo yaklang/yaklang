@@ -128189,6 +128189,133 @@
         "scripts/protocol-tests/required-tests-traffic-unified-v191.json": "required-tests-traffic-unified-v191.json"
       },
       "pack": "pr5265-consolidated-c830"
+    },
+    {
+      "id": "validation-enterprise-traffic-analysis-20261030",
+      "kind": "validation",
+      "source_sha": "02f6e85e76d6f99551b9675909ebb47220b29ffa",
+      "file": "validation-enterprise-traffic-analysis-20261030.zip",
+      "sha256": "6f7bbf93538a142f7842714d7f3e9f60370ea1591a52bd6fc2b01cde8759c5d2",
+      "password": "bin-parser",
+      "members": {
+        "dns-tunnel-c2/TASKS.md": {
+          "sha256": "da215c8c31065c246356fda6aa0cd30075dde82985d1dc3334586b137ac4d2a2",
+          "bytes": 1990
+        },
+        "dns-tunnel-c2/capture.pcap": {
+          "sha256": "17492c2b577101d57c12f8a0122c3c76d327592e2f1d3b4247db2e5eb01299a3",
+          "bytes": 36173
+        },
+        "dns-tunnel-c2/manifest.json": {
+          "sha256": "b38eabdfd821e4af2860f125823430a9dbf3721c78dbd031a075ac322f36fca7",
+          "bytes": 885
+        },
+        "host-user-identification/TASKS.md": {
+          "sha256": "43ecfdf93f7113bdc5ab80198115a312147208a62166e5bfec13db316866efaf",
+          "bytes": 2594
+        },
+        "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-1-of-5.pcap": {
+          "sha256": "f020a11aac3ece5a9776de4efed755507b01187f3628db7c2cafb78550507e67",
+          "bytes": 1110743
+        },
+        "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-2-of-5.pcap": {
+          "sha256": "de6a4aeae511ad2eb89353f816cd35af862be25fc195596de4e38e26e8735851",
+          "bytes": 149063
+        },
+        "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-3-of-5.pcap": {
+          "sha256": "7ce9a37aa6d8f0121d23f9370d11f17d4de7111cf19629d92ff630abd74064af",
+          "bytes": 7133762
+        },
+        "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-4-of-5.pcap": {
+          "sha256": "6a09f3aca8f56c6c9c77c075ec9bd1e36b1d4b8d15b84ea44905d46b50a381c7",
+          "bytes": 63891
+        },
+        "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-5-of-5.pcap": {
+          "sha256": "69f4b7a143253fa0355b605ae7311fc987977ff7f602dcbda329b1261d34abab",
+          "bytes": 104679
+        },
+        "host-user-identification/manifest.json": {
+          "sha256": "f774dff470477c656a481d8e4097a63a0e0d709afcdab2d201f0bd1ef2a09c43",
+          "bytes": 1638
+        },
+        "http-dga-c2/TASKS.md": {
+          "sha256": "5de201475076e1f9c6796ed99c3862b5c4cce86915d58e072b709d631d3c0004",
+          "bytes": 3100
+        },
+        "http-dga-c2/capture.pcapng": {
+          "sha256": "08cc76efbbeeb1eed155964622dcdf512dff166bb0a9fe55ddbc8e18434a2138",
+          "bytes": 9896
+        },
+        "http-dga-c2/manifest.json": {
+          "sha256": "e5e159fbcff7ecc9e5027500199e594df6cc4ef6a6364572677b7d7cd36313a1",
+          "bytes": 858
+        },
+        "https-keylog-dridex/TASKS.md": {
+          "sha256": "55f1aee1ebeee6124ef41211658cb63a1e43c86cab9ba248b1a4b7eb68a96a87",
+          "bytes": 2685
+        },
+        "https-keylog-dridex/capture.keys": {
+          "sha256": "cb5cbc6802964483fc639be179c37ec1fd27073c3acb76cbae9b9c8ef81e6958",
+          "bytes": 1416
+        },
+        "https-keylog-dridex/capture.pcap": {
+          "sha256": "32bd460f240646b9d62549725412f176a5fdaf2ab803bafcc1ee6bf322b3439f",
+          "bytes": 632950
+        },
+        "https-keylog-dridex/manifest.json": {
+          "sha256": "b3844e6dbc51bc63a6bde9d14f8880730bdb6963f01b0c8588e19e045be7023c",
+          "bytes": 1118
+        },
+        "lateral-movement-psexec/TASKS.md": {
+          "sha256": "7704e7cc7c82bbfd846b18b823f7cbc3e24129b5c663f33704a7a3e067684f2e",
+          "bytes": 2604
+        },
+        "lateral-movement-psexec/capture.pcapng": {
+          "sha256": "771897616455a1d3595c663c118ac256edb790bcbda9bcbba2d4324b36bf55c3",
+          "bytes": 207816
+        },
+        "lateral-movement-psexec/manifest.json": {
+          "sha256": "366b7bdeaa894a2e37410bfed4c4c047b83253900b71b351cfefa9efffdede16",
+          "bytes": 836
+        },
+        "redline-infostealer-2023-07/TASKS.md": {
+          "sha256": "e49983ec31f411f0bf3cb18f34f213caa479eabf44994d3e7115946bfa32a94f",
+          "bytes": 4327
+        },
+        "redline-infostealer-2023-07/capture.pcap": {
+          "sha256": "7349b0cab7fbc605f31dd7db95748a23b16b3fc2f5d370a7afb3e99cd9f17c8e",
+          "bytes": 1419604
+        },
+        "redline-infostealer-2023-07/manifest.json": {
+          "sha256": "d93af93f9ee97f9c3222281b1a6c021cb4aaafd6df0a2cbbe21129479ef4f16a",
+          "bytes": 920
+        }
+      },
+      "aliases": {
+        "testdata/enterprise-traffic-analysis/dns-tunnel-c2/TASKS.md": "dns-tunnel-c2/TASKS.md",
+        "testdata/enterprise-traffic-analysis/dns-tunnel-c2/capture.pcap": "dns-tunnel-c2/capture.pcap",
+        "testdata/enterprise-traffic-analysis/dns-tunnel-c2/manifest.json": "dns-tunnel-c2/manifest.json",
+        "testdata/enterprise-traffic-analysis/host-user-identification/TASKS.md": "host-user-identification/TASKS.md",
+        "testdata/enterprise-traffic-analysis/host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-1-of-5.pcap": "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-1-of-5.pcap",
+        "testdata/enterprise-traffic-analysis/host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-2-of-5.pcap": "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-2-of-5.pcap",
+        "testdata/enterprise-traffic-analysis/host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-3-of-5.pcap": "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-3-of-5.pcap",
+        "testdata/enterprise-traffic-analysis/host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-4-of-5.pcap": "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-4-of-5.pcap",
+        "testdata/enterprise-traffic-analysis/host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-5-of-5.pcap": "host-user-identification/Wireshark-tutorial-identifying-hosts-and-users-5-of-5.pcap",
+        "testdata/enterprise-traffic-analysis/host-user-identification/manifest.json": "host-user-identification/manifest.json",
+        "testdata/enterprise-traffic-analysis/http-dga-c2/TASKS.md": "http-dga-c2/TASKS.md",
+        "testdata/enterprise-traffic-analysis/http-dga-c2/capture.pcapng": "http-dga-c2/capture.pcapng",
+        "testdata/enterprise-traffic-analysis/http-dga-c2/manifest.json": "http-dga-c2/manifest.json",
+        "testdata/enterprise-traffic-analysis/https-keylog-dridex/TASKS.md": "https-keylog-dridex/TASKS.md",
+        "testdata/enterprise-traffic-analysis/https-keylog-dridex/capture.keys": "https-keylog-dridex/capture.keys",
+        "testdata/enterprise-traffic-analysis/https-keylog-dridex/capture.pcap": "https-keylog-dridex/capture.pcap",
+        "testdata/enterprise-traffic-analysis/https-keylog-dridex/manifest.json": "https-keylog-dridex/manifest.json",
+        "testdata/enterprise-traffic-analysis/lateral-movement-psexec/TASKS.md": "lateral-movement-psexec/TASKS.md",
+        "testdata/enterprise-traffic-analysis/lateral-movement-psexec/capture.pcapng": "lateral-movement-psexec/capture.pcapng",
+        "testdata/enterprise-traffic-analysis/lateral-movement-psexec/manifest.json": "lateral-movement-psexec/manifest.json",
+        "testdata/enterprise-traffic-analysis/redline-infostealer-2023-07/TASKS.md": "redline-infostealer-2023-07/TASKS.md",
+        "testdata/enterprise-traffic-analysis/redline-infostealer-2023-07/capture.pcap": "redline-infostealer-2023-07/capture.pcap",
+        "testdata/enterprise-traffic-analysis/redline-infostealer-2023-07/manifest.json": "redline-infostealer-2023-07/manifest.json"
+      }
     }
   ],
   "schema_version": 2,

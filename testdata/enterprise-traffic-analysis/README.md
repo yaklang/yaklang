@@ -4,28 +4,21 @@
 
 每个案例包含稳定 PCAP/PCAPNG、来源与 SHA256、调查任务、预期观察点和答案边界。公共样本答案只用于复核，不作为工具输入。
 
-## 压缩包与本地展开
+## corpus 归档与本地展开
 
-为了避免在 Git 中逐个展开大型捕获和任务文件，远端只跟踪一个
-`fixtures.tar.gz`。本地开发目录默认保持展开；展开后的案例目录已被
-`.gitignore` 忽略，不影响现有命令和真实 agent 测试。
+为了避免在 Git 中逐个展开大型捕获和任务文件，远端将案例保存为
+`common/bin-parser/testdata/corpus-batches/validation-enterprise-traffic-analysis-20261030.zip`，
+并在同目录 `index.json` 中记录每个成员的 SHA256、大小和仓库路径 alias。
 
-全新 checkout 首次分析前执行：
+Go 测试不需要解压，统一通过 `internal/trafficfixture`：
 
-```sh
-python3 scripts/enterprise-traffic-fixtures.py extract
-```
+- `ReadFile` 直接返回 hash-pinned 的只读字节副本。
+- `ReadDir` 将归档 alias 与普通源文件合并。
+- `Materialize` 仅当 API 必须接收文件名时，把单个 fixture 写入测试临时目录。
 
-本地修改案例文件后，重新生成压缩包并核对内容：
-
-```sh
-python3 scripts/enterprise-traffic-fixtures.py pack
-python3 scripts/enterprise-traffic-fixtures.py verify
-```
-
-`extract` 默认拒绝覆盖与压缩包内容不同的本地文件，避免误删未提交修改；
-确认备份后再使用 `--force`。Go 测试在展开目录存在时直接读取本地文件，
-否则自动从归档解压到临时目录。
+本地展开目录按既有开发方式保留，并通过 `.gitignore` 避免重复跟踪。只有在
+更新 fixture 内容时才需要生成新 corpus batch；不要在本地修改后直接覆盖
+已有 ZIP，也不要绕过 `index.json` 校验。
 
 ## 目录
 
@@ -43,11 +36,23 @@ python3 scripts/enterprise-traffic-fixtures.py verify
 
 ```sh
 go build -o /tmp/pcap-inspect ./common/pcapx/cmd/pcap-inspect
+go run ./internal/trafficfixture/cmd/corpus verify
 ```
+
+本地仍有展开 fixture 时可直接传入路径：
 
 ```sh
 /tmp/pcap-inspect \
   -read testdata/enterprise-traffic-analysis/redline-infostealer-2023-07/capture.pcap \
+  -workers 1 -protocol http -rows 20
+```
+
+只有 corpus ZIP 时，用现有 `corpus exec` 把 `@alias` 解析为私有临时文件：
+
+```sh
+go run ./internal/trafficfixture/cmd/corpus exec -- \
+  /tmp/pcap-inspect \
+  -read @testdata/enterprise-traffic-analysis/redline-infostealer-2023-07/capture.pcap \
   -workers 1 -protocol http -rows 20
 ```
 

@@ -13,8 +13,8 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools/yakscripttools"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/testutil/enterprisefixtures"
 	_ "github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 	"gotest.tools/v3/assert"
 )
 
@@ -235,8 +235,14 @@ func TestReadFile_BinaryFileDetection(t *testing.T) {
 // The previous hint caused HTTP questions to stop at Layer 4.
 func TestReadFile_PCAPRoutesToStructuredWorkflow(t *testing.T) {
 	tool := getReadFileTool(t)
-	path := enterprisefixtures.Path(t, "http-dga-c2/capture.pcapng")
-	_, err := os.Stat(path)
+	root, err := trafficfixture.RepositoryRoot()
+	assert.NilError(t, err)
+	path, err := trafficfixture.Materialize(
+		filepath.Join(root, "testdata/enterprise-traffic-analysis/http-dga-c2/capture.pcapng"),
+		t.TempDir(),
+	)
+	assert.NilError(t, err)
+	_, err = os.Stat(path)
 	assert.NilError(t, err, "shared HTTP DGA capture should exist")
 
 	stdout, _ := execReadFileTool(t, tool, aitool.InvokeParams{"file": path})

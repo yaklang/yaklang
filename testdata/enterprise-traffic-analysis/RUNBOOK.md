@@ -5,13 +5,14 @@
 在仓库根目录运行，使用隔离环境分析恶意流量。
 
 ```sh
-python3 scripts/enterprise-traffic-fixtures.py extract
 go build -o /tmp/pcap-inspect ./common/pcapx/cmd/pcap-inspect
+go run ./internal/trafficfixture/cmd/corpus verify
 ```
 
-捕获、keylog、manifest 和 `TASKS.md` 从 `fixtures.tar.gz` 恢复；本地已有
-相同展开文件时 `extract` 会保留它们。压缩包本身不代替来源 hash 和
-manifest 校验。
+捕获、keylog、manifest 和 `TASKS.md` 由 `internal/trafficfixture` 从
+hash-pinned corpus ZIP 直接读取。Go 测试不需要解压；本地已有展开文件时
+可以直接使用文件路径。只有归档时可使用 `corpus exec --` 和 `@仓库路径`
+传给需要文件名的命令。ZIP 本身不代替 manifest 中的来源 hash 校验。
 
 ## 推荐顺序
 

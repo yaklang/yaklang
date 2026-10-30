@@ -95,7 +95,7 @@ func packedTestSource(t *testing.T) (*corpus, *Batch) {
 }
 func TestPackedCorpusPreservesFrozenContracts(t *testing.T) {
 	c, b := packedTestSource(t)
-	if len(c.index.Packs) != 1 || len(c.index.Batches) != 288 {
+	if len(c.index.Packs) != 1 || len(c.index.Batches) != 289 {
 		t.Fatal("physical/logical inventory changed")
 	}
 	p := b.packed
@@ -122,7 +122,7 @@ func TestPackedCorpusPreservesFrozenContracts(t *testing.T) {
 			t.Fatal("old PR-added physical ZIP still present", b.File, e)
 		}
 	}
-	if direct != 35 || packed != 253 || members != 24826 || aliases != 25174 {
+	if direct != 36 || packed != 253 || members != 24849 || aliases != 25197 {
 		t.Fatalf("frozen contract counts %d/%d/%d/%d", direct, packed, members, aliases)
 	}
 	origin, e := SourceArchive("validation-sparkplug-template-device-commands.zip")

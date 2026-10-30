@@ -8,8 +8,38 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestEnterpriseTrafficAnalysisBatchAliases(t *testing.T) {
+	root, err := RepositoryRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, err := Names()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const prefix = "testdata/enterprise-traffic-analysis/"
+	count := 0
+	for _, name := range names {
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		count++
+		data, err := ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(data) == 0 {
+			t.Fatalf("%s: empty fixture", name)
+		}
+	}
+	if count != 23 {
+		t.Fatalf("enterprise fixture aliases=%d, want 23", count)
+	}
+}
 
 func TestFrozenBatchIntegrity(t *testing.T) {
 	t.Run("standalone-inventory-workspace", workspaceStandaloneInventory)
