@@ -75,10 +75,26 @@ func probeSMB2(w []byte, limit int) ProbeResult {
 		if n < smb2HeaderSize {
 			return ProbeResult{Verdict: ProbeReject}
 		}
+		if len(w) < 4+smb2HeaderSize {
+			return probeNeed("smb2", "2/3", len(w), 4+smb2HeaderSize)
+		}
+		if binary.LittleEndian.Uint16(w[8:10]) != smb2HeaderSize {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		next := uint64(binary.LittleEndian.Uint32(w[24:28]))
+		if next != 0 && (next < smb2HeaderSize || next%8 != 0 || next+64 > uint64(n)) {
+			return ProbeResult{Verdict: ProbeReject}
+		}
 		_ = limit
 		return probeAccept("smb2", "2/3", 94)
 	case smb3Transform:
 		if n <= 52 {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		if len(w) < 56 {
+			return probeNeed("smb2", "3-transform", len(w), 56)
+		}
+		if binary.LittleEndian.Uint16(w[44:46]) != 0 || binary.LittleEndian.Uint16(w[46:48]) != 1 || binary.LittleEndian.Uint32(w[40:44]) != uint32(n-52) {
 			return ProbeResult{Verdict: ProbeReject}
 		}
 		return probeAccept("smb2", "3-transform", 90)
@@ -240,9 +256,21 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 	info := cmds[0]
 	info["Context Level"] = "observed"
 	names := make([]string, 0, len(cmds))
-	for _, c := range cmds {
+	for index, c := range cmds {
 		name, _ := c["Packet Name"].(string)
 		names = append(names, name)
+		if c["Response"] == true && c["Related"] == true {
+			// A predecessor's wire bytes alone cannot establish file state.
+			delete(c, "Related Previous File ID")
+			if index > 0 {
+				previous := cmds[index-1]
+				if previous["Response"] == true && previous["Status"] == uint32(0) && previous["Association Status"] == "matched" {
+					if fileID, _ := previous["FileId"].(string); fileID != "" {
+						c["Related Previous File ID"] = fileID
+					}
+				}
+			}
+		}
 		if s.dialect != 0 {
 			// Connection observations are not a field in this command. In
 			// particular, never overwrite the current NEGOTIATE's wire value.
@@ -298,8 +326,7 @@ func (s *binSMB2) associate(c map[string]any, max int) error {
 func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 	mid, _ := c["Message ID"].(uint64)
 	name, _ := c["Packet Name"].(string)
-	sid, _ := c["Session ID"].(uint64)
-	tid, _ := c["Tree ID"].(uint32)
+	sid, tid := smb2EffectiveIDs(c)
 	asyncID, _ := c["Async ID"].(uint64)
 	resp, _ := c["Response"].(bool)
 	key := smb2PendingKey{sessionID: sid, treeID: tid, messageID: mid}
@@ -317,10 +344,10 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		}
 		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0}
 		pending.path, _ = c["File Name"].(string)
-		pending.related, _ = c["Related File ID Placeholder"].(bool)
+		pending.related, _ = c["Related File ID Ignored"].(bool)
 		clonePath := false
 		if fileID, ok := c["FileId"].(string); ok && fileID != "" {
-			if related, _ := c["Related File ID Placeholder"].(bool); related {
+			if pending.related {
 				c["File Context Status"] = "related-compound-file-context-is-server-substituted"
 			} else {
 				pending.fileID = fileID
@@ -394,11 +421,11 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 	if name == "CLOSE" && pending.related {
 		if relatedFileID, _ := c["Related Previous File ID"].(string); relatedFileID != "" {
 			pending.fileID = relatedFileID
-			c["FileId"] = relatedFileID
+			c["Request File ID"] = relatedFileID
 			c["Inherited File ID"] = true
 		}
 	}
-	if name == "CREATE" {
+	if name == "CREATE" && status == 0 {
 		fileID, _ := c["FileId"].(string)
 		if fileID != "" {
 			fileKey := smb2FileKey{sessionID: sid, treeID: tid, fileID: fileID}
@@ -417,8 +444,12 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		}
 	}
 	if name == "CLOSE" && status == 0 {
-		delete(s.files, smb2FileKey{sessionID: sid, treeID: tid, fileID: pending.fileID})
-		c["File Context Status"] = "closed"
+		if pending.fileID != "" {
+			delete(s.files, smb2FileKey{sessionID: pending.key.sessionID, treeID: pending.key.treeID, fileID: pending.fileID})
+			c["File Context Status"] = "closed"
+		} else {
+			c["File Context Status"] = "missing-request-file-context"
+		}
 	}
 	if name == "TREE_DISCONNECT" && status == 0 {
 		s.removeTree(sid, tid)
@@ -548,24 +579,30 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 			}
 			end = at + next
 		}
-		cmd, err := smb2ParseCommand(h[:end-at])
+		cmd, err := smb2ParseCommand(h[:end-at], max)
 		if err != nil {
 			return nil, err
 		}
+		smb2OffsetRanges(cmd, 4+at)
 		if related, _ := cmd["Related"].(bool); related {
 			if previous == nil {
 				return nil, protocolError(ErrMalformedMessage, "SMB2 related compound operation has no predecessor")
 			}
-			if sid, _ := cmd["Session ID"].(uint64); sid == ^uint64(0) {
-				cmd["Session ID"] = previous["Session ID"]
+			// MS-SMB2 3.3.5.2.7.2: related requests use the preceding
+			// operation's context even when the ignored literal IDs happen
+			// to be concrete. Responses carry their own returned IDs.
+			if cmd["Response"] == false {
+				effectiveSID, effectiveTID := smb2EffectiveIDs(previous)
+				cmd["Effective Session ID"] = effectiveSID
 				cmd["Inherited Session Context"] = true
-			}
-			if tid, _ := cmd["Tree ID"].(uint32); tid == ^uint32(0) {
-				cmd["Tree ID"] = previous["Tree ID"]
+				cmd["Effective Tree ID"] = effectiveTID
 				cmd["Inherited Tree Context"] = true
 			}
-			if fileID, _ := cmd["FileId"].(string); fileID == "ffffffffffffffffffffffffffffffff" {
-				cmd["Related File ID Placeholder"] = true
+			if fileID, _ := cmd["FileId"].(string); cmd["Response"] == false && fileID != "" {
+				cmd["Related File ID Ignored"] = true
+				if fileID == "ffffffffffffffffffffffffffffffff" {
+					cmd["Related File ID Placeholder"] = true
+				}
 				cmd["File Context Status"] = "related-compound-file-context-is-server-substituted"
 			}
 			if fileID, _ := previous["FileId"].(string); fileID != "" && fileID != "ffffffffffffffffffffffffffffffff" {
@@ -587,7 +624,10 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 	}
 }
 
-func smb2ParseCommand(pdu []byte) (map[string]any, error) {
+func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
+	if len(pdu) < smb2HeaderSize {
+		return nil, fmt.Errorf("smb2: truncated command header")
+	}
 	cmd := binary.LittleEndian.Uint16(pdu[12:14])
 	flags := binary.LittleEndian.Uint32(pdu[16:20])
 	mid := binary.LittleEndian.Uint64(pdu[24:32])
@@ -599,8 +639,8 @@ func smb2ParseCommand(pdu []byte) (map[string]any, error) {
 		"Response":    resp,
 		"Message ID":  mid,
 		"Credit":      binary.LittleEndian.Uint16(pdu[14:16]),
-		"Status":      binary.LittleEndian.Uint32(pdu[8:12]),
 	}
+	smb2HeaderFields(info, pdu, resp, flags)
 	if flags&smb2FlagAsync == 0 {
 		info["Tree ID"] = binary.LittleEndian.Uint32(pdu[36:40])
 		info["Session ID"] = binary.LittleEndian.Uint64(pdu[40:48])
@@ -634,19 +674,8 @@ func smb2ParseCommand(pdu []byte) (map[string]any, error) {
 			}
 		}
 	case 0:
-		if !resp {
-			if len(body) >= 4 {
-				count := int(binary.LittleEndian.Uint16(body[2:4]))
-				var dialects []uint16
-				for i := 0; i < count && 36+2*(i+1) <= len(body); i++ {
-					dialects = append(dialects, binary.LittleEndian.Uint16(body[36+2*i:]))
-				}
-				info["Dialects"] = dialects
-			}
-		} else if len(body) >= 6 {
-			d := binary.LittleEndian.Uint16(body[4:6])
-			info["Dialect"] = d
-			info["Version Name"] = smb2DialectName(d)
+		if err := smb2NegotiateFields(info, pdu, resp, max); err != nil {
+			return nil, err
 		}
 	case 3:
 		if !resp && len(body) >= 8 {
@@ -658,19 +687,12 @@ func smb2ParseCommand(pdu []byte) (map[string]any, error) {
 			}
 		}
 	case 5:
-		if !resp && len(body) >= 48 {
-			off := int(binary.LittleEndian.Uint16(body[44:46]))
-			n := int(binary.LittleEndian.Uint16(body[46:48]))
-			at := off - smb2HeaderSize
-			if at >= 0 && at+n <= len(body) {
-				info["File Name"] = smb2UTF16LE(body[at : at+n])
-			}
-		} else if resp && len(body) >= 80 {
-			info["FileId"] = hex.EncodeToString(body[64:80])
+		if err := smb2CreateFields(info, pdu, resp, max); err != nil {
+			return nil, err
 		}
 	case 6:
-		if len(body) >= 24 {
-			info["FileId"] = hex.EncodeToString(body[8:24])
+		if err := smb2CloseFields(info, pdu, resp); err != nil {
+			return nil, err
 		}
 	case 8, 9:
 		if !resp && len(body) >= 32 {

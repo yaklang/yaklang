@@ -160,10 +160,11 @@ func smb2Close(mid, sid uint64, tid uint32, fid []byte) []byte {
 	return smb2TCP(append(smb2Hdr(6, 0, mid, sid, tid), body...))
 }
 
-func smb2CloseResp(mid, sid uint64, tid uint32, fid []byte) []byte {
-	body := make([]byte, 24)
-	binary.LittleEndian.PutUint16(body[0:], 24)
-	copy(body[8:24], fid)
+func smb2CloseResp(mid, sid uint64, tid uint32, _ []byte) []byte {
+	// MS-SMB2 2.2.16: the response has timestamps/sizes, no FileId.
+	body := make([]byte, 60)
+	binary.LittleEndian.PutUint16(body[0:], 60)
+	binary.LittleEndian.PutUint64(body[8:], 0x0102030405060708)
 	return smb2TCP(append(smb2Hdr(6, 1, mid, sid, tid), body...))
 }
 
@@ -276,8 +277,10 @@ func TestProtocolSessionSMB2CompoundAndTransform(t *testing.T) {
 	require.Equal(t, 2, r.Events[0].Session["Compound Count"])
 	require.Equal(t, []string{"CREATE", "CLOSE"}, r.Events[0].Session["Command Names"])
 	commands := r.Events[0].Session["Commands"].([]map[string]any)
-	require.Equal(t, uint64(0x11), commands[1]["Session ID"])
-	require.Equal(t, uint32(1), commands[1]["Tree ID"])
+	require.Equal(t, ^uint64(0), commands[1]["Session ID"])
+	require.Equal(t, ^uint32(0), commands[1]["Tree ID"])
+	require.Equal(t, uint64(0x11), commands[1]["Effective Session ID"])
+	require.Equal(t, uint32(1), commands[1]["Effective Tree ID"])
 	require.Equal(t, true, commands[1]["Inherited Session Context"])
 	require.Equal(t, true, commands[1]["Inherited Tree Context"])
 	require.Equal(t, true, commands[1]["Related File ID Placeholder"])
@@ -286,12 +289,13 @@ func TestProtocolSessionSMB2CompoundAndTransform(t *testing.T) {
 	closeResp := smb2CloseResp(11, 0x11, 1, bytes.Repeat([]byte{0xff}, 16))[4:]
 	binary.LittleEndian.PutUint32(createResp[20:24], uint32(len(createResp)))
 	binary.LittleEndian.PutUint32(closeResp[16:20], smb2FlagResp|smb2FlagRelated)
-	binary.LittleEndian.PutUint32(closeResp[36:40], ^uint32(0))
-	binary.LittleEndian.PutUint64(closeResp[40:48], ^uint64(0))
+	// A related server reply returns its actual IDs; ignored request
+	// placeholders are not a valid response association shortcut.
 	r = s.Feed(1, ts, smb2TCP(append(createResp, closeResp...)))
 	require.Nil(t, r.Err, "%v", r.Err)
 	responseCommands := r.Events[0].Session["Commands"].([]map[string]any)
-	require.Equal(t, hex.EncodeToString(fid), responseCommands[1]["FileId"])
+	require.NotContains(t, responseCommands[1], "FileId", "CLOSE response has no literal file identifier")
+	require.Equal(t, hex.EncodeToString(fid), responseCommands[1]["Request File ID"])
 	require.Equal(t, true, responseCommands[1]["Inherited File ID"])
 	require.Equal(t, "closed", responseCommands[1]["File Context Status"])
 	require.Empty(t, s.(*captureSession).f.smb2.files, "related CLOSE inherits CREATE's reply FileId and releases that handle")

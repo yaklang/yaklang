@@ -29,6 +29,15 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	// SMB2's fixed header is 68 bytes including Direct TCP, four more than
+	// the default generic probe window. Check that bounded header before
+	// clipping; a signature alone cannot establish this protocol.
+	if p := probeSMB2(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
+		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	if f.port(4739) {
 		if p := probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 			f.protocol = "ipfix"

@@ -344,6 +344,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if p := probeSMB1Negotiate(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
 		return p
 	}
+	if p := probeSMB2(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+		return p
+	}
 	if telnetNegotiationStart(input) && (s.f.port(23) || telnetInitialEvidence(input)) {
 		return probeAccept("telnet", "IAC-negotiation", 95)
 	}
