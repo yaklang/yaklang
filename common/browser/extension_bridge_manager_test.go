@@ -8,6 +8,8 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -18,6 +20,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/minimartian"
 )
 
 func signManagedTestPayload(t *testing.T, key *ecdsa.PrivateKey, payload string) string {
@@ -154,6 +157,20 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.Equal(t, device.ID, manager.Snapshot().Connections[0].DeviceID)
 	require.Equal(t, auth.ManagedInstance, manager.Snapshot().Connections[0].ManagedInstance)
 	require.Equal(t, auth.CapabilityCatalog.Hash, manager.Snapshot().Connections[0].CapabilityCatalog.Hash)
+
+	stopIngress := manager.RegisterMITMIngress(context.Background(), "127.0.0.1:8083", false, make(chan *minimartian.WrapperedConn, 1))
+	t.Cleanup(stopIngress)
+	require.NoError(t, bridgeConnection.WriteJSON(ExtensionBridgeEnvelope{
+		Type: "request", ID: "ingress-request", Method: "yakit.mitm.ingress",
+		Params: json.RawMessage(`{"proxyHost":"127.0.0.1","proxyPort":8083}`),
+	}))
+	var ingressReply ExtensionBridgeEnvelope
+	require.NoError(t, bridgeConnection.ReadJSON(&ingressReply))
+	require.Nil(t, ingressReply.Error)
+	var ingress extensionMITMIngress
+	require.NoError(t, json.Unmarshal(ingressReply.Result, &ingress))
+	require.True(t, ingress.Available)
+	require.Positive(t, ingress.Port)
 	require.Equal(t, managedExtensionBridgeProtocolVersion, manager.currentServer().Status()["protocolVersion"])
 	responseDone := make(chan error, 1)
 	go func() {
@@ -193,6 +210,9 @@ func TestManagedExtensionBridgePairsAuthenticatesAndRevokesDevice(t *testing.T) 
 	require.JSONEq(t, `{"route":"`+device.ID+`"}`, string(raw))
 	require.NoError(t, <-responseDone)
 	require.NoError(t, manager.RevokeDevice(device.ID))
+	reclaimed, err := net.Listen("tcp4", fmt.Sprintf("127.0.0.1:%d", ingress.Port))
+	require.NoError(t, err, "revoking a paired device must reclaim its ingress immediately")
+	_ = reclaimed.Close()
 	require.Eventually(t, func() bool { return !manager.Snapshot().Connected }, time.Second, 10*time.Millisecond)
 	_ = bridgeConnection.SetReadDeadline(time.Now().Add(time.Second))
 	_, _, err = bridgeConnection.ReadMessage()

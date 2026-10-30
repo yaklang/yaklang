@@ -242,6 +242,8 @@ func newServerEx(opts ...ServerOpts) (*Server, error) {
 			browser.SetActiveExtensionBridgeManager(manager)
 			if startErr := manager.Start(serverConfig.browserBridgePort); startErr != nil {
 				log.Warnf("start browser extension bridge failed: %v", startErr)
+			} else {
+				log.Infof("browser extension bridge listening at %s", manager.Snapshot().URL)
 			}
 		}
 	}

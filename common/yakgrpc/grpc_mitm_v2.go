@@ -2033,6 +2033,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 			}
 			// 内置高危凭证检测(TrafficGuard): 复用上面过滤前已扫描的 tgFindings, 标红并生成 Risk。
 			trafficguard.ApplyToFlow(s.GetProjectDatabase(), flow, tgFindings, plainRequest, plainResponse)
+			if identity, ok := httpctx.GetBrowserInstance(req); ok {
+				yakit.ApplyBrowserInstanceToHTTPFlow(flow, identity)
+			}
 			tags := flow.Tags
 			var err error
 			if recorder, ok := httpctx.GetResponseStreamRecorder(req).(*yakit.HTTPFlowStreamRecorder); ok {
@@ -2167,6 +2170,9 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	if firstReq.GetMaxContentLength() != 0 && firstReq.GetMaxContentLength() <= 10*1024*1024 {
 		opts = append(opts, crep.MITM_SetMaxContentLength(firstReq.GetMaxContentLength()))
 	}
+	browserIngressOption, browserIngressReady, browserIngressCleanup := s.prepareBrowserMITMIngress(streamCtx, addr, proxyUsername != "" && proxyPassword != "")
+	defer browserIngressCleanup()
+	opts = append(opts, browserIngressOption)
 	mServer, err = crep.NewMITMServer(opts...)
 	if err != nil {
 		log.Error(err)
@@ -2202,6 +2208,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 		// Single-port path: unchanged behaviour.
 		log.Infof("start serve mitm server for %s", addr)
 		err = mServer.ServeWithListenedCallback(streamCtx, addr, func() {
+			browserIngressReady()
 			feedbackToUser("MITM 服务器已启动 / starting mitm server")
 		})
 		if err != nil {
@@ -2222,6 +2229,7 @@ func (s *Server) MITMV2(stream ypb.Yak_MITMV2Server) error {
 	// ServeWithMultipleAddresses deduplicates, binds all listeners, then
 	// routes every accepted connection into the single underlying proxy loop.
 	err = mServer.ServeWithMultipleAddresses(streamCtx, allAddrs, func() {
+		browserIngressReady()
 		feedbackToUser("MITM 服务器已启动 / starting mitm server")
 	})
 	if err != nil {

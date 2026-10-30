@@ -114,6 +114,9 @@ func newHTTPFlowStreamRecorder(
 	if err != nil {
 		return nil, utils.Wrap(err, "create initial HTTP stream flow")
 	}
+	if identity, ok := httpctx.GetBrowserInstance(req); ok {
+		ApplyBrowserInstanceToHTTPFlow(flow, identity)
+	}
 	flow.SetResponse(string(headerBytes))
 	flow.StatusCode = int64(rsp.StatusCode)
 	flow.ContentType = rsp.Header.Get("Content-Type")

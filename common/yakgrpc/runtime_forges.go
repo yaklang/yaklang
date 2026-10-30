@@ -11,6 +11,7 @@ import (
 	"github.com/yaklang/yaklang/common/ai/aiforge"
 	"github.com/yaklang/yaklang/common/ai/aiforge/browsercrypto"
 	"github.com/yaklang/yaklang/common/browser"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httpctx"
 	"github.com/yaklang/yaklang/common/yakgrpc/ypb"
 )
 
@@ -53,6 +54,19 @@ func (b serverBrowserExtensionBridge) Connections() []browser.ExtensionBridgeCon
 		return nil
 	}
 	return b.server.browserBridge.Snapshot().Connections
+}
+
+func (b serverBrowserExtensionBridge) resolveHTTPFlowIdentity(deviceID, browserRef string) (httpctx.BrowserInstance, error) {
+	deviceID, _, err := browsertools.ResolveBrowserDevice(b, deviceID, browserRef)
+	if err != nil {
+		return httpctx.BrowserInstance{}, err
+	}
+	for _, connection := range b.Connections() {
+		if connection.DeviceID == deviceID {
+			return connection.BrowserInstance(), nil
+		}
+	}
+	return httpctx.BrowserInstance{}, errors.New("the selected browser instance disconnected")
 }
 
 func (s *Server) buildBrowserAgentTools() ([]*aitool.Tool, error) {

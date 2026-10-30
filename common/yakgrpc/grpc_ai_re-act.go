@@ -94,6 +94,7 @@ func (s *Server) startAIReActWithOptions(stream ypb.Yak_StartAIReActServer, load
 		} else {
 			extraOptions = append(extraOptions,
 				aicommon.WithTools(browserTools...),
+				aicommon.WithBrowserHTTPFlowIdentityResolver(bridge.resolveHTTPFlowIdentity),
 				aicommon.WithDynamicContextProvider("browser_runtime", func(
 					aicommon.AICallerConfigIf, *aicommon.Emitter, string,
 				) (string, error) {
