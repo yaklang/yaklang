@@ -92,6 +92,19 @@ func smb1DisplayBindings() []displayFieldBinding {
 	} {
 		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
 	}
+	for _, field := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"smb.andx.cmd", "AndX Command", 8}, {"smb.andx.offset", "AndX Offset", 16},
+		{"smb.security_blob_len", "Security Blob Length", 16}, {"smb.action", "Action", 16}, {"smb.vc", "VC Number", 16},
+	} {
+		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
+	}
+	for _, field := range []struct{ name, key string }{{"smb.native_os", "Native OS"}, {"smb.native_lanman", "Native LAN Manager"}} {
+		add(field.name, field.key, "Body", DisplayString, 0)
+		out[len(out)-1].descriptor.AllowEmpty = true
+	}
 	// Signed timezone and opaque bytes remain their correct typed Body values;
 	// the current public alias schema has neither signed nor bytes field types.
 	out = append(out, displayRoot("smb", "smb.selected_dialect", "Dialect selected from observed matched request", DisplayString, 0, "context", "Selected Dialect Name"))

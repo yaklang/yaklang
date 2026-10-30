@@ -96,6 +96,8 @@ var builtinBinSpecs = [][2]string{
 	{"amqp", "AMQP"},
 	{"application-layer.cifs", "CIFSDirectTCP"},
 	{"application-layer.cifs", "CIFSDirectTCPNegotiateExtendedResponse"},
+	{"application-layer.cifs", "CIFSDirectTCPSessionSetupExtendedRequest"},
+	{"application-layer.cifs", "CIFSDirectTCPSessionSetupExtendedResponse"},
 	{"application-layer.smb2", "SMB2"},
 	{"application-layer.smb3", "SMB3Transform"},
 	{"application-layer.dcerpc", "DCERPC"},

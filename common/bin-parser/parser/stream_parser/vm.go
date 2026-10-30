@@ -475,6 +475,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseSMTPFields(invocation.node, invocation.operator, data)
 		},
+		"parseCIFSSessionSetup": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-session-setup: generation is unsupported")
+			}
+			return parseCIFSSessionSetup(invocation.node, invocation.operator, response)
+		},
 		"parseKafkaFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("kafka-fields: structured generation is not supported")

@@ -278,6 +278,9 @@ func cifsStructuredProjection(node *base.Node, raw []byte, rule string, keys []s
 		return nil, false, nil
 	}
 	switch keys[0] {
+	case "CIFSDirectTCPSessionSetupExtendedRequest", "CIFSDirectTCPSessionSetupExtendedResponse":
+		fields, err := ProjectCIFSSessionSetupFields(node, raw)
+		return fields, true, err
 	case "CIFSDirectTCP", "CIFSNegotiateRequest":
 		fields, err := ProjectCIFSNegotiateFields(node, raw, cifsProjectionMaxDialects)
 		return fields, true, err
