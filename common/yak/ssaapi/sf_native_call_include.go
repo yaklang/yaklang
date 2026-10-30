@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/yaklang/yaklang/common/schema"
 	"github.com/yaklang/yaklang/common/syntaxflow/sfdb"
@@ -47,7 +48,12 @@ func GetSFIncludeCache() *utils.Cache[Values] {
 	return includeCache
 }
 
-var includeCache = createIncludeCache()
+var includeCache = utils.NewTTLCache[Values]()
+
+// includeFlight single-flights identical include computations on top of
+// includeCache: the first cache miss computes once, concurrent misses share
+// the result, and later callers are served from the cache.
+var includeFlight = utils.NewSingleFlightCache[string, Values](includeCache.CacheExWithKey)
 
 type taskLocalSyntaxFlowRuleLibrariesKey struct{}
 
@@ -129,8 +135,25 @@ func taskLocalSyntaxFlowRuleCacheHash(rule *schema.SyntaxFlowRule) string {
 	return utils.CalcSha256(rule.RuleId, rule.RuleName, rule.Content, rule.Tag)
 }
 
-func createIncludeCache() *utils.Cache[Values] {
-	return utils.NewTTLCache[Values]()
+// slowIncludeDuration is the wall-clock threshold after which a single lib
+// include sub-query is logged. It diagnoses rules stuck in include without
+// rule-perf profiling (e.g. 9 rules stuck 200-350s on include java-servlet-param).
+const slowIncludeDuration = 30 * time.Second
+
+// includeFlightValues runs compute once per flightKey across concurrent
+// callers and caches the successful result; a waiter can still give up on its
+// own rule ctx because the shared single-flight cache is context-aware.
+func includeFlightValues(
+	ctx context.Context,
+	flightKey string,
+	ruleName string,
+	compute func() (Values, error),
+) (Values, error) {
+	values, err := includeFlight.Do(ctx, flightKey, compute)
+	if err != nil && ctx.Err() != nil {
+		return nil, utils.Errorf("include %q waiting canceled: %w", ruleName, ctx.Err())
+	}
+	return values, err
 }
 
 func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCallActualParams) (success bool, value sfvm.Values, err error) {
@@ -171,47 +194,89 @@ func nativeCallInclude(v sfvm.Values, frame *sfvm.SFFrame, params *sfvm.NativeCa
 	if bound != nil {
 		cacheKey = cacheKey + ":struct:" + bound.key
 	}
-	hash, ret, shouldCache := GetIncludeCacheValue(parent, cacheKey, inputs)
-	if ret != nil {
-		return true, ret, nil
-	}
-	var queryValue sfvm.Values
-	if len(inputs) == 0 {
-		queryValue = sfvm.ValuesOf(parent)
-	} else {
-		queryValue = ToSFVMValues(inputs)
+	flightKey, cacheable := includeCacheKey(parent, cacheKey, inputs)
+
+	// A non-cacheable include (temp input values, or a program without a hash)
+	// is computed directly; otherwise identical concurrent misses share one
+	// computation through includeFlight.
+	config := frame.GetConfig()
+	ctx := config.GetContext()
+	if ctx == nil {
+		ctx = context.Background()
 	}
 
-	config := frame.GetConfig()
-	opts := []QueryOption{
-		QueryWithSFConfig(config),
-		QueryWithContext(config.GetContext()),
-		QueryWithWorkBudget(config.GetWorkBudget()),
-		QueryWithInitInputValues(queryValue),
-		QueryWithRule(rule),
+	compute := func() (Values, error) {
+		var queryValue sfvm.Values
+		if len(inputs) == 0 {
+			queryValue = sfvm.ValuesOf(parent)
+		} else {
+			queryValue = ToSFVMValues(inputs)
+		}
+		opts := []QueryOption{
+			QueryWithSFConfig(config),
+			QueryWithContext(ctx),
+			QueryWithWorkBudget(config.GetWorkBudget()),
+			QueryWithInitInputValues(queryValue),
+			QueryWithRule(rule),
+		}
+		if bound != nil && rule.IsStructMode() {
+			opts = append(opts, QueryWithStruct(bound.compileUnit()))
+		} else {
+			opts = append(opts, QueryWithProgram(parent))
+		}
+		start := time.Now()
+		result, err := QuerySyntaxflow(opts...)
+		if took := time.Since(start); took > slowIncludeDuration {
+			log.Warnf("syntaxflow include %q on program %s took %s", ruleName, parent.GetProgramName(), took)
+		}
+		if err != nil {
+			return nil, err
+		}
+		var gotValues Values
+		for _, name := range result.GetAlertVariables() {
+			vs := result.GetValues(name)
+			gotValues = append(gotValues, vs...)
+		}
+		if len(gotValues) == 0 {
+			return nil, utils.Errorf("no value found")
+		}
+		return gotValues, nil
 	}
-	if bound != nil && rule.IsStructMode() {
-		opts = append(opts, QueryWithStruct(bound.compileUnit()))
-	} else {
-		opts = append(opts, QueryWithProgram(parent))
+
+	if !cacheable {
+		gotValues, err := compute()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, CreateIncludeValue(gotValues), nil
 	}
-	result, err := QuerySyntaxflow(opts...)
+
+	gotValues, err := includeFlightValues(ctx, flightKey, ruleName, compute)
 	if err != nil {
 		return false, nil, err
 	}
-	var gotValues Values
-	for _, name := range result.GetAlertVariables() {
-		vs := result.GetValues(name)
-		gotValues = append(gotValues, vs...)
+	return true, CreateIncludeValue(gotValues), nil
+}
+
+// includeCacheKey derives the cache / flight identity of one include. ok is
+// false when the result must not be cached or deduped: input values contain
+// temp values, or the program has no hash.
+func includeCacheKey(program *Program, ruleName string, inputValues Values) (string, bool) {
+	// Hash() is unavailable only for a program with neither a stored IR record
+	// nor a name; such results are neither cached nor deduped.
+	hash, ok := program.Hash()
+	if !ok {
+		return "", false
 	}
-	if len(gotValues) == 0 {
-		return false, nil, utils.Errorf("no value found")
+	hash = utils.CalcSha256(hash + ruleName)
+	if inputValues != nil && len(inputValues) > 0 {
+		valueHash, ok := inputValues.Hash()
+		if !ok {
+			return "", false
+		}
+		hash = utils.CalcSha256(hash, valueHash)
 	}
-	if shouldCache {
-		includeCache.Set(hash, gotValues)
-	}
-	val := CreateIncludeValue(gotValues)
-	return true, val, nil
+	return hash, true
 }
 
 func CreateIncludeValue(vs Values) sfvm.Values {
@@ -224,32 +289,16 @@ func CreateIncludeValue(vs Values) sfvm.Values {
 	return sfvm.NewValues(list)
 }
 
+// GetIncludeCacheValue reports the include cache identity for (program, lib
+// rule) and any cached value. Kept for tests that assert cache-key derivation;
+// production include lookups go through includeFlight.
 func GetIncludeCacheValue(program *Program, ruleName string, inputValues Values) (hash string, value sfvm.Values, shouldCache bool) {
-	getRetFromCache := func(hash string) sfvm.Values {
-		if ret, ok := includeCache.Get(hash); ok {
-			return CreateIncludeValue(ret)
-		}
-		return nil
+	hash, shouldCache = includeCacheKey(program, ruleName, inputValues)
+	if !shouldCache {
+		return "", nil, false
 	}
-
-	if programHash, ok := program.Hash(); ok {
-		// Use program hash and rule name to generate a unique hash
-		hash = utils.CalcSha256(programHash + ruleName)
-		shouldCache = true
-		if inputValues != nil && len(inputValues) > 0 {
-			if valueHash, ok := inputValues.Hash(); ok {
-				hash = utils.CalcSha256(hash, valueHash)
-			} else {
-				// if input param values not empty but have temp value,
-				// then the result should not be cached
-				shouldCache = false
-			}
-		}
-		if !shouldCache {
-			return
-		}
-		value = getRetFromCache(hash)
-		return
+	if ret, ok := includeCache.Get(hash); ok {
+		value = CreateIncludeValue(ret)
 	}
-	return
+	return hash, value, true
 }

@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"context"
 	"fmt"
+
 	"golang.org/x/sync/singleflight"
 )
 
@@ -19,8 +21,16 @@ func NewSingleFlightCache[K comparable, V any](cache *CacheExWithKey[K, V]) *Sin
 	}
 }
 
-// Do executes the loader function only once for the same key, even with concurrent requests.
-func (s *SingleFlightCache[K, V]) Do(key K, loader func() (V, error)) (V, error) {
+// Do executes the loader function only once for the same key, even with
+// concurrent requests, and caches the successful result. ctx bounds only this
+// caller's wait: the flight keeps running under the loader's own cancellation
+// and a successful result is still cached. A panicking loader is reported as an
+// error to every caller instead of crashing the process from singleflight's
+// internal goroutine.
+func (s *SingleFlightCache[K, V]) Do(ctx context.Context, key K, loader func() (V, error)) (V, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
 	if s.cache != nil {
 		if value, ok := s.cache.Get(key); ok {
 			return value, nil
@@ -28,14 +38,14 @@ func (s *SingleFlightCache[K, V]) Do(key K, loader func() (V, error)) (V, error)
 	}
 
 	keyStr := fmt.Sprintf("%v", key)
-	result, err, _ := s.sf.Do(keyStr, func() (interface{}, error) {
+	result := s.sf.DoChan(keyStr, func() (interface{}, error) {
 		if s.cache != nil {
 			if value, ok := s.cache.Get(key); ok {
 				return value, nil
 			}
 		}
 
-		data, err := loader()
+		data, err := safeLoad(loader)
 		if err == nil && s.cache != nil {
 			s.cache.Set(key, data)
 		}
@@ -43,16 +53,31 @@ func (s *SingleFlightCache[K, V]) Do(key K, loader func() (V, error)) (V, error)
 		return data, err
 	})
 
-	if err != nil {
+	select {
+	case <-ctx.Done():
 		var zero V
-		return zero, err
+		return zero, ctx.Err()
+	case ret := <-result:
+		if ret.Err != nil {
+			var zero V
+			return zero, ret.Err
+		}
+		if res, ok := ret.Val.(V); ok {
+			return res, nil
+		}
+		var zero V
+		return zero, Errorf("unexpected result type from singleflight")
 	}
-
-	if res, ok := result.(V); ok {
-		return res, nil
-	}
-
-	var zero V
-	return zero, Errorf("unexpected result type from singleflight")
 }
 
+// safeLoad converts a loader panic into the error every caller observes.
+func safeLoad[V any](loader func() (V, error)) (value V, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			var zero V
+			value = zero
+			err = Errorf("singleflight: panic: %v", r)
+		}
+	}()
+	return loader()
+}
