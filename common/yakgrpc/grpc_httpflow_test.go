@@ -2221,6 +2221,7 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 
 	var gotIssueType, gotSeverity, gotStatus, gotStatusReason string
 	var gotHashes []string
+	synced := make(chan struct{}, 1)
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "/api/set/httpflow/tags", r.URL.Path)
 		require.Equal(t, "test-token", r.Header.Get("Authorization"))
@@ -2236,11 +2237,21 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 		gotIssueType, gotSeverity, gotStatus, gotStatusReason =
 			body.SetIssueType, body.SetSeverity, body.SetStatus, body.StatusReason
 		_, _ = w.Write([]byte(`{}`))
+		synced <- struct{}{}
 	}))
 	defer ts.Close()
 	oldBase := consts.GetOnlineBaseUrl()
 	consts.SetOnlineBaseUrl(ts.URL)
 	t.Cleanup(func() { consts.SetOnlineBaseUrl(oldBase) })
+
+	waitOnline := func() {
+		t.Helper()
+		select {
+		case <-synced:
+		case <-time.After(5 * time.Second):
+			t.Fatal("timed out waiting for online sync")
+		}
+	}
 
 	server := &Server{}
 
@@ -2257,6 +2268,7 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Greater(t, resp.UpdatedCount, int64(0))
+	waitOnline()
 
 	assert.NotEmpty(t, gotHashes)
 	assert.Contains(t, gotHashes, flow.Hash)
@@ -2271,6 +2283,31 @@ func TestBatchSetHTTPFlowIssueFields(t *testing.T) {
 	assert.Equal(t, "high", updated.Severity)
 	assert.Equal(t, "confirmed", updated.Status)
 	assert.Equal(t, "verified by admin", updated.StatusReason)
+
+	clearReq := &ypb.BatchSetHTTPFlowIssueFieldsRequest{
+		Hashes:       []string{flow.Hash},
+		SetIssueType: "  ",
+		SetSeverity:  "",
+		SetStatus:    "",
+		StatusReason: "",
+		Token:        "test-token",
+	}
+	clearResp, err := server.BatchSetHTTPFlowIssueFields(context.Background(), clearReq)
+	require.NoError(t, err)
+	require.NotNil(t, clearResp)
+	assert.Greater(t, clearResp.UpdatedCount, int64(0))
+	waitOnline()
+	assert.Equal(t, "", gotIssueType)
+	assert.Equal(t, "", gotSeverity)
+	assert.Equal(t, "", gotStatus)
+	assert.Equal(t, "", gotStatusReason)
+
+	cleared, err := yakit.GetHTTPFlowByHash(db, flow.Hash)
+	require.NoError(t, err)
+	assert.Equal(t, "", cleared.IssueType)
+	assert.Equal(t, "", cleared.Severity)
+	assert.Equal(t, "", cleared.Status)
+	assert.Equal(t, "", cleared.StatusReason)
 }
 
 func TestHTTPFlowsFromOnline(t *testing.T) {

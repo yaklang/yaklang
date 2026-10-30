@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/log"
 	"github.com/yaklang/yaklang/common/utils"
@@ -218,6 +219,10 @@ func (s *OnlineClient) downloadOnlineHTTPFlows(token string, page int, limit int
 }
 
 type setHTTPFlowTagsRequest struct {
+	Page         int64  `json:"page"`
+	Limit        int64  `json:"limit"`
+	OrderBy      string `json:"order_by"`
+	Order        string `json:"order"`
 	Hash         string `json:"hash"`
 	SetIssueType string `json:"setIssueType"`
 	SetSeverity  string `json:"setSeverity"`
@@ -234,6 +239,10 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 	}
 
 	raw, err := json.Marshal(setHTTPFlowTagsRequest{
+		Page:         1,
+		Limit:        int64(len(hashes)),
+		OrderBy:      "created_at",
+		Order:        "desc",
 		Hash:         strings.Join(hashes, ","),
 		SetIssueType: setIssueType,
 		SetSeverity:  setSeverity,
@@ -251,6 +260,8 @@ func (s *OnlineClient) SetHTTPFlowTagsToOnline(ctx context.Context, token string
 		poc.WithReplaceHttpPacketBody(raw, true),
 		poc.WithProxy(consts.GetOnlineBaseUrlProxy()),
 		poc.WithSave(false),
+		poc.WithContext(ctx),
+		poc.WithTimeout(30),
 	)
 	if err != nil {
 		return utils.Errorf("set httpflow tags to online failed: %s", err)
