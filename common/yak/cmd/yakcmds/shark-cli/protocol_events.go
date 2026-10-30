@@ -237,7 +237,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 				}
 			}
-			if protocol == "ssh" {
+			if protocol == "ssh" || protocol == "smb" {
 				// Every nested owner starts its own scope. A context map without
 				// metadata must not borrow a same-named parent's wire occurrence.
 				previous := wireRanges
@@ -665,7 +665,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || protocol == "ssh" || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || (protocol == "ssh" || protocol == "smb") || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -850,7 +850,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			add("Plaintext: unavailable · record authentication has not been verified", false)
 		}
 		values := map[string]any{}
-		if protocol == "ssh" {
+		if protocol == "ssh" || protocol == "smb" {
 			wireRanges = detailWireRanges(e.Fields["Wire Field Ranges"])
 			for key := range e.Session {
 				delete(wireRanges, key) // Session may replace a wire offer with context.
@@ -1039,7 +1039,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 		}
 		if len(values) > 0 {
-			if protocol == "ssh" {
+			if protocol == "ssh" || protocol == "smb" {
 				// This synthetic root owns the explicitly merged root ranges;
 				// nested maps still establish independent scopes in walk.
 				values["Wire Field Ranges"] = wireRanges

@@ -113,8 +113,8 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 		return 0, nil, fmt.Errorf("smb2: Direct TCP zero byte required")
 	}
 	n := smb2DirectLength(w)
-	if n < 52 {
-		return 0, nil, fmt.Errorf("smb2: Direct TCP length smaller than transform header")
+	if n < 4 {
+		return 0, nil, fmt.Errorf("smb: Direct TCP length smaller than signature")
 	}
 	total := 4 + n
 	if total > f.a.config.MaxMessageBytes {
@@ -125,6 +125,12 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	}
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
+	case 0x424d53ff:
+		if probeSMB1Negotiate(w[:total], f.a.budget.MaxFrameBytes).Verdict != ProbeAccept {
+			return 0, nil, fmt.Errorf("smb: unsupported or invalid SMB1 negotiate request")
+		}
+		f.protocol = "smb"
+		return total, f.spec("cifs", "CIFSDirectTCP"), nil
 	case smb3Transform:
 		if n < 52 {
 			return 0, nil, fmt.Errorf("smb2: truncated transform header")
@@ -140,6 +146,7 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 		if uint64(ciphertextLen) > uint64(orig) {
 			return 0, nil, fmt.Errorf("smb2: transform ciphertext length disagrees with original size")
 		}
+		f.protocol = "smb2"
 		return total, f.spec("smb3", "SMB3Transform"), nil
 	case smb2Magic:
 		if n < smb2HeaderSize {
@@ -148,6 +155,7 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 		if binary.LittleEndian.Uint16(w[8:10]) != 64 {
 			return 0, nil, fmt.Errorf("smb2: header StructureSize must be 64")
 		}
+		f.protocol = "smb2"
 		return total, f.spec("smb2", "SMB2"), nil
 	default:
 		return 0, nil, fmt.Errorf("smb2: ProtocolId is not SMB2 or SMB3 transform")
@@ -231,21 +239,42 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 	}
 	info := cmds[0]
 	info["Context Level"] = "observed"
-	if s.dialect != 0 {
-		info["Dialect"] = s.dialect
-		info["Version Name"] = smb2DialectName(s.dialect)
-	}
 	names := make([]string, 0, len(cmds))
 	for _, c := range cmds {
-		names = append(names, fmt.Sprint(c["Packet Name"]))
+		name, _ := c["Packet Name"].(string)
+		names = append(names, name)
+		if s.dialect != 0 {
+			// Connection observations are not a field in this command. In
+			// particular, never overwrite the current NEGOTIATE's wire value.
+			c["Connection Dialect"] = s.dialect
+			c["Connection Version Name"] = smb2DialectName(s.dialect)
+			if name != "NEGOTIATE" {
+				c["Version Name"] = smb2DialectName(s.dialect)
+			}
+		}
 		if err := s.associateFrom(c, max, dir); err != nil {
 			return nil, err
 		}
-		if name, _ := c["Packet Name"].(string); name == "NEGOTIATE" {
+		if name == "NEGOTIATE" && c["Response"] == true && c["Status"] == uint32(0) {
 			if d, ok := c["Dialect"].(uint16); ok && d != 0 {
-				s.dialect = d
-				info["Dialect"] = d
-				info["Version Name"] = smb2DialectName(d)
+				// 0x02ff is the multi-protocol wildcard response. It asks for a
+				// new SMB2 NEGOTIATE and is not a selected session dialect.
+				if d == 0x02ff {
+					c["Dialect Negotiated"], c["SMB2 Negotiate Required"] = false, true
+					// An SMB1 offer has no SMB2 pending entry. Its response can
+					// clear a selection, but a same-direction observation cannot.
+					if c["Association Status"] == "matched" || dir < 0 || dir != s.client {
+						s.dialect = 0
+						c["Dialect Context Updated"] = true
+					} else {
+						c["Dialect Context Updated"] = false
+					}
+				} else if c["Association Status"] == "matched" {
+					s.dialect = d
+					c["Dialect Context Updated"] = true
+				} else {
+					c["Dialect Context Updated"] = false
+				}
 			}
 		}
 	}
@@ -704,6 +733,8 @@ func smb2CommandName(cmd uint16) string {
 
 func smb2DialectName(d uint16) string {
 	switch d {
+	case 0x02ff:
+		return "wildcard (SMB2 negotiate required)"
 	case 0x0202:
 		return "2.0.2"
 	case 0x0210:

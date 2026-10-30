@@ -51,6 +51,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"rdp", "tcp", "TPKT/X224 negotiation and selected TLS carrier", "no complete desktop/session decoding claim"},
 		{"rtsp", "tcp", "RTSP control/interleaved frames", "observed CSeq/session/SETUP mapping"},
 		{"redis", "tcp", "RESP messages", "complete structured initial admission and observed flow"},
+		{"smb", "tcp", "exact Direct TCP SMB1 SMB_COM_NEGOTIATE requests", "ordered raw OEM dialect offers and bounded TCP reassembly; observed SMB2/3 transition at the next complete record, no selected dialect or legacy-to-SMB2 MID association inferred"},
 		{"smb2", "tcp", "direct TCP SMB2/3 messages", "observed dialect/session/MID; encrypted SMB3 opaque"},
 		{"tds", "tcp", "TDS packets/messages", "observed native TDS profile, protected values opaque"},
 		{"rfb", "tcp", "RFB/VNC handshake and messages", "observed native negotiated profile"},

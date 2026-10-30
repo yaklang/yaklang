@@ -54,7 +54,7 @@ var protocolDisplayNames = map[string]string{
 	"quic": "QUIC", "websocket": "WebSocket", "postgresql": "PostgreSQL", "mysql": "MySQL",
 	"ssdp": "SSDP", "rdpudp": "RDPUDP",
 	"redis": "Redis", "mongodb": "MongoDB", "kafka": "Kafka", "mqtt": "MQTT",
-	"smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
+	"smb": "SMB1", "smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
 	"ntlmssp": "NTLMSSP", "spnego": "SPNEGO", "mdns": "mDNS", "llmnr": "LLMNR",
 	"snmp": "SNMP", "dhcp": "DHCP", "dhcpv6": "DHCPv6", "syslog": "Syslog",
 	"icmp": "ICMP", "icmpv6": "ICMPv6",

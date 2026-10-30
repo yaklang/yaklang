@@ -87,6 +87,12 @@ func parseStructuredFallback(data []byte, rule string, keys ...string) (map[stri
 	if reader.Len() != 0 {
 		return nil, fmt.Errorf("structured parse: %d unconsumed message bytes", reader.Len())
 	}
+	if fields, selected, projectErr := cifsStructuredProjection(node, data, rule, keys); selected {
+		if projectErr != nil {
+			return nil, projectErr
+		}
+		return map[string]any{"fields": fields, "metadata": node.Cfg.GetItem("additionInfo")}, nil
+	}
 	return map[string]any{"fields": stream_parser.NodeToMap(node), "metadata": node.Cfg.GetItem("additionInfo")}, nil
 }
 

@@ -223,6 +223,9 @@ func cassandraRequestEvidence(w []byte, maxBytes int) bool {
 }
 
 func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
+	if p := probeSMB1Negotiate(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
 	if p := probeRTSP(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}
