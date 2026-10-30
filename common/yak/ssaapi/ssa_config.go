@@ -182,6 +182,9 @@ var WithRawLanguage = ssaconfig.WithProjectRawLanguage
 var WithLanguage = ssaconfig.WithProjectLanguage
 
 // WithFileSystemEntry 设置编译入口文件（导出名为 ssa.withEntryFile）
+// Yak 只将这些文件作为可执行根；其他源码保留在文件系统中，供 include 加载。
+// 不指定时，Yak 仍编译所有可处理的源码。其他语言的入口行为不变。
+// 路径按扫描名称精确匹配，优先相对文件系统根目录，其次相对 ProgramPath；统一斜杠但不折叠大小写。
 // 参数:
 //   - v: 一个或多个入口文件路径，支持逗号分隔
 //
