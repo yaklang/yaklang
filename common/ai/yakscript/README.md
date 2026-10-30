@@ -33,7 +33,7 @@ AIModelConfig
 
 ## 正式 API 与入口类型
 
-入口是 `chat(req, emit)`，可选入口是 `shouldRetry(req, failure)`。辅助函数通过正式 `ai` 库导出，不需要 import。编辑器传递 `ai-model` 分析上下文；入口参数、字段、函数签名与文档均参与语言服务。
+入口是 `chat(req, emit)`，可选入口是 `shouldRetry(req, failure)`。辅助函数通过正式 `ai` 库导出，不需要 import。编辑器使用普通 `yak` 语言模式，既有语言服务从 script engine 的库表读取正式导出，并结合文档提供 `ai.*` 补全、悬浮说明和函数签名。`req` / `failure` 是宿主运行时传入的入口参数，其字段契约见下表；不另设专用编辑器类型或入口参数类型注入。
 
 | req 字段 | 含义 |
 | --- | --- |

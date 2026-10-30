@@ -108,7 +108,7 @@ func StaticAnalyzeWithContext(ctx context.Context, code, codeTyp string, kind St
 
 	// compiler
 	switch codeTyp {
-	case "yak", "ai-model", "mitm", "port-scan", "codec", "context-menu":
+	case "yak", "mitm", "port-scan", "codec", "context-menu":
 		// Yaklang 编译
 		yaklangStart := time.Now()
 		newEngine := yaklang.New()

@@ -34,7 +34,7 @@ qualityConfig = aim.qualityPriorityAIConfig("openai", options...)
 ## 自定义模型 Provider
 
 模型脚本使用 `chat(req, emit)`，可定义 `shouldRetry(req, failure)`。编辑器使用
-`ai-model` 分析上下文，为 req 和 failure 提供字段补全。公开工具函数如下：
+普通 Yak 模式，复用正式库导出的补全、悬浮文档和函数签名。公开工具函数如下：
 
 - `ai.ReadSSE(reader, callback)` 只解码 SSE 事件信封；回调解析上游模型的 JSON。
 - `ai.ModelError(req, kind, status, code, message, retryAfter)` 报告一次失败，不返回错误正文给 Agent。
