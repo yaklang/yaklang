@@ -14,7 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/schema"
-	"github.com/yaklang/yaklang/common/testutil/enterprisefixtures"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 // TestPCAPHTTPDGAFixtureUsesStructuredWorkflow is the end-to-end regression for
@@ -55,7 +55,13 @@ func TestPCAPHTTPDGAFixtureUsesStructuredWorkflow(t *testing.T) {
 		require.NotNil(t, result.Result)
 		return result.Result
 	}
-	capture := enterprisefixtures.Path(t, "http-dga-c2/capture.pcapng")
+	root, err := trafficfixture.RepositoryRoot()
+	require.NoError(t, err)
+	capture, err := trafficfixture.Materialize(
+		filepath.Join(root, "testdata/enterprise-traffic-analysis/http-dga-c2/capture.pcapng"),
+		t.TempDir(),
+	)
+	require.NoError(t, err)
 	page := invoke("query_pcapdb", map[string]any{
 		"pcapfile": capture, "query_type": "protocols", "protocol": "http", "limit": 20, "result_bytes": 65536,
 	}).(*pcapdb.ResultPage[pcapdb.ProtocolSummary])

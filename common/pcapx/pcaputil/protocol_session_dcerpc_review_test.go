@@ -3,12 +3,13 @@ package pcaputil
 import (
 	"encoding/binary"
 	"errors"
+	"path/filepath"
 	"strconv"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
-	"github.com/yaklang/yaklang/common/testutil/enterprisefixtures"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func newReviewDCERPC() *binDCERPC {
@@ -169,7 +170,13 @@ func TestProtocolSessionDCERPCBindAckNegotiateResult(t *testing.T) {
 }
 
 func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
-	raw := enterprisefixtures.ReadFile(t, "lateral-movement-psexec/capture.pcapng")
+	root, err := trafficfixture.RepositoryRoot()
+	require.NoError(t, err)
+	raw, err := trafficfixture.ReadFile(filepath.Join(
+		root,
+		"testdata/enterprise-traffic-analysis/lateral-movement-psexec/capture.pcapng",
+	))
+	require.NoError(t, err)
 	events, _, err := binReplay(t, raw, 1)
 	require.NoError(t, err)
 
