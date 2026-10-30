@@ -495,3 +495,30 @@ func TestSMB1SetupRefusedBodyRetiresOnlyItsLineageAndKeepsNextRecord(t *testing.
 	next = smb1FeedComplete(t, s2, 0, smb1SetupWire(false, 4, 2048, 0))
 	require.NotContains(t, next.Session, "Continuation Response Event ID")
 }
+
+func TestSMB1SetupStateCopyBudgetRefusesBeforeCommitting(t *testing.T) {
+	a := &binParser{budget: DefaultParserBudget(), config: BinParserConfig{MaxBufferedBytes: 1024}}
+	f := &binFlow{a: a}
+	f.smb2 = &binSMB2{flow: f}
+	e := &ProtocolEvent{Raw: smb1SetupWire(false, 2, 0, 0), Entry: "CIFSDirectTCPSessionSetupExtendedRequest"}
+	err := f.consumeSMB1Setup(0, e)
+	var typed *ProtocolError
+	require.ErrorAs(t, err, &typed)
+	require.Equal(t, ErrResourceExceeded, typed.Kind)
+	require.Nil(t, f.smb2.smb1Setup)
+	require.Zero(t, a.buffered.Load())
+	require.Zero(t, f.sessionBytes)
+	a.config.MaxBufferedBytes = 1 << 20
+	require.NoError(t, f.consumeSMB1Setup(0, e))
+	state, reserved := f.smb2.smb1Setup, f.sessionBytes
+	require.Positive(t, reserved)
+	a.config.MaxBufferedBytes = int(reserved + 1)
+	err = f.consumeSMB1Setup(0, &ProtocolEvent{Raw: smb1SetupWire(false, 3, 0, 0), Entry: e.Entry})
+	require.ErrorAs(t, err, &typed)
+	require.Equal(t, ErrResourceExceeded, typed.Kind)
+	require.Same(t, state, f.smb2.smb1Setup)
+	require.Len(t, state.pending, 1)
+	require.Equal(t, reserved, f.sessionBytes)
+	f.closeSession()
+	require.Zero(t, a.buffered.Load())
+}

@@ -72,6 +72,7 @@ func FuzzSMB1SetupMessageSources(f *testing.F) {
 						require.NotZero(t, units[i])
 					}
 					require.Equal(t, string(utf16.Decode(units)), v)
+					require.Equal(t, units, utf16.Encode(utf16.Decode(units)), "accepted UTF-16 must round-trip without replacement")
 					raw := body[name+" Raw Bytes"].([]byte)
 					require.Equal(t, append(bytes.Clone(literal), 0, 0), raw)
 				default:
