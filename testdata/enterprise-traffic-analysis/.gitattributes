@@ -2,3 +2,4 @@
 *.pcap binary
 *.pcapng binary
 *.keys -text whitespace=-blank-at-eof,-trailing-space
+fixtures.tar.gz binary
