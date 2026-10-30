@@ -12,11 +12,17 @@ import (
 // command's body, excluding the 64-byte SMB2 header and any following command.
 // Offsets on the wire include that header; returned spans are body-relative.
 // Request selectors are not present in a response. Output remains opaque here.
+const SMB2QueryInfoMaxBodyBytes = 1 << 20
+
 func DecodeSMB2QueryInfoBody(wire []byte, response bool, status uint32) (map[string]any, error) {
 	fields, info, err := decodeSMB2QueryInfoBody(wire, response, status)
 	if err != nil {
 		return nil, err
 	}
+	return projectSMB2BodyFields(wire, fields, info), nil
+}
+
+func projectSMB2BodyFields(wire []byte, fields []tlsCertificateField, info map[string]any) map[string]any {
 	ranges := make(map[string]any, len(fields))
 	info["Wire Field Ranges"] = ranges
 	for _, field := range fields {
@@ -35,15 +41,18 @@ func DecodeSMB2QueryInfoBody(wire []byte, response bool, status uint32) (map[str
 		info[field.Name] = value
 		ranges[field.Name] = []any{uint64(field.Start), uint64(field.End)}
 	}
-	return info, nil
+	return info
 }
 
 func decodeSMB2QueryInfoBody(wire []byte, response bool, status uint32) ([]tlsCertificateField, map[string]any, error) {
-	if len(wire) > 1<<20 {
+	if len(wire) > SMB2QueryInfoMaxBodyBytes {
 		return nil, nil, fmt.Errorf("smb2 query info: body exceeds bounded profile")
 	}
 	minimum, structure := 40, uint16(41)
 	errorResponse := response && status != 0 && status != 0x80000005 // STATUS_BUFFER_OVERFLOW carries the response layout.
+	if errorResponse {
+		return decodeSMB2ErrorBody(wire)
+	}
 	if response {
 		minimum, structure = 8, 9
 	}
@@ -52,22 +61,6 @@ func decodeSMB2QueryInfoBody(wire []byte, response bool, status uint32) ([]tlsCe
 	}
 	fields := []tlsCertificateField{tlsCertificateLeaf("Structure Size", "uint16", 0, 2)}
 	info := map[string]any{}
-	if errorResponse {
-		n := uint64(binary.LittleEndian.Uint32(wire[4:8]))
-		if n > uint64(len(wire)-8) {
-			return nil, nil, fmt.Errorf("smb2 query info: error ByteCount exceeds command")
-		}
-		fields = append(fields,
-			tlsCertificateLeaf("Error Context Count", "uint8", 2, 3),
-			tlsCertificateLeaf("Reserved", "uint8", 3, 4),
-			tlsCertificateLeaf("Byte Count", "uint32", 4, 8),
-			tlsCertificateLeaf("Error Data", "raw", 8, 8+int(n)))
-		if end := 8 + int(n); end < len(wire) {
-			fields = append(fields, tlsCertificateLeaf("Trailing Bytes", "raw", end, len(wire)))
-		}
-		info["Error Response"] = true
-		return fields, info, nil
-	}
 	var offset, length uint64
 	bufferName := "Input Buffer"
 	if response {

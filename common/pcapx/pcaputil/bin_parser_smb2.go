@@ -460,6 +460,9 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 	status, _ := c["Status"].(uint32)
 	if status == 0x00000103 { // STATUS_PENDING: preserve until the async final response.
 		if gotID, ok := c["Async ID"].(uint64); ok {
+			if pending.async && pending.asyncID != gotID {
+				return protocolError(ErrMalformedMessage, "SMB2 outstanding request changed its AsyncId")
+			}
 			asyncKey := smb2AsyncKey{sessionID: sid, asyncID: gotID}
 			if oldKey, exists := s.async[asyncKey]; exists && oldKey != pendingKey {
 				return protocolError(ErrMalformedMessage, "SMB2 AsyncId collision within a session")
@@ -590,14 +593,17 @@ func smb2RequestLinks(commands []map[string]any) []smb2CompoundLink {
 
 func (s *binSMB2) findResponse(key smb2PendingKey, asyncID uint64, name string, c map[string]any) (smb2PendingKey, smb2Pending, bool) {
 	if asyncID != 0 {
-		if pendingKey, ok := s.async[smb2AsyncKey{sessionID: key.sessionID, asyncID: asyncID}]; ok {
-			pending, exists := s.pending[pendingKey]
-			return pendingKey, pending, exists && pending.name == name
-		}
 		status, _ := c["Status"].(uint32)
-		if status != 0x00000103 { // STATUS_PENDING still carries the request MessageId.
+		if status != 0x00000103 {
+			if pendingKey, ok := s.async[smb2AsyncKey{sessionID: key.sessionID, asyncID: asyncID}]; ok {
+				pending, exists := s.pending[pendingKey]
+				return pendingKey, pending, exists && pending.name == name
+			}
 			return smb2PendingKey{}, smb2Pending{}, false
 		}
+		// STATUS_PENDING establishes an AsyncId for this literal MessageId.
+		// An existing AsyncId mapping cannot select a different pending request
+		// and thereby hide the collision checked by associateCommand.
 	}
 	if pending, ok := s.pending[key]; ok {
 		return key, pending, pending.name == name
@@ -702,6 +708,9 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 		if binary.LittleEndian.Uint16(h[4:6]) != 64 {
 			return nil, fmt.Errorf("smb2: header StructureSize must be 64")
 		}
+		if binary.LittleEndian.Uint32(h[16:20])&smb2FlagAsync != 0 && binary.LittleEndian.Uint64(h[32:40]) == 0 {
+			return nil, fmt.Errorf("smb2: ASYNC header requires a nonzero AsyncId")
+		}
 		next := int(binary.LittleEndian.Uint32(h[20:24]))
 		end := len(payload)
 		if next != 0 {
@@ -712,7 +721,9 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 		}
 		cmd, err := smb2ParseCommand(h[:end-at], max)
 		if err != nil {
-			return nil, err
+			// No association has run yet. A caller may isolate this body-only
+			// failure after independently validating every enclosing header.
+			return nil, &smb2BodyDecodeError{command: len(cmds), cause: err}
 		}
 		if len(cmds) > 0 && cmd["Response"] != cmds[0]["Response"] {
 			return nil, protocolError(ErrMalformedMessage, "SMB2 compound mixes requests and responses")
@@ -762,32 +773,37 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 	if len(pdu) < smb2HeaderSize {
 		return nil, fmt.Errorf("smb2: truncated command header")
 	}
-	cmd := binary.LittleEndian.Uint16(pdu[12:14])
-	flags := binary.LittleEndian.Uint32(pdu[16:20])
-	mid := binary.LittleEndian.Uint64(pdu[24:32])
-	resp := flags&smb2FlagResp != 0
-	info := map[string]any{
-		"Command":     cmd,
-		"Packet Name": smb2CommandName(cmd),
-		"Flags":       flags,
-		"Response":    resp,
-		"Message ID":  mid,
-		"Credit":      binary.LittleEndian.Uint16(pdu[14:16]),
-	}
-	smb2HeaderFields(info, pdu, resp, flags)
-	if flags&smb2FlagAsync == 0 {
-		info["Tree ID"] = binary.LittleEndian.Uint32(pdu[36:40])
-		info["Session ID"] = binary.LittleEndian.Uint64(pdu[40:48])
-	} else {
-		info["Async ID"] = binary.LittleEndian.Uint64(pdu[32:40])
-		info["Session ID"] = binary.LittleEndian.Uint64(pdu[40:48])
-	}
-	if flags&smb2FlagRelated != 0 {
-		info["Related"] = true
-	}
+	info := smb2CommandHeader(pdu)
+	cmd := info["Command"].(uint16)
+	resp := info["Response"].(bool)
 	body := pdu[smb2HeaderSize:]
 	switch cmd {
 	case 1:
+		if len(body) > stream_parser.SMB2QueryInfoMaxBodyBytes {
+			return nil, protocolError(ErrResourceExceeded, "SMB2 SESSION_SETUP body exceeds bounded profile")
+		}
+		if resp && info["Status"] != uint32(0) && info["Status"] != uint32(0xc0000016) {
+			fields, err := stream_parser.DecodeSMB2ErrorBody(body)
+			if err != nil {
+				return nil, err
+			}
+			delete(fields, "Error Response")
+			smb2OffsetRanges(fields, 64)
+			info["Body"], info["Error Response"] = fields, true
+			return info, nil
+		}
+		if !resp || info["Status"] == uint32(0) || info["Status"] == uint32(0xc0000016) {
+			minimum, structure := 24, uint16(25)
+			if resp {
+				minimum, structure = 8, 9
+			}
+			if len(body) < minimum || binary.LittleEndian.Uint16(body) != structure {
+				if !resp && len(body) >= 2 && binary.LittleEndian.Uint16(body) == 17 {
+					return nil, protocolError(ErrUnsupportedVersion, "SESSION_SETUP observed StructureSize 17; supported modern request layout requires 25")
+				}
+				return nil, fmt.Errorf("smb2: SESSION_SETUP complete %d-byte fixed body and StructureSize %d required", minimum, structure)
+			}
+		}
 		at := 12
 		if resp {
 			at = 4
@@ -840,6 +856,9 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 			info["Count"] = binary.LittleEndian.Uint32(body[4:8])
 		}
 	case 16:
+		if len(body) > stream_parser.SMB2QueryInfoMaxBodyBytes {
+			return nil, protocolError(ErrResourceExceeded, "SMB2 QUERY_INFO body exceeds bounded profile")
+		}
 		status, _ := info["Status"].(uint32)
 		fields, err := stream_parser.DecodeSMB2QueryInfoBody(body, resp, status)
 		if err != nil {

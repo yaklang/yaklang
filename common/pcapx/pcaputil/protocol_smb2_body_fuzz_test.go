@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"testing"
 	"time"
@@ -58,6 +59,7 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 			for _, event := range result.Events {
 				if event.Status == "decoded" {
 					smb2FuzzOwnedRanges(t, event.Session, len(event.Raw))
+					smb2FuzzLiteralValues(t, event.Session, event.Raw)
 				}
 				owned := bytes.Clone(event.Raw)
 				before, err := json.Marshal(event.Session)
@@ -77,6 +79,56 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		require.LessOrEqual(t, session.Stats().PeakBufferedBytes, int64(128<<10))
 		require.Nil(t, session.(*captureSession).f.a.err.Load(), "malformed bodies must not use panic recovery")
 	})
+}
+
+// This oracle checks literal values/types against the owning little-endian
+// bytes, independently of the field codec. It does not establish that every
+// protocol field has been published or validate all SMB session semantics.
+func smb2FuzzLiteralValues(t *testing.T, value any, raw []byte) {
+	t.Helper()
+	switch value := value.(type) {
+	case map[string]any:
+		if ranges, ok := value["Wire Field Ranges"].(map[string]any); ok {
+			for name, span := range ranges {
+				pair := span.([]any)
+				lo, _ := displayUint(pair[0])
+				hi, _ := displayUint(pair[1])
+				wire := raw[lo:hi] // Range bounds are asserted by smb2FuzzOwnedRanges first.
+				switch literal := value[name].(type) {
+				case uint8:
+					require.Len(t, wire, 1)
+					require.Equal(t, wire[0], literal, name)
+				case uint16:
+					require.Len(t, wire, 2)
+					require.Equal(t, binary.LittleEndian.Uint16(wire), literal, name)
+				case uint32:
+					require.Len(t, wire, 4)
+					require.Equal(t, binary.LittleEndian.Uint32(wire), literal, name)
+				case uint64:
+					require.Len(t, wire, 8)
+					require.Equal(t, binary.LittleEndian.Uint64(wire), literal, name)
+				case int64:
+					require.Len(t, wire, 8)
+					require.Equal(t, int64(binary.LittleEndian.Uint64(wire)), literal, name)
+				case []byte:
+					require.Equal(t, wire, literal, name)
+				}
+			}
+		}
+		for name, child := range value {
+			if name != "Wire Field Ranges" {
+				smb2FuzzLiteralValues(t, child, raw)
+			}
+		}
+	case []map[string]any:
+		for _, child := range value {
+			smb2FuzzLiteralValues(t, child, raw)
+		}
+	case []any:
+		for _, child := range value {
+			smb2FuzzLiteralValues(t, child, raw)
+		}
+	}
 }
 
 func smb2FuzzOwnedRanges(t *testing.T, value any, size int) {
