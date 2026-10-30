@@ -224,6 +224,16 @@ func (p *cifsFieldProjection) literal(owner map[string]any, key string, node *ba
 				return fmt.Errorf("CIFS field projection: %q scalar type differs", key)
 			}
 			actual = uint64(v)
+		case uint64:
+			if typ != "uint64" {
+				return fmt.Errorf("CIFS field projection: %q scalar type differs", key)
+			}
+			actual = v
+		case int16:
+			if typ != "int16" || width != 2 {
+				return fmt.Errorf("CIFS field projection: %q scalar type differs", key)
+			}
+			actual = uint64(uint16(v))
 		default:
 			return fmt.Errorf("CIFS field projection: %q is not a typed scalar", key)
 		}
@@ -261,12 +271,20 @@ func cifsEscapedName(name []byte) string {
 	return out.String()
 }
 
-// Only the two explicit, successful CIFS profiles use this projection. Carrier
+// Only the explicit, successful CIFS profiles use this projection. Carrier
 // fallback, old SMB rules and custom parser registrations retain NodeToMap.
 func cifsStructuredProjection(node *base.Node, raw []byte, rule string, keys []string) (map[string]any, bool, error) {
-	if rule != "application-layer.cifs" || len(keys) != 1 || keys[0] != "CIFSDirectTCP" && keys[0] != "CIFSNegotiateRequest" || base.ParserRegistration("default") != defaultParserRegistration {
+	if rule != "application-layer.cifs" || len(keys) != 1 || base.ParserRegistration("default") != defaultParserRegistration {
 		return nil, false, nil
 	}
-	fields, err := ProjectCIFSNegotiateFields(node, raw, cifsProjectionMaxDialects)
-	return fields, true, err
+	switch keys[0] {
+	case "CIFSDirectTCP", "CIFSNegotiateRequest":
+		fields, err := ProjectCIFSNegotiateFields(node, raw, cifsProjectionMaxDialects)
+		return fields, true, err
+	case "CIFSDirectTCPNegotiateExtendedResponse", "CIFSNegotiateExtendedResponse":
+		fields, err := ProjectCIFSNegotiateResponseFields(node, raw)
+		return fields, true, err
+	default:
+		return nil, false, nil
+	}
 }

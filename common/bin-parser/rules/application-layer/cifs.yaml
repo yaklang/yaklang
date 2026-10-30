@@ -10,6 +10,8 @@ endian: little
 Package:
   CIFSNegotiateRequest: CIFSRequest
   CIFSDirectTCP: CIFSDirectRecord
+  CIFSNegotiateExtendedResponse: CIFSExtendedResponse
+  CIFSDirectTCPNegotiateExtendedResponse: CIFSDirectExtendedResponse
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }
@@ -104,3 +106,100 @@ CIFSDialect:
     this.ProcessSubNode("Dialect Name")
   BufferFormat: uint8
   Dialect Name: "del:\0;type:string"
+
+# Explicit successful WC17 extended-security response, MS-SMB 2.2.4.5.2.1:
+# https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-smb/d883d0a5-5a0a-4626-8e3e-87b0b66b79aa
+# Index-to-name resolution belongs to observed request context, not this rule.
+CIFSDirectExtendedResponse:
+  endian: big
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs response: explicit byte boundary required") }
+    size = this.GetMaxLength()
+    if size < 89 || size > 65608 { panic("cifs response: bounded record size outside extended-security profile") }
+    if this.ProcessSubNode("Direct TCP Zero").Value != 0 { panic("cifs response: Direct TCP prefix must start with zero") }
+    if int(this.ProcessSubNode("Direct TCP Length").Value) != size-4 { panic("cifs response: Direct TCP length does not equal bounded message") }
+    message = this.GetSubNode("Negotiate Response")
+    message.SetMaxLength(size-4)
+    message.Process()
+  Direct TCP Zero: uint8
+  Direct TCP Length: uint32,3
+  Negotiate Response: CIFSExtendedResponse
+
+CIFSExtendedResponse:
+  endian: little
+  operator: |
+    if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs response: explicit byte boundary required") }
+    size = this.GetMaxLength()
+    if size < 85 || size > 65604 { panic("cifs response: bounded message size outside extended-security profile") }
+    if this.ProcessSubNode("ProtocolId").Value != 0x424d53ff { panic("cifs response: invalid SMB signature") }
+    if this.ProcessSubNode("Command").Value != 0x72 { panic("cifs response: entry requires SMB_COM_NEGOTIATE") }
+    if this.ProcessSubNode("Status").Value != 0 { panic("cifs response: entry requires a successful response") }
+    if int(this.ProcessSubNode("Flags").Value) & 0x80 == 0 { panic("cifs response: REPLY is required") }
+    if int(this.ProcessSubNode("Flags2").Value) & 0x800 == 0 { panic("cifs response: extended security flag is required") }
+    this.ProcessSubNode("PIDHigh")
+    this.ProcessSubNode("SecurityFeatures")
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("TID")
+    this.ProcessSubNode("PID")
+    this.ProcessSubNode("UID")
+    this.ProcessSubNode("MID")
+    body = this.GetSubNode("Body")
+    body.SetMaxLength(size-32)
+    body.Process()
+    if this.Length() != size { panic("cifs response: unconsumed bounded message bytes") }
+  ProtocolId: uint32
+  Command: uint8
+  Status: uint32
+  Flags: uint8
+  Flags2: uint16
+  PIDHigh: uint16
+  SecurityFeatures: raw,8
+  Reserved: uint16
+  TID: uint16
+  PID: uint16
+  UID: uint16
+  MID: uint16
+  Body: CIFSExtendedResponseBody
+
+CIFSExtendedResponseBody:
+  endian: little
+  operator: |
+    size = this.GetMaxLength()
+    if size < 53 || size > 65572 { panic("cifs response: truncated bounded words/data") }
+    if this.ProcessSubNode("WordCount").Value != 17 { panic("cifs response: extended response WordCount must be17") }
+    this.ProcessSubNode("DialectIndex")
+    this.ProcessSubNode("SecurityMode")
+    this.ProcessSubNode("MaxMpxCount")
+    this.ProcessSubNode("MaxNumberVcs")
+    this.ProcessSubNode("MaxBufferSize")
+    this.ProcessSubNode("MaxRawSize")
+    this.ProcessSubNode("SessionKey")
+    caps = this.ProcessSubNode("Capabilities").Value
+    if caps & 0x80000000 == 0 { panic("cifs response: CAP_EXTENDED_SECURITY required") }
+    this.ProcessSubNode("SystemTime")
+    this.ProcessSubNode("ServerTimeZone")
+    if this.ProcessSubNode("ChallengeLength").Value != 0 { panic("cifs response: extended-security ChallengeLength must be zero") }
+    count = int(this.ProcessSubNode("ByteCount").Value)
+    if count < 16 || count != size-37 { panic("cifs response: bounded ByteCount mismatch") }
+    this.ProcessSubNode("ServerGUID")
+    if count > 16 {
+      blob = this.GetSubNode("SecurityBlob")
+      blob.SetMaxLength(count-16)
+      blob.Process()
+    }
+    if this.Length() != size { panic("cifs response: unconsumed bounded body bytes") }
+  WordCount: uint8
+  DialectIndex: uint16
+  SecurityMode: uint8
+  MaxMpxCount: uint16
+  MaxNumberVcs: uint16
+  MaxBufferSize: uint32
+  MaxRawSize: uint32
+  SessionKey: uint32
+  Capabilities: uint32
+  SystemTime: uint64
+  ServerTimeZone: int16
+  ChallengeLength: uint8
+  ByteCount: uint16
+  ServerGUID: raw,16
+  SecurityBlob: raw

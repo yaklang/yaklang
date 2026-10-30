@@ -14,12 +14,14 @@ import (
 // comes from NEGOTIATE. Encrypted transform headers are a boundary, not
 // decryption. Ports including 445 are never consulted.
 type binSMB2 struct {
-	flow    *binFlow
-	client  int
-	dialect uint16
-	pending map[smb2PendingKey]smb2Pending
-	async   map[smb2AsyncKey]smb2PendingKey
-	files   map[smb2FileKey]string
+	flow       *binFlow
+	client     int
+	dialect    uint16
+	pending    map[smb2PendingKey]smb2Pending
+	async      map[smb2AsyncKey]smb2PendingKey
+	files      map[smb2FileKey]string
+	smb1       *smb1NegotiateState
+	smb1Modern bool
 }
 
 type smb2PendingKey struct {
@@ -152,6 +154,9 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	}
 	s.flow = f
 	if err := s.reserveState(0); err != nil {
+		if f.protocol == "smb" {
+			return 0, nil, smb1ResourceRefusal(err)
+		}
 		return 0, nil, err
 	}
 	if len(w) < 4 {
@@ -174,11 +179,30 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
 	case 0x424d53ff:
-		if probeSMB1Negotiate(w[:total], f.a.budget.MaxFrameBytes).Verdict != ProbeAccept {
-			return 0, nil, fmt.Errorf("smb: unsupported or invalid SMB1 negotiate request")
+		if probeSMB1Negotiate(w[:total], f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+			f.protocol = "smb"
+			return total, f.spec("cifs", "CIFSDirectTCP"), nil
 		}
-		f.protocol = "smb"
-		return total, f.spec("cifs", "CIFSDirectTCP"), nil
+		if probeSMB1NegotiateExtendedResponse(w[:total], 65608).Verdict == ProbeAccept {
+			f.protocol = "smb"
+			return total, f.spec("cifs", "CIFSDirectTCPNegotiateExtendedResponse"), nil
+		}
+		if n >= 35 && w[8] == 0x72 {
+			fixed := 39 + 2*int(w[36])
+			if total < fixed || int(binary.LittleEndian.Uint16(w[fixed-2:fixed])) != total-fixed {
+				return 0, nil, fmt.Errorf("smb: negotiate WordCount/ByteCount exceed the complete record boundary")
+			}
+		}
+		// Availability of a bounded native profile is separate from wire
+		// validity. Other complete SMB1 commands/response forms stay explicit
+		// unsupported observations instead of being called malformed.
+		if n >= 32 && w[8] != 0x72 {
+			return 0, nil, protocolError(ErrUnsupportedFeature, "SMB1 command 0x%02x has no selected native body profile", w[8])
+		}
+		if n >= 35 && w[13]&0x80 != 0 && (w[36] != 17 || binary.LittleEndian.Uint32(w[9:13]) != 0 || binary.LittleEndian.Uint16(w[14:16])&0x800 == 0 || n >= 56 && binary.LittleEndian.Uint32(w[56:60])&0x80000000 == 0) {
+			return 0, nil, protocolError(ErrUnsupportedFeature, "SMB1 negotiate response form is outside the WC17 extended-security profile")
+		}
+		return 0, nil, fmt.Errorf("smb: unsupported or invalid SMB1 negotiate profile")
 	case smb3Transform:
 		if n < 52 {
 			return 0, nil, fmt.Errorf("smb2: truncated transform header")
@@ -232,7 +256,7 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	}
 	// Includes the private chain identity and the retained QUERY_INFO selector.
 	target := int64(256) + int64(len(s.pending)+1)*160 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
-	target += pathBytes + chainBytes + additionalPathBytes
+	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes()
 	return s.flow.reserveSession(target)
 }
 

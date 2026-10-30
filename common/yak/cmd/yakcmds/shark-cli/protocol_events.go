@@ -504,6 +504,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			var generated []byte
 			sourceName := ""
+			if protocol == "smb" && name == "Selected Dialect Raw Name Bytes" {
+				generated = bytesValue(x)
+				sourceName = "SMB1 selected dialect · request context bytes · response offsets unavailable"
+			}
 			if protocol == "dcerpc" && dcerpcMessage && name == "Stub" {
 				generated = bytesValue(x)
 				x = generated
@@ -778,6 +782,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 		}
 		unit := "PDU"
+		smbPreview := e.Protocol == "smb" && (e.Profile == "smb-record-resource-diagnostic" || e.Profile == "smb-record-diagnostic")
+		if smbPreview {
+			unit = "observation"
+		}
 		opaqueSSH := protectedSSHEvent(e)
 		if opaqueSSH {
 			// NEWKEYS establishes opaque stream context. Neither a complete
@@ -809,6 +817,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				name = "SMB2 wire PDU (authentication)"
 			}
 			sourceName := name + " · " + kind + " PDU"
+			if smbPreview {
+				sourceName = fmt.Sprintf("SMB1 record preview · %d/%d observed bytes · %s", len(e.Raw), e.Length, kind)
+			}
 			if udpPreview {
 				sourceName = name // A bounded preview is not a complete application PDU.
 			}

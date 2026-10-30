@@ -226,6 +226,9 @@ func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
 	if p := probeSMB1Negotiate(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}
+	if p := probeSMB1NegotiateExtendedResponse(w, 65608); p.Verdict == ProbeNeedMore {
+		return p
+	}
 	if p := probeRTSP(w, maxBytes); p.Verdict == ProbeNeedMore {
 		return p
 	}
