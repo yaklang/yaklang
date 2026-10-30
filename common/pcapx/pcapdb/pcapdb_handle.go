@@ -138,6 +138,13 @@ func (h *DatabaseHandle) Metadata() (*PCAPFileDBMetadata, error) {
 	}
 	return h.database.manager.MetadataContext(h.ctx, h.ID)
 }
+func (h *DatabaseHandle) CaptureOverview(options ...QueryOption) (*CaptureOverview, error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return nil, err
+	}
+	return h.database.CaptureOverview(bound...)
+}
 func (h *DatabaseHandle) Export(output string) (string, error) {
 	if err := h.check(); err != nil {
 		return "", err
@@ -228,6 +235,22 @@ func (h *DatabaseHandle) QueryPacketsPage(options ...QueryOption) (*ResultPage[P
 		return failedHandlePage[PacketSummary](h, options, "record_id", err)
 	}
 	return h.database.QueryPacketsPage(bound...)
+}
+
+func (h *DatabaseHandle) QueryMACSummariesPage(options ...QueryOption) (*ResultPage[MACSummary], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[MACSummary](h, options, "mac_index", err)
+	}
+	return h.database.QueryMACSummariesPage(bound...)
+}
+
+func (h *DatabaseHandle) QueryEndpointBindingsPage(options ...QueryOption) (*ResultPage[EndpointBindingSummary], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[EndpointBindingSummary](h, options, "binding_index", err)
+	}
+	return h.database.QueryEndpointBindingsPage(bound...)
 }
 
 func (h *DatabaseHandle) QueryProtocolsPage(options ...QueryOption) (*ResultPage[ProtocolSummary], error) {

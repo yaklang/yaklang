@@ -50,6 +50,9 @@ type Packet struct {
 	DestinationIP      string `gorm:"column:dst_ip;type:text;not null" json:"destination_ip"`
 	SourcePort         int    `gorm:"column:src_port;not null" json:"source_port"`
 	DestinationPort    int    `gorm:"column:dst_port;not null" json:"destination_port"`
+	SourceMAC          string `gorm:"column:src_mac;type:text;not null;default:''" json:"source_mac,omitempty"`
+	DestinationMAC     string `gorm:"column:dst_mac;type:text;not null;default:''" json:"destination_mac,omitempty"`
+	VLANStack          string `gorm:"column:vlan_stack;type:text;not null;default:''" json:"vlan_stack,omitempty"`
 	Transport          string `gorm:"type:text;not null" json:"transport"`
 	DecodeError        string `gorm:"type:text;not null" json:"decode_error,omitempty"`
 }
@@ -213,6 +216,7 @@ func migratePCAPDatabase(db *gorm.DB) error {
 		{&Packet{}, "packets_dst_ip", []string{"dst_ip", "id"}},
 		{&Packet{}, "packets_src_port", []string{"src_port", "id"}},
 		{&Packet{}, "packets_dst_port", []string{"dst_port", "id"}},
+		{&Packet{}, "packets_l2_endpoint", []string{"section", "interface_id", "link_type", "vlan_stack", "src_mac", "src_ip"}},
 		{&PCAPProtocolMessage{}, "messages_protocol", []string{"protocol", "id"}},
 		{&PCAPProtocolMessage{}, "messages_flow", []string{"flow_id", "id"}},
 		{&PCAPProtocolMessage{}, "messages_time", []string{"timestamp_ns", "id"}},

@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"strings"
 	"time"
 
@@ -18,6 +19,7 @@ type queryConfig struct {
 	limit                                        int
 	after                                        int64
 	transport, protocol, sourceIP, destinationIP string
+	sourceMAC                                    string
 	sourcePort, destinationPort                  *int
 	flow                                         *int64
 	session, stream                              *uint
@@ -109,6 +111,16 @@ func QueryProtocol(value string) QueryOption {
 }
 func QuerySourceIP(value string) QueryOption {
 	return func(c *queryConfig) error { c.sourceIP = value; return nil }
+}
+func QuerySourceMAC(value string) QueryOption {
+	return func(c *queryConfig) error {
+		mac, err := net.ParseMAC(value)
+		if err != nil {
+			return fmt.Errorf("pcapdb: invalid source MAC: %w", err)
+		}
+		c.sourceMAC = mac.String()
+		return nil
+	}
 }
 func QueryDestinationIP(value string) QueryOption {
 	return func(c *queryConfig) error { c.destinationIP = value; return nil }
@@ -407,7 +419,7 @@ func (d *Database) readData(id uint, protocol bool, options ...QueryOption) ([]b
 	return row.Data, nil
 }
 
-const packetSummaryColumns = "id,created_at,updated_at,deleted_at,capture_interface_id,section,interface_id,link_type,captured_length,original_length,timestamp_ns,src_ip,dst_ip,src_port,dst_port,transport,decode_error"
+const packetSummaryColumns = "id,created_at,updated_at,deleted_at,capture_interface_id,section,interface_id,link_type,captured_length,original_length,timestamp_ns,src_mac,dst_mac,vlan_stack,src_ip,dst_ip,src_port,dst_port,transport,decode_error"
 
 // Summary projections avoid loading JSON blobs unless explicitly requested.
 const protocolSummaryColumns = "id,created_at,updated_at,deleted_at,event_id,flow_id,timestamp_ns,protocol,transport,source,destination,direction,logical_offset,length,status,summary,error,decode_error,profile,rule,entry,completeness,expert_code,transaction_id,response_to,section,interface_id,encapsulation,data_length,session_id,stream_id"
