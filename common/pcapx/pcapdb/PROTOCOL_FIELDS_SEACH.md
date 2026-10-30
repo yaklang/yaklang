@@ -1,6 +1,6 @@
 # 协议字段检索：存储、索引与研究路线
 
-本文件随 pcapdb 第一批实现提供，用于指导 BIN Parser 协议字段的保存、直接查询和后续加速研究。文件名按需求保留为 PROTOCOL_FIELDS_SEACH.md。当前子库 schema version 为 4。
+本文件随 pcapdb 第一批实现提供，用于指导 BIN Parser 协议字段的保存、直接查询和后续加速研究。文件名按需求保留为 PROTOCOL_FIELDS_SEACH.md。当前子库 schema version 为 5。
 
 当前采用“完整 JSONB 原本 + 按需标量字段索引”：协议消息保留完整字段树，常用路径单独建立 B-tree 索引。动态字段、数组成员和全文检索采用下面的分层路线，后续扩展仍使用独立子库和 GORM。
 
@@ -281,7 +281,7 @@ for {
 
 capture_records 按 ID 顺序拼接 Prefix、关联的 Packet.Data、Suffix，包字节只保存一份。重放、深校验与导出一次仅加载一个有界记录，每 64 条结束读快照，避免整个捕获重放固定住 WAL。导出持有共享实例文件锁，多个导出允许并行，写入/重建拿独占锁。发布输出采用同目录临时文件、完整 SHA 校验、Sync 和独占发布，已有文件不覆盖。
 
-关闭读池后，由取得实例独占锁的 writer 做 PASSIVE checkpoint。完全停止该子库的所有使用者后，可携带单个 SQLite 文件及 UUID 目录，启动时从子库检查点重建 profile 登记并更新路径；运行中的库要连同 WAL 保留，不能仅复制 .sqlite 文件。schema 4 不自动转换此前未发布的侧文件原型（schema 3）：原型库保留并报告 UnsupportedSchema，需另行明确迁移/重新导入。
+关闭读池后，由取得实例独占锁的 writer 做 PASSIVE checkpoint。完全停止该子库的所有使用者后，可携带单个 SQLite 文件及 UUID 目录，启动时从子库检查点重建 profile 登记并更新路径；运行中的库要连同 WAL 保留，不能仅复制 .sqlite 文件。schema 5 不自动转换旧 schema 3/4：旧库保留并报告 UnsupportedSchema，需另行明确迁移/重新导入。
 
 冒烟脚本：`common/yak/yaktest/mustpass/files/pcapdb.yak`。按已有 mustpass 路径运行，覆盖导入/去重/登记/校验/包分页/会话/双向流/协议字段/源文件删除/原样导出/关闭再打开。Go 测试另覆盖并行 reader、乱序与重传、缺口、流分页、来源证据受限、跨域隔离，以及 packet/session/stream/protocol 事务中真实进程 kill 和未提交 WAL 尾帧损坏。
 
