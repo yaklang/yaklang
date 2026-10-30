@@ -45,7 +45,8 @@ func capturedPrefixMessage(v *streamSnapshot, d int, data []byte) (*pcaputil.Pro
 		}
 		fields, err := e.GetFields()
 		complete := e.Completeness == "message" || e.Completeness == "record" || e.Completeness == "frame"
-		if err == nil && len(fields) > 0 && (complete || e.Completeness == "envelope" && capturedTLSRecordEnvelope(e, fields)) {
+		tlsEnvelope := e.Completeness == "envelope" || e.Completeness == "encrypted"
+		if err == nil && len(fields) > 0 && (complete || tlsEnvelope && capturedTLSRecordEnvelope(e, fields)) {
 			return e, fields
 		}
 	}

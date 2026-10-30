@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 func streamPrefixTLSForTest(t *testing.T, wire []byte, malformed bool) (*streamSnapshot, *pcaputil.ProtocolEvent) {
@@ -48,6 +49,45 @@ func TestStreamBeginningEvidenceAcceptsOwnedTLSEnvelope(t *testing.T) {
 		require.NotContains(t, text, "Validated TLSv1.3")
 		require.NotContains(t, text, "Protocol at captured offset 0 is not identified.")
 	}
+}
+
+func TestStreamBeginningEvidenceAcceptsCompleteTLSCiphertext(t *testing.T) {
+	wire := append([]byte{23, 3, 3, 0, 32}, make([]byte, 32)...)
+	v, e := streamPrefixTLSForTest(t, wire, false)
+	require.Equal(t, "encrypted", e.Completeness)
+	require.NotEqual(t, true, e.Session["Authentication Verified"])
+	text := streamEvidenceTextForTest(&tui{stream: v})
+	require.Contains(t, text, "Validated TLS record PDU at captured offset 0")
+	require.Contains(t, text, "Application Data")
+	require.NotContains(t, text, "Validated TLSv1.3")
+}
+
+func TestStreamBeginningEvidenceAcceptsCapturedTLSClientHello(t *testing.T) {
+	capture, err := trafficfixture.ReadFile("../../../../pcapx/pcaputil/testdata/protocol-sessions/first-batch-m1/tls-h2-bidi.pcap")
+	require.NoError(t, err)
+	var hello *pcaputil.ProtocolEvent
+	err = pcaputil.ReplayPcap(bytes.NewReader(capture), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
+		if hello == nil && e.Protocol == "tls" && e.Direction == 0 && e.Offset == 0 && number(e.Session["Record Type"]) == 22 {
+			hello = e
+		}
+	}))
+	require.NoError(t, err)
+	require.NotNil(t, hello)
+	require.Positive(t, hello.TCPFlowID)
+	require.True(t, credibleTLSIdentity(hello))
+	v := &streamSnapshot{nativeFlowID: hello.TCPFlowID, domain: hello.Domain, endpoints: [2]string{hello.Source, hello.Destination}, prefix: [2][]byte{bytes.Clone(hello.Raw)}, events: []*pcaputil.ProtocolEvent{hello}}
+	text := streamEvidenceTextForTest(&tui{stream: v})
+	require.Contains(t, text, "Validated TLS record PDU at captured offset 0")
+	require.Contains(t, text, "Handshake")
+}
+
+func TestStreamBeginningEvidenceAcceptsTLSDomain(t *testing.T) {
+	v, e := streamPrefixTLSForTest(t, []byte{21, 3, 3, 0, 2, 1, 0}, false)
+	domain := pcaputil.CaptureDomain{Section: 2, Interface: 7, Encapsulation: "/vlan:80"}
+	v.domain, e.Domain = domain, domain
+	e.SourceBytes.CompletedIn.Domain = domain
+	e.SourceBytes.PacketRefs[0].Domain = domain
+	require.Contains(t, streamEvidenceTextForTest(&tui{stream: v}), "Validated TLS record PDU at captured offset 0")
 }
 
 func TestStreamBeginningEvidenceRejectsUnprovenTLSEnvelope(t *testing.T) {
