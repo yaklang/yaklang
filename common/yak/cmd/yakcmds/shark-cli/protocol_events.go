@@ -237,7 +237,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 				}
 			}
-			if protocol == "ssh" || protocol == "smb" {
+			if protocol == "ssh" || smbDetailProtocol(protocol) {
 				// Every nested owner starts its own scope. A context map without
 				// metadata must not borrow a same-named parent's wire occurrence.
 				previous := wireRanges
@@ -279,6 +279,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				keys = append(keys, k)
 			}
 			sort.Slice(keys, func(i, j int) bool {
+				if smbDetailProtocol(protocol) {
+					return smbDetailFieldLess(keys[i], keys[j], wireRanges)
+				}
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
 				if protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" {
 					// Wire children lead; checksum/authentication context follows
@@ -665,7 +668,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					f.source, f.start, f.end, f.hasRange = http3HeaderSource, span[0], span[1], true
 				}
 			}
-			if span := wireRanges[name]; (depth == 0 || (protocol == "ssh" || protocol == "smb") || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
+			if span := wireRanges[name]; (depth == 0 || (protocol == "ssh" || smbDetailProtocol(protocol)) || protocol == "icmpv6" || protocol == "igmp" || protocol == "dcerpc" || protocol == "hsrp" || protocol == "glbp" || protocol == "bfd" || protocol == "ldp" || protocol == "pim" || protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" || protocol == "l2tp" || protocol == "stp" || protocol == "ripng" || protocol == "isis" || (protocol == "netflow-v9" || protocol == "netflow-v5" || protocol == "ipfix")) && len(span) == 2 && currentSource > 0 && span[0] >= 0 && span[1] > span[0] && span[1] <= len(sources[currentSource-1].Data) {
 				f := &out[len(out)-1]
 				f.source, f.start, f.end, f.hasRange = currentSource, span[0], span[1], true
 			}
@@ -711,6 +714,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	for _, e := range ordered {
 		if e == nil {
 			continue
+		}
+		if allowSessionDedup && smbDetailProtocol(e.Protocol) {
+			// Commit typed equality decisions before the common walker. The
+			// isolated worker receives this copy and only lays it out.
+			e = protocolDisplayEvent(e)
 		}
 		if e.Completeness == "evicted" {
 			// Coverage markers are context, not decoded protocol PDUs. In
@@ -849,206 +857,212 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			add("Negotiated TLS version: unavailable · record legacy version is not negotiation evidence", false)
 			add("Plaintext: unavailable · record authentication has not been verified", false)
 		}
-		values := map[string]any{}
-		if protocol == "ssh" || protocol == "smb" {
-			wireRanges = detailWireRanges(e.Fields["Wire Field Ranges"])
-			for key := range e.Session {
-				delete(wireRanges, key) // Session may replace a wire offer with context.
+		if smbDetailProtocol(e.Protocol) {
+			for _, node := range smbDetailNodes(e) {
+				walk(node.name, node.value, 0)
 			}
-			for key, span := range detailWireRanges(e.Session["Wire Field Ranges"]) {
-				wireRanges[key] = span
-			}
-		}
-		for k, v := range e.Fields {
-			values[k] = v
-		}
-		for k, v := range e.Session {
-			if allowSessionDedup && (k == "DNS" && duplicateDNSSessionFields(e) || k == "Initial Packet Fields" && duplicateSSHInitialFields(e)) {
-				continue // A complete typed copy of this same PDU is already in Fields.
-			}
-			values[k] = v
-		}
-		delete(values, "Wire Field Ranges")
-		if hasTLSConnectionObservation(e.Protocol) {
-			if context, ok := values["Session Establishment"].(map[string]any); ok {
-				fields, limited := connectionObservationFields(context, 4096-len(out))
-				out = append(out, fields...)
-				fieldViewLimited = fieldViewLimited || limited
-				delete(values, "Session Establishment")
-			}
-		}
-		if e.Protocol == "tls" {
-			// Retained hello metadata and this record are separate evidence
-			// scopes. End the metadata branch before publishing wire ranges.
-			add("TLS record and observed context", true)
-		}
-		if e.Protocol == "dcerpc" {
-			add("DCE/RPC message and observed association", true)
-			if e.ResponseTo != 0 {
-				add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
-			}
-			for _, key := range []string{"Packet Name", "Call ID", "Reject Reason", "Version Count", "Protocol Versions", "Trailing Padding", "Context ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Fragment Stub Bytes", "Message ID", "Fragment Index", "Reassembled Message", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
-			add("QUIC wire header and observed context", true)
-			for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "esp" {
-			for _, key := range []string{"SPI", "Sequence", "Sequence Number", "Header Complete", "Algorithm Context Available", "Authentication Verified", "Extended Sequence Reconstructed", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ntp" {
-			for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
-		if e.Protocol == "http3" && e.Error != "" {
-			delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
-		}
-		if e.Protocol == "isis" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ripng" {
-			for _, key := range []string{"Packet Name", "Command", "Version", "Reserved", "Conformance Warning", "Whole Table Request", "Route Count", "Next Hop Count", "Entries", "Authentication Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
-			delete(values, "Opaque Session Payload")
-			delete(values, "Ethernet Bytes")
-			for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Control Setup Complete", "Session Setup Complete", "Observed Control Connection", "Observed Session", "Receiver Proposal Side", "Cookie Length", "Cookie", "Sublayer Type", "Data Sequencing", "Sequence Present", "Sequence Number", "Sequence Observation", "Unobserved Sequence Count", "Payload Decoded", "Payload Admission", "Opaque Payload Bytes", "Association Diagnostic", "Conformance Warning", "AVPs", "Control Context Proof", "Context Proof", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "stp" {
-			for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "rsvp" {
-			for _, key := range []string{"Message Name", "Header", "Objects", "Unparsed Body", "Trailing Bytes", "Checksum Omitted", "Checksum Verified", "Wire Grammar Complete", "Field Layouts Complete", "Procedure Semantics Verified", "Reservation State Inferred", "Authentication Verified", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "gtpv2" {
-			for _, key := range []string{"Messages", "Observed Message Count", "Wire Grammar Complete", "Procedure Semantics Verified", "Bearer State Inferred", "Authentication Verified", "Observation Scope"} {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ospf" {
-			keys := []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
-			if ospfv2Display {
-				// Keep the authentication field next to its declaring header,
-				// then the packet body and independently bounded LLS trailer.
-				keys = []string{"Packet Name", "Header", "Authentication", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "LLS", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
-			}
-			for _, key := range keys {
-				if value, ok := values[key]; ok {
-					walk(key, value, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "pim" {
-			// Lead with the actual control message and advertised (S,G), not
-			// unrelated generic metadata or a large base64 copy of its body.
-			// The complete PDU remains selectable in the byte-source pane.
-			delete(values, "Encapsulated Bytes")
-			for _, key := range []string{"Packet Name", "Version", "Type", "Null Register", "Border", "Register IP Header", "Upstream Neighbor", "Group Count", "Hold Time", "Group", "Source", "Originator", "Groups", "Options", "Fragment Tag", "Hash Mask Length", "BSR Priority", "BSR", "Priority", "RP", "Prefix Count", "Advertised Groups", "RPT", "Metric Preference", "Metric", "Mask Length", "TTL", "Prune Indicator", "Prune Now", "Assert Override", "Interval", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope", "Bootstrap Reassembly"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ldp" {
-			for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
-			delete(values, "Strong Identity")
-			for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ssh" {
-			for _, key := range []string{"Packet Name", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Encryption C2S", "Encryption S2C", "Signature Verified", "Peer Identity Verified", "Identification", "Version", "Kex Family", "Host Key Format", "First Kex Packet Follows", "Languages C2S", "Languages S2C"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		if e.Protocol == "ssdp" {
-			for _, key := range []string{"Message Kind", "Notification Subtype", "Discovery Target", "USN", "Location", "Maximum Age Seconds", "Boot ID", "Next Boot ID", "Config ID", "Conformance Warnings", "Identity Verified"} {
-				if v, ok := values[key]; ok {
-					walk(key, v, 0)
-					delete(values, key)
-				}
-			}
-		}
-		for _, key := range []string{"Negotiated Version", "Content Visibility", "Secret Lookup Status", "Cipher Suite", "SNI", "ALPN", "HTTP3 Connection Error", "HTTP3 Connection Conformance", "HTTP3 Message Conformance", "Handshake Messages", "Alert Level", "Alert Description", "Stream ID", "Request Method", "Headers", "GRPC Status", "GRPC Messages", "Authentication", "Guest Session", "Record Type", "Record Version", "Record Length", "Inner Content Type", "Authentication Verified", "Certificate Trust"} {
-			if v, ok := values[key]; ok {
-				walk(key, v, 0)
-				delete(values, key)
-			}
-		}
-		if len(values) > 0 {
+		} else {
+			values := map[string]any{}
 			if protocol == "ssh" || protocol == "smb" {
-				// This synthetic root owns the explicitly merged root ranges;
-				// nested maps still establish independent scopes in walk.
-				values["Wire Field Ranges"] = wireRanges
+				wireRanges = detailWireRanges(e.Fields["Wire Field Ranges"])
+				for key := range e.Session {
+					delete(wireRanges, key) // Session may replace a wire offer with context.
+				}
+				for key, span := range detailWireRanges(e.Session["Wire Field Ranges"]) {
+					wireRanges[key] = span
+				}
 			}
-			depth := 0
-			if len(wireRanges) > 0 {
-				depth = -1
+			for k, v := range e.Fields {
+				values[k] = v
 			}
-			walk("Other decoded fields", values, depth)
+			for k, v := range e.Session {
+				if allowSessionDedup && (k == "DNS" && duplicateDNSSessionFields(e) || k == "Initial Packet Fields" && duplicateSSHInitialFields(e)) {
+					continue // A complete typed copy of this same PDU is already in Fields.
+				}
+				values[k] = v
+			}
+			delete(values, "Wire Field Ranges")
+			if hasTLSConnectionObservation(e.Protocol) {
+				if context, ok := values["Session Establishment"].(map[string]any); ok {
+					fields, limited := connectionObservationFields(context, 4096-len(out))
+					out = append(out, fields...)
+					fieldViewLimited = fieldViewLimited || limited
+					delete(values, "Session Establishment")
+				}
+			}
+			if e.Protocol == "tls" {
+				// Retained hello metadata and this record are separate evidence
+				// scopes. End the metadata branch before publishing wire ranges.
+				add("TLS record and observed context", true)
+			}
+			if e.Protocol == "dcerpc" {
+				add("DCE/RPC message and observed association", true)
+				if e.ResponseTo != 0 {
+					add(fmt.Sprintf("Response to PDU: #%d (observed request on this connection)", e.ResponseTo), false)
+				}
+				for _, key := range []string{"Packet Name", "Call ID", "Reject Reason", "Version Count", "Protocol Versions", "Trailing Padding", "Context ID", "Context Level", "Error Scope", "Context Missing", "Presentation Context Updated", "Association Status", "Matched Request", "Interface", "Interface Version Major", "Interface Version Minor", "OpNum", "Object UUID", "Fragment Stub Bytes", "Message ID", "Fragment Index", "Reassembled Message", "Stub Bytes", "Accepted Context IDs", "Rejected Context IDs", "Observed Bind Time Feature Bits", "Bind Time Feature Endpoint State Verified", "Presentation Contexts", "Presentation Context Results", "Secondary Address Bytes", "Authentication Verified", "Peer Identity Verified", "Stub Decoded", "Trailer Alignment Validated", "Auth Length", "Security Trailer", "Authentication Padding", "Authentication Token", "Opaque PDU Body"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
+				add("QUIC wire header and observed context", true)
+				for _, key := range []string{"Packet Name", "Header Form", "Version", "DCID Length", "DCID", "SCID Length", "SCID", "Initial Token Length", "Initial Token Length Encoding Bytes", "Initial Token", "Retry Token", "Retry Integrity Tag", "Packet Number Space", "Packet Number", "Packet Number Length", "Authentication Verified", "Peer Identity Verified", "Header Protection", "Cipher", "Payload Delivery", "Rejected Packet Payload", "Rejected Packet Payload SHA256", "Connection State", "CID Association", "Retired Destination CID", "Datagram Offset", "Input Representation", "ALPN", "HTTP3 Wire Observation", "HTTP3 Wire Only"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "esp" {
+				for _, key := range []string{"SPI", "Sequence", "Sequence Number", "Header Complete", "Algorithm Context Available", "Authentication Verified", "Extended Sequence Reconstructed", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ntp" {
+				for _, key := range []string{"Packet Name", "Version", "Mode", "Legacy Reserved", "Leap Indicator", "Role", "Opcode Name", "Opcode", "Sequence Number", "Response", "Control Error", "Status Word", "Status Word Type", "Association ID", "Fragment Offset", "Data Count", "More Fragments", "Association", "Request PDU ID", "Requested Association ID", "Response Association Observation", "Observed Duplicate PDU", "Control Reassembly", "Reassembly Complete", "Context Retention Warning", "Stratum", "Poll", "Precision", "Root Delay Seconds", "Root Dispersion Seconds", "Synchronizing Distance Seconds", "Synchronizing Dispersion Seconds", "Estimated Drift Rate", "Reference ID", "Transmit Timestamp", "Transmit Timestamp Seconds", "Transmit Timestamp Fraction", "Control Data", "Reassembled Control Data", "Control Payload Failure", "Reported Association Count", "Reported Association List Decode", "Reported Associations"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			delete(values, "Observed Header Layers") // already rendered as the ordered breadcrumb
+			if e.Protocol == "http3" && e.Error != "" {
+				delete(values, "HTTP3 Stream Errors") // early, before possibly large byte witnesses
+			}
+			if e.Protocol == "isis" {
+				for _, key := range []string{"Protocol Name", "Packet Name", "PDU Type", "Source System ID", "Holding Timer Seconds", "Local Circuit ID", "LAN ID", "Priority", "LSP ID", "Sequence Number", "Remaining Lifetime Seconds", "Wire Checksum", "Checksum Observation", "Checksum Verified", "Checksum Failure", "Source Node ID", "Source Circuit ID", "Start LSP ID", "End LSP ID", "Fixed Header Complete", "Wire Grammar Complete", "TLV Decode Failure", "TLVs", "Conformance Warning", "Authentication Verified", "Database Completeness", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ripng" {
+				for _, key := range []string{"Packet Name", "Command", "Version", "Reserved", "Conformance Warning", "Whole Table Request", "Route Count", "Next Hop Count", "Entries", "Authentication Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "l2tp" && number(eventValues(e)["Version"]) == 3 {
+				delete(values, "Opaque Session Payload")
+				delete(values, "Ethernet Bytes")
+				for _, key := range []string{"Packet Name", "Version", "Control", "Control Connection ID", "Session ID", "Flags", "Length", "Ns", "Nr", "Connection Context", "Control Setup Complete", "Session Setup Complete", "Observed Control Connection", "Observed Session", "Receiver Proposal Side", "Cookie Length", "Cookie", "Sublayer Type", "Data Sequencing", "Sequence Present", "Sequence Number", "Sequence Observation", "Unobserved Sequence Count", "Payload Decoded", "Payload Admission", "Opaque Payload Bytes", "Association Diagnostic", "Conformance Warning", "AVPs", "Control Context Proof", "Context Proof", "Wire Completeness", "Authentication Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "stp" {
+				for _, key := range []string{"Protocol Name", "Packet Name", "Version", "BPDU Type", "Conformance Warning", "Root Priority", "Root System ID Extension", "Root MAC", "Root Path Cost", "Bridge Priority", "Bridge System ID Extension", "Bridge MAC", "Port ID", "Port Role Name", "Topology Change", "Proposal", "Learning", "Forwarding", "Agreement", "Message Age Seconds", "Max Age Seconds", "Hello Time Seconds", "Forward Delay Seconds", "MST Configuration Name", "MST Configuration Revision", "MST Configuration Digest", "CIST Internal Root Path Cost", "CIST Bridge MAC", "CIST Remaining Hops", "MST Instances", "PVST TLVs", "MST Digest Verified", "Observation Scope"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "rsvp" {
+				for _, key := range []string{"Message Name", "Header", "Objects", "Unparsed Body", "Trailing Bytes", "Checksum Omitted", "Checksum Verified", "Wire Grammar Complete", "Field Layouts Complete", "Procedure Semantics Verified", "Reservation State Inferred", "Authentication Verified", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "gtpv2" {
+				for _, key := range []string{"Messages", "Observed Message Count", "Wire Grammar Complete", "Procedure Semantics Verified", "Bearer State Inferred", "Authentication Verified", "Observation Scope"} {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ospf" {
+				keys := []string{"Packet Name", "Header", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+				if ospfv2Display {
+					// Keep the authentication field next to its declaring header,
+					// then the packet body and independently bounded LLS trailer.
+					keys = []string{"Packet Name", "Header", "Authentication", "Hello", "Database Description", "Requests", "LSA Count", "LSAs", "LSA Headers", "LLS", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope"}
+				}
+				for _, key := range keys {
+					if value, ok := values[key]; ok {
+						walk(key, value, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "pim" {
+				// Lead with the actual control message and advertised (S,G), not
+				// unrelated generic metadata or a large base64 copy of its body.
+				// The complete PDU remains selectable in the byte-source pane.
+				delete(values, "Encapsulated Bytes")
+				for _, key := range []string{"Packet Name", "Version", "Type", "Null Register", "Border", "Register IP Header", "Upstream Neighbor", "Group Count", "Hold Time", "Group", "Source", "Originator", "Groups", "Options", "Fragment Tag", "Hash Mask Length", "BSR Priority", "BSR", "Priority", "RP", "Prefix Count", "Advertised Groups", "RPT", "Metric Preference", "Metric", "Mask Length", "TTL", "Prune Indicator", "Prune Now", "Assert Override", "Interval", "Checksum", "Checksum Scope", "Checksum Verified", "Authentication Verified", "Observation Scope", "Bootstrap Reassembly"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ldp" {
+				for _, key := range []string{"Packet Name", "Version", "PDU Length", "LSR ID", "Label Space ID", "Observation Scope", "Messages"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "hsrp" || e.Protocol == "glbp" || e.Protocol == "bfd" {
+				delete(values, "Strong Identity")
+				for _, key := range []string{"Packet Name", "Version", "Protocol Version", "Opcode", "State", "Group", "Virtual IP", "Identifier", "Owner ID", "Priority", "Hello Time", "Hold Time", "My Discriminator", "Your Discriminator", "Poll", "Final", "Detect Multiplier", "Desired Min TX", "Required Min RX", "Required Min Echo RX"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ssh" {
+				for _, key := range []string{"Packet Name", "Kex Algorithm", "Host Key Algorithm", "Host Key Fingerprint", "Encryption C2S", "Encryption S2C", "Signature Verified", "Peer Identity Verified", "Identification", "Version", "Kex Family", "Host Key Format", "First Kex Packet Follows", "Languages C2S", "Languages S2C"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			if e.Protocol == "ssdp" {
+				for _, key := range []string{"Message Kind", "Notification Subtype", "Discovery Target", "USN", "Location", "Maximum Age Seconds", "Boot ID", "Next Boot ID", "Config ID", "Conformance Warnings", "Identity Verified"} {
+					if v, ok := values[key]; ok {
+						walk(key, v, 0)
+						delete(values, key)
+					}
+				}
+			}
+			for _, key := range []string{"Negotiated Version", "Content Visibility", "Secret Lookup Status", "Cipher Suite", "SNI", "ALPN", "HTTP3 Connection Error", "HTTP3 Connection Conformance", "HTTP3 Message Conformance", "Handshake Messages", "Alert Level", "Alert Description", "Stream ID", "Request Method", "Headers", "GRPC Status", "GRPC Messages", "Authentication", "Guest Session", "Record Type", "Record Version", "Record Length", "Inner Content Type", "Authentication Verified", "Certificate Trust"} {
+				if v, ok := values[key]; ok {
+					walk(key, v, 0)
+					delete(values, key)
+				}
+			}
+			if len(values) > 0 {
+				if protocol == "ssh" || protocol == "smb" {
+					// This synthetic root owns the explicitly merged root ranges;
+					// nested maps still establish independent scopes in walk.
+					values["Wire Field Ranges"] = wireRanges
+				}
+				depth := 0
+				if len(wireRanges) > 0 {
+					depth = -1
+				}
+				walk("Other decoded fields", values, depth)
+			}
 		}
 		state := e.Status
 		if e.Completeness != "" && e.Completeness != state {
