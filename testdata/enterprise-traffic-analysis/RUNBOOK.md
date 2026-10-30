@@ -53,5 +53,5 @@ go test -p 2 ./common/ai/aid/aitool/buildinaitools/yakscripttools/test \
 
 该回归覆盖两件事：
 
-- `.pcap/.pcapng` 提示先走 `load_pcapfile + query_pcapdb`，旧 `analyze_pcap` 只作为兼容工具。
+- `.pcap/.pcapng` 只走 `load_pcapfile + query_pcapdb`；旧 `analyze_pcap` 已退役并从内置工具目录移除，不保留兼容入口。
 - `http-dga-c2` 能通过结构化工具返回 Host、Method、Path、状态码、MessageID 和 4 组 `response_to` 关联。
