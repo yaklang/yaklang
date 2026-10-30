@@ -130,7 +130,6 @@ func UnmarshalTimeline(s string) (*Timeline, error) {
 	// 恢复 Timeline 结构体
 	timeline := &Timeline{
 		totalDumpContentLimit: serializable.TotalDumpContentLimit,
-		branchTimeline:        false,
 		promotedState:         cloneTimelinePromotedState(serializable.PromotedState),
 		freezeState:           cloneTimelineFreezeState(serializable.FreezeState),
 		evidenceInitialized:   serializable.EvidenceInitialized,

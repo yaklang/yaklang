@@ -14,8 +14,7 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/coordinator"
-	// blank-import aive 触发价值评估 submitter 的 init() 注册 (默认开启).
-	// 关键词: aive blank import, RegisterValueFeedbackSubmitter 触发
+	// Register the durable, session-scoped trajectory evaluator.
 	_ "github.com/yaklang/yaklang/common/ai/aid/aive"
 	// blank-import aistats 触发命中统计 (UserAIStats) recorder 的 init() 注册 (默认开启).
 	// 关键词: aistats blank import, RegisterStatsRecorder 触发

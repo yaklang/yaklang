@@ -44,10 +44,15 @@ func openIndex(path string, write, create bool) (*gorm.DB, error) {
 		query.Set("_query_only", "true")
 		query.Set("_cache_size", "-2048")
 	}
-	uriPath := filepath.ToSlash(path)
-	if filepath.IsAbs(path) && filepath.VolumeName(path) != "" && !strings.HasPrefix(uriPath, "/") {
-		// A Windows drive belongs in the URI path: file:///C:/..., rather
-		// than the authority file://C:/... which SQLite rejects.
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, err
+	}
+	uriPath := filepath.ToSlash(absPath)
+	// A Windows drive belongs in the URI path (/C:/...), not its authority.
+	// Root relative paths before URL encoding, and keep escaping centralized so
+	// spaces, Unicode, '#' and '%' remain literal filesystem characters.
+	if !strings.HasPrefix(uriPath, "/") {
 		uriPath = "/" + uriPath
 	}
 	u := url.URL{Scheme: "file", Path: uriPath, RawQuery: query.Encode()}

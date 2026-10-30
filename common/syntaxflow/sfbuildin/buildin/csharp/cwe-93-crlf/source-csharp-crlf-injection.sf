@@ -1,0 +1,59 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# CRLF 响应头注入"
+	title_zh: "检测 C# CRLF 响应头注入"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-crlf-injection"
+	risk: "crlf-injection"
+	cwe: "CWE-93"
+	desc: <<<DESC
+### 规则说明
+把用户输入直接传给 `Response.Headers.Add` / `Response.AddHeader` / `AppendHeader` / `Response.Redirect` 时，输入中的 `\r\n` 可提前结束当前头并注入新头（含 `Set-Cookie`），甚至拆分响应体——HTTP 响应拆分。
+
+### 风险类型
+crlf-injection
+
+### 影响
+注入 `Set-Cookie` 劫持会话；污染代理缓存；响应拆分注入任意页面内容。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法，不能单独证明值来自用户输入。注释、字符串和文档中的相同文本也会命中。
+匹配 `AddHeader`/`AppendHeader`/`Headers.Add`/`Headers.Append` 中头值参数（第二参数）以变量或表达式开头、而非字符串字面量的调用点。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 进入响应头的值统一做 CRLF 过滤（`value.Replace("\r", "").Replace("\n", "")` 或编码）。
+- 重定向目标用允许列表校验，不透传用户 URL；ASP.NET Core 的 `Redirect` 已拒绝不可信 URL，但仍需业务校验。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using Microsoft.AspNetCore.Http;
+
+public class HeaderDemo {
+    public void Bad(HttpRequest req, HttpResponse resp) {
+        resp.Headers.Add("X-Referer", req.Query["ref"]);
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using Microsoft.AspNetCore.Http;
+
+public class HeaderDemo {
+    public void Ok(HttpResponse resp) {
+        resp.Headers.Add("X-Referer", "internal");
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/(\.AddHeader|\.AppendHeader|Headers\.(Add|Append))\s*\(\s*"[^"]*"\s*,\s*[A-Za-z_(\[]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测 C# CRLF 响应头注入",
+	title_zh: "检测 C# CRLF 响应头注入",
+	message: "检测 C# CRLF 响应头注入",
+	risk: "crlf-injection",
+}

@@ -1,0 +1,59 @@
+desc(
+	title: "C SQL execution sinks (lib)"
+	title_zh: "SQL 执行入口（C 库规则）"
+	type: audit
+	level: info
+	language: c
+	lib: "c-sql-sink"
+	risk: "sql-injection"
+	desc: <<<DESC
+### 说明
+`mysql_query`、`mysql_real_query`、`sqlite3_exec`、`sqlite3_prepare_v2`、`PQexec`、`PQexecParams`（PostgreSQL）接收完整 SQL 文本。SQL 由 `sprintf`/`strcat` 拼接用户输入时，引号、分号与注释符会被数据库当成语法，形成注入。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+值一律用参数绑定：MySQL 用 `mysql_stmt_prepare` + `mysql_stmt_bind_param`，SQLite 用 `sqlite3_bind_*`，PostgreSQL 用 `PQexecParams`。必须拼接时先做类型映射（如整数校验），不要靠转义引号。
+SOLUTION
+	reference: <<<REFERENCE
+[CWE-89](https://cwe.mitre.org/data/definitions/89.html)
+REFERENCE
+	rule_id: "e5a0b7c8-1d39-4f2a-9b13-5c7d9e3a1f68"
+)
+
+mysql_query as $output
+mysql_real_query as $output
+sqlite3_exec as $output
+sqlite3_prepare_v2 as $output
+sqlite3_prepare as $output
+PQexec as $output
+PQexecParams as $output
+
+alert $output for {
+	title: "C SQL execution API",
+	title_zh: "C 语言 SQL 执行类 API",
+	level: "info",
+	type: "audit",
+	risk: "sql-injection",
+	message: "检测到 SQL 执行 API，请确认语句文本未拼接用户输入。",
+	name: "output",
+}
+
+desc(
+	lang: c
+	alert_min: 1
+	'file://unsafe_sql_sink.c': <<<UNSAFE
+#include <mysql/mysql.h>
+
+int run(MYSQL *conn, const char *user) {
+    char q[256];
+    sprintf(q, "SELECT * FROM t WHERE u='%s'", user);
+    return mysql_query(conn, q);
+}
+UNSAFE
+	'safefile://safe_sql_sink.c': <<<SAFE
+int plain(void) {
+    int n = 1 + 2;
+    return n;
+}
+SAFE
+)

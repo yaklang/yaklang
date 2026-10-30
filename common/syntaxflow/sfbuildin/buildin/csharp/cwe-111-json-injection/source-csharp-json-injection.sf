@@ -1,0 +1,60 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# JSON 注入"
+	title_zh: "检测 C# JSON 注入"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-json-injection"
+	risk: "json-injection"
+	cwe: "CWE-111"
+	desc: <<<DESC
+### 规则说明
+把用户输入用字符串拼接/插值构造 JSON（`"{\\"name\\":\\"" + input + "\\"}"`、`$"{{\\"name\\":{input}}}"`）时，输入中的引号、反斜杠可逃逸出预期的值域，注入额外键值或整段结构。下游把该 JSON 存库、回放或转发到别处时，结构被篡改。
+
+### 风险类型
+json-injection
+
+### 影响
+注入额外字段改变下游解析逻辑；越权字段（如角色）被写入；JSON 存储的结构完整性被破坏。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法，不能单独证明拼接值来自用户输入。注释、字符串和文档中的相同文本也会命中。
+匹配字符串中含 `":` 的拼接表达式与插值字符串中含 `{`+`":` 的模式。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 用序列化器构造 JSON：`JsonSerializer.Serialize` / `JsonConvert.SerializeObject` 让对象→JSON 的转义由库完成。
+- 需要拼接 JSON 文本时（如日志），先经 `JsonEncodedText` 或 `JValue.ToString()` 转义。
+- 下游解析前校验结构（schema），不信任上游拼出的 JSON。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using System;
+
+public class JsonDemo {
+    public string Bad(string name) {
+        return "{\"user\": \"" + name + "\"}";
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using System.Text.Json;
+
+public class JsonDemo {
+    public string Ok(string name) {
+        return JsonSerializer.Serialize(new { user = name });
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/"[^"]*"\s*\+\s*[a-zA-Z_]|""?\{[^}*"?:]/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测 C# JSON 注入",
+	title_zh: "检测 C# JSON 注入",
+	message: "检测 C# JSON 注入",
+	risk: "json-injection",
+}

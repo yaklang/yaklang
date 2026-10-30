@@ -3,6 +3,8 @@
 package runtime
 
 import (
+	"context"
+	"errors"
 	"os"
 	"strings"
 	"sync"
@@ -27,7 +29,10 @@ type artifactCacheEntry struct {
 	signature artifactSignature
 	artifact  *model.Artifact
 	lastUsed  time.Time
+	err       error
 }
+
+const automaticArtifactTimeout = 2 * time.Second
 
 type artifactSignature struct {
 	sizeBytes int64
@@ -53,48 +58,74 @@ func newArtifactEnricher(policy model.EvidencePolicy, config shortTermContextCon
 }
 
 func (e *artifactEnricher) Apply(event model.Event) model.Event {
+	return e.ApplyContext(context.Background(), event)
+}
+
+func (e *artifactEnricher) ApplyContext(ctx context.Context, event model.Event) model.Event {
 	if e == nil {
 		return event
 	}
+	// Automatic event enrichment shares this short budget. Explicit scans pass
+	// their own request context to snapshotWithErrorContext and keep 30 seconds.
+	ctx, cancel := context.WithTimeout(ctx, automaticArtifactTimeout)
+	defer cancel()
+	var issues []map[string]any
 	if event.Process != nil {
-		event.Process = e.enrichProcess(event.Process)
+		var err error
+		event.Process, err = e.enrichProcess(ctx, event.Process)
+		if err != nil {
+			issues = append(issues, map[string]any{"target": "process.image", "error": err.Error()})
+		}
 	}
 	if event.File != nil {
-		event.File = e.enrichFile(event.File)
+		var err error
+		event.File, err = e.enrichFile(ctx, event.File)
+		if err != nil {
+			issues = append(issues, map[string]any{"target": "file.path", "error": err.Error()})
+		}
+	}
+	if len(issues) > 0 {
+		event.Data = cloneAnyMap(event.Data)
+		if event.Data == nil {
+			event.Data = make(map[string]any)
+		}
+		event.Data["artifact_errors"] = issues
 	}
 	return event
 }
 
-func (e *artifactEnricher) enrichProcess(process *model.Process) *model.Process {
+func (e *artifactEnricher) enrichProcess(ctx context.Context, process *model.Process) (*model.Process, error) {
 	if e == nil || process == nil {
-		return process
+		return process, nil
 	}
 	path := strings.TrimSpace(process.Image)
 	if path == "" || !strings.HasPrefix(path, "/") {
-		return process
+		return process, nil
 	}
 
 	cloned := *process
-	if artifact := e.snapshot(path); artifact != nil {
+	artifact, err := e.snapshotWithErrorContext(ctx, path)
+	if artifact != nil {
 		cloned.Artifact = artifact
 	}
-	return &cloned
+	return &cloned, err
 }
 
-func (e *artifactEnricher) enrichFile(file *model.File) *model.File {
+func (e *artifactEnricher) enrichFile(ctx context.Context, file *model.File) (*model.File, error) {
 	if e == nil || file == nil {
-		return file
+		return file, nil
 	}
 	path := strings.TrimSpace(file.Path)
 	if path == "" || !strings.HasPrefix(path, "/") {
-		return file
+		return file, nil
 	}
 
 	cloned := *file
-	if artifact := e.snapshot(path); artifact != nil {
+	artifact, err := e.snapshotWithErrorContext(ctx, path)
+	if artifact != nil {
 		cloned.Artifact = artifact
 	}
-	return &cloned
+	return &cloned, err
 }
 
 func (e *artifactEnricher) snapshot(path string) *model.Artifact {
@@ -103,9 +134,16 @@ func (e *artifactEnricher) snapshot(path string) *model.Artifact {
 }
 
 func (e *artifactEnricher) snapshotWithError(path string) (*model.Artifact, error) {
+	return e.snapshotWithErrorContext(context.Background(), path)
+}
+
+func (e *artifactEnricher) snapshotWithErrorContext(ctx context.Context, path string) (*model.Artifact, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	signature, ok := currentArtifactSignature(path)
 	if !ok {
-		return enrich.SnapshotArtifact(path, e.options)
+		return enrich.SnapshotArtifactContext(ctx, path, e.options)
 	}
 
 	now := time.Now().UTC()
@@ -121,19 +159,23 @@ func (e *artifactEnricher) snapshotWithError(path string) (*model.Artifact, erro
 			e.cache[cacheKey] = current
 		}
 		e.mu.Unlock()
-		return model.CloneArtifact(cached.artifact), nil
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		return model.CloneArtifact(cached.artifact), cached.err
 	}
 
-	artifact, err := enrich.SnapshotArtifact(path, e.options)
+	artifact, err := enrich.SnapshotArtifactContext(ctx, path, e.options)
 	if err != nil && artifact == nil {
 		return nil, err
 	}
-	if artifact != nil {
+	if artifact != nil && !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
 		e.mu.Lock()
 		e.cache[cacheKey] = artifactCacheEntry{
 			signature: signature,
 			artifact:  model.CloneArtifact(artifact),
 			lastUsed:  now,
+			err:       err,
 		}
 		e.pruneLocked(now)
 		e.enforceCapacityLocked()

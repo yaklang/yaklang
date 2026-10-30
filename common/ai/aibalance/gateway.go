@@ -425,6 +425,7 @@ func (g *GatewayClient) fetchTOTPSecretFromServer() string {
 		poc.WithConnectTimeout(10), // set connect timeout
 		poc.WithRetryTimes(2),      // retry on failure
 	}
+	opts = appendClientUserIDOptions(opts)
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
 	}
@@ -524,6 +525,7 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		poc.WithSave(false),    // do not save AI chat requests to database
 	}
 	opts = aispec.AppendCustomHeadersToPocOptions(opts, aispec.ExtraHeadersToMap(g.config.Headers))
+	opts = appendClientUserIDOptions(opts)
 	opts = append(opts, poc.WithTimeout(g.config.Timeout))
 	if g.config.Proxy != "" {
 		opts = append(opts, poc.WithProxy(g.config.Proxy))
@@ -544,4 +546,13 @@ func (g *GatewayClient) BuildHTTPOptions() ([]poc.PocConfigOption, error) {
 		opts = append(opts, poc.WithPort(g.config.Port))
 	}
 	return opts, nil
+}
+
+// Apply after custom headers, removing all case variants and duplicates first.
+func appendClientUserIDOptions(opts []poc.PocConfigOption) []poc.PocConfigOption {
+	opts = append(opts, poc.WithDeleteHeader(aibalanceclient.ClientUserIDHeader))
+	if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+		opts = append(opts, poc.WithReplaceHttpPacketHeader(aibalanceclient.ClientUserIDHeader, id))
+	}
+	return opts
 }

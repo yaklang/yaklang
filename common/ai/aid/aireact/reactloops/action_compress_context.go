@@ -95,7 +95,7 @@ func handleCompressContext(loop *ReActLoop, action *aicommon.Action, operator *L
 		operator.Fail(err)
 		return
 	}
-	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt); err != nil {
+	if _, err := timeline.ApplyCompressionSelection(selection, operator.requestPrompt, operator.trajectoryResponse); err != nil {
 		operator.Fail(err)
 		return
 	}

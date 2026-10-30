@@ -1,0 +1,64 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C HTTP 响应头注入"
+	title_zh: "源码扫描：C HTTP 响应头注入"
+	type: vuln
+	level: middle
+	rule_id: "source-c-header-manipulation"
+	risk: "crlf-injection"
+	cwe: "CWE-113"
+	desc: <<<DESC
+### 规则说明
+C 语言 Web 程序把用户输入拼进 HTTP 响应头（`Location`、`Set-Cookie`、自定义头）时，输入中的 `\r\n` 可以提前结束当前头并注入新头（含 `Set-Cookie`），甚至拆分出响应体——HTTP 响应拆分。
+
+### 风险类型
+header-injection
+
+### 影响
+注入 `Set-Cookie` 劫持会话；注入缓存头污染代理缓存；响应拆分注入任意页面内容。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配 `Location:`、`Set-Cookie:`、`WWW-Authenticate:` 等敏感响应头字面量附近的 `sprintf` 拼接。
+
+### 参考
+- [CWE-113：HTTP 响应拆分（HTTP 响应头中包含未校验的 CR/LF）](https://cwe.mitre.org/data/definitions/113.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 对拼进头的值做 CRLF 过滤（拒绝或编码 `\r`、`\n`）。
+- 重定向目标用允许列表校验，不要透传用户 URL。
+- `Set-Cookie` 的属性由代码控制，用户输入只进入 value 并编码。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <stdio.h>
+void bad(const char *target) {
+    char h[512];
+    sprintf(h, "Location: %s\r\n", target);
+    send_response(h);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <stdio.h>
+#include <string.h>
+void ok(const char *target) {
+    char safe[128];
+    sanitize_header_value(safe, sizeof(safe), target);
+    send_response("Location: https://example.com/home\r\n");
+}
+
+NEG
+)
+${*.c}.pattern_regex(/sprintf\s*\([^)]*"(Location|Set-Cookie|WWW-Authenticate|Refresh|Content-Disposition)\s*:[^"]*%s/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C HTTP 响应头注入",
+	title_zh: "源码扫描：C HTTP 响应头注入",
+	message: "源码扫描：C HTTP 响应头注入",
+	risk: "crlf-injection",
+}

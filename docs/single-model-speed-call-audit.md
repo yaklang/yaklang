@@ -136,7 +136,7 @@ Timeline 两处压缩和 Interval Review 已统一通过 `ScheduleAuxiliaryTask 
 | `timeline-batch-compress` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge 字段流及成功回调 |
 | `timeline-head-refine` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge；失败规则截断 |
 | `toolcall-interval-review` | `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge；保留工具 Emitter、错误和独立 checkpoint |
-| `ai_value_feedback` | 强制 lightweight LiteForge | 单模型模式在记录构建前停用；普通模式保留原执行路径 |
+| `ai_trajectory_evaluation` | 会话轨迹入库后使用免费评估模型 | 单模型模式保留本地压缩/终结轨迹，跳过模型评分；工具、审批、verification 不再单独评估 |
 | Speed ReAct Loop | 条件选择 `CallSpeedPriorityAI` | `ScheduleAuxiliaryTask` + LiteForge 响应解析/校验回调；普通 Intelligence Loop 不受影响 |
 
 ## 五、已清理的迁移遗留

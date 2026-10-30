@@ -30,7 +30,7 @@ func initSingleModelRegistry() {
 	// Pure display / evaluation — skipping only loses cosmetic output.
 	register(CallerLabelToolCallReason, SingleModelSkip)
 	register(CallerLabelToolCallIntervalReview, SingleModelSkip)
-	register(CallerLabelAIValueFeedback, SingleModelSkip)
+	register(CallerLabelAITrajectoryEvaluation, SingleModelSkip)
 	register(CallerLabelI18nTranslation, SingleModelSkip)
 	register(CallerLabelTaskShortID, SingleModelSkip)
 	register(CallerLabelSmartEvaluation, SingleModelSkip)

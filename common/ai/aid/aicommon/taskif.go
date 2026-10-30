@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/segmentio/ksuid"
@@ -158,6 +159,7 @@ type AIStatefulTaskBase struct {
 	taskMutex           *sync.Mutex
 	statusMu            sync.RWMutex
 	status              AITaskState
+	statusSnapshot      atomic.Pointer[AITaskState]
 	completionHolds     int
 	completionRequested bool
 	createdAt           time.Time
@@ -168,6 +170,7 @@ type AIStatefulTaskBase struct {
 	// index info
 	toolCallResultIds *omap.OrderedMap[int64, *aitool.ToolResult]
 	reActLoop         ReActLoopIF
+	trajectoryPrompt  atomic.Pointer[string]
 	db                *gorm.DB
 
 	uuid            string
@@ -682,6 +685,17 @@ func (s *AIStatefulTaskBase) GetStatus() AITaskState {
 	return s.status
 }
 
+// TryGetStatus reads the last published lifecycle state without waiting for
+// statusMu. A busy lifecycle writer must not discard the terminal trajectory.
+func (s *AIStatefulTaskBase) TryGetStatus() (AITaskState, bool) {
+	if s != nil {
+		if snapshot := s.statusSnapshot.Load(); snapshot != nil {
+			return *snapshot, true
+		}
+	}
+	return "", false
+}
+
 func (s *AIStatefulTaskBase) SetStatus(status AITaskState) {
 	s.setStatus(status, false)
 }
@@ -731,6 +745,7 @@ func (s *AIStatefulTaskBase) setStatus(status AITaskState, force bool) {
 	}
 	old := s.status
 	s.status = status
+	s.statusSnapshot.Store(&status)
 	finished := isFinishedTaskStatus(status)
 	s.statusMu.Unlock()
 
@@ -763,6 +778,7 @@ func (s *AIStatefulTaskBase) RestoreStatus(status AITaskState) {
 	}
 	s.statusMu.Lock()
 	s.status = status
+	s.statusSnapshot.Store(&status)
 	s.statusMu.Unlock()
 }
 
@@ -934,6 +950,8 @@ func newStatefulTaskBase(taskId string, userInput string, opts ...StatefulTaskBa
 		toolCallResultIds: omap.NewOrderedMap[int64, *aitool.ToolResult](make(map[int64]*aitool.ToolResult)),
 		uuid:              ksuid.New().String(),
 	}
+	initialStatus := AITaskState_Created
+	base.statusSnapshot.Store(&initialStatus)
 	for _, opt := range opts {
 		if opt != nil {
 			opt(base)

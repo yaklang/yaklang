@@ -175,6 +175,7 @@ func (r *ReAct) invokeNativeCoordinator(done chan struct{}, ctx context.Context,
 	cfg := newInvokePlanAndExecuteOptions(opts...)
 	if cfg.task != nil {
 		if cfg.task.IsAsyncMode() && !cfg.finalizeMemoryExternally {
+			defer r.collectTerminalTrajectory(cfg.task)
 			release := r.beginUserTaskMemory(cfg.task)
 			defer r.memoryContinuations.Delete(cfg.task.GetId())
 			defer release()

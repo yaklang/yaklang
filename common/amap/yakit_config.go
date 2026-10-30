@@ -141,6 +141,9 @@ func fetchTOTPSecretFromURL(totpURL string) string {
 		"GET /v1/memfit-totp-uuid HTTP/1.1\r\nHost: %s\r\nAccept: application/json\r\nUser-Agent: yaklang-amap-client\r\n\r\n",
 		addr,
 	)
+	if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+		rawReq = lowhttp.ReplaceHTTPPacketHeader(rawReq, aibalanceclient.ClientUserIDHeader, id)
+	}
 
 	rspIns, err := lowhttp.HTTPWithoutRedirect(
 		lowhttp.WithHttps(isHTTPS),

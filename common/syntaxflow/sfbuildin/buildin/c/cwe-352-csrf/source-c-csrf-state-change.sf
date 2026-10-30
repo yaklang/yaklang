@@ -1,0 +1,64 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C 状态变更处理缺少 CSRF 防护"
+	title_zh: "源码扫描：C 状态变更处理缺少 CSRF 防护"
+	type: vuln
+	level: middle
+	rule_id: "source-c-csrf-state-change"
+	risk: "csrf"
+	cwe: "CWE-352"
+	desc: <<<DESC
+### 规则说明
+C 语言 Web/CGI 程序处理状态变更请求时若不校验随机 token，浏览器会自动携带 Cookie，攻击者构造的第三方页面可让受害者浏览器在登录态下发起跨站请求，以受害者身份执行改密码、转账等操作。
+
+### 风险类型
+csrf
+
+### 影响
+以受害者身份执行状态变更操作；绕过同源策略限制（CSRF 不需要读取响应）。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法，不能单独证明缺少 token 校验。注释、字符串和文档中的相同文本也会命中。
+正则匹配代码中出现 `csrf`/`xsrf`/`token` 字样之外的 GET 参数驱动状态变更模式（如 `action=`）。命中后需人工确认是否校验 token。
+
+### 参考
+- [CWE-352：跨站请求伪造](https://cwe.mitre.org/data/definitions/352.html)
+- [OWASP CSRF Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross-Site_Request_Forgery_Prevention_Cheat_Sheet.html)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 会话中绑定服务端生成的随机 token，状态变更请求必须携带并校验。
+- 状态变更操作只接受 POST/PUT/DELETE，GET 只做只读查询。
+- Cookie 设置 `SameSite=Lax/Strict`；高敏操作要求二次验证。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <string.h>
+void bad(const char *query) {
+    if (strstr(query, "action=changepwd") != NULL) {
+        change_password(get_param(query, "newpwd"));
+    }
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <string.h>
+void ok(const char *query, session_t *s) {
+    if (session_token_equal(s, get_param(query, "csrf_token"))) {
+        change_password(get_param(query, "newpwd"));
+    }
+}
+
+NEG
+)
+${*.c}.pattern_regex(/action\s*=\s*(changepwd|delete|remove|update|transfer|withdraw)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "源码扫描：C 状态变更处理缺少 CSRF 防护",
+	title_zh: "源码扫描：C 状态变更处理缺少 CSRF 防护",
+	message: "源码扫描：C 状态变更处理缺少 CSRF 防护",
+	risk: "csrf",
+}

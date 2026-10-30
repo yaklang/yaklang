@@ -1,0 +1,68 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# 不受限制的文件上传"
+	title_zh: "检测 C# 不受限制的文件上传"
+	type: vuln
+	level: high
+	rule_id: "source-csharp-unrestricted-file-upload"
+	risk: "file-upload"
+	cwe: "CWE-434"
+	desc: <<<DESC
+### 规则说明
+`Request.Files` / `IBrowserFile.OpenReadStream` / `IFormFile` 接收的文件名与内容默认完全由客户端控制。若把 `FileName`/`OriginalFileName` 直接拼进保存路径（`Path.Combine(serverDir, file.FileName)`），攻击者可用 `..%2f` 之类穿越写任意位置；若不校验扩展名与内容，可上传 `.aspx`、`.ashx` 等 WebShell。
+
+### 风险类型
+file-upload
+
+### 影响
+WebShell 直接 RCE；覆盖 `web.config` 或 DLL 接管应用；穿越写入系统目录。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法，不能单独证明文件名未校验。注释、字符串和文档中的相同文本也会命中。
+匹配 `SaveAs`、`Path.Combine` 中直接使用 `FileName`/`OriginalFileName` 的写法。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 保存名用服务端生成（`Path.GetRandomFileName()` 或 GUID），不使用客户端文件名。
+- 白名单校验扩展名并检查文件头（magic bytes）；上传目录禁执行（IIS handler 移除）。
+- `Path.Combine` 前用 `Path.GetFileName` 归一化并校验最终路径仍在目标目录内。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using System.IO;
+using Microsoft.AspNetCore.Http;
+
+public class UploadDemo {
+    public void Bad(IFormFile file, string dir) {
+        var target = Path.Combine(dir, file.FileName);
+        using var fs = File.Create(target);
+        file.CopyTo(fs);
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using System.IO;
+using Microsoft.AspNetCore.Http;
+
+public class UploadDemo {
+    public void Ok(IFormFile file, string dir) {
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (ext != ".png") { return; }
+        var target = Path.Combine(dir, Path.GetRandomFileName() + ".png");
+        using var fs = File.Create(target);
+        file.CopyTo(fs);
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/(Path\.Combine\s*\([^)]*,\s*(file|uploaded)\.?(FileName|OriginalFileName))|\.SaveAs\s*\(/) as $hit
+alert $hit for {
+	level: "high",
+	title: "检测 C# 不受限制的文件上传",
+	title_zh: "检测 C# 不受限制的文件上传",
+	message: "检测 C# 不受限制的文件上传",
+	risk: "file-upload",
+}

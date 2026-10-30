@@ -1,0 +1,62 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# 不安全临时文件"
+	title_zh: "检测 C# 不安全临时文件"
+	type: vuln
+	level: middle
+	rule_id: "source-csharp-insecure-tempfile"
+	risk: "file-operation"
+	cwe: "CWE-377"
+	desc: <<<DESC
+### 规则说明
+`Path.GetTempFileName()` 创建的文件所有用户可读；把敏感数据写入临时文件、或用可预测名称（`Path.Combine(Path.GetTempPath(), "export.csv")`）创建文件，本地低权限攻击者可读取、抢占或替换该文件。
+
+### 风险类型
+file-operation
+
+### 影响
+敏感数据（导出、缓存、上传中转）被本机其他用户读取；预测性文件名被抢占导致数据混淆或注入。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+匹配 `GetTempFileName()`、`GetTempPath()` 调用点。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 敏感数据尽量不落盘；必须临时保存时用 `RandomNumberGenerator` 生成随机名并放受限目录。
+- 创建后立即 `File.SetAccessControl` 限制为当前用户。
+- 用完即删（`try/finally` 或 `FileOptions.DeleteOnClose`）。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using System.IO;
+
+public class TempDemo {
+    public void Bad(byte[] secret) {
+        var path = Path.GetTempFileName();
+        File.WriteAllBytes(path, secret);
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using System.IO;
+
+public class TempDemo {
+    public void Ok(byte[] data) {
+        var path = Path.Combine("/var/app/tmp", Path.GetRandomFileName());
+        File.WriteAllBytes(path, data);
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/(Path\.GetTempFileName|Path\.GetTempPath)\s*\(\s*\)/) as $hit
+alert $hit for {
+	level: "middle",
+	title: "检测 C# 不安全临时文件",
+	title_zh: "检测 C# 不安全临时文件",
+	message: "检测 C# 不安全临时文件",
+	risk: "file-operation",
+}

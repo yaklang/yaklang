@@ -444,14 +444,6 @@ func (a *ToolCaller) invoke(
 	if c != nil {
 		browserTracker = c.GetBrowserSessionTracker()
 	}
-	// boundRisks 收集本次工具调用实际 emit / 绑定到 runtime 的 risk (漏洞).
-	// 漏洞主要由 cybersecurity-risk 等 yak 插件工具产生, 工具执行结束后据此异步
-	// 提交 risk_feedback 价值反馈 (交小模型判定是否误报). FeedBacker 可能被工具执行
-	// 协程并发回调, 故用锁保护.
-	var (
-		boundRisksMu sync.Mutex
-		boundRisks   []*schema.Risk
-	)
 	runtimeCfg := &aitool.ToolRuntimeConfig{
 		RuntimeID:             a.callToolId,
 		ProjectDatabase:       a.config.GetDB(),
@@ -465,9 +457,6 @@ func (a *ToolCaller) invoke(
 			risk, _ := handleRiskMessage(result)
 			if risk != nil {
 				e.EmitYakitRisk(risk.ID, risk.Title, risk.RuntimeId)
-				boundRisksMu.Lock()
-				boundRisks = append(boundRisks, risk)
-				boundRisksMu.Unlock()
 				// Append a compact summary to the session-level reported-risks
 				// store so the model sees a "已报告漏洞清单" in every subsequent
 				// prompt and avoids duplicate cybersecurity-risk calls.
@@ -588,18 +577,6 @@ func (a *ToolCaller) invoke(
 	// callback-time errors remain single events even when they are reported here too.
 	if execErr != nil {
 		reportError(execErr)
-	}
-
-	// 工具调用结束、runtime 已绑定漏洞之后, 异步提交 risk_feedback 价值反馈 (AI 自判).
-	// 这是对 cybersecurity-risk 等 "报漏洞" 工具插件的通用埋点, 与 loop 内 generate_risk
-	// 动作路径互补. 非阻塞投递 + 内部 recover, 绝不影响工具调用结果与主流程.
-	boundRisksMu.Lock()
-	risksSnapshot := boundRisks
-	boundRisksMu.Unlock()
-	if len(risksSnapshot) > 0 {
-		if cfg, ok := c.(*Config); ok {
-			cfg.SubmitToolRiskFeedback(tool.Name, risksSnapshot)
-		}
 	}
 
 	ep.ActiveWithParams(ctx, map[string]any{"suggestion": "finish"})

@@ -15,6 +15,8 @@ type fileTracker struct {
 	window     time.Duration
 	maxEntries int
 	nextPrune  time.Time
+	seen       observationTimeIndex
+	zeroSeen   map[string]struct{}
 }
 
 type trackedFile struct {
@@ -152,6 +154,7 @@ func (t *fileTracker) rememberFile(file *model.File, observedAt time.Time) {
 		return
 	}
 	t.byPath[path] = current
+	t.indexFile(path, current.lastSeen)
 	t.prune(observedAt)
 }
 
@@ -175,7 +178,21 @@ func (t *fileTracker) rememberAudit(audit *model.Audit, file *model.File, observ
 		return
 	}
 	t.byPath[path] = current
+	t.indexFile(path, current.lastSeen)
 	t.prune(observedAt)
+}
+
+func (t *fileTracker) indexFile(path string, observedAt time.Time) {
+	if observedAt.IsZero() {
+		t.seen.remove(path)
+		if t.zeroSeen == nil {
+			t.zeroSeen = make(map[string]struct{})
+		}
+		t.zeroSeen[path] = struct{}{}
+		return
+	}
+	delete(t.zeroSeen, path)
+	t.seen.set(path, observedAt)
 }
 
 func (t *fileTracker) forget(path string) {
@@ -183,6 +200,8 @@ func (t *fileTracker) forget(path string) {
 		return
 	}
 	delete(t.byPath, path)
+	t.seen.remove(path)
+	delete(t.zeroSeen, path)
 }
 
 func (t *fileTracker) prune(observedAt time.Time) {
@@ -196,25 +215,28 @@ func (t *fileTracker) prune(observedAt time.Time) {
 		return
 	}
 	if t.window > 0 {
-		for path, entry := range t.byPath {
-			if !entry.lastSeen.IsZero() && observedAt.Sub(entry.lastSeen) > t.window {
-				delete(t.byPath, path)
+		for {
+			path, seen, exists := t.seen.first()
+			if !exists || observedAt.Sub(seen) <= t.window {
+				break
 			}
+			t.forget(path)
 		}
 	}
 	for t.maxEntries > 0 && len(t.byPath) > t.maxEntries {
-		oldestPath := ""
-		var oldestSeen time.Time
-		for path, entry := range t.byPath {
-			if oldestPath == "" || entry.lastSeen.Before(oldestSeen) {
+		oldestPath, seen, exists := t.seen.first()
+		// Zero timestamps were never TTL-expired. They still participate in
+		// capacity eviction with their original time ordering.
+		if len(t.zeroSeen) > 0 && (!exists || !seen.Before(time.Time{})) {
+			for path := range t.zeroSeen {
 				oldestPath = path
-				oldestSeen = entry.lastSeen
+				break
 			}
 		}
 		if oldestPath == "" {
 			break
 		}
-		delete(t.byPath, oldestPath)
+		t.forget(oldestPath)
 	}
 	t.nextPrune = observedAt.Add(shortTermContextPruneInterval)
 }

@@ -89,9 +89,13 @@ func (c *AiBalanceSearchClient) fetchTOTPSecretFromServer() string {
 		opts = append(opts, lowhttp.WithProxy(c.Config.Proxy))
 	}
 
-	raw, err := Request("GET", totpURL, map[string]string{
+	headers := map[string]string{
 		"Accept": "application/json",
-	}, nil, nil, opts...)
+	}
+	if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+		headers[aibalanceclient.ClientUserIDHeader] = id
+	}
+	raw, err := Request("GET", totpURL, headers, nil, nil, opts...)
 	if err != nil {
 		log.Errorf("failed to fetch TOTP UUID from aibalance server: %v", err)
 		return ""
@@ -193,7 +197,10 @@ func (c *AiBalanceSearchClient) doSearchRequest(searchURL string, bodyBytes []by
 	headers := map[string]string{
 		"Content-Type": "application/json",
 		"User-Agent":   "Yaklang-AiBalance-OmniSearch/1.0",
-		"Trace-ID":     aibalanceclient.GetTraceID(),
+	}
+	if id := aibalanceclient.GetOrCreateClientUserID(); id != "" {
+		headers["Trace-ID"] = id
+		headers[aibalanceclient.ClientUserIDHeader] = id
 	}
 
 	// Add Authorization header only if API key is configured

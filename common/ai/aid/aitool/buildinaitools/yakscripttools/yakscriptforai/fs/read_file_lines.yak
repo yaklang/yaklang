@@ -1,4 +1,4 @@
-__DESC__ = "A line-based text file (Absolute File Path) reader with pagination support. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, analyze_pcap, etc.)."
+__DESC__ = "A line-based text file (Absolute File Path) reader with pagination support. Automatically detects binary file formats via mimetype (magic bytes) and redirects to appropriate built-in tools (read_excel_info, read_word_structure, parse_office_to_text, zip_viewer, load_pcapfile/query_pcapdb, etc.)."
 __VERBOSE_NAME__ = "Line File Reader"
 __VERBOSE_NAME_ZH__ = "按行读取文件"
 __KEYWORDS__ = "file reading,line reading,log analysis,text processing,large file,line by line,pagination,streaming read,binary detection,mimetype,read_excel_info,parse_office_to_text"
@@ -252,11 +252,12 @@ if isBinaryFile {
     } else if ext == ".pcap" || ext == ".pcapng" || ext == ".cap" {
         suggestion = sprintf(
             "[Built-in Tool (Recommended)]\n" +
-            "  analyze_pcap - Analyze network packet capture:\n" +
-            "  Call tool \"analyze_pcap\" with params: {\"file\": \"%s\"}\n\n" +
-            "[Alternative: bash]\n" +
-            "  tcpdump -r '%s' -c 50",
-            filePath, filePath,
+            "  pcapdb traffic analysis system:\n" +
+            "  Call tool \"load_pcapfile\" with params: {\"pcapfile\": \"%s\"}\n" +
+            "  Use the returned dataset_id as id for \"query_pcapdb\" (metadata/protocols/fields/sessions/streams/details).\n" +
+            "  Or call \"query_pcapdb\" with pcapfile and query_type=metadata for automatic import.\n" +
+            "  Use \"manage_pcapdb\" to list, validate, export or delete datasets.",
+            filePath,
         )
     } else if ext == ".db" || ext == ".sqlite" || ext == ".sqlite3" {
         suggestion = sprintf(

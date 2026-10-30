@@ -54,10 +54,6 @@ tmp_build/
 *.mmdb
 .vscode/*
 gen
-!scannode/gen/
-scannode/gen/*
-!scannode/gen/legionpb/
-!scannode/gen/legionpb/**
 .antlr/
 common/xlic/*.gzip
 .go-version
@@ -96,7 +92,6 @@ CLAUDE.md
 
 # local legion node binaries
 /legion-node
-/legion-smoke-node
 /bin/
 # In-checkout output staging must not alter Go's VCS dirty stamp.
 .legion-musl-build.*/

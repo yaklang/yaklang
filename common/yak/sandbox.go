@@ -1,23 +1,27 @@
 package yak
 
 import (
+	"context"
 	"os"
 	"sync"
 
+	"github.com/yaklang/yaklang/common/go-funk"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/antlr4yak"
 	"github.com/yaklang/yaklang/common/yak/yaklang"
 )
 
 type Sandbox struct {
-	config *SandboxConfig
-	engine *antlr4yak.Engine
-	mutex  *sync.Mutex
+	config  *SandboxConfig
+	engine  *antlr4yak.Engine
+	mutex   *sync.Mutex
+	session bool
 }
 
 type SandboxConfig struct {
 	lib               map[string]any
 	importYaklangLibs bool
+	isolatedExecution bool
 }
 
 type SandboxOption func(*SandboxConfig)
@@ -53,6 +57,16 @@ func WithSandbox_ExternalLib(lib map[string]any) SandboxOption {
 func WithYaklang_Libs(b bool) SandboxOption {
 	return func(config *SandboxConfig) {
 		config.importYaklangLibs = b
+	}
+}
+
+// WithSandbox_IsolatedExecution discards expression variables and script state
+// after every call. Static libraries are copied into a fresh execution session;
+// callers which need condition/action state within one event can use NewSession.
+// The default Sandbox retains its existing stateful behavior.
+func WithSandbox_IsolatedExecution() SandboxOption {
+	return func(config *SandboxConfig) {
+		config.isolatedExecution = true
 	}
 }
 
@@ -107,7 +121,10 @@ func (s Sandbox) ExecuteAsExpressionRaw(code string, vars map[string]any) (ret a
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
 
-	return s.engine.ExecuteAsExpression(code, vars)
+	if s.session && len(vars) == 0 {
+		vars = nil
+	}
+	return s.executionEngine().ExecuteAsExpression(code, vars)
 }
 
 func (s *Sandbox) ExecuteAsExpression(code string, vars ...any) (ret any, err error) {
@@ -120,10 +137,25 @@ func (s *Sandbox) ExecuteAsExpression(code string, vars ...any) (ret any, err er
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.engine.ExecuteAsExpression(code, merged)
+	if s.session && len(merged) == 0 {
+		merged = nil
+	}
+	return s.executionEngine().ExecuteAsExpression(code, merged)
 }
 
 func (s *Sandbox) ExecuteAsBoolean(code string, vars ...any) (ret bool, err error) {
+	return s.ExecuteAsBooleanContext(context.Background(), code, vars...)
+}
+
+// ExecuteAsBooleanContext evaluates the expression under the caller's deadline.
+// It retains ExecuteAsBoolean's truthiness and library configuration.
+func (s *Sandbox) ExecuteAsBooleanContext(ctx context.Context, code string, vars ...any) (ret bool, err error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
 	merged := make(map[string]any)
 	for _, v := range vars {
 		for k, v := range utils.InterfaceToGeneralMap(v) {
@@ -133,7 +165,81 @@ func (s *Sandbox) ExecuteAsBoolean(code string, vars ...any) (ret bool, err erro
 
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
-	return s.engine.ExecuteAsBooleanExpression(code, merged)
+	engine := s.executionEngine()
+	if !s.session || len(merged) > 0 {
+		engine.ImportLibs(merged)
+	}
+	value, err := engine.SafeEvalInlineWithResult(ctx, code)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return false, ctxErr
+	}
+	if err != nil || value == nil {
+		return false, err
+	}
+	if value.IsBool() {
+		return value.Bool(), nil
+	}
+	return !funk.IsEmpty(value.Value) && !funk.IsZero(value.Value), nil
+}
+
+// NewSession creates an independent, stateful execution session containing the
+// configured libraries and the supplied initial variables. Script state from
+// the original sandbox are never inherited. A session may be shared by a single
+// event's condition and action, then released at the end of that event.
+func (s *Sandbox) NewSession(vars ...any) *Sandbox {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+	session := s.newSession()
+	merged := make(map[string]any)
+	for _, values := range vars {
+		for name, value := range utils.InterfaceToGeneralMap(values) {
+			merged[name] = value
+		}
+	}
+	if len(merged) > 0 {
+		session.engine.ImportLibs(merged)
+	}
+	session.session = true
+	return session
+}
+
+func (s *Sandbox) newSession() *Sandbox {
+	return NewSandbox(
+		WithSandbox_ExternalLib(cloneSandboxLibrary(s.config.lib)),
+		WithYaklang_Libs(s.config.importYaklangLibs),
+	)
+}
+
+// executionEngine is called while the sandbox mutex is held. Isolation is an
+// explicit opt-in so this does not change other interpreter users' globals.
+func (s *Sandbox) executionEngine() *antlr4yak.Engine {
+	if s.config.isolatedExecution {
+		return s.newSession().engine
+	}
+	return s.engine
+}
+
+func cloneSandboxLibrary(library map[string]any) map[string]any {
+	cloned := make(map[string]any, len(library))
+	for name, value := range library {
+		cloned[name] = cloneSandboxLibraryValue(value)
+	}
+	return cloned
+}
+
+func cloneSandboxLibraryValue(value any) any {
+	switch value := value.(type) {
+	case map[string]any:
+		return cloneSandboxLibrary(value)
+	case []any:
+		cloned := make([]any, len(value))
+		for index, item := range value {
+			cloned[index] = cloneSandboxLibraryValue(item)
+		}
+		return cloned
+	default:
+		return value
+	}
 }
 
 var SandboxExports = map[string]any{

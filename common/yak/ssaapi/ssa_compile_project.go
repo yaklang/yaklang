@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/yaklang/javajive/classparser"
+	javaclassparser "github.com/yaklang/javajive/classparser"
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
@@ -280,6 +280,10 @@ func (c *Config) parseProject() (progs Programs, err error) {
 	c.Processf(0, "recompile project, start compile")
 
 	if mode != compileModeFull {
+		// 增量序列（基础全量 + 差量）禁止归档展开：展开条目会让 diff 涌入
+		// 数千个新增/删除，增量退化成全量重编（jar/zip 由
+		// swapLanguageFs 的 disableArchiveExpansion 兜住）。
+		c.disableArchiveExpansion = true
 		var prog *Program
 		if mode == compileModeIncrementalDiff {
 			c.Processf(0.02, "incremental compile detected, base program: %s", c.GetBaseProgramName())
@@ -568,13 +572,8 @@ func (c *Config) parseProjectWithIncrementalCompile() (*Program, error) {
 		}
 	}
 
-	// diff 的两侧必须是同一形态：baseFS 是"编译时"视图（归档已展开、
-	// .class 已映射为 .java），而 c.fs 是裸文件系统。若直接用裸 FS 做
-	// diff，磁盘上的 .jar 会整体判为"新增"、base 的每个展开条目都会判为
-	// "删除"，增量编译退化为全量重编。这里把 newFS 先过一遍与全量编译
-	// 相同的语言预处理，保证与 baseFS 可比。
 	newFSForDiff := c.swapLanguageFs(c.fs)
-	c.Processf(0.09, "diff inputs aligned: new filesystem wrapped with language preprocessing (jar recursive parse: %v)", c.GetCodeSourceJarRecursiveParse())
+	c.Processf(0.09, "diff inputs aligned: new filesystem keeps archives un-expanded (incremental compile forbids jar/zip expansion)")
 
 	diffProgram, err := CompileDiffProgramAndSaveToDB(
 		c.ctx,
@@ -808,16 +807,20 @@ func resolveDiffSourceFilter(language, baseProgramLanguage ssaconfig.Language) f
 // already expanded them into entries (walk sees no archive files), or
 // archive parsing is disabled and they must stay out of the diff entirely.
 // Letting them through would re-expand inside the diff compile and degrade
-// every incremental compile back to a full one.
+// every incremental compile back to a full one. Archive entries are excluded
+// unconditionally (isRawArchiveDiffEntry) even when the whitelist resolves:
+// incremental compiles forbid jar/zip expansion, so entries living inside an
+// archive path (lib/foo.jar/.../A.java) only exist on a legacy expanded
+// base and must not leak into the diff.
 // newSideWalkOptions builds the walk options for the NEW side of the diff:
 // one entry filter answering "is this walk entry inside the diff domain".
 // Directories are pruned whole on exclude matches (SkipDir); files must pass
-// the domain filter — the language whitelist when resolved, the raw-archive
-// blacklist otherwise — and the compile scan rules (skipCompileFile). The
-// per-file hook is appended by the caller: the compare pass installs the
-// digest comparison. Both sides of the diff must apply the same domain
-// filter (isSourceFile), so entries skipped here never reach the comparison
-// hook.
+// the domain filter — the language whitelist when resolved, always composed
+// with the raw-archive blacklist — and the compile scan rules
+// (skipCompileFile). The per-file hook is appended by the caller: the
+// compare pass installs the digest comparison. Both sides of the diff must
+// apply the same domain filter, so entries skipped here never reach the
+// comparison hook.
 func newSideWalkOptions(walk fi.FileSystem, exclude ExcludeFunc, isSourceFile func(string) bool, onFile func(pathname string, info os.FileInfo) error) []filesys.Option {
 	return []filesys.Option{
 		filesys.WithFileSystem(walk),
@@ -831,10 +834,11 @@ func newSideWalkOptions(walk fi.FileSystem, exclude ExcludeFunc, isSourceFile fu
 				}
 				return nil
 			}
-			outOfDomain := isRawArchiveDiffEntry(pathname)
-			if isSourceFile != nil {
-				outOfDomain = !isSourceFile(pathname)
-			}
+			// Archives are hard-excluded from the diff domain even when the
+			// language whitelist would accept them: incremental compiles
+			// forbid jar/zip expansion, and archive-interior entries
+			// (lib/foo.jar/.../A.java) only exist on a legacy expanded base.
+			outOfDomain := isRawArchiveDiffEntry(pathname) || (isSourceFile != nil && !isSourceFile(pathname))
 			if outOfDomain || skipCompileFile(exclude, pathname, info) {
 				return nil
 			}
@@ -857,11 +861,15 @@ func calculateFileSystemDiff(baseFS, newFS fi.FileSystem, exclude ExcludeFunc, p
 		}
 	}
 
-	// base snapshot: path -> content digest (never retains file bytes)
+	// base snapshot: path -> content digest (never retains file bytes).
+	// Archive entries are hard-excluded here too (symmetric with the new
+	// side): a legacy base compiled with jar expansion carries
+	// lib/foo.jar/... interior entries that would otherwise all surface as
+	// phantom deletions.
 	baseDone := 0
 	baseDigests := make(map[string]string)
 	err := filesys.Recursive(".", filesys.WithFileSystem(baseFS), filesys.WithFileStat(func(pathname string, info os.FileInfo) error {
-		if pathname == "" || (isSourceFile != nil && !isSourceFile(pathname)) {
+		if pathname == "" || isRawArchiveDiffEntry(pathname) || (isSourceFile != nil && !isSourceFile(pathname)) {
 			return nil
 		}
 		baseDone++
@@ -914,14 +922,16 @@ func calculateFileSystemDiff(baseFS, newFS fi.FileSystem, exclude ExcludeFunc, p
 	return diffFS, fileHashMap, nil
 }
 
-// isRawArchiveDiffEntry reports whether a diff walk entry is an archive file
-// that no language preprocessing expanded (expanded archives surface as
-// directories, so their file entries never reach this check). It delegates to
-// javaclassparser.IsArchiveFile so the suffix set stays in lockstep with the
-// archives the preprocessor actually expands. Fallback only: used when the
-// diff source filter can't be resolved from a language (see
-// resolveDiffSourceFilter); the language whitelist normally keeps raw
-// archives out of the diff domain without this blacklist.
+// isRawArchiveDiffEntry reports whether a diff walk entry belongs to an
+// archive and must stay out of the diff domain: either a raw archive file
+// (.jar/.war/…) or an entry INSIDE an archive-expanded path
+// (lib/foo.jar/com/x/A.java — the shape a jar-expanded compile persisted).
+// Incremental compiles forbid archive expansion, so a fresh base has no
+// expanded entries; but a legacy base compiled with jar expansion enabled
+// would otherwise surface thousands of phantom deletions. Applied
+// unconditionally on both diff sides, composed with the language whitelist.
+// The raw-file suffix set delegates to javaclassparser.IsArchiveFile so it
+// stays in lockstep with the archives the preprocessor actually expands.
 func isRawArchiveDiffEntry(pathname string) bool {
 	return javaclassparser.IsArchiveFile(pathname)
 }

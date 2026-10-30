@@ -50,6 +50,7 @@ func (r *ReAct) completeUserTaskMemory(task aicommon.AIStatefulTask) {
 // Artifact/result records must be appended before the async completion becomes
 // observable. Review-only continuations still skip extraction here.
 func (r *ReAct) finishAsyncUserTaskMemory(task aicommon.AIStatefulTask, err error, release func()) {
+	defer r.collectTerminalTrajectory(task)
 	if task != nil {
 		defer r.memoryContinuations.Delete(task.GetId())
 	}

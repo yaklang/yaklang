@@ -1,0 +1,60 @@
+desc(
+	mode: "source"
+	language: "c"
+	title: "源码扫描：C libxml2 外部实体加载"
+	title_zh: "源码扫描：C libxml2 外部实体加载"
+	type: vuln
+	level: high
+	rule_id: "source-c-libxml2-xxe"
+	risk: "xxe"
+	cwe: "CWE-611"
+	desc: <<<DESC
+### 规则说明
+libxml2 解析不可信 XML 时，`xmlReadMemory`/`xmlReadFile` 显式传 `XML_PARSE_DTDLOAD`（或旧版本默认行为）会加载 DTD 外部实体。攻击者通过 DTD 声明可让解析器读取本地文件（`file:///etc/passwd`）、发起内部网络请求（SSRF）或用递归实体耗尽内存。
+
+### 风险类型
+xxe
+
+### 影响
+任意文件读取；通过 `http://`/`ftp://` 实体探测内网；billion laughs 拒绝服务。
+
+### 检测方式
+这条规则使用 source 模式，用正则扫描源文件文本，不构建语法树或 SSA。命中只说明出现了对应写法。注释、字符串和文档中的相同文本也会命中。
+正则匹配选项组合中出现 `XML_PARSE_DTDLOAD` 或 `XML_PARSE_NOENT` 与 `XML_PARSE_DTDLOAD` 共存的调用。
+
+### 参考
+- [CWE-611：对外部实体引用的不当限制](https://cwe.mitre.org/data/definitions/611.html)
+- [libxml2 xmlReadMemory](http://xmlsoft.org/html/libxml2-parser.html#xmlReadMemory)
+
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 使用 `XML_PARSE_NONET`，不要同时传 `XML_PARSE_DTDLOAD` 与 `XML_PARSE_NOENT`。
+- libxml2 2.9+ 默认不解析外部实体，升级并保持默认配置。
+- 配合 `xmlCtxtSetMaxAmplification`/`xmlCtxtSetMaxSize` 防御实体爆炸。
+
+SOLUTION
+	alert_min: 1
+	"file://bad.c": <<<POS
+#include <libxml/parser.h>
+xmlDocPtr bad(const char *buf, int len) {
+    return xmlReadMemory(buf, len, "x.xml", NULL, XML_PARSE_NOENT | XML_PARSE_DTDLOAD);
+}
+
+POS
+	"safefile://ok.c": <<<NEG
+#include <libxml/parser.h>
+xmlDocPtr ok(const char *buf, int len) {
+    return xmlReadMemory(buf, len, "x.xml", NULL, XML_PARSE_NONET);
+}
+
+NEG
+)
+${*.c}.pattern_regex(/XML_PARSE_DTDLOAD/) as $hit
+alert $hit for {
+	level: "high",
+	title: "源码扫描：C libxml2 外部实体加载",
+	title_zh: "源码扫描：C libxml2 外部实体加载",
+	message: "源码扫描：C libxml2 外部实体加载",
+	risk: "xxe",
+}

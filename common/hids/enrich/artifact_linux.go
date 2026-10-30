@@ -3,11 +3,13 @@
 package enrich
 
 import (
+	"context"
 	"crypto/md5"
 	"crypto/sha256"
 	"debug/elf"
 	"encoding/binary"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -21,16 +23,36 @@ import (
 )
 
 type ArtifactSnapshotOptions struct {
-	CaptureHashes bool
+	CaptureHashes    bool
+	MaxHashBytes     int64
+	MaxMetadataBytes int64
 }
 
+// The limit applies to complete-file hashes, never to a prefix presented as a
+// full hash. Larger files retain their metadata and return an explicit error.
+const DefaultArtifactHashMaxBytes int64 = 512 << 20
+const DefaultArtifactMetadataMaxBytes int64 = 8 << 20
+
+var ErrArtifactHashLimit = errors.New("artifact exceeds complete-file hash byte limit")
+var ErrArtifactMetadataLimit = errors.New("artifact exceeds ELF metadata byte limit")
+
 func SnapshotArtifact(path string, options ArtifactSnapshotOptions) (*model.Artifact, error) {
+	return SnapshotArtifactContext(context.Background(), path, options)
+}
+
+func SnapshotArtifactContext(ctx context.Context, path string, options ArtifactSnapshotOptions) (*model.Artifact, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return nil, nil
 	}
 
 	info, err := os.Stat(path)
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return nil, ctxErr
+	}
 	if err != nil {
 		if os.IsNotExist(err) {
 			return &model.Artifact{
@@ -60,7 +82,7 @@ func SnapshotArtifact(path string, options ArtifactSnapshotOptions) (*model.Arti
 		return artifact, nil
 	}
 
-	sample, err := readArtifactSample(path, 4096)
+	sample, err := readArtifactSampleContext(ctx, path, 4096)
 	if err != nil {
 		return artifact, err
 	}
@@ -83,7 +105,7 @@ func SnapshotArtifact(path string, options ArtifactSnapshotOptions) (*model.Arti
 	if isELFArtifact(sample) {
 		artifact.FileType = "elf"
 		artifact.TypeSource = "magic"
-		if elfArtifact, elfErr := snapshotELFArtifact(path); elfErr == nil {
+		if elfArtifact, elfErr := snapshotELFArtifactContext(ctx, path, options.MaxMetadataBytes); elfErr == nil {
 			artifact.ELF = elfArtifact
 		} else if err == nil {
 			err = elfErr
@@ -91,7 +113,7 @@ func SnapshotArtifact(path string, options ArtifactSnapshotOptions) (*model.Arti
 	}
 
 	if options.CaptureHashes {
-		hashes, hashErr := snapshotArtifactHashes(path)
+		hashes, hashErr := snapshotArtifactHashesContext(ctx, path, options.MaxHashBytes)
 		if hashErr == nil {
 			artifact.Hashes = hashes
 		} else if err == nil {
@@ -99,6 +121,9 @@ func SnapshotArtifact(path string, options ArtifactSnapshotOptions) (*model.Arti
 		}
 	}
 
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return artifact, ctxErr
+	}
 	return artifact, err
 }
 
@@ -146,6 +171,13 @@ func normalizeArtifactModeType(mode os.FileMode) string {
 }
 
 func readArtifactSample(path string, limit int64) ([]byte, error) {
+	return readArtifactSampleContext(context.Background(), path, limit)
+}
+
+func readArtifactSampleContext(ctx context.Context, path string, limit int64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open artifact %s: %w", path, err)
@@ -156,7 +188,7 @@ func readArtifactSample(path string, limit int64) ([]byte, error) {
 		limit = 4096
 	}
 	buf := make([]byte, limit)
-	n, readErr := io.ReadFull(file, buf)
+	n, readErr := io.ReadFull(artifactContextReader{ctx: ctx, reader: file}, buf)
 	switch {
 	case readErr == nil:
 		return buf[:n], nil
@@ -187,16 +219,43 @@ func isELFArtifact(sample []byte) bool {
 }
 
 func snapshotArtifactHashes(path string) (*model.ArtifactHashes, error) {
+	return snapshotArtifactHashesContext(context.Background(), path, 0)
+}
+
+func snapshotArtifactHashesContext(ctx context.Context, path string, maxBytes int64) (*model.ArtifactHashes, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if maxBytes <= 0 || maxBytes > DefaultArtifactHashMaxBytes {
+		maxBytes = DefaultArtifactHashMaxBytes
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open artifact hashes %s: %w", path, err)
 	}
 	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxBytes {
+		return nil, fmt.Errorf("%w: path=%s size=%d max_bytes=%d", ErrArtifactHashLimit, path, info.Size(), maxBytes)
+	}
 
 	md5Hash := md5.New()
 	sha256Hash := sha256.New()
-	if _, err := io.Copy(io.MultiWriter(md5Hash, sha256Hash), file); err != nil {
+	// Allow one sentinel byte so growth while hashing cannot turn a truncated
+	// prefix into an apparently complete hash.
+	reader := io.LimitReader(artifactContextReader{ctx: ctx, reader: file}, maxBytes+1)
+	written, err := io.Copy(io.MultiWriter(md5Hash, sha256Hash), reader)
+	if err != nil {
 		return nil, fmt.Errorf("compute artifact hashes %s: %w", path, err)
+	}
+	if written > maxBytes {
+		return nil, fmt.Errorf("%w: path=%s max_bytes=%d", ErrArtifactHashLimit, path, maxBytes)
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return &model.ArtifactHashes{
 		SHA256: hex.EncodeToString(sha256Hash.Sum(nil)),
@@ -205,15 +264,33 @@ func snapshotArtifactHashes(path string) (*model.ArtifactHashes, error) {
 }
 
 func snapshotELFArtifact(path string) (*model.ELFArtifact, error) {
-	file, err := elf.Open(path)
+	return snapshotELFArtifactContext(context.Background(), path, 0)
+}
+
+func snapshotELFArtifactContext(ctx context.Context, path string, maxBytes int64) (*model.ELFArtifact, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	reader, err := os.Open(path)
 	if err != nil {
 		return nil, fmt.Errorf("open elf artifact %s: %w", path, err)
+	}
+	defer reader.Close()
+	if maxBytes <= 0 || maxBytes > DefaultArtifactMetadataMaxBytes {
+		maxBytes = DefaultArtifactMetadataMaxBytes
+	}
+	file, err := elf.NewFile(&artifactContextReaderAt{ctx: ctx, reader: reader, remaining: maxBytes})
+	if err != nil {
+		return nil, fmt.Errorf("read elf artifact %s: %w", path, err)
 	}
 	defer file.Close()
 
 	sections := make([]string, 0, len(file.Sections))
 	sectionItems := make([]model.ELFSectionArtifact, 0, len(file.Sections))
 	for _, section := range file.Sections {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if section == nil {
 			continue
 		}
@@ -235,6 +312,9 @@ func snapshotELFArtifact(path string) (*model.ELFArtifact, error) {
 	segments := make([]string, 0, len(file.Progs))
 	segmentItems := make([]model.ELFSegmentArtifact, 0, len(file.Progs))
 	for _, prog := range file.Progs {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		if prog == nil {
 			continue
 		}

@@ -148,23 +148,21 @@ func (i *Instance) replayInventory(ctx context.Context) error {
 }
 
 func (i *Instance) collectCurrentState(ctx context.Context, collectType string) error {
-	if i == nil || i.baselineProvider == nil || i.events == nil {
-		return nil
+	if i == nil || i.events == nil {
+		return ErrCurrentStateUnavailable
 	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	collectCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	switch strings.TrimSpace(collectType) {
-	case "processes":
-		collectProcessCurrentStateObservations(collectCtx, i.baselineProvider, i.events)
-	case "connections":
-		collectNetworkCurrentStateObservations(collectCtx, i.baselineProvider, i.events)
-	default:
-		return fmt.Errorf("unsupported collect_type: %s", collectType)
-	}
-	return nil
+	_, err := i.collectCurrentStateWithSink(ctx, collectType, func(ctx context.Context, event model.Event) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
+		select {
+		case i.events <- event:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	})
+	return err
 }
 
 func (i *Instance) refreshInventoryLoop(ctx context.Context) {
@@ -243,6 +241,11 @@ func (i *Instance) runtimeStatusDetail() map[string]any {
 	}
 	if rules := i.ruleStatusDetail(); len(rules) > 0 {
 		detail["rules"] = rules
+	}
+	if i.pipeline != nil {
+		queues := i.pipeline.queueStatusDetail()
+		queues["events"] = map[string]any{"queue_depth": len(i.events), "capacity": cap(i.events)}
+		detail["pipeline"] = queues
 	}
 	if len(detail) == 0 {
 		return nil

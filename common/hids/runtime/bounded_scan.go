@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/fs"
@@ -87,12 +88,19 @@ func normalizeDirectoryScanOptions(request map[string]any) boundedDirectoryScanO
 }
 
 func (p *pipeline) scanDirectory(path string, options boundedDirectoryScanOptions) (boundedDirectoryScanResult, error) {
+	return p.scanDirectoryContext(context.Background(), path, options)
+}
+
+func (p *pipeline) scanDirectoryContext(ctx context.Context, path string, options boundedDirectoryScanOptions) (boundedDirectoryScanResult, error) {
+	if err := ctx.Err(); err != nil {
+		return boundedDirectoryScanResult{}, err
+	}
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return boundedDirectoryScanResult{}, fmt.Errorf("directory path is required")
 	}
 
-	rootArtifact, err := p.snapshotEvidenceArtifact(path)
+	rootArtifact, err := p.snapshotEvidenceArtifact(ctx, path)
 	if err != nil && rootArtifact == nil {
 		return boundedDirectoryScanResult{}, err
 	}
@@ -111,6 +119,9 @@ func (p *pipeline) scanDirectory(path string, options boundedDirectoryScanOption
 	}
 
 	walkErr := filepath.WalkDir(path, func(current string, entry fs.DirEntry, walkErr error) error {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		if walkErr != nil {
 			return walkErr
 		}
@@ -133,15 +144,18 @@ func (p *pipeline) scanDirectory(path string, options boundedDirectoryScanOption
 
 		if result.ScannedCount >= options.MaxEntries {
 			result.Truncated = true
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
 			return errDirectoryScanTruncated
 		}
 
-		artifact, snapshotErr := p.snapshotEvidenceArtifact(current)
+		artifact, snapshotErr := p.snapshotEvidenceArtifact(ctx, current)
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if snapshotErr != nil && artifact == nil {
 			return snapshotErr
+		}
+		if snapshotErr != nil {
+			return fmt.Errorf("incomplete directory artifact %s: %w", current, snapshotErr)
 		}
 
 		result.ScannedCount++
@@ -160,9 +174,6 @@ func (p *pipeline) scanDirectory(path string, options boundedDirectoryScanOption
 
 		if result.ScannedCount >= options.MaxEntries {
 			result.Truncated = true
-			if entry.IsDir() {
-				return filepath.SkipDir
-			}
 			return errDirectoryScanTruncated
 		}
 		return nil
@@ -174,7 +185,7 @@ func (p *pipeline) scanDirectory(path string, options boundedDirectoryScanOption
 	sort.Slice(result.Entries, func(left, right int) bool {
 		return result.Entries[left].RelativePath < result.Entries[right].RelativePath
 	})
-	return result, nil
+	return result, ctx.Err()
 }
 
 func scanPathDepth(relativePath string) int {

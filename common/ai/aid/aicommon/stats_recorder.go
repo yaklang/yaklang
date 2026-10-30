@@ -9,7 +9,7 @@ import (
 
 // stats_recorder.go 是"用户命中统计"采集的瘦注册缝 (零额外重依赖).
 //
-// 设计与 value_feedback.go 同构: aicommon 只放接口 + 注册函数 + nil-safe 的 Submit* 入口;
+// 设计与 trajectory.go 同构: aicommon 只放接口 + 注册函数 + nil-safe 的 Submit* 入口;
 // 真正的落库实现 (双表: per-entity 命中计数 + per-user/day 汇总) 放在 aistats 包,
 // 由 aistats 在 init() 里调用 RegisterStatsRecorder 注册进来. reactloops / loopinfra /
 // aid 等底层只调用 SubmitToolHit / SubmitSkillHit / SubmitAction / SubmitAICall, 不直接

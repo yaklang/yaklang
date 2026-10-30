@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"sync"
+
+	"github.com/yaklang/yaklang/common/schema"
 )
 
 // combinedBuffer is a thread-safe buffer that captures stdout and stderr
@@ -92,6 +94,9 @@ func (r *ToolExecutionResult) GetJSONSchemaString() string {
 }
 
 func (t *Tool) ExecuteToolWithCapture(ctx context.Context, params map[string]any, config *ToolInvokeConfig) (*ToolExecutionResult, error) {
+	if err := schema.AIToolDeprecationError(t.Name); err != nil {
+		return nil, err
+	}
 	runtimeConfig := config.GetRuntimeConfig()
 	stdout, stderr := config.GetStdout(), config.GetStderr()
 	cancelCallback := config.GetCancelCallback()

@@ -32,6 +32,7 @@ type LoopActionHandlerOperator struct {
 
 	// requestPrompt is the prompt of this call, used by compression callbacks.
 	requestPrompt            string
+	trajectoryResponse       aicommon.TrajectoryResponseReceipt
 	requestTimelineThroughID *int64
 	requestTimelineItemIDs   []int64
 	contextCompressionError  error

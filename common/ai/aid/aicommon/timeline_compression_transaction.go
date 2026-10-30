@@ -112,7 +112,7 @@ func (m *Timeline) compressionSourceStateLocked(through int64) (string, error) {
 // applyCompressionLocked commits one parsed compress_context selection.
 // The caller holds Timeline.mu. The snapshot taken here is only the pre-delete
 // memory source; retain and retire decisions come from selection.
-func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelection, requestPrompt string) (*TimelineCompressionResult, func(), error) {
+func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelection, requestPrompt string, trajectoryConfig *Config, response TrajectoryResponseReceipt) (*TimelineCompressionResult, func(), error) {
 	if selection == nil {
 		return nil, nil, fmt.Errorf("compression selection is nil")
 	}
@@ -148,6 +148,7 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 	// 选择直接来自 action：保留的普通历史、点名淘汰的技能和证据。
 	result, head := compressionSelectionResult(source, selection, summary)
 	memorySource := m.compressionObservedSourceLocked(source, selection.ObservedIDs)
+	trajectoryNotify := trajectoryConfig.compressionTrajectoryNotification(requestPrompt, result, response)
 
 	// 观察者要在删除前拿到冻结回执，回调本身等锁释放后再执行。
 	completion := newTimelineCompressionCompletion(selection)
@@ -167,7 +168,14 @@ func (m *Timeline) applyCompressionLocked(selection *TimelineCompressionSelectio
 	}
 	m.sessionMemory.record(memorySource)
 	m.markCompressionMemoryCoveredLocked(memorySource)
-	return result, notify, nil
+	return result, func() {
+		if trajectoryNotify != nil {
+			trajectoryNotify()
+		}
+		if notify != nil {
+			notify()
+		}
+	}, nil
 }
 
 // compressionSelectionResult applies the whitelist to ordinary history.

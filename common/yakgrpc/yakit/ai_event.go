@@ -247,7 +247,7 @@ func GetRandomAIMaterials(db *gorm.DB, limit int) ([]*schema.AIYakTool, []*schem
 	var kbEntries []*schema.KnowledgeBaseEntry
 	var forges []*schema.AIForge
 
-	_, err := bizhelper.RandomQuery(db.Model(&schema.AIYakTool{}), limit, &tool)
+	_, err := bizhelper.RandomQuery(activeAIYakTools(db), limit, &tool)
 	if err != nil {
 		return nil, nil, nil, err
 	}

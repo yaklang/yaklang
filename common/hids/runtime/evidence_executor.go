@@ -3,6 +3,7 @@
 package runtime
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"reflect"
@@ -20,6 +21,12 @@ const (
 )
 
 func (p *pipeline) enrichAlertEvidence(event model.Event, alert model.Alert) model.Alert {
+	return p.enrichAlertEvidenceContext(context.Background(), event, alert)
+}
+
+func (p *pipeline) enrichAlertEvidenceContext(ctx context.Context, event model.Event, alert model.Alert) model.Alert {
+	ctx, cancel := context.WithTimeout(ctx, automaticArtifactTimeout)
+	defer cancel()
 	if p == nil || len(alert.Detail) == 0 {
 		return alert
 	}
@@ -32,9 +39,14 @@ func (p *pipeline) enrichAlertEvidence(event model.Event, alert model.Alert) mod
 	results := make([]map[string]any, 0, len(requests))
 	errors := make([]map[string]any, 0)
 	for _, request := range requests {
-		result, err := p.executeEvidenceRequest(event, request)
+		result, err := p.executeEvidenceRequestContext(ctx, event, request)
 		if err != nil {
-			errors = append(errors, evidenceErrorMap(request, err))
+			issue := evidenceErrorMap(request, err)
+			if len(result) > 0 {
+				result["incomplete"] = true
+				issue["partial_result"] = result
+			}
+			errors = append(errors, issue)
 			continue
 		}
 		if len(result) == 0 {
@@ -53,30 +65,58 @@ func (p *pipeline) enrichAlertEvidence(event model.Event, alert model.Alert) mod
 }
 
 func (p *pipeline) executeEvidenceRequest(event model.Event, request map[string]any) (map[string]any, error) {
+	return p.executeEvidenceRequestContext(context.Background(), event, request)
+}
+
+func (p *pipeline) executeEvidenceRequestContext(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	kind := strings.ToLower(strings.TrimSpace(readEvidenceString(request, "kind")))
 	switch kind {
 	case "file":
-		return p.executeFileEvidence(event, request)
+		return p.executeFileEvidence(ctx, event, request)
 	case "file_scan", "single_file_scan":
-		return p.executeSingleFileScanEvidence(event, request)
+		return p.executeSingleFileScanEvidence(ctx, event, request)
 	case "directory", "directory_scan":
-		return p.executeDirectoryScanEvidence(event, request)
+		return p.executeDirectoryScanEvidence(ctx, event, request)
 	case "process_tree":
-		return p.executeProcessTreeEvidence(event, request)
+		result, err := p.executeProcessTreeEvidence(ctx, event, request)
+		return validateEventProcessArtifact(event, result, err)
 	case "process_memory":
-		return p.executeProcessMemoryEvidence(event, request)
+		result, err := p.executeProcessMemoryEvidence(ctx, event, request)
+		return validateEventProcessArtifact(event, result, err)
 	default:
 		return nil, fmt.Errorf("unsupported evidence kind %q", kind)
 	}
 }
 
-func (p *pipeline) executeFileEvidence(event model.Event, request map[string]any) (map[string]any, error) {
+// A process may already carry a partial artifact from automatic enrichment.
+// Reusing that snapshot must retain the failure without re-reading its image.
+func validateEventProcessArtifact(event model.Event, result map[string]any, err error) (map[string]any, error) {
+	if err != nil || event.Process == nil {
+		return result, err
+	}
+	pid, ok := anyToInt(result["resolved_target"])
+	if !ok || pid != event.Process.PID {
+		return result, nil
+	}
+	issues, _ := toEvidenceMapSlice(event.Data["artifact_errors"])
+	for _, issue := range issues {
+		if readEvidenceString(issue, "target") == "process.image" {
+			return result, fmt.Errorf("process artifact enrichment incomplete: %s", readEvidenceString(issue, "error"))
+		}
+	}
+	return result, nil
+}
+
+func (p *pipeline) executeFileEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
 	path, err := resolveEvidenceFilePath(event, request)
 	if err != nil {
 		return nil, err
 	}
 
-	artifact, snapshotErr := p.snapshotEvidenceArtifact(path)
+	artifact, snapshotErr := p.snapshotEvidenceArtifact(ctx, path)
 	if artifact == nil && snapshotErr != nil {
 		return nil, snapshotErr
 	}
@@ -89,17 +129,21 @@ func (p *pipeline) executeFileEvidence(event model.Event, request map[string]any
 	result["artifact"] = artifactDetailMap(artifact)
 	if snapshotErr != nil {
 		result["warning"] = snapshotErr.Error()
+		return result, snapshotErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
-func (p *pipeline) executeSingleFileScanEvidence(event model.Event, request map[string]any) (map[string]any, error) {
+func (p *pipeline) executeSingleFileScanEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
 	path, err := resolveEvidenceFilePath(event, request)
 	if err != nil {
 		return nil, err
 	}
 
-	artifact, snapshotErr := p.snapshotEvidenceArtifact(path)
+	artifact, snapshotErr := p.snapshotEvidenceArtifact(ctx, path)
 	if artifact == nil && snapshotErr != nil {
 		return nil, snapshotErr
 	}
@@ -112,74 +156,105 @@ func (p *pipeline) executeSingleFileScanEvidence(event model.Event, request map[
 
 	result := evidenceResultBase(request)
 	result["resolved_target"] = path
-	scanSummary, err := p.applyScanPostFilters(request, buildSingleFileScanSummary(path, artifact))
+	scanSummary, err := p.applyScanPostFiltersContext(ctx, request, buildSingleFileScanSummary(path, artifact))
 	if err != nil {
 		return nil, err
 	}
 	result["scan"] = scanSummary
 	if snapshotErr != nil {
 		result["warning"] = snapshotErr.Error()
+		return result, snapshotErr
+	}
+	if err := ctx.Err(); err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
-func (p *pipeline) executeDirectoryScanEvidence(event model.Event, request map[string]any) (map[string]any, error) {
+func (p *pipeline) executeDirectoryScanEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
 	path, err := resolveEvidenceDirectoryPath(event, request)
 	if err != nil {
 		return nil, err
 	}
 
-	scanResult, scanErr := p.scanDirectory(path, normalizeDirectoryScanOptions(request))
+	scanResult, scanErr := p.scanDirectoryContext(ctx, path, normalizeDirectoryScanOptions(request))
 	if scanErr != nil {
 		return nil, scanErr
 	}
 
 	result := evidenceResultBase(request)
 	result["resolved_target"] = path
-	scanSummary, err := p.applyScanPostFilters(request, buildDirectoryScanSummary(scanResult))
+	scanSummary, err := p.applyScanPostFiltersContext(ctx, request, buildDirectoryScanSummary(scanResult))
 	if err != nil {
 		return nil, err
 	}
 	result["scan"] = scanSummary
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
-func (p *pipeline) executeProcessTreeEvidence(event model.Event, request map[string]any) (map[string]any, error) {
-	process, err := p.resolveEvidenceProcess(event, request)
+func (p *pipeline) executeProcessTreeEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
+	process, err := p.resolveEvidenceProcess(ctx, event, request)
 	if err != nil {
 		return nil, err
 	}
 
-	lineage, lineageTruncated := p.buildEvidenceLineage(*process)
-	children, childrenTruncated := p.buildEvidenceChildren(process.PID)
+	lineage, lineageTruncated := p.buildEvidenceLineage(ctx, *process)
+	// The final lineage entry is this process. Reuse its artifact snapshot even
+	// when no artifact cache is configured rather than reading the image twice.
+	var processDetail map[string]any
+	if len(lineage) > 0 {
+		processDetail = lineage[len(lineage)-1]
+	} else {
+		processDetail = p.processDetailMap(ctx, *process)
+	}
+	details := append([]map[string]any{processDetail}, lineage...)
 
 	tree := map[string]any{
-		"process":           p.processDetailMap(*process),
+		"process":           processDetail,
 		"lineage":           lineage,
 		"lineage_truncated": lineageTruncated,
 	}
 	if p.evidencePolicy.CaptureProcessTree {
+		children, childrenTruncated := p.buildEvidenceChildren(ctx, process.PID)
 		tree["children"] = children
 		tree["children_truncated"] = childrenTruncated
+		details = append(details, children...)
 	}
 
 	result := evidenceResultBase(request)
 	result["resolved_target"] = process.PID
 	result["process_tree"] = tree
+	if err := ctx.Err(); err != nil {
+		return result, err
+	}
+	for _, detail := range details {
+		if issue, ok := detail["artifact_error"].(string); ok && issue != "" {
+			return result, fmt.Errorf("process tree artifact incomplete: %s", issue)
+		}
+	}
 	return result, nil
 }
 
-func (p *pipeline) executeProcessMemoryEvidence(event model.Event, request map[string]any) (map[string]any, error) {
+func (p *pipeline) executeProcessMemoryEvidence(ctx context.Context, event model.Event, request map[string]any) (map[string]any, error) {
 	if p == nil || !p.evidencePolicy.CaptureProcessMemory {
 		return nil, fmt.Errorf("process_memory evidence requires evidence_policy.capture_process_memory")
 	}
 
-	process, err := p.resolveEvidenceProcess(event, request)
+	process, err := p.resolveEvidenceProcess(ctx, event, request)
 	if err != nil {
 		return nil, err
 	}
 
-	processDetail := p.processDetailMap(*process)
+	processDetail := p.processDetailMap(ctx, *process)
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if issue, ok := processDetail["artifact_error"].(string); ok && issue != "" {
+		return map[string]any{"process": processDetail}, fmt.Errorf("process memory artifact incomplete: %s", issue)
+	}
 	memoryEvidence, err := captureProcessMemoryEvidence(
 		processDetail,
 		process.PID,
@@ -192,23 +267,26 @@ func (p *pipeline) executeProcessMemoryEvidence(event model.Event, request map[s
 	result := evidenceResultBase(request)
 	result["resolved_target"] = process.PID
 	result["process_memory"] = memoryEvidence
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	return result, nil
 }
 
-func (p *pipeline) snapshotEvidenceArtifact(path string) (*model.Artifact, error) {
+func (p *pipeline) snapshotEvidenceArtifact(ctx context.Context, path string) (*model.Artifact, error) {
 	path = strings.TrimSpace(path)
 	if path == "" {
 		return nil, fmt.Errorf("artifact path is required")
 	}
 	if p != nil && p.artifacts != nil {
-		return p.artifacts.snapshotWithError(path)
+		return p.artifacts.snapshotWithErrorContext(ctx, path)
 	}
-	return enrich.SnapshotArtifact(path, enrich.ArtifactSnapshotOptions{
+	return enrich.SnapshotArtifactContext(ctx, path, enrich.ArtifactSnapshotOptions{
 		CaptureHashes: p != nil && p.evidencePolicy.CaptureFileHash,
 	})
 }
 
-func (p *pipeline) resolveEvidenceProcess(event model.Event, request map[string]any) (*model.Process, error) {
+func (p *pipeline) resolveEvidenceProcess(ctx context.Context, event model.Event, request map[string]any) (*model.Process, error) {
 	pid, err := resolveEvidenceProcessPID(event, request)
 	if err != nil {
 		return nil, err
@@ -217,7 +295,6 @@ func (p *pipeline) resolveEvidenceProcess(event model.Event, request map[string]
 	if event.Process != nil && event.Process.PID == pid {
 		cloned := *event.Process
 		normalizeProcessContext(&cloned)
-		p.attachProcessArtifact(&cloned)
 		return &cloned, nil
 	}
 
@@ -225,14 +302,13 @@ func (p *pipeline) resolveEvidenceProcess(event model.Event, request map[string]
 		if cached, ok := p.processes.byPID[pid]; ok {
 			cloned := cached.process
 			normalizeProcessContext(&cloned)
-			p.attachProcessArtifact(&cloned)
 			return &cloned, nil
 		}
 	}
 	return nil, fmt.Errorf("process pid %d is not available in current runtime state", pid)
 }
 
-func (p *pipeline) buildEvidenceLineage(process model.Process) ([]map[string]any, bool) {
+func (p *pipeline) buildEvidenceLineage(ctx context.Context, process model.Process) ([]map[string]any, bool) {
 	lineage := []model.Process{process}
 	visited := map[int]struct{}{}
 	if process.PID > 0 {
@@ -242,11 +318,14 @@ func (p *pipeline) buildEvidenceLineage(process model.Process) ([]map[string]any
 	truncated := false
 	current := process
 	for len(lineage) < evidenceProcessLineageLimit && current.ParentPID > 0 {
+		if ctx.Err() != nil {
+			return nil, true
+		}
 		if _, seen := visited[current.ParentPID]; seen {
 			truncated = true
 			break
 		}
-		parent, ok := p.lookupTrackedProcess(current.ParentPID)
+		parent, ok := p.lookupTrackedProcess(ctx, current.ParentPID)
 		if !ok {
 			break
 		}
@@ -260,36 +339,31 @@ func (p *pipeline) buildEvidenceLineage(process model.Process) ([]map[string]any
 
 	reversed := make([]map[string]any, 0, len(lineage))
 	for index := len(lineage) - 1; index >= 0; index-- {
-		reversed = append(reversed, p.processDetailMap(lineage[index]))
+		reversed = append(reversed, p.processDetailMap(ctx, lineage[index]))
 	}
 	return reversed, truncated
 }
 
-func (p *pipeline) buildEvidenceChildren(pid int) ([]map[string]any, bool) {
+func (p *pipeline) buildEvidenceChildren(ctx context.Context, pid int) ([]map[string]any, bool) {
 	if p == nil || p.processes == nil || pid <= 0 {
 		return nil, false
 	}
 
-	children := make([]model.Process, 0)
-	for _, candidate := range p.processes.byPID {
+	children := make([]int, 0)
+	for childPID, candidate := range p.processes.byPID {
+		if ctx.Err() != nil {
+			return nil, true
+		}
 		if candidate.process.ParentPID != pid {
 			continue
 		}
-		cloned := candidate.process
-		normalizeProcessContext(&cloned)
-		p.attachProcessArtifact(&cloned)
-		children = append(children, cloned)
+		children = append(children, childPID)
 	}
 	if len(children) == 0 {
 		return nil, false
 	}
 
-	sort.Slice(children, func(left, right int) bool {
-		if children[left].PID == children[right].PID {
-			return children[left].Image < children[right].Image
-		}
-		return children[left].PID < children[right].PID
-	})
+	sort.Ints(children)
 
 	truncated := false
 	if len(children) > evidenceProcessChildrenLimit {
@@ -298,13 +372,13 @@ func (p *pipeline) buildEvidenceChildren(pid int) ([]map[string]any, bool) {
 	}
 
 	results := make([]map[string]any, 0, len(children))
-	for _, child := range children {
-		results = append(results, p.processDetailMap(child))
+	for _, childPID := range children {
+		results = append(results, p.processDetailMap(ctx, p.processes.byPID[childPID].process))
 	}
 	return results, truncated
 }
 
-func (p *pipeline) lookupTrackedProcess(pid int) (model.Process, bool) {
+func (p *pipeline) lookupTrackedProcess(ctx context.Context, pid int) (model.Process, bool) {
 	if p == nil || p.processes == nil || pid <= 0 {
 		return model.Process{}, false
 	}
@@ -314,27 +388,27 @@ func (p *pipeline) lookupTrackedProcess(pid int) (model.Process, bool) {
 	}
 	process := tracked.process
 	normalizeProcessContext(&process)
-	p.attachProcessArtifact(&process)
 	return process, true
 }
 
-func (p *pipeline) attachProcessArtifact(process *model.Process) {
+func (p *pipeline) attachProcessArtifact(ctx context.Context, process *model.Process) error {
 	if process == nil || process.Artifact != nil {
-		return
+		return nil
 	}
 	image := strings.TrimSpace(process.Image)
 	if image == "" {
-		return
+		return nil
 	}
-	artifact, _ := p.snapshotEvidenceArtifact(image)
+	artifact, err := p.snapshotEvidenceArtifact(ctx, image)
 	if artifact != nil {
 		process.Artifact = artifact
 	}
+	return err
 }
 
-func (p *pipeline) processDetailMap(process model.Process) map[string]any {
+func (p *pipeline) processDetailMap(ctx context.Context, process model.Process) map[string]any {
 	normalizeProcessContext(&process)
-	p.attachProcessArtifact(&process)
+	artifactErr := p.attachProcessArtifact(ctx, &process)
 
 	detail := map[string]any{
 		"pid":                       process.PID,
@@ -350,6 +424,9 @@ func (p *pipeline) processDetailMap(process model.Process) map[string]any {
 	}
 	if process.Artifact != nil {
 		detail["artifact"] = artifactDetailMap(process.Artifact)
+	}
+	if artifactErr != nil {
+		detail["artifact_error"] = artifactErr.Error()
 	}
 	return detail
 }

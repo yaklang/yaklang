@@ -5,6 +5,7 @@ package filewatch
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,6 +19,8 @@ type filewatchCollectorState struct {
 	updatedAt   time.Time
 	roots       []string
 	dirs        map[string]struct{}
+	parents     map[string]int
+	anchors     map[string]struct{}
 	received    uint64
 	emitted     uint64
 	errors      uint64
@@ -32,6 +35,8 @@ func newFilewatchCollectorState(roots []string) filewatchCollectorState {
 		updatedAt: time.Now().UTC(),
 		roots:     cloneFilewatchStrings(roots),
 		dirs:      make(map[string]struct{}),
+		parents:   make(map[string]int),
+		anchors:   filewatchRootAnchors(roots),
 	}
 }
 
@@ -50,6 +55,8 @@ func (s *filewatchCollectorState) setStopped() {
 
 	s.status = "stopped"
 	s.message = "filewatch collector is stopped"
+	s.dirs = make(map[string]struct{})
+	s.parents = make(map[string]int)
 	s.updatedAt = time.Now().UTC()
 }
 
@@ -58,8 +65,90 @@ func (s *filewatchCollectorState) observeDirectory(path string) {
 	defer s.mu.Unlock()
 
 	normalized := filepath.Clean(path)
+	if _, exists := s.dirs[normalized]; exists {
+		return
+	}
 	s.dirs[normalized] = struct{}{}
+	s.adjustParents(normalized, 1)
 	s.updatedAt = time.Now().UTC()
+}
+
+func (s *filewatchCollectorState) hasDirectory(path string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	_, ok := s.dirs[filepath.Clean(path)]
+	return ok
+}
+
+func (s *filewatchCollectorState) hasDirectoryTree(path string) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	path = filepath.Clean(path)
+	_, exists := s.dirs[path]
+	return exists || s.parents[path] > 0
+}
+
+func (s *filewatchCollectorState) adjustParents(path string, delta int) {
+	for {
+		if _, root := s.anchors[path]; root {
+			return
+		}
+		parent := filepath.Dir(path)
+		if parent == path {
+			return
+		}
+		if s.parents[parent]+delta <= 0 {
+			delete(s.parents, parent)
+		} else {
+			s.parents[parent] += delta
+		}
+		path = parent
+	}
+}
+
+func filewatchRootAnchors(roots []string) map[string]struct{} {
+	configured := make(map[string]struct{}, len(roots))
+	for _, root := range roots {
+		configured[filepath.Clean(root)] = struct{}{}
+	}
+	anchors := make(map[string]struct{}, len(configured))
+	for root := range configured {
+		covered := false
+		for path := root; ; {
+			parent := filepath.Dir(path)
+			if parent == path {
+				break
+			}
+			if _, exists := configured[parent]; exists {
+				covered = true
+				break
+			}
+			path = parent
+		}
+		if !covered {
+			anchors[root] = struct{}{}
+		}
+	}
+	return anchors
+}
+
+func (s *filewatchCollectorState) forgetDirectoryTree(root string) []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	root = filepath.Clean(root)
+	prefix := strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
+	var removed []string
+	for path := range s.dirs {
+		if path == root || strings.HasPrefix(path, prefix) {
+			removed = append(removed, path)
+			delete(s.dirs, path)
+			s.adjustParents(path, -1)
+		}
+	}
+	if len(removed) > 0 {
+		s.updatedAt = time.Now().UTC()
+	}
+	return removed
 }
 
 func (s *filewatchCollectorState) observeReceived() {
@@ -94,6 +183,9 @@ func (s *filewatchCollectorState) observeError(err error) {
 	defer s.mu.Unlock()
 
 	s.errors++
+	if s.status == "stopped" {
+		return
+	}
 	s.status = "degraded"
 	if err != nil {
 		s.message = fmt.Sprintf("filewatch collector error: %v", err)

@@ -725,6 +725,7 @@ LOOP:
 				return finalError
 			}
 			prompt = assembled.Prompt
+			aicommon.RecordTaskTrajectoryPrompt(task, prompt)
 			r.promptMode = assembled.Mode
 			r.requestTimelineThroughID = assembled.TimelineThroughID
 			r.requestTimelineItemIDs = assembled.TimelineItemIDs
@@ -824,6 +825,12 @@ LOOP:
 			r.recordModelThinkingTimeline(iterationModelThinking, decision, nonce, loopCalls[0].Action != nil)
 		}
 
+		// Pass the existing response receipt only to successful compression capture.
+		for i := range loopCalls {
+			if loopCalls[i].Action != nil && loopCalls[i].Action.Name() == aicommon.ContextCompressionAction {
+				loopCalls[i].trajectoryResponse = resultDescriptor.onTrajectoryResponse
+			}
+		}
 		batch := r.execCalls(loopCalls, iterationCount, task, prompt, done, eventSink)
 		// A maintenance action does not consume the preceding business action's
 		// next-action constraints, including while a rejected selection is retried.

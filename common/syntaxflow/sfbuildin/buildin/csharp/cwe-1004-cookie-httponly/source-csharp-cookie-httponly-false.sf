@@ -1,0 +1,64 @@
+desc(
+	mode: "source"
+	language: "csharp"
+	title: "检测 C# Cookie HttpOnly 关闭"
+	title_zh: "检测 C# Cookie HttpOnly 关闭"
+	type: vuln
+	level: medium
+	rule_id: "source-csharp-cookie-httponly-false"
+	risk: "cookie-security"
+	cwe: "CWE-1004"
+	desc: <<<DESC
+### 规则说明
+`new HttpCookie(...)` 之后把 `HttpOnly` 设为 `false`，或 `web.config` 的 `httpCookies httpOnlyCookies="false"`，会话 Cookie 可被页面脚本读取。存在 XSS 时，攻击者的脚本可直接取走会话标识，Cookie 窃取不再需要网络中间人。
+
+### 风险类型
+cookie-security
+
+### 影响
+XSS 危害被放大：脚本可读取会话 Cookie 并发起带外外传，实现会话劫持。
+
+### 检测方式
+源码模式正则匹配，定位源码中的危险调用或配置。命中只说明出现了对应写法，需要人工确认该 Cookie 是否承载会话。注释、字符串和文档中的相同文本也会命中。
+匹配 `HttpOnly = false`、`httpOnlyCookies="false"` 两种写法。
+DESC
+	solution: <<<SOLUTION
+### 修复建议
+- 会话与认证类 Cookie 保持 `HttpOnly = true`（ASP.NET 默认开启，不要显式关闭）。
+- `web.config` 设置 `httpCookies httpOnlyCookies="true"`。
+- 只有前端脚本必须读取的偏好类 Cookie 才可关闭 HttpOnly。
+SOLUTION
+	alert_min: 1
+	"file://bad.cs": <<<POS
+using System.Web;
+
+public class CookieDemo {
+    public HttpCookie Bad() {
+        var c = new HttpCookie("sid");
+        c.HttpOnly = false;
+        return c;
+    }
+}
+
+POS
+	"safefile://ok.cs": <<<NEG
+using System.Web;
+
+public class CookieDemo {
+    public HttpCookie Ok() {
+        var c = new HttpCookie("sid");
+        c.HttpOnly = true;
+        return c;
+    }
+}
+
+NEG
+)
+${*.cs}.pattern_regex(/HttpOnly\s*=\s*false/) as $hit
+alert $hit for {
+	level: "medium",
+	title: "检测 C# Cookie HttpOnly 关闭",
+	title_zh: "检测 C# Cookie HttpOnly 关闭",
+	message: "检测 C# Cookie HttpOnly 关闭",
+	risk: "cookie-security",
+}
