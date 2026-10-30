@@ -341,6 +341,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if p := probeSMB1Negotiate(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
 	if telnetNegotiationStart(input) && (s.f.port(23) || telnetInitialEvidence(input)) {
 		return probeAccept("telnet", "IAC-negotiation", 95)
 	}
@@ -705,6 +708,9 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeAMQP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1Negotiate(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSMB2(w, limit); p.Verdict != ProbeReject {

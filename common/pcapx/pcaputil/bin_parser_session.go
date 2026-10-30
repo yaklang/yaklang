@@ -20,6 +20,15 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	// A complete SMB1 multi-protocol offer can exceed ProbeBytes. Preserve its
+	// validated boundary so this direction can continue with the following SMB2
+	// request instead of being permanently stopped as an unknown prefix.
+	if p := probeSMB1Negotiate(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.smb2 = "smb", &binSMB2{client: dir}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	if f.port(4739) {
 		if p := probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 			f.protocol = "ipfix"
@@ -372,8 +381,8 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.tds = "tds", &binTDS{client: -1, encrypt: tdsEncryptUnknown}
 	case "amqp":
 		f.protocol, f.amqp = "amqp", &binAMQP{client: -1, pending: map[uint16][]string{}, delivers: map[uint64]uint16{}, chans: map[uint16]*amqpChan{}}
-	case "smb2":
-		f.protocol, f.smb2 = "smb2", &binSMB2{client: dir, pending: map[smb2PendingKey]smb2Pending{}, async: map[smb2AsyncKey]smb2PendingKey{}, files: map[smb2FileKey]string{}}
+	case "smb", "smb2":
+		f.protocol, f.smb2 = p.Protocol, &binSMB2{client: dir, pending: map[smb2PendingKey]smb2Pending{}, async: map[smb2AsyncKey]smb2PendingKey{}, files: map[smb2FileKey]string{}}
 	case "dcerpc":
 		f.protocol, f.dcerpc = "dcerpc", &binDCERPC{
 			client: dir, ctx: map[uint16]string{}, uuid: map[uint16][]byte{}, ctxVersion: map[uint16]uint32{},
@@ -779,6 +788,13 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
+	case "smb":
+		e.Session, err = decodeSMB1NegotiateFields(e.Raw, f.a.budget)
+		if err == nil {
+			e.Profile, e.Completeness = "cifs-negotiate-request", "message"
+			e.nativeSessionMessage = true
+			e.semanticFields, e.semanticSession = cloneSession(e.Session), cloneSession(e.Session)
+		}
 	case "smb2":
 		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
 		if err == nil && f.nbss {
@@ -1254,6 +1270,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("TDS %v", e.Session["Packet Name"])
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
+		case "smb":
+			e.Summary = "SMB1 SMB_COM_NEGOTIATE · dialect offers"
+			if e.Session["SMB2 Upgrade Offered"] == true {
+				e.Summary += " · SMB2 upgrade offered"
+			}
 		case "smb2":
 			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
 		case "dcerpc":

@@ -222,6 +222,7 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	out = append(out, ldpSessionDisplayBindings()...)
 	out = append(out, tlsResumptionDisplayBindings()...)
 	out = append(out, espDisplayBindings()...)
+	out = append(out, smb1DisplayBindings()...)
 	for _, f := range []struct {
 		name, key string
 		typ       DisplayFieldType
