@@ -47,6 +47,28 @@ type smb2Pending struct {
 	hasDirection bool
 	asyncID      uint64
 	async        bool
+	chain        *smb2RequestChain
+	ordinal      int
+}
+
+// A chain belongs to one observed request PDU and is retained only by that
+// PDU's outstanding requests. Pointer identity cannot collide with another
+// PDU, flow, TCP generation, interface or VLAN. Results are bounded by size.
+type smb2RequestChain struct {
+	size    int
+	results map[int]smb2CompoundResult
+}
+
+type smb2CompoundResult struct {
+	fileID, path string
+	messageID    uint64
+	fileSourceID uint64
+	status       uint32
+}
+
+type smb2CompoundLink struct {
+	chain   *smb2RequestChain
+	ordinal int
 }
 
 const (
@@ -183,14 +205,24 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 		return nil
 	}
 	var pathBytes int64
+	var chainBytes int64
+	seen := make(map[*smb2RequestChain]bool)
 	for _, pending := range s.pending {
 		pathBytes += int64(len(pending.path))
+		if chain := pending.chain; chain != nil && !seen[chain] {
+			seen[chain] = true
+			chainBytes += int64(chain.size)*128 + 64
+			for _, result := range chain.results {
+				pathBytes += int64(len(result.path))
+			}
+		}
 	}
 	for _, path := range s.files {
 		pathBytes += int64(len(path))
 	}
-	target := int64(256) + int64(len(s.pending)+1)*96 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
-	target += pathBytes + additionalPathBytes
+	// Includes the pending request's private chain pointer and ordinal.
+	target := int64(256) + int64(len(s.pending)+1)*128 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
+	target += pathBytes + chainBytes + additionalPathBytes
 	return s.flow.reserveSession(target)
 }
 
@@ -256,21 +288,10 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 	info := cmds[0]
 	info["Context Level"] = "observed"
 	names := make([]string, 0, len(cmds))
+	links := smb2RequestLinks(cmds)
 	for index, c := range cmds {
 		name, _ := c["Packet Name"].(string)
 		names = append(names, name)
-		if c["Response"] == true && c["Related"] == true {
-			// A predecessor's wire bytes alone cannot establish file state.
-			delete(c, "Related Previous File ID")
-			if index > 0 {
-				previous := cmds[index-1]
-				if previous["Response"] == true && previous["Status"] == uint32(0) && previous["Association Status"] == "matched" {
-					if fileID, _ := previous["FileId"].(string); fileID != "" {
-						c["Related Previous File ID"] = fileID
-					}
-				}
-			}
-		}
 		if s.dialect != 0 {
 			// Connection observations are not a field in this command. In
 			// particular, never overwrite the current NEGOTIATE's wire value.
@@ -280,7 +301,7 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 				c["Version Name"] = smb2DialectName(s.dialect)
 			}
 		}
-		if err := s.associateFrom(c, max, dir); err != nil {
+		if err := s.associateCommand(c, max, dir, links[index]); err != nil {
 			return nil, err
 		}
 		if name == "NEGOTIATE" && c["Response"] == true && c["Status"] == uint32(0) {
@@ -324,6 +345,10 @@ func (s *binSMB2) associate(c map[string]any, max int) error {
 }
 
 func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
+	return s.associateCommand(c, max, dir, smb2CompoundLink{})
+}
+
+func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2CompoundLink) error {
 	mid, _ := c["Message ID"].(uint64)
 	name, _ := c["Packet Name"].(string)
 	sid, tid := smb2EffectiveIDs(c)
@@ -342,7 +367,7 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		if _, exists := s.pending[key]; exists {
 			return protocolError(ErrMalformedMessage, "SMB2 MessageId reused within the same session/tree before response")
 		}
-		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0}
+		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0, chain: link.chain, ordinal: link.ordinal}
 		pending.path, _ = c["File Name"].(string)
 		pending.related, _ = c["Related File ID Ignored"].(bool)
 		clonePath := false
@@ -361,7 +386,11 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 				}
 			}
 		}
-		if err := s.reserveState(int64(len(pending.path))); err != nil {
+		additional := int64(len(pending.path))
+		if link.chain != nil && link.ordinal == 0 {
+			additional += int64(link.chain.size)*128 + 64
+		}
+		if err := s.reserveState(additional); err != nil {
 			return err
 		}
 		if clonePath {
@@ -418,17 +447,52 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		delete(s.async, smb2AsyncKey{sessionID: sid, asyncID: pending.asyncID})
 	}
 
-	if name == "CLOSE" && pending.related {
-		if relatedFileID, _ := c["Related Previous File ID"].(string); relatedFileID != "" {
-			pending.fileID = relatedFileID
-			c["Request File ID"] = relatedFileID
-			c["Inherited File ID"] = true
+	var fileSourceID = pending.key.messageID
+	if pending.related {
+		c["File Context Status"] = "missing-matched-compound-predecessor"
+		if pending.chain != nil && pending.ordinal > 0 {
+			previous, observed := pending.chain.results[pending.ordinal-1]
+			// A failed READ/WRITE still used its known request FileId. A
+			// failed CREATE never generated one. Keep identity provenance
+			// separate from the predecessor's operation status.
+			if observed && previous.fileID != "" {
+				pending.fileID, pending.path = previous.fileID, previous.path
+				fileSourceID = previous.fileSourceID
+				c["Request File ID"] = pending.fileID
+				c["Inherited File ID"] = true
+				c["File Context Source Message ID"] = fileSourceID
+				c["Related Predecessor Message ID"] = previous.messageID
+				c["Related Predecessor Status"] = previous.status
+				if pending.path != "" {
+					c["File Context"] = pending.path
+				}
+				c["File Context Status"] = "matched-related-request-chain"
+			}
+		}
+	}
+	retainResult := false
+	if pending.chain != nil {
+		for _, remaining := range s.pending {
+			if remaining.chain == pending.chain {
+				retainResult = true
+				break
+			}
+		}
+		if retainResult {
+			if len(pending.chain.results) >= pending.chain.size {
+				return protocolError(ErrResourceExceeded, "SMB2 compound results exceed observed request chain")
+			}
+			if err := s.reserveState(int64(len(pending.path))); err != nil {
+				return err
+			}
 		}
 	}
 	if name == "CREATE" && status == 0 {
 		fileID, _ := c["FileId"].(string)
 		if fileID != "" {
-			fileKey := smb2FileKey{sessionID: sid, treeID: tid, fileID: fileID}
+			// Async responses have AsyncId instead of TreeId. The matched
+			// request owns the association domain; never invent a header TID.
+			fileKey := smb2FileKey{sessionID: pending.key.sessionID, treeID: pending.key.treeID, fileID: fileID}
 			if len(s.files) >= max && s.files[fileKey] == "" {
 				return protocolError(ErrResourceExceeded, "SMB2 open file contexts exceed budget")
 			}
@@ -436,11 +500,15 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 			if s.files[fileKey] == "" {
 				pathDelta = int64(len(pending.path))
 			}
+			if retainResult {
+				pathDelta += int64(len(pending.path))
+			}
 			if err := s.reserveState(pathDelta); err != nil {
 				return err
 			}
 			s.files[fileKey] = pending.path
 			c["File Context Status"] = "opened"
+			pending.fileID = fileID
 		}
 	}
 	if name == "CLOSE" && status == 0 {
@@ -452,14 +520,40 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		}
 	}
 	if name == "TREE_DISCONNECT" && status == 0 {
-		s.removeTree(sid, tid)
+		s.removeTree(pending.key.sessionID, pending.key.treeID)
 		c["Tree Context Status"] = "disconnected"
 	}
 	if name == "LOGOFF" && status == 0 {
 		s.removeSession(pending.key.sessionID)
 		c["Session Context Status"] = "logged-off"
 	}
+	if retainResult {
+		result := smb2CompoundResult{fileID: pending.fileID, path: pending.path, messageID: pending.key.messageID, fileSourceID: fileSourceID, status: status}
+		pending.chain.results[pending.ordinal] = result
+	}
 	return nil
+}
+
+func smb2RequestLinks(commands []map[string]any) []smb2CompoundLink {
+	links := make([]smb2CompoundLink, len(commands))
+	for start := 0; start < len(commands); {
+		if commands[start]["Response"] == true {
+			start++
+			continue
+		}
+		end := start + 1
+		for end < len(commands) && commands[end]["Response"] == false && commands[end]["Related"] == true {
+			end++
+		}
+		if end-start > 1 {
+			chain := &smb2RequestChain{size: end - start, results: make(map[int]smb2CompoundResult)}
+			for i := start; i < end; i++ {
+				links[i] = smb2CompoundLink{chain: chain, ordinal: i - start}
+			}
+		}
+		start = end
+	}
+	return links
 }
 
 func (s *binSMB2) findResponse(key smb2PendingKey, asyncID uint64, name string, c map[string]any) (smb2PendingKey, smb2Pending, bool) {
@@ -583,6 +677,12 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 		if err != nil {
 			return nil, err
 		}
+		if len(cmds) > 0 && cmd["Response"] != cmds[0]["Response"] {
+			return nil, protocolError(ErrMalformedMessage, "SMB2 compound mixes requests and responses")
+		}
+		if cmd["Response"] == false && len(cmds) > 1 && (cmd["Related"] == true) != (cmds[1]["Related"] == true) {
+			return nil, protocolError(ErrMalformedMessage, "SMB2 compound mixes related and unrelated requests")
+		}
 		smb2OffsetRanges(cmd, 4+at)
 		if related, _ := cmd["Related"].(bool); related {
 			if previous == nil {
@@ -604,9 +704,6 @@ func smb2Walk(payload []byte, max int) ([]map[string]any, error) {
 					cmd["Related File ID Placeholder"] = true
 				}
 				cmd["File Context Status"] = "related-compound-file-context-is-server-substituted"
-			}
-			if fileID, _ := previous["FileId"].(string); fileID != "" && fileID != "ffffffffffffffffffffffffffffffff" {
-				cmd["Related Previous File ID"] = fileID
 			}
 			if previousName, ok := previous["Packet Name"].(string); ok {
 				cmd["Related Previous Command"] = previousName
