@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strings"
 	"unicode/utf16"
+
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 // binSMB2 is the M0 session state for SMB2/SMB3 over Direct TCP. Dialect
@@ -49,6 +51,14 @@ type smb2Pending struct {
 	async        bool
 	chain        *smb2RequestChain
 	ordinal      int
+	queryInfo    smb2QueryInfoSelector
+}
+
+type smb2QueryInfoSelector struct {
+	infoType, fileInfoClass uint8
+	outputLength            uint32
+	additionalInformation   uint32
+	flags                   uint32
 }
 
 // A chain belongs to one observed request PDU and is retained only by that
@@ -220,8 +230,8 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	for _, path := range s.files {
 		pathBytes += int64(len(path))
 	}
-	// Includes the pending request's private chain pointer and ordinal.
-	target := int64(256) + int64(len(s.pending)+1)*128 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
+	// Includes the private chain identity and the retained QUERY_INFO selector.
+	target := int64(256) + int64(len(s.pending)+1)*160 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
 	target += pathBytes + chainBytes + additionalPathBytes
 	return s.flow.reserveSession(target)
 }
@@ -370,6 +380,13 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0, chain: link.chain, ordinal: link.ordinal}
 		pending.path, _ = c["File Name"].(string)
 		pending.related, _ = c["Related File ID Ignored"].(bool)
+		if name == "QUERY_INFO" {
+			body := c["Body"].(map[string]any)
+			pending.queryInfo = smb2QueryInfoSelector{
+				infoType: body["Info Type"].(uint8), fileInfoClass: body["File Info Class"].(uint8),
+				outputLength: body["Output Buffer Length"].(uint32), additionalInformation: body["Additional Information"].(uint32), flags: body["Flags"].(uint32),
+			}
+		}
 		clonePath := false
 		if fileID, ok := c["FileId"].(string); ok && fileID != "" {
 			if pending.related {
@@ -418,6 +435,20 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 	c["Association Status"] = "matched"
 	c["Request Session ID"] = pending.key.sessionID
 	c["Request Tree ID"] = pending.key.treeID
+	if name == "QUERY_INFO" {
+		// These observations belong to the matched request, not this response's
+		// StructureSize bytes. The owning flow already fixes interface/VLAN and
+		// TCP generation; direction and MessageId/session/tree were checked above.
+		c["Request Message ID"] = pending.key.messageID
+		c["Request Info Type"] = pending.queryInfo.infoType
+		c["Request File Info Class"] = pending.queryInfo.fileInfoClass
+		c["Request Additional Information"] = pending.queryInfo.additionalInformation
+		c["Request Query Flags"] = pending.queryInfo.flags
+		c["Request Output Buffer Length"] = pending.queryInfo.outputLength
+		if c["Error Response"] != true {
+			c["Output Content Status"] = "opaque: selector from matched request; typed content not decoded"
+		}
+	}
 	if pending.fileID != "" {
 		c["Request File ID"] = pending.fileID
 		if pending.path != "" {
@@ -576,6 +607,11 @@ func (s *binSMB2) findResponse(key smb2PendingKey, asyncID uint64, name string, 
 	allowTreeConnect := name == "TREE_CONNECT"
 	status, _ := c["Status"].(uint32)
 	allowSessionError := key.sessionID == 0 && key.treeID == 0 && status>>30 >= 2 && status != 0x00000103
+	if name == "QUERY_INFO" && c["Error Response"] != true {
+		// BUFFER_OVERFLOW is a partial QUERY_INFO output, not a lost-session
+		// ERROR. It must retain the actual session/tree or observed AsyncId.
+		allowSessionError = false
+	}
 	allowLogoffClear := name == "LOGOFF" && key.sessionID == 0 && key.treeID == 0 && asyncID == 0
 	async, _ := c["Async ID"].(uint64)
 	if async != 0 {
@@ -802,6 +838,25 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 		} else if resp && cmd == 9 && len(body) >= 8 {
 			info["Count"] = binary.LittleEndian.Uint32(body[4:8])
 		}
+	case 16:
+		status, _ := info["Status"].(uint32)
+		fields, err := stream_parser.DecodeSMB2QueryInfoBody(body, resp, status)
+		if err != nil {
+			return nil, err
+		}
+		if fields["Error Response"] == true {
+			info["Error Response"] = true
+			delete(fields, "Error Response")
+		} else if resp {
+			info["Output Content Status"] = "opaque: request context unavailable"
+		} else {
+			// Keep the historical flat representation distinct from the owned
+			// raw body leaf; both spans refer to this request's actual FileId.
+			fid := fields["File ID"].([]byte)
+			smb2Literal(info, "FileId", 88, 104, hex.EncodeToString(fid))
+		}
+		smb2OffsetRanges(fields, 64)
+		info["Body"] = fields
 	}
 	return info, nil
 }

@@ -275,7 +275,7 @@ var ProtocolCatalog = []ProtocolInfo{
 	{Name: "T3", Layer: "L7", RuleFile: "application-layer/t3.yaml", Status: statusNew, SampleFrom: "T3 hello 12.2.1 AS/HL + IDENTIFY header"},
 	{Name: "PPTP", Layer: "L7", RuleFile: "application-layer/pptp.yaml", Status: statusNew, SampleFrom: "RFC 2637 SCCRQ"},
 	{Name: "BER", Layer: "L7", RuleFile: "application-layer/ber.yaml", Status: statusNew, SampleFrom: "X.690 INTEGER"},
-	{Name: "SMB2", Layer: "L7", RuleFile: "application-layer/smb2.yaml", Status: statusNew, Notes: "header + NEGOTIATE + SESSION_SETUP", SampleFrom: "[MS-SMB2] 2.2.1/2.2.3/2.2.4/2.2.5"},
+	{Name: "SMB2", Layer: "L7", RuleFile: "application-layer/smb2.yaml", Status: statusNew, Notes: "header + NEGOTIATE + SESSION_SETUP; bounded QUERY_INFO request/response/error envelopes share the native codec; selector-dependent output remains opaque", SampleFrom: "[MS-SMB2] 2.2.1/2.2.3/2.2.4/2.2.5/2.2.37/2.2.38"},
 	{Name: "SMB", Layer: "L7", RuleFile: "application-layer/smb.yaml", EntryNode: "SMB", Status: statusNew, Notes: "NEGOTIATE/AndX/CLOSE/TRANSACTION", SampleFrom: "[MS-CIFS] 2.2.3.1/2.2.4.52"},
 	{Name: "NBT SS", Layer: "L4", RuleFile: "application-layer/nbss.yaml", Status: statusNew, Notes: "session message wrapping SMB/SMB2", SampleFrom: "RFC 1002"},
 	{Name: "MySQL Auth Switch Fields", Layer: "L7", RuleFile: "application-layer/mysql_fields.yaml", EntryNode: "MySQLAuthSwitchFields", Status: statusPartial, Notes: "Explicit bounded classic message profile; caller supplies observed authentication or negotiated result context. pcapx selects this profile after validated handshake/state; no credential verification or encrypted/binary row decoding", SampleFrom: "MySQL classic protocol documents and generated protocol-sessions fixtures"},

@@ -425,10 +425,15 @@ func TestSMB2RetainedPathBytesUseSessionBudget(t *testing.T) {
 	require.Zero(t, limitedFlow.sessionBytes)
 	require.Zero(t, limitedParser.buffered.Load())
 
-	accepted, acceptedFlow, _ := newState(600)
+	accepted, acceptedFlow, _ := newState(512 + len(path))
 	require.NoError(t, accepted.associate(request(path), 8))
 	require.Equal(t, path, accepted.pending[smb2PendingKey{sessionID: 0x11, treeID: 1, messageID: 1}].path)
-	require.Equal(t, int64(480+len(path)), acceptedFlow.sessionBytes, "owned path bytes and the expanded pending record are reserved")
+	require.Equal(t, int64(512+len(path)), acceptedFlow.sessionBytes, "owned path bytes and the expanded pending record are reserved")
+	oneByteShort, shortFlow, shortParser := newState(511 + len(path))
+	require.Error(t, oneByteShort.associate(request(path), 8))
+	require.Empty(t, oneByteShort.pending)
+	require.Zero(t, shortFlow.sessionBytes)
+	require.Zero(t, shortParser.buffered.Load())
 }
 
 func TestProtocolSessionSMB2Fragmentation(t *testing.T) {
