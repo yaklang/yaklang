@@ -84,9 +84,8 @@ func TestCallAITransaction_AttemptHistoryPlainOutput(t *testing.T) {
 	assert.Contains(t, errMsg, "action type is empty", "error should contain the underlying postHandler error")
 }
 
-// TestCallAITransaction_AttemptHistoryInErrorMessage verifies that the final
-// transaction error message contains the history of every retry attempt
-// (errors + AI responses), not only the last one.
+// Request failures terminate the Agent transaction without another retry budget.
+// The final error retains the cause; the structured event retains diagnostics.
 func TestCallAITransaction_AttemptHistoryInErrorMessage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
@@ -114,8 +113,8 @@ func TestCallAITransaction_AttemptHistoryInErrorMessage(t *testing.T) {
 	// The returned error no longer wraps the full attempt history; it is emitted
 	// via EmitAICallFailureIfApplicable instead. Verify only the concise error
 	// that carries the last underlying failure.
-	assert.Contains(t, errMsg, "max retry count[3] reached in transaction")
-	assert.Contains(t, errMsg, "attempt-3-failure", "error should contain the last call-ai error")
+	assert.Contains(t, errMsg, "model request failed")
+	assert.Contains(t, errMsg, "attempt-1-failure", "error should contain the last call-ai error")
 }
 
 // TestCallAITransaction_AttemptHistoryStructuredPayload verifies the structured
@@ -167,7 +166,7 @@ func TestCallAITransaction_AttemptHistoryStructuredPayload(t *testing.T) {
 	default:
 		t.Fatalf("attempts has unexpected type: %T", attemptsRaw)
 	}
-	require.Len(t, attempts, 2, "expected 2 attempt records, got %d", len(attempts))
+	require.Len(t, attempts, 1, "request recovery does not create extra Agent attempts")
 
 	for idx, a := range attempts {
 		cause := fmt.Sprint(a["call_ai_error"])

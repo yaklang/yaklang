@@ -11,11 +11,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	"github.com/google/uuid"
 	"github.com/yaklang/yaklang/common/ai/aispec"
-	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 	"github.com/yaklang/yaklang/common/utils/lowhttp/poc"
 )
@@ -31,8 +28,8 @@ type Request struct {
 	RawMessages []aispec.ChatDetail
 	Tools       []aispec.Tool
 	ToolChoice  any
-	retryMu     sync.Mutex
-	retry       *retryDecision
+	failureMu   sync.Mutex
+	failure     *aispec.ModelCallFailure
 }
 
 // Executor runs chat(request, emit). A script either returns a complete string,
@@ -56,8 +53,6 @@ func (g *GatewayClient) LoadOption(opts ...aispec.AIConfigOption) {
 }
 func (g *GatewayClient) GetConfig() *aispec.AIConfig { return g.config }
 
-func (*GatewayClient) ManagesModelRetries() bool { return true }
-
 func (g *GatewayClient) CheckValid() error {
 	if g.config == nil || strings.TrimSpace(g.config.Script) == "" {
 		return errors.New("yak-script requires script source defining chat(request, emit)")
@@ -70,108 +65,41 @@ func (g *GatewayClient) CheckValid() error {
 
 func (g *GatewayClient) Chat(prompt string, functions ...any) (string, error) {
 	if err := g.CheckValid(); err != nil {
-		return "", err
+		return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: err}
 	}
 	c := g.config
 	if len(functions) > 0 {
-		return "", errors.New("yak-script does not accept legacy functions; use tools")
+		return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: errors.New("yak-script does not accept legacy functions; use tools")}
 	}
 	if len(c.Tools) > 0 && !c.EnableNativeToolCalling {
-		return "", errors.New("yak-script native tool calling is disabled in provider configuration")
+		return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: errors.New("yak-script native tool calling is disabled in provider configuration")}
 	}
 	if len(c.Images) > 0 || len(c.Videos) > 0 {
-		return "", errors.New("yak-script currently supports text input only")
+		return "", &aispec.ModelCallFailure{Kind: "configuration", Cause: errors.New("yak-script currently supports text input only")}
 	}
 	ctx := c.Context
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	if !c.Deadline.IsZero() {
-		var cancel context.CancelFunc
-		ctx, cancel = context.WithDeadline(ctx, c.Deadline)
-		defer cancel()
-	}
-	requestID := uuid.NewString()
-	newRequest := func() *Request {
-		return &Request{RequestID: requestID, Prompt: prompt, RawMessages: c.RawMessages, Tools: c.Tools, ToolChoice: c.ToolChoice}
-	}
-	retried := false
-	attempt := 0
-	for {
-		if err := ctx.Err(); err != nil {
-			return "", err
-		}
-		reportResult, admissionErr := aispec.AcquireModelRequest(ctx, g.notify)
-		if admissionErr != nil {
-			return "", admissionErr
-		}
-		attempt++
-		scope := httptrace.GetScope(ctx)
-		scope.Attempt = attempt
-		text, err, decision := g.attempt(httptrace.WithScope(ctx, scope), newRequest(), consts.IsAIRetryForeverEnabled())
-		retry := err != nil && decision != nil && consts.IsAIRetryForeverEnabled() && ctx.Err() == nil
-		delay := aispec.RetryDelay(attempt, "", time.Now())
-		if decision != nil {
-			delay = max(delay, decision.delay)
-		}
-		if reportResult != nil {
-			serverDelay := time.Duration(0)
-			if decision != nil {
-				serverDelay = decision.delay
-			}
-			delay = reportResult(err == nil, decision != nil, serverDelay)
-		}
-		if ctx.Err() != nil {
-			return "", ctx.Err()
-		}
-		if !retry {
-			if err == nil {
-				if retried {
-					g.notify("模型接口已恢复，继续执行任务")
-				}
-			}
-			return text, err
-		}
-		retried = true
-		g.notify(fmt.Sprintf("模型接口暂不可用（%s），请求队列至少冷却 %.1f 秒后按队列逐个尝试；任务仍在运行，可随时停止", decision.reason, delay.Seconds()))
-		if reportResult == nil {
-			if waitErr := aispec.WaitModelRetry(ctx, delay); waitErr != nil {
-				return "", waitErr
-			}
-		}
-		if !consts.IsAIRetryForeverEnabled() {
-			return "", err
-		}
-	}
+	scope := httptrace.GetScope(ctx)
+	req := &Request{Context: ctx, RequestID: scope.CallID, Prompt: prompt, RawMessages: c.RawMessages, Tools: c.Tools, ToolChoice: c.ToolChoice}
+	return g.attempt(ctx, req)
 }
 
-func (g *GatewayClient) notify(message string) {
-	if g.config.ModelRequestStatus != nil {
-		g.config.ModelRequestStatus(message)
-	}
-}
-
-// The script owns HTTP timeouts. The attempt inherits caller cancellation and
-// deadlines; ordinary provider timeout defaults must not override script policy.
-func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForever bool) (result string, resultErr error, resultDecision *retryDecision) {
+// attempt only executes and normalizes one script call. aispec owns recovery.
+func (g *GatewayClient) attempt(ctx context.Context, req *Request) (resultText string, resultErr error) {
+	defer func() {
+		var failure *aispec.ModelCallFailure
+		if resultErr != nil && ctx.Err() == nil && !errors.As(resultErr, &failure) {
+			resultErr = &aispec.ModelCallFailure{Kind: "script", Cause: resultErr}
+		}
+	}()
 	c := g.config
-	bufferOutput := retryForever || len(req.Tools) > 0
-	ctx, cancel := context.WithCancel(parent)
-	defer cancel()
-	req.Context = ctx
+	bufferOutput := len(req.Tools) > 0
 	var mu sync.Mutex
 	var output strings.Builder
 	closed := false
-	// Only retry the uncommitted model invocation. Already emitted output cannot
-	// be retracted; neither local tool execution nor caller cancellation is retried.
-	defer func() {
-		mu.Lock()
-		emitted := output.Len() > 0
-		mu.Unlock()
-		if retryForever && resultErr != nil && resultDecision == nil && (!emitted || bufferOutput) && parent.Err() == nil {
-			resultDecision = &retryDecision{reason: "模型调用失败，持续重试已开启"}
-		}
-	}()
+
 	emit := func(text string) error {
 		mu.Lock()
 		defer mu.Unlock()
@@ -201,52 +129,36 @@ func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForev
 	closed = true
 	text := output.String()
 	mu.Unlock()
-	req.retryMu.Lock()
-	decision := req.retry
-	req.retryMu.Unlock()
-	if decision != nil && err == nil {
-		err = errors.New(decision.reason)
-	}
 	if ctx.Err() != nil {
-		if text != "" && !bufferOutput {
-			decision = nil
-		}
-		return "", ctx.Err(), decision
+		return "", ctx.Err()
 	}
 	if err != nil {
-		// Retrying after already emitting tokens would duplicate/corrupt output.
-		if text != "" && !bufferOutput {
-			decision = nil
-		}
-		if decision != nil {
-			return "", fmt.Errorf("yak-script: %s", decision.reason), decision
-		}
-		return "", fmt.Errorf("yak-script execution failed: %w", err), nil
+		return "", fmt.Errorf("yak-script execution failed: %w", err)
 	}
 	finishReason := "stop"
 	var calls []*aispec.ToolCall
 	if value != nil {
 		if text != "" {
-			return "", errors.New("yak-script chat must either emit text or return a result, not both"), nil
+			return "", errors.New("yak-script chat must either emit text or return a result, not both")
 		}
 		if returned, ok := value.(string); ok {
 			text = returned
 		} else {
 			if !c.EnableNativeToolCalling {
-				return "", errors.New("yak-script structured results require native tool calling to be enabled"), nil
+				return "", errors.New("yak-script structured results require native tool calling to be enabled")
 			}
 			result, err := normalizeNativeResult(value, req.Tools)
 			if err != nil {
-				return "", err, nil
+				return "", err
 			}
 			text, calls, finishReason = result.Content, result.ToolCalls, result.FinishReason
 		}
 	}
 	if strings.TrimSpace(text) == "" && len(calls) == 0 {
-		return "", errors.New("yak-script returned an empty model response"), nil
+		return "", &aispec.ModelCallFailure{Kind: "protocol", Cause: errors.New("yak-script returned an empty model response")}
 	}
 	if ctx.Err() != nil {
-		return "", ctx.Err(), nil
+		return "", ctx.Err()
 	}
 	// Native results are committed only after every call has been validated.
 	if (value != nil || bufferOutput) && c.StreamHandler != nil && text != "" {
@@ -265,11 +177,11 @@ func (g *GatewayClient) attempt(parent context.Context, req *Request, retryForev
 	if c.FinishReasonCallback != nil {
 		c.FinishReasonCallback(finishReason, nil)
 	}
-	return text, nil, nil
+	return text, nil
 }
 
 func (g *GatewayClient) ChatStream(prompt string) (io.Reader, error) {
-	text, err := g.Chat(prompt)
+	text, err := aispec.ChatWithGlobalRetry(g, prompt)
 	if err != nil {
 		return nil, err
 	}
@@ -286,7 +198,7 @@ func (g *GatewayClient) ExtractData(input, description string, fields map[string
 		for _, opt := range opts {
 			opt(&clone)
 		}
-		return (&GatewayClient{config: &clone}).Chat(prompt)
+		return aispec.ChatWithGlobalRetry(&GatewayClient{config: &clone}, prompt)
 	}, aispec.WithFunctionCallMode(false), aispec.WithContext(g.config.Context))
 }
 

@@ -64,13 +64,3 @@ func aiHTTPResponseError(rsp *AIResponse) error {
 	}
 	return errors.New(description)
 }
-
-// ensure429CallbackError fills a missing callback error for a known HTTP 429.
-// Existing errors and all other statuses are returned unchanged. It never waits
-// for headers: completed non-HTTP callbacks may never provide them.
-func ensure429CallbackError(rsp *AIResponse, err error) error {
-	if err != nil || rsp.GetHTTPStatusCode() != 429 {
-		return err
-	}
-	return aiHTTPResponseError(rsp)
-}

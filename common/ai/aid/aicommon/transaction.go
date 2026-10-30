@@ -12,16 +12,6 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// waitForHeadersAndCheck429 may block until headers arrive or ctx is cancelled.
-// Use only where the callback is expected to signal HTTP header readiness.
-func waitForHeadersAndCheck429(ctx context.Context, rsp *AIResponse) bool {
-	if rsp == nil {
-		return false
-	}
-	rsp.WaitForHTTPHeaders(ctx)
-	return rsp.GetHTTPStatusCode() == 429
-}
-
 func normalizeTransactionPostHandlerError(rsp *AIResponse, err error) error {
 	if err == nil || rsp == nil {
 		return err
@@ -112,7 +102,7 @@ func callAITransaction(
 	var nonRetryableHTTPFailure bool
 	var promptOverflowFailure bool
 
-	// attemptHistory records every attempt (including 429 rate-limit retries) so
+	// attemptHistory records every Agent validation attempt so
 	// that the final failure message can expose the full retry history to the
 	// caller instead of only the last attempt.
 	var attemptHistory []transactionAttemptRecord
@@ -171,7 +161,12 @@ func callAITransaction(
 		if err == nil && rsp != nil && !rsp.WaitForCallbackDone(transactionCtx) {
 			return transactionCtx.Err()
 		}
-		err = ensure429CallbackError(rsp, err)
+		if err == nil && rsp != nil {
+			err = rsp.GetError()
+			if err == nil && rsp.GetHTTPStatusCode() >= 400 {
+				err = aiHTTPResponseError(rsp)
+			}
+		}
 		// A request-scoped cancellation is a terminal control signal, not an AI
 		// failure. Check it before classifying callAi errors so a task finishing
 		// while the provider is in flight cannot emit a misleading model-error
@@ -194,22 +189,6 @@ func callAITransaction(
 			lastRsp = rsp
 			rspEmitter := bindEmitter(rsp)
 
-			if waitForHeadersAndCheck429(transactionCtx, rsp) {
-				if is429Retryable(transactionCtx, rsp) {
-					// 频率限流/过载类：可重试，不消耗重试次数。
-					rspEmitter.EmitWarning("429 rate limit detected in transaction layer (seq=%d), will retry without counting attempt", getSeq())
-					attemptHistory = append(attemptHistory, recordAttempt(i+1, err, rsp))
-					retryAfter := parseRetryAfterSeconds(rsp, 5)
-					waitSec := capRetryAfterSeconds(jitterSeconds(retryAfter, 3), 1, 120)
-					if waitErr := waitBeforeAIRetry(transactionCtx, c, time.Duration(waitSec)*time.Second); waitErr != nil {
-						return waitErr
-					}
-					continue
-				}
-				// 额度耗尽类 429：不可重试，消耗重试次数让上层暴露错误。
-				rspEmitter.EmitWarning("429 quota exceeded in transaction layer (seq=%d), not retryable", getSeq())
-			}
-
 			i++
 			attemptHistory = append(attemptHistory, recordAttempt(i, err, rsp))
 			rspEmitter.EmitError("call ai api error (attempt %d/%d): %v", i, trcRetry, err)
@@ -221,12 +200,9 @@ func callAITransaction(
 				nonRetryableHTTPFailure = true
 				break
 			}
-			if i < trcRetry {
-				if waitErr := waitBeforeTransactionRetry(transactionCtx, c, rspEmitter, i, trcRetry, attemptHistory); waitErr != nil {
-					return waitErr
-				}
-			}
-			continue
+			// Request recovery owns its budget. Re-entering here would multiply
+			// retries and could replay a permanent failure or a partially sent stream.
+			break
 		}
 		if err := transactionCtx.Err(); err != nil {
 			return err
@@ -379,6 +355,9 @@ func callAITransaction(
 		}
 		if nonRetryableHTTPFailure {
 			return utils.Wrap(finalErr, "non-retryable AI HTTP request failure")
+		}
+		if lastCallAiErr != nil {
+			return utils.Wrap(finalErr, "model request failed")
 		}
 		return utils.Wrap(finalErr, fmt.Sprintf("max retry count[%v] reached in transaction", trcRetry))
 	}

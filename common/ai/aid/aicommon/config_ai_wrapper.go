@@ -156,60 +156,36 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 		tokenSize := ytoken.CalcTokenCount(request.GetPrompt())
 
-		maxAttempts := int(c.AiAutoRetry)
-		if maxAttempts <= 0 {
-			maxAttempts = 1
-		}
 		// 不需要 checkpoint 的请求直接执行就好
 		if request.IsDetachedCheckpoint() {
-			for _idx := 0; _idx < maxAttempts; {
-				rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-				if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
-					err = ensure429CallbackError(rsp, err)
-					if done {
-						return nil, requestCtx.Err()
-					}
-					if !shouldRetry {
-						_idx++
-					}
-					continue
-				}
-				if ctxErr := requestCtx.Err(); ctxErr != nil {
-					return nil, ctxErr
-				}
-				if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
-					return rsp, overflowErr
-				}
-				if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
-					if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
-						return nil, requestCtx.Err()
-					}
-					return rsp, aiHTTPResponseError(rsp)
-				}
-				if err != nil || rsp == nil {
-					_idx++
-					if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, maxAttempts); waitErr != nil {
-						return nil, waitErr
-					}
-					continue
-				}
-				rsp.SetTaskIndex(request.GetTaskIndex())
-				origRsp := rsp
-				rsp = TeeAIResponse(config, rsp, nil, func() {
-					c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
-				})
-				if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+			rsp, err = c.callModelRequest(requestCtx, i, wrapCallerWithTierConsumption(outConfig, tier), request)
+			if ctxErr := requestCtx.Err(); ctxErr != nil {
+				return nil, ctxErr
+			}
+			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+				return rsp, overflowErr
+			}
+			if err == nil && rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+				if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
 					return nil, requestCtx.Err()
 				}
-				if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
-					return rsp, overflowErr
-				}
+				return rsp, aiHTTPResponseError(rsp)
+			}
+			if err != nil || rsp == nil {
 				return rsp, err
 			}
-			if rsp != nil {
-				rsp.SetTaskIndex(request.GetTaskIndex())
+			rsp.SetTaskIndex(request.GetTaskIndex())
+			origRsp := rsp
+			rsp = TeeAIResponse(config, rsp, nil, func() {
+				c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
+			})
+			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+				return nil, requestCtx.Err()
 			}
-			return rsp, utils.Errorf("ai request err with max retry: %w", err)
+			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+				return rsp, overflowErr
+			}
+			return rsp, err
 		}
 
 		var seq = request.GetSeqId()
@@ -251,191 +227,171 @@ func (c *Config) wrapper(i AICallbackType, tier consts.ModelTier) AICallbackType
 		}
 
 		start := time.Now()
-		for _idx := 0; _idx < maxAttempts; {
-			rsp, err = i(wrapCallerWithTierConsumption(outConfig, tier), request)
-			if is429, shouldRetry, done := c.handle429RateLimitContext(requestCtx, rsp); is429 {
-				err = ensure429CallbackError(rsp, err)
-				if done {
-					return nil, requestCtx.Err()
-				}
-				if !shouldRetry {
-					_idx++
-				}
-				continue
+		rsp, err = c.callModelRequest(requestCtx, i, wrapCallerWithTierConsumption(outConfig, tier), request)
+		if ctxErr := requestCtx.Err(); ctxErr != nil {
+			return nil, ctxErr
+		}
+		if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+			return rsp, overflowErr
+		}
+		if err == nil && rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
+			if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
+				return nil, requestCtx.Err()
 			}
-			if ctxErr := requestCtx.Err(); ctxErr != nil {
-				return nil, ctxErr
-			}
-			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
-				return rsp, overflowErr
-			}
-			if rsp != nil && isNonRetryableAIHTTPResponse(rsp) {
-				if !waitOrigAIResponseCallbackContext(requestCtx, rsp) {
-					return nil, requestCtx.Err()
-				}
-				return rsp, aiHTTPResponseError(rsp)
-			}
-			if err != nil || rsp == nil {
-				_idx++
-				if waitErr := c.waitBeforeNextAIRequestRetry(requestCtx, err, _idx, maxAttempts); waitErr != nil {
-					return nil, waitErr
-				}
-				continue
-			}
-			rsp.SetTaskIndex(request.GetTaskIndex())
+			return rsp, aiHTTPResponseError(rsp)
+		}
+		if err != nil || rsp == nil {
+			return rsp, err
+		}
+		rsp.SetTaskIndex(request.GetTaskIndex())
 
-			saveHandler := func(tee *AIResponse) {
-				reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
-				reason, _ := io.ReadAll(reasonReader)
-				output, _ := io.ReadAll(outputReader)
-				if !request.HaveSaveCheckpointCallback() {
+		saveHandler := func(tee *AIResponse) {
+			reasonReader, outputReader := tee.GetUnboundStreamReaderEx(nil, nil, nil)
+			reason, _ := io.ReadAll(reasonReader)
+			output, _ := io.ReadAll(outputReader)
+			if !request.HaveSaveCheckpointCallback() {
 
-					err := c.SubmitCheckpointResponse(cp, &AIResponseSimple{
+				err := c.SubmitCheckpointResponse(cp, &AIResponseSimple{
+					Reason: string(reason),
+					Output: string(output),
+				})
+				if err != nil {
+					outConfig.EmitError("ai request save response checkpoint failed err: %v", err)
+				}
+			} else {
+				request.CallSaveCheckpointCallback(func() (*schema.AiCheckpoint, error) {
+					return cp, c.SubmitCheckpointResponse(cp, &AIResponseSimple{
 						Reason: string(reason),
 						Output: string(output),
 					})
-					if err != nil {
-						outConfig.EmitError("ai request save response checkpoint failed err: %v", err)
-					}
-				} else {
-					request.CallSaveCheckpointCallback(func() (*schema.AiCheckpoint, error) {
-						return cp, c.SubmitCheckpointResponse(cp, &AIResponseSimple{
-							Reason: string(reason),
-							Output: string(output),
-						})
-					})
-				}
-
+				})
 			}
 
-			origRsp := rsp
-			rsp = TeeAIResponse(config, rsp, func(teeResp *AIResponse) {
-				now := time.Now()
-				du := now.Sub(start)
-				origRsp.SetFirstOutputByteTime(now)
-				c.EmitInfo("[%s] ai response from %v:%v first byte cost: %v",
-					callerLabel, origRsp.GetProviderName(), origRsp.GetModelName(), du.String())
+		}
 
-				outConfig.Add(1)
-				go func() {
-					defer outConfig.Done()
-					saveHandler(teeResp)
-				}()
+		origRsp := rsp
+		rsp = TeeAIResponse(config, rsp, func(teeResp *AIResponse) {
+			now := time.Now()
+			du := now.Sub(start)
+			origRsp.SetFirstOutputByteTime(now)
+			c.EmitInfo("[%s] ai response from %v:%v first byte cost: %v",
+				callerLabel, origRsp.GetProviderName(), origRsp.GetModelName(), du.String())
 
-				c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
-					"ms":            du.Milliseconds(),
-					"second":        du.Seconds(),
-					"model_name":    origRsp.GetModelName(),
-					"provider_name": origRsp.GetProviderName(),
-					"model_tier":    string(tier),
-					"caller_label":  callerLabel,
-				})
-			}, func() {
-				usageMetrics := c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
-				du := time.Since(start)
-				provider := origRsp.GetProviderName()
-				model := origRsp.GetModelName()
-				outputBytes := origRsp.GetTotalOutputBytes()
-				outputTokens := usageMetrics.OutputTokens
-				inputTokens := usageMetrics.InputTokens
-				totalTokens := usageMetrics.TotalTokens
-				cacheHitTokens := usageMetrics.CacheHitTokens
-				firstByteTime := origRsp.GetFirstOutputByteTime()
-				var outputDuration time.Duration
-				if !firstByteTime.IsZero() {
-					outputDuration = time.Since(firstByteTime)
-				}
-				tokenRate := float64(0)
-				if outputDuration.Seconds() > 0 {
-					tokenRate = float64(outputTokens) / outputDuration.Seconds()
-				}
-				c.EmitInfo("[%s] ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
-					callerLabel, provider, model, du, outputDuration, tokenRate)
-				c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
-					"current_cost_token_size": inputTokens,
-					"pressure_token_size":     c.AiCallTokenLimit,
-					"model_tier":              string(tier),
-					"model_name":              model,
-					"provider_name":           provider,
-					"cache_hit_token":         cacheHitTokens,
-					"token_source":            usageMetrics.TokenSource,
-					"caller_label":            callerLabel,
-				})
-				c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
-					"ms":                      du.Milliseconds(),
-					"second":                  du.Seconds(),
-					"model_name":              model,
-					"provider_name":           provider,
-					"model_tier":              string(tier),
-					"token_rate":              tokenRate,
-					"output_bytes":            outputBytes,
-					"estimated_output_tokens": outputTokens,
-					"output_tokens":           outputTokens,
-					"input_tokens":            inputTokens,
-					"total_tokens":            totalTokens,
-					"cache_hit_token":         cacheHitTokens,
-					"token_source":            usageMetrics.TokenSource,
-					"output_duration_ms":      outputDuration.Milliseconds(),
-					"caller_label":            callerLabel,
-				})
-				firstByteCostMs := int64(0)
-				if !firstByteTime.IsZero() {
-					firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
-				}
-				c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
-					"model_name":              model,
-					"provider_name":           provider,
-					"model_tier":              string(tier),
-					"first_byte_cost_ms":      firstByteCostMs,
-					"total_cost_ms":           du.Milliseconds(),
-					"output_bytes":            outputBytes,
-					"estimated_output_tokens": outputTokens,
-					"output_tokens":           outputTokens,
-					"token_rate":              tokenRate,
-					"output_duration_ms":      outputDuration.Milliseconds(),
-					"input_token_size":        inputTokens,
-					"input_tokens":            inputTokens,
-					"total_tokens":            totalTokens,
-					"cache_hit_token":         cacheHitTokens,
-					"token_source":            usageMetrics.TokenSource,
-					"caller_label":            callerLabel,
-				})
-				// 命中统计: 记录一次 AI (模型) 调用及其 token 用量 (每日汇总).
-				SubmitAICall(c, model, &aispec.ChatUsage{
-					PromptTokens:     int(inputTokens),
-					CompletionTokens: int(outputTokens),
-					TotalTokens:      int(totalTokens),
-				})
-				if outputBytes == 0 && requestCtx.Err() == nil && origRsp.GetError() == nil && origRsp.GetHTTPStatusCode() < 400 {
-					rawDump := origRsp.GetRawHTTPResponseDump()
-					if rawDump != "" {
-						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-							"No output content was received (HTTP status=%d).",
-							provider, model, du, inputTokens, origRsp.GetHTTPStatusCode(),
-						)
-					} else {
-						c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
-							"The AI model returned an empty response. (no raw HTTP response available)",
-							provider, model, du, inputTokens,
-						)
-					}
-				}
+			outConfig.Add(1)
+			go func() {
+				defer outConfig.Done()
+				saveHandler(teeResp)
+			}()
+
+			c.EmitJSON(schema.EVENT_TYPE_AI_FIRST_BYTE_COST_MS, "system", map[string]any{
+				"ms":            du.Milliseconds(),
+				"second":        du.Seconds(),
+				"model_name":    origRsp.GetModelName(),
+				"provider_name": origRsp.GetProviderName(),
+				"model_tier":    string(tier),
+				"caller_label":  callerLabel,
 			})
-			if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
-				return nil, requestCtx.Err()
+		}, func() {
+			usageMetrics := c.finalizeTierConsumption(tier, int64(tokenSize), origRsp)
+			du := time.Since(start)
+			provider := origRsp.GetProviderName()
+			model := origRsp.GetModelName()
+			outputBytes := origRsp.GetTotalOutputBytes()
+			outputTokens := usageMetrics.OutputTokens
+			inputTokens := usageMetrics.InputTokens
+			totalTokens := usageMetrics.TotalTokens
+			cacheHitTokens := usageMetrics.CacheHitTokens
+			firstByteTime := origRsp.GetFirstOutputByteTime()
+			var outputDuration time.Duration
+			if !firstByteTime.IsZero() {
+				outputDuration = time.Since(firstByteTime)
 			}
-			if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
-				return rsp, overflowErr
+			tokenRate := float64(0)
+			if outputDuration.Seconds() > 0 {
+				tokenRate = float64(outputTokens) / outputDuration.Seconds()
 			}
-			if c.DebugPrompt {
-				rsp.Debug(true)
+			c.EmitInfo("[%s] ai response from %v:%v cost: %v, output duration: %v, %.1f token/s",
+				callerLabel, provider, model, du, outputDuration, tokenRate)
+			c.EmitJSON(schema.EVENT_TYPE_PRESSURE, "system", map[string]any{
+				"current_cost_token_size": inputTokens,
+				"pressure_token_size":     c.AiCallTokenLimit,
+				"model_tier":              string(tier),
+				"model_name":              model,
+				"provider_name":           provider,
+				"cache_hit_token":         cacheHitTokens,
+				"token_source":            usageMetrics.TokenSource,
+				"caller_label":            callerLabel,
+			})
+			c.EmitJSON(schema.EVENT_TYPE_AI_TOTAL_COST_MS, "system", map[string]any{
+				"ms":                      du.Milliseconds(),
+				"second":                  du.Seconds(),
+				"model_name":              model,
+				"provider_name":           provider,
+				"model_tier":              string(tier),
+				"token_rate":              tokenRate,
+				"output_bytes":            outputBytes,
+				"estimated_output_tokens": outputTokens,
+				"output_tokens":           outputTokens,
+				"input_tokens":            inputTokens,
+				"total_tokens":            totalTokens,
+				"cache_hit_token":         cacheHitTokens,
+				"token_source":            usageMetrics.TokenSource,
+				"output_duration_ms":      outputDuration.Milliseconds(),
+				"caller_label":            callerLabel,
+			})
+			firstByteCostMs := int64(0)
+			if !firstByteTime.IsZero() {
+				firstByteCostMs = firstByteTime.Sub(start).Milliseconds()
 			}
-			return rsp, err
+			c.EmitJSON(schema.EVENT_TYPE_AI_CALL_SUMMARY, "system", map[string]any{
+				"model_name":              model,
+				"provider_name":           provider,
+				"model_tier":              string(tier),
+				"first_byte_cost_ms":      firstByteCostMs,
+				"total_cost_ms":           du.Milliseconds(),
+				"output_bytes":            outputBytes,
+				"estimated_output_tokens": outputTokens,
+				"output_tokens":           outputTokens,
+				"token_rate":              tokenRate,
+				"output_duration_ms":      outputDuration.Milliseconds(),
+				"input_token_size":        inputTokens,
+				"input_tokens":            inputTokens,
+				"total_tokens":            totalTokens,
+				"cache_hit_token":         cacheHitTokens,
+				"token_source":            usageMetrics.TokenSource,
+				"caller_label":            callerLabel,
+			})
+			// 命中统计: 记录一次 AI (模型) 调用及其 token 用量 (每日汇总).
+			SubmitAICall(c, model, &aispec.ChatUsage{
+				PromptTokens:     int(inputTokens),
+				CompletionTokens: int(outputTokens),
+				TotalTokens:      int(totalTokens),
+			})
+			if outputBytes == 0 && requestCtx.Err() == nil && origRsp.GetError() == nil && origRsp.GetHTTPStatusCode() < 400 {
+				rawDump := origRsp.GetRawHTTPResponseDump()
+				if rawDump != "" {
+					c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+						"No output content was received (HTTP status=%d).",
+						provider, model, du, inputTokens, origRsp.GetHTTPStatusCode(),
+					)
+				} else {
+					c.EmitWarning("[AI Empty Response] model=%v:%v, cost=%v, input_tokens~%d. "+
+						"The AI model returned an empty response. (no raw HTTP response available)",
+						provider, model, du, inputTokens,
+					)
+				}
+			}
+		})
+		if !waitOrigAIResponseCallbackContext(requestCtx, origRsp) {
+			return nil, requestCtx.Err()
 		}
-		if rsp != nil {
-			rsp.SetTaskIndex(request.GetTaskIndex())
+		if overflowErr := ClassifyPromptTooLong(rsp, err); overflowErr != nil {
+			return rsp, overflowErr
 		}
-		return rsp, utils.Errorf("ai request err with max retry: %w", err)
+		if c.DebugPrompt {
+			rsp.Debug(true)
+		}
+		return rsp, err
 	}
 }
 

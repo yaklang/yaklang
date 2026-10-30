@@ -6,7 +6,7 @@
 
 | 层 | 职责 |
 | --- | --- |
-| Go 宿主 | 创建 VM、注入接口、传递取消与超时、管理全局请求频率和恢复、把正文接入 StreamHandler / AIResponse，校验并交付原生工具调用 |
+| Go 宿主 | 创建 VM、提供正式 ai 库 API、传递取消与超时，由 aispec 统一管理请求频率和恢复、把正文接入 StreamHandler / AIResponse，校验并交付原生工具调用 |
 | Yak 脚本 | HTTP 请求映射、状态码与媒体类型检查、JSON / SSE 内部业务字段解析、完整性验证，交付正文、归一化工具调用或错误 |
 | Agent | 解析文本 `@action` / answer_payload 或原生工具调用、纠正格式并执行工具 |
 
@@ -31,9 +31,9 @@ AIModelConfig
 
 脚本中的 HTTP 超时在实际发起请求时生效，不受普通模型的默认 `AIConfig.Timeout` 截断。宿主仍传递调用方取消与总 deadline；需要约束脚本整体执行时，可以在脚本内从 req.Context 派生有期限的 Context。源码错误或无限循环仍可通过停止任务取消。
 
-## 宿主注入的接口
+## 正式 API 与入口类型
 
-入口是 `chat(req, emit)`，不需要自行 import 宿主对象。
+入口是 `chat(req, emit)`，可选入口是 `shouldRetry(req, failure)`。辅助函数通过正式 `ai` 库导出，不需要 import。编辑器传递 `ai-model` 分析上下文；入口参数、字段、函数签名与文档均参与语言服务。
 
 | req 字段 | 含义 |
 | --- | --- |
@@ -44,18 +44,22 @@ AIModelConfig
 | Tools | 本次原生工具定义（name、description、parameters），文本模式为空 |
 | ToolChoice | 本次原生工具选择约束；脚本应映射给上游 |
 
-| 注入函数 | 用法和边界 |
+| API | 用法和边界 |
 | --- | --- |
-| `emit(text)` | 交付模型正文片段；用 `emit(part)~` 传播失败，最后 `return nil` |
-| `provider.ReadSSE(reader, callback)` | 只解析 SSE 信封；回调接收字符串 `(event, data)`，JSON 和业务字段仍由脚本解析 |
-| `provider.Retry(req, reason, retryAfter)` | 标记本次可恢复失败并返回 error；应 `return provider.Retry(...)`；不会在脚本内 sleep / 重发 |
-| `provider.IsTransientError(err)` | 检查 EOF、网络超时、连接重置等传输失败；不认识 HTTP 状态或业务错误码 |
+| `emit(text)` | 交付正文片段；最后返回 nil，不同时返回正文 |
+| `ai.ReadSSE(reader, callback)` | 只解析 SSE 信封，回调接收 `(event, data)` |
+| `ai.ModelError(req, kind, status, code, message, retryAfter)` | 返回结构化错误；支持 `return` 或 `~` 传播，不将错误交给 Agent 当作正文 |
+| `ai.IsTransientError(err)` | 判断 EOF、网络超时、连接重置等传输失败 |
+| `ai.Retry(reason, retryAfter)` | 在 shouldRetry 中返回重试决策，不自行 sleep 或发送请求 |
+| `ai.StopRetry(reason)` | 在 shouldRetry 中拒绝重试；返回 nil 使用默认判断 |
+
+`failure` 含 Kind、StatusCode、Code、RetryAfter、Cause、Attempt。Kind 为 network、http、protocol、business、configuration 或 script。业务错误由适配脚本明确判断，不按错误字符串猜测。脚本错误、明确的不可恢复 HTTP 客户端错误和取消不能强制重试。回调自身异常或返回非决策值作为脚本错误直接报告。
 
 `retryAfter` 接受 HTTP Retry-After 秒数或 HTTP 日期字符串，空字符串表示没有上游等待提示。错误原因应简短，避免把凭据和原始报文塞入 UI 错误文本。
 
 ### 输出契约
 
-二选一：返回非空正文字符串，或者多次 `emit(text)~` 后返回 nil。不能既 emit 又返回正文。错误用 `return error(...)`、断言或 `provider.Retry(...)` 表达，不能返回包含报错的字符串假装成功。
+二选一：返回非空正文字符串，或者多次 `emit(text)~` 后返回 nil。不能既 emit 又返回正文。错误用 `return error(...)`、断言或 `ai.ModelError(...)` 表达，不能返回包含报错的字符串假装成功。
 
 只交付模型正文：不返回完整 HTTP / SSE 信封、choices 包装、进度或错误页；不在脚本里补造 `@action`。动作格式校验留在 Agent。
 
@@ -123,11 +127,15 @@ return {
 
 ## 无限重试和限频后的恢复
 
-`AIGlobalConfig.RetryForever` 是独立全局开关，默认关闭。启用后，尚未提交正文的执行阶段失败持续重试，包括未知业务错误、脚本执行错误、空结果、单次超时；Agent 格式纠正也不受普通重试次数限制。配置预检查失败仍直接报错。
+`AIGlobalConfig.RetryForever` 默认关闭，只控制可重试失败的预算是否无限；不改变失败分类。HTTP 429（有无 Retry-After 均可）、临时网络故障、接口响应结构不完整可以重试。明确的凭据错误、配置缺失、脚本错误直接返回；未知业务错误由 shouldRetry 明确选择。Agent 的动作格式纠正仍独立进行，不受普通格式纠正次数限制。
 
-有主动限频时，临时故障触发共享冷却：指数退避从 2 秒增长，退避基数上限 5 分钟，加正向抖动；Retry-After 作为最短等待时间，不受 5 分钟上限截断。冷却结束只放行一个恢复探测，请求成功后恢复正常窗口放行。之前在途请求迟到的成功响应不能解除后来收到的 Retry-After。
+aispec.RunModelCall 是唯一请求恢复执行器。普通 Provider 与脚本 Provider 执行一次尝试；Agent 包装层使用同一执行器接入自定义 AICallback，嵌套调用不叠加重试预算。普通 Agent 请求的有限预算沿用 AiAutoRetry；独立 ai.Chat/脚本调用在未开启无限重试时默认一次。事务层不再等待/重发 HTTP 429。
 
-未开启主动限频且尚无共享冷却时，恢复按每次逻辑调用单独退避。等待不占单次请求超时，但用户取消和调用方总 deadline 始终有效。已完成的本地工具不会因模型重试而重新执行；上游自身的副作用需要上游提供幂等性。
+HTTP 临时错误和可识别网络故障触发共享冷却，即使 RPM=0 也有效：指数退避从 2 秒增长，基数上限 5 分钟，加正向抖动；Retry-After 为最短等待时间，不受上限截断。协议错误/脚本主动选择重试的业务错误采用调用级退避，不令整个引擎进入网络故障冷却。恢复时逐个探测，旧在途成功不会解除较新冷却。
+
+等待不占单次 HTTP 超时，但用户取消与总 deadline 始终有效。重试复用 RequestID，纠正提示词后建立新的逻辑调用。RequestID 不是幂等性保证，上游副作用需上游支持去重。脚本一次 chat 只应发送一次模型请求，禁用底层自动重试/重定向，不自行循环；任意手写多请求循环无法自动获得逐请求的配额保证。
+
+网络恢复失败不会进入 Agent 的动作纠正提示；动作校验失败才会修改提示词。已执行的本地工具不会因模型请求重试而重放。
 
 网络调试与这些开关相互独立，见 [网络诊断说明](../NETWORK_DEBUG.md)。
 

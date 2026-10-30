@@ -125,7 +125,7 @@ func TestTransactionTextRetryCapturesUnboundContent(t *testing.T) {
 	require.Equal(t, 2, attempt)
 }
 
-func TestTransactionTransportRetryDoesNotReuseValidationCorrection(t *testing.T) {
+func TestTransactionTransportFailureDoesNotStartAnotherCorrection(t *testing.T) {
 	cfg := &retryPromptTestConfig{newTransactionTestConfig(context.Background())}
 	cfg.retryMax = 3
 	var attempt int
@@ -136,9 +136,6 @@ func TestTransactionTransportRetryDoesNotReuseValidationCorrection(t *testing.T)
 			require.Contains(t, req.GetPrompt(), "broken JSON")
 			return nil, transportErr
 		}
-		if attempt == 3 {
-			require.Equal(t, "original", req.GetPrompt())
-		}
 		resp := NewUnboundAIResponse()
 		resp.Close()
 		return resp, nil
@@ -148,8 +145,8 @@ func TestTransactionTransportRetryDoesNotReuseValidationCorrection(t *testing.T)
 		}
 		return nil
 	})
-	require.NoError(t, err)
-	require.Equal(t, 3, attempt)
+	require.ErrorIs(t, err, transportErr)
+	require.Equal(t, 2, attempt)
 }
 
 func TestTransactionFailureDiagnosticsKeepFinalProviderCalls(t *testing.T) {
@@ -221,8 +218,9 @@ func TestTransactionEmptyAsyncTransportErrorKeepsOriginalPrompt(t *testing.T) {
 		}
 		return nil
 	})
-	require.NoError(t, err)
-	require.Equal(t, 2, attempt)
+	require.ErrorContains(t, err, "connection reset before model output")
+	require.NotContains(t, err.Error(), "missing action")
+	require.Equal(t, 1, attempt)
 }
 
 func TestRetryCorrectionBoundsResponseAndPreservesErrorChain(t *testing.T) {

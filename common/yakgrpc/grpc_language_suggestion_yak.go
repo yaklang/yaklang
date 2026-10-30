@@ -1447,7 +1447,7 @@ func (s *Server) YaklangLanguageSuggestion(ctx context.Context, req *ypb.Yaklang
 	scriptType := req.GetYakScriptType()
 	ret := &ypb.YaklangLanguageSuggestionResponse{}
 	switch scriptType {
-	case "yak", "mitm", "port-scan", "codec", "context-menu":
+	case "yak", "ai-model", "mitm", "port-scan", "codec", "context-menu":
 		// do nothing
 	default:
 		// unsupported script type

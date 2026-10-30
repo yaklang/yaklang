@@ -1,6 +1,8 @@
 package ssa_option
 
 import (
+	"github.com/yaklang/yaklang/common/ai/aispec"
+	"github.com/yaklang/yaklang/common/ai/yakscript"
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/fp"
 	"github.com/yaklang/yaklang/common/schema"
@@ -11,6 +13,7 @@ import (
 )
 
 func init() {
+	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeAIModel, AIModelSSAOpt)
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeMitm, MitmGetTypeSSAOpt)
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypeCodec, CodecSSAOpt)
 	plugin_type.RegisterSSAOptCollector(plugin_type.PluginTypePortScan, ProtScanSSAOpt)
@@ -73,4 +76,15 @@ func ProtScanSSAOpt() []ssaconfig.Option {
 	}))
 	ret = append(ret, ssaapi.WithExternInfo("plugin-type:portscan"))
 	return ret
+}
+
+// AIModelSSAOpt describes the same entrypoint ABI used by the model executor.
+func AIModelSSAOpt() []ssaconfig.Option {
+	return []ssaconfig.Option{
+		ssaapi.WithDefineFunc(map[string]any{
+			"chat":        func(*yakscript.Request, func(string) error) any { return nil },
+			"shouldRetry": func(*yakscript.Request, *aispec.ModelCallFailure) *aispec.RetryDecision { return nil },
+		}),
+		ssaapi.WithExternInfo("plugin-type:ai-model"),
+	}
 }

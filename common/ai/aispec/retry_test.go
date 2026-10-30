@@ -11,6 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 	"github.com/yaklang/yaklang/common/consts"
+	"github.com/yaklang/yaklang/common/utils/lowhttp/httptrace"
 )
 
 type recoveryClient struct {
@@ -130,4 +131,78 @@ func TestGlobalRetryDelayHonorsServerDateAndCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 	require.ErrorIs(t, WaitModelRetry(ctx, time.Hour), context.Canceled)
+}
+
+func TestModelFailurePolicy(t *testing.T) {
+	for _, tc := range []struct {
+		f     *ModelCallFailure
+		retry bool
+	}{
+		{&ModelCallFailure{Kind: "http", StatusCode: 429, RetryAfter: "86400"}, true},
+		{&ModelCallFailure{Kind: "http", StatusCode: 429}, true},
+		{&ModelCallFailure{Kind: "http", StatusCode: 401, Decision: Retry("force", "")}, false},
+		{&ModelCallFailure{Kind: "script", Decision: Retry("force", "")}, false},
+		{&ModelCallFailure{Kind: "business"}, false},
+		{&ModelCallFailure{Kind: "business", Decision: Retry("busy", "")}, true},
+		{&ModelCallFailure{Kind: "protocol"}, true},
+		{&ModelCallFailure{Kind: "network", Cause: context.Canceled}, false},
+	} {
+		require.Equal(t, tc.retry, tc.f.CanRetry(), "%+v", tc.f)
+	}
+}
+
+func TestModelCallFiniteBudgetAndNestedAdmission(t *testing.T) {
+	globalRecovery(t, false)
+	calls, admitted, reports := 0, 0, 0
+	policy := ModelRetryOptions{MaxAttempts: 3, Wait: func(context.Context, time.Duration) error { return nil },
+		acquire: func(context.Context, func(string)) (ModelAttemptDone, error) {
+			admitted++
+			return func(bool, bool, time.Duration) time.Duration { reports++; return 0 }, nil
+		}}
+	_, err := RunModelCall(context.Background(), policy, func(ctx context.Context) (string, error) {
+		return RunModelCall(ctx, policy, func(context.Context) (string, error) { calls++; return "", io.ErrUnexpectedEOF })
+	})
+	require.Error(t, err)
+	var failure *ModelCallFailure
+	require.ErrorAs(t, err, &failure)
+	require.Equal(t, 3, calls)
+	require.Equal(t, calls, admitted)
+	require.Equal(t, calls, reports)
+}
+
+// The injected waiter is used by deterministic policy tests; they do not share
+// the process admission queue or perform real cooldown sleeps.
+func chatWithGlobalRetry(client AIClient, prompt string, wait func(context.Context, time.Duration) error) (string, error) {
+	return chatWithRecovery(client, prompt, ModelRetryOptions{Wait: wait, acquire: func(context.Context, func(string)) (ModelAttemptDone, error) { return nil, nil }})
+}
+
+// A routed fallback is another request, while wrappers around that request are not.
+func TestModelCallFallbackAdmissionAndTrace(t *testing.T) {
+	globalRecovery(t, false)
+	admissions, reports := 0, 0
+	var scopes []httptrace.Scope
+	policy := ModelRetryOptions{MaxAttempts: 2, Wait: func(context.Context, time.Duration) error { return nil }, acquire: func(context.Context, func(string)) (ModelAttemptDone, error) {
+		require.Equal(t, admissions, reports, "previous probe must finish before a fallback is admitted")
+		admissions++
+		return func(bool, bool, time.Duration) time.Duration { reports++; return 0 }, nil
+	}}
+	_, err := RunModelCall(context.Background(), policy, func(ctx context.Context) (string, error) {
+		for i := 0; i < 2; i++ {
+			_, _ = RunModelCall(ctx, policy, func(inner context.Context) (string, error) {
+				return RunModelCall(inner, policy, func(leaf context.Context) (string, error) {
+					scopes = append(scopes, httptrace.GetScope(leaf))
+					return "", errors.New("temporary")
+				})
+			})
+		}
+		return "", errors.New("temporary")
+	})
+	require.Error(t, err)
+	require.Equal(t, 4, admissions)
+	require.Equal(t, 4, reports)
+	require.NotEmpty(t, scopes[0].CallID)
+	for i, s := range scopes {
+		require.Equal(t, scopes[0].CallID, s.CallID)
+		require.Equal(t, 1+i/2, s.Attempt)
+	}
 }

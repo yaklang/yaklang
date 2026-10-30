@@ -14,7 +14,11 @@ func WithNetworkDebug(enabled bool) ConfigOption {
 func (c *Config) GetNetworkDebug() bool { return c.NetworkDebug }
 
 func modelNetworkDebugContext(ctx context.Context, cfg AICallerConfigIf, sequence int64) context.Context {
-	scope := httptrace.Scope{RuntimeID: cfg.GetRuntimeId(), CallID: uuid.NewString(), Sequence: sequence}
+	scope := httptrace.GetScope(ctx)
+	scope.RuntimeID, scope.Sequence = cfg.GetRuntimeId(), sequence
+	if scope.CallID == "" {
+		scope.CallID = uuid.NewString()
+	}
 	if session, ok := cfg.(interface{ GetPersistentSessionID() string }); ok {
 		scope.SessionID = session.GetPersistentSessionID()
 	}

@@ -113,7 +113,7 @@ func TestAINetworkDebugCallbackAndScriptRecovery(t *testing.T) {
 			cfg := aicommon.NewConfig(ctx, aicommon.WithPersistentSessionId(t.Name()), aicommon.WithDisableMemoryTriage(true))
 			base := []aispec.AIConfigOption{aispec.WithType(provider), aispec.WithModel("local-fixture"), aispec.WithEndpoint(server.URL), aispec.WithEnableEndpoint(true), aispec.WithBaseURL(server.URL), aispec.WithAPIKey("fixture-key"), aispec.WithDisableProviderFallback(true), aispec.WithTimeout(2)}
 			if provider == "yak-script" {
-				base = append(base, aispec.WithScript(strings.NewReplacer(`mode = "json"`, `mode = "sse"`, "https://model.example/v1/chat/completions", server.URL).Replace(yakscript.ExampleScript)))
+				base = append(base, aispec.WithScript(strings.NewReplacer(`mode = "json"`, `mode = "sse"`, "https://model.example/v1/chat/completions", server.URL, `failure.Code == "UPSTREAM_BUSY"`, `failure.Code == "UPSTREAM_ERROR"`).Replace(yakscript.ExampleScript)))
 			}
 			callback := aicommon.AIChatToAICallbackType(func(prompt string, opts ...aispec.AIConfigOption) (string, error) {
 				return ai.Chat(prompt, append(base, opts...)...)

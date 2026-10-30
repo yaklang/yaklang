@@ -7,8 +7,6 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
-
-	"github.com/yaklang/yaklang/common/consts"
 )
 
 func TestAIRetryBackoffSchedule(t *testing.T) {
@@ -31,37 +29,6 @@ func TestAIRetryBackoffSchedule(t *testing.T) {
 			require.Equal(t, tt.want, aiRetryBackoff(tt.retryNumber))
 		})
 	}
-}
-
-func TestCallAITransaction_502UsesExponentialBackoff(t *testing.T) {
-	cfg := newTransactionTestConfig(context.Background())
-	cfg.retryMax = 6
-
-	var waits []time.Duration
-	cfg.retryWait = func(_ context.Context, delay time.Duration) error {
-		waits = append(waits, delay)
-		return nil
-	}
-
-	callCount := 0
-	callAI := func(*AIRequest) (*AIResponse, error) {
-		callCount++
-		return make502Response(), fmt.Errorf("HTTP 502: bad gateway")
-	}
-
-	err := CallAITransaction(cfg, "test 502 backoff", callAI, func(*AIResponse) error {
-		t.Fatal("post handler must not run after an API error")
-		return nil
-	})
-	require.ErrorContains(t, err, "502")
-	require.Equal(t, 6, callCount)
-	require.Equal(t, []time.Duration{
-		2 * time.Second,
-		4 * time.Second,
-		8 * time.Second,
-		16 * time.Second,
-		32 * time.Second,
-	}, waits, "the final failed attempt must not add a useless sleep")
 }
 
 func TestCallAITransaction_PostHandlerErrorUsesExponentialBackoff(t *testing.T) {
@@ -93,34 +60,6 @@ func TestCallAITransaction_PostHandlerErrorUsesExponentialBackoff(t *testing.T) 
 	}, waits)
 }
 
-func TestCallAITransaction_429KeepsRetryAfterBackoff(t *testing.T) {
-	cfg := newTransactionTestConfig(context.Background())
-	cfg.retryMax = 1
-
-	var waits []time.Duration
-	cfg.retryWait = func(_ context.Context, delay time.Duration) error {
-		waits = append(waits, delay)
-		return nil
-	}
-
-	callCount := 0
-	err := CallAITransaction(cfg, "test 429 backoff", func(*AIRequest) (*AIResponse, error) {
-		callCount++
-		if callCount == 1 {
-			return make429Response("Retry-After: 10"), fmt.Errorf("HTTP 429: rate limited")
-		}
-		rsp := NewUnboundAIResponse()
-		rsp.Close()
-		return rsp, nil
-	}, func(*AIResponse) error { return nil })
-
-	require.NoError(t, err)
-	require.Equal(t, 2, callCount, "retryable 429 must not consume the transaction attempt")
-	require.Len(t, waits, 1)
-	require.GreaterOrEqual(t, waits[0], 10*time.Second)
-	require.LessOrEqual(t, waits[0], 12*time.Second)
-}
-
 func TestCallAITransaction_BackoffStopsOnContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cfg := newTransactionTestConfig(ctx)
@@ -132,42 +71,12 @@ func TestCallAITransaction_BackoffStopsOnContextCancellation(t *testing.T) {
 	start := time.Now()
 	err := CallAITransaction(cfg, "test canceled backoff", func(*AIRequest) (*AIResponse, error) {
 		callCount++
-		return make502Response(), fmt.Errorf("HTTP 502: bad gateway")
-	}, func(*AIResponse) error { return nil })
+		return make200Response(), nil
+	}, func(*AIResponse) error { return fmt.Errorf("invalid action") })
 
 	require.ErrorIs(t, err, context.Canceled)
 	require.Equal(t, 1, callCount, "cancellation during backoff must prevent the next request")
 	require.Less(t, time.Since(start), time.Second)
-}
-
-func TestAIRequestWrapper_502UsesExponentialBackoff(t *testing.T) {
-	cfg := newConfig(context.Background())
-	cfg.AiAutoRetry = 6
-
-	var waits []time.Duration
-	cfg.aiRetryWaitFunc = func(_ context.Context, delay time.Duration) error {
-		waits = append(waits, delay)
-		return nil
-	}
-
-	callCount := 0
-	callback := cfg.wrapper(func(AICallerConfigIf, *AIRequest) (*AIResponse, error) {
-		callCount++
-		return make502Response(), fmt.Errorf("HTTP 502: bad gateway")
-	}, consts.TierIntelligent)
-	request := NewAIRequest("test request backoff")
-	request.SetDetachCheckpoint(true)
-
-	_, err := callback(cfg, request)
-	require.ErrorContains(t, err, "502")
-	require.Equal(t, 6, callCount)
-	require.Equal(t, []time.Duration{
-		2 * time.Second,
-		4 * time.Second,
-		8 * time.Second,
-		16 * time.Second,
-		32 * time.Second,
-	}, waits)
 }
 
 func TestWaitBeforeAIRetryDefault_ContextCancellation(t *testing.T) {
@@ -212,5 +121,6 @@ func make502Response() *AIResponse {
 		[]byte("HTTP/1.1 502 Bad Gateway\r\nContent-Type: application/json\r\n\r\n"),
 		[]byte(`{"error":"bad gateway"}`),
 	)
+	rsp.Close()
 	return rsp
 }

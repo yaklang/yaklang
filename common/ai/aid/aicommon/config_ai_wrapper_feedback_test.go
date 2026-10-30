@@ -27,13 +27,14 @@ func TestRequestWrapperAuthenticationFailureIsTerminal(t *testing.T) {
 	require.Equal(t, 1, calls)
 }
 
-// Retryable 429s belong to the tier callback and must not exhaust the ordinary
-// retry count or a transaction-wide limit before the provider recovers.
+// All three model tiers use aispec recovery; Agent validation sees only success.
 func TestTierCallbacks429RecoverAfterRepeatedCooldowns(t *testing.T) {
+	old := consts.GetTieredAIConfig()
+	consts.SetTieredAIConfig(&consts.TieredAIConfig{RetryForever: true})
+	t.Cleanup(func() { consts.SetTieredAIConfig(old) })
 	for _, tier := range []consts.ModelTier{consts.TierIntelligent, consts.TierLightweight, consts.TierVision} {
 		for _, detached := range []bool{false, true} {
 			t.Run(fmt.Sprintf("%s/detached=%t", tier, detached), func(t *testing.T) {
-				t.Parallel()
 				ctx, cancel := context.WithTimeout(context.Background(), 45*time.Second)
 				defer cancel()
 				cfg := NewTestConfig(ctx)
@@ -47,7 +48,7 @@ func TestTierCallbacks429RecoverAfterRepeatedCooldowns(t *testing.T) {
 				cb := func(_ AICallerConfigIf, req *AIRequest) (*AIResponse, error) {
 					calls++
 					require.Equal(t, string(tier), req.GetModelTier())
-					if calls <= 9 {
+					if calls == 1 {
 						rsp := make429Response("Retry-After: 1")
 						rsp.Close()
 						return rsp, nil
@@ -76,9 +77,9 @@ func TestTierCallbacks429RecoverAfterRepeatedCooldowns(t *testing.T) {
 					return callAI(req)
 				}, func(*AIResponse) error { parsed++; return nil })
 				require.NoError(t, err)
-				require.Equal(t, 10, calls)
+				require.Equal(t, 2, calls)
 				require.Equal(t, 1, parsed)
-				require.Len(t, cooldowns, 9)
+				require.Len(t, cooldowns, 1)
 				for _, delay := range cooldowns {
 					require.GreaterOrEqual(t, delay, time.Second)
 					require.LessOrEqual(t, delay, 4*time.Second)

@@ -154,76 +154,29 @@ func (t *transactionTestConfig) ActiveVerificationTodoItemsByScope(VerificationT
 
 // --- tests ---
 
-func TestCallAITransaction_429DoesNotCountRetry(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	cfg := newTransactionTestConfig(ctx)
-	cfg.retryMax = 3
-	var totalWait time.Duration
-	cfg.retryWait = func(_ context.Context, delay time.Duration) error {
-		totalWait += delay
-		return nil
+// Transport errors have already exhausted the request executor's policy.
+// Agent validation must neither replay them nor parse their HTTP error bodies.
+func TestCallAITransaction_RequestFailureIsNotRetried(t *testing.T) {
+	for _, status := range []int{401, 429, 502} {
+		t.Run(fmt.Sprint(status), func(t *testing.T) {
+			cfg := newTransactionTestConfig(context.Background())
+			cfg.retryMax = 9
+			cfg.retryWait = func(context.Context, time.Duration) error {
+				t.Fatal("Agent must not wait for transport replay")
+				return nil
+			}
+			calls := 0
+			err := CallAITransaction(cfg, "test", func(*AIRequest) (*AIResponse, error) {
+				calls++
+				rsp := NewAIResponse(nil)
+				rsp.SetRawHTTPResponseData([]byte(fmt.Sprintf("HTTP/1.1 %d failure\r\n\r\n", status)), []byte(`{"error":"provider failure"}`))
+				rsp.Close()
+				return rsp, nil
+			}, func(*AIResponse) error { t.Fatal("HTTP failure is not model output"); return nil })
+			require.ErrorContains(t, err, "provider failure")
+			require.Equal(t, 1, calls)
+		})
 	}
-
-	var callCount int64
-	const num429Responses = 9
-
-	callAi := func(req *AIRequest) (*AIResponse, error) {
-		n := atomic.AddInt64(&callCount, 1)
-		if n <= num429Responses {
-			// Retryable 429: must have Retry-After header so the transaction
-			// layer classifies it as rate-limit (retryable) rather than
-			// quota-exceeded (not retryable).
-			rsp := make429Response("Retry-After: 60")
-			return rsp, utils.Errorf("429 rate limited")
-		}
-		rsp := NewUnboundAIResponse()
-		rsp.Close()
-		return rsp, nil
-	}
-
-	postHandler := func(rsp *AIResponse) error {
-		return nil
-	}
-
-	err := CallAITransaction(cfg, "test prompt", callAi, postHandler)
-	require.NoError(t, err, "transaction should succeed after 429 retries")
-	require.EqualValues(t, num429Responses+1, callCount)
-	require.Greater(t, totalWait, 2*time.Minute, "valid cooldowns must not exhaust a cumulative wait budget")
-
-	totalCalls := atomic.LoadInt64(&callCount)
-	assert.Greater(t, totalCalls, cfg.retryMax,
-		"total calls (%d) should exceed retry limit (%d) because 429s are not counted",
-		totalCalls, cfg.retryMax)
-}
-
-func TestCallAITransaction_429ContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	cfg := newTransactionTestConfig(ctx)
-
-	var callCount int64
-	callAi := func(req *AIRequest) (*AIResponse, error) {
-		n := atomic.AddInt64(&callCount, 1)
-		if n >= 3 {
-			cancel()
-		}
-		// Retryable 429 with Retry-After so it doesn't consume retry count
-		rsp := make429Response("Retry-After: 1")
-		return rsp, utils.Errorf("429 rate limited")
-	}
-
-	postHandler := func(rsp *AIResponse) error {
-		return nil
-	}
-
-	start := time.Now()
-	err := CallAITransaction(cfg, "test prompt", callAi, postHandler)
-	elapsed := time.Since(start)
-
-	require.Error(t, err)
-	assert.Less(t, elapsed, 30*time.Second, "should exit promptly after context cancellation")
-	t.Logf("exited after %v with %d calls", elapsed, atomic.LoadInt64(&callCount))
 }
 
 func TestCallAITransaction_RequestContextCancelDoesNotRetryOrEmitError(t *testing.T) {
@@ -329,32 +282,6 @@ func TestCallAITransaction_PostHandlerCancellationDoesNotRetryOrEmitError(t *tes
 	}
 }
 
-func TestCallAITransaction_Non429ErrorCountsRetry(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	cfg := newTransactionTestConfig(ctx)
-	cfg.retryMax = 3
-
-	var callCount int64
-	callAi := func(req *AIRequest) (*AIResponse, error) {
-		atomic.AddInt64(&callCount, 1)
-		rsp := make200Response()
-		return rsp, utils.Errorf("some non-429 error")
-	}
-
-	postHandler := func(rsp *AIResponse) error {
-		return nil
-	}
-
-	err := CallAITransaction(cfg, "test prompt", callAi, postHandler)
-	require.Error(t, err)
-
-	totalCalls := atomic.LoadInt64(&callCount)
-	assert.Equal(t, cfg.retryMax, totalCalls,
-		"non-429 errors should be counted, total calls should equal retry limit")
-}
-
 func TestCallAITransaction_PostHandlerErrorEmitsBoundAIInfo(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -396,18 +323,4 @@ func TestCallAITransaction_PostHandlerErrorEmitsBoundAIInfo(t *testing.T) {
 		assert.NotEmpty(t, event.AIModelVerboseName)
 	}
 	require.True(t, found, "expected postHandler error event to be emitted")
-}
-
-func TestIs429Response_Nil(t *testing.T) {
-	assert.False(t, waitForHeadersAndCheck429(context.Background(), nil))
-}
-
-func TestIs429Response_Non429(t *testing.T) {
-	rsp := make200Response()
-	assert.False(t, waitForHeadersAndCheck429(context.Background(), rsp))
-}
-
-func TestIs429Response_429(t *testing.T) {
-	rsp := make429Response()
-	assert.True(t, waitForHeadersAndCheck429(context.Background(), rsp))
 }
