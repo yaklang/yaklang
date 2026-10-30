@@ -108,3 +108,8 @@ CLAUDE.md
 /common/syntaxflow/sfdb/rule_versions.tar.gz
 /common/ai/aid/aireact/skills.tar.gz
 /common/ai/aid/aicommon/promptloader/prompts.tar.gz
+
+# Enterprise traffic fixtures live in the hash-pinned corpus ZIP. Expanded
+# local copies remain available but are intentionally ignored by Git.
+/testdata/enterprise-traffic-analysis/*/
+!/testdata/enterprise-traffic-analysis/public-corpus-index/

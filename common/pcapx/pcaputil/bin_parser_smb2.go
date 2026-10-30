@@ -41,6 +41,7 @@ type smb2Pending struct {
 	key          smb2PendingKey
 	name         string
 	path         string
+	target       string
 	fileID       string
 	related      bool
 	direction    int
@@ -157,7 +158,7 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	}
 	var pathBytes int64
 	for _, pending := range s.pending {
-		pathBytes += int64(len(pending.path))
+		pathBytes += int64(len(pending.path) + len(pending.target))
 	}
 	for _, path := range s.files {
 		pathBytes += int64(len(path))
@@ -280,6 +281,7 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		}
 		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0}
 		pending.path, _ = c["File Name"].(string)
+		pending.target, _ = c["Path"].(string)
 		pending.related, _ = c["Related File ID Placeholder"].(bool)
 		clonePath := false
 		if fileID, ok := c["FileId"].(string); ok && fileID != "" {
@@ -297,7 +299,7 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 				}
 			}
 		}
-		if err := s.reserveState(int64(len(pending.path))); err != nil {
+		if err := s.reserveState(int64(len(pending.path) + len(pending.target))); err != nil {
 			return err
 		}
 		if clonePath {
@@ -331,6 +333,12 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 			c["File Context"] = pending.path
 			c["File Context Status"] = "observed-open"
 		}
+	}
+	if pending.target != "" {
+		c["Request Path"] = pending.target
+	}
+	if pending.path != "" {
+		c["Request File Name"] = pending.path
 	}
 	status, _ := c["Status"].(uint32)
 	if status == 0x00000103 { // STATUS_PENDING: preserve until the async final response.

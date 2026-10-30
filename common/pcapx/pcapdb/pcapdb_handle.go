@@ -138,6 +138,13 @@ func (h *DatabaseHandle) Metadata() (*PCAPFileDBMetadata, error) {
 	}
 	return h.database.manager.MetadataContext(h.ctx, h.ID)
 }
+func (h *DatabaseHandle) CaptureOverview(options ...QueryOption) (*CaptureOverview, error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return nil, err
+	}
+	return h.database.CaptureOverview(bound...)
+}
 func (h *DatabaseHandle) Export(output string) (string, error) {
 	if err := h.check(); err != nil {
 		return "", err
@@ -230,6 +237,22 @@ func (h *DatabaseHandle) QueryPacketsPage(options ...QueryOption) (*ResultPage[P
 	return h.database.QueryPacketsPage(bound...)
 }
 
+func (h *DatabaseHandle) QueryMACSummariesPage(options ...QueryOption) (*ResultPage[MACSummary], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[MACSummary](h, options, "mac_index", err)
+	}
+	return h.database.QueryMACSummariesPage(bound...)
+}
+
+func (h *DatabaseHandle) QueryEndpointBindingsPage(options ...QueryOption) (*ResultPage[EndpointBindingSummary], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[EndpointBindingSummary](h, options, "binding_index", err)
+	}
+	return h.database.QueryEndpointBindingsPage(bound...)
+}
+
 func (h *DatabaseHandle) QueryProtocolsPage(options ...QueryOption) (*ResultPage[ProtocolSummary], error) {
 	bound, err := h.options(options)
 	if err != nil {
@@ -284,6 +307,16 @@ func (h *DatabaseHandle) ProtocolDetailsPage(id uint, options ...QueryOption) (*
 		return failedHandlePage[ProtocolDetail](h, options, "record_id", err)
 	}
 	return h.database.ProtocolDetailsPage(id, bound...)
+}
+
+// HTTPBodyProfilePage returns non-reversible HTTP body statistics and hashes. It
+// never returns the body bytes themselves.
+func (h *DatabaseHandle) HTTPBodyProfilePage(id uint, options ...QueryOption) (*ResultPage[HTTPBodyProfile], error) {
+	bound, err := h.options(options)
+	if err != nil {
+		return failedHandlePage[HTTPBodyProfile](h, options, "record_id", err)
+	}
+	return h.database.HTTPBodyProfilePage(id, bound...)
 }
 
 func (h *DatabaseHandle) DiscoverProtocolFields(options ...QueryOption) (*ResultPage[ProtocolField], error) {

@@ -10,6 +10,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -621,6 +622,19 @@ func timestampNano(timestamp time.Time) *int64 {
 func packetMetadata(raw []byte, link layers.LinkType) Packet {
 	result := Packet{}
 	packet := gopacket.NewPacket(raw, link, gopacket.DecodeOptions{Lazy: true, NoCopy: true})
+	// Store the outer Ethernet observation. Destination MAC is still retained
+	// for packet evidence, but endpoint summaries use only source MAC/IP pairs.
+	if ethernet, ok := packet.Layer(layers.LayerTypeEthernet).(*layers.Ethernet); ok {
+		result.SourceMAC = ethernet.SrcMAC.String()
+		result.DestinationMAC = ethernet.DstMAC.String()
+	}
+	var vlans []string
+	for _, layer := range packet.Layers() {
+		if vlan, ok := layer.(*layers.Dot1Q); ok {
+			vlans = append(vlans, strconv.Itoa(int(vlan.VLANIdentifier)))
+		}
+	}
+	result.VLANStack = strings.Join(vlans, ",")
 	if network := packet.NetworkLayer(); network != nil {
 		result.SourceIP, result.DestinationIP = network.NetworkFlow().Src().String(), network.NetworkFlow().Dst().String()
 	}

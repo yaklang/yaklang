@@ -209,10 +209,13 @@ func TestProtocolSessionSMB2NegotiateCreateIO(t *testing.T) {
 	r = s.Feed(0, ts, smb2TreeConnect(3, 0x11, `\\srv\share`))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, `\\srv\share`, r.Events[0].Session["Path"])
+	require.Equal(t, `SMB2 TREE_CONNECT \\srv\share status=0x00000000 mid 3`, r.Events[0].Summary)
 	r = s.Feed(1, ts, smb2TreeConnectResp(3, 0x11, 1))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "TREE_CONNECT", r.Events[0].Session["Matched Request"])
+	require.Equal(t, `\\srv\share`, r.Events[0].Session["Request Path"])
 	require.Equal(t, uint32(1), r.Events[0].Session["Tree ID"])
+	require.Equal(t, `SMB2 TREE_CONNECT \\srv\share status=0x00000000 mid 3`, r.Events[0].Summary)
 
 	fid := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}
 	r = s.Feed(0, ts, smb2Create(4, 0x11, 1, "file.txt"))
@@ -222,13 +225,18 @@ func TestProtocolSessionSMB2NegotiateCreateIO(t *testing.T) {
 	r = s.Feed(1, ts, smb2CreateResp(4, 0x11, 1, fid))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, hex.EncodeToString(fid), r.Events[0].Session["FileId"])
+	require.Equal(t, "file.txt", r.Events[0].Session["Request File Name"])
 
 	r = s.Feed(0, ts, smb2Read(5, 0x11, 1, fid, 8))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "READ", r.Events[0].Session["Packet Name"])
+	require.Equal(t, "SMB2 READ file.txt len=8 status=0x00000000 mid 5", r.Events[0].Summary)
 	r = s.Feed(1, ts, smb2ReadResp(5, 0x11, 1, []byte("abcdefgh")))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "READ", r.Events[0].Session["Matched Request"])
+	require.Equal(t, "file.txt", r.Events[0].Session["File Context"])
+	require.Equal(t, "SMB2 READ file.txt status=0x00000000 mid 5", r.Events[0].Summary)
+	require.NotContains(t, r.Events[0].Summary, "abcdefgh")
 
 	r = s.Feed(0, ts, smb2Write(6, 0x11, 1, fid, []byte("abcdefgh")))
 	require.Nil(t, r.Err, "%v", r.Err)

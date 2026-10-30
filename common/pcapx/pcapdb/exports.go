@@ -317,6 +317,7 @@ var Exports = map[string]any{
 	"transport":                  QueryTransport,
 	"protocol":                   QueryProtocol,
 	"sourceIP":                   QuerySourceIP,
+	"sourceMAC":                  QuerySourceMAC,
 	"destinationIP":              QueryDestinationIP,
 	"sourcePort":                 QuerySourcePort,
 	"destinationPort":            QueryDestinationPort,
