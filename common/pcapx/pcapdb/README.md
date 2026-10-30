@@ -133,7 +133,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | `db.ReadProtocolPage(messageID, options...)` | 协议消息 BLOB 的受限预览 |
 | `db.ReadStreamPage(streamID, options...)` | 逐块受限预览，以 chunk ID 翻页 |
 | `db.ProtocolDetailsPage(messageID, options...)` | 完整 Fields 与 Session JSON 树，超过预算报错 |
-| `db.BodySummaryPage(messageID, options...)` | HTTP/1 消息的非可逆正文摘要：长度、完整性、编码/压缩/二进制特征、敏感类别及消息/wire body/decoded body SHA256；不返回正文 |
+| `db.HTTPBodyProfilePage(messageID, options...)` | HTTP/1 消息的非可逆正文画像：长度、完整性、编码/压缩/二进制特征、敏感类别及消息/wire body/decoded body SHA256；不返回正文 |
 | `db.DiscoverProtocolFields(options...)` | 字段路径/类型的受限采样，不返回字段值 |
 | `db.ProtocolFieldIndexes(options...)` | 已有路径索引定义；条目数受库级上限约束 |
 | `db.EnsureProtocolFieldIndexes(paths...)` | 给当前库按需建索引，与库级版本同义 |
@@ -192,7 +192,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 
 协议摘要还包含 `TransactionID` 和 `ResponseTo`。对 HTTP 等已建立请求响应关联的协议，响应记录的 `ResponseTo` 是请求消息 ID，可直接用于配对；不要根据相邻行、时间接近或 TCP 流顺序猜测配对。
 
-`BodySummaryPage` 用于需要完整正文统计但不能回显正文的场景。单条存储消息上限 16 MiB。`MessageSHA256` 覆盖完整 HTTP/1 消息；`WireBodySHA256` 覆盖去除 HTTP transfer framing（如 chunked）后的 body；`DecodedBodySHA256` 覆盖按 `Content-Encoding` 解压后的 body。只有相应完整性成立时才返回哈希。`SensitiveIndicators` 是字段/值模式的候选标记，不等同于已确认敏感数据泄漏。
+`HTTPBodyProfilePage` 用于需要完整正文统计但不能回显正文的场景。单条存储消息上限 16 MiB。`MessageSHA256` 覆盖完整 HTTP/1 消息；`WireBodySHA256` 覆盖去除 HTTP transfer framing（如 chunked）后的 body；`DecodedBodySHA256` 覆盖按 `Content-Encoding` 解压后的 body。只有相应完整性成立时才返回哈希。`SensitiveIndicators` 是字段/值模式的候选标记，不等同于已确认敏感数据泄漏。
 
 各选项不是通用 SQL 语言。以下矩阵列出工具可以承诺的筛选语义；对于没有支持的组合，工具应拒绝输入或先做关联查询，不能静默丢弃。
 

@@ -309,14 +309,14 @@ func (h *DatabaseHandle) ProtocolDetailsPage(id uint, options ...QueryOption) (*
 	return h.database.ProtocolDetailsPage(id, bound...)
 }
 
-// BodySummaryPage returns non-reversible HTTP body statistics and hashes. It
+// HTTPBodyProfilePage returns non-reversible HTTP body statistics and hashes. It
 // never returns the body bytes themselves.
-func (h *DatabaseHandle) BodySummaryPage(id uint, options ...QueryOption) (*ResultPage[ProtocolBodySummary], error) {
+func (h *DatabaseHandle) HTTPBodyProfilePage(id uint, options ...QueryOption) (*ResultPage[HTTPBodyProfile], error) {
 	bound, err := h.options(options)
 	if err != nil {
-		return failedHandlePage[ProtocolBodySummary](h, options, "record_id", err)
+		return failedHandlePage[HTTPBodyProfile](h, options, "record_id", err)
 	}
-	return h.database.BodySummaryPage(id, bound...)
+	return h.database.HTTPBodyProfilePage(id, bound...)
 }
 
 func (h *DatabaseHandle) DiscoverProtocolFields(options ...QueryOption) (*ResultPage[ProtocolField], error) {

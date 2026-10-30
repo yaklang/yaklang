@@ -10,7 +10,7 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-func TestProtocolBodySummaryCompressedSensitiveBody(t *testing.T) {
+func TestHTTPBodyProfileCompressedSensitiveBody(t *testing.T) {
 	var compressed bytes.Buffer
 	writer := gzip.NewWriter(&compressed)
 	_, err := writer.Write([]byte(`{"username":"alice","access_token":"redacted-for-test"}`))
@@ -18,7 +18,7 @@ func TestProtocolBodySummaryCompressedSensitiveBody(t *testing.T) {
 	require.NoError(t, writer.Close())
 	raw := []byte(fmt.Sprintf("POST /upload HTTP/1.1\r\nHost: body.example\r\nContent-Type: application/json\r\nContent-Encoding: gzip\r\nContent-Length: %d\r\n\r\n", compressed.Len()))
 	raw = append(raw, compressed.Bytes()...)
-	summary, err := summarizeHTTPBody(PCAPProtocolMessage{Model: gormModel(1), Protocol: "http", Status: "decoded", Data: raw, DataLength: len(raw)}, "")
+	summary, err := profileHTTPBody(PCAPProtocolMessage{Model: gormModel(1), Protocol: "http", Status: "decoded", Data: raw, DataLength: len(raw)}, "")
 	require.NoError(t, err)
 	require.Equal(t, "POST", summary.Method)
 	require.True(t, summary.Compressed)
@@ -32,11 +32,11 @@ func TestProtocolBodySummaryCompressedSensitiveBody(t *testing.T) {
 	require.Contains(t, summary.SensitiveIndicators, "sensitive-body-field")
 }
 
-func TestProtocolBodySummaryBinaryBody(t *testing.T) {
+func TestHTTPBodyProfileBinaryBody(t *testing.T) {
 	body := []byte{0x00, 0x01, 0x02, 0x03, 0xff, 0xfe, 0x7f}
 	raw := []byte(fmt.Sprintf("POST /binary HTTP/1.1\r\nHost: body.example\r\nContent-Type: application/octet-stream\r\nContent-Length: %d\r\n\r\n", len(body)))
 	raw = append(raw, body...)
-	summary, err := summarizeHTTPBody(PCAPProtocolMessage{Model: gormModel(2), Protocol: "http", Status: "decoded", Data: raw, DataLength: len(raw)}, "")
+	summary, err := profileHTTPBody(PCAPProtocolMessage{Model: gormModel(2), Protocol: "http", Status: "decoded", Data: raw, DataLength: len(raw)}, "")
 	require.NoError(t, err)
 	require.True(t, summary.Binary)
 	require.False(t, summary.TextLike)
@@ -45,9 +45,9 @@ func TestProtocolBodySummaryBinaryBody(t *testing.T) {
 	require.True(t, summary.TransferComplete)
 }
 
-func TestProtocolBodySummaryTruncatedBodyHasNoHash(t *testing.T) {
+func TestHTTPBodyProfileTruncatedBodyHasNoHash(t *testing.T) {
 	raw := []byte("POST /truncated HTTP/1.1\r\nHost: body.example\r\nContent-Length: 100\r\n\r\nshort")
-	summary, err := summarizeHTTPBody(PCAPProtocolMessage{Model: gormModel(3), Protocol: "http", Status: "incomplete", Data: raw, DataLength: len(raw)}, "")
+	summary, err := profileHTTPBody(PCAPProtocolMessage{Model: gormModel(3), Protocol: "http", Status: "incomplete", Data: raw, DataLength: len(raw)}, "")
 	require.NoError(t, err)
 	require.False(t, summary.TransferComplete)
 	require.False(t, summary.DecodedComplete)
