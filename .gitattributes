@@ -10,6 +10,8 @@ common/minirehs/native/**/*.c text eol=lf
 common/minirehs/native/**/*.h text eol=lf
 common/minirehs/native/**/*.inc text eol=lf
 common/bin-parser/testdata/corpus-batches/*.zip binary
+internal/trafficfixture/testdata/*.zip binary
+internal/trafficfixture/testdata/*.json -text
 # Existing native certificate/key fixtures retain their exact wire bytes.
 common/bin-parser/testdata/protocol-native/** -text
 common/pcapx/pcaputil/testdata/protocol-sessions/**/*.keys -text
