@@ -1,4 +1,0 @@
-*.py -text whitespace=cr-at-eol
-*.json -text whitespace=cr-at-eol
-*.md text eol=lf
-rsvp_intserv_API48.py -text whitespace=-blank-at-eol,cr-at-eol

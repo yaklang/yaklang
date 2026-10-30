@@ -76,8 +76,8 @@ assertion to the selected detail pane. No budget was raised to hide eviction.
 
 ## Provenance and remaining work
 
-The [source-only archive](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/natt-source/README.md)
-contains 38 exact historical Python/Go sources and their original registration
+The [frozen live audit archive](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)
+retains `live-audit/natt-source/`, containing 38 exact historical Python/Go sources and their original registration
 hashes. Their hard-coded paths and source-specific plans retain their original
 scope; running an adapter is a new execution, not a replacement certificate.
 The earlier priority, scope-gate, fixture, EOF-controller and auditor failures

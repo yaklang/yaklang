@@ -164,7 +164,10 @@ NEW_CONNECTION_ID、无 keylog 的短头，不能仅凭原端点就确认新的 
 
 ## 本机重现与验证
 
-审计工具位于 `common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/`：
+历史审计工具已冻结到
+[`live-audit.zip`](../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)，
+按 [解压说明](../../common/yak/cmd/yakcmds/shark-cli/README.md) 恢复后位于
+`common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/`：
 `public_corpus.py` 做完整逐帧差分，`tls_record_audit.py` 做独立完整记录对照，
 `rdpudp_tls_oracle.py` 做独立有明确标记的派生载荷对照，
 `summarize_public_corpus.py` 仅导出白名单汇总。输入和输出目录若在 Git checkout 内，

@@ -109,5 +109,6 @@ cd7af的[Essential](https://github.com/yaklang/yaklang/actions/runs/40886652682)
 其他TOP30高级协议、GTP及更多SSH/QUIC边界仍开放。
 
 原包、keylog、完整case/plan/预期/导出/账本/PDML、日志、程序和图片均未入Git。
-仅归档43份实际源码及摘要，见[源码清单](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ospfv2-control42/source-manifest.json)
+仅归档43份实际源码及摘要，见[冻结归档](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)
+内的 `live-audit/ospfv2-control42/source-manifest.json`
 及[证据索引](ospfv2-cd7af-summary.json)。

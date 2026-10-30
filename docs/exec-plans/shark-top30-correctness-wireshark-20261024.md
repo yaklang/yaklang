@@ -577,7 +577,9 @@ go run ./internal/trafficfixture/cmd/corpus export C:\tmp\new-shark-audit-corpus
 
 ## 11. 新鲜实抓、逐包差分与故障修复
 
-本节记录用户要求继续实抓后的结果。新增可重跑工具位于
+本节记录用户要求继续实抓后的结果。历史可重跑工具已冻结到
+[`live-audit.zip`](../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)，
+按 [解压说明](../../common/yak/cmd/yakcmds/shark-cli/README.md) 恢复后位于
 `common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/`。每次启动真实 socket
 服务，生成新的证书、端口、密钥、nonce、CID 和会话；Npcap 仅抓取这些测试
 端口。不是从固定协议样本制造“成功”结果。输出保存在仓库外

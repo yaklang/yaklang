@@ -56,6 +56,6 @@ Source0 完整物理字节与 Source1 完整 RSVP PDU 核对；选中 TIME 的 P
 生产源码55b的四项CI全绿：流量测试40927625316、Essential40927636718、Diff40927636795、路径碰撞40927636648。草稿自动跳过的traffic不计通过。前一4d提交曾有SSA引用重复及AI工具WaitGroup计数失败，原日志保留，未改这些源码；失败项重跑后通过。后续归档提交的检查另行跟踪，不借代码提交的结果冒称新HEAD已通过。
 
 [聚合证据](rsvp-55b-summary.json)记录来源、范围、自测、执行与CI的外部proof哈希。
-[源码归档](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-control47/README.md)
-保留47个纯源文件及其逐文件哈希，含旧检查器与来源政策勘误；不含完整逐包事实、期望、编号账本或运行输出。
+[冻结归档](../../../common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip)
+内的 `live-audit/rsvp-control47/` 保留47个纯源文件及其逐文件哈希，含旧检查器与来源政策勘误；不含完整逐包事实、期望、编号账本或运行输出。
 初版native整对象检查器错误地将已字面相同的fresh-QUIC文件送入仅适用两公共包的ID语义mapper，失败原件保留；02仅在完整export SHA与行数均相同且producer绑定完成时跳过映射，未知transaction的任意变化仍拒绝，未扩大其含义猜测。

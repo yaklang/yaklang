@@ -244,8 +244,25 @@ After an observed TCP reset, packets without a new handshake cannot inherit the
 closed connection's identity. An apparent HTTP/2 window violation caused by
 missing peer TCP control bytes is marked unverifiable instead of malformed.
 
-For reproducible fresh socket captures, per-packet Wireshark comparisons and
-fault injection, see [the live audit harness](testdata/live-audit/README.md).
+The historical live audit harness is frozen in
+[`testdata/live-audit.zip`](testdata/live-audit.zip). It contains all 802 original
+files (including 720 Python scripts) from commit
+`39729081a3300381154d96cf1b4866f23976260b`, preserving their repository-relative
+paths, file bytes, permissions, manifests and usage instructions. The ZIP SHA256 is
+`6d750f35a64e052a20d873ce0521284d01974abcf01957b60175673488c3bec4`.
+Normal builds and Go tests do not require extraction.
+
+To rerun the historical socket captures, Wireshark comparisons or fault controls,
+extract explicitly from the repository root:
+
+```sh
+python3 -m zipfile -e common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip .
+```
+
+Then follow `testdata/live-audit/README.md` relative to this directory. The
+restored directory is ignored by Git; keep new captures, keys and generated audit
+output outside the repository as described in the archived instructions.
+
 IP fragmentation itself is not defragmented.
 
 Protocol sessions advance in the capture pipeline before the display queue.
