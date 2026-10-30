@@ -380,7 +380,10 @@ func smbDetailFieldLess(a, b string, ranges map[string][]int) bool {
 		if len(ranges[key]) == 2 {
 			return 10
 		}
-		return 100
+		// Authentication and Mechanism are semantic maps inside the SMB
+		// body, not wire headers. Retain the shared presentation contract:
+		// identity/assertion meaning precedes decoded bytes and raw trees.
+		return 100 + fieldPriority(key)
 	}
 	left, right := priority(a), priority(b)
 	if left != right {
