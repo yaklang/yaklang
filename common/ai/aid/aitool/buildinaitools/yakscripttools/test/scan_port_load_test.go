@@ -108,13 +108,15 @@ func TestMUSTPASS_ScanPortTool_ActivatesTunSafeMode(t *testing.T) {
 	calls := 0
 	exports["Scan"] = func(hosts, ports string, opts ...fp.ConfigOption) (chan *fp.MatchResult, error) {
 		calls++
+		config := fp.NewConfig(opts...)
+		assert.Assert(t, !config.ActiveMode, "TUN-safe scanning must actually disable active probes")
 		assert.Equal(t, hosts, "198.18.215.229")
 		assert.Equal(t, ports, "22,80,443,445,3306,3389,5432,6379,8000,8080,8443,9000")
 		results := make(chan *fp.MatchResult)
 		close(results)
 		return results, nil
 	}
-	_, combined := executeFixtureScript(t, "yakscriptforai/pentest/scan_port.yak", aitool.InvokeParams{"hosts": "198.18.215.229", "ports": "1-65535", "mode": "auto"}, map[string]any{"servicescan": exports})
+	_, combined := executeFixtureScript(t, "yakscriptforai/pentest/scan_port.yak", aitool.InvokeParams{"hosts": "198.18.215.229", "ports": "1-65535", "mode": "auto", "active": true}, map[string]any{"servicescan": exports})
 	assert.Equal(t, calls, 1, "planning must start exactly one compact TCP scan")
 
 	assert.Assert(t, strings.Contains(combined, "[SCAN_TUN_SAFE_MODE]"),
