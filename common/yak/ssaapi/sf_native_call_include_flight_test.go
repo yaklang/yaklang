@@ -48,86 +48,107 @@ alert $output;
 	return program, ctx
 }
 
-// TestIncludeFlightConcurrencySharesOneComputation asserts the flight-map
-// semantics the fix builds on: N concurrent acquirers of one key get exactly
-// one loader, every waiter receives the loader's result after release, and
-// the map entry is cleaned up so a later acquire can load again.
-func TestIncludeFlightConcurrencySharesOneComputation(t *testing.T) {
-	const key = "flight-unit-test"
-	const waiters = 8
+// TestIncludeFlightConcurrentMissComputesOnce asserts that concurrent callers
+// of one flight key share a single computation and that the result is cached.
+func TestIncludeFlightConcurrentMissComputesOnce(t *testing.T) {
+	const key = "flight-share-test"
+	GetSFIncludeCache().Purge()
+	t.Cleanup(func() { GetSFIncludeCache().Purge() })
 
-	loaderEntry, isLoader := acquireIncludeFlight(key, context.Background())
-	if !isLoader {
-		t.Fatal("first acquire was not the loader")
-	}
-	if _, ok := includeFlights.Load(key); !ok {
-		t.Fatal("flight entry not registered")
+	loaderStarted := make(chan struct{})
+	releaseLoader := make(chan struct{})
+	var computations int64
+	compute := func() (Values, error) {
+		if atomic.AddInt64(&computations, 1) == 1 {
+			close(loaderStarted)
+		}
+		<-releaseLoader
+		return Values{}, nil
 	}
 
+	const callers = 8
 	var wg sync.WaitGroup
-	// acquired gates each acquirer past its acquireIncludeFlight call, so the
-	// release below cannot race a waiter that has not acquired yet.
-	acquired := make(chan struct{}, waiters)
-	var loaderSeen int64
-	for i := 0; i < waiters; i++ {
+	started := make(chan struct{}, callers)
+	for i := 0; i < callers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			entry, isLoader := acquireIncludeFlight(key, context.Background())
-			acquired <- struct{}{}
-			if isLoader {
-				// While the original entry is in flight no other acquirer may
-				// become loader; asserted after the wait below.
-				atomic.AddInt64(&loaderSeen, 1)
-				releaseIncludeFlight(key, entry, nil, nil)
-				return
-			}
-			<-entry.done
-			if entry.err != nil {
-				t.Errorf("waiter got error: %v", entry.err)
+			started <- struct{}{}
+			if _, err := includeFlightValues(context.Background(), key, "flight-lib", compute); err != nil {
+				t.Errorf("include flight: %v", err)
 			}
 		}()
 	}
-	// Deterministic barrier: every acquirer has registered before the release,
-	// so none can slip in as a new loader after it.
-	for i := 0; i < waiters; i++ {
-		<-acquired
+	for i := 0; i < callers; i++ {
+		<-started
 	}
-	releaseIncludeFlight(key, loaderEntry, Values{}, nil)
+	// The key is registered before the loader goroutine starts, so once it has
+	// begun every later caller joins it. Give the remaining callers time to
+	// park before releasing the loader.
+	<-loaderStarted
+	time.Sleep(100 * time.Millisecond)
+	close(releaseLoader)
 	wg.Wait()
 
-	if got := atomic.LoadInt64(&loaderSeen); got != 0 {
-		t.Fatalf("concurrent acquirers became loaders %d times during flight", got)
+	if got := atomic.LoadInt64(&computations); got != 1 {
+		t.Fatalf("include computed %d times for one flight key, want 1", got)
 	}
-	if _, still := includeFlights.Load(key); still {
-		t.Fatal("flight entry not removed after release")
+	if _, ok := GetSFIncludeCache().Get(key); !ok {
+		t.Fatal("flight result was not cached")
 	}
 }
 
-// TestIncludeFlightWaiterBailsOnDoneOrContext asserts a waiter blocked on a
-// flight entry stops honoring only its own context while the loader still
-// runs: a runaway include must not hang the waiting rules as well.
-func TestIncludeFlightWaiterBailsOnDoneOrContext(t *testing.T) {
-	key := "flight-waiter-cancel-test"
-	entry, isLoader := acquireIncludeFlight(key, context.Background())
-	if !isLoader {
-		t.Fatal("first acquire was not the loader")
-	}
-	t.Cleanup(func() { releaseIncludeFlight(key, entry, nil, nil) })
+// TestIncludeFlightWaiterHonorsItsContext asserts a waiter leaves while the
+// loader is still running: a slow include must not block the waiting rules.
+func TestIncludeFlightWaiterHonorsItsContext(t *testing.T) {
+	const key = "flight-waiter-ctx-test"
+	GetSFIncludeCache().Purge()
+	t.Cleanup(func() { GetSFIncludeCache().Purge() })
 
-	if _, isLoader := acquireIncludeFlight(key, context.Background()); isLoader {
-		t.Fatal("second acquire became a loader")
+	loaderStarted := make(chan struct{})
+	releaseLoader := make(chan struct{})
+	loaderDone := make(chan error, 1)
+	go func() {
+		_, err := includeFlightValues(context.Background(), key, "flight-lib", func() (Values, error) {
+			close(loaderStarted)
+			<-releaseLoader
+			return Values{}, nil
+		})
+		loaderDone <- err
+	}()
+	<-loaderStarted // the flight key is registered before the loader starts
+
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := includeFlightValues(ctx, key, "flight-lib", func() (Values, error) {
+		return nil, utils.Errorf("waiter must not compute")
+	})
+	if err == nil || !strings.Contains(err.Error(), "waiting canceled") {
+		t.Fatalf("waiter did not bail on its own ctx: %v", err)
+	}
+	if time.Since(start) > time.Second {
+		t.Fatal("waiter did not return promptly after ctx cancellation")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	select {
-	case <-entry.done:
-		t.Fatal("waiter unblocked before the loader finished")
-	case <-ctx.Done():
-		// expected: a waiter with a done ctx must stop waiting immediately.
-	case <-time.After(2 * time.Second):
-		t.Fatal("waiter did not honor its ctx cancellation")
+	close(releaseLoader)
+	if err := <-loaderDone; err != nil {
+		t.Fatalf("loader failed: %v", err)
+	}
+}
+
+// TestIncludeFlightLoaderPanicBecomesError asserts a panicking include fails
+// the call instead of crashing the process from singleflight's goroutine.
+func TestIncludeFlightLoaderPanicBecomesError(t *testing.T) {
+	const key = "flight-panic-test"
+	GetSFIncludeCache().Purge()
+	t.Cleanup(func() { GetSFIncludeCache().Purge() })
+
+	_, err := includeFlightValues(context.Background(), key, "flight-lib", func() (Values, error) {
+		panic("boom")
+	})
+	if err == nil || !strings.Contains(err.Error(), "panic") {
+		t.Fatalf("panic was not converted to an include error: %v", err)
 	}
 }
 
@@ -160,130 +181,5 @@ $check<include("include-flight-lib")> as $target;
 
 	if count := GetSFIncludeCache().Count(); count == 0 {
 		t.Fatal("include result was not cached after concurrent queries")
-	}
-}
-
-// TestIncludeFlightWaiterTakesOverCanceledLoader asserts the failure-propagation
-// semantics of the flight map: when a loader dies because its own rule ctx was
-// canceled (timeout / budget overflow), a waiter whose ctx is still healthy does
-// not inherit that error — it re-acquires the flight and the first such waiter
-// becomes the new loader. Only a waiter whose own ctx is done bails with the
-// cancellation error. A canceled loader therefore cannot silently empty the
-// healthy waiting rules.
-func TestIncludeFlightWaiterTakesOverCanceledLoader(t *testing.T) {
-	const key = "flight-takeover-test"
-	GetSFIncludeCache().Purge()
-	t.Cleanup(func() { GetSFIncludeCache().Purge() })
-
-	loaderCtx, cancelLoader := context.WithCancel(context.Background())
-	defer cancelLoader()
-
-	loaderStarted := make(chan struct{})
-	failLoader := make(chan struct{})
-	loaderDone := make(chan error, 1)
-	go func() {
-		_, err := includeFlightValues(key, "takeover-lib", loaderCtx, func() (Values, error) {
-			close(loaderStarted)
-			<-failLoader
-			return nil, loaderCtx.Err()
-		})
-		loaderDone <- err
-	}()
-	<-loaderStarted // entry registered; loader parked inside compute.
-
-	// Healthy waiter: must end up as the (new) loader and produce a result.
-	waiterComputed := make(chan struct{}, 1)
-	healthyDone := make(chan error, 1)
-	go func() {
-		_, err := includeFlightValues(key, "takeover-lib", context.Background(), func() (Values, error) {
-			waiterComputed <- struct{}{}
-			return Values{}, nil
-		})
-		healthyDone <- err
-	}()
-
-	// Proof waiter: its own ctx is already canceled while the loader's entry is
-	// still registered (the loader cannot release before failLoader closes), so
-	// it must deterministically bail with its own cancellation error and never
-	// compute. Waiting for its return also gives the healthy waiter wall time to
-	// park on the same entry; should the healthy waiter instead race past the
-	// release and become a fresh loader, the asserts below accept that too.
-	proofDone := make(chan error, 1)
-	go func() {
-		proofCtx, cancel := context.WithCancel(context.Background())
-		cancel()
-		_, err := includeFlightValues(key, "takeover-lib", proofCtx, func() (Values, error) {
-			return nil, utils.Errorf("proof waiter must never compute")
-		})
-		proofDone <- err
-	}()
-
-	select {
-	case err := <-proofDone:
-		if err == nil || !strings.Contains(err.Error(), "waiting canceled") {
-			t.Fatalf("proof waiter did not bail on its own canceled ctx: %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("proof waiter never returned")
-	}
-
-	// Kill the loader via its own ctx, then let its compute return that error.
-	cancelLoader()
-	close(failLoader)
-
-	select {
-	case err := <-loaderDone:
-		if err == nil || !strings.Contains(err.Error(), "context canceled") {
-			t.Fatalf("loader did not fail with its own ctx error: %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("loader never returned")
-	}
-
-	select {
-	case err := <-healthyDone:
-		if err != nil {
-			t.Fatalf("healthy waiter inherited the canceled loader's error instead of taking over: %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		t.Fatal("healthy waiter never returned")
-	}
-	select {
-	case <-waiterComputed:
-	default:
-		t.Fatal("healthy waiter returned without computing as the new loader")
-	}
-
-	if _, still := includeFlights.Load(key); still {
-		t.Fatal("flight entry not removed after takeover")
-	}
-}
-
-// TestIncludeFlightWaiterInheritsContentFailure asserts the complementary rule:
-// when the loader failed for a reason every waiter would reproduce identically
-// (no value found, rule error — detected by the loader's ctx still being alive),
-// waiters inherit the error instead of taking over. Unconditional takeover would
-// serialize the very herd the flight map exists to collapse.
-func TestIncludeFlightWaiterInheritsContentFailure(t *testing.T) {
-	const key = "flight-inherit-test"
-	entry := &includeFlightEntry{
-		done:      make(chan struct{}),
-		loaderCtx: context.Background(),
-		err:       utils.Errorf("include \"inherit-lib\": no value found"),
-	}
-	close(entry.done)
-	includeFlights.Store(key, entry)
-	t.Cleanup(func() { includeFlights.Delete(key) })
-
-	recomputed := false
-	_, err := includeFlightValues(key, "inherit-lib", context.Background(), func() (Values, error) {
-		recomputed = true
-		return Values{}, nil
-	})
-	if err == nil || !strings.Contains(err.Error(), "no value found") {
-		t.Fatalf("waiter did not inherit the loader's content failure: %v", err)
-	}
-	if recomputed {
-		t.Fatal("waiter re-ran the include for a deterministic content failure")
 	}
 }
