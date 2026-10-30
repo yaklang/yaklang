@@ -155,6 +155,7 @@ func (f *binFlow) consumeSMB2(dir int, e *ProtocolEvent) error {
 	}
 	info["Recovery Diagnostic"] = fmt.Sprintf("command %d refused; continue at the next complete Direct TCP record", info["Failed Command Index"])
 	e.Session = info
+	e.Profile, e.Completeness = "smb2-record-body-diagnostic", "headers"
 	e.nativeSessionMessage = true
 	e.semanticSession = cloneSession(info)
 	e.semanticFields = cloneSession(info)

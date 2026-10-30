@@ -37,6 +37,8 @@ type packetPresentation struct {
 	nativeESPIncomplete                   bool
 	nativeESPBytes                        int
 	nativeESPSHA                          [32]byte
+	smbDecodedRecordSummary               string
+	smbRefusedRecordSummary               string
 }
 
 var protocolDisplayNames = map[string]string{
@@ -414,6 +416,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := smbQueryInfoSummary(e); ok {
+		return summary
+	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
 		v := eventValues(e)
 		h, _ := v["Header"].(map[string]any)
@@ -873,6 +878,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	// A single captured packet can contain both a refused body and another
+	// complete SMB2 record. Preserve that mixed outcome in either callback order.
+	if smbBodyDiagnostic(e) && p.smbRefusedRecordSummary == "" {
+		p.smbRefusedRecordSummary = clipText(smbRefusedRecordSummary(e), 384)
+	}
+	if e.Protocol == "smb2" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && smbSummaryOwnedRecord(e) && p.smbDecodedRecordSummary == "" {
+		p.smbDecodedRecordSummary = clipText(applicationEventSummary(e), 384)
+	}
 	if validRSVPControlObservation(e) {
 		p.protocol, p.priority, p.status, p.visibility = "RSVP", 20, e.Status, "message"
 		p.evidence = "declared IP next-header46 and byte-bound RSVP observation; grammar status is separate"
@@ -1134,6 +1147,16 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.evidence = "RTSP start line, CSeq and body boundary observed; method semantics unavailable"
 		p.summary = fmt.Sprintf("RTSP unsupported method %s · CSeq=%d", textValue(e.Session["Packet Name"]), number(e.Session["CSeq"]))
 		p.addLayer("RTSP")
+		return
+	}
+	if smbBodyDiagnostic(e) {
+		p.addLayer("SMB2")
+		if p.priority <= eventPriority(e) {
+			p.protocol, p.priority, p.status, p.visibility = "SMB2", eventPriority(e), e.Status, "opaque-body"
+			p.scope = "complete SMB2 record; command body not decoded"
+			p.evidence = "owned Direct TCP boundary and fixed headers; body semantics unavailable"
+			p.summary = smbRefusedRecordSummary(e)
+		}
 		return
 	}
 	if e.Transport == "network" && (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && (e.Status == "incomplete" || e.Status == "malformed" || e.Status == "limited") && e.Completeness == e.Status {
@@ -1517,6 +1540,12 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	}
 	if p.diagnostic != "" && p.diagnostic != p.summary {
 		row.Info += " · " + p.diagnostic
+	}
+	if p.smbDecodedRecordSummary != "" && p.smbRefusedRecordSummary != "" {
+		row.ProtocolStatus, row.Visibility = "partial", "mixed-record-outcomes"
+		row.ProtocolScope = "SMB2 records with refused command bodies"
+		row.ProtocolEvidence = "record framing and body decoding are separate; at least one body was refused"
+		row.Info = "Mixed SMB2 records · " + p.smbDecodedRecordSummary + " · " + p.smbRefusedRecordSummary
 	}
 	if row.Info == "" {
 		row.Info = p.protocol
