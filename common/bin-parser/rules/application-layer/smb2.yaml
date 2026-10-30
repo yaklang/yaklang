@@ -147,6 +147,14 @@ Package:
         err = parseSMB2QueryInfoBody((flags & 1) != 0, status)
         if err != nil { panic(err) }
     Compound Tail: raw
+  FileEaInformation:
+    operator: |
+      err = parseSMB2QueryInfoOutput(1, 7)
+      if err != nil { panic(err) }
+  FileStandardInformation:
+    operator: |
+      err = parseSMB2QueryInfoOutput(1, 5)
+      if err != nil { panic(err) }
 SMB2HeaderFlags:
   operator: |
     this.ProcessSubNode("Prefix")

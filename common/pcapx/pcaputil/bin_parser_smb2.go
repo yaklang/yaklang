@@ -447,6 +447,7 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 		c["Request Output Buffer Length"] = pending.queryInfo.outputLength
 		if c["Error Response"] != true {
 			c["Output Content Status"] = "opaque: selector from matched request; typed content not decoded"
+			smb2DecodeMatchedQueryOutput(c, pending.queryInfo)
 		}
 	}
 	if pending.fileID != "" {

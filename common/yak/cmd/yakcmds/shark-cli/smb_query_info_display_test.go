@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -134,4 +135,85 @@ func TestSMBQueryRequestFileIDAcrossWorkers(t *testing.T) {
 	after, err := json.Marshal(events)
 	require.NoError(t, err)
 	require.Equal(t, before, after, "SDK values and both original representations remain available")
+}
+
+func TestSMBQueryTypedOutputProgressiveOwnedFieldsAcrossWorkers(t *testing.T) {
+	for _, compound := range []bool{false, true} {
+		t.Run(fmt.Sprintf("compound%t", compound), func(t *testing.T) {
+			session, err := pcaputil.NewProtocolSession(pcaputil.DefaultParserBudget())
+			require.NoError(t, err)
+			defer session.Close("test")
+			count := 1
+			if compound {
+				count = 3
+			}
+			var requests, responses []byte
+			for i := 0; i < count; i++ {
+				request := smbQueryDisplayRequest()[4:]
+				request[67] = 5 // The request selects FileStandardInformation, not class0x22.
+				binary.LittleEndian.PutUint64(request[24:], uint64(21+i))
+				body := make([]byte, 32)
+				binary.LittleEndian.PutUint16(body, 9)
+				binary.LittleEndian.PutUint16(body[2:], 72)
+				binary.LittleEndian.PutUint32(body[4:], 24)
+				binary.LittleEndian.PutUint64(body[8:], 8192)
+				binary.LittleEndian.PutUint64(body[16:], 4096)
+				binary.LittleEndian.PutUint32(body[24:], 2)
+				body[28], body[29] = 0x80, 0xff
+				response := smbDetailTestHeader(16, 1, uint64(21+i), 17, 7, body)
+				if i < count-1 {
+					binary.LittleEndian.PutUint32(request[20:], uint32(len(request)))
+					binary.LittleEndian.PutUint32(response[20:], uint32(len(response)))
+				}
+				requests, responses = append(requests, request...), append(responses, response...)
+			}
+			request := session.Feed(0, time.Unix(1, 0), smbDetailTestDirect(requests))
+			require.Nil(t, request.Err)
+			wire := smbDetailTestDirect(responses)
+			result := session.Feed(1, time.Unix(2, 0), wire)
+			require.Nil(t, result.Err)
+			require.Len(t, result.Events, 1)
+			events := result.Events
+			events[0].Fields, err = events[0].GetFields()
+			require.NoError(t, err)
+			before, err := json.Marshal(events)
+			require.NoError(t, err)
+			fields, sources := protocolEventDetail(events)
+			for _, view := range []packetDetail{{fields: fields, sources: sources}, workerMetadataDetail(t, events, false), workerMetadataDetail(t, events, true)} {
+				require.Equal(t, count, smbDetailTestBranchCount(view.fields, "FileStandardInformation"))
+				var eofOffsets []int
+				lastHeader, lastBody, lastClass := -1, -1, -1
+				for i, field := range view.fields {
+					switch {
+					case field.branch && field.text == "Header":
+						lastHeader = i
+					case field.branch && field.text == "Body":
+						lastBody = i
+						require.Greater(t, lastBody, lastHeader)
+					case field.branch && field.text == "FileStandardInformation":
+						lastClass = i
+						require.Greater(t, lastClass, lastBody)
+					case strings.HasPrefix(field.text, "End Of File:"):
+						require.Greater(t, i, lastClass)
+						require.True(t, field.hasRange)
+						require.Equal(t, 8, field.end-field.start)
+						require.Equal(t, uint64(4096), binary.LittleEndian.Uint64(view.sources[field.source-1].Data[field.start:field.end]))
+						eofOffsets = append(eofOffsets, field.start)
+					case strings.HasPrefix(field.text, "Request Output Information Type:"), strings.HasPrefix(field.text, "Delete Pending State:"), strings.HasPrefix(field.text, "Directory State:"):
+						require.False(t, field.hasRange, "request context and Boolean interpretation are not new response literals")
+					}
+				}
+				want := []int{84}
+				if compound {
+					want = []int{84, 180, 276}
+				}
+				require.Equal(t, want, eofOffsets, "identical values in different commands retain their own source occurrences")
+				require.Len(t, view.sources, 1)
+				require.Equal(t, wire, view.sources[0].Data)
+			}
+			after, err := json.Marshal(events)
+			require.NoError(t, err)
+			require.Equal(t, before, after, "presentation cannot rewrite SDK fields")
+		})
+	}
 }

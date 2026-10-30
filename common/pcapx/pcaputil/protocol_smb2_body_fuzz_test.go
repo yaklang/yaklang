@@ -18,6 +18,8 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		f.Add(uint8(kind), bytes.Clone(wire[68:]), uint8(7))
 	}
 	f.Add(uint8(1), []byte{89, 0}, uint8(1))
+	f.Add(uint8(4), bytes.Clone(smb2QueryResponse(5, 17, 7, 0, smb2StandardOutput())[68:]), uint8(1))
+	f.Add(uint8(5), bytes.Clone(smb2QueryResponse(5, 17, 7, 0, []byte{1, 2, 3, 4})[68:]), uint8(7))
 	f.Fuzz(func(t *testing.T, kind uint8, body []byte, chunk uint8) {
 		if len(body) > 2048 {
 			return
@@ -27,7 +29,7 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		smb2ChainFeed(t, session, 1, smb2NegotiateResp(0x0202))
 		command, mid, sid, tid := uint16(0), uint64(1), uint64(0), uint32(0)
-		switch kind % 4 {
+		switch kind % 6 {
 		case 0:
 			smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		case 1:
@@ -41,6 +43,13 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		case 3:
 			command, mid, sid, tid = 16, 5, 17, 7
 			smb2ChainFeed(t, session, 0, smb2QueryRequest(5, 17, 7, 1, 0x22, nil))
+		case 4, 5:
+			command, mid, sid, tid = 16, 5, 17, 7
+			class := byte(5)
+			if kind%6 == 5 {
+				class = 7
+			}
+			smb2ChainFeed(t, session, 0, smb2QueryRequest(5, 17, 7, 1, class, nil))
 		}
 		wire := smb2TCP(append(smb2Hdr(command, smb2FlagResp, mid, sid, tid), body...))
 		for at := 0; at < len(wire); {
@@ -75,7 +84,7 @@ func smb2FuzzOwnedRanges(t *testing.T, value any, size int) {
 	switch value := value.(type) {
 	case map[string]any:
 		if ranges, ok := value["Wire Field Ranges"].(map[string]any); ok {
-			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID", "Request Info Type", "Request File Info Class", "Request Additional Information", "Request Query Flags", "Request Output Buffer Length", "Request Message ID"} {
+			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID", "Request Info Type", "Request File Info Class", "Request Additional Information", "Request Query Flags", "Request Output Buffer Length", "Request Message ID", "Request Output Information Type", "Delete Pending State", "Directory State", "Output Information Type"} {
 				require.NotContains(t, ranges, forbidden)
 			}
 			for _, span := range ranges {
