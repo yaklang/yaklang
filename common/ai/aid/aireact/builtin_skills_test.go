@@ -39,6 +39,7 @@ var allBuiltinSkills = []struct {
 	{"pcap-analysis", "skills/pcap-analysis/SKILL.md", []string{"load_pcapfile", "query_pcapdb", "manage_pcapdb", "dataset_id", "has_more", "ReferencesComplete"}},
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
+	{"syntaxflow-rule", "skills/syntaxflow-rule/SKILL.md", []string{"UNSAFE", "#->", "check_syntaxflow_syntax"}},
 }
 
 // Keep the reference skill complete as the engine's tag registry evolves.
