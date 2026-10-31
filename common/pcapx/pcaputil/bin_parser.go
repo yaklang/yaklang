@@ -18,6 +18,7 @@ import (
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
 	smb1SetupBodyRefusal               bool
+	smb1FileBodyRefusal                bool
 	nativeSessionMessage               bool
 	nativeNetFlowObservation           bool
 	rtmpChildren                       []*ProtocolEvent
@@ -925,6 +926,12 @@ func (a *binParser) emit(e *BinParserEvent) {
 		return
 	}
 	e.setStructured(e.Structured)
+	if e.nativeSessionMessage && (e.Protocol == "smb" || e.Protocol == "smb2") {
+		// Structured/Fields are public compatibility projections. Keep the
+		// accepted native tree independent before handing either to callers.
+		e.semanticFields = cloneSession(e.semanticFields)
+		e.semanticSession = cloneSession(e.semanticSession)
+	}
 	e.finalizeEvidence()
 	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
@@ -1089,6 +1096,12 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if (f.protocol == "smb" || f.protocol == "smb2") && status == "incomplete" {
+		// A trailing or unselected close observation has no complete-message
+		// field tree. Preserve its existing refusal before mutable public
+		// fields, protocol/status, or a caller-supplied rule can promote it.
+		e.nativeDiagnosticError = "protocol parser: event is incomplete, not an exact message"
+	}
 	if f.transportFlow != nil {
 		e.TCPFlowID = f.transportFlow.Index
 	}
@@ -1278,14 +1291,14 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		}
 	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if f.protocol == "smb" && f.binding == nil && f.smb2 != nil {
+	if (f.protocol == "smb" || f.protocol == "smb2") && f.binding == nil && f.smb2 != nil {
 		// The native carrier was identified independently of the resource
 		// refusal. Keep that refusal private before any public cache/status.
 		// A clipped diagnostic is not an accepted response body.
 		e.nativeSessionMessage = true
-		e.Profile, e.Completeness = "smb-record-diagnostic", status
+		e.Profile, e.Completeness = f.protocol+"-record-diagnostic", status
 		if status == "limited" {
-			e.Profile = "smb-record-resource-diagnostic"
+			e.Profile = f.protocol + "-record-resource-diagnostic"
 		}
 		e.SourceBytes.CompletedIn = nil
 		if e.sessionError == nil {
@@ -1541,6 +1554,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					// A response can be structurally identifiable yet exceed its
 					// parser frame budget. Keep only this finite format prefix so
 					// the completed record is refused as limited, not unrecognized.
+					if len(wire) < 65582 && len(wire) < a.config.MaxMessageBytes && probeSMB1FileCommand(wire, 65582).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < 65598 && len(wire) < a.config.MaxMessageBytes && probeSMB1SessionSetupExtended(wire, 65598).Verdict == ProbeNeedMore {
 						break
 					}
@@ -1929,7 +1945,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
-		recoverableSMB1Setup := e.smb1SetupBodyRefusal
+		recoverableSMB1Setup := e.smb1SetupBodyRefusal || e.smb1FileBodyRefusal
 		recoverableRADIUS := e.nativeRADIUSObservation && radiusRecoverableFrame(e.Raw, e.sessionError, e.radiusApplicationRefusal)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"

@@ -278,6 +278,12 @@ func cifsStructuredProjection(node *base.Node, raw []byte, rule string, keys []s
 		return nil, false, nil
 	}
 	switch keys[0] {
+	case "CIFSDirectTCPTreeConnectAndXRequest", "CIFSDirectTCPTreeConnectAndXResponse":
+		fields, err := ProjectCIFSTreeConnectAndXFields(node, raw)
+		return fields, true, err
+	case "CIFSDirectTCPDeleteRequest", "CIFSDirectTCPDeleteResponse":
+		fields, err := ProjectCIFSDeleteFields(node, raw)
+		return fields, true, err
 	case "CIFSDirectTCPSessionSetupExtendedRequest", "CIFSDirectTCPSessionSetupExtendedResponse":
 		fields, err := ProjectCIFSSessionSetupFields(node, raw)
 		return fields, true, err

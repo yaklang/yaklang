@@ -39,7 +39,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 
 <!-- BEGIN GENERATED PROTOCOL INVENTORY -->
 
-路线图共 **622** 项：限定范围 `done` **198**，`partial` **33**，`todo` **391**。目录共 **513** 个入口：`stable` **14**，`partial` **333**，`new` **166**。入口、规则文件和协议家族不是同一个计数。
+路线图共 **622** 项：限定范围 `done` **197**，`partial` **35**，`todo` **390**。目录共 **527** 个入口：`stable` **14**，`partial` **347**，`new` **166**。入口、规则文件和协议家族不是同一个计数。
 
 ### 路线图尚未完成的项目
 
@@ -60,6 +60,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P1 | IPsec ESP | partial | [partial / ESP](rules/ipsec.yaml) |
 | P1 | IPsec ESP Header Fields | partial | [partial / ESPHeaderFields](rules/ipsec_esp.yaml) |
 | P1 | L2TP | partial | [partial / ](rules/l2tp.yaml) |
+| P1 | NAT-T | partial | [partial / NATT](rules/nat_t.yaml) |
 | P1 | RSTP | partial | [partial / STPFields](rules/stp.yaml) |
 | P1 | RTMP | partial | [partial / ](rules/rtmp.yaml) |
 | P1 | SFTP | partial | 需核对别名/Fields 入口 |
@@ -176,7 +177,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | ONVIF | todo | 需核对别名/Fields 入口 |
 | P2 | OPC DA | todo | 需核对别名/Fields 入口 |
 | P2 | OPC UA | partial | [partial / OPCUATCPMessage](rules/application-layer/extended_protocols.yaml) |
-| P2 | OSPFv3 | todo | [partial / OSPFv3](rules/ospfv3.yaml) |
+| P2 | OSPFv3 | partial | [partial / OSPFv3](rules/ospfv3.yaml) |
 | P2 | OXABREF/NSPI | todo | 需核对别名/Fields 入口 |
 | P2 | Omron FINS | todo | [new / OmronFINS](rules/application-layer/extended_protocols.yaml) |
 | P2 | PFCP | todo | [new / PFCP](rules/application-layer/extended_protocols.yaml) |
@@ -491,7 +492,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/c37118.yaml](rules/application-layer/c37118.yaml) | IEEE C37.118 synchrophasor (`C37118`, partial) |
 | [application-layer/cassandra_fields.yaml](rules/application-layer/cassandra_fields.yaml) | CQL Options v4 Fields (`CQLOptions4Fields`, partial)<br>CQL Options v5 Initial Fields (`CQLOptions5InitialFields`, partial)<br>CQL Startup v4 Fields (`CQLStartup4Fields`, partial)<br>CQL Startup v5 Initial Fields (`CQLStartup5InitialFields`, partial)<br>CQL Supported v4 Fields (`CQLSupported4Fields`, partial)<br>CQL Supported v5 Initial Fields (`CQLSupported5InitialFields`, partial)<br>Cassandra Internode Initiate Fields (`CassandraInternodeInitiateFields`, partial) |
 | [application-layer/checkmk.yaml](rules/application-layer/checkmk.yaml) | Checkmk (`CheckmkReport`, partial) |
-| [application-layer/cifs.yaml](rules/application-layer/cifs.yaml) | CIFS Negotiate Request (`CIFSDirectTCP`, partial) |
+| [application-layer/cifs.yaml](rules/application-layer/cifs.yaml) | CIFS Delete Request (`CIFSDirectTCPDeleteRequest`, partial)<br>CIFS Delete Response (`CIFSDirectTCPDeleteResponse`, partial)<br>CIFS Negotiate Extended Response (`CIFSDirectTCPNegotiateExtendedResponse`, partial)<br>CIFS Negotiate Request (`CIFSDirectTCP`, partial)<br>CIFS Session Setup Extended Request (`CIFSDirectTCPSessionSetupExtendedRequest`, partial)<br>CIFS Session Setup Extended Response (`CIFSDirectTCPSessionSetupExtendedResponse`, partial)<br>CIFS Tree Connect AndX Request (`CIFSDirectTCPTreeConnectAndXRequest`, partial)<br>CIFS Tree Connect AndX Response (`CIFSDirectTCPTreeConnectAndXResponse`, partial) |
 | [application-layer/cldap.yaml](rules/application-layer/cldap.yaml) | CLDAP (`CLDAP`, partial) |
 | [application-layer/dcerpc.yaml](rules/application-layer/dcerpc.yaml) | DCE/RPC (``, partial)<br>DCOM (``, new)<br>DRSUAPI (``, new)<br>LSARPC (``, new)<br>MSRPC (``, partial)<br>MSRPC EPM (``, new)<br>NETLOGON (``, new)<br>PsExec/SMB-svcctl (``, new)<br>SAMR (``, new)<br>SRVSVC (``, new)<br>SVCCTL (``, new)<br>WINREG (``, new)<br>WMI (``, new) |
 | [application-layer/dhcp.yaml](rules/application-layer/dhcp.yaml) | DHCP (``, new) |
@@ -568,7 +569,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [application-layer/sigcomp.yaml](rules/application-layer/sigcomp.yaml) | SIGCOMP (`SIGCOMP`, partial) |
 | [application-layer/slimp3.yaml](rules/application-layer/slimp3.yaml) | SliMP3 (`SliMP3`, partial) |
 | [application-layer/smb.yaml](rules/application-layer/smb.yaml) | CIFS (`SMB`, new)<br>SMB (`SMB`, new) |
-| [application-layer/smb2.yaml](rules/application-layer/smb2.yaml) | SMB2 (``, new) |
+| [application-layer/smb2.yaml](rules/application-layer/smb2.yaml) | SMB2 (``, new)<br>SMB2 File EA Information (`FileEaInformation`, partial)<br>SMB2 File Standard Information (`FileStandardInformation`, partial) |
 | [application-layer/smb3.yaml](rules/application-layer/smb3.yaml) | SMB3 (`SMB3Negotiate`, partial) |
 | [application-layer/smtp.yaml](rules/application-layer/smtp.yaml) | SMTP (``, new)<br>Submission (`SMTPCommand`, partial) |
 | [application-layer/smtp_fields.yaml](rules/application-layer/smtp_fields.yaml) | SMTP Command Fields (`SMTPCommandFields`, partial) |
@@ -623,6 +624,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [fibre_channel.yaml](rules/fibre_channel.yaml) | Fibre Channel (`FibreChannel`, partial) |
 | [ftp_data.yaml](rules/ftp_data.yaml) | FTP-DATA (``, new) |
 | [geneve.yaml](rules/geneve.yaml) | Geneve (`Geneve`, partial) |
+| [gtpv2_observed.yaml](rules/gtpv2_observed.yaml) | GTPv2 Observed Control Fields (`GTPv2ControlFields`, partial) |
 | [hessian.yaml](rules/hessian.yaml) | Hessian2 (``, new) |
 | [hsrp.yaml](rules/hsrp.yaml) | HSRP (``, partial) |
 | [iec61850.yaml](rules/iec61850.yaml) | IEC 61850 GOOSE (`GOOSE`, partial)<br>IEC 61850 SV (`SampledValues`, partial) |
@@ -640,7 +642,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ipfix.yaml](rules/ipfix.yaml) | IPFIX Observed Message Fields (`IPFIXFields`, partial) |
 | [ipmi.yaml](rules/ipmi.yaml) | IPMI (``, new)<br>IPMI RMCP+ (`IPMI`, partial) |
 | [ipsec.yaml](rules/ipsec.yaml) | IPsec AH (``, new)<br>IPsec ESP (`ESP`, partial) |
-| [ipsec_esp.yaml](rules/ipsec_esp.yaml) | IPsec ESP Header Fields (`ESPHeaderFields`, partial) |
+| [ipsec_esp.yaml](rules/ipsec_esp.yaml) | IPsec ESP Header Fields (`ESPHeaderFields`, partial)<br>UDP-Encapsulated ESP Header Fields (`ESPHeaderFields`, partial) |
 | [ipx.yaml](rules/ipx.yaml) | IPX (`IPX`, partial) |
 | [isis.yaml](rules/isis.yaml) | IS-IS (`ISIS`, partial) |
 | [j1939.yaml](rules/j1939.yaml) | J1939 (`J1939`, partial) |
@@ -680,7 +682,9 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [onc_rpc.yaml](rules/onc_rpc.yaml) | Mount (`ONCRPC`, partial)<br>NFS (`ONCRPC`, new)<br>ONC RPC (``, new)<br>Portmap/Rpcbind (`ONCRPC`, partial)<br>RPC (`ONCRPC`, partial) |
 | [openvpn.yaml](rules/openvpn.yaml) | OpenVPN (``, new) |
 | [ospf.yaml](rules/ospf.yaml) | OSPF (``, new) |
+| [ospfv2_observed.yaml](rules/ospfv2_observed.yaml) | OSPFv2 Observed Control Fields (`OSPFv2ControlFields`, partial) |
 | [ospfv3.yaml](rules/ospfv3.yaml) | OSPFv3 (`OSPFv3`, partial) |
+| [ospfv3_observed.yaml](rules/ospfv3_observed.yaml) | OSPFv3 Observed Control Fields (`OSPFv3ControlFields`, partial) |
 | [php_ser.yaml](rules/php_ser.yaml) | PHP serialize (``, new) |
 | [pickle.yaml](rules/pickle.yaml) | Python pickle (``, new) |
 | [pim_control.yaml](rules/pim_control.yaml) | PIMv2 Control Message Fields (`PIMControlFields`, partial) |
@@ -695,6 +699,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | [ripng.yaml](rules/ripng.yaml) | RIPng (`RIPng`, partial) |
 | [rmi.yaml](rules/rmi.yaml) | RMI (`RMIHeader`, partial)<br>RMI/JRMP (`RMIHeader`, partial) |
 | [routing_control.yaml](rules/routing_control.yaml) | BFD Observed Message Fields (`BFDMessageFields`, partial)<br>GLBP Observed Message Fields (`GLBPMessageFields`, partial)<br>HSRP Observed Message Fields (`HSRPMessageFields`, partial) |
+| [rsvp_observed.yaml](rules/rsvp_observed.yaml) | RSVP Observed Control Fields (`RSVPControlFields`, partial) |
 | [rsync.yaml](rules/rsync.yaml) | Rsync (`Rsync`, partial)<br>Rsync daemon (``, new) |
 | [rtmp.yaml](rules/rtmp.yaml) | RTMP (``, partial)<br>RTMP AMF0 Message Fields (`AMF0MessageFields`, partial)<br>RTMP Initial Chunk Fields (`RTMPInitialChunkFields`, partial)<br>RTMP Initial Handshake Fields (`RTMPInitialHandshakeFields`, partial) |
 | [rtp.yaml](rules/rtp.yaml) | RTCP (`RTCP`, new)<br>RTP (``, new) |

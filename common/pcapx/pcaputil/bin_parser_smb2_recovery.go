@@ -126,6 +126,9 @@ func smb2RecoverBodyRecord(raw []byte, max int, err error) map[string]any {
 }
 
 func (f *binFlow) consumeSMB2(dir int, e *ProtocolEvent) error {
+	// Accepted fields and refusals belong to this observed native record,
+	// independently of later edits to protocol/rule labels or public caches.
+	e.nativeSessionMessage = true
 	max := f.a.budget.MaxCollectionElements
 	info, err := f.smb2.consumeFrom(dir, e.Raw, max)
 	if err == nil {
@@ -134,7 +137,17 @@ func (f *binFlow) consumeSMB2(dir int, e *ProtocolEvent) error {
 	}
 	info = smb2RecoverBodyRecord(e.Raw, max, err)
 	if info == nil || !f.smb2.bodyRecoveryIdentitySafe(info, dir) {
-		return err
+		// A rejected native record must not fall back to the older field
+		// grammar if its framing/state error happened to be untyped.
+		_, typed := classifySessionError(err)
+		if typed != nil {
+			return err
+		}
+		kind := ErrMalformedMessage
+		if errors.Is(err, errBinContext) {
+			kind = ErrContextRequired
+		}
+		return protocolError(kind, "%s", err)
 	}
 	if dialect := f.smb2.dialect; dialect != 0 {
 		info["Connection Dialect"] = dialect // Observation only, not authenticated identity.
@@ -163,7 +176,7 @@ func (f *binFlow) consumeSMB2(dir int, e *ProtocolEvent) error {
 	// modern carrier even though its body was refused. Retire only legacy
 	// selection eligibility; never commit commands from the refused record.
 	// Framing/partial/resource/identity failures cannot reach this gate.
-	f.smb2.smb1Modern, f.smb2.smb1, f.smb2.smb1Setup = true, nil, nil
+	f.smb2.smb1Modern, f.smb2.smb1, f.smb2.smb1Setup, f.smb2.smb1Legacy = true, nil, nil, nil
 	if reserveErr := f.smb2.reserveState(0); reserveErr != nil {
 		return reserveErr
 	}
