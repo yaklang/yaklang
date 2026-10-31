@@ -329,6 +329,22 @@ func FuzzSMB1FilePublicWireSources(f *testing.F) {
 			after, err := json.Marshal(fresh)
 			require.NoError(t, err)
 			require.Equal(t, before, after, "returned fields are owned; edits cannot mutate private source")
+			if e.Fields != nil {
+				e.Fields["Header"].(map[string]any)["Command"] = byte(0xff)
+			}
+			e.Fields, e.Session, e.Structured = map[string]any{"forged": true}, map[string]any{"Authentication Verified": true}, map[string]any{"fields": map[string]any{"forged": true}}
+			e.Protocol, e.Profile, e.Rule, e.Entry = "tcp", "poisoned", "application-layer.smb2", "SMB2"
+			e.Raw = nil
+			fresh, err = e.GetFields()
+			require.NoError(t, err)
+			after, err = json.Marshal(fresh)
+			require.NoError(t, err)
+			require.Equal(t, before, after, "public projections do not own accepted native fields")
+			decoded, err := e.Decode()
+			require.NoError(t, err)
+			after, err = json.Marshal(decoded["fields"])
+			require.NoError(t, err)
+			require.Equal(t, before, after)
 		}
 	})
 }
