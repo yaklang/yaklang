@@ -23,13 +23,13 @@
 | M2-10.N10 | 6个fuzz TCP tuple分区/复用差异 | 开放，政策/代次证明 | 固定packet header/时间/域/原序号和实际SYN/SYNACK/FIN/RST；每例分别核分区与HTTP关联；不直接用WS tcp.stream号代替连接事实 | 3–6小时 |
 | M2-10.N11 | 24个fuzz UDP分区差异的应用会话 | 开放，物理来源清单及语义缺口 | 从原24例建立完整header/hash/domain/time ledger，逐协议按transaction/CID/会话生命周期验复用/乱序/缺失及域隔离；不能仅把udp.stream划分当唯一答案 | 4–8小时 |
 | M2-10.N12 | KeyUpdate record尾边界和换钥原子性 | 有限完成（M2-41；其他换钥消息仍开放） | 176/180独立源、39ca真实SDK三类误接受及HTTP泄漏；6bac同v02六源通过及12DTO拒绝，私有secret/IV/AEAD/seq及反向/预算测试、96752插桩fuzz。父阶段列表问题另列M2-42；后续9af/229实际60状态已关闭有限UI合同 | 0 |
-| M2-10.N13 | fuzz部分TLS record的message/连接确认资格 | 开放，来源审计进行中（M2-43） | Sharon225608/309343域226实际原SDK部分握手Auth=false，CLI仍TLS及connection TLS/validated protocol events；仅确认当前展示/原DTO，尚未独立原wire/WS。须分开完整record framing、合法message与连接确认，继而验粘性/复用/丢失及接口/VLAN隔离；不直接称误识别已证或已修 | 调查1–2小时；确证后修复另估 |
+| M2-10.N13 | TLS record/message/连接资格及CertificateRequest正文 | 开放，有限来源审计完成、正文覆盖缺口确认（M2-43） | 238/239原wire及全捕获WS：两疑点默认也TLS并报结构错，不是已证标签误识别。240坏41B正文CA声明70仅余13。241真实mTLS12/13、244独立来源/AEAD、245的55字面+1空向量匹配参考；native两消息仍envelope，52正文typed事实未发布。正文校验/字段/源/UI与资格、粘性/复用/丢失/域隔离仍开放；见[审计证据](shark-m2-tls-admission-audit-20261031.md) | 后续实施3–6小时 |
 
-原5个未闭合有限项粗估13–26个AI实施小时；新增N13来源/资格调查1–2小时，若确证修复另估。
-当前6项合计14–28小时，不含CI/构建/回放等待、N13后续修复及新问题；不是核心协议完备承诺。
+原5个未闭合有限项粗估13–26个AI实施小时；N13有限来源审计已完成，正文/资格后续实施粗估3–6小时。
+当前6项合计16–32小时，不含CI/构建/回放等待及新问题；不是核心协议完备承诺。
 M2-42列表可见性已由9af及229实际60状态关闭有限合同，
 [源码、原红测、页面和两大包逐对象验证](shark-m2-tls-row-priority-20261031.md)。
-[N12实际重现、修复及剩余边界](shark-m2-tls-record-boundaries-20261031.md)；后续先审新增N13的原始来源/身份资格，
+[N12实际重现、修复及剩余边界](shark-m2-tls-record-boundaries-20261031.md)；后续先补N13正文校验/字段及身份资格，
 再N07可观察性、N08政策门及N09–N11逐项来源。N10.02只做两原SYN来源及TSO显示审计，
 尚无建立连接或产品误合并证明，不把stream编号当连接事实；其余5个TCP例仍未审。
 
