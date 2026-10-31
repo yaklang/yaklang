@@ -97,6 +97,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 		bits      int
 	}{
 		{"smb.andx.cmd", "AndX Command", 8}, {"smb.andx.offset", "AndX Offset", 16},
+		{"smb.andxoffset", "AndX Offset", 16},
 		{"smb.security_blob_len", "Security Blob Length", 16}, {"smb.action", "Action", 16}, {"smb.vc", "VC Number", 16},
 	} {
 		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
@@ -105,6 +106,23 @@ func smb1DisplayBindings() []displayFieldBinding {
 		add(field.name, field.key, "Body", DisplayString, 0)
 		out[len(out)-1].descriptor.AllowEmpty = true
 	}
+	for _, field := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"smb.pwlen", "Password Length", 16}, {"smb.connect.flags", "Flags", 16}, {"smb.connect.support", "Optional Support", 16},
+		{"smb.search.attribute", "Search Attributes", 16}, {"smb.buffer_format", "Buffer Format", 8},
+	} {
+		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
+	}
+	for _, field := range []struct{ name, key string }{
+		{"smb.path", "Path"}, {"smb.service", "Service"}, {"smb.native_fs", "Native File System"}, {"smb.file", "File Name"},
+	} {
+		add(field.name, field.key, "Body", DisplayString, 0)
+		out[len(out)-1].descriptor.AllowEmpty = true
+	}
+	out = append(out, displayRoot("smb", "smb.request.file", "File name from observed matched request", DisplayString, 0, "context", "Request File Name"))
+	out = append(out, displayRoot("smb", "smb.request.path", "Share path from observed matched request", DisplayString, 0, "context", "Request Path"))
 	// Signed timezone and opaque bytes remain their correct typed Body values;
 	// the current public alias schema has neither signed nor bytes field types.
 	out = append(out, displayRoot("smb", "smb.selected_dialect", "Dialect selected from observed matched request", DisplayString, 0, "context", "Selected Dialect Name"))
