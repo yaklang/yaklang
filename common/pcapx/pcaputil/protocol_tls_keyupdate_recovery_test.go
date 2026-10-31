@@ -63,7 +63,9 @@ func TestTLS13InferredApplicationEpochRetiresFinishedFragment(t *testing.T) {
 		t.Run(tlsCipherTestName(suite), func(t *testing.T) {
 			flow, s := boundaryTLSFlow(t, suite)
 			s.app[1] = false
-			_, err := flow.consumeTLS(1, &ProtocolEvent{Raw: boundaryTLSRecord(t, s, 1, 2, []byte{20, 0, 0, 32}, 22, 0)})
+			// Finished verify_data is Hash.length: SHA384 uses48 bytes.
+			finishedFragment := []byte{20, 0, 0, byte(len(s.secret[1]))}
+			_, err := flow.consumeTLS(1, &ProtocolEvent{Raw: boundaryTLSRecord(t, s, 1, 2, finishedFragment, 22, 0)})
 			require.NoError(t, err)
 			appSecret := bytes.Repeat([]byte{0x63}, len(s.secret[1]))
 			flow.a.tlsSecrets = &TLSKeyLog{secrets: map[string][]byte{"SERVER_TRAFFIC_SECRET_0:" + hex.EncodeToString(s.random): appSecret}}
