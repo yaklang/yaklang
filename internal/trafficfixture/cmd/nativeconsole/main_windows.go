@@ -36,6 +36,14 @@ var readConsoleOutput = windows.NewLazySystemDLL("kernel32.dll").NewProc("ReadCo
 
 // Console byte panes may pad offsets to six or eight hexadecimal digits.
 // Match a complete zero-offset token, not a prefix of another width/value.
+func nativeBytePaneTitleColumn(line string) int {
+	at := strings.Index(line, "╭─ 3 ")
+	if at < 0 {
+		return -1
+	}
+	return len(utf16.Encode([]rune(line[:at+len("╭─ ")])))
+}
+
 func nativeHexOffsetColumn(line []uint16, titleX int) (int, int) {
 	for x := max(0, titleX-4); x <= titleX+2; x++ {
 		if x > 0 && x <= len(line) && line[x-1] != ' ' && line[x-1] != '\t' && line[x-1] != '│' && line[x-1] != '║' {
@@ -524,8 +532,8 @@ func main() {
 			headerY, rightX := -1, -1
 			for row, text := range state.Rows {
 				if mappedRange != "" {
-					if at := strings.Index(text, "3 "); at >= 0 && strings.Contains(text[at:], "PDU") && strings.Contains(text[at:], fmt.Sprintf("0x%x–0x%x · %d bytes", valueStart, readUntil-1, len(want))) {
-						headerY, rightX = row, len(utf16.Encode([]rune(text[:at])))
+					if at := nativeBytePaneTitleColumn(text); at >= 0 && strings.Contains(text, "PDU") && strings.Contains(text, fmt.Sprintf("0x%x–0x%x · %d bytes", valueStart, readUntil-1, len(want))) {
+						headerY, rightX = row, at
 						break
 					}
 					continue
