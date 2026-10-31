@@ -415,6 +415,24 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseSMB3TransformFields(invocation.node, invocation.operator)
 		},
+		"parseSMB2QueryInfoBody": func(response bool, status uint32) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb2-query-info: structured generation is unsupported")
+			}
+			return parseSMB2QueryInfoBody(invocation.node, invocation.operator, response, status)
+		},
+		"parseSMB2QueryInfoOutput": func(infoType, infoClass uint8) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb2-query-output: structured generation is unsupported")
+			}
+			return parseSMB2QueryInfoOutput(invocation.node, invocation.operator, infoType, infoClass)
+		},
+		"parseSMB2ErrorBody": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("smb2-error: structured generation is unsupported")
+			}
+			return parseSMB2ErrorBody(invocation.node, invocation.operator)
+		},
 		"parseLDAPFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("ldap-fields: structured generation is unsupported")
@@ -456,6 +474,24 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 				return fmt.Errorf("smtp-fields: structured generation is not supported")
 			}
 			return parseSMTPFields(invocation.node, invocation.operator, data)
+		},
+		"parseCIFSTreeConnectAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-tree-connect-andx: generation is unsupported")
+			}
+			return parseCIFSTreeConnectAndX(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSDelete": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-delete: generation is unsupported")
+			}
+			return parseCIFSDelete(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSSessionSetup": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-session-setup: generation is unsupported")
+			}
+			return parseCIFSSessionSetup(invocation.node, invocation.operator, response)
 		},
 		"parseKafkaFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {

@@ -341,6 +341,25 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if p := probeSMB1FileCommand(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1SessionSetupExtended(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1Negotiate(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1NegotiateExtendedResponse(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
+	// A short zero-prefixed carrier is ambiguous. Only move SMB2 ahead of
+	// specialized carrier probes once its signature is actually present.
+	if len(input) >= 8 {
+		if p := probeSMB2(input, s.f.a.budget.MaxFrameBytes); p.Verdict != ProbeReject {
+			return p
+		}
+	}
 	if telnetNegotiationStart(input) && (s.f.port(23) || telnetInitialEvidence(input)) {
 		return probeAccept("telnet", "IAC-negotiation", 95)
 	}
@@ -705,6 +724,18 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeAMQP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1FileCommand(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1SessionSetupExtended(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1Negotiate(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1NegotiateExtendedResponse(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSMB2(w, limit); p.Verdict != ProbeReject {

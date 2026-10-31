@@ -32,11 +32,15 @@ type packetPresentation struct {
 	priority                              int
 	count                                 int
 	rejectedTLS                           bool
+	tlsIncompleteSummary                  bool
+	tlsRecordProblem                      string
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
 	nativeESPIncomplete                   bool
 	nativeESPBytes                        int
 	nativeESPSHA                          [32]byte
+	smbDecodedRecordSummary               string
+	smbRefusedRecordSummary               string
 }
 
 var protocolDisplayNames = map[string]string{
@@ -54,7 +58,7 @@ var protocolDisplayNames = map[string]string{
 	"quic": "QUIC", "websocket": "WebSocket", "postgresql": "PostgreSQL", "mysql": "MySQL",
 	"ssdp": "SSDP", "rdpudp": "RDPUDP",
 	"redis": "Redis", "mongodb": "MongoDB", "kafka": "Kafka", "mqtt": "MQTT",
-	"smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
+	"smb": "SMB1", "smb2": "SMB2", "smb3": "SMB3", "dcerpc": "DCE/RPC", "kerberos": "Kerberos",
 	"ntlmssp": "NTLMSSP", "spnego": "SPNEGO", "mdns": "mDNS", "llmnr": "LLMNR",
 	"snmp": "SNMP", "dhcp": "DHCP", "dhcpv6": "DHCPv6", "syslog": "Syslog",
 	"icmp": "ICMP", "icmpv6": "ICMPv6",
@@ -364,6 +368,9 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
+		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
+			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
+		}
 		parts = append(parts, name)
 	}
 	if len(parts) == 0 {
@@ -414,6 +421,9 @@ func http2Frame(v any) string {
 }
 
 func applicationEventSummary(e *pcaputil.ProtocolEvent) string {
+	if summary, ok := smbQueryInfoSummary(e); ok {
+		return summary
+	}
 	if e.Protocol == "ospf" && e.Profile == "ospfv2-bounded-control" {
 		v := eventValues(e)
 		h, _ := v["Header"].(map[string]any)
@@ -873,6 +883,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
 	}
+	// A single captured packet can contain both a refused body and another
+	// complete SMB2 record. Preserve that mixed outcome in either callback order.
+	if smbBodyDiagnostic(e) && p.smbRefusedRecordSummary == "" {
+		p.smbRefusedRecordSummary = clipText(smbRefusedRecordSummary(e), 384)
+	}
+	if e.Protocol == "smb2" && e.Error == "" && (e.Status == "decoded" || e.Status == "deferred") && smbSummaryOwnedRecord(e) && p.smbDecodedRecordSummary == "" {
+		p.smbDecodedRecordSummary = clipText(applicationEventSummary(e), 384)
+	}
 	if validRSVPControlObservation(e) {
 		p.protocol, p.priority, p.status, p.visibility = "RSVP", 20, e.Status, "message"
 		p.evidence = "declared IP next-header46 and byte-bound RSVP observation; grammar status is separate"
@@ -1136,6 +1154,16 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("RTSP")
 		return
 	}
+	if smbBodyDiagnostic(e) {
+		p.addLayer("SMB2")
+		if p.priority <= eventPriority(e) {
+			p.protocol, p.priority, p.status, p.visibility = "SMB2", eventPriority(e), e.Status, "opaque-body"
+			p.scope = "complete SMB2 record; command body not decoded"
+			p.evidence = "owned Direct TCP boundary and fixed headers; body semantics unavailable"
+			p.summary = smbRefusedRecordSummary(e)
+		}
+		return
+	}
 	if e.Transport == "network" && (e.Protocol == "icmpv6" && e.Profile == "icmpv6-mld" || e.Protocol == "igmp" && e.Profile == "igmp-membership-wire") && (e.Status == "incomplete" || e.Status == "malformed" || e.Status == "limited") && e.Completeness == e.Status {
 		label := eventProtocolName(e)
 		if e.Protocol == "icmpv6" {
@@ -1194,6 +1222,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			}
 			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
 			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if e.Protocol == "tls" && e.ExpertCode == string(pcaputil.ErrMalformedMessage) && p.tlsRecordProblem == "" {
+				// A later consequence (for example invalidated stream affinity)
+				// must not replace the original rejected-record diagnosis.
+				p.tlsRecordProblem = p.diagnostic
+			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)
 				if p.protocol == "" && e.FlowID != 0 {
@@ -1253,11 +1286,19 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	info := clipText(applicationEventSummary(e), 384)
+	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
 	if rank > p.priority || p.protocol != label {
 		p.summary, p.count = info, 1
+		p.tlsIncompleteSummary = incompleteTLS
 	} else {
 		p.count++
-		if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
+		if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
+			// Put a completed message before fragment/context text, including
+			// when it arrives beyond the first three coalesced record samples.
+			// Keep the fragment evidence and the existing bounded row budget.
+			p.summary = info + " | " + clipText(p.summary, 384)
+			p.tlsIncompleteSummary = false
+		} else if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
 			p.summary += " | " + info
 		}
 	}
@@ -1373,6 +1414,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 			if row.Protocol == "TLS" {
 				row.Protocol = strings.ToUpper(row.Transport)
 			}
+		}
+		if p.tlsRecordProblem != "" && p.tlsRecordProblem != p.diagnostic {
+			row.Info = p.tlsRecordProblem + " · " + row.Info
+			row.ProtocolStatus = "malformed"
 		}
 		return row
 	}
@@ -1508,6 +1553,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	}
 	row.Visibility, row.ProtocolStatus = p.visibility, p.status
 	row.Info = p.summary
+	if p.tlsRecordProblem != "" {
+		row.Info = p.tlsRecordProblem + " | " + row.Info
+		row.ProtocolStatus = "mixed-record-outcomes"
+	}
 	if p.rejectedTLS && p.count > 0 {
 		row.Info = "Includes rejected TLS record · " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
@@ -1515,8 +1564,14 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.count > 3 {
 		row.Info += fmt.Sprintf(" (+%d further PDUs)", p.count-3)
 	}
-	if p.diagnostic != "" && p.diagnostic != p.summary {
+	if p.diagnostic != "" && p.diagnostic != p.summary && p.diagnostic != p.tlsRecordProblem {
 		row.Info += " · " + p.diagnostic
+	}
+	if p.smbDecodedRecordSummary != "" && p.smbRefusedRecordSummary != "" {
+		row.ProtocolStatus, row.Visibility = "partial", "mixed-record-outcomes"
+		row.ProtocolScope = "SMB2 records with refused command bodies"
+		row.ProtocolEvidence = "record framing and body decoding are separate; at least one body was refused"
+		row.Info = "Mixed SMB2 records · " + p.smbDecodedRecordSummary + " · " + p.smbRefusedRecordSummary
 	}
 	if row.Info == "" {
 		row.Info = p.protocol
@@ -1541,6 +1596,8 @@ func tlsDisplayValue(name string, value any) string {
 		return fmt.Sprintf("%s (0x%04x)", tls.CipherSuiteName(uint16(n)), n)
 	case "Record Type", "Inner Content Type":
 		return fmt.Sprintf("%s (%d)", recordType(value), n)
+	case "Key Update Request":
+		return fmt.Sprintf("%s (%d)", tlsKeyUpdateRequestName(value), n)
 	case "Alert Description":
 		return fmt.Sprintf("%s (%d)", alertName(value), n)
 	case "Alert Level":

@@ -460,13 +460,14 @@ func TestUnifiedFsWithConfigInfo(t *testing.T) {
 				if zipFS, ok := fs.(*filesys.ZipFS); ok {
 					return zipFS
 				}
-				// UnifiedFS 的底层文件系统是私有字段，无法直接访问
-				// 这里简化处理，只检查直接的 ZipFS
+				if unified, ok := fs.(*filesys.UnifiedFS); ok {
+					return findZipFS(unified.GetFileSystem())
+				}
 				return nil
 			}
-			if zipFS := findZipFS(config.fs); zipFS != nil {
-				zipFS.Close()
-			}
+			zipFS := findZipFS(config.fs)
+			require.NotNil(t, zipFS, "close the actual archive even through UnifiedFS")
+			require.NoError(t, zipFS.Close())
 		}()
 	})
 

@@ -31,6 +31,9 @@ func duplicateSSHInitialFields(e *pcaputil.ProtocolEvent) bool {
 // equality decision in the parent, while both original maps are still owned
 // Go values. Only the outgoing display copy loses its redundant subtree.
 func protocolDisplayEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
+	if e != nil && smbDetailProtocol(e.Protocol) {
+		return smbDisplayEvent(e)
+	}
 	redundant := ""
 	if duplicateDNSSessionFields(e) {
 		redundant = "DNS"

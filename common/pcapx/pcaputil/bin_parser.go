@@ -17,6 +17,8 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	smb1SetupBodyRefusal               bool
+	smb1FileBodyRefusal                bool
 	nativeSessionMessage               bool
 	nativeNetFlowObservation           bool
 	rtmpChildren                       []*ProtocolEvent
@@ -924,6 +926,12 @@ func (a *binParser) emit(e *BinParserEvent) {
 		return
 	}
 	e.setStructured(e.Structured)
+	if e.nativeSessionMessage && (e.Protocol == "smb" || e.Protocol == "smb2") {
+		// Structured/Fields are public compatibility projections. Keep the
+		// accepted native tree independent before handing either to callers.
+		e.semanticFields = cloneSession(e.semanticFields)
+		e.semanticSession = cloneSession(e.semanticSession)
+	}
 	e.finalizeEvidence()
 	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
@@ -1079,6 +1087,9 @@ type binFlow struct {
 	level             byte
 	binding           *BinParserBinding
 	directions        [2]binDirection
+
+	httpRequestDirections byte
+	httpReplaying         bool
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -1088,6 +1099,12 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if (f.protocol == "smb" || f.protocol == "smb2") && status == "incomplete" {
+		// A trailing or unselected close observation has no complete-message
+		// field tree. Preserve its existing refusal before mutable public
+		// fields, protocol/status, or a caller-supplied rule can promote it.
+		e.nativeDiagnosticError = "protocol parser: event is incomplete, not an exact message"
+	}
 	if f.transportFlow != nil {
 		e.TCPFlowID = f.transportFlow.Index
 	}
@@ -1220,6 +1237,7 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 }
 
 func (f *binFlow) release(d *binDirection) {
+	f.releaseHTTPAwait(d.http)
 	f.a.buffered.Add(-int64(cap(d.buffer)) - int64(len(d.contributions))*80)
 	d.contributions = nil
 	d.buffer = nil
@@ -1261,6 +1279,7 @@ func (f *binFlow) retain(d *binDirection, data []byte) bool {
 
 func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d := &f.directions[dir]
+	f.prepareHTTPAwaitDiagnostic(dir)
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	retainedHTTPHeader := f.protocol == "http" && d.http != nil && !d.http.omitted && len(d.http.rawHeader) > 0 && d.http.headerFields != nil
 	if retainedHTTPHeader {
@@ -1277,6 +1296,27 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		}
 	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
+	if (f.protocol == "smb" || f.protocol == "smb2") && f.binding == nil && f.smb2 != nil {
+		// The native carrier was identified independently of the resource
+		// refusal. Keep that refusal private before any public cache/status.
+		// A clipped diagnostic is not an accepted response body.
+		e.nativeSessionMessage = true
+		e.Profile, e.Completeness = f.protocol+"-record-diagnostic", status
+		if status == "limited" {
+			e.Profile = f.protocol + "-record-resource-diagnostic"
+		}
+		e.SourceBytes.CompletedIn = nil
+		if e.sessionError == nil {
+			kind := ErrMalformedMessage
+			if status == "limited" {
+				kind = ErrResourceExceeded
+			} else if status == "context-required" {
+				kind = ErrContextRequired
+			}
+			e.sessionError = &ProtocolError{Kind: kind, Message: reason}
+		}
+		e.Error = e.sessionError.Error()
+	}
 	if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeDNSObservation || e.nativeATGObservation || e.nativeDLMSOrSLMPObservation || e.nativeTFTPObservation || e.nativeSIPObservation || e.nativeSTUNObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeHARTIPObservation || e.nativeFINSObservation || e.nativeENIPObservation {
 		if e.sessionError == nil {
 			kind := ErrMalformedMessage
@@ -1314,7 +1354,11 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		if d.http.omitted && !d.http.response {
 			e.ID = 0
 		}
-		e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		if d.http.awaitRequest {
+			e.Session = map[string]any{"Request Context Available": false, "Body Boundary Known": false, "Retained Stream Bytes": len(wire)}
+		} else {
+			e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		}
 		if d.http.response && d.http.status == 101 {
 			e.ExpertCode = "HTTPUpgradeUnverified"
 			e.Session["Upgrade Validated"] = false
@@ -1510,7 +1554,22 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			if f.protocol == "" {
 				if len(wire) >= a.config.ProbeBytes {
+					if len(wire) < 4+smb2HeaderSize && probeSMB2(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
+						break
+					}
+					// A response can be structurally identifiable yet exceed its
+					// parser frame budget. Keep only this finite format prefix so
+					// the completed record is refused as limited, not unrecognized.
+					if len(wire) < 65582 && len(wire) < a.config.MaxMessageBytes && probeSMB1FileCommand(wire, 65582).Verdict == ProbeNeedMore {
+						break
+					}
+					if len(wire) < 65598 && len(wire) < a.config.MaxMessageBytes && probeSMB1SessionSetupExtended(wire, 65598).Verdict == ProbeNeedMore {
+						break
+					}
+					if len(wire) < 65608 && len(wire) < a.config.MaxMessageBytes && probeSMB1NegotiateExtendedResponse(wire, 65608).Verdict == ProbeNeedMore {
 						break
 					}
 					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
@@ -1559,6 +1618,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		if n < 0 || n > a.config.MaxMessageBytes || f.protocol != "http2" && n > a.budget.MaxFrameBytes {
 			reason := fmt.Sprintf("declared message exceeds limit: message_bytes=%d max_message_bytes=%d", n, a.config.MaxMessageBytes)
+			if f.protocol == "smb" {
+				reason += fmt.Sprintf(" max_frame_bytes=%d", a.budget.MaxFrameBytes)
+			}
 			if h := d.http; f.protocol == "http" && h != nil && h.declared > 0 {
 				reason = fmt.Sprintf("HTTP declared message exceeds limit: message_bytes=%d max_message_bytes=%d; increase pcap_protocolBudget to decode the body", h.declared, a.config.MaxMessageBytes)
 			}
@@ -1651,7 +1713,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || (f.protocol == "smb" && f.binding == nil && f.smb2 != nil) || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspNativeControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1892,6 +1954,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
+		recoverableSMB1Setup := e.smb1SetupBodyRefusal || e.smb1FileBodyRefusal
 		recoverableRADIUS := e.nativeRADIUSObservation && radiusRecoverableFrame(e.Raw, e.sessionError, e.radiusApplicationRefusal)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
@@ -1908,9 +1971,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
 		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
-		if e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
+		if recoverableSMB1Setup || e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
 			stopAfterFailure = false
 		}
+		// Snapshot from private flow state before handing the public DTO to callbacks.
+		httpReplayPending := f.httpAwaitingPeerReady(dir)
 		children := e.rtmpChildren
 		e.rtmpChildren = nil
 		a.emit(e)
@@ -1960,6 +2025,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				return
 			}
 		}
+		// Complete request callbacks precede callbacks for responses that had
+		// to await this observed method.
+		if httpReplayPending {
+			f.replayHTTPAwaitingPeer(dir)
+		}
+		if d.stopped {
+			return
+		}
 		d.ts = ts
 	}
 	if len(wire) == 0 {
@@ -1974,6 +2047,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
+	// A valid request header can unblock an informational response before
+	// its body arrives (Expect: 100-continue). Retain this direction first.
+	f.replayHTTPAwaitingPeer(dir)
 	if detected && f.protocol != "" && !f.hasSession() {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
@@ -2010,6 +2086,11 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	}()
 	for dir := range f.directions {
 		d := &f.directions[dir]
+		if h := d.http; h != nil && h.awaitRequest && len(d.buffer) > 0 {
+			f.lastSessionError = &ProtocolError{Kind: ErrContextRequired, Message: "HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)"}
+			f.stop(dir, d.buffer, "context-required", string(reason)+": HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
+			continue
+		}
 		if h := d.http; h != nil && h.omitted {
 			if h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
 				f.finishHTTP(dir)

@@ -51,6 +51,7 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"rdp", "tcp", "TPKT/X224 negotiation and selected TLS carrier", "no complete desktop/session decoding claim"},
 		{"rtsp", "tcp", "RTSP control/interleaved frames", "observed CSeq/session/SETUP mapping"},
 		{"redis", "tcp", "RESP messages", "complete structured initial admission and observed flow"},
+		{"smb", "tcp", "exact Direct TCP SMB1 NEGOTIATE and Unicode extended-security terminal SESSION_SETUP_ANDX", "bounded TCP reassembly; owned raw offers, WC17 response and WC12/WC4 setup words/UTF-16 strings with opaque tokens/extensions. PID32/MID and observed UID continuation are capture-domain/TCP-generation scoped; duplicate/orphan/reused identifiers and validated modern envelopes cannot lend old context. No OEM codepage, active AndX, authentication/signature verification, established session or legacy-to-SMB2 MID/dialect inference"},
 		{"smb2", "tcp", "direct TCP SMB2/3 messages", "observed dialect/session/MID; encrypted SMB3 opaque"},
 		{"tds", "tcp", "TDS packets/messages", "observed native TDS profile, protected values opaque"},
 		{"rfb", "tcp", "RFB/VNC handshake and messages", "observed native negotiated profile"},
