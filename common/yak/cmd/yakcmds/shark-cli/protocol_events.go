@@ -925,7 +925,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					keys []string
 				}{
 					{"Record header", []string{"Record Type", "Record Version", "Record Length"}},
-					{"Record decoding", []string{"Content Visibility", "Secret Lookup Status", "Authentication Verified", "Inner Content Type", "Handshake Messages", "Alert Level", "Alert Description"}},
+					{"Record decoding", []string{"Content Visibility", "Secret Lookup Status", "Authentication Verified", "Inner Content Type", "Record Recovery Verified", "Recovered Record Sequence", "Missing Earlier Plaintext", "Recovery State", "Application Epoch Inferred From Authenticated Record", "Unobserved KeyUpdate Inferred From Authentication", "Discarded Handshake Fragment Bytes", "Application Decoding", "Handshake Parsing", "Handshake Incomplete", "Handshake Messages", "Alert Level", "Alert Description"}},
 					{"Observed connection", []string{"Negotiated Version", "Cipher Suite", "SNI", "ALPN", "Certificate Trust"}},
 				} {
 					present := false
