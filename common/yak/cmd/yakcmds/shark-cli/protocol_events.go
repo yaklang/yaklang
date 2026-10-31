@@ -905,6 +905,43 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				// Retained hello metadata and this record are separate evidence
 				// scopes. End the metadata branch before publishing wire ranges.
 				add("TLS record and observed context", true)
+				for _, group := range []struct {
+					name string
+					keys []string
+				}{
+					{"Record header", []string{"Record Type", "Record Version", "Record Length"}},
+					{"Record decoding", []string{"Content Visibility", "Secret Lookup Status", "Authentication Verified", "Inner Content Type", "Handshake Messages", "Alert Level", "Alert Description"}},
+					{"Observed connection", []string{"Negotiated Version", "Cipher Suite", "SNI", "ALPN", "Certificate Trust"}},
+				} {
+					present := false
+					for _, key := range group.keys {
+						if _, ok := values[key]; ok {
+							present = true
+							break
+						}
+					}
+					if !present {
+						continue
+					}
+					if len(out) >= 4096 {
+						fieldViewLimited = true
+						break
+					}
+					add(group.name, true)
+					out[len(out)-1].depth = 1
+					for _, key := range group.keys {
+						if value, ok := values[key]; ok {
+							start := len(out)
+							// Preserve the existing source/range scope of each root
+							// value, then indent its presentation below this heading.
+							walk(key, value, 0)
+							for i := start; i < len(out); i++ {
+								out[i].depth++
+							}
+							delete(values, key)
+						}
+					}
+				}
 			}
 			if e.Protocol == "dcerpc" {
 				add("DCE/RPC message and observed association", true)
