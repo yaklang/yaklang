@@ -415,6 +415,8 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	})
 	b.rangeKey = "Record Type"
 	out = append(out, b)
+	path("tls", "tls", "tls.handshake.key_update.request_update", "TLS KeyUpdate request decoded from authenticated handshake plaintext", DisplayUnsigned, 8, "derived", "Handshake Messages", "*", "Key Update Request")
+	out[len(out)-1].descriptor.Description = "Literal request byte in authenticated KeyUpdate handshake plaintext; derived by decryption, with no ciphertext PDU or physical-frame span"
 	path("rip", "rip", "rip.metric", "RIP route metric", DisplayUnsigned, 32, "pdu", "Entries", "*", "Metric")
 	path("http2|grpc|doh", "http2", "http2.streamid", "HTTP/2 stream ID", DisplayUnsigned, 31, "pdu", "Stream ID")
 	path("grpc", "grpc", "grpc.status", "gRPC status", DisplayUnsigned, 32, "pdu", "GRPC Status")

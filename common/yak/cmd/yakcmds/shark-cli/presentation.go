@@ -366,6 +366,9 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
+		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
+			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
+		}
 		parts = append(parts, name)
 	}
 	if len(parts) == 0 {
@@ -1570,6 +1573,8 @@ func tlsDisplayValue(name string, value any) string {
 		return fmt.Sprintf("%s (0x%04x)", tls.CipherSuiteName(uint16(n)), n)
 	case "Record Type", "Inner Content Type":
 		return fmt.Sprintf("%s (%d)", recordType(value), n)
+	case "Key Update Request":
+		return fmt.Sprintf("%s (%d)", tlsKeyUpdateRequestName(value), n)
 	case "Alert Description":
 		return fmt.Sprintf("%s (%d)", alertName(value), n)
 	case "Alert Level":

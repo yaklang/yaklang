@@ -68,6 +68,12 @@ func (e *ProtocolEvent) summarizeProtocol() {
 				name = "ClientHello"
 			case byte(2):
 				name = "ServerHello"
+			case byte(24):
+				if e.Session["Authentication Verified"] == true && messages[0]["Authenticated"] == true {
+					if request, ok := messages[0]["Key Update Request"].(byte); ok && request <= 1 {
+						name = "KeyUpdate · " + []string{"update_not_requested", "update_requested"}[request]
+					}
+				}
 			}
 		}
 		e.Summary = fmt.Sprintf("TLS %s (%v bytes, %v)", name, e.Session["Record Length"], e.Session["Content Visibility"])
