@@ -1450,7 +1450,9 @@ func (f *binFlow) closeSession() {
 	f.httpIDs, f.httpTimes = nil, nil
 	f.httpUpgrades, f.httpDoH, f.httpIPP = nil, nil, nil
 	f.httpUpgradeIssues = nil
+	f.httpRequestDirections = 0
 	for dir := range f.directions {
+		f.releaseHTTPAwait(f.directions[dir].http)
 		f.directions[dir].http = nil
 	}
 	if f.tls != nil && f.tls.child != nil {
