@@ -344,6 +344,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 	if p := probeSMB1Negotiate(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
 		return p
 	}
+	if p := probeSMB1NegotiateExtendedResponse(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
 	// A short zero-prefixed carrier is ambiguous. Only move SMB2 ahead of
 	// specialized carrier probes once its signature is actually present.
 	if len(input) >= 8 {
@@ -718,6 +721,9 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeSMB1Negotiate(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1NegotiateExtendedResponse(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSMB2(w, limit); p.Verdict != ProbeReject {

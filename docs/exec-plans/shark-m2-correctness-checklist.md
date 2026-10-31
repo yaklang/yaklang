@@ -6,12 +6,15 @@
 代码量或测试数量估算完成度。M1 尚未合并时，M2 PR 以 M1 分支为基线，避免重复展示 M1。
 
 后续分支 `codex/shark-m2-smb-query-info-types` 从已全绿的 M2 `f9faae9f82c0dbe6a657bfaa94d7d6acdc845380` 开始。
-当前状态：**33 项，已完成 25，进行中 4，未开始 4；剩余 8 项**。
-完成项为 M2-01/02/03、06、12..32 的有限合同，不含进行中的 M2-11；不代表整个 SMB profile 验收完成。
+当前状态：**35 项，已完成 26，进行中 4，未开始 5；剩余 9 项**。
+完成项为 M2-01/02/03、06、12..33 的有限合同，不含进行中的 M2-11；不代表整个 SMB profile 验收完成。
 M2-30/31/32 的正文恢复、异步身份与页面合同已通过本地及原始捕获验收；
-新增 M2-33 记录真实 SMB1 响应缺口，只有来源与接入方案，尚未修复。
-本批实际代码构建为 `0769c2617d8f8fad4e66ecf2a323461669261a10`，
-[完整验证与限制](shark-m2-smb-query-output-validation-20261031.md)；最终交付 SHA 的 CI 仍归 M2-11。
+M2-33 的有限WC17响应profile已经完成代码、原始来源和Windows验收，整批CI归M2-11。
+其后新暴露的SESSION_SETUP_ANDX和Stream展示问题分别追加M2-34/35，没有计入旧完成项。
+QUERY_INFO阶段的代码构建为 `0769c2617d8f8fad4e66ecf2a323461669261a10`，
+[完整验证与限制](shark-m2-smb-query-output-validation-20261031.md)，最终a407为47checks+2statuses全绿并ready。
+最新WC17构建为 `7387371611d5073be5017960f9361b8b2b8cf000`，
+[逐项来源、测试和实际页面](shark-m2-smb1-negotiate-20261031.md)；最终交付SHA的CI仍归M2-11。
 新增 QUERY_INFO 和源码 oracle 见[本批范围与证据](shark-m2-smb-query-info-20261030.md)。
 M2-04 的19个子项另计：QUERY_INFO envelope .08和正文来源补充 .19已完成
 （后者仅oracle），12进行中、5未开始；尚未关闭的17项不能用来源完整性代替。
@@ -35,7 +38,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 未开始 | 逐方向/版本/密钥代际及缺开头矩阵，真实流量与独立负控；不伪造协商/身份/明文 | 2–4 小时 |
 | M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 未开始 | CID/域/连接代际、加密级别和密钥代际、STREAM/QPACK 恢复；实际认证和来源 | 2–4 小时 |
 | M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 未开始 | 从现有差异报告建立稳定问题 ID、预期/来源/测试，新增问题追加，不能隐去未映射项 | 首轮梳理 1–2 小时；修复另估 |
-| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | dd63已47checks+2status全绿；60完整traffic312229 pass/25历史skip、131084 required全部通过，但Essential暴露M2-28失败，不能算全绿；修复后仍须最终SHA的全部CI | 30–90 分钟实施，执行等待另计 |
+| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | f9及a407检查点47checks+2status全绿；a407 traffic312283 pass/25历史skip，131084 required全部通过且无required skip，实际checkout与artifact均核实；最新7387的本地510、真实官方/Weber/Windows和最终fuzz已过，后续交付仍须最终SHA全部CI | 30–90 分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
 | M2-14 | SMB1 status 格式与 NTSTATUS alias 正确 | 已完成（alias 合同） | `TestSMB1AliasContract*`：请求/响应四组合，NTSTATUS 仅响应且 bit 置位；raw Status 与请求格式偏好分开，保留范围 | 0 |
@@ -57,7 +60,9 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-30 | 完整记录的body错误不得停止后续可识别SMB2流量 | 已完成（有限恢复合同，整批CI归11） | 0769三份原始官方捕获2350个QI、49178个固定头/envelope字段和来源逐一匹配；旧17/80布局保留完整raw/header/错误，不伪读PreviousSessionId；仅已知完整DirectTCP及全部compound头可恢复且无state提交；header/framing/资源/关联冲突仍fatal；canonical成功/continuation/ERROR、永久gap与恢复负控及真实Windows拒绝页通过 | 0 |
 | M2-31 | AsyncId的pending建立、唯一性、固定身份与MID复用 | 已完成（有限身份合同，整批CI归11） | PENDING按literalMID绑定；final按已观察非零AsyncId；同ID幂等，换ID/他请求占用/同compound两类冲突拒绝；完成后删唯一alias，MID复用后的late99不借新selector；native/canonical/恢复预检0/1/max ID及workers矩阵、428项回归和覆盖引导fuzz通过 | 0 |
 | M2-32 | 类型化SMB列表与拒绝记录的递进展示一致 | 已完成（四页有限合同，整批CI归11） | 实际列表显示FileStandardInformation/EA及精确整数；Header→Body→命名类型→literal；无正文解码的完整记录显示unsupported body layout，混合成功/失败回调顺序与redraw不丢状态；0769四个Windows实际控制台页80状态、完整物理/PDU字节与精确高亮、mouse/tabs/resize/CP936通过；8785 pass/3历史skip | 0 |
-| M2-33 | 真实SMB1 NEGOTIATE扩展安全响应被误报malformed | 未开始（来源及接入方案已冻结） | smb2-getinfo.cap原frame16/17：11个请求方言，153-byte完整WC17响应、ByteCount80、GUID16+blob64；当前事件只有64-byte诊断preview，不能以此证明坏包。需canonical/native响应入口、完整PID+MID反向同域同代际匹配、选择索引上下文、重组/复用/字段/Windows及负控，随后原捕获逐包复验 | 2–4小时实施及验证；CI等待另计 |
+| M2-33 | 真实SMB1 NEGOTIATE扩展安全响应被误报malformed | 已完成（有限profile，整批CI归11） | 7387共享canonical/native WC17响应、uint64 FILETIME/int16时区/GUID/opaque blob；原frame16/17双副本156 literal/1142断言和源码67负控，0已映射差异；510矩阵、最终103984覆盖引导fuzz、两实际Windows页53状态通过；PID32/MID/域/代次/重复/早到/复用/现代载体含body拒绝时的旧资格退休、预算私有拒绝与cap计费均有负控。不是全部SMB1或token认证完成 | 0 |
+| M2-34 | SMB1 SESSION_SETUP_ANDX扩展安全WC12/WC4尚未原生接入 | 未开始（独立来源已冻结） | 原捕获22个完整SMB1中，19–22是2请求/2响应，PDU228/416/340/246B；terminal ff的非零AndXOffset必须忽略，10个AndX型PDU真实多命令链0；旧generic parser ByteCount位置错误；110个源出现项含两个20B未知尾部，不照抄TS PrimaryDomain。16边界计划和源raw/字段/range已冻，需共享原生/关联/复用/展示与实际比对；另16条其他命令仍开放 | 2–4小时；CI/数据等待另计 |
+| M2-35 | 非HTTP流的Stream起始页仍显示HTTP专用缺头提示 | 未开始（实际Windows页面发现） | windows-M2-SMB1-response69-01/smb1-frame17-server-guid/05-narrow.png真实SMB1连接显示“No complete, valid HTTP header”；需按已观察协议提供相符起始分析，保留原始源与HTTP正例、unknown/多协议反例及Windows页面，不凭端口推协议 | 0.5–1小时 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。上次在账户已用50%时暂停；本轮用户追加20个百分点，账户已用70%时停止，并提前留出提交和精确SHA CI收尾空间。最多 1 个子 agent，主 agent 负责关键路径。
 
