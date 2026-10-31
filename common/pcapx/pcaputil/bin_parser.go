@@ -926,6 +926,12 @@ func (a *binParser) emit(e *BinParserEvent) {
 		return
 	}
 	e.setStructured(e.Structured)
+	if e.nativeSessionMessage && (e.Protocol == "smb" || e.Protocol == "smb2") {
+		// Structured/Fields are public compatibility projections. Keep the
+		// accepted native tree independent before handing either to callers.
+		e.semanticFields = cloneSession(e.semanticFields)
+		e.semanticSession = cloneSession(e.semanticSession)
+	}
 	e.finalizeEvidence()
 	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
@@ -1090,7 +1096,7 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
-	if f.protocol == "smb" && status == "incomplete" {
+	if (f.protocol == "smb" || f.protocol == "smb2") && status == "incomplete" {
 		// A trailing or unselected close observation has no complete-message
 		// field tree. Preserve its existing refusal before mutable public
 		// fields, protocol/status, or a caller-supplied rule can promote it.
@@ -1285,14 +1291,14 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		}
 	}
 	e.sessionError, f.lastSessionError = f.lastSessionError, nil
-	if f.protocol == "smb" && f.binding == nil && f.smb2 != nil {
+	if (f.protocol == "smb" || f.protocol == "smb2") && f.binding == nil && f.smb2 != nil {
 		// The native carrier was identified independently of the resource
 		// refusal. Keep that refusal private before any public cache/status.
 		// A clipped diagnostic is not an accepted response body.
 		e.nativeSessionMessage = true
-		e.Profile, e.Completeness = "smb-record-diagnostic", status
+		e.Profile, e.Completeness = f.protocol+"-record-diagnostic", status
 		if status == "limited" {
-			e.Profile = "smb-record-resource-diagnostic"
+			e.Profile = f.protocol + "-record-resource-diagnostic"
 		}
 		e.SourceBytes.CompletedIn = nil
 		if e.sessionError == nil {
