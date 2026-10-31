@@ -807,7 +807,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.semanticFields, e.semanticSession = cloneSession(e.Session), cloneSession(e.Session)
 		}
 	case "smb2":
-		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		err = f.consumeSMB2(dir, e)
 		if err == nil && f.nbss {
 			e.Session["Carrier"] = "NetBIOS Session Service"
 		}

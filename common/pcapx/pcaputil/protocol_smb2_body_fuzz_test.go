@@ -2,6 +2,7 @@ package pcaputil
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"testing"
 	"time"
@@ -18,6 +19,8 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		f.Add(uint8(kind), bytes.Clone(wire[68:]), uint8(7))
 	}
 	f.Add(uint8(1), []byte{89, 0}, uint8(1))
+	f.Add(uint8(4), bytes.Clone(smb2QueryResponse(5, 17, 7, 0, smb2StandardOutput())[68:]), uint8(1))
+	f.Add(uint8(5), bytes.Clone(smb2QueryResponse(5, 17, 7, 0, []byte{1, 2, 3, 4})[68:]), uint8(7))
 	f.Fuzz(func(t *testing.T, kind uint8, body []byte, chunk uint8) {
 		if len(body) > 2048 {
 			return
@@ -27,7 +30,7 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		smb2ChainFeed(t, session, 1, smb2NegotiateResp(0x0202))
 		command, mid, sid, tid := uint16(0), uint64(1), uint64(0), uint32(0)
-		switch kind % 4 {
+		switch kind % 6 {
 		case 0:
 			smb2ChainFeed(t, session, 0, smb2NegotiateReq(0x0202))
 		case 1:
@@ -41,6 +44,13 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 		case 3:
 			command, mid, sid, tid = 16, 5, 17, 7
 			smb2ChainFeed(t, session, 0, smb2QueryRequest(5, 17, 7, 1, 0x22, nil))
+		case 4, 5:
+			command, mid, sid, tid = 16, 5, 17, 7
+			class := byte(5)
+			if kind%6 == 5 {
+				class = 7
+			}
+			smb2ChainFeed(t, session, 0, smb2QueryRequest(5, 17, 7, 1, class, nil))
 		}
 		wire := smb2TCP(append(smb2Hdr(command, smb2FlagResp, mid, sid, tid), body...))
 		for at := 0; at < len(wire); {
@@ -49,6 +59,7 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 			for _, event := range result.Events {
 				if event.Status == "decoded" {
 					smb2FuzzOwnedRanges(t, event.Session, len(event.Raw))
+					smb2FuzzLiteralValues(t, event.Session, event.Raw)
 				}
 				owned := bytes.Clone(event.Raw)
 				before, err := json.Marshal(event.Session)
@@ -70,12 +81,62 @@ func FuzzSMB2StatefulBodySources(f *testing.F) {
 	})
 }
 
+// This oracle checks literal values/types against the owning little-endian
+// bytes, independently of the field codec. It does not establish that every
+// protocol field has been published or validate all SMB session semantics.
+func smb2FuzzLiteralValues(t *testing.T, value any, raw []byte) {
+	t.Helper()
+	switch value := value.(type) {
+	case map[string]any:
+		if ranges, ok := value["Wire Field Ranges"].(map[string]any); ok {
+			for name, span := range ranges {
+				pair := span.([]any)
+				lo, _ := displayUint(pair[0])
+				hi, _ := displayUint(pair[1])
+				wire := raw[lo:hi] // Range bounds are asserted by smb2FuzzOwnedRanges first.
+				switch literal := value[name].(type) {
+				case uint8:
+					require.Len(t, wire, 1)
+					require.Equal(t, wire[0], literal, name)
+				case uint16:
+					require.Len(t, wire, 2)
+					require.Equal(t, binary.LittleEndian.Uint16(wire), literal, name)
+				case uint32:
+					require.Len(t, wire, 4)
+					require.Equal(t, binary.LittleEndian.Uint32(wire), literal, name)
+				case uint64:
+					require.Len(t, wire, 8)
+					require.Equal(t, binary.LittleEndian.Uint64(wire), literal, name)
+				case int64:
+					require.Len(t, wire, 8)
+					require.Equal(t, int64(binary.LittleEndian.Uint64(wire)), literal, name)
+				case []byte:
+					require.Equal(t, wire, literal, name)
+				}
+			}
+		}
+		for name, child := range value {
+			if name != "Wire Field Ranges" {
+				smb2FuzzLiteralValues(t, child, raw)
+			}
+		}
+	case []map[string]any:
+		for _, child := range value {
+			smb2FuzzLiteralValues(t, child, raw)
+		}
+	case []any:
+		for _, child := range value {
+			smb2FuzzLiteralValues(t, child, raw)
+		}
+	}
+}
+
 func smb2FuzzOwnedRanges(t *testing.T, value any, size int) {
 	t.Helper()
 	switch value := value.(type) {
 	case map[string]any:
 		if ranges, ok := value["Wire Field Ranges"].(map[string]any); ok {
-			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID", "Request Info Type", "Request File Info Class", "Request Additional Information", "Request Query Flags", "Request Output Buffer Length", "Request Message ID"} {
+			for _, forbidden := range []string{"Effective Session ID", "Effective Tree ID", "Request File ID", "File Context", "File Context Source Message ID", "Request Info Type", "Request File Info Class", "Request Additional Information", "Request Query Flags", "Request Output Buffer Length", "Request Message ID", "Request Output Information Type", "Delete Pending State", "Directory State", "Output Information Type"} {
 				require.NotContains(t, ranges, forbidden)
 			}
 			for _, span := range ranges {
