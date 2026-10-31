@@ -23,6 +23,26 @@ Package:
     operator: |
       err = parseCIFSSessionSetup(true)
       if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.55.1/.2 and 2.2.4.7.1/.2. Explicit complete
+  # TREE_CONNECT_ANDX WC4/WC3 and DELETE WC1/WC0. Responses are success-only.
+  # Unicode SMB_STRING plus ASCII-compatible OEM Service; terminal AndX only.
+  # EXTENDED_SECURITY is not required. No authentication/session proof.
+  CIFSDirectTCPTreeConnectAndXRequest:
+    operator: |
+      err = parseCIFSTreeConnectAndX(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPTreeConnectAndXResponse:
+    operator: |
+      err = parseCIFSTreeConnectAndX(true)
+      if err != nil { panic(err) }
+  CIFSDirectTCPDeleteRequest:
+    operator: |
+      err = parseCIFSDelete(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPDeleteResponse:
+    operator: |
+      err = parseCIFSDelete(true)
+      if err != nil { panic(err) }
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }

@@ -164,7 +164,7 @@ func (s *smb1SetupState) clone() *smb1SetupState {
 	return n
 }
 
-func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) error {
+func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) (resultErr error) {
 	response := e.Entry == "CIFSDirectTCPSessionSetupExtendedResponse"
 	e.nativeSessionMessage = true
 	e.Profile, e.Completeness = "cifs-session-setup-extended-request", "message"
@@ -195,6 +195,11 @@ func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) error {
 	if e.ID == 0 {
 		e.ID = f.a.ids.Add(1)
 	}
+	tx, err := f.beginSMB1Legacy(dir, e, fields)
+	if err != nil {
+		return err
+	}
+	defer tx.finish(&resultErr)
 	h := fields["Header"].(map[string]any)
 	uid := h["User ID"].(uint16)
 	requestDir := dir
@@ -210,6 +215,8 @@ func (f *binFlow) consumeSMB1Setup(dir int, e *ProtocolEvent) error {
 	if f.smb2.smb1Modern {
 		fields["Setup Context Status"] = "modern carrier observed; legacy setup context unavailable"
 		next = &smb1SetupState{}
+	} else if !tx.allowed {
+		fields["Setup Context Status"] = tx.reason
 	} else if !response {
 		if lineage, seen := next.seen[key]; seen {
 			delete(next.pending, key)
@@ -312,8 +319,17 @@ func (f *binFlow) stageSMB1SetupState() (*smb1SetupState, error) {
 // path. Keep literal headers and the exact refused PDU, retire that setup's
 // eligibility, then continue at the next declared Direct TCP record. There is
 // no byte scan, accepted body publication, token inference or authenticated UID.
-func (f *binFlow) refuseSMB1SetupBody(dir int, e *ProtocolEvent, cause error) error {
+func (f *binFlow) refuseSMB1SetupBody(dir int, e *ProtocolEvent, cause error) (resultErr error) {
 	w := e.Raw
+	if e.ID == 0 {
+		e.ID = f.a.ids.Add(1)
+	}
+	tx, err := f.beginSMB1Legacy(dir, e, map[string]any{"Header": smb1OwnedHeader(w)})
+	if err != nil {
+		return err
+	}
+	tx.refused = true
+	defer tx.finish(&resultErr)
 	response := w[13]&0x80 != 0
 	pid := uint32(binary.LittleEndian.Uint16(w[16:18]))<<16 | uint32(binary.LittleEndian.Uint16(w[30:32]))
 	requestDir := dir
@@ -332,9 +348,11 @@ func (f *binFlow) refuseSMB1SetupBody(dir int, e *ProtocolEvent, cause error) er
 			lineage = c.lineage
 		}
 	}
-	next.retireLineage(lineage)
-	if _, seen := next.seen[key]; !seen {
-		next.seen[key] = 0
+	if tx.refusalEligible {
+		next.retireLineage(lineage)
+		if _, seen := next.seen[key]; !seen {
+			next.seen[key] = 0
+		}
 	}
 	if len(next.seen) > f.a.budget.MaxCollectionElements {
 		return protocolError(ErrResourceExceeded, "CIFS setup: refused-record identity collection exceeded")
@@ -369,6 +387,9 @@ func (f *binFlow) refuseSMB1SetupBody(dir int, e *ProtocolEvent, cause error) er
 		"Context Eligibility": "refused setup lineage retired; no accepted body committed",
 		"Direct TCP":          map[string]any{"Message Type": w[0], "Payload Length": uint32(len(w) - 4), "Wire Field Ranges": map[string]any{"Message Type": []any{uint64(0), uint64(1)}, "Payload Length": []any{uint64(1), uint64(4)}}},
 		"Wire Field Ranges":   map[string]any{},
+	}
+	if !tx.refusalEligible {
+		fields["Context Eligibility"] = "unmatched refused response; existing request context unchanged"
 	}
 	e.ResponseTo = 0
 	e.Profile, e.Completeness = "smb1-session-setup-body-diagnostic", "headers"

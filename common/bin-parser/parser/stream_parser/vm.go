@@ -475,6 +475,18 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseSMTPFields(invocation.node, invocation.operator, data)
 		},
+		"parseCIFSTreeConnectAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-tree-connect-andx: generation is unsupported")
+			}
+			return parseCIFSTreeConnectAndX(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSDelete": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-delete: generation is unsupported")
+			}
+			return parseCIFSDelete(invocation.node, invocation.operator, response)
+		},
 		"parseCIFSSessionSetup": func(response bool) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("cifs-session-setup: generation is unsupported")
