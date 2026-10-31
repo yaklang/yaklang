@@ -26,7 +26,15 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 	if !tlsAuthenticationError(err) || f.transportFlow == nil && !f.orderedTLSCarrier {
 		return nil, 0, err
 	}
-	commit := func(trial binTLS, p []byte, kind byte, missing bool) ([]byte, byte, error) {
+	commit := func(trial binTLS, p []byte, kind byte, missing, epochChanged bool) ([]byte, byte, error) {
+		// Missing old-epoch handshake bytes cannot be joined to an authenticated
+		// new epoch. Retire them only after the candidate record authenticates;
+		// failed trials retain the live state. Application gap policy is unchanged.
+		if epochChanged && len(trial.handshake[dir]) != 0 {
+			info["Discarded Handshake Fragment Bytes"] = len(trial.handshake[dir])
+			trial.handshake[dir] = nil
+			trial.handshakeAuthenticated[dir] = false
+		}
 		*t = trial
 		t.recordGap[dir] = false
 		t.recoveryFailures[dir] = 0
@@ -43,7 +51,7 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 			trial.seq[dir] += skip
 			p, k, e := trial.open(dir, w)
 			if e == nil {
-				return commit(trial, p, k, true)
+				return commit(trial, p, k, true, false)
 			}
 		}
 	}
@@ -61,7 +69,7 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 					if e == nil {
 						info["Application Epoch Inferred From Authenticated Record"] = true
 						candidate.handshakeGap[dir] = false
-						return commit(candidate, p, k, n > 0 || t.child != nil)
+						return commit(candidate, p, k, n > 0 || t.child != nil, true)
 					}
 				}
 			}
@@ -74,7 +82,7 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 					if e == nil {
 						info["Unobserved KeyUpdate Inferred From Authentication"] = true
 						candidate.handshakeGap[dir] = false
-						return commit(candidate, p, k, true)
+						return commit(candidate, p, k, true, true)
 					}
 				}
 			}
