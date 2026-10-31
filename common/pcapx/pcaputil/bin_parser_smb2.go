@@ -22,6 +22,7 @@ type binSMB2 struct {
 	files      map[smb2FileKey]string
 	smb1       *smb1NegotiateState
 	smb1Setup  *smb1SetupState
+	smb1Legacy *smb1LegacyState
 	smb1Modern bool
 }
 
@@ -180,6 +181,14 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
 	case 0x424d53ff:
+		if n >= 35 && (w[8] == 0x75 || w[8] == 0x06) {
+			if !boundedSMB1FileEnvelope(w[:total]) {
+				return 0, nil, fmt.Errorf("CIFS file command: WordCount/ByteCount exceed exact DirectTCP boundary")
+			}
+			entry, _, _, _ := smb1FileEntry(w[8], w[13]&0x80 != 0)
+			f.protocol = "smb"
+			return total, f.spec("cifs", entry), nil
+		}
 		if probeSMB1SessionSetupExtended(w[:total], 65598).Verdict == ProbeAccept {
 			f.protocol = "smb"
 			entry := "CIFSDirectTCPSessionSetupExtendedRequest"
@@ -268,7 +277,7 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	}
 	// Includes the private chain identity and the retained QUERY_INFO selector.
 	target := int64(256) + int64(len(s.pending)+1)*160 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
-	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes() + s.smb1Setup.ownedBytes()
+	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes() + s.smb1Setup.ownedBytes() + s.smb1Legacy.ownedBytes()
 	return s.flow.reserveSession(target)
 }
 

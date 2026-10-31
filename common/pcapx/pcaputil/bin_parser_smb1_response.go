@@ -107,7 +107,7 @@ func smb1NegotiateIdentity(fields map[string]any) (uint32, uint16, error) {
 	return uint32(high)<<16 | uint32(low), mid, nil
 }
 
-func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) error {
+func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) (resultErr error) {
 	response := e.Entry == "CIFSDirectTCPNegotiateExtendedResponse"
 	// Retain refusal authority before invoking the bounded codec. Caller edits
 	// must not turn a resource refusal into a successful generic raw decode.
@@ -139,6 +139,11 @@ func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) error {
 	if f.smb2 == nil {
 		return sessionContext("CIFS: carrier state unavailable")
 	}
+	tx, err := f.beginSMB1Legacy(dir, e, fields)
+	if err != nil {
+		return err
+	}
+	defer tx.finish(&resultErr)
 	previous := f.smb2.smb1
 	var next smb1NegotiateState
 	if previous != nil {
@@ -148,7 +153,14 @@ func (f *binFlow) consumeSMB1Negotiate(dir int, e *ProtocolEvent) error {
 		next.ambiguous, next.offer = true, nil
 	}
 	fields["Selection Policy"] = "one observed negotiation per TCP generation; additional requests disable name resolution"
-	if !response {
+	if !tx.allowed {
+		fields["Selection Status"] = tx.reason
+		if !response {
+			// Even a cross-command collision is an observed additional offer.
+			// It cannot bypass the stricter one-negotiation-per-generation policy.
+			next.ambiguous, next.offer, next.seenRequest = true, nil, true
+		}
+	} else if !response {
 		if next.ambiguous || next.seenRequest || next.seenOrphan || next.completed {
 			next.ambiguous = true
 			next.offer = nil

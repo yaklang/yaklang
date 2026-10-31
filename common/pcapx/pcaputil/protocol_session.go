@@ -341,6 +341,9 @@ func (s *captureSession) Probe(data []byte) ProbeResult {
 		limit = 64
 	}
 	input := data
+	if p := probeSMB1FileCommand(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
+		return p
+	}
 	if p := probeSMB1SessionSetupExtended(input, min(s.f.a.budget.MaxFrameBytes, s.f.a.config.MaxMessageBytes)); p.Verdict != ProbeReject {
 		return p
 	}
@@ -721,6 +724,9 @@ func probeWireTransport(w []byte, limit int, tcp bool) ProbeResult {
 		return p
 	}
 	if p := probeAMQP(w, limit); p.Verdict != ProbeReject {
+		return p
+	}
+	if p := probeSMB1FileCommand(w, limit); p.Verdict != ProbeReject {
 		return p
 	}
 	if p := probeSMB1SessionSetupExtended(w, limit); p.Verdict != ProbeReject {
