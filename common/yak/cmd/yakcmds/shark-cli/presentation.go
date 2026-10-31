@@ -32,6 +32,8 @@ type packetPresentation struct {
 	priority                              int
 	count                                 int
 	rejectedTLS                           bool
+	tlsIncompleteSummary                  bool
+	tlsRecordProblem                      string
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
 	nativeESPIncomplete                   bool
@@ -1220,6 +1222,11 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			}
 			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
 			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if e.Protocol == "tls" && e.ExpertCode == string(pcaputil.ErrMalformedMessage) && p.tlsRecordProblem == "" {
+				// A later consequence (for example invalidated stream affinity)
+				// must not replace the original rejected-record diagnosis.
+				p.tlsRecordProblem = p.diagnostic
+			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)
 				if p.protocol == "" && e.FlowID != 0 {
@@ -1279,11 +1286,19 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	info := clipText(applicationEventSummary(e), 384)
+	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
 	if rank > p.priority || p.protocol != label {
 		p.summary, p.count = info, 1
+		p.tlsIncompleteSummary = incompleteTLS
 	} else {
 		p.count++
-		if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
+		if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
+			// Put a completed message before fragment/context text, including
+			// when it arrives beyond the first three coalesced record samples.
+			// Keep the fragment evidence and the existing bounded row budget.
+			p.summary = info + " | " + clipText(p.summary, 384)
+			p.tlsIncompleteSummary = false
+		} else if p.count <= 3 && info != "" && !strings.Contains(p.summary, info) {
 			p.summary += " | " + info
 		}
 	}
@@ -1399,6 +1414,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 			if row.Protocol == "TLS" {
 				row.Protocol = strings.ToUpper(row.Transport)
 			}
+		}
+		if p.tlsRecordProblem != "" && p.tlsRecordProblem != p.diagnostic {
+			row.Info = p.tlsRecordProblem + " · " + row.Info
+			row.ProtocolStatus = "malformed"
 		}
 		return row
 	}
@@ -1534,6 +1553,10 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	}
 	row.Visibility, row.ProtocolStatus = p.visibility, p.status
 	row.Info = p.summary
+	if p.tlsRecordProblem != "" {
+		row.Info = p.tlsRecordProblem + " | " + row.Info
+		row.ProtocolStatus = "mixed-record-outcomes"
+	}
 	if p.rejectedTLS && p.count > 0 {
 		row.Info = "Includes rejected TLS record · " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
@@ -1541,7 +1564,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.count > 3 {
 		row.Info += fmt.Sprintf(" (+%d further PDUs)", p.count-3)
 	}
-	if p.diagnostic != "" && p.diagnostic != p.summary {
+	if p.diagnostic != "" && p.diagnostic != p.summary && p.diagnostic != p.tlsRecordProblem {
 		row.Info += " · " + p.diagnostic
 	}
 	if p.smbDecodedRecordSummary != "" && p.smbRefusedRecordSummary != "" {
