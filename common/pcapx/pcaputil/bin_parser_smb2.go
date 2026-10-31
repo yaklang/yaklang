@@ -21,6 +21,7 @@ type binSMB2 struct {
 	async      map[smb2AsyncKey]smb2PendingKey
 	files      map[smb2FileKey]string
 	smb1       *smb1NegotiateState
+	smb1Setup  *smb1SetupState
 	smb1Modern bool
 }
 
@@ -179,6 +180,17 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
 	case 0x424d53ff:
+		if probeSMB1SessionSetupExtended(w[:total], 65598).Verdict == ProbeAccept {
+			f.protocol = "smb"
+			entry := "CIFSDirectTCPSessionSetupExtendedRequest"
+			if w[13]&0x80 != 0 {
+				entry = "CIFSDirectTCPSessionSetupExtendedResponse"
+			}
+			return total, f.spec("cifs", entry), nil
+		}
+		if n >= 32 && w[8] == 0x73 {
+			return 0, nil, smb1SetupUnsupported(w[:total])
+		}
 		if probeSMB1Negotiate(w[:total], f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
 			f.protocol = "smb"
 			return total, f.spec("cifs", "CIFSDirectTCP"), nil
@@ -256,7 +268,7 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	}
 	// Includes the private chain identity and the retained QUERY_INFO selector.
 	target := int64(256) + int64(len(s.pending)+1)*160 + int64(len(s.async)+1)*32 + int64(len(s.files)+1)*64
-	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes()
+	target += pathBytes + chainBytes + additionalPathBytes + s.smb1.ownedBytes() + s.smb1Setup.ownedBytes()
 	return s.flow.reserveSession(target)
 }
 

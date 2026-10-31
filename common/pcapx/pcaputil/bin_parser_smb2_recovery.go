@@ -163,7 +163,7 @@ func (f *binFlow) consumeSMB2(dir int, e *ProtocolEvent) error {
 	// modern carrier even though its body was refused. Retire only legacy
 	// selection eligibility; never commit commands from the refused record.
 	// Framing/partial/resource/identity failures cannot reach this gate.
-	f.smb2.smb1Modern, f.smb2.smb1 = true, nil
+	f.smb2.smb1Modern, f.smb2.smb1, f.smb2.smb1Setup = true, nil, nil
 	if reserveErr := f.smb2.reserveState(0); reserveErr != nil {
 		return reserveErr
 	}

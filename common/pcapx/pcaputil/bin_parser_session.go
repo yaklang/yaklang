@@ -20,6 +20,27 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	if f.detectBinding(wire) {
 		return
 	}
+	if p := probeSMB1SessionSetupExtended(wire, 65598); p.Verdict == ProbeAccept {
+		client := dir
+		if wire[13]&0x80 != 0 {
+			client = 1 - dir
+		}
+		f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		fixed := 63
+		if len(wire) > 13 && wire[13]&0x80 != 0 {
+			fixed = 47
+		}
+		if len(wire) >= fixed && (smb2DirectLength(wire)+4 > f.a.budget.MaxFrameBytes || smb2DirectLength(wire)+4 > f.a.config.MaxMessageBytes) {
+			client := dir
+			if wire[13]&0x80 != 0 {
+				client = 1 - dir
+			}
+			f.protocol, f.smb2 = "smb", &binSMB2{client: client}
+		}
+		return
+	}
 	// A complete SMB1 multi-protocol offer can exceed ProbeBytes. Preserve its
 	// validated boundary so this direction can continue with the following SMB2
 	// request instead of being permanently stopped as an unknown prefix.
@@ -815,13 +836,17 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "amqp":
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb":
-		err = f.consumeSMB1Negotiate(dir, e)
+		if isSMB1SetupEntry(e.Entry) {
+			err = f.consumeSMB1Setup(dir, e)
+		} else {
+			err = f.consumeSMB1Negotiate(dir, e)
+		}
 	case "smb2":
 		err = f.consumeSMB2(dir, e)
 		if err == nil && f.smb2 != nil {
 			// A successfully accepted modern carrier makes any old legacy
 			// offer ineligible. Do not reuse its MID or infer an SMB2 dialect.
-			f.smb2.smb1Modern, f.smb2.smb1 = true, nil
+			f.smb2.smb1Modern, f.smb2.smb1, f.smb2.smb1Setup = true, nil, nil
 			err = f.smb2.reserveState(0)
 		}
 		if err == nil && f.nbss {
@@ -1298,7 +1323,11 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "amqp":
 			e.Summary = fmt.Sprintf("AMQP ch %v %v", e.Session["Channel"], e.Session["Packet Name"])
 		case "smb":
-			if e.Session["Response"] == true {
+			if isSMB1SetupEntry(e.Entry) {
+				body, _ := e.Session["Body"].(map[string]any)
+				blob, _ := body["Security Blob"].([]byte)
+				e.Summary = fmt.Sprintf("SMB1 SESSION_SETUP_ANDX · %v · opaque security blob %d B", e.Session["Setup Phase"], len(blob))
+			} else if e.Session["Response"] == true {
 				body, _ := e.Session["Body"].(map[string]any)
 				blob, _ := body["Security Blob"].([]byte)
 				e.Summary = "SMB1 NEGOTIATE response"
