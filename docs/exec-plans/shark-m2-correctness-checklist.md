@@ -21,7 +21,10 @@ PR #5380保持draft，f743最终CI已47checks+2statuses全绿，但最终fuzz取
 分支 `codex/shark-m2-tls-row-priority`，[PR #5383](https://github.com/yaklang/yaklang/pull/5383)。
 [列表修复、60个Windows状态、两个大包五行差异及新资格审计项](shark-m2-tls-row-priority-20261031.md)。
 从父#5382最终13ae全绿后才开分支；父47checks+2statuses成功、traffic312560pass/25历史skip，
-131084 required和新增37终态全过且已ready。新42有限合同完成，43只记录新资格疑点，尚非已证误识别。
+131084 required和新增37终态全过且已ready。新42有限合同完成；43的
+[独立来源、真实mTLS及正文覆盖审计](shark-m2-tls-admission-audit-20261031.md)已补。
+两疑点Wireshark默认也TLS，正文校验/字段及资格门仍开放，尚非已证标签误识别。
+后续分支 `codex/shark-m2-tls-admission-audit` 从#5383最终全绿26bc分出，此审计不改已ready的#5383。
 此前非SMB代码 `ab24d5ec7657a058d3d52a0925f9589e9964d0dd`、测试正控修正及干净构建
 `6bacd80c8df9e4a3352f88cadaee889e5058ca3a`，分支 `codex/shark-m2-tls-record-boundaries`，
 [N12原失败、record边界/换钥恢复、真实回放及Windows列表新缺口](shark-m2-tls-record-boundaries-20261031.md)。
@@ -61,7 +64,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 进行中 | 107/121和全部281来源门保持；60三种新构建完整回放、选定QI字段/Windows闭合；dd63→60的42223事件仅93个SMB2变化，其余42130和完整CLI/flow逐字节相同；M1→60全行账本保留，完整语义ID/字段/会话仍开放 | 1–3 小时 |
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 进行中（8场景实际复验，有限范围已闭合） | 82fc六来源72+两个匹配新SYNACK后77场景重跑，七个严格通过；C1 TLS1.2保留exit4/8项策略差异，额外4TLS+3HTTP经双Python AEAD/peer/父子/response_to/Feed57审计均旧Flow2，未串入新3。真实callback与CompletedIn分开；原严格失败不抹去。字节范围及TLS页面另闭合37；密钥代际/缺开头/KeyUpdate等整体未完成 | 2–4 小时；新增边界另计，不以7/8代替全部高级恢复 |
 | M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（四实际域组合已跑，缺握手整体仍开放） | 82fc接口/VLAN full/full两严格门通过，每域2022认证/3坏tag/6tail、4556来源检查；两个app-only严格73各2664差异原样保留。另核各2007个准确UDP预览（1332截64B/675完整短包），0借域身份，不等于完整QUIC解析。CID/epoch/STREAM/QPACK/0RTT仍需独立语义门 | 2–4 小时；执行等待及新问题另计 |
-| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N13中7有限完成/6未关闭；原133项、6 TCP/24 UDP政策项保留。N12已修；N10.02仅源/TSO审计，其余5例未审。9af大包五行展示已逐条审阅，新增N13审两个原部分TLS记录的连接确认资格，不将分类/展示正确当全部协议正确 | 原5项13–26 AI小时；N13调查另1–2小时，确证修复另估，不含等待/新问题 |
+| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N13中7有限完成/6未关闭；原133项、6 TCP/24 UDP政策项保留。N12已修；N10.02仅源/TSO审计，其余5例未审。N13两疑点原wire/WS与真实mTLS来源已核，正文/字段/资格仍缺，不将分类/展示正确当全部协议正确 | 原5项13–26 AI小时；N13后续3–6小时；合计16–32，不含等待/新问题 |
 | M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | #5379/5381/5382最终SHA各47checks+2statuses全绿且ready；5382最终13ae实际checkout及artifact已核，312560pass/25历史optional skip、131084 required和新增37终态全过。本批5383代码9af完整CLI1066pass/2历史skip，Windows229实际60状态及大包231/五行逐条232复核已过有限门；最终交付SHA仍须独立完整CI，不用父成功替代 | 30–90 分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
@@ -94,7 +97,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-40 | 原94/39字段清单绑定当前非SMB构建与大捕获 | 已完成（133项有限清单，整批CI归11） | 137原133逐项新physical/DNS门及固定TLS参考哈希；4477两个完整捕获SDK42223/263109及CLI/flow共6导出与4bfb逐字节相同，闭合173据精确输出绑定133门，无ID归一化、无新TShark冒称；2非法UTF8文字差异及RDPUDP参考限制保留，不宣称全协议语义 | 0 |
 | M2-41 | TLS1.3 KU record尾边界及跨epoch旧握手残片 | 已完成（N12有限native/详情合同，整批CI归11） | 176独立3正/3负AEAD源、39ca SDK实际误接受/HTTP泄漏；6bac同v02六门通过、12DTO负控；跨epoch认证成功才退休旧同向残片，三套AEAD/合法分片/坏尾/反向状态、5038原生与1055CLI/96752插桩fuzz通过。198/200真实七场景和207/208/209保留旧失败，199六大捕获导出与133逐字节相同；Windows详情及列表分列，不称全UI通过 | 0 |
 | M2-42 | 多TLS PDU物理帧的列表摘要挤掉关键结果 | 已完成（9af有限展示合同，整批CI归11） | 原214/222列表失败保留，225红3pass/7fail、227完整CLI1066pass/2历史skip；完整消息前移且原Malformed原因不被后Context盖掉，不改事件/应用身份。229实际三页60状态及root9图、原list断言/全部源与高亮/resize/CP936通过；231四SDK/flow字节相同，CLI仅Sharon5行info/status按原native事实校正，其他pdus/字段/源/域/stream逐对象完全一致 | 0 |
-| M2-43 | fuzz TLS部分record与连接身份资格分层审计 | 进行中（新疑点，尚非已证误识别） | Sharon225608/309343域226原SDK Handshake Incomplete=true/Auth=false，前者Type6/len0、后者Type13/len41；CLI保留TLS/connection TLS/validated protocol events。9af只前置实际malformed，未改变上述资格；须独立原wire/TShark及后续粘性/复用/丢失/域隔离审计，不把native DTO当最终协议oracle | 来源/资格调查1–2 AI小时；是否修复及工时在确证后另估 |
+| M2-43 | TLS身份资格分层与CertificateRequest正文 | 进行中（有限来源审计完成，正文缺口确认） | 238/239完整原捕获WS默认两疑点也TLS并报结构错；240坏正文独立边界。241真实双向认证TLS12/13，244独立wire/AEAD，245共55字面范围+1空向量对齐参考；native仍envelope，52正文typed事实未发布，不称52错误值。正文/字段/拥有源/递进UI、缺握手资格及粘性/复用/丢失/域隔离仍开放，详见审计记录 | 后续实施3–6 AI小时，执行等待另计 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。上次在账户已用50%时暂停；本轮用户追加20个百分点，账户已用70%时停止，并提前留出提交和精确SHA CI收尾空间。最多 1 个子 agent，主 agent 负责关键路径。
 
