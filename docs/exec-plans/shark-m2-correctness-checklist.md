@@ -1,5 +1,9 @@
 # M2 协议正确性验收清单
 
+2026-11-01已将9个分批PR实际归并到M2阶段PR #5371，并移到rebase后的M1基线。
+[当前两阶段分支、树核对及历史归档](shark-stage-consolidation-20261101.md)。下文分批SHA/分支/PR
+状态保留为当时证据，当前只维护M1/M2两个活动阶段；M2仍draft，SMB搁置和开放项数量不变。
+
 M2最初从M1全绿提交 `39729081a3300381154d96cf1b4866f23976260b` 分出；
 [验收记录与 PR/CI 链接](shark-m1-acceptance-397.md)。新分支为
 `codex/shark-m2-protocol-correctness`。此表按可验收工作项计数，不按协议数量、
