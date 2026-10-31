@@ -151,6 +151,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var dcerpcMessage bool
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
+	var tls13KeyUpdates bool
 	var http3FrameKind string
 	var http3StreamID uint64
 	var http3HeaderSource int
@@ -448,6 +449,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 				if name == "Handshake Messages" {
 					add(handshakeType(r["Type"]), true)
+					keyUpdateSource := 0
+					if data := tlsKeyUpdatePlaintext(r, authenticatedTLS && tls13KeyUpdates); data != nil {
+						sources = append(sources, detailSource{Name: "TLS Key Update · authenticated handshake plaintext", Data: bytes.Clone(data)})
+						keyUpdateSource = len(sources)
+					}
 					keys := make([]string, 0, len(r))
 					for key := range r {
 						if key != "Type" {
@@ -457,6 +463,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					sort.Strings(keys)
 					for _, key := range keys {
 						walk(key, r[key], depth+1)
+						if keyUpdateSource > 0 && (key == "Key Update Request" || key == "Encoded Key Update") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = keyUpdateSource, 4, 5, true
+							if key == "Encoded Key Update" {
+								field.start = 0
+								field.text = "Encoded Key Update: " + formatFieldValue(key, bytesValue(r[key]))
+							}
+						}
 					}
 					continue
 				}
@@ -752,6 +766,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		wireRanges = detailWireRanges(e.Session["Wire Field Ranges"])
 		dcerpcResult, dcerpcResultKnown = 0, false
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
+		tls13KeyUpdates = number(e.Session["Negotiated Version"]) == 0x304
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil

@@ -420,7 +420,7 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			t.secret[dir] = nil
 		}
 	case 24:
-		if !authenticated || !t.app[dir] || len(body) != 1 || body[0] > 1 {
+		if t.version != 0x304 || !authenticated || !t.app[dir] || len(body) != 1 || body[0] > 1 {
 			return nil, protocolError(ErrMalformedMessage, "invalid TLS KeyUpdate")
 		}
 		next, err := quicHKDFExpandLabel(t.secret[dir], "traffic upd", len(t.secret[dir]))
@@ -431,6 +431,11 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			return nil, err
 		}
 		t.seq[dir] = 0
+		m["Key Update Request"] = body[0]
+		m["Key Update Request Name"] = []string{"update_not_requested", "update_requested"}[body[0]]
+		// These bytes belong to authenticated handshake plaintext, not the
+		// outer record ciphertext. Keep them owned and free of wire ranges.
+		m["Encoded Key Update"] = bytes.Clone(b)
 	case 11:
 		// Certificate bytes are evidence, not a trust assertion. Store hashes only;
 		// large chains remain bounded by the handshake message budget.
