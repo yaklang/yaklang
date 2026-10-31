@@ -6,6 +6,20 @@ import (
 	"unicode/utf16"
 )
 
+func TestNativeBytePaneTitleDoesNotSelectFrameNumber(t *testing.T) {
+	for _, frame := range []string{"3", "23", "103", "1023"} {
+		prefix := " ╭─ 2 SMB1 FIELDS ── #" + frame + " ╮"
+		line := prefix + "╭─ 3 SMB1 · reassembled PDU ── 0x30–0x5d · 46 bytes ╮"
+		want := len(utf16.Encode([]rune(prefix + "╭─ ")))
+		if got := nativeBytePaneTitleColumn(line); got != want {
+			t.Fatalf("frame%s: title column=%d want%d", frame, got, want)
+		}
+	}
+	if got := nativeBytePaneTitleColumn("╭─ 2 SMB1 FIELDS ── #23 ╮"); got != -1 {
+		t.Fatalf("frame-only title accepted: %d", got)
+	}
+}
+
 func TestNativeHexOffsetColumnCompleteTokens(t *testing.T) {
 	for _, digits := range []int{6, 8} {
 		for _, shift := range []int{-4, 0, 2} {
