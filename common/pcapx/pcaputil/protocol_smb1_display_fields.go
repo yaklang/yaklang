@@ -28,7 +28,7 @@ func smb1DisplayBindings() []displayFieldBinding {
 	// MS-CIFS 2.2.3.1: in a request NT_STATUS asks for the response error
 	// format; it does not turn the request's raw Status into a server error.
 	// A response uses NTSTATUS only when both REPLY and NT_STATUS are set.
-	// This header projection does not admit or parse an SMB1 response profile.
+	// Header aliases do not establish request association or authentication.
 	// https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-cifs/69a29f73-de0c-45a6-a1aa-8ceeea42217f
 	ntStatus := displayCustom("smb", "smb.nt_status", "Response NTSTATUS", DisplayUnsigned, 32, "pdu", func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
 		flags, flagsOK := smb1DisplayHeaderUint(e, "Flags", 8)
@@ -65,8 +65,36 @@ func smb1DisplayBindings() []displayFieldBinding {
 	// Their combined opaque identifier cannot claim a single source range.
 	pid.descriptor.Description = "32-bit opaque process identifier composed from observed PIDHigh and PIDLow; literal halves retain their separate PDU ranges"
 	out = append(out, pid)
-	add("smb.wct", "Word Count", "", DisplayUnsigned, 8)
-	add("smb.bcc", "Byte Count", "", DisplayUnsigned, 16)
+	for _, field := range []struct {
+		name, key string
+		bits      int
+	}{{"smb.wct", "Word Count", 8}, {"smb.bcc", "Byte Count", 16}} {
+		field := field
+		binding := displayCustom("smb", field.name, field.key, DisplayUnsigned, field.bits, "pdu", func(e *ProtocolEvent, emit func(any), _ *displayProjection) {
+			if value, ok := smb1WordCountOwner(e, field.key)[field.key]; ok {
+				emit(value)
+			}
+		})
+		binding.rangeFor = func(e *ProtocolEvent, _ int) *DisplayFieldRange {
+			return (&ProtocolEvent{Raw: e.Raw, Session: smb1WordCountOwner(e, field.key)}).displayPDUFieldRange(field.key)
+		}
+		out = append(out, binding)
+	}
+	for _, field := range []struct {
+		name, key string
+		bits      int
+	}{
+		{"smb.dialect.index", "Dialect Index", 16}, {"smb.security_mode", "Security Mode", 8},
+		{"smb.max_mpx_count", "Max Mpx Count", 16}, {"smb.max_vcs", "Max Number Vcs", 16},
+		{"smb.max_buf", "Max Buffer Size", 32}, {"smb.max_raw", "Max Raw Size", 32},
+		{"smb.session_key", "Session Key", 32}, {"smb.capabilities", "Capabilities", 32},
+		{"smb.system_time", "System Time", 64}, {"smb.challenge_length", "Challenge Length", 8},
+	} {
+		add(field.name, field.key, "Body", DisplayUnsigned, field.bits)
+	}
+	// Signed timezone and opaque bytes remain their correct typed Body values;
+	// the current public alias schema has neither signed nor bytes field types.
+	out = append(out, displayRoot("smb", "smb.selected_dialect", "Dialect selected from observed matched request", DisplayString, 0, "context", "Selected Dialect Name"))
 	b := displayRoot("smb", "smb.dialect", "Advertised OEM dialect (escaped if needed)", DisplayString, 0, "pdu", "Name")
 	b.path, b.descriptor.AllowEmpty = []string{"Dialects", "*", "Name"}, true
 	b.rangeFor = func(e *ProtocolEvent, ordinal int) *DisplayFieldRange {
@@ -86,6 +114,14 @@ func smb1DisplayBindings() []displayFieldBinding {
 	out = append(out, b)
 	out = append(out, displayRoot("smb", "smb.smb2_upgrade_offered", "SMB2 upgrade offered, not selected", DisplayBoolean, 0, "derived", "SMB2 Upgrade Offered"))
 	return out
+}
+
+func smb1WordCountOwner(e *ProtocolEvent, key string) map[string]any {
+	if _, ok := e.Session[key]; ok {
+		return e.Session
+	}
+	body, _ := e.Session["Body"].(map[string]any)
+	return body
 }
 
 func smb1DisplayHeaderUint(e *ProtocolEvent, key string, bits uint) (uint64, bool) {
