@@ -1080,6 +1080,9 @@ type binFlow struct {
 	level             byte
 	binding           *BinParserBinding
 	directions        [2]binDirection
+
+	httpRequestDirections byte
+	httpReplaying         bool
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
@@ -1221,6 +1224,7 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 }
 
 func (f *binFlow) release(d *binDirection) {
+	f.releaseHTTPAwait(d.http)
 	f.a.buffered.Add(-int64(cap(d.buffer)) - int64(len(d.contributions))*80)
 	d.contributions = nil
 	d.buffer = nil
@@ -1262,6 +1266,7 @@ func (f *binFlow) retain(d *binDirection, data []byte) bool {
 
 func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d := &f.directions[dir]
+	f.prepareHTTPAwaitDiagnostic(dir)
 	preview := wire[:min(len(wire), f.a.config.ProbeBytes)]
 	retainedHTTPHeader := f.protocol == "http" && d.http != nil && !d.http.omitted && len(d.http.rawHeader) > 0 && d.http.headerFields != nil
 	if retainedHTTPHeader {
@@ -1336,7 +1341,11 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 		if d.http.omitted && !d.http.response {
 			e.ID = 0
 		}
-		e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		if d.http.awaitRequest {
+			e.Session = map[string]any{"Request Context Available": false, "Body Boundary Known": false, "Retained Stream Bytes": len(wire)}
+		} else {
+			e.Session = map[string]any{"Method": d.http.method, "Declared Message Bytes": d.http.declared}
+		}
 		if d.http.response && d.http.status == 101 {
 			e.ExpertCode = "HTTPUpgradeUnverified"
 			e.Session["Upgrade Validated"] = false
@@ -1949,6 +1958,8 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		if recoverableSMB1Setup || e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
 			stopAfterFailure = false
 		}
+		// Snapshot from private flow state before handing the public DTO to callbacks.
+		httpReplayPending := f.httpAwaitingPeerReady(dir)
 		children := e.rtmpChildren
 		e.rtmpChildren = nil
 		a.emit(e)
@@ -1998,6 +2009,14 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				return
 			}
 		}
+		// Complete request callbacks precede callbacks for responses that had
+		// to await this observed method.
+		if httpReplayPending {
+			f.replayHTTPAwaitingPeer(dir)
+		}
+		if d.stopped {
+			return
+		}
 		d.ts = ts
 	}
 	if len(wire) == 0 {
@@ -2012,6 +2031,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		f.stop(dir, wire, "limited", "capture buffer limit reached")
 	}
+	// A valid request header can unblock an informational response before
+	// its body arrives (Expect: 100-continue). Retain this direction first.
+	f.replayHTTPAwaitingPeer(dir)
 	if detected && f.protocol != "" && !f.hasSession() {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
@@ -2048,6 +2070,11 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 	}()
 	for dir := range f.directions {
 		d := &f.directions[dir]
+		if h := d.http; h != nil && h.awaitRequest && len(d.buffer) > 0 {
+			f.lastSessionError = &ProtocolError{Kind: ErrContextRequired, Message: "HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)"}
+			f.stop(dir, d.buffer, "context-required", string(reason)+": HTTP response header observed without request framing context (capture may have started midstream or lost request bytes)")
+			continue
+		}
 		if h := d.http; h != nil && h.omitted {
 			if h.closeDelimited && reason == TrafficFlowCloseReason_FIN {
 				f.finishHTTP(dir)

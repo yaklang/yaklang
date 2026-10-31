@@ -40,7 +40,7 @@ func (h *binHTTPState) retainedHeaderFields() map[string]any {
 func (f *binFlow) omitHTTPPayload(dir int, wire []byte, reason string) bool {
 	d := &f.directions[dir]
 	h := d.http
-	if f.protocol != "http" || h == nil || h.omitted || h.tunnel || len(h.rawHeader) == 0 {
+	if f.protocol != "http" || h == nil || h.awaitRequest || h.omitted || h.tunnel || len(h.rawHeader) == 0 {
 		return false
 	}
 	h.omitted = true
