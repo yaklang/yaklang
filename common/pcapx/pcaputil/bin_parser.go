@@ -1090,6 +1090,12 @@ func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if f.protocol == "smb" && status == "incomplete" {
+		// A trailing or unselected close observation has no complete-message
+		// field tree. Preserve its existing refusal before mutable public
+		// fields, protocol/status, or a caller-supplied rule can promote it.
+		e.nativeDiagnosticError = "protocol parser: event is incomplete, not an exact message"
+	}
 	if f.transportFlow != nil {
 		e.TCPFlowID = f.transportFlow.Index
 	}

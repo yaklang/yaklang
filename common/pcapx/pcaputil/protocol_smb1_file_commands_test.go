@@ -139,3 +139,46 @@ func TestSMB1FileCommandsPublicSessionProfiles(t *testing.T) {
 		}
 	}
 }
+
+func TestSMB1FileCommandsUnselectedDiagnosticCannotPromote(t *testing.T) {
+	// Minimized by the instrumented wire fuzzer. Its plausible signature is
+	// not a complete admitted record and must never become a field tree.
+	w := []byte("\x00\x00\x00J\xffSMBu000000\xc000000000000000000000\x04\xff0000000\x1f\x0000000000000000000000000000000000")
+	s := smb1SetupSession(t)
+	var events []*ProtocolEvent
+	cut := 106 % (len(w) + 1)
+	for _, piece := range [][]byte{w[:cut], w[cut:]} {
+		r := s.Feed(0, time.Unix(100, 0), piece)
+		require.Equal(t, len(piece), r.Consumed)
+		events = append(events, r.Events...)
+	}
+	events = append(events, s.Close("FIN")...)
+	require.Zero(t, s.Stats().BufferedBytes)
+	var diagnostics int
+	for _, e := range events {
+		if e.Protocol != "smb" {
+			continue
+		}
+		if e.Status != "incomplete" {
+			require.Equal(t, "malformed", e.Status)
+			smb1Fuzz102RejectedAuthority(t, e)
+			continue
+		}
+		diagnostics++
+		require.Equal(t, "incomplete", e.Status)
+		fields, err := e.GetFields()
+		require.Nil(t, fields)
+		require.EqualError(t, err, "protocol parser: event is incomplete, not an exact message")
+		poison := map[string]any{"accepted": true, "Authentication Verified": true}
+		e.Fields, e.Session, e.Structured = poison, poison, map[string]any{"fields": poison}
+		e.Status, e.Error, e.Protocol, e.Profile, e.Completeness = "decoded", "", "tcp", "poisoned", "message"
+		e.Rule, e.Entry = "application-layer.cifs", "CIFSDirectTCPDeleteResponse"
+		fields, err = e.GetFields()
+		require.Nil(t, fields)
+		require.EqualError(t, err, "protocol parser: event is incomplete, not an exact message")
+		decoded, err := e.Decode()
+		require.Nil(t, decoded)
+		require.EqualError(t, err, "protocol parser: event is incomplete, not an exact message")
+	}
+	require.Equal(t, 1, diagnostics)
+}

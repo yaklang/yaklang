@@ -6,6 +6,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"sort"
 	"testing"
 	"time"
@@ -219,8 +220,14 @@ func smb1Fuzz102RejectedAuthority(t *testing.T, e *ProtocolEvent) {
 	require.Error(t, err)
 	require.Nil(t, got)
 	var before *ProtocolError
-	require.ErrorAs(t, err, &before)
-	kind := before.Kind
+	typed := errors.As(err, &before)
+	message := err.Error()
+	if !typed {
+		// A native close diagnostic preserves the established non-message
+		// refusal, rather than inventing a typed body-decoder failure.
+		require.Equal(t, "incomplete", e.Status)
+		require.EqualError(t, err, "protocol parser: event is incomplete, not an exact message")
+	}
 	poison := map[string]any{"accepted": true, "Authentication Verified": true, "Body": map[string]any{"forged": true}}
 	e.Fields, e.Session, e.Structured = poison, poison, map[string]any{"fields": poison}
 	e.Status, e.Error, e.Protocol, e.Profile, e.Completeness = "decoded", "", "tcp", "poisoned", "message"
@@ -229,13 +236,21 @@ func smb1Fuzz102RejectedAuthority(t *testing.T, e *ProtocolEvent) {
 	require.Error(t, err)
 	require.Nil(t, got)
 	var after *ProtocolError
-	require.ErrorAs(t, err, &after)
-	require.Equal(t, kind, after.Kind)
+	if typed {
+		require.ErrorAs(t, err, &after)
+		require.Equal(t, before.Kind, after.Kind)
+	} else {
+		require.EqualError(t, err, message)
+	}
 	_, err = e.Decode()
 	require.Error(t, err)
 	var decoded *ProtocolError
-	require.ErrorAs(t, err, &decoded)
-	require.Equal(t, kind, decoded.Kind)
+	if typed {
+		require.ErrorAs(t, err, &decoded)
+		require.Equal(t, before.Kind, decoded.Kind)
+	} else {
+		require.EqualError(t, err, message)
+	}
 }
 
 func FuzzSMB1FilePublicWireSources(f *testing.F) {
@@ -251,6 +266,7 @@ func FuzzSMB1FilePublicWireSources(f *testing.F) {
 	binary.LittleEndian.PutUint16(bad[48:50], 0xd800)
 	f.Add(bad, uint16(48))
 	f.Add(append(bytes.Clone(w), smb1FileWire(0x06, true, 5, 2048, 2048)...), uint16(len(w)+3))
+	f.Add([]byte("\x00\x00\x00J\xffSMBu000000\xc000000000000000000000\x04\xff0000000\x1f\x0000000000000000000000000000000000"), uint16(106))
 	f.Fuzz(func(t *testing.T, input []byte, cut uint16) {
 		if len(input) > 4096 {
 			return
