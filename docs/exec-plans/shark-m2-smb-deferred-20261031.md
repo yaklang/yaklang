@@ -63,7 +63,7 @@ delta118、red119/122/125、full126、fuzz118/121/127及用户取消receipt保�
 | M2-36.03 | 27–30 NT_CREATE/WRITE只有独立source110的119项事实/32门合同；source117四入口/8测试补丁仅在仓库外，未应用/编译，未接native/FID | 搁置 |
 | M2-36.04 | 31–38的TRANSACTION2、SET_INFORMATION2、QUERY_INFORMATION2共8条正文未接入；完整tree/FID及handle复用未证明 | 搁置 |
 | M2-36.05 | 76e0bd4最终fuzz取消、最终SDK/大捕获/Windows重建复验未完成；不得用较早构建证据替代 | 搁置 |
-| M2-36.06 | 最终说明提交的完整CI及artifact覆盖尚待执行；PR保持draft，CI成功也不替代上一行运行缺口 | 未验收 |
+| M2-36.06 | 最终f743b953说明提交已47checks+2statuses全绿，traffic312647pass/25历史optional skip/131084required全部通过，checkout/artifact及156新增terminal已核；CI成功不替代上一行运行缺口，PR仍draft | CI已验；最终运行缺口搁置 |
 | UI | Packet Name摘要仍有重复；其余SMB页面及全部Windows环境未覆盖 | 搁置 |
 
 不将SMB签名、认证、会话建立或文件操作真实成功由字段/标签推断为已验证。
