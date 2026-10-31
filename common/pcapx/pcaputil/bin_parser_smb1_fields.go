@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 )
 
 type smb1NegotiateBoundedReader struct {
@@ -27,6 +28,14 @@ func decodeSMB1NegotiateResponseFields(raw []byte, budget ParserBudget) (map[str
 }
 
 func decodeSMB1CIFSFields(raw []byte, budget ParserBudget, response bool) (map[string]any, error) {
+	return decodeSMB1CIFSProfileFields(raw, budget, response, false)
+}
+
+func decodeSMB1SessionSetupFields(raw []byte, budget ParserBudget, response bool) (map[string]any, error) {
+	return decodeSMB1CIFSProfileFields(raw, budget, response, true)
+}
+
+func decodeSMB1CIFSProfileFields(raw []byte, budget ParserBudget, response, setup bool) (map[string]any, error) {
 	defaults := DefaultParserBudget()
 	for _, pair := range [][2]*int{
 		{&budget.MaxFrameBytes, &defaults.MaxFrameBytes}, {&budget.MaxMessageBytes, &defaults.MaxMessageBytes},
@@ -44,6 +53,12 @@ func decodeSMB1CIFSFields(raw []byte, budget ParserBudget, response bool) (map[s
 	if response {
 		maxSize, depth, entry = 65608, 3, "CIFSDirectTCPNegotiateExtendedResponse"
 	}
+	if setup {
+		maxSize, depth, entry = 65598, 3, "CIFSDirectTCPSessionSetupExtendedRequest"
+		if response {
+			maxSize, entry = 65582, "CIFSDirectTCPSessionSetupExtendedResponse"
+		}
+	}
 	if len(raw) > maxSize || len(raw) > budget.MaxFrameBytes || len(raw) > budget.MaxMessageBytes || len(raw) > budget.MaxBufferedBytes {
 		return nil, protocolError(ErrResourceExceeded, "CIFS: bounded profile exceeds byte budget")
 	}
@@ -55,13 +70,20 @@ func decodeSMB1CIFSFields(raw []byte, budget ParserBudget, response bool) (map[s
 	r := &smb1NegotiateBoundedReader{Reader: bytes.NewReader(raw), bits: uint64(len(raw)) * 8}
 	node, err := parser.ParseBinary(r, "application-layer.cifs", entry)
 	if err != nil {
+		if setup {
+			if profileErr := stream_parser.ValidateCIFSSessionSetupProfile(raw, response); errors.Is(profileErr, stream_parser.ErrCIFSSessionSetupUnsupported) {
+				return nil, protocolError(ErrUnsupportedFeature, "%s", profileErr)
+			}
+		}
 		return nil, err
 	}
 	if r.Len() != 0 {
 		return nil, fmt.Errorf("CIFS: %d unconsumed bounded request bytes", r.Len())
 	}
 	var fields map[string]any
-	if response {
+	if setup {
+		fields, err = parser.ProjectCIFSSessionSetupFields(node, raw)
+	} else if response {
 		fields, err = parser.ProjectCIFSNegotiateResponseFields(node, raw)
 	} else {
 		fields, err = parser.ProjectCIFSNegotiateFields(node, raw, budget.MaxCollectionElements)

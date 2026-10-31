@@ -17,6 +17,7 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
+	smb1SetupBodyRefusal               bool
 	nativeSessionMessage               bool
 	nativeNetFlowObservation           bool
 	rtmpChildren                       []*ProtocolEvent
@@ -1540,6 +1541,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					// A response can be structurally identifiable yet exceed its
 					// parser frame budget. Keep only this finite format prefix so
 					// the completed record is refused as limited, not unrecognized.
+					if len(wire) < 65598 && len(wire) < a.config.MaxMessageBytes && probeSMB1SessionSetupExtended(wire, 65598).Verdict == ProbeNeedMore {
+						break
+					}
 					if len(wire) < 65608 && len(wire) < a.config.MaxMessageBytes && probeSMB1NegotiateExtendedResponse(wire, 65608).Verdict == ProbeNeedMore {
 						break
 					}
@@ -1925,6 +1929,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// Only complete frames with an independently retained boundary carry this private
 		// application-level refusal scope. Snapshot before public callbacks.
 		recoverableHARTIP := e.nativeHARTIPObservation && hartIPRecoverable(e.Raw, e.sessionError)
+		recoverableSMB1Setup := e.smb1SetupBodyRefusal
 		recoverableRADIUS := e.nativeRADIUSObservation && radiusRecoverableFrame(e.Raw, e.sessionError, e.radiusApplicationRefusal)
 		recoverableDoIP := e.Protocol == "doip" && e.doipAssociationRefusal
 		recoverableDNP3 := e.Protocol == "dnp3" && e.Session["Error Scope"] == "application"
@@ -1941,7 +1946,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
 		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
-		if e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
+		if recoverableSMB1Setup || e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
 			stopAfterFailure = false
 		}
 		children := e.rtmpChildren
