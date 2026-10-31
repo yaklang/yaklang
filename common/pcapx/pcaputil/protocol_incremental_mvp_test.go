@@ -204,7 +204,14 @@ func runIncrementalMVPSealedReplay(t *testing.T, prefix string, groups []string)
 							case "dns-pointer":
 								assertDNSPointerMVPEvents(t, answer, normalized)
 							case "signature":
-								assertSignatureMVPEvents(t, answer, normalized)
+								if c.ID == "ntpv2-negative" {
+									// This frozen negative described the former v3/v4-only
+									// discovery profile. Preserve its capture and answer;
+									// independently check the newly supported v2 header.
+									assertNativeNTPLegacyVersionReview(t, events)
+								} else {
+									assertSignatureMVPEvents(t, answer, normalized)
+								}
 								incrementalMVPRawOracle(t, answer, normalized)
 							case "tunnel":
 								incrementalMVPTunnel(t, a, normalized)
@@ -657,6 +664,44 @@ func incrementalMVPRawOracle(t *testing.T, raw json.RawMessage, es []*ProtocolEv
 	}
 }
 
+// The sealed line fixtures predate literal range metadata. Supplement only
+// their independently specified current line, after checking its source bytes;
+// keep the original archive and every old field value unchanged.
+func incrementalMVPSSHLineRanges(t testing.TB, expected json.RawMessage, rawHex string) json.RawMessage {
+	t.Helper()
+	var values map[string]any
+	require.NoError(t, json.Unmarshal(expected, &values))
+	require.NotContains(t, values, "Wire Field Ranges", "review an updated source oracle explicitly")
+	wire, err := hex.DecodeString(rawHex)
+	require.NoError(t, err)
+	require.True(t, bytes.HasSuffix(wire, []byte{'\n'}), "source oracle must contain one complete line")
+	line := bytes.TrimSuffix(bytes.TrimSuffix(wire, []byte{'\n'}), []byte{'\r'})
+	require.False(t, bytes.ContainsAny(line, "\r\n"))
+	ranges := map[string]any{}
+	switch values["Packet Name"] {
+	case "identification":
+		ident, ok := values["Identification"].(string)
+		require.True(t, ok)
+		version, ok := values["Version"].(string)
+		require.True(t, ok)
+		require.Equal(t, []byte(ident), line)
+		require.True(t, bytes.HasPrefix(line, []byte("SSH-"+version+"-")))
+		ranges["Identification"] = []any{0, len(line)}
+		ranges["Version"] = []any{4, 4 + len(version)}
+	case "pre-identification line":
+		text, ok := values["Text"].(string)
+		require.True(t, ok)
+		require.Equal(t, []byte(text), line)
+		ranges["Text"] = []any{0, len(line)}
+	default:
+		t.Fatalf("range supplement is limited to literal line fixtures, received %v", values["Packet Name"])
+	}
+	values["Wire Field Ranges"] = ranges
+	out, err := json.Marshal(values)
+	require.NoError(t, err)
+	return out
+}
+
 // Bind complete independently specified fields, source order and diagnostics.
 func assertFTPSSHReviewMVPEvents(t testing.TB, protocol string, raw json.RawMessage, events []*ProtocolEvent) {
 	t.Helper()
@@ -697,14 +742,19 @@ func assertFTPSSHReviewMVPEvents(t testing.TB, protocol string, raw json.RawMess
 	require.Len(t, a.Raw, len(decoded))
 	for i, e := range decoded {
 		require.Equal(t, a.Raw[i], hex.EncodeToString(e.Raw))
+		expectedSession, expectedFields := a.Session[i], a.Fields[i]
+		if protocol == "ssh" {
+			expectedSession = incrementalMVPSSHLineRanges(t, expectedSession, a.Raw[i])
+			expectedFields = incrementalMVPSSHLineRanges(t, expectedFields, a.Raw[i])
+		}
 		wire, err := json.Marshal(e.Session)
 		require.NoError(t, err)
-		require.JSONEq(t, string(a.Session[i]), string(wire), "complete Session oracle")
+		require.JSONEq(t, string(expectedSession), string(wire), "complete Session oracle")
 		fields, err := e.GetFields()
 		require.NoError(t, err)
 		wire, err = json.Marshal(fields)
 		require.NoError(t, err)
-		require.JSONEq(t, string(a.Fields[i]), string(wire), "complete GetFields oracle")
+		require.JSONEq(t, string(expectedFields), string(wire), "complete GetFields oracle")
 	}
 	require.NotNil(t, a.Diagnostics, "complete diagnostic count oracle")
 	require.Equal(t, *a.Diagnostics, diagnostics, "complete diagnostic collection")

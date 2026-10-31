@@ -33,43 +33,47 @@ type DeviceAdapter struct {
 }
 
 type CaptureConfig struct {
-	c37118Engineering     bool
-	mavlinkSigning        *mavlinkSigningOptions
-	tlsSecrets            TLSSecretProvider
-	datagramDecodeAs      map[uint16]string
-	rtpsShapeWriters      map[uint16]RTPSShapeWriter
-	canISOTransports      map[int][]CANISOTransport
-	canDecodeAs           map[int]string
-	binParserConfig       *BinParserConfig
-	binParser             *binParser
-	recorder              *captureWriter
-	outputFile            string
-	captureBuffer         int
-	normalizePcapLength   bool
-	reassemblyOptions     TCPReassemblyOptions
-	requiresFullStream    bool
-	Context               context.Context
-	mock                  PcapHandleOperation // TEST MOCK
-	trafficPool           *TrafficPool
-	Output                *pcapgo.Writer // output debug info
-	onNetInterfaceCreated func(handle *PcapHandleWrapper)
-	onReassemblyStats     func(TCPReassemblyStats)
-	onFlowCreated         func(*TrafficFlow)
-	onFlowPacket          []func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)
-	wg                    *sync.WaitGroup
-	Filename              string
-	OverrideCacheId       string
-	BPFFilter             string
-	onPoolCreated         []func(*TrafficPool)
-	Device                []string
-	onEveryPacket         []func(packet gopacket.Packet)
-	beforeTransportPacket []func(gopacket.Packet)
-	Debug                 bool // output debug info
-	EnableCache           bool //  cache for handler cache
-	EmptyDeviceStop       bool
-	DisableAssembly       bool
-	deviceAdapter         *DeviceAdapter
-	DeviceAdapter         []*DeviceAdapter
+	c37118Engineering      bool
+	mavlinkSigning         *mavlinkSigningOptions
+	tlsSecrets             TLSSecretProvider
+	datagramDecodeAs       map[uint16]string
+	rtpsShapeWriters       map[uint16]RTPSShapeWriter
+	canISOTransports       map[int][]CANISOTransport
+	canDecodeAs            map[int]string
+	binParserConfig        *BinParserConfig
+	binParser              *binParser
+	transportNormalizer    *binParser
+	recorder               *captureWriter
+	outputFile             string
+	captureBuffer          int
+	normalizePcapLength    bool
+	ignoreEmbeddedSecrets  bool
+	reassemblyOptions      TCPReassemblyOptions
+	reassemblyIdleExplicit bool
+	offlineReplayClock     bool
+	requiresFullStream     bool
+	Context                context.Context
+	mock                   PcapHandleOperation // TEST MOCK
+	trafficPool            *TrafficPool
+	Output                 *pcapgo.Writer // output debug info
+	onNetInterfaceCreated  func(handle *PcapHandleWrapper)
+	onReassemblyStats      func(TCPReassemblyStats)
+	onFlowCreated          func(*TrafficFlow)
+	onFlowPacket           []func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)
+	wg                     *sync.WaitGroup
+	Filename               string
+	OverrideCacheId        string
+	BPFFilter              string
+	onPoolCreated          []func(*TrafficPool)
+	Device                 []string
+	onEveryPacket          []func(packet gopacket.Packet)
+	beforeTransportPacket  []func(gopacket.Packet)
+	Debug                  bool // output debug info
+	EnableCache            bool //  cache for handler cache
+	EmptyDeviceStop        bool
+	DisableAssembly        bool
+	deviceAdapter          *DeviceAdapter
+	DeviceAdapter          []*DeviceAdapter
 }
 
 type CaptureOption func(*CaptureConfig) error
@@ -80,6 +84,12 @@ type CaptureOption func(*CaptureConfig) error
 // PCAPNG validation is unchanged. Native/live sources reject this option.
 func WithLegacyPcapLengthNormalization(enabled bool) CaptureOption {
 	return func(c *CaptureConfig) error { c.normalizePcapLength = enabled; return nil }
+}
+
+// WithIgnoreEmbeddedSecrets validates and discards PCAPNG secret blocks during
+// offline replay. It never enables decryption; keys must be supplied separately.
+func WithIgnoreEmbeddedSecrets(enabled bool) CaptureOption {
+	return func(c *CaptureConfig) error { c.ignoreEmbeddedSecrets = enabled; return nil }
 }
 
 func emptyOption(_ *CaptureConfig) error {
@@ -131,8 +141,9 @@ func WithBeforeTransportPacket(h func(gopacket.Packet)) CaptureOption {
 	}
 }
 
-// WithOnTrafficFlowPacket observes admitted TCP packets before their payload is
-// fed to reassembly, including handshake/control packets and retransmissions.
+// WithOnTrafficFlowPacket observes TCP packets associated with a flow before
+// sequence validation and reassembly, including control packets and retransmissions.
+// Association does not imply that a segment's sequence or payload is accepted.
 // References own their slice. Callbacks must not retain pooled flows/connections.
 func WithOnTrafficFlowPacket(h func(*TrafficFlow, *TrafficConnection, []PacketReference, time.Time)) CaptureOption {
 	return func(c *CaptureConfig) error {
@@ -568,16 +579,58 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	if packet == nil {
 		return
 	}
-	if c.binParser != nil {
-		packet = protocolAnalysisPacket(packet)
+	normalizer := c.binParser
+	if normalizer == nil {
+		normalizer = c.transportNormalizer
+	}
+	if normalizer != nil {
+		packet = protocolAnalysisPacket(packet, normalizer.datagramDecodeAs)
+		var rejectedVersion *ipVersionError
+		if failure := packet.ErrorLayer(); failure != nil {
+			errors.As(failure.Error(), &rejectedVersion)
+		}
 		var consumed bool
-		packet, consumed = c.binParser.networkPacket(packet)
+		packet, consumed = normalizer.networkPacket(packet)
 		if consumed {
+			if rejectedVersion != nil {
+				// Publish the precise diagnostic while preserving the capture API's
+				// existing decoder-error accounting and final error result. Later
+				// valid packets still drain normally; invalid bytes enter no state.
+				c.trafficPool.malformedPacket(rejectedVersion.Error())
+			}
 			return
 		}
 	}
 	for _, h := range c.beforeTransportPacket {
 		h(packet)
+	}
+	if failure := packet.ErrorLayer(); failure != nil {
+		if hasUnselectedEtherIP(packet) {
+			// networkPacket already published the parent refusal. Keep the
+			// original decoder failure for strict capture/error accounting, but
+			// do not publish a second generic diagnostic or admit a child.
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
+		if _, observedIGMP := packet.(*igmpObservedErrorPacket); observedIGMP {
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
+		var pptp *pptpHeaderError
+		var truncatedIP *ipHeaderTruncatedError
+		var vxlan *vxlanHeaderError
+		var esp *espHeaderTruncatedError
+		var ah *ahHeaderError
+		var options *ipv6OptionsHeaderError
+		if errors.As(failure.Error(), &pptp) || errors.As(failure.Error(), &truncatedIP) || errors.As(failure.Error(), &vxlan) || errors.As(failure.Error(), &esp) || errors.As(failure.Error(), &ah) || errors.As(failure.Error(), &options) {
+			// A selected UDP tunnel can retain its outer TransportLayer when an
+			// inner header fails. The precise native refusal already owns this
+			// packet; do not redispatch those bytes as an outer UDP application.
+			// Other unselected parents returned above; an EtherIP failure has
+			// already retained its original accounting without redispatch.
+			c.trafficPool.malformedPacket(failure.Error().Error())
+			return
+		}
 	}
 	var matched bool
 	ret, isOk := packet.TransportLayer().(*layers.TCP)
@@ -634,7 +687,7 @@ func (c *CaptureConfig) packetHandler(ctx context.Context, packet gopacket.Packe
 	}
 
 	if save {
-		c.Save(packet)
+		c.Save(originalPacket)
 	}
 }
 

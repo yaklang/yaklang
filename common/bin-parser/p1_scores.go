@@ -45,7 +45,9 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("WPA/RSN", "ieee_802_11.yaml", 25, 15, 20, 20, 10, "L2",
 		"TestP1MiscAndAliases RSN IE; TestP1FailPaths RSN", ""),
 	alias("IEEE 802.1X", "EAPOL"),
-	p1card("ICMPv6 NDP", "internet_control_message_protocol_v6.yaml", 25, 25, 20, 20, 10, "L1",
+	// The shared legacy file now retains bounded, normative opaque MLD tails;
+	// the static YAML scanner cannot count them as fully expanded schema.
+	p1card("ICMPv6 NDP", "internet_control_message_protocol_v6.yaml", 20, 25, 20, 20, 10, "L1",
 		"icmpv6/mldv2-report RFC 3810 Type 143 MODE_IS_EXCLUDE ff02::1:ff00:1; icmpv6/mld-query RFC 2710 MRC 10000; TestP1FailPaths trunc-mldv2", ""),
 	p1card("IGMP", "igmp.yaml", 20, 25, 20, 20, 10, "L1",
 		"igmp/v1-report 224.0.1.60; igmp/v3-query RFC 3376 source 192.0.2.1; igmp/v3-report MODE_IS_EXCLUDE Ethernet+IP proto 2; TestP1FailPaths igmp", ""),
@@ -54,7 +56,9 @@ var P1Scorecards = []ProtocolScorecard{
 	p1card("IPsec AH", "ipsec.yaml", 15, 25, 16, 20, 10, "L1",
 		"TestP1MiscAndAliases gopacket testPacketIPSecAHTransport Ethernet+IPv4+AH SPI 0x101; TestP1FailPaths AH", "ICV Ciphertext"),
 	p1card("IPsec ESP", "ipsec.yaml", 15, 25, 16, 20, 10, "L2",
-		"TestP1MiscAndAliases ESP proto 50; TestP1FailPaths ESP", "ICV Ciphertext"),
+		"TestP1MiscAndAliases ESP proto 50; TestP1FailPaths ESP; legacy structural score only, not SA/authentication/decryption coverage; ipsec_esp/ESPHeaderFields exposes the bounded opaque-body observation", "ICV Ciphertext"),
+	p1card("IPsec ESP Header Fields", "ipsec_esp.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestESPCanonicalHeaderEntryAndLegacyCompatibility; clear SPI/low32 sequence and opaque remainder only; native and external public-capture evidence is not scored by the historical YAML schema audit; no SA, integrity, replay or decryption claim", "Opaque Body"),
 	p1card("MPLS", "mpls.yaml", 20, 25, 20, 20, 10, "L1",
 		"mpls/bottom RFC 3032 Bottom=1 TTL 0xfe IPv4; mpls/stack two-label Bottom 0 then 1 EtherType 0x8847; TestP1FailPaths mpls", ""),
 	p1card("VXLAN", "vxlan.yaml", 15, 25, 20, 20, 10, "L1",
@@ -115,12 +119,24 @@ var P1Scorecards = []ProtocolScorecard{
 		"pop3/list RFC 1939 scan Number=1 Size=120; pop3/stat Messages=2 Octets=320 TCP/110; pop3/capa RFC 2449 USER/UIDL; TestP1FailPaths pop3", ""),
 	p1card("IMAP", "imap.yaml", 25, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 3501 greeting Arg Ethernet+TCP/143; TestP1FailPaths imap", ""),
+	// These explicit transport profiles do not inherit the historical IMAP
+	// greeting's score. Dynamic native fields/external live captures are not
+	// credited by this frozen YAML evidence rubric; keep the scope partial.
+	p1card("IMAP SASL Response", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope, TestIMAPSASLRuleCatalogAndWireCoordinates, TestIMAPSASLRejectsInvalidValuesAndLimits and native TestIMAPSASLAssociationFragmentationAndReuse; external capture evidence is separate", "caller-selected SASL transport value; mechanism authentication and security layers are not verified"),
+	p1card("IMAP SASL Challenge", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope and shared bounded challenge grammar; native opposite-direction challenge ownership is separate from this score", "no credential, identity, or negotiated mechanism verification"),
+	p1card("IMAP SASL Initial Value", "application-layer/imap_sasl.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestIMAPSASLCanonicalBoundedScope; RFC 4959 explicit initial-value boundary including empty = marker; external live receipts are not frozen scorecard samples", "capability authorization and mechanism semantics are not verified"),
 	p1card("FTP-DATA", "ftp_data.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1WiresharkAndRFCSamples RFC 959 §3.4.1 STREAM file + §3.4.2 EOR/EOF Ethernet+TCP/20; TestP1FailPaths empty/trunc-hdr/count-overflow", ""),
 	p1card("TFTP", "tftp.yaml", 25, 25, 20, 20, 10, "L2",
 		"tftp/blksize RFC 2348 blksize 512; tftp/timeout RFC 2349 timeout 5 two-option list; tftp/oack tsize UDP/69; TestP1FailPaths tftp", ""),
-	p1card("SFTP", "application-layer/ssh.yaml", 20, 25, 20, 20, 10, "L2",
-		"TestP1WiresharkAndRFCSamples RFC 4253 SSH_MSG_KEXINIT kex_algorithms curve25519-sha256 + KEXDH_INIT mpint e Ethernet+TCP/22; TestSSHPacketAndFTPSMTPCommands", ""),
+	// SSH transport fields do not implement an encrypted SFTP subsystem.
+	// No SFTP grammar, original subsystem traffic or application tests are
+	// credited to this card. Keep the outer transport's useful scope separate.
+	p1card("SFTP", "application-layer/ssh.yaml", 0, 0, 0, 0, 0, "L4",
+		"TestSFTPOuterSSHScopeDoesNotClaimSubsystem; only the outer SSH identification and initial transport packet are decoded; no SFTP subsystem grammar or decrypted application evidence", "encrypted SSH subsystem; SFTP requests, replies and file operations remain unavailable"),
 	p1card("NFS", "onc_rpc.yaml", 20, 25, 20, 20, 10, "L2",
 		"TestP1TCPApplications ONC RPC TCP/111; TestP1FailPaths onc_rpc", "stub opaque"),
 	alias("RPC", "NFS"),

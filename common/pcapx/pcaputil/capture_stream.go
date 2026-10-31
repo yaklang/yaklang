@@ -42,7 +42,7 @@ func NewCaptureReaderWithOptions(input io.Reader, opts PcapReaderOptions) (*Capt
 	}
 	r := &CaptureReader{}
 	if binary.LittleEndian.Uint32(magic) == 0x0a0d0d0a {
-		r.ng, err = NewBoundedNgReader(b, pcapgo.NgReaderOptions{WantMixedLinkType: true, SectionEndCallback: func(_ []pcapgo.NgInterface, _ pcapgo.NgSectionInfo) { r.section++ }})
+		r.ng, err = newBoundedNgReader(b, pcapgo.NgReaderOptions{WantMixedLinkType: true, SectionEndCallback: func(_ []pcapgo.NgInterface, _ pcapgo.NgSectionInfo) { r.section++ }}, opts.IgnoreEmbeddedSecrets)
 		if err == nil {
 			r.first, r.firstInfo, err = r.ReadPacketData()
 			if err == nil {
@@ -135,7 +135,7 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 			return nil, err
 		}
 	}
-	if c.normalizePcapLength || c.captureBuffer > 0 || c.BPFFilter != "" || c.Filename != "" || len(c.Device) != 0 || len(c.DeviceAdapter) != 0 || c.deviceAdapter != nil || c.outputFile != "" || c.Output != nil || c.onNetInterfaceCreated != nil || c.mock != nil || c.DisableAssembly || c.EnableCache {
+	if c.normalizePcapLength || c.ignoreEmbeddedSecrets || c.captureBuffer > 0 || c.BPFFilter != "" || c.Filename != "" || len(c.Device) != 0 || len(c.DeviceAdapter) != 0 || c.deviceAdapter != nil || c.outputFile != "" || c.Output != nil || c.onNetInterfaceCreated != nil || c.mock != nil || c.DisableAssembly || c.EnableCache {
 		return nil, fmt.Errorf("PacketAnalyzer does not support capture-source, BPF, recording, cache, or disabled-reassembly options")
 	}
 	if err := c.prepareBinParser(); err != nil {
@@ -150,7 +150,7 @@ func NewPacketAnalyzer(options ...CaptureOption) (*PacketAnalyzer, error) {
 	}
 	ctx, cancel := context.WithCancel(parent)
 	c.Context = ctx
-	p := newTrafficPool(ctx, c.reassemblyOptions)
+	p := newTrafficPool(ctx, c.tcpPoolOptions())
 	c.trafficPool, p.captureConf = p, c
 	p.captureAccountingAvailable = true
 	for _, init := range c.onPoolCreated {

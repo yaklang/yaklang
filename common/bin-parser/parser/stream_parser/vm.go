@@ -433,6 +433,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseMySQLFields(invocation.node, invocation.operator, profile)
 		},
+		"parseIMAPSASL": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("imap-sasl: structured generation is unsupported")
+			}
+			return parseIMAPSASL(invocation.node, invocation.operator, profile)
+		},
 		"parseIMAPFields": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("imap-fields: structured generation is unsupported")
@@ -481,6 +487,7 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseHTTP2Fields(invocation.node, invocation.operator, mode)
 		},
+		"validateSSHIdentification": validateSSHIdentification,
 		"parseSSHPlaintextPacket": func(profile string) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("ssh-plaintext: structured generation is not supported")
@@ -618,6 +625,30 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 				return fmt.Errorf("gssapi: structured generation is not supported")
 			}
 			return parseGSSAPIToken(invocation.node, invocation.operator)
+		},
+		"parseSSDPMessage": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("ssdp: structured generation is not supported")
+			}
+			return parseSSDPMessage(invocation.node, invocation.operator)
+		},
+		"parseRDPUDPEnvelope": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("rdpudp: structured generation is not supported")
+			}
+			return parseRDPUDPEnvelope(invocation.node, invocation.operator, profile)
+		},
+		"parseObservedSession": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("observed session: generation unavailable")
+			}
+			return parseObservedSession(invocation.node, invocation.operator, profile)
+		},
+		"parseNetworkControl": func(profile string) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("network-control: generation unavailable")
+			}
+			return parseNetworkControl(invocation.node, invocation.operator, profile)
 		},
 		"inspectGSSAPIBase64":             inspectGSSAPIBase64,
 		"inspectACMEJWS":                  inspectACMEJWS,

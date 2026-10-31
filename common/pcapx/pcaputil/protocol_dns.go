@@ -10,7 +10,45 @@ import (
 	"net"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 )
+
+// DNS display text is not a transaction identity. Keep the expanded wire and
+// RFC-style escaped Name separately; do not replace invalid octets by U+FFFD.
+func dnsDisplayName(wire []byte) string {
+	var out strings.Builder
+	for at := 0; at < len(wire); {
+		n := int(wire[at])
+		at++
+		if n == 0 {
+			break
+		}
+		if n > 63 || n > len(wire)-at {
+			return ""
+		}
+		if out.Len() > 0 {
+			out.WriteByte('.')
+		}
+		label := wire[at : at+n]
+		for len(label) > 0 {
+			r, size := utf8.DecodeRune(label)
+			if (r == utf8.RuneError && size == 1) || !unicode.IsGraphic(r) {
+				for _, c := range label[:size] {
+					fmt.Fprintf(&out, "\\%03d", c)
+				}
+			} else {
+				if r == '.' || r == '\\' {
+					out.WriteByte('\\')
+				}
+				out.Write(label[:size])
+			}
+			label = label[size:]
+		}
+		at += n
+	}
+	return out.String()
+}
 
 // DecodeDNSMessage is the shared semantic DNS codec. Compression targets refer
 // to the entire message, but the encoded RDATA cursor cannot leave its RR.
@@ -61,6 +99,9 @@ func DecodeDNSMessage(w []byte, limit int) (map[string]any, error) {
 			typ, class := binary.BigEndian.Uint16(w[pos:]), binary.BigEndian.Uint16(w[pos+2:])
 			pos += 4
 			row := map[string]any{"Name": nm, "Type": typ, "Class": class, "Class Base": class & 0x7fff}
+			if display := dnsDisplayName(nameWire); display != nm {
+				row["Display Name"], row["Name Wire"] = display, nameWire
+			}
 			if section == 0 {
 				row["QU"] = class&0x8000 != 0
 				row["Name Wire"] = nameWire

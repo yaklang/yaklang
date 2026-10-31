@@ -13,6 +13,12 @@ import (
 // reply did not disappear. Admission here examines only bounded headers/ports or
 // an already observed exact endpoint/capture-domain key, never an oversized body.
 func (a *binParser) refuseUDPOversizeAssociation(e *ProtocolEvent, w []byte, src, dst uint16) bool {
+	if a.refuseIPFIXOversize(e, w, src, dst) {
+		return true
+	}
+	if a.refuseNetFlowV9Oversize(e, w, src, dst) {
+		return true
+	}
 	if a.refuseRADIUSOversize(e, w) {
 		return true
 	}
@@ -270,7 +276,7 @@ func (a *binParser) refuseTFTPOversizeAssociation(e *ProtocolEvent, w []byte) bo
 	v := el.Value.(*binUDPEntry)
 	f := v.flow
 	t := f.tftp
-	if t == nil || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
+	if t == nil || !tftpUDPHasPeerEvidence(f, e, w, dir) || t.server != "" && (dir == 1 && t.server != e.Source || dir == 0 && t.server != e.Destination) {
 		return false
 	}
 	peer := e.Source

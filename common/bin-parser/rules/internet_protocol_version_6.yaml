@@ -31,12 +31,13 @@ Package:
         protocol = getNodeResult("../Next Header").Value
         dccpDestination = getNodeResult("../Destination").Value
         dccpContextAvailable = true
-        for protocol == 0 || protocol == 43 || protocol == 44 || protocol == 60 {
+        for protocol == 0 || protocol == 43 || protocol == 44 || protocol == 51 || protocol == 60 {
           var header
           switch protocol {
             case 0: header = this.NewSubNode("Hop By Hop Options")
             case 43: header = this.NewSubNode("Routing Header")
             case 44: header = this.NewSubNode("Fragment Header")
+            case 51: header = this.NewSubNode("Authentication Header")
             case 60: header = this.NewSubNode("Destination Options")
           }
           value = header.Process()
@@ -98,6 +99,25 @@ Package:
         node.Process()
 Hop By Hop Options: IPv6OptionsHeader
 Destination Options: IPv6OptionsHeader
+Authentication Header:
+  operator: |
+    this.ProcessSubNode("Next Header")
+    this.ProcessSubNode("Payload Len")
+    length = (getNodeResult("Payload Len").Value+2)*4
+    if length < 12 || length % 8 != 0 || length > this.GetMaxLength() { panic("ipv6: invalid AH header extent") }
+    this.ProcessSubNode("Reserved")
+    this.ProcessSubNode("SPI")
+    this.ProcessSubNode("Sequence")
+    if length > 12 {
+      this.GetSubNode("ICV").SetMaxLength(length-12)
+      this.ProcessSubNode("ICV")
+    }
+  Next Header: uint8
+  Payload Len: uint8
+  Reserved: uint16
+  SPI: uint32
+  Sequence: uint32
+  ICV: raw
 Routing Header: IPv6RoutingHeader
 Fragment Header:
   Next Header: uint8

@@ -43,7 +43,7 @@ func comprehensiveCapture(t testing.TB) (string, []byte, comprehensiveManifest) 
 	require.NoError(t, err)
 	var manifest comprehensiveManifest
 	require.NoError(t, json.Unmarshal(raw, &manifest))
-	compressed, err := os.ReadFile("testdata/comprehensive.pcapng.gz")
+	compressed, err := trafficfixture.ReadFile("testdata/comprehensive.pcapng.gz")
 	require.NoError(t, err)
 	require.Len(t, compressed, manifest.CompressedBytes)
 	require.GreaterOrEqual(t, len(compressed), 190<<10)

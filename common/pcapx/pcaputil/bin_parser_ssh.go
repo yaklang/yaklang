@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -25,6 +26,9 @@ type binSSH struct {
 	newkeys            [2]bool
 	selected           map[string]string
 	encrypted          bool
+	guessPending       [2]bool
+	compatIdentProof   [2]bool
+	identWarning       [2]string
 }
 
 type sshKexLists struct {
@@ -44,7 +48,27 @@ func probeSSH(w []byte, limit int) ProbeResult {
 	}
 	if i := bytes.IndexByte(w, '\n'); i >= 0 {
 		if _, _, err := sshIdentification(w[:i+1]); err != nil {
-			return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "unsupported identification"}
+			if _, _, warning, observedErr := sshObservedIdentification(w[:i+1]); observedErr != nil || warning == "" {
+				return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "unsupported identification"}
+			}
+			// A nonconformant software spelling is not sufficient admission.
+			// Require a full initial KEXINIT, including all mandatory fields.
+			body := w[i+1:]
+			want := i + 1 + 16
+			if len(body) >= 4 {
+				n := uint64(binary.BigEndian.Uint32(body)) + 4
+				if n < 16 || n > 35000 || n%8 != 0 || len(body) >= 6 && body[5] != 20 {
+					return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "nonconformant identification lacks a valid initial KEXINIT"}
+				}
+				want = i + 1 + int(n)
+				if len(body) >= int(n) && want <= limit {
+					if _, err := stream_parser.DecodeSSHInitialPacket(body[:int(n)], "transport"); err == nil {
+						return probeAccept("ssh", "observed-nonconformant-identification/2.0", 95)
+					}
+					return ProbeResult{Verdict: ProbeReject, Protocol: "ssh", Reason: "invalid initial KEXINIT after nonconformant identification"}
+				}
+			}
+			return probeNeed("ssh", "unconfirmed-nonconformant-identification", len(w), min(limit, want))
 		}
 		_ = limit
 		return probeAccept("ssh", "2.0", 95)
@@ -120,6 +144,53 @@ func sshIdentification(raw []byte) (string, string, error) {
 	return string(line), version, nil
 }
 
+// Retain the literal wire string. The owned validation copy only establishes
+// that '-' in softwareversion is the sole strict-grammar discrepancy; it never
+// rewrites capture bytes or turns that discrepancy into standards compliance.
+func sshObservedIdentification(raw []byte) (string, string, string, error) {
+	line, version, originalErr := sshIdentification(raw)
+	if originalErr == nil {
+		return line, version, "", nil
+	}
+	start := 0
+	if bytes.HasPrefix(raw, []byte("SSH-2.0-")) {
+		start = 8
+	} else if bytes.HasPrefix(raw, []byte("SSH-1.99-")) {
+		start = 9
+	} else {
+		return "", "", "", originalErr
+	}
+	trimmed := bytes.TrimSuffix(bytes.TrimSuffix(raw, []byte{'\n'}), []byte{'\r'})
+	end := len(trimmed)
+	if i := bytes.IndexByte(trimmed[start:], ' '); i >= 0 {
+		end = start + i
+	}
+	check := bytes.Clone(raw)
+	changed := false
+	for i := start; i < end; i++ {
+		if check[i] == '-' {
+			check[i], changed = '_', true
+		}
+	}
+	if _, version, err := sshIdentification(check); changed && err == nil {
+		return string(trimmed), version, "softwareversion uses '-' (RFC4253 4.2)", nil
+	}
+	return "", "", "", originalErr
+}
+
+func (s *binSSH) identificationWarningFields(info map[string]any) {
+	var warnings []string
+	for dir, warning := range s.identWarning {
+		if warning != "" {
+			warnings = append(warnings, fmt.Sprintf("endpoint %d: %s", dir, warning))
+		}
+	}
+	if len(warnings) > 0 {
+		info["Identification Conformance"] = "nonconformant"
+		info["Identification Warning"] = strings.Join(warnings, "; ")
+	}
+}
+
 // Call only with observed server direction. A line of arbitrary text, a port
 // hint, or a client preamble alone never admits SSH.
 func probeSSHServerPreamble(w []byte, limit int) ProbeResult {
@@ -177,11 +248,18 @@ func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 		if i := bytes.IndexByte(w, '\n'); i >= 0 {
 			n := i + 1
 			if bytes.HasPrefix(w, []byte("SSH-")) {
-				if _, _, err := sshIdentification(w[:n]); err != nil {
+				_, _, warning, err := sshObservedIdentification(w[:n])
+				if err != nil {
 					return 0, nil, err
+				}
+				if warning != "" && !s.compatIdentProof[dir] && !s.compatIdentProof[1-dir] && !(s.banner[1-dir] && s.identWarning[1-dir] == "") && probeSSH(w, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict != ProbeAccept {
+					return 0, nil, protocolError(ErrContextRequired, "SSH nonconformant identification needs a confirmed peer or complete initial KEXINIT")
 				}
 				if err := f.reserveSession(512 + int64(len(s.ident[0])+len(s.ident[1])+n)); err != nil {
 					return 0, nil, err
+				}
+				if warning != "" {
+					s.compatIdentProof[dir] = true
 				}
 				return n, &binSpec{entry: "SSHIdentification"}, nil
 			}
@@ -238,6 +316,14 @@ func (f *binFlow) frameSSH(dir int, w []byte) (int, *binSpec, error) {
 }
 
 func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
+	info, err := s.consumeMessage(dir, raw)
+	if err == nil && info != nil {
+		s.identificationWarningFields(info)
+	}
+	return info, err
+}
+
+func (s *binSSH) consumeMessage(dir int, raw []byte) (map[string]any, error) {
 	if s.client < 0 {
 		s.client = dir
 	}
@@ -255,18 +341,26 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 			}
 			s.preLines++
 			s.preBytes += len(raw)
-			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server"}, nil
+			return map[string]any{"Packet Name": "pre-identification line", "Text": line, "Line Number": s.preLines, "Context Level": "observed-server", "Wire Field Ranges": map[string]any{"Text": []any{uint64(0), uint64(len(line))}}}, nil
 		}
-		line, ver, err := sshIdentification(raw)
+		line, ver, warning, err := sshObservedIdentification(raw)
 		if err != nil {
 			return nil, err
 		}
+		if warning != "" && !s.compatIdentProof[dir] && !s.compatIdentProof[1-dir] && !(s.banner[1-dir] && s.identWarning[1-dir] == "") {
+			return nil, protocolError(ErrContextRequired, "SSH nonconformant identification lacks independent admission evidence")
+		}
 		s.banner[dir], s.ident[dir] = true, line
+		s.identWarning[dir] = warning
 		return map[string]any{
 			"Packet Name":    "identification",
 			"Identification": line,
 			"Version":        ver,
 			"Context Level":  "observed",
+			"Wire Field Ranges": map[string]any{
+				"Identification": []any{uint64(0), uint64(len(line))},
+				"Version":        []any{uint64(4), uint64(4 + len(ver))},
+			},
 		}, nil
 	}
 	if len(raw) < 6 {
@@ -283,34 +377,113 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		return nil, fmt.Errorf("ssh: empty payload")
 	}
 	msg := payload[0]
+	kex := s.selected["Kex Algorithm"]
+	profile := sshKexProfile(kex)
+	ignoredGuess := false
+	if msg != 20 && s.guessPending[dir] {
+		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
+			own := s.kex[dir]
+			ignoredGuess = strings.Split(sshRealKexNames(own.Kex), ",")[0] != kex || strings.Split(own.HostKey, ",")[0] != s.selected["Host Key Algorithm"]
+			if ignoredGuess {
+				profile = "transport"
+			}
+		}
+	}
+	expectedClient, roleBound := sshMethodClientSender(profile, msg)
+	roleMismatch := !ignoredGuess && roleBound && s.clientKnown && (dir == s.client) != expectedClient
+	if roleMismatch {
+		// The complete transport envelope is still owned, but an observed
+		// sender contradiction cannot establish client key or server host-key
+		// fields. A missing earlier message alone is not such a contradiction.
+		profile = "transport"
+	}
+	initial, err := stream_parser.DecodeSSHInitialPacket(raw, profile)
+	if err != nil {
+		return nil, protocolError(ErrMalformedMessage, err.Error())
+	}
 	info := map[string]any{
-		"Packet Name":    sshMsgName(msg),
+		"Packet Name":    sshExchangeMessageName(msg, kex),
 		"Message Number": msg,
 		"Context Level":  "observed",
 		"Identification": s.ident[dir],
 	}
+	sshCurrentMessageRanges(info, initial, false)
+	if msg != 20 {
+		for key, value := range s.selected {
+			info[key] = value
+		}
+	}
+	if !s.clientKnown && (msg == 20 || s.haveKEX[0] && s.haveKEX[1]) {
+		info["Negotiation Context"] = "client/server role not observed"
+		info["Context Level"] = "partial"
+	}
+	if msg != 20 && s.guessPending[dir] {
+		s.guessPending[dir] = false
+		if ignoredGuess {
+			info["Packet Name"] = "Ignored guessed key-exchange packet"
+			info["Payload Interpretation"] = "discarded after algorithm mismatch"
+			return info, nil
+		}
+	}
+	if roleMismatch {
+		expected, observed := "server", "client"
+		if expectedClient {
+			expected, observed = "client", "server"
+		}
+		info["Packet Name"] = fmt.Sprintf("KEY_EXCHANGE_%d (unexpected sender)", msg)
+		info["Expected Sender Role"], info["Observed Sender Role"] = expected, observed
+		info["Payload Interpretation"] = "not decoded: sender contradicts observed TCP role"
+		info["Error Scope"] = "message"
+		return info, protocolError(ErrMalformedMessage, "SSH %s requires the observed %s, received from the observed %s", sshExchangeMessageName(msg, kex), expected, observed)
+	}
 	switch msg {
 	case 20:
+		if s.haveKEX[dir] {
+			return nil, protocolError(ErrMalformedMessage, "SSH repeated KEXINIT before NEWKEYS")
+		}
 		lists, err := sshParseKexInit(payload[1:])
 		if err != nil {
 			return nil, err
 		}
-		s.kex[dir] = lists
-		s.haveKEX[dir] = true
+		// Validate the complete candidate negotiation before publishing either
+		// sender's offers or pending-guess state. A refused second KEXINIT must
+		// not leave a half-committed connection that later packets can inherit.
+		offers, have := s.kex, s.haveKEX
+		offers[dir], have[dir] = lists, true
+		selected := s.selected
+		if have[0] && have[1] && s.clientKnown {
+			selected = sshNegotiate(offers[s.client], offers[1-s.client])
+			if err := sshNegotiationError(selected); err != nil {
+				return nil, err
+			}
+		}
+		s.kex, s.haveKEX, s.selected = offers, have, selected
 		info["Kex Algorithms"] = lists.Kex
 		info["Host Key Algorithms"] = lists.HostKey
-		info["Encryption C2S"] = lists.EncC2S
-		info["Encryption S2C"] = lists.EncS2C
-		info["MAC C2S"] = lists.MACC2S
-		info["MAC S2C"] = lists.MACS2C
-		info["Compression C2S"] = lists.CompC2S
-		if s.haveKEX[0] && s.haveKEX[1] {
-			s.selected = sshNegotiate(s.kex[s.client], s.kex[1-s.client])
+		// KEXINIT contains sender offers. Client-preference negotiation below
+		// is a different observation and must not overwrite those wire lists.
+		info["Offered Encryption C2S"] = lists.EncC2S
+		info["Offered Encryption S2C"] = lists.EncS2C
+		info["Offered MAC C2S"] = lists.MACC2S
+		info["Offered MAC S2C"] = lists.MACS2C
+		info["Offered Compression C2S"] = lists.CompC2S
+		info["Offered Compression S2C"] = lists.CompS2C
+		if wf, ok := initial["Wire Fields"].(map[string]any); ok {
+			if p, ok := wf["Payload"].(map[string]any); ok {
+				for _, key := range []string{"Languages C2S", "Languages S2C", "First Kex Packet Follows", "Reserved"} {
+					info[key] = p[key]
+				}
+				follows, _ := p["First Kex Packet Follows"].(byte)
+				s.guessPending[dir] = follows != 0
+			}
+		}
+		if s.haveKEX[0] && s.haveKEX[1] && s.clientKnown {
 			for k, v := range s.selected {
 				info[k] = v
 			}
 			info["Kex Family"] = sshKexFamily(s.selected["Kex Algorithm"])
 		}
+		sshCurrentMessageRanges(info, initial, true)
 	case 21:
 		s.newkeys[dir] = true
 		if s.newkeys[0] && s.newkeys[1] {
@@ -323,18 +496,65 @@ func (s *binSSH) consume(dir int, raw []byte) (map[string]any, error) {
 		if !s.haveKEX[0] || !s.haveKEX[1] {
 			info["Context Level"] = "partial"
 		}
-	case 31:
+	case 31, 33:
+		if !sshSelectedReply(profile, msg) || initial["Payload Layout Decoded"] != true {
+			info["Kex Family"] = sshKexFamily(kex)
+			break
+		}
 		host, err := sshParseHostKey(payload[1:])
 		if err != nil {
 			return nil, err
 		}
 		sum := sha256.Sum256(host)
 		info["Host Key Format"] = sshHostKeyFormat(host)
+		if wire, ok := initial["Wire Fields"].(map[string]any); ok {
+			payload, _ := wire["Payload"].(map[string]any)
+			key, _ := payload["Host Key"].(map[string]any)
+			ranges, _ := key["Wire Field Ranges"].(map[string]any)
+			if span, ok := ranges["Host Key Format"]; ok {
+				info["Wire Field Ranges"].(map[string]any)["Host Key Format"] = cloneSessionValue(span)
+			}
+		}
 		info["Host Key Fingerprint"] = "SHA256:" + base64.RawStdEncoding.EncodeToString(sum[:])
 		info["Host Key SHA256"] = fmt.Sprintf("%x", sum[:])
+		info["Signature Verified"], info["Peer Identity Verified"] = false, false
 		info["Kex Family"] = sshKexFamily(s.selected["Kex Algorithm"])
 	}
+	if msg >= 30 && msg <= 34 && profile != "transport" {
+		info["Initial Packet Fields"] = initial["Wire Fields"]
+		info["Signature Verified"], info["Peer Identity Verified"] = false, false
+	}
 	return info, nil
+}
+
+// Only aliases of this PDU's literal payload fields inherit wire positions.
+// Negotiated algorithms, carried identification and computed key fingerprints
+// remain connection context, even when their values equal a current offer.
+func sshCurrentMessageRanges(info, initial map[string]any, kexInit bool) {
+	wire, _ := initial["Wire Fields"].(map[string]any)
+	payload, _ := wire["Payload"].(map[string]any)
+	owned, _ := payload["Wire Field Ranges"].(map[string]any)
+	ranges, _ := info["Wire Field Ranges"].(map[string]any)
+	if ranges == nil {
+		ranges = map[string]any{}
+	}
+	copyRange := func(source, target string) {
+		if span, ok := owned[source]; ok {
+			ranges[target] = cloneSessionValue(span)
+		}
+	}
+	copyRange("Message Number", "Message Number")
+	if kexInit {
+		for _, key := range []string{"Kex Algorithms", "Host Key Algorithms", "Languages C2S", "Languages S2C", "First Kex Packet Follows", "Reserved"} {
+			copyRange(key, key)
+		}
+		for _, key := range []string{"Encryption C2S", "Encryption S2C", "MAC C2S", "MAC S2C", "Compression C2S", "Compression S2C"} {
+			copyRange(key, "Offered "+key)
+		}
+	}
+	if len(ranges) > 0 {
+		info["Wire Field Ranges"] = ranges
+	}
 }
 
 func sshParseKexInit(body []byte) (sshKexLists, error) {
@@ -352,7 +572,46 @@ func sshParseKexInit(body []byte) (sshKexLists, error) {
 		*dst = s
 		i = n
 	}
+	// The two language lists, follows boolean and reserved word are mandatory,
+	// even when their values do not affect algorithm choice.
+	for n := 0; n < 2; n++ {
+		_, next, err := sshReadString(body, i)
+		if err != nil {
+			return lists, err
+		}
+		i = next
+	}
+	if len(body)-i != 5 {
+		return lists, fmt.Errorf("ssh: KEXINIT missing or trailing fields")
+	}
 	return lists, nil
+}
+
+func sshExchangeMessageName(msg byte, kex string) string {
+	if msg < 30 || msg > 49 {
+		return sshMsgName(msg)
+	}
+	switch sshKexProfile(kex) {
+	case "dh-gex":
+		if name := map[byte]string{30: "KEX_DH_GEX_REQUEST_OLD", 31: "KEX_DH_GEX_GROUP", 32: "KEX_DH_GEX_INIT", 33: "KEX_DH_GEX_REPLY", 34: "KEX_DH_GEX_REQUEST"}[msg]; name != "" {
+			return name
+		}
+	case "ecdh-curve25519", "ecdh-nistp256":
+		if msg == 30 {
+			return "KEX_ECDH_INIT"
+		}
+		if msg == 31 {
+			return "KEX_ECDH_REPLY"
+		}
+	case "dh":
+		if msg == 30 {
+			return "KEXDH_INIT"
+		}
+		if msg == 31 {
+			return "KEXDH_REPLY"
+		}
+	}
+	return fmt.Sprintf("KEY_EXCHANGE_%d (layout unconfirmed)", msg)
 }
 
 func sshParseHostKey(body []byte) ([]byte, error) {
@@ -409,8 +668,8 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		}
 		return ""
 	}
-	return map[string]string{
-		"Kex Algorithm":      pick(client.Kex, server.Kex),
+	selected := map[string]string{
+		"Kex Algorithm":      pick(sshRealKexNames(client.Kex), sshRealKexNames(server.Kex)),
 		"Host Key Algorithm": pick(client.HostKey, server.HostKey),
 		"Encryption C2S":     pick(client.EncC2S, server.EncC2S),
 		"Encryption S2C":     pick(client.EncS2C, server.EncS2C),
@@ -419,17 +678,96 @@ func sshNegotiate(client, server sshKexLists) map[string]string {
 		"Compression C2S":    pick(client.CompC2S, server.CompC2S),
 		"Compression S2C":    pick(client.CompS2C, server.CompS2C),
 	}
+	// These explicit OpenSSH AEAD profiles negotiate integrity with the
+	// cipher. The offered MAC vectors remain wire facts, but are not selected
+	// algorithms and do not need an intersection. RFC 5647's older AEAD_AES_*
+	// identifiers have different negotiation rules; unknown names never imply
+	// this behavior merely because they contain "gcm" or "poly1305".
+	for _, direction := range []string{"C2S", "S2C"} {
+		switch selected["Encryption "+direction] {
+		case "aes128-gcm@openssh.com", "aes256-gcm@openssh.com", "chacha20-poly1305@openssh.com":
+			selected["MAC "+direction] = "<implicit>"
+		}
+	}
+	return selected
+}
+
+func sshNegotiationError(selected map[string]string) error {
+	for _, name := range []string{"Kex Algorithm", "Host Key Algorithm", "Encryption C2S", "Encryption S2C", "MAC C2S", "MAC S2C", "Compression C2S", "Compression S2C"} {
+		if selected[name] == "" {
+			return protocolError(ErrMalformedMessage, "SSH negotiation has no common "+name)
+		}
+	}
+	return nil
+}
+
+func sshRealKexNames(names string) string {
+	var out []string
+	for _, n := range strings.Split(names, ",") {
+		switch n {
+		case "ext-info-c", "ext-info-s", "kex-strict-c-v00@openssh.com", "kex-strict-s-v00@openssh.com":
+			// Capability indicators are exact names, not algorithm prefixes.
+		default:
+			out = append(out, n)
+		}
+	}
+	return strings.Join(out, ",")
 }
 
 func sshKexFamily(name string) string {
-	switch {
-	case strings.Contains(name, "curve25519") || strings.HasPrefix(name, "ecdh-"):
+	switch sshKexProfile(name) {
+	case "ecdh-curve25519", "ecdh-nistp256":
 		return "ECDH"
-	case strings.Contains(name, "diffie-hellman"):
+	case "dh", "dh-gex":
 		return "DH"
 	default:
 		return ""
 	}
+}
+
+// Select only the exact RFC4253/4419/5656/8268/8731 method names whose
+// complete initial packet layouts this codec implements. A private @domain
+// name can contain any of these words without defining the same wire format.
+func sshKexProfile(name string) string {
+	switch name {
+	case "diffie-hellman-group1-sha1", "diffie-hellman-group14-sha1", "diffie-hellman-group14-sha256", "diffie-hellman-group15-sha512", "diffie-hellman-group16-sha512", "diffie-hellman-group17-sha512", "diffie-hellman-group18-sha512":
+		return "dh"
+	case "diffie-hellman-group-exchange-sha1", "diffie-hellman-group-exchange-sha256":
+		return "dh-gex"
+	case "ecdh-sha2-nistp256":
+		return "ecdh-nistp256"
+	case "curve25519-sha256", "curve25519-sha256@libssh.org":
+		return "ecdh-curve25519"
+	default:
+		return "transport"
+	}
+}
+
+func sshSelectedReply(profile string, msg byte) bool {
+	if profile == "dh-gex" {
+		return msg == 33
+	}
+	return msg == 31 && (profile == "dh" || profile == "ecdh-nistp256" || profile == "ecdh-curve25519")
+}
+
+// RFC4253 section8, RFC4419 sections3/5 and RFC5656 section4 bind these
+// method messages to an endpoint role. Unknown private method numbers have
+// no such contract. This does not infer missing handshake order from absence.
+func sshMethodClientSender(profile string, msg byte) (client, known bool) {
+	switch profile {
+	case "dh", "ecdh-nistp256", "ecdh-curve25519":
+		if msg == 30 || msg == 31 {
+			return msg == 30, true
+		}
+	case "dh-gex":
+		switch msg {
+		case 30, 32, 34:
+			return true, true
+		case 31, 33:
+			return false, true
+		}
+	}
+	return false, false
 }
 
 func sshMsgName(msg byte) string {

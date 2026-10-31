@@ -1,5 +1,11 @@
 endian: big
 Package:
+  operator: |
+    this.ProcessSubNode("BGP")
+  BGPMessageFields:
+    operator: |
+      err = parseObservedSession("bgp")
+      if err != nil { panic(err) }
   BGP:
     operator: |
       this.ProcessSubNode("Marker")

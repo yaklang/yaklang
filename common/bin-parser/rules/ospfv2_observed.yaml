@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("OSPFv2ControlFields")
+  OSPFv2ControlFields:
+    operator: |
+      err = parseObservedSession("ospfv2-control")
+      if err != nil { panic(err) }

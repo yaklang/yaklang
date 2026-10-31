@@ -1,0 +1,4843 @@
+{
+  "scope": "Bounded RFC5036/6720 UDP discovery, canonical codec/native dispatch/typed fields and progressive UI; TCP sessions, label distribution and cryptographic authentication remain pending",
+  "binaries": {
+    "yak-ldp-stage.exe": "99c2477ee0d96a21b420c7101c37ad02b932d9b39e201350c5c6bb01b946c55a",
+    "yak-ldp-final.exe": "2bab63d8ec2ad3bdf05aca661585307e8f55ed49816ad4694beb6d92f4870c32",
+    "yak-ldp-source-check.exe": "2bab63d8ec2ad3bdf05aca661585307e8f55ed49816ad4694beb6d92f4870c32",
+    "events-ldp-stage.exe": "3653c9d402f0cc204a592ef5259f23a31f6a5e711f31667c5bd9c409d95c7bfa",
+    "events-ldp-source-check.exe": "3653c9d402f0cc204a592ef5259f23a31f6a5e711f31667c5bd9c409d95c7bfa"
+  },
+  "full_corpus_binary_scope": "Full SDK/CLI comparisons use the stage pair. SDK stage equals rebuilt final SDK. Final CLI fixes the repeated summary only; it is independently verified on all 51,328 frames in the Windows console.",
+  "tests": {
+    "full_packages_seconds": {
+      "common/bin-parser": 154.243,
+      "common/bin-parser/parser": 7.966,
+      "common/bin-parser/parser/base": 0.668,
+      "common/bin-parser/parser/stream_parser": 5.776,
+      "common/bin-parser/protocol-impl": 0.694,
+      "common/bin-parser/protocol-impl/msrdp": 0.284,
+      "common/bin-parser/rules": 0.474,
+      "common/pcapx/pcaputil": 448.619,
+      "common/yak/cmd/yakcmds/shark-cli": 2.051
+    },
+    "final_focused_bin_parser_seconds": 0.661,
+    "final_focused_pcaputil_seconds": 0.605,
+    "final_focused_cli_seconds": 0.62,
+    "fuzz_executions": 17167,
+    "fuzz_seconds": 10.943
+  },
+  "windows": {
+    "binary_sha256": "2bab63d8ec2ad3bdf05aca661585307e8f55ed49816ad4694beb6d92f4870c32",
+    "capture_frames": 51328,
+    "initial_filter": "ldp.msg.type == 0x0100",
+    "visible": 290,
+    "first_frame": 5,
+    "ui_skipped": 0,
+    "checks": [
+      "EOF",
+      "native fields",
+      "byte sources",
+      "conversation/evidence",
+      "180x48 to 80x30 to 180x48",
+      "quit",
+      "restore CP936"
+    ],
+    "result": "passed"
+  },
+  "corpora": {
+    "weber": {
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "oracle_sha256": "92888e12f7ea6b141148ca1f72451d0605d25b4720b9bc28eb46dad4629b46ac",
+      "native_export_sha256": "3ecb109fd0e36a62391d72c6cc349b874c0f26b788bc80f8dee63a7e78970fba",
+      "audit_sha256": "e22d21f94f475eccbc5bd8395f79a28b291a2df95ff898e6e4238fb1aa7bfbe6",
+      "raw_full_summary_sha256": "a76f53e3eb005b7b294341aed7e211c7e9c6f6051b2b3e2ec16d2fe01679e821",
+      "frames": 51328,
+      "native_status": {
+        "decoded": 290
+      },
+      "matched_discovery_pdus": 290,
+      "checks": {
+        "wire_bytes": 290,
+        "domain_and_no_session_inference": 290,
+        "ldp.hdr.version": 290,
+        "ldp.hdr.pdu_len": 290,
+        "ldp.hdr.ldpid.lsr": 290,
+        "ldp.hdr.ldpid.lsid": 290,
+        "ldp.msg.type": 290,
+        "ldp.msg.len": 290,
+        "ldp.msg.id": 290,
+        "ldp.msg.tlv.type": 290,
+        "ldp.msg.tlv.len": 290,
+        "ldp.msg.tlv.hello.hold": 290,
+        "ldp.msg.tlv.hello.targeted": 290,
+        "ldp.msg.tlv.hello.requested": 290,
+        "ldp.msg.tlv.hello.gtsm": 290,
+        "ldp.msg.tlv.hello.res": 290,
+        "ldp.msg.tlv.ipv4.taddr": 290,
+        "cli_progressive_path": 290
+      },
+      "checks_total": 5220,
+      "full_cli_label_delta": {
+        "UDP": -290,
+        "LDP": 290
+      },
+      "refused_or_incomplete_views": [],
+      "outside_native_scope": [
+        {
+          "frame": 91,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 327,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 481,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 583,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 739,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 897,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 967,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 971,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 975,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 979,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 983,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1195,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1201,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1417,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1471,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        }
+      ],
+      "failures": [],
+      "extra_native_pdu_ids": [],
+      "remaining_raw_generic_field_mismatches": 90,
+      "native_tcp_flows": 824,
+      "preview_flows": 808
+    },
+    "sharon": {
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "oracle_sha256": "23f883f9abac82518351dd0dc6389e79a92dcd35f924138d83b1986df1a1e0ad",
+      "native_export_sha256": "eaed6b7db6438a7dd3bead4f4167ab3b4abe1f377d040d0866075b4c4684ed43",
+      "audit_sha256": "e22d21f94f475eccbc5bd8395f79a28b291a2df95ff898e6e4238fb1aa7bfbe6",
+      "raw_full_summary_sha256": "0beb8a6ea55ef4f8d539848713127f2f3b1a178844e149c17dd840688ce8ad91",
+      "frames": 328127,
+      "native_status": {
+        "decoded": 290
+      },
+      "matched_discovery_pdus": 290,
+      "checks": {
+        "wire_bytes": 290,
+        "domain_and_no_session_inference": 290,
+        "ldp.hdr.version": 290,
+        "ldp.hdr.pdu_len": 290,
+        "ldp.hdr.ldpid.lsr": 290,
+        "ldp.hdr.ldpid.lsid": 290,
+        "ldp.msg.type": 290,
+        "ldp.msg.len": 290,
+        "ldp.msg.id": 290,
+        "ldp.msg.tlv.type": 290,
+        "ldp.msg.tlv.len": 290,
+        "ldp.msg.tlv.hello.hold": 290,
+        "ldp.msg.tlv.hello.targeted": 290,
+        "ldp.msg.tlv.hello.requested": 290,
+        "ldp.msg.tlv.hello.gtsm": 290,
+        "ldp.msg.tlv.hello.res": 290,
+        "ldp.msg.tlv.ipv4.taddr": 290,
+        "cli_progressive_path": 290
+      },
+      "checks_total": 5220,
+      "full_cli_label_delta": {
+        "UDP": -290,
+        "LDP": 290
+      },
+      "refused_or_incomplete_views": [
+        {
+          "frame": 36688,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 37166,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 37832,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 38684,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 39005,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 39109,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 39609,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 39790,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 40069,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 40787,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41121,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41301,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41318,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41447,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41658,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 41798,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42012,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42053,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42716,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42802,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42836,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 42851,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 43378,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 43911,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 44079,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45588,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45627,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45702,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45709,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45809,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45814,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45880,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45920,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 45989,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 46376,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 46635,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 46739,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 46746,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 46834,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 47091,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 47280,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 47705,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 47728,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 47933,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 48106,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 48125,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 48249,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 48765,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49043,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49263,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49383,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49407,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49438,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 49468,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 50876,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 50953,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 50956,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 51665,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 52069,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 52099,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 52123,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 52522,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 52898,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 53049,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 53523,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 53753,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 53956,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54186,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54276,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54281,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54442,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54469,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54471,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54687,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54946,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 54959,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 55130,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 55278,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 55873,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 56244,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 56514,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 56717,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 56753,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 57063,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 57146,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 57474,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 57646,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 57716,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 58220,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 58444,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 58713,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 58745,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 58818,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 59383,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 60365,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 60730,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 60779,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 61796,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 61844,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 62178,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 62536,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 62801,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 62891,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 63186,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 63197,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 63296,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 63641,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 64414,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 64603,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65082,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65249,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65345,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65436,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65567,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 65773,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 66181,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 66392,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 67060,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 67911,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 68445,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 68882,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 69194,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 69232,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 70097,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 70502,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 70986,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 71101,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 71643,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 71870,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 72133,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 72596,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 73113,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 73343,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 73765,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 73825,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 74261,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 74290,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75107,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75139,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75158,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75295,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75522,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75807,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 75843,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 76267,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 76504,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 76540,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 76873,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 77126,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 77400,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 77457,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 77538,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 77835,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 78095,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 78113,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 78238,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 78644,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 78815,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 79549,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 79724,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 80397,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 80481,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 80756,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 80869,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 80965,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 81111,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 81413,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 81803,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 81829,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 82069,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 82317,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 82436,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 82514,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 82944,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 83692,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 83779,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 83896,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 83977,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 84007,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 84266,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 84654,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 84757,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 85107,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 85361,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 85603,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 86300,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 86628,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 87106,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 87295,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 87355,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 88229,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 88345,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 88676,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 88744,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 88925,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89206,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89210,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89251,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89303,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89438,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89796,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 89972,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90183,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90215,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90270,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90365,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90487,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90777,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 90914,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 91129,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 91146,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 91439,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 93241,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 93832,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 94188,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 94432,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 94501,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 94502,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 94640,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 94889,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 95510,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 95711,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 96707,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 96826,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 96828,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 97012,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 97186,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 97253,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 98331,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 98360,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 98820,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 98980,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 99146,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 99368,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 99814,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 100046,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 100206,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 100845,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 100878,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101101,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101287,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101778,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101788,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101855,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 101956,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 102542,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 102687,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 102782,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 103637,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 103654,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 103942,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 103996,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 104142,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 104179,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 104379,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 104918,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105194,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105350,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105520,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105587,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105642,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 105668,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 106325,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 106748,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 106936,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 106993,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 107086,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 107407,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 107670,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 107897,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 108046,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 108608,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 108873,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 108890,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 109722,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 109786,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 109938,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 109943,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 110035,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 110037,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 111585,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 111596,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 111598,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 112034,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 112355,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 112410,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 112459,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113018,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113109,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113118,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113168,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113561,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 113845,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 114001,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 114539,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 114829,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 115106,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 115177,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 115640,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 115994,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 116019,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 116986,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 117055,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 117246,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 117517,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 117922,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 118059,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 118161,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119005,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119068,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119414,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119439,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119529,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119878,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 119968,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 120302,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 120319,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 120547,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 121827,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 122239,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 122299,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 122704,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123002,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123289,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123341,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123429,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123588,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 123691,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 124084,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 125584,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 125950,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126029,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126075,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126092,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126226,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126251,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126316,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126403,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126539,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 126820,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 127411,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 127431,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 128415,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 128588,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 128871,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 129117,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 129661,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 130093,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 130511,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 130626,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 131132,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 131173,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 131553,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 131580,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 131670,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132385,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132473,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132640,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132689,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132740,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 132809,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 133012,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 133707,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 133716,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 134494,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 135372,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 135382,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 135812,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 136066,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 136406,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 136593,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 136676,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 136964,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 137103,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 137875,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 138089,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 138648,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 138786,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 138986,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 139045,
+          "reason": "outside selected discovery byte bounds"
+        },
+        {
+          "frame": 139350,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 139599,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 140052,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 140324,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 140363,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 140823,
+          "reason": "incomplete or inconsistent PDU length"
+        },
+        {
+          "frame": 140872,
+          "reason": "incomplete or inconsistent PDU length"
+        }
+      ],
+      "outside_native_scope": [
+        {
+          "frame": 91,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 327,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 481,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 583,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 739,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 897,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 967,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 971,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 975,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 979,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 983,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1195,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1201,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1417,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 1471,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 141740,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 141932,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 141976,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 142028,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 142334,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 143161,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 143304,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 143730,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 144134,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 144186,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 144570,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 144759,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 145230,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 145301,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 145575,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 145955,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 146021,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 147060,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 147098,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 147269,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 147743,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 147857,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 148017,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 148118,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 148655,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 148934,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 149525,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 149595,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 149879,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 150662,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 151011,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 151209,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152221,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152320,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152531,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152561,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152568,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 152956,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 153282,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 153319,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 154225,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 154381,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 154406,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 154938,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 155115,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 155270,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 155557,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 155845,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 155875,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 156609,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 157363,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 157785,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 158284,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 158978,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 159298,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 159767,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 160016,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 160914,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 160967,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 161018,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 161731,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 161968,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 162054,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 162161,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 162787,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 163011,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 163396,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 164179,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 164479,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 164502,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 164919,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 165020,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 165184,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 166069,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 166219,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 166295,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 167708,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 168010,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 168577,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 168769,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 168853,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 169274,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 169608,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 169662,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 169753,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 170320,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 170375,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 170691,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 171281,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 171291,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 171352,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 171886,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 172116,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 173041,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 173237,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 173602,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 174020,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 174070,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 174140,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 174176,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 174266,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 175291,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 175490,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 176201,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 176229,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 176406,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 176965,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 177399,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 177528,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 178103,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 178143,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 178310,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 178313,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 178353,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 179137,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 179300,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 179463,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 179619,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 179822,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 180144,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 180602,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 180949,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 181817,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 182304,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 182511,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 182894,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 183530,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 184187,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 184374,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185005,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185111,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185422,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185788,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185789,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185820,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185866,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 185873,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 186398,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 186665,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 186712,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 186810,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 187857,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 187868,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 188290,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 189078,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 189226,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 189610,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 189742,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 190411,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 190655,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 191741,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192067,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192084,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192166,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192665,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192666,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192788,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 192912,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 193252,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 193303,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 193714,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 193773,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 194284,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 194483,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 194806,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195017,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195039,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195378,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195429,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195521,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195533,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 195562,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 196162,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 196709,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 196746,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 196775,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197247,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197378,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197449,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197484,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197539,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197594,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197684,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 197763,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 198371,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 198390,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 198842,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 199428,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 199560,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 199791,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 200012,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 200658,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 200920,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 200961,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 201352,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 201709,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 202180,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 202290,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 202300,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 202440,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 203895,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 204122,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 204525,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 204847,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 204899,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 205588,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 206154,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 206469,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 207366,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 207390,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 207424,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 207728,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 208058,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 208527,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209119,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209141,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209571,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209669,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209700,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209736,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 209822,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 210443,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 210856,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 210889,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 211188,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 211444,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 212079,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 212121,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 212306,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 212344,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 213553,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 214098,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 214310,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 214854,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 215600,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 215624,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 216705,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 216741,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 216835,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217170,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217325,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217486,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217703,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217894,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 217998,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 218114,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 218232,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 218493,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 219402,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 219445,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 219480,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 220117,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 220394,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 220881,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 221149,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 221304,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 221400,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 221679,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 221680,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 222349,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 222779,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 223560,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 223623,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 223818,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 223978,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 224268,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 224294,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 224725,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 225363,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 225754,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 225866,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 226359,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 226622,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 226820,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 226839,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 227064,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 227674,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228237,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228271,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228403,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228416,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228813,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228894,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 228998,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 229314,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 229770,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 230227,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 230411,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 230476,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 230564,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 231052,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 231220,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 231437,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 231712,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 232056,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 232607,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 232677,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 232939,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 233723,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 233724,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 233751,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 233849,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 234274,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 235472,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 235613,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 235864,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 235967,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 236168,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 236424,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 236582,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 236635,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 237287,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238372,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238417,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238492,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238669,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238847,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 238946,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 239117,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 240200,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 240440,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 241147,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 241232,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 241513,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 242398,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 242596,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 243679,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 244000,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 244135,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 244142,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 244808,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 244913,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 245249,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 245489,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 245687,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 245888,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 246139,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 247105,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 247687,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 248265,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 248353,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 248511,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 248644,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 249060,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 249202,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 249317,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250044,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250208,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250294,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250401,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250574,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 250743,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251056,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251155,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251577,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251610,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251689,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251877,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251984,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 251992,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 252239,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 252363,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 252585,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 252962,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 253288,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 253451,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 253785,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 254184,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 254736,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 254826,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 255079,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 255179,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 255238,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 256494,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 256725,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 256851,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 256986,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 257091,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 257739,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258093,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258268,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258466,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258533,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258569,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 258765,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 259103,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 259686,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 260098,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 260145,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 260458,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 261244,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 261806,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 261825,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 262816,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 263431,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 263514,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 263658,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 263856,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 265588,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 265651,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 265730,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 266050,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 266367,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 266618,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 267503,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 269019,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 269317,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 269337,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 269383,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270065,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270214,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270390,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270581,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270621,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 270936,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 271630,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 271639,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 272032,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 272218,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 272251,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 273827,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 274109,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 274545,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 274619,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 275087,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 275133,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 275362,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 275577,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 275640,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277043,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277126,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277599,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277684,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277873,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 277920,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 278064,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 278452,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 278810,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 278874,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 279350,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 279585,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 280087,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 280729,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 280813,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 281007,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 281657,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 281974,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 282019,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 282078,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 282629,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 282659,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 283058,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 283112,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 283576,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 283808,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 283834,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 284133,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285025,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285112,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285135,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285640,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285819,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 285913,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 286056,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 286074,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 286833,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 286897,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 288156,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 288852,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 289195,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 289303,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 289410,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 289432,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 289844,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 290107,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 291208,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 291318,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 291853,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 291884,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 292364,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 292979,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 293590,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 294375,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 294886,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 295294,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 295461,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 295663,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 295858,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 296002,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 296234,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 296251,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 296281,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 296706,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 297269,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 297384,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 298025,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 298174,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 298199,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 298563,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 299819,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 299862,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 300029,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 300259,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 300397,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 301084,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 301206,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 301307,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 301467,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 301673,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 302426,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 302601,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 302820,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303138,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303314,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303495,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303531,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303861,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 303984,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 304278,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 304455,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 304656,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 305683,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 305694,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 305993,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 306715,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 306730,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 306814,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 306861,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 307737,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 307890,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 308107,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 308700,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 308958,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 309098,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 309971,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 310003,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 310276,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 310576,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 310841,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311026,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311121,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311143,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311400,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311604,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 311940,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 312016,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 312326,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 313019,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 313531,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 313912,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 313995,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 314835,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 314933,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 314952,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 315247,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 315326,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 315371,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 315921,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 316108,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 316230,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 316378,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317240,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317298,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317485,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317583,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317607,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 317897,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 318565,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 319983,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 320739,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 320989,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321208,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321412,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321473,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321542,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321741,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 321886,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 322016,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 322743,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 323213,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 323395,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 323473,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 323715,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324042,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324399,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324402,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324420,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324464,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324583,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 324720,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 325291,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 325581,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 325784,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 326008,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 326614,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 326912,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 327168,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 327238,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        },
+        {
+          "frame": 327960,
+          "stack": "eth:ethertype:ip:tcp:ldp",
+          "reason": "TCP/session native receiver pending"
+        }
+      ],
+      "failures": [],
+      "extra_native_pdu_ids": [],
+      "remaining_raw_generic_field_mismatches": 35,
+      "native_tcp_flows": 840,
+      "preview_flows": 735
+    }
+  }
+}

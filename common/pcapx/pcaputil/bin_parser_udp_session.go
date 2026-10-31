@@ -145,6 +145,9 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 	if !request && el == nil {
 		return false
 	}
+	if !request && !tftpUDPHasPeerEvidence(el.Value.(*binUDPEntry).flow, e, w, dir) {
+		return false
+	}
 	e.nativeTFTPObservation = true
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
@@ -162,7 +165,8 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		f := el.Value.(*binUDPEntry).flow
 		t := f.tftp
 		count := len(t.retired)
-		if t.server != "" && !t.retiredTID(t.server) {
+		_, serverObserved := t.retired[t.server]
+		if t.server != "" && !serverObserved {
 			count++
 		}
 		target := int64(512 + len(w)*3 + count*128)
@@ -181,10 +185,13 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 		} else {
 			history := t.retired
 			if history == nil && t.server != "" {
-				history = make(map[string]struct{}, count)
+				history = make(map[string]tftpPeerState, count)
+			}
+			for peer := range history {
+				history[peer] = tftpRetiredPeer
 			}
 			if t.server != "" {
-				history[t.server] = struct{}{}
+				history[t.server] = tftpRetiredPeer
 			}
 			f.tftp = &binTFTP{retired: history, file: a.newTFTPFile(e.Destination), ambiguous: t.futureAmbiguous, futureAmbiguous: t.futureAmbiguous}
 			f.id = a.flows.Add(1)
@@ -257,6 +264,13 @@ func (a *binParser) decodeTFTPDatagram(e *ProtocolEvent, w []byte) bool {
 					}
 				}
 				e.Session, err = t.consume(dir, w, sessionCollectionLimit(a.budget.MaxCollectionElements), tftpFileEvidence{ID: e.ID, Refs: e.SourceBytes.PacketRefs})
+				if err != nil && dir == 1 && t.server == "" && tftpCandidatePrefix(w) {
+					// A partial OACK/DATA identifies this exact candidate port,
+					// without committing the server or joining UDP datagrams.
+					if historyErr := f.rememberTFTPPeer(peer, tftpRefusedCandidate); historyErr != nil {
+						err = historyErr
+					}
+				}
 				if err != nil && t.file != nil {
 					t.file.abort()
 					t.ambiguous = true
@@ -618,6 +632,12 @@ func validTURNChannelDataDatagram(w []byte) bool {
 }
 func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *binSpec, err error) {
 	e.Raw = append([]byte(nil), w...)
+	// L2 and raw network observers share this completion path with UDP. They
+	// may not have a transport constructor to initialize the observed length.
+	// Preserve an explicit length for a limited/omitted body or retained preview.
+	if e.Length == 0 {
+		e.Length = len(w)
+	}
 	e.Status, e.Summary = "deferred", e.Protocol
 	if spec != nil {
 		e.Rule, e.Entry, e.plan = spec.rule, spec.entry, spec.plan
@@ -630,7 +650,16 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 		var decoded map[string]any
 		decoded, err = e.Decode()
 		if err == nil {
-			e.semanticFields = cloneSession(protocolFields(decoded))
+			if e.nativeQUICWire {
+				// Retaining one interface{} per ciphertext byte multiplies the
+				// inspector budget and evicts otherwise small captures. Preserve
+				// accepted original wire privately; Decode reconstructs the same
+				// public envelope shape without trusting editable Raw/Fields.
+				e.nativeQUICWireBytes = append([]byte(nil), w...)
+				e.semanticFields = nil
+			} else {
+				e.semanticFields = cloneSession(protocolFields(decoded))
+			}
 			if !a.config.Deferred {
 				e.Structured = decoded
 			}
@@ -658,6 +687,12 @@ func (a *binParser) finishProtocolDatagram(e *ProtocolEvent, w []byte, spec *bin
 	}
 }
 func (a *binParser) closeUDPSessions() {
+	for _, e := range a.closeL2TPv3() {
+		a.emit(e)
+	}
+	for _, e := range a.closeCarrierSessions() {
+		a.emit(e)
+	}
 	a.closeMAVLinkSigning()
 	// Snapshot incomplete native block and information segmentation observations.
 	// Emit after unlocking; user callbacks must not run under udpMu.
@@ -679,7 +714,13 @@ func (a *binParser) closeUDPSessions() {
 	a.dnsMu.Unlock()
 	a.udpMu.Lock()
 	defer a.udpMu.Unlock()
+	if a.ntpControl != nil {
+		a.buffered.Add(-a.ntpControl.bytes)
+		a.ntpControl = nil
+	}
 	incomplete = append(incomplete, a.closeSomeIPTPLocked()...)
+	a.closeNetFlowV9()
+	a.closeIPFIX()
 	incomplete = append(incomplete, a.closeAISMultipartLocked()...)
 	incomplete = append(incomplete, a.closeRTPSFragmentsLocked()...)
 	if s := a.semtechSessions; s != nil {

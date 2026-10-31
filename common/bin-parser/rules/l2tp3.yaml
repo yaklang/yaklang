@@ -1,0 +1,12 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("L2TPv3IPFields")
+  L2TPv3IPFields:
+    operator: |
+      err = parseObservedSession("l2tp3-ip")
+      if err != nil { panic(err) }
+  L2TPv3UDPFields:
+    operator: |
+      err = parseObservedSession("l2tp3-udp")
+      if err != nil { panic(err) }

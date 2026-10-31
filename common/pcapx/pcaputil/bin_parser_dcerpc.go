@@ -12,11 +12,15 @@ import (
 // state. Ports including 135 are never consulted.
 type binDCERPC struct {
 	client               int
+	peerMessages         [2]bool
 	ctx                  map[uint16]string
 	uuid                 map[uint16][]byte
 	pending              map[uint32]string
 	pendingDir           map[uint32]int
 	pendingContext       map[uint32]uint16
+	pendingPDU           map[uint32]uint64
+	pendingGeneration    map[uint32]uint64
+	callGeneration       uint64
 	proposals            map[uint32][]dcerpcProposal
 	ctxVersion           map[uint16]uint32
 	frags                map[dcerpcFragmentKey]dcerpcFragment
@@ -34,6 +38,10 @@ type dcerpcFragment struct {
 	ptype      byte
 	firstFlags byte
 	body       []byte
+	header     int
+	count      int
+	pieces     []dcerpcFragmentPiece
+	generation uint64 // request identity, or reply's frozen expected request identity
 }
 
 type dcerpcProposal struct {
@@ -158,7 +166,54 @@ func (d *binDCERPC) consume(raw []byte, max int) (map[string]any, error) {
 	return d.consumeFrom(dir, raw, max)
 }
 
+// Wire Call IDs are scoped to this connection and remain separate from generated
+// PDU identities. A clear request owns a numeric reply link only after its
+// complete message has been validated. Fragmented messages identify their first
+// PDU and retain every exact stub interval; opaque security bodies never own it.
+func (d *binDCERPC) consumeEvent(dir int, e *ProtocolEvent, max int) error {
+	e.ResponseTo = 0
+	var call uint32
+	if len(e.Raw) >= 16 {
+		call = binary.LittleEndian.Uint32(e.Raw[12:16])
+	}
+	owner := d.pendingPDU[call]
+	var err error
+	e.Session, err = d.consumePDU(dir, e.Raw, max, e.ID)
+	if err != nil {
+		return err
+	}
+	complete := e.Session["First Frag"] == true && e.Session["Last Frag"] == true || e.Session["Reassembled"] == true
+	if !complete || dcerpcHasSecurityTrailer(e.Raw) {
+		return nil
+	}
+	if e.Session["Outstanding"] == true && e.ID != 0 {
+		// push/stageProposals reserved this optional identity slot before they
+		// admitted the request. Refused duplicates cannot overwrite its owner.
+		if d.pendingPDU == nil {
+			d.pendingPDU = make(map[uint32]uint64)
+		}
+		identifier := e.ID
+		if message, ok := e.Session["Reassembled Message"].(map[string]any); ok {
+			identifier, _ = message["Message ID"].(uint64)
+		}
+		if identifier != 0 {
+			d.pendingPDU[call] = identifier
+		}
+	}
+	if e.Session["Association Status"] == "matched" {
+		e.ResponseTo = owner
+	}
+	return nil
+}
+
 func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, error) {
+	return d.consumePDU(dir, raw, max, 0)
+}
+
+func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[string]any, error) {
+	if dir < 0 || dir > 1 {
+		return nil, protocolError(ErrMalformedMessage, "DCE/RPC direction is outside the observed connection")
+	}
 	if len(raw) < 16 {
 		return nil, fmt.Errorf("dcerpc: truncated header")
 	}
@@ -168,6 +223,9 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 	}
 	if !dcerpcLittleEndian(raw) {
 		return nil, protocolError(ErrUnsupportedVersion, "DCE/RPC data representation is not supported")
+	}
+	if raw[0] != 5 || raw[1] != 0 || raw[2] > 19 {
+		return nil, protocolError(ErrUnsupportedVersion, "DCE/RPC security/session profile requires connection-oriented version 5.0")
 	}
 	ptype := raw[2]
 	flags := raw[3]
@@ -184,9 +242,8 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		"Last Frag":     flags&dcerpcLast != 0,
 	}
 	if authLength > 0 {
-		// A security trailer contains an 8-byte verifier header before the
-		// auth_value. We do not decode authenticated stub data, so reject the
-		// whole PDU as opaque rather than counting verifier bytes as stub.
+		// Token boundaries can be observed without security-provider state.
+		// Never feed unverified protected bodies into bind/call/fragment state.
 		if len(body) < 8 || authLength > len(body)-8 {
 			return nil, fmt.Errorf("dcerpc: authentication verifier length exceeds fragment payload")
 		}
@@ -194,95 +251,38 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		if err := d.reserveMemory(d.retainedBytes()); err != nil {
 			return nil, err
 		}
-		return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC authentication verifier is not supported")
+		return dcerpcSecurityEnvelope(raw, info)
 	}
+	d.peerMessages[dir] = true
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
 	parseFlags := flags
+	var fragmentGeneration uint64
 	if flags&dcerpcFirst != 0 {
 		if _, exists := d.frags[fragmentKey]; exists {
 			d.discardFragment(fragmentKey)
 			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrDesynchronized, "DCE/RPC duplicate first fragment for call")
+			_, err := dcerpcFragmentFailure(info, protocolError(ErrDesynchronized, "DCE/RPC duplicate first fragment for call"))
+			return info, err
 		}
 	}
-	if flags&dcerpcFirst == 0 {
-		previous, exists := d.frags[fragmentKey]
-		if !exists {
-			return nil, sessionContext("DCE/RPC continuation has no first fragment in this direction")
+	if flags&(dcerpcFirst|dcerpcLast) != dcerpcFirst|dcerpcLast {
+		message, err := d.consumeMessageFragment(fragmentKey, ptype, flags, body, info, max, pduID)
+		if err != nil || !message.complete {
+			return info, err
 		}
-		if previous.ptype != ptype {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrDesynchronized, "DCE/RPC fragment PType changed within call")
-		}
-		parseFlags = previous.firstFlags
-		need := len(previous.body) + len(body)
-		if need+16 > d.messageLimit() {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC reassembled message exceeds budget")
-		}
-		newCap := cap(previous.body)
-		if newCap < need {
-			newCap = need
-		}
-		if err := d.reserveFragmentGrowth(previous.body, newCap, flags&dcerpcLast != 0, true); err != nil {
-			delete(d.frags, fragmentKey)
-			_ = d.reserveMemory(d.retainedBytes())
-			return nil, err
-		}
-		var assembled []byte
-		if newCap == cap(previous.body) {
-			assembled = append(previous.body, body...)
-		} else {
-			assembled = make([]byte, need, newCap)
-			copy(assembled, previous.body)
-			copy(assembled[len(previous.body):], body)
-		}
-		info["Fragment"] = true
-		if flags&dcerpcLast == 0 {
-			d.frags[fragmentKey] = dcerpcFragment{ptype: previous.ptype, firstFlags: previous.firstFlags, body: assembled}
-			info["Outstanding"] = true
-			return info, nil
-		}
-		body = assembled
-		delete(d.frags, fragmentKey)
-		if err := d.reserveMemory(d.retainedBytes()); err != nil {
-			return nil, err
-		}
-		info["Reassembled"] = true
-	} else if flags&dcerpcLast == 0 {
-		if len(body)+16 > d.messageLimit() {
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC fragment exceeds message budget")
-		}
-		if d.stateElements() >= sessionCollectionLimit(max) {
-			return nil, protocolError(ErrResourceExceeded, "DCE/RPC retained fragment count exceeds budget")
-		}
-		if err := d.reserveFragmentGrowth(nil, len(body), false, false); err != nil {
-			return nil, err
-		}
-		fragment := make([]byte, len(body), len(body))
-		copy(fragment, body)
-		d.frags[fragmentKey] = dcerpcFragment{ptype: ptype, firstFlags: flags, body: fragment}
-		info["Fragment"] = true
-		info["Outstanding"] = true
-		if ptype == 0 && len(body) >= 8 {
-			info["Context ID"] = binary.LittleEndian.Uint16(body[4:6])
-			info["OpNum"] = binary.LittleEndian.Uint16(body[6:8])
-		}
-		return info, nil
+		body, parseFlags, fragmentGeneration = message.body, message.flags, message.generation
 	}
 	switch ptype {
 	case 11, 14:
 		if _, exists := d.pending[call]; exists {
-			return nil, fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+			return dcerpcCallError(info, d.duplicateCall(call, dir))
 		}
 		proposals, err := d.parseBind(body, info, max)
 		if err != nil {
 			return nil, err
 		}
 		if err := d.stageProposals(call, dcerpcPTypeName(ptype), dir, proposals, max); err != nil {
-			return nil, err
+			return dcerpcCallError(info, err)
 		}
 		info["Outstanding"] = true
 	case 12:
@@ -305,8 +305,8 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 			return nil, err
 		}
 		contextID := info["Context ID"].(uint16)
-		if err := d.push(call, fmt.Sprint(info["Packet Name"]), max, dir, contextID); err != nil {
-			return nil, err
+		if err := d.push(call, fmt.Sprint(info["Packet Name"]), max, dir, contextID, fragmentGeneration); err != nil {
+			return dcerpcCallError(info, err)
 		}
 		info["Outstanding"] = true
 	case 2:
@@ -315,13 +315,13 @@ func (d *binDCERPC) consumeFrom(dir int, raw []byte, max int) (map[string]any, e
 		}
 		contextID := binary.LittleEndian.Uint16(body[4:6])
 		info["Context ID"] = contextID
-		d.matchContext(call, "Response", info, dir, contextID)
+		d.matchMessageContext(call, "Response", info, dir, contextID, flags, fragmentGeneration)
 	case 3:
 		if len(body) >= 16 {
 			contextID := binary.LittleEndian.Uint16(body[4:6])
 			info["Context ID"] = contextID
 			info["Status"] = binary.LittleEndian.Uint32(body[8:12])
-			d.matchContext(call, "Fault", info, dir, contextID)
+			d.matchMessageContext(call, "Fault", info, dir, contextID, flags, fragmentGeneration)
 		} else {
 			return nil, fmt.Errorf("dcerpc: truncated fault header")
 		}
@@ -350,7 +350,9 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 	}
 	proposals := make([]dcerpcProposal, 0, n)
 	names := make([]string, 0, n)
+	contexts := make([]map[string]any, 0, n)
 	newIDs := make(map[uint16]struct{}, n)
+	featureProposal := false
 	for i, off := 0, 12; i < n; i, off = i+1, off+44 {
 		id := binary.LittleEndian.Uint16(body[off : off+2])
 		if _, duplicate := newIDs[id]; duplicate {
@@ -369,6 +371,17 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 		name := dcerpcIfaceName(abstractSyntax, abstractMajor, abstractMinor)
 		transferSyntax := append([]byte(nil), body[off+24:off+40]...)
 		transferVersion := binary.LittleEndian.Uint32(body[off+40 : off+44])
+		feature := len(transferSyntax) == 16 && bytes.Equal(transferSyntax[:8], dcerpcBindFeaturePrefix) && transferVersion == 1
+		if feature {
+			if featureProposal {
+				return nil, protocolError(ErrMalformedMessage, "DCE/RPC bind feature proposal appears more than once")
+			}
+			if i == 0 || !bytes.Equal(abstractSyntax, proposals[i-1].abstractSyntax) || abstractMajor != proposals[i-1].abstractMajor || abstractMinor != proposals[i-1].abstractMinor {
+				return nil, protocolError(ErrUnsupportedFeature, "DCE/RPC bind feature placement is outside the observed matching-predecessor profile")
+			}
+			featureProposal = true
+			info["Proposed Bind Time Feature Bits"] = binary.LittleEndian.Uint64(transferSyntax[8:])
+		}
 		proposals = append(proposals, dcerpcProposal{
 			id:              id,
 			name:            name,
@@ -379,6 +392,21 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 			transferVersion: transferVersion,
 		})
 		names = append(names, name)
+		view := map[string]any{
+			"Context ID": id, "Abstract Syntax": bytes.Clone(abstractSyntax),
+			"Interface": name, "Interface Version Major": abstractMajor, "Interface Version Minor": abstractMinor,
+			"Transfer Syntax": bytes.Clone(transferSyntax), "Transfer Version": transferVersion,
+			"Bind Time Feature Proposal": feature,
+		}
+		dcerpcAttachBodyRanges(info, view, map[string]any{
+			"Context ID":              []uint64{uint64(16 + off), uint64(18 + off)},
+			"Abstract Syntax":         []uint64{uint64(20 + off), uint64(36 + off)},
+			"Interface Version Major": []uint64{uint64(36 + off), uint64(38 + off)},
+			"Interface Version Minor": []uint64{uint64(38 + off), uint64(40 + off)},
+			"Transfer Syntax":         []uint64{uint64(40 + off), uint64(56 + off)},
+			"Transfer Version":        []uint64{uint64(56 + off), uint64(60 + off)},
+		})
+		contexts = append(contexts, view)
 		info["Context ID"] = id
 		info["Interface"] = name
 		info["Abstract Syntax"] = hex.EncodeToString(abstractSyntax)
@@ -389,27 +417,36 @@ func (d *binDCERPC) parseBind(body []byte, info map[string]any, max int) ([]dcer
 			info["Interface Alias State"] = "UUID or abstract syntax version is outside the supported alias profile"
 		}
 	}
+	if len(body) != 12+n*44 {
+		return nil, protocolError(ErrMalformedMessage, "DCE/RPC bind context list leaves %d trailing bytes", len(body)-12-n*44)
+	}
 	if len(names) > 1 {
 		info["Interfaces"] = names
 	}
+	info["Presentation Contexts"] = contexts
 	return proposals, nil
 }
 
 func (d *binDCERPC) stageProposals(call uint32, name string, dir int, proposals []dcerpcProposal, max int) error {
 	max = sessionCollectionLimit(max)
 	if _, exists := d.pending[call]; exists {
-		return fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+		return d.duplicateCall(call, dir)
 	}
 	if d.stateElements()+len(proposals)+1 > max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	extra := int64(32 + 64 + len(name)) // proposal map slot and pending request.
+	extra := int64(32 + 80 + dcerpcPendingGenerationCharge + len(name)) // proposal and pending request identity.
 	for _, proposal := range proposals {
 		extra += int64(64 + len(proposal.name) + cap(proposal.abstractSyntax) + cap(proposal.transferSyntax))
 	}
 	if err := d.reserveMemory(d.retainedBytes() + extra); err != nil {
 		return err
 	}
+	generation, err := d.nextCallGeneration()
+	if err != nil {
+		return err
+	}
+	d.setPendingGeneration(call, generation)
 	d.pending[call] = name
 	if d.pendingDir == nil {
 		d.pendingDir = make(map[uint32]int)
@@ -445,6 +482,26 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	if err != nil {
 		return err
 	}
+	views := make([]map[string]any, 0, len(results))
+	addressEnd := 10 + int(binary.LittleEndian.Uint16(body[8:10]))
+	resultStart := 16 + ((addressEnd + 3) &^ 3) + 4
+	for i, result := range results {
+		start := uint64(resultStart + 24*i)
+		view := map[string]any{
+			"Ordinal": i, "Result": result.result, "Reason": result.reason,
+			"Transfer Syntax": bytes.Clone(result.transferSyntax), "Transfer Version": result.transferVersion,
+		}
+		dcerpcAttachBodyRanges(info, view, map[string]any{
+			"Result": []uint64{start, start + 2}, "Reason": []uint64{start + 2, start + 4},
+			"Transfer Syntax": []uint64{start + 4, start + 20}, "Transfer Version": []uint64{start + 20, start + 24},
+		})
+		views = append(views, view)
+	}
+	info["Presentation Context Results"] = views
+	if addressEnd > 10 {
+		info["Secondary Address Bytes"] = bytes.Clone(body[10:addressEnd])
+		dcerpcAttachBodyRanges(info, info, map[string]any{"Secondary Address Bytes": []uint64{26, uint64(16 + addressEnd)}})
+	}
 	want, pending := d.pending[call]
 	if !pending {
 		d.markUnmatched(responseName, info, "missing-request")
@@ -469,8 +526,12 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	var rejected []uint16
 	for i, result := range results {
 		proposal := proposals[i]
+		views[i]["Proposed Context ID"] = proposal.id
 		switch result.result {
 		case 0:
+			if dcerpcBindFeatureProposal(proposal) {
+				return protocolError(ErrUnsupportedFeature, "DCE/RPC bind feature proposal cannot establish an ordinary transfer context")
+			}
 			if result.reason != 0 {
 				return fmt.Errorf("dcerpc: accepted bind result has a rejection reason")
 			}
@@ -480,13 +541,19 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 			accepted = append(accepted, proposal)
 		case 1, 2:
 			rejected = append(rejected, proposal.id)
+		case 3:
+			if !dcerpcBindFeatureProposal(proposal) || result.transferVersion != 0 || !bytes.Equal(result.transferSyntax, make([]byte, 16)) {
+				return protocolError(ErrMalformedMessage, "DCE/RPC negotiate_ack has no matching feature proposal or nonzero transfer syntax")
+			}
+			info["Observed Bind Time Feature Bits"] = result.reason
+			info["Bind Time Feature Endpoint State Verified"] = false
 		default:
 			return fmt.Errorf("dcerpc: invalid bind result %d", result.result)
 		}
 	}
 	// Reserve the post-ack state before matching/removing the pending call so
 	// an accepted context can never become visible without its memory charge.
-	target := d.retainedBytes() - int64(64+len(want)) - 32
+	target := d.retainedBytes() - int64(80+len(want)) - 32
 	for _, proposal := range proposals {
 		target -= int64(64 + len(proposal.name) + cap(proposal.abstractSyntax) + cap(proposal.transferSyntax))
 	}
@@ -532,10 +599,18 @@ func (d *binDCERPC) consumeBindNak(call uint32, dir int, body []byte, info map[s
 	if count > sessionCollectionLimit(max) {
 		return protocolError(ErrResourceExceeded, "DCE/RPC bind nak version count exceeds budget")
 	}
-	if len(body) != 3+count*2 {
+	end := 3 + count*2
+	// Windows sends a four-byte-aligned Bind NAK, including when there is no
+	// optional MS-RPCE signature. Keep unpadded peers compatible and accept
+	// exactly the final alignment octets, never an arbitrary unparsed tail.
+	if len(body) != end && len(body) != (end+3)&^3 {
 		return fmt.Errorf("dcerpc: invalid bind nak protocol-version list")
 	}
+	if len(body) < end {
+		return fmt.Errorf("dcerpc: truncated bind nak protocol-version list")
+	}
 	info["Version Count"] = count
+	ranges := map[string]any{"Reject Reason": []uint64{16, 18}, "Version Count": []uint64{18, 19}}
 	if count > 0 {
 		versions := make([]string, 0, count)
 		for i := 0; i < count; i++ {
@@ -543,7 +618,13 @@ func (d *binDCERPC) consumeBindNak(call uint32, dir int, body []byte, info map[s
 			versions = append(versions, fmt.Sprintf("%d.%d", body[off], body[off+1]))
 		}
 		info["Protocol Versions"] = versions
+		ranges["Protocol Versions"] = []uint64{19, uint64(16 + end)}
 	}
+	if len(body) > end {
+		info["Trailing Padding"] = bytes.Clone(body[end:])
+		ranges["Trailing Padding"] = []uint64{uint64(16 + end), uint64(16 + len(body))}
+	}
+	dcerpcAttachBodyRanges(info, info, ranges)
 	want, pending := d.pending[call]
 	if !pending {
 		d.markUnmatched("BindNak", info, "missing-request")
@@ -589,8 +670,12 @@ func parseDCERPCBindResults(body []byte, max int) ([]dcerpcBindResult, error) {
 	}
 	results := make([]dcerpcBindResult, 0, count)
 	for off := resultOffset + 4; off < len(body); off += 24 {
+		result := binary.LittleEndian.Uint16(body[off : off+2])
+		if result > 3 {
+			return nil, protocolError(ErrMalformedMessage, "DCE/RPC invalid bind result %d", result)
+		}
 		results = append(results, dcerpcBindResult{
-			result:          binary.LittleEndian.Uint16(body[off : off+2]),
+			result:          result,
 			reason:          binary.LittleEndian.Uint16(body[off+2 : off+4]),
 			transferSyntax:  append([]byte(nil), body[off+4:off+20]...),
 			transferVersion: binary.LittleEndian.Uint32(body[off+20 : off+24]),
@@ -611,6 +696,10 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	op := binary.LittleEndian.Uint16(body[6:8])
 	info["Context ID"] = ctx
 	info["OpNum"] = op
+	if flags&dcerpcObject != 0 {
+		info["Object UUID"] = bytes.Clone(body[8:24])
+		dcerpcAttachBodyRanges(info, info, map[string]any{"Object UUID": []uint64{24, 40}})
+	}
 	if name, ok := d.ctx[ctx]; ok {
 		info["Interface"] = name
 		info["Packet Name"] = dcerpcOpName(name, op)
@@ -632,17 +721,33 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	return nil
 }
 
-func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16) error {
+// Assembled RPC body offsets do not belong to the final wire fragment. Logical
+// stubs carry their own source; these ranges describe only an actual wire PDU.
+func dcerpcAttachBodyRanges(info, target map[string]any, ranges map[string]any) {
+	if info["First Frag"] == true && info["Last Frag"] == true && info["Reassembled"] != true {
+		target["Wire Field Ranges"] = ranges
+	}
+}
+
+func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint16, generation uint64) error {
 	max = sessionCollectionLimit(max)
 	if _, exists := d.pending[call]; exists {
-		return fmt.Errorf("dcerpc: duplicate outstanding call id %d", call)
+		return d.duplicateCall(call, dir)
 	}
 	if d.stateElements() >= max {
 		return protocolError(ErrResourceExceeded, "DCE/RPC session element count exceeds budget")
 	}
-	if err := d.reserveMemory(d.retainedBytes() + int64(80+len(name))); err != nil {
+	if err := d.reserveMemory(d.retainedBytes() + int64(dcerpcPendingRequestCharge+len(name))); err != nil {
 		return err
 	}
+	if generation == 0 {
+		var err error
+		generation, err = d.nextCallGeneration()
+		if err != nil {
+			return err
+		}
+	}
+	d.setPendingGeneration(call, generation)
 	d.pending[call] = name
 	if d.pendingDir == nil {
 		d.pendingDir = make(map[uint32]int)
@@ -657,7 +762,12 @@ func (d *binDCERPC) push(call uint32, name string, max, dir int, contextID uint1
 
 func (d *binDCERPC) matchContext(call uint32, respName string, info map[string]any, dir int, contextID uint16) bool {
 	if _, pending := d.pending[call]; pending {
-		if requestContext, hasContext := d.pendingContext[call]; hasContext && requestContext != contextID {
+		requestContext, hasContext := d.pendingContext[call]
+		if !hasContext {
+			d.markUnmatched(respName, info, "request-type-mismatch")
+			return false
+		}
+		if requestContext != contextID {
 			d.markUnmatched(respName, info, "context-mismatch")
 			return false
 		}
@@ -677,6 +787,8 @@ func (d *binDCERPC) match(call uint32, respName string, info map[string]any, dir
 		delete(d.pending, call)
 		delete(d.pendingDir, call)
 		delete(d.pendingContext, call)
+		delete(d.pendingPDU, call)
+		delete(d.pendingGeneration, call)
 		info["Matched Request"] = want
 		info["Association Status"] = "matched"
 		info["Packet Name"] = respName
@@ -688,6 +800,9 @@ func (d *binDCERPC) match(call uint32, respName string, info map[string]any, dir
 
 func (d *binDCERPC) stateElements() int {
 	n := len(d.ctx) + len(d.pending) + len(d.frags)
+	for _, fragment := range d.frags {
+		n += fragment.count
+	}
 	for _, proposals := range d.proposals {
 		n += len(proposals)
 	}
@@ -695,9 +810,9 @@ func (d *binDCERPC) stateElements() int {
 }
 
 // retainedBytes conservatively charges actual retained fragment capacities,
-// UUID data, pending-call names, and map/slice bookkeeping.
+// UUID data, pending-call names, optional PDU identities and map/slice bookkeeping.
 func (d *binDCERPC) retainedBytes() int64 {
-	n := int64(64) + int64(len(d.ctx))*80 + int64(len(d.pending))*64
+	n := int64(dcerpcStateCharge) + int64(len(d.ctx))*80 + int64(len(d.pending))*80
 	for _, uuid := range d.uuid {
 		n += int64(cap(uuid))
 	}
@@ -705,8 +820,9 @@ func (d *binDCERPC) retainedBytes() int64 {
 		n += int64(len(name))
 	}
 	n += int64(len(d.pendingContext)) * 16
+	n += int64(len(d.pendingGeneration)) * dcerpcPendingGenerationCharge
 	for _, fragment := range d.frags {
-		n += 48 + int64(cap(fragment.body))
+		n += dcerpcFragmentCharge + int64(cap(fragment.body)) + int64(cap(fragment.pieces))*dcerpcFragmentPieceCharge
 	}
 	for _, proposals := range d.proposals {
 		n += 32
@@ -730,20 +846,6 @@ func (d *binDCERPC) reserveMemory(target int64) error {
 		}
 	}
 	return nil
-}
-
-func (d *binDCERPC) reserveFragmentGrowth(previous []byte, newCapacity int, final, hasPrevious bool) error {
-	if newCapacity+16 > d.messageLimit() {
-		return protocolError(ErrResourceExceeded, "DCE/RPC fragment exceeds message budget")
-	}
-	target := d.retainedBytes()
-	if hasPrevious {
-		target -= int64(cap(previous))
-	} else if !final {
-		target += 48
-	}
-	target += int64(newCapacity)
-	return d.reserveMemory(target)
 }
 
 func fragmentKeyFor(direction int, call uint32) dcerpcFragmentKey {
@@ -797,8 +899,21 @@ func dcerpcIfaceName(uuid []byte, major, minor uint16) string {
 func dcerpcOpName(iface string, op uint16) string {
 	switch iface {
 	case "EPM":
-		if op == 3 {
+		switch op {
+		case 0:
+			return "EPM.ept_insert"
+		case 1:
+			return "EPM.ept_delete"
+		case 2:
+			return "EPM.ept_lookup"
+		case 3:
 			return "EPM.ept_map"
+		case 4:
+			return "EPM.ept_lookup_handle_free"
+		case 5:
+			return "EPM.ept_inq_object"
+		case 6:
+			return "EPM.ept_mgmt_delete"
 		}
 	case "SRVSVC":
 		if op == 15 {

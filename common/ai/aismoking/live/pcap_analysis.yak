@@ -11,7 +11,13 @@ if provider == "" { provider = "aibalance" }
 root = os.Getenv("PCAP_SKILL_OUTPUT")
 assert root != "" && !file.IsExisted(file.Join(root,"summary.json")), "Choose a fresh PCAP_SKILL_OUTPUT"
 file.MkdirAll(root)~
-fixture = file.ReadFile("common/ai/aismoking/live/testdata/pcap_analysis.pcap")~
+fixtureName = "common/ai/aismoking/live/testdata/pcap_analysis.pcap"
+fixtureIndex = json.loads(file.ReadFile("internal/trafficfixture/testdata/captures.manifest.json")~)
+fixtureArchive = file.ReadFile("internal/trafficfixture/testdata/captures.zip")~
+assert len(fixtureArchive) == fixtureIndex.archive_bytes && codec.Sha256(fixtureArchive) == fixtureIndex.archive_sha256
+fixture = zip.ExtractFileFromRaw(fixtureArchive, fixtureName)~
+fixtureExpected = fixtureIndex.members[fixtureName]
+assert len(fixture) == fixtureExpected.bytes && codec.Sha256(fixture) == fixtureExpected.sha256
 source = file.Join(root,"proof.pcap")
 file.Save(source,fixture)~
 modelOptions = [ai.apiKey(key),ai.model(model),ai.timeout(90)]

@@ -1,0 +1,16 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("HSRPMessageFields")
+  HSRPMessageFields:
+    operator: |
+      err = parseObservedSession("hsrp")
+      if err != nil { panic(err) }
+  GLBPMessageFields:
+    operator: |
+      err = parseObservedSession("glbp")
+      if err != nil { panic(err) }
+  BFDMessageFields:
+    operator: |
+      err = parseObservedSession("bfd")
+      if err != nil { panic(err) }

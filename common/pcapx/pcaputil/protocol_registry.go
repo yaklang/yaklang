@@ -10,12 +10,69 @@ import (
 type ProtocolProfile struct{ Protocol, Transport, Framing, Context string }
 
 func NativeProtocolProfiles() []ProtocolProfile {
+	// Native ingress requires an observed wire grammar and directional state;
+	// legacy YAML availability alone does not imply a registered receiver.
 	return []ProtocolProfile{
+		{"rsvp", "network", "bounded IP46 RSVPv1 messages1..7, complete object envelopes and selected IPv4/IPv6 base objects", "private per-occurrence fields; checksum zero is omitted; Scope objects and addresses share a budget; unknown/Intserv layouts remain opaque with incomplete field projection. Advertised SESSION selectors and HOP handles never create captured UDP/session, reservation or authenticated peer state"},
+		{"gtpv2", "udp", "bounded EPC GTPv2-C conditional header, up to two indicated messages and exact TLIV/group93 envelopes", "service hint plus complete selected wire grammar or explicit DecodeAs; private observed fields, receive-ignored spares and selected Recovery/EBI/Cause/F-TEID values; other IE layouts opaque, no mandatory procedure, NAS, bearer/TEID ownership, captured connection or authenticated peer inference"},
+		{"ospf", "network", "bounded IPv4 OSPFv2 and IPv6 OSPFv3 five control messages and base LSAs", "declared IP protocol/version, private repeated occurrence spans and independent packet/LSA integrity; OSPFv2 instance/auth octets, digest-before-LLS and padded TLVs; AH/digests are not SA authentication, unselected authentication/address families/extensions retain explicit context; no LSDB, verified adjacency, installed route or inherited fields across instance/router/domain reuse"},
+		{"igmp", "network", "RFC1112/2236/9776 membership types over bounded direct IPv4; record/source/auxiliary envelopes and raw/version-specific timer codes", "independent wire observations and private per-occurrence ranges; incomplete and unknown-extent prefixes stay explicit, unknown protocol2 types and normalized tunnel parents unselected in this initial ingress; no listener/querier state, checksum, TTL, Router Alert, sender trust or membership validation"},
+		{"netflow-v5", "udp", "complete 24-byte version-5 header and one to thirty fixed 48-byte records", "independent exports with no template or captured connection state; loss/reordering/reused engine cannot inherit fields; sequence counts reported flows, all captured endpoints and transport IDs remain separate; exact record bounds and residual nanoseconds, literal conformance warnings; no uptime-derived absolute time, delivery or authenticated sender claim"},
+		{"ipfix", "udp,tcp", "RFC7011 bounded templates/options, ordered Sets, variable lengths and opaque enterprise fields", "directed endpoint/domain isolation, local300-second template leases, data-record sequence continuity and duplicate/reuse quarantine; UDP withdrawals ignored; native TCP generation/direction/domain receiver and ordered withdrawals, unwithdrawn TCP redefinitions quarantined; unknown schemas explicit; reported records are not captured flows or authenticated exporters"},
+		{"netflow-v9", "udp", "bounded v9 export header, Template/Options Template FlowSets and fixed-width template-driven records; same-PDU templates may follow data", "directed exporter/collector/capture-domain/SourceID isolation; local five-minute capture-time leases, consecutive sequence and uptime checks, exact adjacent duplicates without lease refresh; gaps/reuse/unknown/malformed context quarantined, complete templates recover; selected zero-to-three-byte padding and count constraints, opaque unknown fields; reported flows never become captured TCP connections, absolute times or authenticated exporter identity"},
+		{"isis", "l2", "bounded six-octet-System-ID LAN/P2P IIH, LSP, CSNP and PSNP over observed IEEE802.3 LLC", "complete literal carrier, PDU/header/TLV bounds, active LSP and optional PDU Fletcher checks, owned common advertised fields and reachability; unknown TLV/context stays partial, no inherited fields, elected DIS, authenticated adjacency, assembled LSDB or installed route; other ID widths and carriers remain unselected"},
+		{"ripng", "udp", "complete RFC2080 v1 request/response over observed IPv6; every bounded twenty-byte route or next-hop entry", "service hint plus complete grammar; explicit empty request inspection only; next-hop advisories reset every datagram, ignored nonzero advisory parameters remain literal, non-link-local advisories fall back to originator; no installed routing table, validated neighbor/hop-limit, response association or authenticated sender"},
+		{"stp", "l2", "complete bounded IEEE STP/RSTP/standard MSTP or observed Cisco SNAP PVST+/RPVST+ BPDU", "exact 802.3/SAP/UI/OUI/PID and complete type-selected layout/length admission; configuration/TCN wire versions stay literal and never imply a rapid/multiple format; independent advertisements with complete MSTI/PVST fields, no inherited root/port state, elected topology, digest verification or authenticated bridge; legacy MST encodings and SPT remain unselected"},
+		{"pim", "network", "complete selected PIMv2 control messages over observed IP protocol 103; IPv4/IPv6 encoded addresses, bounded options and exact message boundaries", "enclosing-address checksum verification and Register carrier/dummy distinction; advertised parameters only, no transport identity, authenticated neighbor, elected router, installed multicast route or Bootstrap RP-set assembly; v1 and extension encodings remain unselected"},
+		{"ldp", "udp/tcp", "complete v1 discovery or service-hinted ordered TCP PDU; every message and TLV boundary; base prefix FEC/address/generic-label advertisements", "TCP generation isolated Init/KeepAlive, identifier stability and conservative negotiated-length evidence; repeated Init/changed identity quarantined, fatal Notification closes context; unknown FEC/link label semantics stay opaque; UDP Hello never establishes TCP identity; no installed label database or authentication claim"},
+		{"hsrp", "udp", "complete HSRPv1 advertisement and bounded HSRPv2 TLV messages", "sender/interface observations; short interface-only TLVs require a previous complete sender identity; no router election, authentication or inherited group/VIP fields"},
+		{"glbp", "udp", "GLBPv1 header and complete Hello/forwarder/authentication TLVs", "bounded sender/owner/group observations; changed owner identity resets context; unknown TLVs stay raw; no inferred gateway health or authentication"},
+		{"bfd", "udp", "BFDv1 control header and complete optional authentication envelope", "observed discriminator pairs, one-sided bootstrap, reciprocal Poll/Final and tuple reuse; no cryptographic/TTL verification, link-health inference or port-only Echo classification"},
+		{"bgp", "tcp", "BGP4 marker, bounded OPEN/UPDATE/NOTIFICATION/KEEPALIVE/ROUTE-REFRESH", "observed TCP generation; AS4, extended-message and directional ADD-PATH negotiation; unknown width/family remains opaque; repeated OPEN quarantines negotiation; no routing-policy or peer authentication inference"},
+		{"ajp", "tcp", "AJP13 directional magic, complete typed messages and contextual untyped request body", "one observed Forward Request per reusable request cycle; exact strings, headers, attributes and Content-Length; pull/body/ping/reuse association; ambiguous reuse quarantined; incomplete Close"},
+		{"rtmp", "tcp", "complete version3 initial/echo handshake, directional chunk sizes and CSID fmt0/1/2/3", "bounded interleaved logical messages, extended timestamp/wrap, Abort and command transaction observation; separate payload byte source and parent chunks; AMF0, controls, selected audio/video headers and aggregates; public digest is not authentication; no RTMPE, AMF3 or shared-object event interpretation"},
 		{"hart-ip", "tcp/udp", "v1 initiate/close/keepalive and token-passing commands0/1/2/3", "observed primary-master session pairs; HART5/6/7 identity, IEEE32 values and selected three/four-variable layouts; exact counts/checksum/direction/logical address/command/sequence; bounded first-use history, retry and ambiguity quarantine; no authenticated/device success, TLSv2/direct-PDU/arbitrary HART command"},
 		{"enip", "tcp", "encapsulation-v1 RegisterSession and SendRRData selected ANSI simple-tag single-DINT read/write", "exact opaque8-byte RegisterSession echo; observed per-flow handle, direction, CIP service and first-use sender context; distinct-context pipelining, byte-identical active retries, ambiguous completed-context reuse refused; owned fields and typed refusals, bounded pending/history/high-water memory and incomplete Close; no physical write/authentication, connected IO, arbitrary CIP object/service or unobserved tag inference"},
 		{"fins", "tcp/explicit-udp", "W421 FINS/TCP0/1/2/3/6 and W342 CPU0501/selected bit/word Read0101 and mixed Read0104/Status0601/Cycle0620/Clock0701/Connection0502/MSG0920/Log2102/Write0102/Fill0103/Transfer0105/ParameterRead0201/ParameterWrite0202/ParameterClear0203/ProgramRead0306/ProgramWrite0307/ProgramClear0308", "owned literal node/header/end-code/CPU fields, selected CS/CJ/CP/NSJ bit/word layouts, ordered mixed descriptors and forced masks, selected status masks/modes/opaque error words, cycle100us ticks, BCD two-digit clock fields, bounded unit/model records, context-bound MSG/FAL raw messages and clear observation, selected error-log records including exact partial-range counts, selected bit/word write values and word fill/transfer descriptors with observed acknowledgements, fixed parameter-area layouts/count/last flags and498-word read/write limit with exact1104/1108 partial replies and context-bound empty acknowledgements, selected programFFFF/alignedBE32 address/BE16 byte count with992-byte read/996-byte write, exact program data and header echoes, observed00/10 clear parameters, and exact selected word counts; no inferred century/timezone or physical clock/timing truth; bounded first-use directional SID observation, reversed full logical endpoints and optional observed TCP node allocation; retry/reuse/expiry/refusal quarantine; no node-zero alias inference, device execution, authentication, routing validation, physical MSG clearing, physical memory modification or arbitrary memory schemas"},
 		{"bacnet-routed-read-property", "explicit-udp", "BACnet/IP NPDUv1 selected direct or routed ReadProperty", "bounded one-to-six-byte logical source/destination MAC observations, network and present-only hop count; reversed physical endpoints plus logical route addresses/domain/invoke/descriptor association; unknown/refused routes quarantine the physical relay pair; same primitive/terminal APDU scope as direct profile, no network services, broadcast peer inference, forwarded BVLC, segmentation, device/authentication or router-operation claim"},
 		{"bacnet-read-property", "explicit-udp", "BACnet/IP original unicast, NPDUv1 unsegmented ReadProperty", "bounded request/ComplexACK primitive application values and Error/Reject/server Abort; exact object/property/optional index and reversed endpoint/domain/invoke observation, reuse/retry/expiry quarantined; no constructed property schemas, segmentation, routing, client Abort, authentication or device-operation success claim"},
+		{"nbss", "tcp", "RFC1002 session request/control and observed SMB2 carrier", "encoded called/calling names, response and keepalive; SMB1/retarget execution unavailable"},
+		{"amqp", "tcp", "AMQP protocol header and frames", "observed native negotiated profile"},
+		{"dcerpc", "tcp", "connection-oriented fragments", "observed bind/context/call identifiers"},
+		{"ftp", "tcp", "control command/reply lines", "observed command order and STARTTLS boundary"},
+		{"ftp-data", "tcp", "control-associated passive data", "bounded one-use PASV/EPSV endpoint association"},
+		{"smtp", "tcp", "commands, reply lines and DATA", "observed transaction and STARTTLS boundary"},
+		{"imap", "tcp", "tagged lines and literals", "observed command/tag state"},
+		{"pop3", "tcp", "reply lines and multiline bodies", "observed command order"},
+		{"kafka", "tcp", "length-prefixed requests/replies", "observed API version/correlation"},
+		{"ldap", "tcp", "bounded BER messages", "observed LDAP message IDs and SASL/STARTTLS boundary"},
+		{"mqtt", "tcp", "variable-length packets", "observed 3.x/5 capabilities, aliases and QoS state"},
+		{"mongodb", "tcp", "Mongo wire messages", "observed request/response IDs and negotiated profile"},
+		{"rdp", "tcp", "TPKT/X224 negotiation and selected TLS carrier", "no complete desktop/session decoding claim"},
+		{"rtsp", "tcp", "RTSP control/interleaved frames", "observed CSeq/session/SETUP mapping"},
+		{"redis", "tcp", "RESP messages", "complete structured initial admission and observed flow"},
+		{"smb2", "tcp", "direct TCP SMB2/3 messages", "observed dialect/session/MID; encrypted SMB3 opaque"},
+		{"tds", "tcp", "TDS packets/messages", "observed native TDS profile, protected values opaque"},
+		{"rfb", "tcp", "RFB/VNC handshake and messages", "observed native negotiated profile"},
+		{"kerberos", "udp/tcp", "bounded ASN.1 application envelope", "observed message type; encrypted tickets opaque"},
+		{"vxlan", "udp tunnel", "validated VXLAN carrier and inner Ethernet", "capture-domain-isolated tunnel ingress; no VTEP identity verification"},
+		{"telnet", "tcp", "bounded IAC negotiation, subnegotiation and escaped data", "port plus complete option negotiation, or two independent negotiations; no login/outcome inference"},
+		{"ssh", "tcp", "identification and initial plaintext binary packets", "observed direction/KEXINIT/NEWKEYS; encrypted suffix opaque; host key signature and identity not verified"},
+		{"tftp", "udp", "request and observed transfer-ID datagrams", "RRQ/WRQ, options, block sequence and bounded conversation"},
+		{"radius", "udp", "complete RADIUS header and attributes", "service routing plus exact length/type/attribute validation; authenticators unverified"},
+		{"ntp", "udp", "RFC1059 v1 time header with reserved low bits and distinct distance/drift; v2-v4 modes1..5; service-hinted v2..4 mode6 control and bounded response fragments", "literal seconds/fraction without era inference; capture-domain/endpoints/version/sequence request ownership, local30-second capture-time lease, reorder/overlap/final-size checks and capture-lifetime reuse quarantine; system variable responses may report a selected peer ID; timestamps/status are observations, optional authenticator is never verified; time extensions and private mode7 remain unselected"},
+		{"ike", "udp", "IKEv1/v2 payload chain, NAT-T non-ESP marker", "exact length, payload boundaries; encrypted bodies opaque; no SA/authentication success inference"},
+		{"esp", "network", "explicit IP Next Header50 clear SPI/low sequence words and opaque remainder", "independent bounded header observations; capture prefixes stay incomplete; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
+		{"esp-natt", "udp", "RFC3948 UDP4500 or explicit DecodeAs with nonzero ports; nonzero SPI, complete eight-byte ESP header and at least one opaque word", "validated UDP carrier; automatic header fallback follows registered complete-message grammars; independent per-datagram observations, marked IKE and keepalives never inherit ESP; no SA, algorithm, authenticated peer, ESN, decryption or replay verdict"},
+		{"wireguard", "udp", "exact initiation/response/cookie/transport envelope", "observed endpoint/domain/receiver-index association; no crypto or peer identity verification"},
+		{"rip", "udp", "RIPv1/v2 request/response entries", "complete entries, metric checks and v2 clear password; no routing or authentication success"},
+		{"nbt-dg", "udp", "RFC1002 datagram/query/error", "encoded source/destination names; fragments remain explicit without reassembly"},
+		{"onc-rpc", "udp", "RPCv2 CALL/REPLY and padded opaque_auth", "bounded XDR envelope; procedure arguments/results opaque and unassociated"},
+		{"l2tp", "udp/network", "L2TPv2 UDP control/data envelope and complete IP115/service-hinted UDP L2TPv3 control AVPs; explicit IP115 v3 session envelope", "exact lengths and mandatory message AVPs, 32-bit v3 receiver-local IDs; no guessed cookie/sublayer/pseudowire for midstream data; hidden/vendor values opaque; no authenticated peer or operational tunnel claim"},
+		{"openvpn", "udp", "clear control and observed data envelope", "tls-auth/tls-crypt configuration unavailable; encrypted data opaque; no tunnel/authentication inference"},
+		{"ipmi", "udp", "RMCP IPMI1.5 and RMCP+ envelopes", "checksummed clear IPMI commands, open-session algorithm fields; session authentication/decryption unavailable"},
+		{"ssdp", "udp", "bodyless NOTIFY/M-SEARCH/200 search response", "complete per-datagram discovery headers and exact identity evidence; unverified announcements, no LOCATION fetch or fabricated transaction/device state"},
+		{"rdpudp", "udp", "captured SYN/SYN-ACK selected reliable carrier", "bounded source/channel sequence ordering and duplicate/conflict handling into the shared TLS engine; observed generations, no FEC recovery, cookie authentication or lossy DTLS decoding"},
 		{"knx", "udp", "KNXnet/IP v1 basic and selected extended UDP search", "bounded HPAI, basic discovery plus extended SRP1-4 and DIB1/2/6; raw unknown DIBs, per-datagram unverified observations without multicast pairing, filter verification, tunneling, cEMI or secure-session claim"},
 		{"pfcp", "udp", "PFCPv1 Heartbeat, AssociationSetup5/6 Update7/8/Release9/10 and unbundled SessionDeletion54/55 selected core", "TS29.244 v16.12.1, first-wins bounded IEs and exact selected NodeID/FQDN/Cause/features; Heartbeat Recovery is mandatory and Setup Recovery does not drive restart; shared originating-endpoint sequence namespace across peer/message kinds, exact response-type/endpoint/domain observation, ambiguity quarantine and erroneous supported reply retirement; receiver-local uint64 SEIDs, Cause2/AURI follow-on-report claims, priority and ordered raw report groups; optional independent SEID binding on an isolated UDP byte session; observed release flags and graceful timer do not prove authenticated association, live session deletion, negotiated features or restart"},
 		{"c37118-engineering", "tcp/udp", "opt-in v1/v2 CFG-2 or complete/collected CFG-3 DATA conversions", "same native publisher/configuration validation; raw fields preserved; configured phasor/frequency and CFG-3 analog conversion, declared GPA status bits and digital masks; CFG-2 integer analog convention requires independent context; no authenticated source, physical quality or inferred digital-label bit association"},
@@ -81,7 +138,9 @@ func NativeProtocolProfiles() []ProtocolProfile {
 		{"beanstalkd", "tcp", "CRLF commands with bounded put/reserved body", "strict put syntax on port 11300 and observed response order"},
 		{"bjnp", "udp", "16-byte printer datagram header and exact payload", "observed command family, direction, sequence and session; port hint or explicit DecodeAs"},
 		{"dns", "udp/tcp", "datagram or two-byte TCP length prefix", "RFC1035 opcode/question and reversed endpoint/flow/domain observations; local idle clock, exact retries and charged identity/refusal history; ambiguous reuse has no precise owner, new TCP generations recover; shared count/byte caps and owned UDP/TCP queries; no DNSSEC/authenticated resolver claim"}, {"mdns", "udp", "datagram", "multicast observation"}, {"llmnr", "udp", "datagram", "domain/requester/opcode/question with bounded multicast responders, local idle clock and charged identity/refusal history; ambiguous reuse has no precise owner; no authenticated peer claim"}, {"dhcp", "udp", "datagram", "domain/client/relay/xid-local idle and owned native fields/refusals; bounded observed association, not a DHCP lease state machine"}, {"dhcpv6", "udp", "datagram", "domain/relay/client/xid-local idle and owned native fields/refusals; bounded observed association, not an authenticated allocation"}, {"syslog", "udp/tcp", "RFC 5424 v1, bounded RFC 3164; UDP datagram or RFC 6587", "PRI signature/port hint or explicit DecodeAs; hostname is unverified message content"},
-		{"arp", "l2", "ethernet", "unverified neighbor"}, {"icmp", "network", "IP", "quoted packet observation"}, {"icmpv6", "network", "IPv6", "unverified neighbor"},
+		{"arp", "l2", "ethernet", "unverified neighbor"}, {"icmp", "network", "IP", "quoted packet observation"},
+		{"icmpv6", "network", "observed IP generic/ND headers and bounded MLDv1/v2 query/report/done wire fields", "unverified neighbor and listener state; MLD records/sources/auxiliary data have exact per-occurrence ranges; captured prefixes, unknown lengths and collection limits remain explicit; no checksum, Router Alert, hop-limit or parent validity inference"},
+		{"nbns", "udp", "RFC1002 bounded name service datagram", "encoded NetBIOS names, NB addresses and NBSTAT node names; unverified observations, no authenticated owner claim"},
 		{"http", "tcp", "ordered bytes", "observed request method"}, {"websocket", "tcp", "ordered bytes", "validated HTTP upgrade"}, {"tls", "tcp", "records", "ClientRandom/direction/epoch; TLS 1.3 non-PSK HelloRetryRequest"}, {"http2", "tcp", "frames", "preface and HPACK state"}, {"grpc", "tcp", "HTTP2 DATA", "content-type and stream"},
 	}
 }
@@ -95,7 +154,8 @@ func WithProtocolDecodeAs(transport string, port uint16, protocol string) Captur
 			return fmt.Errorf("DecodeAs requires UDP and a nonzero port")
 		}
 		switch protocol {
-		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip":
+		case "ntp", "hsrp", "glbp", "bfd", "ldp", "ripng", "netflow-v9", "netflow-v5", "ipfix", "esp-natt", "gtpv2":
+		case "hart-ip", "fins", "someip-sd", "someip-tp", "bacnet-routed-read-property", "bacnet-read-property", "dns", "mdns", "llmnr", "dhcp", "dhcpv6", "syslog", "snmp", "mqtt-sn", "bittorrent-dht", "bjnp", "rtp", "sip", "stun", "turn", "dtls", "mavlink", "nmea", "nmea-ais-multipart", "semtech-udp", "semtech-downlink-session", "rtps", "rtps-control", "rtps-wire", "rtps13-wire", "rtps13-parameters", "rtps20-rti-filter", "rtps-shape-fragments", "rtps-spdp-fragments", "bsap", "slmp", "dlms", "opendroneid", "opendroneid-system", "opendroneid-identity", "opendroneid-auth-pages", "c37118", "c37118-engineering", "knx", "pfcp", "dlms-wrapper", "doip", "ike", "ike-natt", "wireguard", "rip", "nbt-dg", "onc-rpc", "l2tp", "openvpn", "ipmi", "ssdp", "nbns":
 		default:
 			return fmt.Errorf("unsupported native DecodeAs profile")
 		}
@@ -148,6 +208,7 @@ var nativeDatagrams = []nativeDatagramProfile{
 	{"rtps-wire", nil, rtpsDatagramHeader, decodeRTPSWire},
 	{"semtech-udp", []uint16{1700}, validSemtechDatagram, decodeSemtechDatagram},
 	{"nmea", nil, validNMEADatagram, decodeNMEADatagram},
+	{"nbns", []uint16{137}, func(w []byte) bool { return len(w) >= 13 && w[12] == 32 }, decodeNBNS},
 	{"mdns", []uint16{5353}, dnsHeader, DecodeDNSMessage},
 	{"llmnr", []uint16{5355}, dnsHeader, DecodeDNSMessage},
 	{"dns", []uint16{53}, dnsHeader, DecodeDNSMessage},
@@ -163,9 +224,12 @@ var nativeDatagrams = []nativeDatagramProfile{
 }
 
 func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst uint16) bool {
-	explicit := a.datagramDecodeAs[dst]
-	if explicit == "" {
-		explicit = a.datagramDecodeAs[src]
+	explicit := a.protocolDatagramSelection(src, dst)
+	if explicit == "gtpv2" {
+		return a.decodeGTPv2Datagram(e, w, src, dst, explicit)
+	}
+	if explicit == "esp-natt" {
+		return a.decodeESPNATTDatagram(e, w, src, dst, explicit)
 	}
 	if explicit == "semtech-downlink-session" {
 		return a.decodeSemtechCorrelatedDatagram(e, w)
@@ -205,6 +269,12 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 	}
 	if explicit == "nmea-ais-multipart" {
 		return a.decodeAISMultipartDatagram(e, w, nil)
+	}
+	if a.decodeControlDatagram(e, w, src, dst, explicit) {
+		return true
+	}
+	if (explicit == "" || explicit == "ssdp") && a.decodeSSDPDatagram(e, w, explicit == "ssdp") {
+		return true
 	}
 	if (explicit == "" || explicit == "semtech-udp") && a.decodeSemtechDownlinkDatagram(e, w, src, dst, explicit == "semtech-udp") {
 		return true
@@ -310,8 +380,8 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 			return a.decodeRTPDatagram(e, w, false, false, match)
 		}
 	}
-	if explicit == "" && len(w) == 48 && probeNTP(w, len(w)).Verdict == ProbeAccept {
-		return a.decodeSessionDatagram(e, w)
+	if (explicit == "" || explicit == "ntp") && a.decodeNTPDatagram(e, w, src, dst, explicit == "ntp") {
+		return true
 	}
 	for _, p := range nativeDatagrams {
 		if (p.name == "rtps-control" || p.name == "rtps-wire") && explicit != p.name {
@@ -457,5 +527,14 @@ func (a *binParser) decodeNativeDatagram(e *ProtocolEvent, w []byte, src, dst ui
 		}
 		return true
 	}
-	return false
+	// A broad opaque-IE envelope plus source port2123 must not preempt a
+	// complete existing native grammar or an observed media/session owner.
+	return a.decodeGTPv2Datagram(e, w, src, dst, explicit)
+}
+
+func (a *binParser) protocolDatagramSelection(src, dst uint16) string {
+	if selected := a.datagramDecodeAs[dst]; selected != "" {
+		return selected
+	}
+	return a.datagramDecodeAs[src]
 }

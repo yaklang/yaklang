@@ -2,12 +2,15 @@ package bin_parser
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
@@ -71,10 +74,36 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 					}
 					require.NoError(t, err)
 					require.NotNil(t, node)
+					fieldName := func(name string) string { return name }
+					if (c.ID == "gen-icmpv6-mld" || c.ID == "pr5023-gen-icmpv6-mld") && e.Protocol == "ICMPv6 MLD" && !protocolCorpusHasNode(node, "Maximum Response Delay") {
+						// The sealed old label called the v2 code or Report/Done's
+						// unused word a response delay. Preserve its original numeric
+						// assertion under the corrected label, proving literal bytes
+						// and the exact old word position; never alter frozen answers.
+						require.GreaterOrEqual(t, len(input), 6)
+						corrected := "Unused Delay Word"
+						if input[0] == 130 {
+							require.GreaterOrEqual(t, len(input), 28)
+							corrected = "Maximum Response Code"
+						} else {
+							require.Contains(t, []byte{131, 132}, input[0])
+						}
+						word := protocolCorpusFindNode(node, corrected)
+						require.NotNil(t, word)
+						require.Equal(t, [2]uint64{32, 48}, stream_parser.GetNodeResultPos(word))
+						protocolCorpusRequireValue(t, node, corrected, uint64(binary.BigEndian.Uint16(input[4:6])))
+						fieldName = func(name string) string {
+							if name == "Maximum Response Delay" {
+								return corrected
+							}
+							return name
+						}
+					}
 					for _, name := range e.Expected.RequiredFields {
-						require.True(t, protocolCorpusHasNode(node, name), "missing frozen field %q", name)
+						require.True(t, protocolCorpusHasNode(node, fieldName(name)), "missing frozen field %q", name)
 					}
 					for name, raw := range e.Expected.Values {
+						name = fieldName(name)
 						var value any
 						require.NoError(t, json.Unmarshal(raw, &value))
 						switch v := value.(type) {
@@ -92,6 +121,21 @@ func TestFrozenCorpusSelectedInputs(t *testing.T) {
 							protocolCorpusRequireValue(t, node, name, data)
 						default:
 							t.Fatalf("unsupported frozen value for %s: %T", name, value)
+						}
+					}
+					if c.ID == "ndpi-vxlan" {
+						// The sealed old assertions above remain authoritative. New
+						// header fields have a separate literal-byte oracle, independent
+						// of the parser output and the default-entry choice.
+						require.GreaterOrEqual(t, len(input), 8)
+						values := map[string]uint64{"G": uint64(input[0] >> 7), "I": uint64(input[0] >> 3 & 1), "Reserved High": uint64(input[0] >> 4 & 7), "Reserved Low": uint64(input[0] & 7), "VNI": uint64(input[4])<<16 | uint64(input[5])<<8 | uint64(input[6])}
+						for field, want := range values {
+							protocolCorpusRequireValue(t, node, field, want)
+						}
+						for path, span := range map[string][2]uint64{"@VXLAN.G": {0, 1}, "@VXLAN.I": {4, 5}, "@VXLAN.VNI": {32, 56}} {
+							field := base.GetNodeByPath(node, path)
+							require.NotNil(t, field)
+							require.Equal(t, span, stream_parser.GetNodeResultPos(field))
 						}
 					}
 				})

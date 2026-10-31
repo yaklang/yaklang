@@ -6,10 +6,13 @@ import (
 	"crypto/cipher"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"golang.org/x/crypto/chacha20poly1305"
+	"hash"
 	"strings"
 )
 
@@ -65,19 +68,24 @@ func ParseTLSKeyLog(text string) (*TLSKeyLog, error) {
 	return k, nil
 }
 
-// WithTLSSecrets enables authenticated TLS decryption for the documented AES
-// 128 GCM profiles. Missing keys preserve encrypted events. Certificate trust
+// WithTLSSecrets enables authenticated TLS decryption for the documented AEAD
+// profiles. Missing keys preserve encrypted events. Certificate trust
 // and application authentication are not established by record authentication.
 func WithTLSSecrets(provider TLSSecretProvider) CaptureOption {
 	return func(c *CaptureConfig) error { c.tlsSecrets = provider; return nil }
 }
 
 type binTLS struct {
+	recordGap                              [2]bool
+	handshakeGap                           [2]bool
+	recoveryFailures                       [2]uint8
+	extraStorage                           int64
 	client                                 int
 	random, serverRandom                   []byte
 	version, suite                         uint16
 	sni, alpn                              string
 	handshake                              [2][]byte
+	handshakeAuthenticated                 [2]bool
 	alert                                  [2]byte
 	alertPending                           [2]bool
 	seq                                    [2]uint64
@@ -92,23 +100,49 @@ type binTLS struct {
 	firstHello, retryCookie                []byte
 	retrySeen, retryClientSeen, finalHello bool
 	retrySuite, retryGroup                 uint16
+	resumption                             tlsResumptionState
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
 func (t *binTLS) storage() int64 {
-	return 2048 + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
+	return 2048 + t.extraStorage + t.resumption.storage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
 }
 func tlsU24(b []byte) int { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
 func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) {
 	t := f.tls
 	if t == nil {
 		t = newBinTLS()
+		if f.ftpData != nil {
+			t.extraStorage = f.ftpData.charge
+		}
 		f.tls = t
 	}
 	w := e.Raw
+	t.plaintext = nil
+	t.content = 0
 	typ, plain := w[0], w[5:]
+	// Preserve already observed negotiation on encrypted records too. Missing
+	// keys and unsupported suites return early; neither erases the wire-proven
+	// version, SNI or selected ALPN from the connection.
 	info := map[string]any{"Record Type": typ, "Record Version": binary.BigEndian.Uint16(w[1:3]), "Record Length": len(plain), "Authentication Verified": false, "Certificate Trust": "not-evaluated"}
+	if t.version != 0 && t.suite != 0 {
+		info["Negotiated Version"], info["Cipher Suite"] = t.version, t.suite
+	}
+	if t.sni != "" {
+		info["SNI"] = t.sni
+	}
+	if t.alpn != "" {
+		info["ALPN"] = t.alpn
+	}
 	e.Session = info
+	defer func() {
+		t.resumption.project(info)
+		// A refused record still has exact header/authentication observations.
+		// Freeze those separately from editable public maps. sessionError is
+		// checked before this cache by Decode/GetFields, so it grants no
+		// successful decode or application admission to a rejected message.
+		e.semanticFields = cloneSession(info)
+	}()
 	if t.version == 0x304 && typ == 22 && t.finalHello {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 cleartext handshake after ServerHello")
 	}
@@ -130,7 +164,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			info["Secret Lookup Status"] = "missing-context"
 			return map[string]any{"fields": info}, nil
 		}
-		if t.version != 0x304 && t.version != 0x303 || t.version == 0x304 && t.suite != 0x1301 || t.version == 0x303 && t.suite != 0xc02f && t.suite != 0xc02b {
+		if !tlsSupportedSuite(t.version, t.suite) {
 			info["Secret Lookup Status"] = "unsupported-suite"
 			return map[string]any{"fields": info}, nil
 		}
@@ -145,11 +179,22 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			}
 		}
 		var err error
-		plain, typ, err = t.open(dir, w)
+		if t.recoveryFailures[dir] >= 4 {
+			info["Secret Lookup Status"] = "recovery-exhausted"
+			info["Recovery State"] = "bounded record recovery suspended; encrypted envelope retained"
+			return map[string]any{"fields": info}, nil
+		}
+		plain, typ, err = f.openTLSRecord(dir, w, info)
 		if err != nil {
+			if tlsAuthenticationError(err) {
+				f.noteTLSRecordFailure(dir, info)
+			}
 			return nil, err
 		}
 		info["Authentication Verified"] = true
+		if info["Missing Earlier Plaintext"] == true {
+			f.markTLSInnerGap(dir)
+		}
 		info["Secret Lookup Status"] = "found"
 		info["Content Visibility"] = "authenticated-plaintext"
 		info["Inner Content Type"] = typ
@@ -172,11 +217,22 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			t.seq[dir] = 0
 		}
 	} else if typ == 22 {
+		if t.handshakeGap[dir] {
+			info["Handshake Parsing"] = "unavailable after missing protected handshake bytes"
+			return map[string]any{"fields": info}, nil
+		}
 		if len(t.handshake[dir])+len(plain) > f.a.config.MaxMessageBytes {
 			return nil, protocolError(ErrResourceExceeded, "TLS handshake buffer limit")
 		}
 		if err := f.reserveSession(t.storage() + int64(len(plain))); err != nil {
 			return nil, err
+		}
+		if len(plain) > 0 {
+			if len(t.handshake[dir]) == 0 {
+				t.handshakeAuthenticated[dir] = encrypted
+			} else {
+				t.handshakeAuthenticated[dir] = t.handshakeAuthenticated[dir] && encrypted
+			}
 		}
 		t.handshake[dir] = append(t.handshake[dir], plain...)
 		var messages []map[string]any
@@ -198,12 +254,15 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 					return nil, err
 				}
 			}
-			m, err := t.handshakeMessage(dir, b[:n], encrypted, f.a.budget.MaxCollectionElements)
+			m, err := t.handshakeMessage(dir, b[:n], t.handshakeAuthenticated[dir], f.a.budget.MaxCollectionElements)
 			if err != nil {
 				return nil, err
 			}
 			messages = append(messages, m)
 			t.handshake[dir] = b[n:]
+			// Any remainder was contributed by this record; earlier records
+			// ended inside the message just consumed.
+			t.handshakeAuthenticated[dir] = encrypted
 		}
 		if len(t.handshake[dir]) == 0 {
 			t.handshake[dir] = nil
@@ -211,6 +270,10 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		info["Handshake Messages"] = messages
 		info["Handshake Incomplete"] = len(t.handshake[dir]) > 0
 	} else if typ == 23 && encrypted {
+		if f.plaintextGap[dir] {
+			info["Authenticated Plaintext"] = bytes.Clone(plain)
+			info["Application Decoding"] = "unavailable across prior plaintext gap"
+		}
 		t.plaintext = bytes.Clone(plain)
 		t.content = typ
 	} else if typ == 21 {
@@ -224,7 +287,42 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	}
 	return map[string]any{"fields": info}, nil
 }
+func tlsSupportedSuite(version, suite uint16) bool {
+	if version == 0x304 {
+		return suite == 0x1301 || suite == 0x1302 || suite == 0x1303
+	}
+	if version != 0x303 {
+		return false
+	}
+	switch suite {
+	case 0xc02f, 0xc02b, 0xc030, 0xc02c, 0x009c, 0x009d, 0xcca8, 0xcca9:
+		return true
+	}
+	return false
+}
+func (t *binTLS) prfHash() func() hash.Hash {
+	if t.suite == 0xc030 || t.suite == 0xc02c || t.suite == 0x009d {
+		return sha512.New384
+	}
+	return sha256.New
+}
+
 func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
+	if dir < 0 || dir > 1 || len(b) < 4 || tlsU24(b[1:4]) != len(b)-4 {
+		return nil, protocolError(ErrMalformedMessage, "TLS handshake framing")
+	}
+	// Hello/extension validation and Finished/KeyUpdate transitions commit
+	// together. A rejected message cannot retain half-applied peer state.
+	// Retained slices and metadata are immutable or replaced, never edited.
+	trial := *t
+	m, err := trial.applyHandshakeMessage(dir, b, authenticated, limits...)
+	if err == nil {
+		*t = trial
+	}
+	return m, err
+}
+
+func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, limits ...int) (map[string]any, error) {
 	typ, body := b[0], b[4:]
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
 	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
@@ -232,6 +330,19 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	}
 	switch typ {
 	case 1, 2:
+		h, err := tlsHello(body, typ == 1, limits...)
+		if err != nil {
+			return nil, err
+		}
+		if err = tlsHelloExtensionStructure(h, typ == 1); err != nil {
+			return nil, err
+		}
+		if typ == 1 && t.client >= 0 && (!t.retrySeen || t.retryClientSeen) || typ == 2 && t.finalHello {
+			return nil, protocolError(ErrUnsupportedFeature, "TLS repeated hello or renegotiation requires a new epoch")
+		}
+		if err = t.observeResumptionHello(dir, typ, body, h, m, limits...); err != nil {
+			return nil, err
+		}
 		retry, err := t.observeHello(dir, typ, body, limits...)
 		if err != nil {
 			return nil, err
@@ -287,6 +398,12 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 				return nil, err
 			}
 		}
+	case 4:
+		ticket, err := t.newSessionTicket(dir, body, authenticated, limits...)
+		if err != nil {
+			return nil, err
+		}
+		m["New Session Ticket"] = ticket
 	case 8:
 		if !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS EncryptedExtensions")
@@ -306,7 +423,7 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 		if !authenticated || !t.app[dir] || len(body) != 1 || body[0] > 1 {
 			return nil, protocolError(ErrMalformedMessage, "invalid TLS KeyUpdate")
 		}
-		next, err := quicHKDFExpandLabel(t.secret[dir], "traffic upd", 32)
+		next, err := quicHKDFExpandLabel(t.secret[dir], "traffic upd", len(t.secret[dir]))
 		if err != nil {
 			return nil, err
 		}
@@ -392,8 +509,12 @@ func (t *binTLS) loadKey(dir int, p TLSSecretProvider) (bool, error) {
 		if !ok {
 			return false, nil
 		}
-		if len(s) != 32 {
-			return false, protocolError(ErrContextRequired, "TLS AES128 traffic secret length")
+		size := 32
+		if t.suite == 0x1302 {
+			size = 48
+		}
+		if len(s) != size {
+			return false, protocolError(ErrContextRequired, "TLS traffic secret length disagrees with cipher suite")
 		}
 		return true, t.install13(dir, s)
 	}
@@ -406,21 +527,36 @@ func (t *binTLS) loadKey(dir int, p TLSSecretProvider) (bool, error) {
 	}
 	seed := append([]byte("key expansion"), t.serverRandom...)
 	seed = append(seed, t.random...)
-	block := tlsPRF(master, seed, 40)
+	keyLen, ivLen := 16, 4
+	if t.suite == 0xc030 || t.suite == 0xc02c || t.suite == 0x009d {
+		keyLen = 32
+	}
+	if t.suite == 0xcca8 || t.suite == 0xcca9 {
+		keyLen, ivLen = 32, 12
+	}
+	block := tlsPRFHash(master, seed, 2*(keyLen+ivLen), t.prfHash())
 	i := 0
 	if dir != t.client {
 		i = 1
 	}
-	c, err := aes.NewCipher(block[i*16 : (i+1)*16])
-	if err != nil {
-		return false, err
+	var err error
+	if ivLen == 12 {
+		t.keys[dir], err = chacha20poly1305.New(block[i*keyLen : (i+1)*keyLen])
+	} else {
+		c, e := aes.NewCipher(block[i*keyLen : (i+1)*keyLen])
+		if e != nil {
+			return false, e
+		}
+		t.keys[dir], err = cipher.NewGCM(c)
 	}
-	t.keys[dir], err = cipher.NewGCM(c)
-	t.iv[dir] = bytes.Clone(block[32+i*4 : 36+i*4])
+	t.iv[dir] = bytes.Clone(block[2*keyLen+i*ivLen : 2*keyLen+(i+1)*ivLen])
 	return err == nil, err
 }
 func tlsPRF(secret, seed []byte, n int) []byte {
-	mac := func(data []byte) []byte { h := hmac.New(sha256.New, secret); h.Write(data); return h.Sum(nil) }
+	return tlsPRFHash(secret, seed, n, sha256.New)
+}
+func tlsPRFHash(secret, seed []byte, n int, hashFn func() hash.Hash) []byte {
+	mac := func(data []byte) []byte { h := hmac.New(hashFn, secret); h.Write(data); return h.Sum(nil) }
 	a := mac(seed)
 	out := make([]byte, 0, n+32)
 	for len(out) < n {
@@ -430,7 +566,11 @@ func tlsPRF(secret, seed []byte, n int) []byte {
 	return out[:n]
 }
 func (t *binTLS) install13(dir int, secret []byte) error {
-	key, err := quicHKDFExpandLabel(secret, "key", 16)
+	keyLen := 16
+	if t.suite == 0x1302 || t.suite == 0x1303 {
+		keyLen = 32
+	}
+	key, err := quicHKDFExpandLabel(secret, "key", keyLen)
 	if err != nil {
 		return err
 	}
@@ -438,11 +578,16 @@ func (t *binTLS) install13(dir int, secret []byte) error {
 	if err != nil {
 		return err
 	}
-	c, err := aes.NewCipher(key)
-	if err != nil {
-		return err
+	var a cipher.AEAD
+	if t.suite == 0x1303 {
+		a, err = chacha20poly1305.New(key)
+	} else {
+		c, e := aes.NewCipher(key)
+		if e != nil {
+			return e
+		}
+		a, err = cipher.NewGCM(c)
 	}
-	a, err := cipher.NewGCM(c)
 	if err != nil {
 		return err
 	}
@@ -465,11 +610,21 @@ func (t *binTLS) open(dir int, w []byte) ([]byte, byte, error) {
 			nonce[11-i] ^= byte(t.seq[dir] >> uint(i*8))
 		}
 	} else {
-		if len(payload) < 24 {
+		explicit := 8
+		if t.suite == 0xcca8 || t.suite == 0xcca9 {
+			explicit = 0
+		}
+		if len(payload) < explicit+16 {
 			return nil, 0, protocolError(ErrMalformedMessage, "TLS GCM record length")
 		}
-		nonce = append(nonce, payload[:8]...)
-		payload = payload[8:]
+		if explicit == 8 {
+			nonce = append(nonce, payload[:8]...)
+		} else {
+			for i := 0; i < 8; i++ {
+				nonce[11-i] ^= byte(t.seq[dir] >> uint(i*8))
+			}
+		}
+		payload = payload[explicit:]
 		aad = make([]byte, 13)
 		binary.BigEndian.PutUint64(aad, t.seq[dir])
 		copy(aad[8:11], w[:3])
@@ -501,7 +656,16 @@ func (f *binFlow) deliverTLS(dir int, parent *ProtocolEvent) {
 	plain := t.plaintext
 	t.plaintext = nil
 	if t.child == nil {
-		t.child = &binFlow{a: f.a, id: f.id, endpoints: f.endpoints, ports: f.ports, domain: f.domain, byteSource: "decrypted", captureTCP: true}
+		t.child = &binFlow{a: f.a, id: f.id, endpoints: f.endpoints, ports: f.ports, domain: f.domain, transportFlow: f.transportFlow, byteSource: "decrypted", captureTCP: true, tcpClientKnown: f.tcpClientKnown, tcpClientDir: f.tcpClientDir}
+		t.child.plaintextGap = f.plaintextGap
+		for d, gap := range f.plaintextGap {
+			if gap {
+				t.child.directions[d].stopped, t.child.directions[d].tlsPlaintextGap = true, true
+			}
+		}
+		if f.ftpData != nil {
+			t.child.protocol, t.child.ftpData = "ftp-data", f.ftpData
+		}
 		// STARTTLS carries observed application state into authenticated plaintext.
 		// The new child owns that state; guessing from a port would lose the
 		// greeting capabilities and sequence number for MySQL.
@@ -515,6 +679,22 @@ func (f *binFlow) deliverTLS(dir int, parent *ProtocolEvent) {
 			t.child.protocol = "postgresql"
 			t.child.pg = f.pg
 			f.pg = nil
+		}
+		// STARTTLS resets application negotiation. Preserve the observed inner
+		// protocol, but do not carry pre-TLS authentication/capability state.
+		switch {
+		case f.smtp != nil && f.smtp.encrypted:
+			t.child.protocol, t.child.smtp = "smtp", &binSMTP{client: f.smtp.client, maxPending: f.a.budget.MaxCollectionElements}
+			f.smtp = nil
+		case f.imap != nil && f.imap.encrypted:
+			t.child.protocol, t.child.imap = "imap", &binIMAP{pending: map[string]string{}, maxPending: f.a.budget.MaxCollectionElements}
+			f.imap = nil
+		case f.pop3 != nil && f.pop3.encrypted:
+			t.child.protocol, t.child.pop3 = "pop3", &binPOP3{}
+			f.pop3 = nil
+		case f.ftp != nil && f.ftp.encrypted:
+			t.child.protocol, t.child.ftp = "ftp", &binFTP{}
+			f.ftp = nil
 		}
 
 	}

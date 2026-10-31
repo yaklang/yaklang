@@ -10,29 +10,33 @@ import (
 
 func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	t.Run("ssh/kexinit", func(t *testing.T) {
-		// RFC 4253 §7.1 SSH_MSG_KEXINIT; Wireshark ssh.kex.algorithms.
+		// Retain the old 153-byte sample as a rejection control. Its claimed
+		// RFC4253 initial packet was not eight-byte aligned.
 		raw := mustHex(t, "000000950414000102030405060708090a0b0c0d0e0f00000011637572766532353531392d7368613235360000000b7373682d656432353531390000000a6165733132382d6374720000000a6165733132382d6374720000000d686d61632d736861322d3235360000000d686d61632d736861322d323536000000046e6f6e65000000046e6f6e650000000000000000000000000000000000")
-		n := parseRule(t, raw, "application-layer.ssh", "SSHPacket")
+		parseMustFail(t, raw, "application-layer.ssh", "SSHPacket")
+		n := parseRule(t, sshDirectKEX(), "application-layer.ssh", "SSHPacket")
 		require.Equal(t, uint64(20), uintVal(t, mustChild(t, n, "Payload").Child("Message Number")))
-		kex := mustChild(t, n, "Payload", "SSHKexInit")
-		require.Equal(t, "curve25519-sha256", strVal(t, kex.Child("Kex Algos")))
-		require.Equal(t, "ssh-ed25519", strVal(t, kex.Child("Host Key Algos")))
-		require.Equal(t, "aes128-ctr", strVal(t, kex.Child("Enc C2S")))
-		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, raw))
-		wired := mustChild(t, eth, "IP", "TCP", "SSHPacket", "Payload", "SSHKexInit")
-		require.Equal(t, "curve25519-sha256", strVal(t, wired.Child("Kex Algos")))
+		kex := mustChild(t, n, "Payload")
+		require.Equal(t, "curve25519-sha256", strVal(t, kex.Child("Kex Algorithms")))
+		require.Equal(t, "ssh-ed25519", strVal(t, kex.Child("Host Key Algorithms")))
+		require.Equal(t, "aes128-ctr", strVal(t, kex.Child("Encryption C2S")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, sshDirectKEX()))
+		wired := mustChild(t, eth, "IP", "TCP", "SSHPacket", "Payload")
+		require.Equal(t, "curve25519-sha256", strVal(t, wired.Child("Kex Algorithms")))
 	})
 
 	t.Run("ssh/kexdh", func(t *testing.T) {
-		// RFC 4253 §8 SSH_MSG_KEXDH_INIT (30) mpint e.
+		// The original 15-byte packet is invalid. Message 30 alone also does
+		// not select DH: it is shared by multiple negotiated exchange methods.
 		raw := mustHex(t, "0000000b041e000000010200000000")
-		n := parseRule(t, raw, "application-layer.ssh", "SSHPacket")
+		parseMustFail(t, raw, "application-layer.ssh", "SSHPacket")
+		valid := sshDirectPacket(append([]byte{30}, sshDirectString([]byte{2})...))
+		n := parseRule(t, valid, "application-layer.ssh", "SSHPacket")
 		require.Equal(t, uint64(30), uintVal(t, mustChild(t, n, "Payload").Child("Message Number")))
-		dh := mustChild(t, n, "Payload", "SSHKexDHInit")
-		require.Equal(t, uint64(1), uintVal(t, dh.Child("E Length")))
-		require.Equal(t, []byte{2}, bytesVal(t, dh.Child("E")))
-		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, raw))
-		require.Equal(t, uint64(1), uintVal(t, mustChild(t, eth, "IP", "TCP", "SSHPacket", "Payload", "SSHKexDHInit").Child("E Length")))
+		require.Nil(t, mustChild(t, n, "Payload").Child("SSHKexDHInit"))
+		require.Equal(t, sshDirectString([]byte{2}), bytesVal(t, mustChild(t, n, "Payload", "Opaque Message Data")))
+		eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, valid))
+		require.Nil(t, mustChild(t, eth, "IP", "TCP").Child("SSHPacket"))
 	})
 
 	t.Run("dhcp/discover", func(t *testing.T) {
@@ -574,7 +578,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		// Wireshark icmpv6.mld.mrc / icmpv6.mld.multicast_address.
 		unspec := make([]byte, 16)
 		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
-		n := parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6")
+		n := parseMLDLegacyComplete(t, q)
 		require.Equal(t, uint64(130), uintVal(t, n.Child("Type")))
 		query := mustChild(t, n, "Multicast Listener Query")
 		require.Equal(t, uint64(10000), uintVal(t, query.Child("Maximum Response Delay")))
@@ -604,7 +608,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 		require.Equal(t, uint64(132), uintVal(t, n.Child("Type")))
 		require.Equal(t, ff02ones, bytesVal(t, mustChild(t, n, "Multicast Listener Done").Child("Multicast Address")))
 		eth := parseEthernet(t, ipv6ICMPBytes(t, d))
-		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Done").Child("Maximum Response Delay")))
+		require.Equal(t, uint64(0), uintVal(t, mustChild(t, eth, "IPv6", "ICMPv6", "Multicast Listener Done").Child("Unused Delay Word")))
 	})
 
 	t.Run("icmpv6/redirect", func(t *testing.T) {
@@ -3284,7 +3288,7 @@ func TestP1WiresharkAndRFCSamples(t *testing.T) {
 	t.Run("igmp/v3-query", func(t *testing.T) {
 		// RFC 3376 §4.1 Membership Query with one source. Wireshark igmp.type / igmp.maddr.
 		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
-		n := parseRule(t, raw, "igmp", "IGMP")
+		n := parseIGMPLegacyComplete(t, raw)
 		require.Equal(t, uint64(0x11), uintVal(t, n.Child("Type")))
 		require.Equal(t, []byte{239, 1, 1, 1}, bytesVal(t, n.Child("Group Address")))
 		require.Equal(t, uint64(2), uintVal(t, n.Child("SQRV")))

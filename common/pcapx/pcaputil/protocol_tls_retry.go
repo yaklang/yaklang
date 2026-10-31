@@ -69,6 +69,7 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 		// the output map/order or retaining a rejected Hello as retry state.
 		var seen [1024]uint64
 		count := 0
+		var psk, versions, modes []byte
 		for q := p; q < len(body); {
 			if len(body)-q < 4 {
 				return bad()
@@ -79,9 +80,28 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 			if n > len(body)-q || seen[kind/64]&bit != 0 {
 				return bad()
 			}
+			if err := tlsHelloExtensionDataStructure(kind, body[q:q+n], client, q+n == len(body)); err != nil {
+				return nil, err
+			}
 			seen[kind/64] |= bit
+			switch kind {
+			case 41:
+				psk = body[q : q+n]
+			case 43:
+				versions = body[q : q+n]
+			case 45:
+				modes = body[q : q+n]
+			}
 			count++
 			q += n
+		}
+		if client && psk != nil {
+			if err := tlsPSKClientRequirements(versions, modes); err != nil {
+				return nil, err
+			}
+			if binary.BigEndian.Uint16(body) != 0x303 || !bytes.Equal(h.compression, []byte{0}) {
+				return nil, protocolError(ErrMalformedMessage, "TLS 1.3 PSK ClientHello legacy parameters")
+			}
 		}
 		if count > limits[0] {
 			return nil, protocolError(ErrResourceExceeded, "TLS hello extension count")
@@ -114,23 +134,30 @@ func tlsSNIName(v []byte) ([]byte, error) {
 // Validate known extension grammar before applying a new inner collection cap.
 // Resource refusal must not hide an existing structural error in another entry.
 func tlsHelloExtensionStructure(h *tlsHelloView, client bool) error {
-	for _, kind := range h.order {
-		v := h.ext[kind]
-		switch kind {
-		case 0:
-			if client {
-				if _, err := tlsSNIName(v); err != nil {
-					return err
-				}
-			}
-		case 16:
-			if _, err := tlsALPNName(v, !client); err != nil {
-				return err
-			}
-		case 43:
-			if !client && len(v) != 2 {
-				return protocolError(ErrMalformedMessage, "TLS selected version length")
-			}
+	for i, kind := range h.order {
+		if err := tlsHelloExtensionDataStructure(kind, h.ext[kind], client, i == len(h.order)-1); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) error {
+	if err := tlsResumptionExtensionStructure(kind, v, client, last); err != nil {
+		return err
+	}
+	switch kind {
+	case 0:
+		if client {
+			_, err := tlsSNIName(v)
+			return err
+		}
+	case 16:
+		_, err := tlsALPNName(v, !client)
+		return err
+	case 43:
+		if !client && len(v) != 2 {
+			return protocolError(ErrMalformedMessage, "TLS selected version length")
 		}
 	}
 	return nil
@@ -233,9 +260,6 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 			if !bytes.Equal(h.ext[44], t.retryCookie) {
 				return bad("cookie mismatch")
 			}
-			if first.ext[41] != nil || h.ext[41] != nil {
-				return false, protocolError(ErrUnsupportedFeature, "TLS HRR PSK binder changes")
-			}
 			if t.retryGroup != 0 {
 				shares, err := tlsClientShares(h.ext[51])
 				if err != nil {
@@ -271,6 +295,9 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 				}
 			}
 			t.retryClientSeen = true
+			// Final ServerHello PSK indices refer to ClientHello2, which may
+			// remove incompatible identities and recompute ages/binders.
+			t.firstHello = bytes.Clone(body)
 		} else if t.firstHello == nil {
 			t.firstHello = bytes.Clone(body)
 		}

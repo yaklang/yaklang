@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -16,44 +17,62 @@ import (
 // legacy WithBinParser callbacks may run concurrently for different flows.
 // Messages in one TCP flow are delivered in order.
 type ProtocolEvent struct {
-	nativeOPCUAObservation                   bool
-	nativeMMSObservation                     bool
-	nativeFINSObservation                    bool
-	nativeENIPObservation                    bool
-	nativeHARTIPObservation                  bool
-	nativeTLSObservation                     bool
-	nativeDTLSObservation                    bool
-	nativeRADIUSObservation                  bool
-	radiusApplicationRefusal                 bool
-	nativeSNMPObservation                    bool
-	nativeSTUNObservation                    bool
-	nativeSIPObservation                     bool
-	nativeTFTPObservation                    bool
-	nativeATGObservation                     bool
-	nativeDHCPObservation                    bool
-	nativeDNSObservation                     bool
-	nativeDNSStreamObservation               bool
-	nativeDLMSOrSLMPObservation              bool
-	nativeUnrecognizedUDP                    bool
-	nativeBACnetRead                         bool
-	nativeBACnetRoutedRead                   bool
-	Admission                                string
-	nativeDiagnosticError                    string // immutable query refusal; public caches are not authority
-	semanticFields                           map[string]any
-	semanticSession                          map[string]any
-	semanticMetadata                         any
-	ownedRuleEnvelope, hasRuleMetadata       bool
-	nativeQUICObservation                    bool
-	nativeQUICWire                           bool
-	nativeDoIPObservation                    bool
-	doipAssociationRefusal                   bool // private complete-frame refusal scope
-	nativeCANRecord                          bool
-	ocpp                                     bool
-	Domain                                   CaptureDomain
-	SourceBytes                              ByteSource
-	Profile, Completeness, ExpertCode        string
-	TransactionID, ResponseTo                uint64
-	ID, FlowID                               uint64
+	nativeSessionMessage               bool
+	nativeNetFlowObservation           bool
+	rtmpChildren                       []*ProtocolEvent
+	nativeCarrierObservation           bool
+	nativeOPCUAObservation             bool
+	nativeMMSObservation               bool
+	nativeFINSObservation              bool
+	nativeENIPObservation              bool
+	nativeHARTIPObservation            bool
+	nativeTLSObservation               bool
+	nativeESPObservation               bool
+	nativeNetworkFields                *nativeNetworkObservation
+	nativeDTLSObservation              bool
+	nativeRADIUSObservation            bool
+	radiusApplicationRefusal           bool
+	nativeSNMPObservation              bool
+	nativeSTUNObservation              bool
+	nativeSIPObservation               bool
+	nativeSSHObservation               bool
+	nativeIMAPObservation              bool
+	nativeDCERPCObservation            bool
+	nativeTFTPObservation              bool
+	nativeATGObservation               bool
+	nativeDHCPObservation              bool
+	nativeDNSObservation               bool
+	nativeDNSStreamObservation         bool
+	nativeDLMSOrSLMPObservation        bool
+	nativeUnrecognizedUDP              bool
+	nativeBACnetRead                   bool
+	nativeBACnetRoutedRead             bool
+	Admission                          string
+	nativeDiagnosticError              string // immutable query refusal; public caches are not authority
+	nativeFieldsIncomplete             bool   // explicit partial-field scope survives status normalization/public edits
+	semanticFields                     map[string]any
+	semanticSession                    map[string]any
+	semanticMetadata                   any
+	ownedRuleEnvelope, hasRuleMetadata bool
+	nativeQUICObservation              bool
+	nativeQUICWire                     bool
+	nativeQUICWireBytes                []byte // immutable accepted envelope; expand byte leaves only on query
+	nativeDoIPObservation              bool
+	doipAssociationRefusal             bool // private complete-frame refusal scope
+	nativeCANRecord                    bool
+	ocpp                               bool
+	Domain                             CaptureDomain
+	SourceBytes                        ByteSource
+	// CarrierLayers lists observed protocol envelopes between the physical
+	// transport and this PDU. It does not turn a UDP carrier into TCP.
+	CarrierLayers                     []string
+	Profile, Completeness, ExpertCode string
+	TransactionID, ResponseTo         uint64
+	ID, FlowID                        uint64
+	// TCPFlowID identifies the physical capture reassembler generation. FlowID
+	// belongs to the separate protocol-session namespace. Zero means no direct
+	// captured TCP flow (including standalone sessions and reliable UDP carriers).
+	TCPFlowID                                uint64
 	Timestamp                                time.Time
 	Transport, Source, Destination, Protocol string
 	Direction                                int    // 0: first observed endpoint -> peer, 1: reverse (not a role guess)
@@ -87,6 +106,9 @@ type BinParserEvent = ProtocolEvent
 func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 	defer func() {
 		session := e.Session
+		if e.nativeSessionMessage && e.semanticFields != nil {
+			session = e.semanticFields
+		}
 		if e.semanticSession != nil {
 			session = e.semanticSession
 		}
@@ -117,7 +139,7 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 		}
 		// These native observations already retain their complete session
 		// context in the private field tree. Public projections are not authority.
-		ownedContext := e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
+		ownedContext := e.nativeNetFlowObservation || e.nativeCarrierObservation || e.nativeSNMPObservation || e.nativeTLSObservation || e.nativeDTLSObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.nativeFINSObservation || e.Protocol == "slmp" && (e.Profile == slmpTCPProfile || e.Profile == "slmp-binary-self-test") ||
 			e.Transport == "ethernet" && (e.Protocol == "sv" && e.Profile == "iec61850-sv-raw-asdu" || e.Protocol == "ethercat" && e.Profile == "ethercat-datagram-chain")
 		if ownedContext && e.semanticFields != nil {
 			session = e.semanticFields
@@ -168,13 +190,52 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			result = owned
 		}
 	}()
+	// A selected native SSH method refusal must not be retried as a successful
+	// generic packet grammar. Both accepted fields and errors are private facts,
+	// independent of caller edits to Protocol, Session and compatibility caches.
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+		if e.semanticFields == nil {
+			return nil, protocolError(ErrContextRequired, "native accepted field projection is unavailable")
+		}
+		out := map[string]any{"fields": cloneSession(e.semanticFields)}
+		if e.hasRuleMetadata {
+			out["metadata"] = cloneSessionValue(e.semanticMetadata)
+		}
+		return out, nil
+	}
 	// Native QUIC identity survives edits to all public labels and caches.
 	// A refused packet cannot become a successful rule decode, and accepted
 	// wire fields keep their legacy metadata envelope and private context.
+	if e.nativeCarrierObservation || e.nativeNetFlowObservation {
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+		if e.sessionError != nil {
+			owned := *e.sessionError
+			return nil, &owned
+		}
+	}
+	if e.nativeSessionMessage {
+		if e.sessionError != nil {
+			v := *e.sessionError
+			return nil, &v
+		}
+		if e.semanticFields != nil {
+			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+		}
+	}
 	if e.nativeQUICObservation {
 		if e.sessionError != nil {
 			owned := *e.sessionError
 			return nil, &owned
+		}
+		if e.nativeQUICWireBytes != nil {
+			fields, err := quicWireEnvelope(e.nativeQUICWireBytes)
+			return map[string]any{"fields": fields, "metadata": nil}, err
 		}
 		if e.semanticFields != nil {
 			return map[string]any{"fields": cloneSession(e.semanticFields), "metadata": nil}, nil
@@ -382,6 +443,15 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
+		return true
+	}
+	if e.nativeSessionMessage {
+		return true
+	}
+	if e.nativeCarrierObservation {
+		return true
+	}
 	if e.nativeQUICObservation {
 		return true
 	}
@@ -455,7 +525,7 @@ func (e *ProtocolEvent) ownsNativeFields() bool {
 	if e.Transport == "udp" && (e.Protocol == "mqtt-sn" || e.Protocol == "bittorrent-dht" || e.Protocol == "bjnp") && e.Profile == e.Protocol+"-native" {
 		return true
 	}
-	if e.Profile == "quic-v1-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
+	if e.Profile == "quic-v1-native" || e.Profile == "quic-v2-native" || e.Profile == "quic-native" || e.Profile == "http3-native" || e.Profile == "doq-native" {
 		return true
 	}
 	if e.Protocol == "semtech-udp" && (e.Profile == semtechDownlinkProfile || e.Profile == semtechCorrelationProfile) {
@@ -609,8 +679,13 @@ type binSpec struct {
 	plan        *binparser.StructuredPlan
 }
 type binParser struct {
+	l2tp3Mu                                                                    sync.Mutex
+	l2tp3                                                                      *l2tp3Store
 	c37118Engineering                                                          bool
 	mavlinkSigning                                                             *mavlinkSigningState
+	ftpMu                                                                      sync.Mutex
+	ftpClock                                                                   time.Time
+	ftpEndpoints                                                               map[ftpDataKey]ftpDataBinding
 	pfcpSessionIdentity                                                        *pfcpSessionIdentity
 	semtechDisabled                                                            bool                                       // udpMu; bounded opt-in correlation fails closed after global state exhaustion
 	semtechSessions                                                            *binUDPStore                               // udpMu; token quarantine must survive unrelated UDP expiry
@@ -643,18 +718,26 @@ type binParser struct {
 	lan                                                                        dnsCorrelation
 	tlsSecrets                                                                 TLSSecretProvider
 	udpMu                                                                      sync.Mutex
+	ntpControl                                                                 *ntpControlStore // udpMu; capture-lifetime sequence ownership
+	carrierMu                                                                  sync.Mutex
+	rdpUDP                                                                     *rdpUDPStore
+	eapTLS                                                                     *eapTLSStore
 	udpSessions                                                                *binUDPStore
-	tftpUntrackedRefusal                                                       bool // udpMu; unknown refused client/server identity
-	sipUntrackedRefusal                                                        bool // udpMu; uncertainty for identities that could not be retained
-	stunUntrackedRefusal                                                       bool // constant-size quarantine when an admitted UDP key cannot be retained
-	pfcpUntrackedRefusal                                                       bool // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
-	dlmsUntrackedRefusal                                                       bool // udpMu; no fresh HDLC association after an unretained admitted refusal
-	hartUntrackedRefusal                                                       bool // udpMu; unidentified refusals cannot start a fresh association
-	radiusUntrackedRefusal                                                     bool // udpMu; unretained RADIUS history
-	snmpUntrackedRefusal                                                       bool // udpMu; only newly untrackable SNMP conversations are conservative
-	finsUntrackedRefusal                                                       bool // udpMu; unretained identity cannot become a fresh generation
-	slmpUntrackedRefusal                                                       bool // udpMu; refused unretained SLMP identity has no verified generation
-	wrapperUntrackedRefusal                                                    bool // udpMu; missing Wrapper history cannot prove a fresh invoke generation
+	ipfixMu                                                                    sync.Mutex
+	ipfix                                                                      *ipfixStore
+	netflowV9Mu                                                                sync.Mutex
+	netflowV9                                                                  *netflowV9Store // netflowV9Mu; independent pre-dispatch receiver observations
+	tftpUntrackedRefusal                                                       bool            // udpMu; unknown refused client/server identity
+	sipUntrackedRefusal                                                        bool            // udpMu; uncertainty for identities that could not be retained
+	stunUntrackedRefusal                                                       bool            // constant-size quarantine when an admitted UDP key cannot be retained
+	pfcpUntrackedRefusal                                                       bool            // udpMu; forgotten rejected identity cannot verify a newly admitted PFCP key
+	dlmsUntrackedRefusal                                                       bool            // udpMu; no fresh HDLC association after an unretained admitted refusal
+	hartUntrackedRefusal                                                       bool            // udpMu; unidentified refusals cannot start a fresh association
+	radiusUntrackedRefusal                                                     bool            // udpMu; unretained RADIUS history
+	snmpUntrackedRefusal                                                       bool            // udpMu; only newly untrackable SNMP conversations are conservative
+	finsUntrackedRefusal                                                       bool            // udpMu; unretained identity cannot become a fresh generation
+	slmpUntrackedRefusal                                                       bool            // udpMu; refused unretained SLMP identity has no verified generation
+	wrapperUntrackedRefusal                                                    bool            // udpMu; missing Wrapper history cannot prove a fresh invoke generation
 	dcpMu                                                                      sync.Mutex
 	dcpClock                                                                   time.Time
 	dcpObservations                                                            map[dcpKey]*dcpObservation
@@ -681,6 +764,20 @@ func (c *CaptureConfig) prepareBinParser() error {
 		return fmt.Errorf("MMS description validation requires explicit service/value ports")
 	}
 	if c.binParserConfig == nil || (c.binParserConfig.OnEvent == nil && c.binParserConfig.OnStats == nil) {
+		if !c.DisableAssembly {
+			// Network validation, tunnel admission and bounded IP reassembly are
+			// required by TCP consumers independently of protocol subscriptions.
+			// Keep this instance out of TrafficFlow.onFrame: it creates no
+			// application plans, probes, sessions or readable TCP stream copies.
+			a := &binParser{config: BinParserConfig{MaxMessageBytes: 16 << 20, MaxBufferedBytes: 128 << 20, ProbeBytes: 64}, budget: DefaultParserBudget()}
+			a.budget.MaxMessageBytes, a.budget.MaxFrameBytes = a.config.MaxMessageBytes, a.config.MaxMessageBytes
+			a.budget.MaxBufferedBytes, a.budget.ProbeBytes = a.config.MaxBufferedBytes, a.config.ProbeBytes
+			a.datagramDecodeAs = make(map[uint16]string, len(c.datagramDecodeAs))
+			for port, profile := range c.datagramDecodeAs {
+				a.datagramDecodeAs[port] = profile
+			}
+			c.transportNormalizer = a
+		}
 		return nil
 	}
 	if c.DisableAssembly || c.EnableCache || c.requiresFullStream {
@@ -768,14 +865,18 @@ func (a *binParser) stats() BinParserStats {
 }
 
 func (c *CaptureConfig) finishBinParser() error {
-	if c.binParser == nil {
+	a := c.binParser
+	if a == nil {
+		a = c.transportNormalizer
+	}
+	if a == nil {
 		return nil
 	}
-	a := c.binParser
 	a.closeCANISO()
 	a.closeJ1939TP()
 	a.closeDroneCANStats()
 	a.closeUDPSessions()
+	a.closeFTPEndpoints()
 	a.closeDCPObservations()
 	a.closeMediaAssociations()
 	a.closeRTSPMedia()
@@ -795,6 +896,9 @@ func (a *binParser) emit(e *BinParserEvent) {
 	}
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
+	}
+	if e.Completeness == "limited" || e.Completeness == "evicted" {
+		e.nativeFieldsIncomplete = true
 	}
 	// Capture diagnostics cannot become parsed messages through public cache,
 	// protocol or status edits. Manually constructed events retain legacy caches.
@@ -821,6 +925,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 	}
 	e.setStructured(e.Structured)
 	e.finalizeEvidence()
+	e.freezeNativeNetworkFields()
 	e.summarizeProtocol()
 	// IEC104, DNP3, GOOSE, MQTT and legacy stream media keep rule fields distinct from observed
 	// session context. Freeze the final context before handing out public maps.
@@ -840,6 +945,7 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
+	tlsPlaintextGap bool
 	contributions   []contribution
 	evidenceLimited bool
 	headerScan      int
@@ -854,13 +960,22 @@ type binDirection struct {
 	sshOpaque bool
 }
 type binFlow struct {
+	ajp               *binAJP
+	bgp               *binBGP
+	ipfixTCP          *binIPFIX
+	ldp               *binLDP
+	rtmp              *binRTMP
+	routing           *routingDatagramState
 	mms               *binMMS
+	plaintextGap      [2]bool
 	domain            CaptureDomain
 	tls               *binTLS
 	dtls              *binDTLS
 	byteSource        string
+	captureCarriers   []string
 	parentID          uint64
 	captureTCP        bool
+	orderedTLSCarrier bool // separately validated reliable UDP carrier; never a TCP identity
 	tcpClientKnown    bool
 	tcpClientDir      int
 	syslogStreamProbe bool
@@ -881,6 +996,11 @@ type binFlow struct {
 	smb2              *binSMB2
 	dcerpc            *binDCERPC
 	ssh               *binSSH
+	// Reassembly can publish its final gap diagnostic after closeSession frees
+	// SSH negotiation state. Retain only the bounded identification warnings.
+	closedSSHWarnings [2]string
+	nbss              bool
+	control           *controlDatagramState
 	nfs               *binNFS
 	snmp              *binSNMP
 	rdp               *binRDP
@@ -893,6 +1013,7 @@ type binFlow struct {
 	imap              *binIMAP
 	pop3              *binPOP3
 	ftp               *binFTP
+	ftpData           *ftpDataBinding
 	tns               *binTNS
 	socks5            *binSOCKS5
 	scgi              *binSCGI
@@ -950,6 +1071,7 @@ type binFlow struct {
 	httpWSProtocols   []string
 	httpMethods       []string
 	a                 *binParser
+	transportFlow     *TrafficFlow // serialized native capture context; nil for explicit sessions
 	id                uint64
 	endpoints         [2]string
 	ports             [2]uint16
@@ -960,12 +1082,26 @@ type binFlow struct {
 }
 
 func (a *binParser) newFlow(t *TrafficFlow) *binFlow {
-	return &binFlow{domain: t.key.domain, a: a, captureTCP: true, tcpClientKnown: !t.IsHalfOpen, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
+	return &binFlow{domain: t.key.domain, a: a, transportFlow: t, captureTCP: true, tcpClientKnown: !t.IsHalfOpen, id: a.flows.Add(1), endpoints: [2]string{t.ClientConn.LocalAddr().String(), t.ServerConn.LocalAddr().String()}, ports: [2]uint16{uint16(t.ClientConn.LocalPort()), uint16(t.ServerConn.LocalPort())}}
 }
 
 func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEvent {
 	d := &f.directions[dir]
 	e := &BinParserEvent{FlowID: f.id, Timestamp: d.ts, Transport: "tcp", Source: f.endpoints[dir], Destination: f.endpoints[1-dir], Direction: dir, Offset: d.offset, Length: len(raw), Protocol: f.protocol, Status: status, Summary: detail, Raw: append([]byte(nil), raw...)}
+	if f.transportFlow != nil {
+		e.TCPFlowID = f.transportFlow.Index
+	}
+	if f.protocol == "ssh" && status != "decoded" && status != "deferred" {
+		info := map[string]any{}
+		if f.ssh != nil {
+			f.ssh.identificationWarningFields(info)
+		} else {
+			(&binSSH{identWarning: f.closedSSHWarnings}).identificationWarningFields(info)
+		}
+		if len(info) > 0 {
+			e.Session, e.semanticSession = info, cloneSession(info)
+		}
+	}
 	if f.protocol == "dnp3" && f.a.config.DecodeDNP3ReadPoints {
 		e.Profile = "dnp3-read-points"
 	}
@@ -1240,7 +1376,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
 		// dictionaries/sequence state just as a malformed session message does.
-		if d.stopped && f.hasSession() && !d.sshOpaque {
+		if d.stopped && f.hasSession() && !d.sshOpaque && !d.tlsPlaintextGap {
 			f.invalidateSession(1 - dir)
 			f.closeSession()
 		}
@@ -1254,6 +1390,20 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	if d.stopped {
 		a.unclassified.Add(uint64(len(data)))
 		d.offset += uint64(len(data))
+		return
+	}
+	if f.protocol == "" && f.ftpData == nil && len(data) > 0 && f.captureTCP {
+		f.ftpData = f.a.matchFTPData(f, ts)
+		if f.ftpData != nil {
+			if f.ftpData.protected {
+				f.protocol = "tls"
+			} else {
+				f.protocol = "ftp-data"
+			}
+		}
+	}
+	if f.protocol == "ftp-data" && f.ftpData != nil {
+		f.emitFTPData(dir, data, ts)
 		return
 	}
 	if len(d.buffer) == 0 {
@@ -1363,7 +1513,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < a.config.MaxMessageBytes && probeDLMSStream(wire, a.budget.MaxFrameBytes, a.config.ProbeBytes).Verdict == ProbeNeedMore {
 						break
 					}
-					if len(wire) < a.budget.MaxFrameBytes && (probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
+					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
@@ -1487,7 +1637,15 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			}
 			var result map[string]any
 			var err error
-			if f.protocol == "tls" {
+			if f.bgp != nil || f.ajp != nil || f.rtmp != nil || f.ldp != nil || f.protocol == "ipfix" || f.imap != nil && f.imap.needsNativeSASL(dir, e.Raw) || f.protocol == "dcerpc" && dcerpcHasSecurityTrailer(e.Raw) {
+				result = map[string]any{}
+			} else if f.protocol == "ssh" && e.Entry == "SSHPacket" {
+				// Packet numbers 30..49 depend on the observed exchange. Decode
+				// their generic envelope first, never the legacy fixed-DH layout.
+				var fields map[string]any
+				fields, err = stream_parser.DecodeSSHInitialPacket(e.Raw, "transport")
+				result = map[string]any{"fields": fields["Wire Fields"]}
+			} else if f.protocol == "tls" {
 				if f.byteSource == "decrypted" {
 					err = protocolError(ErrUnsupportedFeature, "nested TLS carrier")
 				} else {
@@ -1495,7 +1653,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				}
 			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
-			} else if e.Protocol == "rtsp" && rtspAppleControlWire(e.Raw, a.budget.MaxCollectionElements) {
+			} else if e.Protocol == "rtsp" && rtspNativeControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
 			} else if e.Protocol == "websocket" && e.Entry == "WebSocket" && f.ws != nil && f.ws.deflate {
 				result = map[string]any{"fields": map[string]any{}}
@@ -1516,6 +1674,15 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.Raw = rawCopy
 				}
 				err = f.consumeSession(dir, e, result)
+				if err == nil && e.Protocol == "ssh" {
+					e.semanticSession = cloneSession(e.Session)
+					if fields, ok := e.Session["Initial Packet Fields"].(map[string]any); ok {
+						result = map[string]any{"fields": cloneSession(fields)}
+					}
+				}
+				if e.nativeSessionMessage {
+					result = map[string]any{"fields": cloneSession(e.Session)}
+				}
 				if e.Profile == "rtsp-apple-control" {
 					result = map[string]any{"fields": cloneSession(e.Session)}
 				}
@@ -1612,8 +1779,11 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				if errors.Is(err, stream_parser.ErrKafkaUnsupported) {
 					err = protocolError(ErrUnsupportedFeature, err.Error())
 				}
+				if e.Protocol == "dcerpc" {
+					e.nativeSessionMessage = true
+				}
 				e.Status, e.sessionError = classifySessionError(err)
-				if ((e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation) && e.sessionError == nil {
+				if (e.Protocol == "dcerpc" || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Entry == "MySQLPreparedFields" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.nativeTLSObservation || e.nativeSNMPObservation || e.nativeSTUNObservation || e.nativeSIPObservation || e.nativeSSHObservation || e.nativeIMAPObservation) && e.sessionError == nil {
 					// These legacy codecs also return wrapped context or
 					// grammar errors. Preserve their status/message privately so
 					// later queries cannot use a caller-supplied successful cache.
@@ -1622,6 +1792,12 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 						kind = ErrContextRequired
 					}
 					e.sessionError = &ProtocolError{Kind: kind, Message: err.Error()}
+				}
+				if e.Protocol == "dcerpc" {
+					if diagnostic := dcerpcIsolatedUnconsumedTail(e.Raw, e.sessionError); diagnostic != nil {
+						e.Session = diagnostic
+						e.semanticSession = cloneSession(diagnostic)
+					}
 				}
 				e.Error = err.Error()
 			} else if a.config.Deferred {
@@ -1640,7 +1816,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				// decoding and history; retrying a different grammar loses fields
 				// or rejects valid argumentless/multiline messages.
 				e.semanticFields = protocolFields(result)
-				if e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
+				if e.Protocol == "ssh" || e.nativeIMAPObservation || e.nativeSIPObservation || (e.Protocol == "iec104" || e.Protocol == "dnp3") || e.Protocol == "goose" || e.Protocol == "mqtt" || e.nativeOPCUAObservation || e.Protocol == "websocket" && e.Session["OCPP"] != nil || e.Protocol == "rtp" && e.Transport != "udp" {
 					e.retainRuleEnvelope(result)
 				}
 				if e.nativeRADIUSObservation || e.nativeDNSStreamObservation || e.nativeATGObservation || e.nativeHARTIPObservation || e.nativeENIPObservation || e.Protocol == "tls" || e.Protocol == "redis" || e.Entry == "MySQLPreparedFields" || e.Protocol == "stun" || e.Protocol == "turn" || e.Protocol == "snmp" || e.Protocol == "slmp" || e.Protocol == "dlms-wrapper" || e.Protocol == "dlms" || e.Protocol == "c37118" {
@@ -1731,8 +1907,30 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			tlsParent = &owned
 		}
 		// Recovery is engine policy, not a caller-editable event projection.
-		stopAfterFailure := failed && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
+		stopAfterFailure := failed && !(e.Protocol == "tls" && e.Session["Record Failure Isolated"] == true) && !recoverableRADIUS && !recoverableHARTIP && !(e.Protocol == "fins" && finsRecoverable(e.sessionError)) && !recoverableDNP3 && !recoverableDoIP && !(e.Protocol == "slmp" && slmpTCPRecoverable(e.sessionError)) && !(e.Protocol == "dlms-wrapper" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "c37118" && c37118RecoverableMessageError(e.sessionError)) && !(e.Protocol == "dlms" && dlmsRecoverableMessageError(e.sessionError)) && !(e.Protocol == "roc-plus" && rocRecoverableMessageError(e.sessionError)) && !(e.Protocol == "genisys" && genisysRecoverableMessageError(e.sessionError)) && !((e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") && e.Session["Error Scope"] == "stream")
+		if e.nativeSessionMessage && e.Session["Error Scope"] == "message" {
+			stopAfterFailure = false
+		}
+		children := e.rtmpChildren
+		e.rtmpChildren = nil
 		a.emit(e)
+		for _, child := range children {
+			a.messages.Add(1)
+			a.messageBytes.Add(uint64(child.Length))
+			switch child.Status {
+			case "decoded":
+				a.decoded.Add(1)
+			case "incomplete":
+				a.incomplete.Add(1)
+			case "context-required":
+				a.contextRequired.Add(1)
+			case "limited":
+				a.limited.Add(uint64(child.Length))
+			default:
+				a.malformed.Add(1)
+			}
+			a.emit(child)
+		}
 		if !failed {
 			f.deliverTLS(dir, tlsParent)
 		}
@@ -1752,7 +1950,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 		// A peer SETTINGS already captured before a complete client preface
 		// must be applied before subsequent coalesced request header blocks.
 		// Never replay the peer after only a partial greeting/preface.
-		if detected || stateful && (e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
+		if detected || stateful && (strings.HasSuffix(fmt.Sprint(e.Session["Protocol Transition"]), "->tls") || e.Entry == "MySQLGreetingFields" || e.Entry == "HTTP2InitialClientStream" || e.Entry == "PostgreSQLStartupFields" || e.Entry == "PostgreSQLSSLRequestFields" || e.Protocol == "socks5" && f.protocol == "") {
 			detected = false
 			other := &f.directions[1-dir]
 			if len(other.buffer) > 0 && !other.stopped {
@@ -1785,6 +1983,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 }
 
 func (f *binFlow) close(reason TrafficFlowCloseReason) {
+	if f.ssh != nil {
+		f.closedSSHWarnings = f.ssh.identWarning
+	}
 	if f.dlms != nil && f.binding == nil {
 		for i := range f.directions {
 			d := &f.directions[i]
@@ -1890,6 +2091,12 @@ func (f *binFlow) close(reason TrafficFlowCloseReason) {
 type ProtocolInspector struct {
 	mu                           sync.Mutex
 	rows                         []*protocolHistoryEntry
+	byID                         map[uint64][]*protocolHistoryEntry
+	byPacket                     map[PacketReference][]*protocolHistoryEntry
+	byPhysical                   map[PacketReference][]*protocolHistoryEntry
+	packetIndexLinks, unindexed  int
+	packetIndexLimit             int
+	identities                   *protocolIdentityIndex
 	head, count, bytes, maxBytes int
 	evicted                      uint64
 	received                     uint64
@@ -1897,7 +2104,8 @@ type ProtocolInspector struct {
 
 type protocolHistoryEntry struct {
 	BinParserEvent
-	retainedCost int
+	retainedCost  int
+	packetIndexed bool
 }
 
 // BinParserInspector is retained for source compatibility. Use ProtocolInspector.
@@ -1907,7 +2115,7 @@ func NewBinParserInspector(messages, bytes int) (*BinParserInspector, error) {
 	if messages <= 0 || messages > 1000000 || bytes <= 0 {
 		return nil, errors.New("inspector requires positive bounded message/byte limits")
 	}
-	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes}, nil
+	return &BinParserInspector{rows: make([]*protocolHistoryEntry, messages), maxBytes: bytes, byID: make(map[uint64][]*protocolHistoryEntry), byPacket: make(map[PacketReference][]*protocolHistoryEntry), byPhysical: make(map[PacketReference][]*protocolHistoryEntry), packetIndexLimit: min(256<<10, max(1, bytes/128)), identities: newProtocolIdentityIndex(min(8<<20, max(1<<20, bytes/8)))}, nil
 }
 
 func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
@@ -1918,6 +2126,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 		v.mu.Lock()
 		v.received++
 		v.evicted++
+		v.identities.observe(e, v.received)
 		v.mu.Unlock()
 		return
 	}
@@ -1925,15 +2134,27 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	row.semanticFields = cloneSession(e.semanticFields)
 	row.semanticSession = cloneSession(e.semanticSession)
 	row.semanticMetadata = cloneSessionValue(e.semanticMetadata)
+	row.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 	row.Session = cloneSession(e.Session)
 	cloneEvidence(&row.BinParserEvent)
+	// A short substring must not pin an uncharged caller-owned domain backing
+	// string. Detail and identity ledgers own and charge their separate copies.
+	row.Domain.Encapsulation = strings.Clone(row.Domain.Encapsulation)
+	for i := range row.SourceBytes.PacketRefs {
+		row.SourceBytes.PacketRefs[i].Domain.Encapsulation = strings.Clone(row.SourceBytes.PacketRefs[i].Domain.Encapsulation)
+	}
+	if row.SourceBytes.CompletedIn != nil {
+		row.SourceBytes.CompletedIn.Domain.Encapsulation = strings.Clone(row.SourceBytes.CompletedIn.Domain.Encapsulation)
+	}
 	row.Structured, row.Fields, row.Metadata = nil, nil, nil
 	row.Raw = append([]byte(nil), e.Raw...)
 	v.mu.Lock()
 	defer v.mu.Unlock()
 	v.received++
 	row.historySequence = v.received
+	v.identities.observe(&row.BinParserEvent, v.received)
 	for v.count > 0 && (v.count == len(v.rows) || row.retainedCost > v.maxBytes-v.bytes) {
+		v.unindex(v.rows[v.head])
 		v.bytes -= v.rows[v.head].retainedCost
 		v.rows[v.head] = nil
 		v.head = (v.head + 1) % len(v.rows)
@@ -1943,6 +2164,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	v.rows[(v.head+v.count)%len(v.rows)] = &row
 	v.count++
 	v.bytes += row.retainedCost
+	v.index(&row)
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -1957,6 +2179,7 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 			row := *e
 			cloneEvidence(&row)
 			row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+			row.nativeQUICWireBytes = nil
 			row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 			rows = append(rows, &row)
 		}
@@ -1964,29 +2187,52 @@ func (v *BinParserInspector) Rows(protocol string, flow uint64) []*BinParserEven
 	return rows
 }
 
+// TCPFlowRows returns owned message metadata for an exact capture-domain/TCP
+// generation. Protocol FlowID is independent and must not be used as this ID.
+// A zero generation has no capture binding and returns no rows.
+func (v *ProtocolInspector) TCPFlowRows(domain CaptureDomain, tcpFlow uint64) []*ProtocolEvent {
+	if tcpFlow == 0 {
+		return nil
+	}
+	v.mu.Lock()
+	defer v.mu.Unlock()
+	var rows []*ProtocolEvent
+	for i := 0; i < v.count; i++ {
+		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
+		if e.Domain != domain || e.TCPFlowID != tcpFlow || e.Transport != "tcp" {
+			continue
+		}
+		row := *e
+		cloneEvidence(&row)
+		row.Raw, row.Session, row.Structured, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+		row.nativeQUICWireBytes = nil
+		row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
+		rows = append(rows, &row)
+	}
+	return rows
+}
+
 func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 	v.mu.Lock()
 	var row *BinParserEvent
-	for i := 0; i < v.count; i++ {
-		e := &v.rows[(v.head+i)%len(v.rows)].BinParserEvent
-		if e.ID == id {
-			copyEvent := *e
-			cloneEvidence(&copyEvent)
-			copyEvent.Structured = cloneSession(e.Structured)
-			copyEvent.semanticFields = cloneSession(e.semanticFields)
-			copyEvent.semanticSession = cloneSession(e.semanticSession)
-			copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
-			copyEvent.Session = cloneSession(e.Session)
-			copyEvent.Raw = append([]byte(nil), e.Raw...)
-			row = &copyEvent
-			break
-		}
+	if entries := v.byID[id]; len(entries) != 0 {
+		e := &entries[0].BinParserEvent
+		copyEvent := *e
+		cloneEvidence(&copyEvent)
+		copyEvent.Structured = cloneSession(e.Structured)
+		copyEvent.semanticFields = cloneSession(e.semanticFields)
+		copyEvent.semanticSession = cloneSession(e.semanticSession)
+		copyEvent.semanticMetadata = cloneSessionValue(e.semanticMetadata)
+		copyEvent.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
+		copyEvent.Session = cloneSession(e.Session)
+		copyEvent.Raw = append([]byte(nil), e.Raw...)
+		row = &copyEvent
 	}
 	v.mu.Unlock()
 	if row == nil {
 		return nil, fmt.Errorf("message %d is absent or evicted", id)
 	}
-	if row.Rule != "" || row.semanticFields != nil {
+	if row.Rule != "" || row.semanticFields != nil || row.nativeQUICWireBytes != nil {
 		result, err := row.Decode()
 		if err != nil {
 			return row, err
@@ -2000,6 +2246,10 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 }
 
 func (v *BinParserInspector) Evicted() uint64 { v.mu.Lock(); defer v.mu.Unlock(); return v.evicted }
+
+// Revision includes arrivals that evict old entries or exceed retention limits.
+// A frozen packet list can gain contributor fields when a stream closes.
+func (v *BinParserInspector) Revision() uint64 { v.mu.Lock(); defer v.mu.Unlock(); return v.received }
 
 // RowsAfter returns at most limit newest matching arrivals after a viewer
 // cursor. The cursor follows arrival order, not concurrently assigned event IDs.
@@ -2026,6 +2276,7 @@ func (v *BinParserInspector) RowsAfter(after uint64, limit int, protocol string,
 				row := *e
 				cloneEvidence(&row)
 				row.Raw, row.Structured, row.Session, row.semanticFields, row.semanticSession, row.semanticMetadata = nil, nil, nil, nil, nil, nil
+				row.nativeQUICWireBytes = nil
 				row.ownedRuleEnvelope, row.hasRuleMetadata = false, false
 				rows = append(rows, &row)
 			}

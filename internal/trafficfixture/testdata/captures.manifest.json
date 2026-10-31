@@ -1,0 +1,161 @@
+{
+  "archive": "internal/trafficfixture/testdata/captures.zip",
+  "archive_bytes": 18916097,
+  "archive_sha256": "0371e1304d6711497f697ea8a7622c707140e7e5378215d67bde7f0985bd8213",
+  "members": {
+    "common/ai/aismoking/live/testdata/pcap_analysis.pcap": {
+      "bytes": 709,
+      "sha256": "685eb9d0d0c42a562be4bc791522049182b0a5d45634d8b1627a355cde687b17"
+    },
+    "common/bin-parser/testdata/corpus-batches/auxiliary-2fb090d177c3.zip": {
+      "bytes": 156134,
+      "sha256": "06f56d88e362998ab4d5d699872efd7d22a04a14a672737d50a13f35399eab63"
+    },
+    "common/bin-parser/testdata/corpus-batches/baseline-2fb090d177c3.zip": {
+      "bytes": 5198507,
+      "sha256": "bff6a5a82336ac3d4f4d139b6d1ba75289be23ece04fae3c07c75032d63da017"
+    },
+    "common/bin-parser/testdata/corpus-batches/materials-2598e4d6.zip": {
+      "bytes": 180160,
+      "sha256": "8266960ccb868ad485e8cc64bb1acfd27e18bdbe21e0759394b95729c941300d"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-bsap-local-rdb-bf4d631.zip": {
+      "bytes": 82896,
+      "sha256": "a84da14de2bc7ae60cf8605c758c0643abf6de84dbae74916b8573e01937a9f0"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-c37118-cfg2-data-c722c83.zip": {
+      "bytes": 107876,
+      "sha256": "8a1b00c33ae1c8c0ee7c8859ff2a729c239093b6bb1765aacf99b1bc049b12ef"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-closure-core-9814bfb6c51.zip": {
+      "bytes": 22806,
+      "sha256": "dbd2e5854f9cb2fb44035ea0d48f6cb574f8cf3e314d7281c61fa4781e2414f6"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-core-adversarial-0a5286c.zip": {
+      "bytes": 48689,
+      "sha256": "33540f67a8748399f906e269c3b4762321405c02a31556d0d4d828310a59af1c"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-dcp-identify-0f89231f399.zip": {
+      "bytes": 132581,
+      "sha256": "3946ebad18f741ed4e5641247dbca3f9d79e5e70733355df63cf36654d623452"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-dlms-hdlc-84de77d.zip": {
+      "bytes": 144926,
+      "sha256": "916d16929e4809ef4660fdbca82ad77b3d2745e18117691aa85c5b4d77be9e6f"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-dlms-wrapper-acdfc52d642.zip": {
+      "bytes": 82376,
+      "sha256": "a88f6cc8bd8d4e033c5e3ed52d7cdc439e5e667131ee5cf2d7b350f14b5c4b77"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-dns-budget-ae44a462.zip": {
+      "bytes": 3182,
+      "sha256": "a8ef85eef1f65f31d43f43162340fef67ed3ab0bdd8a6a2cce715c7ba37b328a"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-doip-discovery-ce2d8a0595c.zip": {
+      "bytes": 75977,
+      "sha256": "736792b9db28fdad3b5ecdbd3d85c08aaa2745c5f1660fd7a563d400926818b5"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-dronecan-node-status-95d8dfd.zip": {
+      "bytes": 61547,
+      "sha256": "6423121492ef3bdeafec28a0ffb58f59861fe9a20a3925c150e4078d24dd9962"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-genisys-wire-14310e7.zip": {
+      "bytes": 74523,
+      "sha256": "d4ba967ac03e02687a1609e64921aa36727cf0960f01522800e647a5d794bd3f"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-incremental-mvp-2d5fc98f.zip": {
+      "bytes": 381246,
+      "sha256": "89ec76416767d52c91d9beb874a90f5d780f0184be0cfd9106fbd653af7233f0"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-industrial-link-core-359ea16.zip": {
+      "bytes": 166058,
+      "sha256": "d46fb4352f2b4fba296908138271a9189ca6208665b8d128915dea224a1877b1"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-iso8583-public-6a1af0a7c22.zip": {
+      "bytes": 18803,
+      "sha256": "3b8dd3d0a95ff25f0e0de7f8b0613b500ac136a6fd25194962e214d96d588501"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-knx-extended-ce2d8a0595c.zip": {
+      "bytes": 90780,
+      "sha256": "952d8caef48287d0a45dee41c3bdeb9629aa66c5f26203495bbe0ecc2075c5ed"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-knx-pfcp-1dab43f3e82.zip": {
+      "bytes": 98555,
+      "sha256": "e7c4f4d74168bd6a01823b19351281e6ea11942882458711002b82f243096d2c"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-lldp-discovery-cb0938f.zip": {
+      "bytes": 50564,
+      "sha256": "7375ea8cccf83d07cc42215d1bba7aab2fe3d0da881dbf059b76f2303c8fd4bd"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-native-compatibility-9814bfb6c51.zip": {
+      "bytes": 18202,
+      "sha256": "07a8d7a81942d55f3b68732f711b7710f71de125c8531303174ba4db0d3fb1f0"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-opendroneid-v2-8b19fdc.zip": {
+      "bytes": 103031,
+      "sha256": "887a0724671994de4d99d047415d9e996e23d1a5220af4a24db9f3ba512a0616"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-pfcp-profile-upgrade-5dbfa1b2cb2.zip": {
+      "bytes": 1974,
+      "sha256": "c1889c51737dacf2dc11910d8ff0f04a6c9aefc924e48d07ff19c882f92759ad"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-pfcp-session-deletion-39f09efd2a1.zip": {
+      "bytes": 125483,
+      "sha256": "39906e7c115303f100a8e1f1f1ba4079daa7c04edd05959636eb9d2666c6702e"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-pfcp-setup-365fa9dffcb.zip": {
+      "bytes": 226848,
+      "sha256": "ce5757d11a3ba8062b3f49e6cba7ab24adfd8a0a4119143e6cedafb148278649"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-pfcp-update-release-3645353c166.zip": {
+      "bytes": 114826,
+      "sha256": "9bb17b0439d4b1a8a6357b8ad2f5d0d4d2e88422eaca5bf8ec143fd941bb0611"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-pr5265-consolidated.zip": {
+      "bytes": 10187716,
+      "sha256": "3d35fff4990c80ed608e0880438307f0b2bbe5092dae18166c0d04b928442860"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-roc-plus-clock-2453800.zip": {
+      "bytes": 76889,
+      "sha256": "948ad7e3d785f629f1fbf6c4a19a46f93e4e0cccca7d3ca4bde965358f6cb40b"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-rtps-spdp-af39c37.zip": {
+      "bytes": 99251,
+      "sha256": "4143c42110c6390959ea3d84451d3417994e69b3749bba8eb769a4a21c345157"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-semantic-review-d0a40a2.zip": {
+      "bytes": 82333,
+      "sha256": "a60f43013f276605c3979f25760e825fc76c189dbc84c8dadcff5856b13be3fb"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-semtech-downlink-e667459b0ea.zip": {
+      "bytes": 148104,
+      "sha256": "2a95d7a2625b0dc3362a7bdaef102cdbe414b90f097bbf575fbad36acc807f34"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-slmp-self-test-96379bc.zip": {
+      "bytes": 95112,
+      "sha256": "d845b094e889fa59a20cb057ebc5abdafb0ea9dcfeee601a9206fe14488d6122"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-slmp-tcp-ce2d8a0595c.zip": {
+      "bytes": 115915,
+      "sha256": "e60904f1de430f0ae8e726608944507675179aebf754cb8cc1009b5421d9853b"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-small-corpus-df13184f.zip": {
+      "bytes": 33293,
+      "sha256": "791da912589f56829a1c510fb5b29df023601c033f5c1615af858a30cce02f4b"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-socketcan-j1939-56f6409.zip": {
+      "bytes": 61122,
+      "sha256": "ec484433c3ff040a3c9249be20f1e93e42fb7d15b7ba2e3f2864f23056c26568"
+    },
+    "common/bin-parser/testdata/corpus-batches/validation-udp-terminal-budget-f92c1176689.zip": {
+      "bytes": 35297,
+      "sha256": "81a7de6f6711d7836063b044bc19573af29f31d848cc6a3be5785667f2abc9ba"
+    },
+    "common/pcapx/pcapdb/testdata/comprehensive.pcapng.gz": {
+      "bytes": 202940,
+      "sha256": "5e92b88a518c55f6a0274e3c08bcb5f25d15db10239d0e3ffb637c5f66ae9cf8"
+    }
+  },
+  "source_head": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+  "version": 1
+}

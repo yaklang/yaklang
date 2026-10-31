@@ -95,6 +95,9 @@ func smb2DirectLength(w []byte) int {
 }
 
 func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
+	if f.nbss && len(w) > 0 && w[0] != 0 {
+		return f.frameNBSS(0, w)
+	}
 	s := f.smb2
 	if s == nil {
 		return 0, nil, sessionContext("SMB2 session was not observed")
@@ -272,6 +275,11 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 	resp, _ := c["Response"].(bool)
 	key := smb2PendingKey{sessionID: sid, treeID: tid, messageID: mid}
 	if !resp {
+		if name == "CANCEL" {
+			c["Response Expected"] = false
+			c["Cancellation Target Message ID"] = mid
+			return nil
+		}
 		if len(s.pending) >= max {
 			return protocolError(ErrResourceExceeded, "SMB2 outstanding requests exceed budget")
 		}
@@ -388,7 +396,7 @@ func (s *binSMB2) associateFrom(c map[string]any, max, dir int) error {
 		c["Tree Context Status"] = "disconnected"
 	}
 	if name == "LOGOFF" && status == 0 {
-		s.removeSession(sid)
+		s.removeSession(pending.key.sessionID)
 		c["Session Context Status"] = "logged-off"
 	}
 	return nil
@@ -412,6 +420,9 @@ func (s *binSMB2) findResponse(key smb2PendingKey, asyncID uint64, name string, 
 	// assigns the TreeId. Only allow their exact command-specific fallback.
 	allowSessionSetup := name == "SESSION_SETUP"
 	allowTreeConnect := name == "TREE_CONNECT"
+	status, _ := c["Status"].(uint32)
+	allowSessionError := key.sessionID == 0 && key.treeID == 0 && status>>30 >= 2 && status != 0x00000103
+	allowLogoffClear := name == "LOGOFF" && key.sessionID == 0 && key.treeID == 0 && asyncID == 0
 	async, _ := c["Async ID"].(uint64)
 	if async != 0 {
 		allowSessionSetup = false
@@ -422,6 +433,14 @@ func (s *binSMB2) findResponse(key smb2PendingKey, asyncID uint64, name string, 
 	count := 0
 	for candidateKey, candidate := range s.pending {
 		if candidateKey.messageID != key.messageID {
+			continue
+		}
+		if (allowSessionError || allowLogoffClear) && candidate.name == name {
+			// A server that no longer has this session can return a zero SID
+			// error (e.g. a repeated LOGOFF). Correlate only a unique MID/command
+			// on this capture flow, with the opposite direction checked below.
+			foundKey, found = candidateKey, candidate
+			count++
 			continue
 		}
 		if allowSessionSetup && candidate.name == "SESSION_SETUP" && candidateKey.sessionID == 0 && candidateKey.treeID == 0 {
@@ -565,6 +584,26 @@ func smb2ParseCommand(pdu []byte) (map[string]any, error) {
 	}
 	body := pdu[smb2HeaderSize:]
 	switch cmd {
+	case 1:
+		at := 12
+		if resp {
+			at = 4
+		}
+		if len(body) >= at+4 && (!resp || info["Status"] == uint32(0) || info["Status"] == uint32(0xc0000016)) {
+			offset, n := int(binary.LittleEndian.Uint16(body[at:at+2])), int(binary.LittleEndian.Uint16(body[at+2:at+4]))
+			minimum := 88
+			if resp {
+				minimum = 72
+				info["Session Flags"] = binary.LittleEndian.Uint16(body[2:4])
+				info["Guest Session"] = binary.LittleEndian.Uint16(body[2:4])&1 != 0
+			}
+			if n > 0 {
+				if offset < minimum || offset > len(pdu) || n > len(pdu)-offset {
+					return nil, fmt.Errorf("smb2: security buffer outside command")
+				}
+				info["Authentication"] = decodeAuthenticationEnvelope(pdu[offset : offset+n])
+			}
+		}
 	case 0:
 		if !resp {
 			if len(body) >= 4 {
@@ -635,14 +674,30 @@ func smb2CommandName(cmd uint16) string {
 		return "CREATE"
 	case 6:
 		return "CLOSE"
+	case 7:
+		return "FLUSH"
 	case 8:
 		return "READ"
 	case 9:
 		return "WRITE"
+	case 10:
+		return "LOCK"
 	case 11:
 		return "IOCTL"
+	case 12:
+		return "CANCEL"
 	case 13:
 		return "ECHO"
+	case 14:
+		return "QUERY_DIRECTORY"
+	case 15:
+		return "CHANGE_NOTIFY"
+	case 16:
+		return "QUERY_INFO"
+	case 17:
+		return "SET_INFO"
+	case 18:
+		return "OPLOCK_BREAK"
 	}
 	return fmt.Sprintf("CMD_%d", cmd)
 }

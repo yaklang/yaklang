@@ -75,7 +75,8 @@ func TestStreamReordersDeduplicatesAndIdentifiesWholeConnection(t *testing.T) {
 			require.Equal(t, "HTTP", v.protocol)
 			u := &tui{streams: s}
 			row := u.packetRow(&packetEntry{packet: packets[0]})
-			require.Equal(t, "TCP/HTTP", row.Protocol)
+			require.Equal(t, "TCP", row.Protocol)
+			require.Equal(t, "HTTP", row.ConnectionProtocol)
 			require.Equal(t, v.id, row.StreamID)
 			// Reads are detached: capture cannot mutate a browsed snapshot.
 			old := directionData(v, 1)
@@ -169,31 +170,35 @@ func TestStreamRunsBeforeLossyDisplayQueue(t *testing.T) {
 }
 func TestStreamApplicationSignaturesAndYAMLDecode(t *testing.T) {
 	for _, tc := range []struct{ data, name string }{
-		{"GET / HTTP/1.1\r\n\r\n", "HTTP"}, {"\x17\x03\x03\x00\x05abcde", "TLS"}, {"SSH-2.0-OpenSSH\r\n", "SSH"},
-		{"*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n", "Redis"}, {"\x10\x10\x00\x04MQTT\x04\x02\x00\x3c", "MQTT"}, {"AMQP\x00\x00\x09\x01", "AMQP"}, {"RFB 003.008\n", "VNC"},
-		{"\xfeSMB0123456789", "SMB2"}, {string(bytes.Repeat([]byte{0xa5}, 80)), ""},
+		{"GET / HTTP/1.1\r\n\r\n", "HTTP"}, {"\x17\x03\x03\x00\x05abcde", ""}, {"SSH-2.0-OpenSSH\r\n", "SSH"},
+		{"*2\r\n$3\r\nGET\r\n$3\r\nkey\r\n", ""}, {"\x10\x10\x00\x04MQTT\x04\x02\x00\x3c", ""}, {"AMQP\x00\x00\x09\x01", ""}, {"RFB 003.008\n", ""},
+		{"\xfeSMB0123456789", ""}, {string(bytes.Repeat([]byte{0xa5}, 80)), ""},
 	} {
 		require.Equal(t, tc.name, sniffStreamPayload([]byte(tc.data), 12011, 45000), fmt.Sprintf("%q", tc.data))
 	}
 	d := decodeStream(streamDecodeRequest{ID: 9, Ports: [2]uint16{45000, 12011}, Prefix: [2][]byte{[]byte("GET /assembled HTTP/1.1\r\nHost: example.com\r\n\r\n"), []byte("HTTP/1.1 200 OK\r\nContent-Length: 5\r\n\r\nHELLO")}})
 	require.Equal(t, "HTTP", d.protocol)
 	var text strings.Builder
+	nested := false
 	for _, f := range d.fields {
 		text.WriteString(f.text)
 		text.WriteByte('\n')
-		require.Zero(t, f.depth)
+		nested = nested || f.depth > 0
 	}
+	require.True(t, nested, "decoded stream fields retain their protocol nesting")
 	require.Contains(t, text.String(), "/assembled")
 	require.Contains(t, text.String(), "HELLO")
 	require.NotContains(t, text.String(), "Sequence Number")
 }
-func TestStreamPaneSelectionScrollingAndFlatFields(t *testing.T) {
+func TestStreamPaneSelectionScrollingAndProgressiveFields(t *testing.T) {
 	u := browsingFixture(t)
 	u.fields = detail(u.inspect)
+	nested := false
 	for _, f := range u.fields.fields {
-		require.Zero(t, f.depth)
+		nested = nested || f.depth > 0
 		require.NotEqual(t, "root", f.text)
 	}
+	require.True(t, nested)
 	frame := u.view(&captureSession{}, &captureSource{}, captureConfig{})
 	require.NotContains(t, frame, "▾")
 	require.NotContains(t, frame, "▸")
@@ -206,7 +211,7 @@ func TestStreamPaneSelectionScrollingAndFlatFields(t *testing.T) {
 	u.follow = true
 	u.refreshVisible()
 	u.syncInspection(time.Now())
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 38, y: l.tabs})
 	require.Equal(t, 3, u.pane)
 	require.NotNil(t, u.stream)

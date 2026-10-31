@@ -2,114 +2,124 @@ package pcaputil
 
 import (
 	"fmt"
-	"math/big"
-	"net"
+	"net/netip"
 	"strconv"
 	"strings"
 	"unicode"
 )
 
-// DisplayFields returns stable, typed aliases. Semantic/derived fields carry
-// their event's ByteSource, never offsets into compressed or encrypted packets.
-func (e *ProtocolEvent) DisplayFields() map[string][]any {
-	m := map[string][]any{"protocol": {e.Protocol}, "status": {e.Status}, "pdu.id": {e.ID}, "pdu.length": {e.Length}, "source": {e.Source}, "destination": {e.Destination}}
-	for _, endpoint := range []string{e.Source, e.Destination} {
-		host, _, err := net.SplitHostPort(endpoint)
-		if err != nil {
-			host = endpoint
-		}
-		if net.ParseIP(host) != nil {
-			m["ip.addr"] = append(m["ip.addr"], host)
-		}
-	}
-	if d, ok := e.Session["DNS"].(map[string]any); ok {
-		m["dns.id"] = []any{d["ID"]}
-		if qs, ok := d["Questions"].([]map[string]any); ok {
-			for _, q := range qs {
-				m["dns.qry.name"] = append(m["dns.qry.name"], q["Name"])
-				m["dns.qry.type"] = append(m["dns.qry.type"], q["Type"])
-			}
-		}
-	}
-	if v, ok := e.Session["SNI"].(string); ok && v != "" {
-		m["tls.handshake.extensions_server_name"] = []any{v}
-	}
-	if v, ok := e.Session["Negotiated Version"]; ok {
-		m["tls.version"] = []any{v}
-	}
-	_, http2Carrier := e.Session["Stream ID"]
-	if !http2Carrier && (e.Protocol == "http" || e.Protocol == "doh" || e.Protocol == "ipp") {
-		if i := strings.IndexByte(string(e.Raw), ' '); i > 0 && i < 16 {
-			first := string(e.Raw[:i])
-			if strings.HasPrefix(first, "HTTP/") {
-				parts := strings.SplitN(string(e.Raw), " ", 3)
-				if n, err := strconv.Atoi(parts[1]); err == nil {
-					m["http.response.code"] = []any{n}
-				}
-			} else {
-				m["http.request.method"] = []any{first}
-			}
-		}
-	}
-	for alias, key := range map[string]string{"http2.streamid": "Stream ID", "grpc.status": "GRPC Status", "tls.record.authenticated": "Authentication Verified"} {
-		if v, ok := e.Session[key]; ok {
-			if alias == "grpc.status" {
-				if n, err := strconv.Atoi(fmt.Sprint(v)); err == nil {
-					v = n
-				}
-			}
-			m[alias] = []any{v}
-		}
-	}
-	// HTTP aliases apply to decoded HTTP/2 headers, including DoH and gRPC
-	// events carried by HTTP/2. Never interpret frame bytes as an HTTP/1 line.
-	if _, h2 := e.Session["Stream ID"]; h2 && (e.Protocol == "http2" || e.Protocol == "grpc" || e.Protocol == "doh") {
-		headers, _ := e.Session["Headers"].([]map[string]any)
-		for _, h := range headers {
-			switch h["Name"] {
-			case ":method":
-				m["http.request.method"] = append(m["http.request.method"], h["Value"])
-			case ":status":
-				if n, err := strconv.Atoi(fmt.Sprint(h["Value"])); err == nil {
-					m["http.response.code"] = append(m["http.response.code"], n)
-				}
-			}
-		}
-	}
-	if e.Protocol == "http3" {
-		frames, _ := e.Session["Frames"].([]map[string]any)
-		for _, fr := range frames {
-			if fr["HTTP3"] != true {
-				continue
-			}
-			if id, ok := fr["Stream ID"]; ok {
-				m["http3.streamid"] = append(m["http3.streamid"], id)
-			}
-			hf, _ := fr["HTTP3 Frames"].([]map[string]any)
-			for _, frame := range hf {
-				headers, _ := frame["Headers"].([]map[string]any)
-				for _, h := range headers {
-					if h["Name"] == ":method" {
-						m["http.request.method"] = append(m["http.request.method"], h["Value"])
-					}
-					if h["Name"] == ":status" {
-						if n, err := strconv.Atoi(fmt.Sprint(h["Value"])); err == nil {
-							m["http.response.code"] = append(m["http.response.code"], n)
-						}
-					}
-				}
-			}
-		}
-	}
+type DisplayFilter struct{ match fieldPredicate }
 
-	return m
+type DisplayFilterResult struct {
+	Matched bool `json:"matched"`
+	// Complete certifies the predicate's outcome, not an exhaustive projection.
+	Complete bool   `json:"complete"`
+	Partial  bool   `json:"partial,omitempty"`
+	Reason   string `json:"reason,omitempty"`
 }
 
-var displayAliases = map[string]bool{"protocol": true, "status": true, "pdu.id": true, "pdu.length": true, "source": true, "destination": true, "ip.addr": true, "dns.id": true, "dns.qry.name": true, "dns.qry.type": true, "tls.handshake.extensions_server_name": true, "tls.version": true, "tls.record.authenticated": true, "http.request.method": true, "http.response.code": true, "http3.streamid": true, "http2.streamid": true, "grpc.status": true}
+// Match evaluates one PDU. MatchEvents evaluates the union of fields from a
+// caller-supplied packet's PDUs, never from unrelated connections or packets.
+// Field absence concerns these observations, not all content of their streams.
+// Retained witnesses can decide a predicate on a partial projection. Missing
+// fields cannot prove absence, and universal comparisons require complete input.
+func (f *DisplayFilter) Match(e *ProtocolEvent) bool {
+	if f == nil {
+		return true
+	}
+	return f.MatchEvents([]*ProtocolEvent{e})
+}
 
-type DisplayFilter struct{ match func(map[string][]any) bool }
+func (f *DisplayFilter) MatchEvents(events []*ProtocolEvent) bool {
+	result := f.EvaluateEvents(events)
+	return result.Complete && result.Matched
+}
 
-func (f *DisplayFilter) Match(e *ProtocolEvent) bool { return f == nil || f.match(e.DisplayFields()) }
+func (f *DisplayFilter) EvaluateEvents(events []*ProtocolEvent) DisplayFilterResult {
+	return f.evaluateSnapshots(len(events), func(i int) DisplayFieldSnapshot {
+		e := events[i]
+		if e != nil && e.Completeness == "evicted" {
+			return DisplayFieldSnapshot{Completeness: e.Completeness}
+		}
+		return e.DisplayFieldValues()
+	})
+}
+
+// EvaluateSnapshots evaluates an owned packet observation without consulting
+// mutable history or reparsing a PDU. Snapshots must belong to the same packet;
+// completeness and projection limits remain part of the filtering contract.
+func (f *DisplayFilter) EvaluateSnapshots(snapshots []DisplayFieldSnapshot) DisplayFilterResult {
+	return f.evaluateSnapshots(len(snapshots), func(i int) DisplayFieldSnapshot { return snapshots[i] })
+}
+
+func (f *DisplayFilter) evaluateSnapshots(length int, at func(int) DisplayFieldSnapshot) DisplayFilterResult {
+	if f == nil {
+		return DisplayFilterResult{Matched: true, Complete: true}
+	}
+	m := fieldObservation{values: map[string][]any{}, exhaustive: true}
+	reason := ""
+	partial := func(s string) {
+		m.exhaustive = false
+		if reason == "" {
+			reason = s
+		}
+	}
+	count := 0
+snapshots:
+	for i := 0; i < length; i++ {
+		snapshot := at(i)
+		if snapshot.Completeness == "evicted" || snapshot.Completeness == "detail-unavailable" || snapshot.Completeness == "limited" {
+			if snapshot.Completeness == "evicted" {
+				partial("protocol detail unavailable in retained history")
+				continue
+			}
+			if snapshot.Completeness == "detail-unavailable" {
+				// Independently retained scalar witnesses remain usable even
+				// when the PDU's payload/field detail is unavailable.
+				partial("protocol detail unavailable in retained history")
+			} else {
+				partial("protocol field coverage limited")
+			}
+		}
+		if snapshot.Truncated {
+			partial("field projection budget exceeded")
+		}
+		if snapshot.Incomplete {
+			partial("field projection incomplete or value not representable by its registered type")
+		}
+		for _, v := range snapshot.Values {
+			count++
+			if count > maxDisplayFieldValues {
+				partial("packet field union budget exceeded")
+				break snapshots
+			}
+			d, ok := LookupDisplayField(v.Name)
+			if !ok {
+				partial("unregistered snapshot field")
+				continue
+			}
+			value := v.Value
+			if v.ExactValue != "" {
+				if d.Type == DisplayUnsigned && d.Bits > 53 {
+					n, err := strconv.ParseUint(v.ExactValue, 10, d.Bits)
+					if err != nil {
+						partial("invalid exact unsigned field value")
+						continue
+					}
+					value = n
+				}
+			}
+			value, ok = normalizeDisplayValue(value, d)
+			if !ok {
+				partial("snapshot value not representable by its registered type")
+				continue
+			}
+			m.values[v.Name] = append(m.values[v.Name], value)
+		}
+	}
+	decision := f.match(m)
+	return DisplayFilterResult{Matched: decision == fieldTrue, Complete: decision != fieldUnknown, Partial: !m.exhaustive, Reason: reason}
+}
 
 type filterToken struct {
 	s      string
@@ -182,7 +192,50 @@ type filterParser struct {
 	tokens []filterToken
 	pos    int
 }
-type fieldPredicate func(map[string][]any) bool
+type fieldTruth uint8
+
+const (
+	fieldUnknown fieldTruth = iota
+	fieldFalse
+	fieldTrue
+)
+
+type fieldObservation struct {
+	values     map[string][]any
+	exhaustive bool
+}
+
+type fieldPredicate func(fieldObservation) fieldTruth
+
+func fieldNot(t fieldTruth) fieldTruth {
+	if t == fieldUnknown {
+		return t
+	}
+	if t == fieldTrue {
+		return fieldFalse
+	}
+	return fieldTrue
+}
+
+func fieldAnd(a, b fieldTruth) fieldTruth {
+	if a == fieldFalse || b == fieldFalse {
+		return fieldFalse
+	}
+	if a == fieldTrue && b == fieldTrue {
+		return fieldTrue
+	}
+	return fieldUnknown
+}
+
+func fieldOr(a, b fieldTruth) fieldTruth {
+	if a == fieldTrue || b == fieldTrue {
+		return fieldTrue
+	}
+	if a == fieldFalse && b == fieldFalse {
+		return fieldFalse
+	}
+	return fieldUnknown
+}
 
 func (p *filterParser) take(s string) bool {
 	if p.pos < len(p.tokens) && !p.tokens[p.pos].quoted && p.tokens[p.pos].s == s {
@@ -211,16 +264,16 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 			}
 			a, b := left, right
 			if op == "or" {
-				left = func(m map[string][]any) bool { return a(m) || b(m) }
+				left = func(m fieldObservation) fieldTruth { return fieldOr(a(m), b(m)) }
 			} else {
-				left = func(m map[string][]any) bool { return a(m) && b(m) }
+				left = func(m fieldObservation) fieldTruth { return fieldAnd(a(m), b(m)) }
 			}
 		}
 		return left, nil
 	}
 	if p.take("not") {
 		f, err := p.parse(2, depth+1)
-		return func(m map[string][]any) bool { return !f(m) }, err
+		return func(m fieldObservation) fieldTruth { return fieldNot(f(m)) }, err
 	}
 	if p.take("(") {
 		f, err := p.parse(0, depth+1)
@@ -236,8 +289,10 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 		return nil, fmt.Errorf("missing field")
 	}
 	name := p.tokens[p.pos].s
+	quoted := p.tokens[p.pos].quoted
 	p.pos++
-	if !displayAliases[name] {
+	descriptor, registered := LookupDisplayField(name)
+	if quoted || !registered {
 		return nil, fmt.Errorf("unknown display field %q", name)
 	}
 	op := ""
@@ -248,81 +303,125 @@ func (p *filterParser) parse(level, depth int) (fieldPredicate, error) {
 		}
 	}
 	if op == "" {
-		return func(m map[string][]any) bool { return len(m[name]) > 0 }, nil
+		return func(m fieldObservation) fieldTruth {
+			if len(m.values[name]) > 0 {
+				return fieldTrue
+			}
+			if m.exhaustive {
+				return fieldFalse
+			}
+			return fieldUnknown
+		}, nil
 	}
 	if p.pos >= len(p.tokens) {
 		return nil, fmt.Errorf("missing comparison value")
 	}
 	value := p.tokens[p.pos]
 	p.pos++
-	var network *net.IPNet
-	if op == "in" {
-		_, n, err := net.ParseCIDR(value.s)
-		if err != nil {
-			return nil, fmt.Errorf("invalid CIDR")
-		}
-		network = n
+	literal, err := validateDisplayFieldLiteral(descriptor, op, value)
+	if err != nil {
+		return nil, err
 	}
-	return func(m map[string][]any) bool {
-		vals := m[name]
+	return func(m fieldObservation) fieldTruth {
+		vals := m.values[name]
 		if len(vals) == 0 {
-			return false
+			if m.exhaustive {
+				return fieldFalse
+			}
+			return fieldUnknown
 		}
 		equal := false
 		for _, v := range vals {
-			str, ok := v.(string)
 			if op == "in" {
-				if network.Contains(net.ParseIP(fmt.Sprint(v))) {
-					return true
+				addr, err := netip.ParseAddr(fmt.Sprint(v))
+				if descriptor.Bits != 128 {
+					addr = addr.Unmap()
+				}
+				if err == nil && literal.(netip.Prefix).Contains(addr) {
+					return fieldTrue
 				}
 				continue
 			}
 			if op == "contains" {
-				if ok && strings.Contains(str, value.s) {
-					return true
+				if text, ok := v.(string); ok && strings.Contains(text, literal.(string)) {
+					return fieldTrue
 				}
 				continue
 			}
-			cmp := 2
-			if ok {
-				cmp = strings.Compare(str, value.s)
-			} else if b, ok := v.(bool); ok {
-				if value.s == strconv.FormatBool(b) {
-					cmp = 0
-				}
-			} else {
-				a, oka := new(big.Rat).SetString(fmt.Sprint(v))
-				b, okb := new(big.Rat).SetString(value.s)
-				if oka && okb {
-					cmp = a.Cmp(b)
-				}
+			cmp, valid := compareDisplayValue(v, literal, descriptor)
+			if !valid {
+				continue
 			}
 			if cmp == 0 {
 				equal = true
+				if op == "!=" {
+					return fieldFalse
+				}
 			}
 			switch op {
 			case "==":
 				if cmp == 0 {
-					return true
+					return fieldTrue
 				}
 			case ">":
-				if cmp == 1 {
-					return true
+				if cmp > 0 {
+					return fieldTrue
 				}
 			case "<":
-				if cmp == -1 {
-					return true
+				if cmp < 0 {
+					return fieldTrue
 				}
 			case ">=":
-				if cmp == 0 || cmp == 1 {
-					return true
+				if cmp >= 0 {
+					return fieldTrue
 				}
 			case "<=":
-				if cmp == 0 || cmp == -1 {
-					return true
+				if cmp <= 0 {
+					return fieldTrue
 				}
 			}
 		}
-		return op == "!=" && !equal
+		if !m.exhaustive {
+			return fieldUnknown
+		}
+		if op == "!=" && !equal {
+			return fieldTrue
+		}
+		return fieldFalse
 	}, nil
+}
+
+func compareDisplayValue(actual, literal any, descriptor DisplayFieldDescriptor) (int, bool) {
+	value, ok := normalizeDisplayValue(actual, descriptor)
+	if !ok {
+		return 0, false
+	}
+	switch descriptor.Type {
+	case DisplayUnsigned:
+		a, b := value.(uint64), literal.(uint64)
+		if a < b {
+			return -1, true
+		}
+		if a > b {
+			return 1, true
+		}
+		return 0, true
+	case DisplayString:
+		return strings.Compare(value.(string), literal.(string)), true
+	case DisplayBoolean:
+		if value.(bool) == literal.(bool) {
+			return 0, true
+		}
+		return 1, true
+	case DisplayAddress:
+		a, err := netip.ParseAddr(value.(string))
+		if err != nil {
+			return 0, false
+		}
+		if descriptor.Bits != 128 {
+			a = a.Unmap()
+		}
+		return a.Compare(literal.(netip.Addr)), true
+	}
+	return 0, false
 }

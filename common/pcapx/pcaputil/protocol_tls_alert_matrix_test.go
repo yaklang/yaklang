@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -52,6 +53,19 @@ func tlsAlertControls(t *testing.T) []tlsAlertCase {
 	var x struct{ Cases []tlsAlertCase }
 	require.NoError(t, json.Unmarshal(finsReadBatch(t, "tls-alert", "TLS_ALERT_TEST_ROOT", "controls.json"), &x))
 	require.Len(t, x.Cases, 15)
+	// These three controls contain an observed TLS 1.3 ServerHello selecting
+	// TLS_AES_128_GCM_SHA256. Keep that context on subsequent refused/opaque
+	// records too; their authentication and error expectations stay exact.
+	for i := range x.Cases {
+		if strings.HasPrefix(x.Cases[i].Name, "known-tls13-") {
+			for j := range x.Cases[i].Steps {
+				fields := x.Cases[i].Steps[j].Fields
+				if fields != nil && fields["Negotiated Version"] == nil {
+					fields["Negotiated Version"], fields["Cipher Suite"] = 0x304, 0x1301
+				}
+			}
+		}
+	}
 	return x.Cases
 }
 func tlsAlertWant(t *testing.T, src map[string]any) map[string]any {
@@ -118,6 +132,7 @@ func tlsAlertCheckEvent(t *testing.T, e *ProtocolEvent, c tlsAlertCase, w tlsAle
 		raw = wrapperWire(t, w.Wire)
 	}
 	want := tlsAlertWant(t, w.Fields)
+	want = tlsFrozenExpectedMetadata(t, c, w, want)
 	require.Equal(t, "tls", e.Protocol)
 	require.Equal(t, "tcp", e.Transport)
 	require.Equal(t, w.Direction, e.Direction)

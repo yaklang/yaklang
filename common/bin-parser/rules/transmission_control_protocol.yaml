@@ -329,7 +329,7 @@ Option:
 TLS: "import:application-layer/tls.yaml;node:Transport Layer Security"
 HTTP: "import:application-layer/http.yaml;node:HTTP"
 SSH: "import:application-layer/ssh.yaml;node:SSH"
-SSHPacket: "import:application-layer/ssh.yaml;node:SSHPacket"
+SSHPacket: "import:application-layer/ssh.yaml;node:SSHKexInitPacket"
 FTP: "import:application-layer/ftp.yaml;node:FTP"
 FTPCommand: "import:application-layer/ftp.yaml;node:FTPCommand"
 SMTP: "import:application-layer/smtp.yaml;node:SMTP"

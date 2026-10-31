@@ -10,8 +10,12 @@ common/minirehs/native/**/*.c text eol=lf
 common/minirehs/native/**/*.h text eol=lf
 common/minirehs/native/**/*.inc text eol=lf
 common/bin-parser/testdata/corpus-batches/*.zip binary
+internal/trafficfixture/testdata/*.zip binary
+internal/trafficfixture/testdata/*.json -text
 # Existing native certificate/key fixtures retain their exact wire bytes.
 common/bin-parser/testdata/protocol-native/** -text
 common/pcapx/pcaputil/testdata/protocol-sessions/**/*.keys -text
 # Independent TShark exports preserve empty trailing columns.
 scripts/protocol-tests/generate-dcerpc-session/*.tsv -text whitespace=-blank-at-eol
+# Historical audit sources retain their exact bytes inside one frozen archive.
+common/yak/cmd/yakcmds/shark-cli/testdata/live-audit.zip binary

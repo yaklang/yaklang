@@ -1,0 +1,334 @@
+{
+  "scope": "Ordered RPC negotiation/association details, canonical wire UUIDs, readable context-sensitive result codes and exact context/result-local PDU ranges through the production worker JSON chain. No new protocol acceptance, decryption or full RPC-fragment semantics are claimed.",
+  "native_source": "7fe4765f04",
+  "final_CLI_source": "556ff732a5",
+  "native_console_harness_source": "7fe4765f04",
+  "baseline_native_source": "550f8f1078",
+  "previous_aggregate": {
+    "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\docs\\exec-plans\\shark-public-corpus-20261025\\dcerpc-observed-wire-summary.json",
+    "sha256": "3d1b77fd2608a5ab04eed55855a666af80e46f5a5e0e85f9aa3f39b1d95436d7",
+    "bytes": 87336
+  },
+  "binaries": {
+    "native": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\events-ordered.exe",
+      "sha256": "444276cf304ef0d887abc0a7c864d905a934163a7c6027698cbe7be96fdf32ff",
+      "bytes": 52378112
+    },
+    "CLI": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\yak-ordered-final.exe",
+      "sha256": "b72c8246b5bb4b23c97d73db224a57ae0077f8b5a31171d65c09657caca47278",
+      "bytes": 241204224
+    },
+    "console_harness": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\native-console-ordered.exe",
+      "sha256": "9cae5f528fe69cc1a391011011486b2db205ece8b78551d27919ed248bdb8d09",
+      "bytes": 5646336
+    }
+  },
+  "public": {
+    "weber": {
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "records_with_scoped_range_additions": 29,
+      "scoped_range_maps_added": 86,
+      "all_original_values_types_IDs_order_flows_and_sources_exact": true,
+      "wire_checks": 223086,
+      "reference_fields": 4788,
+      "wire_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\weber\\wire-audit.json",
+        "sha256": "93aabbd7ed2ec6770546ef0f6883b1585d3983d6e522149044292b6e38e7b271",
+        "bytes": 126953
+      },
+      "metadata_only_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\weber\\SDK-range-additions.json",
+        "sha256": "9d1547957d4616a58674447e44c41d24d598c6841d1a51878ce4e2a61d8d370f",
+        "bytes": 2521
+      },
+      "SDK_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\weber\\events.jsonl",
+        "sha256": "463845cfb4d1e2dd7a77650c418677d3cbf500244dfe45b13e7abdee26170eda",
+        "bytes": 210538264
+      },
+      "final_CLI_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered-final\\weber\\yak.jsonl",
+        "sha256": "f823e2a58b230ee097520c3bd4c2c9aa9cdd45cc696ad5c9cbd277c11284ec6c",
+        "bytes": 142610390
+      },
+      "all_CLI_bytes_exact_to_previous_stage": true
+    },
+    "sharon": {
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "records_with_scoped_range_additions": 0,
+      "scoped_range_maps_added": 0,
+      "all_original_values_types_IDs_order_flows_and_sources_exact": true,
+      "wire_checks": 494670,
+      "reference_fields": 121,
+      "wire_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\sharon\\wire-audit.json",
+        "sha256": "423c17cad92abce35545ac1235d093499ec0e5672b458a3ebb870bca3b530e76",
+        "bytes": 15268
+      },
+      "metadata_only_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\sharon\\SDK-range-additions.json",
+        "sha256": "eaa15fbd57a3763f1595a77ac01cab1ad1e7a25b536522c476e0ad291ecbe26d",
+        "bytes": 806
+      },
+      "SDK_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\sharon\\events.jsonl",
+        "sha256": "d01760b715e600feb25ab53fd6adaf6a87b2393700b527921ecff450f9739a52",
+        "bytes": 499308630
+      },
+      "final_CLI_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered-final\\sharon\\yak.jsonl",
+        "sha256": "69914bf3344ab516121e6e7dad77ae0eb5c0ab22276e486e40a2ab024b8259df",
+        "bytes": 526884848
+      },
+      "all_CLI_bytes_exact_to_previous_stage": true
+    }
+  },
+  "live": {
+    "live-fragmented": {
+      "capture_sha256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "physical_frames": 134,
+      "SDK_records": 9,
+      "records_with_scoped_range_additions": 4,
+      "scoped_range_maps_added": 8,
+      "all_original_values_types_IDs_order_flows_and_sources_exact": true,
+      "wire_checks": 1418,
+      "reference_fields": 48,
+      "wire_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-fragmented\\wire-audit.json",
+        "sha256": "dfb30e02ca7f834cd1e1bf1c773119f23cb96c3d6c8061eb9e9533bac3dea3a6",
+        "bytes": 8920
+      },
+      "metadata_only_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-fragmented\\SDK-range-additions.json",
+        "sha256": "e5c915278c6afedfef7b68f134415dc09e83406259e06ef2d202e403c5553838",
+        "bytes": 1024
+      },
+      "SDK_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-fragmented\\events.jsonl",
+        "sha256": "92c5e541fd8174f51bcc5d1d455028794f70ae4c70f34eb63697f3543170fad0",
+        "bytes": 33831
+      },
+      "final_CLI_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered-final\\live-fragmented\\yak.jsonl",
+        "sha256": "48886706105ab01357ed92f6f307b3144e2a8b67f4ec6b6e4f02a5c0f2aacf4c",
+        "bytes": 107375
+      },
+      "all_CLI_bytes_exact_to_previous_stage": true
+    },
+    "live-unfragmented": {
+      "capture_sha256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "physical_frames": 36,
+      "SDK_records": 9,
+      "records_with_scoped_range_additions": 4,
+      "scoped_range_maps_added": 8,
+      "all_original_values_types_IDs_order_flows_and_sources_exact": true,
+      "wire_checks": 1250,
+      "reference_fields": 110,
+      "wire_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-unfragmented\\wire-audit.json",
+        "sha256": "866547832d094a0bcd1a72aac72740cd34e0c572ace2d46709238b261826b0d6",
+        "bytes": 7322
+      },
+      "metadata_only_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-unfragmented\\SDK-range-additions.json",
+        "sha256": "5c45d8c93f937eb79dbc7fed42dac8fa289664c4c180b896be486ffb3dff204e",
+        "bytes": 1024
+      },
+      "SDK_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-unfragmented\\events.jsonl",
+        "sha256": "a59a8962f13aaa2985065b9dd249492bd0aa708525d330afdd7aa8f5acea8359",
+        "bytes": 26925
+      },
+      "final_CLI_export": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered-final\\live-unfragmented\\yak.jsonl",
+        "sha256": "0c604f529693a2081515d59003a7f16704670c774308ada9833cf2fd01261356",
+        "bytes": 39866
+      },
+      "all_CLI_bytes_exact_to_previous_stage": true
+    }
+  },
+  "Windows": {
+    "auth": {
+      "field_bytes": 32,
+      "PDU_range": [
+        88,
+        120
+      ],
+      "all_displayed_PDU_bytes_match_endpoint_receipt": true,
+      "exact_native_highlight_ordinal": true,
+      "full_navigation_resize_quit_pass": true,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "selection_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-auth\\native-selection-proof.json",
+        "sha256": "2d23526fdce3181b13a43ff0786d2dd5a7c08f18e250f14eec80c74e6e50ef7d",
+        "bytes": 1144
+      },
+      "native_snapshot": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-auth\\01-selected-byte-field.json",
+        "sha256": "6ef1b4240fd1acbae537d7e1013677c162cd6434edeb29f8a62a5ce5a65ba978",
+        "bytes": 91389
+      },
+      "native_log": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-auth.log",
+        "sha256": "8bd978136977ea1f7e6d304b087203127e4185a03b7db5b620b2c232e0d8d677",
+        "bytes": 124
+      },
+      "input_recipe": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-auth\\wire-config.json",
+        "sha256": "f3c293853619e30b394c87133efec816d45d25d5db29476046723c67aecf4898",
+        "bytes": 442
+      }
+    },
+    "NDR64": {
+      "field_bytes": 16,
+      "PDU_range": [
+        64,
+        80
+      ],
+      "all_displayed_PDU_bytes_match_endpoint_receipt": true,
+      "exact_native_highlight_ordinal": true,
+      "full_navigation_resize_quit_pass": true,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "selection_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-NDR64-02\\native-selection-proof.json",
+        "sha256": "ba8b1f32f6983761a11857ae72eb6a58f1ff759dbd8247d7f2aa9b4762dcd78b",
+        "bytes": 980
+      },
+      "native_snapshot": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-NDR64-02\\01-selected-byte-field.json",
+        "sha256": "50433a793b094959c9cab355060ccfdabe233b52e6f0c572b5b796de5a4d4daf",
+        "bytes": 91290
+      },
+      "native_log": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-NDR64-02.log",
+        "sha256": "dea504c21bf1108e18a3afc77b0b59469daccac30c29e33b580db660d3604a70",
+        "bytes": 140
+      },
+      "input_recipe": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-NDR64-02\\wire-config.json",
+        "sha256": "e82bb23819d6476ae4c52a39ae7ede9dea57c4b9c3b01c85c2d470482fc95c0b",
+        "bytes": 405
+      }
+    },
+    "feature": {
+      "field_bytes": 16,
+      "PDU_range": [
+        88,
+        104
+      ],
+      "all_displayed_PDU_bytes_match_endpoint_receipt": true,
+      "exact_native_highlight_ordinal": true,
+      "full_navigation_resize_quit_pass": true,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "selection_certificate": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-feature-02\\native-selection-proof.json",
+        "sha256": "1c547a6cda6714eff97dcafcc81f6fade191a11ee9aebacd669564f66bbafd97",
+        "bytes": 987
+      },
+      "native_snapshot": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-feature-02\\01-selected-byte-field.json",
+        "sha256": "ec8f7d3db02bf6d25ca18ad72c154370a5a32c1d32726d99beb3c5dbf7038a7d",
+        "bytes": 91340
+      },
+      "native_log": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-feature-02.log",
+        "sha256": "765958a60d278e23475e765be99773b9627202a17154dffc74bb700d290f225e",
+        "bytes": 127
+      },
+      "input_recipe": {
+        "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-feature-02\\wire-config.json",
+        "sha256": "70717ee29cc5863f28fd8416a485f4f8a81fc662198596fef3b4aaef91cbf3f0",
+        "bytes": 406
+      }
+    }
+  },
+  "auditors": {
+    "dcerpc_wire_audit.py": {
+      "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\dcerpc_wire_audit.py",
+      "sha256": "32104579fb6cfbf5e2857b4d4207c71e1b18ec04b2ebb949e608c76140d20d2d",
+      "bytes": 31008
+    },
+    "dcerpc_scoped_range_invariants.py": {
+      "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\dcerpc_scoped_range_invariants.py",
+      "sha256": "42cc7f090a27bb350bb4d1b420e16fd8492cc5a117fee8d2dece1106e50aa526",
+      "bytes": 3105
+    },
+    "dcerpc_wire_negative_controls.py": {
+      "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\dcerpc_wire_negative_controls.py",
+      "sha256": "5fbb8ee01b25d7d6311eddc0eb485e0dfdf3f9f1a245ae9761d6c01b6220c9ff",
+      "bytes": 6328
+    },
+    "dcerpc_windows_scoped_selection.py": {
+      "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\dcerpc_windows_scoped_selection.py",
+      "sha256": "b980a0aafa5ebe2296195910c4b39cb7025b0c804cc76e6930ce27de8f287c04",
+      "bytes": 4663
+    },
+    "dcerpc_windows_selection_negative_controls.py": {
+      "local_path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\dcerpc_windows_selection_negative_controls.py",
+      "sha256": "e1b660c36b7b0dd6f7ff55aa784335e19eb90b0f3cc919260e338220caedecbc",
+      "bytes": 3212
+    }
+  },
+  "tests": {
+    "full_native_and_CLI_seconds": {
+      "github.com/yaklang/yaklang/common/pcapx/pcaputil": 448.189,
+      "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": 2.087
+    },
+    "full_log": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\full-ordered.log",
+      "sha256": "40dc3f3fc252501192d555c4d9559e8eb3f858bf15c8c197e514a92d9b379268",
+      "bytes": 516
+    },
+    "final_CLI_seconds": 2.353,
+    "final_CLI_log": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ui-worker-final.log",
+      "sha256": "44b91037a46d5b52fd2cc30bb67dedfea8dba2320a9b1f94dbd45bbb1a8f4ffc",
+      "bytes": 452
+    },
+    "production_worker_regression_before": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ui-worker-number-before.log",
+      "sha256": "cf4262f138baf3b70319d3b5b6233328d016a527acfbf0332e283d65b52c801e",
+      "bytes": 2248
+    },
+    "bounded_result_tail_fuzz_executions": 34620,
+    "fuzz_log": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\FuzzDCERPCResultTailRecovery-ordered.log",
+      "sha256": "07538415fd2d26a35ea6ac024f3b47476571111c44ba354487b602f947984b5d",
+      "bytes": 1668
+    },
+    "full_owned_capture_forgeries_rejected": 38,
+    "wire_negative_certificate": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\ordered\\live-unfragmented\\negative-controls\\summary.json",
+      "sha256": "2d2a0ec6ed68855f91f4cb26e100761a99c163ceec00233ee5c1279a9452fb1b",
+      "bytes": 9595
+    },
+    "actual_native_cell_forgeries_rejected": 5,
+    "cell_negative_certificate": {
+      "local_path": "C:\\tmp\\yak-shark-dcerpc-20261027\\windows-ordered-final-feature-02\\negative-controls\\summary.json",
+      "sha256": "de3adb08ffab7d430dffae61e19af87d783bb66722e4edf863304d31c86ecb6c",
+      "bytes": 1524
+    }
+  },
+  "range_scope": "Contiguous unfragmented RPC PDU bodies only. TCP reassembly into a full PDU retains mappings; an RPC logical body assembled from multiple RPC fragments has no final-fragment offset claim.",
+  "fixed_regression": "Actual Windows worker JSON uses json.Number; accepting only default json.Unmarshal float64 values lost mappings and result labels. Production worker decode, integer precision and actual mapped clicks are now tested.",
+  "remaining": "RPC numeric ResponseTo, callback/reuse namespaces, repeated RPC fragment headers/stubs and named-pipe/security-provider/NDR parsing remain incomplete; broader protocol limitations remain in the previous report."
+}

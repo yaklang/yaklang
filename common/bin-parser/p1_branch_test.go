@@ -226,7 +226,7 @@ func TestP1BranchRows(t *testing.T) {
 	t.Run("internet_control_message_protocol_v6/mld-query", func(t *testing.T) {
 		unspec := make([]byte, 16)
 		q := append([]byte{0x82, 0x00, 0x00, 0x00, 0x27, 0x10, 0x00, 0x00}, unspec...)
-		require.Equal(t, uint64(10000), uintVal(t, mustChild(t, parseRule(t, q, "internet_control_message_protocol_v6", "ICMPV6"), "Multicast Listener Query").Child("Maximum Response Delay")))
+		require.Equal(t, uint64(10000), uintVal(t, mustChild(t, parseMLDLegacyComplete(t, q), "Multicast Listener Query").Child("Maximum Response Delay")))
 		require.Equal(t, unspec, bytesVal(t, mustChild(t, parseEthernet(t, ipv6ICMPBytes(t, q)), "IPv6", "ICMPv6", "Multicast Listener Query").Child("Multicast Address")))
 	})
 	t.Run("internet_control_message_protocol_v6/redirect", func(t *testing.T) {
@@ -368,12 +368,14 @@ func TestP1BranchRows(t *testing.T) {
 	})
 
 	t.Run("ssh/kexinit", func(t *testing.T) {
-		kex := mustChild(t, parseRule(t, mustHex(t, "000000950414000102030405060708090a0b0c0d0e0f00000011637572766532353531392d7368613235360000000b7373682d656432353531390000000a6165733132382d6374720000000a6165733132382d6374720000000d686d61632d736861322d3235360000000d686d61632d736861322d323536000000046e6f6e65000000046e6f6e650000000000000000000000000000000000"), "application-layer.ssh", "SSHPacket"), "Payload", "SSHKexInit")
-		require.Equal(t, "curve25519-sha256", strVal(t, kex.Child("Kex Algos")))
+		parseMustFail(t, mustHex(t, "000000950414000102030405060708090a0b0c0d0e0f00000011637572766532353531392d7368613235360000000b7373682d656432353531390000000a6165733132382d6374720000000a6165733132382d6374720000000d686d61632d736861322d3235360000000d686d61632d736861322d323536000000046e6f6e65000000046e6f6e650000000000000000000000000000000000"), "application-layer.ssh", "SSHPacket")
+		kex := mustChild(t, parseRule(t, sshDirectKEX(), "application-layer.ssh", "SSHPacket"), "Payload")
+		require.Equal(t, "curve25519-sha256", strVal(t, kex.Child("Kex Algorithms")))
 	})
 	t.Run("ssh/kexdh", func(t *testing.T) {
-		dh := mustChild(t, parseRule(t, mustHex(t, "0000000b041e000000010200000000"), "application-layer.ssh", "SSHPacket"), "Payload", "SSHKexDHInit")
-		require.Equal(t, uint64(1), uintVal(t, dh.Child("E Length")))
+		parseMustFail(t, mustHex(t, "0000000b041e000000010200000000"), "application-layer.ssh", "SSHPacket")
+		opaque := mustChild(t, parseRule(t, sshDirectPacket(append([]byte{30}, sshDirectString([]byte{2})...)), "application-layer.ssh", "SSHPacket"), "Payload", "Opaque Message Data")
+		require.Equal(t, sshDirectString([]byte{2}), bytesVal(t, opaque))
 	})
 	t.Run("dhcp/discover", func(t *testing.T) {
 		n := parseRule(t, mustHex(t, "010106001234567800000000"+
@@ -1127,7 +1129,7 @@ func TestP1BranchRows(t *testing.T) {
 	})
 	t.Run("igmp/v3-query", func(t *testing.T) {
 		raw := []byte{0x11, 0x64, 0x00, 0x00, 239, 1, 1, 1, 0x02, 0x7d, 0x00, 0x01, 192, 0, 2, 1}
-		n := parseRule(t, raw, "igmp", "IGMP")
+		n := parseIGMPLegacyComplete(t, raw)
 		require.Equal(t, uint64(1), uintVal(t, n.Child("Number of Sources")))
 		require.Equal(t, []byte{192, 0, 2, 1}, bytesVal(t, n.Child("Sources").Children()[0]))
 	})

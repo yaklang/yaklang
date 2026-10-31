@@ -1,0 +1,20 @@
+# Explicit bounded RFC 9051 / RFC 4959 SASL transport values.
+# Caller supplies the profile and AUTHENTICATE context; base64 is not admission.
+# Decoded bytes are derived values, never spans in the encoded wire source.
+# No credential, identity, mechanism signature or security-layer verification.
+# Local input bound 64 KiB. Empty initial response uses "="; cancel uses "*".
+endian: big
+unit: byte
+Package:
+  IMAPSASLResponse:
+    operator: |
+      err = parseIMAPSASL("response")
+      if err != nil { panic(err) }
+  IMAPSASLChallenge:
+    operator: |
+      err = parseIMAPSASL("challenge")
+      if err != nil { panic(err) }
+  IMAPSASLInitialValue:
+    operator: |
+      err = parseIMAPSASL("initial-value")
+      if err != nil { panic(err) }

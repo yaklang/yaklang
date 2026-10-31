@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
 	"sort"
 	"strconv"
+	"strings"
 )
 
 const binH2Preface = "PRI * HTTP/2.0\r\n\r\nSM\r\n\r\n"
@@ -16,6 +18,40 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	// identity until its data TPDU arrives; keep its bounded prefix away from
 	// weak length-prefixed DNS detection. An actual RDP negotiation is decisive.
 	if f.detectBinding(wire) {
+		return
+	}
+	if f.port(4739) {
+		if p := probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+			f.protocol = "ipfix"
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
+	if f.port(646) {
+		if p := probeLDP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+			f.protocol, f.ldp = "ldp", &binLDP{}
+			return
+		} else if p.Verdict == ProbeNeedMore {
+			return
+		}
+	}
+	if p := probeRTMP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.rtmp = "rtmp", newBinRTMP()
+		return
+	} else if p.Verdict == ProbeNeedMore && f.port(1935) {
+		return
+	}
+	if p := probeAJP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.ajp = "ajp", &binAJP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
+	if p := probeBGP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		f.protocol, f.bgp = "bgp", &binBGP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
 	for _, port := range f.a.config.MMSISOPorts {
@@ -36,6 +72,23 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if len(wire) >= 4 && bytes.Equal(wire[:4], []byte("FINS")) {
 		f.protocol, f.fins = "fins", &binFINS{clientKnown: f.tcpClientKnown, clientDir: f.tcpClientDir}
+		return
+	}
+	if len(wire) >= 4 && wire[0] == 0x81 {
+		if _, err := stream_parser.DecodeNetworkControl(wire, "nbss"); err == nil {
+			f.protocol, f.nbss = "nbss", true
+			return
+		}
+	}
+	if telnetNegotiationStart(wire) && (f.port(23) || telnetInitialEvidence(wire) || telnetMatchingNegotiation(wire, f.directions[1-dir].buffer)) {
+		f.protocol = "telnet"
+		return
+	}
+	// Complete MySQL protocol-41 evidence takes precedence over SLMP's weak
+	// 0x50 0x00 prefix. Otherwise a greeting of length 0x50 can be held as a
+	// huge SLMP candidate while the peer is misidentified as PostgreSQL.
+	if probeMySQL(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
+		f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
 		return
 	}
 	if p := probeSLMPTCP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes), f.port(5000)); p.Verdict == ProbeAccept {
@@ -94,7 +147,17 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	// A long MySQL greeting can begin with 'P\x00\x00\x00\x0a', which
+	// resembles a tiny PostgreSQL Parse frame. Check the numeric version,
+	// salt/filler and protocol-41 capabilities before weak typed messages.
+	if p := probeMySQL(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept || p.Verdict == ProbeNeedMore {
+		f.protocol, f.mysql = "mysql", &binMySQL{server: dir, phase: "greeting"}
+		return
+	}
 	f.detect(wire)
+	if f.protocol == "mqtt" && f.mqtt == nil {
+		f.mqtt = &binMQTT{client: dir, level: f.level, pending: [2]map[uint16]mqttPending{{}, {}}, aliases: [2]map[uint16]string{{}, {}}}
+	}
 	if f.binding != nil || f.protocol != "" {
 		// The legacy detector recognizes MQTT 3.1.1 before generic native
 		// probing. Give that validated CONNECT the same bounded session path
@@ -114,6 +177,10 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	}
 	if p := probeS7(wire, f.a.budget.MaxFrameBytes); p.Verdict == ProbeAccept {
 		f.protocol, f.s7 = "s7comm", &binS7{}
+		return
+	}
+	if probeSSH(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeAccept {
+		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: f.tcpClientKnown}
 		return
 	}
 	if f.tcpClientKnown && dir != f.tcpClientDir && probeSSHServerPreamble(wire, f.a.budget.MaxFrameBytes).Verdict == ProbeAccept {
@@ -151,8 +218,10 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		}
 		return
 	}
-	if bytes.HasPrefix(wire, []byte("GET ")) && probeRTSP(wire, f.a.config.ProbeBytes).Verdict == ProbeAccept {
+	if p := probeRTSP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
 		f.protocol, f.rtsp = "rtsp", &binRTSP{}
+		return
+	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
 	if isHTTPStartLineCandidate(wire) {
@@ -276,6 +345,12 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	case "ldap":
 		f.protocol, f.ldap = "ldap", &binLDAP{pending: map[ldapPendingKey]ldapRequest{}}
 	case "redis":
+		if f.transportFlow != nil && len(wire) > 0 && strings.ContainsRune("+-:_#,(", rune(wire[0])) {
+			// A standalone scalar (notably POP3's exact "+OK\r\n") cannot
+			// establish Redis on a midstream native capture. Once a structured
+			// RESP exchange admits the flow, normal framing accepts these replies.
+			return
+		}
 		f.protocol, f.redis = "redis", &binRedis{client: -1}
 	case "websocket":
 		client := dir
@@ -398,6 +473,15 @@ func (f *binFlow) needsMoreBoundedText(wire []byte) bool {
 }
 
 func (f *binFlow) needsMorePortProtocolPrefix(wire []byte) bool {
+	if f.port(4739) && probeIPFIX(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeNeedMore {
+		return true
+	}
+	// A service hint may extend bounded lookahead, never establish protocol
+	// identity. First LDP PDUs can exceed the generic 64-byte probe window;
+	// admission still waits for every message and mandatory TLV to validate.
+	if f.port(646) && probeLDP(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)).Verdict == ProbeNeedMore {
+		return true
+	}
 	if !f.captureTCP {
 		return false
 	}
@@ -413,8 +497,24 @@ func (f *binFlow) needsMoreOpenWire(wire []byte) bool {
 }
 
 func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]any) error {
+	if e.Entry == "NBSSControl" {
+		e.Protocol = "nbss"
+		fields, err := stream_parser.DecodeNetworkControl(e.Raw, "nbss")
+		e.Session = fields
+		return err
+	}
 	var err error
 	switch f.protocol {
+	case "ipfix":
+		err = f.consumeIPFIX(dir, e)
+	case "ldp":
+		err = f.consumeLDP(dir, e)
+	case "bgp":
+		err = f.consumeBGP(dir, e)
+	case "rtmp":
+		err = f.consumeRTMP(dir, e)
+	case "ajp":
+		err = f.consumeAJP(dir, e)
 	case "mms":
 		e.Session, err = f.consumeMMSISO(dir, e)
 		if err == nil {
@@ -518,11 +618,33 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "rtsp":
 		e.Session, err = f.rtsp.consume(dir, e.Raw, e.Timestamp, f.a.budget.MaxCollectionElements)
+		if err != nil {
+			e.nativeSessionMessage = true
+			if e.Session["Profile"] == "extension-semantics-unsupported" {
+				e.Profile = "rtsp-extension-semantics-unsupported"
+			}
+			status, typed := classifySessionError(err)
+			if typed == nil {
+				kind := ErrMalformedMessage
+				if status == "context-required" {
+					kind = ErrContextRequired
+				}
+				err = protocolError(kind, "%s", err)
+			}
+			e.semanticSession = cloneSession(e.Session)
+		}
+		if err == nil && e.Session["Profile"] == "extension-envelope" {
+			e.nativeSessionMessage = true
+			e.Profile, e.Completeness = "rtsp-extension-envelope", "message"
+			e.semanticSession = cloneSession(e.Session)
+		}
 		if err == nil && e.Session["Profile"] == "apple-control" {
 			e.Profile = "rtsp-apple-control"
-			e.ExpertCode = "RTSPSequenceNotObserved"
 			e.Completeness = "message"
-			e.Summary = fmt.Sprintf("RTSP Apple control %v (CSeq absent; transaction association unavailable)", e.Session["Packet Name"])
+			if e.Session["CSeq Observed"] == false {
+				e.ExpertCode = "RTSPSequenceNotObserved"
+				e.Summary = fmt.Sprintf("RTSP Apple control %v (CSeq absent; transaction association unavailable)", e.Session["Packet Name"])
+			}
 		}
 	case "stun":
 		e.Session, err = f.stun.consume(dir, e.Timestamp, e.Raw, f.a.budget.MaxCollectionElements, true)
@@ -538,6 +660,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		}
 	case "http2":
 		var previous *binH2Stream
+		f.h2.peerCaptureGap = f.plaintextGap[1-dir]
+		if tf := f.transportFlow; tf != nil {
+			peer := tf.ServerConn
+			if dir == 1 {
+				peer = tf.ClientConn
+			}
+			f.h2.peerCaptureGap = f.h2.peerCaptureGap || tf.reassemblyIncomplete || peer.pendingBytes > 0
+		}
 		if len(e.Raw) >= 9 && !bytes.HasPrefix(e.Raw, []byte(binH2Preface)) {
 			previous = f.h2.streams[binary.BigEndian.Uint32(e.Raw[5:9])&0x7fffffff]
 		}
@@ -651,10 +781,45 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		e.Session, err = f.amqp.consume(dir, e.Raw, f.a.budget.MaxCollectionElements)
 	case "smb2":
 		e.Session, err = f.smb2.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if err == nil && f.nbss {
+			e.Session["Carrier"] = "NetBIOS Session Service"
+		}
 	case "dcerpc":
-		e.Session, err = f.dcerpc.consumeFrom(dir, e.Raw, f.a.budget.MaxCollectionElements)
+		if e.ID == 0 {
+			e.ID = f.a.ids.Add(1)
+		}
+		err = f.dcerpc.consumeEvent(dir, e, f.a.budget.MaxCollectionElements)
+		e.nativeDCERPCObservation = true
+		e.semanticSession = cloneSession(e.Session)
+		if err != nil || dcerpcHasSecurityTrailer(e.Raw) {
+			e.nativeSessionMessage = true
+			e.semanticSession = cloneSession(e.Session)
+			if err == nil {
+				e.Profile, e.Completeness = "dcerpc-security-envelope", "envelope"
+				e.semanticFields = cloneSession(e.Session)
+			} else {
+				status, typed := classifySessionError(err)
+				if typed == nil {
+					kind := ErrMalformedMessage
+					if status == "context-required" {
+						kind = ErrContextRequired
+					}
+					err = protocolError(kind, "%s", err)
+				}
+			}
+		}
 	case "ssh":
+		e.nativeSSHObservation = true
 		e.Session, err = f.ssh.consume(dir, e.Raw)
+		if err != nil && e.Session["Error Scope"] == "message" {
+			// Only the SSH codec can establish this complete cleartext boundary.
+			// Keep its role diagnostic privately; the refused method publishes
+			// no successful fields and cannot retire the next complete message.
+			e.nativeSessionMessage = true
+			e.semanticSession = cloneSession(e.Session)
+		}
+	case "telnet":
+		e.Session, err = stream_parser.DecodeNetworkControl(e.Raw, "telnet")
 	case "nfs":
 		e.Session, err = f.nfs.consume(e.Raw, f.a.budget.MaxCollectionElements)
 	case "snmp":
@@ -684,11 +849,14 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 	case "smtp":
 		e.Session, err = f.smtp.consume(dir, e.Raw)
 	case "imap":
-		e.Session, err = f.imap.consume(dir, e.Raw)
+		err = f.consumeIMAP(dir, e)
 	case "pop3":
 		e.Session, err = f.pop3.consume(e.Raw)
 	case "ftp":
 		e.Session, err = f.ftp.consume(e.Raw)
+		if err == nil {
+			f.observeFTPDataControl(dir, e)
+		}
 	case "finger", "whois", "gopher", "dict":
 		if f.textInternet == nil {
 			err = sessionContext("text protocol state was not initialized")
@@ -1014,6 +1182,15 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			}
 		}
 	}
+	if err == nil && f.transportFlow != nil && e.Session != nil && e.Session["Encrypted"] == true {
+		switch e.Protocol {
+		case "smtp", "imap", "pop3", "ftp":
+			// The successful upgrade reply is observed wire evidence. Continue
+			// through TLS framing, including missing-key/negotiation metadata,
+			// instead of stopping the entire connection at the first ciphertext.
+			f.protocol = "tls"
+		}
+	}
 	if e.Session != nil {
 		// Carried HTTP/2 and MySQL messages inherit the actual byte source.
 		// Their protocol decoders cannot decide whether TLS decrypted the bytes.
@@ -1081,6 +1258,9 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 			e.Summary = fmt.Sprintf("SMB2 %v mid %v", e.Session["Packet Name"], e.Session["Message ID"])
 		case "dcerpc":
 			e.Summary = fmt.Sprintf("DCE/RPC %v call %v", e.Session["Packet Name"], e.Session["Call ID"])
+			if e.Profile == "dcerpc-security-envelope" {
+				e.Summary += " · security envelope · authentication unverified"
+			}
 		case "ssh":
 			e.Summary = fmt.Sprintf("SSH %v", e.Session["Packet Name"])
 		case "nfs":
@@ -1160,7 +1340,15 @@ func (f *binFlow) invalidateSession(dir int) {
 }
 
 func (f *binFlow) closeSession() {
+	f.ipfixTCP = nil
+	f.ldp = nil
+	f.bgp = nil
+	f.rtmp = nil
+	f.ajp = nil
+	f.routing = nil
 	f.mms = nil
+	f.a.forgetFTPControl(f.id)
+	f.ftpData = nil
 	f.releaseDoH()
 	if f.protocol == "dns" || f.protocol == "dot" {
 		f.a.closeDNSFlow(f.id)
@@ -1216,6 +1404,17 @@ func (f *binFlow) closeSession() {
 }
 
 func (f *binFlow) finishSession(reason TrafficFlowCloseReason) {
+	f.finishRTMP(reason)
+	if s := f.ajp; s != nil && (s.active || s.expectBody || s.ping != 0) {
+		e := f.event(s.proxy, nil, "incomplete", string(reason)+": AJP observed request/body/ping unfinished")
+		e.Completeness = "incomplete"
+		e.Session = map[string]any{"Request Active": s.active, "Body Expected": s.expectBody, "Ping Pending": s.ping != 0}
+		e.semanticSession = cloneSession(e.Session)
+		e.sessionError = &ProtocolError{Kind: ErrNeedMore, Message: e.Summary}
+		e.Error = e.sessionError.Error()
+		f.a.incomplete.Add(1)
+		f.a.emit(e)
+	}
 	f.finishDNP3Transport(reason)
 	if p := f.hart; p != nil && len(p.pending) > 0 {
 		e := f.event(max(p.client, 0), nil, "incomplete", string(reason)+": HART-IP outstanding observed requests")
@@ -1889,5 +2088,16 @@ func sessionSnapshotSize(v any, byteCapacity bool) int {
 }
 
 func protocolHistoryBytes(e *ProtocolEvent) int {
-	return len(e.Raw) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	n := len(e.Raw) + len(e.nativeQUICWireBytes) + sessionSnapshotSize(e.Session, false) + sessionSnapshotSize(e.semanticFields, false) + sessionSnapshotSize(e.semanticSession, false) + sessionSnapshotSize(e.semanticMetadata, false) + len(e.SourceBytes.PacketRefs)*64 + len(e.SourceBytes.ParentPDUs)*8
+	n += len(e.Domain.Encapsulation)
+	for _, ref := range e.SourceBytes.PacketRefs {
+		n += len(ref.Domain.Encapsulation)
+	}
+	if e.SourceBytes.CompletedIn != nil {
+		n += 64 + len(e.SourceBytes.CompletedIn.Domain.Encapsulation)
+	}
+	for _, layer := range e.CarrierLayers {
+		n += 16 + len(layer)
+	}
+	return n
 }

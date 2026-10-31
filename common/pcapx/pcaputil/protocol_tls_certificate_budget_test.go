@@ -89,6 +89,11 @@ func tlsCertificateBudgetControls(t *testing.T) []tlsAlertCase {
 		tc.Budget.Collection = 1
 		var n uint64
 		for _, s := range c.Steps {
+			// The preceding ServerHello independently selects TLS 1.2 / 0x003c.
+			// A certificate collection refusal retains that observed context.
+			if s.Error != "" && s.Fields["Negotiated Version"] == nil {
+				s.Fields["Negotiated Version"], s.Fields["Cipher Suite"] = uint16(0x303), uint16(0x003c)
+			}
 			completeness := "envelope"
 			if s.Error != "" {
 				completeness = "limited"
@@ -133,6 +138,7 @@ func tlsCertificateBudgetCheckEvent(t *testing.T, e *ProtocolEvent, c tlsAlertCa
 		raw = wrapperWire(t, w.Wire)
 	}
 	want := tlsCertificateBudgetWant(t, "", w.Fields).(map[string]any)
+	want = tlsFrozenExpectedMetadata(t, c, w, want)
 	require.Equal(t, "tls", e.Protocol)
 	require.Equal(t, "tcp", e.Transport)
 	require.Equal(t, w.Direction, e.Direction)

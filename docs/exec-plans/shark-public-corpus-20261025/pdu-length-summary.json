@@ -1,0 +1,106 @@
+{
+  "before_source": "778d338cdb",
+  "binaries": {
+    "events-length-fixed.exe": "9d7b480be5f095ef7c39d722f9c386b9361d21ca90bd35b850b7649aad8dec57",
+    "yak-length-fixed.exe": "5d9a01c3ac7a048b58e75fca5c6096b1f55bcb1ec9eaf2c3991e384b563814bd"
+  },
+  "captures": {
+    "sharon": {
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "full_differential": {
+        "corrected_CLI_PDU_occurrences": {
+          "isis": 678,
+          "pim": 131,
+          "stp": 2612
+        },
+        "corrected_native_lengths": {
+          "isis": 678,
+          "pim": 131,
+          "stp": 2612
+        },
+        "corrected_native_total": 3421,
+        "input_sha256": {
+          "C:\\tmp\\yak-shark-isis-20261026\\sharon-778d338c\\events.jsonl": "cddbcd92aa54347a224a84713cce9f60b4738561537950c9b809fa53c272c966",
+          "C:\\tmp\\yak-shark-isis-20261026\\sharon-778d338c\\yak.jsonl": "b26085108e81a2d270ce16ffcf55e17275a4e686f6b4028a061f3773f47ac6e5",
+          "C:\\tmp\\yak-shark-isis-20261026\\sharon-length-fixed\\events.jsonl": "019913028a5cf394e402425b1da3d39ea4c6a7380f296bfec609c00391e8f26d",
+          "C:\\tmp\\yak-shark-isis-20261026\\sharon-length-fixed\\yak.jsonl": "4c8cfb4d43e799a01188e913e8c13d40900a9fe1117d7f521a5749666c5e67cb"
+        },
+        "native_rows": 245615,
+        "physical_CLI_frames": 328127,
+        "scope": "Compare complete native/CLI exports around a default PDU length correction.\n\nInputs must be ordered replays of the same original capture with identical\noptions. Only a zero pdu.length with nonempty native Raw may change, to that\nexact observed byte count. Every other JSON value, row and association must\nremain identical. Explicit nonzero lengths (including omitted/preview bodies)\nare preserved. This is a bounded-metadata differential, not a new oracle for\nprotocol semantics, reported flow counts or capture completeness.\n",
+        "script_sha256": "58b73caa3047bbde0a29cdeea1c3db92f4289c4dc01b3382fdd9b3ef43c2faef",
+        "unrelated_differences": 0
+      },
+      "generic_summary_sha256": "9a70293120d7abd767a7a5b2d95109b7e505a1e5cfa4c06244b62bcc25a02aaa",
+      "metrics_unchanged": {
+        "bidirectional_session_checks": true,
+        "endpoint_frames_checked": true,
+        "field_frames_checked": true,
+        "field_frames_missing": true,
+        "field_mismatch_count": true,
+        "native_tcp_flow_count": true,
+        "native_tcp_preview_count": true,
+        "packet_metadata_mismatches": true,
+        "scoped_session_partitions": true,
+        "session_partitions": true
+      }
+    },
+    "weber": {
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "full_differential": {
+        "corrected_CLI_PDU_occurrences": {
+          "isis": 678,
+          "pim": 333,
+          "stp": 2612
+        },
+        "corrected_native_lengths": {
+          "isis": 678,
+          "pim": 333,
+          "stp": 2612
+        },
+        "corrected_native_total": 3623,
+        "input_sha256": {
+          "C:\\tmp\\yak-shark-isis-20261026\\weber-778d338c\\events.jsonl": "8875f3affbcf38df5794818b0e9094a80d3bed586fb68397f0cf1babcb01306e",
+          "C:\\tmp\\yak-shark-isis-20261026\\weber-778d338c\\yak.jsonl": "8bed512b7fe844d87c61d17ae966dc9d6c68a2319e14d7159a888fbd5c3bba13",
+          "C:\\tmp\\yak-shark-isis-20261026\\weber-length-fixed\\events.jsonl": "0d1342ab77d64de071690cfc390d9d6f7afc3e4f5f0a8b4dea05f1b046148f97",
+          "C:\\tmp\\yak-shark-isis-20261026\\weber-length-fixed\\yak.jsonl": "24c25dc9554521583b73a75d495c9a275de15af46dc622c1dafcd0b5d52daa9c"
+        },
+        "native_rows": 39283,
+        "physical_CLI_frames": 51328,
+        "scope": "Compare complete native/CLI exports around a default PDU length correction.\n\nInputs must be ordered replays of the same original capture with identical\noptions. Only a zero pdu.length with nonempty native Raw may change, to that\nexact observed byte count. Every other JSON value, row and association must\nremain identical. Explicit nonzero lengths (including omitted/preview bodies)\nare preserved. This is a bounded-metadata differential, not a new oracle for\nprotocol semantics, reported flow counts or capture completeness.\n",
+        "script_sha256": "58b73caa3047bbde0a29cdeea1c3db92f4289c4dc01b3382fdd9b3ef43c2faef",
+        "unrelated_differences": 0
+      },
+      "generic_summary_sha256": "57d011e8287048d9d0a372a95c4b8e9078b0acf1ff94201acab411b186800a22",
+      "metrics_unchanged": {
+        "bidirectional_session_checks": true,
+        "endpoint_frames_checked": true,
+        "field_frames_checked": true,
+        "field_frames_missing": true,
+        "field_mismatch_count": true,
+        "native_tcp_flow_count": true,
+        "native_tcp_preview_count": true,
+        "packet_metadata_mismatches": true,
+        "scoped_session_partitions": true,
+        "session_partitions": true
+      }
+    }
+  },
+  "previous_full_regression_source": "778d338cdb",
+  "scope": "Only missing default observed PDU lengths are filled. Explicit lengths for omitted or preview bodies stay literal. Complete ordered native/CLI JSON values, physical frames, IDs, source bytes, fields, direction and associations must remain identical except individually checked exact pdu.length deltas.",
+  "source": "83e2a69e6b",
+  "targeted_tests": {
+    "CLI_seconds": 0.31,
+    "log_sha256": "1be8bf91b11b2675650e8af738b6ea73a866f974278474741e86bef27352b0ef",
+    "native_seconds": 0.978
+  },
+  "windows": {
+    "image_sha256": "6e0f1253d498ada0612187cba52dc5c7b161725b8293ac9695f26b5b1cad18b1",
+    "log_sha256": "16f6597122f6f2eb17d0b859d72bd46a8f18c6004bd214b2cd28096c38190194",
+    "physical_packets": 2,
+    "proven_matching_rows": 1,
+    "query": "fields pdu.length == 24",
+    "scope": "Declared offline two-Hello control: first24-byte PDU has unknown TLV, second is20 bytes. Native CP936 drained EOF/query/protocol/detail, bytes, resize/restore and quit pass; partial evidence remains explicit.",
+    "screen_sha256": "f911fa5580c42ee9548fd6619b48fee44034aa2205d5044c700f159ba90126fb"
+  }
+}

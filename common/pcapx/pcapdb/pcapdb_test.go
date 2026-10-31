@@ -454,7 +454,8 @@ func TestPCAPDBConcurrentDeduplicationAndStartupBusy(t *testing.T) {
 	require.NoError(t, err)
 	var aliases []string
 	require.NoError(t, json.Unmarshal([]byte(resolved.SourceAliases), &aliases))
-	require.Contains(t, aliases, alias)
+	require.Equal(t, input, resolved.SourcePath)
+	require.ElementsMatch(t, []string{alias}, aliases)
 }
 
 func TestPCAPDBCancellationRecoveryAndDurableCounts(t *testing.T) {

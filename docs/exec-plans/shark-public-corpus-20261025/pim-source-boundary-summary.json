@@ -1,0 +1,291 @@
+{
+  "scope": "Four independently bounded PIM source corrections, full native/CLI comparisons and actual Windows field-source checks. Historical producer identities remain explicit.",
+  "source": "928cd01d8820f4fb264bdce50a3900cebf7c6338",
+  "binary_SHA256": "a451eb153355e08e68c3f3e0ea32e25bf952cbcf1917431ef480135ec53f21b1",
+  "real_public_PIM": {
+    "weber": 333,
+    "sharon": 131,
+    "total": 464,
+    "checksum_and_grammar_complete_Weber": 315,
+    "sharon_literal_unknown_extent": 58,
+    "sharon_literal_incomplete_extent": 73,
+    "sharon_capture_length_equals_original": 131,
+    "note": "Declared message insufficiency is not evidence of capture loss."
+  },
+  "correction": {
+    "source_frames": [
+      153985,
+      179032,
+      184143,
+      222058,
+      232036,
+      251991
+    ],
+    "events": 6,
+    "fabricated_Session_keys_removed": 21,
+    "fabricated_typed_values_removed": 21,
+    "legal_zero_and_false_with_complete_source_words_retained": true,
+    "root_cause": "Reader errors returned numeric zero; derived metric/RPT/refresh flags were published after their source location was already invalid."
+  },
+  "whole_native": {
+    "inputs": 37,
+    "actual_executions": 39,
+    "rows": 306455,
+    "literal_unchanged": 306449,
+    "entire_independent_expected_changes": 6,
+    "differences": 0,
+    "ID_mapping": false,
+    "whole_flow_files": 2,
+    "whole_flow_bytes_identical": true,
+    "negative_controls": 66
+  },
+  "selected_WS_comparison": {
+    "equal": 7284,
+    "unavailable": 470,
+    "different": 0,
+    "scope": "Source-proved public typed scalar occurrences before the minimal removal; unavailable is not equal, and does not authorize invalid parents."
+  },
+  "proofs": [
+    {
+      "external_relative_name": "PIM-public-source-before-02/summary.json",
+      "SHA256": "b619fdd018d67bccbb5fc07315335a823b40651349a6dcaa35bb8b798e84ca45"
+    },
+    {
+      "external_relative_name": "PIM-phantom-derived-plan-before-01/summary.json",
+      "SHA256": "81f9802ca3992dfef1d446877eb4075c4dc47e514a078f0ae35bbd1815776a14"
+    },
+    {
+      "external_relative_name": "PIM-literal-prefix-plan-before-01/summary.json",
+      "SHA256": "cbb35ccf3150f524cd1b5de00752eb665bf60c71d4f58740880508f827683420"
+    },
+    {
+      "external_relative_name": "PIM-minimal-native22-whole-01/summary.json",
+      "SHA256": "00f11e99f63646dd134a2102691db0baae9531581eeba5c4c56a422213c98253"
+    },
+    {
+      "external_relative_name": "PIM-derived-green01/receipt.json",
+      "SHA256": "1c6127eaa4ef4a15f8c9e6615e2ed9faf63139ed3aa3a2013d7a3f29c88d0c36"
+    },
+    {
+      "external_relative_name": "PIM-Register-public-parent-plan-before-02/summary.json",
+      "SHA256": "3e7b1c80e9cd509f1574d75fcdd7510513e04bd17c13e00ee13fbe4838343ea7"
+    },
+    {
+      "external_relative_name": "PIM-portable-source-01/manifest.json",
+      "SHA256": "cb53b448faeec6c28ed992f384abcea4a76a658d5603c5910dd94b85819c58f7"
+    }
+  ],
+  "initial_findings": [
+    "143 failed PIM observations overstate complete selected fields; parent-extent and Scope correction is implemented separately and awaits its public whole proof.",
+    "Complete field prefixes are lost on later Hello/address/record errors.",
+    "6102 source-valid typed aliases lack exact occurrence ranges; 1378 already have ranges. The removed 21 values are separate from valid missing ranges.",
+    "Register child admission must require a complete literal parent, while eight-byte header checksum observation remains distinct.",
+    "This does not implement adjacency, installed multicast routes, neighbor verification or Bootstrap RP-set reassembly."
+  ],
+  "current_open_findings": [
+    "PIMv1 and unselected encapsulations are not promoted by a Wireshark label alone.",
+    "No adjacency, installed multicast routes, neighbor verification or Bootstrap RP-set reassembly is certified.",
+    "The broader 94/39 field audit and 303 EOL investigation remain separate; these PIM proofs do not close them wholesale."
+  ],
+  "subsequent_native_stages": [
+    {
+      "name": "parent_extent_and_scope",
+      "source": "b82a9db459226ed9382fb963389c4fa0c85ce978",
+      "entire_events": 306455,
+      "whole_source_expected_changes": 143,
+      "unexplained_differences": 0,
+      "whole_flow_files_byte_identical": 2,
+      "ID_mapping": false,
+      "proof": {
+        "external_relative_name": "PIM-extent-scope-native23-whole-01/summary.json",
+        "SHA256": "93d0c83798b52acaa83396ac2a0e80bffeddcc0347de5d5a02e2dd4e2e9598b8"
+      }
+    },
+    {
+      "name": "captured_field_prefixes",
+      "source": "52566374c6038d2370d7f9be5d733aaae1af14cc",
+      "entire_events": 306455,
+      "whole_source_expected_changes": 142,
+      "unexplained_differences": 0,
+      "whole_flow_files_byte_identical": 2,
+      "ID_mapping": false,
+      "proof": {
+        "external_relative_name": "PIM-prefix-native24-whole-after-order-correction-02/summary.json",
+        "SHA256": "dc7259f641d484221f69129444f4917b15754dc93056983a2844d19e47f91f55"
+      }
+    },
+    {
+      "name": "private_per_occurrence_ranges",
+      "source": "8d803955720ab47a505ce1cad0adf2f5d799c883",
+      "entire_events": 306455,
+      "whole_source_expected_changes": 433,
+      "unexplained_differences": 0,
+      "whole_flow_files_byte_identical": 2,
+      "ID_mapping": false,
+      "proof": {
+        "external_relative_name": "PIM-ranges-native25-whole-01/summary.json",
+        "SHA256": "d49cca00370fc9307a1809733eee9d7d337f167f572a0b8167ddeb6ccce89c08"
+      }
+    }
+  ],
+  "source_prefix_order_correction": {
+    "original_failure_retained": {
+      "external_relative_name": "PIM-prefix-native24-whole-01/summary.json",
+      "SHA256": "abc1f2c3c673b33adf74b0cae6384a02b00a73ffb10dedee602140712c84b0f7"
+    },
+    "correction": {
+      "external_relative_name": "PIM-prefix-order-correction-proof-01/summary.json",
+      "SHA256": "a282e77aaae85ae52d9607b18216a69a4c7347cf3a0e4a328560a836bb90722c"
+    },
+    "corrected_plan": {
+      "external_relative_name": "PIM-prefix-whole-plan-after-order-correction-02/summary.json",
+      "SHA256": "29ea444710649509e1d5b13af8a868765672c5e4af886844899c49beb55cf96b"
+    },
+    "note": "The first oracle globally sorted two API snapshot batches. Actual Session/Raw/ranges were already exact. Old source reconstructs all 464 snapshots, with 458 counterexamples rejecting global sorting. Only source expectations changed; actual output was never normalized."
+  },
+  "range_source_facts": {
+    "wire_occurrences": 7898,
+    "context_values_without_span": 316,
+    "same_name_equal_value_different_position_pairs": 1739,
+    "Register_IPVersion_ranges_added": 23,
+    "direct_word_controls": {
+      "external_relative_name": "PIM-ranges-literal-occurrence-controls-before-01/summary.json",
+      "SHA256": "53f0e836305267d924f150d7ac90700a21f873a8489fa6f4e6d89fe43d40157c"
+    },
+    "portable_native_verifier_rerun": {
+      "external_relative_name": "PIM-ranges-native25-vendored01/summary.json",
+      "SHA256": "d49cca00370fc9307a1809733eee9d7d337f167f572a0b8167ddeb6ccce89c08"
+    }
+  },
+  "register_integrity_scope": {
+    "public_valid_parent_child_observations_preserved": 10,
+    "authored_invalid_parent_children_withdrawn": 3,
+    "authored_valid_parent_child_preserved": 1,
+    "bad_header_error_observations": 12,
+    "actual_native_DecodeErrors_per_witness": 0,
+    "error_witness_proof": {
+      "external_relative_name": "PIM-Register-error-witnesses-before-04/summary.json",
+      "SHA256": "2856af4f3badc78c4444444ad350a634d8254cf7c13c37f90eb22798220e4a1f"
+    },
+    "note": "Native PIM consumes these observations before generic DecodeErrors. Header checksum integrity and complete parent extent are separate requirements."
+  },
+  "whole_CLI_stages": [
+    {
+      "source": "b82a9db459226ed9382fb963389c4fa0c85ce978",
+      "inputs": 37,
+      "whole_rows": 384518,
+      "whole_source_expected_changes": 7,
+      "unexplained_differences": 0,
+      "proof": {
+        "external_relative_name": "PIM-CLI-whole-boundary23-01/summary.json",
+        "SHA256": "8298c7c9b01a48c29f16c939458c7af5d94a1119c4c9ac8afa3b1cfc60d9adb5"
+      }
+    },
+    {
+      "source": "52566374c6038d2370d7f9be5d733aaae1af14cc",
+      "inputs": 37,
+      "whole_rows": 384518,
+      "whole_source_expected_changes": 142,
+      "unexplained_differences": 0,
+      "proof": {
+        "external_relative_name": "PIM-CLI-whole-prefix24-01/summary.json",
+        "SHA256": "734198f2d275b53b63c0faae547663fcab904f8d9e0a4924aaeb6850960d6f3b"
+      }
+    },
+    {
+      "source": "8d803955720ab47a505ce1cad0adf2f5d799c883",
+      "inputs": 37,
+      "whole_rows": 384518,
+      "whole_source_expected_changes": 433,
+      "unexplained_differences": 0,
+      "proof": {
+        "external_relative_name": "PIM-CLI-whole-ranges25-01/summary.json",
+        "SHA256": "54b6d5265d8508f5905f46a42690107805a48ebfb547ef8e99c4fd0d3a61aa74"
+      }
+    }
+  ],
+  "whole_CLI_literal_UI_continuity": [
+    {
+      "before_source": "8d803955720ab47a505ce1cad0adf2f5d799c883",
+      "after_source": "bb636bb1544bdf546320cce427b4de2dffe2fd18",
+      "inputs": 37,
+      "rows": 384518,
+      "all_exports_byte_identical": true,
+      "proof": {
+        "external_relative_name": "CLI25-to-26-whole-source-audit01/summary.json",
+        "SHA256": "d6a89f83ea84c0c4959fa34079f55f9cb709b84b85a52a873d9b772b9d814fed"
+      }
+    },
+    {
+      "before_source": "bb636bb1544bdf546320cce427b4de2dffe2fd18",
+      "after_source": "b76d88b3504c7857e69b4ad09388df1e29cb42c6",
+      "inputs": 37,
+      "rows": 384518,
+      "all_exports_byte_identical": true,
+      "proof": {
+        "external_relative_name": "CLI26-to-27-whole-source-audit01/summary.json",
+        "SHA256": "6acf04f2797c3264a4dbdc31051efb7e8f035398d9a8da9e4f9d1b77851f6210"
+      }
+    }
+  ],
+  "Windows_actual_console": {
+    "source": "b76d88b3504c7857e69b4ad09388df1e29cb42c6",
+    "cases": 3,
+    "actual_buffers": 51,
+    "public_original_wire_excerpts": 2,
+    "authored_identical_address_occurrence_control": 1,
+    "exact_clicked_PIM_body_ranges": [
+      [
+        9,
+        10
+      ],
+      [
+        8,
+        9
+      ],
+      [
+        38,
+        42
+      ]
+    ],
+    "negative_controls": 18,
+    "CP936_restored": true,
+    "proof": {
+      "external_relative_name": "PIM-Windows-exact-sources04-01/summary.json",
+      "SHA256": "410c1efcb6c64a02e1e0039cef53009158291bd12f52d692519b626b236af063"
+    },
+    "portable_verifier_rerun": {
+      "external_relative_name": "PIM-Windows-exact-sources04-vendored01/summary.json",
+      "SHA256": "410c1efcb6c64a02e1e0039cef53009158291bd12f52d692519b626b236af063"
+    },
+    "note": "Actual Windows console cells/attributes rendered to PNG, not native Windows Terminal pixel screenshots. Original frame, native PIM body and opaque extracted suffix are distinct sources. Unknown IPv4 Total Length is displayed as unavailable; it cannot admit an inner transport."
+  },
+  "tests": {
+    "native_source": "8d803955720ab47a505ce1cad0adf2f5d799c883",
+    "full_five_packages": {
+      "pass_count": 285328,
+      "skip_count": 24,
+      "proof": {
+        "external_relative_name": "PIM-all-five-full25/receipt.json",
+        "SHA256": "823680f8599497e2dfb6199b2be6c6185d5da77397d35ed0f9ac7f2f9366680c"
+      }
+    },
+    "source_prefix_fuzz": {
+      "executions": 149642,
+      "active_seconds": 40,
+      "proof": {
+        "external_relative_name": "PIM-prefix-fuzz25-01/FuzzPIMCapturedPrefixOwnership-receipt.json",
+        "SHA256": "5a9c4c31f7e299956a49713e5b4dc7b343d1b049419af7a31dfc18531a1829f0"
+      }
+    },
+    "latest_PIM_UI": {
+      "pass_count": 851,
+      "skip_count": 2,
+      "proof": {
+        "external_relative_name": "PIM-unknown-parent-CLI-full28/receipt.json",
+        "SHA256": "86812ff14ed719cac853a0435728516e508e3de39090cebd65881b752171efc5"
+      }
+    },
+    "note": "Counts overlap. Source-prefix fuzz covers the shared codec, while UI changes have their own working-source hashes and complete CLI replay proofs."
+  }
+}

@@ -28,18 +28,27 @@ const decoderInputLimit = 2 << 20
 const decoderOutputLimit = 8 << 20
 
 type decodeRequest struct {
-	Events []*pcaputil.ProtocolEvent
-	Stream *streamDecodeRequest
-	Number uint64
-	Data   []byte
-	Length int
-	Link   layers.LinkType
+	ByteFields         []workerByteField    `json:",omitempty"`
+	TransportView      *packetTransportView `json:",omitempty"`
+	TransportHeader    []byte               `json:",omitempty"`
+	ConnectionStack    []string             `json:",omitempty"`
+	ConnectionProtocol string               `json:",omitempty"`
+	ConnectionEvidence string               `json:",omitempty"`
+	OpaqueTransport    bool                 `json:",omitempty"`
+	Events             []*pcaputil.ProtocolEvent
+	Stream             *streamDecodeRequest
+	Number             uint64
+	Reference          pcaputil.PacketReference
+	Data               []byte
+	Length             int
+	Link               layers.LinkType
 }
 type streamDecodeRequest struct {
-	Events []*pcaputil.ProtocolEvent
-	ID     uint64
-	Ports  [2]uint16
-	Prefix [2][]byte
+	fieldsProjected bool
+	Events          []*pcaputil.ProtocolEvent
+	ID              uint64
+	Ports           [2]uint16
+	Prefix          [2][]byte
 }
 type decodeField struct {
 	Depth      int
@@ -47,11 +56,14 @@ type decodeField struct {
 	Branch     bool
 	Start, End int
 	HasRange   bool
+	Source     int
 }
 type decodeResponse struct {
-	Protocol string
-	Number   uint64
-	Fields   []decodeField
+	Protocol          string
+	DetailUnavailable bool `json:",omitempty"`
+	Number            uint64
+	Fields            []decodeField
+	Sources           []detailSource
 }
 
 var WorkerCommand = &cli.Command{
@@ -69,22 +81,44 @@ var WorkerCommand = &cli.Command{
 
 func runDecodeWorker(input io.Reader, output io.Writer) error {
 	var req decodeRequest
-	if err := json.NewDecoder(io.LimitReader(input, decoderInputLimit)).Decode(&req); err != nil {
+	decoder := json.NewDecoder(io.LimitReader(input, decoderInputLimit))
+	decoder.UseNumber()
+	if err := decoder.Decode(&req); err != nil {
 		return err
 	}
 	if len(req.Data) > 262144 {
 		return fmt.Errorf("packet exceeds decoder limit")
 	}
+	if req.Reference.Number != 0 && req.Reference.Number != req.Number {
+		return fmt.Errorf("captured reference does not match decoder packet number")
+	}
+	events := req.Events
+	if req.Stream != nil {
+		events = req.Stream.Events
+	}
+	if err := restoreWorkerByteFields(events, req.ByteFields); err != nil {
+		return err
+	}
 	var d packetDetail
 	if req.Stream != nil {
+		req.Stream.fieldsProjected = true
 		d = decodeStream(*req.Stream)
 	} else {
-		raw := &capturedPacket{events: req.Events, number: req.Number, data: req.Data, link: req.Link, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw := &capturedPacket{events: req.Events, number: req.Number, reference: req.Reference, data: req.Data, link: req.Link, application: req.ConnectionProtocol, evidence: req.ConnectionEvidence, connectionStack: req.ConnectionStack, opaqueTransport: req.OpaqueTransport, ci: gopacket.CaptureInfo{Length: req.Length, CaptureLength: len(req.Data)}}
+		raw.workerFieldProjection = true
+		if req.TransportView != nil {
+			v := req.TransportView
+			if len(req.TransportHeader) != v.HeaderLength || v.Protocol == "tcp" && (v.HeaderLength < 20 || v.HeaderLength > 60 || int(req.TransportHeader[12]>>4)*4 != v.HeaderLength) || v.Protocol == "udp" && v.HeaderLength != 8 || v.Protocol != "tcp" && v.Protocol != "udp" {
+				return fmt.Errorf("invalid observed transport header in decoder request")
+			}
+			v.Header = req.TransportHeader // JSON decoding owns this logical byte source.
+			raw.transportView = v
+		}
 		d = detail(raw)
 	}
-	response := decodeResponse{Number: d.number, Protocol: d.protocol}
+	response := decodeResponse{Number: d.number, Protocol: d.protocol, DetailUnavailable: d.unavailable, Sources: d.sources}
 	for _, f := range d.fields {
-		response.Fields = append(response.Fields, decodeField{Depth: f.depth, Text: f.text, Branch: f.branch, Start: f.start, End: f.end, HasRange: f.hasRange})
+		response.Fields = append(response.Fields, decodeField{Depth: f.depth, Text: f.text, Branch: f.branch, Start: f.start, End: f.end, HasRange: f.hasRange, Source: f.source})
 	}
 	payload, err := marshalDecodeResponse(response)
 	if err != nil {
@@ -106,11 +140,19 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 // Only pinned packets use the VM. A bounded child process keeps both parser
 // diagnostics and pathological input away from the capture/UI event loops.
 func decodeIsolated(parent context.Context, raw *capturedPacket) (packetDetail, error) {
-	output, err := runIsolated(parent, decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Data: raw.data, Length: raw.ci.Length, Link: raw.link})
+	output, err := runIsolated(parent, packetDecodeRequest(raw))
 	if err != nil {
 		return packetDetail{}, err
 	}
 	return decodeWorkerOutput(output, raw)
+}
+
+func packetDecodeRequest(raw *capturedPacket) decodeRequest {
+	req := decodeRequest{Events: raw.protocolEvents(), Number: raw.number, Reference: raw.reference, Data: raw.data, Length: raw.ci.Length, Link: raw.link, ConnectionStack: raw.connectionStack, ConnectionProtocol: raw.application, ConnectionEvidence: raw.evidence, OpaqueTransport: raw.opaqueTransport, TransportView: raw.transportView}
+	if raw.transportView != nil {
+		req.TransportHeader = raw.transportView.Header
+	}
+	return req
 }
 
 func decodeStreamIsolated(parent context.Context, stream *streamSnapshot) (packetDetail, error) {
@@ -158,6 +200,7 @@ func runIsolated(parent context.Context, request decodeRequest) ([]byte, error) 
 func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 	// JSON escapes and repeated maps are charged as transmitted bytes. Work
 	// on shallow copies: history snapshots still belong to their callers.
+	request.ByteFields = nil // Parent facts are regenerated from actual Go types.
 	var events []*pcaputil.ProtocolEvent
 	if request.Stream != nil {
 		stream := *request.Stream
@@ -182,7 +225,7 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 			remaining -= 5
 			continue
 		}
-		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC encoded byte budget", Error: "Detail unavailable: IPC encoded byte budget", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
+		marker := &pcaputil.ProtocolEvent{ID: e.ID, FlowID: e.FlowID, TCPFlowID: e.TCPFlowID, ResponseTo: e.ResponseTo, Protocol: e.Protocol[:min(len(e.Protocol), 128)], Status: "limited", Completeness: "limited", Summary: "Detail unavailable: IPC byte/type projection limit", Error: "Detail unavailable: IPC byte/type projection limit", ExpertCode: string(pcaputil.ErrResourceExceeded), Domain: pcaputil.CaptureDomain{Section: e.Domain.Section, Interface: e.Domain.Interface}}
 		wire, err := json.Marshal(marker)
 		if err != nil {
 			return nil, err
@@ -197,13 +240,27 @@ func marshalDecodeRequest(request decodeRequest) ([]byte, error) {
 		if e == nil {
 			continue
 		}
-		wire, err := json.Marshal(e)
+		display := protocolDisplayEvent(e)
+		wire, err := json.Marshal(display)
 		if err != nil {
 			return nil, err
 		}
-		delta := len(wire) - markerCosts[i]
+		types, typeErr := eventByteFields(display, i)
+		if typeErr != nil || len(request.ByteFields)+len(types) > workerByteFieldLimit {
+			continue // The explicit IPC-limited marker remains, never untyped success.
+		}
+		typeCost := 0
+		for _, descriptor := range types {
+			encoded, err := json.Marshal(descriptor)
+			if err != nil {
+				return nil, err
+			}
+			typeCost += len(encoded) + 1
+		}
+		delta := len(wire) - markerCosts[i] + typeCost
 		if delta <= remaining {
-			bounded[i] = e
+			bounded[i] = display
+			request.ByteFields = append(request.ByteFields, types...)
 			remaining -= delta
 		}
 	}
@@ -265,9 +322,35 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 	}
 	d := quickDetail(raw)
 	d.protocol = response.Protocol
+	d.unavailable = response.DetailUnavailable
+	// The parent freezes classification at capture time. IPC receives public
+	// snapshots, so its carrier fallback can lose the original private proof.
+	// Preserve that caption without restoring any fields, bytes or authentication.
+	if d.unavailable {
+		observed := raw.presentation
+		if late := presentEvents(raw.protocolEvents()); late.protocol != "" {
+			observed = late
+		}
+		if observed.protocol != "" {
+			d.protocol = observed.protocol
+		}
+	} else if raw.presentation.protocol == "HTTP/3" {
+		// Complete public IPC fields can still omit the native ALPN proof,
+		// including authenticated STREAM observations blocked on QPACK.
+		d.protocol = raw.presentation.protocol
+	}
 	d.fields = nil
+	d.sources = response.Sources
+	for i := range d.sources {
+		d.sources[i].Name = safeText(d.sources[i].Name)
+	}
 	for _, f := range response.Fields {
-		d.fields = append(d.fields, field{depth: f.Depth, text: safeText(f.Text), branch: f.Branch, start: f.Start, end: f.End, hasRange: f.HasRange && f.Start >= 0 && f.End > f.Start && f.End <= len(raw.data)})
+		length := len(raw.data)
+		validSource := f.Source == 0
+		if f.Source > 0 && f.Source <= len(d.sources) {
+			length, validSource = len(d.sources[f.Source-1].Data), true
+		}
+		d.fields = append(d.fields, field{depth: f.Depth, text: safeText(f.Text), branch: f.Branch, start: f.Start, end: f.End, source: f.Source, hasRange: f.HasRange && validSource && f.Start >= 0 && f.End > f.Start && f.End <= length})
 	}
 	return d, nil
 }
@@ -277,7 +360,19 @@ func decodeWorkerOutput(output []byte, raw *capturedPacket) (packetDetail, error
 func decodeStream(req streamDecodeRequest) (d packetDetail) {
 	d.number = req.ID
 	if req.Events != nil {
-		d.fields = protocolEventFields(req.Events)
+		d.unavailable = protocolDetailsUnavailable(req.Events)
+		for _, event := range req.Events {
+			if _, _, refused := networkHeaderRefusalPresentation(event); refused {
+				// There is no captured frame in a stream-only request. Retain the
+				// exact diagnostic and its observed prefix identity, without child
+				// dissectors or fabricated physical network-header byte ranges.
+				events := []*pcaputil.ProtocolEvent{event}
+				d.fields, d.sources = protocolEventDetail(events, !req.fieldsProjected)
+				d.protocol = presentEvents(events).protocol
+				return
+			}
+		}
+		d.fields, d.sources = protocolEventDetail(req.Events, !req.fieldsProjected)
 		d.protocol = eventProtocols(req.Events)
 		return
 	}
