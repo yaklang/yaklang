@@ -201,6 +201,11 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	} else {
 		info["Content Visibility"] = "cleartext"
 	}
+	// Authentication consumed this old-epoch record, but application bytes
+	// cannot interrupt a continuously observed TLS1.3 handshake fragment.
+	if t.version == 0x304 && encrypted && typ == 23 && len(t.handshake[dir]) != 0 {
+		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 application data interleaves a fragmented handshake")
+	}
 	if typ == 20 {
 		if !bytes.Equal(plain, []byte{1}) {
 			return nil, protocolError(ErrMalformedMessage, "invalid TLS ChangeCipherSpec")
@@ -244,6 +249,13 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			}
 			if n > len(b) {
 				break
+			}
+			// A KeyUpdate must finish its record before installing the next
+			// epoch. Earlier old-key fragments and preceding messages are valid;
+			// complete or partial trailing handshake bytes are not. Inner padding
+			// has already been removed by record decryption.
+			if t.version == 0x304 && b[0] == 24 && n != len(b) {
+				return nil, protocolError(ErrMalformedMessage, "TLS KeyUpdate does not end at the record boundary")
 			}
 			if len(messages) >= f.a.budget.MaxCollectionElements {
 				return nil, protocolError(ErrResourceExceeded, "TLS handshake count limit")
