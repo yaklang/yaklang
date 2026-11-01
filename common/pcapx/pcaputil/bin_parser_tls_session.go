@@ -520,6 +520,12 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			// Enforce these server-only rules only after the connection has
 			// established which direction sent ClientHello (RFC 8446 4.4.2).
 			if t.client >= 0 && dir != t.client {
+				// Post-handshake authentication is a client response. An
+				// authenticated application key does not permit the server
+				// to send another Certificate (RFC 8446 4.6.2).
+				if t.app[dir] {
+					return nil, protocolError(ErrMalformedMessage, "server TLS Certificate in application epoch")
+				}
 				if view.Fields["Context Length"].(byte) != 0 {
 					return nil, protocolError(ErrMalformedMessage, "server TLS Certificate has nonempty request context")
 				}

@@ -34,6 +34,13 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 			info["Discarded Handshake Fragment Bytes"] = len(trial.handshake[dir])
 			trial.handshake[dir] = nil
 			trial.handshakeAuthenticated[dir] = false
+			if kind == 22 {
+				// Authentication recovers a record boundary, not a handshake
+				// boundary. The new bytes may be the missing message's suffix;
+				// even plausible framing cannot establish where it starts.
+				trial.handshakeGap[dir] = true
+				info["Handshake Boundary"] = "unavailable after authenticated key-epoch recovery"
+			}
 		}
 		*t = trial
 		t.recordGap[dir] = false

@@ -94,6 +94,10 @@ func TestTLSCertificateEntryExtensionAuthenticatedAdmission(t *testing.T) {
 		t.Run(tlsCipherTestName(suite), func(t *testing.T) {
 			for _, dir := range []int{0, 1} {
 				f, state := boundaryTLSFlow(t, suite)
+				// The server sends its certificate with the handshake keys;
+				// client post-handshake certificates use application keys.
+				state.app[1] = false
+				epochs := state.app
 				wire := boundaryTLSRecord(t, state, dir, 2, reliabilityHS(11, valid), 22, 0)
 				e := &ProtocolEvent{Protocol: "tls", Raw: wire}
 				_, err := f.consumeTLS(dir, e)
@@ -115,7 +119,7 @@ func TestTLSCertificateEntryExtensionAuthenticatedAdmission(t *testing.T) {
 				require.Equal(t, secret, state.secret[dir])
 				require.Equal(t, iv, state.iv[dir])
 				require.Same(t, key, state.keys[dir])
-				require.True(t, state.app[dir])
+				require.Equal(t, epochs, state.app)
 			}
 		})
 	}

@@ -14,20 +14,22 @@ func TestTLSCertificateKnownServerRoleAdmission(t *testing.T) {
 	for _, suite := range []uint16{0x1301, 0x1302, 0x1303} {
 		for _, server := range []int{0, 1} {
 			for _, c := range []struct {
-				name    string
-				client  bool
-				unknown bool
-				context []byte
-				entry   bool
-				refuse  bool
+				name        string
+				client      bool
+				unknown     bool
+				application bool
+				context     []byte
+				entry       bool
+				refuse      bool
 			}{
 				{name: "server-context", context: []byte{0xa5}, entry: true, refuse: true},
 				{name: "server-empty-list", refuse: true},
 				{name: "server-certificate", entry: true},
-				{name: "client-empty-list", client: true},
-				{name: "client-post-handshake-empty-list", client: true, context: []byte{0xa5}},
-				{name: "unknown-empty-list", unknown: true},
-				{name: "unknown-context", unknown: true, context: []byte{0xa5}, entry: true},
+				{name: "server-application-certificate", application: true, entry: true, refuse: true},
+				{name: "client-empty-list", client: true, application: true},
+				{name: "client-post-handshake-empty-list", client: true, application: true, context: []byte{0xa5}},
+				{name: "unknown-empty-list", unknown: true, application: true},
+				{name: "unknown-context", unknown: true, application: true, context: []byte{0xa5}, entry: true},
 			} {
 				t.Run(fmt.Sprintf("suite%04x/server%d/%s", suite, server, c.name), func(t *testing.T) {
 					flow, state := boundaryTLSFlow(t, suite)
@@ -39,6 +41,8 @@ func TestTLSCertificateKnownServerRoleAdmission(t *testing.T) {
 					if c.client {
 						dir = 1 - server
 					}
+					state.app[dir] = c.application
+					epochs := state.app
 					var entries [][]byte
 					if c.entry {
 						entries = [][]byte{nil}
@@ -77,7 +81,7 @@ func TestTLSCertificateKnownServerRoleAdmission(t *testing.T) {
 					if !c.unknown {
 						require.Equal(t, uint64(3), state.seq[dir], "the authenticated record consumed its own sequence")
 					}
-					require.True(t, state.app[dir], "a body role check cannot reset the key epoch")
+					require.Equal(t, epochs, state.app, "a body role check cannot change either key epoch")
 				})
 			}
 		}
