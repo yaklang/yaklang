@@ -159,17 +159,27 @@ func (q *binQUIC) rememberRetiredCID(owner int, seq uint64, cid string, max int)
 	q.cidRetired[owner][seq] = cid
 }
 func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[string]any, max int) error {
+	if dir < 0 || dir > 1 || space < quicSpaceInitial || space > quicSpaceApplication {
+		return protocolError(ErrMalformedMessage, "QUIC CRYPTO direction or encryption level")
+	}
 	a := &q.cryptoData[dir][space]
 	_, _, _, err := a.feed(off, data, false, q.byteLimit, max)
 	if err != nil {
 		return err
 	}
-	if q.tls == nil {
-		q.tls = &binTLS{client: -1}
+	// All complete messages made available by this delivery form one TLS
+	// transaction. A valid prefix followed by a refused message must not leave
+	// a ClientHello/ALPN/key epoch committed while cryptoRead remains unchanged.
+	next := binTLS{client: -1}
+	if q.tls != nil {
+		next = *q.tls
 	}
 	at := q.cryptoRead[dir][space]
 	var messages []map[string]any
 	for len(a.data)-at >= 4 {
+		if space == quicSpaceHandshake && next.app[dir] {
+			return protocolError(ErrMalformedMessage, "QUIC handshake CRYPTO extends beyond observed Finished")
+		}
 		b := a.data[at:]
 		n := 4 + (int(b[1]) << 16) + (int(b[2]) << 8) + int(b[3])
 		if n > q.byteLimit {
@@ -178,13 +188,36 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		if len(b) < n {
 			break
 		}
+		if err := quicTLSMessageLevel(b[0], space); err != nil {
+			return err
+		}
+		if err := quicTLSHelloVersion(b[:n], max); err != nil {
+			return err
+		}
+		if b[0] == 4 && next.version == 0 {
+			return sessionContext("QUIC NewSessionTicket needs the observed negotiated TLS version")
+		}
 		// Initial protection authenticates packet bytes, not peer identity.
-		m, err := q.tls.handshakeMessage(dir, b[:n], space != quicSpaceInitial, max)
+		m, err := next.handshakeMessage(dir, b[:n], space != quicSpaceInitial, max)
 		if err != nil {
+			return err
+		}
+		if err := quicTLSTicketValues(m); err != nil {
 			return err
 		}
 		messages = append(messages, m)
 		at += n
+	}
+	if space == quicSpaceHandshake && next.app[dir] && (at < len(a.data) || len(a.pending) > 0) {
+		// Even an incomplete header or an out-of-order tail cannot extend
+		// this old level once its complete Finished is observed. Refuse the
+		// entire TLS batch rather than committing just the Finished prefix.
+		return protocolError(ErrMalformedMessage, "QUIC handshake CRYPTO extends beyond observed Finished")
+	}
+	if q.tls == nil {
+		q.tls = &next
+	} else {
+		*q.tls = next
 	}
 	q.cryptoRead[dir][space] = at
 	if len(messages) > 0 {
