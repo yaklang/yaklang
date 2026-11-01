@@ -185,10 +185,10 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 		}
 		if len(frame.evidence.refs) > 0 {
 			for _, ref := range frame.evidence.refs {
-				t.binState.contribute(direction, len(frame.Payload), ref)
+				t.binState.contributeCaptured(direction, len(frame.Payload), ref, frame.evidence)
 			}
 		} else {
-			t.binState.contribute(direction, len(frame.Payload), frame.evidence.Ref)
+			t.binState.contributeCaptured(direction, len(frame.Payload), frame.evidence.Ref, frame.evidence)
 		}
 		if frame.evidence.byteSourceKind != "" {
 			t.binState.byteSource = frame.evidence.byteSourceKind
@@ -197,7 +197,7 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 			t.binState.captureCarriers = append([]string(nil), frame.evidence.carrierLayers...)
 		}
 		for _, parent := range frame.evidence.parents {
-			t.binState.contribute(direction, len(frame.Payload), PacketReference{}, parent)
+			t.binState.contributeCaptured(direction, len(frame.Payload), PacketReference{}, frame.evidence, parent)
 		}
 		t.binState.feed(direction, frame.Payload, frame.Timestamp)
 	}

@@ -20,6 +20,11 @@ func phaResponseTestFlow(t *testing.T, suite uint16, server int) (*binFlow, *bin
 		require.NoError(t, err)
 		s.keys[dir], s.iv[dir], s.secret[dir], s.seq[dir] = key, iv, secret, sequence
 	}
+	// These unit programs model an already delivered bidirectional TCP prefix.
+	// Real capture ordering/ACK propagation is exercised separately.
+	f.captureTCP = true
+	f.transportFlow.ClientConn = &TrafficConnection{initialed: true, synSeen: true, isn: 99, nextSeq: 100}
+	f.transportFlow.ServerConn = &TrafficConnection{initialed: true, synSeen: true, isn: 99, nextSeq: 100}
 	return f, s
 }
 
@@ -40,6 +45,10 @@ func phaResponseTestCertificate(context []byte, empty bool) []byte {
 func phaResponseTestSend(t *testing.T, f *binFlow, s *binTLS, dir int, encoded []byte, kind byte) (*ProtocolEvent, error) {
 	t.Helper()
 	e := &ProtocolEvent{Protocol: "tls", Status: "decoded", Raw: boundaryTLSRecord(t, s, dir, s.seq[dir], encoded, kind, 0)}
+	e.Length = len(e.Raw)
+	prior := f.directions[dir].contributions
+	f.directions[dir].contributions = []contribution{{start: 0, end: uint64(e.Length), tcpACK: 100, tcpACKKnown: true}}
+	defer func() { f.directions[dir].contributions = prior }()
 	_, err := f.consumeTLS(dir, e)
 	return e, err
 }

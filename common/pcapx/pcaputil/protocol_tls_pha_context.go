@@ -17,6 +17,12 @@ func (t *binTLS) requestContextStorage() int64 {
 	if t.phaResponse.stage != tlsPHAResponseNone {
 		size += 128 + int64(len(t.phaResponse.context))
 	}
+	if len(t.phaEarlyResponses) != 0 {
+		size += 256
+		for context := range t.phaEarlyResponses {
+			size += 192 + int64(len(context))
+		}
+	}
 	return size
 }
 
@@ -42,7 +48,12 @@ func (t *binTLS) admitCertificateRequest(dir int, request *TLSCertificateRequest
 	if _, repeated := t.requestContexts[context]; repeated {
 		return nil, protocolError(ErrMalformedMessage, "repeated TLS CertificateRequest context")
 	}
-	if len(t.requestContexts) >= sessionCollectionLimit(limit) {
+	_, early := t.phaEarlyResponses[context]
+	retained := len(t.requestContexts) + len(t.phaEarlyResponses)
+	if early {
+		retained-- // this request replaces its already charged early-response slot
+	}
+	if retained >= sessionCollectionLimit(limit) {
 		return nil, protocolError(ErrResourceExceeded, "TLS CertificateRequest context history limit")
 	}
 	next := make(map[string]struct{}, len(t.requestContexts)+1)
@@ -54,10 +65,21 @@ func (t *binTLS) admitCertificateRequest(dir int, request *TLSCertificateRequest
 	if !t.app[dir] {
 		return nil, nil
 	}
-	t.retainPHARequest(context, uint64(len(next)))
-	return map[string]any{
+	response, observedEarly := t.retainPHARequest(context, uint64(len(next)))
+	out := map[string]any{
 		"Client PHA Offer":       offer,
 		"Context Uniqueness":     "unique among observed requests",
 		"Observed Request Count": uint64(len(next)),
-	}, nil
+	}
+	if observedEarly {
+		stage := "response block complete; transcript not verified"
+		if response.stage == tlsPHAResponseVerify {
+			stage = "awaiting CertificateVerify"
+		} else if response.stage == tlsPHAResponseFinished {
+			stage = "awaiting Finished"
+		}
+		out["Earlier Response"] = response.observation(stage)
+		out["Response Observation Order"] = "response observed before request; earlier events retain their original observation"
+	}
+	return out, nil
 }

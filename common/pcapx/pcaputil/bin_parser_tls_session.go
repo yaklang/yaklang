@@ -106,6 +106,8 @@ type binTLS struct {
 	phaRequests                            map[string]tlsPHARequest
 	phaResponse                            tlsPHAResponse
 	phaInitialFinished, phaGap             [2]bool
+	phaPeerPrefixComplete                  bool // current record only; no connection-wide ACK inference
+	phaEarlyResponses                      map[string]tlsPHAResponse
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
@@ -123,6 +125,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		f.tls = t
 	}
 	w := e.Raw
+	t.phaPeerPrefixComplete = f.phaPeerPrefixComplete(dir, e)
 	t.plaintext = nil
 	t.content = 0
 	typ, plain := w[0], w[5:]
@@ -584,7 +587,7 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			m["Certificates"], m["Certificate Body"] = view.Certificates, view.Fields
 			m["Certificate Version"], m["Encoded Certificate"] = t.version, bytes.Clone(b)
 			m["Certificate Body Status"] = "body vectors decoded; request context, certificate type and trust not evaluated"
-			association, err := t.admitPHACertificate(dir, view.Fields["Context"].([]byte), len(view.Certificates) == 0, authenticated)
+			association, err := t.admitPHACertificate(dir, view.Fields["Context"].([]byte), len(view.Certificates) == 0, authenticated, limit)
 			if err != nil {
 				return nil, err
 			}

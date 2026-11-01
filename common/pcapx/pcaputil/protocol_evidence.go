@@ -44,6 +44,8 @@ type captureEvidence struct {
 	networkPrefix        []gopacket.LayerType
 	networkPrefixLimited bool
 	tcpMissingTail       uint32 // validated captured TCP payload suffix; no invented bytes
+	tcpACK               uint32 // ACK on this byte contributor, never a later packet's ACK
+	tcpACKKnown          bool
 	Ref                  PacketReference
 	refs                 []PacketReference
 	// Applies to the current IP packet, not an outer tunnel carrier.
@@ -205,9 +207,20 @@ func cloneEvidence(e *ProtocolEvent) {
 }
 
 type contribution struct {
-	start, end uint64
-	ref        PacketReference
-	parent     uint64
+	start, end  uint64
+	ref         PacketReference
+	parent      uint64
+	tcpACK      uint32
+	tcpACKKnown bool
+}
+
+func (f *binFlow) contributeCaptured(dir, n int, ref PacketReference, evidence captureEvidence, parent ...uint64) {
+	d := &f.directions[dir]
+	before := len(d.contributions)
+	f.contribute(dir, n, ref, parent...)
+	if len(d.contributions) > before {
+		d.contributions[before].tcpACK, d.contributions[before].tcpACKKnown = evidence.tcpACK, evidence.tcpACKKnown
+	}
 }
 
 func (f *binFlow) contribute(dir int, n int, ref PacketReference, parent ...uint64) {
