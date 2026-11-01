@@ -257,6 +257,7 @@ func smb2NegotiateContextFields(body map[string]any, pdu []byte, count int, at u
 		smb2Literal(c, "Data Length", int(at+2), int(at+4), uint16(length))
 		smb2Literal(c, "Reserved", int(at+4), int(at+8), binary.LittleEndian.Uint32(pdu[at+4:at+8]))
 		smb2Literal(c, "Data", int(at+8), int(end), bytes.Clone(pdu[at+8:end]))
+		smb2TypeNegotiateContext(c, int(at+8))
 		contexts = append(contexts, c)
 		at = (end + 7) &^ 7
 	}
@@ -300,7 +301,7 @@ func smb2CreateFields(info map[string]any, pdu []byte, response bool, max int) e
 			smb2Literal(info, "File Name", offset, offset+length, info["File Name"])
 			smb2Literal(body, "File Name", offset, offset+length, info["File Name"])
 		}
-		return smb2CreateContextFields(body, pdu, 112, 120, max)
+		return smb2CreateContextFields(body, pdu, 112, 120, max, false)
 	}
 	smb2Literal(body, "Oplock Level", 66, 67, pdu[66])
 	smb2Literal(body, "Flags", 67, 68, pdu[67])
@@ -322,13 +323,13 @@ func smb2CreateFields(info map[string]any, pdu []byte, response bool, max int) e
 	fid := hex.EncodeToString(pdu[128:144])
 	smb2Literal(info, "FileId", 128, 144, fid)
 	smb2Literal(body, "FileId", 128, 144, fid)
-	return smb2CreateContextFields(body, pdu, 144, 152, max)
+	return smb2CreateContextFields(body, pdu, 144, 152, max, true)
 }
 
 // CREATE contexts form a forward-only, command-bounded chain. Validate all
-// declared buffers before publishing a successful open; their type-specific
-// data remains an explicitly opaque observation here.
-func smb2CreateContextFields(body map[string]any, pdu []byte, pairOffset, minimum, max int) error {
+// declared buffers before publishing a successful open. Only the observed
+// DH2Q, MxAc, QFid and RqLs layouts from MS-SMB2 2.2.13.2 are typed.
+func smb2CreateContextFields(body map[string]any, pdu []byte, pairOffset, minimum, max int, response bool) error {
 	offset := uint64(binary.LittleEndian.Uint32(pdu[pairOffset : pairOffset+4]))
 	length := uint64(binary.LittleEndian.Uint32(pdu[pairOffset+4 : pairOffset+8]))
 	smb2Literal(body, "Create Contexts Offset", pairOffset, pairOffset+4, uint32(offset))
@@ -376,12 +377,174 @@ func smb2CreateContextFields(body map[string]any, pdu []byte, pairOffset, minimu
 		if dataLength != 0 {
 			smb2Literal(c, "Data", int(at+dataOffset), int(at+dataOffset+dataLength), bytes.Clone(pdu[at+dataOffset:at+dataOffset+dataLength]))
 		}
+		smb2TypeCreateContext(c, int(at+dataOffset), response)
 		contexts = append(contexts, c)
 		if next == 0 {
 			body["Create Contexts"] = contexts
 			return nil
 		}
 		at += next
+	}
+}
+
+func smb2ContextData(c map[string]any) ([]byte, int, bool) {
+	data, _ := c["Data"].([]byte)
+	if len(data) == 0 {
+		return nil, 0, true
+	}
+	ranges, _ := c["Wire Field Ranges"].(map[string]any)
+	span, _ := ranges["Data"].([]any)
+	if len(span) != 2 {
+		return data, 0, false
+	}
+	base, ok := displayUint(span[0])
+	if !ok || uint64(int(base)) != base {
+		return data, 0, false
+	}
+	return data, int(base), true
+}
+
+func smb2TypeCreateContext(c map[string]any, dataAt int, response bool) {
+	name, _ := c["Name"].([]byte)
+	data, base, ok := smb2ContextData(c)
+	if !ok {
+		return
+	}
+	if base == 0 && len(data) != 0 {
+		base = dataAt
+	}
+	opaque := func(reason string) {
+		c["Data Status"] = "opaque: " + reason
+		log.Debugf("smb2: CREATE context %q left opaque: %s", name, reason)
+	}
+	switch string(name) {
+	case "MxAc":
+		// MS-SMB2 2.2.13.2.5 request is one FILETIME. 2.2.13.2.6 response is status plus mask.
+		if response && len(data) == 8 {
+			smb2Literal(c, "Query Status", base, base+4, binary.LittleEndian.Uint32(data[0:4]))
+			smb2Literal(c, "Maximal Access", base+4, base+8, binary.LittleEndian.Uint32(data[4:8]))
+			return
+		}
+		if !response && len(data) == 8 {
+			smb2Literal(c, "Timestamp", base, base+8, binary.LittleEndian.Uint64(data[0:8]))
+			return
+		}
+		opaque("MxAc length is not the 8-byte request or response layout")
+	case "QFid":
+		// MS-SMB2 2.2.13.2: the request passes no data. The response is 32 bytes.
+		if !response && len(data) == 0 {
+			c["Data Status"] = "request has no QFid buffer"
+			return
+		}
+		if response && len(data) == 32 {
+			smb2Literal(c, "Disk File Id", base, base+8, binary.LittleEndian.Uint64(data[0:8]))
+			smb2Literal(c, "Volume Id", base+8, base+16, binary.LittleEndian.Uint64(data[8:16]))
+			smb2Literal(c, "Reserved", base+16, base+32, bytes.Clone(data[16:32]))
+			return
+		}
+		opaque("QFid length is not an empty request or a 32-byte response")
+	case "RqLs":
+		// MS-SMB2 2.2.13.2.8 is 32 bytes. 2.2.13.2.10 lease v2 is 52 bytes. Request and response share the layout.
+		if len(data) != 32 && len(data) != 52 {
+			opaque("RqLs length is not 32 or 52")
+			return
+		}
+		smb2Literal(c, "Lease Key", base, base+16, bytes.Clone(data[0:16]))
+		smb2Literal(c, "Lease State", base+16, base+20, binary.LittleEndian.Uint32(data[16:20]))
+		smb2Literal(c, "Lease Flags", base+20, base+24, binary.LittleEndian.Uint32(data[20:24]))
+		smb2Literal(c, "Lease Duration", base+24, base+32, binary.LittleEndian.Uint64(data[24:32]))
+		if len(data) == 52 {
+			smb2Literal(c, "Parent Lease Key", base+32, base+48, bytes.Clone(data[32:48]))
+			smb2Literal(c, "Epoch", base+48, base+50, binary.LittleEndian.Uint16(data[48:50]))
+			smb2Literal(c, "Reserved", base+50, base+52, binary.LittleEndian.Uint16(data[50:52]))
+		}
+	case "DH2Q":
+		// MS-SMB2 2.2.13.2.11 request is 32 bytes. 2.2.13.2.12 response is 8 bytes.
+		if !response && len(data) == 32 {
+			smb2Literal(c, "Timeout", base, base+4, binary.LittleEndian.Uint32(data[0:4]))
+			smb2Literal(c, "Flags", base+4, base+8, binary.LittleEndian.Uint32(data[4:8]))
+			smb2Literal(c, "Reserved", base+8, base+16, bytes.Clone(data[8:16]))
+			smb2Literal(c, "Create Guid", base+16, base+32, bytes.Clone(data[16:32]))
+			return
+		}
+		if response && len(data) == 8 {
+			smb2Literal(c, "Timeout", base, base+4, binary.LittleEndian.Uint32(data[0:4]))
+			smb2Literal(c, "Flags", base+4, base+8, binary.LittleEndian.Uint32(data[4:8]))
+			return
+		}
+		opaque("DH2Q length is not the 32-byte request or 8-byte response")
+	default:
+		if len(data) != 0 {
+			opaque("CREATE context tag is not a selected layout")
+		}
+	}
+}
+
+func smb2TypeNegotiateContext(c map[string]any, dataAt int) {
+	kind, _ := c["Type"].(uint16)
+	data, base, ok := smb2ContextData(c)
+	if !ok {
+		return
+	}
+	if base == 0 && len(data) != 0 {
+		base = dataAt
+	}
+	opaque := func(reason string) {
+		c["Data Status"] = "opaque: " + reason
+		log.Debugf("smb2: negotiate context type %d left opaque: %s", kind, reason)
+	}
+	switch kind {
+	case 1: // MS-SMB2 2.2.3.1.1 PREAUTH
+		if len(data) < 4 {
+			opaque("PREAUTH header is truncated")
+			return
+		}
+		count := int(binary.LittleEndian.Uint16(data[0:2]))
+		salt := int(binary.LittleEndian.Uint16(data[2:4]))
+		if count < 1 || salt < 0 || 4+count*2+salt != len(data) {
+			opaque("PREAUTH hash count or salt length does not fill this context")
+			return
+		}
+		smb2Literal(c, "Hash Algorithm Count", base, base+2, uint16(count))
+		smb2Literal(c, "Salt Length", base+2, base+4, uint16(salt))
+		smb2Literal(c, "Hash Algorithms", base+4, base+4+count*2, bytes.Clone(data[4:4+count*2]))
+		smb2Literal(c, "Salt", base+4+count*2, base+len(data), bytes.Clone(data[4+count*2:]))
+	case 2: // MS-SMB2 2.2.3.1.2 ENCRYPTION
+		if len(data) < 2 {
+			opaque("ENCRYPTION cipher count is truncated")
+			return
+		}
+		count := int(binary.LittleEndian.Uint16(data[0:2]))
+		if count < 1 || 2+count*2 != len(data) {
+			opaque("ENCRYPTION cipher count does not fill this context")
+			return
+		}
+		smb2Literal(c, "Cipher Count", base, base+2, uint16(count))
+		smb2Literal(c, "Ciphers", base+2, base+len(data), bytes.Clone(data[2:]))
+	case 3: // MS-SMB2 2.2.3.1.3 COMPRESSION
+		if len(data) < 8 {
+			opaque("COMPRESSION header is truncated")
+			return
+		}
+		count := int(binary.LittleEndian.Uint16(data[0:2]))
+		if count < 1 || 8+count*2 != len(data) {
+			opaque("COMPRESSION algorithm count does not fill this context")
+			return
+		}
+		smb2Literal(c, "Compression Algorithm Count", base, base+2, uint16(count))
+		smb2Literal(c, "Padding", base+2, base+4, binary.LittleEndian.Uint16(data[2:4]))
+		smb2Literal(c, "Flags", base+4, base+8, binary.LittleEndian.Uint32(data[4:8]))
+		smb2Literal(c, "Compression Algorithms", base+8, base+len(data), bytes.Clone(data[8:]))
+	case 5: // MS-SMB2 2.2.3.1.4 NETNAME. The buffer is the UTF-16 name.
+		if len(data) == 0 || len(data)%2 != 0 {
+			opaque("NETNAME is not an even UTF-16 buffer")
+			return
+		}
+		smb2Literal(c, "Net Name", base, base+len(data), smb2UTF16LE(data))
+	default:
+		if len(data) != 0 {
+			opaque("negotiate context type is not a selected layout")
+		}
 	}
 }
 
