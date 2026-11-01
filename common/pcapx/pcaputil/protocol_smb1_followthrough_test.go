@@ -511,6 +511,21 @@ func TestSMBSecurityDescriptorBodyAndDFSVersions(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok, "version 4 without TargetSetBoundary is not the selected layout")
 
+	v3 := make([]byte, 8+34+6)
+	binary.LittleEndian.PutUint16(v3[2:4], 1)
+	binary.LittleEndian.PutUint16(v3[8:10], 3)
+	binary.LittleEndian.PutUint16(v3[10:12], 34)
+	binary.LittleEndian.PutUint16(v3[8+12:8+14], 34)
+	copy(v3[42:], []byte{'\\', 0, 'd', 0, 0, 0})
+	referral, ok, err = smb2DecodeDFSReferralV3Spec(v3, 4)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, `\d`, referral["Referrals"].([]map[string]any)[0]["DFS Path"])
+	v3[8+6] = 0x02
+	_, ok, err = smb2DecodeDFSReferralV3Spec(v3, 4)
+	require.NoError(t, err)
+	require.False(t, ok, "NameListReferral padding is not a fixed layout")
+
 	unknown := make([]byte, 8+22)
 	binary.LittleEndian.PutUint16(unknown[2:4], 1)
 	binary.LittleEndian.PutUint16(unknown[8:10], 5)

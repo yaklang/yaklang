@@ -1035,7 +1035,7 @@ func smb2DecodeDFSReferralV1(raw []byte, max int) (map[string]any, bool, error) 
 }
 
 func smb2SelectDFSReferral(raw []byte, max int) (map[string]any, string, bool, error) {
-	for _, version := range []string{"3", "1", "2", "4"} {
+	for _, version := range []string{"3", "1", "2", "4", "3guid"} {
 		var referral map[string]any
 		var ok bool
 		var err error
@@ -1048,8 +1048,13 @@ func smb2SelectDFSReferral(raw []byte, max int) (map[string]any, string, bool, e
 			referral, ok, err = smb2DecodeDFSReferralV2(raw, max)
 		case "4":
 			referral, ok, err = smb2DecodeDFSReferralV4(raw, max)
+		case "3guid":
+			referral, ok, err = smb2DecodeDFSReferralV3Spec(raw, max)
 		}
 		if err != nil || ok {
+			if version == "3guid" {
+				version = "3"
+			}
 			return referral, version, ok, err
 		}
 	}
@@ -1067,6 +1072,13 @@ func smb2DecodeDFSReferralV2(raw []byte, max int) (map[string]any, bool, error) 
 // first entry must set TargetSetBoundary.
 func smb2DecodeDFSReferralV4(raw []byte, max int) (map[string]any, bool, error) {
 	return smb2DecodeDFSReferralFixed(raw, max, 4, 34, true)
+}
+
+// MS-DFSC 2.2.5.3.1. NameListReferral clear: the entry is 34 bytes and includes
+// the ignored ServiceSiteGuid. This is separate from the 18-byte v3 records
+// already selected from capture.
+func smb2DecodeDFSReferralV3Spec(raw []byte, max int) (map[string]any, bool, error) {
+	return smb2DecodeDFSReferralFixed(raw, max, 3, 34, false)
 }
 
 func smb2DecodeDFSReferralFixed(raw []byte, max int, version uint16, fixed int, v4 bool) (map[string]any, bool, error) {
@@ -1091,7 +1103,7 @@ func smb2DecodeDFSReferralFixed(raw []byte, max int, version uint16, fixed int, 
 			return nil, false, nil
 		}
 		flags := binary.LittleEndian.Uint16(raw[at+6 : at+8])
-		if v4 && (flags&0x0002 != 0 || i == 0 && flags&0x0004 == 0) {
+		if fixed == 34 && flags&0x0002 != 0 || v4 && i == 0 && flags&0x0004 == 0 {
 			return nil, false, nil
 		}
 		sizes[i] = size
