@@ -1343,6 +1343,10 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)
+			authenticatedTLS := authenticatedTLSHandshakeDiagnostic(e)
+			if authenticatedTLS {
+				label = eventProtocolName(e)
+			}
 			if e.Protocol == "" && e.Transport != "" {
 				label = strings.ToUpper(e.Transport)
 			}
@@ -1355,6 +1359,16 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				// A later consequence (for example invalidated stream affinity)
 				// must not replace the original rejected-record diagnosis.
 				p.tlsRecordProblem = p.diagnostic
+			}
+			if authenticatedTLS && p.protocol == "" {
+				for _, layer := range eventCarriers(e) {
+					p.addLayer(layer)
+				}
+				p.addLayer(label)
+				p.protocol, p.priority, p.status = label, eventPriority(e), e.Status
+				p.visibility, p.scope = "authenticated-plaintext", "authenticated TLS record diagnostic"
+				p.evidence = "record AEAD verified; handshake message rejected"
+				p.summary = "Handshake rejected · record AEAD verified"
 			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)
@@ -1712,7 +1726,9 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	row.Info = p.summary
 	if p.tlsRecordProblem != "" {
 		row.Info = p.tlsRecordProblem + " | " + row.Info
-		row.ProtocolStatus = "mixed-record-outcomes"
+		if p.count > 0 {
+			row.ProtocolStatus = "mixed-record-outcomes"
+		}
 	}
 	if p.tlsHandshakeBoundaryUnavailable {
 		row.Info = "TLS handshake boundary unavailable | " + row.Info
