@@ -257,6 +257,9 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			if t.version == 0x304 && b[0] == 24 && n != len(b) {
 				return nil, protocolError(ErrMalformedMessage, "TLS KeyUpdate does not end at the record boundary")
 			}
+			if t.version == 0x304 && b[0] == 20 && n != len(b) {
+				return nil, protocolError(ErrMalformedMessage, "TLS Finished does not end at the record boundary")
+			}
 			if len(messages) >= f.a.budget.MaxCollectionElements {
 				return nil, protocolError(ErrResourceExceeded, "TLS handshake count limit")
 			}
@@ -424,7 +427,34 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			return nil, err
 		}
 	case 20:
-		if authenticated && t.version == 0x304 {
+		if t.version != 0x303 && t.version != 0x304 {
+			m["Finished Status"] = "negotiated version unavailable or unsupported; body uninterpreted"
+			break
+		}
+		if !authenticated {
+			return nil, protocolError(ErrMalformedMessage, "unauthenticated TLS Finished")
+		}
+		verifyData, err := DecodeTLSFinished(b, t.version, t.suite)
+		if err != nil {
+			return nil, err
+		}
+		phase := "handshake"
+		if t.version == 0x304 && t.app[dir] {
+			// Post-handshake client authentication uses application traffic
+			// keys, including its Finished. Only the initial Finished changes
+			// from handshake to application keys. Do not reset this sequence.
+			if t.client >= 0 && dir != t.client {
+				return nil, protocolError(ErrMalformedMessage, "server sent application-key TLS Finished")
+			}
+			phase = "application"
+		}
+		m["Finished Phase"], m["Finished Version"], m["Finished Cipher Suite"] = phase, t.version, t.suite
+		m["Finished Verify Data"], m["Encoded Finished"] = verifyData, bytes.Clone(b)
+		m["Finished Verification Status"] = "AEAD authenticated; transcript MAC not evaluated"
+		if phase == "application" {
+			m["Finished Context Status"] = "application-key handshake; PHA exchange context not validated"
+		}
+		if t.version == 0x304 && !t.app[dir] {
 			t.app[dir] = true
 			t.seq[dir] = 0
 			t.keys[dir] = nil

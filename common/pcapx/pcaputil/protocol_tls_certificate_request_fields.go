@@ -1,5 +1,7 @@
 package pcaputil
 
+import "encoding/hex"
+
 func tlsHandshakeDisplayRoot(e *ProtocolEvent) (map[string]any, string) {
 	if e.nativeQUICObservation {
 		return e.semanticSession, "TLS Handshakes"
@@ -61,5 +63,18 @@ func tlsCertificateRequestDisplayBindings() []displayFieldBinding {
 	add("tls.handshake.extensions_length", "CertificateRequest extensions vector length", 16, []string{"Extensions Length"})
 	add("tls.handshake.extension.type", "CertificateRequest extension type", 16, []string{"Extensions", "*", "Type"})
 	add("tls.handshake.extension.len", "CertificateRequest extension data length", 16, []string{"Extensions", "*", "Length"})
+	finished := displayCustom("tls", "tls.handshake.verify_data", "Observed TLS Finished verify_data", DisplayString, 0, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		session, root := tlsHandshakeDisplayRoot(e)
+		if root != "" {
+			p.walk(session, []string{root, "*", "Finished Verify Data"}, func(value any) {
+				if raw, ok := value.([]byte); ok {
+					emit(hex.EncodeToString(raw))
+				}
+			})
+		}
+	})
+	finished.protocols = "|tls|quic|http3|doq|"
+	finished.descriptor.Description = "Literal hexadecimal bytes of a complete cipher-suite-sized Finished. Record authentication is distinct from transcript MAC or peer authentication. Owned handshake plaintext has no outer record/frame span."
+	out = append(out, finished)
 	return out
 }
