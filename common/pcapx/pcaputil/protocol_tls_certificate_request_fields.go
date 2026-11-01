@@ -77,10 +77,7 @@ func tlsCertificateRequestDisplayBindings() []displayFieldBinding {
 	out = append(out, signatureAlgorithm)
 	add("tls.handshake.dnames_len", "CertificateRequest distinguished names vector length", 16,
 		[]string{"Certificate Authorities Length"}, []string{"Extensions", "*", "Certificate Authorities Length"})
-	add("tls.handshake.certificate_request_context_length", "CertificateRequest context length", 8, []string{"Context Length"})
-	add("tls.handshake.extensions_length", "CertificateRequest extensions vector length", 16, []string{"Extensions Length"})
-	add("tls.handshake.extension.type", "CertificateRequest extension type", 16, []string{"Extensions", "*", "Type"})
-	add("tls.handshake.extension.len", "CertificateRequest extension data length", 16, []string{"Extensions", "*", "Length"})
+	out = append(out, tlsCertificateDisplayBindings()...)
 	finished := displayCustom("tls", "tls.handshake.verify_data", "Observed TLS Finished verify_data", DisplayString, 0, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
 		session, root := tlsHandshakeDisplayRoot(e)
 		if root != "" {

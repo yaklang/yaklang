@@ -501,15 +501,30 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		// outer record ciphertext. Keep them owned and free of wire ranges.
 		m["Encoded Key Update"] = bytes.Clone(b)
 	case 11:
-		// Certificate bytes are evidence, not a trust assertion. Store hashes only;
-		// large chains remain bounded by the handshake message budget.
+		// Certificate bytes are evidence, not a trust assertion. The existing
+		// legacy summaries remain compatible; TLS 1.3 also retains the complete
+		// owned vector for its request context, entry and extension ranges.
 		sum := sha256.Sum256(body)
 		m["Certificate Message SHA256"] = hex.EncodeToString(sum[:])
-		certs, err := tlsCertificates(body, t.version == 0x304, limits...)
-		if err != nil {
-			return nil, err
+		if t.version == 0x304 {
+			limit := 4096
+			if len(limits) > 0 {
+				limit = limits[0]
+			}
+			view, err := DecodeTLSCertificate(b, t.version, limit)
+			if err != nil {
+				return nil, err
+			}
+			m["Certificates"], m["Certificate Body"] = view.Certificates, view.Fields
+			m["Certificate Version"], m["Encoded Certificate"] = t.version, bytes.Clone(b)
+			m["Certificate Body Status"] = "body vectors decoded; request context, certificate type and trust not evaluated"
+		} else {
+			certs, err := tlsCertificates(body, false, limits...)
+			if err != nil {
+				return nil, err
+			}
+			m["Certificates"] = certs
 		}
-		m["Certificates"] = certs
 	case 13:
 		if t.version == 0x304 && !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS 1.3 CertificateRequest")
@@ -831,7 +846,7 @@ func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, err
 	// before the configured limit, preserving malformed-vector error priority.
 	// This bounds certificate entries,
 	// not a newly invented count of fixed ASN.1 structure fields.
-	count := 0
+	count, extensions := 0, 0
 	for scan := b; len(scan) > 0; {
 		if count >= 64 {
 			return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
@@ -854,6 +869,14 @@ func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, err
 			if n > len(scan) {
 				return nil, bad()
 			}
+			// RFC 8446 4.4.2 uses complete Extension entries, not an opaque
+			// byte string. Check each certificate's block independently before
+			// hashing/parsing any certificate or admitting its collection.
+			elements, err := tlsCertificateEntryExtensions(scan[:n])
+			if err != nil {
+				return nil, err
+			}
+			extensions += elements
 			scan = scan[n:]
 		}
 		count++
@@ -861,6 +884,9 @@ func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, err
 
 	if count > max {
 		return nil, protocolError(ErrResourceExceeded, "TLS certificate count")
+	}
+	if len(limits) > 0 && count+extensions > limits[0] {
+		return nil, protocolError(ErrResourceExceeded, "TLS certificate extension collection limit")
 	}
 	var out []map[string]any
 	for len(b) > 0 {
@@ -904,4 +930,27 @@ func tlsCertificates(b []byte, tls13 bool, limits ...int) ([]map[string]any, err
 		}
 	}
 	return out, nil
+}
+
+// The fixed bitset bounds duplicate tracking without allocating an attacker-
+// sized map. Reusing a type in another CertificateEntry is allowed. Extension
+// payloads remain uninterpreted; this does not verify offers, OCSP, SCT or trust.
+func tlsCertificateEntryExtensions(b []byte) (int, error) {
+	var seen [1024]uint64
+	count := 0
+	for len(b) > 0 {
+		if len(b) < 4 {
+			return 0, protocolError(ErrMalformedMessage, "TLS certificate extension header")
+		}
+		typ, n := binary.BigEndian.Uint16(b), int(binary.BigEndian.Uint16(b[2:]))
+		b = b[4:]
+		bit := uint64(1) << (typ % 64)
+		if n > len(b) || seen[typ/64]&bit != 0 {
+			return 0, protocolError(ErrMalformedMessage, "TLS certificate extension length or duplicate type")
+		}
+		seen[typ/64] |= bit
+		count++
+		b = b[n:]
+	}
+	return count, nil
 }
