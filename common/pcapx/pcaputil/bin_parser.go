@@ -38,6 +38,7 @@ type ProtocolEvent struct {
 	nativeSTUNObservation              bool
 	nativeSIPObservation               bool
 	nativeSSHObservation               bool
+	nativeHTTPHeaderObservation        bool
 	nativeIMAPObservation              bool
 	nativeDCERPCObservation            bool
 	nativeTFTPObservation              bool
@@ -330,6 +331,12 @@ func (e *ProtocolEvent) Decode() (result map[string]any, err error) {
 			return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
 		}
 	}
+	if e.nativeHTTPHeaderObservation {
+		if e.semanticFields == nil {
+			return nil, protocolError(ErrContextRequired, "accepted HTTP response header fields unavailable")
+		}
+		return map[string]any{"fields": cloneSession(e.semanticFields)}, nil
+	}
 	if e.nativeDiagnosticError != "" {
 		return nil, fmt.Errorf("%s", e.nativeDiagnosticError)
 	}
@@ -445,6 +452,9 @@ func (e *ProtocolEvent) retainRuleEnvelope(result map[string]any) {
 }
 
 func (e *ProtocolEvent) ownsNativeFields() bool {
+	if e.nativeHTTPHeaderObservation {
+		return true
+	}
 	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeESPObservation {
 		return true
 	}
@@ -953,15 +963,18 @@ func (a *binParser) emit(e *BinParserEvent) {
 }
 
 type binDirection struct {
-	tlsPlaintextGap bool
-	contributions   []contribution
-	evidenceLimited bool
-	headerScan      int
-	http            *binHTTPState
-	buffer          []byte
-	offset          uint64
-	ts              time.Time
-	stopped         bool
+	httpUnframedHeaderID   uint64
+	httpUnframedVersion    string
+	httpUnframedHeaderHash [32]byte
+	tlsPlaintextGap        bool
+	contributions          []contribution
+	evidenceLimited        bool
+	headerScan             int
+	http                   *binHTTPState
+	buffer                 []byte
+	offset                 uint64
+	ts                     time.Time
+	stopped                bool
 	// RFC4253 section 7.3 switches SSH keys independently in each direction.
 	// Only ErrEncrypted after observed NEWKEYS preserves the peer's plaintext
 	// phase; malformed data, resource exhaustion and panics still invalidate it.
@@ -1371,6 +1384,9 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 			e.Completeness = "headers"
 			e.semanticFields = d.http.retainedHeaderFields()
 			e.Structured = map[string]any{"fields": cloneSession(e.semanticFields)}
+			if charge := f.retainHTTPUnframedObservation(dir, e, wire); charge != 0 {
+				defer f.a.buffered.Add(-charge)
+			}
 		}
 	}
 	if status == "limited" {
@@ -1405,6 +1421,7 @@ func (f *binFlow) stop(dir int, wire []byte, status, reason string) {
 	d.offset += uint64(len(wire))
 	d.stopped = true
 	f.release(d)
+	f.rememberHTTPHeaderObservation(dir, e)
 	f.a.emit(e)
 }
 
@@ -1416,6 +1433,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 			a.malformed.Add(1)
 			d.stopped = true
 			d.sshOpaque = false
+			d.httpUnframedHeaderID = 0
 			f.release(d)
 		}
 		// Resource exhaustion and panic containment invalidate connection-wide
@@ -1432,6 +1450,9 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	}()
 	a.input.Add(uint64(len(data)))
 	if d.stopped {
+		if d.httpUnframedHeaderID != 0 && len(data) > 0 {
+			f.emitHTTPUnframedArrival(dir, data, ts)
+		}
 		a.unclassified.Add(uint64(len(data)))
 		d.offset += uint64(len(data))
 		return
