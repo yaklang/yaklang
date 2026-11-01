@@ -11,6 +11,10 @@ func FuzzTLS13PHAResponseAssociation(f *testing.F) {
 	for _, seed := range [][]byte{{0, 3, 4, 1, 3, 4}, {8, 4, 9, 4}, {1, 3, 4, 8, 4}, {0, 5}, {8, 3}, {2}, {7, 3, 4}, {15, 10, 4}} {
 		f.Add(seed)
 	}
+	// Minimized real fuzz program: missing peer history, an empty response,
+	// then a client gap and the same context again. A gap does not erase the
+	// first observed Certificate, even when its request was never captured.
+	f.Add([]byte{0x7f, 0x5a, 0x37, 0x32})
 	f.Fuzz(func(t *testing.T, program []byte) {
 		if len(program) > 64 {
 			program = program[:64]
@@ -23,7 +27,7 @@ func FuzzTLS13PHAResponseAssociation(f *testing.F) {
 		// This model describes the response block, independently of private
 		// parser state. Public constants supply valid AEAD envelopes, not valid
 		// CertificateVerify signatures or Finished transcript MACs.
-		seen := [2]bool{}
+		seen := [3]bool{} // two observed requests and one unobserved-request context
 		active, needVerify, empty := false, false, false
 		clientGap, serverGap := false, false
 		for _, instruction := range program {
@@ -48,11 +52,9 @@ func FuzzTLS13PHAResponseAssociation(f *testing.F) {
 				}
 				chosenEmpty := instruction&8 != 0
 				encoded = phaResponseTestCertificate(context, chosenEmpty)
-				refuse = active || op < 2 && seen[op] || op == 2 && !serverGap
+				refuse = active || seen[op] || op == 2 && !serverGap
 				if !refuse {
-					if op < 2 {
-						seen[op] = true
-					}
+					seen[op] = true
 					active, needVerify, empty = true, !chosenEmpty, chosenEmpty
 				}
 			case 3:
