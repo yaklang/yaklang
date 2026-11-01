@@ -21,12 +21,18 @@ go run ./internal/trafficfixture/cmd/corpus verify
 ## Enterprise traffic analysis fixtures
 
 The six enterprise investigation scenarios are stored in
-`validation-enterprise-traffic-analysis-20261030.zip`. The batch contains 23
-PCAP/PCAPNG, keylog, manifest and `TASKS.md` members under
+`validation-enterprise-traffic-analysis-20261030.zip`. The batch contains 24
+members: 23 PCAP/PCAPNG, keylog, manifest and `TASKS.md` files aliased under
 `testdata/enterprise-traffic-analysis/`. Tests read them directly through
 `internal/trafficfixture.ReadFile`; filename-based consumers use
 `Materialize` into a test-owned temporary directory. Expanded copies are
 ignored by Git and do not shadow the indexed archive.
+
+The remaining member, `validation/expected.json`, binds all ten captures to
+their source manifest hashes, sizes and packet counts. Its partial oracle
+scope describes capture facts, without claiming application semantics or
+successful authentication. Original capture and scenario member bytes are
+unchanged.
 
 The current gate is **`required-tests-traffic-unified-v191.json`**. Chronological
 entries below retain their original batch context; an older entry saying

@@ -128195,7 +128195,7 @@
       "kind": "validation",
       "source_sha": "02f6e85e76d6f99551b9675909ebb47220b29ffa",
       "file": "validation-enterprise-traffic-analysis-20261030.zip",
-      "sha256": "6f7bbf93538a142f7842714d7f3e9f60370ea1591a52bd6fc2b01cde8759c5d2",
+      "sha256": "6a6f46a24e5e52dd0ac477d6158c1ab1e79417e7ce214deff72c717530666259",
       "password": "bin-parser",
       "members": {
         "dns-tunnel-c2/TASKS.md": {
@@ -128289,6 +128289,10 @@
         "redline-infostealer-2023-07/manifest.json": {
           "sha256": "d93af93f9ee97f9c3222281b1a6c021cb4aaafd6df0a2cbbe21129479ef4f16a",
           "bytes": 920
+        },
+        "validation/expected.json": {
+          "sha256": "7118e57de7e664b5204cb36f773b2e1d576e860e720bea08608c49781f3611a3",
+          "bytes": 14067
         }
       },
       "aliases": {

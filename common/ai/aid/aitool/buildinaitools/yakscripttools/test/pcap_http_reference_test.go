@@ -21,18 +21,33 @@ import (
 // the reported tshark detour. The public fixture must be answerable by the
 // built-in load_pcapfile/query_pcapdb workflow, including request/response IDs.
 func TestPCAPHTTPDGAFixtureUsesStructuredWorkflow(t *testing.T) {
+	previous := schema.GetGormProfileDatabase()
+	previousPath := ""
+	if previous != nil {
+		previousPath = consts.GetCurrentProfileDatabasePath()
+	}
+	var previousProject consts.ProjectDatabaseBinding
+	if schema.GetGormProjectDatabase() != nil {
+		previousProject = consts.CaptureProjectDatabaseBinding()
+	}
 	home := t.TempDir()
 	t.Setenv("YAKIT_HOME", home)
 	consts.ResetYakitHomeOnce()
-	profile, err := gorm.Open("sqlite3", filepath.Join(home, "profile.sqlite"))
+	profilePath := filepath.Join(home, "profile.sqlite")
+	profile, err := gorm.Open("sqlite3", profilePath)
 	require.NoError(t, err)
-	previous, previousPath := schema.GetGormProfileDatabase(), consts.GetCurrentProfileDatabasePath()
+	projectPath := filepath.Join(home, "project.sqlite")
+	project, err := consts.CreateProjectDatabase(projectPath)
+	require.NoError(t, err)
 	require.NoError(t, pcapdb.ClosePCAPDatabases())
-	consts.BindProfileDatabase(profile, "")
+	consts.BindProfileDatabase(profile, profilePath)
+	consts.BindProjectDatabaseWithReader(project, nil, projectPath)
 	t.Cleanup(func() {
 		require.NoError(t, pcapdb.ClosePCAPDatabases())
 		consts.BindProfileDatabase(previous, previousPath)
-		profile.Close()
+		consts.BindProjectDatabaseWithReader(previousProject.Database, previousProject.ReadDatabase, previousProject.Path)
+		require.NoError(t, profile.Close())
+		require.NoError(t, project.Close())
 		consts.ResetYakitHomeOnce()
 	})
 

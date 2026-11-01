@@ -96,14 +96,17 @@ func TestProtocolSessionDCERPCFragmentContextAndAuthSafety(t *testing.T) {
 
 	t.Run("authenticated-stub-is-opaque-and-auth-length-is-bounded", func(t *testing.T) {
 		d := newReviewDCERPC()
-		wire := dcerpcTestAuth(dcerpcRequest(call, 0, 3, nil), 2, 0, 0)
+		wire := dcerpcTestAuth(dcerpcRequest(call, 0, 3, nil), 2, 0, 6)
 		info, err := d.consumeFrom(0, wire, max)
 		require.NoError(t, err)
-		require.Equal(t, true, info["Authenticated"])
-		require.Equal(t, uint8(10), info["Auth Type"])
-		require.Equal(t, uint8(0), info["Auth Level"])
-		require.Equal(t, 2, info["Auth Value Bytes"])
-		require.Equal(t, uint16(3), info["OpNum"])
+		require.Equal(t, false, info["Authentication Verified"])
+		require.Equal(t, false, info["Stub Decoded"])
+		trailer := info["Security Trailer"].(map[string]any)
+		require.Equal(t, uint8(10), trailer["Auth Type"])
+		require.Equal(t, uint8(6), trailer["Auth Level"])
+		require.Len(t, info["Authentication Token"], 2)
+		require.NotContains(t, info, "OpNum")
+		require.Empty(t, d.pending)
 
 		bad := append([]byte(nil), wire...)
 		binary.LittleEndian.PutUint16(bad[10:12], 100)
@@ -137,25 +140,30 @@ func TestProtocolSessionDCERPCAuthenticatedCallsContinue(t *testing.T) {
 	), 40, 0, 6)
 	r := s.Feed(0, ts, bind)
 	require.Nil(t, r.Err)
-	require.Equal(t, true, r.Events[0].Session["Authenticated"])
-	require.Equal(t, uint8(6), r.Events[0].Session["Auth Level"])
+	require.Equal(t, "dcerpc-security-envelope", r.Events[0].Profile)
+	require.Equal(t, false, r.Events[0].Session["Authentication Verified"])
+	require.Empty(t, s.(*captureSession).f.dcerpc.proposals)
 
 	ack := dcerpcBindAckResults(12, 1, dcerpcBindAckEntry{result: 0, syntax: dcerpcNDR, version: 2})
 	r = s.Feed(1, ts, ack)
 	require.Nil(t, r.Err)
-	require.Equal(t, []uint16{0}, r.Events[0].Session["Accepted Context IDs"])
+	require.Equal(t, "missing-request", r.Events[0].Session["Association Status"])
+	require.NotContains(t, r.Events[0].Session, "Accepted Context IDs")
 
 	request := dcerpcTestAuth(dcerpcRequest(2, 0, 15, []byte{1, 2, 3, 4}), 16, 8, 6)
 	r = s.Feed(0, ts, request)
 	require.Nil(t, r.Err)
-	require.Equal(t, uint16(15), r.Events[0].Session["OpNum"])
-	require.Equal(t, 4, r.Events[0].Session["Stub Bytes"], "auth padding must not be counted as stub data")
-	require.Equal(t, true, r.Events[0].Session["Stub Opaque"])
+	require.Equal(t, request[16:28], r.Events[0].Session["Opaque PDU Body"], "auth padding must stay outside the protected body")
+	require.Equal(t, false, r.Events[0].Session["Stub Decoded"])
+	require.NotContains(t, r.Events[0].Session, "OpNum")
 
 	response := dcerpcTestAuth(dcerpcResponse(2, 0, []byte{9, 9}), 16, 8, 6)
 	r = s.Feed(1, ts, response)
 	require.Nil(t, r.Err)
-	require.Equal(t, "matched", r.Events[0].Session["Association Status"])
+	require.Equal(t, "dcerpc-security-envelope", r.Events[0].Profile)
+	require.NotContains(t, r.Events[0].Session, "Matched Request")
+	require.Zero(t, r.Events[0].ResponseTo)
+	require.Empty(t, s.(*captureSession).f.dcerpc.pending)
 }
 
 func TestProtocolSessionDCERPCBindAckNegotiateResult(t *testing.T) {
@@ -166,17 +174,21 @@ func TestProtocolSessionDCERPCBindAckNegotiateResult(t *testing.T) {
 
 	bind := dcerpcBindContexts(11, 1,
 		dcerpcBindContext{uuid: dcerpcEPM, id: 0},
-		dcerpcBindContext{uuid: dcerpcSRVSVC, id: 1},
+		dcerpcBindContext{uuid: dcerpcEPM, id: 1},
 	)
+	featureOffset := 16 + 12 + 44 + 24
+	copy(bind[featureOffset:featureOffset+16], append(append([]byte(nil), dcerpcBindFeaturePrefix...), 3, 0, 0, 0, 0, 0, 0, 0))
+	binary.LittleEndian.PutUint32(bind[featureOffset+16:], 1)
 	require.Nil(t, s.Feed(0, ts, bind).Err)
 	ack := dcerpcBindAckResults(12, 1,
 		dcerpcBindAckEntry{result: 0, syntax: dcerpcNDR, version: 2},
-		dcerpcBindAckEntry{result: 3, syntax: dcerpcNDR, version: 2},
+		dcerpcBindAckEntry{result: 3, syntax: make([]byte, 16), version: 0},
 	)
 	r := s.Feed(1, ts, ack)
 	require.Nil(t, r.Err)
 	require.Equal(t, []uint16{0}, r.Events[0].Session["Accepted Context IDs"])
 	require.Equal(t, []uint16{1}, r.Events[0].Session["Negotiated Context IDs"])
+	require.NotContains(t, s.(*captureSession).f.dcerpc.ctx, uint16(1))
 }
 
 func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
@@ -201,42 +213,31 @@ func TestProtocolSessionDCERPCRealSMBExecAuthTraffic(t *testing.T) {
 	var foundAuth3, foundRequest, foundResponse bool
 	for _, event := range dcerpcEvents {
 		require.Empty(t, event.Error, "DCE/RPC authentication must not stop the stream: %s", event.Error)
+		if event.Profile != "dcerpc-security-envelope" {
+			continue
+		}
+		require.Equal(t, false, event.Session["Authentication Verified"])
+		require.Equal(t, false, event.Session["Peer Identity Verified"])
+		require.Equal(t, false, event.Session["Stub Decoded"])
+		require.NotContains(t, event.Session, "Matched Request")
+		require.Zero(t, event.ResponseTo)
 		ptype, _ := event.Session["PType"].(byte)
 		switch ptype {
 		case 16:
 			foundAuth3 = true
-			require.Equal(t, true, event.Session["Authenticated"])
 			ntlm, ok := event.Session["NTLMSSP"].(map[string]any)
-			require.True(t, ok, "NTLM Type3 identity fields must be structured")
+			require.True(t, ok, "observed NTLM Type3 identity fields must be structured")
 			require.NotEmpty(t, ntlm["User"])
 		case 0:
-			if op, ok := event.Session["OpNum"].(uint16); ok && op == 15 {
-				foundRequest = true
-				require.Equal(t, true, event.Session["Stub Opaque"])
-			}
+			foundRequest = true
+			require.NotContains(t, event.Session, "OpNum")
 		case 2:
 			foundResponse = true
-			require.Equal(t, "matched", event.Session["Association Status"])
 		}
 	}
 	require.True(t, foundAuth3, "NTLM AUTH3 must be framed and retained")
-	require.True(t, foundRequest, "svcctl request after authenticated bind must be decoded")
-	require.True(t, foundResponse, "svcctl response after authenticated bind must be decoded")
-
-	var sawOpen, sawCreate bool
-	for _, event := range dcerpcEvents {
-		switch event.Session["Packet Name"] {
-		case "svcctl.ROpenSCManagerW":
-			sawOpen = true
-			require.Equal(t, uint16(15), event.Session["OpNum"])
-		case "svcctl.RCreateServiceWOW64W":
-			sawCreate = true
-			require.Equal(t, uint16(45), event.Session["OpNum"])
-		}
-		require.NotContains(t, event.Summary, "unknown.op_")
-	}
-	require.True(t, sawOpen)
-	require.True(t, sawCreate)
+	require.True(t, foundRequest, "protected request envelope after bind must be retained")
+	require.True(t, foundResponse, "protected response envelope after bind must be retained")
 }
 
 func TestProtocolSessionDCERPCResponseContextMustMatchRequest(t *testing.T) {
