@@ -1,6 +1,8 @@
 package sharkcli
 
 import (
+	"bytes"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -72,4 +74,33 @@ func TestTLSAuthenticatedPHAApplicationInterruptionKeepsIdentity(t *testing.T) {
 	view := workerMetadataDetailForPacket(t, packet)
 	require.Equal(t, "TLSv1.3", view.protocol)
 	require.Contains(t, detailLines(view.fields), "TLS post-handshake response interleaved")
+}
+
+func TestTLSStoppedRemainderIsAnObservationWithAnExactPreview(t *testing.T) {
+	for _, observed := range []int{64, 74, 360} {
+		t.Run(fmt.Sprintf("observed%d", observed), func(t *testing.T) {
+			e := &pcaputil.ProtocolEvent{ID: 20, FlowID: 1, Protocol: "tls", Transport: "tcp", Profile: "tls", Status: "context-required", ExpertCode: string(pcaputil.ErrContextRequired), Error: "ContextRequired: decode failure invalidated stream affinity", Length: observed, Raw: bytes.Repeat([]byte{0xa5}, 64), SourceBytes: pcaputil.ByteSource{Kind: "reassembled"}}
+			fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+			for _, view := range []packetDetail{{fields: fields, sources: sources}, workerMetadataDetail(t, []*pcaputil.ProtocolEvent{e}, false), workerMetadataDetail(t, []*pcaputil.ProtocolEvent{e}, true)} {
+				text := detailLines(view.fields)
+				require.Contains(t, text, "TLS stream remainder · observation #20")
+				require.NotContains(t, text, "handshake not captured")
+				require.NotContains(t, text, "TLS? candidate record")
+				require.NotContains(t, text, "· PDU #20")
+				require.Len(t, view.sources, 1, "the unparsed extent has no decrypted handshake source")
+				want := fmt.Sprintf("Unparsed TLS stream remainder · %d observed bytes", observed)
+				if observed > 64 {
+					want = fmt.Sprintf("Unparsed TLS stream remainder preview · 64/%d observed bytes", observed)
+				}
+				require.Equal(t, want, view.sources[0].Name)
+				require.Equal(t, e.Raw, view.sources[0].Data)
+				for _, field := range view.fields {
+					if field.hasRange && field.source == 1 {
+						require.GreaterOrEqual(t, field.start, 0)
+						require.LessOrEqual(t, field.end, 64)
+					}
+				}
+			}
+		})
+	}
 }

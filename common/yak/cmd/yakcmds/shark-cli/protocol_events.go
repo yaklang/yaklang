@@ -1012,10 +1012,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind
+		tlsRemainder := tlsStoppedStreamRemainder(e)
 		if kind == "" {
 			kind = "message"
 		}
-		if !credibleTLSIdentity(e) {
+		if !credibleTLSIdentity(e) && !tlsRemainder {
 			if strongTLSRecord(e) {
 				kind += " · TLS record framing; handshake not captured"
 			} else {
@@ -1038,7 +1039,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				label = "UDP carrier diagnostic"
 			}
 		}
-		if !credibleTLSIdentity(e) {
+		if !credibleTLSIdentity(e) && !tlsRemainder {
 			label = "TLS?"
 			if strongTLSRecord(e) {
 				label = "TLS · record framing only"
@@ -1047,6 +1048,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		unit := "PDU"
 		if tcpPayload {
 			unit = "observation"
+		}
+		if tlsRemainder {
+			label, unit = "TLS stream remainder", "observation"
 		}
 		smbPreview := e.Protocol == "smb" && (e.Profile == "smb-record-resource-diagnostic" || e.Profile == "smb-record-diagnostic")
 		if smbPreview {
@@ -1091,6 +1095,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			sourceName := name + " · " + kind + " PDU"
 			if tcpPayload {
 				sourceName = name // An unidentified byte extent is not a decoded PDU.
+			}
+			if tlsRemainder {
+				sourceName = fmt.Sprintf("Unparsed TLS stream remainder · %d observed bytes", e.Length)
+				if e.Length > len(e.Raw) {
+					sourceName = fmt.Sprintf("Unparsed TLS stream remainder preview · %d/%d observed bytes", len(e.Raw), e.Length)
+				}
 			}
 			if smbPreview {
 				sourceName = fmt.Sprintf("SMB1 record preview · %d/%d observed bytes · %s", len(e.Raw), e.Length, kind)

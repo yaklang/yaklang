@@ -328,3 +328,66 @@ func TestTLS13PHAResponseTypedFieldsOwnTheirObservedContext(t *testing.T) {
 		}
 	}
 }
+
+func TestTLS13PHAResponseCoalescedMessagesKeepTheirOrdinals(t *testing.T) {
+	for _, suite := range []uint16{0x1301, 0x1302, 0x1303} {
+		for _, empty := range []bool{false, true} {
+			t.Run(fmt.Sprintf("suite%04x/empty%t", suite, empty), func(t *testing.T) {
+				f, s := phaResponseTestFlow(t, suite, 1)
+				_, err := phaResponseTestSend(t, f, s, 1, append(phaContextTestRequest([]byte{0xa1}), phaContextTestRequest([]byte{0xb2})...), 22)
+				require.NoError(t, err)
+				// Reverse the two responses. A single TLS record carries each
+				// complete block, with Finished at its required record boundary.
+				for _, index := range []int{1, 0} {
+					block := phaResponseTestCertificate([]byte{[]byte{0xa1, 0xb2}[index]}, empty)
+					stages := []any{"awaiting CertificateVerify", "awaiting Finished", "response block complete; transcript not verified"}
+					if !empty {
+						block = append(block, certificateVerifyTestMessage(0x304, 0x0804, []byte{1})...)
+					} else {
+						stages = stages[1:]
+					}
+					block = append(block, finishedTestMessage(phaResponseTestHashSize(suite))...)
+					event, err := phaResponseTestSend(t, f, s, 0, block, 22)
+					require.NoError(t, err)
+					messages := event.Session["Handshake Messages"].([]map[string]any)
+					require.Len(t, messages, len(stages))
+					indices := make([]any, len(stages))
+					for i, message := range messages {
+						association := phaResponseTestAssociation(t, message)
+						require.Equal(t, uint64(index+1), association["Request Ordinal"])
+						require.Equal(t, stages[i], association["Response Stage"])
+						indices[i] = uint64(index + 1)
+					}
+					event.nativeTLSObservation, event.semanticFields = true, cloneSession(event.Session)
+					fields := event.DisplayFieldValues().FieldMap()
+					require.Equal(t, indices, fields["tls.pha.request_index"])
+					require.Equal(t, stages, fields["tls.pha.response_stage"])
+				}
+			})
+		}
+	}
+}
+
+func TestTLS13PHAResponseUninterpretedPrefixStaysUnavailable(t *testing.T) {
+	for _, suite := range []uint16{0x1301, 0x1302, 0x1303} {
+		for _, kind := range []byte{25, 255} {
+			t.Run(fmt.Sprintf("suite%04x/type%d", suite, kind), func(t *testing.T) {
+				f, s := phaResponseTestFlow(t, suite, 1)
+				_, err := phaResponseTestSend(t, f, s, 1, phaContextTestRequest([]byte{0xa1}), 22)
+				require.NoError(t, err)
+				// Opaque bytes do not claim a valid compressed Certificate.
+				// They exercise the unsupported-message uncertainty fence.
+				event, err := phaResponseTestSend(t, f, s, 0, reliabilityHS(kind, []byte{1, 2, 3}), 22)
+				require.NoError(t, err)
+				require.Equal(t, "unavailable after uninterpreted post-handshake message", event.Session["Handshake Messages"].([]map[string]any)[0]["PHA Response Context"])
+				for _, encoded := range [][]byte{certificateVerifyTestMessage(0x304, 0x0804, []byte{1}), finishedTestMessage(phaResponseTestHashSize(suite))} {
+					event, err = phaResponseTestSend(t, f, s, 0, encoded, 22)
+					require.NoError(t, err)
+					association := phaResponseTestAssociation(t, event.Session["Handshake Messages"].([]map[string]any)[0])
+					require.Equal(t, "response prefix unavailable", association["Response Stage"])
+					require.NotContains(t, association, "Request Ordinal")
+				}
+			})
+		}
+	}
+}

@@ -45,3 +45,12 @@ func authenticatedTLSRecordDiagnostic(e *pcaputil.ProtocolEvent) bool {
 	}
 	return true
 }
+
+// A stopped decoder can retain a bounded prefix of several remaining records.
+// This is a stream extent, not a successfully framed or authenticated TLS PDU.
+func tlsStoppedStreamRemainder(e *pcaputil.ProtocolEvent) bool {
+	return e != nil && e.Protocol == "tls" && e.Transport == "tcp" && e.Profile == "tls" &&
+		e.Status == "context-required" && e.ExpertCode == string(pcaputil.ErrContextRequired) &&
+		e.Error == e.ExpertCode+": decode failure invalidated stream affinity" &&
+		e.SourceBytes.Kind == "reassembled" && len(e.Raw) > 0 && e.Length >= len(e.Raw)
+}

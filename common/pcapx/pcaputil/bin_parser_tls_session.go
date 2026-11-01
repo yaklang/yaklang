@@ -632,6 +632,14 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		m["Certificate Request"], m["Certificate Request Version"] = request.Fields, t.version
 		m["Encoded Certificate Request"] = bytes.Clone(b)
 		m["Certificate Request Status"] = "body vectors decoded; handshake conformance not established"
+	default:
+		if t.phaClientApplication(dir) {
+			// An unsupported message can replace an authentication message,
+			// for example CompressedCertificate (RFC 8879). Its context is
+			// opaque here; do not infer a missing Certificate from a later CV.
+			t.notePHAGap(dir)
+			m["PHA Response Context"] = "unavailable after uninterpreted post-handshake message"
+		}
 	}
 	return m, nil
 }

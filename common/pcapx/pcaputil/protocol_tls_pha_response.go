@@ -12,10 +12,11 @@ const (
 )
 
 type tlsPHAResponse struct {
-	context string
-	ordinal uint64
-	stage   uint8
-	empty   bool
+	context          string
+	ordinal          uint64
+	stage            uint8
+	empty            bool
+	uncertainHistory bool
 }
 
 // Request and response history belong to the connection, including across
@@ -77,6 +78,9 @@ func (response tlsPHAResponse) observation(stage string) map[string]any {
 	if response.ordinal != 0 {
 		out["Request Ordinal"] = response.ordinal
 	}
+	if response.uncertainHistory {
+		out["Prior Client History"] = "unavailable; association covers observed messages only"
+	}
 	return out
 }
 
@@ -104,7 +108,7 @@ func (t *binTLS) admitPHACertificate(dir int, context []byte, empty, authenticat
 	if !matched && t.phaInitialFinished[0] && t.phaInitialFinished[1] && !t.phaGap[1-dir] {
 		return nil, protocolError(ErrMalformedMessage, "unobserved TLS CertificateRequest context")
 	}
-	response := tlsPHAResponse{context: key, empty: empty, stage: tlsPHAResponseVerify}
+	response := tlsPHAResponse{context: key, empty: empty, stage: tlsPHAResponseVerify, uncertainHistory: !t.phaInitialFinished[dir] || t.phaGap[dir]}
 	stage := "awaiting CertificateVerify"
 	if empty {
 		response.stage, stage = tlsPHAResponseFinished, "awaiting Finished"
