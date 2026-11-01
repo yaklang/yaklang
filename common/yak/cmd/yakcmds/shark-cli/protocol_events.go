@@ -1425,10 +1425,17 @@ func eventProtocols(events []*pcaputil.ProtocolEvent) string {
 		if e == nil {
 			continue
 		}
-		if e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) && !validESPIncompleteObservation(e) {
-			continue
+		name := ""
+		if h := observedHTTPResponseHeader(e); h != nil {
+			name = strings.SplitN(h.line, " ", 2)[0]
+		} else if context := observedHTTPUnframedContext(e); context != "" {
+			name = context
+		} else {
+			if isHTTPObservationProfile(e) || e.Status != "decoded" && e.Status != "deferred" && !validESPHeaderObservation(e) && !validESPIncompleteObservation(e) {
+				continue
+			}
+			name = eventProtocolName(e)
 		}
-		name := eventProtocolName(e)
 		if !credibleTLSIdentity(e) {
 			name = "TLS?"
 			if strongTLSRecord(e) {

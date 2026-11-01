@@ -41,6 +41,9 @@ func TestHTTPHeaderObservationHasProgressiveOwnedSources(t *testing.T) {
 		"stream-worker": workerMetadataDetail(t, []*pcaputil.ProtocolEvent{e}, true),
 	} {
 		t.Run(name, func(t *testing.T) {
+			if name != "direct" {
+				require.Equal(t, "HTTP/1.1", d.protocol, "the worker title retains the qualified partial-header identity")
+			}
 			text := detailLines(d.fields)
 			require.Contains(t, text, "HTTP/1.1 response header · observation")
 			require.Contains(t, text, "Body boundary: unknown · request method unavailable")
@@ -162,6 +165,9 @@ func TestHTTPLaterUnframedBytesUseHeaderContextWithoutMessages(t *testing.T) {
 	fs, ss := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
 	for name, d := range map[string]packetDetail{"direct": {fields: fs, sources: ss}, "worker": workerMetadataDetail(t, []*pcaputil.ProtocolEvent{e}, false), "stream": workerMetadataDetail(t, []*pcaputil.ProtocolEvent{e}, true)} {
 		t.Run(name, func(t *testing.T) {
+			if name != "direct" {
+				require.Equal(t, "HTTP/1.1", d.protocol, "stream title must retain the explicitly qualified header context")
+			}
 			text := detailLines(d.fields)
 			require.Contains(t, text, "HTTP response context · unframed observation")
 			require.Contains(t, text, fmt.Sprintf("Observed header PDU: #%d", headerID))

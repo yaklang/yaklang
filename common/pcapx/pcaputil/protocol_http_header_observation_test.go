@@ -83,6 +83,8 @@ func TestHTTPUnknownMethodRetainsUnframedObservation(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, 200, queried["Status Code"])
 				require.NotContains(t, queried, "Body")
+				require.Equal(t, []any{uint64(200)}, e.DisplayFields()["http.response.code"])
+				require.NotContains(t, e.DisplayFields(), "http.request.method")
 				decoded, err := e.Decode()
 				require.NoError(t, err)
 				context := decoded["session"].(map[string]any)
@@ -176,7 +178,7 @@ func TestHTTPUnknownMethodLaterArrivalsRemainOwnedUnframedBytes(t *testing.T) {
 			require.Len(t, r.Events, 1)
 			headerID := r.Events[0].ID
 			base := uint64(len(header))
-			for i, tail := range [][]byte{[]byte("OK"), []byte("HTTP/1.1 204 No Content\r\n\r\n\xff\x00")} {
+			for i, tail := range [][]byte{[]byte("OK"), []byte("HTTP/1.1 204 No Content\r\n\r\n\xff\x00"), []byte("GET /embedded HTTP/1.1\r\nHost: example.test\r\n\r\n")} {
 				ref := PacketReference{Number: uint64(21 + i), Domain: f.domain}
 				require.True(t, f.a.reserveEvidence(80))
 				f.directions[1].contributions = append(f.directions[1].contributions, contribution{start: base, end: base + uint64(len(tail)), ref: ref, parent: uint64(121 + i)})
@@ -197,11 +199,15 @@ func TestHTTPUnknownMethodLaterArrivalsRemainOwnedUnframedBytes(t *testing.T) {
 				require.Equal(t, false, e.Session["Body Boundary Known"])
 				require.Zero(t, e.ResponseTo)
 				require.Zero(t, e.TransactionID)
+				require.NotContains(t, e.DisplayFields(), "http.response.code")
+				require.NotContains(t, e.DisplayFields(), "http.request.method")
 				_, err = e.GetFields()
 				require.Error(t, err, "an unframed arrival has no complete HTTP field grammar")
 				e.Fields, e.Structured, e.Protocol, e.Status = map[string]any{"Body": "forged"}, map[string]any{"fields": map[string]any{"Body": "forged"}}, "http", "decoded"
 				_, err = e.GetFields()
 				require.Error(t, err, "public cache edits cannot turn an observation into a message")
+				require.NotContains(t, e.DisplayFields(), "http.response.code")
+				require.NotContains(t, e.DisplayFields(), "http.request.method")
 				base += uint64(len(tail))
 				require.Zero(t, s.Stats().BufferedBytes)
 			}
@@ -307,6 +313,8 @@ func FuzzHTTPUnframedResponseObservation(f *testing.F) {
 				}
 			case "http-unframed-stream-observation":
 				require.Equal(t, len(e.Raw), e.Length)
+				require.NotContains(t, e.DisplayFields(), "http.response.code")
+				require.NotContains(t, e.DisplayFields(), "http.request.method")
 				observed = append(observed, e.Raw...)
 			default:
 				t.Fatalf("unframed bytes acquired a protocol message: %s", e.Profile)

@@ -858,6 +858,20 @@ func (p *displayProjection) maps(value any, fn func(map[string]any)) {
 }
 
 func displayHTTPValues(e *ProtocolEvent, request bool, emit func(any), p *displayProjection) {
+	// A private framing refusal is not an admitted HTTP message. Opaque
+	// continuation bytes may themselves contain a full-looking request or
+	// response line; publishing aliases from them would invent a boundary.
+	if e.nativeDiagnosticError != "" {
+		return
+	}
+	if e.nativeHTTPHeaderObservation {
+		// Header-only queries use the accepted literal snapshot, including
+		// after public Raw/Fields/Session edits. No method was observed.
+		if !request {
+			emit(e.semanticFields["Status Code"])
+		}
+		return
+	}
 	header := ":status"
 	if request {
 		header = ":method"
