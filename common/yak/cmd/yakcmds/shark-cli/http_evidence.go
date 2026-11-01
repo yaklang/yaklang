@@ -19,8 +19,12 @@ type httpEvidence struct {
 }
 
 func inspectHTTP(p []byte) *httpEvidence {
-	if len(p) > streamPrefixLimit {
-		p = p[:streamPrefixLimit]
+	return inspectHTTPBounded(p, streamPrefixLimit)
+}
+
+func inspectHTTPBounded(p []byte, limit int) *httpEvidence {
+	if len(p) > limit {
+		p = p[:limit]
 	}
 	end := bytes.Index(p, []byte("\r\n\r\n"))
 	first := bytes.Index(p, []byte("\r\n"))

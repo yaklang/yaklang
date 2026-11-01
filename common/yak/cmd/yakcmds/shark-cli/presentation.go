@@ -1296,6 +1296,34 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.evidence = "packet authentication is per packet; datagram padding is unprotected"
 		return
 	}
+	if h := observedHTTPResponseHeader(e); h != nil {
+		for _, layer := range eventCarriers(e) {
+			p.addLayer(layer)
+		}
+		label := strings.SplitN(h.line, " ", 2)[0]
+		p.addLayer(label)
+		if rank := eventPriority(e); rank >= p.priority {
+			p.protocol, p.priority, p.status = label, rank, e.Status
+			p.visibility, p.scope = "headers", "response header only; message boundary unavailable"
+			p.evidence = "validated complete response header; request method unavailable"
+			p.summary = safeText(h.line) + " · header only · request method unavailable"
+		}
+		return
+	}
+	if label := observedHTTPUnframedContext(e); label != "" {
+		p.addLayer(label)
+		if rank := eventPriority(e); rank >= p.priority {
+			p.protocol, p.priority, p.status = label, rank, e.Status
+			p.visibility, p.scope = "unframed-stream", "observed header context; current message boundary unavailable"
+			p.evidence = "earlier complete response header on this direction; no request method or complete message"
+			p.summary = clipText(e.Summary, 384)
+		}
+		return
+	}
+	if isHTTPObservationProfile(e) {
+		p.diagnostic = "HTTP observation · context or owned source unavailable"
+		return
+	}
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)

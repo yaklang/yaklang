@@ -939,6 +939,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			appendUnsupportedQUICTCPCarrier(&out, &sources, e)
 			continue
 		}
+		if h := observedHTTPResponseHeader(e); h != nil {
+			appendHTTPHeaderObservation(&out, &sources, e, h)
+			continue
+		}
+		if observedHTTPUnframedContext(e) != "" {
+			appendHTTPUnframedContext(&out, &sources, e)
+			continue
+		}
+		if isHTTPObservationProfile(e) {
+			appendUnqualifiedHTTPObservation(&out, &sources, e)
+			continue
+		}
 		protocol, currentSource = e.Protocol, 0
 		ospfv3Display = e.Profile == "ospfv3-bounded-control"
 		ospfv2Display = e.Profile == "ospfv2-bounded-control"
