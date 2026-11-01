@@ -937,6 +937,12 @@ func smb2DecodeDFSReferralV3(raw []byte, max int) (map[string]any, bool, error) 
 		if len(raw)-at < 18 || binary.LittleEndian.Uint16(raw[at:at+2]) != 3 || binary.LittleEndian.Uint16(raw[at+2:at+4]) != 18 {
 			return nil, false, nil
 		}
+		// MS-DFSC 2.2.5.3.2. NameListReferral padding is 0 or 16 bytes and has
+		// no length, so this 18-byte target layout must not read it as a path.
+		if binary.LittleEndian.Uint16(raw[at+6:at+8])&0x0002 != 0 {
+			log.Debugf("smb2: DFS referral left opaque; NameListReferral padding width is not fixed")
+			return nil, false, nil
+		}
 		at += 18
 	}
 	info := map[string]any{}

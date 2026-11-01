@@ -3,6 +3,7 @@ package stream_parser
 import (
 	"encoding/binary"
 	"fmt"
+	"strings"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
 	"github.com/yaklang/yaklang/common/log"
@@ -232,13 +233,18 @@ func smb2SecurityDescriptorFields(wire []byte, info map[string]any) ([]tlsCertif
 		if off == 0 {
 			return
 		}
-		aclFields, n, reason := smb2ACLFields(wire[off:], name)
+		aclFields, n, reason := smb2ACLFields(wire[off:], name, info)
 		if reason != "" {
 			info[name+" Status"] = reason
 			log.Debugf("smb2: %s left opaque: %s", name, reason)
 			return
 		}
 		if overlaps(off, off+n) {
+			for key := range info {
+				if strings.HasPrefix(key, name+" ACE ") {
+					delete(info, key)
+				}
+			}
 			info[name+" Status"] = "opaque: security descriptor ranges overlap"
 			log.Debugf("smb2: %s left opaque; its bytes overlap another security descriptor field", name)
 			return
@@ -307,7 +313,7 @@ func smb2SIDLiteral(wire []byte) (string, int, string) {
 
 // MS-DTYP 2.4.5. AclSize covers the 8-byte header and any ACE bytes that follow.
 // An ACE that does not fit is not published.
-func smb2ACLFields(wire []byte, name string) ([]tlsCertificateField, int, string) {
+func smb2ACLFields(wire []byte, name string, info map[string]any) ([]tlsCertificateField, int, string) {
 	if len(wire) < 8 {
 		return nil, 0, "opaque: ACL header leaves this buffer"
 	}
@@ -339,6 +345,16 @@ func smb2ACLFields(wire []byte, name string) ([]tlsCertificateField, int, string
 			tlsCertificateLeaf(prefix+" Size", "uint16", at+2, at+4),
 			tlsCertificateLeaf(prefix+" Body", "raw", at+4, at+aceSize),
 		)
+		// MS-DTYP 2.4.4.2 ACCESS_ALLOWED_ACE and the denied/audit/alarm forms:
+		// mask, then one SID. Other ACE types do not share that offset.
+		if aceType := wire[at]; (aceType <= 3) && aceSize >= 8 {
+			text, n, reason := smb2SIDLiteral(wire[at+8 : at+aceSize])
+			if reason == "" && n == aceSize-8 {
+				info[prefix+" SID"] = text
+			} else if reason != "" {
+				log.Debugf("smb2: %s SID left raw: %s", prefix, reason)
+			}
+		}
 		at += aceSize
 	}
 	if aces == 0 && size != 8 {

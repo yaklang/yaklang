@@ -35,17 +35,13 @@ func TestSMB2IOCTLResponsePayloadsFromCapture(t *testing.T) {
 		require.NoError(t, err)
 		body := info["Body"].(map[string]any)
 		require.Equal(t, uint32(0x00060194), body["Ctl Code"])
-		require.Equal(t, "decoded: FSCTL_DFS_GET_REFERRALS version 3", body["Control Payload Status"])
-		referral := body["DFS Referral"].(map[string]any)
-		require.Equal(t, uint16(2), referral["Number Of Referrals"])
-		entries := referral["Referrals"].([]map[string]any)
-		require.Len(t, entries, 2)
-		require.Equal(t, uint16(3), entries[0]["Version"])
-		require.Equal(t, uint16(18), entries[0]["Size"])
-		require.Equal(t, uint32(600), entries[0]["Time To Live"])
-		require.Equal(t, `\AD2024`, entries[0]["DFS Path"])
-		require.Contains(t, entries[1]["DFS Path"].(string), "weberlab.de")
-		require.NotContains(t, entries[0], "DFS Alternate Path")
+		// The captured entries set ReferralEntryFlags 0x0002. MS-DFSC 2.2.5.3.2
+		// NameListReferral padding is 0 or 16 bytes with no length, so the
+		// following strings are not a v3 target path.
+		require.Contains(t, body["Control Payload Status"], "opaque")
+		require.NotContains(t, body, "DFS Referral")
+		require.NotContains(t, body["Control Payload Status"], `\AD2024`)
+		require.NotEmpty(t, body["Output Buffer"])
 	})
 
 	t.Run("pipe stays opaque", func(t *testing.T) {

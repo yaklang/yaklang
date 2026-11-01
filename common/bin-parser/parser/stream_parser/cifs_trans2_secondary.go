@@ -197,8 +197,10 @@ func cifsOEMString(raw []byte) (string, bool) {
 	return string(content), true
 }
 
-// MS-CIFS 2.2.8.4.1, 2.2.8.4.3, 2.2.8.4.4 and 2.2.8.4.5. The record must fill
-// the data block exactly. Any other width stays opaque.
+// MS-CIFS 2.2.8.4.1, 2.2.8.4.3, 2.2.8.4.4, 2.2.8.4.5 and 2.2.8.4.6. The record
+// must fill the data block exactly. Level 0x0104 here is SMB_SET_FILE_END_OF_FILE_INFO,
+// not the QUERY_PATH name record that uses the same numeric level. Any other
+// width stays opaque.
 func cifsSetInformationRecord(data []byte, at int, level uint16) (tlsCertificateField, string, bool) {
 	var leaves []tlsCertificateField
 	label := ""
@@ -232,6 +234,12 @@ func cifsSetInformationRecord(data []byte, at int, level uint16) (tlsCertificate
 		}
 		label = "SMB_SET_FILE_ALLOCATION_INFO"
 		leaves = []tlsCertificateField{cifsLeaf("Allocation Size", "int64", at, at+8)}
+	case 0x0104:
+		if len(data) != 8 {
+			return tlsCertificateField{}, "", false
+		}
+		label = "SMB_SET_FILE_END_OF_FILE_INFO"
+		leaves = []tlsCertificateField{cifsLeaf("End Of File", "int64", at, at+8)}
 	default:
 		return tlsCertificateField{}, "", false
 	}
@@ -349,6 +357,18 @@ func cifsApplyQueryRecord(body map[string]any, ranges map[string]any, level uint
 		record["Stream Name Raw Bytes"] = append([]byte(nil), data[24:]...)
 		record["Wire Field Ranges"].(map[string]any)["Stream Name"] = []any{start + 24, start + uint64(len(data))}
 		record["Wire Field Ranges"].(map[string]any)["Stream Name Raw Bytes"] = record["Wire Field Ranges"].(map[string]any)["Stream Name"]
+	case 0x010B:
+		// MS-CIFS 2.2.8.3.13. Exactly 16 bytes; a neighboring width is not this record.
+		if len(data) != 16 {
+			return false
+		}
+		put("Compressed File Size", "int64", 0, 8)
+		put("Compression Format", "uint16", 8, 2)
+		put("Compression Unit Shift", "uint8", 10, 1)
+		put("Chunk Shift", "uint8", 11, 1)
+		put("Cluster Shift", "uint8", 12, 1)
+		put("Reserved", "raw", 13, 3)
+		body["Information Level Name"] = "SMB_QUERY_FILE_COMPRESSION_INFO"
 	default:
 		return false
 	}

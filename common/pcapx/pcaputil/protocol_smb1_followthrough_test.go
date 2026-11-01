@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -370,6 +371,48 @@ func TestSMB1RemainingTrans2InformationLevels(t *testing.T) {
 	wideEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 27, wideWords, wide))
 	require.NotContains(t, wideEvent.Session["Body"], "Information Record")
 
+	// MS-CIFS 2.2.8.4.6. SET level 0x0104 is EndOfFile, not the QUERY name record.
+	eof := make([]byte, 8)
+	binary.LittleEndian.PutUint64(eof, 9)
+	eofWords := smb1Words(uint16(6), uint16(8), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(8), uint16(74), byte(1), byte(0), uint16(8))
+	eofData := append([]byte{0, 0, 0, 0x00, 0x40, 0x04, 0x01, 0, 0}, eof...)
+	eofEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 32, eofWords, eofData))
+	require.Equal(t, "SMB_SET_FILE_END_OF_FILE_INFO", eofEvent.Session["Body"].(map[string]any)["Information Level Name"])
+	require.Equal(t, int64(9), eofEvent.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["End Of File"])
+	shortEOF := eofData[:len(eofData)-1]
+	shortEOFWords := smb1Words(uint16(6), uint16(7), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(7), uint16(74), byte(1), byte(0), uint16(8))
+	shortEOFEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 33, shortEOFWords, shortEOF))
+	require.Contains(t, shortEOFEvent.Session["Body"].(map[string]any)["Data Status"], "opaque")
+	require.NotContains(t, shortEOFEvent.Session["Body"], "Information Record")
+
+	// MS-CIFS 2.2.8.3.13. Exactly 16 bytes.
+	compReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
+	compParams := []byte{0, 0, 0, 0x0b, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
+	require.Nil(t, session.Feed(0, time.Unix(9, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 34, compReq, compParams)).Err)
+	comp := make([]byte, 16)
+	binary.LittleEndian.PutUint64(comp[0:8], 7)
+	binary.LittleEndian.PutUint16(comp[8:10], 2)
+	comp[10], comp[11], comp[12] = 4, 3, 2
+	compWords := smb1Words(uint16(2), uint16(16), uint16(0), uint16(2), uint16(56), uint16(0), uint16(16), uint16(60), uint16(0), byte(0), byte(0))
+	compEvent := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 34, compWords, append([]byte{0, 0, 0, 0, 0}, comp...)))
+	compRecord := compEvent.Session["Body"].(map[string]any)["Information Record"].(map[string]any)
+	require.Equal(t, "SMB_QUERY_FILE_COMPRESSION_INFO", compEvent.Session["Body"].(map[string]any)["Information Level Name"])
+	require.Equal(t, int64(7), compRecord["Compressed File Size"])
+	require.Equal(t, uint16(2), compRecord["Compression Format"])
+	for _, width := range []int{15, 17} {
+		require.Nil(t, session.Feed(0, time.Unix(10, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, uint16(40+width), compReq, compParams)).Err)
+		bad := append([]byte(nil), comp...)
+		if width == 15 {
+			bad = comp[:15]
+		} else {
+			bad = append(comp, 0)
+		}
+		badWords := smb1Words(uint16(2), uint16(width), uint16(0), uint16(2), uint16(56), uint16(0), uint16(width), uint16(60), uint16(0), byte(0), byte(0))
+		badEvent := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, uint16(40+width), badWords, append([]byte{0, 0, 0, 0, 0}, bad...)))
+		require.Contains(t, badEvent.Session["Body"].(map[string]any)["Data Status"], "opaque")
+		require.NotContains(t, badEvent.Session["Body"], "Information Record")
+	}
+
 	// MS-CIFS 2.2.8.3.11 and 2.2.8.3.12. A short counted tail keeps the header and does not publish a name.
 	altReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
 	altParams := []byte{0, 0, 0, 0x08, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
@@ -457,6 +500,44 @@ func TestSMBSecurityDescriptorBodyAndDFSVersions(t *testing.T) {
 	require.Contains(t, typed["Owner SID Status"], "opaque")
 	require.Equal(t, false, typed["Identity Verified"])
 
+	// MS-DTYP 2.4.4.2. One ACCESS_ALLOWED ACE whose SID fills the ACE.
+	ace := make([]byte, 52)
+	ace[0] = 1
+	binary.LittleEndian.PutUint16(ace[2:4], 0x8000)
+	binary.LittleEndian.PutUint32(ace[4:8], 20)
+	binary.LittleEndian.PutUint32(ace[16:20], 28)
+	ace[20] = 1
+	ace[27] = 5
+	ace[28] = 2
+	binary.LittleEndian.PutUint16(ace[30:32], 24)
+	binary.LittleEndian.PutUint16(ace[32:34], 1)
+	ace[36] = 0
+	binary.LittleEndian.PutUint16(ace[38:40], 16)
+	binary.LittleEndian.PutUint32(ace[40:44], 1)
+	ace[44] = 1
+	ace[51] = 5
+	withACE := &binSMB2{client: 0}
+	_, err = withACE.consumeFrom(0, smb2QueryRequest(26, 17, 7, 3, 0, nil), 64)
+	require.NoError(t, err)
+	info, err = withACE.consumeFrom(1, smb2QueryResponse(26, 17, 7, 0, ace), 64)
+	require.NoError(t, err)
+	typed = info["Body"].(map[string]any)[info["Output Information Type"].(string)].(map[string]any)
+	require.Equal(t, "S-1-5", typed["Dacl ACE 0 SID"])
+	require.Equal(t, false, typed["Identity Verified"])
+	require.NotContains(t, typed["Dacl Status"], "account")
+
+	truncatedACE := append([]byte(nil), ace...)
+	truncatedACE[44+1] = 2
+	cutACE := &binSMB2{client: 0}
+	_, err = cutACE.consumeFrom(0, smb2QueryRequest(27, 17, 7, 3, 0, nil), 64)
+	require.NoError(t, err)
+	info, err = cutACE.consumeFrom(1, smb2QueryResponse(27, 17, 7, 0, truncatedACE), 64)
+	require.NoError(t, err)
+	typed = info["Body"].(map[string]any)[info["Output Information Type"].(string)].(map[string]any)
+	require.NotContains(t, typed, "Dacl ACE 0 SID")
+	require.NotEmpty(t, typed["Dacl ACE 0 Body"])
+	require.Equal(t, false, typed["Identity Verified"])
+
 	for _, off := range []uint32{10, 40} {
 		bad := make([]byte, 28)
 		bad[0] = 1
@@ -511,6 +592,17 @@ func TestSMBSecurityDescriptorBodyAndDFSVersions(t *testing.T) {
 	require.NoError(t, err)
 	require.False(t, ok, "version 4 without TargetSetBoundary is not the selected layout")
 
+	plain := make([]byte, 8+18+6)
+	binary.LittleEndian.PutUint16(plain[2:4], 1)
+	binary.LittleEndian.PutUint16(plain[8:10], 3)
+	binary.LittleEndian.PutUint16(plain[10:12], 18)
+	binary.LittleEndian.PutUint16(plain[8+12:8+14], 18)
+	copy(plain[26:], []byte{'\\', 0, 'p', 0, 0, 0})
+	referral, ok, err = smb2DecodeDFSReferralV3(plain, 4)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, `\p`, referral["Referrals"].([]map[string]any)[0]["DFS Path"])
+
 	v3 := make([]byte, 8+34+6)
 	binary.LittleEndian.PutUint16(v3[2:4], 1)
 	binary.LittleEndian.PutUint16(v3[8:10], 3)
@@ -525,6 +617,25 @@ func TestSMBSecurityDescriptorBodyAndDFSVersions(t *testing.T) {
 	_, ok, err = smb2DecodeDFSReferralV3Spec(v3, 4)
 	require.NoError(t, err)
 	require.False(t, ok, "NameListReferral padding is not a fixed layout")
+	// MS-DFSC 2.2.5.3.2. Padding is 0 or 16 bytes and has no length. A path
+	// string after either width must not be published.
+	for _, pad := range []int{0, 16} {
+		size := 18 + pad
+		raw := make([]byte, 8+size+6)
+		binary.LittleEndian.PutUint16(raw[2:4], 1)
+		binary.LittleEndian.PutUint16(raw[8:10], 3)
+		binary.LittleEndian.PutUint16(raw[10:12], uint16(size))
+		binary.LittleEndian.PutUint16(raw[8+6:8+8], 0x0002)
+		binary.LittleEndian.PutUint16(raw[8+12:8+14], uint16(size))
+		copy(raw[8+size:], []byte{'\\', 0, 's', 0, 0, 0})
+		body := map[string]any{}
+		require.NoError(t, smb2DecodeIOCTLOutput(body, smb2FSCTLDFSGetReferrals, raw, 4, 4))
+		require.Contains(t, body["Control Payload Status"], "opaque")
+		require.NotContains(t, body, "DFS Referral")
+		encoded, err := json.Marshal(body)
+		require.NoError(t, err)
+		require.NotContains(t, string(encoded), `\s`)
+	}
 
 	unknown := make([]byte, 8+22)
 	binary.LittleEndian.PutUint16(unknown[2:4], 1)
