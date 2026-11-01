@@ -96,15 +96,21 @@ do not establish certificate trust, negotiated certificate type, request-context
 association or a conforming handshake phase. Existing certificate summaries
 remain available alongside these literal fields.
 When the observed ClientHello establishes endpoint roles, a server Certificate
-must have an empty request context and a nonempty certificate list. A client's
+must use handshake keys, have an empty request context and a nonempty certificate list. A client's
 empty response stays valid. A refusal keeps the observed TLS connection and
 record authentication visible, with a specific error; it does not publish a
-successful certificate body or feed later plaintext into application parsers.
+successful certificate body or treat that handshake as application data.
 In an observed initial exchange, the client Certificate and server
 CertificateRequest also require an empty context. Recovery authenticates an
 application traffic key before applying this condition, so missing Finished
 records do not make post-handshake contexts look like initial ones. Complete
 phase ordering and PHA request/response association remain unverified.
+If authenticated key-epoch recovery retires a pending handshake fragment and
+the new record also contains handshake bytes, their starting boundary is unknown.
+The list says `Handshake · boundary unavailable`; record authentication, discarded
+bytes and the boundary reason appear under Record decoding. These bytes do not
+publish handshake fields or advance KeyUpdate state. Application-data recovery
+keeps its separate gap policy; missing handshake bytes are never reconstructed.
 In the ordinary detail view, diagnostic codes and reasons occupy separate
 fields. Only one exact typed-code prefix is removed from the displayed reason;
 the exported error stays complete, and diagnostics do not claim byte ranges.

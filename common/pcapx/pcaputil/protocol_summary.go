@@ -76,6 +76,10 @@ func (e *ProtocolEvent) summarizeProtocol() {
 				}
 			}
 		}
+		if e.Session["Authentication Verified"] == true && e.Session["Inner Content Type"] == byte(22) &&
+			e.Session["Handshake Parsing"] == "unavailable after missing protected handshake bytes" {
+			name = "Handshake · boundary unavailable"
+		}
 		e.Summary = fmt.Sprintf("TLS %s (%v bytes, %v)", name, e.Session["Record Length"], e.Session["Content Visibility"])
 		if sni, ok := e.Session["SNI"].(string); ok && sni != "" {
 			e.Summary += " SNI=" + sni
