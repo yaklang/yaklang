@@ -254,7 +254,7 @@ func recordType(v any) string {
 }
 
 func handshakeType(v any) string {
-	if name := map[uint64]string{1: "Client Hello", 2: "Server Hello", 4: "New Session Ticket", 8: "Encrypted Extensions", 11: "Certificate", 12: "Server Key Exchange", 13: "Certificate Request", 14: "Server Hello Done", 15: "Certificate Verify", 16: "Client Key Exchange", 20: "Finished", 24: "Key Update", 254: "Message Hash"}[number(v)]; name != "" {
+	if name := map[uint64]string{1: "Client Hello", 2: "Server Hello", 4: "New Session Ticket", 8: "Encrypted Extensions", 11: "Certificate", 12: "Server Key Exchange", 13: "Certificate Request", 14: "Server Hello Done", 15: "Certificate Verify", 16: "Client Key Exchange", 20: "Finished", 24: "Key Update", 25: "Compressed Certificate", 254: "Message Hash"}[number(v)]; name != "" {
 		return name
 	}
 	return fmt.Sprintf("Handshake type %d", number(v))
@@ -320,6 +320,12 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	}
 	if e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq" {
 		parts := []string{textValue(v["Packet Name"])}
+		if summary, _ := quicTLSMessageSummary(e); summary != "" {
+			parts = append([]string{summary}, parts...)
+		}
+		if e.Protocol == "quic" && v["Native Carrier"] == true && v["Authentication Verified"] == true && v["CRYPTO Incomplete"] == true {
+			parts = append(parts, "TLS handshake reassembly incomplete")
+		}
 		if _, ok := v["Packet Number"]; ok {
 			parts = append(parts, fmt.Sprintf("pn=%d", number(v["Packet Number"])))
 		}
@@ -1356,6 +1362,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	info := clipText(applicationEventSummary(e), 384)
 	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
 	detailedTLS := tlsDetailedHandshakeRank(e)
+	if _, rank := quicTLSMessageSummary(e); rank > detailedTLS {
+		detailedTLS = rank
+	}
 	if rank > p.priority || p.protocol != label {
 		p.summary, p.count = info, 1
 		p.tlsIncompleteSummary = incompleteTLS
