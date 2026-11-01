@@ -2,6 +2,12 @@
 
 按用户指令只保留 M1、M2 两个活动阶段；不把协议阶段整理当成所有核心协议验收完成。
 
+最新main又前进到 `238faf87f36e9eff5ec1ea0ff06e8c06d473214c`，已通过普通merge
+`49bb60b02655bb73c75be39ffae9c26a8836c582` 纳入M2；保留两边既有修改并确定性重建压缩规则。
+当前修正合并测试/干净构建为 `d1a6e62123ea8c6b6d3b43838c12beb86943ddaa`。
+[本轮真实Finished、Windows、完整来源及最终CI门](shark-m2-tls-finished-20261101.md)。
+后续同树/相同patch哈希只描述f99当时连接M1 squash的历史动作，不适用于新增main改动后的整棵树。
+
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
 其整个树 `9744c0cb14e9cc80fe3e7c0d82479438c5a0eb89` 与已验收 a9 完全相同。
 M2 #5371 已自动改以 main 为基线，现以普通 merge

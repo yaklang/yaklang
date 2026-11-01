@@ -417,6 +417,13 @@ a legacy-record-version guess. Verification booleans mean verified/not verified;
 false does not itself prove authentication failure. Protocol namespace guards
 prevent WireGuard/OpenVPN/SSH facts from becoming TLS fields.
 
+Finished details validate the complete handshake and supported negotiated suite's
+verify_data length. Initial TLS 1.3 Finished changes to application keys; a client
+Finished already using application keys preserves that epoch and record sequence.
+`tls.handshake.verify_data` and byte highlights use owned handshake plaintext,
+with no borrowed ciphertext/frame range. Record AEAD authentication does not
+verify the transcript MAC or certificate trust; the page states this explicitly.
+
 Offline pcapng files can contain
 multiple interfaces with the same link type; mixed link types fail explicitly
 instead of silently dropping a subset of packets. Files exported from pcapng
