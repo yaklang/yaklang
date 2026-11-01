@@ -263,10 +263,9 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.ssh = "ssh", &binSSH{client: f.tcpClientDir, clientKnown: true}
 		return
 	}
-	if f.captureTCP && probeQUIC(w, f.a.config.ProbeBytes).Verdict == ProbeAccept {
-		f.protocol = "quic" // report unsupported TCP carrier without decoding its payload
-		return
-	}
+	// A QUIC-shaped prefix cannot select a UDP-only native protocol on a
+	// captured TCP stream. Selecting it here made an unconfirmed candidate
+	// sticky and published a QUIC context diagnostic for arbitrary TCP bytes.
 	if f.captureTCP {
 		if s := f.probeTextInternet(dir, w); s != nil {
 			f.protocol, f.textInternet = s.protocol, s

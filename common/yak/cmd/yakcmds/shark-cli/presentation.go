@@ -962,7 +962,7 @@ func quicPayloadDisposition(delivery any) string {
 }
 
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
-	if e == nil || p.networkRefused {
+	if e == nil || p.networkRefused || unsupportedQUICTCPCarrier(e) {
 		return
 	}
 	// A single captured packet can contain both a refused body and another

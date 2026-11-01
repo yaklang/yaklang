@@ -116,7 +116,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	}
 	seenH3Fault := map[uint64]bool{}
 	for _, e := range ordered {
-		if e == nil || e.Completeness == "evicted" {
+		if e == nil || e.Completeness == "evicted" || unsupportedQUICTCPCarrier(e) {
 			continue
 		}
 		fault, ok := e.Session["HTTP3 Connection Error"].(map[string]any)
@@ -136,7 +136,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	// Packet authentication never covers an unparsed datagram neighbour. Put
 	// this range warning before possibly large authenticated CRYPTO/STREAM trees.
 	for _, e := range ordered {
-		if e != nil && e.Completeness != "evicted" && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
+		if e != nil && e.Completeness != "evicted" && !unsupportedQUICTCPCarrier(e) && e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 			add(fmt.Sprintf("QUIC remainder #%d: %d bytes · authentication not verified", e.ID, e.Length), false)
 			add(e.Summary, false)
 		}
@@ -145,7 +145,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	// refusal. Keep byte-source order and all individual trees unchanged.
 	quicPackets := 0
 	for _, e := range ordered {
-		if e != nil && e.Completeness != "evicted" && (e.Protocol == "quic" || (e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Native Carrier"] == true) {
+		if e != nil && e.Completeness != "evicted" && !unsupportedQUICTCPCarrier(e) && (e.Protocol == "quic" || (e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Native Carrier"] == true) {
 			quicPackets++
 		}
 	}
@@ -935,6 +935,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			continue
 		}
+		if unsupportedQUICTCPCarrier(e) {
+			appendUnsupportedQUICTCPCarrier(&out, &sources, e)
+			continue
+		}
 		protocol, currentSource = e.Protocol, 0
 		ospfv3Display = e.Profile == "ospfv3-bounded-control"
 		ospfv2Display = e.Profile == "ospfv2-bounded-control"
@@ -964,6 +968,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		label := eventProtocolName(e)
 		udpPayload := e.Protocol == "" && e.Transport == "udp"
 		udpPreview := udpPayload && e.SourceBytes.Kind == "captured" && e.Length > len(e.Raw)
+		// Only the reassembly-owned extent certifies a TCP stream payload.
+		// A captured transport failure can instead retain a header prefix.
+		tcpPayload := e.Protocol == "" && e.Transport == "tcp" && e.SourceBytes.Kind == "reassembled"
+		tcpPreview := tcpPayload && e.Length > len(e.Raw)
+		if tcpPayload {
+			label = "TCP payload · application unrecognized"
+		}
 		if udpPayload {
 			label = "UDP payload · application unrecognized"
 			if e.Error != "" {
@@ -977,6 +988,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 		}
 		unit := "PDU"
+		if tcpPayload {
+			unit = "observation"
+		}
 		smbPreview := e.Protocol == "smb" && (e.Profile == "smb-record-resource-diagnostic" || e.Profile == "smb-record-diagnostic")
 		if smbPreview {
 			unit = "observation"
@@ -990,6 +1004,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		add(fmt.Sprintf("%s · %s #%d · %s", label, unit, e.ID, kind), true)
 		if len(e.Raw) > 0 {
 			name := eventProtocolName(e)
+			if tcpPayload {
+				name = "Unidentified TCP payload · observed stream bytes"
+				if tcpPreview {
+					name = fmt.Sprintf("Unidentified TCP payload preview · %d/%d observed bytes", len(e.Raw), e.Length)
+				}
+			}
 			if e.Protocol == "dcerpc" {
 				name = "DCE/RPC wire"
 			}
@@ -1012,6 +1032,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				name = "SMB2 wire PDU (authentication)"
 			}
 			sourceName := name + " · " + kind + " PDU"
+			if tcpPayload {
+				sourceName = name // An unidentified byte extent is not a decoded PDU.
+			}
 			if smbPreview {
 				sourceName = fmt.Sprintf("SMB1 record preview · %d/%d observed bytes · %s", len(e.Raw), e.Length, kind)
 			}
@@ -1050,6 +1073,9 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		}
 		if e.SourceBytes.CompletedIn != nil {
 			kind := "Message"
+			if tcpPayload {
+				kind = "Observed TCP"
+			}
 			if e.Protocol == "dcerpc" {
 				kind = "RPC wire PDU"
 			}

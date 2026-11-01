@@ -57,8 +57,9 @@ func appendZeroLengthIPv4Fields(d *packetDetail, wire []byte, ip *layers.IPv4, a
 		add("Captured Options", fmt.Sprintf("%x", header[20:]), 20, len(header))
 	}
 	d.fields = append(d.fields,
-		field{depth: 1, text: "Parent scope: zero IPv4 Total Length; captured-prefix observation; TSO origin unconfirmed"},
-		field{depth: 1, text: fmt.Sprintf("Captured Prefix Bytes: %d; not a valid declared IPv4 extent", len(header)+len(ip.LayerPayload()))},
+		field{depth: 1, text: "Parent scope: captured prefix; IPv4 declared extent unavailable"},
+		field{depth: 1, text: "Offload: TSO origin unconfirmed"},
+		field{depth: 1, text: fmt.Sprintf("Captured Prefix Bytes: %d (not IPv4 Total Length)", len(header)+len(ip.LayerPayload()))},
 	)
 	return true
 }
