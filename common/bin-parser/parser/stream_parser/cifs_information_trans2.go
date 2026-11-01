@@ -292,6 +292,12 @@ func cifsTrans2Select(w []byte, body *tlsCertificateField, extra map[string]any,
 			}
 			extra["Data Status"] = "opaque: SMB_INFO_SET_EAS does not fill this data block"
 		} else if data.ok {
+			if record, label, ok := cifsSetInformationRecord(w[data.start:data.end], data.start, level); ok {
+				body.Children = append(body.Children, record)
+				extra["Information Level Name"] = label
+				extra["Data Status"] = label
+				return
+			}
 			extra["Data Status"] = "opaque: information level has no selected data layout"
 		}
 	case 0x0005:
@@ -308,8 +314,15 @@ func cifsTrans2Select(w []byte, body *tlsCertificateField, extra map[string]any,
 		name := w[levelAt+6 : param.end]
 		unicode := binary.LittleEndian.Uint16(w[14:16])&0x8000 != 0
 		if !unicode {
-			extra["File Name Status"] = "opaque: OEM SMB_STRING is not selected"
 			cifsAppendLeaves(body, cifsLeaf("Information Level", "uint16", levelAt, levelAt+2), cifsLeaf("Reserved", "uint32", levelAt+2, levelAt+6))
+			text, ok := cifsOEMString(name)
+			if !ok {
+				extra["File Name Status"] = "opaque: OEM SMB_STRING is not selected"
+				return
+			}
+			cifsAppendLeaves(body, cifsLeaf("File Name Raw Bytes", "raw", levelAt+6, param.end))
+			extra["File Name"] = text
+			extra["File Name Range"] = []any{uint64(levelAt + 6), uint64(param.end - 1)}
 			return
 		}
 		if len(name) < 2 || len(name)%2 != 0 || (param.start+6-4)%2 != 0 || binary.LittleEndian.Uint16(name[len(name)-2:]) != 0 {
@@ -369,6 +382,10 @@ func AnnotateCIFSTransaction2Response(fields map[string]any, setup, level uint16
 		}
 		if hasLevel && level == 0x0107 && cifsApplyQueryFileAllInfo(body, ranges) {
 			body["Data Status"] = "SMB_QUERY_FILE_ALL_INFO from the matched TRANS2_QUERY_PATH_INFORMATION request"
+			return
+		}
+		if hasLevel && cifsApplyQueryRecord(body, ranges, level) {
+			body["Data Status"] = "decoded from the matched request information level"
 			return
 		}
 		body["Data Status"] = "opaque: matched information level is not a selected SMB_QUERY_FILE_ALL_INFO block"

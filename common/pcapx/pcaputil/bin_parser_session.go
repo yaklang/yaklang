@@ -1371,9 +1371,17 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 				}
 				e.Summary = fmt.Sprintf("SMB1 %v %s", e.Session["Packet Name"], role)
 				body, _ := e.Session["Body"].(map[string]any)
-				for _, key := range []string{"Path", "File Name", "Service", "Native File System"} {
+				for _, key := range []string{"Path", "File Name", "Service", "Native File System", "Setup Name"} {
 					if value, ok := body[key].(string); ok && value != "" {
 						e.Summary += " · " + value
+					}
+				}
+				if fid, ok := body["FID"].(uint16); ok {
+					e.Summary += fmt.Sprintf(" · fid=%d", fid)
+				}
+				if header, ok := e.Session["Header"].(map[string]any); ok {
+					if status, ok := header["Status"].(uint32); ok && status != 0 {
+						e.Summary += fmt.Sprintf(" · status=0x%08x", status)
 					}
 				}
 			} else if isSMB1SetupEntry(e.Entry) {

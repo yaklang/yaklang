@@ -54,13 +54,15 @@ func smb1FileEntry(command byte, response bool) (entry, profile, name string, ma
 		if response {
 			profile = "cifs-transaction2-response"
 		}
+	case 0x33:
+		entry, profile, name, maxSize = "CIFSDirectTCPTransaction2SecondaryRequest", "cifs-transaction2-secondary-request", "SMB_COM_TRANSACTION2_SECONDARY", 65582
 	}
 	return
 }
 
 func smb1SelectedFileCommand(command byte) bool {
 	switch command {
-	case 0x75, 0x06, 0xa2, 0x2f, 0x22, 0x23, 0x32:
+	case 0x75, 0x06, 0xa2, 0x2f, 0x22, 0x23, 0x32, 0x33:
 		return true
 	default:
 		return false
@@ -72,7 +74,7 @@ func isSMB1FileEntry(entry string) bool {
 	case "CIFSDirectTCPTreeConnectAndXRequest", "CIFSDirectTCPTreeConnectAndXResponse", "CIFSDirectTCPDeleteRequest", "CIFSDirectTCPDeleteResponse",
 		"CIFSDirectTCPNTCreateAndXRequest", "CIFSDirectTCPNTCreateAndXResponse", "CIFSDirectTCPWriteAndXRequest", "CIFSDirectTCPWriteAndXResponse",
 		"CIFSDirectTCPSetInformation2Request", "CIFSDirectTCPSetInformation2Response", "CIFSDirectTCPQueryInformation2Request", "CIFSDirectTCPQueryInformation2Response",
-		"CIFSDirectTCPTransaction2Request", "CIFSDirectTCPTransaction2Response":
+		"CIFSDirectTCPTransaction2Request", "CIFSDirectTCPTransaction2Response", "CIFSDirectTCPTransaction2SecondaryRequest":
 		return true
 	}
 	return false
@@ -147,15 +149,29 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 		}
 		base = 39 + 2*int(wc)
 	}
+	if w[8] == 0x33 {
+		if response {
+			return reject
+		}
+		base, wc = 57, 9
+	}
 	if exact && total != base || total < base || total > maxSize {
 		return reject
 	}
+	// MS-CIFS 2.2.3.2: a non-success reply with WordCount 0 and ByteCount 0 is
+	// the error layout. Any other non-success shape is not the success profile.
 	if response && binary.LittleEndian.Uint32(w[9:13]) != 0 {
+		if len(w) < 39 {
+			return probeNeed("smb", profile, len(w), 39)
+		}
+		if total == 39 && w[36] == 0 && binary.LittleEndian.Uint16(w[37:39]) == 0 {
+			return probeAccept("smb", profile, 90)
+		}
 		return reject
 	}
 	// SET/QUERY_INFORMATION2 have no strings. TRANSACTION2 decodes an
 	// SMB_STRING only when FLAGS2_UNICODE is set and leaves OEM opaque.
-	if (w[8] == 0x75 || !response && w[8] != 0x22 && w[8] != 0x23 && w[8] != 0x32) && binary.LittleEndian.Uint16(w[14:16])&0x8000 == 0 {
+	if (w[8] == 0x75 || !response && w[8] != 0x22 && w[8] != 0x23 && w[8] != 0x32 && w[8] != 0x33) && binary.LittleEndian.Uint16(w[14:16])&0x8000 == 0 {
 		return reject
 	}
 	if len(w) > 36 && w[36] != wc || (w[8] == 0x75 || w[8] == 0xa2 || w[8] == 0x2f) && len(w) > 37 && w[37] != 0xff {
@@ -207,6 +223,16 @@ func decodeSMB1FileFields(raw []byte, budget ParserBudget) (map[string]any, erro
 	if len(raw) > maximum || len(raw) > budget.MaxFrameBytes || len(raw) > budget.MaxMessageBytes || len(raw) > budget.MaxBufferedBytes || budget.MaxRecursionDepth < 3 {
 		return nil, protocolError(ErrResourceExceeded, "CIFS file command: bounded profile exceeds parser budget")
 	}
+	if response && binary.LittleEndian.Uint32(raw[9:13]) != 0 {
+		fields, err := stream_parser.DecodeCIFSEmptyError(raw)
+		if err == nil {
+			return fields, nil
+		}
+		if errors.Is(err, stream_parser.ErrCIFSFileCommandUnsupported) {
+			return nil, protocolError(ErrUnsupportedFeature, "%s", err)
+		}
+		return nil, protocolError(ErrMalformedMessage, "CIFS file command: %s", err)
+	}
 	r := &smb1NegotiateBoundedReader{Reader: bytes.NewReader(raw), bits: uint64(len(raw)) * 8}
 	node, err := parser.ParseBinary(r, "application-layer.cifs", entry)
 	if err != nil {
@@ -229,6 +255,8 @@ func decodeSMB1FileFields(raw []byte, budget ParserBudget) (map[string]any, erro
 			_, profileErr = stream_parser.DecodeCIFSQueryInformation2(raw, response)
 		case 0x32:
 			_, profileErr = stream_parser.DecodeCIFSTransaction2(raw, response)
+		case 0x33:
+			_, profileErr = stream_parser.DecodeCIFSTransaction2Secondary(raw)
 		default:
 			profileErr = stream_parser.ValidateCIFSDeleteProfile(raw, response)
 		}
@@ -254,6 +282,8 @@ func decodeSMB1FileFields(raw []byte, budget ParserBudget) (map[string]any, erro
 		fields, err = stream_parser.DecodeCIFSQueryInformation2(raw, response)
 	case 0x32:
 		fields, err = stream_parser.DecodeCIFSTransaction2(raw, response)
+	case 0x33:
+		fields, err = stream_parser.DecodeCIFSTransaction2Secondary(raw)
 	default:
 		fields, err = parser.ProjectCIFSDeleteFields(node, raw)
 	}
@@ -300,6 +330,10 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 	fields["Association Status"] = "request context unavailable"
 	if !tx.allowed {
 		fields["Association Status"] = tx.reason
+	} else if tx.secondary {
+		if err = f.admitSMB1Trans2Secondary(tx, fields); err != nil {
+			return err
+		}
 	} else if !response {
 		ledger := f.smb2.smb1Legacy
 		if len(ledger.pending) >= f.a.budget.MaxCollectionElements {
@@ -321,6 +355,7 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 			if level, ok := body["Information Level"].(uint16); ok {
 				pending.level, pending.hasLevel = level, true
 			}
+			pending.trans2 = smb1Trans2Start(header, body)
 		}
 		ledger.pending[tx.key] = pending
 		fields["Association Status"] = "request observed; response required"
@@ -332,10 +367,12 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 			e.ResponseTo = pending.id
 			fields["Matched Request"], fields["Request Event ID"], fields["Request PDU SHA256"] = name, pending.id, pending.hash
 			fields["Association Status"] = "matched observed request; authentication unverified"
-			if tx.command == 0x32 && pending.hasSetup {
+			if tx.command == 0x32 && pending.hasSetup && fields["Error Layout"] != true {
 				stream_parser.AnnotateCIFSTransaction2Response(fields, pending.setup, pending.level, pending.hasLevel)
 			}
-			if tx.command == 0x06 || tx.command == 0xa2 {
+			if fields["Error Layout"] == true {
+				fields["Association Status"] = "matched observed request; response status is not success"
+			} else if tx.command == 0x06 || tx.command == 0xa2 {
 				fields["Request File Name"] = pending.path
 			} else if tx.command == 0x75 {
 				fields["Request Path"], fields["Request Service"] = pending.path, pending.service

@@ -517,6 +517,12 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseCIFSTransaction2(invocation.node, invocation.operator, response)
 		},
+		"parseCIFSTransaction2Secondary": func() error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-transaction2-secondary: generation is unsupported")
+			}
+			return parseCIFSTransaction2Secondary(invocation.node, invocation.operator)
+		},
 		"parseCIFSSessionSetup": func(response bool) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("cifs-session-setup: generation is unsupported")

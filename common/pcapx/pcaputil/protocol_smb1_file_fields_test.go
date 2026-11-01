@@ -150,18 +150,22 @@ func TestSMB1FileCommandsRefusedOwnerAndModernCarrierBoundaries(t *testing.T) {
 				bad[28] ^= 1
 			}
 			r := s.Feed(1, time.Unix(101, 0), bad)
-			require.NotNil(t, r.Err)
-			require.Equal(t, ErrUnsupportedFeature, r.Err.Kind)
+			require.Nil(t, r.Err)
 			require.Len(t, r.Events, 1)
-			require.Equal(t, "headers", r.Events[0].Completeness)
-			require.NotContains(t, r.Events[0].Session, "Body")
-			require.Zero(t, r.Events[0].ResponseTo)
+			require.Equal(t, true, r.Events[0].Session["Error Layout"])
+			require.Equal(t, false, r.Events[0].Session["Success Layout"])
+			require.Equal(t, byte(0), r.Events[0].Session["Body"].(map[string]any)["Word Count"])
+			require.Equal(t, uint16(0), r.Events[0].Session["Body"].(map[string]any)["Byte Count"])
+			require.NotContains(t, r.Events[0].Session["Body"], "File Name")
+			require.Equal(t, uint32(0xc0000022), r.Events[0].Session["Header"].(map[string]any)["Status"])
 			good := smb1FeedComplete(t, s, 1, smb1FileWire(0x06, true, 4, 2048, 2048))
 			if wrong == "none" {
+				require.Equal(t, req.ID, r.Events[0].ResponseTo)
 				require.Zero(t, good.ResponseTo)
+				require.Contains(t, r.Events[0].Summary, "status=0xc0000022")
 			} else {
+				require.Zero(t, r.Events[0].ResponseTo)
 				require.Equal(t, req.ID, good.ResponseTo)
-				require.NotContains(t, r.Events[0].Session["Context Eligibility"], "retired")
 			}
 		})
 	}

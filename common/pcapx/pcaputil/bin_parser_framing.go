@@ -112,6 +112,7 @@ var builtinBinSpecs = [][2]string{
 	{"application-layer.cifs", "CIFSDirectTCPQueryInformation2Response"},
 	{"application-layer.cifs", "CIFSDirectTCPTransaction2Request"},
 	{"application-layer.cifs", "CIFSDirectTCPTransaction2Response"},
+	{"application-layer.cifs", "CIFSDirectTCPTransaction2SecondaryRequest"},
 	{"application-layer.smb2", "SMB2"},
 	{"application-layer.smb3", "SMB3Transform"},
 	{"application-layer.dcerpc", "DCERPC"},

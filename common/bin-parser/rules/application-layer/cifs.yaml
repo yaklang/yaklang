@@ -91,6 +91,11 @@ Package:
     operator: |
       err = parseCIFSTransaction2(true)
       if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.47.1. WordCount 9, no response, no name byte.
+  CIFSDirectTCPTransaction2SecondaryRequest:
+    operator: |
+      err = parseCIFSTransaction2Secondary()
+      if err != nil { panic(err) }
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }

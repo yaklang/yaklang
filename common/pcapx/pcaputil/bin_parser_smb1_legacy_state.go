@@ -28,6 +28,7 @@ type smb1OperationPending struct {
 	// and parameter block. They are not inferred from the response shape.
 	setup, level       uint16
 	hasSetup, hasLevel bool
+	trans2             *smb1Trans2Buffer
 }
 
 type smb1LegacyState struct {
@@ -51,6 +52,9 @@ func (s *smb1LegacyState) stringBytes() int64 {
 	if s != nil {
 		for _, p := range s.pending {
 			n += smb1OwnedStringBound(p.hash) + smb1OwnedStringBound(p.path) + smb1OwnedStringBound(p.service)
+			if p.trans2 != nil {
+				n += p.trans2.retained()
+			}
 		}
 	}
 	return n
@@ -78,6 +82,9 @@ func (s *smb1LegacyState) clone() *smb1LegacyState {
 			n.owners[k] = v
 		}
 		for k, v := range s.pending {
+			if v.trans2 != nil {
+				v.trans2 = v.trans2.clone()
+			}
 			n.pending[k] = v
 		}
 		n.allocated = [2]int{len(n.owners), len(n.pending)}
@@ -86,13 +93,13 @@ func (s *smb1LegacyState) clone() *smb1LegacyState {
 }
 
 type smb1LegacyTxn struct {
-	f                                                    *binFlow
-	previous                                             *binSMB2
-	key                                                  smb1SetupKey
-	command                                              byte
-	response, allowed, refused, tracked, refusalEligible bool
-	reason                                               string
-	e                                                    *ProtocolEvent
+	f                                                               *binFlow
+	previous                                                        *binSMB2
+	key                                                             smb1SetupKey
+	command                                                         byte
+	response, allowed, refused, tracked, refusalEligible, secondary bool
+	reason                                                          string
+	e                                                               *ProtocolEvent
 }
 
 // The caller already decoded its complete selected canonical profile. Reserve
@@ -198,7 +205,17 @@ func (f *binFlow) beginSMB1Legacy(dir int, e *ProtocolEvent, fields map[string]a
 	ledger := working.smb1Legacy
 	owner, exists := ledger.owners[tx.key]
 	if !response {
-		if exists {
+		if exists && command == 0x33 && owner.command == 0x32 && owner.phase == smb1LegacyPending {
+			if p, ok := ledger.pending[tx.key]; ok && p.command == 0x32 && p.uid == uid && p.tid == tid && p.trans2 != nil {
+				tx.allowed = true
+				tx.secondary = true
+			} else {
+				tx.retireOwner(owner)
+				owner.phase = smb1LegacyAmbiguous
+				ledger.owners[tx.key] = owner
+				tx.reason = "PID/MID operation group is ambiguous; passive association unavailable"
+			}
+		} else if exists {
 			tx.retireOwner(owner)
 			owner.phase = smb1LegacyAmbiguous
 			ledger.owners[tx.key] = owner

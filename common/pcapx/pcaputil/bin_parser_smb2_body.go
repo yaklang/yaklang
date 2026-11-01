@@ -839,14 +839,22 @@ func smb2DecodeIOCTLOutput(body map[string]any, code uint32, raw []byte, base, m
 		if err != nil {
 			return err
 		}
+		version := "3"
 		if !ok {
-			body["Control Payload Status"] = "opaque: DFS referral is not the selected version 3 layout"
-			log.Debugf("smb2: FSCTL_DFS_GET_REFERRALS payload left opaque; version 3 size 18 was not present")
+			referral, ok, err = smb2DecodeDFSReferralV1(raw, max)
+			version = "1"
+		}
+		if err != nil {
+			return err
+		}
+		if !ok {
+			body["Control Payload Status"] = "opaque: DFS referral version is not a selected v1 or v3 layout"
+			log.Debugf("smb2: FSCTL_DFS_GET_REFERRALS payload left opaque; v1 and v3 layouts were not present")
 			return nil
 		}
 		smb2OffsetRanges(referral, base)
 		body["DFS Referral"] = referral
-		body["Control Payload Status"] = "decoded: FSCTL_DFS_GET_REFERRALS version 3"
+		body["Control Payload Status"] = "decoded: FSCTL_DFS_GET_REFERRALS version " + version
 	case smb2FSCTLPipeTransceive:
 		body["Control Payload Status"] = "opaque: FSCTL_PIPE_TRANSCEIVE payload is not an SMB2 layout"
 		log.Debugf("smb2: FSCTL_PIPE_TRANSCEIVE payload left opaque; named-pipe bytes are not decoded")
@@ -955,6 +963,62 @@ func smb2DecodeDFSReferralV3(raw []byte, max int) (map[string]any, bool, error) 
 		}
 		entries[i] = entry
 		at += 18
+	}
+	info["Referrals"] = entries
+	return info, true, nil
+}
+
+// MS-DFSC 2.2.4 header and 2.2.5.1 DFS_REFERRAL_V1. Version is 1, Size covers
+// the 6-byte prefix plus one NUL-terminated UTF-16 share name, and the entries
+// consume the output. Version 2 and every other size stay opaque.
+func smb2DecodeDFSReferralV1(raw []byte, max int) (map[string]any, bool, error) {
+	if len(raw) < 8 {
+		return nil, false, nil
+	}
+	count := int(binary.LittleEndian.Uint16(raw[2:4]))
+	if count <= 0 || count > max {
+		if count > max && max > 0 {
+			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+		}
+		return nil, false, nil
+	}
+	at := 8
+	for i := 0; i < count; i++ {
+		if len(raw)-at < 8 || binary.LittleEndian.Uint16(raw[at:at+2]) != 1 {
+			return nil, false, nil
+		}
+		size := int(binary.LittleEndian.Uint16(raw[at+2 : at+4]))
+		if size < 8 || at+size > len(raw) {
+			return nil, false, nil
+		}
+		_, _, hi, err := smb2UTF16Z(raw, at+6)
+		if err != nil || hi != at+size {
+			return nil, false, nil
+		}
+		at += size
+	}
+	if at != len(raw) {
+		return nil, false, nil
+	}
+	info := map[string]any{}
+	smb2Literal(info, "Path Consumed", 0, 2, binary.LittleEndian.Uint16(raw[0:2]))
+	smb2Literal(info, "Number Of Referrals", 2, 4, uint16(count))
+	smb2Literal(info, "Referral Header Flags", 4, 8, binary.LittleEndian.Uint32(raw[4:8]))
+	entries := make([]map[string]any, count)
+	at = 8
+	for i := 0; i < count; i++ {
+		size := int(binary.LittleEndian.Uint16(raw[at+2 : at+4]))
+		text, lo, hi, err := smb2UTF16Z(raw, at+6)
+		if err != nil {
+			return nil, false, err
+		}
+		entry := map[string]any{}
+		smb2Literal(entry, "Version", at, at+2, uint16(1))
+		smb2Literal(entry, "Size", at+2, at+4, uint16(size))
+		smb2Literal(entry, "Server Type", at+4, at+6, binary.LittleEndian.Uint16(raw[at+4:at+6]))
+		smb2Literal(entry, "Share Name", lo, hi, text)
+		entries[i] = entry
+		at += size
 	}
 	info["Referrals"] = entries
 	return info, true, nil
