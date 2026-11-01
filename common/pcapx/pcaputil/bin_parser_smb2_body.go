@@ -418,9 +418,10 @@ func smb2CloseFields(info map[string]any, pdu []byte, response bool) error {
 // MS-SMB2 2.2.2 is the error body. STATUS_MORE_PROCESSING_REQUIRED keeps the
 // SESSION_SETUP response. STATUS_BUFFER_OVERFLOW keeps the success body for
 // READ, IOCTL, QUERY_DIRECTORY, CHANGE_NOTIFY and QUERY_INFO. STATUS_PENDING
-// is an interim error response (3.3.4.2), not a successful command body.
+// keeps the command body so an interim async response can publish its AsyncId;
+// the suite's READ interim is StructureSize 17, not the 9-byte error body.
 func smb2StatusUsesErrorBody(command uint16, status uint32, response bool) bool {
-	if !response || status == 0 {
+	if !response || status == 0 || status == 0x00000103 {
 		return false
 	}
 	if command == 1 && status == 0xc0000016 {

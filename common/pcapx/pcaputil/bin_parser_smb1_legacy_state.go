@@ -24,6 +24,10 @@ type smb1OperationPending struct {
 	command       byte
 	uid, tid      uint16
 	path, service string
+	// TRANSACTION2 setup and information level come from the request words
+	// and parameter block. They are not inferred from the response shape.
+	setup, level       uint16
+	hasSetup, hasLevel bool
 }
 
 type smb1LegacyState struct {

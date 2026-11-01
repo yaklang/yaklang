@@ -39,14 +39,40 @@ func smb1FileEntry(command byte, response bool) (entry, profile, name string, ma
 		if response {
 			profile, maxSize = "cifs-write-andx-response", 51
 		}
+	case 0x22:
+		entry, profile, name, maxSize = "CIFSDirectTCPSetInformation2"+suffix, "cifs-set-information2-request", "SMB_COM_SET_INFORMATION2", 53
+		if response {
+			profile, maxSize = "cifs-set-information2-response", 39
+		}
+	case 0x23:
+		entry, profile, name, maxSize = "CIFSDirectTCPQueryInformation2"+suffix, "cifs-query-information2-request", "SMB_COM_QUERY_INFORMATION2", 41
+		if response {
+			profile, maxSize = "cifs-query-information2-response", 61
+		}
+	case 0x32:
+		entry, profile, name, maxSize = "CIFSDirectTCPTransaction2"+suffix, "cifs-transaction2-request", "SMB_COM_TRANSACTION2", 65582
+		if response {
+			profile = "cifs-transaction2-response"
+		}
 	}
 	return
+}
+
+func smb1SelectedFileCommand(command byte) bool {
+	switch command {
+	case 0x75, 0x06, 0xa2, 0x2f, 0x22, 0x23, 0x32:
+		return true
+	default:
+		return false
+	}
 }
 
 func isSMB1FileEntry(entry string) bool {
 	switch entry {
 	case "CIFSDirectTCPTreeConnectAndXRequest", "CIFSDirectTCPTreeConnectAndXResponse", "CIFSDirectTCPDeleteRequest", "CIFSDirectTCPDeleteResponse",
-		"CIFSDirectTCPNTCreateAndXRequest", "CIFSDirectTCPNTCreateAndXResponse", "CIFSDirectTCPWriteAndXRequest", "CIFSDirectTCPWriteAndXResponse":
+		"CIFSDirectTCPNTCreateAndXRequest", "CIFSDirectTCPNTCreateAndXResponse", "CIFSDirectTCPWriteAndXRequest", "CIFSDirectTCPWriteAndXResponse",
+		"CIFSDirectTCPSetInformation2Request", "CIFSDirectTCPSetInformation2Response", "CIFSDirectTCPQueryInformation2Request", "CIFSDirectTCPQueryInformation2Response",
+		"CIFSDirectTCPTransaction2Request", "CIFSDirectTCPTransaction2Response":
 		return true
 	}
 	return false
@@ -64,7 +90,7 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 	if len(w) < 9 {
 		return probeNeed("smb", "1-file-command", len(w), 9)
 	}
-	if w[8] != 0x75 && w[8] != 0x06 && w[8] != 0xa2 && w[8] != 0x2f {
+	if !smb1SelectedFileCommand(w[8]) {
 		return reject
 	}
 	if len(w) < 16 {
@@ -94,13 +120,42 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 			base, wc = 51, 6
 		}
 	}
-	if total < base || total > maxSize {
+	exact := false
+	if w[8] == 0x22 {
+		base, wc, exact = 53, 7, true
+		if response {
+			base, wc = 39, 0
+		}
+	}
+	if w[8] == 0x23 {
+		base, wc, exact = 41, 1, true
+		if response {
+			base, wc = 61, 11
+		}
+	}
+	if w[8] == 0x32 {
+		if len(w) < 37 {
+			return probeNeed("smb", profile, len(w), 37)
+		}
+		wc = w[36]
+		minimum := byte(14)
+		if response {
+			minimum = 10
+		}
+		if wc < minimum {
+			return reject
+		}
+		base = 39 + 2*int(wc)
+	}
+	if exact && total != base || total < base || total > maxSize {
 		return reject
 	}
 	if response && binary.LittleEndian.Uint32(w[9:13]) != 0 {
 		return reject
 	}
-	if (w[8] == 0x75 || !response) && binary.LittleEndian.Uint16(w[14:16])&0x8000 == 0 {
+	// SET/QUERY_INFORMATION2 have no strings. TRANSACTION2 decodes an
+	// SMB_STRING only when FLAGS2_UNICODE is set and leaves OEM opaque.
+	if (w[8] == 0x75 || !response && w[8] != 0x22 && w[8] != 0x23 && w[8] != 0x32) && binary.LittleEndian.Uint16(w[14:16])&0x8000 == 0 {
 		return reject
 	}
 	if len(w) > 36 && w[36] != wc || (w[8] == 0x75 || w[8] == 0xa2 || w[8] == 0x2f) && len(w) > 37 && w[37] != 0xff {
@@ -121,7 +176,7 @@ func probeSMB1FileCommand(w []byte, limit int) ProbeResult {
 // This is a private framing proof, not a successful body parse. Only an exact
 // DirectTCP boundary and complete WC/BC window may retain a body diagnostic.
 func boundedSMB1FileEnvelope(w []byte) bool {
-	if len(w) < 39 || w[0] != 0 || smb2DirectLength(w)+4 != len(w) || binary.LittleEndian.Uint32(w[4:8]) != 0x424d53ff || w[8] != 0x75 && w[8] != 0x06 && w[8] != 0xa2 && w[8] != 0x2f {
+	if len(w) < 39 || w[0] != 0 || smb2DirectLength(w)+4 != len(w) || binary.LittleEndian.Uint32(w[4:8]) != 0x424d53ff || !smb1SelectedFileCommand(w[8]) {
 		return false
 	}
 	fixed := 39 + 2*int(w[36])
@@ -168,6 +223,12 @@ func decodeSMB1FileFields(raw []byte, budget ParserBudget) (map[string]any, erro
 			} else if !response {
 				_, profileErr = stream_parser.DecodeCIFSNTCreateAndX(raw, false)
 			}
+		case 0x22:
+			_, profileErr = stream_parser.DecodeCIFSSetInformation2(raw, response)
+		case 0x23:
+			_, profileErr = stream_parser.DecodeCIFSQueryInformation2(raw, response)
+		case 0x32:
+			_, profileErr = stream_parser.DecodeCIFSTransaction2(raw, response)
 		default:
 			profileErr = stream_parser.ValidateCIFSDeleteProfile(raw, response)
 		}
@@ -187,6 +248,12 @@ func decodeSMB1FileFields(raw []byte, budget ParserBudget) (map[string]any, erro
 		fields, err = stream_parser.DecodeCIFSNTCreateAndX(raw, response)
 	case 0x2f:
 		fields, err = stream_parser.DecodeCIFSWriteAndX(raw, response)
+	case 0x22:
+		fields, err = stream_parser.DecodeCIFSSetInformation2(raw, response)
+	case 0x23:
+		fields, err = stream_parser.DecodeCIFSQueryInformation2(raw, response)
+	case 0x32:
+		fields, err = stream_parser.DecodeCIFSTransaction2(raw, response)
 	default:
 		fields, err = parser.ProjectCIFSDeleteFields(node, raw)
 	}
@@ -246,7 +313,16 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 		path, _ := body[pathKey].(string)
 		service, _ := body["Service"].(string)
 		digest := sha256.Sum256(e.Raw)
-		ledger.pending[tx.key] = smb1OperationPending{id: e.ID, command: tx.command, uid: uid, tid: tid, hash: hex.EncodeToString(digest[:]), path: strings.Clone(path), service: strings.Clone(service)}
+		pending := smb1OperationPending{id: e.ID, command: tx.command, uid: uid, tid: tid, hash: hex.EncodeToString(digest[:]), path: strings.Clone(path), service: strings.Clone(service)}
+		if tx.command == 0x32 {
+			if setup, ok := body["Setup"].(uint16); ok {
+				pending.setup, pending.hasSetup = setup, true
+			}
+			if level, ok := body["Information Level"].(uint16); ok {
+				pending.level, pending.hasLevel = level, true
+			}
+		}
+		ledger.pending[tx.key] = pending
 		fields["Association Status"] = "request observed; response required"
 	} else if ledger := f.smb2.smb1Legacy; ledger != nil {
 		pending, ok := ledger.pending[tx.key]
@@ -256,9 +332,12 @@ func (f *binFlow) consumeSMB1FileCommand(dir int, e *ProtocolEvent) (resultErr e
 			e.ResponseTo = pending.id
 			fields["Matched Request"], fields["Request Event ID"], fields["Request PDU SHA256"] = name, pending.id, pending.hash
 			fields["Association Status"] = "matched observed request; authentication unverified"
+			if tx.command == 0x32 && pending.hasSetup {
+				stream_parser.AnnotateCIFSTransaction2Response(fields, pending.setup, pending.level, pending.hasLevel)
+			}
 			if tx.command == 0x06 || tx.command == 0xa2 {
 				fields["Request File Name"] = pending.path
-			} else if tx.command != 0x2f {
+			} else if tx.command == 0x75 {
 				fields["Request Path"], fields["Request Service"] = pending.path, pending.service
 			}
 			if tx.command == 0xa2 {

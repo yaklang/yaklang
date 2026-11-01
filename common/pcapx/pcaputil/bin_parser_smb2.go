@@ -184,7 +184,7 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
 	case 0x424d53ff:
-		if n >= 35 && (w[8] == 0x75 || w[8] == 0x06 || w[8] == 0xa2 || w[8] == 0x2f) {
+		if n >= 35 && smb1SelectedFileCommand(w[8]) {
 			if !boundedSMB1FileEnvelope(w[:total]) {
 				return 0, nil, fmt.Errorf("CIFS file command: WordCount/ByteCount exceed exact DirectTCP boundary")
 			}
