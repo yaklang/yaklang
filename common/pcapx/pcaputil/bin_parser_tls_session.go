@@ -458,6 +458,30 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			return nil, err
 		}
 		m["Certificates"] = certs
+	case 13:
+		if t.version == 0x304 && !authenticated {
+			return nil, protocolError(ErrMalformedMessage, "cleartext TLS 1.3 CertificateRequest")
+		}
+		if t.client >= 0 && dir == t.client {
+			return nil, protocolError(ErrMalformedMessage, "client sent TLS CertificateRequest")
+		}
+		if t.version == 0 {
+			// The record's legacy version is not a negotiated version. Preserve
+			// the observed envelope without selecting a speculative body grammar.
+			m["Certificate Request Status"] = "negotiated version unavailable; body uninterpreted"
+			break
+		}
+		limit := 4096
+		if len(limits) > 0 {
+			limit = limits[0]
+		}
+		request, err := DecodeTLSCertificateRequest(b, t.version, limit)
+		if err != nil {
+			return nil, err
+		}
+		m["Certificate Request"], m["Certificate Request Version"] = request.Fields, t.version
+		m["Encoded Certificate Request"] = bytes.Clone(b)
+		m["Certificate Request Status"] = "body vectors decoded; handshake conformance not established"
 	}
 	return m, nil
 }

@@ -371,6 +371,17 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
 			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
 		}
+		if request, _, _ := tlsCertificateRequestDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); request != nil {
+			algorithms := len(mapList(request.Fields["Signature Algorithms"]))
+			for _, ext := range mapList(request.Fields["Extensions"]) {
+				if number(ext["Type"]) == 13 {
+					algorithms = len(mapList(ext["Signature Algorithms"]))
+				}
+			}
+			name += fmt.Sprintf(" · %d signature algorithms", algorithms)
+		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable"
+		}
 		parts = append(parts, name)
 	}
 	if len(parts) == 0 {

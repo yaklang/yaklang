@@ -152,6 +152,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var authenticatedQUIC bool
 	var authenticatedTLS bool
 	var tls13KeyUpdates bool
+	var tlsNegotiatedVersion uint64
 	var http3FrameKind string
 	var http3StreamID uint64
 	var http3HeaderSource int
@@ -447,8 +448,30 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 					continue
 				}
-				if name == "Handshake Messages" {
+				if name == "Handshake Messages" || name == "TLS Handshakes" {
 					add(handshakeType(r["Type"]), true)
+					requestVersion, requestAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Request Version"]) == 0x304 {
+						requestVersion, requestAuthenticated = 0x304, true
+					}
+					request, requestWire, requestName := tlsCertificateRequestDetail(r, requestVersion, requestAuthenticated)
+					requestSource := 0
+					if request != nil {
+						if fieldValueSourceCount < 256 && len(requestWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: requestName, Data: bytes.Clone(requestWire)})
+							requestSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(requestWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate Request (13)", depth: depth + 2,
+								source: requestSource, start: 0, end: 1, hasRange: requestSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
 					keyUpdateSource := 0
 					if data := tlsKeyUpdatePlaintext(r, authenticatedTLS && tls13KeyUpdates); data != nil {
 						sources = append(sources, detailSource{Name: "TLS Key Update · authenticated handshake plaintext", Data: bytes.Clone(data)})
@@ -461,8 +484,32 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 					}
 					sort.Strings(keys)
+					if request != nil {
+						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					for _, key := range keys {
+						if request != nil && key == "Certificate Request" {
+							rows, limited := tlsCertificateRequestFields(request, requestSource, depth+2, max(0, 4096-len(out)), uint16(requestVersion))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if request != nil && key == "Encoded Certificate Request" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Certificate Request: " + formatFieldValue(key, requestWire), depth: depth + 2,
+									source: requestSource, start: 0, end: len(requestWire), hasRange: requestSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
+						before := len(out)
 						walk(key, r[key], depth+1)
+						if request != nil && key == "Length" && requestSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = requestSource, 1, 4, true
+						}
 						if keyUpdateSource > 0 && (key == "Key Update Request" || key == "Encoded Key Update") {
 							field := &out[len(out)-1]
 							field.source, field.start, field.end, field.hasRange = keyUpdateSource, 4, 5, true
@@ -767,6 +814,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		dcerpcResult, dcerpcResultKnown = 0, false
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
 		tls13KeyUpdates = number(e.Session["Negotiated Version"]) == 0x304
+		tlsNegotiatedVersion = number(e.Session["Negotiated Version"])
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil
