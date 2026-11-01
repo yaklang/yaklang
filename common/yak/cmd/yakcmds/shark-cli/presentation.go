@@ -36,6 +36,8 @@ type packetPresentation struct {
 	tlsIncompleteSummary                  bool
 	tlsDetailedSummaryRank                int
 	tlsRecordProblem                      string
+	quicPacketProblem                     string
+	quicPacketProblemRank                 int
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
 	nativeESPIncomplete                   bool
@@ -926,6 +928,22 @@ func networkHeaderRefusalPresentation(e *pcaputil.ProtocolEvent) ([]string, stri
 	return names, label, label != ""
 }
 
+// A packet diagnostic is separate from connection identity and from any
+// successfully decoded neighbour in a coalesced UDP datagram. Public short
+// header guesses alone cannot qualify this overview.
+func quicPacketDiagnosticRank(e *pcaputil.ProtocolEvent) int {
+	if e == nil || e.Protocol != "quic" || e.Completeness == "evicted" || e.Error == "" {
+		return 0
+	}
+	if e.Session["Authentication Verified"] != true && (e.FlowID == 0 || e.Admission != "authenticated-wire-and-observed-CID" && e.Admission != "observed-CID-unverified-payload") {
+		return 0
+	}
+	if e.ExpertCode == string(pcaputil.ErrMalformedMessage) || e.ExpertCode == string(pcaputil.ErrAuthenticationFailed) {
+		return 2
+	}
+	return 1
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
@@ -1269,6 +1287,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 			}
 			cause := strings.TrimPrefix(e.Error, e.ExpertCode+": ")
 			p.diagnostic = clipText(label+" · "+e.ExpertCode+" · "+cause, 256)
+			if rank := quicPacketDiagnosticRank(e); rank > p.quicPacketProblemRank {
+				p.quicPacketProblem, p.quicPacketProblemRank = p.diagnostic, rank
+			}
 			if e.Protocol == "tls" && e.ExpertCode == string(pcaputil.ErrMalformedMessage) && p.tlsRecordProblem == "" {
 				// A later consequence (for example invalidated stream affinity)
 				// must not replace the original rejected-record diagnosis.
@@ -1611,6 +1632,16 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 		row.Info = p.tlsRecordProblem + " | " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
 	}
+	if p.quicPacketProblem != "" {
+		if p.quicPacketProblem != p.summary {
+			row.Info = p.quicPacketProblem + " | " + row.Info
+		}
+		if p.count > 0 {
+			row.ProtocolStatus, row.Visibility = "mixed-packet-outcomes", "mixed-packet-outcomes"
+			row.ProtocolScope = "mixed QUIC datagram outcomes"
+			row.ProtocolEvidence = "packet protection and parsing are per packet; at least one QUIC packet was refused"
+		}
+	}
 	if p.rejectedTLS && p.count > 0 {
 		row.Info = "Includes rejected TLS record · " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
@@ -1618,7 +1649,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.count > 3 {
 		row.Info += fmt.Sprintf(" (+%d further PDUs)", p.count-3)
 	}
-	if p.diagnostic != "" && p.diagnostic != p.summary && p.diagnostic != p.tlsRecordProblem {
+	if p.diagnostic != "" && p.diagnostic != p.summary && p.diagnostic != p.tlsRecordProblem && p.diagnostic != p.quicPacketProblem {
 		row.Info += " · " + p.diagnostic
 	}
 	if p.smbDecodedRecordSummary != "" && p.smbRefusedRecordSummary != "" {

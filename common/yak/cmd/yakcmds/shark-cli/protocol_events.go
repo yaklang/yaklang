@@ -139,6 +139,23 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			add(e.Summary, false)
 		}
 	}
+	// A large admitted Initial/Handshake tree must not bury a later packet's
+	// refusal. Keep byte-source order and all individual trees unchanged.
+	quicPackets := 0
+	for _, e := range ordered {
+		if e != nil && e.Completeness != "evicted" && (e.Protocol == "quic" || (e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Native Carrier"] == true) {
+			quicPackets++
+		}
+	}
+	frontloadedQUIC := map[*pcaputil.ProtocolEvent]bool{}
+	if quicPackets > 1 {
+		for _, e := range ordered {
+			if quicPacketDiagnosticRank(e) > 0 && len(frontloadedQUIC) < 8 {
+				add(fmt.Sprintf("Packet diagnostic: QUIC PDU #%d · %s", e.ID, e.Error), false)
+				frontloadedQUIC[e] = true
+			}
+		}
+	}
 	var protocol string
 	var ospfv3Display bool
 	var ospfv2Display bool
@@ -983,8 +1000,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			out[len(out)-1].source, out[len(out)-1].hasRange, out[len(out)-1].end = currentSource, true, len(e.Raw)
 		}
 		add(applicationEventSummary(e), false)
-		earlyQUICDiagnostic := e.Protocol == "quic" && e.Error != "" && e.Session["Authentication Verified"] == true
-		if earlyQUICDiagnostic {
+		earlyQUICDiagnostic := frontloadedQUIC[e] || e.Protocol == "quic" && e.Error != "" && e.Session["Authentication Verified"] == true
+		if earlyQUICDiagnostic && !frontloadedQUIC[e] {
 			add("Packet diagnostic: "+e.Error, false)
 		}
 		if e.Protocol == "http3" && e.Error != "" {
