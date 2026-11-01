@@ -44,19 +44,21 @@ type smb2FileKey struct {
 }
 
 type smb2Pending struct {
-	key          smb2PendingKey
-	name         string
-	path         string
-	target       string
-	fileID       string
-	related      bool
-	direction    int
-	hasDirection bool
-	asyncID      uint64
-	async        bool
-	chain        *smb2RequestChain
-	ordinal      int
-	queryInfo    smb2QueryInfoSelector
+	key               smb2PendingKey
+	name              string
+	path              string
+	target            string
+	fileID            string
+	related           bool
+	direction         int
+	hasDirection      bool
+	asyncID           uint64
+	async             bool
+	chain             *smb2RequestChain
+	ordinal           int
+	queryInfo         smb2QueryInfoSelector
+	directoryClass    uint8
+	hasDirectoryClass bool
 }
 
 type smb2QueryInfoSelector struct {
@@ -831,63 +833,21 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 	resp := info["Response"].(bool)
 	body := pdu[smb2HeaderSize:]
 	switch cmd {
-	case 1:
-		if len(body) > stream_parser.SMB2QueryInfoMaxBodyBytes {
-			return nil, protocolError(ErrResourceExceeded, "SMB2 SESSION_SETUP body exceeds bounded profile")
-		}
-		if resp && info["Status"] != uint32(0) && info["Status"] != uint32(0xc0000016) {
-			fields, err := stream_parser.DecodeSMB2ErrorBody(body)
-			if err != nil {
-				return nil, err
-			}
-			delete(fields, "Error Response")
-			smb2OffsetRanges(fields, 64)
-			info["Body"], info["Error Response"] = fields, true
-			return info, nil
-		}
-		if !resp || info["Status"] == uint32(0) || info["Status"] == uint32(0xc0000016) {
-			minimum, structure := 24, uint16(25)
-			if resp {
-				minimum, structure = 8, 9
-			}
-			if len(body) < minimum || binary.LittleEndian.Uint16(body) != structure {
-				if !resp && len(body) >= 2 && binary.LittleEndian.Uint16(body) == 17 {
-					return nil, protocolError(ErrUnsupportedVersion, "SESSION_SETUP observed StructureSize 17; supported modern request layout requires 25")
-				}
-				return nil, fmt.Errorf("smb2: SESSION_SETUP complete %d-byte fixed body and StructureSize %d required", minimum, structure)
-			}
-		}
-		at := 12
-		if resp {
-			at = 4
-		}
-		if len(body) >= at+4 && (!resp || info["Status"] == uint32(0) || info["Status"] == uint32(0xc0000016)) {
-			offset, n := int(binary.LittleEndian.Uint16(body[at:at+2])), int(binary.LittleEndian.Uint16(body[at+2:at+4]))
-			minimum := 88
-			if resp {
-				minimum = 72
-				info["Session Flags"] = binary.LittleEndian.Uint16(body[2:4])
-				info["Guest Session"] = binary.LittleEndian.Uint16(body[2:4])&1 != 0
-			}
-			if n > 0 {
-				if offset < minimum || offset > len(pdu) || n > len(pdu)-offset {
-					return nil, fmt.Errorf("smb2: security buffer outside command")
-				}
-				info["Authentication"] = decodeAuthenticationEnvelope(pdu[offset : offset+n])
-			}
-		}
 	case 0:
 		if err := smb2NegotiateFields(info, pdu, resp, max); err != nil {
 			return nil, err
 		}
+	case 1:
+		if err := smb2SessionSetupFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
+	case 2, 4:
+		if err := smb2SmallCommandFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
 	case 3:
-		if !resp && len(body) >= 8 {
-			off := int(binary.LittleEndian.Uint16(body[4:6]))
-			n := int(binary.LittleEndian.Uint16(body[6:8]))
-			at := off - smb2HeaderSize
-			if at >= 0 && at+n <= len(body) {
-				info["Path"] = smb2UTF16LE(body[at : at+n])
-			}
+		if err := smb2TreeConnectFields(info, pdu, resp); err != nil {
+			return nil, err
 		}
 	case 5:
 		if err := smb2CreateFields(info, pdu, resp, max); err != nil {
@@ -897,16 +857,21 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 		if err := smb2CloseFields(info, pdu, resp); err != nil {
 			return nil, err
 		}
-	case 8, 9:
-		if !resp && len(body) >= 32 {
-			info["FileId"] = hex.EncodeToString(body[16:32])
-			if cmd == 8 {
-				info["Length"] = binary.LittleEndian.Uint32(body[4:8])
-			} else {
-				info["Length"] = binary.LittleEndian.Uint32(body[4:8])
-			}
-		} else if resp && cmd == 9 && len(body) >= 8 {
-			info["Count"] = binary.LittleEndian.Uint32(body[4:8])
+	case 8:
+		if err := smb2ReadFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
+	case 9:
+		if err := smb2WriteFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
+	case 11:
+		if err := smb2IOCTLFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
+	case 14:
+		if err := smb2QueryDirectoryFields(info, pdu, resp); err != nil {
+			return nil, err
 		}
 	case 16:
 		if len(body) > stream_parser.SMB2QueryInfoMaxBodyBytes {

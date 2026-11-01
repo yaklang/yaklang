@@ -163,3 +163,61 @@ func TestSMBRefusedAndDecodedCoalescedRecordsKeepBothOutcomes(t *testing.T) {
 		require.NotContains(t, row.Info, "stream bytes")
 	}
 }
+
+func TestSMB2ListShowsVersionCommandAndKeepsLiteralDialect(t *testing.T) {
+	session, err := pcaputil.NewProtocolSession(pcaputil.DefaultParserBudget())
+	require.NoError(t, err)
+	defer session.Close("test")
+	negotiate := make([]byte, 36+4)
+	binary.LittleEndian.PutUint16(negotiate[0:], 36)
+	binary.LittleEndian.PutUint16(negotiate[2:], 2)
+	binary.LittleEndian.PutUint16(negotiate[4:], 1)
+	binary.LittleEndian.PutUint16(negotiate[36:], 0x0202)
+	binary.LittleEndian.PutUint16(negotiate[38:], 0x0210)
+	request := session.Feed(0, time.Unix(1, 0), smbDetailTestDirect(smbDetailTestHeader(0, 0, 1, 0, 0, negotiate)))
+	require.Nil(t, request.Err)
+	require.Contains(t, applicationEventSummary(request.Events[0]), "SMB2 · NEGOTIATE · request")
+	require.Contains(t, applicationEventSummary(request.Events[0]), "dialects=2")
+	responseBody := make([]byte, 64)
+	binary.LittleEndian.PutUint16(responseBody[0:], 65)
+	binary.LittleEndian.PutUint16(responseBody[2:], 1)
+	binary.LittleEndian.PutUint16(responseBody[4:], 0x0210)
+	binary.LittleEndian.PutUint16(responseBody[56:], 128)
+	response := session.Feed(1, time.Unix(2, 0), smbDetailTestDirect(smbDetailTestHeader(0, 1, 1, 0, 0, responseBody)))
+	require.Nil(t, response.Err)
+	require.Contains(t, applicationEventSummary(response.Events[0]), "SMB2 · NEGOTIATE · response")
+	require.Contains(t, applicationEventSummary(response.Events[0]), "dialect=0x0210")
+	path := make([]byte, 22)
+	for i, c := range `\\srv\share` {
+		path[i*2] = byte(c)
+	}
+	treeBody := make([]byte, 8+len(path))
+	binary.LittleEndian.PutUint16(treeBody[0:], 9)
+	binary.LittleEndian.PutUint16(treeBody[4:], 72)
+	binary.LittleEndian.PutUint16(treeBody[6:], uint16(len(path)))
+	copy(treeBody[8:], path)
+	tree := session.Feed(0, time.Unix(3, 0), smbDetailTestDirect(smbDetailTestHeader(3, 0, 3, 0x11, 0, treeBody)))
+	require.Nil(t, tree.Err)
+	summary := applicationEventSummary(tree.Events[0])
+	require.Contains(t, summary, "SMB2 · TREE_CONNECT · request")
+	require.Contains(t, summary, `\\srv\share`)
+	require.NotContains(t, summary, "0x0210")
+	body := tree.Events[0].Session["Body"].(map[string]any)
+	require.NotContains(t, body, "Dialect")
+	fields, sources := protocolEventDetail(tree.Events)
+	require.NotEmpty(t, sources)
+	var sawHeader, sawBody bool
+	for _, field := range fields {
+		if field.branch && field.text == "Header" {
+			sawHeader = true
+		}
+		if field.branch && field.text == "Body" {
+			sawBody = true
+		}
+	}
+	require.True(t, sawHeader)
+	require.True(t, sawBody)
+	row := presentEvents(tree.Events).apply(packetSummary{Protocol: "TCP", Transport: "tcp"})
+	require.Equal(t, "SMB2", row.Protocol)
+	require.Contains(t, row.Info, "TREE_CONNECT")
+}

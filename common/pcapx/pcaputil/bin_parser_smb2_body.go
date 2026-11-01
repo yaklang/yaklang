@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // Header and Body contain literal observations. The flat keys retained for
@@ -156,6 +158,10 @@ func smb2NegotiateFields(info map[string]any, pdu []byte, response bool, max int
 	info["Body"] = body
 	b := pdu[64:]
 	if !response {
+		smb2Literal(body, "Security Mode", 68, 70, binary.LittleEndian.Uint16(b[4:6]))
+		smb2Literal(body, "Reserved", 70, 72, binary.LittleEndian.Uint16(b[6:8]))
+		smb2Literal(body, "Capabilities", 72, 76, binary.LittleEndian.Uint32(b[8:12]))
+		smb2Literal(body, "Client Guid", 76, 92, bytes.Clone(b[12:28]))
 		count := int(binary.LittleEndian.Uint16(b[2:4]))
 		if count == 0 || count > (len(b)-36)/2 {
 			return fmt.Errorf("smb2: incomplete or empty negotiate dialect list")
@@ -172,16 +178,37 @@ func smb2NegotiateFields(info map[string]any, pdu []byte, response bool, max int
 			smb2Literal(entries[i], "Dialect", 100+2*i, 102+2*i, dialects[i])
 		}
 		info["Dialects"], body["Dialects"] = dialects, entries
+		modern := false
 		for _, dialect := range dialects {
 			if dialect == 0x0311 {
-				return smb2NegotiateContextFields(body, pdu, int(binary.LittleEndian.Uint16(b[32:34])), uint64(binary.LittleEndian.Uint32(b[28:32])), 100+2*count, max, 0, 0)
+				modern = true
 			}
 		}
+		// MS-SMB2 2.2.3: the 8 bytes at offset 28 are contexts only when 0x0311 is offered.
+		if modern {
+			smb2Literal(body, "Negotiate Context Offset", 92, 96, binary.LittleEndian.Uint32(b[28:32]))
+			smb2Literal(body, "Negotiate Context Count", 96, 98, binary.LittleEndian.Uint16(b[32:34]))
+			smb2Literal(body, "Negotiate Context Reserved", 98, 100, binary.LittleEndian.Uint16(b[34:36]))
+			return smb2NegotiateContextFields(body, pdu, int(binary.LittleEndian.Uint16(b[32:34])), uint64(binary.LittleEndian.Uint32(b[28:32])), 100+2*count, max, 0, 0)
+		}
+		smb2Literal(body, "Client Start Time", 92, 100, binary.LittleEndian.Uint64(b[28:36]))
 		return nil
 	}
 	dialect := binary.LittleEndian.Uint16(b[4:6])
 	smb2Literal(body, "Security Mode", 66, 68, binary.LittleEndian.Uint16(b[2:4]))
 	smb2Literal(body, "Dialect", 68, 70, dialect)
+	if dialect == 0x0311 {
+		smb2Literal(body, "Negotiate Context Count", 70, 72, binary.LittleEndian.Uint16(b[6:8]))
+	} else {
+		smb2Literal(body, "Reserved", 70, 72, binary.LittleEndian.Uint16(b[6:8]))
+	}
+	smb2Literal(body, "Server Guid", 72, 88, bytes.Clone(b[8:24]))
+	smb2Literal(body, "Capabilities", 88, 92, binary.LittleEndian.Uint32(b[24:28]))
+	smb2Literal(body, "Max Transact Size", 92, 96, binary.LittleEndian.Uint32(b[28:32]))
+	smb2Literal(body, "Max Read Size", 96, 100, binary.LittleEndian.Uint32(b[32:36]))
+	smb2Literal(body, "Max Write Size", 100, 104, binary.LittleEndian.Uint32(b[36:40]))
+	smb2Literal(body, "System Time", 104, 112, binary.LittleEndian.Uint64(b[40:48]))
+	smb2Literal(body, "Server Start Time", 112, 120, binary.LittleEndian.Uint64(b[48:56]))
 	info["Dialect"], info["Version Name"] = dialect, smb2DialectName(dialect)
 	smb2Literal(info, "Dialect", 68, 70, dialect)
 	offset, length := int(binary.LittleEndian.Uint16(b[56:58])), int(binary.LittleEndian.Uint16(b[58:60]))
@@ -196,10 +223,12 @@ func smb2NegotiateFields(info map[string]any, pdu []byte, response bool, max int
 	}
 	// Only the 3.1.1 layout interprets these reserved fields as contexts.
 	if dialect == 0x0311 {
+		smb2Literal(body, "Negotiate Context Offset", 124, 128, binary.LittleEndian.Uint32(b[60:64]))
 		count := int(binary.LittleEndian.Uint16(b[6:8]))
 		at := uint64(binary.LittleEndian.Uint32(b[60:64]))
 		return smb2NegotiateContextFields(body, pdu, count, at, 128, max, offset, length)
 	}
+	smb2Literal(body, "Reserved2", 124, 128, binary.LittleEndian.Uint32(b[60:64]))
 	return nil
 }
 
@@ -249,6 +278,18 @@ func smb2CreateFields(info map[string]any, pdu []byte, response bool, max int) e
 	}
 	info["Body"] = body
 	if !response {
+		smb2Literal(body, "Security Flags", 66, 67, pdu[66])
+		smb2Literal(body, "Requested Oplock Level", 67, 68, pdu[67])
+		smb2Literal(body, "Impersonation Level", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+		smb2Literal(body, "Smb Create Flags", 72, 80, binary.LittleEndian.Uint64(pdu[72:80]))
+		smb2Literal(body, "Reserved", 80, 88, binary.LittleEndian.Uint64(pdu[80:88]))
+		smb2Literal(body, "Desired Access", 88, 92, binary.LittleEndian.Uint32(pdu[88:92]))
+		smb2Literal(body, "File Attributes", 92, 96, binary.LittleEndian.Uint32(pdu[92:96]))
+		smb2Literal(body, "Share Access", 96, 100, binary.LittleEndian.Uint32(pdu[96:100]))
+		smb2Literal(body, "Create Disposition", 100, 104, binary.LittleEndian.Uint32(pdu[100:104]))
+		smb2Literal(body, "Create Options", 104, 108, binary.LittleEndian.Uint32(pdu[104:108]))
+		smb2Literal(body, "Name Offset", 108, 110, binary.LittleEndian.Uint16(pdu[108:110]))
+		smb2Literal(body, "Name Length", 110, 112, binary.LittleEndian.Uint16(pdu[110:112]))
 		offset, length := int(binary.LittleEndian.Uint16(pdu[108:110])), int(binary.LittleEndian.Uint16(pdu[110:112]))
 		name, err := smb2Buffer(pdu, offset, length, 120)
 		if err != nil || length%2 != 0 {
@@ -261,6 +302,23 @@ func smb2CreateFields(info map[string]any, pdu []byte, response bool, max int) e
 		}
 		return smb2CreateContextFields(body, pdu, 112, 120, max)
 	}
+	smb2Literal(body, "Oplock Level", 66, 67, pdu[66])
+	smb2Literal(body, "Flags", 67, 68, pdu[67])
+	smb2Literal(body, "Create Action", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+	for i, key := range []string{"Creation Time", "Last Access Time", "Last Write Time", "Change Time"} {
+		at := 72 + 8*i
+		smb2Literal(body, key, at, at+8, binary.LittleEndian.Uint64(pdu[at:at+8]))
+	}
+	for i, key := range []string{"Allocation Size", "End Of File"} {
+		at := 104 + 8*i
+		size := int64(binary.LittleEndian.Uint64(pdu[at : at+8]))
+		if size < 0 {
+			return fmt.Errorf("smb2: CREATE %s is a negative LARGE_INTEGER", key)
+		}
+		smb2Literal(body, key, at, at+8, size)
+	}
+	smb2Literal(body, "File Attributes", 120, 124, binary.LittleEndian.Uint32(pdu[120:124]))
+	smb2Literal(body, "Reserved2", 124, 128, binary.LittleEndian.Uint32(pdu[124:128]))
 	fid := hex.EncodeToString(pdu[128:144])
 	smb2Literal(info, "FileId", 128, 144, fid)
 	smb2Literal(body, "FileId", 128, 144, fid)
@@ -342,6 +400,7 @@ func smb2CloseFields(info map[string]any, pdu []byte, response bool) error {
 	info["Body"] = body
 	smb2Literal(body, "Flags", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
 	if !response {
+		smb2Literal(body, "Reserved", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
 		fid := hex.EncodeToString(pdu[72:88])
 		smb2Literal(info, "FileId", 72, 88, fid)
 		smb2Literal(body, "FileId", 72, 88, fid)
@@ -351,6 +410,393 @@ func smb2CloseFields(info map[string]any, pdu []byte, response bool) error {
 		at := 72 + 8*i
 		smb2Literal(body, key, at, at+8, binary.LittleEndian.Uint64(pdu[at:at+8]))
 	}
+	smb2Literal(body, "Reserved", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
 	smb2Literal(body, "File Attributes", 120, 124, binary.LittleEndian.Uint32(pdu[120:124]))
+	return nil
+}
+
+// MS-SMB2 2.2.2 is the error body. STATUS_MORE_PROCESSING_REQUIRED keeps the
+// SESSION_SETUP response. STATUS_BUFFER_OVERFLOW keeps the success body for
+// READ, IOCTL, QUERY_DIRECTORY, CHANGE_NOTIFY and QUERY_INFO. STATUS_PENDING
+// is an interim error response (3.3.4.2), not a successful command body.
+func smb2StatusUsesErrorBody(command uint16, status uint32, response bool) bool {
+	if !response || status == 0 {
+		return false
+	}
+	if command == 1 && status == 0xc0000016 {
+		return false
+	}
+	if status == 0x80000005 {
+		switch command {
+		case 8, 11, 14, 15, 16:
+			return false
+		}
+	}
+	return true
+}
+
+func smb2SessionSetupFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(1, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if len(pdu) > smb2HeaderSize+(1<<20) {
+		return protocolError(ErrResourceExceeded, "SMB2 SESSION_SETUP body exceeds bounded profile")
+	}
+	minimum, structure := 24, uint16(25)
+	bufferAt := 12
+	bufferMinimum := 88
+	if response {
+		minimum, structure, bufferAt, bufferMinimum = 8, 9, 4, 72
+	}
+	if len(pdu) < smb2HeaderSize+minimum || binary.LittleEndian.Uint16(pdu[64:66]) != structure {
+		if !response && len(pdu) >= 66 && binary.LittleEndian.Uint16(pdu[64:66]) == 17 {
+			return protocolError(ErrUnsupportedVersion, "SESSION_SETUP observed StructureSize 17; supported modern request layout requires 25")
+		}
+		return fmt.Errorf("smb2: SESSION_SETUP complete %d-byte fixed body and StructureSize %d required", minimum, structure)
+	}
+	body, err := smb2Body(pdu, minimum, structure)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	b := pdu[64:]
+	if !response {
+		smb2Literal(body, "Flags", 66, 67, b[2])
+		smb2Literal(body, "Security Mode", 67, 68, b[3])
+		smb2Literal(body, "Capabilities", 68, 72, binary.LittleEndian.Uint32(b[4:8]))
+		smb2Literal(body, "Channel", 72, 76, binary.LittleEndian.Uint32(b[8:12]))
+		smb2Literal(body, "Previous Session Id", 80, 88, binary.LittleEndian.Uint64(b[16:24]))
+	} else {
+		flags := binary.LittleEndian.Uint16(b[2:4])
+		smb2Literal(body, "Session Flags", 66, 68, flags)
+		info["Session Flags"] = flags
+		info["Guest Session"] = flags&1 != 0
+	}
+	offset := int(binary.LittleEndian.Uint16(b[bufferAt : bufferAt+2]))
+	n := int(binary.LittleEndian.Uint16(b[bufferAt+2 : bufferAt+4]))
+	smb2Literal(body, "Security Buffer Offset", 64+bufferAt, 66+bufferAt, uint16(offset))
+	smb2Literal(body, "Security Buffer Length", 66+bufferAt, 68+bufferAt, uint16(n))
+	if n == 0 {
+		return nil
+	}
+	if offset < bufferMinimum || offset > len(pdu) || n > len(pdu)-offset {
+		return fmt.Errorf("smb2: security buffer outside command")
+	}
+	token := bytes.Clone(pdu[offset : offset+n])
+	smb2Literal(body, "Security Buffer", offset, offset+n, token)
+	info["Authentication"] = decodeAuthenticationEnvelope(token)
+	return nil
+}
+
+func smb2SmallCommandFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	command, _ := info["Command"].(uint16)
+	if smb2StatusUsesErrorBody(command, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	body, err := smb2Body(pdu, 4, 4)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	info["Body"] = body
+	return nil
+}
+
+func smb2TreeConnectFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(3, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if !response {
+		body, err := smb2Body(pdu, 8, 9)
+		if err != nil {
+			return err
+		}
+		info["Body"] = body
+		smb2Literal(body, "Flags", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+		offset := int(binary.LittleEndian.Uint16(pdu[68:70]))
+		n := int(binary.LittleEndian.Uint16(pdu[70:72]))
+		smb2Literal(body, "Path Offset", 68, 70, uint16(offset))
+		smb2Literal(body, "Path Length", 70, 72, uint16(n))
+		if n == 0 {
+			return fmt.Errorf("smb2: TREE_CONNECT path is empty")
+		}
+		if n%2 != 0 || n > 4096 {
+			return fmt.Errorf("smb2: TREE_CONNECT path length is not a bounded UTF-16 span")
+		}
+		path, err := smb2Buffer(pdu, offset, n, 72)
+		if err != nil {
+			return fmt.Errorf("smb2: TREE_CONNECT path outside command")
+		}
+		text := smb2UTF16LE(path)
+		smb2Literal(body, "Path", offset, offset+n, text)
+		smb2Literal(info, "Path", offset, offset+n, text)
+		return nil
+	}
+	body, err := smb2Body(pdu, 16, 16)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	smb2Literal(body, "Share Type", 66, 67, pdu[66])
+	smb2Literal(body, "Reserved", 67, 68, pdu[67])
+	smb2Literal(body, "Share Flags", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+	smb2Literal(body, "Capabilities", 72, 76, binary.LittleEndian.Uint32(pdu[72:76]))
+	smb2Literal(body, "Maximal Access", 76, 80, binary.LittleEndian.Uint32(pdu[76:80]))
+	return nil
+}
+
+func smb2ReadFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(8, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if !response {
+		body, err := smb2Body(pdu, 48, 49)
+		if err != nil {
+			return err
+		}
+		info["Body"] = body
+		smb2Literal(body, "Padding", 66, 67, pdu[66])
+		smb2Literal(body, "Flags", 67, 68, pdu[67])
+		length := binary.LittleEndian.Uint32(pdu[68:72])
+		smb2Literal(body, "Length", 68, 72, length)
+		info["Length"] = length
+		smb2Literal(body, "Offset", 72, 80, binary.LittleEndian.Uint64(pdu[72:80]))
+		fid := hex.EncodeToString(pdu[80:96])
+		smb2Literal(body, "FileId", 80, 96, fid)
+		smb2Literal(info, "FileId", 80, 96, fid)
+		smb2Literal(body, "Minimum Count", 96, 100, binary.LittleEndian.Uint32(pdu[96:100]))
+		channel := binary.LittleEndian.Uint32(pdu[100:104])
+		smb2Literal(body, "Channel", 100, 104, channel)
+		smb2Literal(body, "Remaining Bytes", 104, 108, binary.LittleEndian.Uint32(pdu[104:108]))
+		channelOffset := int(binary.LittleEndian.Uint16(pdu[108:110]))
+		channelLength := int(binary.LittleEndian.Uint16(pdu[110:112]))
+		smb2Literal(body, "Read Channel Info Offset", 108, 110, uint16(channelOffset))
+		smb2Literal(body, "Read Channel Info Length", 110, 112, uint16(channelLength))
+		if channel == 0 {
+			if channelOffset != 0 || channelLength != 0 {
+				return fmt.Errorf("smb2: READ channel NONE cannot carry channel info")
+			}
+			return nil
+		}
+		raw, err := smb2Buffer(pdu, channelOffset, channelLength, 112)
+		if err != nil {
+			return fmt.Errorf("smb2: READ channel info outside command")
+		}
+		smb2Literal(body, "Read Channel Info", channelOffset, channelOffset+channelLength, bytes.Clone(raw))
+		body["Read Channel Info Status"] = "opaque: channel payload layout is not selected"
+		log.Debugf("smb2: READ channel 0x%08x payload left opaque; layout not selected", channel)
+		return nil
+	}
+	body, err := smb2Body(pdu, 16, 17)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	dataOffset := int(pdu[66])
+	smb2Literal(body, "Data Offset", 66, 67, pdu[66])
+	smb2Literal(body, "Reserved", 67, 68, pdu[67])
+	dataLength := int(binary.LittleEndian.Uint32(pdu[68:72]))
+	smb2Literal(body, "Data Length", 68, 72, uint32(dataLength))
+	smb2Literal(body, "Data Remaining", 72, 76, binary.LittleEndian.Uint32(pdu[72:76]))
+	smb2Literal(body, "Reserved2", 76, 80, binary.LittleEndian.Uint32(pdu[76:80]))
+	if dataLength == 0 {
+		return nil
+	}
+	if dataOffset < 80 || dataOffset%8 != 0 || dataOffset > len(pdu) || dataLength > len(pdu)-dataOffset {
+		return fmt.Errorf("smb2: READ data outside command")
+	}
+	smb2Literal(body, "Data", dataOffset, dataOffset+dataLength, bytes.Clone(pdu[dataOffset:dataOffset+dataLength]))
+	return nil
+}
+
+func smb2WriteFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(9, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if !response {
+		body, err := smb2Body(pdu, 48, 49)
+		if err != nil {
+			return err
+		}
+		info["Body"] = body
+		dataOffset := int(binary.LittleEndian.Uint16(pdu[66:68]))
+		length := int(binary.LittleEndian.Uint32(pdu[68:72]))
+		smb2Literal(body, "Data Offset", 66, 68, uint16(dataOffset))
+		smb2Literal(body, "Length", 68, 72, uint32(length))
+		info["Length"] = uint32(length)
+		smb2Literal(body, "Offset", 72, 80, binary.LittleEndian.Uint64(pdu[72:80]))
+		fid := hex.EncodeToString(pdu[80:96])
+		smb2Literal(body, "FileId", 80, 96, fid)
+		smb2Literal(info, "FileId", 80, 96, fid)
+		channel := binary.LittleEndian.Uint32(pdu[96:100])
+		smb2Literal(body, "Channel", 96, 100, channel)
+		smb2Literal(body, "Remaining Bytes", 100, 104, binary.LittleEndian.Uint32(pdu[100:104]))
+		channelOffset := int(binary.LittleEndian.Uint16(pdu[104:106]))
+		channelLength := int(binary.LittleEndian.Uint16(pdu[106:108]))
+		smb2Literal(body, "Write Channel Info Offset", 104, 106, uint16(channelOffset))
+		smb2Literal(body, "Write Channel Info Length", 106, 108, uint16(channelLength))
+		smb2Literal(body, "Flags", 108, 112, binary.LittleEndian.Uint32(pdu[108:112]))
+		if length > 0 {
+			raw, err := smb2Buffer(pdu, dataOffset, length, 112)
+			if err != nil {
+				return fmt.Errorf("smb2: WRITE data outside command")
+			}
+			smb2Literal(body, "Data", dataOffset, dataOffset+length, bytes.Clone(raw))
+		}
+		if channel == 0 {
+			if channelOffset != 0 || channelLength != 0 {
+				return fmt.Errorf("smb2: WRITE channel NONE cannot carry channel info")
+			}
+			return nil
+		}
+		raw, err := smb2Buffer(pdu, channelOffset, channelLength, 112)
+		if err != nil {
+			return fmt.Errorf("smb2: WRITE channel info outside command")
+		}
+		smb2Literal(body, "Write Channel Info", channelOffset, channelOffset+channelLength, bytes.Clone(raw))
+		body["Write Channel Info Status"] = "opaque: channel payload layout is not selected"
+		log.Debugf("smb2: WRITE channel 0x%08x payload left opaque; layout not selected", channel)
+		return nil
+	}
+	body, err := smb2Body(pdu, 16, 17)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	count := binary.LittleEndian.Uint32(pdu[68:72])
+	smb2Literal(body, "Count", 68, 72, count)
+	info["Count"] = count
+	smb2Literal(body, "Remaining", 72, 76, binary.LittleEndian.Uint32(pdu[72:76]))
+	smb2Literal(body, "Write Channel Info Offset", 76, 78, binary.LittleEndian.Uint16(pdu[76:78]))
+	smb2Literal(body, "Write Channel Info Length", 78, 80, binary.LittleEndian.Uint16(pdu[78:80]))
+	return nil
+}
+
+func smb2IOCTLFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(11, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	minimum, structure := 56, uint16(57)
+	if response {
+		minimum, structure = 48, 49
+	}
+	body, err := smb2Body(pdu, minimum, structure)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	code := binary.LittleEndian.Uint32(pdu[68:72])
+	smb2Literal(body, "Ctl Code", 68, 72, code)
+	fid := hex.EncodeToString(pdu[72:88])
+	smb2Literal(body, "FileId", 72, 88, fid)
+	smb2Literal(info, "FileId", 72, 88, fid)
+	if !response {
+		smb2Literal(body, "Input Offset", 88, 92, binary.LittleEndian.Uint32(pdu[88:92]))
+		smb2Literal(body, "Input Count", 92, 96, binary.LittleEndian.Uint32(pdu[92:96]))
+		smb2Literal(body, "Max Input Response", 96, 100, binary.LittleEndian.Uint32(pdu[96:100]))
+		smb2Literal(body, "Output Offset", 100, 104, binary.LittleEndian.Uint32(pdu[100:104]))
+		smb2Literal(body, "Output Count", 104, 108, binary.LittleEndian.Uint32(pdu[104:108]))
+		smb2Literal(body, "Max Output Response", 108, 112, binary.LittleEndian.Uint32(pdu[108:112]))
+		smb2Literal(body, "Flags", 112, 116, binary.LittleEndian.Uint32(pdu[112:116]))
+		smb2Literal(body, "Reserved2", 116, 120, binary.LittleEndian.Uint32(pdu[116:120]))
+		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Input", int(binary.LittleEndian.Uint32(pdu[88:92])), int(binary.LittleEndian.Uint32(pdu[92:96])), 120); err != nil {
+			return err
+		}
+	} else {
+		smb2Literal(body, "Input Offset", 88, 92, binary.LittleEndian.Uint32(pdu[88:92]))
+		smb2Literal(body, "Input Count", 92, 96, binary.LittleEndian.Uint32(pdu[92:96]))
+		smb2Literal(body, "Output Offset", 96, 100, binary.LittleEndian.Uint32(pdu[96:100]))
+		smb2Literal(body, "Output Count", 100, 104, binary.LittleEndian.Uint32(pdu[100:104]))
+		smb2Literal(body, "Flags", 104, 108, binary.LittleEndian.Uint32(pdu[104:108]))
+		smb2Literal(body, "Reserved2", 108, 112, binary.LittleEndian.Uint32(pdu[108:112]))
+		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Input", int(binary.LittleEndian.Uint32(pdu[88:92])), int(binary.LittleEndian.Uint32(pdu[92:96])), 112); err != nil {
+			return err
+		}
+		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Output", int(binary.LittleEndian.Uint32(pdu[96:100])), int(binary.LittleEndian.Uint32(pdu[100:104])), 112); err != nil {
+			return err
+		}
+	}
+	body["Control Payload Status"] = "opaque: IOCTL control payload layout is not selected"
+	log.Debugf("smb2: IOCTL control 0x%08x payload left opaque; layout not selected", code)
+	return nil
+}
+
+func smb2OpaqueIOCTLBuffer(body map[string]any, pdu []byte, name string, offset, length, minimum int) error {
+	if length == 0 {
+		return nil
+	}
+	raw, err := smb2Buffer(pdu, offset, length, minimum)
+	if err != nil {
+		return fmt.Errorf("smb2: IOCTL %s buffer outside command", name)
+	}
+	smb2Literal(body, name+" Buffer", offset, offset+length, bytes.Clone(raw))
+	return nil
+}
+
+func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool) error {
+	status, _ := info["Status"].(uint32)
+	if smb2StatusUsesErrorBody(14, status, response) {
+		return smb2ErrorFields(info, pdu)
+	}
+	if !response {
+		body, err := smb2Body(pdu, 32, 33)
+		if err != nil {
+			return err
+		}
+		info["Body"] = body
+		smb2Literal(body, "File Information Class", 66, 67, pdu[66])
+		smb2Literal(body, "Flags", 67, 68, pdu[67])
+		smb2Literal(body, "File Index", 68, 72, binary.LittleEndian.Uint32(pdu[68:72]))
+		fid := hex.EncodeToString(pdu[72:88])
+		smb2Literal(body, "FileId", 72, 88, fid)
+		smb2Literal(info, "FileId", 72, 88, fid)
+		nameOffset := int(binary.LittleEndian.Uint16(pdu[88:90]))
+		nameLength := int(binary.LittleEndian.Uint16(pdu[90:92]))
+		smb2Literal(body, "File Name Offset", 88, 90, uint16(nameOffset))
+		smb2Literal(body, "File Name Length", 90, 92, uint16(nameLength))
+		smb2Literal(body, "Output Buffer Length", 92, 96, binary.LittleEndian.Uint32(pdu[92:96]))
+		if nameLength == 0 {
+			return nil
+		}
+		if nameLength%2 != 0 {
+			return fmt.Errorf("smb2: QUERY_DIRECTORY name length is not UTF-16")
+		}
+		raw, err := smb2Buffer(pdu, nameOffset, nameLength, 96)
+		if err != nil {
+			return fmt.Errorf("smb2: QUERY_DIRECTORY name outside command")
+		}
+		smb2Literal(body, "File Name", nameOffset, nameOffset+nameLength, smb2UTF16LE(raw))
+		return nil
+	}
+	body, err := smb2Body(pdu, 8, 9)
+	if err != nil {
+		return err
+	}
+	info["Body"] = body
+	outputOffset := int(binary.LittleEndian.Uint16(pdu[66:68]))
+	outputLength := int(binary.LittleEndian.Uint32(pdu[68:72]))
+	smb2Literal(body, "Output Buffer Offset", 66, 68, uint16(outputOffset))
+	smb2Literal(body, "Output Buffer Length", 68, 72, uint32(outputLength))
+	if outputLength == 0 {
+		body["Directory Entry Status"] = "opaque: empty output; entry chain not present"
+		return nil
+	}
+	raw, err := smb2Buffer(pdu, outputOffset, outputLength, 72)
+	if err != nil {
+		return fmt.Errorf("smb2: QUERY_DIRECTORY output outside command")
+	}
+	smb2Literal(body, "Output Buffer", outputOffset, outputOffset+outputLength, bytes.Clone(raw))
+	// The information class lives on the matched request. This response does
+	// not repeat it, so the entry chain stays opaque instead of guessing.
+	body["Directory Entry Status"] = "opaque: directory entry chain requires the matched request class"
+	log.Debugf("smb2: QUERY_DIRECTORY output left opaque; entry chain is not selected without a proven class")
 	return nil
 }

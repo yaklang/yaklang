@@ -58,6 +58,82 @@ func smbSummaryInteger(value any) (string, bool) {
 	return "", false
 }
 
+// smbCommandSummary is the list line for a single decoded SMB2 command.
+// Cached connection dialect is not substituted for this packet's own fields.
+func smbCommandSummary(e *pcaputil.ProtocolEvent) (string, bool) {
+	if e == nil || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" || !smbSummaryOwnedRecord(e) {
+		return "", false
+	}
+	v := eventValues(e)
+	if v["Compound"] == true {
+		return "", false
+	}
+	name, _ := v["Packet Name"].(string)
+	if name == "" || name == "QUERY_INFO" {
+		return "", false
+	}
+	h, _ := v["Header"].(map[string]any)
+	role := "request"
+	if v["Response"] == true {
+		role = "response"
+	}
+	parts := []string{"SMB2", name, role}
+	body, _ := v["Body"].(map[string]any)
+	switch name {
+	case "NEGOTIATE":
+		if role == "response" {
+			if _, ok := body["Dialect"]; ok {
+				parts = append(parts, fmt.Sprintf("dialect=0x%04x", number(body["Dialect"])))
+			}
+		} else if n, ok := smbSummaryInteger(body["Dialect Count"]); ok {
+			parts = append(parts, "dialects="+n)
+		}
+	case "TREE_CONNECT":
+		if path, ok := body["Path"].(string); ok && path != "" {
+			parts = append(parts, path)
+		} else if share, ok := smbSummaryInteger(body["Share Type"]); ok {
+			parts = append(parts, "shareType="+share)
+		}
+	case "READ":
+		if n, ok := smbSummaryInteger(body["Length"]); ok && role == "request" {
+			parts = append(parts, "len="+n)
+		}
+		if n, ok := smbSummaryInteger(body["Data Length"]); ok && role == "response" {
+			parts = append(parts, "data="+n)
+		}
+	case "WRITE":
+		if n, ok := smbSummaryInteger(body["Length"]); ok && role == "request" {
+			parts = append(parts, "len="+n)
+		}
+		if n, ok := smbSummaryInteger(body["Count"]); ok && role == "response" {
+			parts = append(parts, "count="+n)
+		}
+	case "SESSION_SETUP":
+		if auth, ok := v["Authentication"].(map[string]any); ok {
+			if mechanism, ok := auth["Mechanism"].(map[string]any); ok {
+				if name, ok := mechanism["Message Name"].(string); ok && name != "" {
+					parts = append(parts, name)
+				}
+			}
+		}
+	case "CREATE":
+		if file, ok := body["File Name"].(string); ok && file != "" {
+			parts = append(parts, file)
+		}
+	case "LOGOFF", "TREE_DISCONNECT":
+		if v["Error Response"] == true {
+			parts = append(parts, "error")
+		}
+	}
+	if status, ok := smbSummaryInteger(h["Status"]); ok && role == "response" && status != "0" {
+		parts = append(parts, "status="+status)
+	}
+	if mid, ok := smbSummaryInteger(h["Message ID"]); ok {
+		parts = append(parts, "MID="+mid)
+	}
+	return safeText(strings.Join(parts, " · ")), true
+}
+
 func smbQueryInfoSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 	if e == nil || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" || !smbSummaryOwnedRecord(e) {
 		return "", false
