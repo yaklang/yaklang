@@ -36,6 +36,7 @@ type packetPresentation struct {
 	tlsIncompleteSummary                  bool
 	tlsDetailedSummaryRank                int
 	tlsRecordProblem                      string
+	tlsHandshakeBoundaryUnavailable       bool
 	quicPacketProblem                     string
 	quicPacketProblemRank                 int
 	h3ConnectionFaultPDU                  uint64
@@ -285,6 +286,15 @@ func tlsKeyStatus(info map[string]any) string {
 	return ""
 }
 
+func tlsHandshakeBoundaryUnavailable(e *pcaputil.ProtocolEvent) bool {
+	if e == nil || e.Protocol != "tls" || e.Error != "" || e.Status != "decoded" && e.Status != "deferred" {
+		return false
+	}
+	v := eventValues(e)
+	return v["Authentication Verified"] == true && number(v["Inner Content Type"]) == 22 &&
+		v["Handshake Parsing"] == "unavailable after missing protected handshake bytes"
+}
+
 func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	v := eventValues(e)
 	if e.Protocol == "ssh" {
@@ -433,7 +443,9 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		parts = append(parts, handshake.text)
 	}
 	if len(parts) == 0 {
-		if _, ok := v["Alert Description"]; ok {
+		if tlsHandshakeBoundaryUnavailable(e) {
+			parts = append(parts, "Handshake · boundary unavailable")
+		} else if _, ok := v["Alert Description"]; ok {
 			level := "warning"
 			if number(v["Alert Level"]) == 2 {
 				level = "fatal"
@@ -1400,6 +1412,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e.Protocol == "" {
 		return
 	}
+	if tlsHandshakeBoundaryUnavailable(e) {
+		p.tlsHandshakeBoundaryUnavailable = true
+	}
 	label := eventProtocolName(e)
 	for _, layer := range eventCarriers(e) {
 		p.addLayer(layer)
@@ -1690,6 +1705,9 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 	if p.tlsRecordProblem != "" {
 		row.Info = p.tlsRecordProblem + " | " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
+	}
+	if p.tlsHandshakeBoundaryUnavailable && !strings.Contains(row.Info, "boundary unavailable") {
+		row.Info = "TLS handshake boundary unavailable | " + row.Info
 	}
 	if p.quicPacketProblem != "" {
 		if p.quicPacketProblem != p.summary {
