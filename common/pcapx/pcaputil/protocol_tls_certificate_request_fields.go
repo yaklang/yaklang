@@ -55,8 +55,26 @@ func tlsCertificateRequestDisplayBindings() []displayFieldBinding {
 	add("tls.handshake.cert_type", "CertificateRequest certificate type", 8, []string{"Certificate Types", "*", "Type"})
 	add("tls.handshake.sig_hash_alg_len", "CertificateRequest signature algorithms vector length", 16,
 		[]string{"Signature Algorithms Length"}, []string{"Extensions", "*", "Signature Algorithms Length"})
-	add("tls.handshake.sig_hash_alg", "CertificateRequest complete two-byte signature algorithm", 16,
-		[]string{"Signature Algorithms", "*", "Algorithm"}, []string{"Extensions", "*", "Signature Algorithms", "*", "Algorithm"})
+	// This alias is shared by CertificateRequest and CertificateVerify. Walk
+	// messages first so a coalesced flight retains wire-message occurrence order.
+	signatureAlgorithm := displayCustom("tls", "tls.handshake.sig_hash_alg", "Observed complete two-byte TLS signature algorithm", DisplayUnsigned, 16, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		session, root := tlsHandshakeDisplayRoot(e)
+		if root == "" {
+			return
+		}
+		p.walk(session, []string{root, "*"}, func(message any) {
+			for _, path := range [][]string{
+				{"Certificate Request", "Signature Algorithms", "*", "Algorithm"},
+				{"Certificate Request", "Extensions", "*", "Signature Algorithms", "*", "Algorithm"},
+				{"Certificate Verify", "Signature Algorithm"},
+			} {
+				p.walk(message, path, emit)
+			}
+		})
+	})
+	signatureAlgorithm.protocols = "|tls|quic|http3|doq|"
+	signatureAlgorithm.descriptor.Description = "Literal identifier in a complete version-qualified handshake body; TLS 1.2 pairs do not select an ECDSA curve. Naming does not establish negotiation, scheme conformance or signature validity. No outer record/frame span."
+	out = append(out, signatureAlgorithm)
 	add("tls.handshake.dnames_len", "CertificateRequest distinguished names vector length", 16,
 		[]string{"Certificate Authorities Length"}, []string{"Extensions", "*", "Certificate Authorities Length"})
 	add("tls.handshake.certificate_request_context_length", "CertificateRequest context length", 8, []string{"Context Length"})
@@ -76,5 +94,33 @@ func tlsCertificateRequestDisplayBindings() []displayFieldBinding {
 	finished.protocols = "|tls|quic|http3|doq|"
 	finished.descriptor.Description = "Literal hexadecimal bytes of a complete cipher-suite-sized Finished. Record authentication is distinct from transcript MAC or peer authentication. Owned handshake plaintext has no outer record/frame span."
 	out = append(out, finished)
+	for _, spec := range []struct {
+		name, key string
+		kind      DisplayFieldType
+		bits      int
+	}{
+		{"tls.handshake.client_cert_vrfy.sig_len", "Signature Length", DisplayUnsigned, 16},
+		{"tls.handshake.client_cert_vrfy.sig", "Signature", DisplayString, 0},
+	} {
+		spec := spec
+		b := displayCustom("tls", spec.name, "CertificateVerify "+spec.key, spec.kind, spec.bits, "derived", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			session, root := tlsHandshakeDisplayRoot(e)
+			if root != "" {
+				p.walk(session, []string{root, "*", "Certificate Verify", spec.key}, func(value any) {
+					if spec.key == "Signature" {
+						if raw, ok := value.([]byte); ok {
+							emit(hex.EncodeToString(raw))
+						}
+						return
+					}
+					emit(value)
+				})
+			}
+		})
+		b.protocols = "|tls|quic|http3|doq|"
+		b.descriptor.Description = "Literal in a complete version-qualified CertificateVerify signature vector. Signature, certificate trust and exchange context are not verified. Owned handshake encoding has no outer record/frame span."
+		b.descriptor.AllowEmpty = spec.key == "Signature"
+		out = append(out, b)
+	}
 	return out
 }

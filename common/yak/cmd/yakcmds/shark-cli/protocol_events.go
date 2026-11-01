@@ -495,6 +495,28 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 							fieldViewLimited = true
 						}
 					}
+					verifyVersion, verifyAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Verify Version"]) == 0x304 {
+						verifyVersion, verifyAuthenticated = 0x304, true
+					}
+					verify, verifyWire, verifyName := tlsCertificateVerifyDetail(r, verifyVersion, verifyAuthenticated)
+					verifySource := 0
+					if verify != nil {
+						if fieldValueSourceCount < 256 && len(verifyWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: verifyName, Data: bytes.Clone(verifyWire)})
+							verifySource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(verifyWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate Verify (15)", depth: depth + 2,
+								source: verifySource, start: 0, end: 1, hasRange: verifySource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
 					keyUpdateSource := 0
 					if data := tlsKeyUpdatePlaintext(r, authenticatedTLS && tls13KeyUpdates); data != nil {
 						sources = append(sources, detailSource{Name: "TLS Key Update · authenticated handshake plaintext", Data: bytes.Clone(data)})
@@ -515,7 +537,17 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						order := map[string]int{"Length": 0, "Finished Verify Data": 1, "Finished Phase": 2, "Authenticated": 3, "Finished Version": 4, "Finished Cipher Suite": 5, "Finished Verification Status": 6, "Finished Context Status": 7, "Encoded Finished": 8}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
+					if verify != nil {
+						order := map[string]int{"Length": 0, "Certificate Verify": 1, "Certificate Verify Phase": 2, "Authenticated": 3, "Certificate Verify Version": 4, "Certificate Verify Status": 5, "Encoded Certificate Verify": 6}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					for _, key := range keys {
+						if verify != nil && key == "Certificate Verify" {
+							rows, limited := tlsCertificateVerifyFields(verify, verifySource, depth+2, max(0, 4096-len(out)), uint16(verifyVersion))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
 						if finishedWire != nil && key == "Finished Verify Data" {
 							if len(out)+2 <= 4096 {
 								out = append(out, field{text: "Finished body", depth: depth + 2, branch: true},
@@ -553,6 +585,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 							if key == "Encoded Finished" {
 								field.start, field.end = 0, len(finishedWire)
 								field.text = "Encoded Finished: " + formatFieldValue(key, finishedWire)
+							}
+						}
+						if verifySource > 0 && len(out) > before && (key == "Length" || key == "Encoded Certificate Verify") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = verifySource, 1, 4, true
+							if key == "Encoded Certificate Verify" {
+								field.start, field.end = 0, len(verifyWire)
+								field.text = "Encoded Certificate Verify: " + formatFieldValue(key, verifyWire)
 							}
 						}
 						if keyUpdateSource > 0 && (key == "Key Update Request" || key == "Encoded Key Update") {

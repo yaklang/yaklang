@@ -426,6 +426,28 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		if err := t.extensions(body, false, limits...); err != nil {
 			return nil, err
 		}
+	case 15:
+		if t.version < 0x301 || t.version > 0x304 {
+			m["Certificate Verify Status"] = "negotiated version unavailable or unsupported; body uninterpreted"
+			break
+		}
+		if t.version == 0x304 && !authenticated {
+			return nil, protocolError(ErrMalformedMessage, "cleartext TLS 1.3 CertificateVerify")
+		}
+		if t.client >= 0 && dir != t.client && (t.version < 0x304 || t.app[dir]) {
+			return nil, protocolError(ErrMalformedMessage, "server sent client-only TLS CertificateVerify")
+		}
+		verify, err := DecodeTLSCertificateVerify(b, t.version)
+		if err != nil {
+			return nil, err
+		}
+		phase := "handshake"
+		if t.version == 0x304 && t.app[dir] {
+			phase = "application"
+		}
+		m["Certificate Verify"], m["Certificate Verify Version"] = verify.Fields, t.version
+		m["Certificate Verify Phase"], m["Encoded Certificate Verify"] = phase, bytes.Clone(b)
+		m["Certificate Verify Status"] = "body vector decoded; signature not evaluated; certificate trust and handshake context not evaluated"
 	case 20:
 		if t.version != 0x303 && t.version != 0x304 {
 			m["Finished Status"] = "negotiated version unavailable or unsupported; body uninterpreted"

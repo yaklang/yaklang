@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -364,7 +365,10 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		return strings.Join(parts, " · ")
 	}
 	var parts []string
-	leadingMessage, leadingRank := -1, 0
+	var handshakes []struct {
+		text string
+		rank int
+	}
 	for _, h := range mapList(v["Handshake Messages"]) {
 		name := handshakeType(h["Type"])
 		messageRank := 0
@@ -387,6 +391,15 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable"
 		}
+		if verify, _, _ := tlsCertificateVerifyDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); verify != nil {
+			if algorithm, ok := verify.Fields["Signature Algorithm"]; ok {
+				name += " · " + tlsCertificateRequestAlgorithm(uint16(number(algorithm)), uint16(number(v["Negotiated Version"])))
+			}
+			name += fmt.Sprintf(" · %d signature bytes · signature not evaluated", number(verify.Fields["Signature Length"]))
+			messageRank = max(messageRank, 1)
+		} else if number(h["Type"]) == 15 && strings.Contains(textValue(h["Certificate Verify Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable or unsupported"
+		}
 		if wire, _ := tlsFinishedDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); wire != nil {
 			name += " · " + textValue(h["Finished Phase"]) + " epoch · transcript MAC not evaluated"
 			if h["Finished Phase"] == "application" {
@@ -395,17 +408,17 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		} else if number(h["Type"]) == 20 && strings.Contains(textValue(h["Finished Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable or unsupported"
 		}
-		if messageRank > leadingRank {
-			leadingMessage, leadingRank = len(parts), messageRank
-		}
-		parts = append(parts, name)
+		handshakes = append(handshakes, struct {
+			text string
+			rank int
+		}{name, messageRank})
 	}
-	if leadingMessage > 0 {
-		// The detail tree retains wire order. The bounded row puts the first
-		// fully decoded request/update ahead of coalesced envelope names.
-		leading := parts[leadingMessage]
-		copy(parts[1:leadingMessage+1], parts[:leadingMessage])
-		parts[0] = leading
+	// The detail tree retains wire order. Put every body-qualified message
+	// before envelope-only names, so an earlier request cannot hide a later
+	// CertificateVerify behind a long coalesced flight. Equal ranks stay stable.
+	sort.SliceStable(handshakes, func(i, j int) bool { return handshakes[i].rank > handshakes[j].rank })
+	for _, handshake := range handshakes {
+		parts = append(parts, handshake.text)
 	}
 	if len(parts) == 0 {
 		if _, ok := v["Alert Description"]; ok {
@@ -1328,7 +1341,9 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.tlsDetailedSummaryRank = detailedTLS
 	} else {
 		p.count++
-		if detailedTLS > p.tlsDetailedSummaryRank && info != "" {
+		if info != "" && (detailedTLS > p.tlsDetailedSummaryRank || detailedTLS == 1 && p.tlsDetailedSummaryRank == 1 && !strings.Contains(p.summary, info)) {
+			// Distinct qualified messages in separate records of one frame
+			// remain visible beyond the ordinary three-record sample budget.
 			p.summary = info + " | " + clipText(p.summary, 384)
 			p.tlsDetailedSummaryRank, p.tlsIncompleteSummary = detailedTLS, false
 		} else if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
