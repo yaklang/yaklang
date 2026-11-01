@@ -101,11 +101,12 @@ type binTLS struct {
 	retrySeen, retryClientSeen, finalHello bool
 	retrySuite, retryGroup                 uint16
 	resumption                             tlsResumptionState
+	requestContexts                        map[string]struct{}
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
 func (t *binTLS) storage() int64 {
-	return 2048 + t.extraStorage + t.resumption.storage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
+	return 2048 + t.extraStorage + t.resumption.storage() + t.requestContextStorage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
 }
 func tlsU24(b []byte) int { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
 func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) {
@@ -269,10 +270,20 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 					return nil, err
 				}
 			}
-			m, err := t.handshakeMessage(dir, b[:n], t.handshakeAuthenticated[dir], f.a.budget.MaxCollectionElements)
+			trial := *t
+			m, err := trial.handshakeMessage(dir, b[:n], t.handshakeAuthenticated[dir], f.a.budget.MaxCollectionElements)
 			if err != nil {
 				return nil, err
 			}
+			// Request history is immutable copy-on-write. Refusing its retained
+			// capacity cannot publish the request or consume its context. Record
+			// authentication and sequence consumption have already happened.
+			if len(trial.requestContexts) > len(t.requestContexts) {
+				if err := f.reserveSession(trial.storage()); err != nil {
+					return nil, err
+				}
+			}
+			*t = trial
 			messages = append(messages, m)
 			t.handshake[dir] = b[n:]
 			// Any remainder was contributed by this record; earlier records
@@ -572,6 +583,13 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		if t.version == 0x304 && t.client >= 0 && !t.app[dir] && request.Fields["Context Length"].(byte) != 0 {
 			return nil, protocolError(ErrMalformedMessage, "initial TLS CertificateRequest context must be empty")
 		}
+		admission, err := t.admitCertificateRequest(dir, request, limit)
+		if err != nil {
+			return nil, err
+		}
+		if admission != nil {
+			m["Certificate Request Admission"] = admission
+		}
 		m["Certificate Request"], m["Certificate Request Version"] = request.Fields, t.version
 		m["Encoded Certificate Request"] = bytes.Clone(b)
 		m["Certificate Request Status"] = "body vectors decoded; handshake conformance not established"
@@ -619,6 +637,10 @@ func (t *binTLS) extensions(b []byte, client bool, limits ...int) error {
 			}
 			if !client {
 				t.alpn = string(selected)
+			}
+		case 49:
+			if !client || len(v) != 0 {
+				return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")
 			}
 		}
 	}

@@ -159,6 +159,10 @@ func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) er
 		if !client && len(v) != 2 {
 			return protocolError(ErrMalformedMessage, "TLS selected version length")
 		}
+	case 49:
+		if !client || len(v) != 0 {
+			return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")
+		}
 	}
 	return nil
 }

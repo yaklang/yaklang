@@ -595,7 +595,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					if request != nil {
-						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5}
+						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5, "Certificate Request Admission": 6}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					if finishedWire != nil {
