@@ -479,6 +479,23 @@ func main() {
 			}
 			click(8, fieldY)
 			loadShot("01-selected-field")
+			// Keep the selected source/range while inspecting fields larger than
+			// one real viewport. Consumers verify bytes and highlight coverage
+			// across these snapshots rather than accepting a short preview.
+			if pages := os.Getenv("SHARK_QA_SELECTED_BYTE_PAGES"); pages != "" {
+				n, err := strconv.Atoi(pages)
+				fail(err)
+				if n < 1 || n > 32 {
+					panic("selected byte-page QA outside bounded range")
+				}
+				send("3g")
+				loadShot("01-selected-byte-page-00")
+				for page := 1; page <= n; page++ {
+					send("\x1b[6~")
+					loadShot(fmt.Sprintf("01-selected-byte-page-%02d", page))
+				}
+				send("2")
+			}
 		}
 		if name := os.Getenv("SHARK_QA_BYTE_FIELD"); name != "" {
 			want, err := hex.DecodeString(os.Getenv("SHARK_QA_BYTE_HEX"))
