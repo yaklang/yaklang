@@ -162,3 +162,25 @@ CI 关闭记录写入阶段 PR；M2-11 继续开放，不把本批局部完成�
 
 后续继续 N13.P03 的多轮请求/Certificate/CV/Finished 关联和生命周期，随后 P04 的完整阶段、协商依赖及高级恢复；
 N08、N09、N10、N11、N14 与 [SMB S01–S06 任务书](shark-m2-smb-taskbook-20261101.md)的未关闭项继续保留。
+
+## 本批 CI 计时修正
+
+`2fa472af1b3dde6e4c72e684d611124914d32892` 的手动流量专项已通过：
+[实际运行 41346603001](https://github.com/yaklang/yaklang/actions/runs/41346603001)。
+官方 artifact 为 16,969,896 字节，SHA256 `7c696244e34c21d031e9bbec529820e283243d3af5b4ae029a4edb8c5b47c971`。
+775 按预先冻结的清单逐项确认 313,945 个 raw ID、终态和唯一 run/terminal，101 个新增项全部 pass，
+131,084 required 项全部 pass/0 skip；旧 313,844 个 ID 和终态完整保留。
+这不代表该提交全部 CI 通过：自动 Essential 的 `Test Utils Foundation` 中旧 `TestCache` 测速断言失败，依赖 gate 也失败。
+
+`77ff501940562e4343185e585af87c1d8107a8ae` 只修正 `common/utils/gzip_embed/test/fs_test.go` 的计时方法，
+采用 `testing.Benchmark` 校准操作数，再比较每次读取的耗时。原内容校验、读取错误检查和“至少快 10 倍”的断言原样保留，
+没有修改生产缓存逻辑、协议实现、测试 ID、fixture 或 CI 跳过条件。
+旧方法在 Windows 本机重复 30 次为 29 pass/1 fail，其中 29 次缓存批次测成 0ns；失败批次为 529,900ns 对 1,026,000ns。
+新方法完整包为 30 pass/1 原有 skip；另行重复五次全部 pass，缓存为 36–45ns/op，非缓存为 12,940–13,800ns/op。
+重复次数按原始 JSON 的每次 run/terminal 计数，没有用去重后的单个 ID 冒充五次或三十次运行。
+
+本机关闭证据为 `cache-timing-qualification784-01/summary784.json`，
+SHA256 `f84c3da5fd48596799244de8c88282cb363af703cc9934db3741e0194cd1cb75`。
+相对 747 构建冻结输入，只有上述 `_test.go` 改变；生产 Go、配置和两个捕获 ZIP 均保持一致。
+本文件前述 747/772 的“全部 Go 输入保持”描述对应当时历史快照；不将它套用到这次测试文件变更之后。
+包含本修正的最终推送 SHA 仍须重新运行完整 CI；最终 SHA、官方 artifact 和检查关闭结果记录在阶段 PR。
