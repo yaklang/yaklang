@@ -1151,10 +1151,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
 		}
-		if !credibleTLSIdentity(e) {
+		if !credibleTLSIdentity(e) && !tlsRemainder {
 			add("TLS session identity: unconfirmed · complete record header/body, handshake context not observed", false)
 			add("Negotiated TLS version: unavailable · record legacy version is not negotiation evidence", false)
 			add("Plaintext: unavailable · record authentication has not been verified", false)
+		}
+		if tlsRemainder {
+			add("Remainder decoding: stopped; no additional records admitted", false)
+			add("Remainder authentication: not evaluated", false)
 		}
 		if smbDetailProtocol(e.Protocol) {
 			for _, node := range smbDetailNodes(e) {
@@ -1189,7 +1193,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					delete(values, "Session Establishment")
 				}
 			}
-			if e.Protocol == "tls" {
+			if e.Protocol == "tls" && !tlsRemainder {
 				// Retained hello metadata and this record are separate evidence
 				// scopes. End the metadata branch before publishing wire ranges.
 				add("TLS record and observed context", true)

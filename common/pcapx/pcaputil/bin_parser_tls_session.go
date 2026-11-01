@@ -479,6 +479,9 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		}
 		if association != nil {
 			m["Post Handshake Response"] = association
+			if association["Context Association"] == "matched observed CertificateRequest" {
+				m["Certificate Verify Status"] = "body vector decoded; observed response order matched; signature, transcript and trust not evaluated"
+			}
 		}
 	case 20:
 		if t.version != 0x303 && t.version != 0x304 {
@@ -587,6 +590,9 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			}
 			if association != nil {
 				m["Post Handshake Response"] = association
+				if association["Context Association"] == "matched observed CertificateRequest" {
+					m["Certificate Body Status"] = "body vectors decoded; observed request context matched; certificate type and trust not evaluated"
+				}
 			}
 		} else {
 			certs, err := tlsCertificates(body, false, limits...)

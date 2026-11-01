@@ -83,6 +83,7 @@ func TestTLS13PHAResponseContextAndProgression(t *testing.T) {
 						certificate, err := phaResponseTestSend(t, f, s, client, encoded, 22)
 						require.NoError(t, err)
 						message := certificate.Session["Handshake Messages"].([]map[string]any)[0]
+						require.Equal(t, "body vectors decoded; observed request context matched; certificate type and trust not evaluated", message["Certificate Body Status"])
 						association := phaResponseTestAssociation(t, message)
 						require.Equal(t, uint64(index+1), association["Request Ordinal"])
 						require.Equal(t, "matched observed CertificateRequest", association["Context Association"])
@@ -99,6 +100,7 @@ func TestTLS13PHAResponseContextAndProgression(t *testing.T) {
 						if !empty {
 							verify, err := phaResponseTestSend(t, f, s, client, certificateVerifyTestMessage(0x304, 0x0804, []byte{1, 2}), 22)
 							require.NoError(t, err)
+							require.Equal(t, "body vector decoded; observed response order matched; signature, transcript and trust not evaluated", verify.Session["Handshake Messages"].([]map[string]any)[0]["Certificate Verify Status"])
 							association = phaResponseTestAssociation(t, verify.Session["Handshake Messages"].([]map[string]any)[0])
 							require.Equal(t, uint64(index+1), association["Request Ordinal"])
 							require.Equal(t, "awaiting Finished", association["Response Stage"])
