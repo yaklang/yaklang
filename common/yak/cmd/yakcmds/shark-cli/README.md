@@ -117,6 +117,14 @@ after earlier valid frames were applied. Its byte source never claims that all
 packet effects were rolled back or highlights unrelated captured ciphertext.
 Record AEAD verification and certificate trust are separate fields: this analyzer
 does not evaluate certificate trust.
+Captured TCP is not automatically identified as UDP-only QUIC, HTTP/3, or DoQ
+from similar payload bytes. Unsupported carrier candidates and unrecognized
+reassembled TCP bytes retain owned observation/preview sources, without claiming
+decoded protocol fields or a complete message boundary. Explicit packet-algorithm
+APIs and native UDP QUIC keep their own qualification rules.
+An IPv4 Total Length of zero remains the literal captured value and highlights
+its original two bytes. Captured-prefix size is separate; a presumed TSO origin
+does not become a verified offload or a valid declared IP extent.
 Live selection immediately shows packet headers and raw bytes. Pin a packet
 with Enter, navigation keys, or a detail-pane key to run the branch's YAML
 protocol dissectors in an isolated process (with a five-second limit). Unrecognized or truncated packets keep

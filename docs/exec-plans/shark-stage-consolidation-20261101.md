@@ -13,6 +13,10 @@
 `0fc42e285292b38090c24e77d114bdb7da009d61`，
 [QUIC资格、真实流量、83个Windows状态及大捕获逐对象核对](shark-m2-quic-crypto-qualification-20261101.md)。
 本轮四个代码提交继续同一M2，无新阶段分支/强推；SMB仍跳过。最终说明head的CI独立验收，不能沿用631成功。
+随后同一M2的代码/干净构建为 `788c8e27ba38d9037a4a75284bbcada74f843d7e`，
+[捕获TCP误QUIC、未知流观察及IPv4原始长度修复](shark-m2-tcp-carrier-and-length-20261101.md)。
+54项中44个有限完成、10未关闭（含3个SMB搁置）；实际Windows、完整大捕获和127新终态已核，
+最终说明head的完整CI仍待独立核验。维持M1已合并/M2唯一活动阶段，没有新的SMB语义分析或强推。
 后续同树/相同patch哈希只描述f99当时连接M1 squash的历史动作，不适用于新增main改动后的整棵树。
 
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
