@@ -43,6 +43,26 @@ Package:
     operator: |
       err = parseCIFSDelete(true)
       if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.64.1/.2 ordinary WC24/WC34 NT_CREATE_ANDX.
+  # Terminal AndX only. Name Length excludes the UTF-16 NUL.
+  CIFSDirectTCPNTCreateAndXRequest:
+    operator: |
+      err = parseCIFSNTCreateAndX(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPNTCreateAndXResponse:
+    operator: |
+      err = parseCIFSNTCreateAndX(true)
+      if err != nil { panic(err) }
+  # MS-CIFS 2.2.4.43.1/.2 and MS-SMB 2.2.4.3 high-count slots.
+  # Data Offset is relative to the SMB header. Offset low/high stay separate.
+  CIFSDirectTCPWriteAndXRequest:
+    operator: |
+      err = parseCIFSWriteAndX(false)
+      if err != nil { panic(err) }
+  CIFSDirectTCPWriteAndXResponse:
+    operator: |
+      err = parseCIFSWriteAndX(true)
+      if err != nil { panic(err) }
   CIFSDirectTCPCarrier:
     operator: |
       if !this.HasMaxLength() || this.GetMaxLength("bit") % 8 != 0 { panic("cifs: explicit byte boundary required") }

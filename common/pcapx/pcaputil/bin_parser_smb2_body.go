@@ -678,7 +678,7 @@ func smb2WriteFields(info map[string]any, pdu []byte, response bool) error {
 	return nil
 }
 
-func smb2IOCTLFields(info map[string]any, pdu []byte, response bool) error {
+func smb2IOCTLFields(info map[string]any, pdu []byte, response bool, max int) error {
 	status, _ := info["Status"].(uint32)
 	if smb2StatusUsesErrorBody(11, status, response) {
 		return smb2ErrorFields(info, pdu)
@@ -720,12 +720,22 @@ func smb2IOCTLFields(info map[string]any, pdu []byte, response bool) error {
 		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Input", int(binary.LittleEndian.Uint32(pdu[88:92])), int(binary.LittleEndian.Uint32(pdu[92:96])), 112); err != nil {
 			return err
 		}
-		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Output", int(binary.LittleEndian.Uint32(pdu[96:100])), int(binary.LittleEndian.Uint32(pdu[100:104])), 112); err != nil {
+		outOff := int(binary.LittleEndian.Uint32(pdu[96:100]))
+		outN := int(binary.LittleEndian.Uint32(pdu[100:104]))
+		if err := smb2OpaqueIOCTLBuffer(body, pdu, "Output", outOff, outN, 112); err != nil {
 			return err
 		}
+		if outN > 0 {
+			raw := body["Output Buffer"].([]byte)
+			if err := smb2DecodeIOCTLOutput(body, code, raw, outOff, max); err != nil {
+				return err
+			}
+		}
 	}
-	body["Control Payload Status"] = "opaque: IOCTL control payload layout is not selected"
-	log.Debugf("smb2: IOCTL control 0x%08x payload left opaque; layout not selected", code)
+	if _, ok := body["Control Payload Status"]; !ok {
+		body["Control Payload Status"] = "opaque: IOCTL control payload layout is not selected"
+		log.Debugf("smb2: IOCTL control 0x%08x payload left opaque; layout not selected", code)
+	}
 	return nil
 }
 
@@ -799,4 +809,262 @@ func smb2QueryDirectoryFields(info map[string]any, pdu []byte, response bool) er
 	body["Directory Entry Status"] = "opaque: directory entry chain requires the matched request class"
 	log.Debugf("smb2: QUERY_DIRECTORY output left opaque; entry chain is not selected without a proven class")
 	return nil
+}
+
+const (
+	smb2FSCTLQueryNetworkInterfaceInfo = 0x001401fc
+	smb2FSCTLDFSGetReferrals           = 0x00060194
+	smb2FSCTLPipeTransceive            = 0x0011c017
+	smb2FileIdBothDirectoryInformation = 37
+)
+
+// MS-SMB2 2.2.32.5. Each interface is 152 bytes. Next is the distance to the
+// following entry and must be zero on the last one. The chain cannot walk
+// outside this output buffer.
+func smb2DecodeIOCTLOutput(body map[string]any, code uint32, raw []byte, base, max int) error {
+	switch code {
+	case smb2FSCTLQueryNetworkInterfaceInfo:
+		entries, err := smb2DecodeNetworkInterfaces(raw, max)
+		if err != nil {
+			return err
+		}
+		for _, entry := range entries {
+			smb2OffsetRanges(entry, base)
+		}
+		body["Network Interfaces"] = entries
+		body["Control Payload Status"] = "decoded: FSCTL_QUERY_NETWORK_INTERFACE_INFO"
+	case smb2FSCTLDFSGetReferrals:
+		referral, ok, err := smb2DecodeDFSReferralV3(raw, max)
+		if err != nil {
+			return err
+		}
+		if !ok {
+			body["Control Payload Status"] = "opaque: DFS referral is not the selected version 3 layout"
+			log.Debugf("smb2: FSCTL_DFS_GET_REFERRALS payload left opaque; version 3 size 18 was not present")
+			return nil
+		}
+		smb2OffsetRanges(referral, base)
+		body["DFS Referral"] = referral
+		body["Control Payload Status"] = "decoded: FSCTL_DFS_GET_REFERRALS version 3"
+	case smb2FSCTLPipeTransceive:
+		body["Control Payload Status"] = "opaque: FSCTL_PIPE_TRANSCEIVE payload is not an SMB2 layout"
+		log.Debugf("smb2: FSCTL_PIPE_TRANSCEIVE payload left opaque; named-pipe bytes are not decoded")
+	default:
+		body["Control Payload Status"] = "opaque: IOCTL control payload layout is not selected"
+		log.Debugf("smb2: IOCTL control 0x%08x payload left opaque; layout not selected", code)
+	}
+	return nil
+}
+
+func smb2DecodeNetworkInterfaces(raw []byte, max int) ([]map[string]any, error) {
+	if max <= 0 {
+		max = 1
+	}
+	var out []map[string]any
+	for at := 0; ; {
+		if len(out) >= max {
+			return nil, protocolError(ErrResourceExceeded, "SMB2 network interface count exceeds collection budget")
+		}
+		if len(raw)-at < 152 {
+			return nil, fmt.Errorf("smb2: truncated network interface")
+		}
+		next := int(binary.LittleEndian.Uint32(raw[at : at+4]))
+		if next != 0 && (next < 152 || at+next > len(raw)) {
+			return nil, fmt.Errorf("smb2: network interface Next leaves this output buffer")
+		}
+		entry := map[string]any{}
+		smb2Literal(entry, "Next", at, at+4, uint32(next))
+		smb2Literal(entry, "IfIndex", at+4, at+8, binary.LittleEndian.Uint32(raw[at+4:at+8]))
+		smb2Literal(entry, "Capability", at+8, at+12, binary.LittleEndian.Uint32(raw[at+8:at+12]))
+		smb2Literal(entry, "Reserved", at+12, at+16, binary.LittleEndian.Uint32(raw[at+12:at+16]))
+		smb2Literal(entry, "Link Speed", at+16, at+24, binary.LittleEndian.Uint64(raw[at+16:at+24]))
+		family := binary.LittleEndian.Uint16(raw[at+24 : at+26])
+		smb2Literal(entry, "Address Family", at+24, at+26, family)
+		smb2Literal(entry, "Socket Address", at+24, at+152, bytes.Clone(raw[at+24:at+152]))
+		switch family {
+		case 2:
+			smb2Literal(entry, "IPv4 Address", at+28, at+32, bytes.Clone(raw[at+28:at+32]))
+		case 23:
+			smb2Literal(entry, "IPv6 Address", at+32, at+48, bytes.Clone(raw[at+32:at+48]))
+		default:
+			entry["Address Status"] = "opaque: socket family is not IPv4 or IPv6"
+		}
+		out = append(out, entry)
+		if next == 0 {
+			if at+152 != len(raw) {
+				return nil, fmt.Errorf("smb2: bytes follow the last network interface")
+			}
+			return out, nil
+		}
+		at += next
+	}
+}
+
+// MS-DFSC 2.2.4 and 2.2.5.3. Only the version 3 entry of exactly 18 bytes is
+// selected. Any other version keeps the whole output opaque.
+func smb2DecodeDFSReferralV3(raw []byte, max int) (map[string]any, bool, error) {
+	if len(raw) < 8 {
+		return nil, false, nil
+	}
+	count := int(binary.LittleEndian.Uint16(raw[2:4]))
+	if count <= 0 || count > max {
+		if count > max && max > 0 {
+			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+		}
+		return nil, false, nil
+	}
+	at := 8
+	for i := 0; i < count; i++ {
+		if len(raw)-at < 18 || binary.LittleEndian.Uint16(raw[at:at+2]) != 3 || binary.LittleEndian.Uint16(raw[at+2:at+4]) != 18 {
+			return nil, false, nil
+		}
+		at += 18
+	}
+	info := map[string]any{}
+	smb2Literal(info, "Path Consumed", 0, 2, binary.LittleEndian.Uint16(raw[0:2]))
+	smb2Literal(info, "Number Of Referrals", 2, 4, uint16(count))
+	smb2Literal(info, "Referral Header Flags", 4, 8, binary.LittleEndian.Uint32(raw[4:8]))
+	entries := make([]map[string]any, count)
+	at = 8
+	for i := 0; i < count; i++ {
+		entry := map[string]any{}
+		smb2Literal(entry, "Version", at, at+2, uint16(3))
+		smb2Literal(entry, "Size", at+2, at+4, uint16(18))
+		smb2Literal(entry, "Server Type", at+4, at+6, binary.LittleEndian.Uint16(raw[at+4:at+6]))
+		smb2Literal(entry, "Referral Entry Flags", at+6, at+8, binary.LittleEndian.Uint16(raw[at+6:at+8]))
+		smb2Literal(entry, "Time To Live", at+8, at+12, binary.LittleEndian.Uint32(raw[at+8:at+12]))
+		pathOff := int(binary.LittleEndian.Uint16(raw[at+12 : at+14]))
+		altOff := int(binary.LittleEndian.Uint16(raw[at+14 : at+16]))
+		netOff := int(binary.LittleEndian.Uint16(raw[at+16 : at+18]))
+		smb2Literal(entry, "DFS Path Offset", at+12, at+14, uint16(pathOff))
+		smb2Literal(entry, "DFS Alternate Path Offset", at+14, at+16, uint16(altOff))
+		smb2Literal(entry, "Network Address Offset", at+16, at+18, uint16(netOff))
+		for _, item := range []struct {
+			name string
+			off  int
+		}{{"DFS Path", pathOff}, {"DFS Alternate Path", altOff}, {"Network Address", netOff}} {
+			if item.off == 0 {
+				continue
+			}
+			text, lo, hi, err := smb2UTF16Z(raw, at+item.off)
+			if err != nil {
+				return nil, false, err
+			}
+			smb2Literal(entry, item.name, lo, hi, text)
+		}
+		entries[i] = entry
+		at += 18
+	}
+	info["Referrals"] = entries
+	return info, true, nil
+}
+
+func smb2UTF16Z(raw []byte, at int) (string, int, int, error) {
+	if at < 0 || at > len(raw) || at%2 != 0 {
+		return "", 0, 0, fmt.Errorf("smb2: UTF-16 string offset is outside the buffer")
+	}
+	for i := at; i+1 < len(raw); i += 2 {
+		if raw[i] == 0 && raw[i+1] == 0 {
+			return smb2UTF16LE(raw[at:i]), at, i + 2, nil
+		}
+	}
+	return "", 0, 0, fmt.Errorf("smb2: UTF-16 string is not terminated inside the buffer")
+}
+
+// MS-FSCC 2.4.17 FileIdBothDirectoryInformation. NextEntryOffset is from the
+// start of this entry, must be a multiple of 8, and must stay inside the
+// output buffer. Zero ends the chain.
+func smb2DecodeMatchedDirectory(command map[string]any, class uint8, max int) {
+	body, ok := command["Body"].(map[string]any)
+	if !ok {
+		return
+	}
+	if class != smb2FileIdBothDirectoryInformation {
+		body["Directory Entry Status"] = "opaque: directory information class is not selected"
+		log.Debugf("smb2: QUERY_DIRECTORY class %d left opaque; FileIdBothDirectoryInformation is the selected chain", class)
+		return
+	}
+	output, _ := body["Output Buffer"].([]byte)
+	ranges, _ := body["Wire Field Ranges"].(map[string]any)
+	span, _ := ranges["Output Buffer"].([]any)
+	if len(output) == 0 || len(span) != 2 {
+		body["Directory Entry Status"] = "opaque: directory output source range unavailable"
+		return
+	}
+	lo, loOK := displayUint(span[0])
+	hi, hiOK := displayUint(span[1])
+	if !loOK || !hiOK || hi-lo != uint64(len(output)) {
+		body["Directory Entry Status"] = "opaque: directory output source range inconsistent"
+		return
+	}
+	entries, err := smb2DecodeFileIdBothEntries(output, max)
+	if err != nil {
+		command["Directory Decode Error"] = err.Error()
+		body["Directory Entry Status"] = "opaque: directory entry chain is incomplete or walks outside the output buffer"
+		log.Debugf("smb2: QUERY_DIRECTORY FileIdBoth chain refused: %s", err.Error())
+		return
+	}
+	for _, entry := range entries {
+		smb2OffsetRanges(entry, int(lo))
+	}
+	body["Directory Entries"] = entries
+	body["Directory Entry Status"] = "decoded: FileIdBothDirectoryInformation from matched request"
+}
+
+func smb2DecodeFileIdBothEntries(raw []byte, max int) ([]map[string]any, error) {
+	if max <= 0 {
+		max = 1
+	}
+	var out []map[string]any
+	for at := 0; at < len(raw); {
+		if len(out) >= max {
+			return nil, protocolError(ErrResourceExceeded, "SMB2 directory entry count exceeds collection budget")
+		}
+		if len(raw)-at < 104 {
+			return nil, fmt.Errorf("smb2: truncated directory entry")
+		}
+		next := int(binary.LittleEndian.Uint32(raw[at : at+4]))
+		nameLen := int(binary.LittleEndian.Uint32(raw[at+60 : at+64]))
+		shortLen := int(raw[at+68])
+		if nameLen < 0 || nameLen%2 != 0 || at+104+nameLen > len(raw) || shortLen > 24 || shortLen%2 != 0 {
+			return nil, fmt.Errorf("smb2: directory name leaves this entry")
+		}
+		if next != 0 && (next < 104+nameLen || next%8 != 0 || at+next > len(raw)) {
+			return nil, fmt.Errorf("smb2: directory NextEntryOffset leaves this output buffer")
+		}
+		endOfFile := int64(binary.LittleEndian.Uint64(raw[at+40 : at+48]))
+		allocation := int64(binary.LittleEndian.Uint64(raw[at+48 : at+56]))
+		if endOfFile < 0 || allocation < 0 {
+			return nil, fmt.Errorf("smb2: directory size is a negative LARGE_INTEGER")
+		}
+		entry := map[string]any{}
+		smb2Literal(entry, "Next Entry Offset", at, at+4, uint32(next))
+		smb2Literal(entry, "File Index", at+4, at+8, binary.LittleEndian.Uint32(raw[at+4:at+8]))
+		for i, key := range []string{"Creation Time", "Last Access Time", "Last Write Time", "Change Time"} {
+			from := at + 8 + 8*i
+			smb2Literal(entry, key, from, from+8, binary.LittleEndian.Uint64(raw[from:from+8]))
+		}
+		smb2Literal(entry, "End Of File", at+40, at+48, endOfFile)
+		smb2Literal(entry, "Allocation Size", at+48, at+56, allocation)
+		smb2Literal(entry, "File Attributes", at+56, at+60, binary.LittleEndian.Uint32(raw[at+56:at+60]))
+		smb2Literal(entry, "File Name Length", at+60, at+64, uint32(nameLen))
+		smb2Literal(entry, "EA Size", at+64, at+68, binary.LittleEndian.Uint32(raw[at+64:at+68]))
+		smb2Literal(entry, "Short Name Length", at+68, at+69, raw[at+68])
+		smb2Literal(entry, "Reserved", at+69, at+70, raw[at+69])
+		smb2Literal(entry, "Short Name Bytes", at+70, at+94, bytes.Clone(raw[at+70:at+94]))
+		smb2Literal(entry, "Reserved2", at+94, at+96, binary.LittleEndian.Uint16(raw[at+94:at+96]))
+		smb2Literal(entry, "FileId", at+96, at+104, binary.LittleEndian.Uint64(raw[at+96:at+104]))
+		if nameLen > 0 {
+			smb2Literal(entry, "File Name", at+104, at+104+nameLen, smb2UTF16LE(raw[at+104:at+104+nameLen]))
+		}
+		if shortLen > 0 {
+			smb2Literal(entry, "Short Name", at+70, at+70+shortLen, smb2UTF16LE(raw[at+70:at+70+shortLen]))
+		}
+		out = append(out, entry)
+		if next == 0 {
+			return out, nil
+		}
+		at += next
+	}
+	return nil, fmt.Errorf("smb2: directory chain has no terminal entry")
 }

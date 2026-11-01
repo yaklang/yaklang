@@ -487,6 +487,18 @@ func (invocation *operatorInvocation) library() map[string]interface{} {
 			}
 			return parseCIFSDelete(invocation.node, invocation.operator, response)
 		},
+		"parseCIFSNTCreateAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-nt-create-andx: generation is unsupported")
+			}
+			return parseCIFSNTCreateAndX(invocation.node, invocation.operator, response)
+		},
+		"parseCIFSWriteAndX": func(response bool) error {
+			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
+				return fmt.Errorf("cifs-write-andx: generation is unsupported")
+			}
+			return parseCIFSWriteAndX(invocation.node, invocation.operator, response)
+		},
 		"parseCIFSSessionSetup": func(response bool) error {
 			if len(invocation.modes) == 0 || invocation.modes[0] != ParserMode {
 				return fmt.Errorf("cifs-session-setup: generation is unsupported")

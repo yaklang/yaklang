@@ -184,7 +184,7 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 	magic := binary.LittleEndian.Uint32(w[4:8])
 	switch magic {
 	case 0x424d53ff:
-		if n >= 35 && (w[8] == 0x75 || w[8] == 0x06) {
+		if n >= 35 && (w[8] == 0x75 || w[8] == 0x06 || w[8] == 0xa2 || w[8] == 0x2f) {
 			if !boundedSMB1FileEnvelope(w[:total]) {
 				return 0, nil, fmt.Errorf("CIFS file command: WordCount/ByteCount exceed exact DirectTCP boundary")
 			}
@@ -429,6 +429,11 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 		pending.path, _ = c["File Name"].(string)
 		pending.target, _ = c["Path"].(string)
 		pending.related, _ = c["Related File ID Ignored"].(bool)
+		if name == "QUERY_DIRECTORY" {
+			body := c["Body"].(map[string]any)
+			pending.directoryClass = body["File Information Class"].(uint8)
+			pending.hasDirectoryClass = true
+		}
 		if name == "QUERY_INFO" {
 			body := c["Body"].(map[string]any)
 			pending.queryInfo = smb2QueryInfoSelector{
@@ -484,6 +489,13 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 	c["Association Status"] = "matched"
 	c["Request Session ID"] = pending.key.sessionID
 	c["Request Tree ID"] = pending.key.treeID
+	if name == "QUERY_DIRECTORY" && pending.hasDirectoryClass {
+		// The class is request context. It has no range in this response.
+		c["Request File Information Class"] = pending.directoryClass
+		if c["Error Response"] != true {
+			smb2DecodeMatchedDirectory(c, pending.directoryClass, max)
+		}
+	}
 	if name == "QUERY_INFO" {
 		// These observations belong to the matched request, not this response's
 		// StructureSize bytes. The owning flow already fixes interface/VLAN and
@@ -866,7 +878,7 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 			return nil, err
 		}
 	case 11:
-		if err := smb2IOCTLFields(info, pdu, resp); err != nil {
+		if err := smb2IOCTLFields(info, pdu, resp, max); err != nil {
 			return nil, err
 		}
 	case 14:

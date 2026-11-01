@@ -10,6 +10,8 @@ import (
 // parser helpers may be lowered; arbitrary callables remain Yak programs.
 var planNativeCalls = map[string]any{
 	"parseCIFSSessionSetup":    parseCIFSSessionSetup,
+	"parseCIFSNTCreateAndX":    parseCIFSNTCreateAndX,
+	"parseCIFSWriteAndX":       parseCIFSWriteAndX,
 	"parseCIFSTreeConnectAndX": parseCIFSTreeConnectAndX,
 	"parseCIFSDelete":          parseCIFSDelete,
 	"parseSSDPMessage":         parseSSDPMessage,
