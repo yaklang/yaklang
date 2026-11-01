@@ -881,6 +881,10 @@ func smb2ParseCommand(pdu []byte, max int) (map[string]any, error) {
 		if err := smb2IOCTLFields(info, pdu, resp, max); err != nil {
 			return nil, err
 		}
+	case 12:
+		if err := smb2CancelFields(info, pdu, resp); err != nil {
+			return nil, err
+		}
 	case 14:
 		if err := smb2QueryDirectoryFields(info, pdu, resp); err != nil {
 			return nil, err

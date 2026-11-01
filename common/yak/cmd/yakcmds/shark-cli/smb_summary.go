@@ -169,21 +169,56 @@ func smbQueryInfoSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 		if !ok {
 			return "", false
 		}
-		keys := []struct{ key, label string }{{"EA Size", "EA size"}}
-		if profile == "FileStandardInformation" {
-			keys = []struct{ key, label string }{{"End Of File", "EOF"}, {"Allocation Size", "allocation"}, {"Number Of Links", "links"}}
-		}
-		for _, field := range keys {
-			value, ok := smbSummaryInteger(fields[field.key])
+		switch profile {
+		case "FileEaInformation":
+			value, ok := smbSummaryInteger(fields["EA Size"])
 			if !ok {
 				return "", false
 			}
-			parts = append(parts, field.label+"="+value)
-		}
-		if profile == "FileStandardInformation" {
+			parts = append(parts, "EA size="+value)
+		case "FileStandardInformation":
+			for _, field := range []struct{ key, label string }{{"End Of File", "EOF"}, {"Allocation Size", "allocation"}, {"Number Of Links", "links"}} {
+				value, ok := smbSummaryInteger(fields[field.key])
+				if !ok {
+					return "", false
+				}
+				parts = append(parts, field.label+"="+value)
+			}
 			if directory, ok := fields["Directory State"].(bool); ok {
 				parts = append(parts, fmt.Sprintf("directory=%t", directory))
 			}
+		case "FileNetworkOpenInformation":
+			value, ok := smbSummaryInteger(fields["End Of File"])
+			if !ok {
+				return "", false
+			}
+			parts = append(parts, "EOF="+value)
+		case "FileStreamInformation":
+			name, ok := fields["Stream Name"].(string)
+			if !ok || name == "" {
+				return "", false
+			}
+			parts = append(parts, "stream="+name)
+		case "FileFsVolumeInformation":
+			label, ok := fields["Volume Label"].(string)
+			if !ok || label == "" {
+				return "", false
+			}
+			parts = append(parts, "volume="+label)
+		case "FileFsAttributeInformation":
+			name, ok := fields["File System Name"].(string)
+			if !ok || name == "" {
+				return "", false
+			}
+			parts = append(parts, "fs="+name)
+		case "SecurityDescriptor":
+			revision, ok := smbSummaryInteger(fields["Revision"])
+			if !ok || fields["Security Body Status"] == nil {
+				return "", false
+			}
+			parts = append(parts, "revision="+revision, "opaque SID/ACL")
+		default:
+			return "", false
 		}
 		if v["Output Content Partial"] == true {
 			parts = append(parts, "partial output")

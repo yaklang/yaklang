@@ -490,6 +490,24 @@ func smb2SessionSetupFields(info map[string]any, pdu []byte, response bool) erro
 	return nil
 }
 
+// MS-SMB2 2.2.30. CANCEL is a 4-byte request and has no response. It names the
+// MessageId to cancel and does not itself retire that outstanding request.
+func smb2CancelFields(info map[string]any, pdu []byte, response bool) error {
+	if response {
+		return fmt.Errorf("smb2: CANCEL has no response")
+	}
+	if len(pdu) != smb2HeaderSize+4 {
+		return fmt.Errorf("smb2: CANCEL request must be exactly 4 bytes")
+	}
+	body, err := smb2Body(pdu, 4, 4)
+	if err != nil {
+		return err
+	}
+	smb2Literal(body, "Reserved", 66, 68, binary.LittleEndian.Uint16(pdu[66:68]))
+	info["Body"] = body
+	return nil
+}
+
 func smb2SmallCommandFields(info map[string]any, pdu []byte, response bool) error {
 	status, _ := info["Status"].(uint32)
 	command, _ := info["Command"].(uint16)

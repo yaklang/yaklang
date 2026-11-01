@@ -153,6 +153,12 @@ func smb2WriteResp(mid, sid uint64, tid uint32, count uint32) []byte {
 	return smb2TCP(append(smb2Hdr(9, 1, mid, sid, tid), body...))
 }
 
+func smb2Cancel(mid, sid uint64, tid uint32) []byte {
+	body := make([]byte, 4)
+	binary.LittleEndian.PutUint16(body, 4)
+	return smb2TCP(append(smb2Hdr(12, 0, mid, sid, tid), body...))
+}
+
 func smb2Close(mid, sid uint64, tid uint32, fid []byte) []byte {
 	body := make([]byte, 24)
 	binary.LittleEndian.PutUint16(body[0:], 24)

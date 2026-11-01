@@ -311,6 +311,64 @@ func TestSMB2ConstructedQueryInfoAndDFSVersions(t *testing.T) {
 	require.NotContains(t, body["Control Payload Status"], "DCERPC")
 }
 
+func TestSMB1RemainingTrans2InformationLevels(t *testing.T) {
+	// Constructed records. MS-CIFS 2.2.8.3.6, 2.2.8.3.9, 2.2.8.4.3 and 2.2.8.4.5.
+	session := smb1Session(t)
+	basicReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
+	basicParams := []byte{0, 0, 0, 0x01, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
+	require.Nil(t, session.Feed(0, time.Unix(1, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 21, basicReq, basicParams)).Err)
+	data := make([]byte, 40)
+	binary.LittleEndian.PutUint64(data[0:8], 0x0102030405060708)
+	responseWords := smb1Words(uint16(2), uint16(40), uint16(0), uint16(2), uint16(56), uint16(0), uint16(40), uint16(60), uint16(0), byte(0), byte(0))
+	response := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 21, responseWords, append([]byte{0, 0, 0, 0, 0}, data...)))
+	record := response.Session["Body"].(map[string]any)["Information Record"].(map[string]any)
+	require.Equal(t, "SMB_QUERY_FILE_BASIC_INFO", response.Session["Body"].(map[string]any)["Information Level Name"])
+	require.Equal(t, uint64(0x0102030405060708), record["Creation Time"])
+	require.Equal(t, []any{uint64(64), uint64(72)}, record["Wire Field Ranges"].(map[string]any)["Creation Time"])
+	shortWords := smb1Words(uint16(2), uint16(39), uint16(0), uint16(2), uint16(56), uint16(0), uint16(39), uint16(60), uint16(0), byte(0), byte(0))
+	require.Nil(t, session.Feed(0, time.Unix(2, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 22, basicReq, basicParams)).Err)
+	short := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 22, shortWords, append([]byte{0, 0, 0, 0, 0}, data[:39]...)))
+	require.NotContains(t, short.Session["Body"], "Information Record")
+	require.Contains(t, short.Session["Body"].(map[string]any)["Data Status"], "opaque")
+
+	nameReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
+	nameParams := []byte{0, 0, 0, 0x04, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
+	require.Nil(t, session.Feed(0, time.Unix(3, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 23, nameReq, nameParams)).Err)
+	nameData := []byte{4, 0, 0, 0, 'a', 0, 'b', 0}
+	nameWords := smb1Words(uint16(2), uint16(8), uint16(0), uint16(2), uint16(56), uint16(0), uint16(8), uint16(60), uint16(0), byte(0), byte(0))
+	named := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 23, nameWords, append([]byte{0, 0, 0, 0, 0}, nameData...)))
+	nameRecord := named.Session["Body"].(map[string]any)["Information Record"].(map[string]any)
+	require.Equal(t, "ab", nameRecord["File Name"])
+	require.Equal(t, []byte{'a', 0, 'b', 0}, nameRecord["File Name Raw Bytes"])
+	require.Equal(t, []any{uint64(68), uint64(72)}, nameRecord["Wire Field Ranges"].(map[string]any)["File Name"])
+	require.Nil(t, session.Feed(0, time.Unix(4, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 24, nameReq, nameParams)).Err)
+	overflow := []byte{4, 0, 0, 0, 'a', 0}
+	overflowWords := smb1Words(uint16(2), uint16(6), uint16(0), uint16(2), uint16(56), uint16(0), uint16(6), uint16(60), uint16(0), byte(0), byte(0))
+	opaque := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 24, overflowWords, append([]byte{0, 0, 0, 0, 0}, overflow...)))
+	require.Contains(t, opaque.Session["Body"].(map[string]any)["Data Status"], "opaque")
+
+	record40 := make([]byte, 40)
+	binary.LittleEndian.PutUint64(record40[0:8], 9)
+	setWords := smb1Words(uint16(6), uint16(40), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(40), uint16(74), byte(1), byte(0), uint16(8))
+	setData := append([]byte{0, 0, 0, 0x00, 0x40, 0x01, 0x01, 0, 0}, record40...)
+	setBasic := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 25, setWords, setData))
+	setRecord := setBasic.Session["Body"].(map[string]any)["Information Record"].(map[string]any)
+	require.Equal(t, "SMB_SET_FILE_BASIC_INFO", setBasic.Session["Body"].(map[string]any)["Information Level Name"])
+	require.Equal(t, uint64(9), setRecord["Creation Time"])
+	require.Equal(t, []any{uint64(78), uint64(86)}, setRecord["Wire Field Ranges"].(map[string]any)["Creation Time"])
+
+	alloc := make([]byte, 8)
+	binary.LittleEndian.PutUint64(alloc, 0x8000000000000000)
+	allocWords := smb1Words(uint16(6), uint16(8), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(8), uint16(74), byte(1), byte(0), uint16(8))
+	allocData := append([]byte{0, 0, 0, 0x00, 0x40, 0x03, 0x01, 0, 0}, alloc...)
+	allocEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 26, allocWords, allocData))
+	require.Equal(t, int64(-9223372036854775808), allocEvent.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["Allocation Size"])
+	wide := append(allocData, 0)
+	wideWords := smb1Words(uint16(6), uint16(9), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(9), uint16(74), byte(1), byte(0), uint16(8))
+	wideEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 27, wideWords, wide))
+	require.NotContains(t, wideEvent.Session["Body"], "Information Record")
+}
+
 func smbCount(events []*ProtocolEvent, name string) int {
 	n := 0
 	for _, event := range events {
