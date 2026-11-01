@@ -107,7 +107,7 @@ records do not make post-handshake contexts look like initial ones. Complete
 phase ordering and PHA request/response association remain unverified.
 If authenticated key-epoch recovery retires a pending handshake fragment and
 the new record also contains handshake bytes, their starting boundary is unknown.
-The list says `Handshake · boundary unavailable`; record authentication, discarded
+Packet rows show `TLS handshake boundary unavailable`; record authentication, discarded
 bytes and the boundary reason appear under Record decoding. These bytes do not
 publish handshake fields or advance KeyUpdate state. Application-data recovery
 keeps its separate gap policy; missing handshake bytes are never reconstructed.

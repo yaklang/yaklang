@@ -1425,6 +1425,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		return
 	}
 	info := clipText(applicationEventSummary(e), 384)
+	if tlsHandshakeBoundaryUnavailable(e) {
+		// Keep one packet-level warning even when several records share
+		// this outcome. Only remove our own leading TLS phrase here;
+		// application text must not suppress or be rewritten by it.
+		if rest, ok := strings.CutPrefix(info, "Handshake · boundary unavailable"); ok {
+			info = "Handshake" + rest
+		}
+	}
 	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
 	detailedTLS := tlsDetailedHandshakeRank(e)
 	if _, rank := quicTLSMessageSummary(e); rank > detailedTLS {
@@ -1706,7 +1714,7 @@ func (p packetPresentation) apply(row packetSummary) packetSummary {
 		row.Info = p.tlsRecordProblem + " | " + row.Info
 		row.ProtocolStatus = "mixed-record-outcomes"
 	}
-	if p.tlsHandshakeBoundaryUnavailable && !strings.Contains(row.Info, "boundary unavailable") {
+	if p.tlsHandshakeBoundaryUnavailable {
 		row.Info = "TLS handshake boundary unavailable | " + row.Info
 	}
 	if p.quicPacketProblem != "" {

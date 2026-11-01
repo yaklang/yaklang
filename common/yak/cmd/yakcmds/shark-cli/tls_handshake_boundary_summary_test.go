@@ -10,7 +10,7 @@ import (
 
 // Row projection of admitted observations; native AEAD/state checks live in pcaputil.
 func TestTLSHandshakeBoundarySummarySurvivesCoalescedMessages(t *testing.T) {
-	for _, name := range []string{"request-gap-first", "request-gap-last", "update", "application", "duplicate", "unauthenticated", "other-protocol", "malformed"} {
+	for _, name := range []string{"request-gap-first", "request-gap-last", "update", "application", "application-warning-text", "duplicate", "unauthenticated", "other-protocol", "malformed"} {
 		t.Run(name, func(t *testing.T) {
 			gap := &pcaputil.ProtocolEvent{Protocol: "tls", Status: "decoded", Session: map[string]any{
 				"Record Type": byte(23), "Negotiated Version": uint16(0x304), "Cipher Suite": uint16(0x1301),
@@ -27,6 +27,8 @@ func TestTLSHandshakeBoundarySummarySurvivesCoalescedMessages(t *testing.T) {
 				events = []*pcaputil.ProtocolEvent{gap, keyUpdatePresentationForTest(1)}
 			case "application":
 				events = []*pcaputil.ProtocolEvent{gap, {Protocol: "http", Status: "decoded", Summary: "GET / HTTP/1.1", Fields: map[string]any{"Protocol": "HTTP/1.1"}}}
+			case "application-warning-text":
+				events = []*pcaputil.ProtocolEvent{gap, {Protocol: "http", Status: "decoded", Summary: "GET /boundary unavailable HTTP/1.1", Fields: map[string]any{"Protocol": "HTTP/1.1"}}}
 			case "duplicate":
 				events = []*pcaputil.ProtocolEvent{gap, request, gap}
 			case "unauthenticated":
@@ -43,10 +45,14 @@ func TestTLSHandshakeBoundarySummarySurvivesCoalescedMessages(t *testing.T) {
 				return
 			}
 			require.Contains(t, secureTransportSummary(gap), "Handshake · boundary unavailable")
-			require.Equal(t, 1, strings.Count(row.Info, "boundary unavailable"), row.Info)
-			if name == "application" {
+			require.Equal(t, 1, strings.Count(row.Info, "TLS handshake boundary unavailable | "), row.Info)
+			require.True(t, strings.HasPrefix(row.Info, "TLS handshake boundary unavailable | "), row.Info)
+			if strings.HasPrefix(name, "application") {
 				require.Equal(t, "HTTP/1.1", row.Protocol)
 				require.Contains(t, row.Info, "GET /")
+				if name == "application-warning-text" {
+					require.Contains(t, row.Info, "GET /boundary unavailable HTTP/1.1")
+				}
 			} else {
 				require.Equal(t, "TLSv1.3", row.Protocol)
 				if name == "update" {
