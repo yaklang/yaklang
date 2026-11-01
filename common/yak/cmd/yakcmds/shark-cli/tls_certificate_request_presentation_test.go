@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -157,4 +158,86 @@ func TestTLSCertificateRequestQUICProgressivePlaintext(t *testing.T) {
 		}
 	}
 	require.Equal(t, 20, count)
+}
+
+// The real241 server flight places CertificateRequest after three other TLS
+// PDUs in one physical frame. The important result must survive bounded rows.
+func TestTLSCertificateRequestSurvivesCoalescedFrameSummary(t *testing.T) {
+	for _, count := range []int{3, 5} {
+		for _, reverse := range []bool{false, true} {
+			t.Run(fmt.Sprintf("prefix%d/reverse%t", count, reverse), func(t *testing.T) {
+				request := certificateRequestPresentation(t, true)
+				var events []*pcaputil.ProtocolEvent
+				for i := 0; i < count; i++ {
+					e := keyUpdatePresentationForTest(0)
+					e.ID = uint64(i + 2)
+					e.Session["Handshake Messages"] = []map[string]any{{"Type": byte(2), "Length": 76, "Authenticated": false}}
+					e.Session["SNI"] = strings.Repeat("a", 100) + ".example"
+					events = append(events, e)
+				}
+				if reverse {
+					events = append([]*pcaputil.ProtocolEvent{request}, events...)
+				} else {
+					events = append(events, request)
+				}
+				before, err := json.Marshal(events)
+				require.NoError(t, err)
+				row := presentEvents(events).apply(packetSummary{})
+				require.True(t, strings.HasPrefix(row.Info, "Certificate Request"), row.Info)
+				require.Contains(t, clipText(row.Info, 80), "20 signature algorithms")
+				after, err := json.Marshal(events)
+				require.NoError(t, err)
+				require.Equal(t, before, after)
+			})
+		}
+	}
+}
+
+func TestTLSCertificateRequestSurvivesCoalescedHandshakeSummary(t *testing.T) {
+	e := certificateRequestPresentation(t, true)
+	request := e.Session["Handshake Messages"].([]map[string]any)[0]
+	var messages []map[string]any
+	for i := 0; i < 10; i++ {
+		messages = append(messages, map[string]any{"Type": byte(2), "Length": 76, "Authenticated": false})
+	}
+	e.Session["Handshake Messages"] = append(messages, request)
+	require.True(t, strings.HasPrefix(secureTransportSummary(e), "Certificate Request · 20 signature algorithms"))
+}
+
+func TestTLSCertificateRequestSummaryPromotionRequiresBodyEvidence(t *testing.T) {
+	for _, name := range []string{"record-auth", "message-auth", "body", "encoding", "version", "status"} {
+		t.Run(name, func(t *testing.T) {
+			e := certificateRequestPresentation(t, true)
+			m := e.Session["Handshake Messages"].([]map[string]any)[0]
+			switch name {
+			case "record-auth":
+				e.Session["Authentication Verified"] = false
+			case "message-auth":
+				m["Authenticated"] = false
+			case "body":
+				m["Certificate Request"].(map[string]any)["Context Length"] = byte(1)
+			case "encoding":
+				m["Encoded Certificate Request"].([]byte)[4] = 0xff
+			case "version":
+				delete(m, "Certificate Request Version")
+			case "status":
+				e.Status = "malformed"
+			}
+			require.Zero(t, tlsDetailedHandshakeRank(e), "a matching message name is not a decoded/authenticated body")
+		})
+	}
+}
+
+func TestTLSCertificateRequestSummaryDoesNotDisplaceKeyUpdateOrApplication(t *testing.T) {
+	request, update := certificateRequestPresentation(t, true), keyUpdatePresentationForTest(1)
+	for _, events := range [][]*pcaputil.ProtocolEvent{{request, update}, {update, request}} {
+		row := presentEvents(events).apply(packetSummary{})
+		require.True(t, strings.HasPrefix(row.Info, "Key Update · update_requested"), row.Info)
+		require.Equal(t, "TLSv1.3", row.Protocol)
+	}
+	application := &pcaputil.ProtocolEvent{Protocol: "http", Status: "decoded", Summary: "GET / HTTP/1.1", Fields: map[string]any{"Protocol": "HTTP/1.1"}}
+	row := presentEvents([]*pcaputil.ProtocolEvent{request, application}).apply(packetSummary{})
+	require.Equal(t, "HTTP/1.1", row.Protocol)
+	require.Contains(t, row.Info, "GET /")
+	require.NotContains(t, row.Info, "20 signature algorithms")
 }

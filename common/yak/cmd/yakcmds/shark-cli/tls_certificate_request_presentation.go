@@ -41,6 +41,26 @@ func tlsCertificateRequestDetail(m map[string]any, version uint64, authenticated
 	return view, wire, name
 }
 
+// A message name or connection label is insufficient for row promotion. Require
+// the same body/authentication checks that qualify its owned detail source.
+func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
+	if e == nil || e.Protocol != "tls" || e.Status != "decoded" && e.Status != "deferred" {
+		return 0
+	}
+	v := eventValues(e)
+	version, authenticated := number(v["Negotiated Version"]), v["Authentication Verified"] == true
+	rank := 0
+	for _, h := range mapList(v["Handshake Messages"]) {
+		if tlsKeyUpdatePlaintext(h, authenticated && version == 0x304) != nil {
+			return 2
+		}
+		if view, _, _ := tlsCertificateRequestDetail(h, version, authenticated); view != nil {
+			rank = 1
+		}
+	}
+	return rank
+}
+
 var tlsCertificateRequestFieldPriority = map[string]int{
 	"Certificate Types Length": 0, "Certificate Types": 1,
 	"Context Length": 0, "Context": 1,

@@ -33,6 +33,7 @@ type packetPresentation struct {
 	count                                 int
 	rejectedTLS                           bool
 	tlsIncompleteSummary                  bool
+	tlsDetailedSummaryRank                int
 	tlsRecordProblem                      string
 	h3ConnectionFaultPDU                  uint64
 	networkRefused                        bool
@@ -363,13 +364,16 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		return strings.Join(parts, " · ")
 	}
 	var parts []string
+	leadingMessage, leadingRank := -1, 0
 	for _, h := range mapList(v["Handshake Messages"]) {
 		name := handshakeType(h["Type"])
+		messageRank := 0
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
 		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
 			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
+			messageRank = 2
 		}
 		if request, _, _ := tlsCertificateRequestDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); request != nil {
 			algorithms := len(mapList(request.Fields["Signature Algorithms"]))
@@ -379,10 +383,21 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 				}
 			}
 			name += fmt.Sprintf(" · %d signature algorithms", algorithms)
+			messageRank = max(messageRank, 1)
 		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable"
 		}
+		if messageRank > leadingRank {
+			leadingMessage, leadingRank = len(parts), messageRank
+		}
 		parts = append(parts, name)
+	}
+	if leadingMessage > 0 {
+		// The detail tree retains wire order. The bounded row puts the first
+		// fully decoded request/update ahead of coalesced envelope names.
+		leading := parts[leadingMessage]
+		copy(parts[1:leadingMessage+1], parts[:leadingMessage])
+		parts[0] = leading
 	}
 	if len(parts) == 0 {
 		if _, ok := v["Alert Description"]; ok {
@@ -1298,12 +1313,17 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	}
 	info := clipText(applicationEventSummary(e), 384)
 	incompleteTLS := e.Protocol == "tls" && eventValues(e)["Handshake Incomplete"] == true
+	detailedTLS := tlsDetailedHandshakeRank(e)
 	if rank > p.priority || p.protocol != label {
 		p.summary, p.count = info, 1
 		p.tlsIncompleteSummary = incompleteTLS
+		p.tlsDetailedSummaryRank = detailedTLS
 	} else {
 		p.count++
-		if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
+		if detailedTLS > p.tlsDetailedSummaryRank && info != "" {
+			p.summary = info + " | " + clipText(p.summary, 384)
+			p.tlsDetailedSummaryRank, p.tlsIncompleteSummary = detailedTLS, false
+		} else if e.Protocol == "tls" && p.tlsIncompleteSummary && !incompleteTLS && info != "" {
 			// Put a completed message before fragment/context text, including
 			// when it arrives beyond the first three coalesced record samples.
 			// Keep the fragment evidence and the existing bounded row budget.
