@@ -109,6 +109,23 @@ func TestSMB2QueryDirectoryFileIdBothChain(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestSMB2QueryDirectoryClassOtherThanFileIdBothStaysOpaque(t *testing.T) {
+	response := smb2LayoutFixture(t, "query-directory-fileidboth-response.bin")
+	request := smb2DirectoryRequestMatching(response)
+	request[70] = 38
+	state := &binSMB2{client: 0}
+	_, err := state.consumeFrom(0, request, 64)
+	require.NoError(t, err)
+	matched, err := state.consumeFrom(1, response, 64)
+	require.NoError(t, err)
+	body := smb2NamedCommand(matched, "QUERY_DIRECTORY")["Body"].(map[string]any)
+	require.Equal(t, byte(38), smb2NamedCommand(matched, "QUERY_DIRECTORY")["Request File Information Class"])
+	require.Contains(t, body["Directory Entry Status"], "not selected")
+	require.NotContains(t, body, "Directory Entries")
+	require.NotContains(t, body, "File Name")
+	require.NotContains(t, body, "Next Entry Offset")
+}
+
 func TestSMB2QueryDirectoryNoMoreFilesIsError(t *testing.T) {
 	info, err := (&binSMB2{}).consume(smb2LayoutFixture(t, "query-directory-no-more-files.bin"), 64)
 	require.NoError(t, err)

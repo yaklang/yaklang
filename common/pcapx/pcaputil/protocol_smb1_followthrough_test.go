@@ -283,6 +283,14 @@ func TestSMB2ConstructedQueryInfoAndDFSVersions(t *testing.T) {
 			require.Equal(t, tc.text, typed[tc.key])
 		}
 		require.Contains(t, typed, "Wire Field Ranges")
+		if tc.class == 34 && tc.typ == 1 {
+			require.Equal(t, int64(7), typed["End Of File"])
+			require.IsType(t, int64(0), typed["End Of File"])
+			outputSpan := body["Wire Field Ranges"].(map[string]any)["Output Buffer"].([]any)
+			base := outputSpan[0].(uint64)
+			require.Equal(t, []any{base + 40, base + 48}, typed["Wire Field Ranges"].(map[string]any)["End Of File"])
+			require.Equal(t, []byte{7, 0, 0, 0, 0, 0, 0, 0}, body["Output Buffer"].([]byte)[40:48])
+		}
 		short := tc.wire[:len(tc.wire)-1]
 		miss := &binSMB2{client: 0}
 		_, err = miss.consumeFrom(0, smb2QueryRequest(22, 17, 7, tc.typ, tc.class, nil), 64)
