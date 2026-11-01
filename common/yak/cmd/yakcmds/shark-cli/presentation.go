@@ -950,6 +950,17 @@ func quicPacketDiagnosticRank(e *pcaputil.ProtocolEvent) int {
 	return 1
 }
 
+func quicPayloadDisposition(delivery any) string {
+	switch delivery {
+	case "not delivered to protocol state; packet AEAD verified":
+		return "not delivered"
+	case "packet parsing stopped at refused frame; earlier validated frames may have been applied":
+		return "parsing stopped"
+	default:
+		return "delivery not certified"
+	}
+}
+
 func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e == nil || p.networkRefused {
 		return
@@ -1341,7 +1352,14 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				p.summary = p.diagnostic
 				if _, retained := e.Session["Rejected Packet Payload"]; retained && e.Session["Authentication Verified"] == true {
 					p.visibility, p.scope = "authenticated-plaintext", "authenticated packet diagnostic"
-					p.evidence = "packet AEAD verified; payload not delivered"
+					switch quicPayloadDisposition(e.Session["Payload Delivery"]) {
+					case "not delivered":
+						p.evidence = "packet AEAD verified; payload not delivered"
+					case "parsing stopped":
+						p.evidence = "packet AEAD verified; parsing stopped; earlier validated frame effects may remain"
+					default:
+						p.evidence = "packet AEAD verified; payload delivery not certified"
+					}
 				}
 			}
 		}

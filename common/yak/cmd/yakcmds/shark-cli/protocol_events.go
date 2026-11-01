@@ -58,6 +58,8 @@ var http3FramePriority = map[string]int{"Frame Type": 0, "Frame Type Value": 1, 
 
 var http3StreamPriority = map[string]int{"Frame Type": 0, "Stream ID": 1, "Offset": 2, "Length": 3, "FIN": 4, "Contiguous Offset": 5, "Delivered Bytes": 6, "HTTP3 Frame Error": 7, "Stream Data": 8, "HTTP3 Frames": 9, "Byte Source": 50, "Delivered Byte Source": 51}
 
+var quicCryptoFramePriority = map[string]int{"Frame Type": 0, "Offset": 1, "Length": 2, "Crypto Data": 3}
+
 // Detail snapshots include owned public and private parser evidence, unlike
 // the compact scalar observations used by streaming JSON. Keep a separate
 // bounded allowance for the selected packet's native protocol tree. Rendering
@@ -167,6 +169,8 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var dcerpcResultKnown bool
 	var dcerpcMessage bool
 	var authenticatedQUIC bool
+	var quicPayloadState string
+	quicCryptoSize := -1
 	var authenticatedTLS bool
 	var tls13KeyUpdates bool
 	var tlsNegotiatedVersion uint64
@@ -204,6 +208,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
+				previous := quicCryptoSize
+				defer func() { quicCryptoSize = previous }()
+				quicCryptoSize = -1
+				if x["Frame Type"] == "CRYPTO" {
+					if length, ok := detailRangeOffset(x["Length"]); ok {
+						quicCryptoSize = length
+					}
+				}
+			}
 			if protocol == "dcerpc" {
 				if name == "Reassembled Message" {
 					previous := dcerpcMessage
@@ -303,6 +317,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					return smbDetailFieldLess(keys[i], keys[j], wireRanges)
 				}
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
+				if (protocol == "quic" || protocol == "http3" || protocol == "doq") && x["Frame Type"] == "CRYPTO" {
+					if rank, ok := quicCryptoFramePriority[keys[i]]; ok {
+						a = rank
+					}
+					if rank, ok := quicCryptoFramePriority[keys[j]]; ok {
+						b = rank
+					}
+				}
 				if protocol == "ospf" || protocol == "gtpv2" || protocol == "rsvp" {
 					// Wire children lead; checksum/authentication context follows
 					// them. Equal values still keep their own nested occurrence.
@@ -693,9 +715,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				generated = bytesValue(x)
 				sourceName = "QUIC STREAM · authenticated plaintext"
 			}
+			if name == "Crypto Data" && authenticatedQUIC && quicCryptoSize >= 0 {
+				if octets := bytesValue(x); octets != nil && len(octets) == quicCryptoSize {
+					generated = octets
+					sourceName = "QUIC CRYPTO · packet AEAD verified"
+				}
+			}
 			if name == "Rejected Packet Payload" && authenticatedQUIC {
 				generated = bytesValue(x)
-				sourceName = "QUIC packet payload · AEAD verified · not delivered"
+				sourceName = "QUIC packet payload · AEAD verified · " + quicPayloadState
 			}
 			if name == "Protected Payload" && (protocol == "quic" || protocol == "http3" || protocol == "doq") {
 				generated = bytesValue(x)
@@ -759,7 +787,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if name == "Rejected Packet Payload" && authenticatedQUIC && emptyCID {
-				value = "0 bytes (AEAD verified; not delivered)"
+				value = "0 bytes (AEAD verified; " + quicPayloadState + ")"
 			}
 			if protocol == "ipfix" && name == "Export Time" && number(x) <= 0xffffffff {
 				value = fmt.Sprintf("%s · Unix seconds %d", time.Unix(int64(number(x)), 0).UTC().Format(time.RFC3339), number(x))
@@ -919,6 +947,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		tlsNegotiatedVersion = number(e.Session["Negotiated Version"])
 		tlsCipherSuite = number(e.Session["Cipher Suite"])
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
+		quicPayloadState = quicPayloadDisposition(e.Session["Payload Delivery"])
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind

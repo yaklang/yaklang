@@ -240,6 +240,9 @@ func TestQUICAuthenticatedWrongLevelCannotBecomeCleanDuplicate(t *testing.T) {
 					require.Equal(t, true, info["Authentication Verified"])
 					require.NotContains(t, info, "TLS Handshakes")
 					require.Equal(t, before, *q.tls)
+					require.Equal(t, plain, info["Rejected Packet Payload"])
+					require.Contains(t, info["Payload Delivery"], "parsing stopped")
+					info["Rejected Packet Payload"].([]byte)[0] ^= 0xff
 					first := err.(*ProtocolError)
 					kind, message := first.Kind, first.Message
 					first.Message = "caller changed returned error"
@@ -248,6 +251,7 @@ func TestQUICAuthenticatedWrongLevelCannotBecomeCleanDuplicate(t *testing.T) {
 					require.Equal(t, true, info["Duplicate"])
 					require.Equal(t, kind, err.(*ProtocolError).Kind)
 					require.Equal(t, message, err.(*ProtocolError).Message)
+					require.Equal(t, plain, info["Rejected Packet Payload"])
 					require.NotContains(t, info, "TLS Handshakes")
 					require.Equal(t, before, *q.tls)
 				})

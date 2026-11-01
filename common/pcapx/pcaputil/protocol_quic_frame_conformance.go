@@ -12,6 +12,13 @@ func quicRetainUndeliveredPayload(info map[string]any, plain []byte) {
 	info["Payload Delivery"] = "not delivered to protocol state; packet AEAD verified"
 }
 
+func quicRetainStoppedPayload(info map[string]any, plain []byte) {
+	quicRetainUndeliveredPayload(info, plain)
+	// applyFrames can have processed preceding frames before refusing CRYPTO
+	// or stream content. This diagnostic is not a whole-packet rollback.
+	info["Payload Delivery"] = "packet parsing stopped at refused frame; earlier validated frames may have been applied"
+}
+
 // These are observed wire-role and packet-type constraints, not complete TLS,
 // transport-parameter, stream-state or endpoint conformance certification.
 func quicValidateNativePacketFrames(h quicHdr, dir int, frames []map[string]any) error {

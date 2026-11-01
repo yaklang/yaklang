@@ -324,6 +324,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 		if rejected, ok := q.space(dir, h.space).rejected[pn]; ok {
 			// A verified retransmission of a refused packet is not a successful
 			// frame delivery. Return an owned copy, not the retained error object.
+			if q.native {
+				quicRetainStoppedPayload(info, plain)
+			}
 			return info, &rejected
 		}
 		return info, nil
@@ -371,6 +374,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	q.observePN(q.space(dir, h.space), pn, info)
 	info, err = q.finishFrames(dir, h.space, frames, info, max)
 	if err != nil && !isRecoverableH3ObservationError(err) {
+		if q.native {
+			quicRetainStoppedPayload(info, plain)
+		}
 		if _, rejected := classifySessionError(err); rejected != nil {
 			space := q.space(dir, h.space)
 			if space.rejected == nil {
