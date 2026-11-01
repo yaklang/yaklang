@@ -153,6 +153,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var authenticatedTLS bool
 	var tls13KeyUpdates bool
 	var tlsNegotiatedVersion uint64
+	var tlsCipherSuite uint64
 	var http3FrameKind string
 	var http3StreamID uint64
 	var http3HeaderSource int
@@ -472,6 +473,28 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 							fieldViewLimited = true
 						}
 					}
+					finishedVersion, finishedSuite, finishedAuthenticated := tlsNegotiatedVersion, tlsCipherSuite, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Finished Version"]) == 0x304 && r["Finished Phase"] == "handshake" {
+						finishedVersion, finishedSuite, finishedAuthenticated = 0x304, number(r["Finished Cipher Suite"]), true
+					}
+					finishedWire, finishedName := tlsFinishedDetail(r, finishedVersion, finishedSuite, finishedAuthenticated)
+					finishedSource := 0
+					if finishedWire != nil {
+						if fieldValueSourceCount < 256 && len(finishedWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: finishedName, Data: bytes.Clone(finishedWire)})
+							finishedSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(finishedWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Finished (20)", depth: depth + 2,
+								source: finishedSource, start: 0, end: 1, hasRange: finishedSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
 					keyUpdateSource := 0
 					if data := tlsKeyUpdatePlaintext(r, authenticatedTLS && tls13KeyUpdates); data != nil {
 						sources = append(sources, detailSource{Name: "TLS Key Update · authenticated handshake plaintext", Data: bytes.Clone(data)})
@@ -488,7 +511,21 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
+					if finishedWire != nil {
+						order := map[string]int{"Length": 0, "Finished Verify Data": 1, "Finished Phase": 2, "Authenticated": 3, "Finished Version": 4, "Finished Cipher Suite": 5, "Finished Verification Status": 6, "Finished Context Status": 7, "Encoded Finished": 8}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					for _, key := range keys {
+						if finishedWire != nil && key == "Finished Verify Data" {
+							if len(out)+2 <= 4096 {
+								out = append(out, field{text: "Finished body", depth: depth + 2, branch: true},
+									field{text: "Finished Verify Data: " + formatFieldValue(key, finishedWire[4:]), depth: depth + 3,
+										source: finishedSource, start: 4, end: len(finishedWire), hasRange: finishedSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
 						if request != nil && key == "Certificate Request" {
 							rows, limited := tlsCertificateRequestFields(request, requestSource, depth+2, max(0, 4096-len(out)), uint16(requestVersion))
 							out = append(out, rows...)
@@ -509,6 +546,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						if request != nil && key == "Length" && requestSource > 0 && len(out) > before {
 							field := &out[len(out)-1]
 							field.source, field.start, field.end, field.hasRange = requestSource, 1, 4, true
+						}
+						if finishedSource > 0 && len(out) > before && (key == "Length" || key == "Encoded Finished") {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = finishedSource, 1, 4, true
+							if key == "Encoded Finished" {
+								field.start, field.end = 0, len(finishedWire)
+								field.text = "Encoded Finished: " + formatFieldValue(key, finishedWire)
+							}
 						}
 						if keyUpdateSource > 0 && (key == "Key Update Request" || key == "Encoded Key Update") {
 							field := &out[len(out)-1]
@@ -815,6 +860,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		authenticatedTLS = e.Protocol == "tls" && e.Session["Authentication Verified"] == true
 		tls13KeyUpdates = number(e.Session["Negotiated Version"]) == 0x304
 		tlsNegotiatedVersion = number(e.Session["Negotiated Version"])
+		tlsCipherSuite = number(e.Session["Cipher Suite"])
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil

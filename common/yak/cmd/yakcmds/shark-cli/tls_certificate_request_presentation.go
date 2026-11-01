@@ -57,6 +57,9 @@ func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
 		if view, _, _ := tlsCertificateRequestDetail(h, version, authenticated); view != nil {
 			rank = 1
 		}
+		if wire, _ := tlsFinishedDetail(h, version, number(v["Cipher Suite"]), authenticated); wire != nil && h["Finished Phase"] == "application" {
+			rank = 1
+		}
 	}
 	return rank
 }

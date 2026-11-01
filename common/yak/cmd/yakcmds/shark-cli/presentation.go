@@ -387,6 +387,14 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable"
 		}
+		if wire, _ := tlsFinishedDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); wire != nil {
+			name += " · " + textValue(h["Finished Phase"]) + " epoch · transcript MAC not evaluated"
+			if h["Finished Phase"] == "application" {
+				messageRank = max(messageRank, 1)
+			}
+		} else if number(h["Type"]) == 20 && strings.Contains(textValue(h["Finished Status"]), "unavailable") {
+			name += " envelope · negotiated version unavailable or unsupported"
+		}
 		if messageRank > leadingRank {
 			leadingMessage, leadingRank = len(parts), messageRank
 		}
