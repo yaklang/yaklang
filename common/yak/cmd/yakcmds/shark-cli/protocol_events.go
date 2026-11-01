@@ -1397,16 +1397,22 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		add(protocolEventStatusText(e, state), false)
 		if e.Error != "" && !earlyQUICDiagnostic {
 			message := e.Error
-			if e.Protocol == "ssh" && e.ExpertCode != "" && strings.HasPrefix(message, e.ExpertCode+": ") {
+			if e.ExpertCode != "" {
 				// Keep the reason visible in a split inspector. These are exact
 				// diagnostic components; the original event error stays intact.
 				add("Diagnostic code: "+e.ExpertCode, false)
-				message = strings.TrimPrefix(message, e.ExpertCode+": ")
-				for _, decoder := range []string{"ssh-plaintext", "ssh"} {
-					if strings.HasPrefix(message, decoder+": ") {
-						add("Decoder: "+decoder, false)
-						message = strings.TrimPrefix(message, decoder+": ")
-						break
+				if strings.HasPrefix(message, e.ExpertCode+": ") {
+					message = strings.TrimPrefix(message, e.ExpertCode+": ")
+					// Decoder labels are protocol-specific, unlike the typed
+					// diagnostic code. Preserve other protocols' literal colons.
+					if e.Protocol == "ssh" {
+						for _, decoder := range []string{"ssh-plaintext", "ssh"} {
+							if strings.HasPrefix(message, decoder+": ") {
+								add("Decoder: "+decoder, false)
+								message = strings.TrimPrefix(message, decoder+": ")
+								break
+							}
+						}
 					}
 				}
 			}
