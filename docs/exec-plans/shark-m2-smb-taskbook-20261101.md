@@ -18,6 +18,13 @@
 
 ## 已有成果和保留缺口
 
+2026-11-02交接续记：最新已独立全绿检查点为 `ce26c0d9238194e4dde43547e536199a357ff803`，
+47验收检查名、2statuses及全部91实际执行检查成功，313745pass/25历史optional skip、
+131084 required全pass/0skip；[traffic](https://github.com/yaklang/yaklang/actions/runs/41329494037)、
+[Essential](https://github.com/yaklang/yaklang/actions/runs/41329497344)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41329500697)。
+随后非SMB代码/干净构建480b5补充证书epoch与恢复握手边界，最终说明head须另验CI。
+以上不重新验收SMB；承接人从开工时远端最新M2独立固定S01，保留原107/121和字段分母。
+
 SMB1 到 SMB2 协商后的探测恢复已有实现，107 个完整记录、121 个命令头以及全部 281 条来源门属于已有有限成果。先复核并保持它们，不把这些记录再次算成新增成果。
 
 字段审计保留同一 checker04 的 1400 个原始 coverage gaps；其中 392 个 QUERY_INFO 映射项已独立闭合，另外仍有 1008 项：961 个字段未发表、47 个范围未映射。原审计中的“已映射值错误为 0”只覆盖已映射项目。

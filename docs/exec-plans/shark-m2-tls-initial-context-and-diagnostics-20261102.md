@@ -139,6 +139,17 @@ ASDU2worker/10161帧原ID及历史平台例外不变。
 | 最终六次完整大包631 | `fddaa6ecdec01ea6556b9787fbc0db009810bfd2b3bd6271213e8ff2c5931fbd` |
 | 最终两Windows页630 | `43b37077e4a6fe6a4e8350ed95ef45207d7ea9e2b4e2e3b82c73d3ee5245d016` |
 
+2026-11-02验收续记：最终ce26已独立47验收检查名、2statuses及全部91实际执行检查成功。
+313770原始ID逐项保持，新增59及131084 required全pass/0skip；官方16967503B产物SHA256
+`05032644de53203749ad829ef2225e2decb35bea40daad805b9dda87d4c5c00e`与实际checkout/上传日志一致。
+[traffic](https://github.com/yaklang/yaklang/actions/runs/41329494037)、
+[Essential](https://github.com/yaklang/yaklang/actions/runs/41329497344)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/41329500697)。645/646闭合分别为
+`e097131dea56ef4c379fb9283cf110414d5caabf79106f14463b1343b8efec8b`和
+`a4e644e259253ec0f83746d8937b7398731731e5a1aded7d3c4e8ca5b46a76bf`。
+随后[480b5服务端证书epoch和新握手边界](shark-m2-tls-epoch-boundary-20261102.md)及其最终说明head另验CI；不沿用本报告ce26成功。
+
+以下57/47是本报告原交付时的计数，最新58/48见主清单。
 初始上下文归M2-56补充，诊断截断新增并关闭M2-57有限合同。
 当前57父项，47有限完成、6进行中、1未开始、3 SMB搁置，剩10。
 非SMB仍17包中11有限完成/6开放，粗估23–46 AI实施小时，等待及新发现另计。
