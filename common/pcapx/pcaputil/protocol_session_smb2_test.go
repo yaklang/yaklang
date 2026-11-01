@@ -210,7 +210,11 @@ func TestProtocolSessionSMB2NegotiateCreateIO(t *testing.T) {
 	r = s.Feed(0, ts, smb2TreeConnect(3, 0x11, `\\srv\share`))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, `\\srv\share`, r.Events[0].Session["Path"])
-	require.Equal(t, `SMB2 TREE_CONNECT \\srv\share status=0x00000000 mid 3`, r.Events[0].Summary)
+	// The request header carries Process ID, not response NTSTATUS. Keep
+	// main's new path summary checks without inventing a request status.
+	require.NotContains(t, r.Events[0].Session, "Status")
+	require.Contains(t, r.Events[0].Session, "Process ID")
+	require.Equal(t, `SMB2 TREE_CONNECT \\srv\share mid 3`, r.Events[0].Summary)
 	r = s.Feed(1, ts, smb2TreeConnectResp(3, 0x11, 1))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "TREE_CONNECT", r.Events[0].Session["Matched Request"])
@@ -231,7 +235,9 @@ func TestProtocolSessionSMB2NegotiateCreateIO(t *testing.T) {
 	r = s.Feed(0, ts, smb2Read(5, 0x11, 1, fid, 8))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "READ", r.Events[0].Session["Packet Name"])
-	require.Equal(t, "SMB2 READ file.txt len=8 status=0x00000000 mid 5", r.Events[0].Summary)
+	require.NotContains(t, r.Events[0].Session, "Status")
+	require.Contains(t, r.Events[0].Session, "Process ID")
+	require.Equal(t, "SMB2 READ file.txt len=8 mid 5", r.Events[0].Summary)
 	r = s.Feed(1, ts, smb2ReadResp(5, 0x11, 1, []byte("abcdefgh")))
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, "READ", r.Events[0].Session["Matched Request"])
