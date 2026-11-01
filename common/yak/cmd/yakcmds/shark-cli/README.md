@@ -95,6 +95,11 @@ span several byte-pane viewports. Record authentication and valid body vectors
 do not establish certificate trust, negotiated certificate type, request-context
 association or a conforming handshake phase. Existing certificate summaries
 remain available alongside these literal fields.
+When the observed ClientHello establishes endpoint roles, a server Certificate
+must have an empty request context and a nonempty certificate list. A client's
+empty response stays valid. A refusal keeps the observed TLS connection and
+record authentication visible, with a specific error; it does not publish a
+successful certificate body or feed later plaintext into application parsers.
 CertificateVerify uses its complete version-qualified signature vector, with
 the observed two-byte algorithm, exact length and owned signature bytes. The
 detail tree progresses from header to body to context; selecting a signature

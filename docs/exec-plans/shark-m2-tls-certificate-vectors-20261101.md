@@ -34,6 +34,8 @@ API可按TLS1.0..1.3布局读取；本批新增的原生/页面正文投影限�
 原生TLS1.3事件保留完整Encoded Certificate与私有已接纳字段，公开缓存或输入修改不能替代它们。
 原有证书摘要保持；记录AEAD认证、正文向量解析、请求关联、证书类型、签名和信任分别表达。
 本批不验证证书类型协商、角色/完整阶段规则、PHA请求context的唯一性和响应关联，N13继续开放。
+后续17fe另补已知服务端空context/非空列表的两个条件，见[限定角色补充及新验证](shark-m2-tls-certificate-roles-20261101.md)。
+本页0f1的构建、fuzz和阶段边界保留原事实，不将该补充当完整角色/阶段已验收。
 
 列表增加条目数和上下文长度，已有CertificateVerify、KeyUpdate和已解码应用的优先级保留。
 详情依次呈现握手头、Certificate body、Context、Certificate Entries、每条证书和Extensions，
