@@ -515,6 +515,18 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			if err != nil {
 				return nil, err
 			}
+			// The grammar API is role-neutral: clients may send an empty
+			// certificate list, including a post-handshake request context.
+			// Enforce these server-only rules only after the connection has
+			// established which direction sent ClientHello (RFC 8446 4.4.2).
+			if t.client >= 0 && dir != t.client {
+				if view.Fields["Context Length"].(byte) != 0 {
+					return nil, protocolError(ErrMalformedMessage, "server TLS Certificate has nonempty request context")
+				}
+				if len(view.Certificates) == 0 {
+					return nil, protocolError(ErrMalformedMessage, "server TLS Certificate has empty certificate list")
+				}
+			}
 			m["Certificates"], m["Certificate Body"] = view.Certificates, view.Fields
 			m["Certificate Version"], m["Encoded Certificate"] = t.version, bytes.Clone(b)
 			m["Certificate Body Status"] = "body vectors decoded; request context, certificate type and trust not evaluated"
