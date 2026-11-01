@@ -527,7 +527,7 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 					return nil, protocolError(ErrMalformedMessage, "server TLS Certificate has empty certificate list")
 				}
 			} else if t.client >= 0 && !t.app[dir] && view.Fields["Context Length"].(byte) != 0 {
-				return nil, protocolError(ErrMalformedMessage, "initial client TLS Certificate has nonempty request context")
+				return nil, protocolError(ErrMalformedMessage, "initial client TLS Certificate context must be empty")
 			}
 			m["Certificates"], m["Certificate Body"] = view.Certificates, view.Fields
 			m["Certificate Version"], m["Encoded Certificate"] = t.version, bytes.Clone(b)
@@ -564,7 +564,7 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		// key recovery is authenticated before this dispatch, so a missing
 		// Finished cannot turn a post-handshake context into an initial one.
 		if t.version == 0x304 && t.client >= 0 && !t.app[dir] && request.Fields["Context Length"].(byte) != 0 {
-			return nil, protocolError(ErrMalformedMessage, "initial TLS CertificateRequest has nonempty request context")
+			return nil, protocolError(ErrMalformedMessage, "initial TLS CertificateRequest context must be empty")
 		}
 		m["Certificate Request"], m["Certificate Request Version"] = request.Fields, t.version
 		m["Encoded Certificate Request"] = bytes.Clone(b)
