@@ -36,6 +36,9 @@ jobs:
           failed-labels: 'do-not-merge,work in progress,wip,rfc'
           skip-labels: 'pass-diff-check'
           cache-key-prefix: 'diff-code-check'
+          # An explicitly requested scan must execute even after a green
+          # commit status. Failed/skip labels are still enforced by the action.
+          ignore-success-status: ${{ github.event_name == 'workflow_dispatch' || github.run_attempt > 1 }}
 
   setup:
     runs-on: ubuntu-22.04
