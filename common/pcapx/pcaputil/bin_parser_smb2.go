@@ -1,6 +1,7 @@
 package pcaputil
 
 import (
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"unicode/utf16"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // binSMB2 is the M0 session state for SMB2/SMB3 over Direct TCP. Dialect
@@ -89,9 +91,11 @@ type smb2CompoundLink struct {
 }
 
 const (
-	smb2Magic       = 0x424d53fe
-	smb3Transform   = 0x424d53fd
-	smb2HeaderSize  = 64
+	smb2Magic                 = 0x424d53fe
+	smb3Transform             = 0x424d53fd
+	smb2CompressionTransform  = 0x424d53fc // on-wire FC 53 4D 42 (0xFC534D42 in byte order)
+	smb2CompressionHeaderSize = 16
+	smb2HeaderSize            = 64
 	smb2FlagResp    = 0x00000001
 	smb2FlagAsync   = 0x00000002
 	smb2FlagRelated = 0x00000004
@@ -105,7 +109,7 @@ func probeSMB2(w []byte, limit int) ProbeResult {
 		return probeNeed("smb2", "2/3", len(w), 8)
 	}
 	n := smb2DirectLength(w)
-	if n < 52 || n > 1<<20 {
+	if n < smb2CompressionHeaderSize || n > 1<<20 {
 		return ProbeResult{Verdict: ProbeReject}
 	}
 	magic := binary.LittleEndian.Uint32(w[4:8])
@@ -137,6 +141,14 @@ func probeSMB2(w []byte, limit int) ProbeResult {
 			return ProbeResult{Verdict: ProbeReject}
 		}
 		return probeAccept("smb2", "3-transform", 90)
+	case smb2CompressionTransform:
+		if n < smb2CompressionHeaderSize {
+			return ProbeResult{Verdict: ProbeReject}
+		}
+		if len(w) < 4+smb2CompressionHeaderSize {
+			return probeNeed("smb2", "3.1.1-compression", len(w), 4+smb2CompressionHeaderSize)
+		}
+		return probeAccept("smb2", "3.1.1-compression", 88)
 	default:
 		return ProbeResult{Verdict: ProbeReject}
 	}
@@ -244,6 +256,12 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 		}
 		f.protocol = "smb2"
 		return total, f.spec("smb3", "SMB3Transform"), nil
+	case smb2CompressionTransform:
+		if n < smb2CompressionHeaderSize {
+			return 0, nil, fmt.Errorf("smb2: truncated compression transform header")
+		}
+		f.protocol = "smb2"
+		return total, f.spec("smb2", "SMB2"), nil
 	case smb2Magic:
 		if n < smb2HeaderSize {
 			return 0, nil, fmt.Errorf("smb2: Direct TCP length smaller than header")
@@ -254,8 +272,39 @@ func (f *binFlow) frameSMB2(w []byte) (int, *binSpec, error) {
 		f.protocol = "smb2"
 		return total, f.spec("smb2", "SMB2"), nil
 	default:
-		return 0, nil, fmt.Errorf("smb2: ProtocolId is not SMB2 or SMB3 transform")
+		return 0, nil, fmt.Errorf("smb2: ProtocolId is not SMB2, SMB3 transform, or SMB2 compression transform")
 	}
+}
+
+// MS-SMB2 2.2.42 fixed compression transform header. The bytes after the
+// 16-byte header stay opaque; this decoder does not decompress them.
+func smb2CompressionTransformFields(payload []byte) (map[string]any, error) {
+	if len(payload) < smb2CompressionHeaderSize {
+		return nil, fmt.Errorf("smb2: truncated compression transform header")
+	}
+	info := map[string]any{}
+	algorithm := binary.LittleEndian.Uint16(payload[8:10])
+	flags := binary.LittleEndian.Uint16(payload[10:12])
+	smb2Literal(info, "Protocol ID", 0, 4, binary.LittleEndian.Uint32(payload[0:4]))
+	smb2Literal(info, "Original Compressed Segment Size", 4, 8, binary.LittleEndian.Uint32(payload[4:8]))
+	smb2Literal(info, "Compression Algorithm", 8, 10, algorithm)
+	smb2Literal(info, "Flags", 10, 12, flags)
+	smb2Literal(info, "Offset", 12, 16, binary.LittleEndian.Uint32(payload[12:16]))
+	reason := "compressed payload is not decompressed"
+	if flags&0x0001 != 0 {
+		reason = "chained compression payload is not decoded"
+	}
+	if len(payload) > smb2CompressionHeaderSize {
+		smb2Literal(info, "Compressed Payload", smb2CompressionHeaderSize, len(payload), bytes.Clone(payload[smb2CompressionHeaderSize:]))
+	}
+	info["Compressed Payload Status"] = "opaque: " + reason
+	info["Packet Name"] = "COMPRESSION_TRANSFORM"
+	info["Content Visibility"] = "opaque"
+	info["Decompression Performed"] = false
+	info["Context Level"] = "opaque"
+	log.Debugf("smb2: compression transform algorithm 0x%04x left opaque; %s", algorithm, reason)
+	smb2OffsetRanges(info, 4)
+	return info, nil
 }
 
 func (s *binSMB2) reserveState(additionalPathBytes int64) error {
@@ -309,6 +358,9 @@ func (s *binSMB2) consumeFrom(dir int, raw []byte, max int) (map[string]any, err
 	}
 	payload := raw[4:]
 	magic := binary.LittleEndian.Uint32(payload[:4])
+	if magic == smb2CompressionTransform {
+		return smb2CompressionTransformFields(payload)
+	}
 	if magic == smb3Transform {
 		if len(payload) < 52 {
 			return nil, fmt.Errorf("smb2: truncated transform header")
