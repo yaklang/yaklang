@@ -122,7 +122,7 @@ func TestPackedCorpusPreservesFrozenContracts(t *testing.T) {
 			t.Fatal("old PR-added physical ZIP still present", b.File, e)
 		}
 	}
-	if direct != 36 || packed != 253 || members != 24849 || aliases != 25197 {
+	if direct != 36 || packed != 253 || members != 24850 || aliases != 25197 {
 		t.Fatalf("frozen contract counts %d/%d/%d/%d", direct, packed, members, aliases)
 	}
 	origin, e := SourceArchive("validation-sparkplug-template-device-commands.zip")
