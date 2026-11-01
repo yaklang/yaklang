@@ -103,6 +103,9 @@ type binTLS struct {
 	resumption                             tlsResumptionState
 	requestContexts                        map[string]struct{}
 	phaOfferKnown, phaOffered              bool // outlive the owned retry ClientHello body
+	phaRequests                            map[string]tlsPHARequest
+	phaResponse                            tlsPHAResponse
+	phaInitialFinished, phaGap             [2]bool
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
@@ -163,10 +166,12 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 	if encrypted {
 		info["Content Visibility"] = "encrypted"
 		if t.client < 0 || len(t.random) != 32 || t.version == 0 || t.retrySeen && !t.finalHello {
+			t.notePHAGap(dir)
 			info["Secret Lookup Status"] = "missing-context"
 			return map[string]any{"fields": info}, nil
 		}
 		if !tlsSupportedSuite(t.version, t.suite) {
+			t.notePHAGap(dir)
 			info["Secret Lookup Status"] = "unsupported-suite"
 			return map[string]any{"fields": info}, nil
 		}
@@ -176,12 +181,14 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 				return nil, err
 			}
 			if !ok {
+				t.notePHAGap(dir)
 				info["Secret Lookup Status"] = "missing-key"
 				return map[string]any{"fields": info}, nil
 			}
 		}
 		var err error
 		if t.recoveryFailures[dir] >= 4 {
+			t.notePHAGap(dir)
 			info["Secret Lookup Status"] = "recovery-exhausted"
 			info["Recovery State"] = "bounded record recovery suspended; encrypted envelope retained"
 			return map[string]any{"fields": info}, nil
@@ -202,6 +209,9 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 		info["Inner Content Type"] = typ
 	} else {
 		info["Content Visibility"] = "cleartext"
+	}
+	if encrypted && typ != 22 && typ != 21 && t.phaClientApplication(dir) && t.phaResponse.stage != tlsPHAResponseNone {
+		return nil, protocolError(ErrMalformedMessage, "TLS post-handshake response interleaved")
 	}
 	// Authentication consumed this old-epoch record, but application bytes
 	// cannot interrupt a continuously observed TLS1.3 handshake fragment.
@@ -279,7 +289,7 @@ func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) 
 			// Request history is immutable copy-on-write. Refusing its retained
 			// capacity cannot publish the request or consume its context. Record
 			// authentication and sequence consumption have already happened.
-			if len(trial.requestContexts) > len(t.requestContexts) {
+			if trial.storage() > t.storage() {
 				if err := f.reserveSession(trial.storage()); err != nil {
 					return nil, err
 				}
@@ -354,6 +364,9 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 	m := map[string]any{"Type": typ, "Length": len(body), "Authenticated": authenticated}
 	if !authenticated && t.version == 0x304 && (t.finalHello || t.retrySeen && typ != 1 && typ != 2) {
 		return nil, protocolError(ErrMalformedMessage, "TLS 1.3 unexpected cleartext handshake")
+	}
+	if err := t.checkPHAHandshakeOrder(dir, typ); err != nil {
+		return nil, err
 	}
 	switch typ {
 	case 1, 2:
@@ -460,6 +473,13 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		m["Certificate Verify"], m["Certificate Verify Version"] = verify.Fields, t.version
 		m["Certificate Verify Phase"], m["Encoded Certificate Verify"] = phase, bytes.Clone(b)
 		m["Certificate Verify Status"] = "body vector decoded; signature not evaluated; certificate trust and handshake context not evaluated"
+		association, err := t.admitPHACertificateVerify(dir)
+		if err != nil {
+			return nil, err
+		}
+		if association != nil {
+			m["Post Handshake Response"] = association
+		}
 	case 20:
 		if t.version != 0x303 && t.version != 0x304 {
 			m["Finished Status"] = "negotiated version unavailable or unsupported; body uninterpreted"
@@ -487,8 +507,19 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		m["Finished Verification Status"] = "AEAD authenticated; transcript MAC not evaluated"
 		if phase == "application" {
 			m["Finished Context Status"] = "application-key handshake; PHA exchange context not validated"
+			association, err := t.admitPHAFinished(dir)
+			if err != nil {
+				return nil, err
+			}
+			if association != nil {
+				m["Post Handshake Response"] = association
+				if association["Context Association"] == "matched observed CertificateRequest" {
+					m["Finished Context Status"] = "observed response context and order matched; transcript MAC not evaluated"
+				}
+			}
 		}
 		if t.version == 0x304 && !t.app[dir] {
+			t.phaInitialFinished[dir] = true
 			t.app[dir] = true
 			t.seq[dir] = 0
 			t.keys[dir] = nil
@@ -550,6 +581,13 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 			m["Certificates"], m["Certificate Body"] = view.Certificates, view.Fields
 			m["Certificate Version"], m["Encoded Certificate"] = t.version, bytes.Clone(b)
 			m["Certificate Body Status"] = "body vectors decoded; request context, certificate type and trust not evaluated"
+			association, err := t.admitPHACertificate(dir, view.Fields["Context"].([]byte), len(view.Certificates) == 0, authenticated)
+			if err != nil {
+				return nil, err
+			}
+			if association != nil {
+				m["Post Handshake Response"] = association
+			}
 		} else {
 			certs, err := tlsCertificates(body, false, limits...)
 			if err != nil {

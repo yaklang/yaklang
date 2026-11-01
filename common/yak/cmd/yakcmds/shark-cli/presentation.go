@@ -1343,7 +1343,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 	if e.Status != "decoded" && e.Status != "deferred" || e.Error != "" {
 		if e.Error != "" || e.ExpertCode != "" {
 			label := protocolName(e.Protocol)
-			authenticatedTLS := authenticatedTLSHandshakeDiagnostic(e)
+			authenticatedTLS := authenticatedTLSRecordDiagnostic(e)
 			if authenticatedTLS {
 				label = eventProtocolName(e)
 			}
@@ -1369,6 +1369,10 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 				p.visibility, p.scope = "authenticated-plaintext", "authenticated TLS record diagnostic"
 				p.evidence = "record AEAD verified; handshake message rejected"
 				p.summary = "Handshake rejected · record AEAD verified"
+				if number(eventValues(e)["Inner Content Type"]) == 23 {
+					p.evidence = "record AEAD verified; post-handshake response interrupted"
+					p.summary = "Response interrupted · record AEAD verified"
+				}
 			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)

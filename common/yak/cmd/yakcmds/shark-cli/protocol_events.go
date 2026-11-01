@@ -591,7 +591,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					}
 					sort.Strings(keys)
 					if certificate != nil {
-						order := map[string]int{"Length": 0, "Certificate Body": 1, "Certificates": 2, "Authenticated": 3, "Certificate Version": 4, "Certificate Body Status": 5, "Certificate Message SHA256": 6, "Encoded Certificate": 7}
+						order := map[string]int{"Length": 0, "Certificate Body": 1, "Certificates": 2, "Authenticated": 3, "Certificate Version": 4, "Certificate Body Status": 5, "Certificate Message SHA256": 6, "Encoded Certificate": 7, "Post Handshake Response": 8}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					if request != nil {
@@ -599,11 +599,11 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					if finishedWire != nil {
-						order := map[string]int{"Length": 0, "Finished Verify Data": 1, "Finished Phase": 2, "Authenticated": 3, "Finished Version": 4, "Finished Cipher Suite": 5, "Finished Verification Status": 6, "Finished Context Status": 7, "Encoded Finished": 8}
+						order := map[string]int{"Length": 0, "Finished Verify Data": 1, "Finished Phase": 2, "Authenticated": 3, "Finished Version": 4, "Finished Cipher Suite": 5, "Finished Verification Status": 6, "Finished Context Status": 7, "Encoded Finished": 8, "Post Handshake Response": 9}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					if verify != nil {
-						order := map[string]int{"Length": 0, "Certificate Verify": 1, "Certificate Verify Phase": 2, "Authenticated": 3, "Certificate Verify Version": 4, "Certificate Verify Status": 5, "Encoded Certificate Verify": 6}
+						order := map[string]int{"Length": 0, "Certificate Verify": 1, "Certificate Verify Phase": 2, "Authenticated": 3, "Certificate Verify Version": 4, "Certificate Verify Status": 5, "Encoded Certificate Verify": 6, "Post Handshake Response": 7}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					for _, key := range keys {

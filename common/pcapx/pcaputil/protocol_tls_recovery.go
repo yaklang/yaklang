@@ -100,6 +100,9 @@ func (f *binFlow) openTLSRecord(dir int, w []byte, info map[string]any) ([]byte,
 
 func (f *binFlow) markTLSInnerGap(dir int) {
 	f.plaintextGap[dir] = true
+	if t := f.tls; t != nil {
+		t.notePHAGap(dir)
+	}
 	if t := f.tls; t != nil && t.child != nil {
 		child := t.child
 		child.plaintextGap[dir] = true

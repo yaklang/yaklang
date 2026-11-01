@@ -11,14 +11,18 @@ import (
 // A rejected handshake does not erase an authenticated TLS record identity.
 // This projection consumes the parser's record-authentication observation; it
 // does not certify the rejected message or independently authenticate a DTO.
-func authenticatedTLSHandshakeDiagnostic(e *pcaputil.ProtocolEvent) bool {
+func authenticatedTLSRecordDiagnostic(e *pcaputil.ProtocolEvent) bool {
 	if e == nil || e.Protocol != "tls" || e.Transport != "tcp" || e.FlowID == 0 || e.ID == 0 ||
 		e.Status != "malformed" || e.ExpertCode != string(pcaputil.ErrMalformedMessage) || !strings.HasPrefix(e.Error, e.ExpertCode+": ") {
 		return false
 	}
 	info := eventValues(e)
 	if info["Authentication Verified"] != true || info["Content Visibility"] != "authenticated-plaintext" ||
-		number(info["Negotiated Version"]) != 0x304 || number(info["Inner Content Type"]) != 22 {
+		number(info["Negotiated Version"]) != 0x304 {
+		return false
+	}
+	inner := number(info["Inner Content Type"])
+	if inner != 22 && (inner != 23 || e.Error != e.ExpertCode+": TLS post-handshake response interleaved") {
 		return false
 	}
 	switch number(info["Cipher Suite"]) {

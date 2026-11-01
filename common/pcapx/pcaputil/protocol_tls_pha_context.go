@@ -4,12 +4,18 @@ package pcaputil
 // certificate or global cache. Strings own their bytes; public decoded bodies
 // and encoded handshakes cannot mutate this history. All updates replace the map.
 func (t *binTLS) requestContextStorage() int64 {
-	if len(t.requestContexts) == 0 {
-		return 0
+	var size int64
+	if len(t.requestContexts) != 0 {
+		size += 256
+		for context := range t.requestContexts {
+			size += 128 + int64(len(context))
+		}
 	}
-	size := int64(256)
-	for context := range t.requestContexts {
-		size += 128 + int64(len(context))
+	if len(t.phaRequests) != 0 {
+		size += 256 + 128*int64(len(t.phaRequests))
+	}
+	if t.phaResponse.stage != tlsPHAResponseNone {
+		size += 128 + int64(len(t.phaResponse.context))
 	}
 	return size
 }
@@ -48,6 +54,7 @@ func (t *binTLS) admitCertificateRequest(dir int, request *TLSCertificateRequest
 	if !t.app[dir] {
 		return nil, nil
 	}
+	t.retainPHARequest(context, uint64(len(next)))
 	return map[string]any{
 		"Client PHA Offer":       offer,
 		"Context Uniqueness":     "unique among observed requests",
