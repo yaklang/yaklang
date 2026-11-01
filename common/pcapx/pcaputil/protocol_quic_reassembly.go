@@ -124,11 +124,39 @@ func (q *binQUIC) wireHeader(raw []byte, dir int) (quicHdr, error) {
 			return h, nil
 		}
 	}
+	// A retired CID is no longer an active route, but a packet sent before
+	// retirement can arrive afterwards. Native admission authenticates these
+	// historical candidates before associating them with a conversation.
+	for _, cid := range q.cidRetired[1-dir] {
+		if len(raw) >= 1+len(cid) && string(raw[1:1+len(cid)]) == cid {
+			h.dcid, h.payloadOff = []byte(cid), 1+len(cid)
+			return h, nil
+		}
+	}
 	if q.zeroCID[1-dir] {
 		h.payloadOff = 1
 		return h, nil
 	}
 	return h, sessionContext("QUIC short header requires observed destination CID")
+}
+
+func (q *binQUIC) rememberRetiredCID(owner int, seq uint64, cid string, max int) {
+	if max < 1 {
+		return
+	}
+	if q.cidRetired[owner] == nil {
+		q.cidRetired[owner] = map[uint64]string{}
+	}
+	if _, exists := q.cidRetired[owner][seq]; !exists && len(q.cidRetired[owner]) >= max {
+		oldest := ^uint64(0)
+		for n := range q.cidRetired[owner] {
+			if n < oldest {
+				oldest = n
+			}
+		}
+		delete(q.cidRetired[owner], oldest)
+	}
+	q.cidRetired[owner][seq] = cid
 }
 func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[string]any, max int) error {
 	a := &q.cryptoData[dir][space]
@@ -162,6 +190,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 	if len(messages) > 0 {
 		info["TLS Handshakes"] = messages
 	}
+	q.tls.resumption.project(info)
 	info["CRYPTO Incomplete"] = at < len(a.data) || len(a.pending) > 0
 	if len(q.tls.random) == 32 {
 		info["Client Random"] = hex.EncodeToString(q.tls.random)
@@ -175,6 +204,8 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		switch q.tls.suite {
 		case 0x1301:
 			aead = quicAEADAES128GCM
+		case 0x1302:
+			aead = quicAEADAES256GCM
 		case 0x1303:
 			aead = quicAEADChaCha20Poly1305
 		default:
@@ -186,7 +217,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 				secrets[label] = v
 			}
 		}
-		ring, err := quicLoadKeys(QUICKeyMaterial{Secrets: secrets, AEAD: aead})
+		ring, err := quicLoadKeys(QUICKeyMaterial{Secrets: secrets, AEAD: aead, Version: q.effectiveVersion()})
 		if err != nil {
 			return err
 		}

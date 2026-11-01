@@ -1,0 +1,1353 @@
+{
+  "scope": "Correct complete QUIC Initial token varints and opaque token/tag projections; selected 20 KiB token ceiling, literal ranges and independent evidence. Historical envelope body remains opaque; no token/address/ticket or peer identity claim.",
+  "native_UI_and_rule_source": "ae39f07afc",
+  "frozen_manifest_scope_review_source": "601a84aa29",
+  "captures_and_secrets_outside_Git": true,
+  "immutable_inputs_and_answers_unchanged": true,
+  "tests": {
+    "all_QUIC_native_binparser_CLI_seconds": [
+      2.247,
+      0.947,
+      0.605
+    ],
+    "bit_offset_and_UI_targeted_binparser_CLI_seconds": [
+      0.854,
+      0.602
+    ],
+    "full_native_seconds": 425.04,
+    "full_CLI_seconds": 2.073,
+    "full_binparser_after_historical_status_review_seconds": 130.994,
+    "token_fuzz_executions": 4078,
+    "token_fuzz_seconds": 41.385,
+    "varint_wire_widths": [
+      1,
+      2,
+      4,
+      8
+    ],
+    "unaligned_carrier_offsets": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7
+    ],
+    "corpus_integrity": {
+      "captures": 552,
+      "packets": 58533,
+      "mapped_protocols": 341,
+      "minimums_unchanged": true,
+      "initial_full_binparser_failure": "one frozen QUIC done score conflicted with current partial; reviewed only that exact capture after checking executable scope, preserving all historical files and inventory floors"
+    }
+  },
+  "auditor_sha256": {
+    "discovery/http3_field_live.py": "7ab7a4a1e6f8e4dbb2640ac169784b514aa7636d610351cfbd00ec7d03833db2",
+    "quic_header_wire_audit.py": "914d970b5f4e14003fcbcdfb1361c7b8890f67e73567686853ab157463144226",
+    "quic_header_negative_controls.py": "e67d014f933c7bc73df67fa1b074115bd4e722315d282d2157cd6e3ff2a2d594",
+    "quic_retry_initial_audit.py": "632b88ffd51b4e58b84a02b696ec4d845f865c34f3f401c60f92819a96b2ff7c",
+    "quic_key_update_wire_audit.py": "7d91f2834ce7628be4c37122f82bb261f22d38d7b1432f02e18c2d57243ac170",
+    "quic_source_graph_audit.py": "2c087aa7b818fcc08e0b0cba8eb7aeb767326e437a28b62620d57ba651e133ce",
+    "http3_field_wire_audit.py": "e0d94b8a6a4cf2d1ea17c398b608f031812148a4e2374dda47a92b5d1a764f3c",
+    "quic_token_export_invariants.py": "9f8cf95047ff5312001423f2b7351d096c2412e1f934985658c26625e1d02ae0",
+    "quic_token_negative_controls.py": "71a34f130574bcb0701854c972b40b0ed3004720c45c454a9a2147052840e5d2"
+  },
+  "live": {
+    "capture_sha256": "c7623f2f01d76fc2ffe617de7107181fe5db8c7cfc8c1aaefb0dcaa5111f5dd8",
+    "manifest_sha256": "f72a40e248fc01e9c3c6fd3526f6e2e6d795fe14b77cd6e50b99dcc464a2b164",
+    "generator_sha256": "7ab7a4a1e6f8e4dbb2640ac169784b514aa7636d610351cfbd00ec7d03833db2",
+    "declared_controls": {
+      "wire_versions": [
+        1,
+        1798521807,
+        1
+      ],
+      "cipher_suites": [
+        4865,
+        4866,
+        4867
+      ],
+      "connection_id_lengths": [
+        8,
+        0,
+        20
+      ],
+      "zero_cid_policy": "omit-new-connection-id",
+      "server_retry": true,
+      "retry_client_policy": "preserve-first-client-hello",
+      "client_key_update_followup": true,
+      "v2_key_update_policy": "rfc9369-label",
+      "retry_token_padding_bytes": [
+        0,
+        128,
+        512
+      ]
+    },
+    "actual_byte_exact_request_reply_receipts": 12,
+    "network": {
+      "retry_packets": 3,
+      "delayed": 11,
+      "dropped": 6
+    },
+    "native_records": 124,
+    "protocol_counts": {
+      "": 3,
+      "quic": 92,
+      "http3": 29
+    },
+    "Initial_token_length_width_occurrences": {
+      "(0, 1)": 6,
+      "(61, 1)": 2,
+      "(189, 2)": 2,
+      "(585, 2)": 2
+    },
+    "SDK_invariants": {
+      "scope": "Constrain complete SDK/CLI changes to independently reviewed QUIC token fields.\nAll physical bytes, flows, application records, transactions and source graphs\nmust remain identical. The separate header/crypto audits validate every new\ntoken value/range; this comparator cannot establish packet or peer validity.\n",
+      "kind": "SDK",
+      "checks": 468,
+      "records": 124,
+      "changed_records": 15,
+      "added_token_aliases": {
+        "quic.token": 12,
+        "quic.token_length": 12,
+        "quic.retry_integrity_tag": 3,
+        "quic.retry_token": 3
+      },
+      "new_literal_session_facts": {
+        "Initial Token Length": 12,
+        "Initial Token Length Encoding Bytes": 12,
+        "Initial Token": 12,
+        "Retry Integrity Tag": 3,
+        "Retry Token": 3
+      },
+      "wide_token_envelopes_fixed": 4,
+      "before_protocol_counts": {
+        "": 3,
+        "quic": 92,
+        "http3": 29
+      },
+      "after_protocol_counts": {
+        "": 3,
+        "quic": 92,
+        "http3": 29
+      },
+      "before_sha256": "da1b5cb3393c8c84fcd5c2ba6b1378273ab64dee29594bd5333f05ad8ec91f45",
+      "after_sha256": "29fc60893ef89507ea8725334fc84ed73aee9128e33c521e234ae86774d4dbff",
+      "other_export_differences": []
+    },
+    "header": {
+      "checks": 8332,
+      "physical_frames": 106,
+      "reference_raw_views": 124,
+      "matched_reference_views": 121,
+      "typed_header_occurrences": {
+        "quic.version": 21,
+        "quic.dcil": 21,
+        "quic.dcid": 110,
+        "quic.scil": 21,
+        "quic.scid": 21,
+        "quic.long.packet_type": 14,
+        "quic.token_length": 12,
+        "quic.token": 12,
+        "quic.retry_token": 3,
+        "quic.retry_integrity_tag": 3,
+        "quic.long.packet_type_v2": 7
+      },
+      "authenticated_packet_numbers": 107,
+      "authenticated_flow_association_checks": 107,
+      "reference_zero_length_omissions": {
+        "quic.token": 6,
+        "quic.scid": 6,
+        "quic.dcid": 36
+      },
+      "reference_field_omissions": [],
+      "reference_value_differences": [],
+      "unmatched_native_views": [],
+      "unmatched_reference_views": [
+        {
+          "frame": 1,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "b38929f584ac2bdf2457a5a2133621029bf73dca4d97ee74fb1d8c1169ff6f3a",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 2,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "b38929f584ac2bdf2457a5a2133621029bf73dca4d97ee74fb1d8c1169ff6f3a",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 3,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "b38929f584ac2bdf2457a5a2133621029bf73dca4d97ee74fb1d8c1169ff6f3a",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        }
+      ],
+      "capture_sha256": "c7623f2f01d76fc2ffe617de7107181fe5db8c7cfc8c1aaefb0dcaa5111f5dd8",
+      "oracle_sha256": "5bfb3f63a465e6048ccc611aa535e76738cbebf97ab0a4ffec34832451e215f5",
+      "events_sha256": "29fc60893ef89507ea8725334fc84ed73aee9128e33c521e234ae86774d4dbff"
+    },
+    "header_certificate_sha256": "72b5e0828cce1dafcfb1297736dcfc02f8377068fa50d063c82bf9d3884f0c98",
+    "Initial_and_Retry": {
+      "checks": 594,
+      "independently_decrypted_Initial_packets": 12,
+      "verified_public_Retry_tags": 3,
+      "nonconforming_pairs": 0,
+      "oracle_sha256": "5bfb3f63a465e6048ccc611aa535e76738cbebf97ab0a4ffec34832451e215f5",
+      "events_sha256": "29fc60893ef89507ea8725334fc84ed73aee9128e33c521e234ae86774d4dbff",
+      "header_certificate_sha256": "72b5e0828cce1dafcfb1297736dcfc02f8377068fa50d063c82bf9d3884f0c98"
+    },
+    "Initial_and_Retry_certificate_sha256": "dc0a3d1cf83d8ad1db961ffad1b86a1048e38c932c320e3796b7fc47bed00b8b",
+    "independent_1RTT": {
+      "checks": 1553,
+      "protected_short_packets": 89,
+      "profiles": {
+        "('RFC', 4865, 0, 0)": 25,
+        "('RFC', 4865, 1, 1)": 3,
+        "('RFC', 4866, 0, 0)": 29,
+        "('RFC', 4866, 1, 1)": 2,
+        "('RFC', 4867, 0, 0)": 27,
+        "('RFC', 4867, 1, 1)": 3
+      },
+      "legacy_only_packets": 0,
+      "oracle_sha256": "5bfb3f63a465e6048ccc611aa535e76738cbebf97ab0a4ffec34832451e215f5",
+      "events_sha256": "29fc60893ef89507ea8725334fc84ed73aee9128e33c521e234ae86774d4dbff",
+      "keylog_sha256": "b267190c8f6dfd7b6ab2206b8467a9b6bb90e191a2e076b824d5c77a1e023d40",
+      "header_certificate_sha256": "72b5e0828cce1dafcfb1297736dcfc02f8377068fa50d063c82bf9d3884f0c98",
+      "initial_certificate_sha256": "dc0a3d1cf83d8ad1db961ffad1b86a1048e38c932c320e3796b7fc47bed00b8b"
+    },
+    "independent_1RTT_certificate_sha256": "c27a38f5291c7e356d6b595ceca548b5630a26dbbc7390c1121c0a9bb7e46ccb",
+    "application_source": {
+      "checks": 12776,
+      "connections": 3,
+      "application_frames": 42,
+      "types": {
+        "4": 6,
+        "1": 24,
+        "0": 12
+      },
+      "source_ranges": 237,
+      "unprotected_zero_tails": [
+        {
+          "frame": 40,
+          "bytes": 889,
+          "sha256": "971af1ffa67aa21dc41688f3b31c40e6e2728f975dd795923213d5bc933051d6"
+        }
+      ],
+      "selected_differences": []
+    },
+    "application_source_certificate_sha256": "87cc45cbf637f0f97835ed5cccf41a53f7432b2a6081a6a40ed59e7a0ca5fd14",
+    "application_fields": {
+      "checks": 6087,
+      "peer_operations": 12,
+      "native_connections": 3,
+      "header_sections": 24,
+      "native_conformance": {
+        "base-shape-valid": 24
+      },
+      "reference_frame_views": {
+        "4": 6,
+        "1": 24,
+        "0": 13,
+        "12400": 1
+      },
+      "reference_repeated_frame_views": [
+        {
+          "connection": "1",
+          "direction": 1,
+          "stream": 0,
+          "type": 0,
+          "sha256": "a1ef49fb7e76c816b226675686bbd3bdb8214889a72a3bcb5447b92fc4254522",
+          "frames": [
+            46,
+            58
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 1,
+          "stream": 0,
+          "type": 1,
+          "sha256": "df4fce9cedbb5e451117bb5e6227e67a418d4847b3f51a80e25f9a02e7e1778d",
+          "frames": [
+            46,
+            58
+          ]
+        }
+      ],
+      "reference_header_views_unavailable": [
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 4,
+          "case": "cid-long-header-field"
+        }
+      ],
+      "reference_raw_field_differences": [],
+      "native_selected_differences": [],
+      "manifest_sha256": "f72a40e248fc01e9c3c6fd3526f6e2e6d795fe14b77cd6e50b99dcc464a2b164",
+      "oracle_sha256": "5bfb3f63a465e6048ccc611aa535e76738cbebf97ab0a4ffec34832451e215f5",
+      "events_sha256": "29fc60893ef89507ea8725334fc84ed73aee9128e33c521e234ae86774d4dbff"
+    },
+    "application_fields_certificate_sha256": "0f7979715c22593f9ce4b9c4dbf20976559b37a83dc68f425138976e66a2818f",
+    "token_negative_controls": {
+      "scope": "Require literal token projection checks to reject deliberately corrupted exports.\nOriginal physical packets and TShark output are retained, never rewritten to\nmatch a native value. This selected dataset must contain Initial, Retry, wide,\nempty and binary tokens, plus short-header traffic.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 19,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "Initial-token-octets",
+          "accepted": false
+        },
+        {
+          "control": "Retry-token-octets",
+          "accepted": false
+        },
+        {
+          "control": "Retry-tag-octets",
+          "accepted": false
+        },
+        {
+          "control": "Initial-length-fact",
+          "accepted": false
+        },
+        {
+          "control": "Initial-width-fact",
+          "accepted": false
+        },
+        {
+          "control": "Initial-length-alias",
+          "accepted": false
+        },
+        {
+          "control": "Initial-token-alias",
+          "accepted": false
+        },
+        {
+          "control": "Retry-token-alias",
+          "accepted": false
+        },
+        {
+          "control": "Retry-tag-alias",
+          "accepted": false
+        },
+        {
+          "control": "token-length-span",
+          "accepted": false
+        },
+        {
+          "control": "token-body-span",
+          "accepted": false
+        },
+        {
+          "control": "legacy-token-length",
+          "accepted": false
+        },
+        {
+          "control": "legacy-width-prefix",
+          "accepted": false
+        },
+        {
+          "control": "Retry-borrows-Initial-field",
+          "accepted": false
+        },
+        {
+          "control": "short-borrows-quic.token",
+          "accepted": false
+        },
+        {
+          "control": "short-borrows-quic.token_length",
+          "accepted": false
+        },
+        {
+          "control": "short-borrows-quic.retry_token",
+          "accepted": false
+        },
+        {
+          "control": "short-borrows-quic.retry_integrity_tag",
+          "accepted": false
+        },
+        {
+          "control": "token-length-exact",
+          "accepted": false
+        }
+      ]
+    },
+    "header_negative_controls": {
+      "scope": "Require QUIC header/epoch audit to reject deliberately corrupted exports.\nUses the original real capture and reference, then mutates one evidence item.\nFull captures, manifests, oracle output and mutated JSONL stay outside Git.\n",
+      "baseline_passed": true,
+      "corruptions_rejected": 37,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "raw-octet",
+          "accepted": false
+        },
+        {
+          "control": "raw-digest",
+          "accepted": false
+        },
+        {
+          "control": "physical-domain",
+          "accepted": false
+        },
+        {
+          "control": "physical-witness",
+          "accepted": false
+        },
+        {
+          "control": "missing-actual-pdu",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-event-id",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-native-occurrence",
+          "accepted": false
+        },
+        {
+          "control": "wrong-generation",
+          "accepted": false
+        },
+        {
+          "control": "DCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "SCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-token-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "legacy-first-byte",
+          "accepted": false
+        },
+        {
+          "control": "owned-range",
+          "accepted": false
+        },
+        {
+          "control": "missing-alias",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-alias",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-value",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-origin",
+          "accepted": false
+        },
+        {
+          "control": "CID-value-span",
+          "accepted": false
+        },
+        {
+          "control": "version-alias",
+          "accepted": false
+        },
+        {
+          "control": "empty-CID-not-zero-octet",
+          "accepted": false
+        },
+        {
+          "control": "short-version",
+          "accepted": false
+        },
+        {
+          "control": "short-SCID",
+          "accepted": false
+        },
+        {
+          "control": "short-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type",
+          "accepted": false
+        },
+        {
+          "control": "short-forged-range",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type-v2",
+          "accepted": false
+        },
+        {
+          "control": "version-type-alias",
+          "accepted": false
+        },
+        {
+          "control": "long-type-value",
+          "accepted": false
+        },
+        {
+          "control": "unverified-PN",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-exact",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-not-ciphertext-span",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-range",
+          "accepted": false
+        }
+      ]
+    }
+  },
+  "public": {
+    "weber": {
+      "SDK": {
+        "scope": "Constrain complete SDK/CLI changes to independently reviewed QUIC token fields.\nAll physical bytes, flows, application records, transactions and source graphs\nmust remain identical. The separate header/crypto audits validate every new\ntoken value/range; this comparator cannot establish packet or peer validity.\n",
+        "kind": "SDK",
+        "checks": 39767,
+        "records": 39283,
+        "changed_records": 22,
+        "added_token_aliases": {
+          "quic.token": 18,
+          "quic.token_length": 18,
+          "quic.retry_token": 4,
+          "quic.retry_integrity_tag": 4
+        },
+        "new_literal_session_facts": {
+          "Initial Token": 18,
+          "Initial Token Length": 18,
+          "Initial Token Length Encoding Bytes": 18,
+          "Retry Token": 4,
+          "Retry Integrity Tag": 4
+        },
+        "wide_token_envelopes_fixed": 4,
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "before_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "after_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "other_export_differences": []
+      },
+      "CLI": {
+        "scope": "Constrain complete SDK/CLI changes to independently reviewed QUIC token fields.\nAll physical bytes, flows, application records, transactions and source graphs\nmust remain identical. The separate header/crypto audits validate every new\ntoken value/range; this comparator cannot establish packet or peer validity.\n",
+        "kind": "CLI",
+        "checks": 51636,
+        "records": 51328,
+        "changed_records": 22,
+        "added_token_aliases": {
+          "quic.token_length": 18,
+          "quic.token": 18,
+          "quic.retry_token": 4,
+          "quic.retry_integrity_tag": 4
+        },
+        "new_literal_session_facts": {},
+        "wide_token_envelopes_fixed": 0,
+        "before_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "after_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "before_sha256": "8752e5d4a231c3a4200b2318ad689f6eb03af690992e66a121e7dab2153d7e13",
+        "after_sha256": "4df32deed2810b5ffec015a714168ece87370ed88427f031f5283e3379d87a1a",
+        "other_export_differences": []
+      },
+      "header": {
+        "checks": 263942,
+        "physical_frames": 51328,
+        "matched_reference_views": 84,
+        "typed_header_occurrences": {
+          "quic.version": 46,
+          "quic.dcil": 46,
+          "quic.dcid": 78,
+          "quic.scil": 46,
+          "quic.scid": 46,
+          "quic.long.packet_type": 46,
+          "quic.token_length": 18,
+          "quic.token": 18,
+          "quic.retry_token": 4,
+          "quic.retry_integrity_tag": 4
+        },
+        "reference_zero_length_omissions": {
+          "quic.token": 14
+        },
+        "reference_field_omissions": [],
+        "reference_value_differences": [],
+        "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+        "events_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "unmatched_native_views_count": 4,
+        "unmatched_reference_views_count": 21,
+        "reference_derived_views_count": 0
+      },
+      "header_certificate_sha256": "04ce9ca2521e0c6ae6fa138bd446829a32eea471e421723e0725ca7bd654e5bd",
+      "wide_token_records": [
+        {
+          "PDU": 37393,
+          "physical_frames": [
+            48066
+          ],
+          "token_length": 101,
+          "encoding_bytes": 2,
+          "status": "decoded"
+        },
+        {
+          "PDU": 37410,
+          "physical_frames": [
+            48078
+          ],
+          "token_length": 101,
+          "encoding_bytes": 2,
+          "status": "decoded"
+        },
+        {
+          "PDU": 37442,
+          "physical_frames": [
+            48100
+          ],
+          "token_length": 101,
+          "encoding_bytes": 2,
+          "status": "decoded"
+        },
+        {
+          "PDU": 37461,
+          "physical_frames": [
+            48114
+          ],
+          "token_length": 101,
+          "encoding_bytes": 2,
+          "status": "decoded"
+        }
+      ],
+      "independent_Initial_Retry_regression": {
+        "checks": 987,
+        "independently_decrypted_Initial_packets": 22,
+        "verified_public_Retry_tags": 4,
+        "nonconforming_pairs": 4
+      }
+    },
+    "sharon": {
+      "SDK": {
+        "scope": "Constrain complete SDK/CLI changes to independently reviewed QUIC token fields.\nAll physical bytes, flows, application records, transactions and source graphs\nmust remain identical. The separate header/crypto audits validate every new\ntoken value/range; this comparator cannot establish packet or peer validity.\n",
+        "kind": "SDK",
+        "checks": 245615,
+        "records": 245615,
+        "changed_records": 0,
+        "added_token_aliases": {},
+        "new_literal_session_facts": {},
+        "wide_token_envelopes_fixed": 0,
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "before_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "other_export_differences": []
+      },
+      "CLI": {
+        "scope": "Constrain complete SDK/CLI changes to independently reviewed QUIC token fields.\nAll physical bytes, flows, application records, transactions and source graphs\nmust remain identical. The separate header/crypto audits validate every new\ntoken value/range; this comparator cannot establish packet or peer validity.\n",
+        "kind": "CLI",
+        "checks": 328127,
+        "records": 328127,
+        "changed_records": 0,
+        "added_token_aliases": {},
+        "new_literal_session_facts": {},
+        "wide_token_envelopes_fixed": 0,
+        "before_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "after_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "other_export_differences": []
+      },
+      "header": {
+        "checks": 1651082,
+        "physical_frames": 328127,
+        "matched_reference_views": 0,
+        "typed_header_occurrences": {},
+        "reference_zero_length_omissions": {},
+        "reference_field_omissions": [],
+        "reference_value_differences": [],
+        "oracle_sha256": "7cc7781a97eb803043dedd7e89122955cdd7fb455f3c8bd4315c96c2f31dc926",
+        "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "unmatched_native_views_count": 1,
+        "unmatched_reference_views_count": 1027,
+        "reference_derived_views_count": 10
+      },
+      "header_certificate_sha256": "dc6ad7d541f67be63e01a370170ea78a1f81389225f821ca6ebcc4a4f2d178e7",
+      "wide_token_records": []
+    }
+  },
+  "Windows": [
+    {
+      "case": "initial-wide-token-body",
+      "PDU": 87,
+      "physical_frames": [
+        74
+      ],
+      "label": "Initial Token: 585 bytes",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "ef6a73d56f0205fd13c389f2ad13d6fe62ed7dcba508a5c6aae3c21c58b1d91c",
+        "01-deep-protocol-fields.json": "7dc50613295fdba58676a38cf3fd915637c7d4c00e2b84918b5976a47f35249d",
+        "02-byte-sources.json": "d434b619b2379ccb087225bbc69ddb732933804964c67b4b28490debddca541b",
+        "03-conversation-messages.json": "aae3a3c3720b5b86ec2959a3228c3790906c8ad036cbd10eaf6eb26c2ddbf7ea",
+        "04-association-evidence.json": "9d3195f6131a647a5ca2a4e876a82898f24112d0a3a5ccc0cda56e1e10c50dd5",
+        "05-narrow.json": "e9bd9b211f48a6a0b72ee06137ab513df6b588850755b118096fec5c3d95fcee",
+        "06-restored.json": "9d3195f6131a647a5ca2a4e876a82898f24112d0a3a5ccc0cda56e1e10c50dd5",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-deep-protocol-fields.png": "7db0ef35aa020c1d91de10c9db44a8fb2380d9032b06bde663f34082addafc9c",
+        "05-narrow.png": "a03b1e393a0f807e632a3dd6ce20ab7443ed55c95d04c73d103d89960bc6789a"
+      }
+    },
+    {
+      "case": "retry-wide-token",
+      "PDU": 86,
+      "physical_frames": [
+        73
+      ],
+      "label": "Retry Token: 585 bytes",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "e3d057b720947f062f7d97d4b2ba8083549e311d638bf4cd81aa2e59e7006a20",
+        "01-deep-protocol-fields.json": "88be4381f7906c3a13c6a1190718a079817e66dbef19ad62b46e32369163cd12",
+        "02-byte-sources.json": "189d73f691f736fdbf4f95574256143637df067def45156029f880e4e7b1ef84",
+        "03-conversation-messages.json": "fe055598cb790e2ee991d04c24a916fce51d58f0d332e74eaf61b5bd1c5c8d79",
+        "04-association-evidence.json": "260fbe735cd66d579debf10d893f8145b021f40615befc973fc17c6083f8dcae",
+        "05-narrow.json": "d1b1acae7b552c0c84e2bc4274d3abd4e25078e79da748f2c4f64c9e8c7191cb",
+        "06-restored.json": "260fbe735cd66d579debf10d893f8145b021f40615befc973fc17c6083f8dcae",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-deep-protocol-fields.png": "e55f39a754a406faefa8607c0095fc1ebed003b55e9e7e558b5a7106ec764ed2",
+        "05-narrow.png": "943467783996f49aba33329d681b33667928d9e6fe2e8821ffef34f593aa1015"
+      }
+    }
+  ],
+  "remaining": [
+    "20 KiB resource bound is not an unlimited token-size implementation",
+    "Historical QUIC envelope retains opaque fallback on invalid token framing; explicit token fields and native ingress refuse incomplete fields",
+    "Retry public tag and visible token bytes do not validate an address/ticket or peer",
+    "One HTTP3 reference header view remains unavailable in this capture; repeated/unknown reference views are retained",
+    "All prior QUIC/HTTP3/carrier/version-negotiation/whole-protocol scope limits remain"
+  ],
+  "audit_source": "726e6a7e68",
+  "local_executable_sha256": {
+    "events-token.exe": "ec0660e783e830b51c073986ca06cb0fdc09243656b0e5c5ab55f3acfefcbe83",
+    "yak-token.exe": "0ea005890e0a41b08ed46d7a6c818a8c106cf55754fafe719d0061aaff0bfeb0"
+  }
+}

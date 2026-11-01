@@ -16,7 +16,11 @@ const maxCaptureBlock = 16 << 20
 // publication. Unknown private blocks are bounded; name records have a lifetime metadata
 // budget. Embedded secrets are rejected rather than implicitly authorized.
 func NewBoundedNgReader(input io.Reader, options pcapgo.NgReaderOptions) (*pcapgo.NgReader, error) {
-	return pcapgo.NewNgReader(&boundedNgInput{input: input}, options)
+	return newBoundedNgReader(input, options, false)
+}
+
+func newBoundedNgReader(input io.Reader, options pcapgo.NgReaderOptions, ignoreSecrets bool) (*pcapgo.NgReader, error) {
+	return pcapgo.NewNgReader(&boundedNgInput{input: input, ignoreSecrets: ignoreSecrets}, options)
 }
 
 type boundedNgInput struct {
@@ -28,13 +32,14 @@ type boundedNgInput struct {
 	sections, metadata int
 	totalMetadata      int
 	err                error
+	ignoreSecrets      bool
 }
 
 func (r *boundedNgInput) Read(p []byte) (int, error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	if len(r.prefix) == 0 {
+	for len(r.prefix) == 0 {
 		if r.err != nil {
 			return 0, r.err
 		}
@@ -95,7 +100,10 @@ func (r *boundedNgInput) nextBlock() error {
 	case 5:
 		fixed = 20
 	case 10:
-		return fmt.Errorf("pcapng: embedded secrets require explicit external authorization")
+		if !r.ignoreSecrets {
+			return fmt.Errorf("pcapng: embedded secrets require explicit external authorization (use IgnoreEmbeddedSecrets to discard, and supply authorized keys separately)")
+		}
+		fixed = 16
 	}
 	if int(length) < fixed+4 {
 		return fmt.Errorf("pcapng: block shorter than header")
@@ -105,6 +113,12 @@ func (r *boundedNgInput) nextBlock() error {
 	}
 	options := fixed
 	switch kind {
+	case 10:
+		n := r.order.Uint32(head[12:16])
+		if n > 1<<20 || (n+3)&^uint32(3) > length-uint32(fixed)-4 {
+			return fmt.Errorf("pcapng: invalid or excessive embedded secret length")
+		}
+		options += int((n + 3) &^ uint32(3))
 	case 1:
 		snap := r.order.Uint32(head[12:16])
 		if snap > maxCaptureBlock {
@@ -159,6 +173,10 @@ func (r *boundedNgInput) nextBlock() error {
 	} else {
 		r.block = r.block[:length]
 	}
+	if kind == 10 {
+		// Also clear a refused/truncated DSB, including bad options/trailers.
+		defer func() { clear(r.block) }()
+	}
 	copy(r.block, head[:fixed])
 	if _, err := io.ReadFull(r.input, r.block[fixed:]); err != nil {
 		return shortNg(err)
@@ -207,12 +225,12 @@ func (r *boundedNgInput) nextBlock() error {
 		}
 	}
 	switch kind {
-	case 0x0a0d0d0a, 1, 2, 5, 6:
+	case 0x0a0d0d0a, 1, 2, 5, 6, 10:
 		if err := r.validateOptions(kind, r.block[options:len(r.block)-4]); err != nil {
 			return err
 		}
 	}
-	if kind == 1 || kind == 4 || kind == 5 || section {
+	if kind == 1 || kind == 4 || kind == 5 || kind == 10 || section {
 		r.metadata += len(r.block)
 		r.totalMetadata += len(r.block)
 		if r.totalMetadata > 4<<20 {
@@ -222,7 +240,13 @@ func (r *boundedNgInput) nextBlock() error {
 			return fmt.Errorf("pcapng: section metadata budget")
 		}
 	}
-	r.prefix = r.block
+	if kind == 10 {
+		// Never forward secrets to pcapgo's private retaining store. Clear the
+		// temporary buffer before processing the next block, including on EOF.
+		clear(r.block)
+	} else {
+		r.prefix = r.block
+	}
 	return nil
 }
 

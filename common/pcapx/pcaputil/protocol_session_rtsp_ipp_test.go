@@ -3,6 +3,7 @@ package pcaputil
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -26,6 +27,27 @@ func TestRTSPInterleavingAndHTTPIsolation(t *testing.T) {
 	}
 	_, _, _, _, err := rtspHeader([]byte("PLAY x RTSP/1.0\r\nCSeq: 1\r\nContent-Length: 1\r\nContent-Length: 2\r\n\r\n"), 8)
 	require.Error(t, err)
+}
+
+func TestRTSPAppleExtensionMethodsKeepObservedCSeq(t *testing.T) {
+	for _, method := range []string{"GET", "POST"} {
+		request := method + " /audit-control RTSP/1.0\r\nCSeq: 7\r\nUser-Agent: AirPlay/1.0\r\nContent-Length: 3\r\n\r\nabc"
+		response := "RTSP/1.0 200 OK\r\nCSeq: 7\r\nContent-Length: 0\r\n\r\n"
+		for _, deferred := range []bool{false, true} {
+			for _, chunk := range []int{0, 1, 7} {
+				events, _ := sessionTestFlow(t, "rtsp", []sessionStep{{0, []byte(request)}, {1, []byte(response)}}, chunk, deferred)
+				require.Len(t, events, 2)
+				assertSessionEvents(t, events, "rtsp", deferred)
+				require.Equal(t, "rtsp-apple-control", events[0].Profile)
+				require.Equal(t, true, events[0].Session["CSeq Observed"])
+				require.Equal(t, method, events[0].Session["Packet Name"])
+				require.Empty(t, events[0].ExpertCode, "an observed CSeq must not be described as absent")
+				require.Equal(t, true, events[1].Session["Matched"])
+			}
+		}
+	}
+	_, err := (&binRTSP{}).consume(0, []byte("POST /audit-control RTSP/1.0\r\nCSeq: 7\r\n\r\n"), time.Time{}, 16)
+	require.Error(t, err, "generic POST is not silently admitted as the Apple profile")
 }
 func ippTestWire(op byte) []byte {
 	return []byte{1, 1, 0, op, 0, 0, 0, 1, 1, 0x47, 0, 18, 'a', 't', 't', 'r', 'i', 'b', 'u', 't', 'e', 's', '-', 'c', 'h', 'a', 'r', 's', 'e', 't', 0, 5, 'u', 't', 'f', '-', '8', 3}

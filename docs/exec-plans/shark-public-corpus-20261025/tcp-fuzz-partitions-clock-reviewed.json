@@ -1,0 +1,390 @@
+{
+  "admission_sha256": "2ef7b54bdf23c4af8fe2e4980315d8ee7009d2cb245e3501366797a84a44463e",
+  "oracle_sha256": "ccfa6c2f4b2a002006e448581be49e5cd8924d18a7c863992af5161b83074b0b",
+  "tuple_inventory_sha256": "081891605d69f2f5f9b5801a348fc0cf46548d4b688996856c6751882a6a17fb",
+  "script_sha256": "52c8f33ca01df8dc9921858a50d7a221d852161b47100f7c5a584408282dac0d",
+  "reviewed_native_flows": 6,
+  "admitted_chunks": 8,
+  "admitted_bytes": 544,
+  "post_rollover_admitted_bytes": 0,
+  "reviews": [
+    {
+      "native_flow": 320,
+      "original_interface": 226,
+      "tuple_frames": 2,
+      "observed_frames": [
+        144025,
+        303024
+      ],
+      "wireshark_stream_packet_counts": {
+        "32900": 1,
+        "6260": 1
+      },
+      "initial_wireshark_stream": "6260",
+      "post_rollover_observed_frames": [
+        303024
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 144025,
+          "length": 32,
+          "sha256": "c8fd07f79955831b1d764168837baddf736ed39b924e08ed5b33aff653d8e3d9"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 144025,
+          "flags": 2594,
+          "header_sha256": "a28e022654d06582ff14a0e59bdbbb428188b7c49be286b0a4be897932ff7ed4",
+          "native_observed": true,
+          "payload_admitted": true,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 303024,
+          "flags": 2594,
+          "header_sha256": "4ed4b3d19c576c9277f91c74a97923e0366273c0689968c6b22ae923eb95e9b6",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        }
+      ]
+    },
+    {
+      "native_flow": 324,
+      "original_interface": 226,
+      "tuple_frames": 33,
+      "observed_frames": [
+        145998,
+        170513,
+        172731,
+        179351,
+        193660,
+        199130,
+        200143,
+        201384,
+        208943,
+        213026,
+        214644,
+        233288,
+        244460,
+        250430,
+        261082,
+        298857,
+        299908,
+        301141,
+        306141,
+        306481,
+        321959
+      ],
+      "wireshark_stream_packet_counts": {
+        "27168": 6,
+        "6606": 4,
+        "14869": 7,
+        "20735": 4
+      },
+      "initial_wireshark_stream": "6606",
+      "post_rollover_observed_frames": [
+        193660,
+        199130,
+        200143,
+        201384,
+        208943,
+        213026,
+        214644,
+        233288,
+        244460,
+        250430,
+        261082,
+        298857,
+        299908,
+        301141,
+        306141,
+        306481,
+        321959
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 145998,
+          "length": 120,
+          "sha256": "2e0f89d88ff07d2b09dfc470680f14b9852caad3f5115a2ece3b013e0cf83938"
+        },
+        {
+          "frame": 170513,
+          "length": 97,
+          "sha256": "2a3e98dd8b742da315bc089e3091d18589830e24cb3ac048f9d58397266aeec8"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 145192,
+          "flags": 3899,
+          "header_sha256": "d6d374b4026d694507f0f0f5559cbe830723ee8f6de79d44dca6b763c434cd1c",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        },
+        {
+          "frame": 145238,
+          "flags": 254,
+          "header_sha256": "169d79611daab8cd24c9b69221c11e5c0f33c9777bc5bae41b6236bfd72341a7",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        },
+        {
+          "frame": 183305,
+          "flags": 3899,
+          "header_sha256": "d95bb44012969668d3a3c4d5bf7b4d1e633f36f09cedb6a3a427db7f6223a840",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        },
+        {
+          "frame": 218362,
+          "flags": 3899,
+          "header_sha256": "d6d374b4026d694507f0f0f5559cbe830723ee8f6de79d44dca6b763c434cd1c",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        },
+        {
+          "frame": 261453,
+          "flags": 3899,
+          "header_sha256": "4428c0739c1fd4d241b1e1a3d0f0e29afcb42b0498cde81e06cf491f8469679e",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        }
+      ]
+    },
+    {
+      "native_flow": 551,
+      "original_interface": 226,
+      "tuple_frames": 2,
+      "observed_frames": [
+        220593,
+        300111
+      ],
+      "wireshark_stream_packet_counts": {
+        "21087": 1,
+        "32512": 1
+      },
+      "initial_wireshark_stream": "21087",
+      "post_rollover_observed_frames": [
+        300111
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 220593,
+          "length": 51,
+          "sha256": "07af7ff1e34a086af19ca2cc84d1a9cb3066d3516e8c45fe1a5fe6eec965a7f8"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 220593,
+          "flags": 2914,
+          "header_sha256": "e5ce37abf8263f5e92f8a6843f6767aa320e5d0cf4ca5756e800085fb1fdff18",
+          "native_observed": true,
+          "payload_admitted": true,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 300111,
+          "flags": 2914,
+          "header_sha256": "866f21d12f6d6aeda5052d9024c31bf79eedb7749be354feccb58b71e4e4fa34",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        }
+      ]
+    },
+    {
+      "native_flow": 508,
+      "original_interface": 226,
+      "tuple_frames": 6,
+      "observed_frames": [
+        207944,
+        266331,
+        291128,
+        314482
+      ],
+      "wireshark_stream_packet_counts": {
+        "19025": 1,
+        "31294": 1,
+        "27835": 1,
+        "34465": 1
+      },
+      "initial_wireshark_stream": "19025",
+      "post_rollover_observed_frames": [
+        266331,
+        291128,
+        314482
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 207944,
+          "length": 51,
+          "sha256": "05b785bb5be58e85a4ef5339fd207f891fe6be9a6aa450b6d453c45a8141df1a"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 158008,
+          "flags": 2914,
+          "header_sha256": "073090178c9ff79340599e1f40f33216fd81c6c590d9eb4b000845ec3104cd1c",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 207944,
+          "flags": 2914,
+          "header_sha256": "6a4cb5166cd2db5c64f7e070ebf6b9766fe45759647adc1eb35433ce64aa19fd",
+          "native_observed": true,
+          "payload_admitted": true,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 266331,
+          "flags": 2914,
+          "header_sha256": "456264e2f898d2f34050f752bf1b8a9bb451019a0a12f96c41e3943a1cd4479f",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 291128,
+          "flags": 2914,
+          "header_sha256": "93a11ebca978a257571c126783cc572b4934e8e8eedebedf205effb4576334aa",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 314482,
+          "flags": 2914,
+          "header_sha256": "456264e2f898d2f34050f752bf1b8a9bb451019a0a12f96c41e3943a1cd4479f",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 322508,
+          "flags": 2914,
+          "header_sha256": "073090178c9ff79340599e1f40f33216fd81c6c590d9eb4b000845ec3104cd1c",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        }
+      ]
+    },
+    {
+      "native_flow": 461,
+      "original_interface": 226,
+      "tuple_frames": 2,
+      "observed_frames": [
+        189580,
+        274736
+      ],
+      "wireshark_stream_packet_counts": {
+        "28958": 1,
+        "15945": 1
+      },
+      "initial_wireshark_stream": "15945",
+      "post_rollover_observed_frames": [
+        274736
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 189580,
+          "length": 24,
+          "sha256": "224a0c70978b48b9a78032e48193ce8a9ea104e7e0d015bf3171cadada59b0ce"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 189580,
+          "flags": 2914,
+          "header_sha256": "456264e2f898d2f34050f752bf1b8a9bb451019a0a12f96c41e3943a1cd4479f",
+          "native_observed": true,
+          "payload_admitted": true,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        },
+        {
+          "frame": 274736,
+          "flags": 2914,
+          "header_sha256": "2e9f74443c5e7ad4630cfc73b7d71eac3bf22583dd201ec9c9d9f686f06e965e",
+          "native_observed": true,
+          "payload_admitted": false,
+          "assessment": "SYN/ISN observation; conflicting later SYN does not replace active generation"
+        }
+      ]
+    },
+    {
+      "native_flow": 318,
+      "original_interface": 226,
+      "tuple_frames": 29,
+      "observed_frames": [
+        143253,
+        161764,
+        182918,
+        188971,
+        197787,
+        198779,
+        243312,
+        249133,
+        266272,
+        271432,
+        284048,
+        310855,
+        327733
+      ],
+      "wireshark_stream_packet_counts": {
+        "25660": 5,
+        "6022": 8
+      },
+      "initial_wireshark_stream": "6022",
+      "post_rollover_observed_frames": [
+        266272,
+        271432,
+        284048,
+        310855,
+        327733
+      ],
+      "post_rollover_admitted_frames": [],
+      "admitted_chunks": [
+        {
+          "frame": 143253,
+          "length": 92,
+          "sha256": "41984cb19506f4c627051b34d400095fe8e03dc7420cef76fc49242c0b50dcaf"
+        },
+        {
+          "frame": 161764,
+          "length": 77,
+          "sha256": "9270a547d5e82dafeee4080fdafe0967f0478e77c98fd355755569bce0bc0971"
+        }
+      ],
+      "control_frames": [
+        {
+          "frame": 251113,
+          "flags": 4095,
+          "header_sha256": "31541d485ca2785c57fda857b2f29739086b56f433c0fb7338965b6b1877ef6a",
+          "native_observed": false,
+          "payload_admitted": false,
+          "assessment": "invalid SYN+FIN/RST rejected before tuple lookup"
+        }
+      ]
+    }
+  ],
+  "scope": "six known fuzz TCP partition differences; observation IDs remain different, but only byte-proven initial chunks were admitted. Does not certify every TCP generation or UDP session model.",
+  "probe_binary_sha256": "c075a6771e9a39295b326c5301dde9750f14c00e6fb1a69fc75b6350a90adeb0",
+  "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+  "scope_note": "Revalidated on the current deterministic 840-flow replay; observed IDs and admitted chunks match the delayed whole-file export exactly."
+}

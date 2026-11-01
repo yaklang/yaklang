@@ -12,6 +12,14 @@ import (
 )
 
 var builtinBinSpecs = [][2]string{
+	{"ipfix", "IPFIXFields"},
+	{"ldp_session", "LDPSessionFields"},
+	{"rtmp", "RTMPInitialHandshakeFields"},
+	{"rtmp", "RTMPInitialChunkFields"},
+	{"rtmp", "AMF0MessageFields"},
+	{"bgp", "BGPMessageFields"},
+	{"application-layer.ajp", "AJPMessageFields"},
+	{"application-layer.ajp", "AJPRequestBodyFields"},
 	{"session_envelopes", "TPKT"},
 	{"session_envelopes", "UATCP"},
 	{"session_envelopes", "RFB"},
@@ -556,6 +564,11 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 	e := &BinParserEvent{Timestamp: ci.Timestamp, Transport: "udp", Source: net.JoinHostPort(src.String(), strconv.Itoa(int(udp.SrcPort))), Destination: net.JoinHostPort(dst.String(), strconv.Itoa(int(udp.DstPort))), Length: len(wire), Status: "unrecognized", Summary: "unrecognized UDP datagram"}
 	evidence := evidenceFrom(ci)
 	e.Domain = evidence.Ref.Domain
+	e.CarrierLayers = append([]string(nil), evidence.carrierLayers...)
+	e.SourceBytes.ParentPDUs = append([]uint64(nil), evidence.parents...)
+	if len(evidence.parents) > 0 {
+		e.SourceBytes.ParentPDU = evidence.parents[len(evidence.parents)-1]
+	}
 	if evidence.Ref.Number != 0 {
 		e.SourceBytes.PacketRefs = []PacketReference{evidence.Ref}
 		if len(evidence.refs) > 0 {
@@ -563,53 +576,69 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			e.SourceBytes.PacketRefs = append([]PacketReference(nil), evidence.refs...)
 		}
 	}
-	if truncated || ci.CaptureLength < ci.Length || udp.Length < 8 || int(udp.Length) != len(wire)+8 {
+	if evidence.byteSourceKind != "" {
+		e.SourceBytes.Kind = evidence.byteSourceKind
+	}
+	carrierErr := udpCarrierError(network, udp, ci, truncated)
+	a.observeNetFlowV9Boundary(e, wire, carrierErr != nil)
+	a.observeIPFIXBoundary(e, wire, carrierErr != nil)
+	if a.l2tp3RawDatagram(e, wire, carrierErr) {
+		return
+	}
+	if carrierErr != nil {
 		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
-			a.decodeHARTIPDatagram(e, wire, protocolError(ErrNeedMore, "HART-IP truncated or invalid UDP carrier"))
+			a.decodeHARTIPDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.finsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeFINSDatagram(e, wire, protocolError(ErrNeedMore, "FINS truncated or invalid UDP carrier"))
+			a.decodeFINSDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.someIPSDSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeSomeIPSDDatagram(e, wire, protocolError(ErrNeedMore, "SD carrier truncated or invalid UDP length"))
+			a.decodeSomeIPSDDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.someIPSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeSomeIPTPDatagram(e, wire, protocolError(ErrNeedMore, "SOME/IP carrier truncated or invalid UDP length"))
+			a.decodeSomeIPTPDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.rtps20RTIFilterSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS20RTIFilterInput(e, wire, protocolError(ErrNeedMore, "RTI filter carrier is truncated or has invalid UDP length"))
+			a.decodeRTPS20RTIFilterInput(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
 		if a.rtps13Selected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPS13SelectedInput(e, wire, protocolError(ErrNeedMore, "legacy RTPS carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.decodeRTPS13SelectedInput(e, wire, carrierErr, uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
 		if a.rtpsFragmentsSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeRTPSSelectedFragmentDatagram(e, wire, protocolError(ErrNeedMore, "RTPS fragment carrier is truncated or has invalid UDP length"), uint16(udp.SrcPort), uint16(udp.DstPort))
+			a.decodeRTPSSelectedFragmentDatagram(e, wire, carrierErr, uint16(udp.SrcPort), uint16(udp.DstPort))
 			a.emit(e)
 			return
 		}
 		if a.aisMultipartSelected(uint16(udp.SrcPort), uint16(udp.DstPort)) {
-			a.decodeAISMultipartDatagram(e, wire, protocolError(ErrNeedMore, "AIS fragment carrier is truncated or has invalid UDP length"))
+			a.decodeAISMultipartDatagram(e, wire, carrierErr)
 			a.emit(e)
 			return
 		}
-		if a.refuseBACnetReadTruncated(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+		if a.refuseBACnetReadCarrier(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort), carrierErr) {
 			a.emit(e)
 			return
 		}
-		e.Status, e.Summary = "incomplete", "truncated or invalid UDP datagram"
-		a.incomplete.Add(1)
+		e.Status, e.sessionError = classifySessionError(carrierErr)
+		e.Error, e.Summary = carrierErr.Error(), carrierErr.Message
+		e.nativeDiagnosticError = carrierErr.Error()
+		e.Completeness = "limited"
+		if carrierErr.Kind == ErrNeedMore {
+			a.incomplete.Add(1)
+		} else {
+			a.malformed.Add(1)
+		}
 	} else if len(wire) > a.config.MaxMessageBytes {
 		if a.hartSelected(uint16(udp.SrcPort), uint16(udp.DstPort), e, wire) {
 			a.decodeHARTIPDatagram(e, wire, protocolError(ErrResourceExceeded, "HART-IP UDP byte budget"))
@@ -660,6 +689,7 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		e.Error = e.sessionError.Message
 		a.limited.Add(uint64(len(wire)))
 	} else {
+		explicit := a.protocolDatagramSelection(uint16(udp.SrcPort), uint16(udp.DstPort))
 		if events, ok := a.decodeMAVLinkDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)); ok {
 			for _, event := range events {
 				a.emit(event)
@@ -672,17 +702,43 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 			}
 			return
 		}
+		if events, ok := a.decodeRDPUDPDatagram(e, wire); ok {
+			for _, event := range events {
+				a.emit(event)
+			}
+			return
+		}
 		if a.decodeNativeDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort)) {
+			var children []*ProtocolEvent
+			if e.Protocol == "radius" {
+				if e.ID == 0 {
+					e.ID = a.ids.Add(1)
+				}
+				children = a.decodeEAPTLSCarrier(e, wire)
+			}
 			a.emit(e)
+			for _, event := range children {
+				a.emit(event)
+			}
 			return
 		}
 		var spec *binSpec
-		if len(wire) >= 2 && kerberosTag(wire[0]) && ((udp.SrcPort == 88 || udp.DstPort == 88) || kerberosWireEvidence(wire, a.config.MaxMessageBytes)) {
+		if explicit != "esp-natt" && len(wire) >= 2 && kerberosTag(wire[0]) && ((udp.SrcPort == 88 || udp.DstPort == 88) || kerberosWireEvidence(wire, a.config.MaxMessageBytes)) {
 			e.Protocol = "kerberos"
 			spec = a.specs["application-layer.kerberos_fields/KerberosMessageFields"]
 		}
-		if spec == nil && a.decodeSessionDatagram(e, wire) {
+		if spec == nil && explicit != "esp-natt" && a.decodeSessionDatagram(e, wire) {
+			var children []*ProtocolEvent
+			if e.Protocol == "radius" {
+				if e.ID == 0 {
+					e.ID = a.ids.Add(1)
+				}
+				children = a.decodeEAPTLSCarrier(e, wire)
+			}
 			a.emit(e)
+			for _, event := range children {
+				a.emit(event)
+			}
 			return
 		}
 		if spec != nil {
@@ -700,7 +756,10 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 				e.Status, e.Structured = "decoded", result
 				a.decoded.Add(1)
 			}
-		} else {
+		} else if !a.decodeESPNATTDatagram(e, wire, uint16(udp.SrcPort), uint16(udp.DstPort), explicit) {
+			// A service port and nonzero SPI provide only a clear-header
+			// observation. Try it after every existing complete-message and
+			// session codec, once each, without bypassing another DecodeAs.
 			a.unknown.Add(1)
 			a.unclassified.Add(uint64(len(wire)))
 		}

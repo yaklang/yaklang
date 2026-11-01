@@ -305,6 +305,13 @@ func load() (*corpus, error) {
 }
 
 func readBoundedFile(name string, limit int64) ([]byte, error) {
+	if data, found, err := readCentralCapture(name, limit); err != nil || found {
+		return data, err
+	}
+	return readDiskBoundedFile(name, limit)
+}
+
+func readDiskBoundedFile(name string, limit int64) ([]byte, error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, err
@@ -353,6 +360,9 @@ func ReadFile(name string) ([]byte, error) {
 	}
 	if loc, ok := c.aliases[rel]; ok {
 		return readMember(loc.batch, loc.member)
+	}
+	if data, found, err := readCentralCapture(name, maxBatch); err != nil || found {
+		return data, err
 	}
 	ext := strings.ToLower(path.Ext(rel))
 	if validName(rel) && (ext == ".pcap" || ext == ".pcapng" || ext == ".cap") {

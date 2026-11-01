@@ -1,0 +1,7 @@
+# Shared fixed-record observation; application-layer.NetFlowV5 remains compatible.
+endian: big
+Package:
+  NetFlowV5Fields:
+    operator: |
+      err = parseObservedSession("netflow-v5")
+      if err != nil { panic(err) }

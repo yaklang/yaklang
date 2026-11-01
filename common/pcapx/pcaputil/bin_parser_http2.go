@@ -37,6 +37,7 @@ type binH2Settings struct {
 	push         bool
 }
 type binHTTP2 struct {
+	peerCaptureGap      bool
 	grpcBuffered        int64
 	scanEnd, scanFrames [2]int
 	client              int
@@ -380,7 +381,13 @@ func (h *binHTTP2) consume(dir int, wire []byte) (map[string]any, error) {
 		h.window[dir] -= n
 		stream.window[dir] -= n
 		if h.window[dir] < 0 || stream.window[dir] < 0 {
-			return nil, fmt.Errorf("http2: flow-control window exceeded")
+			if !h.peerCaptureGap {
+				return nil, fmt.Errorf("http2: flow-control window exceeded")
+			}
+			// The peer's missing TCP bytes may contain WINDOW_UPDATE. Parsing
+			// this direction's complete frames remains valid, but claiming a
+			// peer flow-control violation from incomplete evidence does not.
+			info["Flow Control Verification"] = "unavailable: peer TCP sequence gap"
 		}
 		stream.ended[dir] = f.Flags&1 != 0
 	}

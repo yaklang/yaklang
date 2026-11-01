@@ -1,0 +1,211 @@
+{
+  "scope": "Aggregate/counts metadata only; source bundle contains no captures, secrets, case/plan/expected data or exports",
+  "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f",
+  "copied_source_files": 38,
+  "Go_source_files": 3,
+  "Python_source_files": 35,
+  "source_bytes": 275085,
+  "source_registration_manifest_SHA256": "6e1abfe0cc0ecde9a5d5f4e60f11b47effafbdbb75f5140fbb1d52ff8126376f",
+  "privacy_audit_SHA256": "e5d374ad7c015de148c8d19893b61402d4fdd9204dc33da99d36fb9f579786cc",
+  "known_sensitive_pattern_matches": 0,
+  "full35": {
+    "passed": 285542,
+    "skipped": 24,
+    "failed": 0,
+    "runs": 285566,
+    "all_runs_have_unique_terminal": true,
+    "receipt": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-all-five-full35\\receipt.json",
+      "SHA256": "e059fa658145119cfc47bfe1df58a0bda1cf8f5921e6157965197fab8efe5e6b",
+      "included": false
+    },
+    "log_SHA256": "05db308398fd01241fd2b9c30d78dbfad501a5280835f6b87a0510f5c7b9b387",
+    "log_included": false
+  },
+  "Native35": {
+    "inputs": 37,
+    "closed_exports": 39,
+    "event_objects": 306455,
+    "flow_objects": 2,
+    "exact_source_corrections": 7,
+    "unplanned_differences": 0,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-native37-whole-a82-01\\summary.json",
+      "SHA256": "ff1cb2858803cfc474f92ad6e2199c4680f33917a9e89d1b60b2689020b8151c",
+      "included": false
+    },
+    "event_flow_counts_are_separate": true
+  },
+  "CLI35": {
+    "inputs": 37,
+    "rows": 384518,
+    "exact_source_corrections": 7,
+    "unplanned_differences": 0,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI37-whole-a82-01\\summary.json",
+      "SHA256": "d6c9f97b451f438acf71e076ad4400a3d454bf689a98850d76caa39c86a24303",
+      "included": false
+    },
+    "whole37_certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-CLI37-whole-a82-01\\whole37\\summary.json",
+      "SHA256": "eb108348d3bd2c9fd29512abe370916d0b4a38fedaaab925b4ebc08418e70b1a",
+      "included": false
+    }
+  },
+  "Windows03": {
+    "passed": true,
+    "exit_code": 0,
+    "protocol_history_default_mib": 64,
+    "packet_cache_default": 20000,
+    "budgets_raised": false,
+    "source_0_bytes": 138,
+    "source_1_bytes": 96,
+    "selected_SPI_bytes": 4,
+    "truthful_global_partial_footer_required": true,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-ESPNATT-a82-default03\\proof.json",
+      "SHA256": "96dfc06af1f387e101463239e3cc5517b05c9b5169cb9b74fbe66dadfed6b57f",
+      "included": false
+    },
+    "visual_review": "Root agent reports reviewing actual page; this child did not independently perform visual review"
+  },
+  "C8": {
+    "physical_packets": 8,
+    "native_objects": 10,
+    "CLI_rows": 10,
+    "capture_close_publications": 2,
+    "unplanned_differences": 0,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-C8-whole-a82-audit01\\summary.json",
+      "SHA256": "801befcd575ebb7bb55b09a4bbc09e38cffdf1c1f5a7f7a7a276010c62000024",
+      "included": false
+    }
+  },
+  "Stats_API": {
+    "complete_API_objects": 7,
+    "complete_ProtocolStats_objects": 1,
+    "whole_objects": 8,
+    "unplanned_differences": 0,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-stats-after-a82-whole-audit01\\summary.json",
+      "SHA256": "3c1f61b5ec3f7ddffff15aa805575711080685503850afc4405775ffc81093c9",
+      "included": false
+    }
+  },
+  "fuzz": {
+    "targets": [
+      {
+        "target": "FuzzSharedUDPClockCannotEraseQUICIdentity",
+        "executions": 28973,
+        "requested_fuzz_seconds": 60,
+        "invocation_wall_seconds": 139.031,
+        "failures": 0,
+        "receipt_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\UDP-ownership-fuzz-a82-01\\FuzzSharedUDPClockCannotEraseQUICIdentity-receipt.json",
+        "receipt_SHA256": "838fd60a52bc309161f312d6ef83de442d389fe75e73ff98538dc0bcb09ad184",
+        "log_SHA256": "cabcc207cf9532793d52a999fb05ae04c3c163c6a6caaab462308659f9c82e80",
+        "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f"
+      },
+      {
+        "target": "FuzzQUICReusedTupleOwnershipProbe",
+        "executions": 143059,
+        "requested_fuzz_seconds": 60,
+        "invocation_wall_seconds": 69.969,
+        "failures": 0,
+        "receipt_path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\UDP-ownership-fuzz-a82-01\\FuzzQUICReusedTupleOwnershipProbe-receipt.json",
+        "receipt_SHA256": "eaaaddfd63fe362c18597c1f89fa06df2113e6a7edf7a54fe3abfb5e05fbfd09",
+        "log_SHA256": "3f8c2b796e6ae6dfc6c6f6bc5dd3ea7ac1b769e6db4d83540ddcfad8892f6dc8",
+        "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f"
+      }
+    ],
+    "total_executions": 172032,
+    "certificate": {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\UDP-ownership-fuzz-a82-01\\summary.json",
+      "SHA256": "84f71b1c029aa0eba768a2d4f64fecc878f078167ae6689a7c140c21c8ad47b7",
+      "included": false
+    }
+  },
+  "CI": {
+    "source": "a82acd0fff97ae50dfc1bbb403c16af359d7bf8f",
+    "evidence_authority": "Root agent verified exact-commit CI; not re-queried by this child",
+    "Essential": {
+      "run": 40827559951,
+      "status": "green"
+    },
+    "explicit_traffic": {
+      "run": 40827567724,
+      "status": "green"
+    },
+    "diff": {
+      "run": 40827559946,
+      "status": "green"
+    },
+    "case": {
+      "run": 40827559934,
+      "status": "green"
+    }
+  },
+  "caveats": [
+    "Wireshark default CoAP label on these synthetic UDP4500 controls is literally ESP; CoAP source grammar is independently explicit-decoded. No label normalization or automatic-label parity claim.",
+    "RADIUS Authentication remains not-verified; NAS-IP is an observed field, not packet-source/authenticated identity proof.",
+    "Refused TFTP peer is route/refusal evidence, not server binding; malformed UDP datagrams remain separate and file evidence stays aborted.",
+    "Seven ESP NAT-T rows expose only clear SPI/sequence and opaque remainder, with no SA/decryption/replay/authentication claim.",
+    "TOP30/core protocol completeness remains open; the independently verified OSPFv3 source gaps are not fixed by this NAT-T work."
+  ],
+  "preserved_failures": [
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-competition-source-01\\actual01",
+      "scope": "Original reference assumption incorrectly expected automatic CoAP on UDP4500; Wireshark label remains ESP",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-baseline5c-actual01",
+      "scope": "Old mixed controller expected correct RADIUS before discovering TFTP coarse-port capture",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-baseline5c-actual02",
+      "scope": "Closed observed old failure: RADIUS bytes incorrectly routed into TFTP; not a correctness oracle",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-isolation-old5c-actual01",
+      "scope": "Missing-NAS Access-Request is correctly malformed once isolated; never promote it to decoded",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-valid02-old5c-actual01",
+      "scope": "Old execution controller omitted unmatched RADIUS EOF records",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-valid02-old5c-actual02",
+      "scope": "Old execution controller assumed every CLI EOF row had a top protocol field",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-collision-before-f4-actual01",
+      "scope": "Actual DNS/IKE/DNS source records incorrectly selected by premature ESP header fallback",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\NATT-session-premature693-actual01",
+      "scope": "Actual old eight controls all prematurely selected as ESP",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\ESP-NATT-focused35-01",
+      "scope": "Initial restricted TFTP guard forgot exact malformed-peer evidence; sealed residual cases lost FlowID",
+      "included_in_source_archive": false
+    },
+    {
+      "directory": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\windows-ESPNATT-693-default01",
+      "scope": "Actual selected ESP pane valid but original checker rejected truthful global partial footer",
+      "included_in_source_archive": false
+    }
+  ],
+  "external_reproduction_prerequisites_required": true,
+  "generators_must_execute_in_external_temp_working_copy": true,
+  "original_data_and_frozen_expectations_remain_external_and_not_included": true,
+  "core_TOP30_complete": false,
+  "no_repository_write_or_Go_execution": true
+}

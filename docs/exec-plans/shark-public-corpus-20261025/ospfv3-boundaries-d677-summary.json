@@ -1,0 +1,159 @@
+{
+  "scope": "Closed d677 OSPFv3 boundaries and Windows proofs; historical checkpoint, not all OSPF or TOP30 completeness",
+  "source": "d6772965c669e288705f7e0d0e25c62972226832",
+  "authored_controls": 20,
+  "synthetic_controls_not_live": true,
+  "native_CLI_controls": 17,
+  "direct_parser_controls": 3,
+  "native_CLI_wire_leaves": 283,
+  "private_typed_occurrences": 259,
+  "direct_wire_leaves": 60,
+  "source_ref": {
+    "external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/source-result-closure04-01/manifest.json",
+    "SHA256": "ad51df2a9ac6a76d5691fe7edd8d0095865823542fb87c0c1c493f892db8cd97",
+    "copied": false
+  },
+  "native_CLI_fields": {
+    "external_relative_name": "OSPF-boundary-fields-d677-source03-02/summary.json",
+    "SHA256": "7d3ffaa854ca318e4b4b98495ee8b8e8f47d9368b6bcedb1b9c1c7adfdb96aae",
+    "copied": false
+  },
+  "direct_fields": {
+    "external_relative_name": "OSPF-direct-source-fields-d677-01/summary.json",
+    "SHA256": "4ee28484e91e1e47ada32d37250fe132924f91cd06c5fc13fe1fd2da4c4572ef",
+    "copied": false
+  },
+  "source_controls_before_candidate": {
+    "external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/frozen-source03/plan.json",
+    "SHA256": "e9f5b8e4f2820bf12ca79bf7049562442f0bec7540d1a910c7dd2d11da570cd0",
+    "copied": false
+  },
+  "checksums": "Unknown complete LSA stays opaque and does not discard following known LSA; independent packet integrity outranks unsupported context. Resource errors and integrity errors are both retained. AT, AF, missing pseudo-header and LLS scopes stay distinct.",
+  "reference_raw_checks": 94,
+  "reference_raw_differences": 0,
+  "reference_checksum_disagreements": 2,
+  "reference_short_LSA_scalar_omissions": 10,
+  "checksum_owner": {
+    "external_relative_name": "OSPFv3-boundary-authored-source-before-next-01/reference-checksum-owner-proof01.json",
+    "SHA256": "c8422867157c17f8a76d5f0512493748dee5237f3240c060a91a36cffd7e2f60",
+    "copied": false
+  },
+  "public_native": {
+    "inputs": 37,
+    "events": 307262,
+    "complete_flow_objects": 2,
+    "differences": 0,
+    "ID_mapping": false,
+    "proof": {
+      "external_relative_name": "OSPFv3-native-literal-636-d677-01/summary.json",
+      "SHA256": "0b4f8f538c8622084c79c117adc0e45f1db7593df0ee60c76c5eb9a3bccf4ce2",
+      "copied": false
+    }
+  },
+  "public_CLI": {
+    "inputs": 37,
+    "rows": 384518,
+    "differences": 0,
+    "ID_mapping": false,
+    "proof": {
+      "external_relative_name": "OSPFv3-CLI-literal-685-d677-01/summary.json",
+      "SHA256": "f78ff92b7f538fa3558d43e146276654498166fb9d2996905891f287e1c3f50d",
+      "copied": false
+    }
+  },
+  "tests": {
+    "passed": 285564,
+    "skipped": 24,
+    "failed": 0,
+    "proof": {
+      "external_relative_name": "OSPFv3-all-five-full38-02/receipt.json",
+      "SHA256": "906cd07201cc925e950c10574a13e34d08ee68cf4dfab1ff2d430c57cdcfbb2e",
+      "copied": false
+    }
+  },
+  "fuzz": {
+    "executions": 167349,
+    "seconds": 60,
+    "failures": 0,
+    "proof": {
+      "external_relative_name": "OSPFv3-fuzz-d677-01/summary.json",
+      "SHA256": "b591d64d6fd3b68af9629c1efc993cee639c4d6e002d1eb30e32762de14ef379",
+      "copied": false
+    }
+  },
+  "Windows": {
+    "full_capture": {
+      "external_relative_name": "windows-OSPFv3-d677-default01/proof.json",
+      "SHA256": "eaf2be0e11660ff56e4a65bd2f1ba6607e6d81e3455ca8b80aca97affb91f914",
+      "copied": false
+    },
+    "authored_short_LSA": {
+      "external_relative_name": "windows-OSPFv3-short-LSA-d677-default01/proof.json",
+      "SHA256": "eb61c6e2f491c5105ac0b682ca1e62721e16bc3959d0171d769c3bf1aeb66b6a",
+      "copied": false
+    },
+    "actual_native_console": true,
+    "Terminal_pixel_screenshot": false,
+    "root_visual_review": "Both selected-field native console cell renderings personally viewed after the original proofs; immutable original proof files retain their visual-review-pending flags",
+    "default_packet_budget": 20000,
+    "default_byte_budget": 67108864,
+    "full_source_bytes": 334,
+    "OSPF_source_bytes": 240,
+    "prefix_highlight_bytes": 8,
+    "short_original_frame_bytes": 122,
+    "short_captured_bytes": 116,
+    "short_OSPF_bytes": 62,
+    "short_LSA_type_physical_range": [
+      100,
+      102
+    ],
+    "whole_byte_range_claim": "Each selected field range only, not every byte visible in one viewport"
+  },
+  "protected_recovery": {
+    "cases": 6,
+    "complete_events": 8053,
+    "differences": 0,
+    "ID_mapping": false,
+    "actual": {
+      "external_relative_name": "protected-TLS-QUIC-d677-01/summary.json",
+      "SHA256": "1e2553390cbef823100f2676fa2d7652aeecb736c1e36511035e2ca5b875d91e",
+      "copied": false
+    },
+    "QUIC_epochs": {
+      "external_relative_name": "protected-QUIC-epochs-literal-d677-01/summary.json",
+      "SHA256": "9f4f69ddb8dfa8ae6a5561cecddf83e5bcce45acb217abaa4c1b538ac0152744",
+      "copied": false
+    },
+    "QUIC_controls": {
+      "external_relative_name": "protected-QUIC-controls-literal-d677-01/summary.json",
+      "SHA256": "cbb5384a51ec38f54b7daa4bc1b423651e0e849029ffced6c0769420ffb41416",
+      "copied": false
+    },
+    "TLS_loss": {
+      "external_relative_name": "protected-TLS-loss-literal-d677-01/summary.json",
+      "SHA256": "ab9b21634bd969b693fd561fbcf9967e543b95fe257fcee393f7926ac3f77341",
+      "copied": false
+    },
+    "source": "Original real captures plus explicitly authored observation controls; not six newly captured live faults"
+  },
+  "failures_preserved": [
+    "Original unknown-LSA test fixture had an invalid zero checksum; corrected with independent 0x3cf5 and retained a negative control",
+    "First external boundary checker incorrectly equated field snapshot coverage with event outcome; old failed proof preserved and source leaves/ranges unchanged",
+    "Earlier full38 test run predates later partial-header fixes and is not relabelled as the final full38-02 run"
+  ],
+  "current_CI": {
+    "Essential": 40854905634,
+    "explicit_complete_SHA_traffic": 40854898830,
+    "Diff": 40854905576,
+    "case_paths": 40854905558,
+    "all_success": true,
+    "draft_auto_traffic": "40854905602 skipped, not a pass"
+  },
+  "archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ospfv3-boundaries38",
+    "sources": 28,
+    "manifest_SHA256": "424a3e69bc25b48132cb0e42eaf902b212724513ced43bfe242e8032c77bd837"
+  },
+  "exclusions": "Captures, key logs, complete controls/plans/expected objects, actual output, logs, images and executables remain external",
+  "pending": "OSPFv2 native profile and other advanced/core protocols are separate work; no all-protocol conformance claim"
+}

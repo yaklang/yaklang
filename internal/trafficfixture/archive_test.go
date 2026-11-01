@@ -56,7 +56,7 @@ func TestArchiveRejectsTampering(t *testing.T) {
 		t.Fatal(err)
 	}
 	original := c.index.Batches[0]
-	raw, err := os.ReadFile(filepath.Join(c.root, batchDir, original.File))
+	raw, err := readBoundedFile(filepath.Join(c.root, batchDir, original.File), maxBatch)
 	if err != nil {
 		t.Fatal(err)
 	}

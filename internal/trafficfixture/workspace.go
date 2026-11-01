@@ -26,6 +26,9 @@ func Verify() error {
 	if err != nil {
 		return err
 	}
+	if err := verifyCentralCaptures(c.root); err != nil {
+		return err
+	}
 	for _, p := range c.index.Packs {
 		for name := range p.Members {
 			if _, err := readMember(p.data.physical, name); err != nil {
@@ -134,6 +137,9 @@ func exportNames(directory string, names []string) error {
 	entries, err := os.ReadDir(directory)
 	if err != nil || len(entries) != 0 {
 		return fmt.Errorf("trafficfixture: export directory must be empty")
+	}
+	if err := preparePrivateWorkspace(directory); err != nil {
+		return err
 	}
 	const maxWorkspace = 384 << 20
 	var total int64

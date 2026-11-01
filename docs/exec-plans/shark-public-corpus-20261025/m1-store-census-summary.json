@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "audit": "M1 physical capture fixture consumer census",
+  "source_HEAD": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+  "repository_modified_by_audit": false,
+  "Go_build_test_SDK_TShark_started": false,
+  "tracked_files": 17198,
+  "index_SHA256": "341f5398647d808f6b2edd869794ddd78a3668d577fcbcc5346c03c13fe0bff0",
+  "logical_batches": 288,
+  "packs": 1,
+  "physical_corpus_archives": 36,
+  "existing_corpus_ZIP_bytes": 18703582,
+  "loose_capture_files": 2,
+  "loose_capture_bytes": 203649,
+  "prospective_outer_members": 38,
+  "prospective_outer_source_bytes": 18907231,
+  "tracked_ZIPs": 122,
+  "nontraffic_ZIPs": 86,
+  "lexical_go_embed_directives": 318,
+  "embed_matches_for_migrating_targets": 0,
+  "inspected_unique_archived_sources": 1518,
+  "inspected_unique_archived_source_bytes": 7286501,
+  "archived_directory_reference_sources": 120,
+  "archived_reference_basenames": {
+    "package_controls.py": 1,
+    "seal_batch.py": 2,
+    "seal.py": 109,
+    "correct_carriers.py": 1,
+    "build.py": 3,
+    "prepare.py": 1,
+    "profile-upgrade.py": 1,
+    "verify.py": 1,
+    "legacy-upgrade.py": 1
+  },
+  "errors": 0,
+  "original_proofs": [
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\result01\\inventory.json",
+      "SHA256": "95e99c0f7f3d2975bfaf0d84e41433e401307f010dc2a324825bc98ad8ecbb25"
+    },
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\closure01\\closure.json",
+      "SHA256": "e960bb1b92209e9676d238b5c507c096251d3b5fd225cd752ba4af8061b39d52"
+    }
+  ],
+  "unchanged_dependency": {
+    "path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\common\\yak\\cmd\\yakcmds\\shark-cli\\testdata\\live-audit\\natt-source\\sources\\phase-source\\TFTP-refused-peer-source-01\\extract_source.py",
+    "SHA256": "d53403c09addf8d5ad1c68357726d0d47319cd7a57195201bea1ca066087dc97"
+  },
+  "source_only": [
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\inventory.py",
+      "bytes": 7388,
+      "SHA256": "bc655136921e45a6ed0e335538519f08b5dd5dbb7bdc0fc4887b498f09c22e25"
+    },
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\close_audit.py",
+      "bytes": 5964,
+      "SHA256": "5f267392eae767dfc7cab6364679f88ef076577ff4f7e7bd47fbdc970456d780"
+    },
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\write_report.py",
+      "bytes": 8849,
+      "SHA256": "a1d6ce22ab3863f07244678cd277909dc2658f4d9d22819a55ce2bbdeb9c7932"
+    },
+    {
+      "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\write_addendum.py",
+      "bytes": 5315,
+      "SHA256": "f3fb1f0beae96f9d87479f5cde5298fe3fba1e4a8f5ebd10b5a1d0a9adc6124c"
+    }
+  ],
+  "source_only_exclusions": "No PCAP/PCAPNG, raw packets, keylogs, complete fixture/index/expected data, ZIPs, DLLs, tools, logs or exports are in the proposed import list.",
+  "limits": [
+    "Known magic signatures only; ZIP directories, bounded non-encrypted member header reads, gzip first64. Nested ZIP/unsupported/encrypted bodies not claimed scanned.",
+    "Only tracked files and pinned logical code sources; generic future consumer paths and unrecognized capture formats are not asserted absent."
+  ],
+  "production_store_review": "Initial source review plus 17 final Python regression methods closed. Root Go/Windows/full-suite/CI outcomes are intentionally not inferred here.",
+  "M2": "Unverified CIFS/SMB changes parked by root in stash6914ec2fa5ceb305fd3a1c4709c92841a5fa42fa and external M2-park-before-M1-55-02; no M2 test pass is claimed.",
+  "prior_aggregate": {
+    "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\M1-capture-consumer-audit01\\stage01\\aggregate-summary.json",
+    "SHA256": "a17c1066cf5c6692c1b62c9d480fabfd82199550a32d4986d12208e54350f7bf"
+  },
+  "Python_reader_regression": {
+    "final_methods_passed": 17,
+    "final_failed": 0,
+    "initial_failure": "Three manifest integer-schema subcases accepted bool/float in Python while Go int/int64 decoding rejects them; initial receipt and red log retained.",
+    "correction": "Root added exact integer types. Child strengthened structural negative controls to invoke store() directly, avoiding a later missing-file false pass.",
+    "fixtures": "Only stdlib-authored small ZIPs/manifests in TemporaryDirectory; no real capture or repository store modified.",
+    "test_source": {
+      "path": "C:\\Users\\V\\.codex\\worktrees\\shark-protocol-infrastructure\\yaklang\\internal\\trafficfixture\\test_capture_store.py",
+      "bytes": 11959,
+      "SHA256": "2b24e78ee67d3bdd2578dd1e5ce1ef58185d1a615ea0df281d9bc9b981e4e091"
+    },
+    "executions": [
+      {
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\test-M1-capture-python55-01\\receipt.json",
+        "SHA256": "3cea20186c87202cf1fe9df7601703b8777ae72e0fa35a167b43aca2af696aae",
+        "exit_code": 1,
+        "source_before_after": [
+          {
+            "path": "internal/trafficfixture/capture_store.py",
+            "SHA256": "140033ac37842cb4f508ebbfc5c835ae2c91c7dfedff16ea16240c64a0d711b5"
+          },
+          {
+            "path": "internal/trafficfixture/test_capture_store.py",
+            "SHA256": "3b6b8f7010ac6b7e6275786a3116b9c967c4a8b911a922d97d062cd0576af539"
+          }
+        ],
+        "stderr_SHA256": "e5ead696c87869a0f6bd15a883cfed81b972afdaacadc6ae652f8831a21d6ec9"
+      },
+      {
+        "path": "C:\\tmp\\yak-shark-ESP-SSH-UI-20261028\\test-M1-capture-python55-02\\receipt.json",
+        "SHA256": "63e062a096a92d37eb71c255f937191b33440f77c2db1946c7562c9f7e41bd0e",
+        "exit_code": 0,
+        "source_before_after": [
+          {
+            "path": "internal/trafficfixture/capture_store.py",
+            "SHA256": "0890901f648989bc2cea346a6a301e0af571dd3bd14b62081ce0987880a18ad3"
+          },
+          {
+            "path": "internal/trafficfixture/test_capture_store.py",
+            "SHA256": "2b24e78ee67d3bdd2578dd1e5ce1ef58185d1a615ea0df281d9bc9b981e4e091"
+          }
+        ],
+        "stderr_SHA256": "6210868dde6f4e5862d23b561cbbe7a8e4266cd28f9f03da10a33efdf8aecc2e"
+      }
+    ]
+  },
+  "next_platform_findings": [
+    "PCAPDB openIndex drive path serialized as file://C:/..., making C: an invalid SQLite authority; root is applying a leading-path-slash fix and real create/rw/ro regressions. No child Go execution/result claimed.",
+    "Windows Go FileMode exposes 0666/0444 from READONLY attributes, not a private DACL. Unix 0600 cannot serve as its privacy oracle; protected user+SYSTEM directory ACL and file ACL checks were recommended. Implementation/result remains root-owned."
+  ],
+  "source_only_note": "Four external audit/report controllers are import candidates. The ordinary repo unittest is separately referenced, not duplicated. No data, archives, logs, receipts or expected objects belong in the source-only import."
+}

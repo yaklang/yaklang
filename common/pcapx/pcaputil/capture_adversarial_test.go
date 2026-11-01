@@ -183,24 +183,60 @@ func TestTCPMalformedNetworkRecovery(t *testing.T) {
 	}
 }
 
-func TestTCPFragmentsNeverBecomeStreamBytes(t *testing.T) {
+// A first fragment containing a TCP header is not a complete datagram.
+// Neither is a nonzero-offset fragment whose bytes resemble another TCP
+// header. Conflicting overlaps invalidate the entire fragment set.
+func TestIncompleteTCPFragmentsNeverBecomeStreamBytes(t *testing.T) {
+	first := adversarialWire(100, 0x10, nil, []byte("EVIL"))
+	first[20] = 0x20
+	later := bytes.Clone(first)
+	later[20], later[21] = 0, 3
+	overlap := bytes.Clone(later)
+	overlap[21] = 2
+	for _, tc := range []struct {
+		name   string
+		frames [][]byte
+	}{
+		{"missing-first", [][]byte{later}},
+		{"missing-last", [][]byte{first}},
+		{"conflicting-overlap", [][]byte{first, overlap}},
+		{"reversed-conflicting-overlap", [][]byte{overlap, first}},
+	} {
+		for _, workers := range []int{1, 4} {
+			for _, full := range []bool{false, true} {
+				t.Run(fmt.Sprintf("%s/workers=%d/full=%v", tc.name, workers, full), func(t *testing.T) {
+					frames := append([][]byte{adversarialWire(99, 2, nil, nil)}, tc.frames...)
+					frames = append(frames, adversarialWire(100, 0x11, nil, []byte("SAFE")))
+					file := filepath.Join(t.TempDir(), "fragments.pcap")
+					require.NoError(t, os.WriteFile(file, classicFixture(binary.LittleEndian, false, 65535, frames...), 0600))
+					var got bytes.Buffer
+					opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithTCPReassemblyStream(13), WithOnTrafficFlowOnDataFrameReassembled(func(_ *TrafficFlow, _ *TrafficConnection, f *TrafficFrame) { got.Write(f.Payload) })}
+					if full {
+						opts = append(opts, WithEveryPacket(func(gopacket.Packet) {}))
+					}
+					_ = OpenPcapFile(file, opts...)
+					require.Equal(t, "SAFE", got.String())
+				})
+			}
+		}
+	}
+}
+
+func TestCompletedTCPFragmentsDeliverOnlyReassembledPayload(t *testing.T) {
 	for _, workers := range []int{1, 4} {
 		for _, full := range []bool{false, true} {
 			t.Run(fmt.Sprintf("workers=%d/full=%v", workers, full), func(t *testing.T) {
-				first := adversarialWire(100, 0x10, nil, []byte("EVIL"))
-				first[20] = 0x20
-				later := bytes.Clone(first)
-				later[20] = 0
-				later[21] = 3
-				file := filepath.Join(t.TempDir(), "fragments.pcap")
-				require.NoError(t, os.WriteFile(file, classicFixture(binary.LittleEndian, false, 65535, adversarialWire(99, 2, nil, nil), first, later, adversarialWire(100, 0x11, nil, []byte("SAFE"))), 0600))
+				whole := adversarialWire(100, 0x10, nil, []byte("FRAGMENTED"))
+				pieces := icmpFragmentFrames(t, whole, 24, false)
+				frames := append([][]byte{adversarialWire(99, 2, nil, nil)}, pieces...)
+				frames = append(frames, adversarialWire(110, 0x11, nil, []byte("SAFE")))
 				var got bytes.Buffer
 				opts := []CaptureOption{WithTCPReassemblyWorkers(workers), WithTCPReassemblyStream(13), WithOnTrafficFlowOnDataFrameReassembled(func(_ *TrafficFlow, _ *TrafficConnection, f *TrafficFrame) { got.Write(f.Payload) })}
 				if full {
 					opts = append(opts, WithEveryPacket(func(gopacket.Packet) {}))
 				}
-				_ = OpenPcapFile(file, opts...)
-				require.Equal(t, "SAFE", got.String())
+				require.NoError(t, ReplayPcap(bytes.NewReader(classicFixture(binary.LittleEndian, false, 65535, frames...)), opts...))
+				require.Equal(t, "FRAGMENTEDSAFE", got.String(), "TCP receives the completed payload, not fragment headers or individual fragment prefixes")
 			})
 		}
 	}

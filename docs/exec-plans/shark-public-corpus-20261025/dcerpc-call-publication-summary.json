@@ -1,0 +1,2054 @@
+{
+  "scope": "Selected whole clear direct-TCP RPC owner/operation verification; additive all-protocol late-publication export preservation. No whole-protocol conformance claim.",
+  "SDK_source": "7822ba2aa59e0c24cd0c86f3433ad73cd6b0a702",
+  "CLI_source": "24c9ad0a454eef1910f446b0548d8406282ba540",
+  "cases": {
+    "duplicate-request-observation": {
+      "capture_sha256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "physical_frames": 118,
+      "SDK_records": 58,
+      "SDK_export_sha256": "08a96303d484b4ef87efb9647d5802b7d95d29041a3f4749f598ecd3ed2c94ff",
+      "CLI_export_sha256": "158828dd541432ea0aa2c6a16ce9da56e68ed135334f77c6029d2496c81ab182",
+      "wire_checks": 11596,
+      "complete_wire_PDUs": 56,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 0,
+      "wire_status_counts": {
+        "decoded": 56
+      },
+      "numeric_call_link_checks": 692,
+      "numeric_call_links": 28,
+      "reference_request_links": 27,
+      "reference_response_links": 27,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "c985f178ff6186d81ad2d967afda1876c2f2160d7a222f244cfd50b41ac9505c",
+        "after_sha256": "08a96303d484b4ef87efb9647d5802b7d95d29041a3f4749f598ecd3ed2c94ff",
+        "wire_certificate_sha256": "0513341484cb978830f8b2a75ea435aa1fa0f04ca81ffcc441f58d97cdacbb62",
+        "complete_records_compared": 58,
+        "byte_equivalent_records": 3,
+        "changed_RPC_records": 55,
+        "changed": [
+          {
+            "PDU": 4,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          },
+          {
+            "PDU": 5,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 6,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 7,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 8,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 9,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 10,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 11,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 12,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 13,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 14,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 15,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 16,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 17,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 18,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 19,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 20,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 21,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 22,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 23,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 24,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 25,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 26,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 27,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 28,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 29,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 30,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 31,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 32,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 33,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 34,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 35,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 36,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 37,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 38,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 39,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 40,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 41,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 42,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 43,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 44,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 45,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 46,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 47,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 48,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 49,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 50,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 51,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 52,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 53,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 54,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 55,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 56,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 57,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 58,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 56,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 56,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\duplicate-request-observation\\wire-certified-01.json": "0513341484cb978830f8b2a75ea435aa1fa0f04ca81ffcc441f58d97cdacbb62",
+        "calls\\duplicate-request-observation\\SDK-invariants.json": "ecad392785e3017c8102015306ec5f81161049566aa5cb5da0001e1ac2fbd166",
+        "publications\\duplicate-request-observation\\CLI-invariants.json": "05e8cec8968e611e66328527aa11073bf5f6fa6e661efe329bf4858c36aaf5e7",
+        "publications\\duplicate-request-observation\\publication-invariants.json": "256466d92605a8c250485938fc9e8ac36f58a0ff4741e57006ba6d99df19da73"
+      }
+    },
+    "live-fragmented": {
+      "capture_sha256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "physical_frames": 134,
+      "SDK_records": 9,
+      "SDK_export_sha256": "9f1f86037e9fe8c670cf3e382cfa19cb82aab54040e881ec3259029142ef325a",
+      "CLI_export_sha256": "aea06aa7a0aa49fe68291c5f6c823237a667708c16d1792d958e2efd2b467f99",
+      "wire_checks": 1418,
+      "complete_wire_PDUs": 6,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 0,
+      "wire_status_counts": {
+        "decoded": 6
+      },
+      "numeric_call_link_checks": 42,
+      "numeric_call_links": 2,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "92c5e541fd8174f51bcc5d1d455028794f70ae4c70f34eb63697f3543170fad0",
+        "after_sha256": "9f1f86037e9fe8c670cf3e382cfa19cb82aab54040e881ec3259029142ef325a",
+        "wire_certificate_sha256": "3ad363e49d0ee81fa12b732cb5c809373ca7aa726e3b4d4f87ab3a8bc1af4a9d",
+        "complete_records_compared": 9,
+        "byte_equivalent_records": 7,
+        "changed_RPC_records": 2,
+        "changed": [
+          {
+            "PDU": 5,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          },
+          {
+            "PDU": 7,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 4,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 6,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\live-fragmented\\wire-certified-01.json": "3ad363e49d0ee81fa12b732cb5c809373ca7aa726e3b4d4f87ab3a8bc1af4a9d",
+        "calls\\live-fragmented\\SDK-invariants.json": "43ce635ad6fa938bb4bb305e00596123972188606cc83b07cbce0482a9fe69eb",
+        "publications\\live-fragmented\\CLI-invariants.json": "da9983edeb90a6c10cea65c382d5e3ce7096d0ea0f99b9857cab8562e0bc5574",
+        "publications\\live-fragmented\\publication-invariants.json": "1d8bb7092368961741b191db550da81ded52e03aa72d1af71c77629f940b891b"
+      }
+    },
+    "live-query": {
+      "capture_sha256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "physical_frames": 117,
+      "SDK_records": 58,
+      "SDK_export_sha256": "a1e6bac23a702588745fed7552562ae931ab6d546c08744e4bc380f89448d924",
+      "CLI_export_sha256": "236da26169cd3a3f89bd5953f780d33dd96ced04535b55484a3fc0c38702a312",
+      "wire_checks": 11482,
+      "complete_wire_PDUs": 56,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 0,
+      "wire_status_counts": {
+        "decoded": 56
+      },
+      "numeric_call_link_checks": 692,
+      "numeric_call_links": 28,
+      "reference_request_links": 27,
+      "reference_response_links": 27,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "b917ccec13c537df917ff5891d08c82cb3098bbf88395696cb33695b46a6cdd4",
+        "after_sha256": "a1e6bac23a702588745fed7552562ae931ab6d546c08744e4bc380f89448d924",
+        "wire_certificate_sha256": "d44f92cc07cc990c0342aa3d34521bd1998bd6850ad9b8b2be3273a272534903",
+        "complete_records_compared": 58,
+        "byte_equivalent_records": 3,
+        "changed_RPC_records": 55,
+        "changed": [
+          {
+            "PDU": 4,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          },
+          {
+            "PDU": 5,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 6,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 7,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 8,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 9,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 10,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 11,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 12,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 13,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 14,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 15,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 16,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 17,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 18,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 19,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 20,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 21,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 22,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 23,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 24,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 25,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 26,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 27,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 28,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 29,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 30,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 31,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 32,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 33,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 34,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 35,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 36,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 37,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 38,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 39,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 40,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 41,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 42,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 43,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 44,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 45,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 46,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 47,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 48,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 49,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 50,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 51,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 52,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 53,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 54,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 55,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 56,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 57,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 58,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 56,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 56,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\live-query\\wire-certified-01.json": "d44f92cc07cc990c0342aa3d34521bd1998bd6850ad9b8b2be3273a272534903",
+        "calls\\live-query\\SDK-invariants.json": "8aa7e4a52aaf58e0338dbf5d7c51b1deab5e39b7f28ef164728919de85044eed",
+        "publications\\live-query\\CLI-invariants.json": "02bb426a25340c6c435d0b14fe92cb40c92e6c11b88dd34a5de5ca8131fa7dc0",
+        "publications\\live-query\\publication-invariants.json": "948153ce9cfeb8a8739677dff35d807504a524bd861cfd2e9ca209f98691a888"
+      }
+    },
+    "live-unfragmented": {
+      "capture_sha256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "physical_frames": 36,
+      "SDK_records": 9,
+      "SDK_export_sha256": "eac7599e55ca559f88fd8b8bd616796ce549f0f2824da4f97917a06e403a5f45",
+      "CLI_export_sha256": "bca7e29fe8336c586a471f6cd3fbb7ce9f4c8a7c3944c62cd44729830b3e4f11",
+      "wire_checks": 1250,
+      "complete_wire_PDUs": 6,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 0,
+      "wire_status_counts": {
+        "decoded": 6
+      },
+      "numeric_call_link_checks": 42,
+      "numeric_call_links": 2,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "a59a8962f13aaa2985065b9dd249492bd0aa708525d330afdd7aa8f5acea8359",
+        "after_sha256": "eac7599e55ca559f88fd8b8bd616796ce549f0f2824da4f97917a06e403a5f45",
+        "wire_certificate_sha256": "1e82d1b932ea16c9f99aeb0e412a065339ffd753e58aea61bf422e95d58b5556",
+        "complete_records_compared": 9,
+        "byte_equivalent_records": 7,
+        "changed_RPC_records": 2,
+        "changed": [
+          {
+            "PDU": 5,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          },
+          {
+            "PDU": 7,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 4,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 6,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\live-unfragmented\\wire-certified-01.json": "1e82d1b932ea16c9f99aeb0e412a065339ffd753e58aea61bf422e95d58b5556",
+        "calls\\live-unfragmented\\SDK-invariants.json": "075abce8f7af3d07b7de0491f1c1d47764e665be3e07d802783630cec8a40c18",
+        "publications\\live-unfragmented\\CLI-invariants.json": "d2a211b1c66052f1f0b192136b0f4736148fd89f5661c2149c883655a4cb4175",
+        "publications\\live-unfragmented\\publication-invariants.json": "7b0401dbd45f6740255b5c56f111b2e753766a2ea0f1f1b6d01943076c203a18"
+      }
+    },
+    "permanent-request-capture-hole": {
+      "capture_sha256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "physical_frames": 116,
+      "SDK_records": 32,
+      "SDK_export_sha256": "9f13150f86282f2628bfada9ca6addc60046a4ccc587e1d8ce2d2aacc8c509d7",
+      "CLI_export_sha256": "eea2e7c4c79f9287ee3dfd766eaa5ed12447d5b396bd925f6e68db0823559055",
+      "wire_checks": 10264,
+      "complete_wire_PDUs": 29,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 1,
+      "wire_status_counts": {
+        "decoded": 29,
+        "incomplete": 1
+      },
+      "numeric_call_link_checks": 182,
+      "numeric_call_links": 1,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "42a2ed93196594e6f0ef3fa0351ffd1057abd70db3c5fb5fa4de6db81bb1c981",
+        "after_sha256": "9f13150f86282f2628bfada9ca6addc60046a4ccc587e1d8ce2d2aacc8c509d7",
+        "wire_certificate_sha256": "4d3d366c96d2322377bc7ea9e24fb01bd328d7a9dee8e073bb07446683207721",
+        "complete_records_compared": 32,
+        "byte_equivalent_records": 31,
+        "changed_RPC_records": 1,
+        "changed": [
+          {
+            "PDU": 4,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 29,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 29,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\permanent-request-capture-hole\\wire-certified-01.json": "4d3d366c96d2322377bc7ea9e24fb01bd328d7a9dee8e073bb07446683207721",
+        "calls\\permanent-request-capture-hole\\SDK-invariants.json": "2ef984cc69c24db06bf2a31cce926c18251577a9a03ca712745e05e1cd661c3e",
+        "publications\\permanent-request-capture-hole\\CLI-invariants.json": "aec9fbd13c0acf22d9497fdfa057ce0623e0bdd4ba7981072ba7d3ea169e6086",
+        "publications\\permanent-request-capture-hole\\publication-invariants.json": "d026da8d694128826abd2d8f87d7d9c1a6593eacf18851671f6643db3714d8d7"
+      }
+    },
+    "request-arrives-after-two-later-requests": {
+      "capture_sha256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "physical_frames": 117,
+      "SDK_records": 59,
+      "SDK_export_sha256": "750bbbd955751f729441330748cfdc4f14298dd95d17e756c2f7ede285573593",
+      "CLI_export_sha256": "17dd8ba44325700403829a84886305196cd7cf525f99ca1f39ea67e6d3cb19eb",
+      "wire_checks": 11484,
+      "complete_wire_PDUs": 56,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 1,
+      "wire_status_counts": {
+        "decoded": 56,
+        "incomplete": 1
+      },
+      "numeric_call_link_checks": 679,
+      "numeric_call_links": 26,
+      "reference_request_links": 25,
+      "reference_response_links": 25,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "fff0db66e6eaffc9289ca6bdd55e4dd86c9f7d700668eada893c82ee437dc3df",
+        "after_sha256": "750bbbd955751f729441330748cfdc4f14298dd95d17e756c2f7ede285573593",
+        "wire_certificate_sha256": "30f2d08955c3a0d6e36f4c59decc06dd5f9158bf544b57a8f9ebf6dc0ad1df9b",
+        "complete_records_compared": 59,
+        "byte_equivalent_records": 6,
+        "changed_RPC_records": 53,
+        "changed": [
+          {
+            "PDU": 4,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          },
+          {
+            "PDU": 7,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 8,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 9,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 10,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 11,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 12,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 13,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 14,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 15,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 16,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 17,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 18,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 19,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 20,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 21,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 22,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 23,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 24,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 25,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 26,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 27,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 28,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 29,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 30,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 31,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 32,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 33,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 34,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 35,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 36,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 37,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 38,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 39,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 40,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 41,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 42,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 43,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 44,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 45,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 46,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 47,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 48,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 49,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 50,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 51,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 52,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 53,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 54,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 55,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 56,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          },
+          {
+            "PDU": 57,
+            "changes": [
+              "verified EPM request operation name"
+            ]
+          },
+          {
+            "PDU": 58,
+            "changes": [
+              "wire-proven generated reply owner and typed alias",
+              "same original request operation on the reply"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 54,
+      "late_publications": 2,
+      "publication_protocol_counts": {
+        "dcerpc": 2
+      },
+      "decoded_nonempty_SDK_messages": 56,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\request-arrives-after-two-later-requests\\wire-certified-01.json": "30f2d08955c3a0d6e36f4c59decc06dd5f9158bf544b57a8f9ebf6dc0ad1df9b",
+        "calls\\request-arrives-after-two-later-requests\\SDK-invariants.json": "13e04b890555792c53ac6bb056d07e953df4265e855aa9a006e1f85e57675d2d",
+        "publications\\request-arrives-after-two-later-requests\\CLI-invariants.json": "df8ff4d3afc9e255e18be7422302e110a5063223bbe30b8d725142442f415936",
+        "publications\\request-arrives-after-two-later-requests\\publication-invariants.json": "3893ca98182984e94eed6a3aa86d63e53bbc83a9cb04d6e864bc326822236e31"
+      }
+    },
+    "sharon": {
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "SDK_export_sha256": "d01760b715e600feb25ab53fd6adaf6a87b2393700b527921ecff450f9739a52",
+      "CLI_export_sha256": "f200c3e047978fca780de234e04f38a0c6e41238b3fc629bb17a3b7dc9ea774a",
+      "wire_checks": 494670,
+      "complete_wire_PDUs": 14,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 1,
+      "wire_status_counts": {
+        "decoded": 5,
+        "malformed": 8,
+        "context-required": 1,
+        "incomplete": 1
+      },
+      "numeric_call_link_checks": 65,
+      "numeric_call_links": 0,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "d01760b715e600feb25ab53fd6adaf6a87b2393700b527921ecff450f9739a52",
+        "after_sha256": "d01760b715e600feb25ab53fd6adaf6a87b2393700b527921ecff450f9739a52",
+        "wire_certificate_sha256": "fe3c500de9ef5bc851285ac1aa54cb6b5c54f1ae662e93f80bd933412a699594",
+        "complete_records_compared": 245784,
+        "complete_exports_byte_identical": true,
+        "byte_equivalent_records": 245784,
+        "changed_RPC_records": 0,
+        "changed": [],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 1,
+      "late_publications": 405,
+      "publication_protocol_counts": {
+        "": 50,
+        "dns": 2,
+        "http": 1,
+        "ip": 339,
+        "modbus": 1,
+        "whois": 12
+      },
+      "decoded_nonempty_SDK_messages": 23997,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\sharon\\wire-certified-01.json": "fe3c500de9ef5bc851285ac1aa54cb6b5c54f1ae662e93f80bd933412a699594",
+        "calls\\sharon\\SDK-invariants.json": "47c3a4be486b046ac812d88607874bd52697e70bff1ec7b6d48c9a5933709b51",
+        "publications\\sharon\\CLI-invariants.json": "08ae944b26a2dbf53e75212957b5bc7e38c6fc6803b5b1564a5f0c24cca040d9",
+        "publications\\sharon\\publication-invariants.json": "c0e2bec8b311976f014831ac8398c8fd6b20351140698cb20efb1164c8250d60"
+      }
+    },
+    "snaplen-request-capture-hole": {
+      "capture_sha256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "physical_frames": 117,
+      "SDK_records": 33,
+      "SDK_export_sha256": "90864d1f5e58c470f741757c01e1b951225a3837409b1ad5ac5a0c6d0274f234",
+      "CLI_export_sha256": "8167be3b7550a7c50c251296f4e08257da165c32e22d97cec01aed29e4107236",
+      "wire_checks": 10294,
+      "complete_wire_PDUs": 29,
+      "incomplete_captured_prefix_diagnostics": 1,
+      "closure_diagnostics": 1,
+      "wire_status_counts": {
+        "decoded": 29,
+        "incomplete": 2
+      },
+      "numeric_call_link_checks": 186,
+      "numeric_call_links": 1,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "dcf9814711cf61dc22faac30ee18bf9fec75962f3bb46d5100a938ac6b00861b",
+        "after_sha256": "90864d1f5e58c470f741757c01e1b951225a3837409b1ad5ac5a0c6d0274f234",
+        "wire_certificate_sha256": "80323b2eb23f93d020a7c296f9773f18e007c4a8a65f09f558370eb39e103317",
+        "complete_records_compared": 33,
+        "byte_equivalent_records": 32,
+        "changed_RPC_records": 1,
+        "changed": [
+          {
+            "PDU": 4,
+            "changes": [
+              "wire-proven generated reply owner and typed alias"
+            ]
+          }
+        ],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 29,
+      "late_publications": 0,
+      "publication_protocol_counts": {},
+      "decoded_nonempty_SDK_messages": 29,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\snaplen-request-capture-hole\\wire-certified-01.json": "80323b2eb23f93d020a7c296f9773f18e007c4a8a65f09f558370eb39e103317",
+        "calls\\snaplen-request-capture-hole\\SDK-invariants.json": "a2ce6388585c28322b56b2d83a5d10d9679fca5429e5d0646598f4872e1b8a02",
+        "publications\\snaplen-request-capture-hole\\CLI-invariants.json": "6b8bd388ed922a51bccfdbd8a73d29755cb6697ee6d63c1a6c1710d1510473ee",
+        "publications\\snaplen-request-capture-hole\\publication-invariants.json": "cb1b87f22305c5666247491567a23a36968175b38322ac0ee4582af4809ffb00"
+      }
+    },
+    "weber": {
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "SDK_export_sha256": "463845cfb4d1e2dd7a77650c418677d3cbf500244dfe45b13e7abdee26170eda",
+      "CLI_export_sha256": "c2ec4ad37d5ad353d547f7466d707bac9a5ebccff68b906b6bfef40dacfcb054",
+      "wire_checks": 223086,
+      "complete_wire_PDUs": 384,
+      "incomplete_captured_prefix_diagnostics": 0,
+      "closure_diagnostics": 16,
+      "wire_status_counts": {
+        "decoded": 369,
+        "context-required": 14,
+        "malformed": 1,
+        "incomplete": 16
+      },
+      "numeric_call_link_checks": 1853,
+      "numeric_call_links": 0,
+      "reference_request_links": 0,
+      "reference_response_links": 0,
+      "unexported_contiguous_complete_PDUs": 0,
+      "SDK_preservation": {
+        "scope": "Certify exact whole-SDK preservation across wire-proven RPC owner additions.\n\nAllow only a verified numeric reply alias and the precise EPM operation names\nderived from accepted UUID/version/context/opnum. Every original record, type,\nID, flow, byte, field, refusal and contributor remains exact without ID mapping.\n",
+        "before_sha256": "463845cfb4d1e2dd7a77650c418677d3cbf500244dfe45b13e7abdee26170eda",
+        "after_sha256": "463845cfb4d1e2dd7a77650c418677d3cbf500244dfe45b13e7abdee26170eda",
+        "wire_certificate_sha256": "9bb595f742be457f7e3f7cceae356b54be2b6f886511109b1dc2bb97ab98da5d",
+        "complete_records_compared": 39740,
+        "complete_exports_byte_identical": true,
+        "byte_equivalent_records": 39740,
+        "changed_RPC_records": 0,
+        "changed": [],
+        "all_other_values_types_IDs_order_flows_fields_and_sources_exact": true
+      },
+      "CLI_changed_RPC_scope_rows": 89,
+      "late_publications": 122,
+      "publication_protocol_counts": {
+        "": 96,
+        "dcerpc": 6,
+        "dns": 2,
+        "http": 1,
+        "modbus": 1,
+        "smb2": 1,
+        "tls": 3,
+        "whois": 12
+      },
+      "decoded_nonempty_SDK_messages": 35397,
+      "decoded_SDK_messages_still_unexported": 0,
+      "unresolved_numeric_response_targets": 0,
+      "all_original_rows_and_ordinary_PDUs_exact": true,
+      "certificates": {
+        "calls\\weber\\wire-certified-01.json": "9bb595f742be457f7e3f7cceae356b54be2b6f886511109b1dc2bb97ab98da5d",
+        "calls\\weber\\SDK-invariants.json": "f610390a990a45d863bc098b07ef092366a84ee5a74bb9129a37a6790f489e2e",
+        "publications\\weber\\CLI-invariants.json": "524b992bdba8f807159cda62a48692c8705989d9e39a162496c64a80bd3168d4",
+        "publications\\weber\\publication-invariants.json": "32142a5dfa155532ed24aab90dd4368db3961d5d52cb150af7a83112da56389c"
+      }
+    }
+  },
+  "new_real_windows_capture": {
+    "generator_sha256": "86c801b548502a8f28dbe530c836e24cab72f26b2862d8488d2080bd77c94d12",
+    "capture_sha256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+    "marker_port": 59315,
+    "client": "Windows Rpcrt4.dll through independent Python ctypes declarations",
+    "target": "actual local Windows endpoint mapper over TCP/135",
+    "binding_rounds": 3,
+    "inquiry_next_operations": 24,
+    "API_receipts": 42,
+    "authentication": "explicit RPC_C_AUTHN_NONE before inquiries",
+    "endpoint_registration_or_service_invocation": false,
+    "failures": []
+  },
+  "derived_observation_controls": [
+    {
+      "case": "duplicate-request-observation",
+      "physical_frames": 118,
+      "derived_capture_sha256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816"
+    },
+    {
+      "case": "request-arrives-after-two-later-requests",
+      "physical_frames": 117,
+      "derived_capture_sha256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24"
+    },
+    {
+      "case": "permanent-request-capture-hole",
+      "physical_frames": 116,
+      "derived_capture_sha256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce"
+    },
+    {
+      "case": "snaplen-request-capture-hole",
+      "physical_frames": 117,
+      "derived_capture_sha256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c"
+    }
+  ],
+  "totals": {
+    "physical_frames": 380210,
+    "SDK_records": 285782,
+    "wire_checks": 775544,
+    "complete_wire_PDUs": 636,
+    "numeric_call_links": 88,
+    "reference_request_links": 79,
+    "reference_response_links": 79,
+    "late_publications": 529
+  },
+  "public_late_publications": 527,
+  "public_SDK_records_byte_identical": 285524,
+  "negative_controls": {
+    "negative-call-links-02": {
+      "scope": "Reject consistent-looking but incorrect RPC owner and operation projections.\n\nEach control changes a complete SDK export and re-runs original-capture wire,\nfield, contributor, ordered-context and independently derived call-link checks.\nCaptures and mutated exports must remain outside Git.\n",
+      "capture_sha256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "events_sha256": "a1e6bac23a702588745fed7552562ae931ab6d546c08744e4bc380f89448d924",
+      "oracle_sha256": "57359ce4578880d98688d06fdd19a21d45195662e918a8a88a189cc92e260e25",
+      "baseline_links": 28,
+      "negative_controls_rejected": 16,
+      "rejected": [
+        {
+          "name": "missing-owner-and-alias",
+          "PDU": 6,
+          "rejection": "('exact original request PDU owner', 6, 5)",
+          "mutated_export_sha256": "5baf0bcdf26f6444d5d2b9003d905f8a9d29062e150cb5ca99997e8c86dda6d2"
+        },
+        {
+          "name": "wrong-original-request-and-alias",
+          "PDU": 6,
+          "rejection": "('exact original request PDU owner', 6, 5)",
+          "mutated_export_sha256": "c29968c5399b8591972a61a867051e911251a7b0ca898d1fdacfe86a7a1101d9"
+        },
+        {
+          "name": "self-owner-and-alias",
+          "PDU": 6,
+          "rejection": "('exact original request PDU owner', 6, 5)",
+          "mutated_export_sha256": "44551fbb938eb33bda13351f10b601b8e1e4d158d5ed79ca1d221d51696a6d7e"
+        },
+        {
+          "name": "future-owner-and-alias",
+          "PDU": 6,
+          "rejection": "('exact original request PDU owner', 6, 5)",
+          "mutated_export_sha256": "8e268ba288d353970e622506713883a657f6f7a927a55446367e688221249a95"
+        },
+        {
+          "name": "owner-string-type",
+          "PDU": 6,
+          "rejection": "literal generated response identity",
+          "mutated_export_sha256": "9b35a8ed71dcc09b0b81552bcb69e83bd7c8784300abccc5008b128b3f9729d7"
+        },
+        {
+          "name": "typed-owner-only",
+          "PDU": 6,
+          "rejection": "typed generated reply owner",
+          "mutated_export_sha256": "05384e7b7b16698edb25ba9f290815c63f676f0c22cd508c6574d44c586b9085"
+        },
+        {
+          "name": "typed-owner-exact-decimal",
+          "PDU": 6,
+          "rejection": "exact decimal generated reply owner",
+          "mutated_export_sha256": "7124b7f4f441bfd8d727846301fd2bf83227a75568ff905c7b4bd21c8e9bd21e"
+        },
+        {
+          "name": "reply-connection-generation",
+          "PDU": 6,
+          "rejection": "('association follows original request type/direction/context', 6, 'missing-request')",
+          "mutated_export_sha256": "cfc7790e188ec0a779f0e0002487e9ed06795cc97debd87c76a70af758f750b7"
+        },
+        {
+          "name": "reply-operation-owner",
+          "PDU": 6,
+          "rejection": "reply operation name comes from the same original request",
+          "mutated_export_sha256": "d3a807c1d11ad73d1b59e1b51bb271b76cabab9c9879aaa7626b5f5d7f95a11a"
+        },
+        {
+          "name": "request-operation-name",
+          "PDU": 5,
+          "rejection": "precise operation name follows the original UUID/version/opnum",
+          "mutated_export_sha256": "a8daa8f28927af10af7de77732517c538eb90438ad57a1769f91b4b4f1a97e22"
+        },
+        {
+          "name": "request-interface-alias",
+          "PDU": 5,
+          "rejection": "operation interface follows the original accepted context",
+          "mutated_export_sha256": "f427350d802e24a7bd6a19b98bbdb1c5c7d0a2f5da943711d260c4672349b2d5"
+        },
+        {
+          "name": "request-interface-version",
+          "PDU": 5,
+          "rejection": "operation interface version follows the accepted original proposal",
+          "mutated_export_sha256": "60a84cf87a8f7713d88919c891d562e9a29ecea0c8460b0e53b32e6251e6c2c3"
+        },
+        {
+          "name": "request-operation-number",
+          "PDU": 5,
+          "rejection": "native operation number equals the original request header",
+          "mutated_export_sha256": "d4116e2f0e58f7ca58159a1859afe30dab1fee8ef524a681499d457c0720c591"
+        },
+        {
+          "name": "reply-association-success",
+          "PDU": 6,
+          "rejection": "('association follows original request type/direction/context', 6, 'matched')",
+          "mutated_export_sha256": "2184be04da49a1d3a188c561efc0993fefa9c13af4b4cae8c32903691ea91dcc"
+        },
+        {
+          "name": "reply-context",
+          "PDU": 6,
+          "rejection": "native call context equals the original fixed header",
+          "mutated_export_sha256": "fb58efe129b1d0f431c779256827164e2f28153a96d272812dc99bce12529ee2"
+        },
+        {
+          "name": "literal-wire-call-id",
+          "PDU": 6,
+          "rejection": "literal native common field Call ID",
+          "mutated_export_sha256": "abfee526660b8aade783f3fbd02d0cbb8f8e3280a1ac36d2d20f635cfb82af06"
+        }
+      ]
+    },
+    "negative-delivery-links-01": {
+      "scope": "Reject consistent-looking but incorrect RPC owner and operation projections.\n\nEach control changes a complete SDK export and re-runs original-capture wire,\nfield, contributor, ordered-context and independently derived call-link checks.\nCaptures and mutated exports must remain outside Git.\n",
+      "capture_sha256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "events_sha256": "750bbbd955751f729441330748cfdc4f14298dd95d17e756c2f7ede285573593",
+      "oracle_sha256": "9f22f2c58c585998bc9d804f4a26b1529d4648e48a5a79db00424f66c0a81375",
+      "baseline_links": 26,
+      "negative_controls_rejected": 19,
+      "rejected": [
+        {
+          "name": "missing-owner-and-alias",
+          "PDU": 10,
+          "rejection": "('exact original request PDU owner', 10, 9)",
+          "mutated_export_sha256": "2c482174351ac1f4d555b76409b64a4493717c7b9e047bfc06115da7b4cf2ae3"
+        },
+        {
+          "name": "wrong-original-request-and-alias",
+          "PDU": 10,
+          "rejection": "('exact original request PDU owner', 10, 9)",
+          "mutated_export_sha256": "71f1b141dd9248aa1ae3b0035a801f9e6b64df72a6f2ccb6fe018ddaaac9eb0c"
+        },
+        {
+          "name": "self-owner-and-alias",
+          "PDU": 10,
+          "rejection": "('exact original request PDU owner', 10, 9)",
+          "mutated_export_sha256": "a9065d38003b2090bf50f9307de53639f07dc29c2ab957739f179a1b542ea96c"
+        },
+        {
+          "name": "future-owner-and-alias",
+          "PDU": 10,
+          "rejection": "('exact original request PDU owner', 10, 9)",
+          "mutated_export_sha256": "7a52b03f0c66e0bee9dbdbf89e21642c688177a847b5d96862dc3304ac7ff778"
+        },
+        {
+          "name": "owner-string-type",
+          "PDU": 10,
+          "rejection": "literal generated response identity",
+          "mutated_export_sha256": "353af423463c9745d1acd1fe7e9760d61423c1a484e07864da16d578642e78c6"
+        },
+        {
+          "name": "typed-owner-only",
+          "PDU": 10,
+          "rejection": "typed generated reply owner",
+          "mutated_export_sha256": "9df4dcff488fdc5aa0503808ba2d5a817ee1fedcbdf8a106155d97c3e0c0b929"
+        },
+        {
+          "name": "typed-owner-exact-decimal",
+          "PDU": 10,
+          "rejection": "exact decimal generated reply owner",
+          "mutated_export_sha256": "ee7f5df9f89e33e3c0d87742faa4abc0adb824cb3ed4d91f873f194f97ca3041"
+        },
+        {
+          "name": "reply-connection-generation",
+          "PDU": 10,
+          "rejection": "('association follows original request type/direction/context', 10, 'missing-request')",
+          "mutated_export_sha256": "d9685b62331615f8db778b33c4835e5545e98d58a4f69da487f66517c5f80732"
+        },
+        {
+          "name": "reply-operation-owner",
+          "PDU": 10,
+          "rejection": "reply operation name comes from the same original request",
+          "mutated_export_sha256": "8c275189df93c608b0d86236df5134593f9a858354ba820a894b7f8dc07503dc"
+        },
+        {
+          "name": "request-operation-name",
+          "PDU": 9,
+          "rejection": "precise operation name follows the original UUID/version/opnum",
+          "mutated_export_sha256": "2a05a9594a966fe0cc4e01dc328480ff75070d0c86b0e817f19aa99f9bb6ace6"
+        },
+        {
+          "name": "request-interface-alias",
+          "PDU": 9,
+          "rejection": "operation interface follows the original accepted context",
+          "mutated_export_sha256": "b06ae487485bf44c5fb3efc35098ef8d2a58a32d216e88098a11935636b79506"
+        },
+        {
+          "name": "request-interface-version",
+          "PDU": 9,
+          "rejection": "operation interface version follows the accepted original proposal",
+          "mutated_export_sha256": "8ce24d24359a010e83488c37d2a640085434ef04f117ad8f9de40b1a59c7ddec"
+        },
+        {
+          "name": "request-operation-number",
+          "PDU": 9,
+          "rejection": "native operation number equals the original request header",
+          "mutated_export_sha256": "9a118b7d59ce8ede4f293eb73348f6d9cbde8a6281fb49c03f8dba8382fa5d7b"
+        },
+        {
+          "name": "reply-association-success",
+          "PDU": 10,
+          "rejection": "('association follows original request type/direction/context', 10, 'matched')",
+          "mutated_export_sha256": "fd9d57ab48be285dfc78917c294375943611ae6967f5850ad04568363633e980"
+        },
+        {
+          "name": "reply-context",
+          "PDU": 10,
+          "rejection": "native call context equals the original fixed header",
+          "mutated_export_sha256": "e43e38a221fd193d7c2218cf597f247aae09ddc6103d6ae850066a6dfe75d908"
+        },
+        {
+          "name": "literal-wire-call-id",
+          "PDU": 10,
+          "rejection": "literal native common field Call ID",
+          "mutated_export_sha256": "e5a5d686b9bb18af308cc2b48efc48457916cf048ccd38c4e8a8842955e6dcde"
+        },
+        {
+          "name": "replace-original-contributors-with-Wireshark-delivery-frame",
+          "PDU": 9,
+          "rejection": "complete original contributor frames",
+          "mutated_export_sha256": "ba2309b687b7ed61c9881ec1b5c24d43ead0eb8a8033379faa977979554e0a13"
+        },
+        {
+          "name": "dcerpc.request_in-wrong-stream-delivery",
+          "rejection": "('Wireshark request frame equals independently reconstructed TCP prefix delivery', 10)",
+          "mutated_oracle_sha256": "5f7cba80b5128ea32874c5756f5e91d65e86d0e7f8f127b3ec5cc5729d2fba73"
+        },
+        {
+          "name": "dcerpc.response_in-wrong-stream-delivery",
+          "rejection": "('Wireshark response frame equals independently reconstructed reply delivery', 10)",
+          "mutated_oracle_sha256": "ddb795e0f4155f71b3f663eff392d51a003968c365010fb8865f5babcb24644c"
+        }
+      ]
+    },
+    "negative-CLI-publications-01": {
+      "scope": "Reject mutations of two actual CLI rows under full original PDU mappings.\n\nThe full SDK/wire and CLI certificates are mandatory inputs. Controls reuse the\nfull immutable ID/source mapping but compare two declared row subsets; they do\nnot pretend to replay a modified whole public capture.\n",
+      "full_CLI_certificate_sha256": "df8ff4d3afc9e255e18be7422302e110a5063223bbe30b8d725142442f415936",
+      "wire_certificate_sha256": "30f2d08955c3a0d6e36f4c59decc06dd5f9158bf544b57a8f9ebf6dc0ad1df9b",
+      "full_before_sha256": "e4851319ba38ef4207adf97a117a7e45e957b6607a5f6363b3cbc0e181a389ab",
+      "full_after_sha256": "17dd8ba44325700403829a84886305196cd7cf525f99ca1f39ea67e6d3cb19eb",
+      "SDK_sha256": "750bbbd955751f729441330748cfdc4f14298dd95d17e756c2f7ede285573593",
+      "selected_physical_rows": [
+        1,
+        6
+      ],
+      "full_nonselected_PDU_mapping": 2,
+      "negative_controls_rejected": 16,
+      "rejected": [
+        {
+          "name": "physical-length",
+          "frame": 6,
+          "rejection": "('non-certified row/physical-fact change', 6, ['info', 'length'])"
+        },
+        {
+          "name": "physical-frame-type",
+          "frame": 6,
+          "rejection": "('non-certified row/physical-fact change', '6', ['info', 'number'])"
+        },
+        {
+          "name": "physical-endpoint",
+          "frame": 6,
+          "rejection": "physical capture-domain/TCP identity cannot change"
+        },
+        {
+          "name": "capture-domain",
+          "frame": 6,
+          "rejection": "physical capture-domain/TCP identity cannot change"
+        },
+        {
+          "name": "outside-protocol-label",
+          "frame": 1,
+          "rejection": "('non-certified row/physical-fact change', 1, ['protocol'])"
+        },
+        {
+          "name": "outside-summary",
+          "frame": 1,
+          "rejection": "('non-certified row/physical-fact change', 1, ['info'])"
+        },
+        {
+          "name": "unrelated-PDU-metadata",
+          "frame": 1,
+          "rejection": "('complete other-protocol CLI PDU metadata', 1)"
+        },
+        {
+          "name": "unrelated-PDU-response",
+          "frame": 1,
+          "rejection": "('complete other-protocol CLI PDU metadata', 1)"
+        },
+        {
+          "name": "selected-status",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "selected PDU status is the native status"
+        },
+        {
+          "name": "selected-completeness",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "complete native protocol/scope projection"
+        },
+        {
+          "name": "selected-response",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "CLI reply points to the same original request as the SDK"
+        },
+        {
+          "name": "selected-source-SHA",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "complete selected source projection"
+        },
+        {
+          "name": "selected-source-contributors",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "complete selected source projection"
+        },
+        {
+          "name": "selected-typed-owner",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "complete selected typed alias snapshot"
+        },
+        {
+          "name": "selected-typed-snapshot",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "complete selected typed alias snapshot"
+        },
+        {
+          "name": "selected-flat-status",
+          "CLI_PDU": 3,
+          "SDK_PDU": 3,
+          "rejection": "flat selected aliases equal the owned typed values"
+        }
+      ]
+    },
+    "negative-publications-01": {
+      "scope": "Reject missing/forged late publications using a complete owned export.\n\nRequire the baseline to contain every decoded nonempty SDK message, then change\none full export per control. Byte ownership, physical rows, aliases and numeric\nidentities remain independent of the row that published the result.\n",
+      "before_sha256": "92c4012b10df42ca4fea2f19103249c0b45d07b8a1a86064f9348508b52a5103",
+      "after_sha256": "17dd8ba44325700403829a84886305196cd7cf525f99ca1f39ea67e6d3cb19eb",
+      "SDK_sha256": "750bbbd955751f729441330748cfdc4f14298dd95d17e756c2f7ede285573593",
+      "baseline_publications": 2,
+      "negative_controls_rejected": 12,
+      "rejected": [
+        {
+          "name": "physical-byte-count",
+          "frame": 18,
+          "rejection": "('every original physical fact, label, ordinary PDU and metadata remains exact', 18)",
+          "mutated_export_sha256": "10a8f4af0546c1607f523ec49b81f84387966181a181095dd53da6ff962a7642"
+        },
+        {
+          "name": "physical-protocol-label",
+          "frame": 18,
+          "rejection": "('every original physical fact, label, ordinary PDU and metadata remains exact', 18)",
+          "mutated_export_sha256": "fe3a3f3ff19d67bf6d790a74046d8fc035302225db616ae96e2367262f9c5b35"
+        },
+        {
+          "name": "publication-promoted-to-ordinary-contributor",
+          "frame": 18,
+          "rejection": "('every original physical fact, label, ordinary PDU and metadata remains exact', 18)",
+          "mutated_export_sha256": "dd15228a2968b37f963ad004773408efebb4935f4afe5cff62733b1b0e68d62a"
+        },
+        {
+          "name": "original-byte-owner-replaced-by-publication-frame",
+          "frame": 18,
+          "rejection": "a current contributor belongs to ordinary PDUs, not the late-publication channel",
+          "mutated_export_sha256": "6697f8e0a02ff3e329bac4f59a325439c36ed3a9f8bda617fc0e8fca17f09c58"
+        },
+        {
+          "name": "source-SHA",
+          "frame": 18,
+          "rejection": "('complete literal native SDK publication projection', 8)",
+          "mutated_export_sha256": "ae7e7dd0ddbc1eddd131a28d143515c07417c0c7be083a875cf5c28c94ddaa80"
+        },
+        {
+          "name": "typed-owner-ID",
+          "frame": 18,
+          "rejection": "('complete literal native SDK publication projection', 8)",
+          "mutated_export_sha256": "5dd1e5b1c8cb7260f766a5a71d5119ee70a1dcb94a8ad84832f2c11786924daf"
+        },
+        {
+          "name": "numeric-request-owner",
+          "frame": 18,
+          "rejection": "('complete literal native SDK publication projection', 8)",
+          "mutated_export_sha256": "81558d886bffcf1c72b67f1a1bbfa3cd8b1e2b7c01a35dfd96c3a4635d90fbdf"
+        },
+        {
+          "name": "missing-complete-late-message",
+          "frame": 18,
+          "rejection": "removing a complete publication cannot pass decoded-message coverage",
+          "mutated_export_sha256": "1cb681ed275d5711e046011df1778a4a2d5cd4a0734d4b1044b913385fccbe7e"
+        },
+        {
+          "name": "ordinary-PDU-identity-reused",
+          "frame": 18,
+          "rejection": "new publications cannot duplicate previously exported ordinary PDUs",
+          "mutated_export_sha256": "115130555de961b9640fcc7315e5a0b00f8dbe00807b8af217c0af22c1fbf7f0"
+        },
+        {
+          "name": "published-protocol",
+          "frame": 18,
+          "rejection": "('complete literal native SDK publication projection', 8)",
+          "mutated_export_sha256": "747f5449140a13c48a21d0c1eefce75927894d37e8f24d41224dcb22b02d5d69"
+        },
+        {
+          "name": "publication-claimed-as-byte-contribution",
+          "frame": 18,
+          "rejection": "explicit availability-only publication scope",
+          "mutated_export_sha256": "641eca4a793199fb3714b1b92b2014e361d5bb32719339986abe861eab7d3adc"
+        },
+        {
+          "name": "typed-snapshot-completeness",
+          "frame": 18,
+          "rejection": "('complete literal native SDK publication projection', 8)",
+          "mutated_export_sha256": "67b887bdf6078a76646468b849cb7dbadfd59c87c550db3b2eac9dbfe08336b6"
+        }
+      ]
+    }
+  },
+  "negative_controls_rejected": 63,
+  "tests": {
+    "native_full_seconds": 415.375,
+    "CLI_full_seconds": 2.078,
+    "final_CLI_full_seconds": 2.045,
+    "numeric_owner_fuzz_executions": 91860,
+    "numeric_owner_fuzz_seconds": 41.483
+  },
+  "Windows": {
+    "reply": {
+      "source": "7822ba2aa59e0c24cd0c86f3433ad73cd6b0a702",
+      "query": "fields pdu.id == 6",
+      "SDK_response_PDU": 6,
+      "SDK_request_PDU": 5,
+      "CLI_response_PDU": 6,
+      "CLI_request_PDU": 5,
+      "request_wire_sha256": "818cd25871c69bbe1b9fe3205abd5b2087daa28717b202ceb1bcdac68dca0ad1",
+      "response_wire_sha256": "a286a587730e85cce27030e0dc6eea25125821572882ed315f3f573a76eaadcb",
+      "visible_native_request_link": "Response to PDU: #5",
+      "visible_native_operation": "EPM.ept_lookup",
+      "native_snapshot_sha256": "81a67eb87f7d5daf96698a9afb7483a8306c09a8d4779dc830cf4392310376a8",
+      "rendered_native_cells": true
+    },
+    "late_request": {
+      "CLI_source": "24c9ad0a454eef1910f446b0548d8406282ba540",
+      "SDK_source": "7822ba2aa59e0c24cd0c86f3433ad73cd6b0a702",
+      "query": "fields pdu.id == 9",
+      "PDU": 9,
+      "original_contributor_frames": [
+        17
+      ],
+      "publication_frame": 18,
+      "selected_UI_frame": 17,
+      "source_sha256": "781913acad5ddf6a4e4084fab2ebd9429a4a80707a441d93b920fbe0079332f0",
+      "native_snapshot_sha256": "09bb7531021cee9e1b08341d14101e54293f862be5b2cea6f1b49c1c23669dd2",
+      "native_interface_and_operation_fields_visible": true
+    },
+    "latest_restoration": {
+      "error": "<nil>",
+      "input_cp": 936,
+      "output_cp": 936
+    }
+  },
+  "audit_source_sha256": {
+    "dcerpc_wire_audit.py": "c4bfbba87967ff49d120a629ddf6f13950dc659c260979808ee646e438e28976",
+    "dcerpc_call_links.py": "8bfc9942e418db826d78306851a0a4449eea0ef9a1bd55bb1325d9291783cca7",
+    "dcerpc_call_link_negative_controls.py": "375b5cc3568c9b57b1239d1b09d6486804e9898dba61172651cbed667007e721",
+    "dcerpc_call_sdk_invariants.py": "0c71e55641311fa6d98f01053a09f0735515db66375573d34b5c74810b8bc356",
+    "dcerpc_cli_invariants.py": "15af035372a33bd93861fcf3e0c079ab01613dcae13eaf4e1e6633088e4ee442",
+    "dcerpc_cli_negative_controls.py": "40c8f501560a1f272b9f2226a8e5314ae2fc3482546a028b5138ff43569c02d0",
+    "protocol_publication_audit.py": "b24bab75be4f6e47a324b3eb3eaed24fb136b9aa56053b4d770e68ce011198d0",
+    "protocol_publication_negative_controls.py": "1657b764d6a23d01b3793cb3b0813c2d81d016ab29a04e81c3a56a19e7a9b4d0",
+    "discovery/dcerpc_windows_query_live.py": "86c801b548502a8f28dbe530c836e24cab72f26b2862d8488d2080bd77c94d12",
+    "discovery/dcerpc_query_transport_variants.py": "0ebd3dfe4cedd029da3634e82642f1069819aafd77ed75374f98a93accbcec66"
+  },
+  "binary_sha256": {
+    "events-calls.exe": "7fd292386e4b2d21c7e3ab70daa48da921f49df0400d1cf15a3845e733d8c03e",
+    "yak-calls.exe": "4f4a642ed25b561de8c9c27d33b2a36deb6ab2ea29ca26901bd88d4f7cf59bcf",
+    "yak-publications.exe": "81af31e5dbd2e68e340731b5ae0326a8f504b435a3d1706bea7b6687bf309d3c"
+  },
+  "explicit_limits": [
+    "General RPC fragment header/stub reassembly and numeric logical-message ownership remain incomplete.",
+    "Multisyntax bind offers, reverse-call ID namespaces, Auth3/SSP verification and NDR service bodies are not newly certified.",
+    "SMB named-pipe/tunnel carriers, earlier public source-domain refusals and late pre-origin bytes retain their previous limits.",
+    "Derived reorder/drop/snaplen files are controlled observation mutations, not actual socket impairment.",
+    "All decoded nonempty SDK IDs are present in these unfiltered exports; this is not equality with all Wireshark fields, support for unrecognized traffic, or a hindsight packet-filter guarantee.",
+    "PR remains draft; global TOP30/core protocol conformance is incomplete."
+  ]
+}

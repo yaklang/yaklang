@@ -99,6 +99,7 @@ func testICMPFragmentObservations(t *testing.T) {
 	require.NoError(t, json.Unmarshal(raw, &doc))
 	count := 0
 	for _, c := range doc.Cases {
+		c.Fields = networkOwnershipFieldsCurrent(t, c)
 		if c.Protocol == "arp" || c.Error != "" {
 			continue
 		}

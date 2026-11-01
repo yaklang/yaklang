@@ -103,15 +103,16 @@ func TestProtocolSessionFTPReplayWinlabCorpus(t *testing.T) {
 		}
 		if strings.HasSuffix(event.Source, ":1025") || strings.HasSuffix(event.Destination, ":1025") {
 			dataEvents = append(dataEvents, event)
-			require.Empty(t, event.Protocol, "passive data is not an FTP control channel")
-			require.Contains(t, []string{"incomplete", "unrecognized"}, event.Status)
+			require.Equal(t, "ftp-data", event.Protocol, "data stays distinct from the control grammar")
+			require.Equal(t, "decoded", event.Status)
+			require.Equal(t, "observed-control-command-and-data-endpoint", event.Admission)
 			continue
 		}
 		require.Empty(t, event.Protocol, "only the negotiated control flow should be FTP")
 	}
 	require.Len(t, ftpEvents, 14)
-	require.EqualValues(t, 14, stats.Decoded)
-	require.EqualValues(t, 1, stats.Incomplete)
+	require.EqualValues(t, 22, stats.Decoded)
+	require.Zero(t, stats.Incomplete)
 	require.Zero(t, stats.Unknown)
 	var packetNames []string
 	var ftpBytes uint64
@@ -125,8 +126,16 @@ func TestProtocolSessionFTPReplayWinlabCorpus(t *testing.T) {
 		ftpBytes += uint64(event.Length)
 	}
 	require.Equal(t, []string{"Reply", "USER", "Reply", "PASS", "Reply", "TYPE", "Reply", "PASV", "Reply", "RETR", "Reply", "Reply", "QUIT", "Reply"}, packetNames)
-	require.Len(t, dataEvents, 1)
-	require.Equal(t, ftpBytes, stats.MessageBytes, "only the control messages count as decoded; passive data stays opaque")
+	require.Len(t, dataEvents, 8)
+	var data []byte
+	for _, event := range dataEvents {
+		require.EqualValues(t, len(data), event.Session["Stream Offset"])
+		data = append(data, event.Raw...)
+	}
+	// Independently verified with Wireshark 4.6.9 Follow TCP Stream 1; eight
+	// four-byte chunks, with no application framing added by the data decoder.
+	require.Equal(t, "flag{winlab-ftp-reassembly-5013}", string(data))
+	require.Equal(t, ftpBytes+uint64(len(data)), stats.MessageBytes)
 }
 
 func TestProtocolSessionFTPRejectsDecoyBannerAndCommandPrefixes(t *testing.T) {

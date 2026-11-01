@@ -1,0 +1,1122 @@
+{
+  "scope": "Fresh owned real IPv4 Windows Npcap loopback sockets; supplemental random-port Decode-As taken only from generator manifest; 13 fault captures explicitly derived offline from this fresh capture",
+  "capture_sha256": "18333c529e5fbe1a9e23c0bf26e4d3bca37c0b91517c110367efb98072a7f6a7",
+  "manifest_sha256": "b61ba09e52686123916ae6a46f7ddfb6aa53ebf95598535aeb5d07731b78e0b0",
+  "frames": 679,
+  "bytes": 1066130,
+  "kernel_drops": 0,
+  "operations": {
+    "http": 3,
+    "tls-http1": 12,
+    "grpc-request": 5,
+    "grpc-response": 5,
+    "dns-udp": 3,
+    "dns-tcp": 3,
+    "http3": 12,
+    "tuple-reuse-tls": 1,
+    "tuple-reuse-redis": 1
+  },
+  "proxy": {
+    "delayed": 14,
+    "dropped": 8,
+    "packets": 228
+  },
+  "baseline": {
+    "frames": [
+      679,
+      679
+    ],
+    "rows_yak": {
+      "TCP": 253,
+      "HTTP/1.1": 26,
+      "TLS": 6,
+      "TLSv1.2": 57,
+      "TLSv1.3": 60,
+      "HTTP/2": 13,
+      "gRPC": 27,
+      "DNS": 12,
+      "QUIC": 96,
+      "HTTP/3": 127,
+      "Redis": 2
+    },
+    "rows_ws": {
+      "TCP": 255,
+      "HTTP": 32,
+      "TLSv1.2": 53,
+      "TLSv1.3": 63,
+      "HTTP2": 33,
+      "GRPC/PB(<UNKNOWN>)": 8,
+      "DNS": 12,
+      "QUIC": 172,
+      "HTTP3": 51
+    },
+    "events": {
+      "http/decoded": 26,
+      "tls/decoded": 220,
+      "http2/decoded": 52,
+      "grpc/decoded": 32,
+      "dns/decoded": 12,
+      "quic/decoded": 108,
+      "http3/decoded": 127,
+      "redis/decoded": 2
+    },
+    "grpc": [
+      10,
+      10
+    ],
+    "grpc_bytes_equal": true,
+    "h3_paths_equal": true,
+    "h3_data": [
+      27,
+      27
+    ],
+    "h3_data_equal": true,
+    "h3_wireshark_retransmitted_data_observations": 2,
+    "h3_yak_application_replies_verified": true,
+    "h3_ws_application_replies_verified": true,
+    "tls_records": [
+      220,
+      220
+    ],
+    "tls_wire": {
+      "wireshark": 220,
+      "native": 220,
+      "matching_occurrences": 220,
+      "missing_occurrences": 0,
+      "extra_occurrences": 0,
+      "native_header_checks": 660,
+      "wireshark_incomplete_views": 0,
+      "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+    },
+    "authenticated_plaintext_without_verified_tag": [],
+    "h3_path_counts": [
+      12,
+      12
+    ],
+    "diagnostics": {}
+  },
+  "faults": {
+    "tcp-reorder": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 61,
+        "HTTP/2": 13,
+        "gRPC": 26,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 256,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 32,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "da0329bf2bb9a28ba6a435e668907acae6b57bf40836000b2244a7d716e5397d",
+      "capture_sha256": "462ccc0448d10c246e7dbe507c573d0959119b1f0ac3c065e443e3ec0a29e057"
+    },
+    "tcp-loss": {
+      "frames": [
+        678,
+        678
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 66,
+        "HTTP/2": 12,
+        "gRPC": 21,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 261,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 62,
+        "HTTP2": 28,
+        "GRPC/PB(<UNKNOWN>)": 7,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 213,
+        "http2/decoded": 37,
+        "grpc/decoded": 26,
+        "http2/malformed": 1,
+        "http2/context-required": 2,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2,
+        "tls/incomplete": 1
+      },
+      "grpc": [
+        9,
+        9
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        213,
+        214
+      ],
+      "tls_wire": {
+        "wireshark": 213,
+        "native": 213,
+        "matching_occurrences": 213,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 639,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "http2/malformed/": 1,
+        "http2/context-required/": 2,
+        "tls/incomplete/": 1
+      },
+      "provenance_sha256": "e9da34345f89705ccea8ddb0b9df6c64234d9927ec1ac19aba28170b959e750c",
+      "capture_sha256": "2a758277c474d0425d4bf0656d72dda68e2bcc01c1343b8ccbc08ea36752f302"
+    },
+    "tcp-duplicate": {
+      "frames": [
+        680,
+        680
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 61,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 256,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "a1a69993029fbe5d9e4f7518c9c24b83b057e15106000f60db7b762b172af4f5",
+      "capture_sha256": "d26a9c404efeda0a905904c072e6bcdc76afb8f8c1c98da8ec6264d7d5c58c75"
+    },
+    "tcp-snaplen-recovered": {
+      "frames": [
+        680,
+        680
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 62,
+        "HTTP/2": 13,
+        "gRPC": 26,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 256,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 64,
+        "HTTP2": 32,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        221,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 1,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "c79ab08cba40dd121902063a3fc3c8b5135283c95610b909dcac134bf7ffe333",
+      "capture_sha256": "a5185be74320da8a6dfa91c6a4cfac38dd99e55f0b15b707ebd1935ba139002a"
+    },
+    "tcp-snaplen": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 67,
+        "HTTP/2": 12,
+        "gRPC": 21,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 261,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 28,
+        "GRPC/PB(<UNKNOWN>)": 7,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 213,
+        "http2/decoded": 37,
+        "grpc/decoded": 26,
+        "http2/malformed": 1,
+        "http2/context-required": 2,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2,
+        "tls/incomplete": 2
+      },
+      "grpc": [
+        9,
+        9
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        214,
+        215
+      ],
+      "tls_wire": {
+        "wireshark": 213,
+        "native": 213,
+        "matching_occurrences": 213,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 639,
+        "wireshark_incomplete_views": 1,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "http2/malformed/": 1,
+        "http2/context-required/": 2,
+        "tls/incomplete/": 2
+      },
+      "provenance_sha256": "79323a79ecb48fcab5231433cf19bd853e572b5819979a0ee44dff2ed4df1a5b",
+      "capture_sha256": "71dd6cf0f0b6dca69a1d566224022b373d9c04f739bc1d2a6e0061182585b221"
+    },
+    "tls-auth-failure": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 67,
+        "HTTP/2": 12,
+        "gRPC": 21,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 69,
+        "HTTP2": 28,
+        "GRPC/PB(<UNKNOWN>)": 7,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 219,
+        "http2/decoded": 37,
+        "grpc/decoded": 26,
+        "tls/malformed": 1,
+        "http2/malformed": 1,
+        "http2/context-required": 1,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        9,
+        9
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "tls/malformed/AuthenticationFailed": 1,
+        "http2/malformed/": 1,
+        "http2/context-required/": 1
+      },
+      "provenance_sha256": "d7a0fbdba8ccf814d826e4b94fee1d3398c12634432e0bf843f500a8494e1c3d",
+      "capture_sha256": "b70c6b8b143c5c3ffc8d0662911fd8043936d3b4f3fda8693e8c55ec663023aa"
+    },
+    "tls-missing-clienthello": {
+      "frames": [
+        678,
+        678
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 20,
+        "TLS": 5,
+        "TLSv1.2": 57,
+        "TLSv1.3": 66,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 270,
+        "HTTP": 26,
+        "TLSv1.2": 53,
+        "TLSv1.3": 53,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 20,
+        "tls/decoded": 203,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127,
+        "redis/decoded": 2,
+        "tls/incomplete": 1
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        203,
+        204
+      ],
+      "tls_wire": {
+        "wireshark": 203,
+        "native": 203,
+        "matching_occurrences": 203,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 609,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "tls/incomplete/": 1
+      },
+      "provenance_sha256": "7d8b441500d04a947a775e05bbd61381a023e6238dd6e4d5d76ad7ec816392ef",
+      "capture_sha256": "5ac7f7fb53dd6a1ef6a2a8bef243a14687eb9a8acbb987bc71b924b7952c600f"
+    },
+    "quic-reorder": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 98,
+        "HTTP/3": 125,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 110,
+        "http3/decoded": 125,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "c3f3db5900305b0157c1c9099a6a235076b80db75c7e6770f02e9b3065d7776b",
+      "capture_sha256": "50192fff3cc84f5899dade119931b996569faf42257c0e1c7194f5bb7b5c9376"
+    },
+    "quic-loss": {
+      "frames": [
+        678,
+        678
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 100,
+        "HTTP/3": 122,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 50
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 112,
+        "http3/decoded": 122,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        26,
+        26
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "7f7227a36b1574f63fb36e44cc1553f438ced11389120ea49fa279750d014a40",
+      "capture_sha256": "f1dba85df69f843d53d18db35a40435194a1a838a99bbed8bcab51d5464530f6"
+    },
+    "quic-snaplen": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 100,
+        "HTTP/3": 122,
+        "UDP": 1,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 173,
+        "HTTP3": 50
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 112,
+        "http3/decoded": 122,
+        "/incomplete": 1,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        26,
+        26
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "/incomplete/": 1
+      },
+      "provenance_sha256": "e7d3069de1ea5f9849598052d353ae1320ef264b95eed1df387f35e416832d0b",
+      "capture_sha256": "2913bbafbd0c279ef889d2f28c67f69bd9f8d8a4e4fe59070130992c34506b55"
+    },
+    "quic-unknown-cid": {
+      "frames": [
+        679,
+        679
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 100,
+        "HTTP/3": 122,
+        "UDP": 1,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 173,
+        "HTTP3": 50
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 112,
+        "http3/decoded": 122,
+        "/unrecognized": 1,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        26,
+        26
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {
+        "/unrecognized/ProtocolNotRecognized": 1
+      },
+      "provenance_sha256": "3db5e585b72e645abcf53a42b279e65c8a13cc875e8a90493e8c1fdff58c75a9",
+      "capture_sha256": "9e249f3dce7c50e36e65e2287e2eee18113d2be71a6894f99c043b340d2a1763"
+    },
+    "quic-no-initial": {
+      "frames": [
+        670,
+        670
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "UDP": 214,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 255,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 214
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "/unrecognized": 214,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        0,
+        0
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 0,
+      "h3_yak_application_replies_verified": false,
+      "h3_ws_application_replies_verified": false,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        0,
+        0
+      ],
+      "diagnostics": {
+        "/unrecognized/ProtocolNotRecognized": 214
+      },
+      "provenance_sha256": "54124edcb2871191cdaefc98ebde30895f484b45a547c514511e5e09ab18f7ab",
+      "capture_sha256": "6676e23544876251b61f1ebbf0d8aaa3904c73b63e2e83ed1c1a08df729e9bfd"
+    },
+    "reuse-missing-second-syn": {
+      "frames": [
+        677,
+        677
+      ],
+      "rows_yak": {
+        "TCP": 253,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 60,
+        "HTTP/2": 13,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 96,
+        "HTTP/3": 127
+      },
+      "rows_ws": {
+        "TCP": 253,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 63,
+        "HTTP2": 33,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 172,
+        "HTTP3": 51
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 220,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 108,
+        "http3/decoded": 127
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        27,
+        27
+      ],
+      "h3_data_equal": true,
+      "h3_wireshark_retransmitted_data_observations": 2,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": true,
+      "tls_records": [
+        220,
+        220
+      ],
+      "tls_wire": {
+        "wireshark": 220,
+        "native": 220,
+        "matching_occurrences": 220,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 660,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "authenticated_plaintext_without_verified_tag": [],
+      "h3_path_counts": [
+        12,
+        12
+      ],
+      "diagnostics": {},
+      "provenance_sha256": "e39fc11d9a425d6ec8fde6767ec4d5d4871daef928657ff82d774ce2d63d7416",
+      "capture_sha256": "9db05a8a05534c159f0334d4c38d93a35417140b830e84c135e72799d2d223ed"
+    }
+  },
+  "script_sha256": {
+    "compare.py": "2df69112eb1dc80ab79e949aa3a9eb7180a8909bcf14b384b7930377de25c74e",
+    "faults.py": "dab8676366b786e7b1270c7040170acc204e588a7324246e23461aecd2d668d2",
+    "main.go": "a85897669772180ac4f3ddfec941ccd54854d9baf2915880bb8f4bf7e6dc62be"
+  }
+}

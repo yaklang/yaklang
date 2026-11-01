@@ -1,0 +1,1067 @@
+{
+  "source": "b9242dc9c31ac70341c99fee445b24ec76cb18a3",
+  "scope": "Shared UDP carrier rejection, native IPv6 HBH bounds, early L2TPv3/tunnel dispatch, field refusal coverage and real Windows diagnostics. Fresh owned live TLS/QUIC payload verification remains separate from original-corpus protocol/field completeness.",
+  "binaries": {
+    "yak-tunnel.exe": {
+      "bytes": 240674304,
+      "sha256": "5a8a549daba4a596affd8407e62fa6f910e9590bf1b84122a6ca78534876478d"
+    },
+    "events-tunnel.exe": {
+      "bytes": 51964928,
+      "sha256": "aad5cb44b8dc34bd3064215c409f820813c0d53caa001a725ab3fa6e6b8f5b9a"
+    },
+    "generate-live.exe": {
+      "bytes": 14884864,
+      "sha256": "27e694d131a734c0915b9fa61aca826db7e92bc9e5bdce03f4b6810538af244d"
+    }
+  },
+  "audit_sources": {
+    "udp_carrier_wire_audit.py": "924164d7ce4ac2efa4ac26bbb19e44d493afd881e1405edd68a21e9357cc7b5b",
+    "udp_carrier_fault_audit.py": "c5bc9f1b4d8d5648b03bdff0fe9f36412873a6b3083ac5a30a2d76558271f18f",
+    "udp_carrier_audit_negative_controls.py": "278a2ff1367ea4e9734ce2b19dda6d2aeb7a7074446c2448cc06067fa5820b03",
+    "quic_http3_data_audit.py": "bcf0f216de36a129ae295b02c9ae982be141743f3d5b28de99a844f6cad401b9",
+    "quic_http3_audit_negative_controls.py": "614f508cec9841a0ca4e3fb5dd0752a371d47959ccd317451339166135c224fe",
+    "compare.py": "2df69112eb1dc80ab79e949aa3a9eb7180a8909bcf14b384b7930377de25c74e",
+    "main.go": "a85897669772180ac4f3ddfec941ccd54854d9baf2915880bb8f4bf7e6dc62be",
+    "public_corpus.py": "adb82e02b6b171f56ffb5df482fd7fe50bb377eef2b82d561a28175c67bb08e6"
+  },
+  "primary_sources": [
+    "https://www.rfc-editor.org/rfc/rfc768",
+    "https://www.rfc-editor.org/rfc/rfc8200",
+    "https://www.rfc-editor.org/rfc/rfc2675"
+  ],
+  "whole_corpora": {
+    "weber": {
+      "frames": 51328,
+      "manifest": {
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "capture_bytes": 15602892,
+        "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+        "fields": [
+          "frame.number",
+          "frame.interface_id",
+          "frame.encap_type",
+          "frame.len",
+          "frame.cap_len",
+          "frame.protocols",
+          "_ws.col.Protocol",
+          "_ws.col.Info",
+          "ip.src",
+          "ip.dst",
+          "ipv6.src",
+          "ipv6.dst",
+          "tcp.srcport",
+          "tcp.dstport",
+          "udp.srcport",
+          "udp.dstport",
+          "tcp.stream",
+          "udp.stream",
+          "tcp.seq_raw",
+          "tcp.ack_raw",
+          "tcp.len",
+          "tcp.flags",
+          "tls.record.content_type",
+          "quic.dcid",
+          "quic.scid",
+          "quic.packet_number",
+          "_ws.expert.message",
+          "dns.id",
+          "dns.qry.name",
+          "dns.qry.type",
+          "tls.record.version",
+          "tls.record.length",
+          "tls.handshake.extensions_server_name",
+          "tls.handshake.ciphersuite",
+          "http.request.method",
+          "http.response.code",
+          "http2.streamid",
+          "ssh.protocol",
+          "ssh.message_code",
+          "isakmp.version",
+          "isakmp.exchangetype",
+          "isakmp.flags",
+          "isakmp.messageid",
+          "isakmp.length",
+          "rip.command",
+          "rip.version",
+          "rip.metric",
+          "nbss.type",
+          "nbss.length",
+          "l2tp.flags",
+          "l2tp.length",
+          "rpc.xid",
+          "rpc.msgtyp",
+          "rpc.program",
+          "rpc.procedure",
+          "rdpudp.flags",
+          "rdpudp.synex.version",
+          "rdpudp.data.seqnum",
+          "rdpudp.data.channelseqnumber",
+          "rdpudp.data.sourceStart"
+        ],
+        "two_pass": true,
+        "out_of_order_reassembly": true,
+        "keylog_sha256": "221a1806bd307e3d80d71419ffab5d30934b44afa4fd98e21f5c54e2f9b14975"
+      },
+      "outputs": {
+        "yak.jsonl": {
+          "bytes": 138408755,
+          "sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1"
+        },
+        "events.jsonl": {
+          "bytes": 203119795,
+          "sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770"
+        },
+        "summary.json": {
+          "bytes": 118551,
+          "sha256": "fd5dd0a7f1b2455bdbdb6d7351def3d08a131d265dc3aa234a4dfd061d660282"
+        },
+        "carrier-wire-audit.json": {
+          "bytes": 2125,
+          "sha256": "15a2d6308257559fa848aa4f29695fe2b6bbafbf58d092d624c27ddd4e229671"
+        },
+        "netflow-wire-audit.json": {
+          "bytes": 3839,
+          "sha256": "4e127d8587cfc26826082fbd52dab6957c65b441624e8532fc117d9ae0ec7136"
+        }
+      },
+      "raw_field_mismatches": 90,
+      "field_frames_checked": {
+        "l2tp.flags": 40,
+        "l2tp.length": 40,
+        "http.request.method": 74,
+        "http.response.code": 60,
+        "dns.id": 3786,
+        "dns.qry.name": 3584,
+        "dns.qry.type": 3584,
+        "tls.record.version": 2189,
+        "tls.record.length": 2189,
+        "tls.handshake.ciphersuite": 90,
+        "rip.command": 68,
+        "rip.version": 68,
+        "rip.metric": 68,
+        "ssh.protocol": 7,
+        "isakmp.version": 719,
+        "isakmp.exchangetype": 719,
+        "isakmp.flags": 719,
+        "isakmp.messageid": 719,
+        "isakmp.length": 719,
+        "tls.handshake.extensions_server_name": 88,
+        "ssh.message_code": 15,
+        "rdpudp.flags": 2380,
+        "rdpudp.synex.version": 2,
+        "rdpudp.data.seqnum": 2045,
+        "rdpudp.data.channelseqnumber": 1550
+      },
+      "field_frames_missing": {
+        "tls.handshake.ciphersuite": 116,
+        "ssh.protocol": 1,
+        "ssh.message_code": 8,
+        "http.request.method": 115,
+        "http.response.code": 22,
+        "dns.id": 21,
+        "dns.qry.name": 21,
+        "dns.qry.type": 21,
+        "nbss.type": 281,
+        "nbss.length": 281,
+        "tls.record.version": 1,
+        "tls.record.length": 1,
+        "tls.handshake.extensions_server_name": 6
+      },
+      "packet_metadata_mismatches": {
+        "source": 13,
+        "destination": 13
+      },
+      "endpoint_frames_checked": {
+        "source": 44786,
+        "destination": 44786
+      },
+      "native_TCP_flows": 824,
+      "native_TCP_previews": 808,
+      "scoped_session_partitions": {
+        "tcp": {
+          "oracle_stream_domain_pairs": 824,
+          "missing_or_split_within_domain": 0
+        },
+        "udp": {
+          "oracle_stream_domain_pairs": 3367,
+          "missing_or_split_within_domain": 0
+        }
+      },
+      "carrier_checks": 665,
+      "carrier_reference_frames": 141,
+      "carrier_semantically_asserted_frames": 131,
+      "carrier_outcomes": {
+        "complete_HBH_ICMPv6_selected_base_fields": 131
+      },
+      "carrier_unselected_views": {
+        "multiple/quoted IP or UDP TVBs": 10
+      },
+      "carrier_semantically_unasserted_frame_count": 0,
+      "selected_carrier_differences": [],
+      "retained_netflow_v9_checks": 544027,
+      "selected_netflow_v9_differences": [],
+      "acceptance": "pending: label, coverage, field, reassembly and session differences require investigation"
+    },
+    "sharon": {
+      "frames": 328127,
+      "manifest": {
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "capture_bytes": 86779688,
+        "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+        "fields": [
+          "frame.number",
+          "frame.interface_id",
+          "frame.encap_type",
+          "frame.len",
+          "frame.cap_len",
+          "frame.protocols",
+          "_ws.col.Protocol",
+          "_ws.col.Info",
+          "ip.src",
+          "ip.dst",
+          "ipv6.src",
+          "ipv6.dst",
+          "tcp.srcport",
+          "tcp.dstport",
+          "udp.srcport",
+          "udp.dstport",
+          "tcp.stream",
+          "udp.stream",
+          "tcp.seq_raw",
+          "tcp.ack_raw",
+          "tcp.len",
+          "tcp.flags",
+          "tls.record.content_type",
+          "quic.dcid",
+          "quic.scid",
+          "quic.packet_number",
+          "_ws.expert.message",
+          "dns.id",
+          "dns.qry.name",
+          "dns.qry.type",
+          "tls.record.version",
+          "tls.record.length",
+          "tls.handshake.extensions_server_name",
+          "tls.handshake.ciphersuite",
+          "http.request.method",
+          "http.response.code",
+          "http2.streamid",
+          "ssh.protocol",
+          "ssh.message_code",
+          "isakmp.version",
+          "isakmp.exchangetype",
+          "isakmp.flags",
+          "isakmp.messageid",
+          "isakmp.length",
+          "rip.command",
+          "rip.version",
+          "rip.metric",
+          "nbss.type",
+          "nbss.length",
+          "l2tp.flags",
+          "l2tp.length",
+          "rpc.xid",
+          "rpc.msgtyp",
+          "rpc.program",
+          "rpc.procedure",
+          "rdpudp.flags",
+          "rdpudp.synex.version",
+          "rdpudp.data.seqnum",
+          "rdpudp.data.channelseqnumber",
+          "rdpudp.data.sourceStart"
+        ],
+        "two_pass": true,
+        "out_of_order_reassembly": true,
+        "keylog_sha256": null
+      },
+      "outputs": {
+        "yak.jsonl": {
+          "bytes": 513403474,
+          "sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522"
+        },
+        "events.jsonl": {
+          "bytes": 493759102,
+          "sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7"
+        },
+        "summary.json": {
+          "bytes": 1814210,
+          "sha256": "57960e8f46e9bf8933d4abad0a53208536b499a82788ebc817ed04592a272fb1"
+        },
+        "carrier-wire-audit.json": {
+          "bytes": 25034380,
+          "sha256": "5d370dabff4727acf0574231fcda17b8a4134d6b268e9f3010f3df2beb2fb036"
+        },
+        "netflow-wire-audit.json": {
+          "bytes": 10371,
+          "sha256": "519853e32367d1622af31bb6e160b16ebc349f9c12708f62a7cd976c5a745ff4"
+        }
+      },
+      "raw_field_mismatches": 35,
+      "field_frames_checked": {
+        "l2tp.flags": 40,
+        "l2tp.length": 40,
+        "http.request.method": 48,
+        "http.response.code": 52,
+        "dns.id": 1680,
+        "dns.qry.name": 1478,
+        "dns.qry.type": 1478,
+        "tls.record.version": 631,
+        "tls.record.length": 631,
+        "tls.handshake.ciphersuite": 33,
+        "rip.command": 68,
+        "rip.version": 68,
+        "rip.metric": 68,
+        "ssh.protocol": 5,
+        "isakmp.version": 274,
+        "isakmp.exchangetype": 274,
+        "isakmp.flags": 274,
+        "isakmp.messageid": 274,
+        "isakmp.length": 274,
+        "tls.handshake.extensions_server_name": 27,
+        "ssh.message_code": 10
+      },
+      "field_frames_missing": {
+        "tls.handshake.ciphersuite": 1209,
+        "ssh.protocol": 1,
+        "ssh.message_code": 8,
+        "http.request.method": 211,
+        "http.response.code": 35,
+        "nbss.type": 448,
+        "nbss.length": 448,
+        "dns.id": 1326,
+        "tls.record.version": 1545,
+        "tls.record.length": 1517,
+        "isakmp.version": 303,
+        "isakmp.flags": 303,
+        "isakmp.messageid": 303,
+        "isakmp.length": 296,
+        "dns.qry.name": 227,
+        "dns.qry.type": 227,
+        "l2tp.flags": 672,
+        "l2tp.length": 665,
+        "rdpudp.flags": 39,
+        "rdpudp.data.sourceStart": 15,
+        "rpc.xid": 39,
+        "rpc.msgtyp": 39,
+        "rpc.program": 39,
+        "rpc.procedure": 39,
+        "isakmp.exchangetype": 176,
+        "http2.streamid": 70,
+        "rip.command": 44,
+        "rip.version": 44,
+        "rip.metric": 30,
+        "rdpudp.synex.version": 4,
+        "rdpudp.data.seqnum": 7,
+        "rdpudp.data.channelseqnumber": 6
+      },
+      "packet_metadata_mismatches": {
+        "source": 46377,
+        "destination": 46306
+      },
+      "endpoint_frames_checked": {
+        "source": 322578,
+        "destination": 322522,
+        "source_oracle_unavailable": 422,
+        "destination_oracle_unavailable": 448
+      },
+      "native_TCP_flows": 840,
+      "native_TCP_previews": 735,
+      "scoped_session_partitions": {
+        "tcp": {
+          "oracle_stream_domain_pairs": 35105,
+          "missing_or_split_within_domain": 34315
+        },
+        "udp": {
+          "oracle_stream_domain_pairs": 10100,
+          "missing_or_split_within_domain": 10
+        }
+      },
+      "carrier_checks": 1134304,
+      "carrier_reference_frames": 105503,
+      "carrier_semantically_asserted_frames": 93571,
+      "carrier_outcomes": {
+        "complete_HBH_ICMPv6_selected_base_fields": 69,
+        "malformed_UDP_carrier": 93502,
+        "selected_L2TPv3_codec_carrier_diagnostic_no_fields": 2
+      },
+      "carrier_unselected_views": {
+        "multiple/quoted IP or UDP TVBs": 11215,
+        "physical UDP header unavailable; possible reassembly TVB": 2,
+        "zero IPv6 payload length/jumbogram profile unselected": 7,
+        "UDP view belongs to an unselected nested carrier, not this literal IPv4 UDP envelope": 1
+      },
+      "carrier_semantically_unasserted_frame_count": 707,
+      "selected_carrier_differences": [],
+      "retained_netflow_v9_checks": 544027,
+      "selected_netflow_v9_differences": [],
+      "acceptance": "pending: label, coverage, field, reassembly and session differences require investigation"
+    }
+  },
+  "shared_deltas": {
+    "partition_before": {
+      "tcp": {
+        "oracle_stream_domain_pairs": 35105,
+        "missing_or_split_within_domain": 34315
+      },
+      "udp": {
+        "oracle_stream_domain_pairs": 10100,
+        "missing_or_split_within_domain": 13
+      }
+    },
+    "partition_after": {
+      "tcp": {
+        "oracle_stream_domain_pairs": 35105,
+        "missing_or_split_within_domain": 34315
+      },
+      "udp": {
+        "oracle_stream_domain_pairs": 10100,
+        "missing_or_split_within_domain": 10
+      }
+    },
+    "domain_patterns": [
+      {
+        "before": "/geneve",
+        "after": "",
+        "status": "malformed",
+        "count": 1670
+      },
+      {
+        "before": "/vxlan",
+        "after": "",
+        "status": "malformed",
+        "count": 3
+      }
+    ],
+    "changed_protocol": [
+      {
+        "frames": [
+          75002
+        ],
+        "before": [
+          "ip",
+          "limited",
+          "",
+          ""
+        ],
+        "after": [
+          "",
+          "malformed",
+          "1.2.3.4:2152",
+          "4.3.2.1:2578"
+        ],
+        "error": "MalformedMessage: UDP length 41226 exceeds declared IP payload available to UDP (119 bytes)"
+      },
+      {
+        "frames": [
+          97159
+        ],
+        "before": [
+          "ip",
+          "limited",
+          "",
+          ""
+        ],
+        "after": [
+          "",
+          "malformed",
+          "1.2.3.4:17670",
+          "4.3.2.1:2152"
+        ],
+        "error": "MalformedMessage: UDP length 259 exceeds declared IP payload available to UDP (174 bytes)"
+      },
+      {
+        "frames": [
+          98754
+        ],
+        "before": [
+          "ip",
+          "limited",
+          "",
+          ""
+        ],
+        "after": [
+          "",
+          "malformed",
+          "1.2.3.4:2152",
+          "4.3.2.1:5140"
+        ],
+        "error": "MalformedMessage: UDP length 5140 exceeds declared IP payload available to UDP (78 bytes)"
+      }
+    ]
+  },
+  "whole_output_deltas_vs_previous_v5": {
+    "weber": {
+      "events": {
+        "rows": 39283,
+        "changed_rows": 21,
+        "changed_top_level_keys": {
+          "field_values": 21
+        },
+        "field_metadata_changes": {
+          "field_values.completeness": 21
+        },
+        "before_sha256": "59829ae38c564b527ac1434316204bf01acae528f295c81086385a486ef82dc3",
+        "after_sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770"
+      },
+      "yak": {
+        "rows": 51328,
+        "changed_rows": 3612,
+        "changed_top_level_keys": {
+          "info": 3609,
+          "pdus": 65
+        },
+        "field_metadata_changes": {},
+        "before_sha256": "95a423e6c5aa7e81896c2a40b95b5744c6148d786d444b74a56f666ef488d4f8",
+        "after_sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1"
+      }
+    },
+    "sharon": {
+      "events": {
+        "rows": 245615,
+        "changed_rows": 105276,
+        "changed_top_level_keys": {
+          "field_values": 105276,
+          "summary": 104484,
+          "completeness": 104485,
+          "error": 104486,
+          "status": 104485,
+          "fields_error": 104486,
+          "expert": 104486,
+          "source_bytes": 1676,
+          "domain": 1673,
+          "raw": 3,
+          "destination": 3,
+          "profile": 3,
+          "protocol": 3,
+          "source": 3,
+          "transport": 3
+        },
+        "field_metadata_changes": {
+          "field_values.completeness": 105273,
+          "field_values.incomplete": 104481,
+          "field_values.values": 104485,
+          "field_values.source": 1676
+        },
+        "before_sha256": "971a6050235de4e38c3570ea4fe6861bb08a1053e807f8b19b5998e1e1974190",
+        "after_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7"
+      },
+      "yak": {
+        "rows": 328127,
+        "changed_rows": 110439,
+        "changed_top_level_keys": {
+          "info": 110436,
+          "pdus": 105276,
+          "protocol_status": 104486,
+          "protocol_evidence": 104481,
+          "physical_source": 3,
+          "transport_view": 3,
+          "transport": 3,
+          "protocol_scope": 3,
+          "destination_port": 3,
+          "protocol_stack": 3,
+          "destination": 3,
+          "source_port": 3,
+          "protocol": 3,
+          "source": 3,
+          "physical_destination": 3
+        },
+        "field_metadata_changes": {},
+        "before_sha256": "f8558e9311ae97a642092f2f1f198c8ed60939b9467a06ccb5429495a536d13b",
+        "after_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522"
+      }
+    }
+  },
+  "independent_Sharon_SDK_repeat": {
+    "same_binary_independent_full_runs": true,
+    "sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7"
+  },
+  "offline_controls": {
+    "outputs": {
+      "bytes": 54248,
+      "sha256": "ee141c68430d081f01ee5258e7b8847e343968c3e1bd28520904a4905d3ca17b"
+    },
+    "controls": 54,
+    "frames": 66,
+    "checks": 612,
+    "selected_differences": [],
+    "scope": "UDP boundary admission and IPv6 extension/fragment recovery, literal DNS ID/name/type/raw message. No checksum/jumbogram/MLD-body certification.",
+    "retained_differences": [
+      {
+        "case": "ipv4-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv4-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv4-cut-and-contradiction",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-bad-zero",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv6-cut-and-contradiction",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-bad-zero",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv6-hbh-cut-and-contradiction",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-dest-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-dest-bad-zero",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-dest-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv6-dest-cut-and-contradiction",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-dest-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-dest-bad-zero",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-dest-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv6-hbh-dest-cut-and-contradiction",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "tunnel-vxlan-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "tunnel-vxlan-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "tunnel-geneve-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "tunnel-geneve-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "tunnel-gtp-valid",
+        "native_status": "limited",
+        "reference_DNS_views": 1,
+        "reason": "Valid GTP inner normalization remains outside the selected native tunnel profile; not counted as a decoded application"
+      },
+      {
+        "case": "tunnel-gtp-bad-long",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "tunnel-gtp-capture-cut",
+        "native_status": "incomplete",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark exposes partial application fields with an unavailable captured suffix; native refuses complete application admission"
+      },
+      {
+        "case": "ipv6-hbh-fragments-conflicting-overlap",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark best-effort overlapping-fragment payload; native quarantines conflicting bytes"
+      },
+      {
+        "case": "ipv6-hbh-fragments-bad-ordered",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-fragments-bad-reversed",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-fragments-bad-duplicate",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark dissects application despite impossible UDP carrier; native refuses application admission"
+      },
+      {
+        "case": "ipv6-hbh-fragments-bad-conflicting-overlap",
+        "native_status": "malformed",
+        "reference_DNS_views": 1,
+        "reason": "Wireshark best-effort overlapping-fragment payload; native quarantines conflicting bytes"
+      }
+    ]
+  },
+  "audit_negative_controls": {
+    "controls": [
+      {
+        "case": "wrong-wire-status",
+        "detected": true
+      },
+      {
+        "case": "wrong-typed-cause",
+        "detected": true
+      },
+      {
+        "case": "invented-application",
+        "detected": true
+      },
+      {
+        "case": "missing-diagnostic",
+        "detected": true
+      },
+      {
+        "case": "invented-fields",
+        "detected": true
+      },
+      {
+        "case": "complete-field-coverage",
+        "detected": true
+      },
+      {
+        "case": "lost-incomplete-flag",
+        "detected": true
+      },
+      {
+        "case": "wrong-reference-port",
+        "detected": true
+      }
+    ],
+    "all_detected": true
+  },
+  "fresh_live": {
+    "kind": "New Windows Npcap loopback socket capture, not offline generated packet bytes. Capture filter includes only owned ephemeral service/client ports. UDP proxy drop/delay counts describe this run, not Npcap loss.",
+    "capture": {
+      "bytes": 1078672,
+      "sha256": "be3ba23140b3df81252f3b0a4d450b99007051626f86c8d1f33e3060a9ffbab7"
+    },
+    "manifest": {
+      "bytes": 14878,
+      "sha256": "0972c6f8edb5ceb7c2b0b8e4fc4ffcf9850b46e2e21a16fc2faf63e343718003"
+    },
+    "started": "2026-10-26T02:21:55.2762959Z",
+    "finished": "2026-10-26T02:21:56.3525486Z",
+    "frames": 747,
+    "bytes": 1066696,
+    "operations": 45,
+    "operation_protocols": {
+      "http": 3,
+      "tls-http1": 12,
+      "grpc-request": 5,
+      "grpc-response": 5,
+      "dns-udp": 3,
+      "dns-tcp": 3,
+      "http3": 12,
+      "tuple-reuse-tls": 1,
+      "tuple-reuse-redis": 1
+    },
+    "kernel_drops": 0,
+    "proxy": {
+      "delayed": 15,
+      "dropped": 9,
+      "packets": 263
+    },
+    "reference_configuration": "Owned supplemental nonstandard ports explicitly selected by protocol; same owned TLS keys supplied. TCP/TLS reassembly settings recorded in compare.py. Original large-corpus default-reference metrics are separate.",
+    "comparison": {
+      "frames": [
+        747,
+        747
+      ],
+      "rows_yak": {
+        "TCP": 265,
+        "HTTP/1.1": 26,
+        "TLS": 6,
+        "TLSv1.2": 57,
+        "TLSv1.3": 62,
+        "HTTP/2": 30,
+        "gRPC": 27,
+        "DNS": 12,
+        "QUIC": 132,
+        "HTTP/3": 128,
+        "Redis": 2
+      },
+      "rows_ws": {
+        "TCP": 267,
+        "HTTP": 32,
+        "TLSv1.2": 53,
+        "TLSv1.3": 65,
+        "HTTP2": 50,
+        "GRPC/PB(<UNKNOWN>)": 8,
+        "DNS": 12,
+        "QUIC": 201,
+        "HTTP3": 59
+      },
+      "events": {
+        "http/decoded": 26,
+        "tls/decoded": 239,
+        "http2/decoded": 52,
+        "grpc/decoded": 32,
+        "dns/decoded": 12,
+        "quic/decoded": 145,
+        "http3/decoded": 128,
+        "redis/decoded": 2
+      },
+      "grpc": [
+        10,
+        10
+      ],
+      "grpc_bytes_equal": true,
+      "h3_paths_equal": true,
+      "h3_data": [
+        24,
+        27
+      ],
+      "h3_data_equal": false,
+      "h3_wireshark_retransmitted_data_observations": 0,
+      "h3_yak_application_replies_verified": true,
+      "h3_ws_application_replies_verified": false,
+      "tls_records": [
+        239,
+        239
+      ],
+      "tls_wire": {
+        "wireshark": 239,
+        "native": 239,
+        "matching_occurrences": 239,
+        "missing_occurrences": 0,
+        "extra_occurrences": 0,
+        "native_header_checks": 717,
+        "wireshark_incomplete_views": 0,
+        "scope": "Complete wire records, oracle TCP stream and directional endpoints; contributor binding checked; plaintext authentication separate"
+      },
+      "errors": [],
+      "authenticated_plaintext_without_verified_tag": []
+    },
+    "independent_QUIC_STREAM_audit": {
+      "oracle_sha256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06",
+      "events_sha256": "0be78bed3d36aa2aba91bbc184e93a98767aad7e5a67e591dbf949ca79859baa",
+      "checks": 10398,
+      "QUIC_STREAM_views": 150,
+      "native_QUIC_STREAM_views": 150,
+      "identical_overlap_bytes": 8454,
+      "bidirectional_stream_directions": 24,
+      "connections": 3,
+      "reference_stream_reconstructed_DATA": 27,
+      "native_DATA": 27,
+      "selected_differences": [],
+      "scope": "Owned HTTP/3 bidirectional streams only. Physical STREAM source, connection/endpoints, stream ID, offset, length, bytes and FIN verified against reference. Independently reconstructed from original TShark authenticated QUIC STREAM bytes, including gaps/overlap/FIN and ordered DATA by capture connection/direction/stream. This certifies observed payload reconstruction, not QPACK, packet-column agreement, stream-field highlight ranges or general QUIC completeness."
+    },
+    "audit_negative_controls": {
+      "controls": [
+        {
+          "case": "wrong-payload",
+          "detected": true
+        },
+        {
+          "case": "wrong-direction",
+          "detected": true
+        },
+        {
+          "case": "wrong-stream",
+          "detected": true
+        },
+        {
+          "case": "wrong-declared-length",
+          "detected": true
+        },
+        {
+          "case": "unverified-plaintext",
+          "detected": true
+        },
+        {
+          "case": "missing-source",
+          "detected": true
+        },
+        {
+          "case": "omitted-DATA",
+          "detected": true
+        },
+        {
+          "case": "duplicate-delivery",
+          "detected": true
+        },
+        {
+          "case": "wrong-STREAM-offset",
+          "detected": true
+        },
+        {
+          "case": "wrong-STREAM-length",
+          "detected": true
+        },
+        {
+          "case": "wrong-STREAM-FIN",
+          "detected": true
+        }
+      ],
+      "all_detected": true
+    },
+    "outputs": {
+      "baseline/events.jsonl": {
+        "bytes": 6158652,
+        "sha256": "0be78bed3d36aa2aba91bbc184e93a98767aad7e5a67e591dbf949ca79859baa"
+      },
+      "baseline/yak.jsonl": {
+        "bytes": 1962322,
+        "sha256": "1929704d43f50072052d88dab2a19c5f5ef6c9c6f73389e8a31a70309913b1b1"
+      },
+      "baseline/tls-wire-oracle.json": {
+        "bytes": 48744561,
+        "sha256": "5442523bb16eb29fc564789588b032f70f42db74780c3d9b3eca694d3a41b248"
+      },
+      "quic-stream-oracle.json": {
+        "bytes": 9533735,
+        "sha256": "b6d8e229caef416789ab2a661479847e55a0934264423e7a0d9a6a5e37098d06"
+      },
+      "quic-stream-audit-b924.json": {
+        "bytes": 14466,
+        "sha256": "e0e4c18fcbd72d9744e939b59110e05c29c8287894612c4cdbb7073a97f7d542"
+      }
+    },
+    "latest_SDK_repeat_byte_identical": true
+  },
+  "windows": {
+    "89636": {
+      "source": "ec13807f64",
+      "kind": "Actual CP936 Windows native console cells, not a mockup; original extracted frame bytes, numbered 1 in excerpt.",
+      "query": "fields status == malformed",
+      "passed": "PASS: Windows CP936 + color; protocol fields; byte sources; conversation messages/evidence; resize; q; UDP",
+      "native_cells": {
+        "bytes": 91074,
+        "sha256": "9e4fac6958f1b2439a694bb0d93f8b685f0334c64abe5884f9b006db31e304db"
+      },
+      "rendered_native_cells": {
+        "bytes": 122564,
+        "sha256": "74b5753ddd9b652e64ce89213fa8a34a793db120ddeee6ba79063c4872b2a76e"
+      }
+    },
+    "75002": {
+      "source": "b9242dc9c31ac70341c99fee445b24ec76cb18a3",
+      "kind": "Actual CP936 Windows native console cells, not a mockup; original extracted frame bytes, numbered 1 in excerpt.",
+      "query": "fields status == malformed",
+      "passed": "PASS: Windows CP936 + color; protocol fields; byte sources; conversation messages/evidence; resize; q; UDP",
+      "native_cells": {
+        "bytes": 91172,
+        "sha256": "b26e3d75d8881a42bd067bb9dfcad7ebd94ff4c5950eb833a7a156041c983c3d"
+      },
+      "rendered_native_cells": {
+        "bytes": 133743,
+        "sha256": "8be90e0280a795b22a44ab4937fd3abe01a4c2203db20005a5d3623588f2152f"
+      }
+    }
+  },
+  "validation": {
+    "full_native_and_CLI": {
+      "source": "b9242dc9c31ac70341c99fee445b24ec76cb18a3",
+      "native_seconds": 441.219,
+      "CLI_seconds": 1.989,
+      "log": {
+        "bytes": 516,
+        "sha256": "35417984cc9f678b707a2cdade0452f369d3f6be2da4501866b101875b26eba9"
+      }
+    },
+    "IPv6_envelope_fuzz": {
+      "tested_source": "703c75fefc",
+      "executions": 26036,
+      "seconds": 46.457,
+      "workers": 2,
+      "GOMEMLIMIT": "1GiB",
+      "log": {
+        "bytes": 1814,
+        "sha256": "c26e7ccfc07cdadb6ae33dc6c279eb4387475584b3e718dbdb7e50310ee60f08"
+      }
+    },
+    "legacy_contract": "Immutable sealed archives/hashes preserved. Corrected six impossible UDP-length expected statuses, one malformed offload UDP diagnostic, BACnet/RTPS carrier refusal expectations and true truncation cause assertions; no capture bytes added or rewritten."
+  },
+  "remaining": [
+    "Raw field differences 90/35 and existing endpoint/partition differences remain explicit; full acceptance is pending.",
+    "11225 Sharon reference views are outside this selected physical carrier scope; 707 more frames have no selected semantic assertion. They are not counted as passed protocol fields.",
+    "Valid GTP inner normalization, EtherIP/XIP carriers and zero-length IPv6/jumbogram profiles remain unselected.",
+    "IPv6 extension option semantics, MLD bodies, UDP checksum policy and arbitrary nested-carrier reassembly are not certified by these base-header checks.",
+    "The new live HTTP/3 DATA discrepancy is a retained 27-native/24-reference presentation count. Independent reconstruction from the same reference QUIC STREAM bytes yields 27; it does not certify QPACK or stream-field highlight ranges.",
+    "IPFIX v10, NetFlow v1/v7/v8 and broader protocol/field/fuzz coverage remain ongoing.",
+    "All captures, keys, binaries, console images/cells, raw JSONL and raw reference JSON stay outside Git."
+  ]
+}

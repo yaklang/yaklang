@@ -59,9 +59,12 @@ func TestBinParserCorpusReplay(t *testing.T) {
 		require.NoError(t, err)
 		t.Log(string(encoded))
 	}
-	require.EqualValues(t, 108, decoded, "full message coverage changed")
-	require.EqualValues(t, 78033, useful, "decoded byte coverage changed")
-	require.EqualValues(t, 81028, delivered, "delivered byte coverage changed")
+	// Delayed original SYN handling recovers the complete 2459-byte HTTP 407
+	// spanning frames 6/7 in ndpi-http-connect; independently confirmed by
+	// Wireshark 4.6.9 (Content-Length 2167). No bytes are inferred across a gap.
+	require.EqualValues(t, 109, decoded, "full message coverage changed")
+	require.EqualValues(t, 80492, useful, "decoded byte coverage changed")
+	require.EqualValues(t, 83487, delivered, "delivered byte coverage changed")
 }
 
 func BenchmarkPcapBinParserCorpus(b *testing.B) {

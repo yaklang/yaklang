@@ -1,0 +1,68 @@
+{
+  "scope": "Actual Windows identity filtering and unavailable-detail presentation, with source-bound physical bytes; not restored evicted protocol fields.",
+  "source": "5c88aed7aa9ee8c7438aca30a6bfaa114fff85d9",
+  "binary_SHA256": "f4354d318c3a7b9dad97d17a3c82b87d2c43fedc30c4b052fb93872706be5a9e",
+  "current_caption": "HTTP/3 FIELDS · detail unavailable",
+  "fake_PDU0": false,
+  "duplicate_reason": false,
+  "sealed_and_missing_detail_scope_separate": true,
+  "later_complete_response_not_downgraded": true,
+  "Windows": {
+    "actual_console_buffers": 7,
+    "physical_frame": 294,
+    "ID_only_query": 299,
+    "unchanged_1MiB_detail_budget": true,
+    "codepage_restored": 936,
+    "source_proof": {
+      "external_relative_name": "Windows-history-source31-02/summary.json",
+      "SHA256": "cb406e9ca42fb0ca2557ae4142e7a98740b261e9991f3b1760434c35e1fb1e11"
+    },
+    "runtime_proof": {
+      "external_relative_name": "windows-identity-1MiB-5c88a-02/proof.json",
+      "SHA256": "8e32bd6e51e2e1cc0fa96a92b26fbfbee50f6e161da243b157c1a2daa89bae4a"
+    },
+    "visible_prefix_bytes": 416,
+    "whole_frame_bytes": 1232,
+    "viewport_is_not_full_source": true,
+    "independent_negative_controls": [
+      "caption",
+      "PDU0",
+      "duplicate-reason",
+      "physical-octet",
+      "plaintext-caption"
+    ]
+  },
+  "CLI_validation": {
+    "passed": 862,
+    "skipped": 2,
+    "evidence": {
+      "external_relative_name": "history-unavailable-CLI-full32/receipt.json",
+      "SHA256": "81ebe00073a2e5090488e1f4754a30843af6e1581cd0c9465e2ddcd00c14e967"
+    },
+    "source_binding": "receipt parent HEAD plus the five Go working-file digests"
+  },
+  "CLI_whole_preservation": {
+    "cases": 37,
+    "whole_rows": 384518,
+    "differences": 0,
+    "evidence": {
+      "external_relative_name": "CLI30-to-31-whole-source-audit01/summary.json",
+      "SHA256": "df65966754269b6ef0a7479717ced098ba8d87ae6d23b88ce40217d4bf02b3e7"
+    }
+  },
+  "native_execution_source": "6b704e2f55a44483e47754d40fd93725100d9666",
+  "native_binary_identity": "bins31 events/flows exactly equal bins30; old actual native executions retain source6b, not relabeled as5c",
+  "native_binary_SHA256": {
+    "events": "5c9e2cb96255f1dbd282d0a48dde4adbc30befa3b4ab109030ca774ce7104b98",
+    "flows": "f2b3443e9fbfb680ec248d3ba9fcb061fdb575b0a9b37ec5b05adfdd474c0a9c"
+  },
+  "CI_at_document_preparation": {
+    "explicit_traffic_success": 40816825679,
+    "path_case_success": 40816831332,
+    "Diff_success": 40816831325,
+    "Essential_run": 40816831362,
+    "Essential_state": "success",
+    "all_four_green": true,
+    "automatic_draft_traffic_skip_not_counted": true
+  }
+}

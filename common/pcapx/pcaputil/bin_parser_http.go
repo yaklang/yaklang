@@ -51,6 +51,16 @@ func (h *binHTTPState) config(bodyLimit int) map[string]any {
 func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 	if f.binding == nil {
 		switch f.protocol {
+		case "ipfix":
+			return f.frameIPFIX(w)
+		case "ldp":
+			return f.frameLDP(w)
+		case "bgp":
+			return f.frameBGP(w)
+		case "rtmp":
+			return f.frameRTMP(dir, w)
+		case "ajp":
+			return f.frameAJP(dir, w)
 		case "mms":
 			return f.frameMMSISO(w)
 		case "fins":
@@ -109,6 +119,10 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameDCERPC(w)
 		case "ssh":
 			return f.frameSSH(dir, w)
+		case "telnet":
+			return f.frameTelnet(w)
+		case "nbss":
+			return f.frameNBSS(dir, w)
 		case "nfs":
 			return f.frameNFS(w)
 		case "snmp":

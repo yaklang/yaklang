@@ -1,0 +1,4349 @@
+{
+  "scope": "Bounded original opening observations, native TCP page ownership, callback-independent network normalization, and complete capture-close JSON projections. Does not certify all-protocol/Wireshark parity.",
+  "sources": {
+    "opening_fix": "09c26576aa956b7aa7b420fa71242bfd8974daca",
+    "explicit_TCP_binding": "f8cc2e3eb4c36c5d180dc92e88ba08bc37225ab8",
+    "native_network_and_SDK": "41784e9de706d01e1165e85dfdf3252b6877fb87",
+    "fragment_contract_test": "a28afdc3293894779e8f062a18014a5f34f3e5ba",
+    "CLI": "f52e386603085667ee28b24073ed3b67b98092cb"
+  },
+  "prior_aggregate_SHA256": "cf9dedadf13f51a14eef3458538b028e00e5d934f22f5763dab266e7649e92d5",
+  "original_source_capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+  "original_source_frames": 155,
+  "original_source_TCP_generations": 4,
+  "opening_profiles": [
+    {
+      "case": "actual",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "physical_frames": 155,
+      "TCP_observations": 152,
+      "SDK_records": 72,
+      "wire_PDUs": 67,
+      "logical_responses": 2,
+      "numeric_links": 5,
+      "wire_checks": 114851,
+      "logical_checks": 897,
+      "reference_field_values": 654,
+      "wire_certificate_SHA256": "d7c171c09adb5ef8d1509dc8909e02c893bd461129d24bac435fedd89d4eeb69",
+      "logical_certificate_SHA256": "2769fa562d1240d829621579b7a39c4457a73d953535d149ac68522d8bc59c1e",
+      "source_observation_proof_SHA256": "e1debb5c82ab51df743f8bb8c518b8c3b62936431bc4c99d87464d80ed34d75e",
+      "before": {
+        "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+        "created_flows": 4,
+        "observed_TCP_packets": 152,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "after": {
+        "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+        "created_flows": 4,
+        "observed_TCP_packets": 152,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "Wireshark_streams": 4,
+      "reference_grouping_differences": [],
+      "packet_reference_stream_differences": 0,
+      "flow_comparison_CSV_SHA256": "e43686a51fda5462c84bf1c09eaf61566a7f4eb35aac5791dc49972136a34f9b",
+      "full_old_change_proof_SHA256": "da2eac5de7dc864d854296395852793991f8861b3dc232a49e9d3c5a7a5497a8"
+    },
+    {
+      "case": "late-old-close",
+      "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+      "physical_frames": 152,
+      "TCP_observations": 149,
+      "SDK_records": 72,
+      "wire_PDUs": 67,
+      "logical_responses": 2,
+      "numeric_links": 5,
+      "wire_checks": 114845,
+      "logical_checks": 897,
+      "reference_field_values": 654,
+      "wire_certificate_SHA256": "fceeb081e293c7d2bf481e63cad1edc505d0446414bcd1109522376678a38a74",
+      "logical_certificate_SHA256": "5b65bb4feb00159d5d8aa93a9f2e4a95e38f5b3bb0b63e6a1a5cd0aeda0f7a37",
+      "source_observation_proof_SHA256": "83998d4ac175905c683d1d67282dd1ea565e41f22f22756f7e14639ee1b2ec35",
+      "before": {
+        "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+        "created_flows": 4,
+        "observed_TCP_packets": 148,
+        "missing_TCP_packets": [
+          13
+        ],
+        "metadata_differences": [
+          {
+            "frame": 15,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 16,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 17,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 18,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 19,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 20,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 21,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 22,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "source",
+            "native": "127.0.0.1:135",
+            "expected": "127.0.0.1:52557"
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "destination",
+            "native": "127.0.0.1:52557",
+            "expected": "127.0.0.1:135"
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "half_open",
+            "native": true,
+            "expected": false
+          }
+        ],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "after": {
+        "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+        "created_flows": 4,
+        "observed_TCP_packets": 149,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "Wireshark_streams": 5,
+      "reference_grouping_differences": [
+        {
+          "original_epoch": 1,
+          "native_flow": 1,
+          "Wireshark_stream": 0,
+          "opening_frame": 4,
+          "native_packets": 10,
+          "reference_packets": 9,
+          "native_only_frames": [
+            14
+          ],
+          "reference_only_frames": [],
+          "whole_packet_sets_equal": false
+        },
+        {
+          "original_epoch": 2,
+          "native_flow": 2,
+          "Wireshark_stream": 1,
+          "opening_frame": 13,
+          "native_packets": 9,
+          "reference_packets": 2,
+          "native_only_frames": [
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22
+          ],
+          "reference_only_frames": [
+            14
+          ],
+          "whole_packet_sets_equal": false
+        }
+      ],
+      "packet_reference_stream_differences": 9,
+      "flow_comparison_CSV_SHA256": "973facdc6561b9ddc0316c8a88735561cb2e9c88b3abb9d16ef7cd319bcf1f7e",
+      "full_old_change_proof_SHA256": "ae1c857a99b6d63dccc843d423b22fe909849cbb88204233fe4f713c3132b308"
+    },
+    {
+      "case": "late-old-close-opening-retry",
+      "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+      "physical_frames": 161,
+      "TCP_observations": 158,
+      "SDK_records": 72,
+      "wire_PDUs": 67,
+      "logical_responses": 2,
+      "numeric_links": 5,
+      "wire_checks": 114863,
+      "logical_checks": 897,
+      "reference_field_values": 654,
+      "wire_certificate_SHA256": "06f4c1feda4f117c7be373b1568b106b1f951122dd1944b0e20b079cb8f2ff23",
+      "logical_certificate_SHA256": "f0c60794b23d14e0878cc31ff1d105d4e041c2dadb2eec1de6809ed8d6968dff",
+      "source_observation_proof_SHA256": "3fb41c0c2380024e675eb92db8bf785fb329f977612d82602ba0138c0296d044",
+      "before": {
+        "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+        "created_flows": 4,
+        "observed_TCP_packets": 151,
+        "missing_TCP_packets": [
+          15,
+          16,
+          17,
+          29,
+          30,
+          96,
+          97
+        ],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "after": {
+        "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+        "created_flows": 4,
+        "observed_TCP_packets": 158,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "Wireshark_streams": 5,
+      "reference_grouping_differences": [
+        {
+          "original_epoch": 1,
+          "native_flow": 1,
+          "Wireshark_stream": 0,
+          "opening_frame": 4,
+          "native_packets": 12,
+          "reference_packets": 11,
+          "native_only_frames": [
+            18
+          ],
+          "reference_only_frames": [],
+          "whole_packet_sets_equal": false
+        },
+        {
+          "original_epoch": 2,
+          "native_flow": 2,
+          "Wireshark_stream": 1,
+          "opening_frame": 15,
+          "native_packets": 12,
+          "reference_packets": 4,
+          "native_only_frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27
+          ],
+          "reference_only_frames": [
+            18
+          ],
+          "whole_packet_sets_equal": false
+        }
+      ],
+      "packet_reference_stream_differences": 10,
+      "flow_comparison_CSV_SHA256": "c13b974098c0f06b9dd7102e4475ef14b65554b8552a5df68f86f6b34d7f683a",
+      "full_old_change_proof_SHA256": "4503ae027c2ed26bf4d3d6d06c8bb111ea14f359a710ad135b594c0d24f5a21a"
+    },
+    {
+      "case": "late-old-close-with-duplicates",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "physical_frames": 160,
+      "TCP_observations": 157,
+      "SDK_records": 72,
+      "wire_PDUs": 67,
+      "logical_responses": 2,
+      "numeric_links": 5,
+      "wire_checks": 114861,
+      "logical_checks": 897,
+      "reference_field_values": 654,
+      "wire_certificate_SHA256": "986c14d732e062c58e89420023551fd8d0982b5f461dfb1d7be9ab73dbdc7ca4",
+      "logical_certificate_SHA256": "801580a5ecbb824f9e7fbf47e8ad1b2d2c55d46e2d3d92c108130e3dc54aaa1e",
+      "source_observation_proof_SHA256": "1167c12f994de2f591991e8a9b1f76a0288e1349e323c776b1bcce122cf05c99",
+      "before": {
+        "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+        "created_flows": 4,
+        "observed_TCP_packets": 152,
+        "missing_TCP_packets": [
+          15,
+          16,
+          17,
+          95,
+          96
+        ],
+        "metadata_differences": [
+          {
+            "frame": 19,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 20,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 21,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 22,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 23,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 24,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "frame": 25,
+            "kind": "direction does not follow the captured opener",
+            "native": 0,
+            "expected": 1
+          },
+          {
+            "frame": 26,
+            "kind": "direction does not follow the captured opener",
+            "native": 1,
+            "expected": 0
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "source",
+            "native": "127.0.0.1:135",
+            "expected": "127.0.0.1:52557"
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "destination",
+            "native": "127.0.0.1:52557",
+            "expected": "127.0.0.1:135"
+          },
+          {
+            "flow": 2,
+            "kind": "original opener metadata mismatch",
+            "field": "half_open",
+            "native": true,
+            "expected": false
+          }
+        ],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "after": {
+        "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+        "created_flows": 4,
+        "observed_TCP_packets": 157,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "Wireshark_streams": 5,
+      "reference_grouping_differences": [
+        {
+          "original_epoch": 1,
+          "native_flow": 1,
+          "Wireshark_stream": 0,
+          "opening_frame": 4,
+          "native_packets": 12,
+          "reference_packets": 11,
+          "native_only_frames": [
+            18
+          ],
+          "reference_only_frames": [],
+          "whole_packet_sets_equal": false
+        },
+        {
+          "original_epoch": 2,
+          "native_flow": 2,
+          "Wireshark_stream": 1,
+          "opening_frame": 15,
+          "native_packets": 11,
+          "reference_packets": 4,
+          "native_only_frames": [
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26
+          ],
+          "reference_only_frames": [
+            18
+          ],
+          "whole_packet_sets_equal": false
+        }
+      ],
+      "packet_reference_stream_differences": 9,
+      "flow_comparison_CSV_SHA256": "a469bbdb59aa4185f9aab99f5837ea886cef8cfa887a9ad401149f7f51e6cc72",
+      "full_old_change_proof_SHA256": "f6b49e86c72233f7f159ec827cc9e7f379f21c8a57d5d89185227e5fc5106d27"
+    },
+    {
+      "case": "missing-close-opening-duplicates",
+      "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+      "physical_frames": 159,
+      "TCP_observations": 156,
+      "SDK_records": 72,
+      "wire_PDUs": 67,
+      "logical_responses": 2,
+      "numeric_links": 5,
+      "wire_checks": 114859,
+      "logical_checks": 897,
+      "reference_field_values": 654,
+      "wire_certificate_SHA256": "800def87dcf322647d76f97dd612233ebe8ea9326501d74ea68c2f934b88866a",
+      "logical_certificate_SHA256": "898f43c69e4a8d410fd163ea7ee60aac6acdd80fc2eb6f1d3274d38c46e7a6f4",
+      "source_observation_proof_SHA256": "52f4a9040036b3616c0512fbcce44f3018da7374a92eaa125def35d7159c59cb",
+      "before": {
+        "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+        "created_flows": 4,
+        "observed_TCP_packets": 150,
+        "missing_TCP_packets": [
+          16,
+          17,
+          27,
+          28,
+          94,
+          95
+        ],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "after": {
+        "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+        "created_flows": 4,
+        "observed_TCP_packets": 156,
+        "missing_TCP_packets": [],
+        "metadata_differences": [],
+        "native_flow_epochs": {
+          "1": 1,
+          "2": 2,
+          "3": 3,
+          "4": 4
+        },
+        "reassembly_error": ""
+      },
+      "Wireshark_streams": 4,
+      "reference_grouping_differences": [],
+      "packet_reference_stream_differences": 0,
+      "flow_comparison_CSV_SHA256": "c8405e98b4bf9cd8a25b48ad1901cb27246e2d382891738e187ede0cb29b2176",
+      "full_old_change_proof_SHA256": "8d044cc8539f4e07e7895451caccaa74c3a85574bf96d093432bc25f821e0759"
+    }
+  ],
+  "exports": [
+    {
+      "case": "actual",
+      "group": "matrix",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "physical_frames": 155,
+      "SDK_records": 72,
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "a746f8d72179e41799c01f635032445c6d59d4d0e74351427c4952f55959e690",
+      "producer_receipt_SHA256": "9e91cabbf419b607a7b254ea780759dd0c9c3d88cf7b63a749bcd195f414f67d",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "actual",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "055ed19394ed9bdc2a159902d6460ca54e5b72f0d9274ec2a9b8bccc6b5a97d4",
+        "SDK_after_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+        "CLI_before_SHA256": "1a92b3cacaae374e50869a495b2f0db400d4c2398ccb1d9643acb03d28baa124",
+        "CLI_after_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "bbab8125c342f0b6c24b204cf3bea9e61415a5d4ad24240f472aa877871c8c87",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+        "observer_SHA256": "0a8043af47c7cc7391d20a8a7c8b80462021563c89d9eb2b69069e4bdcf36a5f",
+        "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+        "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 155,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 4,
+        "source_bound_TCP_events": 69,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 4,
+        "context_only_TCP_records": [
+          {
+            "PDU": 7,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 10,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 0,
+        "compared_CLI_PDUs": 72,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 4
+      },
+      "native_page_complete_byte_proof_SHA256": "838074f15673eaf539f401114dacab3a7513ff7fbf6f764cf3d410e1c25f89e1"
+    },
+    {
+      "case": "late-old-close",
+      "group": "matrix",
+      "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+      "physical_frames": 152,
+      "SDK_records": 72,
+      "SDK_SHA256": "db9f8e32ba7302bb20b0ae8077d59d48e86f1fe2a64652ef2fabf415d7aa356e",
+      "CLI_SHA256": "3b90ed3a6c69656969ae5c758bb9ec729af619b2bd8b2e372d09dd3850487be0",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "985883923ba94398e34369b75864eb3765251f0bf3de20c046ffc16c6d3e2096",
+      "producer_receipt_SHA256": "35e0d978e5a500c4e73b2c07488144b89f4b36da69fda51e2ad75d0497ee5d71",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "late-old-close",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "fdc64989803f61b1e8fae33d14a9b20ed10104ca052a66f4b586909574176b02",
+        "SDK_after_SHA256": "db9f8e32ba7302bb20b0ae8077d59d48e86f1fe2a64652ef2fabf415d7aa356e",
+        "CLI_before_SHA256": "7ecd8bc86ca4aa2bf22d7f33f12070c48ea949ae132ef55e0ea0e1a24c625848",
+        "CLI_after_SHA256": "3b90ed3a6c69656969ae5c758bb9ec729af619b2bd8b2e372d09dd3850487be0",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "193092e54a4d26b7430f1652b663ecf755dfe2a206000f832fff768633660f77",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+        "observer_SHA256": "1ecf93ad67b67e056bab11a875f8d7bc3b32743f9bff2dad894b6d130c576398",
+        "SDK_SHA256": "db9f8e32ba7302bb20b0ae8077d59d48e86f1fe2a64652ef2fabf415d7aa356e",
+        "CLI_SHA256": "3b90ed3a6c69656969ae5c758bb9ec729af619b2bd8b2e372d09dd3850487be0",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 152,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 4,
+        "source_bound_TCP_events": 69,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 4,
+        "context_only_TCP_records": [
+          {
+            "PDU": 7,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 10,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 0,
+        "compared_CLI_PDUs": 72,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [
+          13,
+          23,
+          88
+        ],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 4
+      },
+      "native_page_complete_byte_proof_SHA256": "6e27028a89aae3d97f18a1c2f732a43c465bdcd7fe51c09ebcb0e58affca96f2"
+    },
+    {
+      "case": "late-old-close-opening-retry",
+      "group": "matrix",
+      "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+      "physical_frames": 161,
+      "SDK_records": 72,
+      "SDK_SHA256": "35e5c7c73ffbb22a9f72e713a71bc430cdd30e7f1cd399d2f524d4f88e0d1f58",
+      "CLI_SHA256": "fc7c18dae1f0d6a23efc8129105df391ced054ac0f9d9fed1c6b70a2d09c9168",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "5935d3fd080525ae64903115719bc2f22cc44bf0c72e0cb766d018a7ef57de4c",
+      "producer_receipt_SHA256": "0162b0a6e1c411b1d039e0c6916c6073c52316b3cd06e24facb685cd39079844",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "late-old-close-opening-retry",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "297a2c2ede7bcc50d14a2566b23ac1532d6ad57490faf164629005d836f120c2",
+        "SDK_after_SHA256": "35e5c7c73ffbb22a9f72e713a71bc430cdd30e7f1cd399d2f524d4f88e0d1f58",
+        "CLI_before_SHA256": "5c9991abf6d9a91693b47d4a35ef140269cca48e65a11e78f4de5f3803678e0b",
+        "CLI_after_SHA256": "fc7c18dae1f0d6a23efc8129105df391ced054ac0f9d9fed1c6b70a2d09c9168",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "12547822c8de842310f9808df615da8687acb7579f8bac7a427e1535a8e21157",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+        "observer_SHA256": "f5e91c6406e8d7a49a63a87f409297d2a9f6046d5066f4e310664bee6a9701b8",
+        "SDK_SHA256": "35e5c7c73ffbb22a9f72e713a71bc430cdd30e7f1cd399d2f524d4f88e0d1f58",
+        "CLI_SHA256": "fc7c18dae1f0d6a23efc8129105df391ced054ac0f9d9fed1c6b70a2d09c9168",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 161,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 4,
+        "source_bound_TCP_events": 69,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 4,
+        "context_only_TCP_records": [
+          {
+            "PDU": 7,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 10,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 0,
+        "compared_CLI_PDUs": 72,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [
+          15,
+          16,
+          17,
+          28,
+          29,
+          30,
+          95,
+          96,
+          97
+        ],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 4
+      },
+      "native_page_complete_byte_proof_SHA256": "8fb150f1bce9e31242fe5bb6ca65803585493c9cf02ef40d70909c4eafb3b288"
+    },
+    {
+      "case": "late-old-close-with-duplicates",
+      "group": "matrix",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "physical_frames": 160,
+      "SDK_records": 72,
+      "SDK_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+      "CLI_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "c6e88b5309e5165e9ca9c0276f64562d1c349f7481a6b8c0464e53e181116746",
+      "producer_receipt_SHA256": "f43335adbda9a99214829f77cb66c78ef498723c2c871216e18971e66cc8d00c",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "late-old-close-with-duplicates",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "aa42a3a91300bfee93c24b9a948fec31ffcacebbca63692073521f04d0b9024c",
+        "SDK_after_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+        "CLI_before_SHA256": "b08be67129680b3bcdfc6e47c806ddb9976bdf8c68a9536a66747dccbdad66ee",
+        "CLI_after_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "cbb3a4827254316648ca1a9c4275c93d8af7ec00e8040af5676358919167e6de",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+        "observer_SHA256": "5bad010406125723cc3794e15927647d32ff9b06c931b785de97013690cc0bd2",
+        "SDK_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+        "CLI_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 160,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 4,
+        "source_bound_TCP_events": 69,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 4,
+        "context_only_TCP_records": [
+          {
+            "PDU": 7,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 10,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 0,
+        "compared_CLI_PDUs": 72,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [
+          15,
+          16,
+          17,
+          27,
+          28,
+          29,
+          94,
+          95,
+          96
+        ],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 4
+      },
+      "native_page_complete_byte_proof_SHA256": "9d0957eab4d4ebe0a20c74bb60b290ee0bcc99612d9fe10c6050e1c9dea45794"
+    },
+    {
+      "case": "missing-close-opening-duplicates",
+      "group": "matrix",
+      "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+      "physical_frames": 159,
+      "SDK_records": 72,
+      "SDK_SHA256": "8e633801fdefe53de3c6be3c216142f48c1a68ff052ba842fff738129d6babf3",
+      "CLI_SHA256": "c8f7ac8c8bb9eb9f0ab248e7d00ad3df86c92bd67b30476ebbdbef4519fb2f85",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "27a5d322faeff6a92f2c1d3432eafc307aafaba1bfc2ab3725e442bf2d53ca3d",
+      "producer_receipt_SHA256": "d664d660e3977838b23fbf44ad6977dc91fe71e92c66f049dc9dac22eccc7892",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "missing-close-opening-duplicates",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "675702d599a993b48e83095e6b7492c4f0232142ed9f965ae2c83b11faf3b9fd",
+        "SDK_after_SHA256": "8e633801fdefe53de3c6be3c216142f48c1a68ff052ba842fff738129d6babf3",
+        "CLI_before_SHA256": "b49a3ea4ac78224d662c29c97cb324e9735ca7c376bf3289a4bd8fa7bd2faf73",
+        "CLI_after_SHA256": "c8f7ac8c8bb9eb9f0ab248e7d00ad3df86c92bd67b30476ebbdbef4519fb2f85",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "4c251eb6d75f952270ee60e453b98a6400c838021eef1bf041a99cd895dd961f",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+        "observer_SHA256": "a7de791fdcda59d784a636c5cb2345e6f9c4d7903149b4d17f195bf020078e76",
+        "SDK_SHA256": "8e633801fdefe53de3c6be3c216142f48c1a68ff052ba842fff738129d6babf3",
+        "CLI_SHA256": "c8f7ac8c8bb9eb9f0ab248e7d00ad3df86c92bd67b30476ebbdbef4519fb2f85",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 159,
+        "capture_close_publications": 0,
+        "native_TCP_generations": 4,
+        "source_bound_TCP_events": 69,
+        "events_with_different_protocol_and_TCP_numbers": 0,
+        "protocol_sessions_with_captured_TCP": 4,
+        "context_only_TCP_records": [
+          {
+            "PDU": 7,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 10,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 0,
+        "compared_CLI_PDUs": 72,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [
+          15,
+          16,
+          17,
+          26,
+          27,
+          28,
+          93,
+          94,
+          95
+        ],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 4
+      },
+      "native_page_complete_byte_proof_SHA256": "f8361ad5cfb53f7e77e82a44785d50734b839377420f6abaeff16629e423e5c8"
+    },
+    {
+      "case": "control-invalid-first-request-replaced",
+      "group": "preservation",
+      "capture_SHA256": "837b013d82c6150a63b52cdb544fa2347352fe9cd5f48529663db6b7847ba69f",
+      "physical_frames": 75,
+      "SDK_records": 34,
+      "SDK_SHA256": "4391336840dae7be945f0f64d39f31b1ea26c2b3044335970e756227b0091a1a",
+      "CLI_SHA256": "35130d2dc8b59d93c92b147b1c2580049ccd9cc3c018fa0c6ca6f13ad409a8e3",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "29f4c573aa77932750f30981c736e8e5fdb8f950615eafbb7d10854ef9b865eb",
+      "producer_receipt_SHA256": "8345bf860c23b1d5733e751bb262edaad5480fec75a97c1e8a25aadfeda6db8f",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "control-invalid-first-request-replaced",
+        "SDK_records": 34,
+        "declared_TCP_metadata_additions": 34,
+        "compared_CLI_TCP_PDU_copies": 34,
+        "SDK_before_SHA256": "9541004b88cf1f829e2df3cdb0a88c0159b4696e93d8ba13e45df6880e530a90",
+        "SDK_after_SHA256": "4391336840dae7be945f0f64d39f31b1ea26c2b3044335970e756227b0091a1a",
+        "CLI_before_SHA256": "fd5725b67128f63aeedb41d7373c65e0d184b8934bf1069d4d00c4be73c0f4f5",
+        "CLI_after_SHA256": "35130d2dc8b59d93c92b147b1c2580049ccd9cc3c018fa0c6ca6f13ad409a8e3",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "7a39b362ef299c6739d19669e3ba90018a5d33fe57502b9011a7512f484d6db4"
+    },
+    {
+      "case": "control-known-request-late-completion",
+      "group": "preservation",
+      "capture_SHA256": "75780cc495b2b9aac828d6988f53fe3c8b5f957f93503770b92bcbecfc014aaa",
+      "physical_frames": 71,
+      "SDK_records": 32,
+      "SDK_SHA256": "42df0b5c51def9c8a423ac542664eaccf6b7c8acabac744b7c25f4da705ac770",
+      "CLI_SHA256": "4ca17fcc1bd20a212356d5b835a2626c12985ef8a72c9689406778fc12cb247f",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "ab7251de74f9adf77f298520ec70ee889b8600a45225a53e751feb6377df59b9",
+      "producer_receipt_SHA256": "f77a81676766ce3c21607cdc1faeaaaa7cc6a29473339e6f00b8c439b802bbb1",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "control-known-request-late-completion",
+        "SDK_records": 32,
+        "declared_TCP_metadata_additions": 32,
+        "compared_CLI_TCP_PDU_copies": 32,
+        "SDK_before_SHA256": "7317a44412b12fb808dc6c48593fc177cb4adf8c9e1672674cd139c0c257df7d",
+        "SDK_after_SHA256": "42df0b5c51def9c8a423ac542664eaccf6b7c8acabac744b7c25f4da705ac770",
+        "CLI_before_SHA256": "91ab68553efa207f67134baffcc23bbb72512222a8e3668f68499acf5b30d554",
+        "CLI_after_SHA256": "4ca17fcc1bd20a212356d5b835a2626c12985ef8a72c9689406778fc12cb247f",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "a3135746bf3007b5b3ecee360d43aa7e0842d317b1afb983531aa17bebc4e8ce"
+    },
+    {
+      "case": "control-overlap-before-old-reply",
+      "group": "preservation",
+      "capture_SHA256": "30644406001f2d245a9414571772ed8159521ac73becdb5e67300c45f9a75b08",
+      "physical_frames": 23,
+      "SDK_records": 8,
+      "SDK_SHA256": "ec09b109b513c8df976477a59cd10658aa2bda09c4b352c7023e8edab86c3b87",
+      "CLI_SHA256": "2dae44804bbc02e2d1effcd4f8245bd14e72ae8f3c71205e82a2ce15ca25822a",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "2c68aa20b34636dc4ad6f51af3acb46d0b992fe325f27bc513766f046bc946a3",
+      "producer_receipt_SHA256": "e6f59f4ef922ba508227fd4ee7e7969f4ef5918373cc59995cbf83ce4980c2ce",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "control-overlap-before-old-reply",
+        "SDK_records": 8,
+        "declared_TCP_metadata_additions": 8,
+        "compared_CLI_TCP_PDU_copies": 8,
+        "SDK_before_SHA256": "1782fdc101b05535281821897ddb9eaaf16f8a921ee39f6b89ea5b9c96171ead",
+        "SDK_after_SHA256": "ec09b109b513c8df976477a59cd10658aa2bda09c4b352c7023e8edab86c3b87",
+        "CLI_before_SHA256": "dfe048940aad98eba4420ec69383b63aca4b2d8fc506272f00f55a887decc233",
+        "CLI_after_SHA256": "2dae44804bbc02e2d1effcd4f8245bd14e72ae8f3c71205e82a2ce15ca25822a",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "6b6256c5705eb5858edc45068d31c4bad9e0fd45cb33ef939b2800b2484e28e8"
+    },
+    {
+      "case": "control-reply-before-any-request",
+      "group": "preservation",
+      "capture_SHA256": "8321dc3021d9f8183b19488f04203af883b6f08f70d3ef15f60594ef059723ed",
+      "physical_frames": 71,
+      "SDK_records": 32,
+      "SDK_SHA256": "f94e0de46a8318e23c02b7be90f2199dfd2d8349ba1bf297ab03efd4a0d7f57f",
+      "CLI_SHA256": "33c5b6ffdd3802c8c3fb40cc4ff1aa66d869e6e9da22332eb3abcbc673471390",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "fd09b72a547f213787992d743e7329fdabe9e3650f91f67a418814b1dc8c3749",
+      "producer_receipt_SHA256": "6cb06a96da30dba09052d2a4e8d46a9507f826161a1135e5a4dd7f7d3dc24a21",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "control-reply-before-any-request",
+        "SDK_records": 32,
+        "declared_TCP_metadata_additions": 32,
+        "compared_CLI_TCP_PDU_copies": 32,
+        "SDK_before_SHA256": "8945364463684357c55441a1c90737611049525da884d4f81e451b1a2a6e7950",
+        "SDK_after_SHA256": "f94e0de46a8318e23c02b7be90f2199dfd2d8349ba1bf297ab03efd4a0d7f57f",
+        "CLI_before_SHA256": "1cebb1c4a7e43f3cd9a93a1012adcefd96c61c5d136561c66b448a1f8390581b",
+        "CLI_after_SHA256": "33c5b6ffdd3802c8c3fb40cc4ff1aa66d869e6e9da22332eb3abcbc673471390",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "97fd557e723bc43b69c66bddbc1d420a4a476ff1efcfd13bb205be9a4a259833"
+    },
+    {
+      "case": "duplicate-request-observation",
+      "group": "preservation",
+      "capture_SHA256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "physical_frames": 118,
+      "SDK_records": 58,
+      "SDK_SHA256": "1f72c76e2befd4de0f77582a948c7e844ce0de78312d90885c4c464442fc114a",
+      "CLI_SHA256": "68e65dd7bb9c9ac895ee09236fe37d46a890702f6391c8ac656e10cf27543d5c",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "ce0b9c4d99d520ec1779330b777bf8ef7253a59bc2adda4d39df2b546c7c1a2e",
+      "producer_receipt_SHA256": "8b42fd9b6044c30e30bdff5d9a3842110cbb02dee2f920e17d2efd94bf6f722b",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "duplicate-request-observation",
+        "SDK_records": 58,
+        "declared_TCP_metadata_additions": 56,
+        "compared_CLI_TCP_PDU_copies": 56,
+        "SDK_before_SHA256": "47f4d4e54ec36646027408edf9b6fa666af22f84155f1d7d7e4596c0750ead46",
+        "SDK_after_SHA256": "1f72c76e2befd4de0f77582a948c7e844ce0de78312d90885c4c464442fc114a",
+        "CLI_before_SHA256": "4a71d42e361e54c35707702ff0eaf4de6851c8f8fe4a114e56dc9444646a9db0",
+        "CLI_after_SHA256": "68e65dd7bb9c9ac895ee09236fe37d46a890702f6391c8ac656e10cf27543d5c",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "b057bd42b76951233c4665ccfca07b764bbcebee5012fb0564fb9662eca75565"
+    },
+    {
+      "case": "fresh-live",
+      "group": "preservation",
+      "capture_SHA256": "54cf33366e832801c96bd11fad6686ec4f073b0b286f8c1be62e8e622510c64d",
+      "physical_frames": 106,
+      "SDK_records": 47,
+      "SDK_SHA256": "95bee6c4c76f84f7805bfcec047f8777760e0e9260a490089fe72615fce660a7",
+      "CLI_SHA256": "8ffba30f2d58ae243e26a034c7a62967077fe3cefc4254d3368d4c1917af984b",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "f96d84ffefa4364c5d19531ea5670a0e8e5884f169fb48a00a600a39caa211c9",
+      "producer_receipt_SHA256": "57c2a428e19e7cdd7905b4e35417e6225effdf0d03f801b1d5019cb2a2627dc2",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "fresh-live",
+        "SDK_records": 47,
+        "declared_TCP_metadata_additions": 45,
+        "compared_CLI_TCP_PDU_copies": 45,
+        "SDK_before_SHA256": "6da63859e058c1fdb2e8acb415a886334ce59c26a7a10b316069574e4495bbc8",
+        "SDK_after_SHA256": "95bee6c4c76f84f7805bfcec047f8777760e0e9260a490089fe72615fce660a7",
+        "CLI_before_SHA256": "1e2b5305ce5bed1e8f7632d5343b62a5262a413f6c833518596fb475542990b0",
+        "CLI_after_SHA256": "8ffba30f2d58ae243e26a034c7a62967077fe3cefc4254d3368d4c1917af984b",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "804ea471ed132d964238df4016f428e5b65b64fff6082093d3a10f2e987dbccd"
+    },
+    {
+      "case": "live-fragmented",
+      "group": "preservation",
+      "capture_SHA256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "physical_frames": 134,
+      "SDK_records": 9,
+      "SDK_SHA256": "84abd3bec559f31782cc20dbe493e6a26e3813d55fcff6d5cab8027e5c853f9c",
+      "CLI_SHA256": "c6391a3f548cecb91acbaae0a10391e8a8da037d5e245724c3ad9c02b981e144",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "d034a122e9a7c0eeac63fdaf409eb067b458d37fc217aceefd34dd6b5cc9b5a0",
+      "producer_receipt_SHA256": "040d4d6fb2f2d2364c20ddc643bf01c55045f55d9228403f967cd54fe38746ec",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "live-fragmented",
+        "SDK_records": 9,
+        "declared_TCP_metadata_additions": 6,
+        "compared_CLI_TCP_PDU_copies": 6,
+        "SDK_before_SHA256": "14481b42674ac54b6006f242e52a7d4e4f2efa0e9b640c09fbd382b27de6024e",
+        "SDK_after_SHA256": "84abd3bec559f31782cc20dbe493e6a26e3813d55fcff6d5cab8027e5c853f9c",
+        "CLI_before_SHA256": "898e6f91a381860809c6840d41067c0725bf4a9085b9bf7dbfbff5fdfb949437",
+        "CLI_after_SHA256": "c6391a3f548cecb91acbaae0a10391e8a8da037d5e245724c3ad9c02b981e144",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "2a597e150f7ea45720ca36d49b34561f4c9ac59a8635c59571b107c930ab8385"
+    },
+    {
+      "case": "live-query",
+      "group": "preservation",
+      "capture_SHA256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "physical_frames": 117,
+      "SDK_records": 58,
+      "SDK_SHA256": "745fa480613fb0ca95dfcc86d8cfb92938216d0b25f276bf3ed068e897361031",
+      "CLI_SHA256": "a01905d94f7ee4910a159ea6488671bc8faa5fa3dc064369660b339cd9846cdc",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "6981bb27d67275e5a275159d48b3ccb5a358cf73c0de845ec5efed4d754d477c",
+      "producer_receipt_SHA256": "bd96b87278e64c665602ec3f6db4ab02f820db61f2792caf03cfb4d22a11d45b",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "live-query",
+        "SDK_records": 58,
+        "declared_TCP_metadata_additions": 56,
+        "compared_CLI_TCP_PDU_copies": 56,
+        "SDK_before_SHA256": "ffacb954e7fcb7f4fe1d9df8829f94bf18d5d65f478cf4d54050f3aaa0cca072",
+        "SDK_after_SHA256": "745fa480613fb0ca95dfcc86d8cfb92938216d0b25f276bf3ed068e897361031",
+        "CLI_before_SHA256": "94ac8a56c7fd92efa8fd1ec30a2cb4035fda3eb0ccc5c8b358a9627b67bb4adb",
+        "CLI_after_SHA256": "a01905d94f7ee4910a159ea6488671bc8faa5fa3dc064369660b339cd9846cdc",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "f0280bba40b0a1352e9fdbb427ca4cad760b7ea9d15a55b8111cfe36e97a5b57"
+    },
+    {
+      "case": "live-unfragmented",
+      "group": "preservation",
+      "capture_SHA256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "physical_frames": 36,
+      "SDK_records": 9,
+      "SDK_SHA256": "2e7a0a06d9d5bb96a4e4db9abdd0d83c8c8dbc40f8ffb2a5eea04f35f723781c",
+      "CLI_SHA256": "f8d18f5ba043d73418e12bf86e0bd343e311f9a82f6fe2f17ed4b4edad6f5328",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "40aab58a9a8be8736faa13c6e5ede43576fd073fc0f4d79d372ca5d09c215f4b",
+      "producer_receipt_SHA256": "0f115eacf49cc350d17dd61da86f7a585a21a03286608606a10f72c43c17d9a1",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "live-unfragmented",
+        "SDK_records": 9,
+        "declared_TCP_metadata_additions": 6,
+        "compared_CLI_TCP_PDU_copies": 6,
+        "SDK_before_SHA256": "c4a5515d65ecdcba7034876b15816e8bc8bd2c40194d8e9936f5bc6a8764791d",
+        "SDK_after_SHA256": "2e7a0a06d9d5bb96a4e4db9abdd0d83c8c8dbc40f8ffb2a5eea04f35f723781c",
+        "CLI_before_SHA256": "e273bff35984f2dd1c909d74618d021a21ca63b6018659a5d364811bffc0004e",
+        "CLI_after_SHA256": "f8d18f5ba043d73418e12bf86e0bd343e311f9a82f6fe2f17ed4b4edad6f5328",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "01cb84fad01015f151fd2c131c5a872d417f5f0e637cc389ab598ab97648dc6e"
+    },
+    {
+      "case": "permanent-request-capture-hole",
+      "group": "preservation",
+      "capture_SHA256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "physical_frames": 116,
+      "SDK_records": 32,
+      "SDK_SHA256": "1c0df028740f6ee9604a1edc85a6ef50a947670ff3b41255662f7eba925685ad",
+      "CLI_SHA256": "cf30c20e7a4f19a2965c40658584e1ef886fa5cde0ba884c6670a548b0d76eda",
+      "final_publications": 1,
+      "final_statuses": {
+        "incomplete": 1
+      },
+      "final_protocols": {
+        "dcerpc": 1
+      },
+      "complete_projection_proof_SHA256": "36464d6476d99988c194a66532745c52262fe4f46943bc1a5d5facb2918aa766",
+      "producer_receipt_SHA256": "e604c9aa936a8ba6a17eae2e23979c3fd30baad6255b2f35282b48e528838018",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "permanent-request-capture-hole",
+        "SDK_records": 32,
+        "declared_TCP_metadata_additions": 30,
+        "compared_CLI_TCP_PDU_copies": 29,
+        "SDK_before_SHA256": "7859e27ddb3bf072ad09cbe6b1aa788e2c822cf5f49bde2f36b06f221f619477",
+        "SDK_after_SHA256": "1c0df028740f6ee9604a1edc85a6ef50a947670ff3b41255662f7eba925685ad",
+        "CLI_before_SHA256": "62ed83dc09d22ff96f2bf598a6a078e1d68da2fe8b5eb52b678b0f9831b6aaaf",
+        "CLI_after_SHA256": "0d3d008e3f66837e77ec502ac1e2611f015696390cd42117b5a948821f8b65ec",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "5f96d58264460ceab6d8cee0e8ac85cc142e434e1aace92d84f73262fe6bf1a2"
+    },
+    {
+      "case": "request-arrives-after-two-later-requests",
+      "group": "preservation",
+      "capture_SHA256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "physical_frames": 117,
+      "SDK_records": 59,
+      "SDK_SHA256": "2b4fb6c28998d305ef91418a98ec98b7f2c513b4c731b65b76304528372a6b2c",
+      "CLI_SHA256": "e16ed41bc3d80e313da3126add266babec9ef036f8257b0359d7358c7ffd16da",
+      "final_publications": 1,
+      "final_statuses": {
+        "incomplete": 1
+      },
+      "final_protocols": {
+        "dcerpc": 1
+      },
+      "complete_projection_proof_SHA256": "26e4cfaba8cdbf32b8ceb6c73fbfc229de361ed7f14570682e995a097f1c3e5a",
+      "producer_receipt_SHA256": "911f1adf2e8ec16ec0c8a779f2b3cffabe6bf2571944eb96cbe632044d7095e2",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "request-arrives-after-two-later-requests",
+        "SDK_records": 59,
+        "declared_TCP_metadata_additions": 57,
+        "compared_CLI_TCP_PDU_copies": 56,
+        "SDK_before_SHA256": "35caa68800f57acc665a9c94412be779547a2b43263a118ba1526f3e47a584e6",
+        "SDK_after_SHA256": "2b4fb6c28998d305ef91418a98ec98b7f2c513b4c731b65b76304528372a6b2c",
+        "CLI_before_SHA256": "de858d87f0b4bc42f895ef618d960a2d28f81d97e047e1e8a3b2ed260b3ca74a",
+        "CLI_after_SHA256": "89a465168dfa2940353b6c048de3c2894a0b6faa89ec5f5a083f6574594a0d09",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "3a760df0396cd5fe1e576a17dbdd8a9e6e101bea4187673be67fd566960f35eb"
+    },
+    {
+      "case": "request-tail-arrives-after-first-response",
+      "group": "preservation",
+      "capture_SHA256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "SDK_SHA256": "5b51f22dcb312953ecd1b557e864b3e5bcc5fcf9bc01525ae8d993422982cc3b",
+      "CLI_SHA256": "d226688f3cd4d928bc0c87b2549a8121be4e0a9f0941cdf532d95dd7bf987bab",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "55d83acfed1740b44febfacb4cdb8cf319154adb62f6116feb07dffc3ae0cd8e",
+      "producer_receipt_SHA256": "059d0e059c49938bf35eea9b2b089e1e818062adf3d3a3da29d9607690a0ec0f",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "request-tail-arrives-after-first-response",
+        "SDK_records": 46,
+        "declared_TCP_metadata_additions": 44,
+        "compared_CLI_TCP_PDU_copies": 44,
+        "SDK_before_SHA256": "b327e0ae3ee83ada20964f08d1945037a9b5129a8a4e342b1e7c5c350137c0a4",
+        "SDK_after_SHA256": "5b51f22dcb312953ecd1b557e864b3e5bcc5fcf9bc01525ae8d993422982cc3b",
+        "CLI_before_SHA256": "6762d32118b1d432483182499930b94c6d4b41aef2a1385665c85a37497417da",
+        "CLI_after_SHA256": "d226688f3cd4d928bc0c87b2549a8121be4e0a9f0941cdf532d95dd7bf987bab",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "78296d10898c8d47ece723bd41d7dc919e7e50b7a5b57fb939ad6d611fa4b9e4"
+    },
+    {
+      "case": "response-first-two-swapped",
+      "group": "preservation",
+      "capture_SHA256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "SDK_SHA256": "fad834e7f97e3a9e93fdefd28cf703a88a1a2a24c0c99bc2f88451a4352d4cee",
+      "CLI_SHA256": "3ce4b61eb7117a78d62ce25c47c2c59c9ad64fa0325274584f8afafd85bbd438",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "2cef532ec57fa649b376e00aee171a6319b8af860e1d8084dcdf8fef757c72a3",
+      "producer_receipt_SHA256": "ecf207216aec8018f45e9a5c0adae6b753c179d5e3deee1d1e780fb5e3e8de68",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "response-first-two-swapped",
+        "SDK_records": 46,
+        "declared_TCP_metadata_additions": 44,
+        "compared_CLI_TCP_PDU_copies": 44,
+        "SDK_before_SHA256": "d339ff5a1103cef5e5cb5a6ae7dbb9e819ad6561e97aa366987bc34063b7813c",
+        "SDK_after_SHA256": "fad834e7f97e3a9e93fdefd28cf703a88a1a2a24c0c99bc2f88451a4352d4cee",
+        "CLI_before_SHA256": "223d401425c506e2c30288b946b7755a222511f4c1f3614c22d816ce5e1e2217",
+        "CLI_after_SHA256": "3ce4b61eb7117a78d62ce25c47c2c59c9ad64fa0325274584f8afafd85bbd438",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "a5ad7b0c74937f261d24a1e655233f6e5bd9e92aa273627fabcf1c21a86e1ac1"
+    },
+    {
+      "case": "reuse-actual",
+      "group": "preservation",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "physical_frames": 155,
+      "SDK_records": 72,
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "a746f8d72179e41799c01f635032445c6d59d4d0e74351427c4952f55959e690",
+      "producer_receipt_SHA256": "e661a869b256d1ba42eb64d7e2f0435008663c94a70852140985e645b389adba",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-actual",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "055ed19394ed9bdc2a159902d6460ca54e5b72f0d9274ec2a9b8bccc6b5a97d4",
+        "SDK_after_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+        "CLI_before_SHA256": "1a92b3cacaae374e50869a495b2f0db400d4c2398ccb1d9643acb03d28baa124",
+        "CLI_after_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "838074f15673eaf539f401114dacab3a7513ff7fbf6f764cf3d410e1c25f89e1"
+    },
+    {
+      "case": "reuse-lost-close",
+      "group": "preservation",
+      "capture_SHA256": "643577643950565946f5fcb8b8dd2e8955c937a2b2813d37f89e0d1333b031ff",
+      "physical_frames": 151,
+      "SDK_records": 72,
+      "SDK_SHA256": "e133aa4dc3a248c113cb6d4613b048d8b804f12ece0c7547b1d05da6eab60b05",
+      "CLI_SHA256": "ecf17b9da0a3c3c07b1d871dc3813c152af7bcb506c0e4af7036f65275b840a6",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "bd5ecf94789a42b5c853ff84a56d19647f5bf4c2a4d012f564acbce5d9a0fdfb",
+      "producer_receipt_SHA256": "6ab3fc9364a6f44a4ec64e74bd963db6e29cd39ca1e58639bb6d1ab982a6713f",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-lost-close",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "50ed2a8b1976fcd44015546df16339318aced05dac3730905856fb636dd94650",
+        "SDK_after_SHA256": "e133aa4dc3a248c113cb6d4613b048d8b804f12ece0c7547b1d05da6eab60b05",
+        "CLI_before_SHA256": "7f9abbe773ed4af98922312cf240bc3838d2d5980448e500f9e539d197c4ebd0",
+        "CLI_after_SHA256": "ecf17b9da0a3c3c07b1d871dc3813c152af7bcb506c0e4af7036f65275b840a6",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "fbcc38ced71599a25af6d6a15df22f242224c0a4e23ef5782305d31d855a7512"
+    },
+    {
+      "case": "reuse-lost-close-out-of-order",
+      "group": "preservation",
+      "capture_SHA256": "e7a6af68a0aa75dcf7c39b3acd182e0f1996ea6326524c7d200971e02aa3a031",
+      "physical_frames": 151,
+      "SDK_records": 72,
+      "SDK_SHA256": "7b89ae66f44d200ec5f0a43ddbfe161c3cc4263e89254cd018a907ffb2d6a44f",
+      "CLI_SHA256": "350fbb0e3860db620294892c151f9c34ea58340f79b3ecd2f0da208f7f42dd0b",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "3b20c43a681437c3d6fd44ed559e721650b8223ecb0509018dca3026217cfa4f",
+      "producer_receipt_SHA256": "7c77cda67ee994e6041132ebe6ff406510d315dfc3a83d178327b60b96c54875",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-lost-close-out-of-order",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "2bfdab5b31a10dbaa2b03cfac47945ed9c3e34db0ef180ee1483e95e60809afd",
+        "SDK_after_SHA256": "7b89ae66f44d200ec5f0a43ddbfe161c3cc4263e89254cd018a907ffb2d6a44f",
+        "CLI_before_SHA256": "ec8b29ec23b9ca5c838f06fff9ac35183e76645d01dd0e88b98fa387133ca22f",
+        "CLI_after_SHA256": "350fbb0e3860db620294892c151f9c34ea58340f79b3ecd2f0da208f7f42dd0b",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "3526777e100ef3718fc2b39371c35fd948473701cfa0618edc831e6a3ac61b91"
+    },
+    {
+      "case": "reuse-lost-middle",
+      "group": "preservation",
+      "capture_SHA256": "8ff8ed83c800f56981791f7de25479531da98471c431fbc100e4c574a2d8b4b7",
+      "physical_frames": 154,
+      "SDK_records": 60,
+      "SDK_SHA256": "a631323fd1245ec63c438dc55a3f4930ce6e450d586a4e5334a75d2be3c40158",
+      "CLI_SHA256": "1132aa347a8b836e1626aca2603ca9a594f019392403dd68dd4bc91843fec1a3",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "91c8721be1cffcdf088e1aaa22b38f652886c31704a552f266e1a09498e5b872",
+      "producer_receipt_SHA256": "fac2b8f5e2b7e4635410400477be19c1e2c5b9045c2245b337451cb7cb33a02d",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-lost-middle",
+        "SDK_records": 60,
+        "declared_TCP_metadata_additions": 57,
+        "compared_CLI_TCP_PDU_copies": 57,
+        "SDK_before_SHA256": "fece32ccc933b8a3c85b5fbc73292ce5a97bdc71adee23218da2e87496e5e2d5",
+        "SDK_after_SHA256": "a631323fd1245ec63c438dc55a3f4930ce6e450d586a4e5334a75d2be3c40158",
+        "CLI_before_SHA256": "25a19f0f3c49a8a56398e6a962ac2d8d98bb4a032fc6e1a023a9472338ff850b",
+        "CLI_after_SHA256": "1132aa347a8b836e1626aca2603ca9a594f019392403dd68dd4bc91843fec1a3",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "e1daddb86eae28b8dd0c1ebb1dfb289f2b331162ac2e9fccb2f1a3160b98d354"
+    },
+    {
+      "case": "reuse-lost-middle-and-close",
+      "group": "preservation",
+      "capture_SHA256": "13b49c05399fb5c21a4c8d5413f582e5192d5699c7dad816dde6b374d39897db",
+      "physical_frames": 150,
+      "SDK_records": 60,
+      "SDK_SHA256": "79e0bd7090665a6407363233bd7e89c3c8ad9094dc2596e859a65006d4d97ac1",
+      "CLI_SHA256": "6bbacc765938573cdf7e3674b51a2a68f80d3ffae7f54c395f37f96bbb1ccd8d",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "cc68a69315e5640ef87c8093ecda123b03fcb0f9415d73a5e7da0990d33ed06a",
+      "producer_receipt_SHA256": "cf7dafd4b592617a31af4bad9aa94a5135bb0c7c1f2ec86f603374893dd7b3bb",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-lost-middle-and-close",
+        "SDK_records": 60,
+        "declared_TCP_metadata_additions": 57,
+        "compared_CLI_TCP_PDU_copies": 57,
+        "SDK_before_SHA256": "2ba4a2fc0d8593a5adacd74941036161a491d5b6f22d156981a7eeeb9e7cb339",
+        "SDK_after_SHA256": "79e0bd7090665a6407363233bd7e89c3c8ad9094dc2596e859a65006d4d97ac1",
+        "CLI_before_SHA256": "cf94ce8645fab518c3e3db9a4249a053b1fed988f9a300be31c60dada8b702e1",
+        "CLI_after_SHA256": "6bbacc765938573cdf7e3674b51a2a68f80d3ffae7f54c395f37f96bbb1ccd8d",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "a6452bd8ad18dd8927e65097a0216ea5070cbc29c97f0b059730cc41aa1ab065"
+    },
+    {
+      "case": "reuse-out-of-order",
+      "group": "preservation",
+      "capture_SHA256": "43eec2f51f71d46e587c6c2ebd9d6456e4bcfd99df964a1d400b9e5f22f4c4eb",
+      "physical_frames": 155,
+      "SDK_records": 72,
+      "SDK_SHA256": "c05fb03ce59430973117bd2a572e13a46590e9b0b456cfc584e9ae6cc8c3d79a",
+      "CLI_SHA256": "3a20fdce5213ac5081e69d900239f0f54c83186f72c13ca42dfc5cc918451f32",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "83ab23c7c455c08220ff1cc4b22779d33dd231ef753300f89df0c2e4224bbe44",
+      "producer_receipt_SHA256": "621b67088e9429854453077c60941d28459bd8d61766179fdb480f3e15bb5fad",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "reuse-out-of-order",
+        "SDK_records": 72,
+        "declared_TCP_metadata_additions": 69,
+        "compared_CLI_TCP_PDU_copies": 69,
+        "SDK_before_SHA256": "1f443605dc0149e6416b681d67e7c374b0c2abf56b3bc44ed25a5e512797df5c",
+        "SDK_after_SHA256": "c05fb03ce59430973117bd2a572e13a46590e9b0b456cfc584e9ae6cc8c3d79a",
+        "CLI_before_SHA256": "4fe93ee96ba1cda96aa6ba99aa9665bdd9e85d93d561ac1c1a4d71de86314c29",
+        "CLI_after_SHA256": "3a20fdce5213ac5081e69d900239f0f54c83186f72c13ca42dfc5cc918451f32",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "a83c0a043a7effd12850b7edddeb0a72677e4354cab35250c60dd2588e3e4ab5"
+    },
+    {
+      "case": "rpc-fragments-live",
+      "group": "preservation",
+      "capture_SHA256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "SDK_SHA256": "49b3072f874c34babead638d623afad54d737a659fa8995b6292cfe478a6d8d6",
+      "CLI_SHA256": "a37c4dddcf83f3a8380e43fe89e35b522b62152180e3a238ded22fac35363ca8",
+      "final_publications": 0,
+      "final_statuses": {},
+      "final_protocols": {},
+      "complete_projection_proof_SHA256": "4b1f514eba046c537ad305f3a066df52f01a1a672150e26af4aec3b2af5be88d",
+      "producer_receipt_SHA256": "e7704ae38a32a06a88f17a047c72d2e64698dc570245f27e1cc3dfbb197f15ce",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "rpc-fragments-live",
+        "SDK_records": 46,
+        "declared_TCP_metadata_additions": 44,
+        "compared_CLI_TCP_PDU_copies": 44,
+        "SDK_before_SHA256": "0145b6ce04960f8e3079078df7ca038eaeb84b3dab52a24300a39cc372c9baa8",
+        "SDK_after_SHA256": "49b3072f874c34babead638d623afad54d737a659fa8995b6292cfe478a6d8d6",
+        "CLI_before_SHA256": "84e292e8c879a59d2d70928a5303e136798ab4616fbdb58493bcd8b9ff4e3bb1",
+        "CLI_after_SHA256": "a37c4dddcf83f3a8380e43fe89e35b522b62152180e3a238ded22fac35363ca8",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "c2534aa80bea231b760e7b25b308765c33c79ccdfbc83df12b94d22b45bd600c"
+    },
+    {
+      "case": "sharon",
+      "group": "preservation",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "SDK_SHA256": "98fde91c33e3c3612ba0239ca0d43d8b60f6e88d8ddaf0146c75f688d7a1eadb",
+      "CLI_SHA256": "a8788fbd2af92b57b6cc840237c1b25f1895d738a9f7e8cc2aec6cda5e26d2c4",
+      "final_publications": 552,
+      "final_statuses": {
+        "incomplete": 552
+      },
+      "final_protocols": {
+        "dns": 3,
+        "": 421,
+        "smtp": 1,
+        "imap": 2,
+        "sip": 1,
+        "kafka": 5,
+        "smb2": 3,
+        "dcerpc": 1,
+        "postgresql": 2,
+        "tls": 3,
+        "http": 1,
+        "ip": 109
+      },
+      "complete_projection_proof_SHA256": "43cc0a8acd2a29473ae59ac206610a660a6f10665b96059ffbf38eb55886f529",
+      "producer_receipt_SHA256": "48ace9c134bdfa1fd61f3dd49c642be572e8be5e8391b983540bfb86096dc039",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "sharon",
+        "SDK_records": 245784,
+        "declared_TCP_metadata_additions": 2704,
+        "compared_CLI_TCP_PDU_copies": 2261,
+        "SDK_before_SHA256": "a5caa24b1af8d7ef1d55dc472daa083128be5555f236a37e36b79c290eb9ec6a",
+        "SDK_after_SHA256": "98fde91c33e3c3612ba0239ca0d43d8b60f6e88d8ddaf0146c75f688d7a1eadb",
+        "CLI_before_SHA256": "96d863154d00f9297d9dc891aba9c845e7dce7cb8638ce94d210208d5662c97f",
+        "CLI_after_SHA256": "fe605e7602483fb000c6e34c7d769eb67d0a89278efd4ac64bc600ee3ebf0336",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "53ef18b06479a5ee14bc932e7e19bd5ed22f53111160856d1ecbc40a2dd65867",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "observer_SHA256": "877d9621952c5d8f0708e007c8dc095dd75a88c3dbdafe8a3802d8c17ab3c008",
+        "SDK_SHA256": "98fde91c33e3c3612ba0239ca0d43d8b60f6e88d8ddaf0146c75f688d7a1eadb",
+        "CLI_SHA256": "a8788fbd2af92b57b6cc840237c1b25f1895d738a9f7e8cc2aec6cda5e26d2c4",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 328127,
+        "capture_close_publications": 552,
+        "native_TCP_generations": 840,
+        "source_bound_TCP_events": 2704,
+        "events_with_different_protocol_and_TCP_numbers": 2607,
+        "protocol_sessions_with_captured_TCP": 791,
+        "context_only_TCP_records": [
+          {
+            "PDU": 11436,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 11447,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245233,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245243,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245244,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245246,
+            "protocol": "smtp",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245285,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245286,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245374,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245403,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245463,
+            "protocol": "postgresql",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245508,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245546,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245579,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245584,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245598,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245640,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245674,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245675,
+            "protocol": "http",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 221614,
+        "compared_CLI_PDUs": 245784,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 840
+      }
+    },
+    {
+      "case": "snaplen-request-capture-hole",
+      "group": "preservation",
+      "capture_SHA256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "physical_frames": 117,
+      "SDK_records": 33,
+      "SDK_SHA256": "425f1e12c14d48b12020277bab8dacac7546754d206e58fe04471ddb96a20d0e",
+      "CLI_SHA256": "95d1a2b3a887b486e8767841191e06f173f8ac67de7357370a1c7ce285a3b1cd",
+      "final_publications": 2,
+      "final_statuses": {
+        "incomplete": 2
+      },
+      "final_protocols": {
+        "dcerpc": 2
+      },
+      "complete_projection_proof_SHA256": "1c6d8af99d4685ddcf1c14a61e34caf6ed2244a7d9eb2b8cf7f1170fd5ecc761",
+      "producer_receipt_SHA256": "6de9d2e619de9474e1a9f0088e2e13d466512841cb93a7f52b988230a73dce6d",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "snaplen-request-capture-hole",
+        "SDK_records": 33,
+        "declared_TCP_metadata_additions": 31,
+        "compared_CLI_TCP_PDU_copies": 29,
+        "SDK_before_SHA256": "42b720fc3c3bc530dd2b953a316e772b77b7085f8a646bd6cbe338068db7961f",
+        "SDK_after_SHA256": "425f1e12c14d48b12020277bab8dacac7546754d206e58fe04471ddb96a20d0e",
+        "CLI_before_SHA256": "0e7af69bcd755be513d23ff49f3a3fa0b0262a57aedbec3696e671ba8f1c702c",
+        "CLI_after_SHA256": "4351a76870ef54dd87df618269b23c58e60e075dab3195a32edc15febc787603",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "native_page_complete_byte_proof_SHA256": "231bbe5d10918bd191a4ba58dd80d92a98c90ca95bfaaec9412c6db9cbb4400c"
+    },
+    {
+      "case": "weber",
+      "group": "preservation",
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "SDK_SHA256": "b15f43048a660186efbf3ffd3f554c7fa5f96812373ba66f6de60541c24c10cb",
+      "CLI_SHA256": "1dc779d10af31fcdeec1b336a8a04f155d432b7daa402203a32022dc2a5fc7f0",
+      "final_publications": 26,
+      "final_statuses": {
+        "incomplete": 26
+      },
+      "final_protocols": {
+        "dns": 2,
+        "dcerpc": 10,
+        "imap": 2,
+        "": 3,
+        "ldap": 3,
+        "smb2": 1,
+        "tls": 4,
+        "http": 1
+      },
+      "complete_projection_proof_SHA256": "c955a30d7549425033bf4d8d1b99e2b865ffab25610d590936fe662e16b3a0bf",
+      "producer_receipt_SHA256": "7ce5dc61401f51981023975e565e378316a7b5c69df82b8e762f8574c5d21f0a",
+      "normalizer_complete_byte_preservation": true,
+      "typed_value_preservation": {
+        "case": "weber",
+        "SDK_records": 39740,
+        "declared_TCP_metadata_additions": 5113,
+        "compared_CLI_TCP_PDU_copies": 5087,
+        "SDK_before_SHA256": "73e8b1e4e26005b79246d4537342ea2dc61403fd67ed7df7bab9242ec83e9c1b",
+        "SDK_after_SHA256": "b15f43048a660186efbf3ffd3f554c7fa5f96812373ba66f6de60541c24c10cb",
+        "CLI_before_SHA256": "6e4040219d8052372d9252960b879a176cff6c49e2309f08c58b34214cab399d",
+        "CLI_after_SHA256": "b612b734dadce24a8c5a2ec23b553c13d05d4f0174de26bf3de02b18ca6388de",
+        "all_original_values_and_types_exact": true,
+        "all_declared_metadata_additions_checked": true,
+        "complete_export_byte_identity_claim": false,
+        "auditor_SHA256": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6"
+      },
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "fd87011bb5e15c68f596b8d47cdcc8d39c5c0e07ecf8e91cdb9470820f9f930a",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "observer_SHA256": "94974097cc7f39366ecf6c3dc7a5050f8add9cf4f4a425516aac06930d1acd2c",
+        "SDK_SHA256": "b15f43048a660186efbf3ffd3f554c7fa5f96812373ba66f6de60541c24c10cb",
+        "CLI_SHA256": "1dc779d10af31fcdeec1b336a8a04f155d432b7daa402203a32022dc2a5fc7f0",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 51328,
+        "capture_close_publications": 26,
+        "native_TCP_generations": 824,
+        "source_bound_TCP_events": 5113,
+        "events_with_different_protocol_and_TCP_numbers": 5016,
+        "protocol_sessions_with_captured_TCP": 722,
+        "context_only_TCP_records": [
+          {
+            "PDU": 9093,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 9104,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30236,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30582,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30945,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31159,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31693,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31914,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31981,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39715,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39716,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39717,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39718,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39719,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39721,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39722,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39723,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39724,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39725,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39726,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39727,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39728,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39729,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39730,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39731,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39732,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39733,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39734,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39735,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39736,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39737,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39738,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39739,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39740,
+            "protocol": "http",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 288,
+        "compared_CLI_PDUs": 39740,
+        "source_bound_parent_links": 8,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [
+          {
+            "frame": 49568,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "9d09e6f6ad3ed395e7b1c8c2bcef8c89db659a7a3cb30ddfeb6a24f6f7bc4ae6",
+            "version": 6,
+            "identifier": 3158141878,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49573,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "5da3dfe5f84e2637a6aec88d690bb0ebe48f9db805c4186e324ca954297f687c",
+            "version": 6,
+            "identifier": 3024233048,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49575,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "241100fc09cab075607ba01d8efe6efe26463e2aef017cd6524ae7d55a5e9f60",
+            "version": 6,
+            "identifier": 1582708242,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49586,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3c31db9b764cf7eaaccc1c4ba08cec48ecaef17f46bb07a93992bb6308ee7faa",
+            "version": 6,
+            "identifier": 3714641287,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49588,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ebc1f76b289e562e26a7042e4f7d4e2966301d15e3e20d7347f2093d7c1b0481",
+            "version": 6,
+            "identifier": 1544708580,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49590,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "294623089d1be9694c3dad32715fe8b983a0b07e829dba752c6bc12be2e05268",
+            "version": 6,
+            "identifier": 2832392391,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49619,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3222672e4e0dc9a1545a6b38419642edd36537b8dc81ee32637dbdc91040b787",
+            "version": 6,
+            "identifier": 3174734018,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49621,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "6211f6be58f1a60ad8e825675f3ae02ac921d0018066730631240fccc5dc2d1c",
+            "version": 6,
+            "identifier": 1204957298,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49650,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cc4add763186024051586b0e98d09f6fc402aee6b5be8ee0a7271e8bf024109e",
+            "version": 6,
+            "identifier": 458420629,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49706,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a957574f800b081881b046cafbd2dbe740bdfb3bd0e0fb87f2b5cd9afbd9456f",
+            "version": 6,
+            "identifier": 216500316,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49708,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7aa8f3b3628aa99de4c0ca63482e8d43926d9969a6ebcfda10ab77d7baf37330",
+            "version": 6,
+            "identifier": 1361580515,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49711,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "285ff470a26124f4711d280752f42dc6745433498a0364edeba508adf4579ef9",
+            "version": 6,
+            "identifier": 1188871097,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49713,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a62b931b0248a25ee82df2b1bdae8eaea2ac923bfb487145c4a6251edae5d8b3",
+            "version": 6,
+            "identifier": 296206146,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49721,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d363e2c096a45783fa063d140dca644f1e923744ec00724893a8a00954c17596",
+            "version": 6,
+            "identifier": 3907921435,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49723,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "f6983e4dc92798533d53c24eecd668ef5d9080a8967ef6f3f79f62753f7a0541",
+            "version": 6,
+            "identifier": 1020416901,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49727,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e0b903801bbf0d0496138a49999ab2d9681326256e00680ba9b8d65f2e8774d5",
+            "version": 6,
+            "identifier": 4285156066,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49729,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d6c5ba32c4884ee61f1a1a2d1a0d90247455a77907afeae5e31c32041667b846",
+            "version": 6,
+            "identifier": 2698431781,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49733,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "c8658be9488a405b8a177c7d08b2cf886ca116098f9e7689f6607f7a6ca7ec94",
+            "version": 6,
+            "identifier": 595643371,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49735,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4f81ad1f32f20ab1a624ad0dbdfea28e3b5b8f236c044653afe568840bf21a5c",
+            "version": 6,
+            "identifier": 911368446,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49740,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "933652003b79882bdf9b8de0fe856ef80c53511010b5cf4a2fd38dfe796a0752",
+            "version": 6,
+            "identifier": 3183193359,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49742,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "6236327da46e9a6b91c53204f016d29bc4156824ca30824d48da112c37321f2a",
+            "version": 6,
+            "identifier": 720199907,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49746,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4a3a3d73443010e710d5812048d68d786419d3aa9aa0cfd12becaaf068e559af",
+            "version": 6,
+            "identifier": 1517229834,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49748,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "40daff79867e5d2faa9500807c6f30238cecf84be8a20b35a5e822e7083d13d2",
+            "version": 6,
+            "identifier": 369545684,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49752,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ff32ceebfe19170b1f6a07341e16379b9abcc7f5561174361b27363eb411ef0b",
+            "version": 6,
+            "identifier": 614263658,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49754,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0da4e893e4292ee174ee90fff851b66efc5bc434648553aab4cf0477fd148c29",
+            "version": 6,
+            "identifier": 4194764440,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49758,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "5d8ae991507117aeb5f0e5461cd89631df482b250a7392f822ae8017117b9a65",
+            "version": 6,
+            "identifier": 3154911416,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49760,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cc4334a21b7954e721762442a1401733d2d22a54bb1e991dddeb363e354582e0",
+            "version": 6,
+            "identifier": 3681125911,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49765,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "bbf0b1b418f72cdfdd880f8bce32b893b5406487412af54ddfb64ea34ec88b98",
+            "version": 6,
+            "identifier": 1149221495,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49767,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0b926ceb099e7ad32341f6df37543ff64f8d95088f8e6a274fa65054ea0d2808",
+            "version": 6,
+            "identifier": 1504886018,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49771,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "592cbb4acadd90c32a94370baafa0ddbb91fb751a10a70d740b129a4a752f4c3",
+            "version": 6,
+            "identifier": 1915340111,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49773,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a8df1a0f619205daeeaf83e8cced8fb2cd0ff922ec2cdd703f3a3c1fda59cfa0",
+            "version": 6,
+            "identifier": 2565396328,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49777,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "298b612df2787f60ddc16883fd16b2fad6839f3ccd32e7659dff426c3d6c1008",
+            "version": 6,
+            "identifier": 2037540788,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49779,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "213ef4ebf656ae2ffb8358625cfd5b47f87a3d672d5c0bad9b799c8d5600b340",
+            "version": 6,
+            "identifier": 2866216052,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49783,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7e9b08b3d761627d43817081480072a14b3e0f33e9e0fb7034730b3d8e921797",
+            "version": 6,
+            "identifier": 2471189050,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49785,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4336dfa4b9ad47c35e50c60d711acc5ebdfbb337b48bc466ce22018376ead0f6",
+            "version": 6,
+            "identifier": 3965197308,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49789,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "f8e1a888f37b7f1271ea60c5107dff3b1b2d650911d24d234e29354691631f03",
+            "version": 6,
+            "identifier": 1398779112,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49791,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "59cf2741abf4d1ba2c4e14c9acabe3dde88fc9a7ed38b814984954a35d31ec64",
+            "version": 6,
+            "identifier": 606380295,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49795,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "baa93dfe5b16b99f5479ff666da251a29f4ea28a498bd1376684cc2564aa868f",
+            "version": 6,
+            "identifier": 1784932235,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49797,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "05f5d69fea3c00c0ba02b206b5c6c6b34805ad89ee173c57c27d8f81d63df5f9",
+            "version": 6,
+            "identifier": 1165073144,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49801,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "aa96e07afea4e116553e7a1aa1ba5bf3f580b8388a9022169fc008579595f50b",
+            "version": 6,
+            "identifier": 623803849,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49803,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "8298230837621a14e0a4483a6cc1e8c6ecb3d3a9b34c6862c03d77dad93feee3",
+            "version": 6,
+            "identifier": 3273298539,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49806,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "bbd27ce80f29221a1991a3d14f7f3a2537ac3fac705b60ed002dfc69a276350e",
+            "version": 6,
+            "identifier": 4275182530,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49811,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e5022a0ef6e67eb36c0babdb509c96447ccdae4e7d3d41f46fa3cb9fc6583c4c",
+            "version": 6,
+            "identifier": 2966513902,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49813,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "732245125d4f54c4053e6919310198a94adfa6a8555f382435e1103075e03887",
+            "version": 6,
+            "identifier": 2835286883,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49816,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "183f82e8adbbb4cfbe1f495c21f5cabbad61e028eaf706ccb79fba5249425911",
+            "version": 6,
+            "identifier": 696005400,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49818,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e972d5228ec66dd65defaabd1d9d0d61a37e5111019f804317cd9abca9020cc3",
+            "version": 6,
+            "identifier": 2613413560,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49823,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3511a8ec5ad286cbb56f7a382a6a74f85d7377678ddcdf3d61b8f4cc180be5f6",
+            "version": 6,
+            "identifier": 432651022,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49825,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cbe4325365468e6a064efdb95ed87f589d13b19d9c67aeba9d79aa8b8e280427",
+            "version": 6,
+            "identifier": 367691551,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49840,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "02ea57c4aa37cddb7ec51adcd54077d0859cef8a051ebb5e01a24e38a6fd1d6f",
+            "version": 6,
+            "identifier": 220268773,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49842,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ef3ba7f2dc0e950b102b3835b9c2a785fb10ddc29baef9403affda88b7671c5a",
+            "version": 6,
+            "identifier": 2489233217,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49844,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4f2016bef5d54a7abcdb620805207f3d5042e37d662ae794a623c9f2e0c1625b",
+            "version": 6,
+            "identifier": 3574495692,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49846,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "8f8ef6af012bebde3f80eea426fcd1f7be7206a7e1cf287b050cdf4b4df6380a",
+            "version": 6,
+            "identifier": 3220608921,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49848,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "aab4daca5c997574da52cae1a79e6fa97d14c3ed9651d8557bdc2224a1ce5904",
+            "version": 6,
+            "identifier": 2736472924,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49852,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ecd7a4f31503b0e09046e9f2bf7d4f6cfff9001672a7428eba794050ae375e8f",
+            "version": 6,
+            "identifier": 4221592565,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49898,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d5daee4217dc6398404e1421de8196f0332b97920c3b26993627523207f2a5cd",
+            "version": 6,
+            "identifier": 779506294,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49900,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "689fc887164e32b7c3af08b89836d82833d671294de9e750edc67110112a7058",
+            "version": 6,
+            "identifier": 4106451939,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49903,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7f486bf1918d6591bd24c08f4fbf222168c22d2056d60f52eb70e919b52f07b6",
+            "version": 6,
+            "identifier": 2248945014,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49905,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "35ea80be96e782e9b7dee41e5f70eefe6dd69bf476d6cbd22d0e09186c5d1b3d",
+            "version": 6,
+            "identifier": 3166544966,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49931,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "483f555e7fcd71d2203f68b17a0c36ce51e90e325fd1e852074cd6dd96b06ade",
+            "version": 6,
+            "identifier": 1244429015,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49933,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "fd720d1fb7f4e98fe2fe1c09da4b10720e149c8bc25344fb9ea6ac6b98097796",
+            "version": 6,
+            "identifier": 892775981,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49943,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "15039ffe11c397a28346bda5da0d498f0e92ef136db1d5f7e9d62194770c9fcb",
+            "version": 6,
+            "identifier": 2222390555,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49945,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "59db17f858ca47f89cd14c9d2ba79252892506f8ea8de6c76770350eb1efb76d",
+            "version": 6,
+            "identifier": 3517879923,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49975,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "dbc6604dc6e7a8deeb16386de9344e06c03ae7ef420cd12b88eb13d60f6156c3",
+            "version": 4,
+            "identifier": 57373,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49987,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d9a449708ff637d0fe320c0ba18e73116edfcbd56b8888e9bc3d41bf4704f488",
+            "version": 4,
+            "identifier": 57389,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49989,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0f615ee694934679a40b534873e0d16b34a93984d316ad1b1a5e106e46b36aa1",
+            "version": 4,
+            "identifier": 57390,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49991,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "dab6eefad53a96dbe100581bd00aa4539be19c016685bf8eac93be66b66cce05",
+            "version": 4,
+            "identifier": 57391,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          }
+        ],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 824
+      }
+    }
+  ],
+  "public": [
+    {
+      "case": "sharon",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "final_publications": 552,
+      "final_statuses": {
+        "incomplete": 552
+      },
+      "final_protocols": {
+        "dns": 3,
+        "": 421,
+        "smtp": 1,
+        "imap": 2,
+        "sip": 1,
+        "kafka": 5,
+        "smb2": 3,
+        "dcerpc": 1,
+        "postgresql": 2,
+        "tls": 3,
+        "http": 1,
+        "ip": 109
+      },
+      "RPC_wire_PDUs": 14,
+      "RPC_checks": 494671,
+      "RPC_reference_field_values": 121,
+      "RPC_wire_certificate_SHA256": "6cc3fe0f96e5e2f1e91e2db5dd570e66fb1d2992e9c86823e2d62eb4cb5a588f",
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "53ef18b06479a5ee14bc932e7e19bd5ed22f53111160856d1ecbc40a2dd65867",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "observer_SHA256": "877d9621952c5d8f0708e007c8dc095dd75a88c3dbdafe8a3802d8c17ab3c008",
+        "SDK_SHA256": "98fde91c33e3c3612ba0239ca0d43d8b60f6e88d8ddaf0146c75f688d7a1eadb",
+        "CLI_SHA256": "a8788fbd2af92b57b6cc840237c1b25f1895d738a9f7e8cc2aec6cda5e26d2c4",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 328127,
+        "capture_close_publications": 552,
+        "native_TCP_generations": 840,
+        "source_bound_TCP_events": 2704,
+        "events_with_different_protocol_and_TCP_numbers": 2607,
+        "protocol_sessions_with_captured_TCP": 791,
+        "context_only_TCP_records": [
+          {
+            "PDU": 11436,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 11447,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245233,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245243,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245244,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245246,
+            "protocol": "smtp",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245285,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245286,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245374,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245403,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245463,
+            "protocol": "postgresql",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245508,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245546,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245579,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245584,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245598,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245640,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245674,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 245675,
+            "protocol": "http",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 221614,
+        "compared_CLI_PDUs": 245784,
+        "source_bound_parent_links": 0,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 840
+      }
+    },
+    {
+      "case": "weber",
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "final_publications": 26,
+      "final_statuses": {
+        "incomplete": 26
+      },
+      "final_protocols": {
+        "dns": 2,
+        "dcerpc": 10,
+        "imap": 2,
+        "": 3,
+        "ldap": 3,
+        "smb2": 1,
+        "tls": 4,
+        "http": 1
+      },
+      "RPC_wire_PDUs": 384,
+      "RPC_checks": 223087,
+      "RPC_reference_field_values": 4788,
+      "RPC_wire_certificate_SHA256": "2a20dd7664ab0e2589e56ac7c8f78a667e963f4bb5801e1eea73942dbe514570",
+      "TCP_protocol_page_binding": {
+        "full_binding_proof_SHA256": "fd87011bb5e15c68f596b8d47cdcc8d39c5c0e07ecf8e91cdb9470820f9f930a",
+        "scope": "Verify protocol-session/TCP-generation/page links against native packet hooks.\n\nThis is a projection/ownership audit, not an independent TCP receive algorithm.\nWire/oracle correctness needs its separate source-certified capture audit. IDs\nin each namespace stay literal; no endpoint/time-window ID guess is accepted.\n",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "observer_SHA256": "94974097cc7f39366ecf6c3dc7a5050f8add9cf4f4a425516aac06930d1acd2c",
+        "SDK_SHA256": "b15f43048a660186efbf3ffd3f554c7fa5f96812373ba66f6de60541c24c10cb",
+        "CLI_SHA256": "1dc779d10af31fcdeec1b336a8a04f155d432b7daa402203a32022dc2a5fc7f0",
+        "auditor_SHA256": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+        "physical_rows": 51328,
+        "capture_close_publications": 26,
+        "native_TCP_generations": 824,
+        "source_bound_TCP_events": 5113,
+        "events_with_different_protocol_and_TCP_numbers": 5016,
+        "protocol_sessions_with_captured_TCP": 722,
+        "context_only_TCP_records": [
+          {
+            "PDU": 9093,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 9104,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30236,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30582,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 30945,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31159,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31693,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31914,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 31981,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39715,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39716,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39717,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39718,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39719,
+            "protocol": "imap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39721,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39722,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39723,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39724,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39725,
+            "protocol": "",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39726,
+            "protocol": "smb2",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39727,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39728,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39729,
+            "protocol": "dns",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39730,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39731,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39732,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39733,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39734,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39735,
+            "protocol": "ldap",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39736,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39737,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39738,
+            "protocol": "dcerpc",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39739,
+            "protocol": "tls",
+            "status": "incomplete"
+          },
+          {
+            "PDU": 39740,
+            "protocol": "http",
+            "status": "incomplete"
+          }
+        ],
+        "TCP_events_without_direct_capture_binding": 0,
+        "unavailable_endpoint_projections": 288,
+        "compared_CLI_PDUs": 39740,
+        "source_bound_parent_links": 8,
+        "deferred_opening_rows": [],
+        "deferred_network_fragment_rows": [
+          {
+            "frame": 49568,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "9d09e6f6ad3ed395e7b1c8c2bcef8c89db659a7a3cb30ddfeb6a24f6f7bc4ae6",
+            "version": 6,
+            "identifier": 3158141878,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49573,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "5da3dfe5f84e2637a6aec88d690bb0ebe48f9db805c4186e324ca954297f687c",
+            "version": 6,
+            "identifier": 3024233048,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49575,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "241100fc09cab075607ba01d8efe6efe26463e2aef017cd6524ae7d55a5e9f60",
+            "version": 6,
+            "identifier": 1582708242,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49586,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3c31db9b764cf7eaaccc1c4ba08cec48ecaef17f46bb07a93992bb6308ee7faa",
+            "version": 6,
+            "identifier": 3714641287,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49588,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ebc1f76b289e562e26a7042e4f7d4e2966301d15e3e20d7347f2093d7c1b0481",
+            "version": 6,
+            "identifier": 1544708580,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49590,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "294623089d1be9694c3dad32715fe8b983a0b07e829dba752c6bc12be2e05268",
+            "version": 6,
+            "identifier": 2832392391,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49619,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3222672e4e0dc9a1545a6b38419642edd36537b8dc81ee32637dbdc91040b787",
+            "version": 6,
+            "identifier": 3174734018,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49621,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "6211f6be58f1a60ad8e825675f3ae02ac921d0018066730631240fccc5dc2d1c",
+            "version": 6,
+            "identifier": 1204957298,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49650,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cc4add763186024051586b0e98d09f6fc402aee6b5be8ee0a7271e8bf024109e",
+            "version": 6,
+            "identifier": 458420629,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49706,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a957574f800b081881b046cafbd2dbe740bdfb3bd0e0fb87f2b5cd9afbd9456f",
+            "version": 6,
+            "identifier": 216500316,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49708,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7aa8f3b3628aa99de4c0ca63482e8d43926d9969a6ebcfda10ab77d7baf37330",
+            "version": 6,
+            "identifier": 1361580515,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49711,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "285ff470a26124f4711d280752f42dc6745433498a0364edeba508adf4579ef9",
+            "version": 6,
+            "identifier": 1188871097,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49713,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a62b931b0248a25ee82df2b1bdae8eaea2ac923bfb487145c4a6251edae5d8b3",
+            "version": 6,
+            "identifier": 296206146,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49721,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d363e2c096a45783fa063d140dca644f1e923744ec00724893a8a00954c17596",
+            "version": 6,
+            "identifier": 3907921435,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49723,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "f6983e4dc92798533d53c24eecd668ef5d9080a8967ef6f3f79f62753f7a0541",
+            "version": 6,
+            "identifier": 1020416901,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49727,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e0b903801bbf0d0496138a49999ab2d9681326256e00680ba9b8d65f2e8774d5",
+            "version": 6,
+            "identifier": 4285156066,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49729,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d6c5ba32c4884ee61f1a1a2d1a0d90247455a77907afeae5e31c32041667b846",
+            "version": 6,
+            "identifier": 2698431781,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49733,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "c8658be9488a405b8a177c7d08b2cf886ca116098f9e7689f6607f7a6ca7ec94",
+            "version": 6,
+            "identifier": 595643371,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49735,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4f81ad1f32f20ab1a624ad0dbdfea28e3b5b8f236c044653afe568840bf21a5c",
+            "version": 6,
+            "identifier": 911368446,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49740,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "933652003b79882bdf9b8de0fe856ef80c53511010b5cf4a2fd38dfe796a0752",
+            "version": 6,
+            "identifier": 3183193359,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49742,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "6236327da46e9a6b91c53204f016d29bc4156824ca30824d48da112c37321f2a",
+            "version": 6,
+            "identifier": 720199907,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49746,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4a3a3d73443010e710d5812048d68d786419d3aa9aa0cfd12becaaf068e559af",
+            "version": 6,
+            "identifier": 1517229834,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49748,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "40daff79867e5d2faa9500807c6f30238cecf84be8a20b35a5e822e7083d13d2",
+            "version": 6,
+            "identifier": 369545684,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49752,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ff32ceebfe19170b1f6a07341e16379b9abcc7f5561174361b27363eb411ef0b",
+            "version": 6,
+            "identifier": 614263658,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49754,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0da4e893e4292ee174ee90fff851b66efc5bc434648553aab4cf0477fd148c29",
+            "version": 6,
+            "identifier": 4194764440,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49758,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "5d8ae991507117aeb5f0e5461cd89631df482b250a7392f822ae8017117b9a65",
+            "version": 6,
+            "identifier": 3154911416,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49760,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cc4334a21b7954e721762442a1401733d2d22a54bb1e991dddeb363e354582e0",
+            "version": 6,
+            "identifier": 3681125911,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49765,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "bbf0b1b418f72cdfdd880f8bce32b893b5406487412af54ddfb64ea34ec88b98",
+            "version": 6,
+            "identifier": 1149221495,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49767,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0b926ceb099e7ad32341f6df37543ff64f8d95088f8e6a274fa65054ea0d2808",
+            "version": 6,
+            "identifier": 1504886018,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49771,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "592cbb4acadd90c32a94370baafa0ddbb91fb751a10a70d740b129a4a752f4c3",
+            "version": 6,
+            "identifier": 1915340111,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49773,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "a8df1a0f619205daeeaf83e8cced8fb2cd0ff922ec2cdd703f3a3c1fda59cfa0",
+            "version": 6,
+            "identifier": 2565396328,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49777,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "298b612df2787f60ddc16883fd16b2fad6839f3ccd32e7659dff426c3d6c1008",
+            "version": 6,
+            "identifier": 2037540788,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49779,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "213ef4ebf656ae2ffb8358625cfd5b47f87a3d672d5c0bad9b799c8d5600b340",
+            "version": 6,
+            "identifier": 2866216052,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49783,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7e9b08b3d761627d43817081480072a14b3e0f33e9e0fb7034730b3d8e921797",
+            "version": 6,
+            "identifier": 2471189050,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49785,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4336dfa4b9ad47c35e50c60d711acc5ebdfbb337b48bc466ce22018376ead0f6",
+            "version": 6,
+            "identifier": 3965197308,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49789,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "f8e1a888f37b7f1271ea60c5107dff3b1b2d650911d24d234e29354691631f03",
+            "version": 6,
+            "identifier": 1398779112,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49791,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "59cf2741abf4d1ba2c4e14c9acabe3dde88fc9a7ed38b814984954a35d31ec64",
+            "version": 6,
+            "identifier": 606380295,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49795,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "baa93dfe5b16b99f5479ff666da251a29f4ea28a498bd1376684cc2564aa868f",
+            "version": 6,
+            "identifier": 1784932235,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49797,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "05f5d69fea3c00c0ba02b206b5c6c6b34805ad89ee173c57c27d8f81d63df5f9",
+            "version": 6,
+            "identifier": 1165073144,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49801,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "aa96e07afea4e116553e7a1aa1ba5bf3f580b8388a9022169fc008579595f50b",
+            "version": 6,
+            "identifier": 623803849,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49803,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "8298230837621a14e0a4483a6cc1e8c6ecb3d3a9b34c6862c03d77dad93feee3",
+            "version": 6,
+            "identifier": 3273298539,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49806,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "bbd27ce80f29221a1991a3d14f7f3a2537ac3fac705b60ed002dfc69a276350e",
+            "version": 6,
+            "identifier": 4275182530,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49811,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e5022a0ef6e67eb36c0babdb509c96447ccdae4e7d3d41f46fa3cb9fc6583c4c",
+            "version": 6,
+            "identifier": 2966513902,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49813,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "732245125d4f54c4053e6919310198a94adfa6a8555f382435e1103075e03887",
+            "version": 6,
+            "identifier": 2835286883,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49816,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "183f82e8adbbb4cfbe1f495c21f5cabbad61e028eaf706ccb79fba5249425911",
+            "version": 6,
+            "identifier": 696005400,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49818,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "e972d5228ec66dd65defaabd1d9d0d61a37e5111019f804317cd9abca9020cc3",
+            "version": 6,
+            "identifier": 2613413560,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49823,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "3511a8ec5ad286cbb56f7a382a6a74f85d7377678ddcdf3d61b8f4cc180be5f6",
+            "version": 6,
+            "identifier": 432651022,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49825,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "cbe4325365468e6a064efdb95ed87f589d13b19d9c67aeba9d79aa8b8e280427",
+            "version": 6,
+            "identifier": 367691551,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49840,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "02ea57c4aa37cddb7ec51adcd54077d0859cef8a051ebb5e01a24e38a6fd1d6f",
+            "version": 6,
+            "identifier": 220268773,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49842,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ef3ba7f2dc0e950b102b3835b9c2a785fb10ddc29baef9403affda88b7671c5a",
+            "version": 6,
+            "identifier": 2489233217,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49844,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "4f2016bef5d54a7abcdb620805207f3d5042e37d662ae794a623c9f2e0c1625b",
+            "version": 6,
+            "identifier": 3574495692,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49846,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "8f8ef6af012bebde3f80eea426fcd1f7be7206a7e1cf287b050cdf4b4df6380a",
+            "version": 6,
+            "identifier": 3220608921,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49848,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "aab4daca5c997574da52cae1a79e6fa97d14c3ed9651d8557bdc2224a1ce5904",
+            "version": 6,
+            "identifier": 2736472924,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49852,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "ecd7a4f31503b0e09046e9f2bf7d4f6cfff9001672a7428eba794050ae375e8f",
+            "version": 6,
+            "identifier": 4221592565,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49898,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d5daee4217dc6398404e1421de8196f0332b97920c3b26993627523207f2a5cd",
+            "version": 6,
+            "identifier": 779506294,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49900,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "689fc887164e32b7c3af08b89836d82833d671294de9e750edc67110112a7058",
+            "version": 6,
+            "identifier": 4106451939,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49903,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "7f486bf1918d6591bd24c08f4fbf222168c22d2056d60f52eb70e919b52f07b6",
+            "version": 6,
+            "identifier": 2248945014,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49905,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "35ea80be96e782e9b7dee41e5f70eefe6dd69bf476d6cbd22d0e09186c5d1b3d",
+            "version": 6,
+            "identifier": 3166544966,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49931,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "483f555e7fcd71d2203f68b17a0c36ce51e90e325fd1e852074cd6dd96b06ade",
+            "version": 6,
+            "identifier": 1244429015,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49933,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "fd720d1fb7f4e98fe2fe1c09da4b10720e149c8bc25344fb9ea6ac6b98097796",
+            "version": 6,
+            "identifier": 892775981,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49943,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "15039ffe11c397a28346bda5da0d498f0e92ef136db1d5f7e9d62194770c9fcb",
+            "version": 6,
+            "identifier": 2222390555,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49945,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "59db17f858ca47f89cd14c9d2ba79252892506f8ea8de6c76770350eb1efb76d",
+            "version": 6,
+            "identifier": 3517879923,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49975,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "dbc6604dc6e7a8deeb16386de9344e06c03ae7ef420cd12b88eb13d60f6156c3",
+            "version": 4,
+            "identifier": 57373,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49987,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "d9a449708ff637d0fe320c0ba18e73116edfcbd56b8888e9bc3d41bf4704f488",
+            "version": 4,
+            "identifier": 57389,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49989,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "0f615ee694934679a40b534873e0d16b34a93984d316ad1b1a5e106e46b36aa1",
+            "version": 4,
+            "identifier": 57390,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          },
+          {
+            "frame": 49991,
+            "section": 0,
+            "interface": 28,
+            "original_frame_SHA256": "dab6eefad53a96dbe100581bd00aa4539be19c016685bf8eac93be66b66cce05",
+            "version": 4,
+            "identifier": 57391,
+            "offset": 0,
+            "more": true,
+            "next_header": 47
+          }
+        ],
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false,
+        "proved_native_preview_count": 824
+      }
+    }
+  ],
+  "Windows": [
+    {
+      "source": "f52e386603085667ee28b24073ed3b67b98092cb",
+      "binary_SHA256": "9b7d31d0eb01eec5623ca44156b28b943bdd2126b1df2501f214481aa123747f",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "SDK_PDU": 8,
+      "CLI_PDU": 8,
+      "native_TCP": 2,
+      "protocol_session": 2,
+      "preview": 2,
+      "native_packets": 11,
+      "ordered_bytes": [
+        64,
+        24
+      ],
+      "ordered_byte_SHA256": [
+        "f12c4d15c7ca07570aaf5c0ada73e5c398f7d8f1f3e185535404d6699a012eda",
+        "c9e43aa6f247ca93b4eabe6a1c56da95d08f96e410c3e5a96f0befc5bd86c1d1"
+      ],
+      "SDK_direction": 0,
+      "SDK_response_to": 0,
+      "CLI_response_to": 0,
+      "source_SHA256": "f12c4d15c7ca07570aaf5c0ada73e5c398f7d8f1f3e185535404d6699a012eda",
+      "field_snapshot_SHA256": "cdfbbec3f5261e3cf18f4447bf8e96d6f7933d728875472270510d0158d4f6d8",
+      "stream_snapshot_SHA256": "04148030f47672258c558a47e0297c76f80a44cf6963fc75a6fbaea1d36bce0d",
+      "native_wire_snapshot_SHA256": "c2eacfe4d27bb72e53744faec7cde773cb4f34f933f8e18cea8a343b8d0e05b0",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      }
+    },
+    {
+      "source": "f52e386603085667ee28b24073ed3b67b98092cb",
+      "binary_SHA256": "9b7d31d0eb01eec5623ca44156b28b943bdd2126b1df2501f214481aa123747f",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "SDK_PDU": 41,
+      "CLI_PDU": 41,
+      "native_TCP": 3,
+      "protocol_session": 3,
+      "preview": 3,
+      "native_packets": 67,
+      "ordered_bytes": [
+        136,
+        55508
+      ],
+      "ordered_byte_SHA256": [
+        "4ce82eaa2e46b50b554d3b424a2bb40bff066ab6c862c380c2beba58d0654b7f",
+        "01aac1de973f083a0d01a3bb47ba376b7d4c84b5bf02316bcb6712818f857e66"
+      ],
+      "SDK_direction": 1,
+      "SDK_response_to": 13,
+      "CLI_response_to": 13,
+      "source_SHA256": "d8a4002fdd24742100265c47d8c456a1ff38bbb28a5469e6ce770aacc02c2aac",
+      "field_snapshot_SHA256": "b62761fa559c8356cb2af92b3d8e2e3fa54100caa031695dafbb128f00ead025",
+      "stream_snapshot_SHA256": "c0bd1c637d7c852bc2beac492cb066061818d6d855f6e09f2e17d4f080056406",
+      "native_wire_snapshot_SHA256": "c84bc6dfb584fce820f6fe1f3c5d6433b90575b425a92183eebe02c0f9aea8bc",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      }
+    }
+  ],
+  "negative_controls": [
+    {
+      "scope": "Reject forged original-record controls and false native packet/flow metadata.\n\nTemporary capture/manifest hashes are explicitly re-sealed where needed to reach\nrecord-shape and provenance guards. These fixtures are never wire certificates,\nand no actual endpoint-acceptance claim is derived from them.\n",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "source_capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "source_certificate_SHA256": "8ad06c721a9ae226865d60b98dca0b750e8744ec1cfdac335c8d2e69eb64509f",
+      "manifest_SHA256": "f6e2882bca26078b036c93a5e7534b8b8d14f07a1eb599a5fc538697bbd33e41",
+      "after_observer_SHA256": "5bad010406125723cc3794e15927647d32ff9b06c931b785de97013690cc0bd2",
+      "oracle_SHA256": "8d72e8716b5b0ad7700262fc7ae152151abe268d18b680f8061d22ea435ba988",
+      "auditor_SHA256": "e89c9150d65480062517e9bae0239e7b45fa355946dbc7800085a44422e63ab2",
+      "negative_controls": 20,
+      "rejected_controls": [
+        {
+          "name": "false-source-digest",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "false-source-certificate-digest",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "false-current-capture-digest",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "wrong-original-record",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "boolean-original-record",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "undeclared-opening-copies",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "hidden-delayed-old-reset",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "false-network-injection-scope",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "forged-source-epoch",
+          "guard": "original record/handshake source"
+        },
+        {
+          "name": "removed-application-record",
+          "guard": "re-sealed original record-shape control"
+        },
+        {
+          "name": "duplicated-application-record",
+          "guard": "re-sealed original record-shape control"
+        },
+        {
+          "name": "reordered-application-records",
+          "guard": "re-sealed original record-shape control"
+        },
+        {
+          "name": "old-reset-before-original-data",
+          "guard": "re-sealed original record-shape control"
+        },
+        {
+          "name": "missing-opening-copy",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "late-old-reset-forced-into-reference-new-stream",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "opening-capture-time-replaced",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "foreign-capture-domain",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "wrong-flow-opener",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "false-half-open-with-observed-opening",
+          "guard": "native source/flow metadata"
+        },
+        {
+          "name": "wrong-packet-direction",
+          "guard": "native source/flow metadata"
+        }
+      ],
+      "temporary_control_hash_resealing": true,
+      "actual_endpoint_injection_claim": false
+    },
+    {
+      "scope": "Reject forged TCP-generation/session/page links on a source-bound capture.\n\nInputs are temporary metadata corruptions, never new wire certificates. Source\ncaptures and producer exports stay immutable. No decoder sees these sidecars.\n",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "observer_SHA256": "5bad010406125723cc3794e15927647d32ff9b06c931b785de97013690cc0bd2",
+      "SDK_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+      "CLI_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+      "baseline_TCP_events": 69,
+      "negative_controls": 23,
+      "rejected_controls": [
+        "SDK-foreign-generation-same-tuple",
+        "SDK-missing-native-binding-and-alias",
+        "SDK-boolean-generation",
+        "SDK-boolean-typed-alias",
+        "SDK-floating-typed-alias",
+        "SDK-invented-wire-range-on-event-ID",
+        "SDK-boolean-contributor",
+        "SDK-boolean-capture-domain",
+        "SDK-wrong-observer-direction",
+        "SDK-wrong-protocol-namespace",
+        "CLI-boolean-row-generation",
+        "CLI-missing-native-preview",
+        "CLI-payload-cannot-masquerade-as-deferred-opening",
+        "CLI-boolean-preview-ID",
+        "CLI-floating-row-generation",
+        "CLI-preview-splices-two-generations",
+        "CLI-boolean-PDU-generation",
+        "CLI-boolean-field-map-ID",
+        "CLI-invented-wire-range-on-event-ID",
+        "hook-contributor-in-another-generation",
+        "hook-wrong-original-opener",
+        "hook-failed-replay-cannot-certify",
+        "hook-wrong-capture-digest"
+      ],
+      "auditor_SHA256": "000f045cd95d08e98a02aab397535644f12d2b466bb9fdee1305fe32b4087398",
+      "semantic_corruption_only": true,
+      "wire_or_endpoint_injection_claim": false
+    },
+    {
+      "scope": "Reject missing, relabelled, reordered or corrupted capture-close projections.",
+      "before_SHA256": "0d3d008e3f66837e77ec502ac1e2611f015696390cd42117b5a948821f8b65ec",
+      "after_SHA256": "cf30c20e7a4f19a2965c40658584e1ef886fa5cde0ba884c6670a548b0d76eda",
+      "SDK_SHA256": "1c0df028740f6ee9604a1edc85a6ef50a947670ff3b41255662f7eba925685ad",
+      "baseline_final_records": 1,
+      "negative_controls": 12,
+      "rejected_controls": [
+        "missing-final-diagnostic",
+        "invented-physical-number",
+        "invented-physical-time",
+        "wrong-publication-phase",
+        "relocated-to-last-packet",
+        "publication-before-physical-rows",
+        "duplicate-final-publication",
+        "changed-diagnostic-reason",
+        "missing-explicit-TCP-link",
+        "floating-typed-TCP-ID",
+        "fabricated-wire-range",
+        "hidden-detail-refusal"
+      ],
+      "auditor_SHA256": "0f8e461c8ca2fb813ebc0dabe698947430ff03a195c078db650c88a66f52f5fd",
+      "metadata_controls_only": true
+    }
+  ],
+  "limitations": [
+    "Declared record-copy/reorder/drop controls are not live network impairment.",
+    "Source-certified TCP epochs and literal Wireshark groups differ on three delayed-close/copy profiles; those differences remain listed.",
+    "The new close-publication rows are nonphysical JSONL records. Clients must count physical packets separately.",
+    "A cancelled or limited export is not full projection parity.",
+    "Clear logical RPC stubs remain opaque for full NDR service semantics; authentication is not certified.",
+    "Missing new handshake, TFO and broader old/new-generation interleaving need separate recovery work.",
+    "The flow-only normalization matrix covers IPIP, IPv6-in-IPv4, GRE, VXLAN and Geneve, including outer fragments; it does not certify all negotiated tunnels.",
+    "Existing protocol/version/carrier/field/fuzz differences remain open in the main report."
+  ],
+  "tests": {
+    "normalization-full-native-cli-02.jsonl": {
+      "test_results": {
+        "github.com/yaklang/yaklang/common/pcapx/pcaputil": {
+          "pass": 235259,
+          "skip": 10
+        },
+        "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+          "pass": 632,
+          "skip": 2
+        }
+      },
+      "packages": {
+        "github.com/yaklang/yaklang/common/pcapx/pcaputil": {
+          "status": "pass",
+          "seconds": 413.752
+        },
+        "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+          "status": "pass",
+          "seconds": 2.006
+        }
+      },
+      "log_SHA256": "79af448a46789b5f4085d1d955847edd42e375ef9476995d1afcd3efcc61865d"
+    },
+    "close-publication-full-cli-02.jsonl": {
+      "test_results": {
+        "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+          "pass": 635,
+          "skip": 2
+        }
+      },
+      "packages": {
+        "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": {
+          "status": "pass",
+          "seconds": 2.146
+        }
+      },
+      "log_SHA256": "384a4059a5554387ac86eab55f3849ce502e598141e3ec10b4b90b50b40e4c25"
+    },
+    "identity-fuzz-opening-01.log": {
+      "log_SHA256": "ded0c860339ca747ad09436118d17a42cc41ab2d5e59c7a6b595076c997baccb",
+      "tail": "esting: 1 (total: 50)\nfuzz: elapsed: 9s, execs: 20391 (2489/sec), new interesting: 2 (total: 51)\nfuzz: elapsed: 12s, execs: 27861 (2485/sec), new interesting: 4 (total: 53)\nfuzz: elapsed: 15s, execs: 35307 (2489/sec), new interesting: 4 (total: 53)\nfuzz: elapsed: 18s, execs: 42965 (2555/sec), new interesting: 4 (total: 53)\nfuzz: elapsed: 21s, execs: 50230 (2410/sec), new interesting: 6 (total: 55)\nfuzz: elapsed: 24s, execs: 57696 (2493/sec), new interesting: 6 (total: 55)\nfuzz: elapsed: 27s, execs: 65283 (2528/sec), new interesting: 6 (total: 55)\nfuzz: elapsed: 30s, execs: 72910 (2539/sec), new interesting: 6 (total: 55)\nfuzz: elapsed: 33s, execs: 80111 (2405/sec), new interesting: 8 (total: 57)\nfuzz: elapsed: 36s, execs: 87489 (2464/sec), new interesting: 8 (total: 57)\nfuzz: elapsed: 39s, execs: 94761 (2425/sec), new interesting: 8 (total: 57)\nfuzz: elapsed: 40s, execs: 97297 (2331/sec), new interesting: 8 (total: 57)\nPASS\nok  \tgithub.com/yaklang/yaklang/common/pcapx/pcaputil\t40.435s\n"
+    },
+    "fuzz-opening-source-01.log": {
+      "log_SHA256": "ea6a9c69e985fdd443a11221057776c681557fa041433189a4893f3f22ec9dcb",
+      "tail": "otal: 43)\nfuzz: elapsed: 9s, execs: 15875 (2257/sec), new interesting: 19 (total: 43)\nfuzz: elapsed: 12s, execs: 22618 (2248/sec), new interesting: 21 (total: 45)\nfuzz: elapsed: 15s, execs: 29610 (2331/sec), new interesting: 21 (total: 45)\nfuzz: elapsed: 18s, execs: 36426 (2268/sec), new interesting: 21 (total: 45)\nfuzz: elapsed: 21s, execs: 43250 (2276/sec), new interesting: 23 (total: 47)\nfuzz: elapsed: 24s, execs: 49906 (2220/sec), new interesting: 23 (total: 47)\nfuzz: elapsed: 27s, execs: 56858 (2312/sec), new interesting: 23 (total: 47)\nfuzz: elapsed: 30s, execs: 63756 (2302/sec), new interesting: 23 (total: 47)\nfuzz: elapsed: 33s, execs: 70642 (2292/sec), new interesting: 25 (total: 49)\nfuzz: elapsed: 36s, execs: 77407 (2259/sec), new interesting: 25 (total: 49)\nfuzz: elapsed: 39s, execs: 84508 (2367/sec), new interesting: 25 (total: 49)\nfuzz: elapsed: 40s, execs: 86857 (2174/sec), new interesting: 25 (total: 49)\nPASS\nok  \tgithub.com/yaklang/yaklang/common/pcapx/pcaputil\t42.329s\n"
+    }
+  },
+  "fragment_contract_independent_reference": {
+    "capture_SHA256": "6e849fcc1e24fe88e58c68bf890c28b4e3abc3d58730995d855e8cbc542f2123",
+    "source": "capture_adversarial_test.go original authored control, reconstructed independently without rewriting any production capture",
+    "expected_TCP_payload_bytes": 28,
+    "expected_TCP_payload_hex": "4556494c30390050000000640000000050100000000000004556494c",
+    "Wireshark_payload_exact": true,
+    "checksum_acceptance_or_endpoint_receipt_claim": false
+  },
+  "six_literal_label_changes": {
+    "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "before_SHA256": "96d863154d00f9297d9dc891aba9c845e7dce7cb8638ce94d210208d5662c97f",
+    "after_SHA256": "fe605e7602483fb000c6e34c7d769eb67d0a89278efd4ac64bc600ee3ebf0336",
+    "reference_producer_SHA256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+    "reference_export_SHA256": "a56f59c47d2c1853aede23877a24fddc510ef204d02e004bdae4d8252ca442ee",
+    "changed_frames": [
+      {
+        "frame": 266272,
+        "before": {
+          "number": 266272,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "connection_evidence": "port hint",
+          "tcp_flow_id": 318,
+          "stream_id": 593,
+          "info": "52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #593: port hint=SMB]"
+        },
+        "after": {
+          "number": 266272,
+          "protocol": "SMB2",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "SMB2"
+          ],
+          "connection_protocol": "SMB2",
+          "connection_stack": [
+            "SMB2"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 318,
+          "stream_id": 318,
+          "info": "SMB2 stream bytes · no complete decoded message in this packet · 52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #318: SMB2]"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "266272",
+          "frame.protocols": "eth:ethertype:ip:tcp:nbss:smb2:vssmonitoring",
+          "_ws.col.protocol": "SMB2",
+          "tcp.stream": "25661",
+          "tcp.flags": "0x0018",
+          "tcp.len": "92",
+          "_ws.col.info": "[TCP ACKed unseen segment] [TCP Spurious Retransmission] Close Request"
+        }
+      },
+      {
+        "frame": 271432,
+        "before": {
+          "number": 271432,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "connection_evidence": "port hint",
+          "tcp_flow_id": 318,
+          "stream_id": 593,
+          "info": "52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #593: port hint=SMB]"
+        },
+        "after": {
+          "number": 271432,
+          "protocol": "SMB2",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "SMB2"
+          ],
+          "connection_protocol": "SMB2",
+          "connection_stack": [
+            "SMB2"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 318,
+          "stream_id": 318,
+          "info": "SMB2 stream bytes · no complete decoded message in this packet · 52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #318: SMB2]"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "271432",
+          "frame.protocols": "eth:ethertype:ip:tcp",
+          "_ws.col.protocol": "TCP",
+          "tcp.stream": "25661",
+          "tcp.flags": "0x0018",
+          "tcp.len": "92",
+          "_ws.col.info": "[TCP Spurious Retransmission] 52063 → 445 [PSH, ACK] Seq=3190998847 Ack=1574541210 Win=253 Len=92"
+        }
+      },
+      {
+        "frame": 284048,
+        "before": {
+          "number": 284048,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "connection_evidence": "port hint",
+          "tcp_flow_id": 318,
+          "stream_id": 593,
+          "info": "445 → 52063 [ACK,PSH] Seq=1641650786 Ack=3190999489 Payload=85 (port hint: SMB) [connection #593: port hint=SMB]"
+        },
+        "after": {
+          "number": 284048,
+          "protocol": "SMB2",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "SMB2"
+          ],
+          "connection_protocol": "SMB2",
+          "connection_stack": [
+            "SMB2"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 318,
+          "stream_id": 318,
+          "info": "SMB2 stream bytes · no complete decoded message in this packet · 445 → 52063 [ACK,PSH] Seq=1641650786 Ack=3190999489 Payload=85 (port hint: SMB) [connection #318: SMB2]"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "284048",
+          "frame.protocols": "eth:ethertype:ip:tcp:nbss:smb2",
+          "_ws.col.protocol": "SMB2",
+          "tcp.stream": "25661",
+          "tcp.flags": "0x0018",
+          "tcp.len": "85",
+          "_ws.col.info": "[TCP ACKed unseen segment] [TCP Previous segment not captured] Close Response, Error: Unknown (0x0000030C)[Malformed Packet]"
+        }
+      },
+      {
+        "frame": 288743,
+        "before": {
+          "number": 288743,
+          "protocol": "MODBUS",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "MODBUS"
+          ],
+          "connection_protocol": "MODBUS",
+          "connection_stack": [
+            "MODBUS"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 338,
+          "stream_id": 620,
+          "info": "MODBUS stream bytes · no complete decoded message in this packet · 502 → 10002 [ACK,PSH] Seq=1874482003 Ack=1316969320 Payload=17 [connection #620: MODBUS]"
+        },
+        "after": {
+          "number": 288743,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "tcp_flow_id": 338,
+          "stream_id": 338,
+          "info": "502 → 10002 [ACK,PSH] Seq=1874482003 Ack=1316969320 Payload=17"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "288743",
+          "frame.protocols": "eth:ethertype:ip:tcp",
+          "_ws.col.protocol": "TCP",
+          "tcp.stream": "7867",
+          "tcp.flags": "0x0018",
+          "tcp.len": "17",
+          "_ws.col.info": "[TCP Spurious Retransmission] 502 → 10002 [PSH, ACK] Seq=4160749612 Ack=37 Win=1825 Len=17"
+        }
+      },
+      {
+        "frame": 310855,
+        "before": {
+          "number": 310855,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "connection_evidence": "port hint",
+          "tcp_flow_id": 318,
+          "stream_id": 593,
+          "info": "445 → 52063 [ACK,PSH] Seq=1574541922 Ack=3190999489 Payload=77 (port hint: SMB) [connection #593: port hint=SMB]"
+        },
+        "after": {
+          "number": 310855,
+          "protocol": "SMB2",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "SMB2"
+          ],
+          "connection_protocol": "SMB2",
+          "connection_stack": [
+            "SMB2"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 318,
+          "stream_id": 318,
+          "info": "SMB2 stream bytes · no complete decoded message in this packet · 445 → 52063 [ACK,PSH] Seq=1574541922 Ack=3190999489 Payload=77 (port hint: SMB) [connection #318: SMB2]"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "310855",
+          "frame.protocols": "eth:ethertype:ip:tcp",
+          "_ws.col.protocol": "TCP",
+          "tcp.stream": "25661",
+          "tcp.flags": "0x0018",
+          "tcp.len": "77",
+          "_ws.col.info": "[TCP Retransmission] 445 → 52063 [PSH, ACK] Seq=1574541923 Ack=3190999491 Win=309 Len=77"
+        }
+      },
+      {
+        "frame": 327733,
+        "before": {
+          "number": 327733,
+          "protocol": "TCP",
+          "protocol_scope": "packet",
+          "connection_evidence": "port hint",
+          "tcp_flow_id": 318,
+          "stream_id": 593,
+          "info": "52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #593: port hint=SMB]"
+        },
+        "after": {
+          "number": 327733,
+          "protocol": "SMB2",
+          "protocol_status": "context-required",
+          "protocol_scope": "connection-associated bytes",
+          "protocol_evidence": "observed connection; this segment has no complete decoded message",
+          "protocol_stack": [
+            "Ethernet",
+            "IPv4",
+            "TCP",
+            "SMB2"
+          ],
+          "connection_protocol": "SMB2",
+          "connection_stack": [
+            "SMB2"
+          ],
+          "connection_evidence": "validated protocol events",
+          "tcp_flow_id": 318,
+          "stream_id": 318,
+          "info": "SMB2 stream bytes · no complete decoded message in this packet · 52063 → 445 [ACK,PSH] Seq=3190998845 Ack=1574541209 Payload=92 (port hint: SMB) [connection #318: SMB2]"
+        },
+        "PDUs": [],
+        "Wireshark": {
+          "frame.number": "327733",
+          "frame.protocols": "eth:ethertype:ip:tcp",
+          "_ws.col.protocol": "TCP",
+          "tcp.stream": "25661",
+          "tcp.flags": "0x0018",
+          "tcp.len": "92",
+          "_ws.col.info": "[TCP Spurious Retransmission] 52063 → 445 [PSH, ACK] Seq=3190998847 Ack=1574541210 Win=253 Len=92"
+        }
+      }
+    ]
+  },
+  "totals": {
+    "input_entries": 28,
+    "physical_frames": 382571,
+    "SDK_records": 286841,
+    "new_final_publications": 582,
+    "input_entries_are_not_unique_live_acquisitions": true
+  },
+  "opening_totals": {
+    "physical_frames": 787,
+    "TCP_observations": 772,
+    "wire_PDUs": 335,
+    "reference_field_values": 3270,
+    "numeric_links": 25,
+    "literal_reference_packet_grouping_differences": 28
+  },
+  "audit_sources_SHA256": {
+    "discovery/dcerpc_opening_observations.py": "9daa7581e5bdb2c2770d1228cba6d4dd4560799d68d76beea883ef7d207cacd9",
+    "tcp_opening_wire_audit.py": "308e7009b2ebe7d3c008cd2aaaee9e4f89750bc5241b6dc5a26a9b432edeabe4",
+    "tcp_flow_observation_audit.py": "86c6f233fcdddf580a3aff9a1756aee1ca6a3fae350a5e4515cd17e026f35bbe",
+    "tcp_opening_negative_controls.py": "e89c9150d65480062517e9bae0239e7b45fa355946dbc7800085a44422e63ab2",
+    "tcp_protocol_binding_audit.py": "6a9ac26d1143ef40fd997b018a135a79afbe2aa5af5d1f3075752d1e0e53f0c8",
+    "tcp_protocol_binding_negative_controls.py": "000f045cd95d08e98a02aab397535644f12d2b466bb9fdee1305fe32b4087398",
+    "tcp_projection_metadata_invariants.py": "35c5b46f05afef709438dbcd846ddf4d43bea5bdb697f406e4a3ce51f3e112a6",
+    "close_publication_export_audit.py": "90ef757253d3f6c8622553e623917cb0c2c0e7c54b736e8ec16ddeb71f9a5db8",
+    "close_publication_negative_controls.py": "0f8e461c8ca2fb813ebc0dabe698947430ff03a195c078db650c88a66f52f5fd",
+    "dcerpc_wire_audit.py": "08b839cc901cccdc9b6a5204ed7ae7e5df314a15c9280291c86b19c61cd8b84a",
+    "dcerpc_cli_invariants.py": "09d95980863b7f12a25cdec3a3af140faed976be0652b5d4e4ca4307505b7642"
+  }
+}

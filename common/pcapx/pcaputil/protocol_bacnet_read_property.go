@@ -746,7 +746,7 @@ func (a *binParser) bacnetReadSelection(src, dst uint16) (bool, bool) {
 	return profile == "bacnet-read-property" || profile == "bacnet-routed-read-property", profile == "bacnet-routed-read-property"
 }
 
-func (a *binParser) refuseBACnetReadTruncated(e *ProtocolEvent, w []byte, src, dst uint16) bool {
+func (a *binParser) refuseBACnetReadCarrier(e *ProtocolEvent, w []byte, src, dst uint16, err *ProtocolError) bool {
 	selected, routed := a.bacnetReadSelection(src, dst)
 	if !selected {
 		return false
@@ -760,7 +760,6 @@ func (a *binParser) refuseBACnetReadTruncated(e *ProtocolEvent, w []byte, src, d
 	if e.ID == 0 {
 		e.ID = a.ids.Add(1)
 	}
-	err := bacnetReadError(ErrNeedMore, "truncated or invalid UDP carrier")
 	_ = a.correlateBACnetRead(e, nil, nil, err)
 	a.finishProtocolDatagram(e, w, nil, err)
 	return true

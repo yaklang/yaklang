@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("ESPHeaderFields")
+  ESPHeaderFields:
+    operator: |
+      err = parseObservedSession("esp-header")
+      if err != nil { panic(err) }

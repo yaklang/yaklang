@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-
-	"github.com/mattn/go-runewidth"
 )
 
 func prefixOrigin(v *streamSnapshot, direction int) string {
@@ -21,9 +19,15 @@ func prefixOrigin(v *streamSnapshot, direction int) string {
 
 func (u *tui) streamEvidenceRows() []streamLine {
 	v := u.stream
+	if v.messageBoundaries() {
+		return datagramEvidenceRows(v)
+	}
 	var rows []streamLine
 	add := func(text string, style ink) { rows = append(rows, streamLine{safeText(text), style}) }
-	add("Evidence scope: TCP/HTTP means HTTP was observed in the connection prefix, not in this packet.", inkMuted)
+	add("Connection identity records previously validated messages; it does not claim this packet contains those messages.", inkMuted)
+	if len(v.protocolStack) > 0 {
+		add("Observed connection: "+strings.Join(v.protocolStack, " › "), inkCyan)
+	}
 	for d, data := range v.prefix {
 		if u.streamDirection != 0 && d != u.streamDirection-1 {
 			continue
@@ -95,7 +99,7 @@ func appendStreamData(rows *[]streamLine, data []byte, base uint64, mode, width 
 		var b strings.Builder
 		columns := 0
 		for _, r := range line {
-			w := runewidth.RuneWidth(r)
+			w := terminalWidth.RuneWidth(r)
 			if columns+w > width {
 				add(b.String())
 				b.Reset()

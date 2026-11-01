@@ -59,6 +59,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python3 -B -m unittest discover -s internal/trafficfixture -p test_capture_store.py
+          python3 -B internal/trafficfixture/build_capture_store.py --output "$RUNNER_TEMP/m1-capture-store/captures.zip"
+          cmp internal/trafficfixture/testdata/captures.zip "$RUNNER_TEMP/m1-capture-store/captures.zip"
+          cmp internal/trafficfixture/testdata/captures.manifest.json "$RUNNER_TEMP/m1-capture-store/captures.manifest.json"
           go run ./internal/trafficfixture/cmd/corpus test
           go run ./internal/trafficfixture/cmd/corpus exec -- python3 @common/pcapx/pcaputil/mms-services-values/validator-differential.py @common/pcapx/pcaputil/mms-services-values @scripts/protocol-tests/check_go_test_json.py
           # The timeout is cumulative per package, including every sealed matrix.

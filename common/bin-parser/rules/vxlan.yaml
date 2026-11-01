@@ -1,22 +1,48 @@
 endian: big
 Package:
+  # A direct/default rule call retains its historical standard VXLAN entry.
+  # GPE is selected explicitly by its separate UDP destination service.
+  operator: |
+    this.ProcessSubNode("VXLAN")
+    return
   VXLAN:
     operator: |
+      this.ProcessSubNode("G")
       this.ProcessSubNode("Reserved High")
       this.ProcessSubNode("I")
       this.ProcessSubNode("Reserved Low")
       if getNodeResult("I").Value != 1 {
         panic("vxlan: I-flag must be set")
       }
-      this.ProcessSubNode("Reserved")
+      // Reserved flags/bytes are ignored on receipt (RFC 7348 section 5).
+      // GBP remains Ethernet-compatible. These are wire observations; no
+      // forwarding/group policy is executed by this parser.
+      if getNodeResult("G").Value == 1 {
+        this.ProcessSubNode("GBP")
+      } else {
+        this.ProcessSubNode("Reserved")
+      }
       this.ProcessSubNode("VNI")
       this.ProcessSubNode("Reserved2")
+      if this.HasMaxLength() {
+        remaining = this.GetMaxLength() - this.Length()
+        if remaining < 14 { panic("vxlan: incomplete Ethernet child prefix") }
+        this.GetSubNode("Inner").SetMaxLength(remaining)
+      }
       this.ProcessSubNode("Inner")
       return
-    Reserved High: uint8,4bit
+    G: uint8,1bit
+    Reserved High: uint8,3bit
     I: uint8,1bit
     Reserved Low: uint8,3bit
     Reserved: raw,3
+    GBP:
+      Reserved High: uint8,1bit
+      D: uint8,1bit
+      Reserved Middle: uint8,2bit
+      A: uint8,1bit
+      Reserved Low: uint8,3bit
+      Group Policy ID: uint16
     VNI: uint32,24bit
     Reserved2: uint8
     Inner:
@@ -37,6 +63,35 @@ Package:
       Destination: raw,6
       Source: raw,6
       Type: uint16
+  # The separate destination service selects this bounded v0 header profile.
+  # Its payload is deliberately left to the UDP caller as uninterpreted bytes.
+  VXLANGPEHeader:
+    operator: |
+      this.ProcessSubNode("Reserved High")
+      this.ProcessSubNode("Version")
+      if getNodeResult("Version").Value != 0 { panic("vxlan-gpe: unselected version") }
+      this.ProcessSubNode("I")
+      if getNodeResult("I").Value != 1 { panic("vxlan-gpe: I-flag must be set") }
+      this.ProcessSubNode("P")
+      this.ProcessSubNode("B")
+      this.ProcessSubNode("O")
+      this.ProcessSubNode("Reserved")
+      this.ProcessSubNode("Next Protocol")
+      p = getNodeResult("P").Value
+      next = getNodeResult("Next Protocol").Value
+      if (p == 0 && next != 0) || (p == 1 && next == 0) { panic("vxlan-gpe: inconsistent next protocol presence") }
+      this.ProcessSubNode("VNI")
+      this.ProcessSubNode("Reserved2")
+    Reserved High: uint8,2bit
+    Version: uint8,2bit
+    I: uint8,1bit
+    P: uint8,1bit
+    B: uint8,1bit
+    O: uint8,1bit
+    Reserved: raw,2
+    Next Protocol: uint8
+    VNI: uint32,24bit
+    Reserved2: uint8
 IP:
   operator: |
     this.ProcessSubNode("Version")

@@ -53,6 +53,7 @@ func (f *TrafficFrame) PacketReferences() []PacketReference {
 // OnCreated: flow created
 type TrafficFlow struct {
 	binState               *binFlow
+	opening                *tcpOpening
 	key                    flowKey
 	frameMu                sync.Mutex
 	httpStarted            sync.Once
@@ -189,6 +190,15 @@ func (t *TrafficFlow) onFrame(frame *TrafficFrame) {
 		} else {
 			t.binState.contribute(direction, len(frame.Payload), frame.evidence.Ref)
 		}
+		if frame.evidence.byteSourceKind != "" {
+			t.binState.byteSource = frame.evidence.byteSourceKind
+		}
+		if len(frame.evidence.carrierLayers) > 0 {
+			t.binState.captureCarriers = append([]string(nil), frame.evidence.carrierLayers...)
+		}
+		for _, parent := range frame.evidence.parents {
+			t.binState.contribute(direction, len(frame.Payload), PacketReference{}, parent)
+		}
 		t.binState.feed(direction, frame.Payload, frame.Timestamp)
 	}
 	// Arrived callbacks may retain frames. Do not give them packet-source storage
@@ -320,6 +330,7 @@ func (t *TrafficFlow) triggerCloseEvent(reason TrafficFlowCloseReason) {
 }
 
 func (t *TrafficFlow) Release() {
+	t.discardOpening()
 	if t.binState != nil {
 		t.binState.close(TrafficFlowCloseReason_CTX_CANCEL)
 		t.binState = nil
@@ -342,6 +353,7 @@ func (t *TrafficFlow) Release() {
 	t.Index = 0
 	t.streamCapacity = 0
 	t.reassemblyIncomplete = false
+	t.opening = nil
 	t.key = flowKey{}
 	t.httpStarted = sync.Once{}
 	t.IsHalfOpen, t.IsEthernetLinkLayer, t.IsIpv4, t.IsIpv6 = false, false, false, false

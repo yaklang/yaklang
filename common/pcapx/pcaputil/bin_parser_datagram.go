@@ -17,21 +17,13 @@ func (a *binParser) decodeSessionDatagram(e *ProtocolEvent, wire []byte) bool {
 		return true
 	case a.decodeTFTPDatagram(e, wire):
 		return true
+	case a.decodeCoAPDatagram(e, wire):
+		return true
 	case len(wire) >= 240 && (wire[0] == 1 || wire[0] == 2) && binary.BigEndian.Uint32(wire[236:240]) == dhcpCookie:
 		e.Protocol, spec = "dhcp", a.specs["application-layer.dhcp/DHCP"]
 		session, err = decodeDHCP4(wire, a.budget.MaxCollectionElements)
 	case a.decodeRADIUSDatagram(e, wire):
 		return true
-	case probeNTP(wire, len(wire)).Verdict == ProbeAccept:
-		e.Protocol, spec = "ntp", a.specs["application-layer.ntp/NTP"]
-		if len(wire) != 48 {
-			err = protocolError(ErrUnsupportedFeature, "NTP extensions/authentication require an unsupported profile")
-		} else {
-			session, err = (&binNTP{}).consume(wire)
-		}
-	case probeCoAP(wire, len(wire)).Verdict == ProbeAccept:
-		e.Protocol, spec = "coap", a.specs["application-layer.extended_protocols/CoAP"]
-		session, err = (&binCoAP{maxPending: a.budget.MaxCollectionElements}).consume(0, wire)
 	default:
 		return false
 	}

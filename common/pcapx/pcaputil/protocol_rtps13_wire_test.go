@@ -335,7 +335,7 @@ func TestRTPS13WireSelectionAndCarrier(t *testing.T) {
 		want  string
 	}{
 		{"capture-truncation", func(p []byte) []byte { return p[:len(p)-1] }, 1 << 20, "NeedMore"},
-		{"invalid-udp-length", func(p []byte) []byte { p[24+16+20+4] = 0; p[24+16+20+5] = 7; return p }, 1 << 20, "NeedMore"},
+		{"invalid-udp-length", func(p []byte) []byte { p[24+16+20+4] = 0; p[24+16+20+5] = 7; return p }, 1 << 20, "MalformedMessage"},
 		{"message-limit", func(p []byte) []byte { return p }, len(w) - 1, "ResourceExceeded"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

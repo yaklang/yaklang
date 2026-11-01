@@ -408,6 +408,9 @@ func (a *packedArchive) read(m Member) ([]byte, error) {
 // old ZIP serialization still exists. For consolidated sources the old member
 // contract is bound to source-index.json inside the hash-verified storage ZIP.
 // Physical storage and each reconstructed logical member are verified normally.
+// StorageFile remains the historical storage member name for compatibility; in
+// a normal checkout that member now lives inside testdata/captures.zip. Exported
+// tool workspaces materialize the same old path in their private directory.
 type ArchiveOrigin struct {
 	File, SHA256               string
 	Bytes                      int64

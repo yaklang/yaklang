@@ -1,0 +1,943 @@
+{
+  "scope": "offline TCP lifetime and byte-preview clock repair; default live idle policy unchanged; full protocol acceptance remains pending",
+  "policy": {
+    "offline_default": "EOF, observed TCP control/generation and existing capacity/byte/page limits; no implicit wall-clock idle expiry",
+    "offline_explicit_idle_timeout": "captured timestamps scoped by capture domain; monotone domain watermark, actual latest per-flow timestamp; unknown times excluded from expiry heap",
+    "live_default": "existing 30-second wall-clock resource idle timeout; not a peer-close proof",
+    "packet_analyzer": "manual prerecorded input uses WithCaptureReplayClock; CLI file reads and ReplayPcap enable it automatically"
+  },
+  "reproduction": {
+    "captured_packet_spacing_ns": 1234,
+    "processing_pause_ms": 25,
+    "explicit_idle_timeout_ms": 5,
+    "before_pause_split_flow_ids": [
+      1,
+      2
+    ],
+    "after_pause_one_flow": true,
+    "workers_tested": [
+      1,
+      2,
+      4
+    ],
+    "valid_weber_within_flow_gaps_at_least_30_seconds": 72,
+    "bgp_gaps": 30,
+    "scope": "authored minimal replay plus complete original captures; packet timing metadata is not rewritten in the public-corpus or probe runs"
+  },
+  "binaries": {
+    "yak-clock-final.exe": "1869140154ccf1cb8be7c9a05bcf1fc46fb42e2cbbd81e12cc63b64cdd27b1df",
+    "yak-clock-source-check.exe": "1869140154ccf1cb8be7c9a05bcf1fc46fb42e2cbbd81e12cc63b64cdd27b1df",
+    "events-clock-final.exe": "aac412c38818f0809ad4113affc9592e68e467daf75d825c84e605f50d2ee0f4",
+    "replay-clock-probe.exe": "c075a6771e9a39295b326c5301dde9750f14c00e6fb1a69fc75b6350a90adeb0"
+  },
+  "tests": {
+    "pcaputil_complete_seconds": 468.677,
+    "cli_final_complete_seconds": 1.977,
+    "heap_fuzz_executions": 1568,
+    "heap_fuzz_elapsed_seconds": 21.589,
+    "source_check_matches_actual_windows_binary": true
+  },
+  "complete_tcp_stability_probe": {
+    "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "binary_sha256": "c075a6771e9a39295b326c5301dde9750f14c00e6fb1a69fc75b6350a90adeb0",
+    "script_sha256": "cec7b633cf01012dc4e056887eca45f002f3a1e38946a738c091ed8d86ff25c4",
+    "baseline_jsonl_sha256": "eaf1f48d144bc088ee1b2e7f614ac5b03c857a9894192efe5cbc653e8a35a754",
+    "delayed_jsonl_sha256": "eaf1f48d144bc088ee1b2e7f614ac5b03c857a9894192efe5cbc653e8a35a754",
+    "baseline": {
+      "flows": 840,
+      "association_callbacks": 7700,
+      "admitted_chunks": 3798,
+      "admitted_bytes": 2048129,
+      "associations_sha256": "e6ff0357b4a2066e31200af317f173c67bd01bbac8b9634f0edf67e813bb1872",
+      "chunks_sha256": "95a31e7d1f4aa9f3f5c40f3720d3a4420aaaf9d411b133284c65afb4bfdfee3c"
+    },
+    "delayed": {
+      "flows": 840,
+      "association_callbacks": 7700,
+      "admitted_chunks": 3798,
+      "admitted_bytes": 2048129,
+      "associations_sha256": "e6ff0357b4a2066e31200af317f173c67bd01bbac8b9634f0edf67e813bb1872",
+      "chunks_sha256": "95a31e7d1f4aa9f3f5c40f3720d3a4420aaaf9d411b133284c65afb4bfdfee3c"
+    },
+    "different_association_flow_ids": [],
+    "different_chunk_flow_ids": [],
+    "scope": "complete original-file native TCP observation IDs, exact contributor/domain associations and ordered admitted chunk hashes/sequence/direction; no flow-ID normalization, no UDP or full application-field equivalence claim"
+  },
+  "delayed_probe_settings": {
+    "delay_ms": 50,
+    "every_normalized_packets": 256,
+    "capture_modified": false
+  },
+  "public_replays": {
+    "weber": {
+      "frames": 51328,
+      "native_tcp_flow_count": 824,
+      "native_tcp_preview_count": 808,
+      "field_mismatch_count": 90,
+      "packet_metadata_mismatches": {
+        "source": 13,
+        "destination": 13
+      },
+      "scoped_session_partitions": {
+        "tcp": {
+          "oracle_stream_domain_pairs": 824,
+          "missing_or_split_within_domain": 0
+        },
+        "udp": {
+          "oracle_stream_domain_pairs": 3367,
+          "missing_or_split_within_domain": 0
+        }
+      },
+      "bidirectional_session_checks": {
+        "tcp": {
+          "native_partitions_merging_oracle_streams": 0,
+          "merge_examples": [],
+          "payload_stream_domain_pairs": 722,
+          "payload_pairs_missing_or_split": 0
+        },
+        "udp": {
+          "native_partitions_merging_oracle_streams": 0,
+          "merge_examples": [],
+          "payload_stream_domain_pairs": 3367,
+          "payload_pairs_missing_or_split": 0
+        }
+      },
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "yak_sha256": "1869140154ccf1cb8be7c9a05bcf1fc46fb42e2cbbd81e12cc63b64cdd27b1df",
+      "events_binary_sha256": "aac412c38818f0809ad4113affc9592e68e467daf75d825c84e605f50d2ee0f4",
+      "native_partition_metrics_equal_under_background_regression_load": true
+    },
+    "sharon": {
+      "frames": 328127,
+      "native_tcp_flow_count": 840,
+      "native_tcp_preview_count": 735,
+      "field_mismatch_count": 35,
+      "packet_metadata_mismatches": {
+        "source": 46380,
+        "destination": 46309
+      },
+      "scoped_session_partitions": {
+        "tcp": {
+          "oracle_stream_domain_pairs": 35105,
+          "missing_or_split_within_domain": 34315
+        },
+        "udp": {
+          "oracle_stream_domain_pairs": 10100,
+          "missing_or_split_within_domain": 13
+        }
+      },
+      "bidirectional_session_checks": {
+        "tcp": {
+          "native_partitions_merging_oracle_streams": 6,
+          "merge_examples": [
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "318",
+              "wireshark_streams": [
+                "25660",
+                "6022"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "320",
+              "wireshark_streams": [
+                "32900",
+                "6260"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "324",
+              "wireshark_streams": [
+                "14869",
+                "20735",
+                "27168",
+                "6606"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "461",
+              "wireshark_streams": [
+                "15945",
+                "28958"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "508",
+              "wireshark_streams": [
+                "19025",
+                "27835",
+                "31294",
+                "34465"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+              "native": "551",
+              "wireshark_streams": [
+                "21087",
+                "32512"
+              ]
+            }
+          ],
+          "payload_stream_domain_pairs": 7996,
+          "payload_pairs_missing_or_split": 7213
+        },
+        "udp": {
+          "native_partitions_merging_oracle_streams": 24,
+          "merge_examples": [
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "7df17af45797d452",
+              "wireshark_streams": [
+                "1383",
+                "1619",
+                "7746",
+                "931"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "c3636a8332c0765a",
+              "wireshark_streams": [
+                "6663",
+                "941"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "aaa2239b90d4400e",
+              "wireshark_streams": [
+                "1182",
+                "1322",
+                "1368",
+                "1709",
+                "1807",
+                "1846",
+                "2157",
+                "2372",
+                "2480",
+                "2584",
+                "3178",
+                "3211",
+                "3259",
+                "3283",
+                "3289",
+                "3666",
+                "3856",
+                "3906",
+                "3934",
+                "3935",
+                "3966",
+                "3981",
+                "4095",
+                "4153",
+                "4303",
+                "4345",
+                "4394",
+                "4586",
+                "4803",
+                "4959",
+                "5067",
+                "5199",
+                "5230",
+                "5312",
+                "5449",
+                "5573",
+                "5648",
+                "5666",
+                "5764",
+                "6055",
+                "6138",
+                "6162",
+                "6295",
+                "6297",
+                "6322",
+                "6349",
+                "6380",
+                "6405",
+                "6482",
+                "6836",
+                "7066",
+                "7153",
+                "7187",
+                "7291",
+                "7320",
+                "7328",
+                "7455",
+                "7487",
+                "7667",
+                "7769",
+                "7788",
+                "7852",
+                "7890",
+                "7922",
+                "8014",
+                "8148",
+                "8188",
+                "8196",
+                "8198",
+                "8217",
+                "8277",
+                "8303",
+                "8404",
+                "8411",
+                "8437",
+                "8460",
+                "8703",
+                "8717",
+                "8727",
+                "8907",
+                "8943",
+                "9073",
+                "9107",
+                "9214",
+                "9239",
+                "9242",
+                "9354",
+                "9404",
+                "942",
+                "9497",
+                "9553",
+                "9568",
+                "9659",
+                "9669",
+                "9719",
+                "9724",
+                "9786",
+                "9794",
+                "9819",
+                "993"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "39f9aa50254a3715",
+              "wireshark_streams": [
+                "1667",
+                "949"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "cc2c836b7360162e",
+              "wireshark_streams": [
+                "8582",
+                "956"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "9b28a4ccad824aac",
+              "wireshark_streams": [
+                "7914",
+                "9101",
+                "962"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "79494495962ce0ef",
+              "wireshark_streams": [
+                "1003",
+                "1595",
+                "7786"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "f79e0c7e3f2651cb",
+              "wireshark_streams": [
+                "1095",
+                "6746",
+                "6892"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "c652a9b398e53b26",
+              "wireshark_streams": [
+                "1143",
+                "8378"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "1870a1bd81bc15b0",
+              "wireshark_streams": [
+                "1215",
+                "4990"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "637755867e4c2c72",
+              "wireshark_streams": [
+                "1182",
+                "1335",
+                "1336",
+                "5351"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "4829823bbdc3e35b",
+              "wireshark_streams": [
+                "1694",
+                "2681",
+                "8580"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "47d5c031561f8241",
+              "wireshark_streams": [
+                "1182",
+                "2333"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "e6ed4ff4cbb60146",
+              "wireshark_streams": [
+                "2498",
+                "4271",
+                "6333"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "a098ff85d5c86872",
+              "wireshark_streams": [
+                "2582",
+                "2583"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "64516cf5bf6e4d23",
+              "wireshark_streams": [
+                "2664",
+                "7113"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "e6ce9b195d9b67b2",
+              "wireshark_streams": [
+                "3018",
+                "7011"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "bc0fc942b621edc1",
+              "wireshark_streams": [
+                "3050",
+                "4230",
+                "5501",
+                "6440",
+                "8611",
+                "9058"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "eabb07c7b3b09954",
+              "wireshark_streams": [
+                "3296",
+                "3297",
+                "9125"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "c09333aba9f23593",
+              "wireshark_streams": [
+                "3343",
+                "7631"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "1d3d6d7ffa728bb6",
+              "wireshark_streams": [
+                "3480",
+                "3481"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "3b5a3fdc1d1013a0",
+              "wireshark_streams": [
+                "3979",
+                "5687",
+                "6471",
+                "9089",
+                "9480"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "f2e655f719774b48",
+              "wireshark_streams": [
+                "5702",
+                "5703"
+              ]
+            },
+            {
+              "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+              "native": "6a5a37c0948feb4d",
+              "wireshark_streams": [
+                "6634",
+                "9842"
+              ]
+            }
+          ],
+          "payload_stream_domain_pairs": 10100,
+          "payload_pairs_missing_or_split": 13
+        }
+      },
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "yak_sha256": "1869140154ccf1cb8be7c9a05bcf1fc46fb42e2cbbd81e12cc63b64cdd27b1df",
+      "events_binary_sha256": "aac412c38818f0809ad4113affc9592e68e467daf75d825c84e605f50d2ee0f4",
+      "native_partition_metrics_equal_under_background_regression_load": true
+    }
+  },
+  "tls": {
+    "native_complete_records": 4404,
+    "tcp_record_check": {
+      "wireshark": 2639,
+      "native": 2639,
+      "byte_identical_occurrences": 2639,
+      "missing_occurrences": 0,
+      "extra_occurrences": 0
+    },
+    "native_header_fields_checked": {
+      "tls.record.version": 4404,
+      "tls.record.length": 4404,
+      "tls.record.wire_type": 4404
+    },
+    "native_header_field_differences": [],
+    "carrier_record_check": {
+      "EAP/RADIUS": {
+        "wireshark": 47,
+        "native": 47,
+        "matching": 47,
+        "missing": 0,
+        "extra": 0
+      },
+      "RDPUDP": {
+        "wireshark": 49,
+        "native": 1718,
+        "matching": 48,
+        "missing": 1,
+        "extra": 1670
+      },
+      "TCP": {
+        "wireshark": 2639,
+        "native": 2639,
+        "matching": 2639,
+        "missing": 0,
+        "extra": 0
+      }
+    }
+  },
+  "bgp": {
+    "weber": {
+      "protocol": "bgp",
+      "oracle_sha256": "97cbc10456902e4072f73bf4259029b24e88658fe2d6e2191285e60cb6ceb1c9",
+      "events_sha256": "a7ec4d28756550eb019416ca53ba7ad4161c13c1482330d7db39736afef91ca6",
+      "native_events": 315,
+      "wireshark_complete_views": 302,
+      "matched": 302,
+      "checks": {
+        "exact bytes and occurrence": 302,
+        "bgp.length": 302,
+        "bgp.type": 302,
+        "bgp.open.version": 20,
+        "bgp.open.myas": 20,
+        "bgp.open.holdtime": 20,
+        "bgp.open.identifier": 20,
+        "bgp.cap.type": 86,
+        "bgp.cap.length": 86,
+        "bgp.cap.4as": 16,
+        "bgp.update.withdrawn_routes.length": 100,
+        "bgp.update.path_attributes.length": 100,
+        "bgp.update.path_attribute.flags": 402,
+        "bgp.update.path_attribute.type_code": 402,
+        "bgp.update.path_attribute.length": 402,
+        "bgp.update.path_attribute.origin": 80,
+        "bgp.update.path_attribute.multi_exit_disc": 72,
+        "bgp.update.path_attribute.local_pref": 80,
+        "bgp.prefix_length": 128,
+        "bgp.mp_reach_nlri_ipv6_prefix": 60,
+        "bgp.update.path_attribute.mp_reach_nlri.afi": 36,
+        "bgp.update.path_attribute.mp_reach_nlri.safi": 36,
+        "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6": 36,
+        "bgp.update.path_attribute.mp_unreach_nlri.afi": 10,
+        "bgp.update.path_attribute.mp_unreach_nlri.safi": 10,
+        "bgp.update.path_attribute.next_hop": 44,
+        "bgp.nlri_prefix": 68,
+        "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6.link_local": 2
+      },
+      "mismatches": [],
+      "missing": [],
+      "native_without_oracle_view": [
+        {
+          "id": 66,
+          "frames": [
+            80
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 70,
+          "frames": [
+            84
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 254,
+          "frames": [
+            334
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 258,
+          "frames": [
+            338
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 456,
+          "frames": [
+            598
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 460,
+          "frames": [
+            604
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 632,
+          "frames": [
+            878
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 677,
+          "frames": [
+            941
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 678,
+          "frames": [
+            942
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 870,
+          "frames": [
+            1210
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 872,
+          "frames": [
+            1214
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 1086,
+          "frames": [
+            1488
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 1088,
+          "frames": [
+            1490
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        }
+      ],
+      "oracle_prefix_views": [],
+      "attribution_differences": [],
+      "repeated_oracle_views": [],
+      "lossless_display_differences": [],
+      "notes": "Unmatched native messages remain explicit; scope interfaces before treating cross-interface TCP duplicate views as decoder errors. RTMP handshake grouping differs; byte identities are checked separately. Cross-frame matching requires the same already-observed interface/TCP-stream/native-flow partition and a unique remaining byte identity; it never borrows across TCP generations. Unsupported/truncated BGP envelopes are listed separately, never counted as complete messages."
+    },
+    "sharon": {
+      "protocol": "bgp",
+      "oracle_sha256": "11048b430006f7c9b29cdecd7b72b968aea317e7fd3aca2c04b7ae7d8e1c45d8",
+      "events_sha256": "225485250cb77fac775e45eb1087e6a13ad251f5f05302f90f94019611931164",
+      "native_events": 315,
+      "wireshark_complete_views": 303,
+      "matched": 303,
+      "checks": {
+        "exact bytes and occurrence": 303,
+        "bgp.length": 303,
+        "bgp.type": 303,
+        "bgp.open.version": 20,
+        "bgp.open.myas": 20,
+        "bgp.open.holdtime": 20,
+        "bgp.open.identifier": 20,
+        "bgp.cap.type": 86,
+        "bgp.cap.length": 86,
+        "bgp.cap.4as": 16,
+        "bgp.update.withdrawn_routes.length": 100,
+        "bgp.update.path_attributes.length": 100,
+        "bgp.update.path_attribute.flags": 402,
+        "bgp.update.path_attribute.type_code": 402,
+        "bgp.update.path_attribute.length": 402,
+        "bgp.update.path_attribute.origin": 80,
+        "bgp.update.path_attribute.multi_exit_disc": 72,
+        "bgp.update.path_attribute.local_pref": 80,
+        "bgp.prefix_length": 128,
+        "bgp.mp_reach_nlri_ipv6_prefix": 60,
+        "bgp.update.path_attribute.mp_reach_nlri.afi": 36,
+        "bgp.update.path_attribute.mp_reach_nlri.safi": 36,
+        "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6": 36,
+        "bgp.update.path_attribute.mp_unreach_nlri.afi": 10,
+        "bgp.update.path_attribute.mp_unreach_nlri.safi": 10,
+        "bgp.update.path_attribute.next_hop": 44,
+        "bgp.nlri_prefix": 68,
+        "bgp.update.path_attribute.mp_reach_nlri.next_hop.ipv6.link_local": 2
+      },
+      "mismatches": [],
+      "missing": [],
+      "native_without_oracle_view": [
+        {
+          "id": 66,
+          "frames": [
+            80
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 70,
+          "frames": [
+            84
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 254,
+          "frames": [
+            334
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 258,
+          "frames": [
+            338
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 456,
+          "frames": [
+            598
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 460,
+          "frames": [
+            604
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 632,
+          "frames": [
+            878
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 678,
+          "frames": [
+            942
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 870,
+          "frames": [
+            1210
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 872,
+          "frames": [
+            1214
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 1086,
+          "frames": [
+            1488
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        },
+        {
+          "id": 1088,
+          "frames": [
+            1490
+          ],
+          "status": "decoded",
+          "profile": "bgp4-observed",
+          "bytes": 19
+        }
+      ],
+      "oracle_prefix_views": [
+        {
+          "frame": 264719,
+          "bytes": 7,
+          "reason": "no complete supported BGP marker/length/type envelope"
+        },
+        {
+          "frame": 264719,
+          "bytes": 148,
+          "reason": "no complete supported BGP marker/length/type envelope"
+        },
+        {
+          "frame": 314570,
+          "bytes": 7,
+          "reason": "no complete supported BGP marker/length/type envelope"
+        },
+        {
+          "frame": 314570,
+          "bytes": 58,
+          "reason": "no complete supported BGP marker/length/type envelope"
+        }
+      ],
+      "attribution_differences": [],
+      "repeated_oracle_views": [],
+      "lossless_display_differences": [],
+      "notes": "Unmatched native messages remain explicit; scope interfaces before treating cross-interface TCP duplicate views as decoder errors. RTMP handshake grouping differs; byte identities are checked separately. Cross-frame matching requires the same already-observed interface/TCP-stream/native-flow partition and a unique remaining byte identity; it never borrows across TCP generations. Unsupported/truncated BGP envelopes are listed separately, never counted as complete messages."
+    }
+  },
+  "windows": {
+    "windows-bgp-text-clock-final": {
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_buffers_sha256": {
+        "01-protocol-fields.json": "41028bc64d2dc8e7fbb12c7290f76ab4948b5f80b59fb349cc0bc10ef12ed891",
+        "02-byte-sources.json": "d59b95d75f1cbf66ab1f14b014ee608f8a432ce1c6e2501077d88348294d6b8e",
+        "02-first-byte-source.json": "b8bcca295f5f022e721ffe237685c89b6bb5f16f9d2afbdb95c15f11e1695423",
+        "03-conversation-messages.json": "509fa1b9eeae49401c666950962e6b461d2e8d33459bdc8f3b7df316241d4107",
+        "04-association-evidence.json": "8b228a6d2c59cdc66ba15dbfb7dbe166b4d92154309d489dfffe18b9d7d83e0e",
+        "05-narrow.json": "dc1ad24b43dbe33fb9fda7470a20b7527068722484dfde61ecb56e67ca299ad2",
+        "06-restored.json": "8b228a6d2c59cdc66ba15dbfb7dbe166b4d92154309d489dfffe18b9d7d83e0e"
+      },
+      "max_packets": 60000,
+      "max_streams": 2048,
+      "test_exit": 0
+    },
+    "windows-ssh-clock-final": {
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_buffers_sha256": {
+        "01-protocol-fields.json": "bc71750716e66365dd2b6240bea2f4742f6b5b411432ca5527023a3da39e2aa5",
+        "02-byte-sources.json": "5e1b2cd16a726055a6333f7c3c4562b060f89d1b30b76f4b2c22e5a9a198da9b",
+        "02-first-byte-source.json": "48d9e2efa8d46d35d43228a59f0a836cb0e61c1e09afc7f86b1430929b4ffa2a",
+        "03-conversation-messages.json": "1d0b20ef7a6b79ef79d84896b46be9faa79f572d0cbb82e74f231e27aa075a76",
+        "04-association-evidence.json": "3062f2d3384023e8c797b30c539c4b38e9151b814b299136457faa770bc70c22",
+        "05-narrow.json": "8783b7c6713fd659c2f47270352b5e555856cf810554e66eb129d6e1c4426620",
+        "06-restored.json": "3062f2d3384023e8c797b30c539c4b38e9151b814b299136457faa770bc70c22"
+      },
+      "max_packets": 60000,
+      "max_streams": 2048,
+      "test_exit": 0
+    },
+    "initial_typed_bgp_filter": {
+      "predicate": "bgp.type == 4",
+      "eof_deadline_seconds": 90,
+      "test_exit": 2,
+      "result": "deadline exceeded; failure retained, not counted as a passing path"
+    }
+  },
+  "remaining": [
+    "initial typed BGP filter failed the 90-second EOF UI deadline; per-packet field-predicate caching remains to repair",
+    "original 90 / 35 frame-set field differences retain the existing DNS/TLS attribution explanations",
+    "six fuzz TCP / 24 UDP tuple partition differences remain visible; selected TCP groups have zero admitted bytes after oracle rollover",
+    "PIM/LDP/IS-IS/L2TPv3/MPLS/BFD Echo and other existing field/native coverage gaps are not complete"
+  ]
+}

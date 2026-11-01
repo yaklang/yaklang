@@ -9,11 +9,14 @@ import (
 // Unbound Go functions, never node-bound library closures. Only these audited
 // parser helpers may be lowered; arbitrary callables remain Yak programs.
 var planNativeCalls = map[string]any{
+	"parseSSDPMessage":     parseSSDPMessage,
+	"parseNetworkControl":  parseNetworkControl,
 	"parseMemcachedFields": parseMemcachedFields, "parseCassandraFields": parseCassandraFields,
 	"parseTNSFields": parseTNSFields, "parseTDSFields": parseTDSFields,
 	"parseLDAPFields": parseLDAPFields, "parseSMB3TransformFields": parseSMB3TransformFields,
 	"parsePostgreSQLFields": parsePostgreSQLFields, "parseMySQLFields": parseMySQLFields,
 	"parseIMAPFields": parseIMAPFields, "parsePOP3Fields": parsePOP3Fields,
+	"parseIMAPSASL":   parseIMAPSASL,
 	"parseSMTPFields": parseSMTPFields, "parseMQTTFields": parseMQTTFields,
 	"parseMongoDBFields": parseMongoDBFields, "parseKafkaFields": parseKafkaFields,
 	"parseKerberosFields": parseKerberosFields, "parseHTTP2Fields": parseHTTP2Fields,

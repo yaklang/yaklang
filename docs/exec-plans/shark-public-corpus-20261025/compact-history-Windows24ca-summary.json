@@ -1,0 +1,178 @@
+{
+  "scope": "Immutable historical compaction/Windows checkpoint; not a claim of protocol completeness or closure of overbudget identity filtering.",
+  "source": "24ca25d193994e8911c6fed7076bd4be1b8a69ac",
+  "prior_source": "1181d95ed954fef8389bbb90acadb88612c5f9c3",
+  "binaries": {
+    "events": "0e6ef6eaf4c70db1d30cce934d82458b50a3768b7a5ba33704ec9c396a65f82d",
+    "flows": "a172d67fcdec94fc94c47107f35a924e55ffb56f29392dbde9ba0013836d6ccb",
+    "yak": "f0dc75037f176e354ce3308c9ab3d16d12ebb7000046204663247deb95350706"
+  },
+  "prior_1181_summary_modified": false,
+  "evidence_files_modified": false,
+  "native_literal_preservation": {
+    "inputs": 37,
+    "closed_executions": 39,
+    "whole_event_rows": 306455,
+    "whole_flow_files": 2,
+    "differences": 0,
+    "binding": {
+      "path": "Native28-to-29-whole-source-audit01/summary.json",
+      "SHA256": "9bf0c8b99e578bd990b7a360ab82f5c758fab04b93888a140ce596f7afbc43d0"
+    }
+  },
+  "CLI_literal_preservation": {
+    "cases": 37,
+    "whole_rows": 384518,
+    "differences": 0,
+    "binding": {
+      "path": "CLI28-to-29-whole-source-audit01/summary.json",
+      "SHA256": "911488d78d5d14f5668b004cfd16c27eba24fb1c54889e53eeb34d50a13fa930"
+    }
+  },
+  "QUIC_recovery_literal_preservation": {
+    "cases": 2,
+    "whole_events": 3931,
+    "differences": 0,
+    "binding": {
+      "path": "QUIC-recovery-whole28-to-29-vendored01/summary.json",
+      "SHA256": "623ccb9a93f51c18b8464e5db048659ff988a329c4f7b9ae336758792edd7d3f"
+    }
+  },
+  "default_history": {
+    "budget_bytes": 67108864,
+    "messages": 1880,
+    "total_retained_logical_bytes": 39702734,
+    "evictions": 0,
+    "retained_ID_range": [
+      1,
+      1880
+    ],
+    "PDU299_retained": true,
+    "PDU299_cost": 16592,
+    "before_total_logical_bytes": 81025155,
+    "logical_storage_reduction_fraction": 0.5099949639096648,
+    "measurement": "sum of ProtocolEvent.RetainedBytes on actual native replay; not process RSS",
+    "binding": {
+      "path": "CLI-compact-history-actual29-01/receipt.json",
+      "SHA256": "ceccb6a749b858016bacb0c86f48fdf2c0bee70bd0411a90e2426e86714db122"
+    }
+  },
+  "actual_Windows": {
+    "frame": 294,
+    "PDU": 299,
+    "independent_source_frame": 464,
+    "AEAD_PN": 229,
+    "key_update_steps": 2,
+    "unobserved_key_epochs": 1,
+    "QPACK_blocked": true,
+    "decoded_dynamic_headers_claim": false,
+    "four_sources": [
+      {
+        "kind": "01-protocol-fields",
+        "source_bytes": 1232,
+        "certified_visible_prefix_bytes": 416,
+        "whole_source_SHA256": "ad39a2bf86ea3b57a993b6d50fe51683304a0f6493453996f7b3e3e11b3f8774"
+      },
+      {
+        "kind": "01-deep-protocol-fields",
+        "source_bytes": 1200,
+        "certified_visible_prefix_bytes": 416,
+        "whole_source_SHA256": "eae51c799dfcbb3391235a035c2a831f327e0004e59b7e130195d798c8ee438e"
+      },
+      {
+        "kind": "02-first-byte-source",
+        "source_bytes": 1169,
+        "certified_visible_prefix_bytes": 416,
+        "whole_source_SHA256": "a7f06aa88bff45247f8f8db33cfbf2b40b6a1a5f58c49b8d252ae8337db661ab"
+      },
+      {
+        "kind": "02-byte-sources",
+        "source_bytes": 1199,
+        "certified_visible_prefix_bytes": 416,
+        "whole_source_SHA256": "295db564c539ef5d3e41dc462bbf37b8c332cff4c5f601f9f274f6d72e6d35b8"
+      }
+    ],
+    "full_source_visible_in_viewport": false,
+    "derived_recovery_context_has_no_wire_range_or_byte_highlight": true,
+    "source_binding": {
+      "path": "QUIC-Windows-four-sources29-vendored01/summary.json",
+      "SHA256": "bfca5fc50949e24ac1db766d1e77a30122e2a9407f3d9780db747fb21ba793d3"
+    },
+    "context_binding": {
+      "path": "QUIC-Windows-derived-context29-vendored01/summary.json",
+      "SHA256": "574a32cb8c0cd409230adc35296f13794eef34ffbd76160e582d904fffece1bd"
+    }
+  },
+  "CI": {
+    "source": "24ca25d193994e8911c6fed7076bd4be1b8a69ac",
+    "all_four_green": true,
+    "verified_with": "gh run view --json headSha,status,conclusion",
+    "runs": {
+      "Essential": "https://github.com/yaklang/yaklang/actions/runs/40805015591",
+      "Diff": "https://github.com/yaklang/yaklang/actions/runs/40805015577",
+      "path_case": "https://github.com/yaklang/yaklang/actions/runs/40805015625",
+      "explicit_traffic_full_SHA": "https://github.com/yaklang/yaklang/actions/runs/40805011053"
+    },
+    "automatic_draft_traffic_skipped_not_counted": true
+  },
+  "OPEN_at_this_source": {
+    "budget1MiB": {
+      "actual_messages": 1880,
+      "total_logical_bytes": 39702734,
+      "evictions": 1835,
+      "retained_range": [
+        1836,
+        1880
+      ],
+      "retained_count": 45,
+      "PDU299_absent": true,
+      "exact_and_physical_source_windows_empty_but_complete": true,
+      "binding": {
+        "path": "CLI-identity-overbudget-actual29-01/receipt.json",
+        "SHA256": "42936c98f4d52e3190be6b1af33b162240305803ea0d5bf206bcd21c5954da9f"
+      }
+    },
+    "mixed_same_actual_frame": {
+      "frame": 1,
+      "actual_PDUs": [
+        1,
+        2
+      ],
+      "detail_budget_messages": 1,
+      "remaining_PDU": 2,
+      "evicted_PDU": 1,
+      "first_retained_window": [
+        2
+      ],
+      "first_window_complete_incorrectly_True": true,
+      "wrong_predicates": [
+        "not quic.token_length becomes true/complete/nonpartial",
+        "not(pdu.id==1) becomes true/complete/nonpartial",
+        "quic.token_length==0 becomes false/complete/nonpartial"
+      ],
+      "binding": {
+        "path": "CLI-identity-mixed-same-frame-actual29-02/receipt.json",
+        "SHA256": "ed253145e601cbfa9b222dd1f7319b98dba9d11714dbeffacfa62fa89f1d1ad2"
+      }
+    },
+    "independent_trusted_identity_index": {
+      "status": "external candidate only at source24ca; production fix and Go regressions still pending",
+      "proposal": "CLI-contributor-identity-readonly-proposal01/manifest02.json",
+      "proposal_SHA256": "4e497ca716c0a80403d416c9abaef2d176a8313a999e303531a3b01a9cd31b3a"
+    }
+  },
+  "limits": [
+    "Literal equality preserves unchanged outputs; it does not certify that every unchanged protocol interpretation matches Wireshark.",
+    "The QUIC sparse source audit certifies AEAD/wire facts and stream anchors; missing QPACK prefix prevents a claim of complete decoded HTTP3 request semantics.",
+    "The real Windows certificates certify visible byte prefixes and derived-context presentation; they do not claim an offscreen full source was visible.",
+    "Core TOP30, remaining report differences and SSA project-entry/container boundaries remain separate open work.",
+    "Candidate implementation and later CI/results must receive a NEW source checkpoint, not overwrite this historical24ca report."
+  ],
+  "focused_validation": {
+    "test_passes": 737,
+    "skipped": 0,
+    "external_receipt": "QUIC-compact-history-focused02/receipt.json",
+    "receipt_SHA256": "5b0817e84b5d4821d77c072fad34a6ba7960deff70df43a387f595e77dee403d",
+    "source_binding": "receipt parent HEAD and the four Go working-file digests; not a rerun of the older full-5 suite"
+  }
+}

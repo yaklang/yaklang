@@ -1,0 +1,801 @@
+{
+  "scope": "Observed four-epoch Windows RPC TCP tuple reuse, bounded clear Bind NAK alignment, six source-preserving observation profiles and full prior-export preservation; not all-protocol completeness",
+  "native_and_CLI_source": "5ff05f4ff46498e7a4b164c37f4df7da534c9ab1",
+  "prior_aggregate_SHA256": "d3171c23390bd205d39e0c3521eab851bd066b8f11543b117209a9dfffc4cdad",
+  "prior_inputs": {
+    "inputs": 17,
+    "physical_frames": 380868,
+    "SDK_records": 286073,
+    "RPC_wire_PDUs": 919,
+    "numeric_links": 113,
+    "declared_control_baseline_differences": 8,
+    "literal_reference_differences_on_declared_controls": 55
+  },
+  "totals": {
+    "inputs": 23,
+    "physical_frames": 381784,
+    "SDK_records": 286481,
+    "RPC_wire_PDUs": 1293,
+    "numeric_links": 141
+  },
+  "input_totals_are_not_unique_live_acquisitions": true,
+  "existing_17_complete_exports_preserved": [
+    {
+      "case": "control-invalid-first-request-replaced",
+      "capture_SHA256": "837b013d82c6150a63b52cdb544fa2347352fe9cd5f48529663db6b7847ba69f",
+      "SDK_SHA256": "9541004b88cf1f829e2df3cdb0a88c0159b4696e93d8ba13e45df6880e530a90",
+      "CLI_SHA256": "fd5725b67128f63aeedb41d7373c65e0d184b8934bf1069d4d00c4be73c0f4f5",
+      "baseline_SDK_SHA256": "9541004b88cf1f829e2df3cdb0a88c0159b4696e93d8ba13e45df6880e530a90",
+      "baseline_CLI_SHA256": "fd5725b67128f63aeedb41d7373c65e0d184b8934bf1069d4d00c4be73c0f4f5",
+      "SDK_receipt_SHA256": "b79b71a5dc0670a159185197367c24e945fab43a48032bbb0f809c29ecd1ad05",
+      "CLI_receipt_SHA256": "3e30fa11f9dd5df911ffb344d02dbcf4ac82d03539f59fccb250e2f634db968d"
+    },
+    {
+      "case": "control-known-request-late-completion",
+      "capture_SHA256": "75780cc495b2b9aac828d6988f53fe3c8b5f957f93503770b92bcbecfc014aaa",
+      "SDK_SHA256": "7317a44412b12fb808dc6c48593fc177cb4adf8c9e1672674cd139c0c257df7d",
+      "CLI_SHA256": "91ab68553efa207f67134baffcc23bbb72512222a8e3668f68499acf5b30d554",
+      "baseline_SDK_SHA256": "7317a44412b12fb808dc6c48593fc177cb4adf8c9e1672674cd139c0c257df7d",
+      "baseline_CLI_SHA256": "91ab68553efa207f67134baffcc23bbb72512222a8e3668f68499acf5b30d554",
+      "SDK_receipt_SHA256": "8f39c16e85603650501bc19e9068b9d8238421e439cadb186b6c5e37cd022aaf",
+      "CLI_receipt_SHA256": "98b94039b11434b85975dc03b5ec12de07fbf987bf7512260802317e5bfd62d6"
+    },
+    {
+      "case": "control-overlap-before-old-reply",
+      "capture_SHA256": "30644406001f2d245a9414571772ed8159521ac73becdb5e67300c45f9a75b08",
+      "SDK_SHA256": "1782fdc101b05535281821897ddb9eaaf16f8a921ee39f6b89ea5b9c96171ead",
+      "CLI_SHA256": "dfe048940aad98eba4420ec69383b63aca4b2d8fc506272f00f55a887decc233",
+      "baseline_SDK_SHA256": "1782fdc101b05535281821897ddb9eaaf16f8a921ee39f6b89ea5b9c96171ead",
+      "baseline_CLI_SHA256": "dfe048940aad98eba4420ec69383b63aca4b2d8fc506272f00f55a887decc233",
+      "SDK_receipt_SHA256": "95ddbc43afb98fdfba8ec4e9b1758dce567c2f7705a6e375bbbf1422def40100",
+      "CLI_receipt_SHA256": "bc3dcb80eeecb7bfb468e3ca49d8f306c8db1db630e7eef47d1026cccf4b70c0"
+    },
+    {
+      "case": "control-reply-before-any-request",
+      "capture_SHA256": "8321dc3021d9f8183b19488f04203af883b6f08f70d3ef15f60594ef059723ed",
+      "SDK_SHA256": "8945364463684357c55441a1c90737611049525da884d4f81e451b1a2a6e7950",
+      "CLI_SHA256": "1cebb1c4a7e43f3cd9a93a1012adcefd96c61c5d136561c66b448a1f8390581b",
+      "baseline_SDK_SHA256": "8945364463684357c55441a1c90737611049525da884d4f81e451b1a2a6e7950",
+      "baseline_CLI_SHA256": "1cebb1c4a7e43f3cd9a93a1012adcefd96c61c5d136561c66b448a1f8390581b",
+      "SDK_receipt_SHA256": "2f29cf8985b4d1990d3be41de55aaf37e0b43ba0eacdc8a058dee2d34e0d57fc",
+      "CLI_receipt_SHA256": "e91192b243f06aebc7838748af13163ec0478aaf342ce891a0d1ba7cde91415e"
+    },
+    {
+      "case": "duplicate-request-observation",
+      "capture_SHA256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "SDK_SHA256": "47f4d4e54ec36646027408edf9b6fa666af22f84155f1d7d7e4596c0750ead46",
+      "CLI_SHA256": "4a71d42e361e54c35707702ff0eaf4de6851c8f8fe4a114e56dc9444646a9db0",
+      "baseline_SDK_SHA256": "47f4d4e54ec36646027408edf9b6fa666af22f84155f1d7d7e4596c0750ead46",
+      "baseline_CLI_SHA256": "4a71d42e361e54c35707702ff0eaf4de6851c8f8fe4a114e56dc9444646a9db0",
+      "SDK_receipt_SHA256": "6a341362ac8e14b0f50d08224ca18759448187de402962828d947f65ad6393e9",
+      "CLI_receipt_SHA256": "17c0ca3db8628340bfb0fedc0ba5758dec5c026901428f83218f2518f6a8435e"
+    },
+    {
+      "case": "fresh-live",
+      "capture_SHA256": "54cf33366e832801c96bd11fad6686ec4f073b0b286f8c1be62e8e622510c64d",
+      "SDK_SHA256": "6da63859e058c1fdb2e8acb415a886334ce59c26a7a10b316069574e4495bbc8",
+      "CLI_SHA256": "1e2b5305ce5bed1e8f7632d5343b62a5262a413f6c833518596fb475542990b0",
+      "baseline_SDK_SHA256": "6da63859e058c1fdb2e8acb415a886334ce59c26a7a10b316069574e4495bbc8",
+      "baseline_CLI_SHA256": "1e2b5305ce5bed1e8f7632d5343b62a5262a413f6c833518596fb475542990b0",
+      "SDK_receipt_SHA256": "6747c0fef12f205cbe1bdc07d3a18ee501adc2da90a9eab21368ba8851141f91",
+      "CLI_receipt_SHA256": "8c986864d92506bba04307455a5c24fd972e7fbd253d890ae77e4e92d804c9f2"
+    },
+    {
+      "case": "live-fragmented",
+      "capture_SHA256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "SDK_SHA256": "14481b42674ac54b6006f242e52a7d4e4f2efa0e9b640c09fbd382b27de6024e",
+      "CLI_SHA256": "898e6f91a381860809c6840d41067c0725bf4a9085b9bf7dbfbff5fdfb949437",
+      "baseline_SDK_SHA256": "14481b42674ac54b6006f242e52a7d4e4f2efa0e9b640c09fbd382b27de6024e",
+      "baseline_CLI_SHA256": "898e6f91a381860809c6840d41067c0725bf4a9085b9bf7dbfbff5fdfb949437",
+      "SDK_receipt_SHA256": "80e66e888503f067d39a7b938689d6c338f8128285c7c12a30f0bc324d6d2eb1",
+      "CLI_receipt_SHA256": "6193f6a244cc715524db65bf4a42964622be0ca32197db7af546bff29ff765c9"
+    },
+    {
+      "case": "live-query",
+      "capture_SHA256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "SDK_SHA256": "ffacb954e7fcb7f4fe1d9df8829f94bf18d5d65f478cf4d54050f3aaa0cca072",
+      "CLI_SHA256": "94ac8a56c7fd92efa8fd1ec30a2cb4035fda3eb0ccc5c8b358a9627b67bb4adb",
+      "baseline_SDK_SHA256": "ffacb954e7fcb7f4fe1d9df8829f94bf18d5d65f478cf4d54050f3aaa0cca072",
+      "baseline_CLI_SHA256": "94ac8a56c7fd92efa8fd1ec30a2cb4035fda3eb0ccc5c8b358a9627b67bb4adb",
+      "SDK_receipt_SHA256": "8e3f9bdbd3f13b79a14ea10fe8ad8047dc80e661e3eac3900fe00317b045fc15",
+      "CLI_receipt_SHA256": "cc0102692c9b7e65bf9040a63e8f8d156df2bc1e5cfa3f81b591069d77bb1946"
+    },
+    {
+      "case": "live-unfragmented",
+      "capture_SHA256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "SDK_SHA256": "c4a5515d65ecdcba7034876b15816e8bc8bd2c40194d8e9936f5bc6a8764791d",
+      "CLI_SHA256": "e273bff35984f2dd1c909d74618d021a21ca63b6018659a5d364811bffc0004e",
+      "baseline_SDK_SHA256": "c4a5515d65ecdcba7034876b15816e8bc8bd2c40194d8e9936f5bc6a8764791d",
+      "baseline_CLI_SHA256": "e273bff35984f2dd1c909d74618d021a21ca63b6018659a5d364811bffc0004e",
+      "SDK_receipt_SHA256": "c8a3d065abf873777ef40c6033eedff900917d39a7e1cb20c62eaf195b37a4fd",
+      "CLI_receipt_SHA256": "c583f2313beb96111de5342201a669abe2c4f01a0e5a0405aa0332f0b408b75f"
+    },
+    {
+      "case": "permanent-request-capture-hole",
+      "capture_SHA256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "SDK_SHA256": "7859e27ddb3bf072ad09cbe6b1aa788e2c822cf5f49bde2f36b06f221f619477",
+      "CLI_SHA256": "62ed83dc09d22ff96f2bf598a6a078e1d68da2fe8b5eb52b678b0f9831b6aaaf",
+      "baseline_SDK_SHA256": "7859e27ddb3bf072ad09cbe6b1aa788e2c822cf5f49bde2f36b06f221f619477",
+      "baseline_CLI_SHA256": "62ed83dc09d22ff96f2bf598a6a078e1d68da2fe8b5eb52b678b0f9831b6aaaf",
+      "SDK_receipt_SHA256": "d95ebe548b957207837f784cce87dc25e38731a4ad1367edd69fbc812c7df8c7",
+      "CLI_receipt_SHA256": "517c23a5dc45ccf55edc89c89188ea89de6b54aefff44e06323104685b4ec4f5"
+    },
+    {
+      "case": "request-arrives-after-two-later-requests",
+      "capture_SHA256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "SDK_SHA256": "35caa68800f57acc665a9c94412be779547a2b43263a118ba1526f3e47a584e6",
+      "CLI_SHA256": "de858d87f0b4bc42f895ef618d960a2d28f81d97e047e1e8a3b2ed260b3ca74a",
+      "baseline_SDK_SHA256": "35caa68800f57acc665a9c94412be779547a2b43263a118ba1526f3e47a584e6",
+      "baseline_CLI_SHA256": "de858d87f0b4bc42f895ef618d960a2d28f81d97e047e1e8a3b2ed260b3ca74a",
+      "SDK_receipt_SHA256": "70e0d1a294de34105a8570af43f66f7affe32ff8c865d23782ae805c1d5905b5",
+      "CLI_receipt_SHA256": "3eeebbe230f1b4b4f3fb7ec97570e39e24a0a83ab158d87d6f6e42282b5f4cb5"
+    },
+    {
+      "case": "request-tail-arrives-after-first-response",
+      "capture_SHA256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "SDK_SHA256": "b327e0ae3ee83ada20964f08d1945037a9b5129a8a4e342b1e7c5c350137c0a4",
+      "CLI_SHA256": "6762d32118b1d432483182499930b94c6d4b41aef2a1385665c85a37497417da",
+      "baseline_SDK_SHA256": "b327e0ae3ee83ada20964f08d1945037a9b5129a8a4e342b1e7c5c350137c0a4",
+      "baseline_CLI_SHA256": "6762d32118b1d432483182499930b94c6d4b41aef2a1385665c85a37497417da",
+      "SDK_receipt_SHA256": "8d05b5789965f5b643b1fcb68de993cb56fc13c0d2587ea8eb9912c9d151c6d3",
+      "CLI_receipt_SHA256": "900a849680326d4a46055dc27e71a0d936f8e28fc6184b310112fa78715d1f53"
+    },
+    {
+      "case": "response-first-two-swapped",
+      "capture_SHA256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "SDK_SHA256": "d339ff5a1103cef5e5cb5a6ae7dbb9e819ad6561e97aa366987bc34063b7813c",
+      "CLI_SHA256": "223d401425c506e2c30288b946b7755a222511f4c1f3614c22d816ce5e1e2217",
+      "baseline_SDK_SHA256": "d339ff5a1103cef5e5cb5a6ae7dbb9e819ad6561e97aa366987bc34063b7813c",
+      "baseline_CLI_SHA256": "223d401425c506e2c30288b946b7755a222511f4c1f3614c22d816ce5e1e2217",
+      "SDK_receipt_SHA256": "5bfd86889d983e472b19593be734695734bf4d77581e521af51af8d7f1860bf5",
+      "CLI_receipt_SHA256": "b5c957ab345b025136e698897574c02ec6bb51dba794938bb7e466da1efa58cb"
+    },
+    {
+      "case": "rpc-fragments-live",
+      "capture_SHA256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "SDK_SHA256": "0145b6ce04960f8e3079078df7ca038eaeb84b3dab52a24300a39cc372c9baa8",
+      "CLI_SHA256": "84e292e8c879a59d2d70928a5303e136798ab4616fbdb58493bcd8b9ff4e3bb1",
+      "baseline_SDK_SHA256": "0145b6ce04960f8e3079078df7ca038eaeb84b3dab52a24300a39cc372c9baa8",
+      "baseline_CLI_SHA256": "84e292e8c879a59d2d70928a5303e136798ab4616fbdb58493bcd8b9ff4e3bb1",
+      "SDK_receipt_SHA256": "61d2c847931bf744ecca296d17aa5a5857e780949d1e3afc7790b77e9e649b20",
+      "CLI_receipt_SHA256": "417d30a28d8621576abba4552d1ff8b19a90f81dc4d03544b5a40dd91cd1224d"
+    },
+    {
+      "case": "sharon",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "a5caa24b1af8d7ef1d55dc472daa083128be5555f236a37e36b79c290eb9ec6a",
+      "CLI_SHA256": "96d863154d00f9297d9dc891aba9c845e7dce7cb8638ce94d210208d5662c97f",
+      "baseline_SDK_SHA256": "a5caa24b1af8d7ef1d55dc472daa083128be5555f236a37e36b79c290eb9ec6a",
+      "baseline_CLI_SHA256": "96d863154d00f9297d9dc891aba9c845e7dce7cb8638ce94d210208d5662c97f",
+      "SDK_receipt_SHA256": "ef8af1a6ca2cff8285d8017abef7996df0b42d2936121c239dc4223d84c3e5aa",
+      "CLI_receipt_SHA256": "58b7fcc90569d76bead8a896c6209614fbe6957863b699e8ad23095cef8a16ea"
+    },
+    {
+      "case": "snaplen-request-capture-hole",
+      "capture_SHA256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "SDK_SHA256": "42b720fc3c3bc530dd2b953a316e772b77b7085f8a646bd6cbe338068db7961f",
+      "CLI_SHA256": "0e7af69bcd755be513d23ff49f3a3fa0b0262a57aedbec3696e671ba8f1c702c",
+      "baseline_SDK_SHA256": "42b720fc3c3bc530dd2b953a316e772b77b7085f8a646bd6cbe338068db7961f",
+      "baseline_CLI_SHA256": "0e7af69bcd755be513d23ff49f3a3fa0b0262a57aedbec3696e671ba8f1c702c",
+      "SDK_receipt_SHA256": "df963f48cbb1705eb7db38b95c82f414f692a98b013a52e42e4ee090de00a149",
+      "CLI_receipt_SHA256": "625f9d156fbb9ad4a90df923f1001ff8aee798817ef84cd3a6a67b9b1da00aea"
+    },
+    {
+      "case": "weber",
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "SDK_SHA256": "73e8b1e4e26005b79246d4537342ea2dc61403fd67ed7df7bab9242ec83e9c1b",
+      "CLI_SHA256": "6e4040219d8052372d9252960b879a176cff6c49e2309f08c58b34214cab399d",
+      "baseline_SDK_SHA256": "73e8b1e4e26005b79246d4537342ea2dc61403fd67ed7df7bab9242ec83e9c1b",
+      "baseline_CLI_SHA256": "6e4040219d8052372d9252960b879a176cff6c49e2309f08c58b34214cab399d",
+      "SDK_receipt_SHA256": "c65c572016bb81b9f1536f9b5965a415bc184ab6aadd62ce0285f6e1e593da4b",
+      "CLI_receipt_SHA256": "240c805b8bdbfddc87a80e5c0d13a23ef8053cf70bfc20fb30db9cab64e5e30a"
+    }
+  ],
+  "actual_capture": {
+    "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+    "generator_SHA256": "ed7c999bd5b835a4f418219cf923c6a791d43927b0d1d489f70d3fcb4a455c39",
+    "wire_PDU_receipts": 67,
+    "cases": [
+      {
+        "generation": 0,
+        "offered_context": 0,
+        "sent_complete_lookup": false,
+        "expected_abortive_close": true,
+        "accepted_context": 0,
+        "outcome": "RST-after-incomplete-request"
+      },
+      {
+        "generation": 1,
+        "offered_context": 0,
+        "sent_complete_lookup": false,
+        "expected_abortive_close": true,
+        "outcome": "actual-unbound-context-bind-nak",
+        "reject_reason": 4
+      },
+      {
+        "generation": 2,
+        "offered_context": 1,
+        "sent_complete_lookup": true,
+        "expected_abortive_close": true,
+        "accepted_context": 1,
+        "outcome": "actual-lookup-response",
+        "reply_fragments": 28,
+        "reply_stub_bytes": 54776,
+        "reply_stub_SHA256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd",
+        "returned_entries": 415
+      },
+      {
+        "generation": 3,
+        "offered_context": 0,
+        "sent_complete_lookup": true,
+        "expected_abortive_close": true,
+        "accepted_context": 0,
+        "outcome": "actual-lookup-response",
+        "reply_fragments": 28,
+        "reply_stub_bytes": 54776,
+        "reply_stub_SHA256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd",
+        "returned_entries": 415
+      }
+    ],
+    "authentication_or_endpoint_modification_or_discovered_service_invocation": false
+  },
+  "new_observation_profiles": [
+    {
+      "case": "actual",
+      "physical_frames": 155,
+      "SDK_records": 72,
+      "RPC_wire_PDUs": 67,
+      "RPC_status_counts": {
+        "decoded": 67,
+        "incomplete": 2
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 5,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        },
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        }
+      ],
+      "reference_fields": 654,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "SDK_SHA256": "055ed19394ed9bdc2a159902d6460ca54e5b72f0d9274ec2a9b8bccc6b5a97d4",
+      "CLI_SHA256": "1a92b3cacaae374e50869a495b2f0db400d4c2398ccb1d9643acb03d28baa124",
+      "wire_certificate_SHA256": "8ad06c721a9ae226865d60b98dca0b750e8744ec1cfdac335c8d2e69eb64509f",
+      "logical_certificate_SHA256": "9fca5c048f9dc40619c0a4ecc75cd4fcbb45b581e78217af373f0e405d5b78a5",
+      "CLI_certificate_SHA256": "1783b66b6e794cdbd4cd38d9c5013e53e28e837bbe31221330ef17645452b980"
+    },
+    {
+      "case": "lost-close",
+      "physical_frames": 151,
+      "SDK_records": 72,
+      "RPC_wire_PDUs": 67,
+      "RPC_status_counts": {
+        "decoded": 67,
+        "incomplete": 2
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 5,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        },
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        }
+      ],
+      "reference_fields": 654,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "643577643950565946f5fcb8b8dd2e8955c937a2b2813d37f89e0d1333b031ff",
+      "SDK_SHA256": "50ed2a8b1976fcd44015546df16339318aced05dac3730905856fb636dd94650",
+      "CLI_SHA256": "7f9abbe773ed4af98922312cf240bc3838d2d5980448e500f9e539d197c4ebd0",
+      "wire_certificate_SHA256": "8aff5b78c321e54de3635d88892dfbe5181450466f42ae136e807c90b8985179",
+      "logical_certificate_SHA256": "de7d0140fa0bf6c5f952d69f185dc89e4eaf1bf610053308214202d573b6d930",
+      "CLI_certificate_SHA256": "d22391e158f77850c34220a353edd1aefb0314b515c4275dcfbbf77b3829c698"
+    },
+    {
+      "case": "lost-close-out-of-order",
+      "physical_frames": 151,
+      "SDK_records": 72,
+      "RPC_wire_PDUs": 67,
+      "RPC_status_counts": {
+        "decoded": 67,
+        "incomplete": 2
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 5,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        },
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        }
+      ],
+      "reference_fields": 654,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "e7a6af68a0aa75dcf7c39b3acd182e0f1996ea6326524c7d200971e02aa3a031",
+      "SDK_SHA256": "2bfdab5b31a10dbaa2b03cfac47945ed9c3e34db0ef180ee1483e95e60809afd",
+      "CLI_SHA256": "ec8b29ec23b9ca5c838f06fff9ac35183e76645d01dd0e88b98fa387133ca22f",
+      "wire_certificate_SHA256": "10e8eeabb343b2e67eedcdddfd8f1e4ce96974c7388ccd1ab12cd23917d9aa96",
+      "logical_certificate_SHA256": "6695b3d7913daf8bbd3ce4fc7d82343bb1e730be21a20452a5264526ddfcd8de",
+      "CLI_certificate_SHA256": "b66ac01b785edf8095d8ddb4699108920d3fa61b45129d3f1a270df91e75db49"
+    },
+    {
+      "case": "lost-middle",
+      "physical_frames": 154,
+      "SDK_records": 60,
+      "RPC_wire_PDUs": 53,
+      "RPC_status_counts": {
+        "decoded": 53,
+        "incomplete": 4
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 4,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        },
+        {
+          "first_PDU": 14,
+          "last_captured_PDU": 27,
+          "captured_fragments": 14,
+          "captured_stub_bytes": 28336,
+          "TCP_epoch": 3
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        },
+        {
+          "request_PDU": 13,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 3
+        }
+      ],
+      "reference_fields": 528,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "8ff8ed83c800f56981791f7de25479531da98471c431fbc100e4c574a2d8b4b7",
+      "SDK_SHA256": "fece32ccc933b8a3c85b5fbc73292ce5a97bdc71adee23218da2e87496e5e2d5",
+      "CLI_SHA256": "25a19f0f3c49a8a56398e6a962ac2d8d98bb4a032fc6e1a023a9472338ff850b",
+      "wire_certificate_SHA256": "f4d7d18c93b33bf6cf3032e72fa9db57b61aad44a78f34efb35924059da3ac5a",
+      "logical_certificate_SHA256": "2f536d7c3b91ed4032b57554bdc79de699235b12eb41d2ae9b03a698e4e6c973",
+      "CLI_certificate_SHA256": "6bcf7ccf63c64fe52963030d0bef306bf49928bf101a43bd468d7267b469079a"
+    },
+    {
+      "case": "lost-middle-and-close",
+      "physical_frames": 150,
+      "SDK_records": 60,
+      "RPC_wire_PDUs": 53,
+      "RPC_status_counts": {
+        "decoded": 53,
+        "incomplete": 4
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 4,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        },
+        {
+          "first_PDU": 14,
+          "last_captured_PDU": 27,
+          "captured_fragments": 14,
+          "captured_stub_bytes": 28336,
+          "TCP_epoch": 3
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        },
+        {
+          "request_PDU": 13,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 3
+        }
+      ],
+      "reference_fields": 528,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "13b49c05399fb5c21a4c8d5413f582e5192d5699c7dad816dde6b374d39897db",
+      "SDK_SHA256": "2ba4a2fc0d8593a5adacd74941036161a491d5b6f22d156981a7eeeb9e7cb339",
+      "CLI_SHA256": "cf94ce8645fab518c3e3db9a4249a053b1fed988f9a300be31c60dada8b702e1",
+      "wire_certificate_SHA256": "78145febd02fec2f4e2a278a615160820f4c5ae21bb4bc8d685db4eeb6572a2e",
+      "logical_certificate_SHA256": "1cbdc68fe39fc7113809b03c0cc7e1a001649c95a43914753e156d92adbdeafd",
+      "CLI_certificate_SHA256": "e9fc1579aac8c1591e27e062a285650e61e5e71ee55627b6d2b4d927f2eaed00"
+    },
+    {
+      "case": "out-of-order",
+      "physical_frames": 155,
+      "SDK_records": 72,
+      "RPC_wire_PDUs": 67,
+      "RPC_status_counts": {
+        "decoded": 67,
+        "incomplete": 2
+      },
+      "TCP_epochs": 4,
+      "numeric_links": 5,
+      "logical_messages": [
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        },
+        {
+          "PType": 2,
+          "fragments": 28,
+          "stub_bytes": 54776,
+          "stub_sha256": "4c1f8f24e9c11e9ecd93d20e2b947bd299ec3669053ec0b850fd4585181acadd"
+        }
+      ],
+      "unfinished_messages": [
+        {
+          "first_PDU": 6,
+          "last_captured_PDU": 6,
+          "captured_fragments": 1,
+          "captured_stub_bytes": 20,
+          "TCP_epoch": 1
+        }
+      ],
+      "outstanding_calls": [
+        {
+          "request_PDU": 8,
+          "request_PType": 0,
+          "wire_Call_ID": 2,
+          "TCP_epoch": 2
+        }
+      ],
+      "reference_fields": 654,
+      "reference_layout_limits": [],
+      "reference_field_limits": [],
+      "aggregate_reference_limits": [],
+      "unused_selected_reference_views": [],
+      "capture_SHA256": "43eec2f51f71d46e587c6c2ebd9d6456e4bcfd99df964a1d400b9e5f22f4c4eb",
+      "SDK_SHA256": "1f443605dc0149e6416b681d67e7c374b0c2abf56b3bc44ed25a5e512797df5c",
+      "CLI_SHA256": "4fe93ee96ba1cda96aa6ba99aa9665bdd9e85d93d561ac1c1a4d71de86314c29",
+      "wire_certificate_SHA256": "f5a99f9481ed9ef516e12735a4911f8a6d93b1574a11f84ec58ecdfa1309f0c5",
+      "logical_certificate_SHA256": "bf53983d68ef6a4c53be1527d02ca94b4530bf7095152ce3973f23341abec357",
+      "CLI_certificate_SHA256": "3d0342344721f16eed502758fdf988f7acec7941448be9deb7e9193084601952"
+    }
+  ],
+  "new_checks": 687209,
+  "new_reference_fields": {
+    "dcerpc.ver": 374,
+    "dcerpc.ver_minor": 374,
+    "dcerpc.pkt_type": 374,
+    "dcerpc.cn_flags": 374,
+    "dcerpc.cn_frag_len": 374,
+    "dcerpc.cn_auth_len": 374,
+    "dcerpc.cn_call_id": 374,
+    "dcerpc.cn_max_xmit": 36,
+    "dcerpc.cn_max_recv": 36,
+    "dcerpc.cn_assoc_group": 36,
+    "dcerpc.cn_num_ctx_items": 18,
+    "dcerpc.cn_ctx_id": 350,
+    "dcerpc.cn_num_trans_items": 18,
+    "dcerpc.cn_bind_to_uuid": 18,
+    "dcerpc.cn_bind_if_ver": 18,
+    "dcerpc.cn_bind_if_ver_minor": 18,
+    "dcerpc.cn_bind_trans_id": 18,
+    "dcerpc.cn_bind_trans_ver": 18,
+    "dcerpc.cn_sec_addr_len": 18,
+    "dcerpc.cn_num_results": 18,
+    "dcerpc.cn_ack_result": 18,
+    "dcerpc.cn_ack_trans_id": 18,
+    "dcerpc.cn_ack_trans_ver": 18,
+    "dcerpc.cn_alloc_hint": 332,
+    "dcerpc.opnum": 24,
+    "dcerpc.cn_reject_reason": 6,
+    "dcerpc.cn_num_protocols": 6,
+    "dcerpc.cn_protocol_ver_major": 6,
+    "dcerpc.cn_protocol_ver_minor": 6
+  },
+  "negative_controls": {
+    "scope": "Corrupt source/epoch/semantic metadata in the actual four-epoch RPC audit.\n\nTemporary logical-control certificates deliberately re-seal only the export hash\nto reach semantic guards. They are never independent physical certificates.\nUnchanged original frame bytes remain authoritative for physical controls.\n",
+    "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+    "events_SHA256": "055ed19394ed9bdc2a159902d6460ca54e5b72f0d9274ec2a9b8bccc6b5a97d4",
+    "oracle_SHA256": "2fdcd8ab5fb1b1343ec30516b0cdbec5da694d2af90c6d41c0abaecdf01562cb",
+    "wire_certificate_SHA256": "8ad06c721a9ae226865d60b98dca0b750e8744ec1cfdac335c8d2e69eb64509f",
+    "auditor_SHA256": "6afa21ded908fe10441e7034254cbdde1249d0d0413c90c8b9e291562fe79fc2",
+    "rejected_controls": [
+      {
+        "name": "conflated-native-flows",
+        "guard": "physical"
+      },
+      {
+        "name": "split-native-epoch",
+        "guard": "physical"
+      },
+      {
+        "name": "cross-epoch-byte-contributor",
+        "guard": "physical"
+      },
+      {
+        "name": "false-bind-nak-reason",
+        "guard": "physical"
+      },
+      {
+        "name": "false-supported-version",
+        "guard": "physical"
+      },
+      {
+        "name": "short-padding-projection",
+        "guard": "physical"
+      },
+      {
+        "name": "wrong-padding-interval",
+        "guard": "physical"
+      },
+      {
+        "name": "wrong-version-count",
+        "guard": "physical"
+      },
+      {
+        "name": "old-interface-carried-to-unbound-epoch",
+        "guard": "logical"
+      },
+      {
+        "name": "bind-nak-consumes-operation",
+        "guard": "logical"
+      },
+      {
+        "name": "bind-nak-falsely-matched",
+        "guard": "logical"
+      },
+      {
+        "name": "partial-request-publishes-complete-message",
+        "guard": "logical"
+      },
+      {
+        "name": "wrong-complete-request-owner",
+        "guard": "logical"
+      },
+      {
+        "name": "header-included-in-logical-stub",
+        "guard": "logical"
+      },
+      {
+        "name": "parent-from-another-epoch",
+        "guard": "logical"
+      },
+      {
+        "name": "decoded-NDR-without-service-proof",
+        "guard": "logical"
+      }
+    ],
+    "negative_controls": 16,
+    "original_frame_bytes_rewritten": false,
+    "temporary_logical_control_hash_resealing": true
+  },
+  "full_test_suite": {
+    "source": "5ff05f4ff46498e7a4b164c37f4df7da534c9ab1",
+    "packages": {
+      "github.com/yaklang/yaklang/common/bin-parser": 130.103,
+      "github.com/yaklang/yaklang/common/pcapx/pcaputil": 442.163,
+      "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": 2.078
+    },
+    "passing_test_and_subtest_items": {
+      "github.com/yaklang/yaklang/common/bin-parser": 40135,
+      "github.com/yaklang/yaklang/common/pcapx/pcaputil": 234935,
+      "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": 625
+    },
+    "passing_items": 275695,
+    "failures": [],
+    "log_SHA256": "1f7a404996fd6e8ec24d982d58b216ba2fc9f8f77d4d8ab936e1717773ce71ed",
+    "stderr_SHA256": "cb1b8bfa80e563c44e73478a3c2f05916ee4c4a38417aecb2cbc54bbb66d03c2"
+  },
+  "fuzz": [
+    {
+      "target": "FuzzTCPMalformedPacket",
+      "executions": 115060,
+      "seconds": 41.985,
+      "log_SHA256": "dac5c6d344f5e1b2e32d1314231337a89e3b11417a5b304c185ce249b5bd7c26"
+    },
+    {
+      "target": "FuzzDCERPCFragmentMessageHeaderIsolation",
+      "executions": 98909,
+      "seconds": 42.428,
+      "log_SHA256": "ac83938a62ec5e0e622999bba28fb107908ca80c62db8a8ac8d36686bdba7ade"
+    }
+  ],
+  "Windows_native_pages": [
+    {
+      "case": "bind-nak",
+      "proof": {
+        "source": "5ff05f4ff46498e7a4b164c37f4df7da534c9ab1",
+        "SDK_PDU": 9,
+        "CLI_PDU": 9,
+        "query": "fields pdu.id == 9",
+        "SDK_response_to": 0,
+        "CLI_response_to": 0,
+        "source_SHA256": "c9e43aa6f247ca93b4eabe6a1c56da95d08f96e410c3e5a96f0befc5bd86c1d1",
+        "snapshot_SHA256": "faa3dc5f26b984030e22dbfad6857d1332f555bdfeb7552abcf3f4077bc6a4c1",
+        "restored": {
+          "error": "<nil>",
+          "input_cp": 936,
+          "output_cp": 936
+        }
+      },
+      "proof_SHA256": "b1b646ecf14fea9d258c0acffbd3f8f7fb6967e088c406d7836bafd61a2e8f1e"
+    },
+    {
+      "case": "recovered-context",
+      "proof": {
+        "source": "5ff05f4ff46498e7a4b164c37f4df7da534c9ab1",
+        "binary_SHA256": "89dfafb7add5d2d0cd0ec68bbb5ce063556d5ab9815c46d14a96a5dcb0e9f898",
+        "SDK_PDU": 41,
+        "CLI_PDU": 41,
+        "query": "fields pdu.id == 41",
+        "SDK_response_to": 13,
+        "CLI_response_to": 13,
+        "source_SHA256": "d8a4002fdd24742100265c47d8c456a1ff38bbb28a5469e6ce770aacc02c2aac",
+        "snapshot_SHA256": "91e24ff111f1041ac0c66decc8ce4b9ff56548d25db3e7ed37e26f74fac76534",
+        "restored": {
+          "error": "<nil>",
+          "input_cp": 936,
+          "output_cp": 936
+        },
+        "validated_existing_completed_native_harness": true,
+        "initial_custom_expectation_replaced": "full summary suffix is ellipsized; verify the visible dedicated Stub Bytes field"
+      },
+      "proof_SHA256": "573e6b6eed984353db2fc925d4efb0a15f8c8395f733edd13980a238103499f9"
+    }
+  ],
+  "remaining_limits": [
+    "optional Bind NAK extended-error/signature bodies",
+    "arbitrary midstream or TFO/reversed stale handshake recovery",
+    "candidate SYN retransmission packet attribution follow-up",
+    "RPC NDR service body semantics/authentication/SMB named pipes",
+    "other remaining protocol/field/fuzz scopes from the main report"
+  ],
+  "audit_source": "3a059536b0de4697df23b972c095b57f2cadea7f",
+  "audit_source_files_sha256": {
+    "dcerpc_wire_audit.py": "de72c12d7e45d78ca943eb86e7cbc1df2ff4c16721c71d38cfac035d615149e1",
+    "dcerpc_fragment_messages.py": "a130d9930fdad0f184af93888eebe47abde15e6a9ce1da4e4a436a7573e80d1e",
+    "mail_rtsp_public_wire_audit.py": "f6113d51219ffc39bb2b37274cf48bce10b71de9ed59263a6b5b155906d90bd8",
+    "mail_rtsp_export_invariants.py": "0cdae7e71ca37ffd691c775cfa73da55d44ef186c6802328dca80635aa79da4b",
+    "tcp_epoch_audit.py": "90d70bd564a7898457e669d4a17b4d962d4e04d5a199b012248c781c9a231337",
+    "dcerpc_tcp_epoch_negative_controls.py": "6afa21ded908fe10441e7034254cbdde1249d0d0413c90c8b9e291562fe79fc2",
+    "discovery/dcerpc_windows_tuple_reuse_live.py": "3b51bf250e5d1dae419f5b81fb1257f762e20921d429db2cc4fa8e1c797798f5"
+  },
+  "current_public_original_wire_rechecks": [
+    {
+      "case": "weber",
+      "checks": 223086,
+      "RPC_wire_PDUs": 384,
+      "reference_fields": 4788,
+      "certificate_SHA256": "f305326d6fbbcdc1631117f6885dd56f07e8a5f80efa0c97f872efe5163e2adc",
+      "original_conclusions_unchanged": true
+    },
+    {
+      "case": "sharon",
+      "checks": 494670,
+      "RPC_wire_PDUs": 14,
+      "reference_fields": 121,
+      "certificate_SHA256": "7aff8cb7fbcc66a0802b1a537ce79434db4df7c5006b1ed8ba25ae933268d52c",
+      "original_conclusions_unchanged": true
+    }
+  ],
+  "executed_generator_snapshot_preserved_outside_Git": true
+}

@@ -1,0 +1,1586 @@
+{
+  "scope": "QUIC Retry CID identity, bounded retained refusal diagnostics, unnumbered header absence and real Retry transcript comparison. Native QUIC v2, compatible VN, arbitrary missing CID/key context and whole-protocol conformance remain unselected.",
+  "native_functional_source": "273e8f5578",
+  "unnumbered_absence_source": "290d68368a",
+  "UI_source": "7aa727b978",
+  "captures_and_raw_evidence_outside_Git": true,
+  "tests": {
+    "native_full_seconds_at_273e8f5578": 400.217,
+    "CLI_full_seconds_at_273e8f5578": 2.02,
+    "refused_packet_fuzz_executions": 97356,
+    "refused_packet_fuzz_seconds": 40.418,
+    "native_UDP_duplicate_regression_seconds": 0.329,
+    "all_QUIC_and_FirstBatchT03_tests_at_290d68368a_seconds": 1.488,
+    "full_CLI_at_290d68368a_seconds": 2.262,
+    "full_CLI_at_7aa727b978_seconds": 2.171,
+    "unchanged_immutable_inputs_and_answers": true
+  },
+  "auditor_sha256": {
+    "quic_retry_initial_audit.py": "705f25f39cab59e5bccd343af6357babd7c6a606d647387440b321b266be228f",
+    "quic_retry_audit_negative_controls.py": "c03a4a7e46e94b287d71b7be71ff6ed59b6dee91ac04defec8e1c1153278d850",
+    "quic_unnumbered_export_audit.py": "b06ae8f2236eefba40835649c630face7e2bab1bc695155b10e26cdd7a329e60",
+    "quic_diagnostic_display_audit.py": "50b7f3875aadeee8e1cde7803001f380685d6eb4fd388efcb1607f12f612c91c",
+    "http3_field_wire_audit.py": "e0d94b8a6a4cf2d1ea17c398b608f031812148a4e2374dda47a92b5d1a764f3c",
+    "discovery/http3_field_live.py": "ee0f88e940c07a0b1cbdd0ecead1f27e0cf74bd9cb73d321b2b8e3e532614d40"
+  },
+  "public": {
+    "weber": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 262588,
+        "physical_frames": 51328,
+        "reference_filter_rows": 71,
+        "reference_raw_views": 105,
+        "native_QUIC_carrier_PDUs": 88,
+        "matched_reference_views": 84,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 6,
+          "('long', 8, 4)": 28,
+          "('short', 8, 0)": 8,
+          "('long', 4, 8)": 12,
+          "('short', 4, 0)": 24
+        },
+        "typed_header_occurrences": {
+          "quic.version": 46,
+          "quic.dcil": 46,
+          "quic.dcid": 78,
+          "quic.scil": 46,
+          "quic.scid": 46,
+          "quic.long.packet_type": 46
+        },
+        "authenticated_packet_numbers": 18,
+        "authenticated_flow_association_checks": 18,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+        "events_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 4,
+        "unmatched_reference_views_count": 21,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "absence_SDK_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "SDK",
+        "checks": 39331,
+        "records": 39283,
+        "changed_PDUs": [
+          {
+            "PDU": 37386,
+            "frames": [
+              48061
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 37403,
+            "frames": [
+              48073
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 37435,
+            "frames": [
+              48095
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 37453,
+            "frames": [
+              48108
+            ],
+            "packet": "Retry"
+          }
+        ],
+        "before_sha256": "437c0c781524a23be2f15c5b5c9b5aa9d6701129bf03aca5bfd2a6df78e22cdf",
+        "after_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "other_export_differences": []
+      },
+      "absence_CLI_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "CLI",
+        "checks": 1,
+        "records": 51328,
+        "changed_PDUs": [],
+        "before_sha256": "c0652813758b1929a80491a0e74fe260bf62ad931152036516f3adbc4c4f4b6c",
+        "after_sha256": "c0652813758b1929a80491a0e74fe260bf62ad931152036516f3adbc4c4f4b6c",
+        "other_export_differences": []
+      },
+      "final_display_invariants": {
+        "scope": "Permit exact diagnostic deduplication in a remainder-only QUIC list row.\nEvery other packet/PDU/source/field/protocol value must remain identical.\n",
+        "checks": 51344,
+        "records": 51328,
+        "changed_packet_numbers": [
+          48062,
+          48074,
+          48096,
+          48109
+        ],
+        "before_sha256": "c0652813758b1929a80491a0e74fe260bf62ad931152036516f3adbc4c4f4b6c",
+        "after_sha256": "8752e5d4a231c3a4200b2318ad689f6eb03af690992e66a121e7dab2153d7e13",
+        "other_export_differences": []
+      },
+      "independent_RFC9001_Initial_Retry_audit": {
+        "scope": "Independently decrypt selected v1 Initials and check Retry transcript continuity.\nUses RFC9001 HKDF/AES-GCM/header protection, never the Yak decoder. A prior header\ncertificate binds input/oracle/native bytes; Initial protection and the public\nRetry integrity tag do not authenticate a peer. Selected observed PNs are below\n128, complete client CRYPTO handshakes start at offset zero, and transports are UDP.\n",
+        "checks": 883,
+        "connections": 6,
+        "independently_decrypted_Initial_packets": 22,
+        "verified_public_Retry_tags": 4,
+        "post_Retry_ClientHello_pairs": [
+          {
+            "connection": "0",
+            "before_frame": 48060,
+            "after_frame": 48062,
+            "before_SHA256": "11709ed13d0c7f0bf43c31c62bd561d3d41a9281f0475ad746efbf2ad0c47f8f",
+            "after_SHA256": "6907c0af1354460557024d99a09a012550c2a1e211f85a03dba7bf25ff74c26d",
+            "bytes_before": 495,
+            "bytes_after": 495,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 280,
+            "native_conflict_diagnosed": true
+          },
+          {
+            "connection": "1",
+            "before_frame": 48072,
+            "after_frame": 48074,
+            "before_SHA256": "a1314468263ced0f5ef210287d3271210f6a82e86909c55898c76e4180edc593",
+            "after_SHA256": "8d1114dc653384e68b08d7baedca0e857be6cf299464a25ca776a31c661d3609",
+            "bytes_before": 495,
+            "bytes_after": 495,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 279,
+            "native_conflict_diagnosed": true
+          },
+          {
+            "connection": "3",
+            "before_frame": 48094,
+            "after_frame": 48096,
+            "before_SHA256": "2f55e414ac91c1b74db7009be02da3d467e33a7097f5f0987f28ed0694ece67b",
+            "after_SHA256": "8d61427bf9fcecc6beecfba0650b3f816d2c48df07b57f3cabcf9fe139a7519f",
+            "bytes_before": 495,
+            "bytes_after": 495,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 280,
+            "native_conflict_diagnosed": true
+          },
+          {
+            "connection": "4",
+            "before_frame": 48107,
+            "after_frame": 48109,
+            "before_SHA256": "246033c915f85f6f2fd08225f36287ad0458204e53b017260f2f6d422d0ac4de",
+            "after_SHA256": "b9f69583f4873ce07cbd62d2338b04069905057cd1dcf391630e6ecfd2a2c400",
+            "bytes_before": 486,
+            "bytes_after": 486,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 279,
+            "native_conflict_diagnosed": true
+          }
+        ],
+        "nonconforming_pairs": 4,
+        "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+        "events_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "header_certificate_sha256": "b3c3484a775821725d89e66ffc0fd12f32e8e3baf210d16572a9ab1e71c093b0"
+      },
+      "additional_unowned_reference_views": {
+        "count": 13,
+        "frames": [
+          48068,
+          48069,
+          48080,
+          48081,
+          48090,
+          48091,
+          48102,
+          48103,
+          48106,
+          48116,
+          48117,
+          48127,
+          48128
+        ],
+        "reference_decoded_packet_numbers": 0,
+        "reference_connection_associations": 0,
+        "policy": "No new CID/flow identity is inferred from an encrypted prefix or the UDP tuple alone. These views remain explicit, not matches."
+      }
+    },
+    "sharon": {
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 1651072,
+        "physical_frames": 328127,
+        "reference_filter_rows": 989,
+        "reference_raw_views": 1037,
+        "native_QUIC_carrier_PDUs": 1,
+        "matched_reference_views": 0,
+        "header_CID_profiles": {},
+        "typed_header_occurrences": {},
+        "authenticated_packet_numbers": 0,
+        "authenticated_flow_association_checks": 0,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "oracle_sha256": "7cc7781a97eb803043dedd7e89122955cdd7fb455f3c8bd4315c96c2f31dc926",
+        "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "reference_nonroot_frames_count": 1,
+        "reference_derived_views_count": 10,
+        "reference_untyped_views_count": 10,
+        "unmatched_native_views_count": 1,
+        "unmatched_reference_views_count": 1027,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "absence_SDK_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "SDK",
+        "checks": 245615,
+        "records": 245615,
+        "changed_PDUs": [],
+        "before_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "other_export_differences": []
+      },
+      "absence_CLI_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "CLI",
+        "checks": 1,
+        "records": 328127,
+        "changed_PDUs": [],
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "other_export_differences": []
+      },
+      "final_display_invariants": {
+        "scope": "Permit exact diagnostic deduplication in a remainder-only QUIC list row.\nEvery other packet/PDU/source/field/protocol value must remain identical.\n",
+        "checks": 328127,
+        "records": 328127,
+        "changed_packet_numbers": [],
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "other_export_differences": []
+      }
+    }
+  },
+  "real_Retry_captures": {
+    "retry-unmodified-peer": {
+      "capture_sha256": "28734aac15390de1b7826b7dea6195c74e5b1172576c201c8ec47ad8a6aae046",
+      "manifest_sha256": "98784ca7cc5fc4cf5db4ee6a8f36a72fa23b1fefec6f059be2ab98cf702db3ce",
+      "generator_sha256": "ee0f88e940c07a0b1cbdd0ecead1f27e0cf74bd9cb73d321b2b8e3e532614d40",
+      "transport_controls": {
+        "connection_id_lengths": [
+          8,
+          8,
+          20
+        ],
+        "server_retry": true
+      },
+      "network": {
+        "retry_packets": 3,
+        "delayed": 16,
+        "dropped": 8
+      },
+      "actual_request_reply_receipts": 9,
+      "same_socket_endpoints_across_three_epochs": true,
+      "profiles": [
+        {
+          "epoch": 0,
+          "packets": [
+            19,
+            10
+          ],
+          "dropped": [
+            0,
+            0
+          ],
+          "requests": 3,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1
+        },
+        {
+          "epoch": 1,
+          "packets": [
+            34,
+            21
+          ],
+          "dropped": [
+            2,
+            2
+          ],
+          "requests": 3,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1
+        },
+        {
+          "epoch": 2,
+          "packets": [
+            35,
+            22
+          ],
+          "dropped": [
+            2,
+            2
+          ],
+          "requests": 3,
+          "connection_id_length": 20,
+          "retry_packets_sent": 1
+        }
+      ],
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 6705,
+        "physical_frames": 136,
+        "reference_filter_rows": 136,
+        "reference_raw_views": 154,
+        "native_QUIC_carrier_PDUs": 149,
+        "matched_reference_views": 146,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 12,
+          "('short', 8, 0)": 73,
+          "('long', 20, 20)": 5,
+          "('long', 20, 8)": 1,
+          "('short', 20, 0)": 49
+        },
+        "typed_header_occurrences": {
+          "quic.version": 18,
+          "quic.dcil": 18,
+          "quic.dcid": 140,
+          "quic.scil": 18,
+          "quic.scid": 18,
+          "quic.long.packet_type": 18
+        },
+        "authenticated_packet_numbers": 9,
+        "authenticated_flow_association_checks": 9,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "28734aac15390de1b7826b7dea6195c74e5b1172576c201c8ec47ad8a6aae046",
+        "oracle_sha256": "e9be3eab2818016ef7c8095367a77331b66e5d8cfa3e47d6438cc8da9fe4fee2",
+        "events_sha256": "27e99445cedfcb485c5aa4973ba68fccf401368acd701d7007bdc682dbc7f440",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 3,
+        "unmatched_reference_views_count": 8,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "independent_Initial_Retry_audit": {
+        "scope": "Independently decrypt selected v1 Initials and check Retry transcript continuity.\nUses RFC9001 HKDF/AES-GCM/header protection, never the Yak decoder. A prior header\ncertificate binds input/oracle/native bytes; Initial protection and the public\nRetry integrity tag do not authenticate a peer. Selected observed PNs are below\n128, complete client CRYPTO handshakes start at offset zero, and transports are UDP.\n",
+        "checks": 574,
+        "connections": 3,
+        "independently_decrypted_Initial_packets": 12,
+        "verified_public_Retry_tags": 3,
+        "post_Retry_ClientHello_pairs": [
+          {
+            "connection": "0",
+            "before_frame": 3,
+            "after_frame": 5,
+            "before_SHA256": "c7be621f0054bfd7b665f7d7a4a5adea5b44587afc702c18cd7307260908e4af",
+            "after_SHA256": "14a957edd9ededc6dad38cca56d37d8ef2fb8eeb0a055f928868c7696a7a0f08",
+            "bytes_before": 472,
+            "bytes_after": 472,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 280,
+            "native_conflict_diagnosed": true
+          },
+          {
+            "connection": "1",
+            "before_frame": 33,
+            "after_frame": 35,
+            "before_SHA256": "a55fa20ea138d766ba80b5e7cc4840c4db027c1ac1324051ebbae8878a4be66d",
+            "after_SHA256": "2f93a97b52906314e3221aa65e7af15bb1316bc9c24a0bff5c97ca414662d59d",
+            "bytes_before": 472,
+            "bytes_after": 472,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 280,
+            "native_conflict_diagnosed": true
+          },
+          {
+            "connection": "2",
+            "before_frame": 84,
+            "after_frame": 86,
+            "before_SHA256": "c20a5ca6ca3bb4fd79f4fec2bba790c2356137a716c7e2fbe72c8bbc283b9627",
+            "after_SHA256": "d89a10c1103dee8bdf929b9e8dab5f5b4d9853cce0a90a47b7e68bc1801b35e3",
+            "bytes_before": 484,
+            "bytes_after": 484,
+            "same_ClientHello": false,
+            "same_random": false,
+            "different_octets": 280,
+            "native_conflict_diagnosed": true
+          }
+        ],
+        "nonconforming_pairs": 3,
+        "oracle_sha256": "e9be3eab2818016ef7c8095367a77331b66e5d8cfa3e47d6438cc8da9fe4fee2",
+        "events_sha256": "27e99445cedfcb485c5aa4973ba68fccf401368acd701d7007bdc682dbc7f440",
+        "header_certificate_sha256": "fff70b01d1d975e295ac9b094dd126467fc7db05653d7e99dc4fd368418b1f93"
+      },
+      "absence_SDK_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "SDK",
+        "checks": 187,
+        "records": 151,
+        "changed_PDUs": [
+          {
+            "PDU": 5,
+            "frames": [
+              4
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 40,
+            "frames": [
+              34
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 96,
+            "frames": [
+              85
+            ],
+            "packet": "Retry"
+          }
+        ],
+        "before_sha256": "1496fa8e317fe41d846b38acaaabd10341eaa9b5397e71bc982a54bcc1c52605",
+        "after_sha256": "27e99445cedfcb485c5aa4973ba68fccf401368acd701d7007bdc682dbc7f440",
+        "other_export_differences": []
+      },
+      "absence_CLI_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "CLI",
+        "checks": 1,
+        "records": 136,
+        "changed_PDUs": [],
+        "before_sha256": "c8944988ee3758d49c5029fe1708f5a592d7fd2f5b4cc50eac4b5af4de0015a1",
+        "after_sha256": "c8944988ee3758d49c5029fe1708f5a592d7fd2f5b4cc50eac4b5af4de0015a1",
+        "other_export_differences": []
+      },
+      "final_display_invariants": {
+        "scope": "Permit exact diagnostic deduplication in a remainder-only QUIC list row.\nEvery other packet/PDU/source/field/protocol value must remain identical.\n",
+        "checks": 148,
+        "records": 136,
+        "changed_packet_numbers": [
+          5,
+          35,
+          86
+        ],
+        "before_sha256": "c8944988ee3758d49c5029fe1708f5a592d7fd2f5b4cc50eac4b5af4de0015a1",
+        "after_sha256": "e950c1f70723ae107e0b226d1101506948f0942592d2cc4dae2c6fbb4a557f26",
+        "other_export_differences": []
+      }
+    },
+    "retry-preserved-peer": {
+      "capture_sha256": "88b839a72eb26e8b91fbbdc32c7f1956a15eb2ea9a2417414609b1a8ad85a626",
+      "manifest_sha256": "22cedd516cd3272856998c407fb7129cd85cd00f45a28cfcb0502bcfc41186d9",
+      "generator_sha256": "ee0f88e940c07a0b1cbdd0ecead1f27e0cf74bd9cb73d321b2b8e3e532614d40",
+      "transport_controls": {
+        "connection_id_lengths": [
+          8,
+          8,
+          20
+        ],
+        "server_retry": true,
+        "retry_client_policy": "preserve-first-client-hello"
+      },
+      "network": {
+        "retry_packets": 3,
+        "delayed": 16,
+        "dropped": 8
+      },
+      "actual_request_reply_receipts": 9,
+      "same_socket_endpoints_across_three_epochs": true,
+      "profiles": [
+        {
+          "epoch": 0,
+          "packets": [
+            19,
+            10
+          ],
+          "dropped": [
+            0,
+            0
+          ],
+          "requests": 3,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1
+        },
+        {
+          "epoch": 1,
+          "packets": [
+            34,
+            21
+          ],
+          "dropped": [
+            2,
+            2
+          ],
+          "requests": 3,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1
+        },
+        {
+          "epoch": 2,
+          "packets": [
+            35,
+            22
+          ],
+          "dropped": [
+            2,
+            2
+          ],
+          "requests": 3,
+          "connection_id_length": 20,
+          "retry_packets_sent": 1
+        }
+      ],
+      "header_audit": {
+        "scope": "Bind QUIC CID/version/decoded-PN projections to native PDU bytes and TShark.\nClear header fields do not prove a sender. Decoded packet numbers are separately\ngated by native authentication and compared with the reference when available.\nUnmatched/derived reference views stay visible rather than becoming matches.\n",
+        "checks": 8800,
+        "physical_frames": 136,
+        "reference_filter_rows": 136,
+        "reference_raw_views": 154,
+        "native_QUIC_carrier_PDUs": 152,
+        "matched_reference_views": 152,
+        "header_CID_profiles": {
+          "('long', 8, 8)": 14,
+          "('short', 8, 0)": 73,
+          "('long', 20, 20)": 5,
+          "('long', 20, 8)": 1,
+          "('long', 8, 20)": 1,
+          "('short', 20, 0)": 49
+        },
+        "typed_header_occurrences": {
+          "quic.version": 21,
+          "quic.dcil": 21,
+          "quic.dcid": 143,
+          "quic.scil": 21,
+          "quic.scid": 21,
+          "quic.long.packet_type": 21
+        },
+        "authenticated_packet_numbers": 140,
+        "authenticated_flow_association_checks": 140,
+        "reference_zero_length_omissions": {},
+        "capture_sha256": "88b839a72eb26e8b91fbbdc32c7f1956a15eb2ea9a2417414609b1a8ad85a626",
+        "oracle_sha256": "6fe21730ccfe99da0de5021503179a27ed0e2e807cc0f1286995a9b2d8ea6103",
+        "events_sha256": "e3b7d47c21d371591dc2f15d4db81e818bd7d5e3b60aaf45b83efcc71875fd65",
+        "reference_nonroot_frames_count": 0,
+        "reference_derived_views_count": 0,
+        "reference_untyped_views_count": 0,
+        "unmatched_native_views_count": 0,
+        "unmatched_reference_views_count": 2,
+        "reference_field_omissions_count": 0,
+        "reference_value_differences_count": 0
+      },
+      "independent_Initial_Retry_audit": {
+        "scope": "Independently decrypt selected v1 Initials and check Retry transcript continuity.\nUses RFC9001 HKDF/AES-GCM/header protection, never the Yak decoder. A prior header\ncertificate binds input/oracle/native bytes; Initial protection and the public\nRetry integrity tag do not authenticate a peer. Selected observed PNs are below\n128, complete client CRYPTO handshakes start at offset zero, and transports are UDP.\n",
+        "checks": 574,
+        "connections": 3,
+        "independently_decrypted_Initial_packets": 12,
+        "verified_public_Retry_tags": 3,
+        "post_Retry_ClientHello_pairs": [
+          {
+            "connection": "0",
+            "before_frame": 3,
+            "after_frame": 5,
+            "before_SHA256": "405ee3bf82ef6c6edef9473c734f1cd13a88804eef79801259fb11f032bc327b",
+            "after_SHA256": "405ee3bf82ef6c6edef9473c734f1cd13a88804eef79801259fb11f032bc327b",
+            "bytes_before": 472,
+            "bytes_after": 472,
+            "same_ClientHello": true,
+            "same_random": true,
+            "different_octets": 0,
+            "native_conflict_diagnosed": false
+          },
+          {
+            "connection": "1",
+            "before_frame": 33,
+            "after_frame": 35,
+            "before_SHA256": "cfebf2b4f9e1789f4baf83d4f38af15df1d596ea144419d45390ce2048797b85",
+            "after_SHA256": "cfebf2b4f9e1789f4baf83d4f38af15df1d596ea144419d45390ce2048797b85",
+            "bytes_before": 472,
+            "bytes_after": 472,
+            "same_ClientHello": true,
+            "same_random": true,
+            "different_octets": 0,
+            "native_conflict_diagnosed": false
+          },
+          {
+            "connection": "2",
+            "before_frame": 84,
+            "after_frame": 86,
+            "before_SHA256": "4ec0e77644d435abd35f72568b897ed00eec28bb1159b8ce8c6195c9cab74115",
+            "after_SHA256": "4ec0e77644d435abd35f72568b897ed00eec28bb1159b8ce8c6195c9cab74115",
+            "bytes_before": 484,
+            "bytes_after": 484,
+            "same_ClientHello": true,
+            "same_random": true,
+            "different_octets": 0,
+            "native_conflict_diagnosed": false
+          }
+        ],
+        "nonconforming_pairs": 0,
+        "oracle_sha256": "6fe21730ccfe99da0de5021503179a27ed0e2e807cc0f1286995a9b2d8ea6103",
+        "events_sha256": "e3b7d47c21d371591dc2f15d4db81e818bd7d5e3b60aaf45b83efcc71875fd65",
+        "header_certificate_sha256": "cb400a642476a0ea249d19b40e8c49e35e3e5255b070c87c0842a28bf7b2a068"
+      },
+      "absence_SDK_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "SDK",
+        "checks": 190,
+        "records": 154,
+        "changed_PDUs": [
+          {
+            "PDU": 5,
+            "frames": [
+              4
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 41,
+            "frames": [
+              34
+            ],
+            "packet": "Retry"
+          },
+          {
+            "PDU": 98,
+            "frames": [
+              85
+            ],
+            "packet": "Retry"
+          }
+        ],
+        "before_sha256": "e561c165aa8d5feb2c3f7b27e71176f58df05e988c53a6f0703bf9ea4fcd1f55",
+        "after_sha256": "e3b7d47c21d371591dc2f15d4db81e818bd7d5e3b60aaf45b83efcc71875fd65",
+        "other_export_differences": []
+      },
+      "absence_CLI_invariants": {
+        "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+        "kind": "CLI",
+        "checks": 1,
+        "records": 136,
+        "changed_PDUs": [],
+        "before_sha256": "5c988bf0fb11de4ba043246f70c2cc6d70190dc5b9794e52f6208b952cfc9fe9",
+        "after_sha256": "5c988bf0fb11de4ba043246f70c2cc6d70190dc5b9794e52f6208b952cfc9fe9",
+        "other_export_differences": []
+      },
+      "final_display_invariants": {
+        "scope": "Permit exact diagnostic deduplication in a remainder-only QUIC list row.\nEvery other packet/PDU/source/field/protocol value must remain identical.\n",
+        "checks": 136,
+        "records": 136,
+        "changed_packet_numbers": [],
+        "before_sha256": "5c988bf0fb11de4ba043246f70c2cc6d70190dc5b9794e52f6208b952cfc9fe9",
+        "after_sha256": "5c988bf0fb11de4ba043246f70c2cc6d70190dc5b9794e52f6208b952cfc9fe9",
+        "other_export_differences": []
+      },
+      "source_graph_audit": {
+        "scope": "Independently verify native HTTP/3 byte witnesses against reference STREAMs.\nScope: owned, single-UDP-view capture; complete bidi HTTP streams and uni control\nstreams. Encoder/decoder instruction semantics and peer identity are not certified.\n",
+        "capture_sha256": "88b839a72eb26e8b91fbbdc32c7f1956a15eb2ea9a2417414609b1a8ad85a626",
+        "checks": 18009,
+        "connections": 3,
+        "reference_coalesced_bindings": 9,
+        "reference_expert_only_blocks": 9,
+        "application_frames": 33,
+        "types": {
+          "4": 6,
+          "1": 18,
+          "0": 9
+        },
+        "source_ranges": 249,
+        "unselected_instruction_streams": [],
+        "selected_differences": [],
+        "frames": [
+          {
+            "completed_physical_frame": 8,
+            "parent_PDU": 14,
+            "stream_id": 3,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              14
+            ],
+            "physical_source_packets": [
+              8
+            ]
+          },
+          {
+            "completed_physical_frame": 9,
+            "parent_PDU": 15,
+            "stream_id": 2,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              15
+            ],
+            "physical_source_packets": [
+              9
+            ]
+          },
+          {
+            "completed_physical_frame": 9,
+            "parent_PDU": 15,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 101,
+            "source_PDUs": [
+              15
+            ],
+            "physical_source_packets": [
+              9
+            ]
+          },
+          {
+            "completed_physical_frame": 11,
+            "parent_PDU": 17,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              17
+            ],
+            "physical_source_packets": [
+              11
+            ]
+          },
+          {
+            "completed_physical_frame": 11,
+            "parent_PDU": 17,
+            "stream_id": 0,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 7,
+            "source_PDUs": [
+              17
+            ],
+            "physical_source_packets": [
+              11
+            ]
+          },
+          {
+            "completed_physical_frame": 12,
+            "parent_PDU": 18,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 115,
+            "source_PDUs": [
+              18
+            ],
+            "physical_source_packets": [
+              12
+            ]
+          },
+          {
+            "completed_physical_frame": 16,
+            "parent_PDU": 22,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              22
+            ],
+            "physical_source_packets": [
+              16
+            ]
+          },
+          {
+            "completed_physical_frame": 16,
+            "parent_PDU": 22,
+            "stream_id": 8,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              22
+            ],
+            "physical_source_packets": [
+              16
+            ]
+          },
+          {
+            "completed_physical_frame": 29,
+            "parent_PDU": 35,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 17125,
+            "source_PDUs": [
+              15,
+              18,
+              19,
+              20,
+              23,
+              24,
+              25,
+              26,
+              28,
+              29,
+              30,
+              31,
+              33,
+              34,
+              35
+            ],
+            "physical_source_packets": [
+              9,
+              12,
+              13,
+              14,
+              17,
+              18,
+              19,
+              20,
+              22,
+              23,
+              24,
+              25,
+              27,
+              28,
+              29
+            ]
+          },
+          {
+            "completed_physical_frame": 31,
+            "parent_PDU": 37,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              37
+            ],
+            "physical_source_packets": [
+              31
+            ]
+          },
+          {
+            "completed_physical_frame": 31,
+            "parent_PDU": 37,
+            "stream_id": 4,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              37
+            ],
+            "physical_source_packets": [
+              31
+            ]
+          },
+          {
+            "completed_physical_frame": 38,
+            "parent_PDU": 50,
+            "stream_id": 3,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              50
+            ],
+            "physical_source_packets": [
+              38
+            ]
+          },
+          {
+            "completed_physical_frame": 40,
+            "parent_PDU": 52,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 115,
+            "source_PDUs": [
+              52
+            ],
+            "physical_source_packets": [
+              40
+            ]
+          },
+          {
+            "completed_physical_frame": 42,
+            "parent_PDU": 54,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              54
+            ],
+            "physical_source_packets": [
+              42
+            ]
+          },
+          {
+            "completed_physical_frame": 42,
+            "parent_PDU": 54,
+            "stream_id": 8,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              54
+            ],
+            "physical_source_packets": [
+              42
+            ]
+          },
+          {
+            "completed_physical_frame": 47,
+            "parent_PDU": 59,
+            "stream_id": 2,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              59
+            ],
+            "physical_source_packets": [
+              47
+            ]
+          },
+          {
+            "completed_physical_frame": 47,
+            "parent_PDU": 59,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 101,
+            "source_PDUs": [
+              59
+            ],
+            "physical_source_packets": [
+              47
+            ]
+          },
+          {
+            "completed_physical_frame": 54,
+            "parent_PDU": 66,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              66
+            ],
+            "physical_source_packets": [
+              54
+            ]
+          },
+          {
+            "completed_physical_frame": 54,
+            "parent_PDU": 66,
+            "stream_id": 0,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 7,
+            "source_PDUs": [
+              66
+            ],
+            "physical_source_packets": [
+              54
+            ]
+          },
+          {
+            "completed_physical_frame": 81,
+            "parent_PDU": 93,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 17125,
+            "source_PDUs": [
+              52,
+              53,
+              55,
+              56,
+              57,
+              59,
+              60,
+              63,
+              64,
+              70,
+              72,
+              75,
+              77,
+              81,
+              82,
+              84,
+              85,
+              87,
+              88,
+              91,
+              93
+            ],
+            "physical_source_packets": [
+              40,
+              41,
+              43,
+              44,
+              45,
+              47,
+              48,
+              51,
+              52,
+              58,
+              60,
+              63,
+              65,
+              69,
+              70,
+              72,
+              73,
+              75,
+              76,
+              79,
+              81
+            ]
+          },
+          {
+            "completed_physical_frame": 82,
+            "parent_PDU": 94,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              94
+            ],
+            "physical_source_packets": [
+              82
+            ]
+          },
+          {
+            "completed_physical_frame": 82,
+            "parent_PDU": 94,
+            "stream_id": 4,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              94
+            ],
+            "physical_source_packets": [
+              82
+            ]
+          },
+          {
+            "completed_physical_frame": 89,
+            "parent_PDU": 107,
+            "stream_id": 3,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              107
+            ],
+            "physical_source_packets": [
+              89
+            ]
+          },
+          {
+            "completed_physical_frame": 91,
+            "parent_PDU": 109,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 115,
+            "source_PDUs": [
+              109
+            ],
+            "physical_source_packets": [
+              91
+            ]
+          },
+          {
+            "completed_physical_frame": 93,
+            "parent_PDU": 111,
+            "stream_id": 8,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              111
+            ],
+            "physical_source_packets": [
+              93
+            ]
+          },
+          {
+            "completed_physical_frame": 93,
+            "parent_PDU": 111,
+            "stream_id": 8,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              111
+            ],
+            "physical_source_packets": [
+              93
+            ]
+          },
+          {
+            "completed_physical_frame": 98,
+            "parent_PDU": 116,
+            "stream_id": 2,
+            "stream_offset": 1,
+            "type": 4,
+            "payload_length": 0,
+            "source_PDUs": [
+              116
+            ],
+            "physical_source_packets": [
+              98
+            ]
+          },
+          {
+            "completed_physical_frame": 98,
+            "parent_PDU": 116,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 101,
+            "source_PDUs": [
+              116
+            ],
+            "physical_source_packets": [
+              98
+            ]
+          },
+          {
+            "completed_physical_frame": 105,
+            "parent_PDU": 123,
+            "stream_id": 0,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              123
+            ],
+            "physical_source_packets": [
+              105
+            ]
+          },
+          {
+            "completed_physical_frame": 105,
+            "parent_PDU": 123,
+            "stream_id": 0,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 7,
+            "source_PDUs": [
+              123
+            ],
+            "physical_source_packets": [
+              105
+            ]
+          },
+          {
+            "completed_physical_frame": 134,
+            "parent_PDU": 152,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 17125,
+            "source_PDUs": [
+              109,
+              110,
+              112,
+              113,
+              114,
+              116,
+              117,
+              120,
+              121,
+              127,
+              129,
+              132,
+              134,
+              138,
+              139,
+              141,
+              142,
+              144,
+              145,
+              148,
+              150,
+              152
+            ],
+            "physical_source_packets": [
+              91,
+              92,
+              94,
+              95,
+              96,
+              98,
+              99,
+              102,
+              103,
+              109,
+              111,
+              114,
+              116,
+              120,
+              121,
+              123,
+              124,
+              126,
+              127,
+              130,
+              132,
+              134
+            ]
+          },
+          {
+            "completed_physical_frame": 135,
+            "parent_PDU": 153,
+            "stream_id": 4,
+            "stream_offset": 0,
+            "type": 1,
+            "payload_length": 15,
+            "source_PDUs": [
+              153
+            ],
+            "physical_source_packets": [
+              135
+            ]
+          },
+          {
+            "completed_physical_frame": 135,
+            "parent_PDU": 153,
+            "stream_id": 4,
+            "stream_offset": 17,
+            "type": 0,
+            "payload_length": 21,
+            "source_PDUs": [
+              153
+            ],
+            "physical_source_packets": [
+              135
+            ]
+          }
+        ]
+      },
+      "literal_peer_and_reference_field_audit": {
+        "scope": "Compare declared real-socket HTTP3 fields with literal peer and reference bytes.\nRequires the complete capture-ready three-generation http3_field_live experiment.\nFrame byte-source coverage is checked separately by quic_source_graph_audit.py.\n",
+        "profile": "declared-valid",
+        "checks": 10790,
+        "peer_operations": 9,
+        "native_connections": 3,
+        "header_sections": 18,
+        "native_conformance": {
+          "base-shape-valid": 18
+        },
+        "reference_frame_views": {
+          "4": 14,
+          "1": 20,
+          "0": 9,
+          "12400": 2
+        },
+        "reference_repeated_frame_views": [
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 0,
+            "type": 1,
+            "sha256": "3cd4e311afa187665086289bb79cb4a001ab6a2c793546cfbc560a0e7ff9adec",
+            "frames": [
+              47,
+              55,
+              57
+            ]
+          },
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 2,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              47,
+              55,
+              57
+            ]
+          },
+          {
+            "connection": "1",
+            "direction": 1,
+            "stream": 3,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              38,
+              49,
+              50
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 0,
+            "type": 1,
+            "sha256": "3cd4e311afa187665086289bb79cb4a001ab6a2c793546cfbc560a0e7ff9adec",
+            "frames": [
+              98,
+              106,
+              108
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 2,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              98,
+              106,
+              108
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 1,
+            "stream": 3,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              89,
+              100,
+              101
+            ]
+          }
+        ],
+        "reference_header_views_unavailable": [
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          }
+        ],
+        "reference_raw_field_differences": [],
+        "mixed_status_packets": [],
+        "network": {
+          "retry_packets": 3,
+          "delayed": 16,
+          "dropped": 8
+        },
+        "native_selected_differences": [],
+        "manifest_sha256": "22cedd516cd3272856998c407fb7129cd85cd00f45a28cfcb0502bcfc41186d9",
+        "oracle_sha256": "6fe21730ccfe99da0de5021503179a27ed0e2e807cc0f1286995a9b2d8ea6103",
+        "events_sha256": "e3b7d47c21d371591dc2f15d4db81e818bd7d5e3b60aaf45b83efcc71875fd65"
+      }
+    }
+  },
+  "actual_Windows": {
+    "retry-healthy": {
+      "native_buffer_sha256": "9c65edea4d958b9917a9f7aa889a346b1e6042d6ec43fe1350b08e178d23c0f2",
+      "rendered_cells_PNG_sha256": "a626d51766957e10b7d015ecb6ab03221fbaab69f2d7d8e11b9ff642815d6f1c",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "log_sha256": "2d68cbbf102cd87df3a938588f7beb210c1048767b3129415775a24d4d69fcb2",
+      "scope": "Real CP936 console cells/attributes; fresh EOF, actual query/row/detail, fields, source selection, conversation/evidence, 80x30/180x48 resize, q and restore. Offline duplicate is explicitly derived; final-weber uses the complete original51328-frame input."
+    },
+    "retry-duplicate": {
+      "native_buffer_sha256": "0f5a639d98a86265dd7547d515b7ade56212a2525b8266f66a2a928b41235860",
+      "rendered_cells_PNG_sha256": "e254cdfbb722b06e182f256c858f24673bbc508f6a1072f0c091bc3eb209bd4b",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "log_sha256": "2d68cbbf102cd87df3a938588f7beb210c1048767b3129415775a24d4d69fcb2",
+      "scope": "Real CP936 console cells/attributes; fresh EOF, actual query/row/detail, fields, source selection, conversation/evidence, 80x30/180x48 resize, q and restore. Offline duplicate is explicitly derived; final-weber uses the complete original51328-frame input."
+    },
+    "final-duplicate": {
+      "native_buffer_sha256": "7b24eb94b7287b2dab66ed6a27a4d6aa306deaff6470dd24a3f91e2fa097b6ee",
+      "rendered_cells_PNG_sha256": "f18450e12580ff7f6286dfc5c3986e185c4fbd141ca10f713324b919adb429b0",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "log_sha256": "2d68cbbf102cd87df3a938588f7beb210c1048767b3129415775a24d4d69fcb2",
+      "scope": "Real CP936 console cells/attributes; fresh EOF, actual query/row/detail, fields, source selection, conversation/evidence, 80x30/180x48 resize, q and restore. Offline duplicate is explicitly derived; final-weber uses the complete original51328-frame input."
+    },
+    "final-weber-crypto": {
+      "native_buffer_sha256": "0d84e7f41923725e89b72163cab36044879c3c7d93320fc0cb43495884ca1bd8",
+      "rendered_cells_PNG_sha256": "bd663847fc84729bbc2afa22a0b45c8a55ace7c95f4ac8fb4e2530f29b32f65a",
+      "restored_console": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "log_sha256": "2d68cbbf102cd87df3a938588f7beb210c1048767b3129415775a24d4d69fcb2",
+      "scope": "Real CP936 console cells/attributes; fresh EOF, actual query/row/detail, fields, source selection, conversation/evidence, 80x30/180x48 resize, q and restore. Offline duplicate is explicitly derived; final-weber uses the complete original51328-frame input."
+    }
+  },
+  "limits": [
+    "Four public Retry transcript conflicts are independently verified protocol violations under RFC9000 section17.2.5.3, not four accepted TLS transcript updates.",
+    "Three unmodified aioquic1.7 Retry cases receive application responses despite replacing ClientHello. Receipt is not conformance and is not promoted to a valid native transcript.",
+    "The positive control explicitly preserves the first TLS private context/ClientHello on Retry; this is a declared peer adaptation, not an unmodified production implementation.",
+    "Public Initial keys and Retry tag verify bytes/context, not peer identity.",
+    "The separate cryptographic corruption tests intentionally rebind certificate hashes only to exercise the independent crypto checks; mutated certificates are never physical capture certificates.",
+    "Unnumbered version-negotiation absence is unit checked; native VN ingress/compatible VN remains unselected.",
+    "Packet rejection cache follows the128-entry PN observation window per direction/space. It does not certify general packet-number reuse, stateless resets, or all QUIC conformance.",
+    "Reference HTTP3 field omissions/repeated/unknown frame views are retained; literal peer bytes and STREAM reconstruction independently bind native fields.",
+    "Sharon candidate/fuzz/derived carrier views, native v2 and broader protocol completeness remain open."
+  ],
+  "independent_crypto_negative_controls": {
+    "scope": "Exercise independent Retry/Initial crypto checks with explicitly rebound inputs.\nThese mutations bypass only the prior header-certificate hash binding so the\nseparate crypto/transcript checks are exercised. Rebound certificates are test\ninputs, never replacement certificates for the original physical capture.\n",
+    "baseline_passed": true,
+    "rejected_corruptions": 11,
+    "controls": [
+      {
+        "control": "baseline",
+        "accepted": true
+      },
+      {
+        "control": "Initial-ciphertext",
+        "accepted": false
+      },
+      {
+        "control": "Initial-HP-sample",
+        "accepted": false
+      },
+      {
+        "control": "Initial-DCID-AAD",
+        "accepted": false
+      },
+      {
+        "control": "Initial-SCID-AAD",
+        "accepted": false
+      },
+      {
+        "control": "Retry-integrity",
+        "accepted": false
+      },
+      {
+        "control": "Retry-original-CID-reuse-valid-tag",
+        "accepted": false
+      },
+      {
+        "control": "reference-decoded-PN",
+        "accepted": false
+      },
+      {
+        "control": "reference-CRYPTO-bytes",
+        "accepted": false
+      },
+      {
+        "control": "native-conflict-diagnostic",
+        "accepted": false
+      },
+      {
+        "control": "missing-post-Retry-transcript",
+        "accepted": false
+      },
+      {
+        "control": "header-certificate-digest",
+        "accepted": false
+      }
+    ]
+  },
+  "declared_offline_duplicate_control": {
+    "scope": "Explicit offline excerpt and byte-identical packet duplication control, not an additional real capture.",
+    "source_capture_sha256": "28734aac15390de1b7826b7dea6195c74e5b1172576c201c8ec47ad8a6aae046",
+    "source_frame_order": [
+      3,
+      4,
+      5,
+      5
+    ],
+    "capture_sha256": "7df28460763e829be5f37cb5e59e9cfa124d87de7de718b9b1f7de5913457ecf",
+    "physical_packet_octets_unchanged": true,
+    "results": {
+      "before": {
+        "events": 6,
+        "sha256": "064021da7f15ff3ceaa9604aa7fb7a934acf1c6344ff095862d919146a16f142",
+        "last_packet": [
+          {
+            "PDU": 5,
+            "status": "decoded",
+            "error": null,
+            "duplicate": true,
+            "bytes": 581
+          },
+          {
+            "PDU": 6,
+            "status": "malformed",
+            "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+            "duplicate": null,
+            "bytes": 619
+          }
+        ]
+      },
+      "after": {
+        "events": 5,
+        "sha256": "76ca048317912caafd1cdc2ffa7f5dde70f59616dd9e14309075dbdb9d630877",
+        "last_packet": [
+          {
+            "PDU": 5,
+            "status": "malformed",
+            "error": "MalformedMessage: QUIC conflicting retransmission",
+            "duplicate": null,
+            "bytes": 1200
+          }
+        ]
+      }
+    },
+    "latest_absence_invariants": {
+      "scope": "Allow only removal of the invented PN-space value on unnumbered QUIC packets.\nAll bytes, flows, fields, transactions, application frames and CLI export bytes\nmust remain identical. Retry public integrity is distinct from packet protection.\n",
+      "kind": "SDK",
+      "checks": 17,
+      "records": 5,
+      "changed_PDUs": [
+        {
+          "PDU": 3,
+          "frames": [
+            2
+          ],
+          "packet": "Retry"
+        }
+      ],
+      "before_sha256": "76ca048317912caafd1cdc2ffa7f5dde70f59616dd9e14309075dbdb9d630877",
+      "after_sha256": "b6b612febe7986ce58e4ea91a774c27562195fa98f25c8950419a0ff50aefb17",
+      "other_export_differences": []
+    }
+  },
+  "unchanged_default_69_case_auditor_regression": {
+    "profile": "malformed69",
+    "checks": 13756,
+    "peer_operations": 69,
+    "native_connections": 3,
+    "header_sections": 147,
+    "native_conformance": {
+      "base-shape-valid": 93,
+      "malformed": 51,
+      "unsupported": 3
+    },
+    "manifest_sha256": "98b4e5979b70c4e1a00d71031d1e3fc5c75f7b5686ea71db479cf337118a0c53",
+    "oracle_sha256": "b5405d4ccc68c3a13e59973438caf0cdf66382a5a9c4de0c5d93d612da5856be",
+    "events_sha256": "5566eacf1e23ed0d1ee10afe1c0f2063997e941bac7f366a0f12b714f466f226"
+  }
+}

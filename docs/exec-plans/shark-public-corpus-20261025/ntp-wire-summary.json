@@ -1,0 +1,1787 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-27",
+  "acceptance": "partial; overall protocol/field/session parity is not complete and the PR remains draft",
+  "baseline_source": "e61c8be80b",
+  "native_after_dispatch_source": "4b75fa49a0",
+  "final_display_source": "8f7976af42",
+  "scopes": [
+    "literal NTP selected UDP time/control fields and byte spans",
+    "capture-domain/endpoints/version/sequence/opcode/association observations; selected peer reporting; bounded lease/reuse quarantine",
+    "control fragments, owned byte sources and separate syntax/semantic completeness",
+    "full original capture export invariants and real controlled socket receipts; reference physical/derived/quoted views remain distinct"
+  ],
+  "public": {
+    "weber": {
+      "checks": 456720,
+      "physical_frames": 51328,
+      "reference_filter_rows": 1363,
+      "reference_raw_views": 1331,
+      "reference_views": 1331,
+      "matched_native": 1331,
+      "missing_reference_reasons": {},
+      "native_control_states": {
+        "not-assembled": 40,
+        "complete": 40,
+        "pending-gap-or-final": 24
+      },
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "oracle_sha256": "3c4f11dcae68537caff4093eeb0b858d377cf03373fdfa8529dbf94ff682a9de",
+      "events_sha256": "5027b918519caebc25618d327807c6c63dce9bb35c97bf95dac6441283319654",
+      "retired_legacy_candidates": [],
+      "reference_nonroot_views": [
+        {
+          "frame": 11788,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11791,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11794,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11797,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11802,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11805,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11808,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11811,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11814,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11817,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11820,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11823,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11826,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 11829,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47645,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47654,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47700,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47703,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47706,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47709,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47714,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47717,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47720,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47723,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47726,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47729,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47732,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47735,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47738,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47741,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47744,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 47747,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        }
+      ],
+      "reference_derived_source_views": [],
+      "missing_view_examples_by_reason": {},
+      "missing_view_count": 0,
+      "missing_selected_profile_gaps": 0,
+      "complete_control_responses": 40,
+      "raw_reference_profiles": {
+        "(3, 3)": 29,
+        "(3, 4)": 29,
+        "(4, 3)": 567,
+        "(4, 4)": 564,
+        "(4, 1)": 38,
+        "(2, 6)": 104
+      },
+      "audit_sha256": "072c1d601db5f736ade479d5a2632cd2b658e80336df0b77434451ed1a031480",
+      "events_full_export_invariants": {
+        "scope": "Constrain full export changes to independently certified NTP observations.\nAll other records, transport identities, capture domains, TCP flows and packet\ncolumns must remain identical. This is not a substitute for ntp_wire_audit.py.\n",
+        "kind": "SDK",
+        "checks": 52005,
+        "records": 39283,
+        "changed_records": 1331,
+        "protocol_changes": {
+          "ntp -> ntp": 1189,
+          " -> ntp": 142
+        },
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3640,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1189,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "retired_legacy_candidates": [],
+        "before_sha256": "d580a578ade850eca3d2161d93c6b9ff963bc795f29786b4c5258914e1e49c5b",
+        "after_sha256": "5027b918519caebc25618d327807c6c63dce9bb35c97bf95dac6441283319654",
+        "other_export_differences": []
+      },
+      "yak_full_export_invariants": {
+        "scope": "Constrain full export changes to independently certified NTP observations.\nAll other records, transport identities, capture domains, TCP flows and packet\ncolumns must remain identical. This is not a substitute for ntp_wire_audit.py.\n",
+        "kind": "CLI",
+        "checks": 68340,
+        "records": 51328,
+        "changed_records": 1331,
+        "protocol_changes": {
+          "NTP -> NTP": 1189,
+          "UDP -> NTP": 142
+        },
+        "before_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3404,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1189,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "after_protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "retired_legacy_candidates": [],
+        "before_sha256": "39678bedd7d92809af03c5f4e6b4bf9b4046e66cc1cc009cfe68f73a2427ff38",
+        "after_sha256": "52d37db71a24b211fc6d4a8ee4b9238873821e47df3614a9c2173e2d92265ec8",
+        "other_export_differences": []
+      }
+    },
+    "sharon": {
+      "checks": 2106620,
+      "physical_frames": 328127,
+      "reference_filter_rows": 1900,
+      "reference_raw_views": 1893,
+      "reference_views": 1891,
+      "matched_native": 1213,
+      "missing_reference_reasons": {
+        "unselected-version": 302,
+        "v1-nonzero-reserved-low-bits": 277,
+        "unselected-mode": 32,
+        "control-LI-must-be-zero": 49,
+        "truncated-time-header": 5,
+        "reserved-control-opcode-auto-admission-unselected": 1,
+        "outer-UDP-length-exceeds-captured-extent": 3,
+        "truncated-control-header": 2,
+        "TCP-control-layout-outside-selected-UDP-profile": 1,
+        "invalid-reported-stratum": 3,
+        "zero-sequence-auto-admission-unselected": 3
+      },
+      "native_control_states": {
+        "not-assembled": 40,
+        "complete": 40,
+        "pending-gap-or-final": 24
+      },
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "oracle_sha256": "88d083af1d72793070e51e3cedb9b360e5cd7189678734d743cbb89ac7b6f84d",
+      "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+      "retired_legacy_candidates": [
+        {
+          "PDU": 132021,
+          "frame": 140530,
+          "bytes": 780,
+          "sha256": "bc624e32f84fd90855db422535c465ca4612372d2239f26703d6edcdec91a048",
+          "reference_protocol_stack": "eth:ethertype:ip:udp:mpls:tcp:smtp:data-text-lines",
+          "verdict": "legacy prefix no longer bypasses native UDP admission"
+        }
+      ],
+      "reference_nonroot_views": [
+        {
+          "frame": 14166,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14167,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14168,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14169,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14170,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14171,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        },
+        {
+          "frame": 14172,
+          "scope": "reference filter matched a nested/quoted or nonroot NTP view; no root UDP NTP certification"
+        }
+      ],
+      "reference_derived_source_views": [
+        {
+          "frame": 54621,
+          "data_source": 1,
+          "offset": 48,
+          "bytes": 56,
+          "sha256": "14304b4dcb7c792383cddbc408f40bb8e818adb33dcdb89dd2af0d9c11fec307",
+          "version": 0,
+          "low_bits": 1,
+          "reference_protocol_stack": "eth:ethertype:ip:udp:scop:wpan:6lowpan:ipv6:udp:ntp",
+          "scope": "reference derived/decompressed/reassembled data source; raw offsets are not physical-frame offsets and this direct-UDP certificate does not establish its carrier lineage"
+        },
+        {
+          "frame": 302296,
+          "data_source": 4,
+          "offset": 24,
+          "bytes": 2027,
+          "sha256": "161cbe6bbdae12472cbb757f0cf8647a39e5750b383a73855825ecb6d8b45067",
+          "version": 7,
+          "low_bits": 6,
+          "reference_protocol_stack": "eth:ethertype:ip:gre:ppp_hdlc:data:vjc:ip:tcp:ntp:vjc:ip:tcp:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:vjc:ip:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:data:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:llc:3comxns:wlan:data",
+          "scope": "reference derived/decompressed/reassembled data source; raw offsets are not physical-frame offsets and this direct-UDP certificate does not establish its carrier lineage"
+        }
+      ],
+      "missing_view_examples_by_reason": {
+        "unselected-version": {
+          "frame": 36671,
+          "sha256": "2ca6e28d1667dde1c946854fe6c9d6efb04368bcfb1eaf92c61ca91def2c95e5",
+          "version": 5,
+          "low_bits": 7,
+          "bytes": 50,
+          "reason": "unselected-version"
+        },
+        "v1-nonzero-reserved-low-bits": {
+          "frame": 36863,
+          "sha256": "d1892f9ef6dc026ac1fdd5ee3df1b9c9e2319676f9f96c190935d7bcd41b3997",
+          "version": 1,
+          "low_bits": 7,
+          "bytes": 116,
+          "reason": "v1-nonzero-reserved-low-bits"
+        },
+        "unselected-mode": {
+          "frame": 38740,
+          "sha256": "0862bd66970ebcd12a1478e50f85cd9f6db32fdc322a6d3322c267810e6c220c",
+          "version": 2,
+          "low_bits": 7,
+          "bytes": 128,
+          "reason": "unselected-mode"
+        },
+        "control-LI-must-be-zero": {
+          "frame": 38803,
+          "sha256": "f0d8fab809cc9a1cd14115fa77576cc2b9ef6b8c18dbb17959d64459f268939f",
+          "version": 4,
+          "low_bits": 6,
+          "bytes": 114,
+          "reason": "control-LI-must-be-zero"
+        },
+        "truncated-time-header": {
+          "frame": 42395,
+          "sha256": "0519b52cc3af764b45f13b2711f50121063c4d88be65a2df990ea196af2cc996",
+          "version": 4,
+          "low_bits": 3,
+          "bytes": 45,
+          "reason": "truncated-time-header"
+        },
+        "reserved-control-opcode-auto-admission-unselected": {
+          "frame": 46172,
+          "sha256": "0d32e4595911b422af250752e01d744912ba7039a3e11ce5492f50136ad871ec",
+          "version": 4,
+          "low_bits": 6,
+          "bytes": 19,
+          "reason": "reserved-control-opcode-auto-admission-unselected"
+        },
+        "outer-UDP-length-exceeds-captured-extent": {
+          "frame": 76711,
+          "sha256": "8414663eb323dd6b4d9474e351e4f39b8264c4f1e7c518d1e8e256028f12c9eb",
+          "version": 2,
+          "low_bits": 6,
+          "bytes": 20,
+          "reason": "outer-UDP-length-exceeds-captured-extent"
+        },
+        "truncated-control-header": {
+          "frame": 128388,
+          "sha256": "f080feea12fd288017e1aa577e4ba597106b044cb3d1cb5b396de18300a52eaf",
+          "version": 4,
+          "low_bits": 6,
+          "bytes": 8,
+          "reason": "truncated-control-header"
+        },
+        "TCP-control-layout-outside-selected-UDP-profile": {
+          "frame": 173319,
+          "sha256": "3619e35f28cd0dd198c3caf12401538184b9bac874c136518c9818d09a93bd83",
+          "version": 2,
+          "low_bits": 6,
+          "bytes": 15,
+          "reason": "TCP-control-layout-outside-selected-UDP-profile"
+        },
+        "invalid-reported-stratum": {
+          "frame": 201573,
+          "sha256": "ab5dee93be36417bd874a80547ad65343e93ab2c7b1e3b61acde637520fceed1",
+          "version": 2,
+          "low_bits": 2,
+          "bytes": 80,
+          "reason": "invalid-reported-stratum"
+        },
+        "zero-sequence-auto-admission-unselected": {
+          "frame": 201846,
+          "sha256": "a63351bdd5ba79958a0fd29b97010731c7ef7943a79043a4e7c3af8b7557df1d",
+          "version": 2,
+          "low_bits": 6,
+          "bytes": 13,
+          "reason": "zero-sequence-auto-admission-unselected"
+        }
+      },
+      "missing_view_count": 678,
+      "missing_selected_profile_gaps": 0,
+      "complete_control_responses": 40,
+      "raw_reference_profiles": {
+        "(3, 3)": 7,
+        "(3, 4)": 7,
+        "(4, 3)": 534,
+        "(4, 4)": 530,
+        "(4, 1)": 38,
+        "(2, 6)": 108,
+        "(5, 7)": 96,
+        "(5, 6)": 44,
+        "(1, 7)": 274,
+        "(7, 7)": 62,
+        "(2, 7)": 25,
+        "(4, 6)": 49,
+        "(6, 7)": 5,
+        "(0, 1)": 5,
+        "(0, 0)": 24,
+        "(5, 4)": 3,
+        "(1, 4)": 2,
+        "(0, 4)": 4,
+        "(4, 7)": 2,
+        "(0, 2)": 1,
+        "(3, 7)": 4,
+        "(7, 1)": 1,
+        "(0, 6)": 19,
+        "(2, 1)": 2,
+        "(7, 6)": 35,
+        "(0, 7)": 3,
+        "(3, 6)": 4,
+        "(2, 2)": 1,
+        "(7, 4)": 1,
+        "(1, 1)": 1,
+        "(2, 0)": 1,
+        "(6, 6)": 1
+      },
+      "audit_sha256": "23271c22969143249f3bc29fcd21ced1452315e8fb25db1656ba6d0ca7761358",
+      "events_full_export_invariants": {
+        "scope": "Constrain full export changes to independently certified NTP observations.\nAll other records, transport identities, capture domains, TCP flows and packet\ncolumns must remain identical. This is not a substitute for ntp_wire_audit.py.\n",
+        "kind": "SDK",
+        "checks": 257178,
+        "records": 245615,
+        "changed_records": 1214,
+        "protocol_changes": {
+          "ntp -> ntp": 1071,
+          " -> ntp": 142,
+          "ntp -> ": 1
+        },
+        "before_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 110110,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1072,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "after_protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "retired_legacy_candidates": [
+          {
+            "PDU": 132021,
+            "frames": [
+              140530
+            ],
+            "previous_bytes": 780,
+            "retained_probe_bytes": 64
+          }
+        ],
+        "before_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "other_export_differences": []
+      },
+      "yak_full_export_invariants": {
+        "scope": "Constrain full export changes to independently certified NTP observations.\nAll other records, transport identities, capture domains, TCP flows and packet\ncolumns must remain identical. This is not a substitute for ntp_wire_audit.py.\n",
+        "kind": "CLI",
+        "checks": 343531,
+        "records": 328127,
+        "changed_records": 1214,
+        "protocol_changes": {
+          "NTP -> NTP": 1071,
+          "UDP -> NTP": 142,
+          "UDP -> UDP": 1
+        },
+        "before_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109518,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1071,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "after_protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "retired_legacy_candidates": [],
+        "before_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "other_export_differences": []
+      }
+    }
+  },
+  "live": {
+    "live-01": {
+      "checks": 22626,
+      "physical_frames": 205,
+      "reference_filter_rows": 205,
+      "reference_views": 205,
+      "matched_native": 205,
+      "peer_datagrams_checked": 205,
+      "native_control_states": {
+        "not-assembled": 83,
+        "complete": 40,
+        "pending-gap-or-final": 33,
+        "duplicate-no-replay": 3,
+        "refused": 21,
+        "wire-refused": 9
+      },
+      "capture_sha256": "f810a4686b203c1a1c34c2103e7548a11b6c8c9894e3526323cc35433349617a",
+      "oracle_sha256": "96e6c44419b027cb0af17a58526c1df85282619422715db6ee2cf186a2df6131",
+      "events_sha256": "041c603f25098999551b43a10446205d6371d5d7efefcd5a3cf079b6ae7d3d27",
+      "network": {
+        "delayed": 3,
+        "dropped": 3
+      },
+      "actual_windows_service": {
+        "service": "existing127.0.0.1:123",
+        "response_observed": false,
+        "outcome": "no response within2 seconds; not claimed as a successful server exchange"
+      },
+      "peer_scope": "deliberately authored time/control peers with actual UDP delivery receipts, not ntpd",
+      "capture_ready_observed": true,
+      "negative_controls": {
+        "controls": 31,
+        "results": [
+          {
+            "corruption": "version",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "mode",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "stratum",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "poll-sign",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "seconds",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "fraction",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-sequence",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-count",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-as-time",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "fragment-data",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "complete-flag",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "complete-alias",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "assembled-data",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "assembled-digest",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-hole",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-domain",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-parent",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-packet",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-completeness",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "request-owner",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "transaction",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "field-range",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "field-alias",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "raw-digest",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "authentication",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "replay-payload",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "missing-PDU",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "duplicate-PDU",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "protocol",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "forged-encapsulation-domain",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "clock-word-hardware-state",
+            "detected": "rejected"
+          }
+        ]
+      },
+      "complete_control_responses": 40,
+      "certificate_sha256": "1517c2b8eec5fb7cdbdeece6cca68a9af10a8561312773826e0b5814773eab05",
+      "manifest_sha256": "9a35ada0eb3cef8cfd998979e8891435502b2f2d5823235142720ef7611a3c75"
+    },
+    "live-02": {
+      "checks": 27480,
+      "physical_frames": 251,
+      "reference_filter_rows": 251,
+      "reference_views": 251,
+      "matched_native": 251,
+      "peer_datagrams_checked": 251,
+      "native_control_states": {
+        "not-assembled": 93,
+        "complete": 43,
+        "pending-gap-or-final": 39,
+        "duplicate-no-replay": 3,
+        "refused": 42,
+        "wire-refused": 9
+      },
+      "capture_sha256": "7aeb65f6c52bc10f32b0066324c60966efa2a1f1673b7d98ac55d145255375fd",
+      "oracle_sha256": "15bdf8f84cd3a7db87b45cf1eb06b08b2832bb8727d254988dc8f3a1d3644476",
+      "events_sha256": "b12f51838bc434dd2709f13f8fc2bce693be1551ac6830fcbd96adf79b9bed99",
+      "network": {
+        "delayed": 3,
+        "dropped": 3
+      },
+      "actual_windows_service": {
+        "service": "existing127.0.0.1:123",
+        "response_observed": false,
+        "outcome": "no response within2 seconds; not claimed as a successful server exchange"
+      },
+      "peer_scope": "deliberately authored time/control peers with actual UDP delivery receipts, not ntpd",
+      "capture_ready_observed": true,
+      "negative_controls": {
+        "controls": 35,
+        "results": [
+          {
+            "corruption": "version",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "mode",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "stratum",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "poll-sign",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "seconds",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "fraction",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-sequence",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-count",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "control-as-time",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "fragment-data",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "complete-flag",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "complete-alias",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "assembled-data",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "assembled-digest",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-hole",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-domain",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-parent",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-packet",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "source-completeness",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "request-owner",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "transaction",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "field-range",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "field-alias",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "raw-digest",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "authentication",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "replay-payload",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "missing-PDU",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "duplicate-PDU",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "protocol",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "forged-encapsulation-domain",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "clock-word-hardware-state",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "legacy-modern-mode",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "legacy-distance-sign",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "legacy-drift-scale",
+            "detected": "rejected"
+          },
+          {
+            "corruption": "selected-peer-request-association",
+            "detected": "rejected"
+          }
+        ]
+      },
+      "complete_control_responses": 43,
+      "certificate_sha256": "51e1cdfdafdcb96a8002c1377db1c7f2204645866d8b43ae15f4f6be78867222",
+      "manifest_sha256": "c142a87e5ed154660919d7a12cf43010dd4f9b2bd3bdd553a4e6dc6b3a131842"
+    }
+  },
+  "final_display_exports": {
+    "weber": {
+      "sha256": "52d37db71a24b211fc6d4a8ee4b9238873821e47df3614a9c2173e2d92265ec8",
+      "all_export_bytes_identical": true
+    },
+    "sharon": {
+      "sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+      "all_export_bytes_identical": true
+    },
+    "live-01": {
+      "sha256": "6bef8e369c366da9c8efb75d253fcad79ea0b99193696d64621bdbd1251aa1dd",
+      "only_complete_control_headers_refined": [
+        52,
+        119,
+        186
+      ],
+      "other_export_differences": [],
+      "PDUs_and_fields_unchanged": true
+    },
+    "live-02": {
+      "sha256": "b85c45d9d09947a18e0ef29c40e331796aa03e81c0dfbf09227bef1b98f6307d",
+      "only_complete_control_headers_refined": [
+        55,
+        137,
+        219
+      ],
+      "other_export_differences": [],
+      "PDUs_and_fields_unchanged": true
+    }
+  },
+  "live_native_exports_byte_identical_after_dispatch": {
+    "live-01-final": {
+      "events": "041c603f25098999551b43a10446205d6371d5d7efefcd5a3cf079b6ae7d3d27",
+      "yak": "1038798f159781b53deae574f56ffcad1453953b54a90bf7dd7eded67d5644f0"
+    },
+    "live-02-final": {
+      "events": "b12f51838bc434dd2709f13f8fc2bce693be1551ac6830fcbd96adf79b9bed99",
+      "yak": "d2e8357e51f1f7946d067c114566b70648d30dae2f7a25b400e9296989f0c854"
+    }
+  },
+  "tests": {
+    "full-rfc-tests.log": {
+      "source": "8c47d42095",
+      "sha256": "a52d44b9950785954bc97d1bd263ace437b398be13c6cbc8da8fccf98bd9c6cc",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "419.569s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "2.181s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/bin-parser",
+          "116.035s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/bin-parser/parser",
+          "5.828s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/bin-parser/parser/base",
+          "0.525s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser",
+          "4.941s"
+        ]
+      ]
+    },
+    "full-dispatch-tests.log": {
+      "source": "4b75fa49a0",
+      "sha256": "eb141e08b2503df17cb362550363a10567b7057ac71410bdf747d38b4cd73b66",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "434.307s"
+        ],
+        [
+          "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "1.969s"
+        ]
+      ]
+    },
+    "control-header-cli-tests.log": {
+      "source": "63d1105d67",
+      "sha256": "1b73c8491e7d1c666261b67b131afc59abd5dde2a066e3b609840416ca0381dd",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "1.959s"
+        ]
+      ]
+    },
+    "display-cli-tests.log": {
+      "source": "8f7976af42",
+      "sha256": "82fad2df812f498ba3275b8bd7e27675f3293a27b3cbe1c49e1572f12652c63e",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "2.087s"
+        ]
+      ]
+    },
+    "fuzz-reassembly-rfc.log": {
+      "source": "8c47d42095",
+      "sha256": "9ace84d9dce084ed650b85bd7d086dad34d104d02e2632d641f88db1c14c97b1",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "40.423s"
+        ]
+      ],
+      "final_executions": 91902
+    },
+    "fuzz-wire-rfc.log": {
+      "source": "8c47d42095",
+      "sha256": "20c77e2dcb155e13d39b7531538e4656f21ce57d645cfc2a7315483bddb45f26",
+      "completed_packages": [
+        [
+          "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "41.409s"
+        ]
+      ],
+      "final_executions": 16092
+    }
+  },
+  "windows": {
+    "windows-final-gap": {
+      "actual_executable": "yak-dispatch.exe",
+      "executable_sha256": "b27851d2e038faf42fc0da219a399e9bae9583469de6b8ce7b4d267b4cf35409",
+      "snapshots": {
+        "00-capture-ready": {
+          "sha256": "c4d01d5291f0b1a02191a5d9b40b91772be730b2d5d8a58ae27691476526618f",
+          "width": 180,
+          "height": 48
+        },
+        "00-filter-ready": {
+          "sha256": "bc68d4c794558ebe0b0512dce9b317272ed73e1a6ce7843ef3274642e1595814",
+          "width": 180,
+          "height": 48
+        },
+        "01-protocol-fields": {
+          "sha256": "6826a43cee77f346a15d49edfc5e1158765312d96b4f295fdea7c4cb2d586721",
+          "width": 180,
+          "height": 48
+        },
+        "01-deep-protocol-fields": {
+          "sha256": "0ebbde124752f3461d2164374b7373dc6579524475a0fda0bd6072285b580942",
+          "width": 180,
+          "height": 48
+        },
+        "02-first-byte-source": {
+          "sha256": "cfcf5623bdb6c86dce21719e2c9fc1c8177b1b5f3743dd97e1c5430b253b3da2",
+          "width": 180,
+          "height": 48
+        },
+        "02-byte-sources": {
+          "sha256": "526589d1c40109118f8cff7dc078c3c0a57a71f72ddc9c4a50d7acd2f05519b8",
+          "width": 180,
+          "height": 48
+        },
+        "03-conversation-messages": {
+          "sha256": "45ecf32dba18d76c9ebb0b369dc1bdaad8acb9bdea46e1fd0d28d7227e50d2ca",
+          "width": 180,
+          "height": 48
+        },
+        "04-association-evidence": {
+          "sha256": "ed40618514590db2a86f2ca253470b5482696e705f0cc65bb4b37315582769a1",
+          "width": 180,
+          "height": 48
+        },
+        "05-narrow": {
+          "sha256": "f86b651e032e691ed0d9a0226f2100304716a964c10af6cec91e04d703778ba3",
+          "width": 80,
+          "height": 30
+        },
+        "06-restored": {
+          "sha256": "ed40618514590db2a86f2ca253470b5482696e705f0cc65bb4b37315582769a1",
+          "width": 180,
+          "height": 48
+        },
+        "restored": {
+          "sha256": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+        }
+      },
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "scope": "actual native CP936 console cells/attributes; typed query and selected row/detail; sources/conversation; resize/quit/codepage restoration"
+    },
+    "windows-rfc-selected-peer": {
+      "actual_executable": "yak-rfc.exe",
+      "executable_sha256": "9104691ede0b1ce3ed310f45a7bd345367f33fe6187c1485702aa451298c54c6",
+      "snapshots": {
+        "00-capture-ready": {
+          "sha256": "c4d01d5291f0b1a02191a5d9b40b91772be730b2d5d8a58ae27691476526618f",
+          "width": 180,
+          "height": 48
+        },
+        "00-filter-ready": {
+          "sha256": "979f690d60c12a96a4dc1f3dca0a12c45338b11c2f97e828f9992d6ccd6654ea",
+          "width": 180,
+          "height": 48
+        },
+        "01-protocol-fields": {
+          "sha256": "560a9d9f500ffd366e93fc131ebbd9af92a6fef716636e2ef044a352e1eb325f",
+          "width": 180,
+          "height": 48
+        },
+        "01-deep-protocol-fields": {
+          "sha256": "a96721f69f3f86622239f318b9cfe6a7116be492874c1ccb7e0336a852860fbb",
+          "width": 180,
+          "height": 48
+        },
+        "02-first-byte-source": {
+          "sha256": "b491e3945c14897f5ebf973a64ff8a0e38e64bffccd56b932334df615c019a90",
+          "width": 180,
+          "height": 48
+        },
+        "02-byte-sources": {
+          "sha256": "c0267cd269710ed4d66817163629d6d6ab3a58018dcca4d35b077384f2cfe721",
+          "width": 180,
+          "height": 48
+        },
+        "03-conversation-messages": {
+          "sha256": "5139e5f6bbc21795f054cf577f8678c02c89e2161be6dbc8d2cc99121cf8de95",
+          "width": 180,
+          "height": 48
+        },
+        "04-association-evidence": {
+          "sha256": "8a400f2fed53d61d54aba67b553b3394f3185fdef1c65d066f7ab494cf178aae",
+          "width": 180,
+          "height": 48
+        },
+        "05-narrow": {
+          "sha256": "08fa126f9844f21c991aa62e18bb41ad90a38a30d819107d2743aac8145c3f74",
+          "width": 80,
+          "height": 30
+        },
+        "06-restored": {
+          "sha256": "8a400f2fed53d61d54aba67b553b3394f3185fdef1c65d066f7ab494cf178aae",
+          "width": 180,
+          "height": 48
+        },
+        "restored": {
+          "sha256": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+        }
+      },
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "scope": "actual native CP936 console cells/attributes; typed query and selected row/detail; sources/conversation; resize/quit/codepage restoration"
+    },
+    "windows-final-legacy": {
+      "actual_executable": "yak-dispatch.exe",
+      "executable_sha256": "b27851d2e038faf42fc0da219a399e9bae9583469de6b8ce7b4d267b4cf35409",
+      "snapshots": {
+        "00-capture-ready": {
+          "sha256": "c4d01d5291f0b1a02191a5d9b40b91772be730b2d5d8a58ae27691476526618f",
+          "width": 180,
+          "height": 48
+        },
+        "00-filter-ready": {
+          "sha256": "247406f003f1b0c4ed302ea0dc698b2680c3c4d3a5dce5598e1b5a1b7067a3e4",
+          "width": 180,
+          "height": 48
+        },
+        "01-protocol-fields": {
+          "sha256": "f3214c1bc312e7e94e9426cb9a06d0d4d5bdabf2f41787a0cf34bcac92a94a4f",
+          "width": 180,
+          "height": 48
+        },
+        "01-deep-protocol-fields": {
+          "sha256": "9a7dea4d5f55415da75d5eb0824ce219ad7730b427ce056a8e7ef538d661098b",
+          "width": 180,
+          "height": 48
+        },
+        "02-first-byte-source": {
+          "sha256": "508798dc363e139bb1338862ed7870966148b4e2a8a67fe47d6071649f422e1e",
+          "width": 180,
+          "height": 48
+        },
+        "02-byte-sources": {
+          "sha256": "80b7af03757da5aa214fc2dca6192c5a2eccdd3bdd6e25800955f7644be4e8e1",
+          "width": 180,
+          "height": 48
+        },
+        "03-conversation-messages": {
+          "sha256": "13721117a77c88f023316770bad8a18bd27da349998aebd8e8c3105b7fabe553",
+          "width": 180,
+          "height": 48
+        },
+        "04-association-evidence": {
+          "sha256": "ff1e5508cc052d36a41792afd2668be138b50712ef0e3024a70bb5a5680aa654",
+          "width": 180,
+          "height": 48
+        },
+        "05-narrow": {
+          "sha256": "dd02f839eeea182f180feece8e9071ea2c3a5c0298b28bbda6d6fb93512d393f",
+          "width": 80,
+          "height": 30
+        },
+        "06-restored": {
+          "sha256": "ff1e5508cc052d36a41792afd2668be138b50712ef0e3024a70bb5a5680aa654",
+          "width": 180,
+          "height": 48
+        },
+        "restored": {
+          "sha256": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+        }
+      },
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "scope": "actual native CP936 console cells/attributes; typed query and selected row/detail; sources/conversation; resize/quit/codepage restoration"
+    },
+    "windows-final-display": {
+      "actual_executable": "yak-display.exe",
+      "executable_sha256": "011e2f4af1e055ace1de99a4acbae5d023c8de6ff22d14c9cbd867e0fc63e1b1",
+      "snapshots": {
+        "00-capture-ready": {
+          "sha256": "c4d01d5291f0b1a02191a5d9b40b91772be730b2d5d8a58ae27691476526618f",
+          "width": 180,
+          "height": 48
+        },
+        "00-filter-ready": {
+          "sha256": "7ab00a62eda1f15d9cbd521a399546f54337034ec4aa3fdbbe94b160e9116d80",
+          "width": 180,
+          "height": 48
+        },
+        "01-protocol-fields": {
+          "sha256": "9defb34c7570ae028545b8e69363924e8d80f1bc65bc79d193830346c1c8daa4",
+          "width": 180,
+          "height": 48
+        },
+        "01-deep-protocol-fields": {
+          "sha256": "166c16f68fb4f048d2cff530e5d38ab683ef036b781578caa6a1798a286c64db",
+          "width": 180,
+          "height": 48
+        },
+        "02-first-byte-source": {
+          "sha256": "973f872cef60c352d4f7036c065f497304d7523d3b13b396ce618b03c4aba98c",
+          "width": 180,
+          "height": 48
+        },
+        "02-byte-sources": {
+          "sha256": "31b1d064250b13d7778413be2fe29d1ce79c0ebe90f8b9e34424e67ded945e53",
+          "width": 180,
+          "height": 48
+        },
+        "03-conversation-messages": {
+          "sha256": "1deec4c2b06e615d027ab2a3e35f82b7f65ab1e2c8dbbfe13d965741ca6ec310",
+          "width": 180,
+          "height": 48
+        },
+        "04-association-evidence": {
+          "sha256": "f07371d4f075c54f38cd97d8e53c6c61bdbb26e48b486ee750da64c0be78e676",
+          "width": 180,
+          "height": 48
+        },
+        "05-narrow": {
+          "sha256": "4361e3e2c400d6c0d6a6db08e6ed8a575bfa15fb9e2afd75c205af0028c55fbf",
+          "width": 80,
+          "height": 30
+        },
+        "06-restored": {
+          "sha256": "f07371d4f075c54f38cd97d8e53c6c61bdbb26e48b486ee750da64c0be78e676",
+          "width": 180,
+          "height": 48
+        },
+        "restored": {
+          "sha256": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+        }
+      },
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "scope": "actual native CP936 console cells/attributes; typed query and selected row/detail; sources/conversation; resize/quit/codepage restoration"
+    }
+  },
+  "authored_auditor_source_sha256": {
+    "discovery/ntp_control_live.py": "d8bba953d1603b9b399eb288d85a47e13e480901f6874f1d2359b42c0d232e0e",
+    "ntp_wire_audit.py": "f719c6ed940edd00e112b4b47c0dd4c28bc5ab63ea62bd24993376aa204c6598",
+    "ntp_negative_controls.py": "e34330f2d3b16ce6b4e956e193821c381113ed49a8530a0ab1dc956ea56ed598",
+    "ntp_export_invariants.py": "d4c9f25d23685d04fa5ba2592cd3ca21c4d2a8ae2c038be273957500edcc1e41"
+  },
+  "limitations": [
+    "No time synchronization or clock-discipline correctness claim; no time-message transaction association",
+    "No NTS/time extensions, private mode7, control authentication algorithm, full text-variable semantics or TCP control ingress certification",
+    "No authenticated sender, peer delivery or synchronization inferred from reassembly/status/MAC envelope",
+    "Derived source offsets are not physical frame offsets; remaining unselected/invalid reference views are retained",
+    "Captures, keylogs, executables, raw exports and native screenshots are excluded from Git"
+  ]
+}

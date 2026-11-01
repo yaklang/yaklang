@@ -1,0 +1,1321 @@
+{
+  "scope": "Render literal TOP30 reference-label cohorts from a closed physical census.\n\nOne frame contributes exactly once. The Shark label distribution is preserved,\nwithout aliases, inferred protocol families or a protocol-correctness score.\n",
+  "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617",
+  "census_SHA256": "52a8e70373474303099f7fe0a140797bed9cc9d86c06ba449f3ea9be10b21da5",
+  "auditor_SHA256": "202a0cdfdf558cad69504f31ed28899f3d62e9d1c78128fefb62034a0526d3d6",
+  "alias_normalization": false,
+  "correctness_score": false,
+  "reference_profile": "Fresh isolated TShark configuration, no explicit keylog; see original census arguments and fixed native/CLI providers.",
+  "inputs": {
+    "sharon": {
+      "physical_frames": 328127,
+      "native_message_records": 263112,
+      "CLI_nonphysical_publications": 552,
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "label_pairs_SHA256": "7ee9c3eb268cdfad725324bdfab8d2713f853d2297b73450ed8a5f4bcb6e7af6",
+      "SDK": {
+        "build_SHA256": "c6b910800dd8f5d0c92d2eeb4e79770cb6f0e21f62b7378c7e4c9c36b44b602b",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "export_SHA256": "bfecf9b36221aa45c54666f43afa1ec1f4275829f1ae0d54ce2ac29c1d79a770",
+        "producer_SHA256": "482f592917e00b8dacacd47de0bc912c26655e6d19bfbecb24e3dc09a72e4e4e",
+        "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617"
+      },
+      "CLI": {
+        "build_SHA256": "b73406196b5b0c7a0ecc73677586e515aa960af7281e502623f0c698c9f49f3c",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "export_SHA256": "69620dc848a6a4890b2b3207da8c9d1ede8eb472a72e6e6a83ad626f51686165",
+        "producer_SHA256": "7ee8b8d46f04711c40f9f5361b86130c7090e5c8bf2dc6701840ae08fbb146b1",
+        "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617"
+      },
+      "top30": [
+        {
+          "rank": 1,
+          "reference_literal_label": "IPv4",
+          "physical_frames": 26588,
+          "Shark_literal_distribution": [
+            {
+              "label": "Fragment",
+              "physical_frames": 19871
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 6662
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 25
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 20
+            },
+            {
+              "label": "IPv6Routing",
+              "physical_frames": 5
+            },
+            {
+              "label": "IPv6Fragment",
+              "physical_frames": 2
+            },
+            {
+              "label": "IGMP",
+              "physical_frames": 1
+            },
+            {
+              "label": "SCTP",
+              "physical_frames": 1
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "reference_literal_label": "TCP",
+          "physical_frames": 19371,
+          "Shark_literal_distribution": [
+            {
+              "label": "Fragment",
+              "physical_frames": 7620
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 5431
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 3478
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 2242
+            },
+            {
+              "label": "RTSP",
+              "physical_frames": 176
+            },
+            {
+              "label": "TLSv1.3",
+              "physical_frames": 119
+            },
+            {
+              "label": "Syslog",
+              "physical_frames": 91
+            },
+            {
+              "label": "IPP",
+              "physical_frames": 65
+            },
+            {
+              "label": "TLSv1.2",
+              "physical_frames": 28
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 23
+            },
+            {
+              "label": "HTTP/1.1",
+              "physical_frames": 18
+            },
+            {
+              "label": "BGP",
+              "physical_frames": 16
+            },
+            {
+              "label": "LDP",
+              "physical_frames": 16
+            },
+            {
+              "label": "DNS",
+              "physical_frames": 12
+            },
+            {
+              "label": "SMB2",
+              "physical_frames": 11
+            },
+            {
+              "label": "IMAP",
+              "physical_frames": 10
+            },
+            {
+              "label": "TLS",
+              "physical_frames": 7
+            },
+            {
+              "label": "SSH",
+              "physical_frames": 5
+            },
+            {
+              "label": "HTTP/1.0",
+              "physical_frames": 3
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "reference_literal_label": "GSMTAP",
+          "physical_frames": 17864,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 17864
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "reference_literal_label": "BACnet-APDU",
+          "physical_frames": 10607,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPv4",
+              "physical_frames": 6090
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 4274
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 224
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 18
+            },
+            {
+              "label": "MPLS",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "reference_literal_label": "802.11",
+          "physical_frames": 10527,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPv4",
+              "physical_frames": 5757
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 3711
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 838
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 220
+            },
+            {
+              "label": "MPLS",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 6,
+          "reference_literal_label": "NBAP",
+          "physical_frames": 7875,
+          "Shark_literal_distribution": [
+            {
+              "label": "SCTP",
+              "physical_frames": 3406
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 2609
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1767
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 93
+            }
+          ]
+        },
+        {
+          "rank": 7,
+          "reference_literal_label": "F1AP",
+          "physical_frames": 7708,
+          "Shark_literal_distribution": [
+            {
+              "label": "SCTP",
+              "physical_frames": 3699
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 2694
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1286
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 29
+            }
+          ]
+        },
+        {
+          "rank": 8,
+          "reference_literal_label": "RTP",
+          "physical_frames": 6492,
+          "Shark_literal_distribution": [
+            {
+              "label": "RTP",
+              "physical_frames": 6462
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 30
+            }
+          ]
+        },
+        {
+          "rank": 9,
+          "reference_literal_label": "SCCP (Int. ITU)",
+          "physical_frames": 6310,
+          "Shark_literal_distribution": [
+            {
+              "label": "Fragment",
+              "physical_frames": 5831
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 386
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 41
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 39
+            },
+            {
+              "label": "SCTP",
+              "physical_frames": 13
+            }
+          ]
+        },
+        {
+          "rank": 10,
+          "reference_literal_label": "UDP",
+          "physical_frames": 5998,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 5975
+            },
+            {
+              "label": "TFTP",
+              "physical_frames": 10
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 5
+            },
+            {
+              "label": "SSDP",
+              "physical_frames": 5
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 3
+            }
+          ]
+        },
+        {
+          "rank": 11,
+          "reference_literal_label": "X2AP",
+          "physical_frames": 5534,
+          "Shark_literal_distribution": [
+            {
+              "label": "SCTP",
+              "physical_frames": 3304
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 1132
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1070
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 28
+            }
+          ]
+        },
+        {
+          "rank": 12,
+          "reference_literal_label": "ICMPv6",
+          "physical_frames": 4846,
+          "Shark_literal_distribution": [
+            {
+              "label": "ICMPv6",
+              "physical_frames": 2958
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1069
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 692
+            },
+            {
+              "label": "MLDv2",
+              "physical_frames": 91
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 29
+            },
+            {
+              "label": "MLD",
+              "physical_frames": 3
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 2
+            },
+            {
+              "label": "MLDv1",
+              "physical_frames": 2
+            }
+          ]
+        },
+        {
+          "rank": 13,
+          "reference_literal_label": "S1AP",
+          "physical_frames": 4735,
+          "Shark_literal_distribution": [
+            {
+              "label": "SCTP",
+              "physical_frames": 2418
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1183
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 995
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 139
+            }
+          ]
+        },
+        {
+          "rank": 14,
+          "reference_literal_label": "GTP",
+          "physical_frames": 4352,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 3129
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 924
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 292
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 7
+            }
+          ]
+        },
+        {
+          "rank": 15,
+          "reference_literal_label": "XnAP",
+          "physical_frames": 4300,
+          "Shark_literal_distribution": [
+            {
+              "label": "SCTP",
+              "physical_frames": 2030
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 1667
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 600
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 3
+            }
+          ]
+        },
+        {
+          "rank": 16,
+          "reference_literal_label": "NGAP",
+          "physical_frames": 4171,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 1620
+            },
+            {
+              "label": "SCTP",
+              "physical_frames": 1593
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 937
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 21
+            }
+          ]
+        },
+        {
+          "rank": 17,
+          "reference_literal_label": "ZigBee ",
+          "physical_frames": 4113,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 2145
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 1963
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 3
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 2
+            }
+          ]
+        },
+        {
+          "rank": 18,
+          "reference_literal_label": "GTPv2",
+          "physical_frames": 3302,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 2225
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 679
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 395
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 3
+            }
+          ]
+        },
+        {
+          "rank": 19,
+          "reference_literal_label": "UMA",
+          "physical_frames": 3229,
+          "Shark_literal_distribution": [
+            {
+              "label": "Fragment",
+              "physical_frames": 1859
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 1336
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 29
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 5
+            }
+          ]
+        },
+        {
+          "rank": 20,
+          "reference_literal_label": "SCTP",
+          "physical_frames": 3215,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 1635
+            },
+            {
+              "label": "SCTP",
+              "physical_frames": 781
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 775
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 24
+            }
+          ]
+        },
+        {
+          "rank": 21,
+          "reference_literal_label": "WSP",
+          "physical_frames": 3065,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 3065
+            }
+          ]
+        },
+        {
+          "rank": 22,
+          "reference_literal_label": "ICMP",
+          "physical_frames": 2823,
+          "Shark_literal_distribution": [
+            {
+              "label": "ICMP",
+              "physical_frames": 2499
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 192
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 110
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 21
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 23,
+          "reference_literal_label": "STP",
+          "physical_frames": 2720,
+          "Shark_literal_distribution": [
+            {
+              "label": "RPVST+",
+              "physical_frames": 2205
+            },
+            {
+              "label": "RSTP",
+              "physical_frames": 407
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 50
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 31
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 27
+            }
+          ]
+        },
+        {
+          "rank": 24,
+          "reference_literal_label": "RSVP",
+          "physical_frames": 2628,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPv4",
+              "physical_frames": 2405
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 187
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 30
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 5
+            },
+            {
+              "label": "IPv6Routing",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 25,
+          "reference_literal_label": "DNS",
+          "physical_frames": 2574,
+          "Shark_literal_distribution": [
+            {
+              "label": "DNS",
+              "physical_frames": 1284
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 725
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 391
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 160
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 8
+            },
+            {
+              "label": "SCTP",
+              "physical_frames": 3
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 3
+            }
+          ]
+        },
+        {
+          "rank": 26,
+          "reference_literal_label": "LTP",
+          "physical_frames": 2504,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 1967
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 535
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 2
+            }
+          ]
+        },
+        {
+          "rank": 27,
+          "reference_literal_label": "S7COMM",
+          "physical_frames": 2298,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPv4",
+              "physical_frames": 2096
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 101
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 88
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 13
+            }
+          ]
+        },
+        {
+          "rank": 28,
+          "reference_literal_label": "CoAP",
+          "physical_frames": 2158,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 1391
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 430
+            },
+            {
+              "label": "IPv4",
+              "physical_frames": 335
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 2
+            }
+          ]
+        },
+        {
+          "rank": 29,
+          "reference_literal_label": "RNSAP",
+          "physical_frames": 2109,
+          "Shark_literal_distribution": [
+            {
+              "label": "Fragment",
+              "physical_frames": 2007
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 96
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 6
+            }
+          ]
+        },
+        {
+          "rank": 30,
+          "reference_literal_label": "ieee1905",
+          "physical_frames": 1896,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPv4",
+              "physical_frames": 1318
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 474
+            },
+            {
+              "label": "MPLS",
+              "physical_frames": 76
+            },
+            {
+              "label": "GRE",
+              "physical_frames": 25
+            },
+            {
+              "label": "Fragment",
+              "physical_frames": 3
+            }
+          ]
+        }
+      ]
+    },
+    "weber": {
+      "physical_frames": 51328,
+      "native_message_records": 42095,
+      "CLI_nonphysical_publications": 26,
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "label_pairs_SHA256": "95b162d3b0456e315303b503d3b13c3726bd806e637053ed3c8ac2fc6b6a4145",
+      "SDK": {
+        "build_SHA256": "c6b910800dd8f5d0c92d2eeb4e79770cb6f0e21f62b7378c7e4c9c36b44b602b",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "export_SHA256": "cd74c7cd7ac32de90ffe4bc91f949945b1bd7ca257261185879af74739576e4f",
+        "producer_SHA256": "65acaad0851d8e8cfa3ba2355c8e8dfab1197006413aa46b6ea5bb2062821efe",
+        "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617"
+      },
+      "CLI": {
+        "build_SHA256": "b73406196b5b0c7a0ecc73677586e515aa960af7281e502623f0c698c9f49f3c",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "export_SHA256": "c17c44f614590e87e257935a22ffeedfdf54ee7220e063bff2b9c54f22ca25e2",
+        "producer_SHA256": "296388db235f9202413d56a2eb733bd136b91644523ea80de2656044c426060d",
+        "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617"
+      },
+      "top30": [
+        {
+          "rank": 1,
+          "reference_literal_label": "TCP",
+          "physical_frames": 8509,
+          "Shark_literal_distribution": [
+            {
+              "label": "TCP",
+              "physical_frames": 7801
+            },
+            {
+              "label": "RTSP",
+              "physical_frames": 176
+            },
+            {
+              "label": "TLSv1.3",
+              "physical_frames": 156
+            },
+            {
+              "label": "Syslog",
+              "physical_frames": 91
+            },
+            {
+              "label": "IPP",
+              "physical_frames": 65
+            },
+            {
+              "label": "LDAP",
+              "physical_frames": 39
+            },
+            {
+              "label": "TLSv1.2",
+              "physical_frames": 37
+            },
+            {
+              "label": "TLS",
+              "physical_frames": 27
+            },
+            {
+              "label": "DCE/RPC",
+              "physical_frames": 19
+            },
+            {
+              "label": "HTTP/1.1",
+              "physical_frames": 18
+            },
+            {
+              "label": "BGP",
+              "physical_frames": 16
+            },
+            {
+              "label": "LDP",
+              "physical_frames": 16
+            },
+            {
+              "label": "SMB2",
+              "physical_frames": 14
+            },
+            {
+              "label": "DNS",
+              "physical_frames": 12
+            },
+            {
+              "label": "IMAP",
+              "physical_frames": 10
+            },
+            {
+              "label": "SSH",
+              "physical_frames": 5
+            },
+            {
+              "label": "HTTP/1.0",
+              "physical_frames": 3
+            },
+            {
+              "label": "Kerberos",
+              "physical_frames": 2
+            },
+            {
+              "label": "POP3",
+              "physical_frames": 1
+            },
+            {
+              "label": "RDP",
+              "physical_frames": 1
+            }
+          ]
+        },
+        {
+          "rank": 2,
+          "reference_literal_label": "RTP",
+          "physical_frames": 6462,
+          "Shark_literal_distribution": [
+            {
+              "label": "RTP",
+              "physical_frames": 6462
+            }
+          ]
+        },
+        {
+          "rank": 3,
+          "reference_literal_label": "DNS",
+          "physical_frames": 3384,
+          "Shark_literal_distribution": [
+            {
+              "label": "DNS",
+              "physical_frames": 3372
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 8
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 4
+            }
+          ]
+        },
+        {
+          "rank": 4,
+          "reference_literal_label": "ICMPv6",
+          "physical_frames": 2967,
+          "Shark_literal_distribution": [
+            {
+              "label": "ICMPv6",
+              "physical_frames": 2826
+            },
+            {
+              "label": "MLDv2",
+              "physical_frames": 141
+            }
+          ]
+        },
+        {
+          "rank": 5,
+          "reference_literal_label": "TLSv1.2",
+          "physical_frames": 2810,
+          "Shark_literal_distribution": [
+            {
+              "label": "TLSv1.2",
+              "physical_frames": 2486
+            },
+            {
+              "label": "RDPUDP2",
+              "physical_frames": 228
+            },
+            {
+              "label": "TLS",
+              "physical_frames": 96
+            }
+          ]
+        },
+        {
+          "rank": 6,
+          "reference_literal_label": "STP",
+          "physical_frames": 2612,
+          "Shark_literal_distribution": [
+            {
+              "label": "RPVST+",
+              "physical_frames": 2205
+            },
+            {
+              "label": "RSTP",
+              "physical_frames": 407
+            }
+          ]
+        },
+        {
+          "rank": 7,
+          "reference_literal_label": "ICMP",
+          "physical_frames": 2509,
+          "Shark_literal_distribution": [
+            {
+              "label": "ICMP",
+              "physical_frames": 2509
+            }
+          ]
+        },
+        {
+          "rank": 8,
+          "reference_literal_label": "UDP",
+          "physical_frames": 2138,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 2123
+            },
+            {
+              "label": "TFTP",
+              "physical_frames": 10
+            },
+            {
+              "label": "SSDP",
+              "physical_frames": 5
+            }
+          ]
+        },
+        {
+          "rank": 9,
+          "reference_literal_label": "ESP",
+          "physical_frames": 1600,
+          "Shark_literal_distribution": [
+            {
+              "label": "ESP",
+              "physical_frames": 1600
+            }
+          ]
+        },
+        {
+          "rank": 10,
+          "reference_literal_label": "NTP",
+          "physical_frames": 1331,
+          "Shark_literal_distribution": [
+            {
+              "label": "NTP",
+              "physical_frames": 1331
+            }
+          ]
+        },
+        {
+          "rank": 11,
+          "reference_literal_label": "RMCP+",
+          "physical_frames": 864,
+          "Shark_literal_distribution": [
+            {
+              "label": "IPMI",
+              "physical_frames": 864
+            }
+          ]
+        },
+        {
+          "rank": 12,
+          "reference_literal_label": "TLSv1.3",
+          "physical_frames": 854,
+          "Shark_literal_distribution": [
+            {
+              "label": "TLSv1.3",
+              "physical_frames": 835
+            },
+            {
+              "label": "TLS",
+              "physical_frames": 19
+            }
+          ]
+        },
+        {
+          "rank": 13,
+          "reference_literal_label": "RDPUDP2",
+          "physical_frames": 830,
+          "Shark_literal_distribution": [
+            {
+              "label": "RDPUDP2",
+              "physical_frames": 828
+            },
+            {
+              "label": "TLSv1.2",
+              "physical_frames": 2
+            }
+          ]
+        },
+        {
+          "rank": 14,
+          "reference_literal_label": "VRRP",
+          "physical_frames": 818,
+          "Shark_literal_distribution": [
+            {
+              "label": "VRRP",
+              "physical_frames": 818
+            }
+          ]
+        },
+        {
+          "rank": 15,
+          "reference_literal_label": "GLBP",
+          "physical_frames": 777,
+          "Shark_literal_distribution": [
+            {
+              "label": "GLBP",
+              "physical_frames": 777
+            }
+          ]
+        },
+        {
+          "rank": 16,
+          "reference_literal_label": "HSRPv2",
+          "physical_frames": 768,
+          "Shark_literal_distribution": [
+            {
+              "label": "HSRPv2",
+              "physical_frames": 764
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 4
+            }
+          ]
+        },
+        {
+          "rank": 17,
+          "reference_literal_label": "ISAKMP",
+          "physical_frames": 719,
+          "Shark_literal_distribution": [
+            {
+              "label": "IKEv2",
+              "physical_frames": 480
+            },
+            {
+              "label": "IKEv1",
+              "physical_frames": 239
+            }
+          ]
+        },
+        {
+          "rank": 18,
+          "reference_literal_label": "L2TPv3",
+          "physical_frames": 706,
+          "Shark_literal_distribution": [
+            {
+              "label": "L2TPv3",
+              "physical_frames": 706
+            }
+          ]
+        },
+        {
+          "rank": 19,
+          "reference_literal_label": "OSPF",
+          "physical_frames": 695,
+          "Shark_literal_distribution": [
+            {
+              "label": "OSPFv3",
+              "physical_frames": 417
+            },
+            {
+              "label": "OSPFv2",
+              "physical_frames": 278
+            }
+          ]
+        },
+        {
+          "rank": 20,
+          "reference_literal_label": "SNMP",
+          "physical_frames": 678,
+          "Shark_literal_distribution": [
+            {
+              "label": "SNMP",
+              "physical_frames": 678
+            }
+          ]
+        },
+        {
+          "rank": 21,
+          "reference_literal_label": "ISIS HELLO",
+          "physical_frames": 559,
+          "Shark_literal_distribution": [
+            {
+              "label": "IS-IS Hello",
+              "physical_frames": 559
+            }
+          ]
+        },
+        {
+          "rank": 22,
+          "reference_literal_label": "SSHv2",
+          "physical_frames": 537,
+          "Shark_literal_distribution": [
+            {
+              "label": "SSH",
+              "physical_frames": 537
+            }
+          ]
+        },
+        {
+          "rank": 23,
+          "reference_literal_label": "BFD Echo",
+          "physical_frames": 472,
+          "Shark_literal_distribution": [
+            {
+              "label": "UDP",
+              "physical_frames": 472
+            }
+          ]
+        },
+        {
+          "rank": 24,
+          "reference_literal_label": "MDNS",
+          "physical_frames": 396,
+          "Shark_literal_distribution": [
+            {
+              "label": "mDNS",
+              "physical_frames": 396
+            }
+          ]
+        },
+        {
+          "rank": 25,
+          "reference_literal_label": "LOOP",
+          "physical_frames": 339,
+          "Shark_literal_distribution": [
+            {
+              "label": "EthernetCTPReply",
+              "physical_frames": 339
+            }
+          ]
+        },
+        {
+          "rank": 26,
+          "reference_literal_label": "PIMv2",
+          "physical_frames": 333,
+          "Shark_literal_distribution": [
+            {
+              "label": "PIMv2",
+              "physical_frames": 333
+            }
+          ]
+        },
+        {
+          "rank": 27,
+          "reference_literal_label": "LDAP",
+          "physical_frames": 326,
+          "Shark_literal_distribution": [
+            {
+              "label": "LDAP",
+              "physical_frames": 326
+            }
+          ]
+        },
+        {
+          "rank": 28,
+          "reference_literal_label": "LDP",
+          "physical_frames": 306,
+          "Shark_literal_distribution": [
+            {
+              "label": "LDP",
+              "physical_frames": 306
+            }
+          ]
+        },
+        {
+          "rank": 29,
+          "reference_literal_label": "SMB2",
+          "physical_frames": 242,
+          "Shark_literal_distribution": [
+            {
+              "label": "SMB2",
+              "physical_frames": 122
+            },
+            {
+              "label": "TCP",
+              "physical_frames": 107
+            },
+            {
+              "label": "SPNEGO",
+              "physical_frames": 8
+            },
+            {
+              "label": "NTLMSSP",
+              "physical_frames": 5
+            }
+          ]
+        },
+        {
+          "rank": 30,
+          "reference_literal_label": "Chargen",
+          "physical_frames": 233,
+          "Shark_literal_distribution": [
+            {
+              "label": "TCP",
+              "physical_frames": 228
+            },
+            {
+              "label": "UDP",
+              "physical_frames": 5
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

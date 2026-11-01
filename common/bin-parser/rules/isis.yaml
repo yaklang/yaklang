@@ -3,6 +3,10 @@
 # TLVs; every other code is retained as an opaque, length-bounded value.
 endian: big
 Package:
+  ISISFields:
+    operator: |
+      err = parseObservedSession("isis")
+      if err != nil { panic(err) }
   ISIS:
     operator: |
       if !this.HasMaxLength() { panic("isis: PDU boundary is required") }
@@ -258,6 +262,8 @@ ISISAreaAddress:
   Address: raw
 
 ISISSystemIDs:
+  # Historical leaf name: in LAN IIH TLV6 these six octets are SNPAs/MACs,
+  # not router System IDs. ISISFields exposes the correctly named SNPA.
   list: true
   System ID: raw,6
   operator: |

@@ -24,8 +24,22 @@ type captureConfig struct {
 	snaplen, count                int
 	duration                      time.Duration
 	promisc                       bool
+	ignoreEmbeddedSecrets         bool
 	maxStreams, streamBytes       int
 	tlsSecrets                    pcaputil.TLSSecretProvider
+	decodeAs                      []pcaputil.CaptureOption
+	initialDisplayFilter          string
+	retentionPackets              int
+	protocolHistoryMiB            int
+	freezePacketFields            bool
+	exportProtocolPublications    bool
+}
+
+func protocolHistoryBudget(packets int) (int, int) {
+	// Size history with an explicitly enlarged offline packet window, with
+	// hard ceilings. Defaults remain 80k PDUs/64 MiB.
+	packets = max(20000, min(packets, 100000))
+	return min(256000, packets*4), int(min(int64(256<<20), int64(64<<20)*int64(packets)/20000))
 }
 
 type packetReader interface {
@@ -36,6 +50,8 @@ type captureSource struct {
 	reader  packetReader
 	file    *os.File
 	bpf     *pcap.BPF
+	filter  string
+	bpfs    map[layers.LinkType]*pcap.BPF
 	snaplen uint32
 	handle  *pcap.Handle
 	name    string
@@ -50,7 +66,7 @@ func openCapture(cfg captureConfig) (*captureSource, error) {
 	name := cfg.input
 	gateway := ""
 	if cfg.input != "" {
-		return openOffline(cfg.input, cfg.filter)
+		return openOffline(cfg.input, cfg.filter, cfg.ignoreEmbeddedSecrets)
 	} else {
 		name = cfg.device
 		if name == "" {
@@ -86,9 +102,8 @@ func (s *captureSource) Close() {
 }
 
 // Use pcapgo for offline input: the dynamically loaded pcap implementation does
-// not support all pcapng files. Reject mixed link types instead of silently
-// skipping interfaces or exporting their bytes with the wrong link type.
-func openOffline(name, filter string) (_ *captureSource, result error) {
+// not support all pcapng files. Link types are carried per packet.
+func openOffline(name, filter string, ignoreSecrets ...bool) (_ *captureSource, result error) {
 	f, err := os.Open(name)
 	if err != nil {
 		return nil, fmt.Errorf("open capture: %w", err)
@@ -98,24 +113,53 @@ func openOffline(name, filter string) (_ *captureSource, result error) {
 			_ = f.Close()
 		}
 	}()
-	reader, err := pcaputil.NewCaptureReader(f)
+	reader, err := pcaputil.NewCaptureReaderWithOptions(f, pcaputil.PcapReaderOptions{IgnoreEmbeddedSecrets: len(ignoreSecrets) > 0 && ignoreSecrets[0]})
 	if err != nil {
 		return nil, fmt.Errorf("read capture header: %w", err)
 	}
-	src := &captureSource{file: f, name: name, offline: true, reader: reader, link: reader.LinkType(), snaplen: reader.Snaplen()}
+	src := &captureSource{file: f, name: name, offline: true, reader: reader, link: reader.LinkType(), snaplen: reader.Snaplen(), filter: filter, bpfs: make(map[layers.LinkType]*pcap.BPF)}
 
 	if filter != "" {
-		src.bpf, err = pcap.NewBPF(src.link, int(src.snaplen), filter)
+		src.bpf, err = pcap.NewBPF(bpfLinkType(src.link), int(src.snaplen), filter)
 		if err != nil {
 			return nil, fmt.Errorf("invalid capture BPF %q: %w", filter, err)
 		}
+	}
+	if src.bpf != nil {
+		src.bpfs[src.link] = src.bpf
 	}
 	return src, nil
 }
 
 type capturedPacket struct {
+	workerFieldProjection bool   // IPC values have normalized types; equality was decided by the parent.
+	publicationPhase      string // Nonphysical, bounded JSON analysis record; never a captured frame.
+	transportView         *packetTransportView
+	physicalRecord        bool
+	tcpFlowID             uint64
+	tcpFlowDomain         pcaputil.CaptureDomain
+	tcpFlowState          string
+	tcpUnconfirmed        bool
+	messageTransport      string
+	messageSource         string
+	messageDestination    string
+	messageDomain         pcaputil.CaptureDomain
+	conversationID        uint64
+	conversationTransport string
+	conversationDomain    pcaputil.CaptureDomain
+	conversationDomainSet bool
+	connectionStack       []string
+	connectionDiagnostic  string
+	opaqueTransport       bool
+	presentation          packetPresentation
 	reference             pcaputil.PacketReference
 	events                []*pcaputil.ProtocolEvent
+	observedPDUs          []map[string]any
+	publishedPDUs         []map[string]any
+	observedFields        []pcaputil.DisplayFieldSnapshot
+	observedFieldBudget   int
+	observedFieldsLimited bool
+	fieldsAtObservation   bool
 	eventIDs              []uint64
 	history               *pcaputil.ProtocolInspector
 	streamID              uint64
@@ -145,7 +189,12 @@ type captureSession struct {
 
 func startCapture(parent context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) *captureSession {
 	ctx, cancel := context.WithCancel(parent)
-	s := &captureSession{packets: make(chan *capturedPacket, 2048), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
+	queue := 2048
+	if cfg.freezePacketFields || cfg.exportProtocolPublications {
+		queue = 64
+	} // bounded field snapshots backpressure plain/JSON output
+	s := &captureSession{packets: make(chan *capturedPacket, queue), done: make(chan struct{}), cancel: cancel, streams: newStreamStore(cfg.maxStreams, cfg.streamBytes)}
+	s.streams.captureReplay = src.offline
 	go func() {
 		defer close(s.packets)
 		defer close(s.done)
@@ -158,31 +207,126 @@ func (s *captureSession) Stop()         { s.stopOnce.Do(s.cancel); <-s.done }
 func (s *captureSession) result() error { <-s.done; return s.err }
 
 func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg captureConfig, lossyDisplay bool) (result error) {
-	history, _ := pcaputil.NewProtocolInspector(4096, 32<<20)
+	// A retained physical packet can contribute multiple carrier/inner PDUs.
+	// Keep the default 20k packet window useful after a full-file replay while
+	// bounding both observation count and retained structured/raw bytes.
+	messages, bytes := protocolHistoryBudget(cfg.retentionPackets)
+	if cfg.protocolHistoryMiB > 0 {
+		bytes = cfg.protocolHistoryMiB << 20
+	}
+	history, _ := pcaputil.NewProtocolInspector(messages, bytes)
 	if s.streams != nil {
 		s.streams.mu.Lock()
 		s.streams.history = history
 		s.streams.mu.Unlock()
 	}
 	var current *capturedPacket
-	analyzer, err := pcaputil.NewPacketAnalyzer(pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
+	publishingClose := false
+	// Duration expiry ends input, but the consumer still needs close diagnostics.
+	// Explicit parent cancellation also cancels publication backpressure.
+	publicationContext := ctx
+	// Inspection must retain useful packets from imperfect captures. The engine
+	// still reports gaps and never concatenates bytes across a missing range.
+	options := append([]pcaputil.CaptureOption(nil), cfg.decodeAs...)
+	if src.offline {
+		options = append(options, pcaputil.WithCaptureReplayClock())
+	}
+	options = append(options, pcaputil.WithBeforeTransportPacket(func(packet gopacket.Packet) {
+		if current != nil {
+			current.observeTransportHeader(packet)
+		}
+	}))
+	options = append(options, pcaputil.WithTCPReassemblyOptions(pcaputil.TCPReassemblyOptions{AllowIncomplete: true, Stream: true}), pcaputil.WithTLSSecrets(cfg.tlsSecrets), pcaputil.WithOnTrafficFlowCreated(func(flow *pcaputil.TrafficFlow) {
+		if s.streams != nil {
+			s.streams.nativeCreated(flow)
+		}
+	}), pcaputil.WithOnTrafficFlowOnDataFrameArrived(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, frame *pcaputil.TrafficFrame) {
+		if s.streams != nil {
+			s.streams.nativeData(flow, conn, frame)
+		}
+	}), pcaputil.WithOnTrafficFlowClosed(func(reason pcaputil.TrafficFlowCloseReason, flow *pcaputil.TrafficFlow) {
+		if s.streams != nil {
+			s.streams.nativeClosed(reason, flow)
+		}
+	}), pcaputil.WithOnTrafficFlowPacket(func(flow *pcaputil.TrafficFlow, conn *pcaputil.TrafficConnection, refs []pcaputil.PacketReference, ts time.Time) {
+		if current != nil {
+			for _, ref := range refs {
+				if ref.Number == current.reference.Number {
+					current.tcpFlowID = flow.Index // Copy a scalar; never retain the pooled flow.
+					current.tcpFlowDomain = flow.CaptureDomain()
+					break
+				}
+			}
+		}
+		if s.streams != nil {
+			s.streams.nativePacket(flow, conn, refs, ts, current)
+		}
+	}), pcaputil.WithOnProtocolMessage(func(e *pcaputil.ProtocolEvent) {
 		history.OnEvent(e)
+		if s.streams != nil {
+			s.streams.observeProtocol(e)
+		}
 		if current != nil {
 			current.history = history
-			if len(current.eventIDs) < 128 {
-				current.eventIDs = append(current.eventIDs, e.ID)
+			contributes := false
+			// Time-based flushing can emit events from another flow. Only an
+			// event with this packet among its contributors may label its row.
+			for _, ref := range e.SourceBytes.PacketRefs {
+				// CLI record numbers are global across sections/interfaces. Outer
+				// fragment reassembly can add a proven tunnel domain to this same
+				// record; exact domain equality would hide its completed PDU.
+				if ref.Number == current.reference.Number {
+					contributes = true
+					recordProtocolConversation(current, e)
+					if current.fieldsAtObservation {
+						current.recordObservedPDU(e)
+					}
+					if len(current.eventIDs) < 128 {
+						current.eventIDs = append(current.eventIDs, e.ID)
+					}
+					current.presentation.add(e)
+					if (e.Status == "decoded" || e.Status == "deferred" || protectedSSHEvent(e) || protectedConversationEvent(e)) && (e.Transport == "tcp" || e.Transport == "udp") {
+						current.messageTransport, current.messageSource, current.messageDestination = e.Transport, e.Source, e.Destination
+						current.messageDomain = e.Domain
+					}
+					break
+				}
+			}
+			if current.fieldsAtObservation && !contributes {
+				// Filling a TCP hole may release complete PDUs whose bytes all
+				// belong to previously exported rows. Time-based flushes can also
+				// publish another flow. Preserve these separately without labeling
+				// this packet or inventing it as one of their byte contributors.
+				current.recordPublishedPDU(e)
+			}
+		} else if publishingClose && cfg.exportProtocolPublications {
+			publication := &capturedPacket{publicationPhase: "capture_close", fieldsAtObservation: true, observedFieldBudget: observedPacketFieldBytes - 1024}
+			publication.recordObservedPDU(e)
+			select {
+			case s.packets <- publication:
+			case <-publicationContext.Done():
 			}
 		}
 	}))
+	analyzer, err := pcaputil.NewPacketAnalyzer(options...)
 	if err != nil {
 		return err
 	}
-	defer func() { result = errors.Join(result, analyzer.Close()) }()
-
-	if s.streams != nil {
-		defer s.streams.finish()
-	}
+	defer func() {
+		current = nil
+		publishingClose = true
+		result = errors.Join(result, analyzer.Close())
+		if s.streams != nil {
+			s.streams.finish()
+		}
+	}()
 	var writer packetWriter
+	var ngWriter *pcapgo.NgWriter
+	type outputDomain struct {
+		domain pcaputil.CaptureDomain
+		link   layers.LinkType
+	}
+	interfaces := make(map[outputDomain]int)
 	if cfg.output != "" {
 		// Exclusive creation also protects the input capture, including symlink/hardlink aliases.
 		file, err := os.OpenFile(cfg.output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
@@ -200,6 +344,7 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 				return err
 			}
 			writer = ng
+			ngWriter = ng
 			defer func() {
 				if err := ng.Flush(); result == nil {
 					result = err
@@ -249,17 +394,46 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if err != nil {
 			return fmt.Errorf("read capture: %w", err)
 		}
-		if reader, ok := src.reader.(*pcaputil.CaptureReader); ok && reader.LinkType() != src.link {
-			return fmt.Errorf("shark does not yet export mixed link types; capture interface changed")
+		link := src.link
+		if reader, ok := src.reader.(*pcaputil.CaptureReader); ok {
+			link = reader.LinkType()
 		}
-		if src.bpf != nil && !src.bpf.Matches(ci, data) {
-			continue
+		if src.offline && src.filter != "" {
+			bpf := src.bpfs[link]
+			if bpf == nil {
+				bpf, err = pcap.NewBPF(bpfLinkType(link), int(src.snaplen), src.filter)
+				if err != nil {
+					return fmt.Errorf("compile capture BPF for link %d: %w", link, err)
+				}
+				src.bpfs[link] = bpf
+			}
+			if !bpf.Matches(ci, data) {
+				continue
+			}
 		}
+
 		if writer != nil {
-			// A classic pcap source may carry a nonzero InterfaceIndex. The exported
-			// file has one interface, regardless of the source OS index.
 			outputInfo := ci
 			outputInfo.InterfaceIndex = 0
+			if ngWriter != nil {
+				domain := pcaputil.CapturePacketReference(ci).Domain
+				key := outputDomain{domain: domain, link: link}
+				index, ok := interfaces[key]
+				if !ok {
+					if len(interfaces) == 0 && link == src.link {
+						index = 0
+					} else {
+						index, err = ngWriter.AddInterface(pcapgo.NgInterface{Name: fmt.Sprintf("section-%d-interface-%d", domain.Section, domain.Interface), LinkType: link, TimestampResolution: 9})
+						if err != nil {
+							return fmt.Errorf("write output interface: %w", err)
+						}
+					}
+					interfaces[key] = index
+				}
+				outputInfo.InterfaceIndex = index
+			} else if link != src.link {
+				return fmt.Errorf("classic PCAP cannot represent link change %d to %d; use .pcapng output", src.link, link)
+			}
 			if err := writer.WritePacket(outputInfo, data); err != nil {
 				return fmt.Errorf("write output capture: %w", err)
 			}
@@ -270,16 +444,24 @@ func (s *captureSession) capture(ctx context.Context, src *captureSource, cfg ca
 		if ref.Number == 0 {
 			ref.Number = n
 		}
-		ref.Domain = pcaputil.PacketDomain(data, ci, src.link)
-		packet := &capturedPacket{number: n, data: data, ci: ci, link: src.link, history: history, reference: ref}
-		if s.streams != nil {
-			s.streams.add(packet)
+		ref.Domain = pcaputil.PacketDomain(data, ci, link)
+		packet := &capturedPacket{physicalRecord: true, number: ref.Number, data: data, ci: ci, link: link, history: history, reference: ref}
+		if cfg.freezePacketFields {
+			packet.fieldsAtObservation = true
+			packet.observedFieldBudget = observedPacketFieldBytes - 1024
 		}
 		current = packet
-		if err := analyzer.Feed(data, ci, src.link); err != nil {
+		if err := analyzer.Feed(data, ci, link); err != nil {
 			return err
 		}
+		if s.streams != nil {
+			s.streams.attachNative(packet)
+			s.streams.annotate(packet)
+		}
 		current = nil
+		if packet.conversationID != 0 && len(packet.connectionStack) == 0 {
+			packet.connectionStack = append([]string(nil), packet.presentation.stack...)
+		}
 		if lossyDisplay && !src.offline {
 			s.enqueueLatest(packet)
 		} else {
@@ -313,4 +495,12 @@ func (s *captureSession) enqueueLatest(packet *capturedPacket) {
 	default:
 		s.skipped.Add(1)
 	}
+}
+
+// libpcap consumes DLT_RAW (12), while capture files record LINKTYPE_RAW (101).
+func bpfLinkType(link layers.LinkType) layers.LinkType {
+	if link == layers.LinkTypeRaw {
+		return layers.LinkType(12)
+	}
+	return link
 }

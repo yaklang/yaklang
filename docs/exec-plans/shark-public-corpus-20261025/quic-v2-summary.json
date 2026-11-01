@@ -1,0 +1,1633 @@
+{
+  "scope": "Native fixed-version QUIC v2 packet protection, Retry recovery and isolation; actual Windows mixed-version UDP generations, independent RFC crypto, application source/field comparisons and literal version UI. This is selected-profile evidence, not whole QUIC conformance.",
+  "native_functional_source": "5be60cad5e",
+  "version_specific_alias_and_UI_source": "d608c424c8",
+  "audit_source": "169b6ea528",
+  "captures_and_secrets_outside_Git": true,
+  "rules_and_immutable_legacy_inputs_answers_unchanged": true,
+  "auditor_sha256": {
+    "discovery/http3_field_live.py": "45581539b056b1fd9f26b87697472f43889c6388e530e325b752fc035df0e093",
+    "quic_header_wire_audit.py": "82420418124b695906f43be8ee2b44466717f4424aade5849c6fd733b95ba4f0",
+    "quic_header_negative_controls.py": "e67d014f933c7bc73df67fa1b074115bd4e722315d282d2157cd6e3ff2a2d594",
+    "quic_retry_initial_audit.py": "632b88ffd51b4e58b84a02b696ec4d845f865c34f3f401c60f92819a96b2ff7c",
+    "quic_key_update_wire_audit.py": "7d91f2834ce7628be4c37122f82bb261f22d38d7b1432f02e18c2d57243ac170",
+    "quic_key_update_negative_controls.py": "cdaaa8d8ef9a15bb5f44f960974c397bd76db066eae986362bc6755b0449b18c",
+    "quic_source_graph_audit.py": "2c087aa7b818fcc08e0b0cba8eb7aeb767326e437a28b62620d57ba651e133ce",
+    "http3_field_wire_audit.py": "e0d94b8a6a4cf2d1ea17c398b608f031812148a4e2374dda47a92b5d1a764f3c"
+  },
+  "installed_aioquic_crypto_source_sha256": "bb504bc351ccd521c55a9d83968eba9e3633dc2b04124e8459ff1eb810224bc6",
+  "tests": {
+    "native_full_seconds_at_5be60cad5e": 400.229,
+    "CLI_full_seconds_at_5be60cad5e": 1.985,
+    "catalog_selected_seconds": 1.183,
+    "version_key_phase_isolation_fuzz_executions": 101789,
+    "version_key_phase_isolation_fuzz_seconds": 40.461,
+    "all_QUIC_FirstBatch_and_aliases_at_d608c424c8_seconds": 1.468,
+    "full_CLI_at_d608c424c8_seconds": 1.971
+  },
+  "captures": {
+    "v2-real-01": {
+      "capture_sha256": "fccec9b013cceae5dbedbbd9d511d3cd9fef904c341e9df162ec0cbdc54ce9f5",
+      "manifest_sha256": "bc59eb8f28e91b7f168350b039492f8d657ff4ec9fac893067b2869f534c8a98",
+      "generator_sha256_at_capture": "597069248551ab3d8039289b2c45b8b39a84fb60a9f0c59a70dd62da54251e9a",
+      "generator_controls": {
+        "wire_versions": [
+          1798521807,
+          1798521807,
+          1798521807
+        ],
+        "cipher_suites": [
+          4865,
+          4866,
+          4867
+        ],
+        "connection_id_lengths": [
+          8,
+          0,
+          20
+        ],
+        "zero_cid_policy": "omit-new-connection-id",
+        "server_retry": true,
+        "retry_client_policy": "preserve-first-client-hello",
+        "client_key_update_followup": true
+      },
+      "network": {
+        "retry_packets": 3,
+        "delayed": 12,
+        "dropped": 6
+      },
+      "actual_byte_exact_request_reply_receipts": 12,
+      "physical_frames": 107,
+      "native_PDU_records": 125,
+      "native_protocol_counts": {
+        "": 3,
+        "quic": 96,
+        "http3": 26
+      },
+      "diagnostics": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 10,
+        "AuthenticationFailed: QUIC packet protection authentication failed": 5,
+        "ContextRequired: QUIC reused zero-CID tuple has no unique authenticated captured generation": 2
+      },
+      "profiles": [
+        {
+          "epoch": 0,
+          "packets": [
+            20,
+            11
+          ],
+          "dropped": [
+            0,
+            0
+          ],
+          "requests": 4,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4865,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 1,
+          "packets": [
+            25,
+            14
+          ],
+          "dropped": [
+            2,
+            1
+          ],
+          "requests": 4,
+          "connection_id_length": 0,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4866,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 2,
+          "packets": [
+            25,
+            14
+          ],
+          "dropped": [
+            2,
+            1
+          ],
+          "requests": 4,
+          "connection_id_length": 20,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4867,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        }
+      ],
+      "header": {
+        "checks": 7055,
+        "matched_reference_views": 122,
+        "authenticated_packet_numbers": 102,
+        "authenticated_flow_association_checks": 102,
+        "reference_zero_length_omissions": {
+          "quic.scid": 6,
+          "quic.dcid": 36
+        },
+        "reference_value_differences": [],
+        "reference_field_omissions": [],
+        "oracle_sha256": "1dd7257909376e96b525bc7d7059e036bed64e110c91160f4d1c1ca670ee78d9",
+        "events_sha256": "0f1a24e75ab04aaba9391596cb55f831eb351b43534e1b0b57bba0cca23027ff"
+      },
+      "unmatched_reference_views": [
+        {
+          "frame": 1,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "65bf35b25e2cdb9dadd5974ea6ee63e157acb92f8c6b6dbcbd1c95d4271595e4",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 2,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "65bf35b25e2cdb9dadd5974ea6ee63e157acb92f8c6b6dbcbd1c95d4271595e4",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 3,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "65bf35b25e2cdb9dadd5974ea6ee63e157acb92f8c6b6dbcbd1c95d4271595e4",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        }
+      ],
+      "unmatched_native_views": [],
+      "independent_Initial_and_Retry": {
+        "checks": 595,
+        "connections": 3,
+        "independently_decrypted_Initial_packets": 12,
+        "verified_public_Retry_tags": 3,
+        "nonconforming_pairs": 0,
+        "oracle_sha256": "1dd7257909376e96b525bc7d7059e036bed64e110c91160f4d1c1ca670ee78d9",
+        "events_sha256": "0f1a24e75ab04aaba9391596cb55f831eb351b43534e1b0b57bba0cca23027ff",
+        "header_certificate_sha256": "8027ed403abb60797c5dccab2334dbfb8de1ff122d70e7609eb62235c06903bd"
+      },
+      "independent_1RTT": {
+        "checks": 1567,
+        "protected_short_packets": 91,
+        "profiles": {
+          "('RFC', 4865, 0, 0)": 25,
+          "('legacy-v2-negative', 4865, 1, 1)": 3,
+          "('RFC', 4866, 0, 0)": 29,
+          "('legacy-v2-negative', 4866, 1, 1)": 2,
+          "('RFC', 4867, 0, 0)": 30,
+          "('legacy-v2-negative', 4867, 1, 1)": 2
+        },
+        "legacy_only_packets": 7,
+        "oracle_sha256": "1dd7257909376e96b525bc7d7059e036bed64e110c91160f4d1c1ca670ee78d9",
+        "events_sha256": "0f1a24e75ab04aaba9391596cb55f831eb351b43534e1b0b57bba0cca23027ff",
+        "keylog_sha256": "70b715a55c3c410e497327796e4cb1964ae7912a174f8b367c5d937c2a2f6410",
+        "header_certificate_sha256": "8027ed403abb60797c5dccab2334dbfb8de1ff122d70e7609eb62235c06903bd",
+        "initial_certificate_sha256": "05d1b6a8f2b02a4b77841a30e7cdebed483e9555072a24e757a5de854a78254f"
+      },
+      "independent_certificate_sha256": {
+        "headers": "8027ed403abb60797c5dccab2334dbfb8de1ff122d70e7609eb62235c06903bd",
+        "Initial_and_Retry": "05d1b6a8f2b02a4b77841a30e7cdebed483e9555072a24e757a5de854a78254f",
+        "1RTT": "8b4a01e8d3e66f6a64e727a2757224a9aa57e9833c1038b1d015308dd5ab6fde"
+      }
+    },
+    "v2-real-02": {
+      "capture_sha256": "1bc0664290b43d823321fe77d176cb8c5b62a7c7cba990a402c2ab68e71ecbc6",
+      "manifest_sha256": "74a743d739cff9e13fbab7a66fc999e07fbbc5f4a354e2f99f898031b5a52f45",
+      "generator_sha256_at_capture": "45581539b056b1fd9f26b87697472f43889c6388e530e325b752fc035df0e093",
+      "generator_controls": {
+        "wire_versions": [
+          1798521807,
+          1798521807,
+          1798521807
+        ],
+        "cipher_suites": [
+          4865,
+          4866,
+          4867
+        ],
+        "connection_id_lengths": [
+          8,
+          0,
+          20
+        ],
+        "zero_cid_policy": "omit-new-connection-id",
+        "server_retry": true,
+        "retry_client_policy": "preserve-first-client-hello",
+        "client_key_update_followup": true,
+        "v2_key_update_policy": "rfc9369-label"
+      },
+      "network": {
+        "retry_packets": 3,
+        "delayed": 14,
+        "dropped": 6
+      },
+      "actual_byte_exact_request_reply_receipts": 12,
+      "physical_frames": 123,
+      "native_PDU_records": 141,
+      "native_protocol_counts": {
+        "": 3,
+        "quic": 106,
+        "http3": 32
+      },
+      "diagnostics": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 10
+      },
+      "profiles": [
+        {
+          "epoch": 0,
+          "packets": [
+            20,
+            11
+          ],
+          "dropped": [
+            0,
+            0
+          ],
+          "requests": 4,
+          "connection_id_length": 8,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4865,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 1,
+          "packets": [
+            26,
+            15
+          ],
+          "dropped": [
+            2,
+            1
+          ],
+          "requests": 4,
+          "connection_id_length": 0,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4866,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 2,
+          "packets": [
+            33,
+            19
+          ],
+          "dropped": [
+            2,
+            1
+          ],
+          "requests": 4,
+          "connection_id_length": 20,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4867,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        }
+      ],
+      "header": {
+        "checks": 8086,
+        "matched_reference_views": 138,
+        "authenticated_packet_numbers": 125,
+        "authenticated_flow_association_checks": 125,
+        "reference_zero_length_omissions": {
+          "quic.scid": 6,
+          "quic.dcid": 39
+        },
+        "reference_value_differences": [],
+        "reference_field_omissions": [],
+        "oracle_sha256": "1c65627ca3e8b2a03f786d3f8ad05f721a793d1c5b5af7c8387ca7924e5be89b",
+        "events_sha256": "6b00050d36f9ea9a40efc33822d2b9c0887c60fd5e16ce1aa893d2196a543cef"
+      },
+      "unmatched_reference_views": [
+        {
+          "frame": 1,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "9cab6cebfa4ee8fac0cd93b8debb3b4ccde8bc92228e61608d1f6225a4bb8226",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 2,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "9cab6cebfa4ee8fac0cd93b8debb3b4ccde8bc92228e61608d1f6225a4bb8226",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 3,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "9cab6cebfa4ee8fac0cd93b8debb3b4ccde8bc92228e61608d1f6225a4bb8226",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        }
+      ],
+      "unmatched_native_views": [],
+      "independent_Initial_and_Retry": {
+        "checks": 611,
+        "connections": 3,
+        "independently_decrypted_Initial_packets": 12,
+        "verified_public_Retry_tags": 3,
+        "nonconforming_pairs": 0,
+        "oracle_sha256": "1c65627ca3e8b2a03f786d3f8ad05f721a793d1c5b5af7c8387ca7924e5be89b",
+        "events_sha256": "6b00050d36f9ea9a40efc33822d2b9c0887c60fd5e16ce1aa893d2196a543cef",
+        "header_certificate_sha256": "e075843d0ee26898e652273ef799d7cf9b31f9dd41f76418bfa1a5feb180e2d5"
+      },
+      "independent_1RTT": {
+        "checks": 1837,
+        "protected_short_packets": 107,
+        "profiles": {
+          "('RFC', 4865, 0, 0)": 25,
+          "('RFC', 4865, 1, 1)": 3,
+          "('RFC', 4866, 0, 0)": 31,
+          "('RFC', 4866, 1, 1)": 3,
+          "('RFC', 4867, 0, 0)": 41,
+          "('RFC', 4867, 1, 1)": 4
+        },
+        "legacy_only_packets": 0,
+        "oracle_sha256": "1c65627ca3e8b2a03f786d3f8ad05f721a793d1c5b5af7c8387ca7924e5be89b",
+        "events_sha256": "6b00050d36f9ea9a40efc33822d2b9c0887c60fd5e16ce1aa893d2196a543cef",
+        "keylog_sha256": "49ee4abfdf0c2d7126bac5b36594b83e7af10a57b1e307a77b7194b847cd9cb5",
+        "header_certificate_sha256": "e075843d0ee26898e652273ef799d7cf9b31f9dd41f76418bfa1a5feb180e2d5",
+        "initial_certificate_sha256": "541f2329dfbbb3d11d220c743f45c04c5e4968b5b87e32b6e90476eae93ef2f1"
+      },
+      "independent_certificate_sha256": {
+        "headers": "e075843d0ee26898e652273ef799d7cf9b31f9dd41f76418bfa1a5feb180e2d5",
+        "Initial_and_Retry": "541f2329dfbbb3d11d220c743f45c04c5e4968b5b87e32b6e90476eae93ef2f1",
+        "1RTT": "051a5f9f18955e98f4d289921b7f51d6da951d4aeed900b3099e2e9d5a1affcb"
+      },
+      "application_source_graph": {
+        "checks": 15022,
+        "connections": 3,
+        "reference_coalesced_bindings": 8,
+        "reference_expert_only_blocks": 9,
+        "unprotected_zero_tails": [
+          {
+            "frame": 40,
+            "bytes": 1018,
+            "sha256": "3df3e7ad4df4994b5212a4780e885902004ae52a26d2a1d93a5b8fcbb3a0b1f2"
+          }
+        ],
+        "application_frames": 42,
+        "types": {
+          "4": 6,
+          "1": 24,
+          "0": 12
+        },
+        "source_ranges": 246,
+        "selected_differences": []
+      },
+      "application_source_certificate_sha256": "440f90fd877e668948564dfa9522d140ddb47c4f4beb030c84ea0078f014f5c4",
+      "application_fields": {
+        "profile": "declared-valid",
+        "checks": 7869,
+        "peer_operations": 12,
+        "native_connections": 3,
+        "header_sections": 24,
+        "native_conformance": {
+          "base-shape-valid": 24
+        },
+        "reference_frame_views": {
+          "4": 10,
+          "1": 25,
+          "0": 12,
+          "12400": 2
+        },
+        "reference_repeated_frame_views": [
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 0,
+            "type": 1,
+            "sha256": "3cd4e311afa187665086289bb79cb4a001ab6a2c793546cfbc560a0e7ff9adec",
+            "frames": [
+              50,
+              52
+            ]
+          },
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 2,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              50,
+              52
+            ]
+          },
+          {
+            "connection": "1",
+            "direction": 1,
+            "stream": 3,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              43,
+              49
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 0,
+            "type": 1,
+            "sha256": "3cd4e311afa187665086289bb79cb4a001ab6a2c793546cfbc560a0e7ff9adec",
+            "frames": [
+              88,
+              95,
+              98
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 2,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              88,
+              95,
+              98
+            ]
+          }
+        ],
+        "reference_header_views_unavailable": [
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          }
+        ],
+        "reference_raw_field_differences": [],
+        "network": {
+          "retry_packets": 3,
+          "delayed": 14,
+          "dropped": 6
+        },
+        "native_selected_differences": [],
+        "manifest_sha256": "74a743d739cff9e13fbab7a66fc999e07fbbc5f4a354e2f99f898031b5a52f45",
+        "oracle_sha256": "1c65627ca3e8b2a03f786d3f8ad05f721a793d1c5b5af7c8387ca7924e5be89b",
+        "events_sha256": "6b00050d36f9ea9a40efc33822d2b9c0887c60fd5e16ce1aa893d2196a543cef"
+      },
+      "application_fields_certificate_sha256": "e88aac08f6d84dd193bdafabdc7ff7dc6dc638a4cafad724b7e8757ae96c894e"
+    },
+    "v2-mixed-03": {
+      "capture_sha256": "b78b01e3782a215f8a335fd42ef6cca91a4aa45d4e1fcba51749095924f6e4cf",
+      "manifest_sha256": "5bd0053b5ae768ad7201ab7e7a0c0096d821dc9ba649cd2415aafa2643c3323d",
+      "generator_sha256_at_capture": "45581539b056b1fd9f26b87697472f43889c6388e530e325b752fc035df0e093",
+      "generator_controls": {
+        "wire_versions": [
+          1,
+          1798521807,
+          1
+        ],
+        "cipher_suites": [
+          4865,
+          4866,
+          4867
+        ],
+        "connection_id_lengths": [
+          0,
+          0,
+          20
+        ],
+        "zero_cid_policy": "omit-new-connection-id",
+        "server_retry": true,
+        "retry_client_policy": "preserve-first-client-hello",
+        "client_key_update_followup": true,
+        "v2_key_update_policy": "rfc9369-label"
+      },
+      "network": {
+        "retry_packets": 3,
+        "delayed": 14,
+        "dropped": 7
+      },
+      "actual_byte_exact_request_reply_receipts": 12,
+      "physical_frames": 122,
+      "native_PDU_records": 140,
+      "native_protocol_counts": {
+        "": 2,
+        "quic": 104,
+        "http3": 34
+      },
+      "diagnostics": {
+        "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit": 11
+      },
+      "profiles": [
+        {
+          "epoch": 0,
+          "packets": [
+            20,
+            11
+          ],
+          "dropped": [
+            0,
+            0
+          ],
+          "requests": 4,
+          "connection_id_length": 0,
+          "retry_packets_sent": 1,
+          "wire_version": 1,
+          "cipher_suite": 4865,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 1,
+          "packets": [
+            25,
+            14
+          ],
+          "dropped": [
+            2,
+            1
+          ],
+          "requests": 4,
+          "connection_id_length": 0,
+          "retry_packets_sent": 1,
+          "wire_version": 1798521807,
+          "cipher_suite": 4866,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        },
+        {
+          "epoch": 2,
+          "packets": [
+            33,
+            22
+          ],
+          "dropped": [
+            2,
+            2
+          ],
+          "requests": 4,
+          "connection_id_length": 20,
+          "retry_packets_sent": 1,
+          "wire_version": 1,
+          "cipher_suite": 4867,
+          "final_key_phases": [
+            1,
+            1
+          ]
+        }
+      ],
+      "header": {
+        "checks": 7924,
+        "matched_reference_views": 138,
+        "authenticated_packet_numbers": 124,
+        "authenticated_flow_association_checks": 124,
+        "reference_zero_length_omissions": {
+          "quic.scid": 12,
+          "quic.dcid": 68
+        },
+        "reference_value_differences": [],
+        "reference_field_omissions": [],
+        "oracle_sha256": "d0be71f8986b9be4ed833a912886aba41574531e1495dd07709021833981e067",
+        "events_sha256": "ec94d41e4d2292c35a07bf092d4f86bfc118464123d0d134eefdea6d41d3df5f"
+      },
+      "unmatched_reference_views": [
+        {
+          "frame": 1,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "5774a7f7c9a451d8289596950e0538d0bc4c0843c125a54b8255210bf5ac23aa",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 2,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "5774a7f7c9a451d8289596950e0538d0bc4c0843c125a54b8255210bf5ac23aa",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        }
+      ],
+      "unmatched_native_views": [],
+      "independent_Initial_and_Retry": {
+        "checks": 611,
+        "connections": 3,
+        "independently_decrypted_Initial_packets": 12,
+        "verified_public_Retry_tags": 3,
+        "nonconforming_pairs": 0,
+        "oracle_sha256": "d0be71f8986b9be4ed833a912886aba41574531e1495dd07709021833981e067",
+        "events_sha256": "ec94d41e4d2292c35a07bf092d4f86bfc118464123d0d134eefdea6d41d3df5f",
+        "header_certificate_sha256": "a72ccf5a49990f6c9ec48a5b562e6b268036fd4ff7f850161dc0a7f938a86bc5"
+      },
+      "independent_1RTT": {
+        "checks": 1825,
+        "protected_short_packets": 106,
+        "profiles": {
+          "('RFC', 4865, 0, 0)": 24,
+          "('RFC', 4865, 1, 1)": 3,
+          "('RFC', 4866, 0, 0)": 29,
+          "('RFC', 4866, 1, 1)": 2,
+          "('RFC', 4867, 0, 0)": 43,
+          "('RFC', 4867, 1, 1)": 5
+        },
+        "legacy_only_packets": 0,
+        "oracle_sha256": "d0be71f8986b9be4ed833a912886aba41574531e1495dd07709021833981e067",
+        "events_sha256": "ec94d41e4d2292c35a07bf092d4f86bfc118464123d0d134eefdea6d41d3df5f",
+        "keylog_sha256": "6c27afa96fa51137d9127a2a398a79e4dda81a1bfce8fbfb047e62f5b6f45df7",
+        "header_certificate_sha256": "a72ccf5a49990f6c9ec48a5b562e6b268036fd4ff7f850161dc0a7f938a86bc5",
+        "initial_certificate_sha256": "99280447685e4b1dc889a7b1240f0b25e105937182e7861630bc065c48a72e5d"
+      },
+      "independent_certificate_sha256": {
+        "headers": "a72ccf5a49990f6c9ec48a5b562e6b268036fd4ff7f850161dc0a7f938a86bc5",
+        "Initial_and_Retry": "99280447685e4b1dc889a7b1240f0b25e105937182e7861630bc065c48a72e5d",
+        "1RTT": "40cf25132e4d94d8b565cbdab6324cdcfb16f40df2ed0583c4f901550457548e"
+      },
+      "application_source_graph": {
+        "checks": 13429,
+        "connections": 3,
+        "reference_coalesced_bindings": 7,
+        "reference_expert_only_blocks": 9,
+        "unprotected_zero_tails": [
+          {
+            "frame": 7,
+            "bytes": 1034,
+            "sha256": "363d26aedad3a9c822f9d6ea06f55884675546a8fdbb5086231d635a256db791"
+          },
+          {
+            "frame": 39,
+            "bytes": 1018,
+            "sha256": "3df3e7ad4df4994b5212a4780e885902004ae52a26d2a1d93a5b8fcbb3a0b1f2"
+          }
+        ],
+        "application_frames": 42,
+        "types": {
+          "4": 6,
+          "1": 24,
+          "0": 12
+        },
+        "source_ranges": 246,
+        "selected_differences": []
+      },
+      "application_source_certificate_sha256": "4e2c6130f41248cfd7257de7e2e0b32a399359ca9320e8d1b5688aca91134901",
+      "application_fields": {
+        "profile": "declared-valid",
+        "checks": 6251,
+        "peer_operations": 12,
+        "native_connections": 3,
+        "header_sections": 24,
+        "native_conformance": {
+          "base-shape-valid": 24
+        },
+        "reference_frame_views": {
+          "4": 9,
+          "1": 25,
+          "0": 13,
+          "12400": 2
+        },
+        "reference_repeated_frame_views": [
+          {
+            "connection": "1",
+            "direction": 1,
+            "stream": 0,
+            "type": 0,
+            "sha256": "a1ef49fb7e76c816b226675686bbd3bdb8214889a72a3bcb5447b92fc4254522",
+            "frames": [
+              45,
+              57
+            ]
+          },
+          {
+            "connection": "1",
+            "direction": 1,
+            "stream": 0,
+            "type": 1,
+            "sha256": "df4fce9cedbb5e451117bb5e6227e67a418d4847b3f51a80e25f9a02e7e1778d",
+            "frames": [
+              45,
+              57
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 0,
+            "type": 1,
+            "sha256": "3cd4e311afa187665086289bb79cb4a001ab6a2c793546cfbc560a0e7ff9adec",
+            "frames": [
+              81,
+              93,
+              95
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 2,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              81,
+              93,
+              95
+            ]
+          },
+          {
+            "connection": "2",
+            "direction": 1,
+            "stream": 3,
+            "type": 4,
+            "sha256": "c0ba8a33ac67f44abff5984dfbb6f56c46b880ac2b86e1f23e7fa9c402c53ae7",
+            "frames": [
+              76,
+              77
+            ]
+          }
+        ],
+        "reference_header_views_unavailable": [
+          {
+            "connection": "1",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          },
+          {
+            "connection": "2",
+            "direction": 0,
+            "stream": 4,
+            "case": "cid-long-header-field"
+          }
+        ],
+        "reference_raw_field_differences": [],
+        "network": {
+          "retry_packets": 3,
+          "delayed": 14,
+          "dropped": 7
+        },
+        "native_selected_differences": [],
+        "manifest_sha256": "5bd0053b5ae768ad7201ab7e7a0c0096d821dc9ba649cd2415aafa2643c3323d",
+        "oracle_sha256": "d0be71f8986b9be4ed833a912886aba41574531e1495dd07709021833981e067",
+        "events_sha256": "ec94d41e4d2292c35a07bf092d4f86bfc118464123d0d134eefdea6d41d3df5f"
+      },
+      "application_fields_certificate_sha256": "3411e81bd85ad142ac7f5df4427c824f8189820bf8dcdf77bf43c7a853d86107"
+    }
+  },
+  "negative_controls": {
+    "v2_headers": {
+      "scope": "Require QUIC header/epoch audit to reject deliberately corrupted exports.\nUses the original real capture and reference, then mutates one evidence item.\nFull captures, manifests, oracle output and mutated JSONL stay outside Git.\n",
+      "baseline_passed": true,
+      "corruptions_rejected": 37,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "raw-octet",
+          "accepted": false
+        },
+        {
+          "control": "raw-digest",
+          "accepted": false
+        },
+        {
+          "control": "physical-domain",
+          "accepted": false
+        },
+        {
+          "control": "physical-witness",
+          "accepted": false
+        },
+        {
+          "control": "missing-actual-pdu",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-event-id",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-native-occurrence",
+          "accepted": false
+        },
+        {
+          "control": "wrong-generation",
+          "accepted": false
+        },
+        {
+          "control": "DCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "SCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-token-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "legacy-first-byte",
+          "accepted": false
+        },
+        {
+          "control": "owned-range",
+          "accepted": false
+        },
+        {
+          "control": "missing-alias",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-alias",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-value",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-origin",
+          "accepted": false
+        },
+        {
+          "control": "CID-value-span",
+          "accepted": false
+        },
+        {
+          "control": "version-alias",
+          "accepted": false
+        },
+        {
+          "control": "empty-CID-not-zero-octet",
+          "accepted": false
+        },
+        {
+          "control": "short-version",
+          "accepted": false
+        },
+        {
+          "control": "short-SCID",
+          "accepted": false
+        },
+        {
+          "control": "short-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type",
+          "accepted": false
+        },
+        {
+          "control": "short-forged-range",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type-v2",
+          "accepted": false
+        },
+        {
+          "control": "version-type-alias",
+          "accepted": false
+        },
+        {
+          "control": "long-type-value",
+          "accepted": false
+        },
+        {
+          "control": "unverified-PN",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-exact",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-not-ciphertext-span",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-range",
+          "accepted": false
+        }
+      ]
+    },
+    "v1_headers": {
+      "scope": "Require QUIC header/epoch audit to reject deliberately corrupted exports.\nUses the original real capture and reference, then mutates one evidence item.\nFull captures, manifests, oracle output and mutated JSONL stay outside Git.\n",
+      "baseline_passed": true,
+      "corruptions_rejected": 37,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "raw-octet",
+          "accepted": false
+        },
+        {
+          "control": "raw-digest",
+          "accepted": false
+        },
+        {
+          "control": "physical-domain",
+          "accepted": false
+        },
+        {
+          "control": "physical-witness",
+          "accepted": false
+        },
+        {
+          "control": "missing-actual-pdu",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-event-id",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-native-occurrence",
+          "accepted": false
+        },
+        {
+          "control": "wrong-generation",
+          "accepted": false
+        },
+        {
+          "control": "DCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "SCID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-token-binary",
+          "accepted": false
+        },
+        {
+          "control": "legacy-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "legacy-first-byte",
+          "accepted": false
+        },
+        {
+          "control": "owned-range",
+          "accepted": false
+        },
+        {
+          "control": "missing-alias",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-alias",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-value",
+          "accepted": false
+        },
+        {
+          "control": "CID-alias-origin",
+          "accepted": false
+        },
+        {
+          "control": "CID-value-span",
+          "accepted": false
+        },
+        {
+          "control": "version-alias",
+          "accepted": false
+        },
+        {
+          "control": "empty-CID-not-zero-octet",
+          "accepted": false
+        },
+        {
+          "control": "short-version",
+          "accepted": false
+        },
+        {
+          "control": "short-SCID",
+          "accepted": false
+        },
+        {
+          "control": "short-CID-length",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type",
+          "accepted": false
+        },
+        {
+          "control": "short-forged-range",
+          "accepted": false
+        },
+        {
+          "control": "short-long-type-v2",
+          "accepted": false
+        },
+        {
+          "control": "version-type-alias",
+          "accepted": false
+        },
+        {
+          "control": "long-type-value",
+          "accepted": false
+        },
+        {
+          "control": "unverified-PN",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-exact",
+          "accepted": false
+        },
+        {
+          "control": "decoded-PN-not-ciphertext-span",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN-value",
+          "accepted": false
+        },
+        {
+          "control": "reference-CID-range",
+          "accepted": false
+        }
+      ]
+    },
+    "1RTT": {
+      "scope": "Challenge independent 1-RTT verification with explicitly rebound test inputs.\nRebinding bypasses the input hashes only to exercise crypto, CID context and\nnative/reference PN comparisons. These are declared test controls, never new\ncapture evidence or replacements for the original certificates.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 10,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "AEAD-tag",
+          "accepted": false
+        },
+        {
+          "control": "HP-sample",
+          "accepted": false
+        },
+        {
+          "control": "DCID-context",
+          "accepted": false
+        },
+        {
+          "control": "key-phase-AAD",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN",
+          "accepted": false
+        },
+        {
+          "control": "native-PN",
+          "accepted": false
+        },
+        {
+          "control": "native-authentication",
+          "accepted": false
+        },
+        {
+          "control": "wire-version-context",
+          "accepted": false
+        },
+        {
+          "control": "receiver-CID-context",
+          "accepted": false
+        },
+        {
+          "control": "traffic-secret",
+          "accepted": false
+        }
+      ]
+    }
+  },
+  "public_full_export_regression": {
+    "weber": {
+      "SDK": {
+        "kind": "SDK",
+        "physical_capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "records": 39283,
+        "native_flow_ids": 1044,
+        "protocol_counts": {
+          "ldp": 322,
+          "l2tp": 706,
+          "arp": 218,
+          "icmp": 2509,
+          "bgp": 315,
+          "http": 117,
+          "": 3498,
+          "icmpv6": 2957,
+          "dhcp": 62,
+          "dhcpv6": 226,
+          "dns": 3388,
+          "tls": 4408,
+          "smtp": 23,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 941,
+          "rip": 68,
+          "ntp": 1331,
+          "snmp": 678,
+          "ssh": 32,
+          "tftp": 22,
+          "ike": 719,
+          "ssdp": 104,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 144,
+          "imap": 17,
+          "sip": 21,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 133,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 135,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "radius": 72,
+          "ipmi": 868,
+          "llmnr": 18,
+          "nbns": 36,
+          "pop3": 45,
+          "kerberos": 134,
+          "smb2": 155,
+          "ldap": 193,
+          "dcerpc": 109,
+          "rdp": 6,
+          "rdpudp": 2380,
+          "stun": 22,
+          "dtls": 93,
+          "quic": 88,
+          "pim": 333,
+          "modbus": 2
+        },
+        "baseline_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "after_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+        "byte_identical_to_pushed_retry_baseline": true
+      },
+      "CLI": {
+        "kind": "CLI",
+        "physical_capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "records": 51328,
+        "native_flow_ids": null,
+        "protocol_counts": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 9164,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 128,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "baseline_sha256": "8752e5d4a231c3a4200b2318ad689f6eb03af690992e66a121e7dab2153d7e13",
+        "after_sha256": "8752e5d4a231c3a4200b2318ad689f6eb03af690992e66a121e7dab2153d7e13",
+        "byte_identical_to_pushed_retry_baseline": true
+      }
+    },
+    "sharon": {
+      "SDK": {
+        "kind": "SDK",
+        "physical_capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "records": 245615,
+        "native_flow_ids": 977,
+        "protocol_counts": {
+          "ldp": 322,
+          "l2tp": 1365,
+          "arp": 227,
+          "icmp": 2501,
+          "bgp": 315,
+          "http": 83,
+          "": 109969,
+          "icmpv6": 2985,
+          "dhcp": 17,
+          "dhcpv6": 198,
+          "dns": 1289,
+          "tls": 842,
+          "smtp": 20,
+          "ripng": 124,
+          "stp": 2612,
+          "lldp": 71,
+          "hsrp": 764,
+          "rip": 68,
+          "ntp": 1213,
+          "snmp": 234,
+          "ssh": 22,
+          "tftp": 22,
+          "ike": 274,
+          "ssdp": 73,
+          "mdns": 396,
+          "rtsp": 15,
+          "ip": 110769,
+          "imap": 5,
+          "sip": 23,
+          "rtp": 6462,
+          "whois": 24,
+          "netflow-v9": 196,
+          "telnet": 136,
+          "ipp": 19,
+          "ftp": 96,
+          "ftp-data": 46,
+          "bfd": 65,
+          "isis": 678,
+          "glbp": 777,
+          "syslog": 119,
+          "stun": 2,
+          "turn": 1,
+          "pim": 131,
+          "dcerpc": 12,
+          "smb2": 16,
+          "diameter": 5,
+          "postgresql": 4,
+          "quic": 1,
+          "modbus": 2,
+          "kafka": 5
+        },
+        "baseline_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "byte_identical_to_pushed_retry_baseline": true
+      },
+      "CLI": {
+        "kind": "CLI",
+        "physical_capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "records": 328127,
+        "native_flow_ids": null,
+        "protocol_counts": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6643,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "DCE/RPC": 1,
+          "SMB2": 9,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 2
+        },
+        "baseline_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "byte_identical_to_pushed_retry_baseline": true
+      }
+    }
+  },
+  "public_QUIC_headers": {
+    "weber": {
+      "checks": 262764,
+      "physical_frames": 51328,
+      "reference_raw_views": 105,
+      "matched_reference_views": 84,
+      "authenticated_packet_numbers": 18,
+      "reference_value_differences": [],
+      "reference_field_omissions": [],
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+      "events_sha256": "c6daf697730ca4167a8a485d11195fdd9509e48bff4a04809651f22c46c7c6ce",
+      "unmatched_native_views_count": 4,
+      "unmatched_reference_views_count": 21,
+      "reference_derived_views_count": 0
+    },
+    "sharon": {
+      "checks": 1651074,
+      "physical_frames": 328127,
+      "reference_raw_views": 1037,
+      "matched_reference_views": 0,
+      "authenticated_packet_numbers": 0,
+      "reference_value_differences": [],
+      "reference_field_omissions": [],
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "oracle_sha256": "7cc7781a97eb803043dedd7e89122955cdd7fb455f3c8bd4315c96c2f31dc926",
+      "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+      "unmatched_native_views_count": 1,
+      "unmatched_reference_views_count": 1027,
+      "reference_derived_views_count": 10
+    }
+  },
+  "Windows": [
+    {
+      "case": "v2-zero-header",
+      "PDU": 47,
+      "physical_frames": [
+        39
+      ],
+      "protocol": "QUIC",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "e6563e21be806ed9330bb5363c7d25ddad6d5362815f3b07138a93e3650051ac",
+        "01-deep-protocol-fields.json": "a3a81006df68930f8097946bb6fc364e496f99d37ccee1610ac9a68fed530316",
+        "02-byte-sources.json": "83e31541a33dd5064e0ec09a664f27be420512dbcaa30cac2f8603362e3e380a",
+        "03-conversation-messages.json": "f8e68f80fa1737917c94876da656f7b30f447bdb44dd3814c0bd31ba312cb05d",
+        "04-association-evidence.json": "96686799781729c4a06b17aa513652122d72008d5145157bf619fdf9b2b0a196",
+        "05-narrow.json": "e8ca2a9bf39ac7e227a75ee03f29d948b961849d5adedce0b5c3ba9d9625e6c0",
+        "06-restored.json": "96686799781729c4a06b17aa513652122d72008d5145157bf619fdf9b2b0a196",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-deep-protocol-fields.png": "0d7ae94d6e8af024d6a8e781971eb207218ecdf799e48487c1ae1bbce0acadc7",
+        "05-narrow.png": "51f3f6130c650d61222a93e9973c65a14d2e37f351ff28f89ba20537202dc241"
+      }
+    },
+    {
+      "case": "v2-key-update",
+      "PDU": 39,
+      "physical_frames": [
+        33
+      ],
+      "protocol": "HTTP/3",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "7a0d16317a075b2e631f37eadc1f48ce7dc9aa0cd9aee5a0bc97d3ba179b57ed",
+        "01-deep-protocol-fields.json": "98cc51ea40bc11ebe31d20f4dafb76b084663b74bbfb31b414ae158e71429ca7",
+        "02-byte-sources.json": "e25c7214c002c017995c24ec3cebba655bf9ea3a84ffa3f50e733a6633cc8613",
+        "03-conversation-messages.json": "adf7c3f913861b491701839bc3228b7cb21f5fb509de9d60b2186b5bdb5f4dcf",
+        "04-association-evidence.json": "28fb470df205da1b1fe24731d593e904074e148d51038ca2f3b1feafc2604034",
+        "05-narrow.json": "1723b09bcb32f5a13d55ed357dce15b35557cf15aed1f0d27f30d34c2a9ac29a",
+        "06-restored.json": "28fb470df205da1b1fe24731d593e904074e148d51038ca2f3b1feafc2604034",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-deep-protocol-fields.png": "23f9acf3ad569b9bc3ef6f4a0ee5cc5bf82360a985207aaec670f8e92ae26dd7",
+        "05-narrow.png": "30fc9c732aa6b9dab51166b2dfd24a2bfe20bbfa0470cf6b001210bb540627e1"
+      }
+    }
+  ],
+  "unselected": [
+    "Compatible version negotiation and version_information conformance",
+    "Greased QUIC fixed bit",
+    "Resumption and 0-RTT ticket/transport context",
+    "General PN reuse beyond retained diagnostic window",
+    "Stateless reset",
+    "Arbitrary missing CID/key context or unobserved migration",
+    "Full endpoint packet/frame-role conformance",
+    "Wider legacy rule Initial token varints",
+    "Broader QPACK/HTTP3 semantics and unselected reference views",
+    "All protocols/carriers/fuzz parity"
+  ],
+  "v1_auditor_regression": {
+    "independent_1RTT": {
+      "checks": 2073,
+      "protected_short_packets": 122,
+      "profiles": {
+        "('RFC', 4865, 0, 0)": 122
+      },
+      "legacy_only_packets": 0
+    },
+    "source_graph": {
+      "checks": 18161,
+      "connections": 3,
+      "application_frames": 33,
+      "source_ranges": 249,
+      "selected_differences": []
+    }
+  }
+}

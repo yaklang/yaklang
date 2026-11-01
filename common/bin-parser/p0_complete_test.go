@@ -296,11 +296,17 @@ func TestSSHPacketAndFTPSMTPCommands(t *testing.T) {
 	binary.BigEndian.PutUint32(pkt[0:], 24)
 	pkt[4] = 6
 	pkt[5] = 20 // SSH_MSG_KEXINIT
-	p := parseRule(t, pkt, "application-layer.ssh", "SSHPacket")
-	require.Equal(t, uint64(24), uintVal(t, p.Child("Packet Length")))
+	// Keep the original malformed sample: 28 bytes is unaligned and its
+	// KEXINIT contains neither all required lists nor the flags/reserved word.
+	parseMustFail(t, pkt, "application-layer.ssh", "SSHPacket")
+	invalid := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, pkt))
+	require.Nil(t, mustChild(t, invalid, "IP", "TCP").Child("SSHPacket"))
+	valid := sshDirectKEX()
+	p := parseRule(t, valid, "application-layer.ssh", "SSHPacket")
+	require.Equal(t, uint64(len(valid)-4), uintVal(t, p.Child("Packet Length")))
 	require.Equal(t, uint64(20), uintVal(t, mustChild(t, p, "Payload", "Message Number")))
 
-	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, pkt))
+	eth := parseEthernet(t, ipv4TCPFrame(t, 50000, 22, valid))
 	require.Equal(t, uint64(20), uintVal(t, mustChild(t, eth, "IP", "TCP", "SSHPacket", "Payload", "Message Number")))
 
 	parseMustFail(t, []byte{0x00, 0x00, 0x88, 0xb9, 0x04}, "application-layer.ssh", "SSHPacket")

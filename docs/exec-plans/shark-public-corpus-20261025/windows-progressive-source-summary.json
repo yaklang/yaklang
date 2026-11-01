@@ -1,0 +1,141 @@
+{
+  "scope": "Progressive native/legacy presentation and source-bound physical/preview/observed-header Windows views; not full protocol parity.",
+  "native_depth_source": "41b88b146779559f39aa66891a85852ce697018f",
+  "legacy_depth_source": "ee75b0f3be793142f40a237d0c92cadc4f7409f5",
+  "physical_endpoint_source": "d91f10f03e923372045201f1ccd1cf807c381a00",
+  "Windows_source": "764f9de7bdec1f868fad58c3c2d7326a518e062f",
+  "Windows_binary_SHA256": "657942760971a40d9433d52b4073a1baaae2e685b7a312e406b6dd74d5363db6",
+  "fixes": [
+    "Render semantic protocol/record/list depth; keep TLS wire records separate from retained metadata.",
+    "Preserve real TCP option hierarchy and exact legacy ranges; bound actual recursion and output rows independently.",
+    "Format complete raw address words including loopback Internet Protocol roots; preserve mapped-IPv6 family.",
+    "For owned transport replacements, derive physical endpoints from the first complete captured network prefix.",
+    "Apply admitted transport prefix to quick/fallback details; label unrecognized UDP and bounded raw previews explicitly."
+  ],
+  "physical_source_census": {
+    "views": 407,
+    "whole_views_unchanged": 404,
+    "precisely_corrected": 3,
+    "sharon_frames": [
+      75002,
+      97159,
+      98754
+    ],
+    "scope": "Existing owned transport-view replacement only; no global tunnel endpoint claim."
+  },
+  "Windows": {
+    "actual_cases": 5,
+    "actual_console_buffers": 77,
+    "native_pixel_screenshot": false,
+    "rendering": "Actual Windows console cells and attributes rendered as PNG; not Windows Terminal pixels.",
+    "checks": [
+      {
+        "Source0_bytes": 70,
+        "additional_logical_sources": "not certified in this legacy-only check",
+        "case": "actual-readiness-UDP",
+        "literal_IP_addresses_are_readable_in_actual_console": true
+      },
+      {
+        "Source0_bytes": 56,
+        "actual_TCP_options_are_progressively_indented": true,
+        "additional_logical_sources": "not certified in this legacy-only check",
+        "case": "actual-TCP-SYN",
+        "literal_IP_addresses_are_readable_in_actual_console": true
+      },
+      {
+        "Source0_bytes": 153,
+        "Source1_captured_payload_extent": 111,
+        "Source1_preview_bytes": 64,
+        "Source2_observed_header_bytes": 8,
+        "all_three_source_extents_and_captions_exact": true,
+        "case": "public-UDP-physical-75002",
+        "rejected_negative_controls": [
+          "header-range",
+          "header-SHA",
+          "preview-range",
+          "source-order"
+        ]
+      },
+      {
+        "Source0_bytes": 208,
+        "Source1_captured_payload_extent": 166,
+        "Source1_preview_bytes": 64,
+        "Source2_observed_header_bytes": 8,
+        "all_three_source_extents_and_captions_exact": true,
+        "case": "public-UDP-physical-97159",
+        "rejected_negative_controls": [
+          "header-range",
+          "header-SHA",
+          "preview-range",
+          "source-order"
+        ]
+      },
+      {
+        "Source0_bytes": 112,
+        "Source1_captured_payload_extent": 70,
+        "Source1_preview_bytes": 64,
+        "Source2_observed_header_bytes": 8,
+        "all_three_source_extents_and_captions_exact": true,
+        "case": "public-UDP-physical-98754",
+        "rejected_negative_controls": [
+          "header-range",
+          "header-SHA",
+          "preview-range",
+          "source-order"
+        ]
+      }
+    ],
+    "source_semantics": "Original full frame, 64-byte unadmitted preview and exact 8-byte observed UDP header are distinct sources.",
+    "CP936_restored": true
+  },
+  "whole_CLI": {
+    "source": "6b5c5d64c352d7f93723bb9b7dca11dd6af4cec6",
+    "rows": 384518,
+    "inputs": 37,
+    "literal_byte_identical_to_CLI19": true,
+    "ID_mapping": false
+  },
+  "CI_764": {
+    "Essential_Tests": "https://github.com/yaklang/yaklang/actions/runs/40758059684",
+    "explicit_traffic": "https://github.com/yaklang/yaklang/actions/runs/40758062836",
+    "diff": "https://github.com/yaklang/yaklang/actions/runs/40758059636",
+    "path_case": "https://github.com/yaklang/yaklang/actions/runs/40758059651",
+    "all_four": "success",
+    "automatic_draft_traffic": "skipped, not passed"
+  },
+  "proofs": [
+    {
+      "external_relative_name": "transport-view-source-plan-before-01/summary.json",
+      "SHA256": "ea2b37337e7fd8382f868a5af12667c7dd92c5a9af1d86e7423528bd1f38d279"
+    },
+    {
+      "external_relative_name": "transport-view-controls-before-01/summary.json",
+      "SHA256": "b69701f297cc47a092c040b02dd737701033a3ff4e335e1d88e286e29ca56c5f"
+    },
+    {
+      "external_relative_name": "transport-view-whole-CLI19-01/result/summary.json",
+      "SHA256": "c1858f69505f1c9cf57592f063a2f90634dfc64d1ba39eca70cecd8ce8ff611b"
+    },
+    {
+      "external_relative_name": "CLI19-to-20-whole-source-audit01/summary.json",
+      "SHA256": "5e60698cf48577773cb175c36be735d0f6a9885dd532389169e161eda55ab7d7"
+    },
+    {
+      "external_relative_name": "windows-transport-764-01/runtime-summary.json",
+      "SHA256": "7c6cf1f99d640cb466d6f25596ddf74796b9bbae41dbd426cb528b2906581878"
+    },
+    {
+      "external_relative_name": "windows-transport-three-sources-764-01/summary.json",
+      "SHA256": "b552922360bef17d5000184507295c90534dfb0297e1d43f5eb42cde688bc0a2"
+    },
+    {
+      "external_relative_name": "loopback-address-CLI-full20/receipt.json",
+      "SHA256": "e0127007e8416cd02a7e5a7a03c37bf5ffabb9022a7ee3778808757f6400a139"
+    }
+  ],
+  "limitations": [
+    "Public replay settings are fixed and differ from the no-explicit-keylog label census; equal counts are not correctness proof.",
+    "A prior first-source harness assumption and an omitted loopback root alias were detected by actual runs; those failed outputs remain external.",
+    "Full core/TOP30 protocol/session/field completeness is not established."
+  ]
+}

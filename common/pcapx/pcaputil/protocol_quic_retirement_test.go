@@ -212,6 +212,7 @@ func testQUICRetirementMatrix(t *testing.T) {
 						status = "deferred"
 					}
 					require.Equal(t, status, e.Status)
+					w.Session, w.Fields = quicReviewedLegacyExpectations(t, e, w.Session, w.Fields)
 					rocEqualFields(t, w.Fields, f)
 					rocEqualFields(t, w.Session, e.Session)
 					f["First Byte"] = byte(255)
@@ -290,7 +291,7 @@ func testQUICRetirementResourcesAndDomains(t *testing.T) {
 	f, err := refused[0].GetFields()
 	rocTypedError(t, "AuthenticationFailed", err)
 	require.Nil(t, f)
-	require.Equal(t, map[string]any{"Packet Name": "Initial", "Version": uint32(1), "DCID": []byte(nil), "SCID": rfcHex("f067a5502a4262b5"), "Packet Number Space": "initial", "Connection State": "initial", "Header Form": "long", "Encrypted": true, "Content Visibility": "encrypted", "Protected Payload": true, "Authentication Verified": false, "Authentication Failure": "packet-protection-failed", "Observation Scope": "UDP capture domain and observed CID", "Datagram Offset": 0, "Native Carrier": true, "ALPN": ""}, refused[0].Session)
+	require.Equal(t, map[string]any{"Packet Name": "Initial", "Version": uint32(1), "DCID": []byte(nil), "SCID": rfcHex("f067a5502a4262b5"), "Packet Number Space": "initial", "Connection State": "initial", "Header Form": "long", "Initial Token Length": uint64(0), "Initial Token Length Encoding Bytes": 1, "Initial Token": []byte{}, "Encrypted": true, "Content Visibility": "encrypted", "Protected Payload": true, "Authentication Verified": false, "Authentication Failure": "packet-protection-failed", "Observation Scope": "UDP capture domain and observed CID", "Datagram Offset": 0, "Native Carrier": true, "ALPN": "", "Wire Field Ranges": map[string]any{"Version": []any{1, 5}, "DCID Length": []any{5, 6}, "DCID": []any{6, 6}, "SCID Length": []any{6, 7}, "SCID": []any{7, 15}, "Long Packet Type": []any{0, 1}, "Initial Token Length": []any{15, 16}, "Initial Token": []any{16, 16}}}, refused[0].Session)
 	retry := feed(domain, 704, fresh)
 	require.Empty(t, retry.Error)
 	require.Equal(t, newFlow.FlowID, retry.FlowID)

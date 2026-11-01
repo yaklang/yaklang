@@ -1,0 +1,106 @@
+{
+  "scope": "Closed636 native and685 UI checkpoints; aggregate provenance only,not core/TOP30 completeness.",
+  "native_source": "636816f1da7c97228a6adf11cbc363a41c53c33f",
+  "UI_source": "68527c4d9355d2df37c5c0c9b8bc19f7766ca9c6",
+  "archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/ospfv3-mld-source36",
+    "sources": 39,
+    "source_bytes": 354162,
+    "manifest_SHA256": "d9e4aaf3b52e1a7bc58d57912afde0b5c8d26cba25852770c47fbb9c79599497",
+    "counts_report_SHA256": "d9163d77edeb9c6fe0a9da98051a1e10c24a5c2d2fca13c9369083388f8bc79f"
+  },
+  "native": {
+    "inputs": 37,
+    "event_objects": 307262,
+    "flow_objects": 2,
+    "source_insertions": 807,
+    "unplanned_differences": 0,
+    "proof": {
+      "external_relative_name": "OSPFv3-native37-whole-636-01/summary.json",
+      "SHA256": "463250f963d5816b1e9b3565fb27ae3e444f74f4cae4455caa183d5727936022",
+      "copied": false
+    },
+    "ledger_closure": {
+      "external_relative_name": "OSPFv3-native-ledger-closure36-01.json",
+      "SHA256": "b79a428f0badf6919588ce6b677944444cc4f65257359c7f9c1f809d19f7df12",
+      "copied": false
+    }
+  },
+  "CLI636": {
+    "inputs": 37,
+    "whole_rows": 384518,
+    "proof": {
+      "external_relative_name": "OSPFv3-CLI37-whole-636-01/summary.json",
+      "SHA256": "bfe0ad78db7d0125a3e97d80f0cdf4b74a1d184a64a13d2c32763f84fbc32ca0",
+      "copied": false
+    }
+  },
+  "CLI685": {
+    "inputs": 37,
+    "whole_rows": 384518,
+    "byte_literal": true,
+    "ID_mapping": false,
+    "differences": 0,
+    "proof": {
+      "external_relative_name": "OSPFv3-CLI-literal-636-685-01/summary.json",
+      "SHA256": "adfe1ada607f9d37d6d87026e623827fd9c99b57683ac40b2f19ec622a8fe8e2",
+      "copied": false
+    }
+  },
+  "Windows685": {
+    "proof": {
+      "external_relative_name": "windows-OSPFv3-685-default01/proof.json",
+      "SHA256": "abfb5dca8a65917ba9a9d922b07d25d5195dfbbc5ae897e4c127e08c6f26aa75",
+      "copied": false
+    },
+    "default_cache": 20000,
+    "default_history_mib": 64,
+    "budget_increase": false,
+    "actual_cells_not_terminal_pixels": true,
+    "original_visual_review_pending_preserved": true,
+    "root_visual_review": {
+      "selected_field_image": true,
+      "physical_source_image": false,
+      "attestation": "Root personally viewed the actual685 selected-field console-cell render in this task;636 two images separately reviewed."
+    }
+  },
+  "fuzz685": {
+    "target": "FuzzOSPFv3BoundedOccurrences",
+    "seconds": 60,
+    "executions": 264656,
+    "failures": 0,
+    "proof": {
+      "external_relative_name": "OSPFv3-fuzz-685-01/summary.json",
+      "SHA256": "7f04c86c511a3338b8ebc82da0c02b9020e01b1c88b24521bf3569475e3b0f72",
+      "copied": false
+    }
+  },
+  "source636_CI": {
+    "Essential": 40841330734,
+    "explicit_traffic": 40841322721,
+    "Diff": 40841330693,
+    "path_case": 40841330709,
+    "all_success": true,
+    "automatic_traffic_skipped": 40841330896
+  },
+  "source685_CI": {
+    "Essential": 40847367343,
+    "explicit_traffic": 40847383632,
+    "Diff": 40847367340,
+    "path_case": 40847367339,
+    "all_success": true,
+    "automatic_traffic_skipped": 40847367383
+  },
+  "MLD": {
+    "historical": 237,
+    "complete_IPv6": 220,
+    "noncanonical_IPv4": 17,
+    "incomplete_cross_family": 10,
+    "checks": 7340,
+    "advanced_checks": 69,
+    "differences": 0,
+    "new_native_execution": false
+  },
+  "next_boundary_work_outside_closed_proofs": true,
+  "raw_artifacts_in_Git": false
+}

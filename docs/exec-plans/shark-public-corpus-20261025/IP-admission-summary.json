@@ -1,0 +1,1894 @@
+{
+  "scope": "IP carrier admission and complete source/identity preservation. Conservative refusal labels remain literal differences from Wireshark. No all-protocol, all-field or all-carrier parity claim.",
+  "native_source": "31ba17a699daa2a4931f45bc3769de359ff58711",
+  "Windows_CLI_source": "a8a4de07e8592c895987cf7c86d984af58de679a",
+  "reference": "TShark 4.6.9",
+  "raw_inputs_and_outputs_outside_Git": true,
+  "regression_inputs": [
+    {
+      "group": "matrix",
+      "name": "actual",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "SDK_receipt_SHA256": "f9861a3ce336fe0b4db0510f26a9405f58c324421478eaf0cf24a76f1efc4a2a",
+      "CLI_receipt_SHA256": "3fc58c5d075e6e1729c4a082d89eddeeaef9236bb1ebaeec6b2fe9e1cd85407e",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close",
+      "capture_SHA256": "add16f28847bb7f5ca87166aa2d8299792bebedcfc6ee0721725631ff7b2832c",
+      "SDK_SHA256": "db9f8e32ba7302bb20b0ae8077d59d48e86f1fe2a64652ef2fabf415d7aa356e",
+      "CLI_SHA256": "3b90ed3a6c69656969ae5c758bb9ec729af619b2bd8b2e372d09dd3850487be0",
+      "SDK_receipt_SHA256": "0f7814fbd9fb3ec789fa51f18e51bce075afb3b15a457dd6847794724bfcab57",
+      "CLI_receipt_SHA256": "2e057f881ddf73fd591b06c14b366695ac6fb087b085f3d429949f8efe3bc4f9",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close-opening-retry",
+      "capture_SHA256": "345b178bc2aa1bbff705cab4ef2f812d918f11b97693bc1fbb1c58e3c46f3b68",
+      "SDK_SHA256": "35e5c7c73ffbb22a9f72e713a71bc430cdd30e7f1cd399d2f524d4f88e0d1f58",
+      "CLI_SHA256": "fc7c18dae1f0d6a23efc8129105df391ced054ac0f9d9fed1c6b70a2d09c9168",
+      "SDK_receipt_SHA256": "78c1213f8ba3991747f7589c11887526af04b869f02f51b0654b28670f8445e1",
+      "CLI_receipt_SHA256": "57d64a2d72ec10acbd6d817ac6b473826daa8bf6c55198c3a56e9a81a2caccc5",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "matrix",
+      "name": "late-old-close-with-duplicates",
+      "capture_SHA256": "8a737cc196ffd7b88ea054efedf4ef37e84c840b2fc8507f62b5a4c3fca4283c",
+      "SDK_SHA256": "beaf4c426d73c1b8a0c9713605e974acfacd2c56224a9390003b6dae383027f5",
+      "CLI_SHA256": "fb598a982f2378d2a8fe9e5c558feabe81e80c2368057c48950002469f03452a",
+      "SDK_receipt_SHA256": "2f659a1638418c2c53b502b0e696fabef8898883955063fcf31aac14a5ba69ae",
+      "CLI_receipt_SHA256": "5e914a966047a41de396c4083617467cf20407859aeaa9780b668cd424b9ef4d",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "matrix",
+      "name": "missing-close-opening-duplicates",
+      "capture_SHA256": "ffc453286094327a903feb73fcdd36358b8b4206a709caf5e57ef1cfd5f9c44e",
+      "SDK_SHA256": "8e633801fdefe53de3c6be3c216142f48c1a68ff052ba842fff738129d6babf3",
+      "CLI_SHA256": "c8f7ac8c8bb9eb9f0ab248e7d00ad3df86c92bd67b30476ebbdbef4519fb2f85",
+      "SDK_receipt_SHA256": "1e46c74684c750fe92af9ace97256f9c7a0a71502dc634ac7f1e5e8ee9a0fc16",
+      "CLI_receipt_SHA256": "b9254a297f5ee85fe18ff7216395378c6dc3b93b78da4ebdca91ca96db7b99e3",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-CoAP",
+      "capture_SHA256": "753bb741173787edcf4535974e704cce796e51a6380c51443677c8341b99e093",
+      "SDK_SHA256": "a29ed9d981cd5eeb07ff126b1c70b69067f0a02f9b8ea4292181ee601c743f0a",
+      "CLI_SHA256": "735f9009d6ade52b2e16f990360a10c4d6b0ad9eb5ede728e010603a564bc239",
+      "SDK_receipt_SHA256": "655ae737cd4f791876b4d6f4af1884ad0f239509720bd9567bb5d5078c2d0d34",
+      "CLI_receipt_SHA256": "a772d1a7285405cf168d7f634310d0802590944dd45534599ce9643cff3f8426",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-QUIC",
+      "capture_SHA256": "00347cb1e27508cf951737cf048fb42d5629d6ce585329b9dbfd31a3613d1434",
+      "SDK_SHA256": "7b18be93f3459b54d81360c3f71a9fe1338b8cf416d0fa123549f849eccd946f",
+      "CLI_SHA256": "58bde43604c894af94b2aea22b0d76d68bdd9696b22cf8e9b6b0146431586a1a",
+      "SDK_receipt_SHA256": "a5999c66d9d9971f86f836ab43809b7296bcc6baad310f76ddc80b7b1f1b3cb0",
+      "CLI_receipt_SHA256": "5e1c98c11263deb55f8eb7293130f377a41bf3b17af0b0564f55d3f7e6e0e6ce",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "fresh-TLS",
+      "capture_SHA256": "5e751ac78e765c5adb43a68562e35b6b502a83849a49fd4e9d01dcc869b91ddb",
+      "SDK_SHA256": "57dfde072dcae0e3d1a2e2f9ef1223234efb7dd7603db9e2cf5489eeacdfcd6d",
+      "CLI_SHA256": "58b5ed62236fcb753fe216e4c0f33f8a20aa488065ea229c4a309c54b2ce93f9",
+      "SDK_receipt_SHA256": "a12119d786eb031152e3f9ec5897885e7c4735a949864eeaa9782ade99a85fe6",
+      "CLI_receipt_SHA256": "769243f26d6b9f8016fa79fb6c0bdd87b165c08052638cccb0623588ed346ce4",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-CoAP-foreign-clock",
+      "capture_SHA256": "f89dad749612c5794c0d9f96e6674462dc7ecd1655ecc1f87295791b8f5fb405",
+      "SDK_SHA256": "dba35f75ebaa21e13f918e43453959aca6d03e1b3f9b4ed2205939b14e509420",
+      "CLI_SHA256": "8e63763fb356c53e188ce190412770f51a508c13eca86193e1022c3132f02969",
+      "SDK_receipt_SHA256": "2d50b33a59b8edad8681b8366df17dbfdde1c7206d679a7d8ff89889536f0204",
+      "CLI_receipt_SHA256": "ec6a843b55142b96f5804a55faf3877a77ed3c6ea4a8322a98edee3e849a0362",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-fragment-foreign-clock",
+      "capture_SHA256": "4d1cc26de8d128a16b0efeddb1a9c9e075b1a13a43fc851645ca73fb49fc3fef",
+      "SDK_SHA256": "dcd2a24077100be2d7840cb10691382648f6e5d0900d04fd2808061f56e0abd5",
+      "CLI_SHA256": "9eb0defe1a4b3e561e1a3177d2107fc6981e104de8e84109fbe8e040401ad01f",
+      "SDK_receipt_SHA256": "c0aa0c6882bc3107366eacdd2c1a34c2706731857de712b80a098479cd977ca6",
+      "CLI_receipt_SHA256": "d2cbe219c58ceff9fb633eaf7c62c3dfd2ac88c152d72c70d15a9502f88ca7a1",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-fragment-local",
+      "capture_SHA256": "77bf61f8ebf8326f6b3a0855ea18cc83d143355149ca6b8562c4310ab3e983a8",
+      "SDK_SHA256": "7c86f6c1c843f519d961c6b7932416b5466493570d24b8c79c836166e983e596",
+      "CLI_SHA256": "929265608c5d45f22b1576c6f1e4ce528edb35f3f2460132c3309c2a83194662",
+      "SDK_receipt_SHA256": "5ec3e19807d01fcd0a1227b503127313db7d5f300dbf2246528c171e6eaf5161",
+      "CLI_receipt_SHA256": "ad0358e5012521d57a06d8f9db6a3b778b54a33bf5925c9109ee28be7a05779f",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "QUIC-unknown-CID-foreign-clock",
+      "capture_SHA256": "f32c2b9308792607af65880feae66a25bdaed56072dbc46b4d40217d88d7e70b",
+      "SDK_SHA256": "402bbc6806ef349250c82b51a0da04fa62723915f50fe142a31841b525533e39",
+      "CLI_SHA256": "e3a86148d6ff01120557c0923debad00df7a2b9939e5b35cb3754ff5d62aaf00",
+      "SDK_receipt_SHA256": "4d54320da957717e2744de6db253b21b3a4e47103648fccbe0c11c1288740759",
+      "CLI_receipt_SHA256": "a458e23ed12cb985c120c7d8116e76a800ecf607387dae7a51c723382f61ddc5",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "TLS-fragment-foreign-clock",
+      "capture_SHA256": "24882585ddfc21262c441fd59303c7292cff7a81921c007476c740f3bcd42738",
+      "SDK_SHA256": "4fe0d7bff89ea401762f4cc8f2dca5afd29c66e247ee1b03e442fd02952175eb",
+      "CLI_SHA256": "825a526dc5ccb7ade5ee9fecd5cebb42674d8a17ca9d632b0e411e9de7a1b203",
+      "SDK_receipt_SHA256": "9b8a759c58e15c976b5b599f381097ede4593ca216c7cc868ff7881a48f206df",
+      "CLI_receipt_SHA256": "ab99a71759f36f5ea709287ef71cfb7993207402cf3d825987cff952fb8b271e",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "owned",
+      "name": "TLS-fragment-local",
+      "capture_SHA256": "63e1799fba46691b2809327d1b8b3b74ad81eb9d9b819e83ff180c4b4e4c498f",
+      "SDK_SHA256": "8c73f32b86ef53e20268f278ad22a05196bbc2e2c4317fece3a39cfdbee4e0a3",
+      "CLI_SHA256": "b7536a776d57c97863f40b033aec065f3a87485a0507ff9259c7a4a78132fe6b",
+      "SDK_receipt_SHA256": "eb209aa9b36afc4079dbf382dd440a0ffb3e0050e348af1111d3ce8d35ab4f87",
+      "CLI_receipt_SHA256": "4722e3b641ecab8c8938e0f363aa1f9a7cb6ac32eb534d5e6a8162a72b064782",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-invalid-first-request-replaced",
+      "capture_SHA256": "837b013d82c6150a63b52cdb544fa2347352fe9cd5f48529663db6b7847ba69f",
+      "SDK_SHA256": "4391336840dae7be945f0f64d39f31b1ea26c2b3044335970e756227b0091a1a",
+      "CLI_SHA256": "35130d2dc8b59d93c92b147b1c2580049ccd9cc3c018fa0c6ca6f13ad409a8e3",
+      "SDK_receipt_SHA256": "9ece190aff0a3475058826c69cba9752254243d5586ff69319ce876c5576128b",
+      "CLI_receipt_SHA256": "66bd4cc8b4037c9fde081495a3e674287c00d2c580c52bda4b08be9fcd7a5185",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-known-request-late-completion",
+      "capture_SHA256": "75780cc495b2b9aac828d6988f53fe3c8b5f957f93503770b92bcbecfc014aaa",
+      "SDK_SHA256": "42df0b5c51def9c8a423ac542664eaccf6b7c8acabac744b7c25f4da705ac770",
+      "CLI_SHA256": "4ca17fcc1bd20a212356d5b835a2626c12985ef8a72c9689406778fc12cb247f",
+      "SDK_receipt_SHA256": "d26a833fe1b8d9e5f579fca43837ad753ab73951891a637d349b7e46e2c949e9",
+      "CLI_receipt_SHA256": "823a8c5b307dbe2aabe99007728aee80829c0959c00d2b5e55e3c0c691b5908d",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-overlap-before-old-reply",
+      "capture_SHA256": "30644406001f2d245a9414571772ed8159521ac73becdb5e67300c45f9a75b08",
+      "SDK_SHA256": "ec09b109b513c8df976477a59cd10658aa2bda09c4b352c7023e8edab86c3b87",
+      "CLI_SHA256": "2dae44804bbc02e2d1effcd4f8245bd14e72ae8f3c71205e82a2ce15ca25822a",
+      "SDK_receipt_SHA256": "3c888c955453cdb9afb9778725e9888098ca2739179997cc40697bb58726cef5",
+      "CLI_receipt_SHA256": "c2534e9bcf4b502c0871b98f53dd574c3042872e5309e30deb83154954b37ca9",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "control-reply-before-any-request",
+      "capture_SHA256": "8321dc3021d9f8183b19488f04203af883b6f08f70d3ef15f60594ef059723ed",
+      "SDK_SHA256": "f94e0de46a8318e23c02b7be90f2199dfd2d8349ba1bf297ab03efd4a0d7f57f",
+      "CLI_SHA256": "33c5b6ffdd3802c8c3fb40cc4ff1aa66d869e6e9da22332eb3abcbc673471390",
+      "SDK_receipt_SHA256": "aaa8502721ebd108ed13625b920aa8509622056fe4b8ecdc439caec96ca9cf6f",
+      "CLI_receipt_SHA256": "fb553bda3c98573150b9edd59a11df8667b2a47e38d9e5b978378785bdd60ebf",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "duplicate-request-observation",
+      "capture_SHA256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "SDK_SHA256": "1f72c76e2befd4de0f77582a948c7e844ce0de78312d90885c4c464442fc114a",
+      "CLI_SHA256": "68e65dd7bb9c9ac895ee09236fe37d46a890702f6391c8ac656e10cf27543d5c",
+      "SDK_receipt_SHA256": "2d0fdde84ed6767729171a0eaaee14980ff9c542b2e680210c42ce22852c9969",
+      "CLI_receipt_SHA256": "b798d5ae3b231323c85f8ac8ecb0eb1161b2102f2b87525dd133cccdadaba429",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "fresh-live",
+      "capture_SHA256": "54cf33366e832801c96bd11fad6686ec4f073b0b286f8c1be62e8e622510c64d",
+      "SDK_SHA256": "95bee6c4c76f84f7805bfcec047f8777760e0e9260a490089fe72615fce660a7",
+      "CLI_SHA256": "8ffba30f2d58ae243e26a034c7a62967077fe3cefc4254d3368d4c1917af984b",
+      "SDK_receipt_SHA256": "a7d008aef72724d3ed162a0f10afa8d00a8b044fc9d99af6fd0af1723a67b2d5",
+      "CLI_receipt_SHA256": "17b63d4cceabcdea50d0e4b8b6756e83fccec4f747db96118a5843603e6273e6",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-fragmented",
+      "capture_SHA256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "SDK_SHA256": "84abd3bec559f31782cc20dbe493e6a26e3813d55fcff6d5cab8027e5c853f9c",
+      "CLI_SHA256": "c6391a3f548cecb91acbaae0a10391e8a8da037d5e245724c3ad9c02b981e144",
+      "SDK_receipt_SHA256": "1f128a3baf401f3a30a93680561e0d725ed1910468b5038f53fac99430c29c71",
+      "CLI_receipt_SHA256": "c77618a53a4ae32631a069a8f1c12da9ad0db248d31a6f9ebc9dd71c44df0bd2",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-query",
+      "capture_SHA256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "SDK_SHA256": "745fa480613fb0ca95dfcc86d8cfb92938216d0b25f276bf3ed068e897361031",
+      "CLI_SHA256": "a01905d94f7ee4910a159ea6488671bc8faa5fa3dc064369660b339cd9846cdc",
+      "SDK_receipt_SHA256": "abc998874ec68d9d074ad23b8b8f441cee5b1098256dc66ff0de522788b92a11",
+      "CLI_receipt_SHA256": "67acb235572117aa8065531822975f57f319052f5633811f6468cdcb76935102",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "live-unfragmented",
+      "capture_SHA256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "SDK_SHA256": "2e7a0a06d9d5bb96a4e4db9abdd0d83c8c8dbc40f8ffb2a5eea04f35f723781c",
+      "CLI_SHA256": "f8d18f5ba043d73418e12bf86e0bd343e311f9a82f6fe2f17ed4b4edad6f5328",
+      "SDK_receipt_SHA256": "0fc04e917daec25907bc43326198f2879c7aa50bcb61a58859bf86ccf889ed95",
+      "CLI_receipt_SHA256": "63eacff9e96d1fe859b2e778c4c34cf33aca1daefd1c5e5d2f7ea8006cde26e4",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "permanent-request-capture-hole",
+      "capture_SHA256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "SDK_SHA256": "1c0df028740f6ee9604a1edc85a6ef50a947670ff3b41255662f7eba925685ad",
+      "CLI_SHA256": "cf30c20e7a4f19a2965c40658584e1ef886fa5cde0ba884c6670a548b0d76eda",
+      "SDK_receipt_SHA256": "f8ef7c07f8e9edec344d5ebd07745855465f91866cfe235639d5af22fa27dd12",
+      "CLI_receipt_SHA256": "92512f6e161413b78e8530b5978db8b3fafd8a302a791bba145c50b5c2f0477d",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "request-arrives-after-two-later-requests",
+      "capture_SHA256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "SDK_SHA256": "2b4fb6c28998d305ef91418a98ec98b7f2c513b4c731b65b76304528372a6b2c",
+      "CLI_SHA256": "e16ed41bc3d80e313da3126add266babec9ef036f8257b0359d7358c7ffd16da",
+      "SDK_receipt_SHA256": "632f67cb63134923b5ac29e750c85f231aa983948c7967ee13e6c6559de30bf1",
+      "CLI_receipt_SHA256": "d5a13e8862bd5ebc657304428ba7677a275ce35b2cb610da1c4ec0af9a33e680",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "request-tail-arrives-after-first-response",
+      "capture_SHA256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "SDK_SHA256": "5b51f22dcb312953ecd1b557e864b3e5bcc5fcf9bc01525ae8d993422982cc3b",
+      "CLI_SHA256": "d226688f3cd4d928bc0c87b2549a8121be4e0a9f0941cdf532d95dd7bf987bab",
+      "SDK_receipt_SHA256": "ef22c6e066038305c0a55b851037f244632ff055ba577c6196826fd825f5f809",
+      "CLI_receipt_SHA256": "ffa9d803fac27e1fab3b469dcd34e666ac8bac9d66ae710fc1db1c26cc14b17c",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "response-first-two-swapped",
+      "capture_SHA256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "SDK_SHA256": "fad834e7f97e3a9e93fdefd28cf703a88a1a2a24c0c99bc2f88451a4352d4cee",
+      "CLI_SHA256": "3ce4b61eb7117a78d62ce25c47c2c59c9ad64fa0325274584f8afafd85bbd438",
+      "SDK_receipt_SHA256": "32df32eafe16b5bb6932643ff89ea9c86617980cf1a92cab38f6291b89277aa6",
+      "CLI_receipt_SHA256": "d71dcc353016cc8ea6f4e1c7670b6e732d920d33252cfc4e130a9767e1b35af7",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-actual",
+      "capture_SHA256": "b1e1867f3e2d66566172bf3846a410f5314c87bc7917907c85ba0d6f212c9deb",
+      "SDK_SHA256": "5ea9e3b96341dba271e125c2c2b4ee7b2634eb21f5c3a0d68cffcb0fda54dc28",
+      "CLI_SHA256": "d2d8df9e4d2583507e9438752ece97f3aeeff6bcb58684ed6244c8c84a7f6a62",
+      "SDK_receipt_SHA256": "ad1686889a07956c5c293b34cddac6abed0e9b6f18e912ed61d2b6870d07b2f0",
+      "CLI_receipt_SHA256": "3387a25757523d5d67e91c1a308c110cc8c0e058cab6744224261ea0a880db6a",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-close",
+      "capture_SHA256": "643577643950565946f5fcb8b8dd2e8955c937a2b2813d37f89e0d1333b031ff",
+      "SDK_SHA256": "e133aa4dc3a248c113cb6d4613b048d8b804f12ece0c7547b1d05da6eab60b05",
+      "CLI_SHA256": "ecf17b9da0a3c3c07b1d871dc3813c152af7bcb506c0e4af7036f65275b840a6",
+      "SDK_receipt_SHA256": "259d000baa4a4039524be7173a9a28d341f09595aa0f822fcda0368b2112a70c",
+      "CLI_receipt_SHA256": "b9228710113f458a2cdb04a8e175452cb060f143d0b69c3b308851d89cb77b4e",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-close-out-of-order",
+      "capture_SHA256": "e7a6af68a0aa75dcf7c39b3acd182e0f1996ea6326524c7d200971e02aa3a031",
+      "SDK_SHA256": "7b89ae66f44d200ec5f0a43ddbfe161c3cc4263e89254cd018a907ffb2d6a44f",
+      "CLI_SHA256": "350fbb0e3860db620294892c151f9c34ea58340f79b3ecd2f0da208f7f42dd0b",
+      "SDK_receipt_SHA256": "6f073424145e6bdb6519c787e86741a5e411a64ae2aec2d65f39cd921d4314b7",
+      "CLI_receipt_SHA256": "dd77bd5d1e1d25ecf1581aa9b9dff1e6a852eff2962d172e66b607389fa43ba1",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-middle",
+      "capture_SHA256": "8ff8ed83c800f56981791f7de25479531da98471c431fbc100e4c574a2d8b4b7",
+      "SDK_SHA256": "a631323fd1245ec63c438dc55a3f4930ce6e450d586a4e5334a75d2be3c40158",
+      "CLI_SHA256": "1132aa347a8b836e1626aca2603ca9a594f019392403dd68dd4bc91843fec1a3",
+      "SDK_receipt_SHA256": "92e27211833f76e7166c8e231271fe7b78a9cffd39163d609442c275ac0b789d",
+      "CLI_receipt_SHA256": "85544866b0de1b6364a6cdbfbe53c5ad7e7a5bb264d05b041bec5526a1c0c1b3",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-lost-middle-and-close",
+      "capture_SHA256": "13b49c05399fb5c21a4c8d5413f582e5192d5699c7dad816dde6b374d39897db",
+      "SDK_SHA256": "79e0bd7090665a6407363233bd7e89c3c8ad9094dc2596e859a65006d4d97ac1",
+      "CLI_SHA256": "6bbacc765938573cdf7e3674b51a2a68f80d3ffae7f54c395f37f96bbb1ccd8d",
+      "SDK_receipt_SHA256": "762746f1039e81e1453d1a3864ed79f7c155af4afc8679b102510bf1afde5987",
+      "CLI_receipt_SHA256": "df1932077e52d4da62eba32200c2149634dfee61728f16eaa6051c549381515d",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "reuse-out-of-order",
+      "capture_SHA256": "43eec2f51f71d46e587c6c2ebd9d6456e4bcfd99df964a1d400b9e5f22f4c4eb",
+      "SDK_SHA256": "c05fb03ce59430973117bd2a572e13a46590e9b0b456cfc584e9ae6cc8c3d79a",
+      "CLI_SHA256": "3a20fdce5213ac5081e69d900239f0f54c83186f72c13ca42dfc5cc918451f32",
+      "SDK_receipt_SHA256": "3a764056d93361bdd72ffd4c33dae23b78b0e5a68565ab083e9d127023c7b686",
+      "CLI_receipt_SHA256": "3eeb4584cf32a139bf1c0908b84af4758202bbf3bcf1b189655a4bb5e2cdef4e",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "rpc-fragments-live",
+      "capture_SHA256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "SDK_SHA256": "49b3072f874c34babead638d623afad54d737a659fa8995b6292cfe478a6d8d6",
+      "CLI_SHA256": "a37c4dddcf83f3a8380e43fe89e35b522b62152180e3a238ded22fac35363ca8",
+      "SDK_receipt_SHA256": "0645967b0626e3c045f70c2d4c0fc5d4abf10cba4cb39b5dc5b61a5db65a5295",
+      "CLI_receipt_SHA256": "49788ac95f9520a62628426afa3241a07049a36ef06ab0f3cfee674020207826",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "sharon",
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+      "CLI_SHA256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
+      "SDK_receipt_SHA256": "2782acca5e0b986f739282465a626a5d740068ffe47497f781550ca082b597c3",
+      "CLI_receipt_SHA256": "7be8f370774dcfaed94ebc6cfd64a76c707068038e353013a65d1a888cec47bd",
+      "SDK_byte_identical_to_356": false,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "snaplen-request-capture-hole",
+      "capture_SHA256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "SDK_SHA256": "425f1e12c14d48b12020277bab8dacac7546754d206e58fe04471ddb96a20d0e",
+      "CLI_SHA256": "95d1a2b3a887b486e8767841191e06f173f8ac67de7357370a1c7ce285a3b1cd",
+      "SDK_receipt_SHA256": "bf8d33222ade3fbab8d8cf495987234822e7e18ecc028bd66d7d764d4d1f470c",
+      "CLI_receipt_SHA256": "5d10d301aa566e8533f7844f4b1c7dc64d5da6cc6c273865cdb2b6460b5904a4",
+      "SDK_byte_identical_to_356": true,
+      "final_CLI_byte_identical_to_31ba": true
+    },
+    {
+      "group": "preservation",
+      "name": "weber",
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "SDK_SHA256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+      "CLI_SHA256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+      "SDK_receipt_SHA256": "54e7989e9d123bf0f5052ae7bd6a9503f23c1932d155b1f3a2c41c931b9b3911",
+      "CLI_receipt_SHA256": "4b1f3fcd0efb4644eb6159d1615c4d661de4b5424b842169e4b52f6f300b285e",
+      "SDK_byte_identical_to_356": false,
+      "final_CLI_byte_identical_to_31ba": true
+    }
+  ],
+  "public": {
+    "weber": {
+      "preservation": {
+        "proof_SHA256": "b7b71c3aa183458a42c9e1c4814f328e21e0ffe3ebe9566847090961c3ac88ed",
+        "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "before_SDK_SHA256": "db31c115b3dc7cbcfff3c773068cdad31d6ba5c4fba7b5bf30624faa48076aa2",
+        "after_SDK_SHA256": "a9a7644dcdffe3137066058fdd343c59f0a7a4ab2c9fe19d66c009ef7c8958d6",
+        "before_CLI_SHA256": "cd08903f6b09f4762491ab3421e3e0ea9e5d76e395152b7304ffbe016043df43",
+        "after_CLI_SHA256": "0920a036a129b2794eb2d227e0ac2b59555d3f807ef3fde4bdf759458fba04d7",
+        "auditor_SHA256": "4470974cbe040f30a420ee820e46585b3a393c290a52053101cc3f2f43e02601",
+        "source_bound_non_IP_events": 39596,
+        "complete_non_IP_events_identical": 39596,
+        "non_IP_events_with_only_generated_ID_changes": 0,
+        "all_other_application_values_and_connections_literal": true,
+        "physical_rows": 51328,
+        "physical_facts_unchanged": true,
+        "before_literal_CLI_labels": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 8890,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 111,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 44,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 402,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "after_literal_CLI_labels": {
+          "Ethernet": 70,
+          "LDP": 322,
+          "L2TPv3": 706,
+          "EthernetCTPReply": 339,
+          "ARP": 218,
+          "OSPF": 673,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2509,
+          "BGP": 245,
+          "TCP": 8890,
+          "HTTP/1.1": 82,
+          "HTTP/1.0": 25,
+          "UDP": 3262,
+          "ICMPV6": 2957,
+          "DHCP": 62,
+          "DHCPv6": 226,
+          "DNS": 3384,
+          "IGMP": 57,
+          "IPv6": 79,
+          "TLS": 179,
+          "TLSv1.2": 2551,
+          "SMTP": 24,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1331,
+          "Dot1Q": 78,
+          "SNMP": 678,
+          "SSH": 547,
+          "TFTP": 22,
+          "IKEv2": 480,
+          "IPSecESP": 1593,
+          "IKEv1": 239,
+          "SSDP": 104,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 8,
+          "PPP": 35,
+          "IPv4": 133,
+          "IPSecAH": 5,
+          "IMAP": 44,
+          "Fragment": 232,
+          "SIP": 21,
+          "RTP": 6462,
+          "TLSv1.3": 991,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 22,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 127,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 135,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "HSRPv1": 177,
+          "RADIUS": 29,
+          "IPMI": 868,
+          "LLMNR": 18,
+          "NBNS": 36,
+          "POP3": 43,
+          "Kerberos": 119,
+          "SMB2": 156,
+          "NTLMSSP": 5,
+          "SPNEGO": 8,
+          "LDAP": 365,
+          "DCE/RPC": 402,
+          "RDP": 7,
+          "RDPUDP": 2,
+          "RDPUDP2": 1056,
+          "STUN": 22,
+          "DTLS": 93,
+          "QUIC": 58,
+          "PIMv2": 333,
+          "EAPOL": 144
+        },
+        "before_IP_diagnostics": [
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 22
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 122
+          }
+        ],
+        "after_IP_diagnostics": [
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 22
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 122
+          }
+        ],
+        "all_protocol_Wireshark_parity_claim": false,
+        "generated_ID_mapping_SHA256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "literal_label_changes": [
+        {
+          "before": "GRE",
+          "after": "IPv4",
+          "frames": 22
+        }
+      ],
+      "label_changes_source_proof_SHA256": "b7b71c3aa183458a42c9e1c4814f328e21e0ffe3ebe9566847090961c3ac88ed",
+      "TCP_binding": {
+        "proof_SHA256": "82b9443a7083f91e998ce0ca4acdddba3d60c4ec55894924994a1f0026c7ff30",
+        "native_TCP_generations": 824,
+        "source_bound_TCP_events": 5113,
+        "compared_CLI_PDUs": 39740,
+        "source_bound_parent_links": 8,
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "RPC": {
+        "proof_SHA256": "790a02319cd35f2d053bd8a8d1621132013964e60ba74e1a52ed9a1f3acb414c",
+        "PDUs": 384,
+        "reference_fields": 4788,
+        "unexported_complete_wire_PDUs": 0
+      }
+    },
+    "sharon": {
+      "preservation": {
+        "proof_SHA256": "5b1382b56e3b51045361434664ea8a8e65de51c1b2c4f734ff18a558866dbbe4",
+        "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "before_SDK_SHA256": "c9d1a7b279171ba462be9089453acf86b76d442f3d8fb4bb715611f75833fb54",
+        "after_SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+        "before_CLI_SHA256": "7f6e7021336759e1935713db13c54c1d20543a8e6b2cf866ee6abb73547d5565",
+        "after_CLI_SHA256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
+        "auditor_SHA256": "4470974cbe040f30a420ee820e46585b3a393c290a52053101cc3f2f43e02601",
+        "source_bound_non_IP_events": 135015,
+        "complete_non_IP_events_identical": 132996,
+        "non_IP_events_with_only_generated_ID_changes": 2019,
+        "all_other_application_values_and_connections_literal": true,
+        "physical_rows": 328127,
+        "physical_facts_unchanged": true,
+        "before_literal_CLI_labels": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6635,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 87,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 53639,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51897,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18052,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 17388,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "DCE/RPC": 5,
+          "IPv6Destination": 13,
+          "ICMPv4": 18,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "SMB2": 14,
+          "EtherIP": 7,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 1
+        },
+        "after_literal_CLI_labels": {
+          "Ethernet": 11103,
+          "LDP": 322,
+          "L2TPv3": 707,
+          "EthernetCTPReply": 339,
+          "ARP": 227,
+          "OSPF": 647,
+          "CiscoDiscoveryInfo": 109,
+          "ICMP": 2501,
+          "BGP": 245,
+          "TCP": 6634,
+          "HTTP/1.1": 54,
+          "HTTP/1.0": 23,
+          "UDP": 109376,
+          "ICMPV6": 2985,
+          "DHCP": 17,
+          "DHCPv6": 198,
+          "DNS": 1296,
+          "IGMP": 75,
+          "IPv6": 82,
+          "TLS": 49,
+          "TLSv1.2": 452,
+          "SMTP": 20,
+          "RIPng": 124,
+          "RPVST+": 2205,
+          "LLDP": 71,
+          "HSRPv2": 764,
+          "RIP": 68,
+          "SNAP": 73,
+          "RSTP": 407,
+          "NTP": 1213,
+          "Dot1Q": 26,
+          "SNMP": 234,
+          "SSH": 369,
+          "TFTP": 22,
+          "IKEv2": 35,
+          "IPSecESP": 1005,
+          "IKEv1": 239,
+          "SSDP": 73,
+          "mDNS": 396,
+          "RTSP": 176,
+          "PPPoE": 11,
+          "PPP": 37,
+          "IPv4": 54975,
+          "IPSecAH": 4,
+          "IMAP": 32,
+          "Fragment": 51606,
+          "SIP": 22,
+          "RTP": 6462,
+          "TLSv1.3": 302,
+          "WHOIS": 24,
+          "NetFlow v9": 196,
+          "GRE": 18028,
+          "MLDv2MulticastListenerReport": 10,
+          "Telnet": 129,
+          "IPP": 84,
+          "FTP": 103,
+          "FTP-DATA": 46,
+          "BFDv1": 65,
+          "IS-IS CSNP": 111,
+          "IS-IS Hello": 559,
+          "IS-IS LSP": 7,
+          "IS-IS PSNP": 1,
+          "GLBP": 777,
+          "VRRP": 818,
+          "Syslog": 111,
+          "SCTP": 25412,
+          "IPv6HopByHop": 16381,
+          "STUN": 2,
+          "LLC": 6305,
+          "PIMv2": 94,
+          "MPLS": 255,
+          "EAPOL": 53,
+          "EAP": 26,
+          "DCE/RPC": 5,
+          "IPv6Destination": 13,
+          "ICMPv4": 11,
+          "IPv6Routing": 5,
+          "ICMPv6": 51,
+          "SMB2": 14,
+          "EtherIP": 6,
+          "EthernetCTP": 4,
+          "MDP": 1,
+          "EthernetCTPForwardData": 3,
+          "CiscoDiscovery": 1,
+          "TLS?": 1,
+          "IPv6Fragment": 2,
+          "MODBUS": 1
+        },
+        "before_IP_diagnostics": [
+          {
+            "status": "incomplete",
+            "expert": "FragmentCaptureEnded",
+            "reason": "FragmentCaptureEnded",
+            "records": 116
+          },
+          {
+            "status": "incomplete",
+            "expert": "FragmentTimeout",
+            "reason": "FragmentTimeout",
+            "records": 326
+          },
+          {
+            "status": "incomplete",
+            "expert": "ICMPv6HeaderTruncated",
+            "reason": "ICMPv6HeaderTruncated",
+            "records": 2
+          },
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 50
+          },
+          {
+            "status": "limited",
+            "expert": "FragmentQuarantineBudget",
+            "reason": "FragmentQuarantineBudget",
+            "records": 44425
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentLength",
+            "reason": "FragmentLength",
+            "records": 14972
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentOverlapRejected",
+            "reason": "FragmentOverlapRejected",
+            "records": 19
+          },
+          {
+            "status": "malformed",
+            "expert": "NDOptionLength",
+            "reason": "NDOptionLength",
+            "records": 57
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 50859
+          }
+        ],
+        "after_IP_diagnostics": [
+          {
+            "status": "incomplete",
+            "expert": "FragmentCaptureEnded",
+            "reason": "FragmentCaptureEnded",
+            "records": 109
+          },
+          {
+            "status": "incomplete",
+            "expert": "FragmentTimeout",
+            "reason": "FragmentTimeout",
+            "records": 324
+          },
+          {
+            "status": "incomplete",
+            "expert": "ICMPv6HeaderTruncated",
+            "reason": "ICMPv6HeaderTruncated",
+            "records": 2
+          },
+          {
+            "status": "limited",
+            "expert": "EncapsulationDepthOrProfile",
+            "reason": "EncapsulationDepthOrProfile",
+            "records": 50
+          },
+          {
+            "status": "limited",
+            "expert": "FragmentQuarantineBudget",
+            "reason": "FragmentQuarantineBudget",
+            "records": 44202
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentLength",
+            "reason": "FragmentLength",
+            "records": 14932
+          },
+          {
+            "status": "malformed",
+            "expert": "FragmentOverlapRejected",
+            "reason": "FragmentOverlapRejected",
+            "records": 18
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 0",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 1",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 6",
+            "records": 3926
+          },
+          {
+            "status": "malformed",
+            "expert": "IPVersionMismatch",
+            "reason": "invalid IPv4 version 8",
+            "records": 1
+          },
+          {
+            "status": "malformed",
+            "expert": "NDOptionLength",
+            "reason": "NDOptionLength",
+            "records": 57
+          },
+          {
+            "status": "unrecognized",
+            "expert": "UnsupportedOrMalformedNetworkLayer",
+            "reason": "UnsupportedOrMalformedNetworkLayer",
+            "records": 50859
+          }
+        ],
+        "all_protocol_Wireshark_parity_claim": false,
+        "generated_ID_mapping_SHA256": "f551bf3cf2bf2c75067590d681782c3af2577bc4bc5c6b29fd983e282fb328fe"
+      },
+      "literal_label_changes": [
+        {
+          "before": "GRE",
+          "after": "IPv4",
+          "frames": 24
+        },
+        {
+          "before": "IPv6HopByHop",
+          "after": "IPv4",
+          "frames": 1007
+        },
+        {
+          "before": "Fragment",
+          "after": "IPv4",
+          "frames": 291
+        },
+        {
+          "before": "IPv6",
+          "after": "IPv4",
+          "frames": 5
+        },
+        {
+          "before": "ICMPv4",
+          "after": "IPv4",
+          "frames": 7
+        },
+        {
+          "before": "EtherIP",
+          "after": "IPv4",
+          "frames": 1
+        },
+        {
+          "before": "TCP",
+          "after": "IPv4",
+          "frames": 1
+        }
+      ],
+      "label_changes_source_proof_SHA256": "5b1382b56e3b51045361434664ea8a8e65de51c1b2c4f734ff18a558866dbbe4",
+      "TCP_binding": {
+        "proof_SHA256": "4e122a455902d4af274440c0ed55bf420dae60881431631d90b7bcc1ec727aab",
+        "native_TCP_generations": 840,
+        "source_bound_TCP_events": 2704,
+        "compared_CLI_PDUs": 249497,
+        "source_bound_parent_links": 0,
+        "all_checked_bindings_exact": true,
+        "wire_or_Wireshark_parity_claim": false
+      },
+      "RPC": {
+        "proof_SHA256": "49a8eb9769635b10375238b1d100ea153325df262e0b361133d42aa72bb4c55e",
+        "PDUs": 14,
+        "reference_fields": 121,
+        "unexported_complete_wire_PDUs": 0
+      }
+    }
+  },
+  "tests": {
+    "complete_native_and_initial_CLI": {
+      "proof_SHA256": "e24b1da8b94bf7e595b21492ad8bf380fe68321a134e7fa27d97773589290587",
+      "source": "31ba17a699daa2a4931f45bc3769de359ff58711",
+      "packages": [
+        {
+          "Time": "2026-10-28T08:31:26.8004278+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "Elapsed": 475.492
+        },
+        {
+          "Time": "2026-10-28T08:31:35.9574043+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "Elapsed": 3.519
+        }
+      ],
+      "counts": {
+        "run": 236057,
+        "output": 497383,
+        "pass": 236045,
+        "skip": 12
+      },
+      "all_prior_C2_tests_retained": true,
+      "added_parent_barrier_tests": [
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version4"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version4/EtherIP-version0"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version4/EtherIP-version3"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version4/IPv4-HOPOPT"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version6"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version6/EtherIP-version0"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version6/EtherIP-version3"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedCarrierCannotConfirmAChildIPVersion/child-version6/IPv4-HOPOPT"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "test": "TestUnselectedParentKeepsObservedDomainBeyondDisplayedPrefix"
+        },
+        {
+          "package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "test": "TestUnselectedNetworkParentCannotDisplayAConfirmedChild"
+        }
+      ],
+      "every_started_test_has_one_terminal_result": true,
+      "log_SHA256": "c541720133b7296dd2eb8faee988fe0033e883fb928f389e4cb6a513a4741f9a",
+      "non_JSON_compiler_diagnostics": [
+        "# github.com/VillanCh/go-pcre2-lite/internal/pcre2lite",
+        "In file included from _cgo_export.c:4:",
+        "cgo-gcc-export-header-prolog:49:34: warning: redeclaration of 'p2l_go_callout' should not add 'dllexport' attribute [-Wdll-attribute-on-redeclaration]",
+        "..\\..\\go\\pkg\\mod\\github.com\\!villan!ch\\go-pcre2-lite@v0.1.6\\internal\\pcre2lite/wrapper.h:62:5: note: previous declaration is here"
+      ]
+    },
+    "final_CLI": {
+      "proof_SHA256": "813005aa9f71d8257e2f98cf8b0f2cd4c222fe66b69b65b052227ff60fada8c4",
+      "source": "a8a4de07e8592c895987cf7c86d984af58de679a",
+      "counts": {
+        "run": 641,
+        "output": 1315,
+        "pass": 639,
+        "skip": 2
+      },
+      "every_prior_CLI_test_retained": true,
+      "each_started_test_has_one_terminal": true,
+      "source_of_native_full_suite": "31ba17a699daa2a4931f45bc3769de359ff58711",
+      "native_source_unchanged_after_full_suite": true,
+      "log_SHA256": "c90abc85ba71462f9e04c517a25133256cfd69c06b15dc126252154827d43e29"
+    },
+    "final_combined_passed": 236046,
+    "final_combined_skipped": 12,
+    "native_elapsed_seconds": 475.492,
+    "final_CLI_elapsed_seconds": 2.712,
+    "version_fragment_fuzz": {
+      "executions": 74606,
+      "total_seconds": 49.846,
+      "active_seconds": 40,
+      "log_SHA256": "a1e0b6b117b48e71e74beb48f5cab4d855882559027547abb5afd945e0275950"
+    },
+    "native_full_suite_after_capture_domain_repair": true,
+    "historical_expectations_changed": false,
+    "excluded_attempts": [
+      "Disk-interrupted test/fuzz/build attempts are not passes.",
+      "The intermediate shortened-source-domain implementation failed existing regression tests; 31ba restores the full literal observation domains without changing historical assertions."
+    ]
+  },
+  "Windows": {
+    "invalid_version": {
+      "proof_SHA256": "16bbaf649ffeaa0fec86d12401e6e2adba4351a42c3d86f62508b7cf457e4efa",
+      "source": "a8a4de07e8592c895987cf7c86d984af58de679a",
+      "binary_SHA256": "b118028fb834ca0124d04f17c6d942cfb433e2f269830df1d274ed35515c51d6",
+      "capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+      "CLI_SHA256": "bf62f297a5e2fac2ed392e097025b0e2fe7b592cda4632a14b95ac9d4e65d02d",
+      "CLI_PDU": 1,
+      "field_snapshot_SHA256": "6ccc9bc5d1627a66203fc43ed939872355f60fd5ee192bd62ef83a8483c2a0e3",
+      "actual_protocol_refusal_visible": true,
+      "stateless_speculative_child_tree_absent": true,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "field_image_SHA256": "48d2a30402118174d7dd4788b9668a3110eb4ae9e82985aa71d920b41ed3a89f",
+      "narrow_image_SHA256": "75a11e0b98b8963a53ca25c454c524bffa370de8d32d622d157dcac6d61ba7e0",
+      "native_console_cells": true,
+      "actual_isolated_detail_worker": true
+    },
+    "unselected_parent": {
+      "proof_SHA256": "a7a670cd601fd5f3945e2c9c856b5a3058e0021cf4dbb7531a2d5a8952029b2c",
+      "source": "a8a4de07e8592c895987cf7c86d984af58de679a",
+      "binary_SHA256": "b118028fb834ca0124d04f17c6d942cfb433e2f269830df1d274ed35515c51d6",
+      "capture_SHA256": "c914a4d855411d415f940a40eafd17f8450d44c68e833d8bc1a75cf7dea6a958",
+      "CLI_SHA256": "729140a2304eb9515c0bea03e238ce9b11c05e307213f62e3acf17cd7631cb9c",
+      "CLI_PDU": 1,
+      "field_snapshot_SHA256": "366b2d1e3d97a8a82b66a70a69a735dfa72313aa7e4513749c7dfb691c57295c",
+      "actual_protocol_refusal_visible": true,
+      "stateless_speculative_child_tree_absent": true,
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "field_image_SHA256": "c23a2fafb5c0ea996e349edbea7426d849d1adc97bedd6bbb372f1cc1dec0e0e",
+      "narrow_image_SHA256": "1715d70fc85a273d9f4f0d38fa463df2d8de4380d27d2ad682d273e425fbf58c",
+      "native_console_cells": true,
+      "actual_isolated_detail_worker": true
+    },
+    "parent_original_records": {
+      "proof_SHA256": "819413f18cfe222c438b51017dd5b3f0e0ffc20706936967d844250b783d5bc9",
+      "generator_SHA256": "023bc1f95f65d772fc06d04a8a7b5e701e1eaa7337ec74cb9d39766222021e00",
+      "source_capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "source_proof_SHA256": "b1c4c13bcc9c024fa1069ff302be6872be1a1411510e4ae7ee332756e95bcff4",
+      "capture_SHA256": "c914a4d855411d415f940a40eafd17f8450d44c68e833d8bc1a75cf7dea6a958",
+      "header_or_transport_bytes_modified": false,
+      "declared_changes": [
+        "filter and renumber ten original protocol-0/EtherIP parent records",
+        "original single Ethernet interface mapped to PCAP interface zero"
+      ],
+      "records": 10
+    }
+  },
+  "witnesses": {
+    "proof_SHA256": "09432763dbb43133831560c56c3bcd66783d6545be895c5e161a6bdc51b95844",
+    "source_capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+    "manifest_SHA256": "11aae5202feec247b9347b443148e4611773bcb57ce57b12d22d7d8d45f1bd08",
+    "SDK_SHA256": "488b40e8a6e8c1db60464f8d9b7a353fbd088498406e9a67f687742abcfedcbd",
+    "CLI_SHA256": "bf62f297a5e2fac2ed392e097025b0e2fe7b592cda4632a14b95ac9d4e65d02d",
+    "reference_SHA256": "1b3f9243b9cfe7965956ba1900102d3531951341efed298528966841755ecf7b",
+    "reference_labels_SHA256": "5630c2253ee6b471fd76a9827862bd8bc5bfa95d396d86f009fbde0a4ab0b452",
+    "auditor_SHA256": "9efd1a3babbfb4174e42c2b6bbe03faf102b50215de0d120ec96459b8e1ddd56",
+    "original_wire_witnesses": 269,
+    "literal_reference_version_checks": 269,
+    "reference_bogus_version_expert_checks": 269,
+    "literal_reference_protocol_labels": {
+      "MPLS ECHO": 226,
+      "LLC": 1,
+      "EIGRP": 5,
+      "FDDI": 15,
+      "RSVP": 8,
+      "IPv6": 8,
+      "STP": 1,
+      "ICMPv6": 1,
+      "ICMP": 1,
+      "HIP": 1,
+      "Ethernet": 1,
+      "TCP": 1
+    },
+    "literal_native_protocol_labels": {
+      "IPv4": 269
+    },
+    "full_source_refusal": {
+      "events_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+      "source_frames_checked": 269,
+      "all_source_frames_refused_before_fragment_or_application_state": true
+    },
+    "full_protocol_label_parity_claim": false
+  },
+  "full_IP_version_audit": {
+    "proof_SHA256": "32353c639284c3f24e510bd33a220a500d9128e596969e8a1effa8dcc21febf7",
+    "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+    "SDK_SHA256": "c656d9ebd5a12aa22158b4fc0768348f29d406472c6d55b7373b7e48ff0045c0",
+    "reference_SHA256": "49f87d87ff69c61c533407547b011bc93427f1f37f7e2fae7dcf59e0db64b06b",
+    "reference_labels_SHA256": "c6a1b987a9133ecf354e4993bfc8c165a2da89b1cbea743094023cf7fc5119df",
+    "CLI_SHA256": "efe697869ff8f07d56fa1264352510663b89bf8374c934306a422e9cc46b1578",
+    "auditor_SHA256": "66ee492937eaaffc980e926ae1220c32a3529cc8e6ecdef61c84ce424caa32ee",
+    "source_bound_version_refusals": 3929,
+    "source_contributors_exclusive": true,
+    "literal_reference_version_and_expert_checks": 3929,
+    "unselected_parent_observations": [
+      {
+        "frame": 23084,
+        "PDU": 18981,
+        "raw_frame_SHA256": "c82aad79a961779adf7c6b2b843bdade16de77a6ed4e8a399b68e9d39a89763f",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23086,
+        "PDU": 18982,
+        "raw_frame_SHA256": "291d4e1a28c11d72899568ffe2151c2f13257666e5ffe76ea8902cf6238f5837",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23088,
+        "PDU": 18983,
+        "raw_frame_SHA256": "2bca9d38a4f65019bda5770a5cb312e7637796037d555bf63c69b1bae094310a",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23090,
+        "PDU": 18984,
+        "raw_frame_SHA256": "c956eb0f9c91c49cff646eb0ba27b18efb3ff342e13bf218a772f47cb40b3578",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23098,
+        "PDU": 18991,
+        "raw_frame_SHA256": "95c52018103e836a1b41bad7939f32be88cf69c77bc3ffc6f07e38230c93600a",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23102,
+        "PDU": 18994,
+        "raw_frame_SHA256": "d3b3f50b62473df6649147162e1e99cbbf2a8e742b8d54b7de1d0bd28703fd92",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23116,
+        "PDU": 19007,
+        "raw_frame_SHA256": "bc40deb1e2ded882aea767016b78a5e024c529ec42d547c0f88d638d6244c400",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23137,
+        "PDU": 19018,
+        "raw_frame_SHA256": "0129bd3dba59aa98ba58d05c9e9240d573070076dc789569c34c4216fa385a3e",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23154,
+        "PDU": 19019,
+        "raw_frame_SHA256": "2f6233092cf4c0c42d00300b556382cf74a459caafd5119d39a4756d2f81d50b",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23171,
+        "PDU": 19020,
+        "raw_frame_SHA256": "b843d750ce10eba03df8c4dd88c8d255e5f5735846c2c7f9d9d2783ebba1ab71",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23179,
+        "PDU": 19021,
+        "raw_frame_SHA256": "8997fc5218eec042f00c68f54840925ceb59d20a86d062127f5d8d9926d319d9",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23222,
+        "PDU": 19022,
+        "raw_frame_SHA256": "bf96c57b220ad82bb9950b47f7da8c56b26307d6f9c2e57982b5f0a7e5dd7742",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23245,
+        "PDU": 19023,
+        "raw_frame_SHA256": "10f3bda358138864f11e71257a9fa1904bbe1b33395c6d42dc7762f8fb1dca56",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23274,
+        "PDU": 19024,
+        "raw_frame_SHA256": "b05c6eb82ad01df41a8f163bfde680aee6791360ba7517e0d1426177cfe65cb9",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23276,
+        "PDU": 19025,
+        "raw_frame_SHA256": "623771d630b121a342dda026a48031059739d7f30e5ecb5d19b368f2edfd5b81",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23278,
+        "PDU": 19026,
+        "raw_frame_SHA256": "5adc7638ca59674b022a1395014654784b9672b9a6e4716c08684447522b7ec2",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23280,
+        "PDU": 19027,
+        "raw_frame_SHA256": "2eb060b2946c63c9f6fb4ba329a804b8298a6121595631d0facee60fa69dcd03",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23282,
+        "PDU": 19028,
+        "raw_frame_SHA256": "73c27445cb0154a5bb6b7f3aa0178e36ffb9733b5c104fe8cbc8a370e4d18e4e",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23284,
+        "PDU": 19029,
+        "raw_frame_SHA256": "ca091f7b6fcfc5bb85465679e9f568ad34d784decc6be5dedb4b3636e0248244",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23286,
+        "PDU": 19030,
+        "raw_frame_SHA256": "fcd7b909d8ff1c61b4fda04a679f6becba17e7da7243cdd2f41a5af997753286",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23288,
+        "PDU": 19031,
+        "raw_frame_SHA256": "76563b4919570abb79039d9bd7a76c86d95a18355e390943d60064714cdc2d1b",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 23290,
+        "PDU": 19032,
+        "raw_frame_SHA256": "e86ab6ec0abb5393a553e80ded155f5884253e855ab47f986e6350f52716a5c2",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 144301,
+        "PDU": 134830,
+        "raw_frame_SHA256": "86d81e94682fc24a7714deb904829e0ee1fca9a4686bb29c9d7cd3c5dd3a5c65",
+        "outer_IP_protocol": 0,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 145373,
+        "PDU": 135440,
+        "raw_frame_SHA256": "477af18e01d21b46ee6787ec237160f678eb8cf151f7c8565a2b3fca9b711b2b",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 158852,
+        "PDU": 142421,
+        "raw_frame_SHA256": "3cdda3e4822db96fb91c522428047f9be865753aeccea2109381c0288e8663da",
+        "outer_IP_protocol": 4,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 160104,
+        "PDU": 143257,
+        "raw_frame_SHA256": "0cc97e6429711dfd4c2b183ecf0f9ce5a7c37f8b3c6976740898dab1414568b8",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 166380,
+        "PDU": 147359,
+        "raw_frame_SHA256": "d672836c2e18dbc9332603bdefbacde09cbe698418fbee0428ae43cffe037283",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 170197,
+        "PDU": 149882,
+        "raw_frame_SHA256": "a7e29a54edea14df9b5bd79781ac3052ddfd44e364c14a730b9acefc428ea479",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 171065,
+        "PDU": 150451,
+        "raw_frame_SHA256": "95924b8ce1280abf8115483a042e1f104401a242ab1430747547ea3ab694b88e",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 171932,
+        "PDU": 151028,
+        "raw_frame_SHA256": "9f2697345d4bbe319d25d67f563ae0a0ecb2e7f471a128e5ac9dd216c4f099c9",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 196153,
+        "PDU": 167087,
+        "raw_frame_SHA256": "946bd0b60cebbfe8762b08dfdecdd0080c605be48bf8bc5e375f5c499ac3ea00",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 199011,
+        "PDU": 168978,
+        "raw_frame_SHA256": "aee71c76b4b4acd451d6843323fa5c593e922bf39c82897ec8bdf1413bc459cb",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 201047,
+        "PDU": 170236,
+        "raw_frame_SHA256": "e14d6a207cc6f95a835dd2b3857ae6138f5c876045f01de762311595e1d89496",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 221531,
+        "PDU": 181839,
+        "raw_frame_SHA256": "99a14e34a2b50ae41742529435f623c2950d564c8bfd963182452586369de81e",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 221719,
+        "PDU": 181970,
+        "raw_frame_SHA256": "75f34546ae896ed7c64399e8bb44f9be0c81d6363ef60bbf206d35e6b0f18f6b",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 225056,
+        "PDU": 184169,
+        "raw_frame_SHA256": "587e1f463de6091208379da362d9c954ba67dc9a4edabb98854b948af7b5f1c6",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 237079,
+        "PDU": 192079,
+        "raw_frame_SHA256": "42f97cc8ae9fe8ed7e9d18b1a094577a4b4d4f7b19a08300a64db75b2e96e92e",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 238345,
+        "PDU": 192909,
+        "raw_frame_SHA256": "4a54a886013b905c698f79d82cdcc9ce4467278118deceb98605e5c26f04aba1",
+        "outer_IP_protocol": 0,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 239059,
+        "PDU": 193382,
+        "raw_frame_SHA256": "546f501162b69e3ca16576c3c7656e5ac87a93e1f458950777e5bc464e245c18",
+        "outer_IP_protocol": 0,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 251105,
+        "PDU": 201298,
+        "raw_frame_SHA256": "cda96a0f7937623f488ef5bc9f6b075c69ce2ae2c7b7811cdfe40a7dc9be65ff",
+        "outer_IP_protocol": 97,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 261151,
+        "PDU": 207654,
+        "raw_frame_SHA256": "33c59b67953b5599a739f9911ec4047d30d66ac084da9993c9414190708562bc",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 268628,
+        "PDU": 211630,
+        "raw_frame_SHA256": "18c509f55d80c392821f4a071d3335609c30f2c8ea2dd2972facad60e3ab2ef8",
+        "outer_IP_protocol": 4,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 280948,
+        "PDU": 219059,
+        "raw_frame_SHA256": "b9cea21f73d452f61de18f3796d25b053ea57b50ada3c706008f8ca1ab888665",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 282893,
+        "PDU": 220342,
+        "raw_frame_SHA256": "c8ae1f62430c7a0dbcfe2a4c04fd85f144184287d147678abb0d7135213fd16d",
+        "outer_IP_protocol": 0,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 289804,
+        "PDU": 224951,
+        "raw_frame_SHA256": "6b7539cbb54e4cdb1de7d00eca6e2ef8de50f181ca092d5f7458fbb3b949a050",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 296958,
+        "PDU": 229696,
+        "raw_frame_SHA256": "9d4f87e2753a3c1d26f4a5e010a9f84ee7e94ca14a5ef196d30fe2ce8e821ac1",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 300669,
+        "PDU": 232147,
+        "raw_frame_SHA256": "b812107b65f3230b904dea0305c605a81d135d6ec15b5c1ed9dee6daaf01f4e8",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 303684,
+        "PDU": 234162,
+        "raw_frame_SHA256": "3440a78bd618a39a8864f8f5f5b06f109287d5f238b5125958a374af6cec969a",
+        "outer_IP_protocol": 47,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 313208,
+        "PDU": 240508,
+        "raw_frame_SHA256": "7c187594b4661611cdd4441acf9baef4afa5f9f219c31b029ed98a4f35c3ca71",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      },
+      {
+        "frame": 322465,
+        "PDU": 246068,
+        "raw_frame_SHA256": "fb2f56a22116976a370a3bc60539eff4eb7189e22f1557c64323fd55abe1edfb",
+        "outer_IP_protocol": 137,
+        "child_identity_confirmed": false
+      }
+    ],
+    "parent_refusal_policy": {
+      "baseline_events_SHA256": "c9d1a7b279171ba462be9089453acf86b76d442f3d8fb4bb715611f75833fb54",
+      "same_original_refusal_frame_sets": true
+    },
+    "literal_reference_protocol_labels": {
+      "RSVP": 1000,
+      "ICMPv6": 965,
+      "0x0000": 2,
+      "BACnet-APDU": 782,
+      "EIGRP": 102,
+      "MPLS ECHO": 250,
+      "DVMRP": 18,
+      "IPv6": 186,
+      "DSR": 17,
+      "TCP": 23,
+      "IP": 26,
+      "IPComp": 85,
+      "MIPv6": 4,
+      "MIH": 174,
+      "LLC": 14,
+      "PIMv2": 16,
+      "SNA": 1,
+      "RSVP-E2EI": 34,
+      "IGAP": 1,
+      "LINX": 5,
+      "VRRP": 7,
+      "DCCP": 41,
+      "PPPoED": 1,
+      "swIPe": 1,
+      "MDP": 23,
+      "PNIO": 23,
+      "FDDI": 16,
+      "PIMv0": 1,
+      "TPKT": 3,
+      "MPLS": 4,
+      "BACnet-NPDU": 5,
+      "ICMP": 9,
+      "AH": 9,
+      "SCTP": 6,
+      "TR MAC": 1,
+      "QNET_KIF": 5,
+      "HIP": 7,
+      "BFD Control": 2,
+      "STP": 5,
+      "FLIP": 2,
+      "IGMP": 6,
+      "IPv4": 2,
+      "IDP": 5,
+      "IGMPv3": 2,
+      "PN-RT": 1,
+      "CSM_ENCAPS": 3,
+      "PPP MPLSCP": 5,
+      "PIMv1": 5,
+      "PN-PTCP": 1,
+      "ISIS LSP": 1,
+      "CFM": 1,
+      "L2TPv3": 5,
+      "IGMPv0": 2,
+      "LACP": 2,
+      "AX4000": 1,
+      "Vines ICP": 1,
+      "MPLS PM (ILM)": 1,
+      "GRE": 1,
+      "TR": 1,
+      "NHRP": 1,
+      "IGRP": 2,
+      "Ethernet": 2,
+      "PGM": 1,
+      "VLAN": 1
+    },
+    "literal_native_protocol_labels": {
+      "IPv4": 3979
+    },
+    "full_malformed_carrier_or_protocol_parity_claim": false,
+    "reference_selected_original_frames": 4516,
+    "reference_only_frames": 587,
+    "reference_only_with_explicit_parent_refusal": 10,
+    "reference_only_other_frames": 577,
+    "source_bound_field_descriptor_checks": 7857,
+    "reference_only_inventory_SHA256": "f10ef150aaaa7a5a6e35758c36fc7290b4f6199ea5f4245217c61e37b3f7555f",
+    "reference_only_inventory_categories": {
+      "valid outer IPv4; inspect child or transformed data source": 572,
+      "short Ethernet IPv4 fixed header": 5
+    }
+  },
+  "negative_controls": {
+    "source_and_projection": {
+      "proof_SHA256": "065d342ff0b477f6728b1150592e8c7ea4422a88c5cad334b218d8497529fa41",
+      "auditor_SHA256": "4aaa5af6f0d655ece3c6d7240b95c0373dc93470b4211e64b1fb5dbf2a2183cf",
+      "rejected": 13,
+      "controls": [
+        {
+          "control": "wire-byte-with-updated-hash",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "fbf5d3e7d896c86e264f1fc44195899296d32444cf8f7770b8ec911f4923828f",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "2b481ec366dafe84615f0572c11c130b55d029b9f8ed60b5698f5d64a198a229"
+          }
+        },
+        {
+          "control": "source-time",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "ead3eef063376d1c55de8df007c6383870983fcc5313c8554b0563faf39daa9c"
+          }
+        },
+        {
+          "control": "source-domain",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "5edbf235fb374f4e49886d77b2c11f9a36a167ed8964f6ab590b590f3cc1c5ab",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "duplicate-source-frame",
+          "rejected": true,
+          "reason": "AssertionError: every witness has exactly one native refusal",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "f20053b8d671c26c6ab81b277274c3b41edad804a3a7dcf1bb4a4312192011f5",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "boolean-PDU-ID",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "81e3cdd19d670784a3f9c58d61fed55a381dac0afbd28d7f438a153634cc2ac5",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "observed-version",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "895f33d7698c6a8eb591e135ff951edc39d05b1c7b03d92657cf42930bfc7e09",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "child-header-splice",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "453887eb5c9232aec9e0b4eb8f5f4c7b8821d1f18b0cf2e1f0aa8db1de1c81da",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "false-flow",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "6f93a4236d4a4de357dd15efcc8feff0957d5dacc1479a2d8aaac8ceed0af863",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "CLI-fragment-label",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "016c9355aae4247cf41c9d766df5e153be78b48c602447c728ebade9d885bbe0",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "CLI-application-stack",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "7fefc3186a933351b90472f7500ef36f7297458a4541b19eed5c839532c387e1",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "CLI-connection-identity",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "9395834a37306dc117617441043c1a01f65311103a292243a27b0322354667f0",
+            "oracle": "57f743bbe0b920e9104c68d6ec45c0ff7dafe3108e142b16b45be50b208108cc",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "reference-version",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "28cb846df09098baa6175697177e545a3deb2b6eb927de04edbd16a36f1e6ecf",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        },
+        {
+          "control": "reference-expert",
+          "rejected": true,
+          "reason": "AssertionError: ",
+          "mutated_capture_SHA256": "88b225e5fa30ee55bea937e125169eb278aa1e01b10e2f0958e4c5b26d7b56e7",
+          "mutated_inputs_SHA256": {
+            "events": "ade3f91ff65e315d30592663fb0e4d45d7d4340c82b26234c97689800d1e499a",
+            "cli": "8f2c0df115bb40ac676ca7446a72958294db273c05443135df7545e0e3a81680",
+            "oracle": "38384e930e0213070cac1e98f41be0b1b4307bec916e68c14f4b261a8b62ae23",
+            "manifest": "25a9fb5d6d531c2b38d10e3a15672f57c18157bd23e811a9b60bf7b7d72ff6ae"
+          }
+        }
+      ]
+    },
+    "raw_reference_descriptors": {
+      "proof_SHA256": "0015842c479a413e59da1cd3fd8aa7618cad657d77aaa02707fc8a591e15a728",
+      "reference_SHA256": "49f87d87ff69c61c533407547b011bc93427f1f37f7e2fae7dcf59e0db64b06b",
+      "auditor_SHA256": "f179707375e2000a48e805986e53ca933acc31bc18d746692cda6c229a301b09",
+      "rejected": [
+        "changed original frame",
+        "foreign data source",
+        "wrong byte offset",
+        "wrong field width",
+        "wrong bit mask",
+        "wrong raw byte",
+        "wrong field value",
+        "boolean version",
+        "boolean mask",
+        "boolean width",
+        "boolean data source",
+        "boolean frame source",
+        "missing owning expert",
+        "expert moved to unrelated byte"
+      ],
+      "all_rejected": true,
+      "original_reference_unchanged": true
+    },
+    "total_rejected": 27
+  },
+  "remaining_scope": [
+    "577 reference-only observations remain explicitly inventoried: 572 have valid outer IPv4 and need child/data-source adjudication; five have fewer than 20 IPv4 fixed-header bytes and retain the truncation path. These are not 577 certified missing applications.",
+    "50 unselected encapsulation profiles remain limited outer-prefix observations, with the same original refusal frame sets as the baseline.",
+    "TLS resumption/0-RTT and missing-handshake recovery, broader QUIC CID/QPACK edges, numeric CoAP response-PDU links, SSH advanced profiles and full RPC/NDR/authentication remain incomplete."
+  ]
+}

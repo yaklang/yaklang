@@ -10,9 +10,14 @@ import json
 from pathlib import Path
 import struct
 import zipfile
+import importlib.util
+import io
 
 REPOSITORY = Path(__file__).resolve().parents[4]
 BATCH_ROOT = REPOSITORY / "common/bin-parser/testdata/corpus-batches"
+STORE_SPEC = importlib.util.spec_from_file_location("capture_store", REPOSITORY / "internal/trafficfixture/capture_store.py")
+STORE = importlib.util.module_from_spec(STORE_SPEC)
+STORE_SPEC.loader.exec_module(STORE)
 SELECTED = ['ndpi-dns', 'ndpi-http', 'ndpi-ssh', 'ndpi-mqtt', 'ndpi-mysql', 'ndpi-modbus', 'ndpi-s7comm', 'ndpi-enip-cip', 'ndpi-opcua', 'ndpi-smtp', 'ndpi-ftp', 'ndpi-snmp', 'ndpi-dcerpc', 'gen-dhcpv6', 'gen-icmpv6', 'gen-llmnr-mdns', 'gen-ieee8021q', 'gen-geneve', 'gen-jsonrpc', 'ndpi-rtp', 'ndpi-coap', 'ndpi-sip', 'ndpi-zabbix-agent', 'ndpi-syslog']
 
 
@@ -88,11 +93,11 @@ def inspect_ng(data):
 def main():
     index = json.loads((BATCH_ROOT / "index.json").read_text())
     batch = next(b for b in index["batches"] if b["file"] == "baseline-2fb090d177c3.zip")
-    archive = BATCH_ROOT / batch["file"]
-    assert sha256(archive.read_bytes()) == batch["sha256"]
+    archive = STORE.read_repository_file(REPOSITORY, "common/bin-parser/testdata/corpus-batches/" + batch["file"])
+    assert sha256(archive) == batch["sha256"]
     output = bytearray()
     sources = []
-    with zipfile.ZipFile(archive) as source_zip:
+    with zipfile.ZipFile(io.BytesIO(archive)) as source_zip:
         password = batch["password"].encode()
         provenance = json.loads(source_zip.read("PROVENANCE.json", pwd=password))
         cases = {c["original_path"]: c for c in provenance["cases"]}
@@ -116,7 +121,12 @@ def main():
                                 evidence_kinds=sorted({r.get("evidence_kind", "") for r in records}),
                                 license_evidence=case.get("license_evidence", [])))
             output += converted
-    compressed = gzip.compress(bytes(output), compresslevel=9, mtime=0)
+    # GzipFile fixes the OS header byte to 255. gzip.compress(mtime=0) can
+    # delegate that byte to zlib and change it between Windows and Linux.
+    compressed_output = io.BytesIO()
+    with gzip.GzipFile(fileobj=compressed_output, mode="wb", filename="", compresslevel=9, mtime=0) as compressor:
+        compressor.write(output)
+    compressed = compressed_output.getvalue()
     manifest = dict(
         format="pcapng", source_batch=batch["file"], source_batch_sha256=batch["sha256"],
         source_commit=provenance["source_sha"],
@@ -126,7 +136,14 @@ def main():
         **inspect_ng(output), sources=sources,
     )
     assert 190 << 10 <= len(compressed) <= 215 << 10
-    folder = Path(__file__).resolve().parent
+    # Regeneration is explicit and writes to a private output directory, never
+    # recreating the archived capture in the source checkout.
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output-dir", required=True, type=Path)
+    folder = parser.parse_args().output_dir.resolve()
+    assert not folder.is_relative_to(REPOSITORY), "Use a private output directory outside the checkout"
+    folder.mkdir(parents=True, exist_ok=False)
     (folder / "comprehensive.pcapng.gz").write_bytes(compressed)
     (folder / "comprehensive.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2) + "\n")
     print(json.dumps({k: v for k, v in manifest.items() if k not in ("sources", "conversion")}, indent=2))

@@ -8,6 +8,8 @@
 # A response block is a sequence of complete responses, not a full transaction.
 # Header-only FETCH sections expose unfolded headers with encoded byte provenance;
 # they are not relabeled complete messages or MIME-decoded bodies.
+# Selected RFC 2342 NAMESPACE groups/extensions and argumentless RFC 2177 IDLE
+# commands are included; IDLE continuation ownership remains native session state.
 endian: big
 unit: byte
 Package:

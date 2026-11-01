@@ -1,0 +1,49 @@
+# Complete bounded wire envelopes. Authentication and encrypted application
+# decoding are unavailable; the metadata states exact supported profiles.
+endian: big
+unit: byte
+Package:
+  NBSSControl:
+    operator: |
+      err = parseNetworkControl("nbss")
+      if err != nil { panic(err) }
+  TelnetMessage:
+    operator: |
+      err = parseNetworkControl("telnet")
+      if err != nil { panic(err) }
+  IKEMessage:
+    operator: |
+      err = parseNetworkControl("ike")
+      if err != nil { panic(err) }
+  IKENATTMessage:
+    operator: |
+      err = parseNetworkControl("ike-natt")
+      if err != nil { panic(err) }
+  WireGuardMessage:
+    operator: |
+      err = parseNetworkControl("wireguard")
+      if err != nil { panic(err) }
+  RIPMessage:
+    operator: |
+      err = parseNetworkControl("rip")
+      if err != nil { panic(err) }
+  NBTDGMessage:
+    operator: |
+      err = parseNetworkControl("nbt-dg")
+      if err != nil { panic(err) }
+  ONCRPCMessage:
+    operator: |
+      err = parseNetworkControl("onc-rpc")
+      if err != nil { panic(err) }
+  L2TPMessage:
+    operator: |
+      err = parseNetworkControl("l2tp")
+      if err != nil { panic(err) }
+  OpenVPNMessage:
+    operator: |
+      err = parseNetworkControl("openvpn")
+      if err != nil { panic(err) }
+  IPMIMessage:
+    operator: |
+      err = parseNetworkControl("ipmi")
+      if err != nil { panic(err) }

@@ -9,6 +9,9 @@ import (
 // defaults. Limits close the affected flow with reason "resource-limit"; gaps
 // are never silently concatenated. Limits apply to captured TCP payload bytes.
 type TCPReassemblyOptions struct {
+	// Source policy is set by the capture API, never inferred from timestamps.
+	captureReplay     bool
+	disableIdleExpiry bool
 	// Stream emits ordered data through the arrived callback without retaining
 	// a readable copy of the stream. Reassembled callbacks receive chunks of at
 	// most MaxFrameBytes. Read/GetBuffer return EOF in this mode. Consumers may
@@ -24,7 +27,11 @@ type TCPReassemblyOptions struct {
 	MaxTotalPendingBytes    int
 	MaxTotalPendingSegments int
 	MaxFlows                int
-	IdleTimeout             time.Duration
+	// IdleTimeout is a resource limit, not proof that a peer closed TCP.
+	// Zero uses 30 seconds of wall-clock inactivity for live capture. Offline
+	// replay defaults to EOF/control/capacity retirement instead; an explicit
+	// positive timeout there uses captured timestamps within each capture domain.
+	IdleTimeout time.Duration
 	// Maximum forward sequence distance, including payload. Keeping every
 	// pending interval within half the sequence space makes wrap comparisons
 	// transitive. Far-future segments are rejected without advancing the flow.
@@ -108,10 +115,32 @@ func WithTCPReassemblyWorkers(workers int) CaptureOption {
 // be combined with the built-in HTTP/TLS parsers, which require whole messages.
 func WithTCPReassemblyOptions(options TCPReassemblyOptions) CaptureOption {
 	return func(c *CaptureConfig) error {
+		c.reassemblyIdleExplicit = options.IdleTimeout > 0
 		var err error
 		c.reassemblyOptions, err = options.normalized()
 		return err
 	}
+}
+
+// WithCaptureReplayClock marks manually fed PacketAnalyzer input as offline.
+// ReplayPcap and file capture apply it implicitly. Processing delays cannot
+// expire TCP state: the default lifetime is bounded by EOF, observed controls
+// and capacity. An explicitly configured IdleTimeout uses capture-domain time.
+// Unknown timestamps do not invent a wall-clock observation.
+func WithCaptureReplayClock() CaptureOption {
+	return func(c *CaptureConfig) error {
+		c.offlineReplayClock = true
+		return nil
+	}
+}
+
+func (c *CaptureConfig) tcpPoolOptions() TCPReassemblyOptions {
+	o := c.reassemblyOptions
+	if c.offlineReplayClock || c.Filename != "" {
+		o.captureReplay = true
+		o.disableIdleExpiry = !c.reassemblyIdleExplicit
+	}
+	return o
 }
 
 // WithTCPReassemblyStream enables bounded data callbacks for very large flows.

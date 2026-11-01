@@ -14,6 +14,13 @@ import (
 // TFTP is datagram-only and changes server TID after RRQ/WRQ. File bytes are
 // are retained only by the explicit bounded octet-file profile; the default
 // transfer observer retains sequence/digest metadata only.
+type tftpPeerState uint8
+
+const (
+	tftpRefusedCandidate tftpPeerState = iota // current-generation routing evidence only
+	tftpRetiredPeer                           // cannot establish a fresh observed generation
+)
+
 type binTFTP struct {
 	unverified                       bool
 	futureAmbiguous                  bool
@@ -30,14 +37,15 @@ type binTFTP struct {
 	oack                             [32]byte
 	digest                           [32]byte
 	server                           string
-	// A passive capture cannot distinguish a reused server TID from old wire.
-	// Keep a budgeted history until this captured conversation is closed.
-	retired map[string]struct{}
+	// Exact refused candidates and retired TIDs share one charged, bounded
+	// history. A refused prefix is routing evidence, not a negotiated server;
+	// complete OACK/DATA in this generation may still recover. Only retired
+	// entries prohibit fresh-generation ownership.
+	retired map[string]tftpPeerState
 }
 
 func (s *binTFTP) retiredTID(peer string) bool {
-	_, used := s.retired[peer]
-	return used
+	return s.retired[peer] == tftpRetiredPeer
 }
 
 func tftpStrings(w []byte, max int) ([]string, error) {
@@ -324,8 +332,15 @@ func cloneSessionStringMap(m map[string]string) map[string]any {
 // only the endpoint identity, reserving it before insertion. Refusal to retain
 // new history quarantines future generations without killing the live owner.
 func (f *binFlow) rememberTFTPCandidate(peer string) error {
+	return f.rememberTFTPPeer(peer, tftpRetiredPeer)
+}
+
+func (f *binFlow) rememberTFTPPeer(peer string, state tftpPeerState) error {
 	s := f.tftp
-	if s.retiredTID(peer) {
+	if previous, seen := s.retired[peer]; seen {
+		if state == tftpRetiredPeer && previous != tftpRetiredPeer {
+			s.retired[peer] = tftpRetiredPeer
+		}
 		return nil
 	}
 	if len(s.retired) >= min(128, sessionCollectionLimit(f.a.budget.MaxCollectionElements)) {
@@ -337,9 +352,9 @@ func (f *binFlow) rememberTFTPCandidate(peer string) error {
 		return err
 	}
 	if s.retired == nil {
-		s.retired = map[string]struct{}{}
+		s.retired = map[string]tftpPeerState{}
 	}
-	s.retired[strings.Clone(peer)] = struct{}{}
+	s.retired[strings.Clone(peer)] = state
 	return nil
 }
 
@@ -349,4 +364,21 @@ func tftpCandidatePrefix(w []byte) bool {
 	}
 	op := binary.BigEndian.Uint16(w)
 	return op >= 3 && op <= 6
+}
+
+// The initial request identifies a client TID and server address, not every UDP
+// port on that server. Without a concrete observed/retired peer, only a TFTP
+// reply prefix may enter that negotiation. Decline unrelated service bytes
+// before changing IDs, clocks, LRU state, ambiguity or assembled file contents.
+func tftpUDPHasPeerEvidence(f *binFlow, e *ProtocolEvent, w []byte, dir int) bool {
+	if f == nil || f.tftp == nil {
+		return false
+	}
+	peer := e.Source
+	if dir == 0 {
+		peer = e.Destination
+	}
+	t := f.tftp
+	_, observedPeer := t.retired[peer]
+	return peer == f.endpoints[1] || t.server != "" && peer == t.server || observedPeer || tftpCandidatePrefix(w)
 }

@@ -1,0 +1,10 @@
+# Canonical explicitly bounded, complete membership PDU. Native observations
+# use the same codec but also retain truthful partial prefixes and context.
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("IGMPFields")
+  IGMPFields:
+    operator: |
+      err = parseObservedSession("igmp")
+      if err != nil { panic(err) }

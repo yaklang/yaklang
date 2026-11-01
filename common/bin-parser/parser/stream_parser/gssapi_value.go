@@ -250,11 +250,15 @@ func (d gssapiDecoder) negotiation(at, limit int, initial bool) (gssapiField, ma
 					name = "Optimistic Mechanism Token"
 				}
 			}
-			field, _, err = d.explicitValue(name, "Octet String", t, 4)
+			var value gssapiTLV
+			field, value, err = d.explicitValue(name, "Octet String", t, 4)
 			if err != nil {
 				return gssapiField{}, nil, err
 			}
 			field.Info = map[string]any{"Semantics Decoded": false, "Verified": false}
+			if index == 2 {
+				info["Mechanism Token"] = bytes.Clone(d.wire[value.body:value.end])
+			}
 		}
 		fields, at = append(fields, field), t.end
 	}
@@ -335,6 +339,22 @@ func inspectGSSAPIBase64(encoded string) (map[string]any, error) {
 	if err != nil || base64.StdEncoding.EncodeToString(wire) != encoded {
 		return nil, fmt.Errorf("gssapi: invalid or noncanonical padded Base64")
 	}
+	info, err := DecodeGSSAPIToken(wire)
+	if err != nil {
+		return nil, err
+	}
+	info["Source Encoding"] = "base64"
+	return info, nil
+}
+
+// DecodeGSSAPIToken shares the bounded DER grammar used by the rule tree and
+// HTTP bridge. Returned bytes/fields are owned; mechanism tokens remain opaque.
+// Structural success does not verify a MIC, negotiation outcome, or identity.
+func DecodeGSSAPIToken(input []byte) (map[string]any, error) {
+	if len(input) < 4 || len(input) > gssapiMaxBytes {
+		return nil, fmt.Errorf("gssapi: token must contain 4..65535 bytes in this profile")
+	}
+	wire := bytes.Clone(input)
 	fields, info, err := decodeGSSAPIToken(wire)
 	if err != nil {
 		return nil, err
@@ -358,7 +378,7 @@ func inspectGSSAPIBase64(encoded string) (map[string]any, error) {
 		}
 		return out
 	}
-	info["Source Encoding"] = "base64"
+	info["Source Encoding"] = "binary"
 	info["Span Coordinate System"] = "decoded-token-relative-bits"
 	info["Decoded Bytes"] = wire
 	info["Decoded Fields"] = convert(fields)

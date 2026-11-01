@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
+	"net"
 	"testing"
 
 	"github.com/gopacket/gopacket"
@@ -24,6 +25,26 @@ type networkOwnershipControl struct {
 	Frame       string         `json:"frame_hex"`
 	Fields      map[string]any `json:"fields"`
 	Error       string         `json:"error"`
+}
+
+// Preserve the immutable earlier wire/answers while explicitly superseding
+// their two error-union field names in the current runtime contract.
+func networkOwnershipFieldsCurrent(t *testing.T, c networkOwnershipControl) map[string]any {
+	t.Helper()
+	if c.Protocol != "icmp" {
+		return c.Fields
+	}
+	wire := doipDiscoveryWire(t, c.Frame)
+	start := 14 + int(wire[14]&15)*4
+	typ := wire[start]
+	if typ != 3 && typ != 11 {
+		return c.Fields
+	}
+	want := cloneSession(c.Fields)
+	delete(want, "Identifier")
+	delete(want, "Sequence")
+	want["Rest of Header"] = bytes.Clone(wire[start+4 : start+8])
+	return want
 }
 
 func corruptNetworkObservation(v any) {
@@ -76,6 +97,7 @@ func testNetworkObservationQueryOwnership(t *testing.T, arp bool) {
 		require.Equal(t, want, got)
 	}
 	for _, c := range doc.Cases {
+		c.Fields = networkOwnershipFieldsCurrent(t, c)
 		if (c.Protocol == "arp") != arp {
 			continue
 		}
@@ -113,6 +135,26 @@ func testNetworkObservationQueryOwnership(t *testing.T, arp bool) {
 						require.Zero(t, e.TransactionID)
 						f, err := e.GetFields()
 						if c.Error != "" {
+							if c.Error == "NDOptionLength" {
+								// The immutable wire/answer stays unchanged. A malformed
+								// option no longer hides its complete NS fixed header.
+								wire := doipDiscoveryWire(t, c.Frame)
+								want := map[string]any{"Type": byte(135), "Code": byte(0), "Target": net.IP(wire[62:78]).String(), "Options": []map[string]any(nil)}
+								require.NoError(t, err)
+								require.Equal(t, want, f)
+								require.Equal(t, "icmpv6", e.Protocol)
+								require.Equal(t, "malformed", e.Status)
+								require.Equal(t, c.Error, e.ExpertCode)
+								require.Equal(t, wire, e.Raw)
+								require.Zero(t, stats.Messages)
+								require.EqualValues(t, 1, stats.Malformed)
+								corruptNetworkObservation(f)
+								corruptNetworkObservation(e.Session)
+								f, err = e.GetFields()
+								require.NoError(t, err)
+								require.Equal(t, want, f)
+								return
+							}
 							require.EqualError(t, err, "protocol parser: no exact rule for this message")
 							require.Nil(t, f)
 							require.Equal(t, "ip", e.Protocol)

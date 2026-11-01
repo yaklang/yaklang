@@ -224,7 +224,7 @@ func TestProtocolSessionDCERPCBindEPMAndSRVSVC(t *testing.T) {
 	require.Equal(t, true, r.Events[0].Session["Unmatched"])
 
 	first := dcerpcPDU(0, dcerpcFirst, 6, append([]byte{0, 0, 0, 0, 1, 0, 15, 0}, []byte{0xaa, 0xbb}...))
-	last := dcerpcPDU(0, dcerpcLast, 6, []byte{0xcc, 0xdd})
+	last := dcerpcPDU(0, dcerpcLast, 6, []byte{0, 0, 0, 0, 1, 0, 15, 0, 0xcc, 0xdd})
 	r = s.Feed(0, ts, first)
 	require.Nil(t, r.Err, "%v", r.Err)
 	require.Equal(t, true, r.Events[0].Session["Fragment"])
@@ -463,7 +463,7 @@ func TestProtocolSessionDCERPCBudgetsDirectionAndBigEndian(t *testing.T) {
 	require.Nil(t, s.Feed(1, ts, dcerpcBindAck(1)).Err)
 	first := dcerpcPDU(0, dcerpcFirst, 50, append([]byte{0, 0, 0, 0, 0, 0, 3, 0}, make([]byte, 60)...))
 	require.Nil(t, s.Feed(0, ts, first).Err)
-	last := dcerpcPDU(0, dcerpcLast, 50, make([]byte, 65))
+	last := rpcMessageFragment(0, dcerpcLast, 50, 0, 3, 65, make([]byte, 65))
 	r = s.Feed(0, ts, last)
 	require.NotNil(t, r.Err)
 	require.Equal(t, ErrResourceExceeded, r.Err.Kind)
@@ -472,7 +472,7 @@ func TestProtocolSessionDCERPCBudgetsDirectionAndBigEndian(t *testing.T) {
 	// independently of the per-message ceiling.
 	budget = DefaultParserBudget()
 	budget.MaxMessageBytes = 128
-	budget.MaxBufferedBytes = 263
+	budget.MaxBufferedBytes = 263 + 16 + 32 // PDU owner plus private generation state/map entry.
 	s, err = NewProtocolSession(budget)
 	require.NoError(t, err)
 	require.Nil(t, s.Feed(0, ts, dcerpcBind(dcerpcEPM, 0, 1)).Err)

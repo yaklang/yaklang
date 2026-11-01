@@ -240,6 +240,15 @@ func smallAssertFacts(t *testing.T, name string, events []*ProtocolEvent) {
 			require.Len(t, events, 2)
 			require.Equal(t, "192.0.2.1:40000", es[0].Source)
 			require.Equal(t, "192.0.2.3:40000", es[1].Source)
+		} else if name == "ntp-client-and-control" {
+			// The unchanged second wire message is a complete v2 Read Variables
+			// request (sequence1), now covered by the native control profile.
+			require.Len(t, es, 2)
+			require.Equal(t, 6, es[1].Session["Mode"])
+			require.Equal(t, uint16(1), es[1].Session["Sequence Number"])
+			require.Equal(t, 2, es[1].Session["Opcode"])
+			require.Equal(t, es[1].ID, es[1].TransactionID)
+			require.Nil(t, es[1].Session["Transmit Timestamp"])
 		} else {
 			require.Len(t, es, 1)
 		}

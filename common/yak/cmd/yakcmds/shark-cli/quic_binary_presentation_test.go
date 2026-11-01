@@ -1,0 +1,182 @@
+package sharkcli
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
+)
+
+func TestQUICCIDDetailsKeepBinaryOctetsAndShortHeaderAbsence(t *testing.T) {
+	for _, protocol := range []string{"quic", "http3", "doq"} {
+		e := &pcaputil.ProtocolEvent{Protocol: protocol, Transport: "udp", Status: "decoded", Raw: []byte{0x40, 0xff, 0, 0xc3}, Session: map[string]any{"Header Form": "short", "Version": uint32(0), "DCID": []byte{0xff, 0, 0xc3}, "SCID": []byte(nil), "Wire Field Ranges": map[string]any{"DCID": []any{1, 4}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		seen := map[string]bool{}
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "DCID:") {
+				require.Contains(t, f.text, "ff 00 c3", "binary CID survives worker IPC and is readable as octets")
+				require.True(t, f.hasRange)
+				require.Equal(t, []byte{0xff, 0, 0xc3}, sources[f.source-1].Data[f.start:f.end])
+				seen["CID"] = true
+			}
+			for _, name := range []string{"Version", "SCID"} {
+				if strings.HasPrefix(f.text, name+":") {
+					require.Contains(t, f.text, "not carried in short header")
+					require.False(t, f.hasRange)
+					seen[name] = true
+				}
+			}
+		}
+		require.Len(t, seen, 3)
+	}
+}
+
+func TestQUICOpaqueTokensKeepWireRangesThroughWorkerIPC(t *testing.T) {
+	for _, empty := range []bool{false, true} {
+		token := []byte{0xff, 0, 0xc3}
+		if empty {
+			token = []byte{}
+		}
+		raw := append([]byte{0xd0, 0x6b, 0x33, 0x43, 0xcf, 0, 0, byte(len(token))}, token...)
+		e := &pcaputil.ProtocolEvent{Protocol: "quic", Raw: raw, Session: map[string]any{"Header Form": "long", "Initial Token Length": uint64(len(token)), "Initial Token Length Encoding Bytes": 1, "Initial Token": token, "Wire Field Ranges": map[string]any{"Initial Token Length": []any{7, 8}, "Initial Token": []any{8, 8 + len(token)}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		seen := 0
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "Initial Token:") {
+				seen++
+				if empty {
+					require.Contains(t, f.text, "0 bytes (empty opaque token)")
+					require.False(t, f.hasRange)
+				} else {
+					require.Contains(t, f.text, "ff 00 c3")
+					require.True(t, f.hasRange)
+					require.Equal(t, token, sources[f.source-1].Data[f.start:f.end])
+				}
+			}
+		}
+		require.Equal(t, 1, seen)
+	}
+}
+
+func TestQUICRefusedPayloadIsInspectableWithoutApplicationDelivery(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "quic", Status: "malformed", ExpertCode: "MalformedMessage", Error: "QUIC HANDSHAKE_DONE frame cannot be sent by the observed client", Raw: []byte{0x40, 0xff, 0xc3}, Session: map[string]any{"Authentication Verified": true, "Peer Identity Verified": false, "Rejected Packet Payload": []byte{0x1e}, "Payload Delivery": "not delivered to protocol state; packet AEAD verified"}}
+	encoded, err := json.Marshal(e)
+	require.NoError(t, err)
+	var ipc pcaputil.ProtocolEvent
+	require.NoError(t, json.Unmarshal(encoded, &ipc))
+	fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+	seen := false
+	for _, f := range fields {
+		if strings.HasPrefix(f.text, "Rejected Packet Payload:") {
+			require.True(t, f.hasRange)
+			require.Equal(t, []byte{0x1e}, sources[f.source-1].Data[f.start:f.end])
+			require.Equal(t, "QUIC packet payload · AEAD verified · not delivered", sources[f.source-1].Name)
+			seen = true
+		}
+	}
+	require.True(t, seen)
+	var presentation packetPresentation
+	presentation.add(&ipc)
+	require.NotContains(t, presentation.protocol, "HTTP")
+	require.NotContains(t, presentation.stack, "HTTP/3")
+}
+
+func TestQUICRefusalSummaryAndEmptyPayloadAgreeAcrossWorkerIPC(t *testing.T) {
+	for _, payload := range [][]byte{{0x1e}, {}} {
+		e := &pcaputil.ProtocolEvent{ID: 9, FlowID: 3, Protocol: "quic", Transport: "udp", Status: "malformed", ExpertCode: "MalformedMessage", Admission: "authenticated-wire-and-observed-CID", Error: "MalformedMessage: QUIC protected packet contains no frames", Raw: []byte{0x43, 0, 1, 2, 3}, Session: map[string]any{"Authentication Verified": true, "Peer Identity Verified": false, "Header Form": "short", "DCID": []byte{}, "Version": uint32(0), "SCID": []byte(nil), "Rejected Packet Payload": payload, "Payload Delivery": "not delivered to protocol state; packet AEAD verified", "Wire Field Ranges": map[string]any{"DCID": []any{1, 1}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		row := presentEvents([]*pcaputil.ProtocolEvent{&ipc}).apply(packetSummary{Protocol: "UDP", Transport: "udp", Layers: []string{"Loopback", "IPv4", "UDP"}})
+		require.Equal(t, "QUIC", row.Protocol)
+		require.Equal(t, "malformed", row.ProtocolStatus)
+		require.Equal(t, "authenticated-plaintext", row.Visibility)
+		require.Equal(t, "authenticated packet diagnostic", row.ProtocolScope)
+		require.Equal(t, "QUIC · MalformedMessage · QUIC protected packet contains no frames", row.Info)
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		diagnostic, cid, body := -1, false, false
+		for i, f := range fields {
+			if strings.HasPrefix(f.text, "Packet diagnostic:") {
+				require.Equal(t, -1, diagnostic, "one early diagnostic")
+				diagnostic = i
+			}
+			if strings.HasPrefix(f.text, "DCID:") {
+				require.Equal(t, "DCID: 0 bytes (length from observed connection)", f.text)
+				require.False(t, f.hasRange)
+				cid = true
+			}
+			if strings.HasPrefix(f.text, "Rejected Packet Payload:") {
+				body = true
+				if len(payload) == 0 {
+					require.Equal(t, "Rejected Packet Payload: 0 bytes (AEAD verified; not delivered)", f.text)
+					require.False(t, f.hasRange)
+				} else {
+					require.True(t, f.hasRange)
+					require.Equal(t, payload, sources[f.source-1].Data[f.start:f.end])
+				}
+			}
+			require.False(t, strings.HasPrefix(f.text, "Error:"), "frontloaded packet error must not repeat below the tree")
+		}
+		require.GreaterOrEqual(t, diagnostic, 0)
+		require.Less(t, diagnostic, 4, "packet diagnostic is visible before the wire tree")
+		require.True(t, cid)
+		require.True(t, body)
+		delete(ipc.Session, "Wire Field Ranges")
+		fields, _ = protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "DCID:") {
+				require.Contains(t, f.text, "unavailable")
+				require.NotContains(t, f.text, "0 bytes", "an empty public value alone cannot invent CID length context")
+			}
+		}
+	}
+}
+
+func TestQUICLongHeaderEmptyCIDIsPresentRatherThanUnknown(t *testing.T) {
+	e := &pcaputil.ProtocolEvent{Protocol: "quic", Transport: "udp", Status: "context-required", Raw: []byte{0xc0, 0, 0, 0, 1, 0, 0}, Session: map[string]any{"Header Form": "long", "Version": uint32(1), "DCID": []byte(nil), "SCID": []byte(nil), "Wire Field Ranges": map[string]any{"DCID": []any{6, 6}, "SCID": []any{7, 7}}}}
+	fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+	seen := 0
+	for _, f := range fields {
+		if strings.HasPrefix(f.text, "DCID:") || strings.HasPrefix(f.text, "SCID:") {
+			require.Contains(t, f.text, "0 bytes (empty connection ID)")
+			require.False(t, f.hasRange, "an empty identifier does not highlight unrelated bytes")
+			seen++
+		}
+	}
+	require.Equal(t, 2, seen)
+}
+
+func TestQUICWireVersionDetailsStayLiteralAcrossWorkerIPC(t *testing.T) {
+	for _, tc := range []struct {
+		version uint32
+		text    string
+	}{{1, "QUIC v1 (0x00000001)"}, {0x6b3343cf, "QUIC v2 (0x6b3343cf)"}, {0, "Version Negotiation (0x00000000)"}, {2, "Unknown QUIC version (0x00000002)"}} {
+		e := &pcaputil.ProtocolEvent{Protocol: "quic", Raw: []byte{0xc0, byte(tc.version >> 24), byte(tc.version >> 16), byte(tc.version >> 8), byte(tc.version), 0, 0}, Session: map[string]any{"Header Form": "long", "Version": tc.version, "Wire Field Ranges": map[string]any{"Version": []any{1, 5}}}}
+		encoded, err := json.Marshal(e)
+		require.NoError(t, err)
+		var ipc pcaputil.ProtocolEvent
+		require.NoError(t, json.Unmarshal(encoded, &ipc))
+		fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{&ipc})
+		seen := false
+		for _, f := range fields {
+			if strings.HasPrefix(f.text, "Version:") {
+				require.Equal(t, "Version: "+tc.text, f.text)
+				require.True(t, f.hasRange)
+				require.Equal(t, e.Raw[1:5], sources[f.source-1].Data[f.start:f.end])
+				seen = true
+			}
+		}
+		require.True(t, seen)
+	}
+}

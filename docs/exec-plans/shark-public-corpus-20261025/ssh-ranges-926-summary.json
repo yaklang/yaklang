@@ -1,0 +1,199 @@
+{
+  "source": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+  "wire_range_implementation": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617",
+  "scope": "Owned SSH initial field ranges and one exact same-PDU display tree; not all SSH authentication or TOP30 completeness.",
+  "full_tests": {
+    "pass": 285911,
+    "skip": 24
+  },
+  "targeted_tests": {
+    "pass": 1772
+  },
+  "independent_binary_literal_ranges": 1487,
+  "authored_physical_frames": 263,
+  "authored_connections": 21,
+  "GetFields_owner_ranges": {
+    "source49": 890,
+    "source50": 681
+  },
+  "private_alias_source_ranges": 178,
+  "public_native_events": 307819,
+  "public_CLI_rows": 384518,
+  "public_inputs": 37,
+  "whole_flow_files": 2,
+  "public_range_changes": {
+    "native_rows": 60,
+    "native_metadata_insertions": 296,
+    "CLI_rows": 41,
+    "CLI_alias_range_insertions": 74,
+    "ID_mapping": false,
+    "blanket_stripping": false
+  },
+  "display_followup_whole_exports_byte_identical": true,
+  "fuzz": [
+    {
+      "target": "FuzzSSHClientRoleNegotiationIsolation",
+      "executions": 48417,
+      "fuzztime_seconds": 60,
+      "total_seconds_including_build": 237.11,
+      "log_SHA256": "d13c501c918923537e26368af8144155e03fb3c8c3f0a922e221ef10fbcd7e3c"
+    },
+    {
+      "target": "FuzzSSHNativeRefusalFieldIsolation",
+      "executions": 35828,
+      "fuzztime_seconds": 60,
+      "total_seconds_including_build": 73.735,
+      "log_SHA256": "b3865329bc66171a31997bcb47a7c521b4a90d26bb9945ab66451cedc6d347db"
+    },
+    {
+      "target": "FuzzSSHPlaintextEdwardsBoundaries",
+      "executions": 165709,
+      "fuzztime_seconds": 60,
+      "total_seconds_including_build": 84.812,
+      "log_SHA256": "c749671b2bf57152790629350a6301e9a76dffe577e761a22a1377f1d46ed2c5"
+    }
+  ],
+  "Windows_cases": [
+    {
+      "name": "reply-host-format",
+      "frame": 9,
+      "PDU_span": [
+        14,
+        25
+      ],
+      "physical_bytes": 246,
+      "PDU_bytes": 192,
+      "exact_entire_sources_and_highlights": true,
+      "duplicate_tree_absent_in_actual_views": true,
+      "producer_SHA256": "d202beba81a295cfa8c33c912c63fad41ec43e800bfa5306b70b575f46134785"
+    },
+    {
+      "name": "reply-signature-format",
+      "frame": 9,
+      "PDU_span": [
+        105,
+        116
+      ],
+      "physical_bytes": 246,
+      "PDU_bytes": 192,
+      "exact_entire_sources_and_highlights": true,
+      "duplicate_tree_absent_in_actual_views": true,
+      "producer_SHA256": "1c27e7f2b40a87e344471b15e20ec56852d66341a5994f5c27c2c4165b93e107"
+    },
+    {
+      "name": "KEXINIT-selected-context",
+      "frame": 7,
+      "PDU_span": null,
+      "physical_bytes": 214,
+      "PDU_bytes": 160,
+      "exact_entire_sources_and_highlights": true,
+      "duplicate_tree_absent_in_actual_views": true,
+      "producer_SHA256": "52c2165622e84cc2ae9fc0b974ea8ea985cd1773ce18167bb629587e3f1fab19"
+    }
+  ],
+  "Windows_console_cells_not_Terminal_pixels": true,
+  "CI_runs": [
+    {
+      "id": 40974723731,
+      "name": "Essential Tests",
+      "head": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/yaklang/yaklang/actions/runs/40974723731"
+    },
+    {
+      "id": 40974723739,
+      "name": "Diff-Code-Check",
+      "head": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/yaklang/yaklang/actions/runs/40974723739"
+    },
+    {
+      "id": 40974723805,
+      "name": "Check Git path case collisions",
+      "head": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/yaklang/yaklang/actions/runs/40974723805"
+    },
+    {
+      "id": 40974716776,
+      "name": "Bin Parser Traffic Tests",
+      "head": "92620d72b0c8a1d62ce923e4e69cc1fad5d4c66d",
+      "status": "completed",
+      "conclusion": "success",
+      "attempt": 1,
+      "url": "https://github.com/yaklang/yaklang/actions/runs/40974716776"
+    }
+  ],
+  "evidence": {
+    "full": {
+      "external_path": "test-SSH-926-full54-01/receipt.json",
+      "SHA256": "de669a43d4b32883dea8b0e7583d0ff810bade97ead1e68c5c288d7ec36be238"
+    },
+    "targeted": {
+      "external_path": "test-SSH-dedup54-02/receipt.json",
+      "SHA256": "e695d3e2171f80d1fd20b63de01c7c8fd3af915238f7b43decb495fe0615b71f"
+    },
+    "native": {
+      "external_path": "SSH-dedup-public-native54-01/summary.json",
+      "SHA256": "29cce56f31b9b4b3635f6d0d07fecf0d3ee7e6d8b3057283537e05b3c73ec0db"
+    },
+    "CLI": {
+      "external_path": "SSH-dedup-public-CLI54-01/summary.json",
+      "SHA256": "ab7ee409407531fe6efe294a3aed2fbc9f3a95aa3988a3538f79ed30fbf9ffa9"
+    },
+    "public_ranges": {
+      "external_path": "SSH-ranges-public-preservation53-actual01/summary.json",
+      "SHA256": "3fb6d58873b67e6ce0b9d93a72f4dc99994f8424be07b054545815b06c806cd8"
+    },
+    "Windows": {
+      "external_path": "Windows-SSH-dedup-root-closure54-01/summary.json",
+      "SHA256": "c74e08f92ca86579ee7aea1d86db60d8e2992e78e7e5325b9cdeb9196670873c"
+    },
+    "CI": {
+      "external_path": "SSH-dedup-CI-92654-01.json",
+      "SHA256": "06b8583fc5409a52743d5194c166063b348b603585bbfb207480495f64e1bb19"
+    },
+    "reference49": {
+      "external_path": "SSH-ranges-reference53-01/source49-comparison/summary.json",
+      "SHA256": "c5bce3003cc0e813492364d6c8215ec11b484a1d4bb3dca4dea1e3197d4a6aa9"
+    },
+    "reference50": {
+      "external_path": "SSH-ranges-reference53-01/source50-comparison/summary.json",
+      "SHA256": "2e30743742a4b23822d3d2508d17994de0519f7d6c01e122fa539c4b8a76e57d"
+    },
+    "API49": {
+      "external_path": "SSH-dedup-native-92654-01/source49/independent-audit/summary.json",
+      "SHA256": "3872deff48c41f0741025ff280f07c2af962df615b0fee6e6212eb9d42ec9ca2"
+    },
+    "API50": {
+      "external_path": "SSH-dedup-native-92654-01/source50/independent-audit/summary.json",
+      "SHA256": "5d9ae08cba708c664db3a2ebee990c0df1f1eeb57026ed0370d70b43d075a7c4"
+    },
+    "census": {
+      "external_path": "current-label-census-b58653-01/summary.json",
+      "SHA256": "52a8e70373474303099f7fe0a140797bed9cc9d86c06ba449f3ea9be10b21da5"
+    },
+    "TOP30": {
+      "external_path": "current-TOP30-b58653-01/summary.json",
+      "SHA256": "f605a93d5527fbcb73dfb104594036a1cfaffec0e983947b43d4291d744807ac"
+    }
+  },
+  "initial_full_failure": {
+    "source": "b586dda3c8eb3a3a12f6e2f4e9eaae0441481617",
+    "pass_count": 285824,
+    "skip_count": 24,
+    "failed_actions": 5,
+    "leaf_failures": 4,
+    "reason": "Sealed SSH line expectations predated additive ranges; preserved archive, source-raw supplementary oracle and full JSON equality in 926.",
+    "receipt_SHA256": "596259288d01af972a4757c07618173a8c304a0deef7de789d7cf39ddbabb2b4"
+  },
+  "wire_source_archive_SHA256": "e9ad1db39601a86731487921f1fdabb51bed2be4f2a5ca40151b0111fe35bb6c",
+  "all_TOP30_protocols_complete": false,
+  "all_reference_fields_equivalent": false
+}

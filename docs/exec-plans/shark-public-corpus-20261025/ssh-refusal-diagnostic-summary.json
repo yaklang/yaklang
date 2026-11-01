@@ -1,0 +1,316 @@
+{
+  "scope": "Immutable native SSH selected-method success/refusal and private context survive GetFields/Decode/display queries. A refused method cannot become a successful generic envelope or caller-provided cache. CLI connection identity retains an existing malformed/resource diagnostic instead of downgrading it to missing-context bytes; split inspector diagnostics preserve the full reason and its code/decoder components.",
+  "native_API_and_public_SDK_source": "2154ab1dac",
+  "final_CLI_and_Windows_source": "898f74a789",
+  "refusal_fuzz_source": "dacffa5b57",
+  "independent_auditor_source": "2097181736",
+  "full_native_tests_seconds": 439.342,
+  "full_final_CLI_tests_seconds": 1.966,
+  "refusal_fuzz": {
+    "executions": 69926,
+    "seconds": 40.369,
+    "scope": "actual ProtocolSession initial exchange; non-64-byte Ed25519 signatures, random packet split, eager/deferred, caller-edited protocol/status/entry/raw/Fields/Structured/Session, owned returned errors and immutable typed refusal/aliases"
+  },
+  "regression_before_fix": {
+    "test": "TestSSHNativeRefusalCannotBeReinterpretedAsGenericFields",
+    "failed_seconds": 0.376,
+    "observed": "Malformed selected Ed25519 reply returned successful generic transport fields and no field-query error"
+  },
+  "public": {
+    "weber": {
+      "SDK_records": 39293,
+      "SDK_all_records_values_types_order_and_IDs_exact": true,
+      "physical_CLI_rows": 51328,
+      "CLI_diagnostic_status_restorations": 19,
+      "CLI_restorations_by_protocol": {
+        "RTSP": 1,
+        "IMAP": 1,
+        "DCE/RPC": 17
+      },
+      "CLI_changed_physical_frames": [
+        8579,
+        11522,
+        40263,
+        40480,
+        40494,
+        40507,
+        40699,
+        40897,
+        40906,
+        40913,
+        41451,
+        41820,
+        42176,
+        42183,
+        42188,
+        42711,
+        42948,
+        43135,
+        43290
+      ],
+      "all_other_CLI_values_types_order_and_IDs_exact": true,
+      "SDK_export_sha256": "6aca37a890628409a19e85a2345a29679288871df2d1cf2d1b6a82af52f1eb05",
+      "CLI_export_sha256": "83fa72120db6db528a8b345f3f7d1be0b7fab1e13fde4bf0959733c1e598794e",
+      "SDK_exact_certificate_sha256": "716c7c63422e9ae8142796201449b4266681819eaa3c3955bd49c781fecb6cea",
+      "CLI_projection_certificate_sha256": "80294837fb0e2ca1c73f0c0ff63fdea63669b177aa42731dbac6325bdbdc0b6d"
+    },
+    "sharon": {
+      "SDK_records": 245625,
+      "SDK_all_records_values_types_order_and_IDs_exact": true,
+      "physical_CLI_rows": 328127,
+      "CLI_diagnostic_status_restorations": 2,
+      "CLI_restorations_by_protocol": {
+        "RTSP": 1,
+        "IMAP": 1
+      },
+      "CLI_changed_physical_frames": [
+        8579,
+        13902
+      ],
+      "all_other_CLI_values_types_order_and_IDs_exact": true,
+      "SDK_export_sha256": "7de00a8c05af5ac72f7f54f18eb2bdc0d77726e8a7b02936d3f5bf40ec0d7369",
+      "CLI_export_sha256": "112000f53f20aa9492e60dadd237805206923a44439095f8de5be4f1559d38cb",
+      "SDK_exact_certificate_sha256": "4e25090e92737c85c288edb4e241cea9201f88e4b6f4f6d85473dd3927e2e646",
+      "CLI_projection_certificate_sha256": "029b8d75af76d28d84ebea5a000b329a7d1a74d1ccbeb4806bf6b6518b41fda6"
+    }
+  },
+  "owned_actual_capture_replays": [
+    {
+      "profile": "live",
+      "SDK_records": 55,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "ec4e5d6abc0106c6a043a4d800bbdd7a0a58b317703c416c9b096df9cb660a5a"
+    },
+    {
+      "profile": "no-syn",
+      "SDK_records": 55,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "3a39d7d896eb62820278a40c502fb72418d99b40dc8f5828dd7579c5ec1beca8"
+    },
+    {
+      "profile": "out-of-order",
+      "SDK_records": 55,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "ab4740a42daf6b556f3c252b6f2deb8fe43416fb6e05951dc6efd848b82e568a"
+    },
+    {
+      "profile": "duplicate",
+      "SDK_records": 55,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "892efadf2a937fc4cdb13d7cce789108859ce6f7097222be0d05fc1e12bd90b9"
+    },
+    {
+      "profile": "loss",
+      "SDK_records": 39,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "1173afe5e63b9df72ef543d4bb7d3a940b0231bd5ce3e1ba6ff88e8f1d9d37e0"
+    },
+    {
+      "profile": "snaplen",
+      "SDK_records": 44,
+      "all_records_exact": true,
+      "whole_export_certificate_sha256": "b979b0284024303247c0a351a0a57d80ac619b9b36443a18f6dbfafd78084582"
+    }
+  ],
+  "actual_valid_CLI_rows_exact_certificate_sha256": "45e89b070f04abd02e7946e10ac35990cec602b5ae5d2bb696495b455249c598",
+  "declared_signature_control": {
+    "scope": "Declare one malformed-length control from an actual owned SSH capture.\n\nChange only a complete initial Ed25519 signature's inner string length from\n64 to 4, retaining every captured octet and outer packet/string length. Update\nthe TCP checksum. This is a counterfactual replay control, not peer acceptance\nor an actual network attack. The original capture is never rewritten.\n",
+    "actual_source_capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+    "control_sha256": "df061db9a2a18f449a41eb22ef645642e10f3fa928546ab0cf4ed92dcf40b280",
+    "physical_frames": 376,
+    "changed_physical_frame": 17,
+    "changed_frame_count": 1,
+    "signature_length_before": 64,
+    "signature_length_after": 4,
+    "outer_lengths_payload_octets_and_order_unchanged": true,
+    "TCP_checksum_updated": true,
+    "SDK_records_compared": 51,
+    "SDK_changed_query_records": 1,
+    "CLI_rows_compared": 376,
+    "CLI_changed_status_rows": 1,
+    "reference_profile": "exact raw bytes/endpoints/physical frame and opaque signature container; no reference inner signature length-conformance claim",
+    "SDK_certificate_sha256": "7dde2a1f742e0739fb6b27e780bf7b1221b23fadcf9803609811bbb471fdc524",
+    "CLI_certificate_sha256": "f16a8373d0fd55641c3c5c86561072d313ed772d3e25b22b3b5315b0581ed0b3",
+    "oracle_sha256": "1230c7073e32816423b203ffcdf571007d1d61403d5a5c1825b0ae5bb45ae528"
+  },
+  "negative_controls": {
+    "refusal_projection": {
+      "scope": "Challenge the one-record SSH refusal projection proof without changing wire/reference witnesses.",
+      "positive_format_controls": 1,
+      "records": 51,
+      "negative_controls_rejected": [
+        "generic-success-restored",
+        "empty-map-is-not-refusal",
+        "missing-query-error",
+        "wrong-query-error",
+        "decoded-status",
+        "cleared-original-error",
+        "invented-completion",
+        "wrong-contributor",
+        "wrong-domain",
+        "wrong-id",
+        "wrong-flow",
+        "wrong-value-type",
+        "drop-row",
+        "duplicate-row",
+        "row-order"
+      ],
+      "before_sha256": "8fd71cc13d2b17669e97f1cb7245d5ee12a7f220ef9400e1c44f74b23f6172e1",
+      "after_sha256": "c488da4cd28174a302ba8847b730028b313e5f559f8c1c825678b95ec76ac49e",
+      "manifest_sha256": "e8805c3df4cb7d45d70a87de0b72b954ccfbb232973a6a2291078b1237c630ff",
+      "oracle_sha256": "1230c7073e32816423b203ffcdf571007d1d61403d5a5c1825b0ae5bb45ae528",
+      "wire_and_reference_witnesses_unchanged": true
+    },
+    "connection_diagnostic_projection": {
+      "scope": "Challenge diagnostic-restoration witnesses using declared real IPv4/IPv6/domain subsets.",
+      "subset_physical_frames": [
+        8579,
+        11522,
+        40263
+      ],
+      "subset_rows": 3,
+      "subset_native_records": 3,
+      "positive_controls": 1,
+      "negative_controls_rejected": [
+        "wrong-status",
+        "wrong-scope",
+        "false-encryption",
+        "changed-reason",
+        "cross-domain",
+        "changed-CLI-flow",
+        "changed-PDU-ref",
+        "wrong-SDK-endpoint",
+        "wrong-SDK-status",
+        "wrong-SDK-error",
+        "wrong-SDK-wire",
+        "drop-native-witnesses",
+        "drop-row",
+        "duplicate-row",
+        "row-order"
+      ],
+      "full_projection_proof_sha256": "80294837fb0e2ca1c73f0c0ff63fdea63669b177aa42731dbac6325bdbdc0b6d",
+      "numeric_namespace_equality_not_assumed": true
+    }
+  },
+  "Windows": [
+    {
+      "case": "malformed-before",
+      "capture_packets": 376,
+      "PDU": 9,
+      "capture_sha256": "df061db9a2a18f449a41eb22ef645642e10f3fa928546ab0cf4ed92dcf40b280",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "c779f165333a3dffb745ded5072a6db355d7aca1170af4e85f982c6e3881da74",
+        "00-filter-ready.json": "96cc45597425a860b19df1a58a4cbc754d0202c8e5186a44ef45ae8e02c9b706",
+        "01-adaptive-bytes-click.json": "428ad9fd3b2ceaab1eab0f105ef43ef41b23879a4a24b1d9321b8b93bf7068e6",
+        "01-adaptive-fields-before.json": "6d6c057665ecc8e15e52771daaf8df9616a4355d003bb2cac182c0774fb7d423",
+        "01-adaptive-fields-click.json": "6d6c057665ecc8e15e52771daaf8df9616a4355d003bb2cac182c0774fb7d423",
+        "01-deep-protocol-fields.json": "6d6c057665ecc8e15e52771daaf8df9616a4355d003bb2cac182c0774fb7d423",
+        "01-protocol-fields.json": "6d6c057665ecc8e15e52771daaf8df9616a4355d003bb2cac182c0774fb7d423",
+        "02-byte-sources.json": "cc19bd418016ef3fbbbec78cc02208ab1a746ae3482f5805013827dc27048b94",
+        "02-first-byte-source.json": "d5019af21c78ad1a5c763e298d2cf35bfce606f107a7ba5f67ee9aa02da3a181",
+        "03-conversation-messages.json": "adf86dfd5380115d0cbf29b8e0ce8602214b2c6da0136b7df237111f9608421e",
+        "04-association-evidence.json": "4e533b1717e6737d4c7f77704c620827d85bdd2eabff138021cec5950e066438",
+        "05-narrow.json": "9fbe516bd8a7a72e4d9bcef76098420c1e08fbcba9585521cb8c74f114890ff1",
+        "06-restored.json": "4e533b1717e6737d4c7f77704c620827d85bdd2eabff138021cec5950e066438",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "1f9058bb5a6595dacf38eebccda083c4087983efb7ea3dc6389f643d21402ee6",
+        "03-conversation-messages.png": "c3f8b9625a8438a14517b4252b3736c268a2770a559bdad97665142f1ebf1d05",
+        "04-association-evidence.png": "6f37373462bc887ccd8b1bdabd3d4fcac6c1b3d5fd2a1f425a71d6e8d29edf1f",
+        "05-narrow.png": "ad406927931c2d0a9566ca63b1801b8a01164a4fa3527f7116692edf30881b04"
+      }
+    },
+    {
+      "case": "malformed-after",
+      "capture_packets": 376,
+      "PDU": 9,
+      "capture_sha256": "df061db9a2a18f449a41eb22ef645642e10f3fa928546ab0cf4ed92dcf40b280",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "c779f165333a3dffb745ded5072a6db355d7aca1170af4e85f982c6e3881da74",
+        "00-filter-ready.json": "a93988eaffb11a44efc4484b6cee400ba672fc90bb9859c6bae1ee040322e2b9",
+        "01-adaptive-bytes-click.json": "1ca0376135f0a5a04b42c2c6607b5580aa462ca137e1fa9f08a14abe0702da34",
+        "01-adaptive-fields-before.json": "5be9bae0a21f5311fe0361f32288629a461baf3bf86fea887e4b1918ff25b0ab",
+        "01-adaptive-fields-click.json": "5be9bae0a21f5311fe0361f32288629a461baf3bf86fea887e4b1918ff25b0ab",
+        "01-deep-protocol-fields.json": "5be9bae0a21f5311fe0361f32288629a461baf3bf86fea887e4b1918ff25b0ab",
+        "01-protocol-fields.json": "5be9bae0a21f5311fe0361f32288629a461baf3bf86fea887e4b1918ff25b0ab",
+        "02-byte-sources.json": "1ca0376135f0a5a04b42c2c6607b5580aa462ca137e1fa9f08a14abe0702da34",
+        "02-first-byte-source.json": "d468839b40897c048c375ea1d5412a12578eb1b162cf103971b95e43f10fb45b",
+        "03-conversation-messages.json": "d05a1674cb7cca81b59ef16278ab93625bd69305cdcd5700b64dc9f5262381c4",
+        "04-association-evidence.json": "c9729bf46de72549a8016b7bee053c8538974b8cfac013b6d3002110683e682a",
+        "05-narrow.json": "f2c92be3bdd4b2d9c1402d1dc73dcb195ae5248de0f25fdef13a8fadc56fc1c9",
+        "06-restored.json": "c9729bf46de72549a8016b7bee053c8538974b8cfac013b6d3002110683e682a",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "650b32b287ddf2a47f53ccd25c9ef940eb1758acf6c06035d734b4418dfa4a9a",
+        "03-conversation-messages.png": "f24702caaa258d4b7aa613b375f4fa93a9089a3f0da949b6d61f2e31d1db7863",
+        "04-association-evidence.png": "e0e61292ec8a48dda8d2b79fc5981dc70404830b53ad635a0a0bdc12b1b51567",
+        "05-narrow.png": "78a3bd4d32e7cff139cc97f9eaf2cfda4ef9534300b578089b9d7e1f9cc747a1"
+      }
+    },
+    {
+      "case": "valid-after",
+      "capture_packets": 376,
+      "PDU": 9,
+      "capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "cf4a07fe57b8c1c6576373a59a05d3abc68818c2c08d3e0c0ca39710a021f4ba",
+        "00-filter-ready.json": "d91466b9cfdddbf7a2531ba269b8b6727e652c19ad0f46882cd61bc08c296c95",
+        "01-adaptive-bytes-click.json": "d398f256e4dadc3b153489a53853d9cb6ce65323ad90346b460780032091db2c",
+        "01-adaptive-fields-before.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "01-adaptive-fields-click.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "01-deep-protocol-fields.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "01-protocol-fields.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "02-byte-sources.json": "de2b116629a3cc5c7404882f24f271a6ac75be72c9f811da526d2b536299592c",
+        "02-first-byte-source.json": "5b5f11c49af28f6ffbbdf74450ffe31f5270c984f9575d79697abf0c00cdf6f8",
+        "03-conversation-messages.json": "d9c55755add0c6b905931430ea08cc742d6f755ba1f143367c37ec6e6250d593",
+        "04-association-evidence.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "05-narrow.json": "79bbafb452960e6a3c5ae7589d5551f138b18f1951c19cc7d4a95a812d0f4b17",
+        "06-restored.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "3136ef3b85bdcb9ec603cb7f676dfb0a73de6e53bf478694d0bc0973a03234d2",
+        "03-conversation-messages.png": "cebf4436c00a0d6f6c8a0fe67b473c80408e273816477b705781cb978630abaf",
+        "04-association-evidence.png": "8680a1e3539aaa6256c0036409683b16bc04c3767b47b73c0c3722c555b8ee39",
+        "05-narrow.png": "6cc253033d5befa025d15a7f96b740c1868a5582d693f29547309ecb211e5c84"
+      }
+    }
+  ],
+  "executables_sha256": {
+    "events-refusal.exe": "0287630fe1d2c28b18c94eede938500d272f1ac5b6e080fe534522f15f861495",
+    "yak-refusal.exe": "8f383639ca693489d1f0a38daf014751e26221c9db645e71c2c3f4b564d12758",
+    "yak-SSH-inspector.exe": "acc1c3716a33d19f4627f77dad8de9ba77bdd0cd29614c51e97c813d5de040b5",
+    "yak-final.exe": "486ab716d5ced53e8043e9617af03ba804b8d686772478085a9c493735bcfccd"
+  },
+  "native_console_auditor_source": "36ed3525c7",
+  "native_console_executable_sha256": "51968896ce0a400d2d508f34efce1009f1bb315f5b57e10c6958e6cbfb2e62eb",
+  "failed_auditor_attempts_retained_outside_Git": [
+    "Malformed observations do not promise CompletedIn. The first auditor incorrectly required it; the corrected proof binds exact existing contributors without inventing successful completion.",
+    "The first generic endpoint join omitted IPv6 brackets. The corrected auditor uses literal bracketed endpoint formatting and retains the real VLAN/domain binding.",
+    "The first native postcheck required a full error that the previous UI clipped. Actual retained buffers revealed the prefix/viewport defect; fresh final buffers verify the full reason and preserved code/decoder."
+  ],
+  "raw_captures_keys_exports_executables_and_console_images_outside_Git": true,
+  "remaining": [
+    "This certifies honest display of existing RTSP/IMAP/DCE-RPC parser refusals, not their RFC correctness; underlying refusal causes still require protocol-specific review",
+    "Five reordered initial SSH methods still need later-context derived refinement; original observations remain unchanged",
+    "Other SSH key/signature/certificate and encrypted application scopes, plus the main-report protocol/field/fuzz and TLS/QUIC context limits, remain partial"
+  ],
+  "previous_count_snapshot_sha256": "98a05dc1be92dd89860da7d58d76d69a5d8d797ee3166e6cd1c7c69c885c2f7a"
+}

@@ -55,6 +55,33 @@ func TestCoreAdversarialSealedReplay(t *testing.T) {
 				Refs          [][]uint64
 			}
 			require.NoError(t, json.Unmarshal(answer, &want))
+			// Preserve the immutable legacy archive/answer hashes. Its UDP
+			// refusal taxonomy predates literal IP capacity checks (RFC 768 /
+			// RFC 8200): these complete carriers are malformed, not a missing
+			// capture suffix. Assert the independent wire facts before replacing
+			// just that obsolete diagnostic expectation.
+			carrierSummary := ""
+			if strings.Contains(c.ID, "udp-invalid-length-") {
+				first := wire[40:] // sealed classic PCAP, DLT_RAW, first record
+				header := 20
+				if strings.HasPrefix(c.ID, "ipv6-") {
+					header = 40
+					require.Equal(t, byte(6), first[0]>>4)
+					require.EqualValues(t, 35, binary.BigEndian.Uint16(first[4:6]))
+				} else {
+					require.Equal(t, byte(4), first[0]>>4)
+					require.EqualValues(t, 55, binary.BigEndian.Uint16(first[2:4]))
+				}
+				declared := binary.BigEndian.Uint16(first[header+4 : header+6])
+				require.Contains(t, []uint16{0, 7, 65535}, declared)
+				if declared < 8 {
+					carrierSummary = fmt.Sprintf("UDP length %d is smaller than the 8-byte header", declared)
+				} else {
+					carrierSummary = "UDP length 65535 exceeds declared IP payload available to UDP (35 bytes)"
+				}
+				require.Equal(t, "incomplete", want.Messages[0].Status)
+				want.Messages[0].Status, want.Messages[0].Summary = "malformed", carrierSummary
+			}
 			for _, workers := range []int{1, 2, 4} {
 				for _, deferred := range []bool{false, true} {
 					for _, observer := range []bool{false, true} {
@@ -117,7 +144,16 @@ func TestCoreAdversarialSealedReplay(t *testing.T) {
 									_, err := e.GetFields()
 									require.NoError(t, err)
 								}
-								require.Empty(t, e.Error)
+								if i == 0 && carrierSummary != "" {
+									require.Equal(t, "MalformedMessage: "+carrierSummary, e.Error)
+									require.Equal(t, string(ErrMalformedMessage), e.ExpertCode)
+									_, err := e.GetFields()
+									require.EqualError(t, err, e.Error)
+									require.EqualValues(t, 1, stats.Malformed)
+									require.Zero(t, stats.Incomplete)
+								} else {
+									require.Empty(t, e.Error)
+								}
 								require.NotEmpty(t, e.SourceBytes.PacketRefs)
 								var refs []uint64
 								for _, ref := range e.SourceBytes.PacketRefs {

@@ -84,6 +84,9 @@ func newTrafficPoolWithExpiry(ctx context.Context, options TCPReassemblyOptions,
 		ctx = context.Background()
 	}
 	options, _ = options.normalized()
+	if options.captureReplay || options.disableIdleExpiry {
+		expiry = false
+	}
 	pool := &TrafficPool{ctx: ctx, done: ctx.Done(), options: options}
 	pool.flowCache = newTrafficFlowCache(options)
 	pool.flowCache.checkExpiry = expiry
@@ -203,7 +206,7 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 	if len(tss) > 0 {
 		ts = tss[0]
 	}
-	if ts.IsZero() {
+	if ts.IsZero() && !p.options.captureReplay {
 		ts = time.Now()
 	}
 	p.mu.Lock()
@@ -219,13 +222,79 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		return
 	}
 	defer p.retireFlows()
-	flow, ok := p.flowCache.Get(key)
+	flow, ok := p.flowCache.GetAt(key, ts)
+	var opening *tcpOpening
+	var openingReverse bool
+	defer func() {
+		if opening != nil {
+			p.releasePending(0, len(opening.observations))
+		}
+	}()
+	if ok && tcp.SYN && !tcp.ACK && !flow.IsClosed() {
+		old := flow.ServerConn
+		if old == nil {
+			old = flow.ClientConn
+		}
+		if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
+			old = flow.ClientConn
+		}
+		if old.IsClosed() && old.synSeen && tcp.Seq != old.isn {
+			// An asymmetric capture may never see the peer's FIN/RST. A new
+			// opening SYN after this sender's accepted FIN cannot inherit the
+			// previous generation's parser, even while its peer remains open.
+			if flow.openingMatches(old, tcp) {
+				opening, flow.opening = flow.opening, nil
+			}
+			p.finishFlow(flow, TrafficFlowCloseReason("new SYN after sender FIN"))
+			p.flowCache.Remove(key)
+			ok = false
+		} else if flow.IsHalfOpen && !old.synSeen && (!old.initialed || tcp.Seq+1 != old.isn) {
+			// A captured initial SYN after a midstream observation starts an
+			// isolated generation. It must not inherit the old application state.
+			// The exact delayed original SYN remains in its existing generation.
+			p.finishFlow(flow, TrafficFlowCloseReason("new SYN after midstream observation"))
+			p.flowCache.Remove(key)
+			ok = false
+		}
+	}
+	if ok && tcp.SYN && (!flow.IsClosed() || tcp.ACK && flow.opening != nil) {
+		sender := flow.ServerConn
+		if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
+			sender = flow.ClientConn
+		}
+		confirmed, hold := flow.observeOpening(ethernetLayer, sender, tcp, evidence, ts)
+		if hold {
+			if confirmed == nil {
+				return
+			}
+			opening, flow.opening, openingReverse = confirmed, nil, true
+			p.finishFlow(flow, TrafficFlowCloseReason("new observed TCP handshake without prior close"))
+			p.flowCache.Remove(key)
+			ok = false
+		}
+	}
 	if ok && flow.IsClosed() {
 		p.drainHTTP(flow)
+		conn := flow.ServerConn
+		if flow.ClientConn.localPort == int(tcp.SrcPort) && flow.ClientConn.localIP.Equal(srcIP) {
+			conn = flow.ClientConn
+		}
+		// An asymmetric capture can start its next generation at SYN-ACK.
+		// Require a different observed sender ISN and a nonzero ACK; an exact
+		// retransmission of the old SYN-ACK remains in the closed generation.
+		freshSYNACK := tcp.SYN && tcp.ACK && tcp.Ack != 0 && conn.synSeen && tcp.Seq != conn.isn
 		// A new SYN may immediately reuse a completed 4-tuple. Ignore late data.
-		if !tcp.SYN || tcp.ACK {
+		if !tcp.SYN || tcp.ACK && !freshSYNACK {
+			// Observation is separate from admission. Final ACKs and late
+			// retransmissions still belong to the retained closed generation,
+			// but must never feed its application parser again.
+			p.observeFlowPacket(flow, conn, evidence, ts)
 			return
 		}
+		if flow.openingMatches(conn, tcp) {
+			opening, flow.opening = flow.opening, nil
+		}
+		flow.discardOpening()
 		p.flowCache.Remove(key)
 		ok = false
 	}
@@ -236,17 +305,39 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		// Packet-layer address slices may be overwritten by the next read.
 		src := &net.TCPAddr{IP: append(net.IP(nil), srcIP...), Port: int(tcp.SrcPort)}
 		dst := &net.TCPAddr{IP: append(net.IP(nil), dstIP...), Port: int(tcp.DstPort)}
-		flow = p.newFlowWithAddrs(network, src, dst, evidence.Ref.Domain)
+		if openingReverse {
+			// The current packet confirms the reverse side of the held SYN.
+			src, dst = dst, src
+		}
+		flow = p.newFlowWithAddrsAt(network, src, dst, evidence.Ref.Domain, ts)
 		if flow == nil {
 			return
 		}
 		flow.IsIpv4, flow.IsIpv6 = !ipv6, ipv6
 		flow.IsHalfOpen = !tcp.SYN || tcp.ACK
+		if opening != nil {
+			flow.IsHalfOpen = false
+		}
 		if ethernetLayer != nil {
 			flow.IsEthernetLinkLayer = true
-			flow.HardwareSrcMac, flow.HardwareDstMac = ethernetLayer.SrcMAC.String(), ethernetLayer.DstMAC.String()
+			if opening == nil {
+				flow.HardwareSrcMac, flow.HardwareDstMac = ethernetLayer.SrcMAC.String(), ethernetLayer.DstMAC.String()
+			}
+		}
+		if opening != nil && opening.hardwareKnown {
+			flow.IsEthernetLinkLayer = true
+			flow.HardwareSrcMac, flow.HardwareDstMac = opening.hardwareSrc, opening.hardwareDst
 		}
 		flow.init(p.onFlowCreated, p.onFlowFrameDataFrameReassembled, p.onFlowFrameDataFrameArrived, p.onFlowClosed)
+		if opening != nil {
+			initial := flow.ClientConn
+			for _, observation := range opening.observations {
+				p.observeFlowPacket(flow, initial, captureEvidence{Ref: observation.ref}, observation.captured)
+			}
+			first := opening.observations[0]
+			initial.evidence = captureEvidence{Ref: first.ref}
+			initial.FeedClient(&layers.TCP{SrcPort: layers.TCPPort(src.Port), DstPort: layers.TCPPort(dst.Port), Seq: opening.sequence, SYN: true, Window: opening.window}, first.captured)
+		}
 	}
 	// Port alone cannot identify direction when endpoints use the same port.
 	conn := flow.ServerConn
@@ -254,6 +345,17 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 		conn = flow.ClientConn
 	}
 	conn.evidence = evidence
+	p.observeFlowPacket(flow, conn, evidence, ts)
+	conn.FeedClient(tcp, ts)
+	if flow.ClientConn.IsClosed() {
+		flow.ClientConn.discardPending()
+	}
+	if flow.ServerConn.IsClosed() {
+		flow.ServerConn.discardPending()
+	}
+}
+
+func (p *TrafficPool) observeFlowPacket(flow *TrafficFlow, conn *TrafficConnection, evidence captureEvidence, ts time.Time) {
 	if p.captureConf != nil {
 		for _, h := range p.captureConf.onFlowPacket {
 			refs := append([]PacketReference(nil), evidence.refs...)
@@ -262,13 +364,6 @@ func (p *TrafficPool) feedEvidence(ethernetLayer *layers.Ethernet, networkLayer 
 			}
 			h(flow, conn, refs, ts)
 		}
-	}
-	conn.FeedClient(tcp, ts)
-	if flow.ClientConn.IsClosed() {
-		flow.ClientConn.discardPending()
-	}
-	if flow.ServerConn.IsClosed() {
-		flow.ServerConn.discardPending()
 	}
 }
 
@@ -285,6 +380,7 @@ func (p *TrafficPool) retireFlows() {
 }
 
 func (p *TrafficPool) finishFlow(f *TrafficFlow, reason TrafficFlowCloseReason) {
+	defer f.discardOpening()
 	if p.owner != nil {
 		defer func() {
 			if err := recover(); err != nil {

@@ -1,0 +1,129 @@
+{
+  "scope": "New real Windows TLS/QUIC captures and source-first d677 SDK audit; includes two open CLI label disagreements at this historical checkpoint",
+  "source": "d6772965c669e288705f7e0d0e25c62972226832",
+  "source_facts_frozen_before_candidate": true,
+  "source_manifest": {
+    "external_relative_name": "fresh-TLS-QUIC-source39-01/source-manifest01.json",
+    "SHA256": "8be15e99bfbd572364a4c0acf5c6b19eb4cd2e2f7c02a0a5c5b9a3fe5482bf72",
+    "copied": false
+  },
+  "TLS": {
+    "physical": 227,
+    "actual_connections": 8,
+    "successful_resumptions": 4,
+    "complete_HTTP_pairs": 24,
+    "wire_records": 136,
+    "authenticated_records": 94,
+    "authenticated_close_notify": 16,
+    "whole_HTTP_messages": 48,
+    "source": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/TLS-source03-audit02/summary.json",
+      "SHA256": "2deb23f783baec94e24718269c754d597b1244cac5eae05823d0d7160c627a8d",
+      "copied": false
+    },
+    "metadata": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/TLS-metadata-SDK-d677-01/summary.json",
+      "SHA256": "aafe850f494deaa77926f01fc5899f3e41282dff319012d8be02cafbfff1233f",
+      "copied": false
+    },
+    "scope": "Resumption offer/selection/ticket metadata and generation reset; binder authentication and certificate trust are not certified"
+  },
+  "QUIC": {
+    "physical": 2018,
+    "protected_packets": 2025,
+    "AEAD_positive": 2022,
+    "actual_bad_tags": 3,
+    "unprotected_zero_datagram_tails": 6,
+    "independently_seen_out_of_order_packets": 180,
+    "ciphers": 3,
+    "source_connections": 3,
+    "key_updates": 6,
+    "CID_rotations": 3,
+    "NAT_rebindings": 3,
+    "authenticated_cipher_direction_epoch_cells": 18,
+    "negative_mutations": 138,
+    "complete_source_HTTP3_headers": 36,
+    "complete_source_HTTP3_bodies": 36,
+    "logical_HTTP3_frames": 81,
+    "STREAM_source_ranges": 2592,
+    "source": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/QUIC-source01-audit01/summary.json",
+      "SHA256": "6020e5c719c3d02eb42881671e0dfe8845a59ec0cebbac1d49769a5a8d826859",
+      "copied": false
+    },
+    "Wireshark_scalar_blob_checks": 72632,
+    "Wireshark_differences": 0,
+    "Wireshark": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/QUIC-WS-fields02/summary.json",
+      "SHA256": "07112a08fd973eadb8c51cdf67a76462cd242af40ec84c347f4f020bbd51f917",
+      "copied": false
+    },
+    "Wireshark_full_body_views": 33,
+    "Wireshark_omission": "Three complete independently reassembled bodies lack full http3.data views in this 4.6.9 export. All source STREAM bytes match. No claim about Wireshark internal state or a confirmed Wireshark bug.",
+    "links": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/QUIC-SDK-links-control02.json",
+      "SHA256": "2362fe6c39eca965d6864b1a6b21cd878bd8b0a78695f55dc8e82ed890e301e6",
+      "copied": false
+    },
+    "no_delivery_fragments_without_invented_transaction": 526
+  },
+  "actual": {
+    "external_relative_name": "fresh-TLS-QUIC-d677-actual39-01/summary.json",
+    "SHA256": "1a67bbb37120c339ea2ffad209c81f1b63c0113c7dd04ed59bc031ef2df2b5fb",
+    "copied": false
+  },
+  "SDK": {
+    "proof": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/SDK-d677-source39-audit01/summary.json",
+      "SHA256": "f75f6b9b62a936e1aa3033eb1eca8c5a4cd25ba4b7b3177a2f64d8b851ae158a",
+      "copied": false
+    },
+    "failures": 0,
+    "packet_core_scalar_blob_checks": 13994,
+    "claim": "Core values, exact wire ownership, authenticated plaintext, reassembly/FIN and complete HTTP bodies; not every possible TLS/QUIC extension"
+  },
+  "CLI": {
+    "proof": {
+      "external_relative_name": "fresh-CLI-source39-audit03/summary.json",
+      "SHA256": "f18a105b605921ba5ed4b492440a2b76c47534b7250956a78e5aba2692004893",
+      "copied": false
+    },
+    "physical_rows": 2245,
+    "native_PDUs": 2220,
+    "private_field_occurrences": 41694,
+    "physical_metadata_and_private_PDU_bridge_differences": 0,
+    "label_differences": 2,
+    "affected_physical_frames": [
+      1011,
+      1012
+    ],
+    "cause": "Authenticated h3 connection, new client bidirectional stream prefix missing, buffered suffix still displayed QUIC. This checkpoint leaves the two failures open; subsequent source and UI proof required."
+  },
+  "PDU_filter": {
+    "cases": 8,
+    "failures": 0,
+    "proof": {
+      "external_relative_name": "fresh-TLS-QUIC-source39-01/CLI-PDU-filter-scope-d677-01/summary.json",
+      "SHA256": "6796531c21dd1079b0e5029539b534d995afb858b26d24f7936179d3f0e87163",
+      "copied": false
+    },
+    "contract": "Method/status refer to field sections newly decoded in the supplied PDUs, not all content in the stream. Pure buffered/retransmitted observations do not replay cached headers. Unregistered aliases fail compilation."
+  },
+  "failures_preserved": [
+    "First TLS generator raced abortive RST against client unwrap; failed capture/receipts retained. Final repository helper synchronizes both completed unwraps and was actually rerun.",
+    "First reference selector counted generated response URI as a request; selector corrected while source values were retained",
+    "PDML FT_NONE CRYPTO containers omitted value; raw JSON independently supplies the same twelve source payloads",
+    "First QUIC association checker demanded request IDs from zero-delivery fragments; corrected to independently merged source delivery, not candidate-selected IDs",
+    "CLI checker01 used uppercase transport and checker02 assumed mandatory-only object keys; existing historical format verified and corrected, no packet source values changed"
+  ],
+  "archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/tls-quic-source39",
+    "sources": 24,
+    "manifest_SHA256": "c356591b924a214ee07c69532e4d40ca609843422f764f06ce5f08ee9f82e1e5"
+  },
+  "limitations": [
+    "Fresh traffic does not include the newly identified dynamic-QPACK resumed-method field-filter gap; it is tested separately",
+    "This is not a current full TOP30 census or all-protocol completeness claim",
+    "No captures, keys, full source grids or complete actual objects are copied into the repository"
+  ]
+}

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,9 @@ func TestFrozenCorpusReplay(t *testing.T) {
 						if e.FlowID != 0 {
 							// IDs may be reserved at HTTP headers before a late request body.
 							// Check stream byte order within each direction and protocol layer.
-							key := fmt.Sprintf("%d/%d/%s/%s", e.FlowID, e.Direction, e.Protocol, e.SourceBytes.Kind)
+							// Reassembled RTMP payload messages and their wire chunks
+							// share a protocol name but have distinct observed layers.
+							key := fmt.Sprintf("%d/%d/%s/%s/%s", e.FlowID, e.Direction, e.Protocol, e.SourceBytes.Kind, strings.Join(e.CarrierLayers, ">"))
 							require.GreaterOrEqual(t, e.Offset, order[key])
 							order[key] = e.Offset
 						}
@@ -106,7 +109,15 @@ func TestFrozenCorpusReplay(t *testing.T) {
 					for _, answer := range c.Expectations {
 						if answer.Kind == "whole_capture_event_counts" {
 							require.NoError(t, replayErr)
-							require.Equal(t, answer.Expected.EventCounts, counts, "sealed whole-capture event counts")
+							want := answer.Expected.EventCounts
+							if c.Input.OriginalPath == "common/bin-parser/testdata/winlab5013/captures/ctf-01-ftp.pcapng" {
+								// The sealed baseline predates passive data association. Keep
+								// its control counts exact and add the new independently
+								// checked profile (see TestProtocolSessionFTPReplayWinlabCorpus).
+								require.Equal(t, map[string]int{"ftp:decoded": 14}, want)
+								want = map[string]int{"ftp:decoded": 14, "ftp-data:decoded": 8}
+							}
+							require.Equal(t, want, counts, "sealed counts plus explicitly versioned profile additions")
 						}
 					}
 					sort.Strings(canonical)

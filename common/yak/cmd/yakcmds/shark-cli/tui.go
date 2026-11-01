@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
 
 	"github.com/yaklang/pcap"
+	"github.com/yaklang/yaklang/common/pcapx/pcaputil"
 	"golang.org/x/term"
 )
 
@@ -17,6 +19,14 @@ type packetEntry struct {
 	summary                         packetSummary
 	searchGeneration, searchVersion uint64
 	searchMatched                   bool
+	fieldHistory                    *pcaputil.ProtocolInspector
+	fieldRevision                   pcaputil.ProtocolPacketRevision
+	fieldResult                     pcaputil.DisplayFilterResult
+	fieldEventIDs                   []uint64
+	fieldKnownIDs                   []uint64
+	rowHistory                      *pcaputil.ProtocolInspector
+	rowRevision                     pcaputil.ProtocolPacketRevision
+	rowEventIDs                     []uint64
 }
 type packetRing struct {
 	entries     []packetEntry
@@ -43,6 +53,37 @@ func (r *packetRing) add(p *capturedPacket) {
 func (r *packetRing) at(i int) *packetEntry { return &r.entries[(r.start+i)%len(r.entries)] }
 
 func (e *packetEntry) row() packetSummary {
+	if p := e.packet; p != nil && p.history != nil {
+		// A message can be confirmed after its last byte-contributing packet
+		// was already displayed. Keep its row in step with the detail pane.
+		// Read the token first so a concurrent arrival is seen next redraw.
+		revision := p.history.PacketQueryRevision(p.reference, p.eventIDs, p.physicalRecord)
+		if e.summary.Number == 0 || e.rowHistory != p.history || e.rowRevision != revision || !slices.Equal(e.rowEventIDs, p.eventIDs) {
+			view := *p
+			events := p.protocolEvents()
+			if late := presentEvents(events); late.protocol != "" {
+				view.presentation = late
+			}
+			e.summary = summarize(&view)
+			for _, message := range events {
+				if completed := message.SourceBytes.CompletedIn; completed != nil && completed.Number != p.reference.Number && (message.Status == "decoded" || message.Status == "deferred") {
+					// Put provenance first: long application text otherwise clips
+					// this notice and makes each tiny contributor look complete.
+					notice := fmt.Sprintf("Reassembled PDU #%d · complete in frame #%d · ", message.ID, completed.Number)
+					e.summary.Info = notice + e.summary.Info
+					if e.summary.connectionAnnotated {
+						// Connection redraws restore packetInfo before adding the
+						// connection label. Preserve provenance in that base too.
+						e.summary.packetInfo = notice + e.summary.packetInfo
+					}
+					break
+				}
+			}
+			e.rowHistory, e.rowRevision = p.history, revision
+			e.rowEventIDs = append(e.rowEventIDs[:0], p.eventIDs...)
+		}
+		return e.summary
+	}
 	if e.summary.Number == 0 {
 		e.summary = summarize(e.packet)
 	}
@@ -50,6 +91,9 @@ func (e *packetEntry) row() packetSummary {
 }
 
 type tui struct {
+	streamApplication                                   bool
+	tlsKeysConfigured                                   bool
+	bytesSource                                         int
 	streamBeginning                                     bool
 	streamPinned                                        bool
 	streamRefresh                                       time.Time
@@ -66,14 +110,15 @@ type tui struct {
 	fieldsTouched                                       bool
 	pendingDetail                                       *packetDetail
 
-	inspect           *capturedPacket
-	inspectionChanged time.Time
-	decodeStatus      string
-	visibleVersion    uint64
-	filterDirty       bool
-	rate              trafficRate
-	mix               []protocolShare
-	mixTotal          int
+	inspect              *capturedPacket
+	inspectionChanged    time.Time
+	decodeStatus         string
+	visibleVersion       uint64
+	visibleFieldsVersion uint64
+	filterDirty          bool
+	rate                 trafficRate
+	mix                  []protocolShare
+	mixTotal             int
 
 	ring                             packetRing
 	visible                          []*packetEntry
@@ -109,6 +154,11 @@ type detailResult struct {
 }
 
 func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg captureConfig, capacity int) error {
+	restoreConsole, err := prepareTerminal(os.Stdin, os.Stdout)
+	if err != nil {
+		return err
+	}
+	defer restoreConsole()
 	old, err := term.MakeRaw(int(os.Stdin.Fd()))
 	if err != nil {
 		return err
@@ -116,7 +166,14 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 	defer term.Restore(int(os.Stdin.Fd()), old)
 	fmt.Fprint(os.Stdout, terminalEnter)
 	defer fmt.Fprint(os.Stdout, terminalLeave)
-	ui := &tui{ring: newPacketRing(capacity), follow: !src.offline, width: 100, height: 32, color: os.Getenv("NO_COLOR") == "", streams: s.streams}
+	ui := &tui{ring: newPacketRing(capacity), follow: !src.offline, width: 100, height: 32, color: os.Getenv("NO_COLOR") == "", streams: s.streams, tlsKeysConfigured: cfg.tlsSecrets != nil}
+	if cfg.initialDisplayFilter != "" {
+		search, err := compileSearch("fields " + cfg.initialDisplayFilter)
+		if err != nil {
+			return err
+		}
+		ui.search, ui.searchText, ui.searchGeneration = search, "fields "+cfg.initialDisplayFilter, 1
+	}
 	ui.rate.reset(time.Now(), s)
 	keyCtx, cancel := context.WithCancel(ctx)
 	inputs := make(chan []byte, 64)
@@ -166,7 +223,7 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 	}()
 	var lastCapture time.Time
 	dirty := false
-	screen := screenWriter{out: os.Stdout}
+	screen := screenWriter{out: os.Stdout, color: ui.color}
 	refresh := func(drain bool) error {
 		// One bounded batch per frame. Capture never waits for rendering live data.
 		for i := 0; drain && packets != nil && i < cap(s.packets); i++ {
@@ -211,6 +268,9 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 				decodeCancel = stop
 				requestedStream, requestedVersion = ui.stream.id, ui.stream.decodeVersion
 				ui.streamStatus = "Decoding contiguous stream prefixes…"
+				if ui.stream.messageBoundaries() {
+					ui.streamStatus = "Loading retained protocol message fields…"
+				}
 			default:
 				stop()
 			}
@@ -285,6 +345,7 @@ func (u *tui) syncInspection(now time.Time) {
 	if raw == nil {
 		if u.follow || u.inspect == nil {
 			u.inspect = nil
+			u.bytesSource = 0
 			u.fields = packetDetail{}
 			u.hexStart, u.hexEnd = 0, 0
 			u.pendingDetail = nil
@@ -303,18 +364,28 @@ func (u *tui) syncInspection(now time.Time) {
 	u.fieldSelection = 0
 	u.fieldTop = 0
 	u.hexTop = 0
+	u.bytesSource = 0
 	u.hexStart, u.hexEnd = 0, 0
 	u.decodeStatus = "Live headers · Enter pins and decodes this packet"
 }
 
 func (u *tui) refreshVisible() {
 	version := u.ring.version
+	fieldsVersion := uint64(0)
+	if u.search != nil && u.search.fields != nil && u.streams != nil {
+		u.streams.mu.Lock()
+		history := u.streams.history
+		u.streams.mu.Unlock()
+		if history != nil {
+			fieldsVersion = history.Revision()
+		}
+	}
 	if u.frozen != nil {
 		version = u.frozenAt
 	}
 	// A frozen list can acquire a verified protocol/stream payload later. Recheck
 	// dynamic predicates while packet-only predicates remain cached per entry.
-	if u.visibleVersion != version || u.filterDirty || u.search != nil && u.search.dynamic {
+	if u.visibleVersion != version || u.visibleFieldsVersion != fieldsVersion || u.filterDirty || u.search != nil && u.search.dynamic {
 		u.visible = u.visible[:0]
 		searchContext := newSearchContext(u.streams)
 		size := u.ring.size
@@ -333,6 +404,7 @@ func (u *tui) refreshVisible() {
 			}
 		}
 		u.visibleVersion = version
+		u.visibleFieldsVersion = fieldsVersion
 		u.filterDirty = false
 	}
 	if len(u.visible) == 0 {
@@ -448,6 +520,17 @@ func (u *tui) key(key string, src *captureSource) bool {
 		u.focusPane(2)
 	case "4", "s":
 		u.focusPane(3)
+	case "b":
+		u.focusPane(2)
+		u.bytesSource = (u.bytesSource + 1) % (len(u.fields.sources) + 1)
+		u.hexTop, u.hexStart, u.hexEnd = 0, 0, 0
+	case "a":
+		if u.pane == 3 {
+			u.streamPinned = true
+			u.streamApplication = !u.streamApplication
+			u.streamMode, u.streamTop = 0, 0
+			u.streamRows = nil
+		}
 	case "q":
 		return true
 	case "\t":
@@ -522,7 +605,8 @@ func (u *tui) key(key string, src *captureSource) bool {
 			if key == "e" {
 				u.streamMode = 3
 			} else {
-				u.streamBeginning = key == "h"
+				u.streamApplication = false
+				u.streamBeginning = key == "h" && (u.stream == nil || !u.stream.messageBoundaries())
 				u.streamMode = 0
 			}
 		}

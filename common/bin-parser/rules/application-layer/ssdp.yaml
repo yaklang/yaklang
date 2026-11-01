@@ -1,0 +1,11 @@
+# UPnP Device Architecture 2.0 (2020-04-17), discovery section 1.
+# https://openconnectivity.org/upnp-specs/UPnP-arch-DeviceArchitecture-v2.0-20200417.pdf
+# Exact bodyless SSDP datagram; NOTIFY alive/byebye/update, M-SEARCH, and
+# 200 search responses. Unknown headers remain ordered; duplicate singleton
+# identity/framing fields are rejected. Device assertions remain unverified.
+endian: big
+Package:
+  SSDP:
+    operator: |
+      err = parseSSDPMessage()
+      if err != nil { panic(err) }

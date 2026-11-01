@@ -1,0 +1,190 @@
+{
+  "scope": "Source-bound contributor identity survives payload eviction; no recovery of absent protocol fields and no blanket protocol completeness.",
+  "source": "6b704e2f55a44483e47754d40fd93725100d9666",
+  "identity_ledger": {
+    "logical_budget_min_bytes": 1048576,
+    "logical_budget_max_bytes": 8388608,
+    "target_budget": "detail budget / 8, bounded by the independent floor/ceiling",
+    "absolute_link_ceiling": 32768,
+    "effective_link_capacity": "min(32768, (logical_budget - 256) / (320 + 8))",
+    "input_references_per_callback_cap": 4096,
+    "query_identity_cap": 4096,
+    "budget_charges": "fixed base, ring pointers, link/index ownership and copied encapsulation strings",
+    "only_actual_OnEvent_nonzero_source_references": true,
+    "duplicate_IDs_use_distinct_private_arrivals": true,
+    "own_index_loss": "bounded monotone frame-number watermark, conservative across domains",
+    "fields_not_recovered": true
+  },
+  "actual_mixed_source": {
+    "physical_frame": 1,
+    "actual_PDUs": [
+      1,
+      2
+    ],
+    "retained_detail_ids": [
+      2
+    ],
+    "detail_coverage_complete": false,
+    "identity_coverage_complete": true,
+    "decisions": [
+      {
+        "Expression": "pdu.id == 1",
+        "FullReference": {
+          "matched": true,
+          "complete": true
+        },
+        "IdentityAndRetained": {
+          "matched": true,
+          "complete": true,
+          "partial": true,
+          "reason": "protocol field coverage limited"
+        }
+      },
+      {
+        "Expression": "not quic.token_length",
+        "FullReference": {
+          "matched": false,
+          "complete": true
+        },
+        "IdentityAndRetained": {
+          "matched": false,
+          "complete": false,
+          "partial": true,
+          "reason": "protocol field coverage limited"
+        }
+      },
+      {
+        "Expression": "not (pdu.id == 1)",
+        "FullReference": {
+          "matched": false,
+          "complete": true
+        },
+        "IdentityAndRetained": {
+          "matched": false,
+          "complete": true,
+          "partial": true,
+          "reason": "protocol field coverage limited"
+        }
+      },
+      {
+        "Expression": "quic.token_length == 0",
+        "FullReference": {
+          "matched": true,
+          "complete": true
+        },
+        "IdentityAndRetained": {
+          "matched": false,
+          "complete": false,
+          "partial": true,
+          "reason": "protocol field coverage limited"
+        }
+      },
+      {
+        "Expression": "not http.request.method",
+        "FullReference": {
+          "matched": true,
+          "complete": true
+        },
+        "IdentityAndRetained": {
+          "matched": false,
+          "complete": false,
+          "partial": true,
+          "reason": "protocol field coverage limited"
+        }
+      }
+    ],
+    "evidence": {
+      "external_relative_name": "CLI-identity-mixed-actual30-01/receipt.json",
+      "SHA256": "bf927fd473c5af8431162ae1cfa5110296a027354b2b62a8186e3dd715671102"
+    },
+    "result": {
+      "external_relative_name": "CLI-identity-mixed-actual30-01/actual.json",
+      "SHA256": "807ff1d6ea4bbb3cd499d46e479f304666a86429425b35ee23e486b1f5c0e923"
+    },
+    "helper_build": {
+      "external_relative_name": "CLI-identity-mixed-helper30-01/producer.json",
+      "SHA256": "122e4a831baf3f6331600476548f7a80cd46cbedd25f2be4f5eaa37f2b29f6dc"
+    }
+  },
+  "actual_1MiB_history": {
+    "analyzed_PDUs": 1880,
+    "physical_frame": 294,
+    "source_identity_ID": 299,
+    "detail_present": false,
+    "detail_evictions": 1835,
+    "retained_rows": 45,
+    "exact_and_physical_retained_windows_complete": false,
+    "independent_source_identity_coverage_complete": true
+  },
+  "literal_preservation": {
+    "native_inputs": 37,
+    "native_events": 306455,
+    "whole_flow_files": 2,
+    "native": {
+      "external_relative_name": "Native29-to-30-whole-source-audit01/summary.json",
+      "SHA256": "3505b88b8979cc62f7568ecd907a8bc792169e4fbee069e03eeb85f8d5bc1435"
+    },
+    "CLI_inputs": 37,
+    "whole_CLI_rows": 384518,
+    "CLI": {
+      "external_relative_name": "CLI29-to-30-whole-source-audit01/summary.json",
+      "SHA256": "ed7eb7ca9ceddc8f8b460500583d4c492b8bc2f1bec59d3f4d058a2dbc833b12"
+    },
+    "protected_transport_controls": [
+      {
+        "external_relative_name": "QUIC-recovery-whole29-to-30-vendored01/summary.json",
+        "SHA256": "3f0ece6d941d4a539ab4b8ca4d21ceb9bd722c5d7d1aca1fa5882cd24a54d0af"
+      },
+      {
+        "external_relative_name": "QUIC-controls-whole28-to-30-vendored01/summary.json",
+        "SHA256": "eabd62351fb92e32a947003de67a7d12c4d754858f89d2f578275b66354a9f22"
+      },
+      {
+        "external_relative_name": "TLS-loss-whole28-to-30-vendored01/summary.json",
+        "SHA256": "4e8ed64abf69b2ac301bad1217aa2c60494d884ed623a5513223134ede25dc78"
+      }
+    ]
+  },
+  "local_full_validation": {
+    "passed": 285419,
+    "skipped": 24,
+    "all_started_tests_have_unique_terminal": true,
+    "evidence": {
+      "external_relative_name": "contributor-identity-all-five-full30/receipt.json",
+      "SHA256": "c152b5467f7e78197d8fb8df4caf0fcb131a2be357213b7858d1cfe135f3344f"
+    }
+  },
+  "fuzz": {
+    "executions": 9550,
+    "declared_fuzz_seconds": 60,
+    "new_interesting": 29,
+    "evidence": {
+      "external_relative_name": "contributor-identity-fuzz30-01/FuzzContributorIdentitySourceAndCoverage-receipt.json",
+      "SHA256": "de95ab37ba33cf846fec1f12d44acebf3e22bed0b22954d9dfabb358b6b265ba"
+    },
+    "limit": "The log reports no further completed executions after 6s; this is not a sustained-throughput benchmark."
+  },
+  "CI": {
+    "all_four_green": true,
+    "runs": {
+      "Essential": "https://github.com/yaklang/yaklang/actions/runs/40813824057",
+      "Diff": "https://github.com/yaklang/yaklang/actions/runs/40813824229",
+      "path_case": "https://github.com/yaklang/yaklang/actions/runs/40813824225",
+      "explicit_full_SHA_traffic": "https://github.com/yaklang/yaklang/actions/runs/40813814367"
+    },
+    "auto_draft_traffic_skip_not_counted": true
+  },
+  "historical_Windows01": {
+    "query_and_missing_detail_checks_passed": true,
+    "visual_review_found": [
+      "UDP field caption disagreed with observed HTTP/3 row",
+      "coverage marker displayed a fake PDU #0",
+      "missing-detail reason repeated"
+    ],
+    "evidence": {
+      "external_relative_name": "windows-identity-1MiB-6b704-01/proof.json",
+      "SHA256": "6c38d671cf9432034c48ba9a61d794773c62c6f582d84b618301de423dc15be7"
+    },
+    "superseded_by_source": "5c88aed7aa9ee8c7438aca30a6bfaa114fff85d9"
+  }
+}

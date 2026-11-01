@@ -209,7 +209,10 @@ func TestRound3UpstreamCaptureReplay(t *testing.T) {
 		{"ftp", "ndpi/ndpi-ftp.pcap", 35, 1063}, {"modbus", "ndpi/ndpi-modbus.pcap", 102, 1173},
 		{"radius", "tcpdump/tcpdump-radius.pcap", 4, 519}, {"ntp", "ndpi/ndpi-ntpv4.pcap", 1, 48},
 		{"dhcp", "wireshark-tests/wireshark-dhcp.pcap", 4, 1144},
-		{"coap", "ndpi/ndpi-coap.pcap", 819, 47512},
+		// The first five packets carry only unknown option 2 (Wireshark warns
+		// "Invalid Option Number 2"), without an observed RFC 7252 URI. They
+		// no longer establish automatic identity from code/token shape alone.
+		{"coap", "ndpi/ndpi-coap.pcap", 814, 47388},
 	} {
 		for _, workers := range []int{1, 2} {
 			t.Run(fmt.Sprintf("%s/workers=%d", tc.protocol, workers), func(t *testing.T) {
@@ -224,6 +227,10 @@ func TestRound3UpstreamCaptureReplay(t *testing.T) {
 				count := 0
 				var messageBytes uint64
 				for _, event := range events {
+					if tc.protocol == "coap" && len(event.SourceBytes.PacketRefs) == 1 && event.SourceBytes.PacketRefs[0].Number <= 5 {
+						require.Empty(t, event.Protocol)
+						require.Equal(t, "unrecognized", event.Status)
+					}
 					if event.Protocol == tc.protocol && event.Status == "decoded" {
 						count++
 						messageBytes += uint64(event.Length)

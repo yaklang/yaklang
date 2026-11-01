@@ -1,0 +1,1222 @@
+{
+  "source_commit": "e1cab606dc",
+  "scope": "Original Wireshark4.6.9 two-pass JSON/raw views and independent physical IPv6 UDP message boundaries, no Decode-As/removed packets. RIPng messages have local next-hop advisories, not a transport connection or installed route/validated neighbor.",
+  "sources": {
+    "rfc": "https://www.rfc-editor.org/rfc/rfc2080.html",
+    "reference": "https://github.com/wireshark/wireshark/blob/v4.6.9/epan/dissectors/packet-ripng.c",
+    "official_capture": "https://wiki.wireshark.org/uploads/__moin_import__/attachments/SampleCaptures/ipv6-ripng.gz"
+  },
+  "binaries": {
+    "events-e1cab606.exe": "72102b5c4a4fd54cc8c127ee5a7709a1ab1473585af0dc832d36d69bc5142f16",
+    "yak-e1cab606.exe": "d514634ebac61a0f52917e76f518c09ca561cc9167e6e483f21f9d2653660172"
+  },
+  "corpora": {
+    "weber": {
+      "whole": {
+        "frames": 51328,
+        "manifest": {
+          "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+          "capture_bytes": 15602892,
+          "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+          "fields": [
+            "frame.number",
+            "frame.interface_id",
+            "frame.encap_type",
+            "frame.len",
+            "frame.cap_len",
+            "frame.protocols",
+            "_ws.col.Protocol",
+            "_ws.col.Info",
+            "ip.src",
+            "ip.dst",
+            "ipv6.src",
+            "ipv6.dst",
+            "tcp.srcport",
+            "tcp.dstport",
+            "udp.srcport",
+            "udp.dstport",
+            "tcp.stream",
+            "udp.stream",
+            "tcp.seq_raw",
+            "tcp.ack_raw",
+            "tcp.len",
+            "tcp.flags",
+            "tls.record.content_type",
+            "quic.dcid",
+            "quic.scid",
+            "quic.packet_number",
+            "_ws.expert.message",
+            "dns.id",
+            "dns.qry.name",
+            "dns.qry.type",
+            "tls.record.version",
+            "tls.record.length",
+            "tls.handshake.extensions_server_name",
+            "tls.handshake.ciphersuite",
+            "http.request.method",
+            "http.response.code",
+            "http2.streamid",
+            "ssh.protocol",
+            "ssh.message_code",
+            "isakmp.version",
+            "isakmp.exchangetype",
+            "isakmp.flags",
+            "isakmp.messageid",
+            "isakmp.length",
+            "rip.command",
+            "rip.version",
+            "rip.metric",
+            "nbss.type",
+            "nbss.length",
+            "l2tp.flags",
+            "l2tp.length",
+            "rpc.xid",
+            "rpc.msgtyp",
+            "rpc.program",
+            "rpc.procedure",
+            "rdpudp.flags",
+            "rdpudp.synex.version",
+            "rdpudp.data.seqnum",
+            "rdpudp.data.channelseqnumber",
+            "rdpudp.data.sourceStart"
+          ],
+          "two_pass": true,
+          "out_of_order_reassembly": true,
+          "keylog_sha256": "221a1806bd307e3d80d71419ffab5d30934b44afa4fd98e21f5c54e2f9b14975"
+        },
+        "field_mismatch_count": 90,
+        "field_frames_checked": {
+          "l2tp.flags": 40,
+          "l2tp.length": 40,
+          "http.request.method": 74,
+          "http.response.code": 60,
+          "dns.id": 3786,
+          "dns.qry.name": 3584,
+          "dns.qry.type": 3584,
+          "tls.record.version": 2189,
+          "tls.record.length": 2189,
+          "tls.handshake.ciphersuite": 90,
+          "rip.command": 68,
+          "rip.version": 68,
+          "rip.metric": 68,
+          "ssh.protocol": 7,
+          "isakmp.version": 719,
+          "isakmp.exchangetype": 719,
+          "isakmp.flags": 719,
+          "isakmp.messageid": 719,
+          "isakmp.length": 719,
+          "tls.handshake.extensions_server_name": 88,
+          "ssh.message_code": 15,
+          "rdpudp.flags": 2380,
+          "rdpudp.synex.version": 2,
+          "rdpudp.data.seqnum": 2045,
+          "rdpudp.data.channelseqnumber": 1550
+        },
+        "field_frames_missing": {
+          "tls.handshake.ciphersuite": 116,
+          "ssh.protocol": 1,
+          "ssh.message_code": 8,
+          "http.request.method": 115,
+          "http.response.code": 22,
+          "dns.id": 21,
+          "dns.qry.name": 21,
+          "dns.qry.type": 21,
+          "nbss.type": 281,
+          "nbss.length": 281,
+          "tls.record.version": 1,
+          "tls.record.length": 1,
+          "tls.handshake.extensions_server_name": 6
+        },
+        "packet_metadata_mismatches": {
+          "source": 13,
+          "destination": 13
+        },
+        "endpoint_frames_checked": {
+          "source": 44786,
+          "destination": 44786
+        },
+        "native_tcp_flow_count": 824,
+        "native_tcp_preview_count": 808,
+        "scoped_session_partitions": {
+          "tcp": {
+            "oracle_stream_domain_pairs": 824,
+            "missing_or_split_within_domain": 0
+          },
+          "udp": {
+            "oracle_stream_domain_pairs": 3367,
+            "missing_or_split_within_domain": 0
+          }
+        },
+        "bidirectional_session_checks": {
+          "tcp": {
+            "native_partitions_merging_oracle_streams": 0,
+            "merge_examples": [],
+            "payload_stream_domain_pairs": 722,
+            "payload_pairs_missing_or_split": 0
+          },
+          "udp": {
+            "native_partitions_merging_oracle_streams": 0,
+            "merge_examples": [],
+            "payload_stream_domain_pairs": 3367,
+            "payload_pairs_missing_or_split": 0
+          }
+        }
+      },
+      "ripng": {
+        "oracle_sha256": "2307743fb32b7d548c6bd4b1d54a2e8742766fc240e4389f3f3d113d15f58e9b",
+        "events_sha256": "da7be0e3bbc7be47dc18cf90919547debe7a9376cfb0dab37cdb8bc698827aa5",
+        "reference_frames": 124,
+        "native_events": 124,
+        "matched": 124,
+        "checks": {
+          "exact_wire_and_physical_contributor": 124,
+          "no_inferred_connection_or_query_association": 124,
+          "physical_udp_boundary": 124,
+          "ripng.cmd": 124,
+          "ripng.version": 124,
+          "ripng.reserved": 124,
+          "ripng.rte.ipv6_prefix": 124,
+          "ripng.rte.route_tag": 124,
+          "ripng.rte.prefix_length": 124,
+          "ripng.rte.metric": 124
+        },
+        "checks_total": 1240,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [],
+        "additional_native": [],
+        "scope": "Original full reference, physical UDP boundaries and repeated literal fields. Observed advertisements only, no installed routes, peer/hop-limit validation or response association; invalid/unsupported reference views remain separate."
+      },
+      "label_changes_before_after": {
+        "RIPng": [
+          0,
+          124
+        ],
+        "UDP": [
+          3724,
+          3600
+        ]
+      },
+      "repeated_exports": {
+        "cli": [
+          "07242faa5f45aa83bd39f93b13e76ce00559d8ae1474db2cc5467cb7e6799a59",
+          "07242faa5f45aa83bd39f93b13e76ce00559d8ae1474db2cc5467cb7e6799a59"
+        ],
+        "sdk": [
+          "da7be0e3bbc7be47dc18cf90919547debe7a9376cfb0dab37cdb8bc698827aa5",
+          "da7be0e3bbc7be47dc18cf90919547debe7a9376cfb0dab37cdb8bc698827aa5",
+          "da7be0e3bbc7be47dc18cf90919547debe7a9376cfb0dab37cdb8bc698827aa5"
+        ],
+        "sdk_binaries_byte_identical": true,
+        "cli_byte_identical": true,
+        "sdk_byte_identical": true
+      },
+      "all_previous_selected_field_and_session_metrics_unchanged": true
+    },
+    "sharon": {
+      "whole": {
+        "frames": 328127,
+        "manifest": {
+          "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+          "capture_bytes": 86779688,
+          "tshark_sha256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+          "fields": [
+            "frame.number",
+            "frame.interface_id",
+            "frame.encap_type",
+            "frame.len",
+            "frame.cap_len",
+            "frame.protocols",
+            "_ws.col.Protocol",
+            "_ws.col.Info",
+            "ip.src",
+            "ip.dst",
+            "ipv6.src",
+            "ipv6.dst",
+            "tcp.srcport",
+            "tcp.dstport",
+            "udp.srcport",
+            "udp.dstport",
+            "tcp.stream",
+            "udp.stream",
+            "tcp.seq_raw",
+            "tcp.ack_raw",
+            "tcp.len",
+            "tcp.flags",
+            "tls.record.content_type",
+            "quic.dcid",
+            "quic.scid",
+            "quic.packet_number",
+            "_ws.expert.message",
+            "dns.id",
+            "dns.qry.name",
+            "dns.qry.type",
+            "tls.record.version",
+            "tls.record.length",
+            "tls.handshake.extensions_server_name",
+            "tls.handshake.ciphersuite",
+            "http.request.method",
+            "http.response.code",
+            "http2.streamid",
+            "ssh.protocol",
+            "ssh.message_code",
+            "isakmp.version",
+            "isakmp.exchangetype",
+            "isakmp.flags",
+            "isakmp.messageid",
+            "isakmp.length",
+            "rip.command",
+            "rip.version",
+            "rip.metric",
+            "nbss.type",
+            "nbss.length",
+            "l2tp.flags",
+            "l2tp.length",
+            "rpc.xid",
+            "rpc.msgtyp",
+            "rpc.program",
+            "rpc.procedure",
+            "rdpudp.flags",
+            "rdpudp.synex.version",
+            "rdpudp.data.seqnum",
+            "rdpudp.data.channelseqnumber",
+            "rdpudp.data.sourceStart"
+          ],
+          "two_pass": true,
+          "out_of_order_reassembly": true,
+          "keylog_sha256": null
+        },
+        "field_mismatch_count": 35,
+        "field_frames_checked": {
+          "l2tp.flags": 40,
+          "l2tp.length": 40,
+          "http.request.method": 48,
+          "http.response.code": 52,
+          "dns.id": 1680,
+          "dns.qry.name": 1478,
+          "dns.qry.type": 1478,
+          "tls.record.version": 631,
+          "tls.record.length": 631,
+          "tls.handshake.ciphersuite": 33,
+          "rip.command": 68,
+          "rip.version": 68,
+          "rip.metric": 68,
+          "ssh.protocol": 5,
+          "isakmp.version": 274,
+          "isakmp.exchangetype": 274,
+          "isakmp.flags": 274,
+          "isakmp.messageid": 274,
+          "isakmp.length": 274,
+          "tls.handshake.extensions_server_name": 27,
+          "ssh.message_code": 10
+        },
+        "field_frames_missing": {
+          "tls.handshake.ciphersuite": 1209,
+          "ssh.protocol": 1,
+          "ssh.message_code": 8,
+          "http.request.method": 211,
+          "http.response.code": 35,
+          "nbss.type": 448,
+          "nbss.length": 448,
+          "dns.id": 1326,
+          "tls.record.version": 1545,
+          "tls.record.length": 1517,
+          "isakmp.version": 303,
+          "isakmp.flags": 303,
+          "isakmp.messageid": 303,
+          "isakmp.length": 296,
+          "dns.qry.name": 227,
+          "dns.qry.type": 227,
+          "l2tp.flags": 672,
+          "l2tp.length": 665,
+          "rdpudp.flags": 39,
+          "rdpudp.data.sourceStart": 15,
+          "rpc.xid": 39,
+          "rpc.msgtyp": 39,
+          "rpc.program": 39,
+          "rpc.procedure": 39,
+          "isakmp.exchangetype": 176,
+          "http2.streamid": 70,
+          "rip.command": 44,
+          "rip.version": 44,
+          "rip.metric": 30,
+          "rdpudp.synex.version": 4,
+          "rdpudp.data.seqnum": 7,
+          "rdpudp.data.channelseqnumber": 6
+        },
+        "packet_metadata_mismatches": {
+          "source": 46380,
+          "destination": 46309
+        },
+        "endpoint_frames_checked": {
+          "source": 322578,
+          "destination": 322522,
+          "source_oracle_unavailable": 422,
+          "destination_oracle_unavailable": 448
+        },
+        "native_tcp_flow_count": 840,
+        "native_tcp_preview_count": 735,
+        "scoped_session_partitions": {
+          "tcp": {
+            "oracle_stream_domain_pairs": 35105,
+            "missing_or_split_within_domain": 34315
+          },
+          "udp": {
+            "oracle_stream_domain_pairs": 10100,
+            "missing_or_split_within_domain": 13
+          }
+        },
+        "bidirectional_session_checks": {
+          "tcp": {
+            "native_partitions_merging_oracle_streams": 6,
+            "merge_examples": [
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "318",
+                "wireshark_streams": [
+                  "25660",
+                  "6022"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "320",
+                "wireshark_streams": [
+                  "32900",
+                  "6260"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "324",
+                "wireshark_streams": [
+                  "14869",
+                  "20735",
+                  "27168",
+                  "6606"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "461",
+                "wireshark_streams": [
+                  "15945",
+                  "28958"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "508",
+                "wireshark_streams": [
+                  "19025",
+                  "27835",
+                  "31294",
+                  "34465"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 226, \"Section\": 0}",
+                "native": "551",
+                "wireshark_streams": [
+                  "21087",
+                  "32512"
+                ]
+              }
+            ],
+            "payload_stream_domain_pairs": 7996,
+            "payload_pairs_missing_or_split": 7213
+          },
+          "udp": {
+            "native_partitions_merging_oracle_streams": 24,
+            "merge_examples": [
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "7df17af45797d452",
+                "wireshark_streams": [
+                  "1383",
+                  "1619",
+                  "7746",
+                  "931"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c3636a8332c0765a",
+                "wireshark_streams": [
+                  "6663",
+                  "941"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "aaa2239b90d4400e",
+                "wireshark_streams": [
+                  "1182",
+                  "1322",
+                  "1368",
+                  "1709",
+                  "1807",
+                  "1846",
+                  "2157",
+                  "2372",
+                  "2480",
+                  "2584",
+                  "3178",
+                  "3211",
+                  "3259",
+                  "3283",
+                  "3289",
+                  "3666",
+                  "3856",
+                  "3906",
+                  "3934",
+                  "3935",
+                  "3966",
+                  "3981",
+                  "4095",
+                  "4153",
+                  "4303",
+                  "4345",
+                  "4394",
+                  "4586",
+                  "4803",
+                  "4959",
+                  "5067",
+                  "5199",
+                  "5230",
+                  "5312",
+                  "5449",
+                  "5573",
+                  "5648",
+                  "5666",
+                  "5764",
+                  "6055",
+                  "6138",
+                  "6162",
+                  "6295",
+                  "6297",
+                  "6322",
+                  "6349",
+                  "6380",
+                  "6405",
+                  "6482",
+                  "6836",
+                  "7066",
+                  "7153",
+                  "7187",
+                  "7291",
+                  "7320",
+                  "7328",
+                  "7455",
+                  "7487",
+                  "7667",
+                  "7769",
+                  "7788",
+                  "7852",
+                  "7890",
+                  "7922",
+                  "8014",
+                  "8148",
+                  "8188",
+                  "8196",
+                  "8198",
+                  "8217",
+                  "8277",
+                  "8303",
+                  "8404",
+                  "8411",
+                  "8437",
+                  "8460",
+                  "8703",
+                  "8717",
+                  "8727",
+                  "8907",
+                  "8943",
+                  "9073",
+                  "9107",
+                  "9214",
+                  "9239",
+                  "9242",
+                  "9354",
+                  "9404",
+                  "942",
+                  "9497",
+                  "9553",
+                  "9568",
+                  "9659",
+                  "9669",
+                  "9719",
+                  "9724",
+                  "9786",
+                  "9794",
+                  "9819",
+                  "993"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "39f9aa50254a3715",
+                "wireshark_streams": [
+                  "1667",
+                  "949"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "cc2c836b7360162e",
+                "wireshark_streams": [
+                  "8582",
+                  "956"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "9b28a4ccad824aac",
+                "wireshark_streams": [
+                  "7914",
+                  "9101",
+                  "962"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "79494495962ce0ef",
+                "wireshark_streams": [
+                  "1003",
+                  "1595",
+                  "7786"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "f79e0c7e3f2651cb",
+                "wireshark_streams": [
+                  "1095",
+                  "6746",
+                  "6892"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c652a9b398e53b26",
+                "wireshark_streams": [
+                  "1143",
+                  "8378"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "1870a1bd81bc15b0",
+                "wireshark_streams": [
+                  "1215",
+                  "4990"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "637755867e4c2c72",
+                "wireshark_streams": [
+                  "1182",
+                  "1335",
+                  "1336",
+                  "5351"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "4829823bbdc3e35b",
+                "wireshark_streams": [
+                  "1694",
+                  "2681",
+                  "8580"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "47d5c031561f8241",
+                "wireshark_streams": [
+                  "1182",
+                  "2333"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "e6ed4ff4cbb60146",
+                "wireshark_streams": [
+                  "2498",
+                  "4271",
+                  "6333"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "a098ff85d5c86872",
+                "wireshark_streams": [
+                  "2582",
+                  "2583"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "64516cf5bf6e4d23",
+                "wireshark_streams": [
+                  "2664",
+                  "7113"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "e6ce9b195d9b67b2",
+                "wireshark_streams": [
+                  "3018",
+                  "7011"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "bc0fc942b621edc1",
+                "wireshark_streams": [
+                  "3050",
+                  "4230",
+                  "5501",
+                  "6440",
+                  "8611",
+                  "9058"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "eabb07c7b3b09954",
+                "wireshark_streams": [
+                  "3296",
+                  "3297",
+                  "9125"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "c09333aba9f23593",
+                "wireshark_streams": [
+                  "3343",
+                  "7631"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "1d3d6d7ffa728bb6",
+                "wireshark_streams": [
+                  "3480",
+                  "3481"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "3b5a3fdc1d1013a0",
+                "wireshark_streams": [
+                  "3979",
+                  "5687",
+                  "6471",
+                  "9089",
+                  "9480"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "f2e655f719774b48",
+                "wireshark_streams": [
+                  "5702",
+                  "5703"
+                ]
+              },
+              {
+                "domain": "{\"Encapsulation\": \"\", \"Interface\": 225, \"Section\": 0}",
+                "native": "6a5a37c0948feb4d",
+                "wireshark_streams": [
+                  "6634",
+                  "9842"
+                ]
+              }
+            ],
+            "payload_stream_domain_pairs": 10100,
+            "payload_pairs_missing_or_split": 13
+          }
+        }
+      },
+      "ripng": {
+        "oracle_sha256": "a57df04148bdd2634736ebb38a8eededd5a6fbc329a1bdcf6ec2d7bf0395adcf",
+        "events_sha256": "ed8604baf4a2934f70c9457535af04e7c9a56d987876e9818a148366fceb75ef",
+        "reference_frames": 137,
+        "native_events": 124,
+        "matched": 124,
+        "checks": {
+          "exact_wire_and_physical_contributor": 124,
+          "no_inferred_connection_or_query_association": 124,
+          "physical_udp_boundary": 124,
+          "ripng.cmd": 124,
+          "ripng.version": 124,
+          "ripng.reserved": 124,
+          "ripng.rte.ipv6_prefix": 124,
+          "ripng.rte.route_tag": 124,
+          "ripng.rte.prefix_length": 124,
+          "ripng.rte.metric": 124
+        },
+        "checks_total": 1240,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 44943,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 160,
+            "header_hex": "00007e2f",
+            "wire_sha256": "427dac13072bdb3284ed4e8d0e7666e6eb790b18e9ea5e44fa4ce3b85753c5e6",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 45326,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 80,
+            "header_hex": "7e00002f",
+            "wire_sha256": "851a4d5f793d2bb43e142ea40e6b729e4a4bc91303ec0332dab8de4ea94ae7ed",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 45950,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 2563,
+            "header_hex": "ff0030ff",
+            "wire_sha256": "eb92382eb960044616bad150192f900ba868f77fc41abfd5848f86bb5446d43d",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 49735,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 66,
+            "header_hex": "81818181",
+            "wire_sha256": "9399aa511571f892a1c5ef16fdaee06b3dbb286ad12b97587f66070d109c3548",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 53921,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 667,
+            "header_hex": "30ffeaff",
+            "wire_sha256": "d3c33fc78e5c9f54cc9a09c1a48f412f9d3c703ef934ddc9e1892c05eaf84089",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 55812,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 4,
+            "header_hex": "64000003",
+            "wire_sha256": "c57aaff01850bdc820f1c84a359cde4f3984c44d15c3d5d5cfdb6ec349a2567f",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 67487,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 166,
+            "header_hex": "00007e2f",
+            "wire_sha256": "0eb30c3f18440faabf1089aa40f31b65b57df148623cb2b5369cbc81a23d60a7",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 72116,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 96,
+            "header_hex": "00007e2f",
+            "wire_sha256": "5709719ad2bb228627cb51001584dc88f3ae4e86c5c09462f96e59f96c352395",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 74851,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 320,
+            "header_hex": "ab262626",
+            "wire_sha256": "2126a3f87b370c1c6d7d3fba12da5fc1a3f8a448091f8a84925adc2b39ff8b2b",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 76732,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 347,
+            "header_hex": "ab262626",
+            "wire_sha256": "732063b36029f00b68a6a33037946b1ec6cb2a963d83384d6ccc05e8ae81bf5d",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 86174,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 2584,
+            "header_hex": "ff0030ff",
+            "wire_sha256": "791813c1d37f2fc0c064f45a2f5f46dd42391f57e32526d0bd181fc7c8c5c69e",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 102309,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 640,
+            "header_hex": "30ffeaff",
+            "wire_sha256": "b0beccd89766a8a654db9ea2f09529f7751df903f3e7f4d747917b07ca051ed2",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 127933,
+            "reason": "original reference RIPng view is carried over IPv4",
+            "wire_bytes": 204,
+            "header_hex": "00007e2f",
+            "wire_sha256": "f690b747259d4ee44a7efce774e8dc89a2bd12693a7bfc8b7b2403c288ac7ef4",
+            "native_ripng_observations": 0
+          }
+        ],
+        "additional_native": [],
+        "scope": "Original full reference, physical UDP boundaries and repeated literal fields. Observed advertisements only, no installed routes, peer/hop-limit validation or response association; invalid/unsupported reference views remain separate."
+      },
+      "label_changes_before_after": {
+        "RIPng": [
+          0,
+          124
+        ],
+        "UDP": [
+          109835,
+          109711
+        ]
+      },
+      "repeated_exports": {
+        "cli": [
+          "2c4679fd8083eea48bf87ccffa506bfe83b5f945110d44c105c2be30f6e457a0",
+          "2c4679fd8083eea48bf87ccffa506bfe83b5f945110d44c105c2be30f6e457a0"
+        ],
+        "sdk": [
+          "ed8604baf4a2934f70c9457535af04e7c9a56d987876e9818a148366fceb75ef",
+          "ed8604baf4a2934f70c9457535af04e7c9a56d987876e9818a148366fceb75ef",
+          "ed8604baf4a2934f70c9457535af04e7c9a56d987876e9818a148366fceb75ef"
+        ],
+        "sdk_binaries_byte_identical": true,
+        "cli_byte_identical": true,
+        "sdk_byte_identical": true
+      },
+      "all_previous_selected_field_and_session_metrics_unchanged": true
+    }
+  },
+  "offline_controls": {
+    "source_frame": "2163",
+    "source_frame_sha256": "b59c0ca1ef9618f492e9a988fa773b420a376b225a20eae63e64b0d737390bb4",
+    "sdk_sha256": "72102b5c4a4fd54cc8c127ee5a7709a1ab1473585af0dc832d36d69bc5142f16",
+    "scope": "Declared offline controls derived from real bytes; independent message-local advisories, not transport recovery, installed routes, delivery or peer authentication. Original reference refusals/views retained.",
+    "cases": [
+      {
+        "name": "real-byte-control",
+        "authored": false,
+        "capture_sha256": "86ca3b3b7a748e0cd6dfc397798355a548859821ca04f17d9cf7eb7cb5c4a650",
+        "physical_frames": 1,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "duplicate-independent-advertisements",
+        "authored": false,
+        "capture_sha256": "057197187e0a5eb7e9418ca56d913070719a31574be14427d6e903ae1e0d194a",
+        "physical_frames": 2,
+        "native_messages": 2,
+        "direct_checks": 3,
+        "wire_field_checks": 20,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "same-tuple-reordered-tag-changes",
+        "authored": false,
+        "capture_sha256": "67057e1c0fea0a1aa3c29559a6e36b177be77db34dd886b89e13e7e6a3dff287",
+        "physical_frames": 3,
+        "native_messages": 3,
+        "direct_checks": 7,
+        "wire_field_checks": 30,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "lost-intermediate-advertisement",
+        "authored": false,
+        "capture_sha256": "01024a35c6529c5f1b7276e7cdd7302ba9d90ad86f85d1740a021efb8fffeb3a",
+        "physical_frames": 2,
+        "native_messages": 2,
+        "direct_checks": 3,
+        "wire_field_checks": 20,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "capture-cut-and-full-repair",
+        "authored": false,
+        "capture_sha256": "7fd3a2beec4d429782542c94d2fd0863100e094a9b7e9a11b9babccfa387be4a",
+        "physical_frames": 2,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "no complete selected v1 request/response entry grammar",
+            "wire_bytes": 63,
+            "header_hex": "02010000",
+            "wire_sha256": "353d0e330064815be5dea24b746674c11c4df6d965a7404a61ce041e7e18fc3d",
+            "native_ripng_observations": 0
+          }
+        ]
+      },
+      {
+        "name": "invalid-metric-and-full-repair",
+        "authored": false,
+        "capture_sha256": "2a51737f9004aab2bb562747d4f3d0b23993a0d0471269ae5d5b3008de1a47a0",
+        "physical_frames": 2,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "route entry metric/prefix length outside selected grammar",
+            "wire_bytes": 64,
+            "header_hex": "02010000",
+            "wire_sha256": "6a6c78935f8e44a1ac70a5df48b77f749e69cc39f6ef4ba1c8e8faadad5faedc",
+            "native_ripng_observations": 0
+          }
+        ]
+      },
+      {
+        "name": "complete-carrier-short-entry-and-repair",
+        "authored": false,
+        "capture_sha256": "84ac1c69d35c66c4ac6257537f66d08a042fa93938a1773c7dfec3c49b10ee43",
+        "physical_frames": 2,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "no complete selected v1 request/response entry grammar",
+            "wire_bytes": 63,
+            "header_hex": "02010000",
+            "wire_sha256": "353d0e330064815be5dea24b746674c11c4df6d965a7404a61ce041e7e18fc3d",
+            "native_ripng_observations": 0
+          }
+        ]
+      },
+      {
+        "name": "unknown-version-and-full-repair",
+        "authored": false,
+        "capture_sha256": "5971cd674de34239981f54e141d4f098552e16e15070971e765ea5c1a680998d",
+        "physical_frames": 2,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "no complete selected v1 request/response entry grammar",
+            "wire_bytes": 64,
+            "header_hex": "02080000",
+            "wire_sha256": "113658ee3361be93973d4272653bdcd6bae40cc741ac8e57f13179ee451dbc66",
+            "native_ripng_observations": 0
+          }
+        ]
+      },
+      {
+        "name": "header-alone-cannot-become-identity",
+        "authored": false,
+        "capture_sha256": "d3f29bbde67d2a8a82907dba3a715e188c4619b7d6c89e68f21c6a3b679adfd7",
+        "physical_frames": 2,
+        "native_messages": 1,
+        "direct_checks": 2,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "header alone is insufficient for automatic identity",
+            "wire_bytes": 4,
+            "header_hex": "02010000",
+            "wire_sha256": "7255b3ce83a75f4d6f13513f56db57229ed61a0775438923799f7050c505ecda",
+            "native_ripng_observations": 0
+          }
+        ]
+      },
+      {
+        "name": "message-local-next-hop-does-not-stick",
+        "authored": false,
+        "capture_sha256": "460532f21885e4970b83b5a287d8f31b0df827a0f12d8dd723d2aabeeba0114c",
+        "physical_frames": 2,
+        "native_messages": 2,
+        "direct_checks": 5,
+        "wire_field_checks": 20,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "ignored-next-hop-parameters-stay-literal",
+        "authored": false,
+        "capture_sha256": "42b3efbccc9e49baa5ca4218701b4dc3e90fb5ac9024f282047c00557bfd4e18",
+        "physical_frames": 1,
+        "native_messages": 1,
+        "direct_checks": 5,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "non-link-local-advisory-falls-back",
+        "authored": false,
+        "capture_sha256": "8ba2cfd018cf9705c8aee2c3709b4a9b8912d8765d17b412e664ce6a8edd8fd4",
+        "physical_frames": 1,
+        "native_messages": 1,
+        "direct_checks": 4,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "whole-table-request-is-not-unreachable-route",
+        "authored": false,
+        "capture_sha256": "8358e032f1f2e92dcb86f605a6f703b02030182342780fbdb73edf4544dcc31a",
+        "physical_frames": 1,
+        "native_messages": 1,
+        "direct_checks": 4,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "literal-mapped-ipv6-prefix",
+        "authored": true,
+        "capture_sha256": "3a204c3c09fe62995e59f90483cea35ada35de34f4d885b8af70fb501669e510",
+        "physical_frames": 1,
+        "native_messages": 1,
+        "direct_checks": 3,
+        "wire_field_checks": 10,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": []
+      },
+      {
+        "name": "adjacent-datagrams-are-not-one-message",
+        "authored": false,
+        "capture_sha256": "4a18e3a7b28ba9f92feafa4f00eb7cd725ea9612dba0dcb58eb54982b59e8106",
+        "physical_frames": 2,
+        "native_messages": 0,
+        "direct_checks": 1,
+        "wire_field_checks": 0,
+        "selected_differences": [],
+        "missing_selected": [],
+        "unselected_reference": [
+          {
+            "frame": 1,
+            "reason": "header alone is insufficient for automatic identity",
+            "wire_bytes": 4,
+            "header_hex": "02010000",
+            "wire_sha256": "7255b3ce83a75f4d6f13513f56db57229ed61a0775438923799f7050c505ecda",
+            "native_ripng_observations": 0
+          },
+          {
+            "frame": 2,
+            "reason": "no complete selected v1 request/response entry grammar",
+            "wire_bytes": 60,
+            "header_hex": "20030051",
+            "wire_sha256": "93df507819d3bc22135828fd218cb4b38b611617e66ddb963b8a3fe080d5cef1",
+            "native_ripng_observations": 0
+          }
+        ]
+      }
+    ],
+    "direct_checks_total": 47,
+    "wire_field_checks_total": 190,
+    "physical_frames_total": 26
+  },
+  "official_capture": {
+    "compressed_bytes": 1328,
+    "compressed_sha256": "0339544cbf5491283f2e5c8c9f6d33830bd6c4a68416f26edcdaddef0a83610e",
+    "capture_bytes": 20264,
+    "capture_sha256": "6f28aecd3e7913ef64805e7966631b285eb85a8bc03e6d5d5bcf3c48cb1c7f99",
+    "transformation": "lossless gzip decompression only, no removed/rewritten frames",
+    "audit": {
+      "oracle_sha256": "eba4db593e7295640e0d56508c2a7c27eeb712773ddc33e24c463f4f5d88647c",
+      "events_sha256": "7912d729cd36bb1d0c44f646f1bc594dd7e105e2f1288a6975a540cc87a467a2",
+      "reference_frames": 20,
+      "native_events": 20,
+      "matched": 20,
+      "checks": {
+        "exact_wire_and_physical_contributor": 20,
+        "no_inferred_connection_or_query_association": 20,
+        "physical_udp_boundary": 20,
+        "ripng.cmd": 20,
+        "ripng.version": 20,
+        "ripng.reserved": 20,
+        "ripng.rte.ipv6_prefix": 20,
+        "ripng.rte.route_tag": 20,
+        "ripng.rte.prefix_length": 20,
+        "ripng.rte.metric": 20
+      },
+      "checks_total": 200,
+      "selected_differences": [],
+      "missing_selected": [],
+      "unselected_reference": [],
+      "additional_native": [],
+      "scope": "Original full reference, physical UDP boundaries and repeated literal fields. Observed advertisements only, no installed routes, peer/hop-limit validation or response association; invalid/unsupported reference views remain separate."
+    },
+    "requests": 5,
+    "responses": 15,
+    "wire_entries": 930,
+    "next_hop_entries": 0
+  },
+  "regressions": {
+    "initial_full_command": "bin-parser failed legacy Command leaf compatibility and frozen roadmap metadata; no corpus files were changed",
+    "final_bin_parser_and_children": "PASS on1fc25a4a; main159.201s",
+    "native_pcaputil": "PASS483.297s on02d4fa39, unchanged native/wire/filter code; the final SDK PE is byte-identical to that build",
+    "final_cli": "PASS2.164s after summary polish",
+    "targeted_frozen_legacy_and_canonical": "PASS3.796s",
+    "fuzz": "21434 executions /46.883s PASS; two workers; bounded wire codec unchanged"
+  },
+  "windows": {
+    "source": "e1cab606dc",
+    "capture_packets": 51328,
+    "query": "fields ripng.cmd == 2",
+    "native_sdk_matching_responses": 123,
+    "retained_field_matches_visible": 61,
+    "explicit_partial_field_history_notice": true,
+    "selected_frame": 4004,
+    "verified_field": "Metric1 maps to logical captured-PDU byte0x17; IPv6 prefix, prefix length and route tag have exact owned ranges; derived canonical prefix/advisory invent no ranges",
+    "progressive_path": "Ethernet > Dot1Q > IPv6 > UDP > RIPng",
+    "strict_drained_EOF_query_selected_protocol_and_detail_frame": true,
+    "CP936_resize_restore_quit": "PASS",
+    "raw_buffers_and_screenshots": "external only"
+  },
+  "limitations": [
+    "No fresh live RIPng network traffic was generated; these are original public captures plus explicitly offline controls.",
+    "No real Next Hop special entry occurred in the two corpora or20-message Wiki capture; that branch is covered by authored/derived controls and independent reference dissection.",
+    "No neighbor/hop-limit or route-table installation claim, no unsolicited-response association, and no next-hop inheritance across datagrams.",
+    "Future versions and malformed/partial automatic candidates remain unrecognized; IPv4 reference views are not accepted as native IPv6 RIPng.",
+    "The legacy catalog entry remains RIPng with historical leaves; RIPngFields is the shared canonical/native full-map entry.",
+    "Default bounded TUI field history is partial even when physical packets remain; query counts above are proven retained matches, not complete-match certificates."
+  ],
+  "acceptance": "partial; raw generic90/35 field-set differences and other protocol/carrier/fuzz gaps remain open"
+}

@@ -1,0 +1,55 @@
+{
+  "wireshark_complete_records": 2735,
+  "native_complete_records": 4404,
+  "byte_identical_record_occurrences": 2734,
+  "wireshark_incomplete_record_views": 0,
+  "wireshark_carrier_record_counts": {
+    "TCP": 2639,
+    "EAP/RADIUS": 47,
+    "RDPUDP": 49
+  },
+  "tcp_record_check": {
+    "wireshark": 2639,
+    "native": 2639,
+    "byte_identical_occurrences": 2639,
+    "missing_occurrences": 0,
+    "extra_occurrences": 0
+  },
+  "native_header_fields_checked": {
+    "tls.record.version": 4404,
+    "tls.record.length": 4404,
+    "tls.record.wire_type": 4404
+  },
+  "native_header_field_differences": [],
+  "scope": "Complete TLS record bytes only. Flow partitions, decryption and protocol fields remain separate acceptance checks.",
+  "missing_record_occurrences": 1,
+  "extra_record_occurrences": 1670,
+  "native_carrier_record_counts": {
+    "TCP": 2639,
+    "EAP/RADIUS": 47,
+    "RDPUDP": 1718
+  },
+  "carrier_record_check": {
+    "EAP/RADIUS": {
+      "wireshark": 47,
+      "native": 47,
+      "matching": 47,
+      "missing": 0,
+      "extra": 0
+    },
+    "RDPUDP": {
+      "wireshark": 49,
+      "native": 1718,
+      "matching": 48,
+      "missing": 1,
+      "extra": 1670
+    },
+    "TCP": {
+      "wireshark": 2639,
+      "native": 2639,
+      "matching": 2639,
+      "missing": 0,
+      "extra": 0
+    }
+  }
+}

@@ -1,0 +1,8 @@
+# RFC7011 complete self-contained UDP message. Native receivers supply scoped
+# previous templates; legacy application-layer/ipfix.yaml remains compatible.
+endian: big
+Package:
+  IPFIXFields:
+    operator: |
+      err = parseObservedSession("ipfix")
+      if err != nil { panic(err) }

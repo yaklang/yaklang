@@ -290,7 +290,7 @@ func TestBACnetReadPropertyDomainAndClockIsolation(t *testing.T) {
 func TestBACnetReadPropertyTruncatedCarrierQuarantine(t *testing.T) {
 	q, ack := bacnetRPWire(36, false, nil), bacnetRPWire(36, true, []byte{0})
 	raw := sessionDatagramPCAP(t, []sessionStep{{0, q}, {1, ack}, {1, ack}}, 47808)
-	// Second record's UDP declared length is one octet longer than captured.
+	// The complete IP carrier cannot contain this UDP declared length.
 	second := 24 + 16 + int(binary.LittleEndian.Uint32(raw[32:36]))
 	udpLength := second + 16 + 14 + 20 + 4
 	binary.BigEndian.PutUint16(raw[udpLength:udpLength+2], uint16(len(ack)+9))
@@ -298,7 +298,7 @@ func TestBACnetReadPropertyTruncatedCarrierQuarantine(t *testing.T) {
 	require.NoError(t, ReplayPcap(bytes.NewReader(raw), WithProtocolDecodeAs("udp", 47808, "bacnet-read-property"), WithOnProtocolMessage(func(e *ProtocolEvent) { events = append(events, e) })))
 	require.Len(t, events, 3)
 	require.Empty(t, events[0].Error)
-	bacnetRPReject(t, events[1], ErrNeedMore)
+	bacnetRPReject(t, events[1], ErrMalformedMessage)
 	bacnetRPReject(t, events[2], ErrResourceExceeded)
 }
 func TestBACnetReadPropertyOptionsAndDatagramBoundary(t *testing.T) {

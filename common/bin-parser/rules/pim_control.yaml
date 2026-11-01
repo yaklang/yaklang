@@ -1,0 +1,8 @@
+endian: big
+Package:
+  operator: |
+    this.ProcessSubNode("PIMControlFields")
+  PIMControlFields:
+    operator: |
+      err = parseObservedSession("pim-control")
+      if err != nil { panic(err) }

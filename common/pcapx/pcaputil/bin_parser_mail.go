@@ -25,13 +25,18 @@ type binSMTP struct {
 }
 
 type binIMAP struct {
-	pending      map[string]string
-	maxPending   int
-	pendingBytes int
-	literal      [2]int
-	literalTail  [2]bool
-	startTLS     string
-	encrypted    bool
+	pending             map[string]string
+	maxPending          int
+	pendingBytes        int
+	literal             [2]int
+	literalTail         [2]bool
+	startTLS            string
+	encrypted           bool
+	sasl                *imapSASL
+	protectionUncertain string
+	idle                *imapIdle
+	namespaces          map[string]*imapNamespaceRequest
+	peerCaptureGap      bool
 }
 
 type binPOP3 struct {
@@ -213,7 +218,7 @@ func imapKnownCommand(cmd string) bool {
 	switch cmd {
 	case "CAPABILITY", "NOOP", "LOGOUT", "STARTTLS", "AUTHENTICATE", "LOGIN", "SELECT", "EXAMINE",
 		"CREATE", "DELETE", "RENAME", "SUBSCRIBE", "UNSUBSCRIBE", "LIST", "LSUB", "STATUS", "APPEND",
-		"CHECK", "CLOSE", "EXPUNGE", "SEARCH", "FETCH", "STORE", "COPY", "UID", "IDLE", "ENABLE", "ID":
+		"CHECK", "CLOSE", "EXPUNGE", "SEARCH", "FETCH", "STORE", "COPY", "UID", "IDLE", "ENABLE", "ID", "NAMESPACE":
 		return true
 	}
 	return false
@@ -463,7 +468,7 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 	if s == nil {
 		return 0, nil, sessionContext("IMAP session was not observed")
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes)); err != nil {
+	if err := f.reserveSession(512 + int64(len(s.pending)+1)*192 + int64(s.pendingBytes)); err != nil {
 		return 0, nil, err
 	}
 	if s.encrypted {
@@ -472,20 +477,27 @@ func (f *binFlow) frameIMAP(dir int, w []byte) (int, *binSpec, error) {
 		}
 		return 0, nil, protocolError(ErrEncrypted, "IMAP transport is encrypted after STARTTLS")
 	}
+	if s.protectionUncertain != "" && len(w) > 0 {
+		return 0, nil, protocolError(ErrContextRequired, "IMAP SASL mechanism %s may install a security layer", s.protectionUncertain)
+	}
 	if n := s.literal[dir]; n > 0 {
 		if len(w) < n {
 			return n, nil, nil
 		}
 		return n, f.a.specs["imap/IMAP"], nil
 	}
-	n, err := frameCRLFLine(w, imapLineMax)
+	lineMax := imapLineMax
+	if s.sasl != nil {
+		lineMax = imapSASLLineMax
+	}
+	n, err := frameCRLFLine(w, lineMax)
 	if err != nil {
 		return 0, nil, err
 	}
 	if n == 0 || n > len(w) {
 		return n, nil, nil
 	}
-	if err := f.reserveSession(256 + int64(len(s.pending)+1)*96 + int64(s.pendingBytes+n)); err != nil {
+	if err := f.reserveSession(512 + int64(len(s.pending)+1)*192 + int64(s.pendingBytes+n)); err != nil {
 		return 0, nil, err
 	}
 	// Both literal forms have a line header followed by exactly n opaque bytes.
@@ -539,6 +551,17 @@ func (s *binIMAP) consume(dir int, raw []byte) (map[string]any, error) {
 		}
 	}
 	fields := strings.Fields(line)
+	if s.idle == nil {
+		if out, handled, err := s.consumeSASL(dir, raw, fields); handled {
+			return out, err
+		}
+	}
+	if out, handled, err := s.consumeIdle(dir, raw, fields); handled {
+		return out, err
+	}
+	if out, handled, err := s.consumeNamespace(dir, raw, fields); handled {
+		return out, err
+	}
 	if len(fields) > 0 && fields[0] == "+" {
 		return map[string]any{"Tag": "+", "Role": "continuation", "Packet Name": "Continuation", "Line": line}, nil
 	}

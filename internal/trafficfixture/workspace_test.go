@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strconv"
 	"strings"
 	"testing"
@@ -92,9 +94,11 @@ func TestWorkspaceExportPreservesSealedFiles(t *testing.T) {
 		t.Fatal(err)
 	}
 	filename := filepath.Join(directory, filepath.FromSlash(key))
-	info, err := os.Stat(filename)
-	if err != nil || info.Mode().Perm()&0077 != 0 {
-		t.Fatal("session fixture keylog must remain private in the exported workspace")
+	if err := checkPrivateWorkspacePermissions(directory, true); err != nil {
+		t.Fatal("exported workspace root must remain private", err)
+	}
+	if err := checkPrivateWorkspacePermissions(filename, false); err != nil {
+		t.Fatal("session fixture keylog must remain private in the exported workspace", err)
 	}
 	if err := os.WriteFile(filename, []byte("modified export"), 0600); err != nil {
 		t.Fatal(err)
@@ -119,9 +123,7 @@ func TestWorkspaceExportDoesNotOverwrite(t *testing.T) {
 		t.Fatal("modified existing user work", err)
 	}
 	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(t.TempDir(), link); err != nil {
-		t.Skipf("symlink unavailable: %v", err)
-	}
+	fixtureDirectoryLink(t, t.TempDir(), link)
 	if Export(link) == nil {
 		t.Fatal("accepted symlink output directory")
 	}
@@ -291,10 +293,26 @@ func workspaceStandaloneInventory(t *testing.T) {
 		t.Fatal("overwrote occupied standalone workspace")
 	}
 	link := filepath.Join(t.TempDir(), "link")
-	if err := os.Symlink(t.TempDir(), link); err != nil {
-		t.Fatal(err)
-	}
+	fixtureDirectoryLink(t, t.TempDir(), link)
 	if err := ExportTools(link, []string{checker, inventory}); err == nil {
 		t.Fatal("accepted standalone symlink destination")
+	}
+}
+
+func fixtureDirectoryLink(t *testing.T, target, link string) {
+	t.Helper()
+	if err := os.Symlink(target, link); err == nil {
+		return
+	} else if runtime.GOOS != "windows" {
+		t.Fatal(err)
+	}
+	// Directory junctions exercise the same destination safeguard on Windows
+	// without requiring Developer Mode or the symlink creation privilege.
+	if output, err := exec.Command("cmd.exe", "/c", "mklink", "/J", link, target).CombinedOutput(); err != nil {
+		t.Fatalf("create test-owned directory junction: %v: %s", err, output)
+	}
+	info, err := os.Lstat(link)
+	if err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("test junction is not reported as a directory link: %v", err)
 	}
 }

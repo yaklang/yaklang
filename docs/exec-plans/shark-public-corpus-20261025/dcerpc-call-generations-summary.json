@@ -1,0 +1,1315 @@
+{
+  "scope": "Observed call-start identity across clear RPC fragments, fresh actual Windows EPM capture, scoped constructed reuse controls and whole-export preservation; not all-protocol completeness",
+  "native_and_CLI_source": "1d1a15bd2f3380e8800dc6c9ed9bea1fc3f98845",
+  "audit_source": "9ed8531213d3ed5da500c9425788720b444e1d8a",
+  "prior_aggregate_SHA256": "e9da56881759a4f0ba0528e9883a8579cd1f9f401e10f96af34874a863d791a7",
+  "totals": {
+    "inputs": 17,
+    "physical_frames": 380868,
+    "SDK_records": 286073,
+    "RPC_wire_PDUs": 919,
+    "numeric_links": 113,
+    "declared_control_baseline_differences": 8,
+    "literal_reference_differences_on_declared_controls": 55
+  },
+  "existing_independently_certified_inputs_preserved": [
+    {
+      "case": "duplicate-request-observation",
+      "physical_frames": 118,
+      "SDK_records": 58,
+      "capture_SHA256": "7aa1dfdf5f5e3f1fb69e9a6d7380fe9799722d2ea466a30f0704391ce4579816",
+      "SDK_SHA256": "47f4d4e54ec36646027408edf9b6fa666af22f84155f1d7d7e4596c0750ead46",
+      "CLI_SHA256": "4a71d42e361e54c35707702ff0eaf4de6851c8f8fe4a114e56dc9444646a9db0",
+      "original_wire_certificate_SHA256": "20109ad7c8b445995614c62b7bb2062bfb1a1ba6ce00f0a9979c35d162485bc8",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "9184c3eaae4907e65626d25a780616784c1d32654477474384be7ac14741d941"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "5bd57f8b7b15c9b9aa66ca1ba2c5e671f49475e81e423beccbcb6ab1a022295a"
+        }
+      ]
+    },
+    {
+      "case": "live-fragmented",
+      "physical_frames": 134,
+      "SDK_records": 9,
+      "capture_SHA256": "34d56675c0beac1fa971e57128ba7ecdd102887faaa05cb9bf3b361605c77ed8",
+      "SDK_SHA256": "14481b42674ac54b6006f242e52a7d4e4f2efa0e9b640c09fbd382b27de6024e",
+      "CLI_SHA256": "898e6f91a381860809c6840d41067c0725bf4a9085b9bf7dbfbff5fdfb949437",
+      "original_wire_certificate_SHA256": "a45efe412501e131a653246d551d82e2f7e08843f85e91593dd3e7e97fae486f",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "900ce7ee30f91c40fc76d2b439ade2031a6f29481cff41744451326fc67d4259"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "f0c74666eb6cc9d118adf08068f474e7d5a8cebd044fbff06e3acb3ceaf8d02e"
+        }
+      ]
+    },
+    {
+      "case": "live-query",
+      "physical_frames": 117,
+      "SDK_records": 58,
+      "capture_SHA256": "f121692c7b0ffaf6a03c9b3d62d122ef167c25737a8373e299385fc408251a85",
+      "SDK_SHA256": "ffacb954e7fcb7f4fe1d9df8829f94bf18d5d65f478cf4d54050f3aaa0cca072",
+      "CLI_SHA256": "94ac8a56c7fd92efa8fd1ec30a2cb4035fda3eb0ccc5c8b358a9627b67bb4adb",
+      "original_wire_certificate_SHA256": "7a41b006902e9bbeef3cfe01f7b583ce41b0613d3bcf4cc8e534de9a44b57601",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "c44ac69f5130bd2d5e31d900b75ad8ca76c5f8fa3810b2056cf4b910c7fd4d4a"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "4b3af5c9118696ec1f7a4716e6e3083e18f54ae72e5f084d862dd55c8ff913a7"
+        }
+      ]
+    },
+    {
+      "case": "live-unfragmented",
+      "physical_frames": 36,
+      "SDK_records": 9,
+      "capture_SHA256": "ac02075c9ad29d67df0c5985723e6c93981ff113612b992dd84abe6aed0a68fe",
+      "SDK_SHA256": "c4a5515d65ecdcba7034876b15816e8bc8bd2c40194d8e9936f5bc6a8764791d",
+      "CLI_SHA256": "e273bff35984f2dd1c909d74618d021a21ca63b6018659a5d364811bffc0004e",
+      "original_wire_certificate_SHA256": "4466a52e5475a354d3f93d7772fef85ba73d089ed4467236a691fb08dbfa1175",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "129f743c0b182c4ccdfff453befc02d4bc734ce35150f240a94eac076d47f9a8"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "a5c6ba4cde90dbe0ec74b71f265384d6257ae0bf052c5781742cd3e98e916726"
+        }
+      ]
+    },
+    {
+      "case": "permanent-request-capture-hole",
+      "physical_frames": 116,
+      "SDK_records": 32,
+      "capture_SHA256": "8c1db7d09213bb36fa9ec55e2112df0192165fa75bf5bb33b40570e0cec1cfce",
+      "SDK_SHA256": "7859e27ddb3bf072ad09cbe6b1aa788e2c822cf5f49bde2f36b06f221f619477",
+      "CLI_SHA256": "62ed83dc09d22ff96f2bf598a6a078e1d68da2fe8b5eb52b678b0f9831b6aaaf",
+      "original_wire_certificate_SHA256": "82e1cd40ac7899e8f22cbb11fe49ffcd7a587e1527de6ec3760c3eb3d9ec61e2",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "e692a13598f348aff7fd1e801e16df944e9f0e6c0d32ef8579b343f2c51eee96"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "36b0831603584a6d4e437091642182add3bacafcf79295711d7dc7232bb873da"
+        }
+      ]
+    },
+    {
+      "case": "request-arrives-after-two-later-requests",
+      "physical_frames": 117,
+      "SDK_records": 59,
+      "capture_SHA256": "c29366d312741ef93519290e76ff621dbef1f065a35cbc31255c520f0c4f3c24",
+      "SDK_SHA256": "35caa68800f57acc665a9c94412be779547a2b43263a118ba1526f3e47a584e6",
+      "CLI_SHA256": "de858d87f0b4bc42f895ef618d960a2d28f81d97e047e1e8a3b2ed260b3ca74a",
+      "original_wire_certificate_SHA256": "548690f667b9182e828673d61fd3f462e4b18d4a1f3761847e2f320ed3a0212f",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "0b3d77864380a926f21c5ca4660708e92fe3a399b14dc4f6e9564bda8d273a71"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "b94ed6fad1835701f357a61c5e51542b048a3172f6098953f0719d6aafa73f3b"
+        }
+      ]
+    },
+    {
+      "case": "sharon",
+      "physical_frames": 328127,
+      "SDK_records": 245784,
+      "capture_SHA256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "SDK_SHA256": "a5caa24b1af8d7ef1d55dc472daa083128be5555f236a37e36b79c290eb9ec6a",
+      "CLI_SHA256": "96d863154d00f9297d9dc891aba9c845e7dce7cb8638ce94d210208d5662c97f",
+      "original_wire_certificate_SHA256": "4e8c20c6be96deb98ad2e8ddc1648811a5d7c35d35fac887323c49ac2f322a18",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "98af005392ab5cdf9f7f56ca69bdf987e532cdef275ec78d17ee36c0784a0769"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "1939948ec20ab895dea5e26037f1fd5c4a976f570ad2a0dbd159e48970cd41bf"
+        }
+      ]
+    },
+    {
+      "case": "snaplen-request-capture-hole",
+      "physical_frames": 117,
+      "SDK_records": 33,
+      "capture_SHA256": "f90223a3d10a98c0fbb168a4c19191e3bb52037282cb39d7fc4ab319e079eb7c",
+      "SDK_SHA256": "42b720fc3c3bc530dd2b953a316e772b77b7085f8a646bd6cbe338068db7961f",
+      "CLI_SHA256": "0e7af69bcd755be513d23ff49f3a3fa0b0262a57aedbec3696e671ba8f1c702c",
+      "original_wire_certificate_SHA256": "d4ab74709b34c99793859511d73bf3d26f5f0d266fb785bc7554716ed4c65b87",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "d2a4d1424c7bf90b77c91adb9449b56a99432b3621ca4b7553cb0aa79440fbd6"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "cdb3a75e794434f3d76402b49dc6e9beba344af9da3655558cf705ea482b222b"
+        }
+      ]
+    },
+    {
+      "case": "weber",
+      "physical_frames": 51328,
+      "SDK_records": 39740,
+      "capture_SHA256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "SDK_SHA256": "73e8b1e4e26005b79246d4537342ea2dc61403fd67ed7df7bab9242ec83e9c1b",
+      "CLI_SHA256": "6e4040219d8052372d9252960b879a176cff6c49e2309f08c58b34214cab399d",
+      "original_wire_certificate_SHA256": "1758b744d14b9052a0e2e0259b6e98c4526fb23a5cb4e6666d1b091de5143ead",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "b8488b0cf53c786b025bab8ca448b8f26516cb6daf563dd03ace4d6cc00ce251"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "c5e530e59774024142a1c1a99a8929c35acc82662ae33c623c56ac6cbbeca2b4"
+        }
+      ]
+    },
+    {
+      "case": "rpc-fragments-live",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "capture_SHA256": "b60639710fd27c679d124126045bec876111a458ce35cb2a4a373e958f0ae17e",
+      "SDK_SHA256": "0145b6ce04960f8e3079078df7ca038eaeb84b3dab52a24300a39cc372c9baa8",
+      "CLI_SHA256": "84e292e8c879a59d2d70928a5303e136798ab4616fbdb58493bcd8b9ff4e3bb1",
+      "original_wire_certificate_SHA256": "a0a86e94af43c907516c80e81fc16a9809c9cb427225a423ed0fcf67582e9c28",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "d4c7cc6bb9752b7d8d0891008d3921a55d561aa3e0822a3a7f6a366207a9f91f"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "06fbbaf70255ebb4447618264fdf512b63cec15e3e0d35cc56c81b29395bbe53"
+        }
+      ]
+    },
+    {
+      "case": "request-tail-arrives-after-first-response",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "capture_SHA256": "192af70c5678fb41e898740905412ec83b9c6a613ba23c28ceabdcd2bc860791",
+      "SDK_SHA256": "b327e0ae3ee83ada20964f08d1945037a9b5129a8a4e342b1e7c5c350137c0a4",
+      "CLI_SHA256": "6762d32118b1d432483182499930b94c6d4b41aef2a1385665c85a37497417da",
+      "original_wire_certificate_SHA256": "dabf23ca26da399eb1caaa5ea616b49b171ad6732c45513c06022ee8a4a64826",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "ccec49d30c338100a05b44b9cdf75887f37f682f03c0df1043972992dadb37d4"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "a86cea414b0d831d3401c9c9430d238e6e4b821c6d50f5e4615d1e9fdb9fad4c"
+        }
+      ]
+    },
+    {
+      "case": "response-first-two-swapped",
+      "physical_frames": 104,
+      "SDK_records": 46,
+      "capture_SHA256": "16edca53b4d50c917fa45fbe3ec45737451739d1b89c02e19e06c753c45979e2",
+      "SDK_SHA256": "d339ff5a1103cef5e5cb5a6ae7dbb9e819ad6561e97aa366987bc34063b7813c",
+      "CLI_SHA256": "223d401425c506e2c30288b946b7755a222511f4c1f3614c22d816ce5e1e2217",
+      "original_wire_certificate_SHA256": "eb1d16c6477aaa3fe58fb30587d561aba2850e591b2ca4e3d3bc3e9257183bc6",
+      "full_SDK_and_CLI_exports_byte_identical": true,
+      "certificates": [
+        {
+          "file": "events-producer-and-preservation.json",
+          "SHA256": "d673fe78b4f86a6e47123fd089981a41164b1c03d38a875ce02a2b720f4f4bd0"
+        },
+        {
+          "file": "yak-producer-and-preservation.json",
+          "SHA256": "adbccec074fb8bfefb761d7990f1abd04eea927348404e0e281dda4438c76676"
+        }
+      ]
+    }
+  ],
+  "fresh_actual_capture": {
+    "capture_SHA256": "54cf33366e832801c96bd11fad6686ec4f073b0b286f8c1be62e8e622510c64d",
+    "physical_frames": 106,
+    "SDK_records": 47,
+    "RPC_wire_PDUs": 45,
+    "wire_checks": 113256,
+    "messages": [
+      {
+        "first_PDU": 5,
+        "complete_PDU": 6,
+        "PType": 0,
+        "fragments": 2,
+        "stub_bytes": 40,
+        "stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+        "first_frame": 10,
+        "completion_frame": 12,
+        "first_PDU_byte_contributors": [
+          {
+            "Number": 10,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ],
+        "completion_PDU_byte_contributors": [
+          {
+            "Number": 12,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ]
+      },
+      {
+        "first_PDU": 7,
+        "complete_PDU": 34,
+        "PType": 2,
+        "fragments": 28,
+        "stub_bytes": 54912,
+        "stub_sha256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+        "first_frame": 14,
+        "completion_frame": 68,
+        "first_PDU_byte_contributors": [
+          {
+            "Number": 14,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ],
+        "completion_PDU_byte_contributors": [
+          {
+            "Number": 68,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ]
+      },
+      {
+        "first_PDU": 38,
+        "complete_PDU": 47,
+        "PType": 2,
+        "fragments": 10,
+        "stub_bytes": 54912,
+        "stub_sha256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+        "first_frame": 83,
+        "completion_frame": 101,
+        "first_PDU_byte_contributors": [
+          {
+            "Number": 83,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ],
+        "completion_PDU_byte_contributors": [
+          {
+            "Number": 101,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        ]
+      }
+    ],
+    "numeric_links": 4,
+    "actual_manifest_cases": [
+      {
+        "case": "maxfrag-1024-request-fragmented",
+        "offered_max_fragment": 1024,
+        "ACK_max_xmit": 2048,
+        "ACK_max_recv": 2048,
+        "request_RPC_fragments": 2,
+        "request_stub_bytes": 40,
+        "request_stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+        "response_RPC_fragments": 28,
+        "response_wire_bytes": 55584,
+        "response_stub_bytes": 54912,
+        "response_stub_sha256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+        "returned_entries": 416,
+        "explicit_context_cleanup_calls": 0,
+        "reply_auth_lengths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "case": "maxfrag-5840-request-whole",
+        "offered_max_fragment": 5840,
+        "ACK_max_xmit": 5840,
+        "ACK_max_recv": 5840,
+        "request_RPC_fragments": 1,
+        "request_stub_bytes": 40,
+        "request_stub_sha256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+        "response_RPC_fragments": 10,
+        "response_wire_bytes": 55152,
+        "response_stub_bytes": 54912,
+        "response_stub_sha256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+        "returned_entries": 416,
+        "explicit_context_cleanup_calls": 0,
+        "reply_auth_lengths": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ],
+    "certificates": [
+      {
+        "file": "wire-physical-audit.json",
+        "SHA256": "52c9b1cb30ab7bc0398107f024399c84c1bd90b26de19729719a43bce3e559c8"
+      },
+      {
+        "file": "logical-fragments-audit.json",
+        "SHA256": "b43be0f6f2848b89d5b57484be4b15880a40cc3d4ab345ffe4f360b8c4e0c465"
+      },
+      {
+        "file": "events-producer-and-preservation.json",
+        "SHA256": "2276fff17df08dad3b8ad376ba9b8d17d0cbd7077513c91c877454fc199bcbe3"
+      },
+      {
+        "file": "yak-producer-and-preservation.json",
+        "SHA256": "a9390e61d1cd3b4cfc729c97763792b1f825743662fa3d268f15ed9aba9cda41"
+      }
+    ]
+  },
+  "constructed_controls": [
+    {
+      "case": "invalid-first-request-replaced",
+      "capture_SHA256": "837b013d82c6150a63b52cdb544fa2347352fe9cd5f48529663db6b7847ba69f",
+      "physical_frames": 75,
+      "RPC_wire_PDUs": 34,
+      "wire_checks": 112297,
+      "numeric_links": 2,
+      "completed_messages": [
+        {
+          "complete_PDU": 33,
+          "first_PDU": 4,
+          "fragments": 28,
+          "stub_bytes": 54912,
+          "stub_SHA256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+          "numeric_owner": 0
+        }
+      ],
+      "baseline_errors": [
+        {
+          "label": "old-reply-27",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": 14,
+          "expected_owner_frame": null
+        },
+        {
+          "label": "fresh-reply",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": null,
+          "expected_owner_frame": 14
+        }
+      ],
+      "literal_Wireshark_association_differences": [
+        {
+          "label": "old-reply-1",
+          "frame": 16,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-2",
+          "frame": 18,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-3",
+          "frame": 20,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-4",
+          "frame": 22,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-5",
+          "frame": 24,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-6",
+          "frame": 26,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-7",
+          "frame": 28,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-8",
+          "frame": 30,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-9",
+          "frame": 32,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-10",
+          "frame": 34,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-11",
+          "frame": 36,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-12",
+          "frame": 38,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-13",
+          "frame": 40,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-14",
+          "frame": 42,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-15",
+          "frame": 44,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-16",
+          "frame": 46,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-17",
+          "frame": 48,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-18",
+          "frame": 50,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-19",
+          "frame": 52,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-20",
+          "frame": 54,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-21",
+          "frame": 56,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-22",
+          "frame": 58,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-23",
+          "frame": 60,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-24",
+          "frame": 62,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-25",
+          "frame": 64,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-26",
+          "frame": 66,
+          "literal_Wireshark_request_in": [
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "old-reply-27",
+          "frame": 68,
+          "literal_Wireshark_request_in": [
+            14,
+            14
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        }
+      ],
+      "reference_field_limits": [],
+      "all_call_start_owners_and_logical_bytes_correct": true,
+      "complete_CLI_projection": true,
+      "certificates": [
+        {
+          "file": "manifest.json",
+          "SHA256": "64fa5c700dbd29cb65ec4d27df9c9170bfa1f37ca387af45b1cfc651e99bea35"
+        },
+        {
+          "file": "wire-physical-audit.json",
+          "SHA256": "4f5b5e5aa39fc3c366c4692e35a65f6952aab90d44ebf602c18d68500e7ea4c2"
+        },
+        {
+          "file": "generation-ownership-audit.json",
+          "SHA256": "d57f6b7f94e7305f94f81b8c9b6a6602c53d2af7f0293b0bbc8ea93974fc6347"
+        },
+        {
+          "file": "CLI-projection-audit.json",
+          "SHA256": "4835f338cb41be33882419266836e359e984824fa084fc1af19beec8c08af5db"
+        }
+      ]
+    },
+    {
+      "case": "known-request-late-completion",
+      "capture_SHA256": "75780cc495b2b9aac828d6988f53fe3c8b5f957f93503770b92bcbecfc014aaa",
+      "physical_frames": 71,
+      "RPC_wire_PDUs": 32,
+      "wire_checks": 57217,
+      "numeric_links": 2,
+      "completed_messages": [
+        {
+          "complete_PDU": 5,
+          "first_PDU": 3,
+          "fragments": 2,
+          "stub_bytes": 40,
+          "stub_SHA256": "3ac39f6f29f606c6461a05b5aa4cf9fdb7992ad6069512fca8370510edd6583b",
+          "numeric_owner": 0
+        },
+        {
+          "complete_PDU": 32,
+          "first_PDU": 4,
+          "fragments": 28,
+          "stub_bytes": 54912,
+          "stub_SHA256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+          "numeric_owner": 3
+        }
+      ],
+      "baseline_errors": [],
+      "literal_Wireshark_association_differences": [],
+      "reference_field_limits": [],
+      "all_call_start_owners_and_logical_bytes_correct": true,
+      "complete_CLI_projection": true,
+      "certificates": [
+        {
+          "file": "manifest.json",
+          "SHA256": "f9090924d343ae66727daecacda0b62b8a4959198be7083b196d1d80d1a382df"
+        },
+        {
+          "file": "wire-physical-audit.json",
+          "SHA256": "045f5a7bf0ddd7f5800d4452c88d74506e14b706c5712249de8f622f61dfd454"
+        },
+        {
+          "file": "generation-ownership-audit.json",
+          "SHA256": "e5bfef866cd2ed4c84cbcf34559bea32b79596fe34fdcb5ac6afe10cb6d7fbcd"
+        },
+        {
+          "file": "CLI-projection-audit.json",
+          "SHA256": "9063fa73f31ec239c1cf7da9c6e18b125de8a5baab135e1c38d063426e3c7b3e"
+        }
+      ]
+    },
+    {
+      "case": "overlap-before-old-reply",
+      "capture_SHA256": "30644406001f2d245a9414571772ed8159521ac73becdb5e67300c45f9a75b08",
+      "physical_frames": 23,
+      "RPC_wire_PDUs": 8,
+      "wire_checks": 110589,
+      "numeric_links": 3,
+      "completed_messages": [],
+      "baseline_errors": [
+        {
+          "label": "refused-overlap-first",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": null,
+          "expected_owner_frame": null
+        },
+        {
+          "label": "refused-overlap-tail",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": null,
+          "expected_owner_frame": null
+        },
+        {
+          "label": "fresh-request",
+          "missing": false,
+          "baseline_status": "malformed",
+          "baseline_owner_frame": null,
+          "expected_owner_frame": null
+        },
+        {
+          "label": "fresh-reply",
+          "missing": true,
+          "baseline_status": null,
+          "baseline_owner_frame": null,
+          "expected_owner_frame": 16
+        }
+      ],
+      "literal_Wireshark_association_differences": [
+        {
+          "label": "old-reply",
+          "frame": 12,
+          "literal_Wireshark_request_in": [
+            10,
+            10
+          ],
+          "frozen_observed_request_frame": 8,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        }
+      ],
+      "reference_field_limits": [],
+      "all_call_start_owners_and_logical_bytes_correct": true,
+      "complete_CLI_projection": true,
+      "certificates": [
+        {
+          "file": "manifest.json",
+          "SHA256": "a69d89bf15745a2a4c747fc368a3939ef30d0845adf11b0e497078f6d73810f3"
+        },
+        {
+          "file": "wire-physical-audit.json",
+          "SHA256": "66177a57e0448555383b39ea22ce30ac5e8f9127a4adf1e74038fa3adda9aff4"
+        },
+        {
+          "file": "generation-ownership-audit.json",
+          "SHA256": "2094f6a13679fd08299fcdd8e045a1b6b661eb48841a0156eb890d2eb2ec94be"
+        },
+        {
+          "file": "CLI-projection-audit.json",
+          "SHA256": "263794adb29d6cf16aca0c4c977651a12569752c95e7a6f8569156f8cee25f08"
+        }
+      ]
+    },
+    {
+      "case": "reply-before-any-request",
+      "capture_SHA256": "8321dc3021d9f8183b19488f04203af883b6f08f70d3ef15f60594ef059723ed",
+      "physical_frames": 71,
+      "RPC_wire_PDUs": 32,
+      "wire_checks": 112128,
+      "numeric_links": 2,
+      "completed_messages": [
+        {
+          "complete_PDU": 31,
+          "first_PDU": 3,
+          "fragments": 28,
+          "stub_bytes": 54912,
+          "stub_SHA256": "c3db2363fceb1522ec029e31536660702383c9f5c6c5bcf1ff8f5176f1094572",
+          "numeric_owner": 0
+        }
+      ],
+      "baseline_errors": [
+        {
+          "label": "orphan-reply-27",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": 10,
+          "expected_owner_frame": null
+        },
+        {
+          "label": "fresh-reply",
+          "missing": false,
+          "baseline_status": "decoded",
+          "baseline_owner_frame": null,
+          "expected_owner_frame": 10
+        }
+      ],
+      "literal_Wireshark_association_differences": [
+        {
+          "label": "orphan-reply-1",
+          "frame": 12,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-2",
+          "frame": 14,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-3",
+          "frame": 16,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-4",
+          "frame": 18,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-5",
+          "frame": 20,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-6",
+          "frame": 22,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-7",
+          "frame": 24,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-8",
+          "frame": 26,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-9",
+          "frame": 28,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-10",
+          "frame": 30,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-11",
+          "frame": 32,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-12",
+          "frame": 34,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-13",
+          "frame": 36,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-14",
+          "frame": 38,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-15",
+          "frame": 40,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-16",
+          "frame": 42,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-17",
+          "frame": 44,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-18",
+          "frame": 46,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-19",
+          "frame": 48,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-20",
+          "frame": 50,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-21",
+          "frame": 52,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-22",
+          "frame": 54,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-23",
+          "frame": 56,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-24",
+          "frame": 58,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-25",
+          "frame": 60,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-26",
+          "frame": 62,
+          "literal_Wireshark_request_in": [
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        },
+        {
+          "label": "orphan-reply-27",
+          "frame": 64,
+          "literal_Wireshark_request_in": [
+            10,
+            10
+          ],
+          "frozen_observed_request_frame": null,
+          "reason": "reference per-PDU Call ID correlation differs from the retained original call-start identity; constructed invalid/reuse control"
+        }
+      ],
+      "reference_field_limits": [
+        {
+          "label": "orphan-reply-first",
+          "frame": 8,
+          "reason": "no literal Wireshark request_in field"
+        }
+      ],
+      "all_call_start_owners_and_logical_bytes_correct": true,
+      "complete_CLI_projection": true,
+      "certificates": [
+        {
+          "file": "manifest.json",
+          "SHA256": "24a9d897efb3b423ad06bb5df0205c8450ff7a032d8855ebdd5cb24c040e1b0f"
+        },
+        {
+          "file": "wire-physical-audit.json",
+          "SHA256": "b7e3b4a2e16a75b2da908a1c970555001d543e56f4a671d1e13bb8100e1f23b4"
+        },
+        {
+          "file": "generation-ownership-audit.json",
+          "SHA256": "2d13cbadf0ebbf8d76e046d213613e463c87b625d2abbae69a402aca505320fa"
+        },
+        {
+          "file": "CLI-projection-audit.json",
+          "SHA256": "9b3736730917a6f4ea4cb1bc1fde1dd351782c789c8a8a5b14a3a04299c61b0a"
+        }
+      ]
+    }
+  ],
+  "current_generator_reproduces_original_controls": {
+    "all_four_original_captures_and_manifests_byte_identical": true,
+    "generator_SHA256": "e3ffd0a2bab657034648713dadd9593e6942f1383230d330e5e69b3b194d4789"
+  },
+  "negative_controls": {
+    "declared_control_checks": 14,
+    "changed_namespace_checks": 14,
+    "positive_changed_namespace_snapshots": 3,
+    "certificates": [
+      {
+        "file": "generation-negative-controls.json",
+        "SHA256": "0c2075d956746cd0a152652bf26c919379e0d2e13391bd347627fa8d89e1c26f"
+      },
+      {
+        "file": "CLI-namespace-controls.json",
+        "SHA256": "1621bb22e92faffa93f63901118906c452573bd2a1c88008fc59cdea2a841e8c"
+      }
+    ]
+  },
+  "tests": {
+    "full": {
+      "source": "1d1a15bd2f3380e8800dc6c9ed9bea1fc3f98845",
+      "exit_code": 0,
+      "seconds": 436.907,
+      "packages": [
+        {
+          "Time": "2026-10-28T00:26:19.8111203+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/pcapx/pcaputil",
+          "Elapsed": 422.949
+        },
+        {
+          "Time": "2026-10-28T00:26:24.2759579+08:00",
+          "Action": "pass",
+          "Package": "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli",
+          "Elapsed": 2.292
+        }
+      ],
+      "total_passing_test_cases": 235539,
+      "failures": [],
+      "stdout_SHA256": "aae444f7d55b1930f0c6b627118ed7f455b281a5f5d73abde30071b8e5bae104"
+    },
+    "causality_fuzz": {
+      "executions": 106809,
+      "seconds": 41.406,
+      "passed": true
+    },
+    "certificates": [
+      {
+        "file": "full-native-cli-01.jsonl",
+        "SHA256": "aae444f7d55b1930f0c6b627118ed7f455b281a5f5d73abde30071b8e5bae104"
+      },
+      {
+        "file": "fuzz-generation-01.log",
+        "SHA256": "793979a527c96e81b5c516a9a6e4eb720bc0d876c2740722e45b89674b570910"
+      }
+    ]
+  },
+  "windows": [
+    {
+      "case": "unmatched",
+      "source": "1d1a15bd2f3380e8800dc6c9ed9bea1fc3f98845",
+      "SDK_PDU": 31,
+      "CLI_PDU": 31,
+      "query": "fields pdu.id == 31",
+      "SDK_response_to": 0,
+      "CLI_response_to": 0,
+      "source_SHA256": "f4b86774ea801887534baea4ef42c5aae6914d492ca4826258adb7607cae1337",
+      "snapshot_SHA256": "ac511ce21fa6c112e0fce77d4968911f61e4df1d849087b6f1098bdc2320e1ee",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "PNG_SHA256": "5647f1836fdf2696ed07ba1c28a4e02a425e0b4b4865a42e607dca1c95c8aed3"
+    },
+    {
+      "case": "fresh-reply",
+      "source": "1d1a15bd2f3380e8800dc6c9ed9bea1fc3f98845",
+      "SDK_PDU": 32,
+      "CLI_PDU": 32,
+      "query": "fields pdu.id == 32",
+      "SDK_response_to": 4,
+      "CLI_response_to": 4,
+      "source_SHA256": "af14e00cc8b0a2d1937b7cbdf4e7e4c6828c8274bbf7a4e0ecda800667f3b3b3",
+      "snapshot_SHA256": "4c7d5fe35afdc72dcd975354aed2b17f17cf2e6ec9ea1a96d5f62dde3ce57354",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "PNG_SHA256": "c91b19184724d87591b0581032d643e556302564d36bb65901ec86c6f2888e49"
+    },
+    {
+      "case": "fresh-live",
+      "source": "1d1a15bd2f3380e8800dc6c9ed9bea1fc3f98845",
+      "SDK_PDU": 34,
+      "CLI_PDU": 34,
+      "query": "fields pdu.id == 34",
+      "SDK_response_to": 5,
+      "CLI_response_to": 5,
+      "source_SHA256": "f4b86774ea801887534baea4ef42c5aae6914d492ca4826258adb7607cae1337",
+      "snapshot_SHA256": "30b1a1d012d79d1040d4c105f130f7b2f11cabb39b4cafca7e40649873a158d1",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "PNG_SHA256": "2573d1ff24c20cef7c3f15deb71e3d14f964310d480b8532ce62d9a8ec8ecebc"
+    }
+  ],
+  "binaries_SHA256": {
+    "events-generations.exe": "56071253934612c6c82cb04ff6eb4f004bcac32862d41e4b5b5be1b9f3f34e73",
+    "yak-generations.exe": "79a9b849e7bf056943750e069dd2a7fe14b0e1f98e340dd45a8ffb4ee8a2b4ad"
+  },
+  "audit_sources_SHA256": {
+    "dcerpc_wire_audit.py": "6a3c09cd32ee149578e262bda97d88cd2ba512c761b06ff7a634d53f3200f34b",
+    "dcerpc_generation_control_audit.py": "3ce14466e48fd2a03e2db1344659bfcff161e24afa81b6b2842027c371354580",
+    "dcerpc_generation_negative_controls.py": "967cea042d864679dd671bf01363ed05c3a89892c57a3800d525819e95a43a21",
+    "dcerpc_fragment_sdk_invariants.py": "a58cd3844bb29e7e81848aed3e41df4ca3a26198b5a7f8c393b5efbb9e1dc899",
+    "dcerpc_cli_invariants.py": "eea16f837b764f6758df02ca036ba294e630726f2e9aa8cfa79d4091a03167b5",
+    "dcerpc_call_links.py": "8bfc9942e418db826d78306851a0a4449eea0ef9a1bd55bb1325d9291783cca7",
+    "dcerpc_fragment_messages.py": "a658e9358ba4000fb1a5774d9ddfa3d827ee8ad431907b31ff6f2adaaad9922f",
+    "mail_rtsp_public_wire_audit.py": "23bdf1e457c7946cccb50cbb3eba2155e7b7d7445dd3a99763d7106d21ff77a6",
+    "mail_rtsp_export_invariants.py": "0cdae7e71ca37ffd691c775cfa73da55d44ef186c6802328dca80635aa79da4b",
+    "discovery/dcerpc_generation_controls.py": "e3ffd0a2bab657034648713dadd9593e6942f1383230d330e5e69b3b194d4789",
+    "discovery/dcerpc_windows_fragments_live.py": "5dcb66973f15fd267ad9e0f51d31a759f3008b0c2c997ea3dcd3635499fcad9c"
+  },
+  "limits": [
+    "Call ownership in constructed contradictory/reuse traces follows observed first-request identity; server intent/authentic execution is not inferred",
+    "Literal Wireshark differences are retained; normal/recovered reply request_in fields are mandatory and equal",
+    "NDR service bodies remain opaque; independent reference fixed-field checks do not implement native service decoding",
+    "No new proof of five-tuple TCP generation reuse, callback namespaces, security-provider verification or all protocols",
+    "Captures, raw exports, receipts, endpoint data, binaries and images stay outside Git"
+  ]
+}

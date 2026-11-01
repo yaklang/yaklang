@@ -37,6 +37,10 @@ func TestFirstBatchT09(t *testing.T) {
 					for _, e := range events {
 						require.Empty(t, e.Error, "%s %s", e.Protocol, e.Summary)
 						if e.Protocol == "tls" {
+							if e.Session["Secret Lookup Status"] == "missing-key" {
+								require.Contains(t, []uint16{0x303, 0x304}, e.Session["Negotiated Version"], "missing keys cannot erase observed negotiation")
+								require.Equal(t, "m1.example", e.Session["SNI"])
+							}
 							if v, ok := e.Session["Negotiated Version"].(uint16); ok {
 								versions[v] = true
 							}

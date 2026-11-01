@@ -11,7 +11,7 @@ func (u *tui) panel(pane int) (rect, bool) {
 	if u.width < 70 || u.height < 24 {
 		return rect{}, false
 	}
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	switch pane {
 	case 0:
 		return l.packets, true
@@ -40,9 +40,7 @@ func (u *tui) rowCount(pane int) int {
 	case 1:
 		return len(u.fieldIndices())
 	case 2:
-		if raw := u.inspectedPacket(); raw != nil {
-			return (len(raw.data) + u.hexPerRow() - 1) / u.hexPerRow()
-		}
+		return (len(u.byteData()) + u.hexPerRow() - 1) / u.hexPerRow()
 	case 3:
 		return len(u.streamLines())
 	}
@@ -140,6 +138,9 @@ func (u *tui) resumeLive() {
 func (u *tui) focusPane(pane int) {
 	u.freezeList()
 	u.pane = pane
+	if pane == 2 {
+		u.touchFields()
+	}
 	if pane == 3 {
 		u.syncStream()
 	}
@@ -206,13 +207,16 @@ func (u *tui) mouse(m mouseEvent) {
 			return
 		}
 		if m.button == 0 && u.width >= 70 && u.height >= 24 {
-			l := layoutDashboard(u.width-1, u.height)
+			l := u.dashboardLayout()
 			if m.y == l.tabs {
 				if u.pane == 3 {
-					for i, x := range []int{54, 71, 85} {
-						length := []int{13, 10, 12}[i]
+					for i, x := range []int{54, 71, 85, 101} {
+						if i < 2 && u.stream != nil && u.stream.messageBoundaries() {
+							continue
+						}
+						length := []int{13, 10, 12, 12}[i]
 						if x+length < u.width-1 && m.x >= x && m.x < x+length {
-							u.key([]string{"h", "l", "e"}[i], nil)
+							u.key([]string{"h", "l", "e", "a"}[i], nil)
 							return
 						}
 					}
@@ -322,8 +326,14 @@ func (u *tui) applyDetail(result detailResult) {
 		if u.stream != nil && u.stream.id == result.streamID && u.stream.decodeVersion == result.streamVersion {
 			u.streamFields = result.detail
 			u.streamStatus = "Stream decode ready · d fields · t text · x hex · r refresh"
+			if u.stream.messageBoundaries() {
+				u.streamStatus = "Message fields ready · d fields · t text · x hex · r refresh"
+			}
 			if result.err != nil {
 				u.streamStatus = "Stream decoder unavailable; reassembled bytes remain available"
+				if u.stream.messageBoundaries() {
+					u.streamStatus = "Message details unavailable; retained wire bytes remain available"
+				}
 			}
 			if verified {
 				u.stream.protocol, u.stream.evidence = u.streams.label(result.streamID)
@@ -339,8 +349,8 @@ func (u *tui) applyDetail(result detailResult) {
 		u.decodeStatus = "Deep decode unavailable · using packet headers"
 		return
 	}
-	// Once the user has interacted with the fields, keep their viewport and
-	// structure stable. Cache the full result until an explicit 'd' requests it.
+	// Field and byte interactions own the current structure and source. Cache
+	// the full result until an explicit 'd' requests it.
 	if u.fieldsTouched {
 		u.pendingDetail = &result.detail
 		u.decodeStatus = "Deep decode ready · d opens all fields"
@@ -352,6 +362,7 @@ func (u *tui) installDetail(detail packetDetail) {
 	u.fields = detail
 	u.fieldTop = 0
 	u.fieldSelection = 0
+	u.bytesSource, u.hexTop = 0, 0
 	u.hexStart, u.hexEnd = 0, 0
 	u.pendingDetail = nil
 	u.fieldsTouched = false

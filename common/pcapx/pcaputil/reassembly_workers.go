@@ -423,7 +423,7 @@ func (d *tcpWorkers) flushLoop() {
 		}
 		// Expiry during a backlog would mistake scheduling delay for TCP idle
 		// time. Only expire when all accepted packets have completed.
-		if d.stats.accepted.Load() == d.stats.processed.Load() && time.Since(d.lastSubmit) >= d.root.options.IdleTimeout {
+		if !d.root.options.captureReplay && d.stats.accepted.Load() == d.stats.processed.Load() && time.Since(d.lastSubmit) >= d.root.options.IdleTimeout {
 			for _, w := range d.workers {
 				w.pool.mu.Lock()
 				w.pool.flowCache.expire()

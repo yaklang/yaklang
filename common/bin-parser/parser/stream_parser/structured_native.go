@@ -40,6 +40,8 @@ func structuredNativeDecoder(source string) StructuredDecoder {
 			f = decodePostgreSQLFields
 		case "parseIMAPFields":
 			f = decodeIMAPFields
+		case "parseIMAPSASL":
+			f = decodeIMAPSASL
 		case "parsePOP3Fields":
 			f = decodePOP3Fields
 		case "parseKafkaFields":

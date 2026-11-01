@@ -34,6 +34,11 @@ var inks = []string{
 	"1;38;2;222;248;255;48;2;30;74;94", "38;2;136;178;195;48;2;19;31;44",
 }
 
+// Terminal grid coordinates use narrow ambiguous characters, independently of
+// the shell's locale/code page. Windows CP936 otherwise makes go-runewidth
+// count borders, dots and arrows twice while the terminal renders them once.
+var terminalWidth = &runewidth.Condition{StrictEmojiNeutral: true}
+
 type cell struct {
 	text  string
 	style ink
@@ -57,7 +62,7 @@ func (c *canvas) put(x, y int, text string, style ink) {
 		return
 	}
 	for _, r := range safeText(text) {
-		width := runewidth.RuneWidth(r)
+		width := terminalWidth.RuneWidth(r)
 		if width == 0 {
 			continue
 		}
@@ -65,6 +70,13 @@ func (c *canvas) put(x, y int, text string, style ink) {
 			return
 		}
 		if x >= 0 {
+			// Replacing either half of a wide glyph must remove the other half.
+			if c.cells[y*c.width+x].text == "" && x > 0 {
+				c.cells[y*c.width+x-1].text = " "
+			}
+			if end := x + width; end < c.width && c.cells[y*c.width+end].text == "" {
+				c.cells[y*c.width+end].text = " "
+			}
 			c.cells[y*c.width+x] = cell{string(r), style}
 			for j := 1; j < width; j++ {
 				c.cells[y*c.width+x+j] = cell{"", style}
@@ -75,7 +87,7 @@ func (c *canvas) put(x, y int, text string, style ink) {
 }
 func (c *canvas) text(x, y, w int, text string, style ink) {
 	if w > 0 {
-		c.put(x, y, runewidth.Truncate(text, w, "…"), style)
+		c.put(x, y, terminalWidth.Truncate(safeText(text), w, "…"), style)
 	}
 }
 func (c *canvas) fill(x, y, w int, style ink) { c.put(x, y, strings.Repeat(" ", max(0, w)), style) }
@@ -91,8 +103,8 @@ func (c *canvas) box(r rect, title, right string, active bool) rect {
 		c.put(r.x+r.w-1, y, "│", border)
 	}
 	c.text(r.x+2, r.y, r.w-4, " "+title+" ", inkTitle)
-	if right != "" && runewidth.StringWidth(title)+runewidth.StringWidth(right)+9 < r.w {
-		c.put(r.x+r.w-runewidth.StringWidth(right)-3, r.y, " "+right+" ", border)
+	if right != "" && terminalWidth.StringWidth(title)+terminalWidth.StringWidth(right)+9 < r.w {
+		c.put(r.x+r.w-terminalWidth.StringWidth(right)-3, r.y, " "+right+" ", border)
 	}
 	return panelContent(r)
 }
@@ -126,13 +138,19 @@ type screenWriter struct {
 	out           io.Writer
 	previous      []string
 	width, height int
+	color         bool
 }
 
 func (s *screenWriter) draw(frame string, w, h int) error {
 	rows := strings.Split(frame, "\r\n")
 	var output strings.Builder
+	background := ""
+	if s.color {
+		background = "\x1b[0;" + inks[inkText] + "m"
+	}
 	if s.width != w || s.height != h {
 		s.previous = nil
+		output.WriteString(background)
 		output.WriteString("\x1b[2J")
 		s.width = w
 		s.height = h
@@ -144,7 +162,9 @@ func (s *screenWriter) draw(frame string, w, h int) error {
 		if i < len(s.previous) && s.previous[i] == row {
 			continue
 		}
-		fmt.Fprintf(&output, "\x1b[%d;1H%s\x1b[K", i+1, row)
+		// render resets SGR at row end. Reapply the canvas background before
+		// erasing the spare column, including in a light-themed Windows shell.
+		fmt.Fprintf(&output, "\x1b[%d;1H%s%s\x1b[K", i+1, row, background)
 	}
 	s.previous = rows
 	if output.Len() == 0 {
@@ -234,6 +254,9 @@ func compactNumber(v uint64) string {
 	return fmt.Sprint(v)
 }
 func protocolInk(name string) ink {
+	if strings.HasPrefix(strings.ToUpper(name), "TLS") {
+		return inkBlue
+	}
 	switch strings.TrimPrefix(strings.ToUpper(name), "TCP/") {
 	case "TCP", "TLS", "HTTPS":
 		return inkBlue
@@ -241,7 +264,7 @@ func protocolInk(name string) ink {
 		return inkCyan
 	case "DNS", "MDNS", "LLMNR":
 		return inkGreen
-	case "HTTP", "HTTP2":
+	case "HTTP", "HTTP2", "HTTP/2", "HTTP/3", "GRPC", "WEBSOCKET":
 		return inkGold
 	case "ICMPV4", "ICMPV6", "ARP":
 		return inkRed
@@ -257,6 +280,21 @@ type dashboardLayout struct {
 }
 
 func layoutDashboard(w, h int) dashboardLayout {
+	return layoutDashboardForPackets(w, h, -1)
+}
+
+// Keep the live, unfiltered layout stable while packets arrive. An EOF replay
+// or an applied filter can use spare list rows for the protocol inspector.
+// Rendering, hit testing and scroll geometry must use this same decision.
+func (u *tui) dashboardLayout() dashboardLayout {
+	rows := -1
+	if u.finished || u.searchText != "" || u.displayFilter != nil {
+		rows = len(u.visible)
+	}
+	return layoutDashboardForPackets(u.width-1, u.height, rows)
+}
+
+func layoutDashboardForPackets(w, h, visibleRows int) dashboardLayout {
 	usable := w - 2
 	top := clamp(h/5, 7, 11)
 	l := dashboardLayout{footer: h - 3, split: w >= 118}
@@ -273,6 +311,11 @@ func layoutDashboard(w, h int) dashboardLayout {
 	}
 	remaining := l.footer - (2 + top)
 	packetHeight := max(6, remaining*53/100)
+	if visibleRows >= 0 {
+		// Two borders and the column header precede packet rows. Keep a
+		// separate empty-result message inside even a zero-match panel.
+		packetHeight = min(packetHeight, max(5, visibleRows+3))
+	}
 	detailHeight := remaining - packetHeight
 	l.packets = rect{1, 2 + top, usable, packetHeight}
 	y := l.packets.y + packetHeight
@@ -299,7 +342,7 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		c.text(1, 3, width-2, "Capture continues. q quits; Ctrl+C stops safely.", inkText)
 		return c.render(u.color)
 	}
-	l := layoutDashboard(width, height)
+	l := u.dashboardLayout()
 	u.drawSearch(c)
 	state := "● LIVE"
 	if src.offline {
@@ -338,6 +381,9 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		{"evicted", compactNumber(u.ring.evicted), inkMuted},
 	}
 	for i, row := range healthRows {
+		if row.k == "kernel drops" && src.offline {
+			row.v, row.style = "unknown (file)", inkMuted
+		}
 		if i >= health.h {
 			break
 		}
@@ -348,7 +394,7 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		c.text(health.x+health.w/2, health.y+i, health.w-health.w/2, row.v, row.style)
 	}
 	if l.mix.w > 0 {
-		r := c.box(l.mix, "protocols", fmt.Sprintf("sample %d", u.mixTotal), false)
+		r := c.box(l.mix, "capture protocols", fmt.Sprintf("last %d", u.mixTotal), false)
 		if len(u.mix) == 0 {
 			c.text(r.x, r.y+1, r.w, "Waiting for traffic…", inkMuted)
 		}
@@ -357,7 +403,7 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 				break
 			}
 			pct := float64(p.count) / float64(max(1, u.mixTotal))
-			nameWidth := min(10, r.w/3)
+			nameWidth := min(14, r.w/2)
 			c.text(r.x, r.y+i, nameWidth, p.name, protocolInk(p.name))
 			barWidth := max(1, r.w-nameWidth-8)
 			x := r.x + nameWidth + 1
@@ -382,8 +428,15 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		}
 		c.put([]int{3, 20, 36}[i], l.tabs, label, style)
 	}
+	if u.pane != 3 && u.inspectedPacket() != nil {
+		row := u.packetRow(&packetEntry{packet: u.inspectedPacket()})
+		c.text(54, l.tabs, width-56, conversationCaption(row), protocolInk(row.Protocol))
+	}
 	if u.pane == 3 {
 		for i, label := range []string{"[h Beginning]", "[l Recent]", "[e Evidence]"} {
+			if i < 2 && u.stream != nil && u.stream.messageBoundaries() {
+				continue
+			}
 			x := []int{54, 71, 85}[i]
 			if x+len(label) < width {
 				style := inkMuted
@@ -392,6 +445,13 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 				}
 				c.put(x, l.tabs, label, style)
 			}
+		}
+		if width > 113 {
+			label := "[a Messages]"
+			if u.streamApplication {
+				label = "[a Wire]"
+			}
+			c.put(101, l.tabs, label, inkCyan)
 		}
 		mode := "auto refresh"
 		if u.streamPinned {
@@ -404,16 +464,48 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		}
 		if u.streamMode == 3 {
 			rangeLabel = "evidence"
+		} else if u.streamApplication {
+			rangeLabel = "decoded messages"
 		}
-		r := c.box(l.stream, "4 STREAM", rangeLabel+" · "+mode+" · "+direction, true)
+		title := "4 STREAM"
+		if u.stream != nil && u.stream.messageBoundaries() {
+			title = "4 ASSOCIATION"
+			if u.streamMode != 3 {
+				rangeLabel = "retained messages"
+				if u.streamApplication {
+					rangeLabel = "protocol messages"
+				}
+			}
+		}
+		r := c.box(l.stream, title, rangeLabel+" · "+mode+" · "+direction, true)
 		u.drawStream(c, r)
 	}
 	if u.pane != 3 && (l.split || u.pane != 2) {
-		r := c.box(l.fields, "2 PROTOCOL FIELDS", fmt.Sprintf("#%d", u.fields.number), u.pane == 1)
+		title := "2 PROTOCOL FIELDS"
+		if u.fields.protocol != "" {
+			title = "2 " + u.fields.protocol + " FIELDS"
+		}
+		if u.fields.unavailable {
+			title += " · detail unavailable"
+		}
+		r := c.box(l.fields, title, fmt.Sprintf("#%d", u.fields.number), u.pane == 1)
 		u.drawFields(c, r)
 	}
 	if u.pane != 3 && (l.split || u.pane == 2) {
-		r := c.box(l.bytes, "3 PACKET BYTES", u.bytesLabel(), u.pane == 2)
+		title := "3 PACKET BYTES"
+		if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
+			title = "3 " + u.fields.sources[u.bytesSource-1].Name
+		}
+		right := u.bytesLabel()
+		if u.bytesSource > 0 && u.bytesSource <= len(u.fields.sources) {
+			// The title names the source. Avoid repeating it and suppressing
+			// the selected byte range on ordinary terminal widths.
+			right = "b source · click bytes"
+			if u.hexEnd > u.hexStart {
+				right = fmt.Sprintf("0x%x–0x%x · %d bytes", u.hexStart, u.hexEnd-1, u.hexEnd-u.hexStart)
+			}
+		}
+		r := c.box(l.bytes, title, right, u.pane == 2)
 		u.drawBytes(c, r)
 	}
 	capture := cfg.filter
@@ -445,9 +537,12 @@ func (u *tui) view(s *captureSession, src *captureSource, cfg captureConfig) str
 		notice = u.finishErr.Error()
 	}
 	c.text(2, l.footer+1, width-4, notice, inkGold)
-	help := "q quit  / search  f BPF  c cache  wheel scroll pane  ↑↓ move  Tab pane  4 Stream  Space live  p protocol  d fields"
+	help := "q quit  / search  f BPF  c cache  ↑↓ move  Tab pane  b bytes source  4 Stream  Space live  p protocol  d fields"
 	if u.pane == 3 {
-		help = "h beginning  l recent  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  c cache  q quit"
+		help = "a messages/wire  h beginning  l recent  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  q quit"
+		if u.stream != nil && u.stream.messageBoundaries() {
+			help = "a messages/wire  e evidence  v A/B  t text  x hex  d fields  r refresh  / search  q quit"
+		}
 	}
 	c.text(2, l.footer+2, width-4, help, inkCyan)
 	return c.render(u.color)
@@ -508,12 +603,17 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 	u.listTop = clamp(u.listTop, 0, max(0, len(u.visible)-count))
 	u.drawScrollbar(c, rect{r.x, r.y + 1, r.w, r.h - 1}, 0)
 	r.w -= 2
-	// Fit the endpoints first; the information column consumes the remaining width.
+	// Size the visible values together. Compact rows still need readable IPs
+	// and a real gap after a full protocol label, with room left for Info.
 	compact := r.w < 100
-	widths := []int{9, 12, 10, clamp((r.w-53)/3, 12, 39), clamp((r.w-53)/3, 12, 39), 6}
-	if compact {
-		widths = []int{7, 9, 8, max(10, (r.w-35)/2), max(10, (r.w-35)/2), 5}
+	protocolWidth, sourceWidth, destinationWidth := 8, 6, 11
+	for i := u.listTop; i < min(len(u.visible), u.listTop+count); i++ {
+		row := u.packetRow(u.visible[i])
+		protocolWidth = max(protocolWidth, terminalWidth.StringWidth(row.Protocol))
+		sourceWidth = max(sourceWidth, terminalWidth.StringWidth(row.Source))
+		destinationWidth = max(destinationWidth, terminalWidth.StringWidth(row.Destination))
 	}
+	widths := packetTableColumnWidths(r.w, protocolWidth, sourceWidth, destinationWidth)
 	labels := []string{"No.", "Time", "Protocol", "Source", "Destination", "Bytes"}
 	c.fill(r.x, r.y, r.w, inkHeader)
 	x := r.x
@@ -525,7 +625,11 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 		c.text(x, r.y, r.x+r.w-x, "Info", inkHeader)
 	}
 	if len(u.visible) == 0 {
-		c.text(r.x+2, r.y+2, r.w-4, "No matching packets · / search · click Clear · f BPF", inkMuted)
+		message := "No matching packets · / search · click Clear · f BPF"
+		if u.search != nil && u.search.fields != nil && strings.HasPrefix(u.notice, fieldFilterPartialNoticePrefix) {
+			message = u.notice
+		}
+		c.text(r.x+2, r.y+2, r.w-4, message, inkMuted)
 		return
 	}
 	for i := 0; i < count; i++ {
@@ -560,12 +664,35 @@ func (u *tui) drawPackets(c *canvas, r rect) {
 				colStyle = inkMuted
 			}
 			c.text(x, y, min(widths[j], r.x+r.w-x), value, colStyle)
+			if x+widths[j] < r.x+r.w {
+				c.put(x+widths[j], y, " ", style)
+			}
 			x += widths[j] + 1
 		}
 		if x < r.x+r.w {
 			c.text(x, y, r.x+r.w-x, row.Info, style)
 		}
 	}
+}
+
+func packetTableColumnWidths(width, protocol, source, destination int) []int {
+	widths, infoMin := []int{7, 12, max(12, protocol), min(39, source), min(39, destination), 6}, 20
+	if width < 100 {
+		widths, infoMin = []int{5, 8, max(8, protocol), min(39, source), min(39, destination), 4}, 10
+	}
+	// Avoid letting one long protocol name consume both endpoint columns.
+	widths[2] = min(widths[2], max(8, min(24, width-widths[0]-widths[1]-widths[5]-6-infoMin-16)))
+	budget := max(0, width-widths[0]-widths[1]-widths[2]-widths[5]-6-infoMin)
+	for widths[3]+widths[4] > budget {
+		if widths[3] > widths[4] {
+			widths[3]--
+		} else if widths[4] > 0 {
+			widths[4]--
+		} else {
+			break
+		}
+	}
+	return widths
 }
 func (u *tui) drawFields(c *canvas, r rect) {
 	u.setTop(1, u.fieldTop)
@@ -586,7 +713,10 @@ func (u *tui) drawFields(c *canvas, r rect) {
 		prefix := "  "
 		if f.branch {
 			prefix = "── "
+		} else if f.depth > 0 {
+			prefix = ""
 		}
+		prefix = strings.Repeat("  ", min(max(0, f.depth), 16)) + prefix
 		style := inkText
 		if f.branch {
 			style = inkCyan
@@ -602,23 +732,23 @@ func (u *tui) drawBytes(c *canvas, r rect) {
 	u.setTop(2, u.hexTop)
 	u.drawScrollbar(c, r, 2)
 	r.w -= 2
-	raw := u.inspectedPacket()
-	if raw == nil {
+	data := u.byteData()
+	if data == nil {
 		c.text(r.x, r.y+1, r.w, "Raw bytes appear immediately on selection.", inkMuted)
 		return
 	}
 	perRow := bytesPerRow(r.w)
-	rows := (len(raw.data) + perRow - 1) / perRow
+	rows := (len(data) + perRow - 1) / perRow
 	u.hexTop = clamp(u.hexTop, 0, max(0, rows-r.h))
 	for y := 0; y < r.h; y++ {
 		offset := (u.hexTop + y) * perRow
-		if offset >= len(raw.data) {
+		if offset >= len(data) {
 			break
 		}
 		c.put(r.x, r.y+y, fmt.Sprintf("%06x", offset), inkMuted)
 		asciiX := r.x + 9 + perRow*3 + (perRow-1)/8
-		for i := 0; i < perRow && offset+i < len(raw.data); i++ {
-			b := raw.data[offset+i]
+		for i := 0; i < perRow && offset+i < len(data); i++ {
+			b := data[offset+i]
 			style := inkBlue
 			if b == 0 {
 				style = inkMuted

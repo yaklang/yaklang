@@ -9,9 +9,13 @@ import (
 )
 
 type binFTP struct {
-	pending   string
-	authTLS   bool
-	encrypted bool
+	pending           string
+	authTLS           bool
+	encrypted         bool
+	client            int
+	clientKnown       bool
+	dataProtected     bool
+	pendingProtection string
 }
 
 func probeFTP(w []byte, limit int) ProbeResult {

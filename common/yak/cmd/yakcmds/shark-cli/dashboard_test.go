@@ -108,10 +108,11 @@ func TestDashboardFitsTerminalAndRedrawsOnlyChanges(t *testing.T) {
 				rows := strings.Split(frame, "\r\n")
 				require.Len(t, rows, size[1])
 				for _, row := range rows {
-					require.Equal(t, size[0]-1, runewidth.StringWidth(ansi.ReplaceAllString(row, "")))
+					require.Equal(t, size[0]-1, terminalWidth.StringWidth(ansi.ReplaceAllString(row, "")))
 				}
 				require.Contains(t, frame, "╭")
 				require.Contains(t, frame, "192.168.3.1")
+				require.Contains(t, frame, "Info")
 				var output bytes.Buffer
 				writer := screenWriter{out: &output}
 				require.NoError(t, writer.draw(frame, size[0], size[1]))
@@ -121,6 +122,48 @@ func TestDashboardFitsTerminalAndRedrawsOnlyChanges(t *testing.T) {
 				require.Zero(t, output.Len())
 			}
 		})
+	}
+}
+
+func TestCanvasReplacesWholeWideGlyph(t *testing.T) {
+	for _, x := range []int{1, 2} {
+		c := newCanvas(6, 1)
+		c.put(1, 0, "网", inkText)
+		c.put(x, 0, "x", inkText)
+		require.Equal(t, 6, terminalWidth.StringWidth(c.render(false)))
+		require.NotContains(t, c.render(false), "网")
+	}
+}
+
+func TestScreenEraseUsesCanvasBackground(t *testing.T) {
+	var out bytes.Buffer
+	w := screenWriter{out: &out, color: true}
+	require.NoError(t, w.draw(newCanvas(69, 24).render(true), 70, 24))
+	background := "\x1b[0;" + inks[inkText] + "m"
+	require.True(t, strings.HasPrefix(out.String(), background+"\x1b[2J"))
+	require.Equal(t, 24, strings.Count(out.String(), background+"\x1b[K"))
+	require.NotContains(t, out.String(), "\x1b[0m\x1b[K")
+	out.Reset()
+	w.color = false
+	require.NoError(t, w.draw(newCanvas(79, 30).render(false), 80, 30))
+	require.NotContains(t, out.String(), "38;2;")
+	require.NotContains(t, out.String(), "48;2;")
+}
+
+func TestDashboardIgnoresWindowsCJKCodePageWidth(t *testing.T) {
+	// go-runewidth infers ambiguous characters as wide from Windows CP936,
+	// even though the terminal draws box borders and middle dots in one cell.
+	old := *runewidth.DefaultCondition
+	runewidth.DefaultCondition.EastAsianWidth = true
+	t.Cleanup(func() { *runewidth.DefaultCondition = old })
+	terminal := &runewidth.Condition{StrictEmojiNeutral: true}
+	ansi := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	for _, width := range []int{70, 80, 120, 180} {
+		u := &tui{ring: newPacketRing(1), width: width, height: 48, color: true}
+		frame := u.view(&captureSession{}, &captureSource{name: "以太网 · gateway → 192.168.0.1"}, captureConfig{})
+		for y, row := range strings.Split(frame, "\r\n") {
+			require.Equal(t, width-1, terminal.StringWidth(ansi.ReplaceAllString(row, "")), "width %d row %d", width, y)
+		}
 	}
 }
 func TestWorkerFrameToleratesDiagnosticNoise(t *testing.T) {

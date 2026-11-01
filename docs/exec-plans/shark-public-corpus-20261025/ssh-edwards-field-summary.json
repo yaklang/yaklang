@@ -1,0 +1,387 @@
+{
+  "scope": "Exact RFC8709 Ed25519 (32-byte key /64-byte signature) and Ed448 (57/114) inner SSH strings in caller-selected initial DH/GEX/P-256/Curve25519 packet layouts. This certifies structure and bytes, not point/key mathematics, signatures, host identity, encrypted rekeys or encrypted application semantics. Ed448 has unit/fuzz boundary coverage only, not a live supported-endpoint claim.",
+  "application_source": "6829457341",
+  "validation_source": "e811742433",
+  "independent_auditor_source": "78c563ea06",
+  "native_console_auditor_source": "36ed3525c7",
+  "full_tests_seconds": {
+    "common/bin-parser": 131.118,
+    "common/bin-parser/parser": 7.094,
+    "common/bin-parser/parser/base": 0.576,
+    "common/bin-parser/parser/stream_parser": 5.351,
+    "common/bin-parser/rules": 0.425,
+    "common/yak/cmd/yakcmds/shark-cli": 2.096,
+    "common/pcapx/pcaputil": 401.853
+  },
+  "fuzz": {
+    "executions": 168454,
+    "seconds": 41.358
+  },
+  "unit_boundaries": [
+    "both formats in four caller-selected initial exchange layouts",
+    "every truncated packet prefix",
+    "short/long/empty key and signature strings",
+    "nested trailing bytes",
+    "transport-only method payload remains opaque without selection",
+    "certificate/private format names stay opaque",
+    "eager/deferred native fields and clone ownership",
+    "unchanged historical four-byte Ed25519 signature fixture now explicitly rejected"
+  ],
+  "public": {
+    "weber": {
+      "physical_rows_compared": 51328,
+      "native_messages_compared": 39293,
+      "changed_typed_field_records": [
+        {
+          "row": 16515,
+          "PDU": 16515,
+          "expanded": [
+            "fields/Host Key",
+            "fields/Signature",
+            "session/Initial Packet Fields/Host Key",
+            "session/Initial Packet Fields/Signature"
+          ],
+          "raw_sha256": "eae92503e8c13595f938d61aae3871e278ccf972d89163fadb526222f44b9c0a"
+        }
+      ],
+      "all_other_values_types_order_and_IDs_exact": true,
+      "CLI_all_rows_exact": true,
+      "complete_method_PDUs": 8,
+      "complete_generic_packet_PDUs": 18,
+      "typed_edwards_host_keys": [
+        {
+          "PDU": 16515,
+          "host_key": "ssh-ed25519",
+          "key_bytes": 32,
+          "key_sha256": "252a27da33de8845fb3c0a726d8de03b09a571efd24f6ee5249a290904edb8ba"
+        }
+      ],
+      "native_literal_tree_fields_compared": 343,
+      "reference_fields_compared": 124,
+      "field_certificate_sha256": "b95b94f047d480585f902af345445fad5d5dc08844a5abf38d13e88cac2ed346",
+      "whole_SDK_export_certificate_sha256": "9213ad0bd7bbed9b35c0201a136339d5737814d470912f863e3e5d630b7fe350",
+      "whole_CLI_export_certificate_sha256": "270f690bd3949aa631e5d521f1bc7204e8e2a4bf14924c8c3bf9331664ea6315",
+      "public_SSH_reference_certificate_sha256": "eec8c540140e1b5167699f26172346b55c9e27f8a3e5e23e7e95bb6e431f8746",
+      "SDK_export_sha256": "6aca37a890628409a19e85a2345a29679288871df2d1cf2d1b6a82af52f1eb05",
+      "CLI_export_sha256": "821d29268aa17ce573e43975ca03241f1db86dfb783a3c5deedc51fcb2449159",
+      "reference_oracle_sha256": "ae79dffc088747198943ece6aa089733ff01ad0bb63adb30b225d3b8f29b3c52"
+    },
+    "sharon": {
+      "physical_rows_compared": 328127,
+      "native_messages_compared": 245625,
+      "changed_typed_field_records": [
+        {
+          "row": 18858,
+          "PDU": 18858,
+          "expanded": [
+            "fields/Host Key",
+            "fields/Signature",
+            "session/Initial Packet Fields/Host Key",
+            "session/Initial Packet Fields/Signature"
+          ],
+          "raw_sha256": "eae92503e8c13595f938d61aae3871e278ccf972d89163fadb526222f44b9c0a"
+        }
+      ],
+      "all_other_values_types_order_and_IDs_exact": true,
+      "CLI_all_rows_exact": true,
+      "complete_method_PDUs": 8,
+      "complete_generic_packet_PDUs": 12,
+      "typed_edwards_host_keys": [
+        {
+          "PDU": 18858,
+          "host_key": "ssh-ed25519",
+          "key_bytes": 32,
+          "key_sha256": "252a27da33de8845fb3c0a726d8de03b09a571efd24f6ee5249a290904edb8ba"
+        }
+      ],
+      "native_literal_tree_fields_compared": 271,
+      "reference_fields_compared": 106,
+      "field_certificate_sha256": "05240d8c7973c307b8a12ffaf17f1d01d100923ca80fd0d3d279fbd3d4aad7c9",
+      "whole_SDK_export_certificate_sha256": "0f2e14e88db62f8249e1aaebfbcc8f53865436e7b1d497b69a28343c6b2adcda",
+      "whole_CLI_export_certificate_sha256": "cd361a40b165e074451f92ab087f50098ae5e1b6effef877e217ee6567ab6e3b",
+      "public_SSH_reference_certificate_sha256": "ad40f06224668533c50551031105055f9d628ab874fb8d66b5cfde782b4d0379",
+      "SDK_export_sha256": "7de00a8c05af5ac72f7f54f18eb2bdc0d77726e8a7b02936d3f5bf40ec0d7369",
+      "CLI_export_sha256": "81850c8e7dfbb1879d43e48fc6fc9b88a287b4b7b91ca8361153ea5898cf69dc",
+      "reference_oracle_sha256": "74dc93eae91389da4ab8e66de13612ffaa53f2a4a9d616f979e8e7991fc87cc0"
+    }
+  },
+  "live": {
+    "capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+    "manifest_sha256": "453138b7ad317d48fefa36bab2769a44e07357e1eea328528516e894058cdda2",
+    "generator_sha256": "e6744855ba58614977a29a7d5120e231ca2fafae5fd02b87cd02d7a5fb3f590e",
+    "host_key_format": "ssh-ed25519",
+    "actual_connections": 5,
+    "exact_application_receipts_bytes": [
+      131072,
+      131072,
+      131072,
+      131072,
+      131072
+    ],
+    "fault_scope": "Original actual socket capture plus declared replay reorder/duplicate/loss/snaplen/no-SYN controls; these are not live network loss injection claims.",
+    "replay_profiles": [
+      {
+        "profile": "live",
+        "physical_frames": 376,
+        "complete_initial_PDUs": 42,
+        "complete_method_PDUs": 12,
+        "complete_generic_packet_PDUs": 20,
+        "typed_edwards_host_keys": 5,
+        "changed_typed_field_records": 5,
+        "native_literal_tree_fields_compared": 439,
+        "reference_fields_compared": 168,
+        "wire_certificate_sha256": "2bc1077077d0a1779d906cd0adf16d167f66ead4b6c2fdefa03babdaa9c2dc77",
+        "field_certificate_sha256": "934116a6961ce14a98792cef9f32a7d14d7c4bb2f3bae2731a9013247efe335d",
+        "whole_export_certificate_sha256": "f9659d84ac8d4159ef8d3e33f42150de3d927d86982038bedfd3213085f3b598",
+        "capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+        "oracle_sha256": "57330b483401e16de1d96ee4c7e8d2a577612b2b0e228b55e6184d3d426e5e4f"
+      },
+      {
+        "profile": "no-syn",
+        "physical_frames": 366,
+        "complete_initial_PDUs": 42,
+        "complete_method_PDUs": 0,
+        "complete_generic_packet_PDUs": 32,
+        "typed_edwards_host_keys": 0,
+        "changed_typed_field_records": 0,
+        "native_literal_tree_fields_compared": 370,
+        "reference_fields_compared": 96,
+        "wire_certificate_sha256": "4a3da504e1a430461b763e71775a12622dbb402d16876811464d7fe845c6e47b",
+        "field_certificate_sha256": "26513c067a39011084bbd8eb8334fbe229c7abd624be3102b691a1a350b0dba9",
+        "whole_export_certificate_sha256": "3c7dabb7ddce2af52a216335b329ef494c5a7797298b15509fe99dd5243a3410",
+        "capture_sha256": "f5c34075b99a841fd27a1cf547518a76e1c14b326cd922e4216db44718e60497",
+        "oracle_sha256": "c788583a36ea17fcd88e58b65e06cca8ceb17e501b32186a6f6ca10a53b75a5d"
+      },
+      {
+        "profile": "out-of-order",
+        "physical_frames": 376,
+        "complete_initial_PDUs": 42,
+        "complete_method_PDUs": 7,
+        "complete_generic_packet_PDUs": 25,
+        "typed_edwards_host_keys": 5,
+        "changed_typed_field_records": 5,
+        "native_literal_tree_fields_compared": 431,
+        "reference_fields_compared": 156,
+        "wire_certificate_sha256": "734847fc5aba33e6efd5a1e93d29c011bd30760aa890aaf53246986c65774601",
+        "field_certificate_sha256": "114b0c7ee286d2dd5df3b3f390cf8d6d7c4adf5f3a1910b9e33edcee6a0cfa56",
+        "whole_export_certificate_sha256": "6f9ade558933007b1bf993dc70abdeea6830b4dd2000d890dca7d7bb49dd7c10",
+        "capture_sha256": "53e1ce0589d3af2f09e4b5428c6a39b666e75e8d817eae1b44dd9a62437e907f",
+        "oracle_sha256": "54d4735d7454345214a6aea99cd52c40eaa147a95b4edf7d3e2929d817ecb0bf"
+      },
+      {
+        "profile": "duplicate",
+        "physical_frames": 381,
+        "complete_initial_PDUs": 42,
+        "complete_method_PDUs": 12,
+        "complete_generic_packet_PDUs": 20,
+        "typed_edwards_host_keys": 5,
+        "changed_typed_field_records": 5,
+        "native_literal_tree_fields_compared": 439,
+        "reference_fields_compared": 168,
+        "wire_certificate_sha256": "590e35dc52b79f3d160ebe0c0816d400883bb7d5a60209778cebb7117fb42963",
+        "field_certificate_sha256": "ef7b5a227dd7c9e36a794282bbc147550f0535c9097a12e6aa0b588b9938fe08",
+        "whole_export_certificate_sha256": "2319cbe479db92a350fbc3f3669b41687f3b739b4e427a04578ed732870b44fa",
+        "capture_sha256": "493ba19c2ea669e834b7e0a5f8179b76e2aa7ae98e13618f918ae85fcc561cc3",
+        "oracle_sha256": "fd53d3adfdd07dbd8d23ecb96e0b1fcad059534083d45b396716444bb4970cf1"
+      },
+      {
+        "profile": "loss",
+        "physical_frames": 371,
+        "complete_initial_PDUs": 26,
+        "complete_method_PDUs": 0,
+        "complete_generic_packet_PDUs": 16,
+        "typed_edwards_host_keys": 0,
+        "changed_typed_field_records": 0,
+        "native_literal_tree_fields_compared": 185,
+        "reference_fields_compared": 48,
+        "wire_certificate_sha256": "5f94a5c103536a2c2a174e3e8abb0cdedf956e98d7cf94727d7565515e36e116",
+        "field_certificate_sha256": "210a6cecac54e1265653f63f6c6aba15f3d990fd5dbc2b9350aac1f264324622",
+        "whole_export_certificate_sha256": "a3b601d29ec65bfb22d35a9666a5a9303147a493c1e096d31c4ed27464ea1e13",
+        "capture_sha256": "05865bcbe63b14412b16f5714ffff5875412824f6e02f2f1385add461a239606",
+        "oracle_sha256": "cc93149553c973d00ae3e0ed08dfb63d62959bcb0441a97226eee8088880a453"
+      },
+      {
+        "profile": "snaplen",
+        "physical_frames": 376,
+        "complete_initial_PDUs": 26,
+        "complete_method_PDUs": 0,
+        "complete_generic_packet_PDUs": 16,
+        "typed_edwards_host_keys": 0,
+        "changed_typed_field_records": 0,
+        "native_literal_tree_fields_compared": 185,
+        "reference_fields_compared": 48,
+        "wire_certificate_sha256": "6c05b95fd66eb0d85dc24eeaca819102a5468c1be765363dba7dda79ab389bcf",
+        "field_certificate_sha256": "9bc15dc28085a933d57f9d11e9a613d44374cb1d816691e5d553d503d8f6a944",
+        "whole_export_certificate_sha256": "5f032719c8aad72d9aa4bb64e34327de6f91277d8e1226414915564f16c89d6c",
+        "capture_sha256": "35f7bffce653a67ea6edab0b90d8cdc7a05e4c79fb3803e10754b7960810f249",
+        "oracle_sha256": "7d49bc756bef7b565c46dd68bfad6d427e8874ccf7f9f3ad424fa0b61df12dea"
+      }
+    ]
+  },
+  "negative_controls": {
+    "scope": "Challenge Edwards-only whole-export invariants using real certified rows.\n\nUse a declared subset, preserving all independent wire/tree witnesses. The\nouter export SHA is deliberately rebound for mutations to reach deeper checks;\nthe independent wire/tree hashes are not recomputed to bless altered content.\nNo immutable capture, answer or full reference export is rewritten.\n",
+    "positive_subsets": 1,
+    "subset_records": 3,
+    "negative_controls_rejected": [
+      "typed-key-octets",
+      "typed-key-length",
+      "typed-signature-octets",
+      "typed-signature-length",
+      "format-is-not-certificate",
+      "signature-verification-is-not-parsing",
+      "peer-identity-is-not-parsing",
+      "raw-message",
+      "connection-id",
+      "direction",
+      "source-domain",
+      "physical-contributors",
+      "missing-independent-witness",
+      "wire-witness-hash",
+      "field-witness-hash",
+      "drop-row",
+      "duplicate-row",
+      "row-order"
+    ],
+    "before_sha256": "29d59056e5cf085ff6fd3431378082f0d0bfd34bb727ac9290e7c25869fdf072",
+    "after_sha256": "4899d33e29778f8a3631a36c3e4eb89c5fda66f05d6a9882225aac17e4f9cbb2",
+    "independent_field_certificate_sha256": "934116a6961ce14a98792cef9f32a7d14d7c4bb2f3bae2731a9013247efe335d",
+    "independent_witnesses_not_recomputed_to_accept_mutations": true
+  },
+  "Windows": [
+    {
+      "case": "actual-ed25519-key",
+      "capture_packets": 376,
+      "PDU": 9,
+      "selected_field": "Ed25519 Public Key",
+      "selected_bytes": 32,
+      "selected_wire_value_sha256": "9766094f25b8f67472985e801ba080b04d6ed9a029e90762979e7ea109d58b57",
+      "capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "cf4a07fe57b8c1c6576373a59a05d3abc68818c2c08d3e0c0ca39710a021f4ba",
+        "00-filter-ready.json": "d91466b9cfdddbf7a2531ba269b8b6727e652c19ad0f46882cd61bc08c296c95",
+        "01-adaptive-bytes-click.json": "0e7d923c644e726547e81cfe32c1313d2736ead5334cede69ba485654290d571",
+        "01-adaptive-fields-before.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-adaptive-fields-click.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-deep-protocol-fields.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-protocol-fields.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "01-selected-byte-field.json": "78d843f1e42a3fa8f460a4669ca38cddc21251f509e150e2247dd5886e94c45e",
+        "02-byte-sources.json": "0e7d923c644e726547e81cfe32c1313d2736ead5334cede69ba485654290d571",
+        "02-first-byte-source.json": "3e3481afcff80646e5216c89965e27c8bbf8e4500c6d8dc8e5bb29d2d3a273dc",
+        "03-conversation-messages.json": "d9c55755add0c6b905931430ea08cc742d6f755ba1f143367c37ec6e6250d593",
+        "04-association-evidence.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "05-narrow.json": "79bbafb452960e6a3c5ae7589d5551f138b18f1951c19cc7d4a95a812d0f4b17",
+        "06-restored.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "2f13b9bbd08c55daafd05da40bc707ac974a1aa96667aced759092f2284f36fa",
+        "01-selected-byte-field.png": "c0c8fd3b28720eda4f30cd002ab6f2691daded207afd2bc82377cad3379d3916",
+        "05-narrow.png": "6cc253033d5befa025d15a7f96b740c1868a5582d693f29547309ecb211e5c84"
+      }
+    },
+    {
+      "case": "actual-ed25519-signature",
+      "capture_packets": 376,
+      "PDU": 9,
+      "selected_field": "Ed25519 Signature Bytes",
+      "selected_bytes": 64,
+      "selected_wire_value_sha256": "34c6621e73022d72c9e3622e2edd9e316d44f5af8acd3ebd8d5efc10f6293bc4",
+      "capture_sha256": "e10716c9fc8d273a213861abde3dfb903d06a111bcbc84b64c26c7431da8dd82",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "cf4a07fe57b8c1c6576373a59a05d3abc68818c2c08d3e0c0ca39710a021f4ba",
+        "00-filter-ready.json": "d91466b9cfdddbf7a2531ba269b8b6727e652c19ad0f46882cd61bc08c296c95",
+        "01-adaptive-bytes-click.json": "0e7d923c644e726547e81cfe32c1313d2736ead5334cede69ba485654290d571",
+        "01-adaptive-fields-before.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-adaptive-fields-click.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-deep-protocol-fields.json": "5d1d445671cb7b015c02a7a67665bc7e7cbb0670d3a45ec48923dedbdd933025",
+        "01-protocol-fields.json": "6bfc42e4d79a6a777a270a547c7416004bbaaa8e7ee1ffbc646532739f628f90",
+        "01-selected-byte-field.json": "a100038d633ab65887b8c362385b22af4f89703cd8edf7c1f3a8e162af01a77c",
+        "02-byte-sources.json": "8072aad8700984b6c48dfcad91b3174560f29020b05586166ab0483094917b30",
+        "02-first-byte-source.json": "d507d99b63a256c810f4144d70b47ff5d336a99cf21c856ac94e789094aa73e7",
+        "03-conversation-messages.json": "d9c55755add0c6b905931430ea08cc742d6f755ba1f143367c37ec6e6250d593",
+        "04-association-evidence.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "05-narrow.json": "79bbafb452960e6a3c5ae7589d5551f138b18f1951c19cc7d4a95a812d0f4b17",
+        "06-restored.json": "422ed08254f7b6aa767dd227977169bef3cad8a9152bcb694b8b88bbc4b02229",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "2f13b9bbd08c55daafd05da40bc707ac974a1aa96667aced759092f2284f36fa",
+        "01-selected-byte-field.png": "3acabc54e8284fd166116078c4b4ddbea1fcdc8c53f115066d0c5efe370f8599",
+        "05-narrow.png": "6cc253033d5befa025d15a7f96b740c1868a5582d693f29547309ecb211e5c84"
+      }
+    },
+    {
+      "case": "public-ed25519-key",
+      "capture_packets": 51328,
+      "PDU": 16515,
+      "selected_field": "Ed25519 Public Key",
+      "selected_bytes": 32,
+      "selected_wire_value_sha256": "252a27da33de8845fb3c0a726d8de03b09a571efd24f6ee5249a290904edb8ba",
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "native_cells_sha256": {
+        "00-capture-ready.json": "54b35328451f8dec276d489eaa7d7d661bed86c0ee2d77eadacdb0496aa4cbbd",
+        "00-filter-ready.json": "bb6ada5081a9bfbe0b2fc9dd90170e7cb6b0aef5760b3b72fcb55aa0a685d7df",
+        "01-adaptive-bytes-click.json": "3a976dee59a1f31609c3d94d034c891d9e70c93e360fc280d6f2868cfb025306",
+        "01-adaptive-fields-before.json": "660f26043887cf56e8a09cfa352b8a336b95a493db0a87bd5890ae85875a2d55",
+        "01-adaptive-fields-click.json": "660f26043887cf56e8a09cfa352b8a336b95a493db0a87bd5890ae85875a2d55",
+        "01-deep-protocol-fields.json": "660f26043887cf56e8a09cfa352b8a336b95a493db0a87bd5890ae85875a2d55",
+        "01-protocol-fields.json": "63a9254f47d0e55c8f4fa4b8a9811880770ca70bb8034df2c252f00c0c74073e",
+        "01-selected-byte-field.json": "4d3392e88fae8fdec576516d7468f521ceba70eb1b8cf5f1d2bf168887594540",
+        "02-byte-sources.json": "f7bb74c60531e8ec56b0f0de0cac347286a19d404be1178894255848f7f038e5",
+        "02-first-byte-source.json": "f7e87993dcc1a9e0560e4cf8abfd875677e0127f6efca44d8d0e6c818ade98a7",
+        "03-conversation-messages.json": "2ad48536f622905b2af90a6b1109f4027692bfb27c472a209399a0936109fdbc",
+        "04-association-evidence.json": "8959165386eb706277737f79f10caaf07ff63fa6e1a6c1d2624ba57322956217",
+        "05-narrow.json": "6ab1975498c278d0adbc0d5774c9fac5654188c1d6fd8015abd91d1a1f02274c",
+        "06-restored.json": "8959165386eb706277737f79f10caaf07ff63fa6e1a6c1d2624ba57322956217",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_cells_sha256": {
+        "01-deep-protocol-fields.png": "ff18b774fd3785bb5a228796ed421fe780ebe467e45d1fe6acb8f7438fad0b23",
+        "01-selected-byte-field.png": "a5b143d980a338723575d178e4103826a06c6381f8b08d3d3ef4f25de248ca61",
+        "05-narrow.png": "236e0462b22b287a2b9fe7f805730522094daae21d35cc28c6402f3d1a72b0bf"
+      }
+    }
+  ],
+  "executables_sha256": {
+    "events-edwards.exe": "b23fb208bde36b27d931092699859bda2ad1bdd7abab07347b48c18e5a6dd446",
+    "yak-edwards.exe": "787a01a7114b55afd145e02196440bc535bcfc655ddafb899243e8dc0fcbda9c"
+  },
+  "native_console_executable_sha256": "51968896ce0a400d2d508f34efce1009f1bb315f5b57e10c6958e6cbfb2e62eb",
+  "failed_validation_attempts_retained_outside_Git": [
+    {
+      "test": "TestProtocolSessionM1PCAP",
+      "full_native_run_seconds": 446.564,
+      "reason": "A positive-only helper was accidentally connected to the historical fixture constructor. Restored the unchanged original malformed wire constructor, retained separate positive/negative tests, then reran the complete native suite."
+    },
+    {
+      "test": "TestTop30StreamSegmentationAndStickyAdmission/ssh-valid-curve-newkeys",
+      "full_native_run_seconds": 401.992,
+      "reason": "The positive companion copied the unchanged historical four-byte signature after fixing only its one-byte exchange value. Corrected only the independent positive companion, kept the sealed negative bytes and assertions, and reran the complete native suite."
+    }
+  ],
+  "failed_auditor_attempts_retained_outside_Git": [
+    "The initial native key click requested a nested field outside the initial viewport. The failed buffer is retained; fresh checks navigate the real field pane before clicking."
+  ],
+  "raw_inputs_exports_console_buffers_images_and_keys_outside_Git": true,
+  "remaining": [
+    "Five client method PDUs in the reordered capture remain generic at original publication; later-evidence derived refinement remains open",
+    "SSH key/signature/certificate/identity validation and encrypted SFTP/application contents remain open",
+    "Protected context, carrier and wider protocol/field/fuzz scopes listed in the main report remain partial"
+  ],
+  "previous_count_snapshot_sha256": "fd303eebf04d414fb7eaea6925616e0c4a62e0b510d661bfc0484c3fe14fcb70"
+}

@@ -1,0 +1,319 @@
+{
+  "scope": "Save aggregate closed Intserv evidence and update existing execution docs.",
+  "production_source": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+  "all_core_or_TOP30_complete": false,
+  "selected_profiles": {
+    "C-Type": 2,
+    "Intserv_version": 0,
+    "SENDER_TSPEC_service1": [
+      127
+    ],
+    "FLOWSPEC_service5": [
+      127
+    ],
+    "ADSPEC_service1_or5": [
+      4,
+      6,
+      8,
+      10
+    ]
+  },
+  "direct": {
+    "evaluations": 49,
+    "official_target_objects": 16,
+    "official_physical_frames": 9,
+    "official_distinct_PDU_bytes": 3,
+    "authored_PDU": 29,
+    "authored_evaluations": 33,
+    "counts": {
+      "literal": 583,
+      "derived": 326,
+      "IEEE32": 63,
+      "owned_byte_leaves": 17
+    },
+    "negative_API_controls": 8,
+    "negative_neutral_controls": 7,
+    "source": {
+      "external_proof": "Intserv-source48-01/frozen-plan01/summary.json",
+      "SHA256": "5b2ad9bd626d9ff8188e3dd2d9cd61903e73ca7716e854211fe69c1d2ccbbad5"
+    },
+    "API_plan": {
+      "external_proof": "RSVP-Intserv-API-plan48-03/manifest.json",
+      "SHA256": "1ee14f677769da754b5dcd0b37bfd9e30dc2e0cdfce50791696b5021d2e73227"
+    },
+    "audit": {
+      "external_proof": "RSVP-Intserv-direct-actual48-01/independent-audit/summary.json",
+      "SHA256": "04c38da06f743834fd64bc03ea3e89b71e55f7e54ff080cb78a846ebed913cdc"
+    },
+    "producer": {
+      "external_proof": "RSVP-Intserv-direct-actual48-01/producer.json",
+      "SHA256": "f5e38e60e3ca04bf5d8873e62f20731ec6635f9a2d8410842af44f985b89cb58"
+    },
+    "commit_bridge": {
+      "external_proof": "RSVP-Intserv-commit-bridge48-01.json",
+      "SHA256": "10cc02d462ba158ea561f2dfa8f3f1a86a2c0a1eb35fb4f58d5932f9ee5168e5"
+    }
+  },
+  "native_CLI": {
+    "physical_frames": 38,
+    "official_frames": 9,
+    "authored_frames": 29,
+    "Intserv_target_objects": 45,
+    "registered_descriptors": 65,
+    "private_alias_occurrences": 1696,
+    "Session_API_range_occurrences": 1250,
+    "GetFields_API_range_occurrences": 1022,
+    "not_added_as_independent_wire_fields": true,
+    "contexts": [
+      {
+        "context": "official",
+        "counts": {
+          "session_API_literal_range_occurrences": 669,
+          "session_derived_scalar_observations": 222,
+          "session_source_semantic_issue_occurrences": 11,
+          "fields_API_literal_range_occurrences": 669,
+          "fields_derived_scalar_observations": 222,
+          "fields_source_semantic_issue_occurrences": 11,
+          "private_alias_occurrences": 857,
+          "SDK_CLI_private_snapshot_bridges": 9,
+          "physical_sources_progressive_stacks": 9,
+          "status_decoded": 9,
+          "registered_RSVP_descriptors": 65
+        },
+        "summary_SHA256": "bc32acc2218718d6b388c3d753ceceedd228ef4b66303c2b601d567adf7069f3"
+      },
+      {
+        "context": "authored",
+        "counts": {
+          "session_API_literal_range_occurrences": 581,
+          "session_derived_scalar_observations": 298,
+          "session_source_semantic_issue_occurrences": 6,
+          "private_alias_occurrences": 839,
+          "SDK_CLI_private_snapshot_bridges": 29,
+          "physical_sources_progressive_stacks": 29,
+          "status_incomplete": 9,
+          "status_malformed": 5,
+          "fields_API_literal_range_occurrences": 353,
+          "fields_derived_scalar_observations": 175,
+          "fields_source_semantic_issue_occurrences": 6,
+          "status_decoded": 14,
+          "status_context-required": 1,
+          "registered_RSVP_descriptors": 65
+        },
+        "summary_SHA256": "c4be5db820f3517c0bcfcf59ac4647c856e4169ece7e20070d89f9ee0cb6829e"
+      }
+    ],
+    "plan": {
+      "external_proof": "Intserv-native-CLI-source48-01/plan02/manifest.json",
+      "SHA256": "fc3a502c4eb4d7e8b54679901510b72afe9fa5af8ed6ad53c666d16b4e2e831b"
+    },
+    "audit": {
+      "external_proof": "RSVP-Intserv-native-actual48-03/summary.json",
+      "SHA256": "d9757b5d25f361ee7feb497c809b98d06f449187673bbc4cfe94ce34feca8c65"
+    }
+  },
+  "public_replay": {
+    "inputs": 37,
+    "physical_records": 383936,
+    "CLI_nonphysical_publications": 582,
+    "CLI_records": 384518,
+    "native_event_objects": 307819,
+    "whole_flow_files": 2,
+    "all_exports_byte_identical": true,
+    "ID_or_field_normalization": false,
+    "unplanned_differences": 0,
+    "does_not_certify_all_unchanged_interpretations": true,
+    "native": {
+      "external_proof": "RSVP-Intserv-public-native-bridge48-01/summary.json",
+      "SHA256": "d02696a5a8fff7927f2ea7dd44dfc6d1a9b186aa8d9222ecab442fefffe549e8"
+    },
+    "CLI": {
+      "external_proof": "RSVP-Intserv-public-CLI-bridge48-01/summary.json",
+      "SHA256": "9cd7ee9e003326c02a0887def7b8b30c9e4d43f9de9d001cf395c7d62726785c"
+    }
+  },
+  "latest_full_tests": {
+    "source": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+    "pass_count": 285664,
+    "skip_count": 24,
+    "fail_count": 0,
+    "proof": {
+      "external_proof": "test-RSVP-Intserv-c04a-full48-05/receipt.json",
+      "SHA256": "a8bbbb6adf3236edc06342e19a70ee033997d95e20fdc4de7ced22079fddd144"
+    },
+    "earlier_full": {
+      "external_proof": "test-RSVP-Intserv-full48-03/receipt.json",
+      "SHA256": "3a8abcf2d0b6f14ca086b4196ea7f892e9af5fc0932c693b11565100fca811cc"
+    },
+    "later_targeted": {
+      "external_proof": "test-RSVP-Intserv-fixes48-04/receipt.json",
+      "SHA256": "eaa915d877ede16e82c721b3f1aa6fda6b55114e544440efc22b63b21ca43b59"
+    }
+  },
+  "fuzz": {
+    "source": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+    "target": "FuzzRSVPBoundedOccurrences",
+    "seconds": 60,
+    "workers": 2,
+    "memory_limit_mib": 1024,
+    "executions": 100837,
+    "failures": 0,
+    "not_a_performance_measurement": true,
+    "proof": {
+      "external_proof": "RSVP-Intserv-fuzz-c04a48-01/summary.json",
+      "SHA256": "098067b06a17e938a243e6cc7e5209ee15f070205a5137fa600e94c4ebe0db79"
+    }
+  },
+  "reference": {
+    "tool_version": "Wireshark TShark4.6.9",
+    "tool_SHA256": "662e10fd28a8c58575fe567845d0248080a2856c3d18d6f2ff7a4b4c8511f69b",
+    "counts": {
+      "source_items": 1508,
+      "physical_frames": 38,
+      "Intserv_objects": 45,
+      "classifications": {
+        "source-unmapped-not-reference-pass": 469,
+        "exact-literal-value-and-primitive-span": 831,
+        "exact-derived-value-and-source-span": 143,
+        "reference-aggregate-owner-match-not-primitive": 53,
+        "reference-unrendered-selected-alias": 8,
+        "reference-value-matches-highlight-span-differs": 4
+      },
+      "contexts": {
+        "official": {
+          "source-unmapped-not-reference-pass": 220,
+          "exact-literal-value-and-primitive-span": 466,
+          "exact-derived-value-and-source-span": 48,
+          "reference-aggregate-owner-match-not-primitive": 37
+        },
+        "authored": {
+          "source-unmapped-not-reference-pass": 249,
+          "exact-literal-value-and-primitive-span": 365,
+          "exact-derived-value-and-source-span": 95,
+          "reference-unrendered-selected-alias": 8,
+          "reference-value-matches-highlight-span-differs": 4,
+          "reference-aggregate-owner-match-not-primitive": 16
+        }
+      },
+      "extra_reference_interpretations": {
+        "reference-semantic-field-range-exceeds-captured-PDU": 1,
+        "reference-guaranteed-layout-beyond-selected-profile": 1,
+        "reference-v0-layout-under-future-version": 5
+      },
+      "source_semantic_issues": 17,
+      "source_semantic_issue_packets": 15,
+      "units": {
+        "unit-not-rendered-not-a-unit-agreement": 112
+      }
+    },
+    "difference_categories": 11,
+    "cross_object_interpretations": 1,
+    "IEEE32_occurrences": 62,
+    "counts_not_duplicated_from_direct": true,
+    "no_compared_numeric_conflicts": true,
+    "candidate_Go_SDK_CLI_outputs_not_read": true,
+    "aggregate_not_primitive_passes": true,
+    "unselected_mapping_not_claimed_reference_absence": true,
+    "closure": {
+      "external_proof": "Intserv-Wireshark-source48-01/closure01/summary.json",
+      "SHA256": "1f77711b823990251130f7a09dfeae4e137d7f4bd3aeda10e30210c021044887"
+    },
+    "producer": {
+      "external_proof": "Intserv-Wireshark-source48-01/actual01/producer.json",
+      "SHA256": "214f4bd3adebb7e86805a6adfea1b745d9db4952d234830a1c9fe96027a336ee"
+    },
+    "mapping": {
+      "external_proof": "Intserv-Wireshark-source48-01/plan02/manifest.json",
+      "SHA256": "07f9652a93da40a5cd768251e82cdc8c50e79462ca124f14004cbed2175ae6c7"
+    },
+    "cross_object_evidence": {
+      "external_proof": "Intserv-Wireshark-source48-01/closure01/cross-object-owner-evidence.json",
+      "SHA256": "f1c609287b4c0353cba85ffb94dbdc296230e6b75f92a0d7c9701076ba112765"
+    },
+    "categories": {
+      "external_proof": "Intserv-Wireshark-source48-01/closure01/reference-difference-categories.json",
+      "SHA256": "d07bfbcf62ea65293dc034b1f9d074895147b99fa478171a96b216da45ff2047"
+    }
+  },
+  "Windows": {
+    "cases": 2,
+    "actual_console_cells_not_Terminal_pixels": true,
+    "root_viewed_images": true,
+    "entire_Source0_and_Source1_exact": true,
+    "selected_four_byte_highlights_exact": true,
+    "default_cache_packets": 20000,
+    "default_history_mib": 64,
+    "CP936_mouse_tabs_resize_ack_checked": true,
+    "first_navigation_plan_passed": true,
+    "proof": {
+      "external_proof": "Windows-Intserv-root-closure48-01/summary.json",
+      "SHA256": "19835a3a6a90576277cb2ec4060937b43043abc7e04393a452be197de97fe33a"
+    }
+  },
+  "CI": {
+    "all_four_exact_production_source_green": true,
+    "runs": [
+      {
+        "id": 40940218890,
+        "name": "Bin Parser Traffic Tests",
+        "head": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40940218890",
+        "updated_at": "2026-10-29T19:44:32Z"
+      },
+      {
+        "id": 40940153618,
+        "name": "Essential Tests",
+        "head": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40940153618",
+        "updated_at": "2026-10-29T19:47:32Z"
+      },
+      {
+        "id": 40940153615,
+        "name": "Diff-Code-Check",
+        "head": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40940153615",
+        "updated_at": "2026-10-29T19:31:07Z"
+      },
+      {
+        "id": 40940153625,
+        "name": "Check Git path case collisions",
+        "head": "c04a60630ce2a3d0207aeca507e99dc535f8a4dd",
+        "status": "completed",
+        "conclusion": "success",
+        "attempt": 1,
+        "url": "https://github.com/yaklang/yaklang/actions/runs/40940153625",
+        "updated_at": "2026-10-29T19:27:05Z"
+      }
+    ],
+    "proof": {
+      "external_proof": "RSVP-Intserv-CI-c04a48-01.json",
+      "SHA256": "04206401cd3384de0bfef62bce3b58ca53f695a054cfc60c3e8501badf61b153"
+    },
+    "later_archive_HEAD_requires_separate_checks": true
+  },
+  "source_archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/rsvp-intserv48/source-manifest.json",
+    "SHA256": "027243d97ccaa827099b59e1ac57104f867398a5455e804b65b5d17e9741194e",
+    "source_files": 21,
+    "source_bytes": 176382,
+    "existing_repository_dependencies": 20,
+    "source_only": true
+  },
+  "not_proved": [
+    "complete RSVP mandatory object/service/procedure grammar",
+    "Guaranteed service/RSpec",
+    "authentication/replay/installed reservation",
+    "numeric float display-filter semantics beyond exact decimal strings",
+    "all TOP30 or core protocols complete"
+  ],
+  "captures_keys_full_cases_outputs_images_binaries_not_repository": true
+}

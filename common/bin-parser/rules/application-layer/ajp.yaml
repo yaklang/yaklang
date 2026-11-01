@@ -1,5 +1,15 @@
 endian: big
 Package:
+  operator: |
+    this.ProcessSubNode("AJP")
+  AJPMessageFields:
+    operator: |
+      err = parseObservedSession("ajp")
+      if err != nil { panic(err) }
+  AJPRequestBodyFields:
+    operator: |
+      err = parseObservedSession("ajp-body")
+      if err != nil { panic(err) }
   AJP:
     operator: |
       this.ProcessSubNode("Magic")

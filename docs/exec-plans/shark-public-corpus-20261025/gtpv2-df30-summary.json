@@ -1,0 +1,279 @@
+{
+  "scope": "Write aggregate closed GTPv2 evidence, without importing case/data outputs.",
+  "production_source": "df30fc4bd909d6489844f8e0d1cd0ab03826f35c",
+  "all_core_or_TOP30_complete": false,
+  "primary": {
+    "ETSI": "TS129274 V18.6.0",
+    "PDF_SHA256": "c9eefb4832b1549b7fdb9d3abdf9bf7afe4f7da611942ae6e3149e0a807d3be2",
+    "Wireshark": "4.6.9"
+  },
+  "original37_GTP": {
+    "port_hints": 5538,
+    "UDP_extent_beyond_complete_IP": 5535,
+    "other_bounded_hints_not_GTP": 3,
+    "source_admitted_GTP": 0,
+    "proof": {
+      "external_relative_name": "GTP-family-source43-closure01/summary.json",
+      "SHA256": "9809739a05ac1aae3ccd4ea90fce7f778eb55fc0cb9e93256a8fe7066c4a2a33",
+      "copied": false
+    }
+  },
+  "official": {
+    "physical_frames": 6,
+    "top_level_IEs": 56,
+    "group93_child_IEs": 8,
+    "message_type_counts": {
+      "32": 1,
+      "95": 1,
+      "133": 2,
+      "128": 1,
+      "129": 1
+    },
+    "reference_value_span_checks": 292,
+    "reference_differences": 0,
+    "source": {
+      "external_relative_name": "GTP-official-source43-02/summary.json",
+      "SHA256": "e5031a3ab80aa50a19ec2f7d593b6c51d5b55adbc41776a33f315bb59fba38d8",
+      "copied": false
+    },
+    "before_actual": {
+      "external_relative_name": "GTPv2-official-before-cd7af45-01/summary.json",
+      "SHA256": "c5d7de67aaed33bd2bbb42cad5d3997e57f04f573655809bf3acbb326245b9a9",
+      "copied": false
+    }
+  },
+  "direct": {
+    "source_cases": 30,
+    "unique_physical_inputs": 30,
+    "authored_scenarios": 20,
+    "authored_physical_frames": 24,
+    "counts": {
+      "unverified_metadata_keys": 353,
+      "literal_wire_leaves": 1168,
+      "derived_values": 713,
+      "verified_display_names": 272,
+      "error_contracts": 30,
+      "accepted_IE_nodes": 243,
+      "empty_literal_ranges_not_typed_selectable": 1
+    },
+    "proof": {
+      "external_relative_name": "GTPv2-direct-source-audit45-01/summary.json",
+      "SHA256": "3f350bf4d2bff336508ed24ee1036fb6f35b984af468b0a173b5ff766f133c4b",
+      "copied": false
+    },
+    "producer": {
+      "external_relative_name": "GTPv2-direct-actual45-01/producer.json",
+      "SHA256": "bfbcdfe605a569ebdc7f25ed55e32d7a77e2c7dc573a05d0ffed2a8dc44017fb",
+      "copied": false
+    },
+    "frozen_plan": {
+      "external_relative_name": "GTPv2-API-source-plan43-01/manifest.json",
+      "SHA256": "5ce3e51dac533ad7d68f19bf2c6237de4e5e015c905dd060e9ccef42095a4375",
+      "copied": false
+    },
+    "export_byte_identical_to_pre_receive_fix": true
+  },
+  "native_CLI": {
+    "context_counts": {
+      "official-auto": {
+        "native_CLI_snapshot_bridges": 6,
+        "session_unverified_metadata_keys": 84,
+        "session_literal_wire_leaves": 307,
+        "session_derived_values": 178,
+        "session_verified_display_names": 70,
+        "session_accepted_IE_nodes": 64,
+        "private_aliases": 422,
+        "fields_unverified_metadata_keys": 84,
+        "fields_literal_wire_leaves": 307,
+        "fields_derived_values": 178,
+        "fields_verified_display_names": 70,
+        "fields_accepted_IE_nodes": 64,
+        "decoded_source_datagrams": 6,
+        "progressive_GTP_stacks": 6,
+        "physical_sources_verified": 6
+      },
+      "authored-auto": {
+        "native_CLI_snapshot_bridges": 24,
+        "session_unverified_metadata_keys": 200,
+        "session_literal_wire_leaves": 763,
+        "session_derived_values": 447,
+        "session_verified_display_names": 179,
+        "session_accepted_IE_nodes": 165,
+        "private_aliases": 1051,
+        "fields_unverified_metadata_keys": 200,
+        "fields_literal_wire_leaves": 763,
+        "fields_derived_values": 447,
+        "fields_verified_display_names": 179,
+        "fields_accepted_IE_nodes": 165,
+        "decoded_source_datagrams": 13,
+        "progressive_GTP_stacks": 13,
+        "physical_sources_verified": 24,
+        "GTP_identity_refusals": 11,
+        "carrier_refusals": 1
+      },
+      "authored-explicit": {
+        "native_CLI_snapshot_bridges": 24,
+        "session_unverified_metadata_keys": 262,
+        "session_literal_wire_leaves": 856,
+        "session_derived_values": 529,
+        "session_verified_display_names": 201,
+        "session_accepted_IE_nodes": 179,
+        "private_aliases": 1209,
+        "fields_unverified_metadata_keys": 200,
+        "fields_literal_wire_leaves": 763,
+        "fields_derived_values": 447,
+        "fields_verified_display_names": 179,
+        "fields_accepted_IE_nodes": 165,
+        "decoded_source_datagrams": 13,
+        "progressive_GTP_stacks": 13,
+        "physical_sources_verified": 24,
+        "explicit_diagnostic_not_identification": 10,
+        "explicit_diagnostic_retained_transport_caption": 10,
+        "GTP_identity_refusals": 1,
+        "carrier_refusals": 1
+      }
+    },
+    "physical_rows_each_API": 54,
+    "unique_source_frames": 30,
+    "modes_reuse_sources": true,
+    "registered_descriptors": 30,
+    "Session_and_GetFields_checks_not_additive_wire_coverage": true,
+    "whole_unverified_metadata_not_certified": true,
+    "proof": {
+      "external_relative_name": "GTPv2-native-CLI-df30-actual45-01/summary.json",
+      "SHA256": "0caab9078654b7a2ac3336ce4b8ab56120cc5e3e58701e8bc94f3496bbf361d2",
+      "copied": false
+    },
+    "frozen_plan": {
+      "external_relative_name": "GTPv2-native-CLI-source-plan44-01/manifest.json",
+      "SHA256": "2d393b40ad4ff7f34686de17cc56a467f4d1586e49a219e4b85525835f7c2dc1",
+      "copied": false
+    },
+    "controller_selftest": {
+      "external_relative_name": "GTPv2-native-CLI-controller-selftest44-01/summary.json",
+      "SHA256": "a3aac0cef863dcf17161547537b5091c4c1ab926be458c556d049e8756039448",
+      "copied": false
+    }
+  },
+  "public_replay": {
+    "inputs": 37,
+    "physical_records": 383936,
+    "native_events": 307818,
+    "CLI_rows": 384518,
+    "whole_flow_files": 2,
+    "all_complete_exports_byte_identical": true,
+    "ID_mapping": false,
+    "native": {
+      "external_relative_name": "GTPv2-public-native-literal45-01/summary.json",
+      "SHA256": "b7785fcae3be5f7307b063616018304fef8e59af17e4a7eeac347621134fdc55",
+      "copied": false
+    },
+    "CLI": {
+      "external_relative_name": "GTPv2-public-CLI-literal45-01/summary.json",
+      "SHA256": "eb77b1a592c875e33f64445da8f38ca7ce610d0210bd67668b11ee315deaed26",
+      "copied": false
+    }
+  },
+  "tests": {
+    "base_source": "f1068e2fbaa44d59f7ab82ee6109505bac5b3af1",
+    "full_5_packages": {
+      "pass": 285612,
+      "skip": 24,
+      "fail": 0
+    },
+    "full": {
+      "external_relative_name": "test-GTPv2-full-44-08/receipt.json",
+      "SHA256": "8fca85a1bc9899e5952c5aa4dc845d345aea34d69d3ae6d46640bc6882141fd1",
+      "copied": false
+    },
+    "latest_selected_IE_filters": {
+      "pass": 59,
+      "fail": 0
+    },
+    "selected": {
+      "external_relative_name": "test-GTPv2-IE-length-green45-03/receipt.json",
+      "SHA256": "f4ea53a4a12d233d1705f90516f0797c7eb612705a13a04a7fbcd3e9a0c48f08",
+      "copied": false
+    },
+    "additional_IPv6_dual_address": {
+      "pass": 1,
+      "fail": 0
+    },
+    "IPv6": {
+      "external_relative_name": "test-GTPv2-IPv6-extension45-04/receipt.json",
+      "SHA256": "bb7a3af22b4e13976a90bd1d2a4ae0a07ffa49c66f83356f25d67b2d289079c6",
+      "copied": false
+    },
+    "original_receive_red": {
+      "external_relative_name": "test-GTPv2-IE-length-red45-01/receipt.json",
+      "SHA256": "98dda21c08d4be4e71d7284071f8cbfcb7be83b5819e5275e8cc97cbc18e0e51",
+      "copied": false
+    },
+    "latest_not_claimed_as_new_full_5_package_run": true
+  },
+  "fuzz": {
+    "targets": [
+      {
+        "source": "df30fc4bd909d6489844f8e0d1cd0ab03826f35c",
+        "target": "FuzzGTPv2BoundedOccurrences",
+        "arguments": [
+          "C:\\Users\\V\\sdk\\go1.22.12\\bin\\go.exe",
+          "test",
+          "-p",
+          "1",
+          "-ldflags=-w",
+          "./common/bin-parser/parser/stream_parser",
+          "-run",
+          "^$",
+          "-fuzz",
+          "^FuzzGTPv2BoundedOccurrences$",
+          "-fuzztime",
+          "60s",
+          "-parallel",
+          "2",
+          "-timeout",
+          "12m"
+        ],
+        "exit_code": 0,
+        "seconds": 85.234,
+        "log_SHA256": "3f6752eedb1d26dd5efb54faa594ad450362ecf39bae529eee45351df8c60857",
+        "free_bytes_after": 27577856000
+      }
+    ],
+    "executions": 150375,
+    "proof": {
+      "external_relative_name": "GTPv2-fuzz-df30-45-01/summary.json",
+      "SHA256": "5f984357065b6a3b8e2f3c375f7939cbeacec5fc33f4eb6d6abb8998581f71d7",
+      "copied": false
+    }
+  },
+  "Windows": {
+    "cases": 2,
+    "default_packet_cache": 20000,
+    "default_history_mib": 64,
+    "actual_native_cells_not_Terminal_pixels": true,
+    "entire_visible_sources_and_selected_ranges_exact": true,
+    "original_failed_IPC_run_preserved": true,
+    "only_helper_binding_changed": true,
+    "navigation_and_expected_wire_unchanged": true,
+    "root_viewed_actual_images": true,
+    "proof": {
+      "external_relative_name": "Windows-GTPv2-root-closure45-02/summary.json",
+      "SHA256": "5e083307f3bc4e648b4225399988427d9f1b950288544f7e64424fbaaccf67d0",
+      "copied": false
+    }
+  },
+  "source_archive": {
+    "path": "common/yak/cmd/yakcmds/shark-cli/testdata/live-audit/gtpv2-control45/source-manifest.json",
+    "SHA256": "505107390ba4ea9e4d0a49861b76b1162fb707c68a7b0dcab4011ecc7b01995a",
+    "source_files": 39,
+    "source_bytes": 225538
+  },
+  "remaining": [
+    "mandatory IE/procedure conformance, NAS/subscriber/bearer/session ownership and peer authentication",
+    "unselected IE and non-EPC interface semantics",
+    "Recovery n>1 variable-length specification ambiguity: counter observed, tail explicitly unselected",
+    "more GTP-U, RSVP/Intserv, telecom and TOP30 advanced coverage"
+  ],
+  "captures_keylogs_full_cases_outputs_images_binaries_not_repository": true
+}

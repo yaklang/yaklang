@@ -1,0 +1,760 @@
+{
+  "source_native_full": "ed3bf34ffe461029870a5b5c1434c59f026cc533",
+  "source_streaming_conversation_UI": "3eb430a2fc8936bb1b22318419ae0989287ff117",
+  "source_worker_UI": "aa252cab242034ae6f743b2330b582cc3c3b8bb3",
+  "source_audit": "5a3154cd2072b60c61c7fe82160d18b1710df190",
+  "scope": "Clean, fully reassembled FIN truncating an HTTP3 frame, connection-level findings and wire/field/display recovery; only the declared bounded profile is certified.",
+  "native_full_seconds": 405.239,
+  "CLI_full_at_native_source_seconds": 2.013,
+  "CLI_streaming_conversation_full_seconds": 2.028,
+  "CLI_worker_full_seconds": 2.056,
+  "FIN_gap_fuzz": {
+    "execs": 107646,
+    "seconds": 40.408,
+    "workers": 2,
+    "GOMEMLIMIT": "1GiB",
+    "scope": "post-authentication stream reassembly/layout and same-packet other-stream retention; not wire AEAD fuzz"
+  },
+  "wire_audit": {
+    "scope": "Independently audit clean-FIN frame faults, complete frames and connection scope.\nThe reference QUIC STREAM bytes and actual raw-peer receipts determine wire\nlayout; reference application/expert views remain separate, without normalizing\ncounts or treating absent reference diagnostics as a conformity certificate.\n",
+    "checks": 32409,
+    "physical_frames": 161,
+    "connections": 3,
+    "operations": 36,
+    "directions": 72,
+    "direction_verdicts": {
+      "base": 42,
+      "frame-error": 30
+    },
+    "faults": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 12,
+        "frame_refs": [
+          7
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 19,
+        "frame_refs": [
+          14
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 38,
+        "frame_refs": [
+          33
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "0",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 48,
+        "frame_refs": [
+          43
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 58,
+        "frame_refs": [
+          48
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 68,
+        "frame_refs": [
+          58
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "1",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 106,
+        "frame_refs": [
+          96
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 109,
+        "frame_refs": [
+          99
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 4,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-type",
+        "component": "type-varint",
+        "offset": 74,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 8,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-length",
+        "component": "length-varint",
+        "offset": 74,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 12,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-truncated-payload",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 16,
+        "PDU": 122,
+        "frame_refs": [
+          107
+        ],
+        "case": "request-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 24,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-type",
+        "component": "type-varint",
+        "offset": 17,
+        "available_wire_bytes": 1
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 28,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-length",
+        "component": "length-varint",
+        "offset": 17,
+        "available_wire_bytes": 2
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 32,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-truncated-payload",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 3
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 36,
+        "PDU": 134,
+        "frame_refs": [
+          119
+        ],
+        "case": "reply-first-HEADERS-truncated",
+        "component": "payload",
+        "offset": 0,
+        "available_wire_bytes": 4
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 20,
+        "PDU": 169,
+        "frame_refs": [
+          154
+        ],
+        "case": "request-large-DATA-truncated",
+        "component": "payload",
+        "offset": 74,
+        "available_wire_bytes": 18004
+      },
+      {
+        "connection": "2",
+        "direction": 1,
+        "stream": 40,
+        "PDU": 175,
+        "frame_refs": [
+          160
+        ],
+        "case": "reply-large-DATA-truncated",
+        "component": "payload",
+        "offset": 17,
+        "available_wire_bytes": 18004
+      }
+    ],
+    "same_PDU_new_fault_and_other_decoded_streams": [
+      12,
+      19,
+      58,
+      68,
+      122,
+      134
+    ],
+    "first_fault_PDU_by_connection": {
+      "0": 12,
+      "1": 58,
+      "2": 122
+    },
+    "complete_peer_application_frames": 78,
+    "raw_reference_application_views": {
+      "4": 6,
+      "1": 95,
+      "0": 17
+    },
+    "raw_reference_expert_messages": {
+      "Unknown QUIC connection. Missing Initial Packet or migrated connection?": 2,
+      "This legacy_version field MUST be ignored. The supported_versions extension is present and MUST be used instead.": 6,
+      "(Random) padding data appended to the datagram": 6
+    },
+    "network": {
+      "delayed": 17,
+      "dropped": 8
+    },
+    "native_selected_differences": [],
+    "capture_sha256": "ce66fabf700784ca19e55498c944145323e3bb1803bb9e672e0ffedd056d7384",
+    "reference_sha256": "f009ff2e1ea4d01f149ca8cd721d30e2cd2f18bcecfac5ec4c3efec140428d10",
+    "events_sha256": "33c3a9c413109fa3f87a82ef9eb2de173bdf66b308d3550df938ce8930b5feb2"
+  },
+  "corruption_controls": {
+    "controls": 21,
+    "results": [
+      {
+        "corruption": "code",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "scope",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "fault-PDU",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "direction",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "offset",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "component",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "partial-bytes",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "partial-digest",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-parent",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-domain",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-hole",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "sticky-erased",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "sticky-generation",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "field-alias",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "protocol",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "NeedMore",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-FIN",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "missing-frame",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "duplicate-frame",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "request-association",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-root-stream",
+        "detected": "rejected"
+      }
+    ]
+  },
+  "before_after": {
+    "before_native": {
+      "events": 176,
+      "protocol_status": {
+        "/unrecognized/ProtocolNotRecognized": 2,
+        "quic/decoded/": 147,
+        "quic/malformed/MalformedMessage": 6,
+        "http3/decoded/": 15,
+        "http3/incomplete/NeedMore": 3,
+        "quic/incomplete/NeedMore": 3
+      },
+      "STREAM_frames": 227,
+      "STREAM_sources_missing": 24,
+      "complete_app_frames_including_controls": 60,
+      "complete_app_types": {
+        "SETTINGS": 6,
+        "HEADERS": 42,
+        "DATA": 12
+      }
+    },
+    "after_native": {
+      "events": 176,
+      "protocol_status": {
+        "/unrecognized/ProtocolNotRecognized": 2,
+        "quic/decoded/": 90,
+        "quic/malformed/MalformedMessage": 6,
+        "http3/decoded/": 66,
+        "http3/malformed/MalformedMessage": 12
+      },
+      "STREAM_frames": 227,
+      "STREAM_sources_missing": 0,
+      "complete_app_frames_including_controls": 84,
+      "complete_app_types": {
+        "SETTINGS": 6,
+        "HEADERS": 66,
+        "DATA": 12
+      }
+    },
+    "packet_labels": {
+      "before": {
+        "UDP": 2,
+        "QUIC": 141,
+        "HTTP/3": 18
+      },
+      "after": {
+        "UDP": 2,
+        "QUIC": 81,
+        "HTTP/3": 78
+      },
+      "reference": {
+        "QUIC": 135,
+        "HTTP3": 26
+      }
+    },
+    "raw_label_difference_frames": [
+      1,
+      2,
+      6,
+      7,
+      9,
+      10,
+      11,
+      12,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      37,
+      39,
+      40,
+      41,
+      42,
+      43,
+      48,
+      49,
+      50,
+      57,
+      58,
+      64,
+      65,
+      68,
+      69,
+      70,
+      71,
+      72,
+      73,
+      74,
+      75,
+      81,
+      83,
+      84,
+      86,
+      87,
+      88,
+      95,
+      96,
+      99,
+      101,
+      106,
+      107,
+      116,
+      118,
+      119,
+      120,
+      123,
+      125,
+      127,
+      129,
+      130,
+      131,
+      132,
+      135,
+      139,
+      144,
+      150,
+      151,
+      152,
+      153,
+      154,
+      157,
+      160
+    ],
+    "reference_method": "two-pass TShark4.6.9; explicit QUIC DecodeAs for owned random server UDP port, authorized keylog; readiness probes remain included",
+    "capture_frames": 161
+  },
+  "original_corpus_and_previous_actual_capture_outputs": {
+    "weber": {
+      "SDK_sha256": "d580a578ade850eca3d2161d93c6b9ff963bc795f29786b4c5258914e1e49c5b",
+      "CLI_sha256": "39678bedd7d92809af03c5f4e6b4bf9b4046e66cc1cc009cfe68f73a2427ff38"
+    },
+    "sharon": {
+      "SDK_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "CLI_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522"
+    },
+    "body": {
+      "SDK_sha256": "96d6ba5655a94781214966b8debe5e41a3b83f4e03fd179ad2d17cc54ea49642",
+      "CLI_sha256": "0ec574d757ba0f46a591e9f325c52353eb840788194ab7397bfa7e5575ee8ac7"
+    },
+    "fresh747": {
+      "SDK_sha256": "b1500ce1da2b3d02b4da9820385b7529ff0a94faf3fe76f4dce58345c5d76380",
+      "CLI_sha256": "46c1922a819fb83dd2fd23d83b8c2dcf89fd476d1c9b9eae6f0ceb18e7a2c081"
+    }
+  },
+  "all_four_original_full_outputs_byte_identical_to_previous_scope_phase": true,
+  "unchanged_raw_generic_field_differences": [
+    90,
+    35
+  ],
+  "unchanged_TCP_flows": [
+    824,
+    840
+  ],
+  "unchanged_TCP_previews": [
+    808,
+    735
+  ],
+  "Windows": {
+    "mode": "fresh actual CP936 native console cells, unchanged cell/attribute rendering",
+    "capture_frames": 161,
+    "query": "fields http3.connection.error_code == 0x106",
+    "visible_rows": 148,
+    "selected_frame": 7,
+    "first_error_PDU": 12,
+    "selected_protocol_and_detail_title": "HTTP/3",
+    "packet_list_connection_scope_warning": true,
+    "field_and_conversation_early_connection_warning": true,
+    "fresh_EOF_query_row_detail_byte_sources_resize_quit_codepage": "PASS",
+    "earlier_UI_failures_repaired": [
+      "incremental packet publication bypassed batch warning",
+      "compact conversation projection dropped connection error map",
+      "detail worker title guard omitted the new connection-violation scope"
+    ]
+  },
+  "limits": [
+    "Declared profile only: type/length-varint and payload truncation, first-HEADERS truncation and large DATA; no blanket HTTP3 correctness claim.",
+    "Finite clean-FIN frames announcing a length beyond the configured frame budget still hit ResourceExceeded before layout classification; follow-up needed.",
+    "Five raw retransmission views at frames72,73,125,127,129 remain QUIC in native packet labels after no new contiguous bytes; connection and literal STREAM data remain retained.",
+    "Raw display labels, reference partial/repeated application views and logical complete frames are distinct measures.",
+    "Broader frame-placement/stream-creation errors, late request-method response re-evaluation, authority/extension/QPACK contributor semantics and overall protocol/flow/session parity remain unfinished."
+  ],
+  "local_evidence_sha256": {
+    "native_full_log": "5dc5e09a45fa9be7f4711cf63f221ae40b0f7198c766320f0adc7c4447930ba7",
+    "FIN_fuzz_log": "c4cb193ee97c9b9453d2ab6e7998dbe0aade44e43e36b52ec3a22c95d89d1591",
+    "stream_UI_full_log": "80523b8ed69657bc50c3de322c7b31b7235d05ecf5004535830a6a14318d0df8",
+    "worker_UI_full_log": "24302531b02bcb1b2daf06180d34e4c3ca6ec9d7817277f36dc35e1f4e192cbd",
+    "SDK_binary": "c334afc698435e3f8266c94636d936b2b0d8e9456f9bd37a70cf27d2e479a6c0",
+    "CLI_binary": "c8fcf2018acfdd5922cc429991c573949d18be76b28150358b036b2f0d20db0b",
+    "reference_columns": "12744fff92f9e72992702ba69f5308d197e5fb0981b2c17c1ca7feefe4f2db73",
+    "old_SDK": "c447f621503bd30c48e5838a0680b829eaba6d3a6996512d3acfa6facc806b30",
+    "old_CLI": "af4de1921468a75ab1e644313547bb163175e26be986765d41f4f9cc04f327a3",
+    "new_SDK": "33c3a9c413109fa3f87a82ef9eb2de173bdf66b308d3550df938ce8930b5feb2",
+    "new_CLI": "2213672330d41fdf55da8560f6a32f70b7b513e854042e41293ab6f84b07b7ac",
+    "Windows_fields_cells": "09126a2a19b62c404968b9b76bc6e92e3894fb3c5533910b8f41ef0e4112052b",
+    "Windows_conversation_cells": "bd63d7e4a65ca637a203e8b70a38881ad175da94ec30091d91c74d9c84233a61",
+    "Windows_fields_PNG": "364b590d161669963d47f07ce26721967429f2116d13b1ddd962f4bb82cb8356",
+    "Windows_conversation_PNG": "b38d4f60102cf720bb7dedeb61796e215864b0047d34f92d157a95ade9dc2fb2",
+    "Windows_restored": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+  }
+}

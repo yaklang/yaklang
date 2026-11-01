@@ -223,6 +223,23 @@ func cassandraRequestEvidence(w []byte, maxBytes int) bool {
 }
 
 func initialProtocolNeedMore(w []byte, maxBytes int) ProbeResult {
+	if p := probeRTSP(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
+	if p := probeSSH(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
+	if p := probeAJP(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
+	if p := probeBGP(w, maxBytes); p.Verdict == ProbeNeedMore {
+		return p
+	}
+	if len(w) >= 9 {
+		if p := probeRTMP(w, maxBytes); p.Verdict == ProbeNeedMore {
+			return p
+		}
+	}
 	// A split first ISO 8583 message has a length prefix that already exceeds the
 	// captured bytes. Hold only while the envelope is a valid MTI/bitmap prefix;
 	// a carrier that can never become a complete message rejects instead.

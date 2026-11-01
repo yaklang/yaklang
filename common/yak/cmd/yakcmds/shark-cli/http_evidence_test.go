@@ -57,9 +57,10 @@ func TestConnectionAttributionDoesNotLabelBinaryPacketsAsHTTP(t *testing.T) {
 	s.add(body)
 	u := &tui{streams: s}
 	row := u.packetRow(&packetEntry{packet: body})
-	require.Equal(t, "TCP/HTTP", row.Protocol)
-	require.Equal(t, "connection prefix, not this packet", row.ProtocolScope)
-	require.Contains(t, row.Info, "prefix=HTTP")
+	require.Equal(t, "TCP", row.Protocol)
+	require.Equal(t, "packet", row.ProtocolScope)
+	require.Equal(t, "HTTP", row.ConnectionProtocol)
+	require.Contains(t, row.Info, "connection #")
 	row = u.packetRow(&packetEntry{packet: h})
 	require.Equal(t, "HTTP", row.Protocol)
 	require.Equal(t, "packet", row.ProtocolScope)
@@ -104,7 +105,7 @@ func TestBeginningSurvivesRecentWindowTrimmingAndShowsBinaryHTTPHeaders(t *testi
 	require.Contains(t, view, "00000000")
 	require.Contains(t, view, "50 4f 53 54")
 	// The toolbar uses the same keyboard paths and doesn't depend on focus quirks.
-	l := layoutDashboard(u.width-1, u.height)
+	l := u.dashboardLayout()
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 87, y: l.tabs})
 	require.Equal(t, 3, u.streamMode)
 	u.mouse(mouseEvent{action: mousePress, button: 0, x: 73, y: l.tabs})

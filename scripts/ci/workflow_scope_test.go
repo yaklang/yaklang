@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -44,6 +45,9 @@ func TestTrafficWorkflowIsolation(t *testing.T) {
 		return w
 	}
 	essential := read("essential-tests")
+	if !slices.Contains(essential.On["pull_request"].Paths, "internal/trafficfixture/**") {
+		t.Fatal("central capture store and its loader must trigger Essential Tests")
+	}
 	for jobName, job := range essential.Jobs {
 		for _, suite := range job.Strategy.Matrix.Include {
 			if suite.Configs == "" {

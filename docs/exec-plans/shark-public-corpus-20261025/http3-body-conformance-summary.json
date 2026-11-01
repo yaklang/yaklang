@@ -1,0 +1,375 @@
+{
+  "source_native": "d24e490d078de5e5b5b5562806859a97564e73b0",
+  "source_audit": "626896b5571671620e2a15fbb9be394b3283402f",
+  "scope": "HTTP3 DATA-octet lengths at drained FIN, base-message exceptions and same-datagram stream isolation; no broad protocol-completeness or delivery claim",
+  "native_full_seconds": 392.905,
+  "CLI_full_seconds": 2.007,
+  "body_fuzz": {
+    "execs": 111962,
+    "seconds": 40.437,
+    "workers": 2,
+    "GOMEMLIMIT": "1GiB",
+    "scope": "post-authentication body/FIN state and second-stream isolation; not wire AEAD fuzz"
+  },
+  "owned_socket_capture": {
+    "checks": 43720,
+    "connections": 3,
+    "operations": 84,
+    "checked_directions": 168,
+    "direction_verdicts": {
+      "base": 117,
+      "malformed": 51
+    },
+    "native_selected_differences": [],
+    "native_unparsed_rejected_message_tail_frames": [
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "0",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "1",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 24,
+        "case": "request-conflicting-lengths",
+        "offset": 110,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      },
+      {
+        "connection": "2",
+        "direction": 0,
+        "stream": 28,
+        "case": "request-nondecimal-length",
+        "offset": 93,
+        "type": 0,
+        "payload_bytes": 4,
+        "reason": "unparsed suffix after explicit stream-local message rejection"
+      }
+    ],
+    "raw_reference_HTTP3_views": {
+      "4": 6,
+      "1": 202,
+      "0": 173,
+      "13921": 2
+    },
+    "reference_midframe_views": [
+      {
+        "physical_frame": 80,
+        "connection": "1",
+        "direction": 0,
+        "stream": 104,
+        "raw_type": 13921,
+        "raw_length": 11369,
+        "raw_header_hex": "76616c69",
+        "peer_stream_offset": 69,
+        "actual_enclosing_type": 1,
+        "actual_enclosing_offset": 0,
+        "actual_frame_end": 96,
+        "scope": "raw reference view retained; independently received stream locates it inside HEADERS, not at an application-frame boundary"
+      },
+      {
+        "physical_frame": 147,
+        "connection": "2",
+        "direction": 0,
+        "stream": 104,
+        "raw_type": 13921,
+        "raw_length": 11369,
+        "raw_header_hex": "76616c69",
+        "peer_stream_offset": 69,
+        "actual_enclosing_type": 1,
+        "actual_enclosing_offset": 0,
+        "actual_frame_end": 96,
+        "scope": "raw reference view retained; independently received stream locates it inside HEADERS, not at an application-frame boundary"
+      }
+    ],
+    "native_selected_app_frames": 321,
+    "native_selected_app_types": {
+      "4": 6,
+      "1": 174,
+      "0": 141
+    },
+    "nonapplication_QUIC_diagnostics": [
+      {
+        "PDU": 5,
+        "status": "malformed",
+        "frames": [
+          4
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 8,
+        "status": "malformed",
+        "frames": [
+          5
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 378,
+        "raw_tail_sha256": "8d8c294831ae2b1dd67f6a4903ae6eb38cdaede56707bf6508e70b1e4acbb43e",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 61,
+        "status": "malformed",
+        "frames": [
+          55
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 64,
+        "status": "malformed",
+        "frames": [
+          56
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 379,
+        "raw_tail_sha256": "2eb01848e9217256a0a1af528eb4b2d6d89a1f77c97a8aa2b8fb98a66b2f0e6f",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 133,
+        "status": "malformed",
+        "frames": [
+          122
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 680,
+        "raw_tail_sha256": "3893c122a235d76ac34b7853ae88aae7b72c2785f12e0e5ba05506aa89f4cf6c",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      },
+      {
+        "PDU": 136,
+        "status": "malformed",
+        "frames": [
+          123
+        ],
+        "error": "MalformedMessage: invalid coalesced QUIC header: quic: short header missing fixed bit",
+        "raw_tail_bytes": 377,
+        "raw_tail_sha256": "43c2ae1019ad57912662c9bd170d8d6986299bad4ec76811e70c98c4a1ffe3b6",
+        "admission_before_followup_fix": "authenticated-wire-and-observed-CID",
+        "scope": "unprotected datagram bytes after a valid packet, not authenticated QUIC PADDING frames"
+      }
+    ],
+    "network": {
+      "delayed": 20,
+      "dropped": 8
+    },
+    "capture_sha256": "19ff0cd330c991d0234dc2ca404dd6a0b44e2287b45d0d50e1572258b8af4071",
+    "events_sha256": "0880f0b68f355c9c56ef5da0835ccae067c0d1ddc4ad3c9f3fe6fc384cf08138",
+    "reference_sha256": "47c4e0b0b8297ff03aaa02775eaf2ddc50134ff4df5c5395c6fc8c4abe7429a6"
+  },
+  "independent_corruption_controls": {
+    "controls": 26,
+    "results": [
+      {
+        "corruption": "observed-count",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "declared-length",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "normalization",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "final-FIN",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "length-verdict",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "header-PDU",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "header-flow",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "header-domain",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "header-direction",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "context-stream",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "context-direction",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "source-offset",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "wire-FIN",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "app-length",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "app-bytes",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "header-value",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "missing-app",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "duplicate-app",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "protocol",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "transport",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "ALPN",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "authentication",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "flow-generation",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "missing-error",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "peer-receipt",
+        "detected": "rejected"
+      },
+      {
+        "corruption": "reference-packet",
+        "detected": "rejected"
+      }
+    ]
+  },
+  "previous747_frame_capture": {
+    "source_checks": 24736,
+    "source_application_frames": 57,
+    "source_ranges": 406,
+    "DATA_checks": 10398,
+    "DATA_frames": 27,
+    "STREAM_views": 150,
+    "overlap_bytes": 8454,
+    "directions": 24,
+    "connections": 3,
+    "selected_source_and_payload_differences": [],
+    "raw_reference_DATA_views": 24
+  },
+  "original_corpus_complete_output_sha256": {
+    "weber": {
+      "yak.jsonl": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "events.jsonl": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770"
+    },
+    "sharon": {
+      "yak.jsonl": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "events.jsonl": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7"
+    }
+  },
+  "Windows": {
+    "mode": "actual native CP936 console cells rendered without layout edits",
+    "capture_frames": 188,
+    "query": "fields pdu.id == 58",
+    "selected_physical_frame": 53,
+    "selected_PDU": 58,
+    "observed_protocol": "HTTP/3",
+    "declared_length": "18000",
+    "observed_DATA_bytes": 18000,
+    "drained_FIN": true,
+    "length_check": "matched",
+    "fresh_EOF_query_row_detail_bytes_sources_resize_quit_codepage": "PASS"
+  },
+  "limits": [
+    "Only declared 28 scenarios over 3 generations checked; not all possible HTTP3 messages.",
+    "An earlier unverified response is not retroactively resolved when request method arrives later.",
+    "Extension negotiation, full authority/URI normalization, broader frame placement and complete QPACK contributor dependencies remain open.",
+    "Raw reference counts and rejected-message suffixes retained; no raw zero-difference claim.",
+    "Six unprotected datagram-tail diagnostics still carry overbroad admission text; follow-up required."
+  ],
+  "local_evidence_sha256": {
+    "full_tests": "2fe6d25db5c941c7bbe44bb9ddd27b2d92e97fa23f52403b3d3c648b0a0a769a",
+    "body_fuzz": "0725b56005910a334c973bdc89c3b75abaf47124f629f58ffe0991d3a9e53ff3",
+    "SDK_binary": "a2c8045b925c94cbf44b40304163752eca0602ca57fc8f0e5d8871224686e2a6",
+    "CLI_binary": "206894c6b178b40059381ffc0f270a7dc3329cecee076ecbf1942f42ca5ac3ae",
+    "fresh747_SDK": "b1500ce1da2b3d02b4da9820385b7529ff0a94faf3fe76f4dce58345c5d76380",
+    "fresh747_source_audit": "397a4e659aa3242f1586b591f09f785ba5a13e2d1ecc7c19eb526577f62d7730",
+    "fresh747_DATA_audit": "18ce8c37f432f3e927ee4fa79c6c5c5b4a411000cccd091e53a757d69b002611",
+    "Windows_cells": "4291d96359a83cc2297787034760039b49e9f39e14017ca1f80c1332a45b4021",
+    "Windows_PNG": "b35ca4b046306cf23c773b6144e90121373bffb8c8f7b989b35e3049a6884a1a",
+    "Windows_messages": "74792b534a30309d5cf802c460fc7ea052c7aef259d2e9102fe2547c0c1a5fd5",
+    "Windows_restored": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+  }
+}

@@ -1,0 +1,1352 @@
+{
+  "scope": "Selected native QUIC authenticated frame/role constraints, bounded refusal state, independent live recovery and consistent Windows/compact diagnostic presentation; not full endpoint conformance.",
+  "native_frame_source": "8b024ca521",
+  "native_ownership_source": "c3e5dcd8c4",
+  "CLI_final_source": "97314ee256",
+  "audit_source": "203b513b33",
+  "captures_and_secrets_outside_Git": true,
+  "immutable_inputs_and_answers_unchanged": true,
+  "tests": {
+    "final_full_native_seconds": 422.067,
+    "final_full_CLI_seconds": 1.99,
+    "prior_frame_source_full_native_seconds": 399.352,
+    "prior_frame_source_full_CLI_seconds": 2.143,
+    "routing_targeted_native_CLI_seconds": [
+      2.314,
+      0.643
+    ],
+    "role_cipher_version_key_phase_fuzz": {
+      "executions": 106248,
+      "seconds": 40.447
+    },
+    "unique_epoch_ownership_fuzz": {
+      "executions": 111395,
+      "seconds": 40.567
+    },
+    "native_role_and_level_matrix": {
+      "versions": [
+        1,
+        1798521807
+      ],
+      "ciphers": [
+        "AES-128-GCM",
+        "AES-256-GCM",
+        "ChaCha20-Poly1305"
+      ],
+      "constraints_per_profile": 19,
+      "repeated_packets_per_malformed_refusal": 140,
+      "rejected_PN_window": 128,
+      "ownership_probe_must_not_mutate_keys_or_PNs": true,
+      "subsequent_valid_packet_recovery": true
+    },
+    "resource_controls": [
+      "PING followed by PADDING counts against frame budget; a padding run remains one frame",
+      "oversized selected token remains ResourceExceeded rather than MalformedMessage",
+      "unsupported canonical frame types remain UnsupportedFeature rather than MalformedMessage"
+    ]
+  },
+  "auditor_sha256": {
+    "discovery/http3_field_live.py": "c367e660002a1a0d774e4f9472629a966f8759386ce317ad81a7943ae0ec4c3d",
+    "quic_header_wire_audit.py": "cf7c38f4e2ca4ba775f0b0dbf70c54272fb0e5ba22383d2c6a21a538dbad27f5",
+    "quic_retry_initial_audit.py": "632b88ffd51b4e58b84a02b696ec4d845f865c34f3f401c60f92819a96b2ff7c",
+    "quic_key_update_wire_audit.py": "be5908c2bbe09bddb737876fee4726432f79044ce265653d6692bb92f28ff918",
+    "quic_frame_fault_audit.py": "27abbab35a78a0273d165ffb24ad1a2f08cabcc9155edb4c446a154e4ae3a7d2",
+    "quic_frame_fault_cli_audit.py": "c0c2dfb4902ea41de0777c3ee0a5e97193da9e1a9f1ac8e2e3df6054ca77193e",
+    "quic_frame_fault_negative_controls.py": "aca6c14b38ee4ecea2cbade9e2ca8735e9a4dfda2ebaf0d4e6c2d881ab72c23b",
+    "quic_fault_profile_negative_controls.py": "554d454f1e033b1c7d35ed51bf7b642da214f649230ca2b06e332b29be698722",
+    "quic_source_graph_audit.py": "2c087aa7b818fcc08e0b0cba8eb7aeb767326e437a28b62620d57ba651e133ce",
+    "http3_field_wire_audit.py": "e0d94b8a6a4cf2d1ea17c398b608f031812148a4e2374dda47a92b5d1a764f3c",
+    "protocol_diagnostic_export_invariants.py": "a9b7f9e6085453445457352ee164f1d645ab9b9131d05e6c94eed6a54530ca04",
+    "protocol_diagnostic_negative_controls.py": "094b5bea70cb34565513fd66f59b9bfe262d1250e9ed4e1e839b3c0f69498fb9"
+  },
+  "live": {
+    "capture_sha256": "91b76e8f2217690c1a118296501bc0755cc2652d2e4306af90d35d8f1fc93a95",
+    "manifest_sha256": "60d255bccc2474685451cede67a5c8fbb381e3d3e0bde19a44c4120a3e52f103",
+    "generator_sha256": "c367e660002a1a0d774e4f9472629a966f8759386ce317ad81a7943ae0ec4c3d",
+    "declared_controls": {
+      "wire_versions": [
+        1,
+        1798521807,
+        1
+      ],
+      "cipher_suites": [
+        4865,
+        4866,
+        4867
+      ],
+      "connection_id_lengths": [
+        8,
+        0,
+        20
+      ],
+      "zero_cid_policy": "omit-new-connection-id",
+      "server_retry": true,
+      "retry_client_policy": "preserve-first-client-hello",
+      "client_key_update_followup": true,
+      "v2_key_update_policy": "rfc9369-label",
+      "retry_token_padding_bytes": [
+        0,
+        128,
+        512
+      ],
+      "inject_transport_faults": true
+    },
+    "actual_byte_exact_request_reply_receipts": 15,
+    "network": {
+      "retry_packets": 3,
+      "controlled_injected_drains": 27,
+      "delayed": 12,
+      "dropped": 6
+    },
+    "native_records": 169,
+    "protocol_counts": {
+      "": 2,
+      "quic": 130,
+      "http3": 37
+    },
+    "header": {
+      "checks": 11356,
+      "physical_frames": 151,
+      "reference_raw_views": 169,
+      "matched_reference_views": 167,
+      "authenticated_packet_numbers": 153,
+      "authenticated_packet_number_reference_comparisons": 150,
+      "authenticated_packet_number_reference_omissions": [
+        {
+          "PDU": 48,
+          "frame": 42,
+          "native_authenticated_PN": 27
+        },
+        {
+          "PDU": 103,
+          "frame": 91,
+          "native_authenticated_PN": 31
+        },
+        {
+          "PDU": 162,
+          "frame": 144,
+          "native_authenticated_PN": 32
+        }
+      ],
+      "reference_value_differences": [],
+      "reference_field_omissions": [],
+      "unmatched_native_views": [],
+      "unmatched_reference_views": [
+        {
+          "frame": 1,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "bf718c1f32e11d27c63d18d01fdf0461b61fbca190529e8604ac7a6f5c263fc0",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        },
+        {
+          "frame": 2,
+          "reference_occurrence": 0,
+          "bytes": 27,
+          "sha256": "bf718c1f32e11d27c63d18d01fdf0461b61fbca190529e8604ac7a6f5c263fc0",
+          "wire_version": null,
+          "reference_decoded_packet_number": false,
+          "reference_connection": null
+        }
+      ],
+      "capture_sha256": "91b76e8f2217690c1a118296501bc0755cc2652d2e4306af90d35d8f1fc93a95",
+      "oracle_sha256": "1da099a2788c368e3590be19b3c3001052891723698d4dbe2b1f5ec798325fab",
+      "events_sha256": "2fa11c993a20ff6e0cae1935a7c0f5faf1d080da78ee068bed75108cce35140b"
+    },
+    "header_certificate_sha256": "bda315ac87221dff68f20cf4110184add469e943679c3a61a62862f7c4979c1d",
+    "Initial_Retry": {
+      "checks": 640,
+      "independently_decrypted_Initial_packets": 12,
+      "verified_public_Retry_tags": 3,
+      "nonconforming_pairs": 0
+    },
+    "Initial_Retry_certificate_sha256": "cc0043538b088be1b0847da5df5c4b4d468b0180992ab95d442796ff26a689c0",
+    "independent_1RTT": {
+      "checks": 2389,
+      "protected_short_packets": 135,
+      "profiles": {
+        "('RFC', 4865, 0, 0)": 26,
+        "('RFC', 4865, 1, 1)": 15,
+        "('RFC', 4866, 0, 0)": 29,
+        "('RFC', 4866, 1, 1)": 16,
+        "('RFC', 4867, 0, 0)": 32,
+        "('RFC', 4867, 1, 1)": 17
+      },
+      "legacy_only_packets": 0,
+      "declared_control_packets": 27,
+      "nonzero_reserved_bit_controls": 3,
+      "declared_manifest_sha256": "60d255bccc2474685451cede67a5c8fbb381e3d3e0bde19a44c4120a3e52f103",
+      "oracle_sha256": "1da099a2788c368e3590be19b3c3001052891723698d4dbe2b1f5ec798325fab",
+      "events_sha256": "2fa11c993a20ff6e0cae1935a7c0f5faf1d080da78ee068bed75108cce35140b",
+      "keylog_sha256": "ce51bf56f6807fd2a7b588b7ee09d6826f8ee428d2c16d6b6377597f88ce2fe7",
+      "header_certificate_sha256": "bda315ac87221dff68f20cf4110184add469e943679c3a61a62862f7c4979c1d",
+      "initial_certificate_sha256": "cc0043538b088be1b0847da5df5c4b4d468b0180992ab95d442796ff26a689c0"
+    },
+    "independent_1RTT_certificate_sha256": "763c0435d6582ede7de7affec25f1be06e1d01f0202a12ec2144941ecdc507a0",
+    "frame_constraints": {
+      "checks": 730,
+      "controlled_wire_packets": 27,
+      "native_refusals": 24,
+      "allowed_contrasts": 3,
+      "baseline_false_successes": 12,
+      "baseline_AEAD_fact_omissions": 3,
+      "baseline_unsupported_misclassified_malformed": 6,
+      "recovered_live_generations": 3,
+      "records": [
+        {
+          "case": "client-handshake-done",
+          "epoch": 0,
+          "physical_frame": 35,
+          "PDU": 41,
+          "flow": 1,
+          "packet_number": 21,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x000000000000001e"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "525616b701cfaf1bb0eb4840ef7071c5189a49d3c0266102e0c620cb166b9458",
+          "payload_sha256": "9652595f37edd08c51dfa26567e6cd76e6fa2709c3e578478ca398d316837a7a"
+        },
+        {
+          "case": "client-new-token",
+          "epoch": 0,
+          "physical_frame": 36,
+          "PDU": 42,
+          "flow": 1,
+          "packet_number": 22,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "378acf7e4addef9bd18abe642df287c65f9e3a9014a79a3d0ca050d8d50c965d",
+          "payload_sha256": "08ae861f5659b9d040480ff418454456b7fec16618723d9dac5911fa4625765a"
+        },
+        {
+          "case": "server-empty-new-token",
+          "epoch": 0,
+          "physical_frame": 37,
+          "PDU": 43,
+          "flow": 1,
+          "packet_number": 13,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "7e3577e57d12f7a78f4d245be09b955a0783a55806ec551da44d77efa6bb2dee",
+          "payload_sha256": "0a6361b3a802f55cd5ae06101c88a1e216320fe11cc0cfe1d791eed08a1200fd"
+        },
+        {
+          "case": "reserved-bits",
+          "epoch": 0,
+          "physical_frame": 38,
+          "PDU": 44,
+          "flow": 1,
+          "packet_number": 23,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "29accfdf09dc0e2ae8f19150a8eab5a702a5612469e156ed5a8a76cba55dfc24",
+          "payload_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+        },
+        {
+          "case": "nonminimal-ping",
+          "epoch": 0,
+          "physical_frame": 39,
+          "PDU": 45,
+          "flow": 1,
+          "packet_number": 24,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "14bd2c7a9be5d9ad5035d7d559413b9cc6947e50683b67ca542d465be7c7181b",
+          "payload_sha256": "d2dbb1d582f0029c27ccaa9b62186a1d8e3af5daba05f629e4b13b3741f3795b"
+        },
+        {
+          "case": "unselected-frame",
+          "epoch": 0,
+          "physical_frame": 40,
+          "PDU": 46,
+          "flow": 1,
+          "packet_number": 25,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x000000000000001f"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "58e9d111b7f350e829521681daa05af71de453308c303acaaa87b070a09b7816",
+          "payload_sha256": "ffe679bb831c95b67dc17819c63c5090d221aac6f4c7bf530f594ab43d21fa1e"
+        },
+        {
+          "case": "wide-unselected-frame",
+          "epoch": 0,
+          "physical_frame": 41,
+          "PDU": 47,
+          "flow": 1,
+          "packet_number": 26,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000040"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [
+            "Unknown Frame Type 0x40"
+          ],
+          "wire_sha256": "2d113060934ca065fbe1dde2ba88c0ef197c68de4f2ad2aaaf360ad4e7b00f41",
+          "payload_sha256": "3330e5ba53cb09ab97dd287ad8ba30380b88a5aca467b6c231b0a46f261c16e1"
+        },
+        {
+          "case": "empty-payload",
+          "epoch": 0,
+          "physical_frame": 42,
+          "PDU": 48,
+          "flow": 1,
+          "packet_number": 27,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [],
+          "reference_packet_number_available": false,
+          "reference_expert_messages": [
+            "Failed to create decryption context: Decryption not possible, ciphertext is too short"
+          ],
+          "wire_sha256": "6071d57c2631c5cd2da40ae8e48d8d3e9816c2b6ca510fe62e097ec6d14914bc",
+          "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "allowed-server-token",
+          "epoch": 0,
+          "physical_frame": 43,
+          "PDU": 49,
+          "flow": 1,
+          "packet_number": 14,
+          "native_status": "decoded",
+          "native_error_class": "",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "2ec022dd405f7276b3be0a7faf470da69e8ec63c1ee334ca5de2486938917c4c",
+          "payload_sha256": "7c55f417cd6b7473e4c484879bbc07d34e43508b215074b44eb5ba5e3361b762"
+        },
+        {
+          "case": "client-handshake-done",
+          "epoch": 1,
+          "physical_frame": 84,
+          "PDU": 96,
+          "flow": 2,
+          "packet_number": 25,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x000000000000001e"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "8ad7844a1323ee4e50ac369d156ac1a122a1996b2bdd19cf83fcea4f66ca659b",
+          "payload_sha256": "9652595f37edd08c51dfa26567e6cd76e6fa2709c3e578478ca398d316837a7a"
+        },
+        {
+          "case": "client-new-token",
+          "epoch": 1,
+          "physical_frame": 85,
+          "PDU": 97,
+          "flow": 2,
+          "packet_number": 26,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "d0b091dc9cb5443fc84f8ee6659f4dbf895e681253e00d5bea40d2840777ad61",
+          "payload_sha256": "08ae861f5659b9d040480ff418454456b7fec16618723d9dac5911fa4625765a"
+        },
+        {
+          "case": "server-empty-new-token",
+          "epoch": 1,
+          "physical_frame": 86,
+          "PDU": 98,
+          "flow": 2,
+          "packet_number": 15,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "c6e2932eeadf673b3901a07ecaa23d2736e3a79d595c88e53bedf86f485def3a",
+          "payload_sha256": "0a6361b3a802f55cd5ae06101c88a1e216320fe11cc0cfe1d791eed08a1200fd"
+        },
+        {
+          "case": "reserved-bits",
+          "epoch": 1,
+          "physical_frame": 87,
+          "PDU": 99,
+          "flow": 2,
+          "packet_number": 27,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "494090704db444944107524fa293a304113659250f8a95de2fb81b7ce2305695",
+          "payload_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+        },
+        {
+          "case": "nonminimal-ping",
+          "epoch": 1,
+          "physical_frame": 88,
+          "PDU": 100,
+          "flow": 2,
+          "packet_number": 28,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "cacaf9ef2d0878e1133a021dedbaee608eaf9fc7fec0e9ac049274c287ce04f0",
+          "payload_sha256": "d2dbb1d582f0029c27ccaa9b62186a1d8e3af5daba05f629e4b13b3741f3795b"
+        },
+        {
+          "case": "unselected-frame",
+          "epoch": 1,
+          "physical_frame": 89,
+          "PDU": 101,
+          "flow": 2,
+          "packet_number": 29,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x000000000000001f"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "f273c8f9c33a2d307a9ad297f764b007d20534aca357fd0869ecb6a653f5e8a5",
+          "payload_sha256": "ffe679bb831c95b67dc17819c63c5090d221aac6f4c7bf530f594ab43d21fa1e"
+        },
+        {
+          "case": "wide-unselected-frame",
+          "epoch": 1,
+          "physical_frame": 90,
+          "PDU": 102,
+          "flow": 2,
+          "packet_number": 30,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000040"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [
+            "Unknown Frame Type 0x40"
+          ],
+          "wire_sha256": "f14ad6350ea6120faec52ba64c2709194a8f384644397a60564a6d52764824c5",
+          "payload_sha256": "3330e5ba53cb09ab97dd287ad8ba30380b88a5aca467b6c231b0a46f261c16e1"
+        },
+        {
+          "case": "empty-payload",
+          "epoch": 1,
+          "physical_frame": 91,
+          "PDU": 103,
+          "flow": 2,
+          "packet_number": 31,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [],
+          "reference_packet_number_available": false,
+          "reference_expert_messages": [
+            "Failed to create decryption context: Decryption not possible, ciphertext is too short"
+          ],
+          "wire_sha256": "fc7c71c7fc790784a21bc5f99ea3bc059d2ba776d9830b3ce89999c0f679a541",
+          "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "allowed-server-token",
+          "epoch": 1,
+          "physical_frame": 92,
+          "PDU": 104,
+          "flow": 2,
+          "packet_number": 16,
+          "native_status": "decoded",
+          "native_error_class": "",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "9f07fec14eb9032d44528251b6af6b4c72d9f495772d5465efe32eb43c2d9f96",
+          "payload_sha256": "7c55f417cd6b7473e4c484879bbc07d34e43508b215074b44eb5ba5e3361b762"
+        },
+        {
+          "case": "client-handshake-done",
+          "epoch": 2,
+          "physical_frame": 137,
+          "PDU": 155,
+          "flow": 3,
+          "packet_number": 26,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x000000000000001e"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "51423feeb637c0eabba6309a83e12c51d4a415574c43d0a96e46aeea6ddf6a64",
+          "payload_sha256": "9652595f37edd08c51dfa26567e6cd76e6fa2709c3e578478ca398d316837a7a"
+        },
+        {
+          "case": "client-new-token",
+          "epoch": 2,
+          "physical_frame": 138,
+          "PDU": 156,
+          "flow": 3,
+          "packet_number": 27,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "421f501b595ec2ae35d15717d951b86ae0c17d536eaead2474f80c09c970a0c8",
+          "payload_sha256": "08ae861f5659b9d040480ff418454456b7fec16618723d9dac5911fa4625765a"
+        },
+        {
+          "case": "server-empty-new-token",
+          "epoch": 2,
+          "physical_frame": 139,
+          "PDU": 157,
+          "flow": 3,
+          "packet_number": 17,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "5f9fc580972f225ac662e01183aee16c1eefa9806481135e4b28aa7dc697f2c9",
+          "payload_sha256": "0a6361b3a802f55cd5ae06101c88a1e216320fe11cc0cfe1d791eed08a1200fd"
+        },
+        {
+          "case": "reserved-bits",
+          "epoch": 2,
+          "physical_frame": 140,
+          "PDU": 158,
+          "flow": 3,
+          "packet_number": 28,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "context-required",
+          "before_error_class": "ContextRequired",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "7231882f91a0c607211fe87c947c64da493c23592ec9f0d4a89c998636ea044b",
+          "payload_sha256": "4bf5122f344554c53bde2ebb8cd2b7e3d1600ad631c385a5d7cce23c7785459a"
+        },
+        {
+          "case": "nonminimal-ping",
+          "epoch": 2,
+          "physical_frame": 141,
+          "PDU": 159,
+          "flow": 3,
+          "packet_number": 29,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000001"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "891e1a2d7305e762c7e9c749b49f55027bafde7cce4e33fbc1f1caef5d6ed724",
+          "payload_sha256": "d2dbb1d582f0029c27ccaa9b62186a1d8e3af5daba05f629e4b13b3741f3795b"
+        },
+        {
+          "case": "unselected-frame",
+          "epoch": 2,
+          "physical_frame": 142,
+          "PDU": 160,
+          "flow": 3,
+          "packet_number": 30,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x000000000000001f"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "7c58857a3ef65d9b647003104089d5520dcfad4d2ba8d5ad68d8a874ad32b054",
+          "payload_sha256": "ffe679bb831c95b67dc17819c63c5090d221aac6f4c7bf530f594ab43d21fa1e"
+        },
+        {
+          "case": "wide-unselected-frame",
+          "epoch": 2,
+          "physical_frame": 143,
+          "PDU": 161,
+          "flow": 3,
+          "packet_number": 31,
+          "native_status": "context-required",
+          "native_error_class": "UnsupportedFeature",
+          "before_status": "malformed",
+          "before_error_class": "MalformedMessage",
+          "reference_frame_types": [
+            "0x0000000000000040"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [
+            "Unknown Frame Type 0x40"
+          ],
+          "wire_sha256": "7921e77ae65fee473e0a8e4c8a7028f999dc599161dd6adc9b1aeeecd863eb37",
+          "payload_sha256": "3330e5ba53cb09ab97dd287ad8ba30380b88a5aca467b6c231b0a46f261c16e1"
+        },
+        {
+          "case": "empty-payload",
+          "epoch": 2,
+          "physical_frame": 144,
+          "PDU": 162,
+          "flow": 3,
+          "packet_number": 32,
+          "native_status": "malformed",
+          "native_error_class": "MalformedMessage",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [],
+          "reference_packet_number_available": false,
+          "reference_expert_messages": [
+            "Failed to create decryption context: Decryption not possible, ciphertext is too short"
+          ],
+          "wire_sha256": "66378ea0225ad74a482776b6c78baf09aee1d3ffadd304c1bed0c3da9022a09d",
+          "payload_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "case": "allowed-server-token",
+          "epoch": 2,
+          "physical_frame": 145,
+          "PDU": 163,
+          "flow": 3,
+          "packet_number": 18,
+          "native_status": "decoded",
+          "native_error_class": "",
+          "before_status": "decoded",
+          "before_error_class": "",
+          "reference_frame_types": [
+            "0x0000000000000007"
+          ],
+          "reference_packet_number_available": true,
+          "reference_expert_messages": [],
+          "wire_sha256": "30305a9937f3cffe6bcade400a7d036eb2fff1f9729e36562d61d0aea35db72e",
+          "payload_sha256": "7c55f417cd6b7473e4c484879bbc07d34e43508b215074b44eb5ba5e3361b762"
+        }
+      ]
+    },
+    "frame_constraints_certificate_sha256": "61f21a4fd979fcbf1f1590c32f4eaed6ca7b1b3c88c17b189006ce2219178e92",
+    "CLI": {
+      "checks": 211,
+      "physical_rows": 151,
+      "controlled_rows": 27,
+      "baseline_duplicate_diagnostics": 24,
+      "CLI_sha256": "dd1adf22594e5f718c169e39ad6d61299abc25450ee243492963677d43562385",
+      "before_CLI_sha256": "a50d7eeb099f56d778d7143a744358189f2b0daac579bba8b89ca7ed0906b6bf"
+    },
+    "CLI_certificate_sha256": "b7fafac27a35434bfc65ffd99fd8565d6cda44e1ae7b20e99aec2246ffb3221b",
+    "application_source": {
+      "checks": 14418,
+      "connections": 3,
+      "application_frames": 51,
+      "types": {
+        "4": 6,
+        "1": 30,
+        "0": 15
+      },
+      "source_ranges": 261,
+      "unprotected_zero_tails": [
+        {
+          "frame": 52,
+          "bytes": 889,
+          "sha256": "971af1ffa67aa21dc41688f3b31c40e6e2728f975dd795923213d5bc933051d6"
+        }
+      ],
+      "selected_differences": []
+    },
+    "application_source_certificate_sha256": "e207d8c610e3bbb5c1e18663e500881bd686ff8fe2501ced818dd890f2563aa9",
+    "application_fields": {
+      "checks": 6588,
+      "peer_operations": 15,
+      "native_connections": 3,
+      "header_sections": 30,
+      "native_conformance": {
+        "base-shape-valid": 30
+      },
+      "reference_frame_views": {
+        "4": 6,
+        "1": 31,
+        "0": 17,
+        "12400": 1
+      },
+      "reference_repeated_frame_views": [
+        {
+          "connection": "1",
+          "direction": 1,
+          "stream": 0,
+          "type": 0,
+          "sha256": "a1ef49fb7e76c816b226675686bbd3bdb8214889a72a3bcb5447b92fc4254522",
+          "frames": [
+            58,
+            70
+          ]
+        },
+        {
+          "connection": "1",
+          "direction": 1,
+          "stream": 0,
+          "type": 1,
+          "sha256": "df4fce9cedbb5e451117bb5e6227e67a418d4847b3f51a80e25f9a02e7e1778d",
+          "frames": [
+            58,
+            70
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 1,
+          "stream": 0,
+          "type": 0,
+          "sha256": "a1ef49fb7e76c816b226675686bbd3bdb8214889a72a3bcb5447b92fc4254522",
+          "frames": [
+            114,
+            115
+          ]
+        },
+        {
+          "connection": "2",
+          "direction": 1,
+          "stream": 0,
+          "type": 1,
+          "sha256": "df4fce9cedbb5e451117bb5e6227e67a418d4847b3f51a80e25f9a02e7e1778d",
+          "frames": [
+            114,
+            115
+          ]
+        }
+      ],
+      "reference_header_views_unavailable": [
+        {
+          "connection": "1",
+          "direction": 0,
+          "stream": 4,
+          "case": "cid-long-header-field"
+        }
+      ],
+      "reference_raw_field_differences": [],
+      "native_selected_differences": []
+    },
+    "application_fields_certificate_sha256": "129c1303161be1579cee67acb86ed61689afd65370f5db49272706eba0ed4ced"
+  },
+  "public": {
+    "weber": {
+      "core_SDK": {
+        "scope": "Complete public export comparison against token phase; no record exclusions or label normalization.",
+        "kind": "SDK",
+        "records": 39283,
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "before_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "after_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "byte_identical": true
+      },
+      "core_CLI": {
+        "scope": "Complete public export comparison against token phase; no record exclusions or label normalization.",
+        "kind": "CLI",
+        "records": 51328,
+        "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+        "before_sha256": "4df32deed2810b5ffec015a714168ece87370ed88427f031f5283e3379d87a1a",
+        "after_sha256": "4df32deed2810b5ffec015a714168ece87370ed88427f031f5283e3379d87a1a",
+        "byte_identical": true
+      },
+      "final_CLI_diagnostic_invariants": {
+        "scope": "Allow only newly retained native refusal metadata in complete CLI exports.\nEvery physical row, PDU, field occurrence, byte witness, flow, transaction and\npresentation value must remain equal. Added summary/error/expert strings must\nmatch the separately exported native observation, never a rewritten reference.\n",
+        "checks": 273098,
+        "physical_rows": 51328,
+        "logical_PDUs": 39151,
+        "rows_with_added_diagnostics": 4071,
+        "PDUs_with_added_diagnostics": 4083,
+        "diagnostic_profiles": {
+          "('', 'unrecognized', 'ProtocolNotRecognized')": 3399,
+          "('ssh', 'malformed', 'MalformedMessage')": 1,
+          "('ntp', 'context-required', 'UnsupportedFeature')": 152,
+          "('rtsp', 'malformed', '')": 1,
+          "('ip', 'unrecognized', 'UnsupportedOrMalformedNetworkLayer')": 122,
+          "('imap', 'malformed', '')": 1,
+          "('ssh', 'context-required', 'Encrypted')": 6,
+          "('netflow-v9', 'context-required', 'ContextRequired')": 3,
+          "('ip', 'limited', 'EncapsulationDepthOrProfile')": 22,
+          "('radius', 'context-required', 'ContextRequired')": 6,
+          "('snmp', 'context-required', 'Encrypted')": 232,
+          "('dns', 'malformed', 'MalformedMessage')": 4,
+          "('kerberos', 'malformed', '')": 17,
+          "('dcerpc', 'malformed', '')": 42,
+          "('quic', 'context-required', 'Encrypted')": 56,
+          "('pim', 'malformed', 'MalformedMessage')": 18,
+          "('modbus', 'malformed', '')": 1
+        },
+        "before_sha256": "4df32deed2810b5ffec015a714168ece87370ed88427f031f5283e3379d87a1a",
+        "after_sha256": "e4a9f0df7e5b1a61754bc316e6c932a848b95a6373b608408d1592822f024eb6",
+        "events_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "other_differences": []
+      },
+      "header": {
+        "checks": 263942,
+        "physical_frames": 51328,
+        "matched_reference_views": 84,
+        "authenticated_packet_numbers": 18,
+        "authenticated_packet_number_reference_comparisons": 18,
+        "authenticated_packet_number_reference_omissions": [],
+        "reference_value_differences": [],
+        "reference_field_omissions": [],
+        "oracle_sha256": "7b96f323d98efdb876a4e33e6df299f7f7b45af86d10c634c23d04c107285d5b",
+        "events_sha256": "7f40f3741d7de2c19636036adbacd40a093471c014b7d114796c73390ec4dc85",
+        "unmatched_native_views_count": 4,
+        "unmatched_reference_views_count": 21,
+        "reference_derived_views_count": 0
+      },
+      "header_certificate_sha256": "99a3da375473910c7606a3857c66fcf1e426487f77490f549cc70c59ca93fb8f"
+    },
+    "sharon": {
+      "core_SDK": {
+        "scope": "Complete public export comparison against token phase; no record exclusions or label normalization.",
+        "kind": "SDK",
+        "records": 245615,
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "before_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "after_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "byte_identical": true
+      },
+      "core_CLI": {
+        "scope": "Complete public export comparison against token phase; no record exclusions or label normalization.",
+        "kind": "CLI",
+        "records": 328127,
+        "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "byte_identical": true
+      },
+      "final_CLI_diagnostic_invariants": {
+        "scope": "Allow only newly retained native refusal metadata in complete CLI exports.\nEvery physical row, PDU, field occurrence, byte witness, flow, transaction and\npresentation value must remain equal. Added summary/error/expert strings must\nmatch the separately exported native observation, never a rewritten reference.\n",
+        "checks": 2476254,
+        "physical_rows": 328127,
+        "logical_PDUs": 244660,
+        "rows_with_added_diagnostics": 116303,
+        "PDUs_with_added_diagnostics": 116306,
+        "diagnostic_profiles": {
+          "('', 'unrecognized', 'ProtocolNotRecognized')": 5014,
+          "('ssh', 'malformed', 'MalformedMessage')": 1,
+          "('ntp', 'context-required', 'UnsupportedFeature')": 146,
+          "('rtsp', 'malformed', '')": 1,
+          "('ip', 'unrecognized', 'UnsupportedOrMalformedNetworkLayer')": 50859,
+          "('imap', 'malformed', '')": 1,
+          "('ssh', 'context-required', 'Encrypted')": 4,
+          "('netflow-v9', 'context-required', 'ContextRequired')": 3,
+          "('ip', 'limited', 'EncapsulationDepthOrProfile')": 50,
+          "('ip', 'malformed', 'FragmentLength')": 14963,
+          "('turn', 'context-required', 'ContextRequired')": 1,
+          "('pim', 'context-required', 'ContextRequired')": 77,
+          "('l2tp', 'malformed', 'MalformedMessage')": 427,
+          "('l2tp', 'incomplete', 'NeedMore')": 229,
+          "('pim', 'malformed', 'MalformedMessage')": 54,
+          "('ip', 'malformed', 'NDOptionLength')": 57,
+          "('dcerpc', 'context-required', 'UnsupportedFeature')": 1,
+          "('dcerpc', 'malformed', '')": 10,
+          "('ip', 'malformed', 'FragmentOverlapRejected')": 16,
+          "('ip', 'limited', 'FragmentQuarantineBudget')": 44374,
+          "('smb2', 'malformed', '')": 5,
+          "('diameter', 'malformed', '')": 3,
+          "('tls', 'malformed', 'MalformedMessage')": 5,
+          "('tls', 'context-required', 'ContextRequired')": 3,
+          "('ip', 'incomplete', 'ICMPv6HeaderTruncated')": 2
+        },
+        "before_sha256": "8b6d3e08f9cb8f2f01edba23235f760c4d6c3a07faf969f67fbf73b6f4f69dbb",
+        "after_sha256": "ae21c094f1d18ce15b53ec66a222bf389f3e2bc2478ddecf34933727de7e5426",
+        "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "other_differences": []
+      },
+      "header": {
+        "checks": 1651082,
+        "physical_frames": 328127,
+        "matched_reference_views": 0,
+        "authenticated_packet_numbers": 0,
+        "authenticated_packet_number_reference_comparisons": 0,
+        "authenticated_packet_number_reference_omissions": [],
+        "reference_value_differences": [],
+        "reference_field_omissions": [],
+        "oracle_sha256": "7cc7781a97eb803043dedd7e89122955cdd7fb455f3c8bd4315c96c2f31dc926",
+        "events_sha256": "49e2a34446a9f04b8ca584fac3d1f2ab4b58d7af2ddb6e9d398033c69625fda0",
+        "unmatched_native_views_count": 1,
+        "unmatched_reference_views_count": 1027,
+        "reference_derived_views_count": 10
+      },
+      "header_certificate_sha256": "fd70549a31fed166d795ea35d9ac985b69c8ca529d06184708ccc91553f77118"
+    }
+  },
+  "Windows": [
+    {
+      "case": "refused-readable",
+      "PDU": 96,
+      "protocol": "QUIC",
+      "field_down": 20,
+      "label": "Rejected Packet Payload: 1 bytes",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "ff62cdde3bc6d015d3040471e1a706e2657fc36ebb7bc03d1915f9d77f472c25",
+        "01-protocol-fields.json": "f8130bd7700d0ebc9cb2f4392594351382f3c5d0bc41a33e5b1f698c3ea6fe0c",
+        "01-deep-protocol-fields.json": "2f380cab38e5cb494af7c5f88a68e90f14dedcff8e51091ee7fb885eb18e2dc2",
+        "02-byte-sources.json": "6096170417f0202c8788e78103f0ad91b7d45a381b37c659dda12259e3eda360",
+        "03-conversation-messages.json": "efd987884dc36bf22f7bc2b313a8f8b7fff48327a59e7af19c4b67416c59b291",
+        "04-association-evidence.json": "bdeb15c9620481338fdc2ce044baa9fd0c7170afa6895b5a659c2830a845b348",
+        "05-narrow.json": "7baa8956d861a8e617f252af783520d45fd5baeb36fcec80e7bff31cf035f67a",
+        "06-restored.json": "bdeb15c9620481338fdc2ce044baa9fd0c7170afa6895b5a659c2830a845b348",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "24963d91549711685062725301c9c4f835e05363b0eca6d0aa188d4855280a5a",
+        "01-deep-protocol-fields.png": "ea3e77e4967efb6fd41cb52b127b4e7ad789a12ddc575456811279a2a5693056",
+        "05-narrow.png": "504f27370a9ee82e5133d3f990433065688416456baf26d687154d5ff14c57f7"
+      }
+    },
+    {
+      "case": "empty-readable",
+      "PDU": 103,
+      "protocol": "QUIC",
+      "field_down": 20,
+      "label": "0 bytes (AEAD verified; not delivered)",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "2b17904d37bbde0eb9091308100b7b630a702045a4a08493fa190233d8243421",
+        "01-protocol-fields.json": "0b2b6ca9e656b38304e855b5e447755358af53d29c6d6216a7fa24fe4524d15f",
+        "01-deep-protocol-fields.json": "8e6349da77a4a8abc58a1da0847cef2f2ebbc9cf9a11c84066fb033dff0ddd7f",
+        "02-byte-sources.json": "eae904cab2c86a425c616b495592402896fa78202359e5c3f8d445727da16ef4",
+        "03-conversation-messages.json": "ccf2c29b352da632911a1accf57bdc77707a58f446f5954b16440e0acb05834e",
+        "04-association-evidence.json": "b87b58a8cb2dd7950f919822ac1e53ffdfb330fb80c0c0061028242d6ae6eaf7",
+        "05-narrow.json": "71c6b633a3a7f2ff4a1ae74129f4eff7e756b6e68c8841eac9998bfd46c08bd0",
+        "06-restored.json": "b87b58a8cb2dd7950f919822ac1e53ffdfb330fb80c0c0061028242d6ae6eaf7",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "872f1d94e422a70e986354d4b208fb533aeffdc7884063f1fcb436ff935b8aa2",
+        "01-deep-protocol-fields.png": "b9d9b286f961407bd1ee8136be99c363df1132db598536362ec03ae00bbfacfa",
+        "05-narrow.png": "295199d4a0d5713b57afd0ad653fbf2d66ac1b5cfd22557b3e65e9f8d234c6bc"
+      }
+    },
+    {
+      "case": "recovery-readable",
+      "PDU": 107,
+      "protocol": "HTTP/3",
+      "field_down": 45,
+      "label": "/after-transport-faults",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "3f55fd878d685a7d3b6c03d4010c04ba972112e3012e3bf08100811a87102b02",
+        "01-protocol-fields.json": "737542974af4b20bf5aadb44f3c6432e184bdbe132ac950088680ea9f1112ecf",
+        "01-deep-protocol-fields.json": "962146b586e0b76ac59d37c4b7e7664af2ab2591f3b29756c8ac9f17612a370f",
+        "02-byte-sources.json": "873d696ef99a23684fe5e5ef400649c7343d34eebc6110cf58ebb557e381bf0c",
+        "03-conversation-messages.json": "763419ffa3d2055de2848be8e2fbc3a7ba3e827ec65a81755928658664989ca9",
+        "04-association-evidence.json": "894001d2ed6a0329919469bca1bb12f6d5f6502b2ef6fa666d0b8fe737f3b845",
+        "05-narrow.json": "21c047d21d6f1ea5d23d24256dab24d6ea94d269008c273299a67799db20fb0d",
+        "06-restored.json": "894001d2ed6a0329919469bca1bb12f6d5f6502b2ef6fa666d0b8fe737f3b845",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "5db9d84e3d3e338c5292a98df389d5dbd436c413440b35d727257b8a71304c23",
+        "01-deep-protocol-fields.png": "568133f91e53c534ce330557b22a8f84711f38de909fe5530c3a49748534e51d",
+        "05-narrow.png": "1eb8f66e3700db2d631ec6149f005195c73b5b2e733ab0574f95feed9070143c"
+      }
+    },
+    {
+      "case": "recovery-headers",
+      "PDU": 107,
+      "protocol": "HTTP/3",
+      "field_down": 65,
+      "label": ":path: /after-transport-faults",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "3f55fd878d685a7d3b6c03d4010c04ba972112e3012e3bf08100811a87102b02",
+        "01-protocol-fields.json": "737542974af4b20bf5aadb44f3c6432e184bdbe132ac950088680ea9f1112ecf",
+        "01-deep-protocol-fields.json": "1d90c0d00e6864a15e88ce05c8f0bb70e31c19d47868131079f78d8a61a49076",
+        "02-byte-sources.json": "ec6be34eaaed30240c6e582b4421c7871ae20ca63943ac7d999982a1d08229a6",
+        "03-conversation-messages.json": "763419ffa3d2055de2848be8e2fbc3a7ba3e827ec65a81755928658664989ca9",
+        "04-association-evidence.json": "894001d2ed6a0329919469bca1bb12f6d5f6502b2ef6fa666d0b8fe737f3b845",
+        "05-narrow.json": "21c047d21d6f1ea5d23d24256dab24d6ea94d269008c273299a67799db20fb0d",
+        "06-restored.json": "894001d2ed6a0329919469bca1bb12f6d5f6502b2ef6fa666d0b8fe737f3b845",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "5db9d84e3d3e338c5292a98df389d5dbd436c413440b35d727257b8a71304c23",
+        "01-deep-protocol-fields.png": "6392ea61f3f0546d8c6e1f5121f792ab175c4fee5f22c35c2fe66508e065cbac",
+        "05-narrow.png": "1eb8f66e3700db2d631ec6149f005195c73b5b2e733ab0574f95feed9070143c"
+      }
+    },
+    {
+      "case": "public-weber-final",
+      "PDU": 37387,
+      "physical_frame": 48062,
+      "physical_capture_packets": 51328,
+      "protocol": "QUIC",
+      "field_down": 0,
+      "label": "authentication not verified",
+      "restored": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "unmodified_native_console_sha256": {
+        "00-filter-ready.json": "1e8be09b831efc3deaa9a67996c69dc1b42d6bc8b1cc9cf2841ffd0fc270571a",
+        "01-protocol-fields.json": "b9c0e4d639af11b636b7a5adefecba006ccae895c551834e3d69b07c72891961",
+        "01-deep-protocol-fields.json": "b9c0e4d639af11b636b7a5adefecba006ccae895c551834e3d69b07c72891961",
+        "02-byte-sources.json": "c777826b3af40bdb72cec5a638f5c795bae16a62d240aafe7c36c542447f8df4",
+        "03-conversation-messages.json": "027644c5a2c5b7f02f31ec503a6bdab6587b67cce6c0eda5f793827243b61d3f",
+        "04-association-evidence.json": "320cb85ca44337515e1a0900685cccc00640283899325f9ec18ab821d781cc42",
+        "05-narrow.json": "7307f4f34d1951a0070c3c0acc641a0089807e1ae02f96e016153a40fe27a8f9",
+        "06-restored.json": "320cb85ca44337515e1a0900685cccc00640283899325f9ec18ab821d781cc42",
+        "restored.json": "55c37b2e20147b949d32ed5b42c48be30df6589b5bc21db3b451d12ff2cbadc8"
+      },
+      "rendered_native_buffer_sha256": {
+        "01-protocol-fields.png": "d73966b9c9b99bf8a9c63475398de1b194bf5a23af0b05c167780d9e617cbf23",
+        "01-deep-protocol-fields.png": "d73966b9c9b99bf8a9c63475398de1b194bf5a23af0b05c167780d9e617cbf23",
+        "05-narrow.png": "079d5eab3d9d1f2690a33fae3711f81a4da7c1bc00e7c9aec84febd2e29c127e"
+      }
+    }
+  ],
+  "remaining": [
+    "Actual resumption/0-RTT, ticket validity, complete TLS handshake/transport-parameter and endpoint conformance are not certified; early-data role tests use explicitly supplied unit keys",
+    "General different-byte packet-number reuse is not resolved by bounded refused-PN retention",
+    "Unsupported frame profiles are not negotiated or decoded by this change",
+    "Resource refusal does not retain unbounded plaintext; the selected token ceiling remains 20 KiB",
+    "One HTTP3 reference header section and three empty-payload reference packet numbers remain unavailable; reference diagnostics are preserved",
+    "Prior QUIC/HTTP3/version/carrier/QPACK and whole-protocol acceptance limits remain open; public fuzz refusals are not converted into successful recognition"
+  ],
+  "negative_controls": {
+    "frame_refusal": {
+      "scope": "Challenge refusal, ownership and payload evidence with explicit test rebinding.\nMutated exports are test controls only; the physical capture and oracle stay\nunchanged. Rebinding bypasses the outer export hash to exercise semantic checks.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 15,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "native-AEAD-fact",
+          "accepted": false
+        },
+        {
+          "control": "peer-identity-overclaim",
+          "accepted": false
+        },
+        {
+          "control": "native-PN",
+          "accepted": false
+        },
+        {
+          "control": "refused-payload-octets",
+          "accepted": false
+        },
+        {
+          "control": "refused-payload-digest",
+          "accepted": false
+        },
+        {
+          "control": "payload-delivery-overclaim",
+          "accepted": false
+        },
+        {
+          "control": "refused-frame-delivery",
+          "accepted": false
+        },
+        {
+          "control": "native-error-class",
+          "accepted": false
+        },
+        {
+          "control": "native-status",
+          "accepted": false
+        },
+        {
+          "control": "missing-refusal-diagnostic",
+          "accepted": false
+        },
+        {
+          "control": "application-label-overclaim",
+          "accepted": false
+        },
+        {
+          "control": "wrong-physical-frame",
+          "accepted": false
+        },
+        {
+          "control": "missing-connection",
+          "accepted": false
+        },
+        {
+          "control": "wrong-connection-generation",
+          "accepted": false
+        },
+        {
+          "control": "real-recovery-request",
+          "accepted": false
+        }
+      ]
+    },
+    "exact_reserved_bit_profile": {
+      "scope": "Ensure the exact controlled reserved-bit profile cannot weaken default AEAD QA.\nOnly explicitly declared, receiver-drained wire controls are allowed. Original\ncapture/oracle/native exports and certified Initial/header inputs stay untouched.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 8,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "default-remains-strict",
+          "accepted": false
+        },
+        {
+          "control": "wrong-control-role",
+          "accepted": false
+        },
+        {
+          "control": "wrong-reserved-bits",
+          "accepted": false
+        },
+        {
+          "control": "wrong-control-PN",
+          "accepted": false
+        },
+        {
+          "control": "wrong-control-plaintext",
+          "accepted": false
+        },
+        {
+          "control": "undrained-control",
+          "accepted": false
+        },
+        {
+          "control": "wrong-control-wire",
+          "accepted": false
+        },
+        {
+          "control": "duplicate-control-wire",
+          "accepted": false
+        }
+      ]
+    },
+    "default_independent_crypto_regression": {
+      "scope": "Challenge independent 1-RTT verification with explicitly rebound test inputs.\nRebinding bypasses the input hashes only to exercise crypto, CID context and\nnative/reference PN comparisons. These are declared test controls, never new\ncapture evidence or replacements for the original certificates.\n",
+      "baseline_passed": true,
+      "rejected_corruptions": 10,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "AEAD-tag",
+          "accepted": false
+        },
+        {
+          "control": "HP-sample",
+          "accepted": false
+        },
+        {
+          "control": "DCID-context",
+          "accepted": false
+        },
+        {
+          "control": "key-phase-AAD",
+          "accepted": false
+        },
+        {
+          "control": "reference-PN",
+          "accepted": false
+        },
+        {
+          "control": "native-PN",
+          "accepted": false
+        },
+        {
+          "control": "native-authentication",
+          "accepted": false
+        },
+        {
+          "control": "wire-version-context",
+          "accepted": false
+        },
+        {
+          "control": "receiver-CID-context",
+          "accepted": false
+        },
+        {
+          "control": "traffic-secret",
+          "accepted": false
+        }
+      ]
+    },
+    "compact_diagnostic_invariants": {
+      "scope": "Ensure diagnostic-only export auditing rejects unrelated or invented changes.",
+      "baseline_passed": true,
+      "rejected_corruptions": 12,
+      "controls": [
+        {
+          "control": "baseline",
+          "accepted": true
+        },
+        {
+          "control": "invented-error",
+          "accepted": false
+        },
+        {
+          "control": "invented-expert",
+          "accepted": false
+        },
+        {
+          "control": "invented-summary",
+          "accepted": false
+        },
+        {
+          "control": "missing-diagnostic",
+          "accepted": false
+        },
+        {
+          "control": "changed-PDU-status",
+          "accepted": false
+        },
+        {
+          "control": "changed-PDU-ID",
+          "accepted": false
+        },
+        {
+          "control": "changed-row-flow",
+          "accepted": false
+        },
+        {
+          "control": "changed-row-protocol",
+          "accepted": false
+        },
+        {
+          "control": "changed-row-summary",
+          "accepted": false
+        },
+        {
+          "control": "invented-raw-bytes",
+          "accepted": false
+        },
+        {
+          "control": "changed-typed-value",
+          "accepted": false
+        },
+        {
+          "control": "extra-physical-row",
+          "accepted": false
+        }
+      ]
+    }
+  },
+  "local_executable_sha256": {
+    "events-frames-final.exe": "8957b061e4a82dc1905a54421211453f5e8a62966505bcd5338e0ba6dbbf5aa8",
+    "yak-frames-final.exe": "4b21ba671c29617e4320ece41576d82d583abcea792d922eb5d1613320e628db",
+    "yak-frames-diagnostics.exe": "8c2b010454e64435feb0004fcdf6a4da14afea855b00b0d8a47391fbe11c3114"
+  },
+  "native_console_harness_sha256": "a3ee435e63ad124adcd973e4af1bdd452e1e599a49636ce87ddb12f79189308f",
+  "native_console_harness_source_sha256": "5aedf65ef15e4dcc8aa578d04c1697f9f3efd2b512d942570830cb4224f885f0",
+  "native_buffer_renderer_sha256": "427379a3b9c1ac7e8257a81d3d6e478904fd96659468f231bbec57a55e336e83"
+}

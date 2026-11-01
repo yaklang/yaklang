@@ -291,13 +291,23 @@ func TestProtocolCorpusSSHPlaintextAllOriginalRecords(t *testing.T) {
 	var starts []int
 	counts, algorithms := map[string]int{}, map[string]int{}
 	identBytes, clearBytes, protectedBytes, physicalPayloadBytes, noPayloadFrames := 0, 0, 0, 0, 322
+	strictIdentifications, independentlyObservedNonconformantIdentifications := 0, 0
 	for _, f := range flows {
 		algorithm, profile, entry := sshPlaintextTestProfile(t, f, flows)
 		if f.client {
 			algorithms[algorithm]++
 		}
-		ident := protocolCorpusRequireBoundedRuleParse(t, f.stream[:f.identEnd], "application-layer.ssh", "SSH")
-		require.Equal(t, f.stream[:f.identEnd], NodeToBytes(ident))
+		if string(f.stream[:f.identEnd]) == "SSH-2.0-APACHE-SSHD-2.5.0\r\n" {
+			// Preserve this exact original capture/header. A stateless rule
+			// cannot use its surrounding connection as compatibility evidence.
+			_, err := parser.ParseBinary(newProtocolCorpusBoundedReader(f.stream[:f.identEnd]), "application-layer.ssh", "SSH")
+			require.ErrorContains(t, err, "software version is invalid")
+			independentlyObservedNonconformantIdentifications++
+		} else {
+			ident := protocolCorpusRequireBoundedRuleParse(t, f.stream[:f.identEnd], "application-layer.ssh", "SSH")
+			require.Equal(t, f.stream[:f.identEnd], NodeToBytes(ident))
+			strictIdentifications++
+		}
 		for _, message := range f.packets {
 			counts[profile]++
 			n := protocolCorpusRequireBoundedRuleParse(t, message.wire, sshPlaintextTestRule, entry)
@@ -368,6 +378,8 @@ func TestProtocolCorpusSSHPlaintextAllOriginalRecords(t *testing.T) {
 	require.Equal(t, 171, identBytes)
 	require.Equal(t, 8760, clearBytes)
 	require.Equal(t, 19596, protectedBytes)
+	require.Equal(t, 5, strictIdentifications)
+	require.Equal(t, 1, independentlyObservedNonconformantIdentifications)
 	t.Logf("records=%d no-payload=%d payload-bytes=%d identification=%d clear=%d protected=%d packets=%v", len(records), noPayloadFrames, physicalPayloadBytes, identBytes, clearBytes, protectedBytes, counts)
 }
 

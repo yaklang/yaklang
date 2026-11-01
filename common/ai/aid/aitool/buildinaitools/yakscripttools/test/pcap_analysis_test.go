@@ -22,6 +22,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/pcapx/pcapdb"
 	"github.com/yaklang/yaklang/common/schema"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 )
 
 // Keep the oracle independent of the parser: one TCP conversation, a request
@@ -96,16 +97,18 @@ func TestPCAPAnalysisTools(t *testing.T) {
 	consts.ResetYakitHomeOnce()
 	profile, err := gorm.Open("sqlite3", filepath.Join(home, "profile.sqlite"))
 	require.NoError(t, err)
+	projectPath := filepath.Join(home, "project.sqlite")
+	project, err := consts.CreateProjectDatabase(projectPath)
+	require.NoError(t, err)
 	require.NoError(t, pcapdb.ClosePCAPDatabases())
 	consts.BindProfileDatabase(profile, filepath.Join(home, "profile.sqlite"))
-	// Bind both globals explicitly: lazy project initialization would otherwise
-	// open default-yakit.db inside the fixture and leak its handle on Windows.
-	consts.BindProjectDatabaseWithReader(profile, nil, filepath.Join(home, "profile.sqlite"))
+	consts.BindProjectDatabaseWithReader(project, nil, projectPath)
 	t.Cleanup(func() {
 		require.NoError(t, pcapdb.ClosePCAPDatabases())
 		consts.BindProfileDatabase(previous, previousPath)
 		consts.BindProjectDatabaseWithReader(previousProject.Database, previousProject.ReadDatabase, previousProject.Path)
-		profile.Close()
+		require.NoError(t, profile.Close())
+		require.NoError(t, project.Close())
 		consts.ResetYakitHomeOnce()
 	})
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
@@ -157,7 +160,7 @@ func TestPCAPAnalysisTools(t *testing.T) {
 	}
 	capture := pcapAnalysisCapture(t, "skill.example")
 	// The live-model harness consumes the exact same bytes and known answers.
-	liveFixture, err := os.ReadFile(filepath.Join("..", "..", "..", "..", "..", "aismoking", "live", "testdata", "pcap_analysis.pcap"))
+	liveFixture, err := trafficfixture.ReadFile(filepath.Join("..", "..", "..", "..", "..", "aismoking", "live", "testdata", "pcap_analysis.pcap"))
 	require.NoError(t, err)
 	require.Equal(t, capture, liveFixture)
 	path := filepath.Join(home, "proof.pcap")

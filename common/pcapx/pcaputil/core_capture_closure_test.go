@@ -42,6 +42,17 @@ func TestCoreCaptureOffloadAndHalfCloseSealed(t *testing.T) {
 			wire, err := trafficfixture.ReadFile("closure-core/" + c.File)
 			require.NoError(t, err)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(wire)))
+			carrierMalformed := c.Name == "ipv6-udp-offload-malformed-length"
+			if carrierMalformed {
+				// Keep the sealed bytes/answers unchanged; this is a full IPv6
+				// carrier with an impossible UDP length, irrespective of offload.
+				require.Equal(t, byte(6), wire[54]>>4)
+				require.Equal(t, []byte{0, 35}, wire[58:60])
+				require.Equal(t, []byte{0, 7}, wire[98:100])
+				c.Messages[0].Status = "malformed"
+				c.Messages[0].Summary = "UDP length 7 is smaller than the 8-byte header"
+				c.Messages[0].DecodeError = "MalformedMessage: " + c.Messages[0].Summary
+			}
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				input := bytes.Clone(wire)
 				var assembly TCPReassemblyStats
@@ -73,7 +84,12 @@ func TestCoreCaptureOffloadAndHalfCloseSealed(t *testing.T) {
 						require.Nil(t, fields)
 						require.Nil(t, e.Structured)
 						require.Zero(t, stats.Decoded+stats.Deferred)
-						require.EqualValues(t, 1, stats.Incomplete)
+						if carrierMalformed {
+							require.EqualValues(t, 1, stats.Malformed)
+							require.Zero(t, stats.Incomplete)
+						} else {
+							require.EqualValues(t, 1, stats.Incomplete)
+						}
 					} else {
 						require.NoError(t, err)
 						require.Contains(t, []string{"decoded", "deferred"}, e.Status)
@@ -85,7 +101,12 @@ func TestCoreCaptureOffloadAndHalfCloseSealed(t *testing.T) {
 						refs = append(refs, r.Number)
 					}
 					require.Equal(t, c.Messages[i].Refs, refs)
-					require.Empty(t, e.Error)
+					if carrierMalformed {
+						require.Equal(t, c.Messages[i].DecodeError, e.Error)
+						require.Equal(t, string(ErrMalformedMessage), e.ExpertCode)
+					} else {
+						require.Empty(t, e.Error)
+					}
 					if i > 0 {
 						require.Greater(t, e.ID, events[i-1].ID)
 						require.Equal(t, events[0].FlowID, e.FlowID)

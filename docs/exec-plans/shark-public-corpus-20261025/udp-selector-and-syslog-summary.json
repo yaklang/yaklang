@@ -1,0 +1,355 @@
+{
+  "source": {
+    "native": "6b67bae4aca85b301edb87194748e4b3f846ac9e",
+    "CLI": "ce112020e8294affcfe8c59618c989b53701c543"
+  },
+  "scope": "Explicit UDP selection before legacy service-port tunnel decoding. Default reference dissection remains separate; no live-traffic claim for authored controls.",
+  "controls": {
+    "source_scope": "Explicit UDP selection precedence, ordinary and ordered/reversed IPv4/IPv6-HBH fragment reassembly; original complete message and RFC5424 binary MSG bytes. Default port-based decoding is retained separately.",
+    "cases": [
+      {
+        "case": "ipv4-whole",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "c19d0247e74b53a2c8e94f7f7b4ee0824de3d3a6e87747ebcb9313b2271f2d35",
+        "frames": 1,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "captured",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 1,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tDNS"
+        ],
+        "selected_differences": []
+      },
+      {
+        "case": "ipv4-fragments",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "c63166ea72b1f8cba8022f63a0f7d9c7d2a2326a2ab77f051a73fd80a9a41d0b",
+        "frames": 2,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "reassembled",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            },
+            {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 2,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tIPv4",
+          "2\tDNS"
+        ],
+        "selected_differences": []
+      },
+      {
+        "case": "ipv4-reversed",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "1b53ab2407c020883a4960a0b421e41ac6b7bfa183f5d5a0e85619730f429f5f",
+        "frames": 2,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "reassembled",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            },
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 2,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tIPv4",
+          "2\tDNS"
+        ],
+        "selected_differences": []
+      },
+      {
+        "case": "ipv6-whole",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "164c8cdb48c9e2ad5e709a3a475a7cb18aedd460122aeca787f8e5c3f0edf200",
+        "frames": 1,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "captured",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 1,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tDNS"
+        ],
+        "selected_differences": []
+      },
+      {
+        "case": "ipv6-fragments",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "526f746e6df0439ac17b823b257033dbe5c8ea7bf0a0ebf13783a80973b5641c",
+        "frames": 2,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "reassembled",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            },
+            {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 2,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tIPv6",
+          "2\tDNS"
+        ],
+        "selected_differences": []
+      },
+      {
+        "case": "ipv6-reversed",
+        "kind": "declared offline binary Syslog payload, not live capture",
+        "capture_sha256": "1bca8bbad5cdb4b10515cb21470a00f2d2f7bb198927ace0c15f5f3f57ca483c",
+        "frames": 2,
+        "native_protocol": "syslog",
+        "native_status": "decoded",
+        "native_source": {
+          "Kind": "reassembled",
+          "SHA256": "c30aec8afc5f32d60178ba6dd7de74496d9259efc5f38bbfc1ff8d59d0c4a36d",
+          "ParentPDU": 0,
+          "ParentPDUs": null,
+          "PacketRefs": [
+            {
+              "Number": 2,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            },
+            {
+              "Number": 1,
+              "Domain": {
+                "Section": 0,
+                "Interface": 0,
+                "Encapsulation": ""
+              }
+            }
+          ],
+          "CompletedIn": {
+            "Number": 2,
+            "Domain": {
+              "Section": 0,
+              "Interface": 0,
+              "Encapsulation": ""
+            }
+          }
+        },
+        "selected_reference_MSG_bytes": 64,
+        "default_reference_columns": [
+          "1\tIPv6",
+          "2\tDNS"
+        ],
+        "selected_differences": []
+      }
+    ],
+    "controls": 6,
+    "frames": 10,
+    "selected_differences": []
+  },
+  "complete_original_default_replays": [
+    {
+      "capture": "weber",
+      "kind": "CLI",
+      "rows": 51328,
+      "bytes": 138408755,
+      "exit": 0,
+      "sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "previous_verified_sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "byte_identical": true
+    },
+    {
+      "capture": "weber",
+      "kind": "SDK",
+      "rows": 39283,
+      "bytes": 203119795,
+      "exit": 0,
+      "sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770",
+      "previous_verified_sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "CLI",
+      "rows": 328127,
+      "bytes": 513403474,
+      "exit": 0,
+      "sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "previous_verified_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "SDK",
+      "rows": 245615,
+      "bytes": 493759102,
+      "exit": 0,
+      "sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "previous_verified_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "byte_identical": true
+    }
+  ],
+  "tests": {
+    "native_full_seconds": 416.457,
+    "CLI_full_at_native_source_seconds": 1.864,
+    "CLI_full_at_UI_source_seconds": 1.951
+  },
+  "windows": {
+    "actual_native_CP936_console": true,
+    "EOF_query_selected_frame_verified": true,
+    "MSG_byte_source": "Syslog MSG \u00b7 extracted payload",
+    "MSG_bytes": 64,
+    "selected_range": [
+      0,
+      64
+    ],
+    "NIL_headers": "not provided",
+    "resize_and_quit": true,
+    "restored": {
+      "error": "<nil>",
+      "input_cp": 936,
+      "output_cp": 936
+    },
+    "screenshot_sha256": "0ab1dcd9740b52697b4f391553bba0156a03d900d9cc0220b146f596d75de4f3",
+    "cells_sha256": "cff366ab7b0507f27e4127659fd22dc164c0ef127f2e0d71eccc7c0f003abb8a"
+  },
+  "artifacts": {
+    "events-selector.exe": "f27463747c32ae0e5b3632bc39bb9e9f19aa9cef984a9de727af80d62db9321f",
+    "yak-syslog-ui.exe": "85bef179d23d2b0b49d599d87904acab900928a2d482f9b1537806594bc79220",
+    "full-selector-tests.log": "14ef5d1b65237f0fe143e68f36e8d44102f2c6ff92ecaf8e76df49488ff1076a",
+    "syslog-payload-CLI-tests-final.log": "4fa97cd4db0c58d9c2f0467eecce57953991c8f1fc2d674388d9e4216bee8ad9"
+  },
+  "retained_differences": {
+    "generic_fields": [
+      90,
+      35
+    ],
+    "all_protocol_completeness": false,
+    "raw_default_ambiguous_port_classification": "unchanged and retained separately",
+    "IPFIX_native": "not yet implemented"
+  },
+  "audit_source_sha256": "d231595c0ab88fc38bd52793b76c6d280c74bfa4a5230a67d3d59874b57d41f1"
+}

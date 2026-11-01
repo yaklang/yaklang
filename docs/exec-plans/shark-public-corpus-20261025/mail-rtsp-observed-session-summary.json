@@ -1,0 +1,427 @@
+{
+  "scope": "Observed IMAP SASL/NAMESPACE/IDLE and RTSP control parsing, loss/context refusal and readable Windows progressive presentation. Selected wire/reference correctness plus complete preservation of other SDK records; no all-protocol conformance claim.",
+  "runtime_source": "0f0aa01cef",
+  "independent_corpus_auditor_source": "8328ba0723",
+  "native_wire_audited_source": "dbbe2ca97b",
+  "final_runtime_exports_certify_all_records_exact_to_wire_audited_source": true,
+  "Wireshark_version": "4.6.9 v4.6.9-0-g2d548b197c75",
+  "public": {
+    "weber": {
+      "capture_sha256": "ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4",
+      "physical_frames": 51328,
+      "SDK_records": 39449,
+      "selected_before": {
+        "rtsp": 15,
+        "imap": 17
+      },
+      "selected_after": {
+        "rtsp": 132,
+        "imap": 56
+      },
+      "selected_statuses": {
+        "rtsp/decoded": 132,
+        "imap/decoded": 47,
+        "imap/context-required": 7,
+        "imap/incomplete": 2
+      },
+      "nonselected_complete_records_preserved": 39261,
+      "renumbered_nonselected_records": 33247,
+      "selected_wire_checks": 126724,
+      "wire_bound_record_counts": {
+        "rtsp": 132,
+        "imap": 54
+      },
+      "reference_IMAP_line_fields": 47,
+      "reference_RTSP_fields": {
+        "rtsp.method": 63,
+        "rtsp.url": 63,
+        "rtsp.cseq": 132,
+        "rtsp.status": 66,
+        "rtsp.content-length": 11
+      },
+      "reference_RTSP_layout_limits_count": 3,
+      "peer_gap_context_records": 7,
+      "peer_missing_TCP_ranges": [
+        [
+          1404,
+          14364
+        ]
+      ],
+      "closure_diagnostics": 2,
+      "outstanding_RTSP_requests": 0,
+      "CLI_Info_changes": {
+        "RTSP": 132,
+        "IMAP": 7
+      },
+      "CLI_all_other_columns_types_order_labels_and_IDs_exact": true,
+      "full_literal_CLI_label_counts_unchanged": true,
+      "final_SDK_export_sha256": "fe03754d8e95a19987ebfacc635924d9e7babf7aff6e75d792908e5904395943",
+      "final_CLI_export_sha256": "99b8def989f617686daa386710c4dd0546dc47aeda93f58476a67848e6b73082",
+      "final_complete_SDK_exact_certificate_sha256": "b6b40447e10cdcb52f6efeeea263422126536e50803b4536df4b610304304dfb",
+      "final_complete_CLI_exact_certificate_sha256": "4e626b249b61be74cafbc99ab2f55411fa449f739c09da14e9227db1b67d5c89",
+      "preservation_certificate_sha256": "029ebc9881f400dacd44bade330c037e511705fa268af44aff634b59140e184e",
+      "selected_wire_certificate_sha256": "8f5724f78e6087e56004897a4bb6fdf6ad7444b959c90c9bada9040edd875eb1",
+      "CLI_presentation_certificate_sha256": "3d8212f705353589ca5d04edd8d8baf17c1dd27076c7154b06908b8dda0de53e"
+    },
+    "sharon": {
+      "capture_sha256": "aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c",
+      "physical_frames": 328127,
+      "SDK_records": 245781,
+      "selected_before": {
+        "rtsp": 15,
+        "imap": 5
+      },
+      "selected_after": {
+        "rtsp": 132,
+        "imap": 44
+      },
+      "selected_statuses": {
+        "rtsp/decoded": 132,
+        "imap/decoded": 35,
+        "imap/context-required": 7,
+        "imap/incomplete": 2
+      },
+      "nonselected_complete_records_preserved": 245605,
+      "renumbered_nonselected_records": 239591,
+      "selected_wire_checks": 87890,
+      "wire_bound_record_counts": {
+        "rtsp": 132,
+        "imap": 42
+      },
+      "reference_IMAP_line_fields": 35,
+      "reference_RTSP_fields": {
+        "rtsp.method": 63,
+        "rtsp.url": 63,
+        "rtsp.cseq": 132,
+        "rtsp.status": 66,
+        "rtsp.content-length": 11
+      },
+      "reference_RTSP_layout_limits_count": 3,
+      "peer_gap_context_records": 7,
+      "peer_missing_TCP_ranges": [
+        [
+          1404,
+          14364
+        ]
+      ],
+      "closure_diagnostics": 2,
+      "outstanding_RTSP_requests": 0,
+      "CLI_Info_changes": {
+        "RTSP": 132,
+        "IMAP": 7
+      },
+      "CLI_all_other_columns_types_order_labels_and_IDs_exact": true,
+      "full_literal_CLI_label_counts_unchanged": true,
+      "final_SDK_export_sha256": "b40fe06c30bf1d01f58ea798657ed041a34c7027169f4fab97fb5aa84dcd92ee",
+      "final_CLI_export_sha256": "8d0be51922bc9a90442a835120c4286adf1b3ab51fd626fca1c93c65167e7c94",
+      "final_complete_SDK_exact_certificate_sha256": "85cf4d524755cff2be58ae0284fffb59d7705f8d9607d780c561cf76fa262906",
+      "final_complete_CLI_exact_certificate_sha256": "51b7d5989da160cdf729d0083fd7896ea01e8600006413a46a73cfd92457eeb9",
+      "preservation_certificate_sha256": "c73b811201ebfc8c247899d3dfbaaa9e5d945397a9e963e2c9e4ea4bf5b2605b",
+      "selected_wire_certificate_sha256": "d8a3ff5ffefee3c56faa253f1fdb3b9b742b655187dd4dffd88cb2f5a94dfe10",
+      "CLI_presentation_certificate_sha256": "51489195cc83f5a59cb963f07939684b0d86f750367697d7f4b9b7ac30316658"
+    }
+  },
+  "tests": {
+    "full_native_seconds": 409.041,
+    "full_CLI_seconds": 2.003,
+    "full_bin_parser_seconds": 123.989,
+    "parser_seconds": 6.574,
+    "base_seconds": 0.584,
+    "stream_parser_seconds": 5.414,
+    "rules_seconds": 0.417,
+    "fuzz": [
+      {
+        "name": "FuzzIMAPSASLTransportValue",
+        "executions": 131428,
+        "seconds": 41.321
+      },
+      {
+        "name": "FuzzIMAPNamespaceFields",
+        "executions": 103772,
+        "seconds": 41.314
+      },
+      {
+        "name": "FuzzIMAPSASLNativeExchange",
+        "executions": 19818,
+        "seconds": 41.404
+      }
+    ]
+  },
+  "binaries": {
+    "events-release": "1a543fe14dfc0fecfebd0dbb3ec2d85ea882900936a4b029bac833a391f4a2d6",
+    "yak-release": "782389f53cadc84e9c283f7837f9c11b92f665d21e036688cc1076de131e929b"
+  },
+  "actual_capture": {
+    "capture_sha256": "ce4ead210b10d933a3a6c84964294e07f207874e1b0459472f174535a8934f03",
+    "physical_frames": 1187,
+    "TCP_connections": 5,
+    "TCP_directions": 10,
+    "operations": 25,
+    "endpoint_receipts": 84,
+    "implementation": "Python stdlib imaplib plus explicitly declared socket controls",
+    "owned_endpoints": "independent owned test endpoints; no production mailbox or Apple device claim",
+    "SDK_records": 102,
+    "selected_records": {
+      "imap": 88,
+      "rtsp": 12
+    },
+    "selected_statuses": {
+      "decoded": 99,
+      "malformed": 1
+    },
+    "checks": 12182,
+    "reference_fields_compared": 96,
+    "reference_layout_limits": [
+      {
+        "PDU": 92,
+        "status": 200,
+        "physical_frames": [
+          984,
+          986,
+          988,
+          990,
+          992,
+          994,
+          996,
+          998,
+          1000,
+          1002,
+          1004,
+          1006,
+          1008,
+          1010,
+          1012,
+          1014
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 93,
+        "method": "FLUSH",
+        "physical_frames": [
+          1016
+        ],
+        "limitation": "reference has no complete request method view; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 94,
+        "status": 200,
+        "physical_frames": [
+          1018,
+          1020,
+          1022,
+          1024,
+          1026,
+          1028,
+          1030,
+          1032,
+          1034,
+          1036,
+          1038,
+          1040,
+          1042,
+          1044,
+          1046,
+          1048
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 95,
+        "method": "FLUSH",
+        "physical_frames": [
+          1050
+        ],
+        "limitation": "reference has no complete request method view; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 96,
+        "status": 200,
+        "physical_frames": [
+          1052,
+          1054,
+          1056,
+          1058,
+          1060,
+          1062,
+          1064,
+          1066,
+          1068,
+          1070,
+          1072,
+          1074,
+          1076,
+          1078,
+          1080,
+          1082
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 97,
+        "method": "FLUSH",
+        "physical_frames": [
+          1084
+        ],
+        "limitation": "reference has no complete request method view; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 98,
+        "method": "FLUSH",
+        "physical_frames": [
+          1084
+        ],
+        "limitation": "reference has no complete request method view; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 99,
+        "status": 200,
+        "physical_frames": [
+          1086,
+          1088,
+          1090,
+          1092,
+          1094,
+          1096,
+          1098,
+          1100,
+          1102,
+          1104,
+          1106,
+          1108,
+          1110,
+          1112,
+          1114,
+          1116
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 100,
+        "status": 200,
+        "physical_frames": [
+          1118,
+          1120,
+          1122,
+          1124,
+          1126,
+          1128,
+          1130,
+          1132,
+          1134,
+          1136,
+          1138,
+          1140,
+          1142,
+          1144,
+          1146,
+          1148
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      },
+      {
+        "PDU": 102,
+        "status": 200,
+        "physical_frames": [
+          1152,
+          1154,
+          1156,
+          1158,
+          1160,
+          1162,
+          1164,
+          1166,
+          1168,
+          1170,
+          1172,
+          1174,
+          1176,
+          1178,
+          1180,
+          1182
+        ],
+        "limitation": "reference has no complete response status view for the declared three-byte prefix split; whole TCP bytes independently agree"
+      }
+    ],
+    "wire_certificate_sha256": "8c41af2bb5bd4500a17a8fcebfabb0871513186a010c1b9befa6fee04aaca6c5",
+    "final_SDK_export_sha256": "50aaad94fd0f02446325c54d14e0f84c6d875d4d068dbdffa8de4ace39b5018a",
+    "final_CLI_export_sha256": "fb0a84fdcd3f9928ef74561d083e1542b8be8ff61fda5fb0a48c44755bf8fbee",
+    "final_SDK_exact_certificate_sha256": "c7e47ce1e8ed6a7847dabd7f8c94256e7d7f92b32e4cf1b520191d36d307dd52",
+    "final_CLI_exact_certificate_sha256": "6c02cfe123ba06364c57c0fc43d838bfe3fac36fb1f204e8c96a0153cffd0678",
+    "receipts_sha256": "b521fcf73500e4c6b4cff878e39f23024b0b2f3d4455c302e82e38015074bcc9",
+    "manifest_sha256": "241d98918889aa4463179670433290998441a4ae8a786deca41590431087f8dc"
+  },
+  "negative_controls": {
+    "owned-live": {
+      "certificate_sha256": "6b3673d0e11c831127afb5ec832354827f066706d8ecc24032630e4fc5cc57d1",
+      "counts": {
+        "negative_controls_rejected": 21
+      }
+    },
+    "public-wire-and-records": {
+      "certificate_sha256": "c98571699596184aace2c5f7bc6972c1b8e0aff3747c56bc9e9b524598f20c38",
+      "counts": {
+        "wire_controls_count": 26,
+        "record_projection_controls_count": 12
+      }
+    },
+    "CLI-selected-two-rows": {
+      "certificate_sha256": "96c60e522d0eb25bb45344ef81ab5e5defe5a956b3a1c809852364b6d8ec8c61",
+      "counts": {
+        "selected_rows": 2,
+        "negative_controls_rejected": 12
+      }
+    }
+  },
+  "Windows_CP936": [
+    {
+      "case": "sasl",
+      "source": "0f0aa01cef",
+      "native_buffer_sha256": "f887e610bd395c5b022cac4e2b7d6ddf16d5196a09e92d6bcf08183da1bd209b",
+      "unmodified_cells_render_sha256": "c41d83d34dd7b9d0ae8f6c4dc0782b49ef157678e68e51a84de64972d5011c74",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "filter_fields_byte_sources_conversation_evidence_resize_and_quit_passed": true,
+      "byte_exact_mouse_click": true
+    },
+    {
+      "case": "namespace",
+      "source": "0f0aa01cef",
+      "native_buffer_sha256": "6437196ef46a50bc8f8ffa11ce8e0887895406525adade4e282bf267a838bfd1",
+      "unmodified_cells_render_sha256": "840bc59bab7627aaee132dfe286bc5d2fb8b7a97e1764705953f8fa6525a2fd3",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "filter_fields_byte_sources_conversation_evidence_resize_and_quit_passed": true,
+      "byte_exact_mouse_click": false
+    },
+    {
+      "case": "rtsp",
+      "source": "0f0aa01cef",
+      "native_buffer_sha256": "3826a198bca40c8071be3a4856395f35b75ddfb7aad4dc9b9f45144065f6dafc",
+      "unmodified_cells_render_sha256": "19a1326cf55334978551563057cc62e4146f41cddab6affdc8c5cb9ed2a4c642",
+      "restoration": {
+        "error": "<nil>",
+        "input_cp": 936,
+        "output_cp": 936
+      },
+      "filter_fields_byte_sources_conversation_evidence_resize_and_quit_passed": true,
+      "byte_exact_mouse_click": false
+    }
+  ],
+  "limits": [
+    "The two public captures share the selected original RTSP/IMAP subcapture; they are not two independent acquisitions. The 1187-frame owned capture is an additional acquisition.",
+    "SASL authentication, peer identity, mechanism cryptography and security layers are not verified. Unknown successful security mechanisms stay context-required.",
+    "Native NAMESPACE currently handles complete single-line quoted/NIL values. Shared caller-selected field parsing also handles complete literals; native literal reconstruction is not claimed.",
+    "The 12960-byte public peer hole remains missing. Seven records per capture need context and two closure diagnostics remain; no invented post-gap bytes or success.",
+    "No safe generic TCP post-gap resynchronization/backfill, broad TLS resumption/0-RTT, all SSH late-context refinement or all DCE/RPC boundary conformance claim.",
+    "RTSP FLUSH observations do not verify media effects. Unknown extension headers are observed explicitly while method semantics remain unsupported.",
+    "P1 SASL/RTSP/NAMESPACE scope scorecards remain partial, score 0/F; bounded observed profiles do not claim complete protocol or security support.",
+    "Captures, secrets, raw exports, receipts, EXEs, detailed control files and Windows images remain outside Git."
+  ]
+}

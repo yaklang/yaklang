@@ -1,0 +1,598 @@
+{
+  "source": "63c9b3c71c474fb618adf021cc01667d20200ae8",
+  "reference": "unmodified Wireshark/TShark4.6.9; default original corpora unchanged; upstream2057 explicit selection is supplementary",
+  "tests_full_seconds": {
+    "github.com/yaklang/yaklang/common/bin-parser/parser/stream_parser": 5.29,
+    "github.com/yaklang/yaklang/common/bin-parser": 122.584,
+    "github.com/yaklang/yaklang/common/pcapx/pcaputil": 417.689,
+    "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/shark-cli": 1.905
+  },
+  "fuzz": {
+    "name": "FuzzIPFIXWire",
+    "executions": 108280,
+    "seconds": 40.504,
+    "workers": 2,
+    "memory": "1GiB"
+  },
+  "whole_original_default_replays": [
+    {
+      "capture": "weber",
+      "kind": "CLI",
+      "rows": 51328,
+      "bytes": 138408755,
+      "exit": 0,
+      "sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "previous_verified_sha256": "e95e9cb4db23cb234d2b7e5885e59844250fb1d9437da8a7873f4a428e6cc8f1",
+      "byte_identical": true
+    },
+    {
+      "capture": "weber",
+      "kind": "SDK",
+      "rows": 39283,
+      "bytes": 203119795,
+      "exit": 0,
+      "sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770",
+      "previous_verified_sha256": "4a845e74c4ed11b95f89f6f2c8176b20bcbeca83dbfb082de40eeb0bf94f2770",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "CLI",
+      "rows": 328127,
+      "bytes": 513403474,
+      "exit": 0,
+      "sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "previous_verified_sha256": "ebff5db1f11cddc905cb0ce02ada0a95c4e811e47a31345d63d6aee08c9bc522",
+      "byte_identical": true
+    },
+    {
+      "capture": "sharon",
+      "kind": "SDK",
+      "rows": 245615,
+      "bytes": 493759102,
+      "exit": 0,
+      "sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "previous_verified_sha256": "cc120f2d207f5819dd776d0cb01ebfe02dac02bd25fff7dc4d383685659a38a7",
+      "byte_identical": true
+    }
+  ],
+  "original_v10_necessary_bounds": {
+    "weber": {
+      "scope": "Characterize unchanged original reference v10 views before native admission.\nThis establishes necessary header/Set bounds only, not complete IPFIX semantics.\n",
+      "original_v10_reference_views": 0,
+      "complete_header_and_sets": 0,
+      "categories": {},
+      "full_view_characterization_sha256": "f7193dd9f61a6b0bc63f557dcbf220f8922b04f17ea34bb9ca3df951eafd2834"
+    },
+    "sharon": {
+      "scope": "Characterize unchanged original reference v10 views before native admission.\nThis establishes necessary header/Set bounds only, not complete IPFIX semantics.\n",
+      "original_v10_reference_views": 159,
+      "complete_header_and_sets": 0,
+      "categories": {
+        "udp: message length differs": 122,
+        "udp: invalid Set bound": 1,
+        "tcp: message length differs": 34,
+        "tcp: short header": 1,
+        "other: message length differs": 1
+      },
+      "full_view_characterization_sha256": "d52c52cd987f13c7588e6d3bcac3a1d31be0720eac30a658ee1cf4bf11c8e2b9"
+    }
+  },
+  "upstream": {
+    "project": "akvorado/akvorado",
+    "revision": "60659854777751e6216e3b838ee31d45b2d24afb",
+    "url": "https://raw.githubusercontent.com/akvorado/akvorado/60659854777751e6216e3b838ee31d45b2d24afb/outlet/flow/decoder/netflow/testdata/iosxe-ipfix-timestamps.pcap",
+    "sha256": "473a4baa4ff0f62733cd6bf959fdce1b9831248c49be844e5dc0bd2aa5ba914f",
+    "bytes": 1608,
+    "default_reference": "UDP/data; omission retained",
+    "selected_profile": "UDP2057 explicitly selected as cflow/reference and ipfix/native",
+    "audit": {
+      "scope": "complete positive UDP IPFIX messages; independent wire/layout/value/range assertions and selected reference scalar fields; opaque unknown IEs retained, not semantic coverage",
+      "messages": 2,
+      "data_records": 18,
+      "opaque_values": 36,
+      "checks": 1868,
+      "cases": [
+        {
+          "frame": "1",
+          "message_sha256": "e132241f9080a159db37f58eda091c18fa21e75348c57ca7cec8fbc6ed733ab5",
+          "bytes": 96,
+          "data_records": 0
+        },
+        {
+          "frame": "2",
+          "message_sha256": "50ddc56f1f6bbc5bb6a6c408ab4ee3e972caf6fdbfcc0c70495dc400312c3490",
+          "bytes": 1372,
+          "data_records": 18
+        }
+      ],
+      "selected_differences": []
+    }
+  },
+  "offline_controls": {
+    "scope": "Declared offline RFC7011 UDP controls. These packets are not live captures.\nReference best-known-schema decoding and native quarantine remain distinct.\n",
+    "controls": 16,
+    "frames": 35,
+    "checks": 221,
+    "cases": [
+      {
+        "case": "empty-template-Set",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "724f906c8a32d8bc36505b62ed3db118ee96c680353cca5ca643501030156383",
+        "statuses": [
+          "malformed"
+        ],
+        "native_data_records": [
+          0
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "empty-options-Set",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "e0ae3e51a011c890b83dff484320a1c612b7808d9d1a53360ea16c3811d915b9",
+        "statuses": [
+          "malformed"
+        ],
+        "native_data_records": [
+          0
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "empty-data-Set",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "a90e3fd6f178f9efebc53814329d3f9a42ab92d0f6fe0b9aea5027128418fbaa",
+        "statuses": [
+          "malformed"
+        ],
+        "native_data_records": [
+          0
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "padding-without-record",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "f1fd8a8acbe507403981c5dd9db044dd31eff3b86b035e66be45697ae67aabe0",
+        "statuses": [
+          "malformed"
+        ],
+        "native_data_records": [
+          0
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "template-same-sequence",
+        "kind": "declared offline control",
+        "frames": 2,
+        "sha256": "81d26c8d97df7ef8accc7664f86b48bf3c6e6a7c793b20abadc325343df27b1e",
+        "statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "duplicate-data",
+        "kind": "declared offline control",
+        "frames": 4,
+        "sha256": "ae864e94901d7bf31050aab62a185b2f31390657fc40255505736a2c4ccb3aae",
+        "statuses": [
+          "decoded",
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1,
+          1,
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "loss-and-template-recovery",
+        "kind": "declared offline control",
+        "frames": 4,
+        "sha256": "6a3b2d70f93bc1a1f48c4c1658854a57e6d873a77ba5a8bb73eb799255eacc92",
+        "statuses": [
+          "decoded",
+          "context-required",
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          0,
+          1,
+          1
+        ],
+        "reference_scalar_differences_retained": [
+          {
+            "frame": 2,
+            "reference_address_values": 1,
+            "native_address_values": 0,
+            "native_status": "context-required"
+          }
+        ]
+      },
+      {
+        "case": "reorder-and-recovery",
+        "kind": "declared offline control",
+        "frames": 4,
+        "sha256": "92b9bb5ef0834696ca942205384f8a07191dd3c4d229ffc50b31e14901e016a9",
+        "statuses": [
+          "decoded",
+          "decoded",
+          "context-required",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1,
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": [
+          {
+            "frame": 3,
+            "reference_address_values": 1,
+            "native_address_values": 0,
+            "native_status": "context-required"
+          }
+        ]
+      },
+      {
+        "case": "lease-expiry",
+        "kind": "declared offline control",
+        "frames": 3,
+        "sha256": "958f2769efd49a49cad3d9621e975a36c8df2a7ff1091badff5203e437c1ad6b",
+        "statuses": [
+          "decoded",
+          "context-required",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": [
+          {
+            "frame": 2,
+            "reference_address_values": 1,
+            "native_address_values": 0,
+            "native_status": "context-required"
+          }
+        ]
+      },
+      {
+        "case": "UDP-withdrawal-ignored",
+        "kind": "declared offline control",
+        "frames": 2,
+        "sha256": "ec4e7a8daf1df83fe2ce9ae4644c11f4123dcf1cebdf4d6761fb427bbc374102",
+        "statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "UDP-definition-replacement",
+        "kind": "declared offline control",
+        "frames": 2,
+        "sha256": "a5878c719770380d64eb4fd6352b0fd4b6c5eac003aa11147812f8280bfe8c10",
+        "statuses": [
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "future-template-not-retroactive",
+        "kind": "declared offline control",
+        "frames": 2,
+        "sha256": "7b10b0a3967399538d47513b95ca31064d3e05169e47aded518fdde2d20c292d",
+        "statuses": [
+          "context-required",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1
+        ],
+        "reference_scalar_differences_retained": [
+          {
+            "frame": 1,
+            "reference_address_values": 1,
+            "native_address_values": 0,
+            "native_status": "context-required"
+          }
+        ]
+      },
+      {
+        "case": "short-template",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "c907dd4971bdc1f3818b98205e507bf80b55815988f3f9e362daa13433310e1f",
+        "statuses": [
+          "malformed"
+        ],
+        "native_data_records": [
+          0
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "binary-enterprise-collision",
+        "kind": "declared offline control",
+        "frames": 1,
+        "sha256": "1d447233313780744326bf8b19eac5f044eb8642e473ea55f1e2fc03838d24cb",
+        "statuses": [
+          "decoded"
+        ],
+        "native_data_records": [
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      },
+      {
+        "case": "tuple-reuse",
+        "kind": "declared offline control",
+        "frames": 3,
+        "sha256": "189584e56fd05e3972dfdfe4d2ffa9be35d0fbdf4f060b33046bde3f5572ec50",
+        "statuses": [
+          "decoded",
+          "malformed",
+          "context-required"
+        ],
+        "native_data_records": [
+          0,
+          0,
+          0
+        ],
+        "reference_scalar_differences_retained": [
+          {
+            "frame": 3,
+            "reference_address_values": 1,
+            "native_address_values": 0,
+            "native_status": "context-required"
+          }
+        ]
+      },
+      {
+        "case": "sequence-wrap",
+        "kind": "declared offline control",
+        "frames": 3,
+        "sha256": "c40b53c77d66d1509c96d38b0d9e9d8fdb4900c51fea261d07cd25d987001f17",
+        "statuses": [
+          "decoded",
+          "decoded",
+          "decoded"
+        ],
+        "native_data_records": [
+          0,
+          1,
+          1
+        ],
+        "reference_scalar_differences_retained": []
+      }
+    ]
+  },
+  "negative_controls": {
+    "controls": 12,
+    "results": [
+      {
+        "corruption": "value",
+        "detected": true
+      },
+      {
+        "corruption": "range",
+        "detected": true
+      },
+      {
+        "corruption": "IE-ID",
+        "detected": true
+      },
+      {
+        "corruption": "enterprise",
+        "detected": true
+      },
+      {
+        "corruption": "schema-hash",
+        "detected": true
+      },
+      {
+        "corruption": "record-count",
+        "detected": true
+      },
+      {
+        "corruption": "namespace",
+        "detected": true
+      },
+      {
+        "corruption": "source-frame",
+        "detected": true
+      },
+      {
+        "corruption": "missing",
+        "detected": true
+      },
+      {
+        "corruption": "extra",
+        "detected": true
+      },
+      {
+        "corruption": "projection-value",
+        "detected": true
+      },
+      {
+        "corruption": "projection-range",
+        "detected": true
+      }
+    ]
+  },
+  "owned_live": {
+    "capture": {
+      "scope": "Capture newly generated owned IPFIX socket traffic on Windows Npcap Loopback.\nThis is an authored exporter/collector experiment, not production router traffic.\nOnly127.0.0.1:4739 is captured; no remote destinations or existing services used.\n",
+      "proxy": {
+        "dropped": 1,
+        "delayed": 1,
+        "forwarded": 9
+      },
+      "UDP_received_message_hashes": [
+        "e97de1028ca3c6d96ecf4f4185a090daa3dcc19f2301ce82582d7e8a536bda33",
+        "ac9c2741fcf8eb2b02b64e71e819badee4b6fde17019a9fb0849ed245a12de96",
+        "37050b4c504bd6c4f43beacf1775078b3f097a7b9c3f60fd6c3c4601c7e006ad",
+        "c12ac7bba464797b072b8fab9dc216ab8f81ec79ae10cf513950219ccadbcb72",
+        "37050b4c504bd6c4f43beacf1775078b3f097a7b9c3f60fd6c3c4601c7e006ad",
+        "6e0584bc770c5c789180ced68e21433d222fafdcb8ac4173eaec0d341d973abd",
+        "adb0451f84b5c6546beede2ea902341a791a05efe5153cf0a8458b15d2a12bae",
+        "d55cb12e063f393b967bd6b0facdbcc655a8bc45d58957eb0b70ba916588ff6d",
+        "ba59f0d92c1757c4967edba7e0144055c75bcc5fb597d5b0f34b31088752ae4d"
+      ],
+      "TCP_generations": 3,
+      "TCP_received_message_hashes": [
+        [
+          "c72a5523910759e0ce19c53c5fe16a8e59b1c45956b9097b4edd604df5ffe62b",
+          "264656ab25e15b01660991c33b53022ac9abb575b18a442cf3292001a5e2d722",
+          "5cb24a109548a40041b5a7ebb5935cca71c31a85a5d5d8a6b3e7fee73f65bd66"
+        ],
+        [
+          "8d4233091a0f204e44f1e66f9f90925d05860b3614a7e86799f96c4ae3f77dce"
+        ],
+        [
+          "c72a5523910759e0ce19c53c5fe16a8e59b1c45956b9097b4edd604df5ffe62b",
+          "4ce89b90034d5767efd7e3adcaef92cbb7697a7a2544c7cd3dc5db73207c5ee8",
+          "2579bf0c3ac6130410661f6dc8477e776826b0bacfc786f3e5d58ce04d6ded36"
+        ]
+      ],
+      "capture_sha256": "49578982daf24e0822215f99742deb93f7c00a7d94fa474edc2aaf888b11c62e",
+      "capture_bytes": 4988,
+      "dumpcap_statistics_log": "dumpcap.log",
+      "errors": []
+    },
+    "audit": {
+      "scope": "Audit the ipfix_live_windows owned socket experiment against unmodified TShark.\nIndependently rebuild TCP bytes/contributors; retain receiver-policy differences.\n",
+      "physical_frames": 52,
+      "messages": 16,
+      "TCP_connections": 3,
+      "native_data_records": 7,
+      "reference_data_records": 10,
+      "checks": 258,
+      "proxy": {
+        "dropped": 1,
+        "delayed": 1,
+        "forwarded": 9
+      },
+      "capture_drops": 0,
+      "receiver_policy_differences_retained": [
+        {
+          "frame": 3,
+          "transport": "udp",
+          "reference_records": 1,
+          "native_records": 0,
+          "native_status": "context-required",
+          "cause": "data-record sequence gap/reorder/reuse; templates quarantined"
+        },
+        {
+          "frame": 6,
+          "transport": "udp",
+          "reference_records": 1,
+          "native_records": 0,
+          "native_status": "context-required",
+          "cause": "data-record sequence gap/reorder/reuse; templates quarantined"
+        },
+        {
+          "frame": 7,
+          "transport": "udp",
+          "reference_records": 1,
+          "native_records": 0,
+          "native_status": "context-required",
+          "cause": "prior Data Set record count unknown; sequence continuity unproved; templates quarantined"
+        }
+      ]
+    },
+    "raw_artifacts_sha256": {
+      "capture.pcapng": "49578982daf24e0822215f99742deb93f7c00a7d94fa474edc2aaf888b11c62e",
+      "events-strict.jsonl": "c5027421925c50b5d195cad03fc53a615251fc5ef1379087c1a95f327c644b0c",
+      "oracle.json": "73f5b33ec8098f5e5e5578b2afe818a663f8926223cfbd152af82cf107028a7b",
+      "dumpcap.log": "65666004aea0b9dec6153d6327709adb32df82c78e15627cf41bac2f187cfbb9"
+    }
+  },
+  "windows": {
+    "query": "fields cflow.packets == 9",
+    "frame": 2,
+    "original_packet_count": 2,
+    "selected_reported_source": "203.0.113.235",
+    "collector_source": "192.0.2.1",
+    "selected_PDU_byte_range": [
+      20,
+      24
+    ],
+    "literal_bytes_hex": "cb0071eb",
+    "UTC_and_literal_time": true,
+    "header_order_verified": true,
+    "standard_IE_has_no_PEN": true,
+    "restored": {
+      "error": "<nil>",
+      "input_cp": 936,
+      "output_cp": 936
+    },
+    "screenshot_sha256": "d84c2e61f427b76d29c53175bbfba9f084fb52c95081c40e79a9eadf1fa954d9",
+    "cells_sha256": "418726f2a84cd311847680c3eb20d2f035c6bd0c8afdaf55a6dcfb8c6408300f"
+  },
+  "binaries_sha256": {
+    "events-ipfix-strict.exe": "25b296c7f5f199cfdd5150ae901d964cb00929cb1972ace08a9fb53c0cc2bd97",
+    "yak-ipfix-strict.exe": "4ce658c0444cd5ab26ca9dd71851606cfff63d9c9165fc9c151929057c173066"
+  },
+  "audit_source_sha256": {
+    "ipfix_wire_audit.py": "1a1080a9dbed96680a01e0cd5502d80ac8c6a0dc23b0c52aa1d50a0a02f1b82d",
+    "ipfix_fault_audit.py": "c6aa22db9313b48fa169c2a04a67889fd843f05addf7fb6d72274a39cac5bc46",
+    "ipfix_audit_negative_controls.py": "6d869912ddc662da75d22b075cbff41718f050c0489a06b2ab8f8aaa00b029b5",
+    "ipfix_live_windows.py": "169ab81fd77bfd53cc4d7fd0c86019b6f8967e80179b194c5f4db47f39ad0711",
+    "ipfix_live_audit.py": "8eb224813c72b39a46a78c4a91357b5fe1138b5aa0640850ba25d02a56f47b55",
+    "ipfix_original_v10_audit.py": "ffe5006fd0164b3ee555fd926bf8d1b5f77d603535e2ce3eeef6ee74a02e2653"
+  },
+  "logs_sha256": {
+    "full-tests-strict.log": "62fd01ed0dc726a6e4f3fa0a63e6af3e95ab63df836a474ae0edc4dbc8332c82",
+    "fuzz-strict.log": "2c0d2353433fcfe1bf4a6b815ef75deddccd1132260ab5cb1f792d1bc543fd49",
+    "strict-defaults.log": "28f671ee36df0adf98cb7f86589ee5863dead0ee20e2e8ca45f062ba21623a04",
+    "windows-ipfix-strict.log": "f42dc487f5cc7254c6cd31baf9109b870b9855532d9b02061434f64ff392da0a"
+  },
+  "remaining": {
+    "generic_field_differences": [
+      90,
+      35
+    ],
+    "all_protocols_accepted": false,
+    "IPFIX_unselected": [
+      "structured list elements",
+      "all enterprise IE semantics",
+      "authenticated exporter identity",
+      "unobservable template-only UDP loss",
+      "general SCTP ingress",
+      "absolute timestamp era inference beyond literal wire types"
+    ],
+    "HTTP3_cross_packet_source_UI": "before-fix actual5776 DATA shown as7704 Base64 bytes; next work, not certified by this IPFIX audit"
+  }
+}

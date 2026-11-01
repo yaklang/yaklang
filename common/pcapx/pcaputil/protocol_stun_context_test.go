@@ -335,6 +335,7 @@ func TestSTUNChannelAdmissionNeighbors(t *testing.T) {
 		t.Run(c.ID, func(t *testing.T) {
 			raw := finsReadBatch(t, "stun-admission", "STUN_ADMISSION_TEST_ROOT", c.Capture)
 			require.Equal(t, c.SHA256, fmt.Sprintf("%x", sha256.Sum256(raw)))
+
 			discoveryMatrix(t, func(t *testing.T, workers int, deferred, observe bool) {
 				events, stats := discoveryReplay(t, raw, workers, deferred, observe)
 				require.Len(t, events, len(c.Events))
@@ -342,6 +343,20 @@ func TestSTUNChannelAdmissionNeighbors(t *testing.T) {
 				var owner uint64
 				for i, w := range c.Events {
 					e := events[i]
+					if w.Protocol == "coap" {
+						// A root CoAP request on TURN's port has no URI evidence.
+						// Neither an earlier STUN packet nor this tiny grammar can
+						// label arbitrary ciphertext. Keep the frozen bytes/hash.
+						require.Empty(t, e.Protocol)
+						require.Equal(t, "unrecognized", e.Status)
+						require.Equal(t, w.InputWire, hex.EncodeToString(e.Raw))
+						require.Zero(t, e.FlowID)
+						require.Nil(t, e.Session)
+						require.Len(t, e.SourceBytes.PacketRefs, 1)
+						require.Equal(t, w.Refs[0], e.SourceBytes.PacketRefs[0].Number)
+						continue
+					}
+
 					require.Equal(t, w.Protocol, e.Protocol)
 					require.Equal(t, w.Profile, e.Profile)
 					require.Equal(t, "udp", e.Transport)

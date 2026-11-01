@@ -109,6 +109,7 @@ func coapMessageLength(w []byte) (int, error) {
 		return 0, nil
 	}
 	at := 4 + tkl
+	option := 0
 	for at < len(w) {
 		if w[at] == 0xff {
 			if at+1 == len(w) {
@@ -131,6 +132,10 @@ func coapMessageLength(w []byte) (int, error) {
 		}
 		if at+ln > len(w) {
 			return 0, nil
+		}
+		option += delta
+		if !coapOptionLengthValid(option, ln) {
+			return 0, fmt.Errorf("coap: invalid known option length")
 		}
 		at += ln
 	}
@@ -306,10 +311,37 @@ func coapOptions(w []byte, at, maxOptions int) ([]string, []byte, error) {
 			return nil, nil, fmt.Errorf("coap: truncated option value")
 		}
 		deltaBase += delta
+		if !coapOptionLengthValid(deltaBase, ln) {
+			return nil, nil, fmt.Errorf("coap: invalid known option length")
+		}
 		if deltaBase == 11 {
 			paths = append(paths, string(w[at:at+ln]))
 		}
 		at += ln
 	}
 	return paths, nil, nil
+}
+
+// RFC 7252 table 4. Unknown extensions remain inspectable, while a known
+// option's envelope must be valid before either automatic or explicit decoding.
+func coapOptionLengthValid(number, n int) bool {
+	switch number {
+	case 1:
+		return n <= 8 // If-Match
+	case 3, 39:
+		return n >= 1 && n <= 255 // Uri-Host / Proxy-Scheme
+	case 4:
+		return n >= 1 && n <= 8 // ETag
+	case 5:
+		return n == 0 // If-None-Match
+	case 7, 12, 17:
+		return n <= 2 // Uri-Port / Content-Format / Accept
+	case 8, 11, 15, 20:
+		return n <= 255 // Location/Uri path/query
+	case 14, 60:
+		return n <= 4 // Max-Age / Size1
+	case 35:
+		return n >= 1 && n <= 1034 // Proxy-Uri
+	}
+	return true
 }
