@@ -490,6 +490,28 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 				if name == "Handshake Messages" || name == "TLS Handshakes" {
 					add(handshakeType(r["Type"]), true)
+					certificateVersion, certificateAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Version"]) == 0x304 {
+						certificateVersion, certificateAuthenticated = 0x304, true
+					}
+					certificate, certificateWire, certificateName := tlsCertificateDetail(r, certificateVersion, certificateAuthenticated)
+					certificateSource := 0
+					if certificate != nil {
+						if fieldValueSourceCount < 256 && len(certificateWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: certificateName, Data: bytes.Clone(certificateWire)})
+							certificateSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(certificateWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Certificate (11)", depth: depth + 2,
+								source: certificateSource, start: 0, end: 1, hasRange: certificateSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
 					requestVersion, requestAuthenticated := tlsNegotiatedVersion, authenticatedTLS
 					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Request Version"]) == 0x304 {
 						requestVersion, requestAuthenticated = 0x304, true
@@ -568,6 +590,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 					}
 					sort.Strings(keys)
+					if certificate != nil {
+						order := map[string]int{"Length": 0, "Certificate Body": 1, "Certificates": 2, "Authenticated": 3, "Certificate Version": 4, "Certificate Body Status": 5, "Certificate Message SHA256": 6, "Encoded Certificate": 7}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					if request != nil {
 						order := map[string]int{"Length": 0, "Authenticated": 1, "Certificate Request": 2, "Certificate Request Version": 3, "Certificate Request Status": 4, "Encoded Certificate Request": 5}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
@@ -581,6 +607,21 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					for _, key := range keys {
+						if certificate != nil && key == "Certificate Body" {
+							rows, limited := tlsCertificateFields(certificate, certificateSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if certificate != nil && key == "Encoded Certificate" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Certificate: " + formatFieldValue(key, certificateWire), depth: depth + 2,
+									source: certificateSource, start: 0, end: len(certificateWire), hasRange: certificateSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
 						if verify != nil && key == "Certificate Verify" {
 							rows, limited := tlsCertificateVerifyFields(verify, verifySource, depth+2, max(0, 4096-len(out)), uint16(verifyVersion))
 							out = append(out, rows...)
@@ -614,6 +655,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 						before := len(out)
 						walk(key, r[key], depth+1)
+						if certificate != nil && key == "Length" && certificateSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = certificateSource, 1, 4, true
+						}
 						if request != nil && key == "Length" && requestSource > 0 && len(out) > before {
 							field := &out[len(out)-1]
 							field.source, field.start, field.end, field.hasRange = requestSource, 1, 4, true

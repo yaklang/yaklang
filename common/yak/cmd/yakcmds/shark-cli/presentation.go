@@ -383,6 +383,10 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
+		if certificate, _, _ := tlsCertificateDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); certificate != nil {
+			name += fmt.Sprintf(" · %d entries · context %d bytes · trust not evaluated", len(mapList(certificate.Fields["Certificate Entries"])), number(certificate.Fields["Context Length"]))
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		}
 		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
 			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
 			messageRank = tlsKeyUpdateRank

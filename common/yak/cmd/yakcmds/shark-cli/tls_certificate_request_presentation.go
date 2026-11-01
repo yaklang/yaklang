@@ -63,6 +63,9 @@ func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
 		if view, _, _ := tlsCertificateRequestDetail(h, version, authenticated); view != nil {
 			rank = max(rank, tlsHandshakeBodyRank)
 		}
+		if view, _, _ := tlsCertificateDetail(h, version, authenticated); view != nil {
+			rank = max(rank, tlsHandshakeBodyRank)
+		}
 		if wire, _ := tlsFinishedDetail(h, version, number(v["Cipher Suite"]), authenticated); wire != nil && h["Finished Phase"] == "application" {
 			rank = max(rank, tlsHandshakeBodyRank)
 		}
@@ -84,8 +87,13 @@ var tlsCertificateRequestFieldPriority = map[string]int{
 }
 
 func tlsCertificateRequestFields(view *pcaputil.TLSCertificateRequestView, source, depth, limit int, version uint16) ([]field, bool) {
+	return tlsHandshakeVectorFields(view.Fields, view.Ranges, "Certificate Request body", tlsCertificateRequestFieldPriority,
+		map[uint64]string{13: "signature_algorithms", 47: "certificate_authorities", 50: "signature_algorithms_cert"}, source, depth, limit, version)
+}
+
+func tlsHandshakeVectorFields(values map[string]any, spans []pcaputil.TLSCertificateRequestFieldRange, root string, priorities map[string]int, extensionNames map[uint64]string, source, depth, limit int, version uint16) ([]field, bool) {
 	ranges := map[string]pcaputil.TLSCertificateRequestFieldRange{}
-	for _, span := range view.Ranges {
+	for _, span := range spans {
 		ranges[strings.Join(span.Path, "\x00")] = span
 	}
 	var out []field
@@ -106,8 +114,8 @@ func tlsCertificateRequestFields(view *pcaputil.TLSCertificateRequestView, sourc
 				keys = append(keys, k)
 			}
 			sort.Slice(keys, func(i, j int) bool {
-				a, aok := tlsCertificateRequestFieldPriority[keys[i]]
-				b, bok := tlsCertificateRequestFieldPriority[keys[j]]
+				a, aok := priorities[keys[i]]
+				b, bok := priorities[keys[j]]
 				if !aok {
 					a = 100
 				}
@@ -129,7 +137,7 @@ func tlsCertificateRequestFields(view *pcaputil.TLSCertificateRequestView, sourc
 			for i, entry := range v {
 				label := fmt.Sprintf("%s[%d]", name, i)
 				if name == "Extensions" {
-					if known := map[uint64]string{13: "signature_algorithms", 47: "certificate_authorities", 50: "signature_algorithms_cert"}[number(entry["Type"])]; known != "" {
+					if known := extensionNames[number(entry["Type"])]; known != "" {
 						label += " · " + known
 					}
 				}
@@ -152,7 +160,7 @@ func tlsCertificateRequestFields(view *pcaputil.TLSCertificateRequestView, sourc
 			out = append(out, f)
 		}
 	}
-	walk("Certificate Request body", view.Fields, nil, depth)
+	walk(root, values, nil, depth)
 	return out, limited
 }
 
