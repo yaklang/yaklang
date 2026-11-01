@@ -41,6 +41,12 @@ func tlsCertificateRequestDetail(m map[string]any, version uint64, authenticated
 	return view, wire, name
 }
 
+const (
+	tlsHandshakeBodyRank     = 1
+	tlsCertificateVerifyRank = 2
+	tlsKeyUpdateRank         = 3
+)
+
 // A message name or connection label is insufficient for row promotion. Require
 // the same body/authentication checks that qualify its owned detail source.
 func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
@@ -52,16 +58,16 @@ func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
 	rank := 0
 	for _, h := range mapList(v["Handshake Messages"]) {
 		if tlsKeyUpdatePlaintext(h, authenticated && version == 0x304) != nil {
-			return 2
+			return tlsKeyUpdateRank
 		}
 		if view, _, _ := tlsCertificateRequestDetail(h, version, authenticated); view != nil {
-			rank = 1
+			rank = max(rank, tlsHandshakeBodyRank)
 		}
 		if wire, _ := tlsFinishedDetail(h, version, number(v["Cipher Suite"]), authenticated); wire != nil && h["Finished Phase"] == "application" {
-			rank = 1
+			rank = max(rank, tlsHandshakeBodyRank)
 		}
 		if verify, _, _ := tlsCertificateVerifyDetail(h, version, authenticated); verify != nil {
-			rank = 1
+			rank = max(rank, tlsCertificateVerifyRank)
 		}
 	}
 	return rank

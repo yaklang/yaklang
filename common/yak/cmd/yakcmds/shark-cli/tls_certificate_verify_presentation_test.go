@@ -178,6 +178,13 @@ func TestTLSCertificateVerifyVisibleBesideCoalescedCertificateRequest(t *testing
 
 func TestTLSCertificateVerifySummaryPreservesKeyUpdateAndApplication(t *testing.T) {
 	verify := certificateVerifyPresentation(t, 0x304, "application")
+	finished := finishedPresentation(0x304, 0x1302, "application")
+	for _, events := range [][]*pcaputil.ProtocolEvent{{verify, finished}, {finished, verify}} {
+		row := presentEvents(events).apply(packetSummary{})
+		require.True(t, strings.HasPrefix(row.Info, "Certificate Verify"), "a later Finished must not push the complete signature scheme off the visible row: %s", row.Info)
+		require.Contains(t, clipText(row.Info, 80), "rsa_pss_rsae_sha256 (0x0804)")
+		require.Contains(t, row.Info, "Finished")
+	}
 	update := keyUpdatePresentationForTest(1)
 	for _, events := range [][]*pcaputil.ProtocolEvent{{verify, update}, {update, verify}} {
 		row := presentEvents(events).apply(packetSummary{})

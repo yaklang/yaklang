@@ -377,7 +377,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		}
 		if tlsKeyUpdatePlaintext(h, v["Authentication Verified"] == true && number(v["Negotiated Version"]) == 0x304) != nil {
 			name += " · " + tlsKeyUpdateRequestName(h["Key Update Request"])
-			messageRank = 2
+			messageRank = tlsKeyUpdateRank
 		}
 		if request, _, _ := tlsCertificateRequestDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); request != nil {
 			algorithms := len(mapList(request.Fields["Signature Algorithms"]))
@@ -387,7 +387,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 				}
 			}
 			name += fmt.Sprintf(" · %d signature algorithms", algorithms)
-			messageRank = max(messageRank, 1)
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
 		} else if number(h["Type"]) == 13 && strings.Contains(textValue(h["Certificate Request Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable"
 		}
@@ -396,14 +396,14 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 				name += " · " + tlsCertificateRequestAlgorithm(uint16(number(algorithm)), uint16(number(v["Negotiated Version"])))
 			}
 			name += fmt.Sprintf(" · %d signature bytes · signature not evaluated", number(verify.Fields["Signature Length"]))
-			messageRank = max(messageRank, 1)
+			messageRank = max(messageRank, tlsCertificateVerifyRank)
 		} else if number(h["Type"]) == 15 && strings.Contains(textValue(h["Certificate Verify Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable or unsupported"
 		}
 		if wire, _ := tlsFinishedDetail(h, number(v["Negotiated Version"]), number(v["Cipher Suite"]), v["Authentication Verified"] == true); wire != nil {
 			name += " · " + textValue(h["Finished Phase"]) + " epoch · transcript MAC not evaluated"
 			if h["Finished Phase"] == "application" {
-				messageRank = max(messageRank, 1)
+				messageRank = max(messageRank, tlsHandshakeBodyRank)
 			}
 		} else if number(h["Type"]) == 20 && strings.Contains(textValue(h["Finished Status"]), "unavailable") {
 			name += " envelope · negotiated version unavailable or unsupported"
@@ -1341,7 +1341,7 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.tlsDetailedSummaryRank = detailedTLS
 	} else {
 		p.count++
-		if info != "" && (detailedTLS > p.tlsDetailedSummaryRank || detailedTLS == 1 && p.tlsDetailedSummaryRank == 1 && !strings.Contains(p.summary, info)) {
+		if info != "" && (detailedTLS > p.tlsDetailedSummaryRank || detailedTLS > 0 && detailedTLS < tlsKeyUpdateRank && detailedTLS == p.tlsDetailedSummaryRank && !strings.Contains(p.summary, info)) {
 			// Distinct qualified messages in separate records of one frame
 			// remain visible beyond the ordinary three-record sample budget.
 			p.summary = info + " | " + clipText(p.summary, 384)
