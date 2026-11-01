@@ -100,6 +100,14 @@ must have an empty request context and a nonempty certificate list. A client's
 empty response stays valid. A refusal keeps the observed TLS connection and
 record authentication visible, with a specific error; it does not publish a
 successful certificate body or feed later plaintext into application parsers.
+In an observed initial exchange, the client Certificate and server
+CertificateRequest also require an empty context. Recovery authenticates an
+application traffic key before applying this condition, so missing Finished
+records do not make post-handshake contexts look like initial ones. Complete
+phase ordering and PHA request/response association remain unverified.
+In the ordinary detail view, diagnostic codes and reasons occupy separate
+fields. Only one exact typed-code prefix is removed from the displayed reason;
+the exported error stays complete, and diagnostics do not claim byte ranges.
 CertificateVerify uses its complete version-qualified signature vector, with
 the observed two-byte algorithm, exact length and owned signature bytes. The
 detail tree progresses from header to body to context; selecting a signature
