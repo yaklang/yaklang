@@ -38,6 +38,32 @@ func smb1Fuzz102Expected(t *testing.T, w []byte) []smb1Fuzz102Literal {
 	require.Equal(t, []byte{0xff, 'S', 'M', 'B'}, w[4:8])
 	command, response := w[8], w[13]&0x80 != 0
 	require.Contains(t, []byte{0x75, 0x06}, command)
+	if response && len(w) == 39 && w[36] == 0 && binary.LittleEndian.Uint16(w[37:39]) == 0 && binary.LittleEndian.Uint32(w[9:13]) != 0 {
+		// MS-CIFS 2.2.3.2 empty error reply. It is not the success word layout.
+		var out []smb1Fuzz102Literal
+		add := func(owner, name string, lo, hi int, value any) {
+			out = append(out, smb1Fuzz102Literal{owner, name, lo, hi, value, false})
+		}
+		add("Direct TCP", "Message Type", 0, 1, w[0])
+		add("Direct TCP", "Payload Length", 1, 4, uint32(len(w)-4))
+		add("Header", "Protocol ID", 4, 8, binary.LittleEndian.Uint32(w[4:8]))
+		add("Header", "Command", 8, 9, w[8])
+		add("Header", "Status", 9, 13, binary.LittleEndian.Uint32(w[9:13]))
+		add("Header", "Flags", 13, 14, w[13])
+		add("Header", "Flags 2", 14, 16, binary.LittleEndian.Uint16(w[14:16]))
+		add("Header", "PID High", 16, 18, binary.LittleEndian.Uint16(w[16:18]))
+		sec := make([]byte, 8)
+		copy(sec, w[18:26])
+		add("Header", "Security Features", 18, 26, sec)
+		add("Header", "Reserved", 26, 28, binary.LittleEndian.Uint16(w[26:28]))
+		add("Header", "Tree ID", 28, 30, binary.LittleEndian.Uint16(w[28:30]))
+		add("Header", "Process ID Low", 30, 32, binary.LittleEndian.Uint16(w[30:32]))
+		add("Header", "User ID", 32, 34, binary.LittleEndian.Uint16(w[32:34]))
+		add("Header", "Multiplex ID", 34, 36, binary.LittleEndian.Uint16(w[34:36]))
+		add("Body", "Word Count", 36, 37, w[36])
+		add("Body", "Byte Count", 37, 39, binary.LittleEndian.Uint16(w[37:39]))
+		return out
+	}
 	base, wc := 47, byte(4)
 	if command == 0x75 && response {
 		base, wc = 45, 3

@@ -152,6 +152,8 @@ func DecodeCIFSEmptyError(raw []byte) (map[string]any, error) {
 	out["Error Layout"] = true
 	out["Success Layout"] = false
 	out["Authentication Verified"] = false
+	out["Signature Verified"] = false
+	out["Session Established"] = false
 	return out, nil
 }
 
