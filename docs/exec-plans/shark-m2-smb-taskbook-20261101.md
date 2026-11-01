@@ -13,6 +13,7 @@
 - 最新非SMB代码/干净构建为 `788c8e27ba38d9037a4a75284bbcada74f843d7e`，[TCP承载资格、原始长度、实际回调与Windows证据](shark-m2-tcp-carrier-and-length-20261101.md)。最终说明head的CI另验；本批不分析SMB，不能用大包输出保持或非SMB修复替代S01的SMB逐记录基线。
 - 后续已核全绿检查点为 `3d70333bab584719207e80283e3d385cc2905b82`：47checks/2statuses，313502pass/25历史optional skip，131084 required全pass/0skip；[traffic](https://github.com/yaklang/yaklang/actions/runs/41301299644)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41301302855)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41301306047)。其后同一M2的HTTP代码/干净构建为 `c0b53eedab27bc5e4d0c30956d69b591b5d128a5`，[有限观察及完整回放](shark-m2-http-orphan-observation-20261101.md)，最终说明head须另验CI。上述非SMB运行不替代S01；承接人仍从开工时远端最新M2重新固定基线。
 - 9 个分批 PR 已归入 M2。原 SMB 批次 #5380 的已有代码已保留；最终 fuzz 取消、重建回放和 Windows 的未关闭项仍然有效。
+- 最新已独立全绿检查点为 `7a9a1b14959f6487e09e0144fcbdea2d63bcc94c`：47必需检查名、2状态、313584pass/25历史optional skip；82新增及131084 required全pass/0skip，实际checkout和官方完整产物已核。[traffic](https://github.com/yaklang/yaklang/actions/runs/41310969981)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41310973638)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41310977188)。其后本地Certificate生产构建为 `0f1ab555287149b3b3ced55191597848f135ad66`、QA为 `15290b57c24a02fdfc5fd1da94dd25c7f34a7291`，新head另验CI；不将其非SMB证据当S01已通过。上述基线记录均保留历史事实，承接人仍从开工时远端最新M2独立固定S01。
 - 在独立 worktree 或 clone 开发，使用临时 `codex/` 分支，交付目标为 M2。不得修改 M1、强制覆盖 M2 或在主线程正在测试时改动其源码目录。临时分支不是第三个阶段，合入后清理。
 
 ## 已有成果和保留缺口

@@ -23,8 +23,16 @@
 131084 required及127新增均全pass/0skip。新HTTP有限观察代码/干净构建为
 `c0b53eedab27bc5e4d0c30956d69b591b5d128a5`，
 [真实peer、54公开头、1048后续观察、Windows及完整对象差分](shark-m2-http-orphan-observation-20261101.md)。
-当前55父项中45有限完成/10未关闭（含3SMB），非SMB17包中11有限完成/6开放；
+当时55父项中45有限完成/10未关闭（含3SMB），非SMB17包中11有限完成/6开放；
 最终说明head的CI独立验收，不能沿用3d703成功。继续同一M2普通提交，没有新阶段或SMB分析。
+
+后续7a9检查点实际47checks/2statuses、313584pass/25历史optional skip全绿，
+82新增及131084 required全pass/0skip，实际checkout与官方完整产物已核。
+最新Certificate代码/干净构建为 `0f1ab555287149b3b3ced55191597848f135ad66`，
+Windows QA翻页工具为 `15290b57c24a02fdfc5fd1da94dd25c7f34a7291`，
+[正文向量、真实peer、大包逐项来源和两实际页面](shark-m2-tls-certificate-vectors-20261101.md)。
+当前56父项中46有限完成/10未关闭（含3 SMB搁置），非SMB17包仍11有限完成/6开放。
+新最终head完整CI独立核验，7a9成功不包含本批修改；继续同一M2普通提交，不新建阶段、不分析SMB。
 
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
 其整个树 `9744c0cb14e9cc80fe3e7c0d82479438c5a0eb89` 与已验收 a9 完全相同。

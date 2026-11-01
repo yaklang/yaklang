@@ -86,6 +86,15 @@ types, complete signature identifiers, CA names, or TLS 1.3 request context and
 extensions. Selecting a literal uses a separate complete handshake byte source;
 decrypted fields do not point into ciphertext. Missing negotiation leaves a
 qualified envelope, and an absent CA extension is distinct from an empty vector.
+Authenticated TLS 1.3 Certificate details expose the complete request context,
+certificate list, each certificate's bytes and its extension entries. Lengths,
+extension boundaries and duplicate types within an entry are checked before the
+body is published. Unknown extension data stays opaque. Selecting a literal
+uses owned bytes from the complete handshake encoding, including entries that
+span several byte-pane viewports. Record authentication and valid body vectors
+do not establish certificate trust, negotiated certificate type, request-context
+association or a conforming handshake phase. Existing certificate summaries
+remain available alongside these literal fields.
 CertificateVerify uses its complete version-qualified signature vector, with
 the observed two-byte algorithm, exact length and owned signature bytes. The
 detail tree progresses from header to body to context; selecting a signature
