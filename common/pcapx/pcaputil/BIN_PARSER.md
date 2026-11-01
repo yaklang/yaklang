@@ -5,7 +5,9 @@
 
 这条链路提供类似 Wireshark 的基本工作流：选网卡 → 抓取原包 → TCP 重组 → 识别
 已支持协议 → 按完整消息解析字段 → 查看/筛选会话 → 保存后回放。它是消息分析工具，
-当前没有 Wireshark 的完整协议覆盖、逐包 GUI、TLS 解密或专家诊断功能。
+不提供 Wireshark 的完整协议覆盖或逐包 GUI。当前原生引擎已有有界 IPv4/IPv6 碎片
+重组、选定 TLS AEAD 配置的解密及限定诊断；解密需显式提供相应 TLS secrets，
+记录认证不等于握手签名、Finished transcript MAC 或证书信任已验证。
 
 ## 五分钟开始使用
 
@@ -31,7 +33,8 @@ libpcap 并需要抓包设备权限。普通 pcap/pcapng 文件回放不需要�
 始终检查报告中的 `Analysis` 和 `Reassembly`：`decoded` 是已完成字段；
 `unrecognized` / `context-required` 表示协议或阶段暂不支持；`incomplete` / `malformed`
 表示缺少边界或报文非法；`limited` 表示触及资源上限。原生 Dropped / InterfaceDropped
-与重组缺口同样重要，不能只看 Mbps。TLS 密文不会变成解密后的 HTTP 内容。
+与重组缺口同样重要，不能只看 Mbps。没有相应密钥或支持的配置时，TLS 保持密文观察；
+认证解密后也仅按已支持的应用 profile 继续解析，缺失字节不会被补造。
 
 ## Yak 实时抓包
 
@@ -166,7 +169,7 @@ See [session profiles and explicit limits](PROFILES.md) for the supported versio
 | Protocol | Framing and output |
 | --- | --- |
 | HTTP/1.0, HTTP/1.1 | Observed request methods, lengths, chunks, trailers, HEAD, interim responses, CONNECT/101 upgrade; complete existing `HTTPExact` fields |
-| TLS | Exact records; existing record/ClientHello rule. Ciphertext remains opaque; no decryption or new handshake semantics |
+| TLS | Exact record envelopes and selected handshake bodies; opt-in supported AEAD decryption with TLS secrets. Missing keys/history remain explicit; complete handshake, signature and trust validation are not implied |
 | MQTT | CONNECT establishes observed 3.1.1 or 5.0 connection context and bounded directional QoS tracking; exact wire fields and binary payloads. Legacy 3.1 has fields without native connection state; missing CONNECT needs context |
 | DNS | UDP datagrams or length-prefixed TCP, port hint plus header checks; existing DNS rule |
 | Kerberos | Port 88 plus DER application tag; UDP messages or TCP records; existing native fields |
@@ -175,9 +178,10 @@ See [session profiles and explicit limits](PROFILES.md) for the supported versio
 | ISO 8583 | Two-byte little-endian carried card-originated message; complete envelope and published 1987/1993 element tree in ASCII or packed BCD. Weak length-prefixed candidate, so it is probed after every strong signature and only a fully decodable first message claims the flow |
 
 This is a useful capture/analysis foundation, **not Wireshark-equivalent protocol
-coverage**. Other TCP/UDP traffic yields bounded samples and counters. L2-only
-protocols, IP fragment reassembly, TLS decryption, general protocol negotiation,
-and packet dissection across hundreds of protocols are outside this adapter.
+coverage**. The table contains selected examples, not the complete current native
+catalog. Unsupported traffic yields bounded observations and diagnostics. Bounded
+IPv4/IPv6 fragment normalization and selected TLS AEAD decryption are implemented;
+general protocol negotiation and complete packet dissection are not implied.
 Existing pcapx packet callbacks are available when individual link-layer packets
 are needed; enabling them uses the general packet path.
 
@@ -187,7 +191,8 @@ Events own `Raw` and `Structured`; retaining an event never retains pooled flow
 pointers. `Direction` refers to first-observed endpoint order, not a client/server
 role inferred from a port. `Offset` counts delivered ordered bytes within that
 direction. TCP retransmissions are not counted as new application bytes. UDP
-events use FlowID 0 and have no persistent session identity.
+events retain datagram facts; selected stateful profiles also retain bounded
+observed session identity. A missing/zero identity does not establish packet loss.
 
 `Structured.metadata` preserves the rule's original metadata exactly. For
 example, a native rule's `TCP Reassembly Performed: false` describes that rule's
