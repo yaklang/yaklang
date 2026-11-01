@@ -103,6 +103,17 @@ and gRPC message sizes when actually decoded. Missing keys, unavailable handshak
 context and authentication failures stay visible; opaque records in established
 TLS sessions retain their connection context.
 
+A complete HTTP response header can identify `HTTP/1.0` or `HTTP/1.1` even when
+its request method is missing. The list marks it `header only`; the detail view
+separates the header, unframed stream bytes, and observed context. HEAD and CONNECT
+can change body boundaries, so no request method or complete response boundary is
+guessed. Later bytes retain that HTTP context without becoming new HTTP messages
+or publishing response codes from HTTP-looking body text. Each observation owns
+its byte source, with a preview capped at 64 KiB and by parser budgets, plus the
+whole observed length and SHA256. Missing context does not invent request links,
+body ranges, or a message completion frame. Normal captures with known request
+methods keep their usual message and tunnel handling.
+
 Native QUIC keeps the three CRYPTO encryption levels separate. Complete messages
 must fit their permitted level; TLS KeyUpdate and EndOfEarlyData are refused.
 Supported QUIC Hello profiles require TLS 1.3, and a ticket's early-data marker

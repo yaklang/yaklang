@@ -19,6 +19,13 @@
 最终说明head的完整CI仍待独立核验。维持M1已合并/M2唯一活动阶段，没有新的SMB语义分析或强推。
 后续同树/相同patch哈希只描述f99当时连接M1 squash的历史动作，不适用于新增main改动后的整棵树。
 
+随后3d703实际47checks/2statuses、完整traffic313502pass/25历史optional skip全绿，
+131084 required及127新增均全pass/0skip。新HTTP有限观察代码/干净构建为
+`c0b53eedab27bc5e4d0c30956d69b591b5d128a5`，
+[真实peer、54公开头、1048后续观察、Windows及完整对象差分](shark-m2-http-orphan-observation-20261101.md)。
+当前55父项中45有限完成/10未关闭（含3SMB），非SMB17包中11有限完成/6开放；
+最终说明head的CI独立验收，不能沿用3d703成功。继续同一M2普通提交，没有新阶段或SMB分析。
+
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
 其整个树 `9744c0cb14e9cc80fe3e7c0d82479438c5a0eb89` 与已验收 a9 完全相同。
 M2 #5371 已自动改以 main 为基线，现以普通 merge
