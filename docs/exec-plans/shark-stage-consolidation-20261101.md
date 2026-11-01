@@ -2,6 +2,16 @@
 
 按用户指令只保留 M1、M2 两个活动阶段；不把协议阶段整理当成所有核心协议验收完成。
 
+后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
+其整个树 `9744c0cb14e9cc80fe3e7c0d82479438c5a0eb89` 与已验收 a9 完全相同。
+M2 #5371 已自动改以 main 为基线，现以普通 merge
+`f99ef2b7ad97c135d9f2e49add582cf8b8e46e2d` 连接该基线。合并前后整个 M2 树相同，
+相对 M1/main 的 patch SHA256 均为
+`f0bc0aa074b1c0d56f65180ab1abaf2fec7ebd38bae4cbcb090c224e9fe6d804`。
+未改写提交或强推；阶段文件差异不重复引入 M1。M1为已合并阶段，后续仅维护 M2 活动分支。
+下文未合并/待review等状态是整理时的历史快照；新正文/Windows/回放见
+[CertificateRequest记录](shark-m2-tls-certificate-request-20261101.md)，最终SHA的CI由阶段PR另验。
+
 | 阶段 | 活动分支 / PR | 基线与边界 |
 |---|---|---|
 | M1 | `codex/shark-protocol-infrastructure` / [#5353](https://github.com/yaklang/yaklang/pull/5353) | 实际 rebase 到 main `b22442c81d64f7d825f133931d571f7d0f4d6586`；最终 `a9b8df4f64364065765fc0f7f1df4ed9d68cf7dc`。不含 M2 功能 |

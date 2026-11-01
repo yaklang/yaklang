@@ -81,6 +81,14 @@ eviction remain explicit; the preview never inserts absent bytes to fill a hole.
 
 `--tls-keylog` accepts an NSS key log for authorized captured sessions. Supported
 TLS records are authenticated before their plaintext enters application parsers.
+CertificateRequest details use the observed negotiated version: certificate
+types, complete signature identifiers, CA names, or TLS 1.3 request context and
+extensions. Selecting a literal uses a separate complete handshake byte source;
+decrypted fields do not point into ciphertext. Missing negotiation leaves a
+qualified envelope, and an absent CA extension is distinct from an empty vector.
+Decoded request/update results remain visible ahead of coalesced TLS envelope
+summaries. Body decoding and record authentication do not certify complete
+handshake conformance, certificate trust, or post-handshake authentication.
 The table shows handshake names, alerts, SNI/ALPN, HTTP/2 stream IDs, request paths
 and gRPC message sizes when actually decoded. Missing keys, unavailable handshake
 context and authentication failures stay visible; opaque records in established
