@@ -560,3 +560,34 @@ func TestSMB2NegotiateContextTypedPayloads(t *testing.T) {
 	require.Equal(t, []byte{1, 2}, got["Data"])
 	require.Contains(t, got["Data Status"], "not a selected layout")
 }
+
+func TestSMB2ChannelDescriptorStaysOpaque(t *testing.T) {
+	// MS-SMB2 2.2.31.1 is a fixed RDMA descriptor, but M2-04.14 keeps it as a
+	// separate profile. It must not be published as the read or write bytes.
+	fid := bytes.Repeat([]byte{1}, 16)
+	info := bytes.Repeat([]byte{0xab}, 16)
+	read := append(smb2Read(1, 1, 1, fid, 4)[4:], info...)
+	binary.LittleEndian.PutUint32(read[100:104], 1)
+	binary.LittleEndian.PutUint16(read[108:110], uint16(len(read)-16))
+	binary.LittleEndian.PutUint16(read[110:112], 16)
+	commands, err := smb2Walk(read, 64)
+	require.NoError(t, err)
+	body := commands[0]["Body"].(map[string]any)
+	require.Equal(t, info, body["Read Channel Info"])
+	require.Contains(t, body["Read Channel Info Status"], "opaque")
+	require.NotContains(t, body, "Data")
+
+	file := []byte{9}
+	write := smb2Write(1, 1, 1, fid, file)[4:]
+	off := len(write)
+	write = append(write, info...)
+	binary.LittleEndian.PutUint32(write[96:100], 2)
+	binary.LittleEndian.PutUint16(write[104:106], uint16(off))
+	binary.LittleEndian.PutUint16(write[106:108], 16)
+	commands, err = smb2Walk(write, 64)
+	require.NoError(t, err)
+	body = commands[0]["Body"].(map[string]any)
+	require.Equal(t, file, body["Data"])
+	require.Equal(t, info, body["Write Channel Info"])
+	require.Contains(t, body["Write Channel Info Status"], "opaque")
+}
