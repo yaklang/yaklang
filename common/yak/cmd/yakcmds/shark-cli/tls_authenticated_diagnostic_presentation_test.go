@@ -43,6 +43,11 @@ func TestTLSAuthenticatedHandshakeDiagnosticKeepsRecordIdentity(t *testing.T) {
 			}
 			packet := tcpPacket(t, 1, 100, string(e.Raw), false, false, false, false)
 			packet.events = []*pcaputil.ProtocolEvent{e}
+			packet.connectionDiagnostic = "TLS decoding halted after MalformedMessage; subsequent plaintext unavailable"
+			row := summarize(packet)
+			require.Equal(t, packet.connectionDiagnostic, row.ConnectionDiagnostic)
+			require.Contains(t, row.Info, packet.connectionDiagnostic)
+			require.Equal(t, "malformed", row.ProtocolStatus)
 			view := workerMetadataDetailForPacket(t, packet)
 			require.Equal(t, "TLSv1.3", view.protocol)
 			require.Contains(t, detailLines(view.fields), reason)

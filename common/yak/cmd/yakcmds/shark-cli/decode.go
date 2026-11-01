@@ -258,7 +258,7 @@ func summarize(raw *capturedPacket) packetSummary {
 		row.Info += fmt.Sprintf(" [truncated capture: %d/%d bytes]", len(raw.data), raw.ci.Length)
 		row.ProtocolStatus = "incomplete"
 	}
-	if raw.connectionDiagnostic != "" && len(payload) > 0 && presentation.protocol == "" {
+	if raw.connectionDiagnostic != "" && len(payload) > 0 && (presentation.protocol == "" || presentation.scope == "authenticated TLS record diagnostic" && presentation.status == "malformed") {
 		row.ConnectionDiagnostic = raw.connectionDiagnostic
 		row.Info += " [" + raw.connectionDiagnostic + "]"
 		if row.ProtocolStatus == "" {
