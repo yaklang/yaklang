@@ -102,6 +102,7 @@ type binTLS struct {
 	retrySuite, retryGroup                 uint16
 	resumption                             tlsResumptionState
 	requestContexts                        map[string]struct{}
+	phaOfferKnown, phaOffered              bool // outlive the owned retry ClientHello body
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }

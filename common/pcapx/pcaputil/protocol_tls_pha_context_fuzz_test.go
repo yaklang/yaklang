@@ -35,11 +35,16 @@ func FuzzTLS13PHAContextAdmission(f *testing.F) {
 		state.version, state.suite, state.client = 0x304, 0x1301, 0
 		state.app[1] = !initial
 		if !unknown {
+			state.client = -1
 			extensions := []tlsResumptionExt{{43, []byte{2, 3, 4}}}
 			if offered {
 				extensions = append(extensions, tlsResumptionExt{49, nil})
 			}
-			state.firstHello = tlsResumptionHello(true, nil, state.suite, extensions...)
+			_, err := state.handshakeMessage(0, reliabilityHS(1, tlsResumptionHello(true, nil, state.suite, extensions...)), false)
+			require.NoError(t, err)
+			_, err = state.handshakeMessage(1, reliabilityHS(2, tlsResumptionHello(false, nil, state.suite, tlsResumptionExt{43, []byte{3, 4}})), false)
+			require.NoError(t, err)
+			require.Empty(t, state.firstHello)
 		}
 		wire := phaContextTestRequest(first)
 		message, err := state.handshakeMessage(1, wire, true, 16)

@@ -305,6 +305,10 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		} else if t.firstHello == nil {
 			t.firstHello = bytes.Clone(body)
 		}
+		// Final ServerHello releases firstHello. Keep the complete, admitted
+		// client's PHA offer as connection state across that release and KU.
+		t.phaOfferKnown = true
+		_, t.phaOffered = h.ext[49]
 		return false, nil
 	}
 	retry := bytes.Equal(body[2:34], tlsRetryRandom[:])

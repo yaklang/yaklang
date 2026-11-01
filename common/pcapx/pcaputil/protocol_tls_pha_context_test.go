@@ -22,6 +22,9 @@ func phaContextTestFlow(t *testing.T, suite uint16, server int, offer string) (*
 		_, err := state.handshakeMessage(1-server, reliabilityHS(1, body), false)
 		require.NoError(t, err, "offer knowledge comes from an accepted complete ClientHello")
 		require.NotEmpty(t, state.firstHello)
+		_, err = state.handshakeMessage(server, reliabilityHS(2, tlsResumptionHello(false, nil, suite, tlsResumptionExt{43, []byte{3, 4}})), false)
+		require.NoError(t, err)
+		require.Empty(t, state.firstHello, "final ServerHello releases retry body storage; offer knowledge must survive")
 	}
 	return flow, state
 }
@@ -253,6 +256,41 @@ func TestTLS13PHAOfferCannotBeServerEncryptedExtension(t *testing.T) {
 			require.Equal(t, ErrMalformedMessage, typed.Kind)
 			require.Nil(t, message)
 			require.Empty(t, state.requestContexts)
+		})
+	}
+}
+
+func TestTLS13PHAOfferObservationIsTransactional(t *testing.T) {
+	for _, offer := range []string{"offered", "not-offered", "unknown"} {
+		t.Run(offer, func(t *testing.T) {
+			state := newBinTLS()
+			if offer != "unknown" {
+				extensions := []tlsResumptionExt{{43, []byte{2, 3, 4}}}
+				if offer == "offered" {
+					extensions = append(extensions, tlsResumptionExt{49, nil})
+				}
+				_, err := state.handshakeMessage(0, reliabilityHS(1, tlsResumptionHello(true, nil, 0x1301, extensions...)), false)
+				require.NoError(t, err)
+			}
+			before := bytes.Clone(state.firstHello)
+			_, err := state.handshakeMessage(0, reliabilityHS(1, tlsResumptionHello(true, nil, 0x1301, tlsResumptionExt{49, []byte{1}})), false)
+			require.Error(t, err, "rejected ClientHello must not change an accepted or unknown offer")
+			require.Equal(t, before, state.firstHello)
+			_, err = state.handshakeMessage(1, reliabilityHS(2, tlsResumptionHello(false, nil, 0x1301, tlsResumptionExt{43, []byte{3, 4}})), false)
+			require.NoError(t, err)
+			require.Empty(t, state.firstHello)
+			// This message-level fixture supplies the server direction even
+			// when no admitted ClientHello established the client's role.
+			state.client = 0
+			state.app[1] = true
+			message, err := state.handshakeMessage(1, phaContextTestRequest([]byte{1}), true)
+			if offer == "not-offered" {
+				require.Error(t, err)
+				require.Nil(t, message)
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, offer, message["Certificate Request Admission"].(map[string]any)["Client PHA Offer"])
+			}
 		})
 	}
 }

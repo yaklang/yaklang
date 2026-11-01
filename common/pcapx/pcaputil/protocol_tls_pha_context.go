@@ -23,13 +23,9 @@ func (t *binTLS) admitCertificateRequest(dir int, request *TLSCertificateRequest
 		return nil, nil
 	}
 	offer := "unknown"
-	if len(t.firstHello) != 0 {
-		hello, err := tlsHello(t.firstHello, true)
-		if err != nil {
-			return nil, err
-		}
+	if t.phaOfferKnown {
 		offer = "not-offered"
-		if _, present := hello.ext[49]; present {
+		if t.phaOffered {
 			offer = "offered"
 		}
 	}
