@@ -9,6 +9,10 @@
 当前非SMB修复/干净构建为 `488147e9cd490f863edbca5720ff39a85d8cfcf1`，
 [CertificateVerify、实际Windows可见方案及原始来源](shark-m2-tls-certificate-verify-20261101.md)。
 继续同一M2阶段PR #5371；后续文档head的CI单独验收，不能沿用8a成功。
+后续631已47checks/2statuses及313256精确traffic ID全绿。最新非SMB代码/干净构建为
+`0fc42e285292b38090c24e77d114bdb7da009d61`，
+[QUIC资格、真实流量、83个Windows状态及大捕获逐对象核对](shark-m2-quic-crypto-qualification-20261101.md)。
+本轮四个代码提交继续同一M2，无新阶段分支/强推；SMB仍跳过。最终说明head的CI独立验收，不能沿用631成功。
 后续同树/相同patch哈希只描述f99当时连接M1 squash的历史动作，不适用于新增main改动后的整棵树。
 
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，

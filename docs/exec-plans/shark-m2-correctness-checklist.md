@@ -16,7 +16,11 @@
 合并后6次完整大捕获346和逐对象347也已闭合，非SMB及原ID/raw/来源无变化，SMB仅保留main差异。
 新增CertificateVerify的原生/拥有字段/列表修复为e5和488，
 [175帧7连接、13签名/19MAC独立核验、11组22次回放及72个Windows状态](shark-m2-tls-certificate-verify-20261101.md)。
-新文档提交的CI仍须由PR按实际head_sha闭合，不能拿8a或旧分批全绿替代新代码。
+631检查点已实际47checks/2statuses及313256精确traffic ID全绿，313231pass/25历史optional skip，
+98个新增CV和131084 required均全pass/0skip。随后同分支完成
+[QUIC CRYPTO层级、拒绝字节与实际页面五个有限合同](shark-m2-quic-crypto-qualification-20261101.md)，
+最终代码/干净构建为 `0fc42e285292b38090c24e77d114bdb7da009d61`。
+新文档提交的CI仍须由PR按实际head_sha闭合，不能拿631、8a或旧分批全绿替代新代码。
 
 M2最初从M1全绿提交 `39729081a3300381154d96cf1b4866f23976260b` 分出；
 [验收记录与 PR/CI 链接](shark-m1-acceptance-397.md)。新分支为
@@ -24,8 +28,9 @@ M2最初从M1全绿提交 `39729081a3300381154d96cf1b4866f23976260b` 分出；
 代码量或测试数量估算完成度。M1 尚未合并时，M2 PR 以 M1 分支为基线，避免重复展示 M1。
 
 后续分支 `codex/shark-m2-smb-query-info-types` 从已全绿的 M2 `f9faae9f82c0dbe6a657bfaa94d7d6acdc845380` 开始。
-当前状态：**47 项，已完成 37，进行中 6，未开始 1，按用户要求搁置 3；剩余 10 项（含搁置）**。
-完成项为 M2-01/02/03、06、12..42中除36外、44、46及47的有限合同，不含进行中的 M2-11；不代表核心协议或整个 SMB profile 验收完成。
+当前状态：**52 项，已完成 42，进行中 6，未开始 1，按用户要求搁置 3；剩余 10 项（含搁置）**。
+完成项为 M2-01/02/03、06、12..42中除36外、44、46..52的有限合同，不含进行中的 M2-11；不代表核心协议或整个 SMB profile 验收完成。
+本批新增并关闭48..52五个问题，宽口径父项未因此冒充关闭；非SMB差异清单为16包中9有限完成、7开放，粗估25–50 AI实施小时，构建/CI/回放等待及新发现另计。
 M2-30/31/32 的正文恢复、异步身份与页面合同已通过本地及原始捕获验收；
 M2-33 的有限WC17响应profile已经完成代码、原始来源和Windows验收，整批CI归M2-11。
 M2-34/35的有限setup/当前wire prefix合同已完成本地、原始来源、fuzz和真实Windows验收，整批CI归M2-11。
@@ -82,7 +87,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 进行中 | 107/121和全部281来源门保持；60三种新构建完整回放、选定QI字段/Windows闭合；dd63→60的42223事件仅93个SMB2变化，其余42130和完整CLI/flow逐字节相同；M1→60全行账本保留，完整语义ID/字段/会话仍开放 | 1–3 小时 |
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 进行中（8场景实际复验，有限范围已闭合） | 82fc六来源72+两个匹配新SYNACK后77场景重跑，七个严格通过；C1 TLS1.2保留exit4/8项策略差异，额外4TLS+3HTTP经双Python AEAD/peer/父子/response_to/Feed57审计均旧Flow2，未串入新3。真实callback与CompletedIn分开；原严格失败不抹去。字节范围及TLS页面另闭合37；密钥代际/缺开头/KeyUpdate等整体未完成 | 2–4 小时；新增边界另计，不以7/8代替全部高级恢复 |
 | M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（四实际域组合已跑，缺握手整体仍开放） | 82fc接口/VLAN full/full两严格门通过，每域2022认证/3坏tag/6tail、4556来源检查；两个app-only严格73各2664差异原样保留。另核各2007个准确UDP预览（1332截64B/675完整短包），0借域身份，不等于完整QUIC解析。CID/epoch/STREAM/QPACK/0RTT仍需独立语义门 | 2–4 小时；执行等待及新问题另计 |
-| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N15共7有限完成/8未关闭；原133项、6 TCP/24 UDP政策项保留。N13的CR正文、Finished长度/epoch有限通过，完整阶段仍开放；新增N15的真实CertificateVerify正文/字段缺口。不将字段或展示有限通过当全部协议正确 | 当前8项粗估25–50 AI实施小时，不含CI/构建/回放等待及新问题 |
+| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N16共9有限完成/7未关闭；原133项、6 TCP/24 UDP政策项保留。CR/Finished/CV正文与QUIC当前层级/消息批/拥有字节有限通过，N13完整阶段及N09缺握手高级恢复仍开放；不将局部字段或展示通过当全部协议正确 | 当前7包粗估25–50 AI实施小时，不含CI/构建/回放等待及新问题 |
 | M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | #5379/5381/5382最终SHA各47checks+2statuses全绿且ready；5382最终13ae实际checkout及artifact已核，312560pass/25历史optional skip、131084 required和新增37终态全过。本批5383代码9af完整CLI1066pass/2历史skip，Windows229实际60状态及大包231/五行逐条232复核已过有限门；最终交付SHA仍须独立完整CI，不用父成功替代 | 30–90 分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
@@ -115,11 +120,16 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-40 | 原94/39字段清单绑定当前非SMB构建与大捕获 | 已完成（133项有限清单，整批CI归11） | 137原133逐项新physical/DNS门及固定TLS参考哈希；4477两个完整捕获SDK42223/263109及CLI/flow共6导出与4bfb逐字节相同，闭合173据精确输出绑定133门，无ID归一化、无新TShark冒称；2非法UTF8文字差异及RDPUDP参考限制保留，不宣称全协议语义 | 0 |
 | M2-41 | TLS1.3 KU record尾边界及跨epoch旧握手残片 | 已完成（N12有限native/详情合同，整批CI归11） | 176独立3正/3负AEAD源、39ca SDK实际误接受/HTTP泄漏；6bac同v02六门通过、12DTO负控；跨epoch认证成功才退休旧同向残片，三套AEAD/合法分片/坏尾/反向状态、5038原生与1055CLI/96752插桩fuzz通过。198/200真实七场景和207/208/209保留旧失败，199六大捕获导出与133逐字节相同；Windows详情及列表分列，不称全UI通过 | 0 |
 | M2-42 | 多TLS PDU物理帧的列表摘要挤掉关键结果 | 已完成（9af有限展示合同，整批CI归11） | 原214/222列表失败保留，225红3pass/7fail、227完整CLI1066pass/2历史skip；完整消息前移且原Malformed原因不被后Context盖掉，不改事件/应用身份。229实际三页60状态及root9图、原list断言/全部源与高亮/resize/CP936通过；231四SDK/flow字节相同，CLI仅Sharon5行info/status按原native事实校正，其他pdus/字段/源/域/stream逐对象完全一致 | 0 |
-| M2-43 | TLS身份资格分层与CertificateRequest正文 | 进行中（正文/字段/拥有源有限通过，阶段/恢复仍开放） | CR的56来源事实、55参考literal+1空向量、QUIC CRYPTO重组及有效fuzz81017次保留；M2-46/47另关闭Finished及CV正文/拥有来源有限合同。PHA offer/上下文唯一性/多轮关联、完整阶段、缺握手资格、QUIC高级恢复仍开放。损坏Certificate后CV边界不可证的观察缺口保留，不把独立oracle的MAC/签名核验说成产品已验证 | 后续实施2–4 AI小时，执行等待另计 |
+| M2-43 | TLS身份资格分层与CertificateRequest正文 | 进行中（正文/字段/拥有源有限通过，阶段/恢复仍开放） | CR的56来源事实、55参考literal+1空向量、QUIC CRYPTO重组及有效fuzz81017次保留；46/47关闭Finished/CV正文，48..52关闭QUIC有限资格与实际页面。PHA offer/上下文唯一性/多轮关联、完整阶段、协商依赖/传输参数与缺握手高级恢复仍开放。损坏Certificate后CV边界不可证的缺口保留，不将源oracle核验说成产品验证 | 扩展后的后续实施4–8 AI小时，执行等待另计 |
 | M2-44 | 多个完整TLS PDU挤掉后续具体正文摘要 | 已完成（本地及真实页面有限合同，最终CI归11） | 实际282页正文正确但列表缺请求，286红2pass/4fail；4f7仅对已校验CR/认证KU前移，同record及跨PDU均覆盖，不改原详情顺序/错误/应用身份。288完整CLI1093pass/2历史skip；292两页36实际Windows状态、完整明文及精确高亮/缩放/CP936；新字段与publication全部按原生ID核对 | 0 |
 | M2-45 | IP碎片来源归因及有界重组基础接入 | 未开始（已知能力缺口，未验可恢复分组） | README明确未实现IP碎片重组；新297/300完整参考有大量Fragment列差异。须先冻结原wire/domain/offset/MF/ID/长度、完整/永久洞/重复/冲突及可恢复组；逐步接入IPv4/IPv6、预算/超时/域隔离/拥有来源与递进UI，不能直接将全部列差异当bug或猜补缺字节 | 后续实施8–16 AI小时，来源新问题另计 |
 | M2-46 | PHA Finished误重置应用密钥/序号及缺少正文资格 | 已完成（有限合同，最终CI归11） | 9c/7c有界长度、记录末尾及原子epoch；真实source305红4条HTTP→6，source316同四元组两代12条HTTP，丢失/残缺/损坏不捏造PHA完成。d1干净9组/18次SDK+CLI、当前两页36 Windows状态及52/16B精确来源；有效36654次状态fuzz、187新终态；[完整证据及边界](shark-m2-tls-finished-20261101.md) | 0 |
 | M2-47 | TLS CertificateVerify正文、签名方案与拥有来源 | 已完成（有限合同，M2-10.N15，最终CI归11） | e5完整版本化向量/方案/长度/拥有字节，488修复实际页面被Finished挤掉的可见摘要；175原始帧7连接、13签名/19MAC独立oracle，11组22次SDK/CLI与新隔离参考，残包/乱序/复用及72个新Windows状态。98新增精确ID全要求pass；75064次插桩framing/ownership fuzz。明确签名/信任/上下文未验证，损坏Certificate后的恢复不冒充关闭；[证据和保留失败](shark-m2-tls-certificate-verify-20261101.md) | 0 |
+| M2-48 | QUIC TLS消息层级/版本/票据与TLS批提交资格 | 已完成（N16有限合同，最终CI归11） | 90bc逐消息完整性、层级、旧TLS拒绝、未知profile限定、NST early_data及Finished尾；新实抓2050认证包、三套件/六换钥请求/CID与NAT/真实丢延损，30个AEAD有效控制样本旧18误接纳→新27拒绝/3合法通过；不等于全包事务或完整TLS状态机 | 0 |
+| M2-49 | 合并QUIC数据报的错误在实际页面不可见 | 已完成（有限展示合同，最终CI归11） | 3a错误前移、mixed-packet-outcomes及详情早诊断，保留正常邻包和应用身份；21红终态及完整CLI绿测；最终432-02四页83状态实际诊断可见，源/高亮/缩放/CP936通过 | 0 |
+| M2-50 | 已确认QUIC握手仍只显示包号/1-RTT | 已完成（有限名称合同，最终CI归11） | 89f原生认证/层级/封套合格才显示当前消息名；不推导协商版本，应用行优先；实抓全部21封套及36完整流在PDU快照保留，CLI6行来源解释；公开Weber6行经独立Initial解密及新参考验型/长度/PN | 0 |
+| M2-51 | CRYPTO拒绝缺完整解密字节且错误暗示整包回滚 | 已完成（有限错误路径合同，最终CI归11） | 0fc拥有载荷/SHA及重复包保留；实际早前CID帧已生效但TLS批不推进反例；27真实原包变体逐字节源核对，57193次原生插桩执行，解析停止与未交付分开，拒绝诊断不捏造CompletedIn | 0 |
+| M2-52 | QUIC Crypto Data在worker变Base64且没有范围 | 已完成（有限字段来源合同，最终CI归11） | 实际424旧worker复现，0fc按认证/完整声明长度提供独立HEX字节源，Header→Offset→Length→Body；83状态内合法NST26B完整高亮，其他三页完整错误载荷/可见前缀均与源相同，缺认证/错长度/脱离帧拒绝假源 | 0 |
 
 后续每次报告列本表已完成/进行中/未开始数量、关闭的 ID、新增 ID 和证据链接。新增问题不能藏入既有“完成”项；估时随范围和实际失败更新。历史50%/70%额度限制已被用户后续指令替换；当前按最新授权在剩余5%时停止，提前保留提交和精确SHA CI收尾空间。最多1个子agent，主agent负责关键路径。
 

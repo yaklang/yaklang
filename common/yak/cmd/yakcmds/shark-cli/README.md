@@ -102,6 +102,19 @@ The table shows handshake names, alerts, SNI/ALPN, HTTP/2 stream IDs, request pa
 and gRPC message sizes when actually decoded. Missing keys, unavailable handshake
 context and authentication failures stay visible; opaque records in established
 TLS sessions retain their connection context.
+
+Native QUIC keeps the three CRYPTO encryption levels separate. Complete messages
+must fit their permitted level; TLS KeyUpdate and EndOfEarlyData are refused.
+Supported QUIC Hello profiles require TLS 1.3, and a ticket's early-data marker
+must follow QUIC's rule. These checks do not change TLS-over-TCP ticket handling
+or certify a complete TLS state machine or peer trust.
+Qualified current QUIC handshake names precede packet-number samples; a parsed
+HTTP/3 application keeps its own identity. Coalesced datagrams report per-packet
+outcomes and place refusals before ordinary packet summaries. Authenticated
+CRYPTO vectors have their own HEX byte sources after the JSON worker boundary.
+A refused packet's retained plaintext is diagnostic: parsing may have stopped
+after earlier valid frames were applied. Its byte source never claims that all
+packet effects were rolled back or highlights unrelated captured ciphertext.
 Record AEAD verification and certificate trust are separate fields: this analyzer
 does not evaluate certificate trust.
 Live selection immediately shows packet headers and raw bytes. Pin a packet
