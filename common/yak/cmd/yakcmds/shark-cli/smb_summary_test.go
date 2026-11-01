@@ -243,6 +243,12 @@ func TestSMBQuerySummaryNamesConstructedProfiles(t *testing.T) {
 	binary.LittleEndian.PutUint64(network[40:48], 7)
 	security := make([]byte, 20)
 	security[0] = 1
+	owner := make([]byte, 28)
+	owner[0] = 1
+	binary.LittleEndian.PutUint16(owner[2:4], 0x8000)
+	binary.LittleEndian.PutUint32(owner[4:8], 20)
+	owner[20] = 1
+	owner[27] = 5
 	cases := []struct {
 		typ, class byte
 		output     []byte
@@ -253,6 +259,7 @@ func TestSMBQuerySummaryNamesConstructedProfiles(t *testing.T) {
 		{2, 1, volume, "QUERY_INFO response · FileFsVolumeInformation · volume=C: · MID=21"},
 		{2, 5, fs, "QUERY_INFO response · FileFsAttributeInformation · fs=NTFS · MID=21"},
 		{3, 0, security, "QUERY_INFO response · SecurityDescriptor · revision=1 · opaque SID/ACL · MID=21"},
+		{3, 0, owner, "QUERY_INFO response · SecurityDescriptor · revision=1 · owner=S-1-5 · MID=21"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.want, func(t *testing.T) {

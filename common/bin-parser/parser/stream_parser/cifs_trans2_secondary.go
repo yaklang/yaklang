@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // MS-CIFS 2.2.4.47.1. WordCount is 9. There is no SMB_STRING name and no
@@ -290,25 +291,64 @@ func cifsApplyQueryRecord(body map[string]any, ranges map[string]any, level uint
 		}
 		put("EA Size", "uint32", 0, 4)
 		body["Information Level Name"] = "SMB_QUERY_FILE_EA_INFO"
-	case 0x0104:
+	case 0x0104, 0x0108:
 		if len(data) < 4 {
 			return false
 		}
 		n := int(binary.LittleEndian.Uint32(data[:4]))
-		if n != len(data)-4 || n%2 != 0 {
-			return false
+		put("File Name Length", "uint32", 0, 4)
+		label := "SMB_QUERY_FILE_NAME_INFO"
+		if level == 0x0108 {
+			label = "SMB_QUERY_FILE_ALT_NAME_INFO"
+		}
+		body["Information Level Name"] = label
+		if n != len(data)-4 || n < 0 || n%2 != 0 {
+			body["Data Status"] = "opaque: file name count does not fill this data block"
+			log.Debugf("cifs: %s name left opaque; count %d does not fill %d data bytes", label, n, len(data)-4)
+			body["Information Record"] = record
+			return true
 		}
 		text, err := DecodeCIFSUTF16(data[4:])
 		if err != nil {
-			return false
+			body["Data Status"] = "opaque: file name count does not fill this data block"
+			log.Debugf("cifs: %s name left opaque; UTF-16 bytes are not a complete name", label)
+			body["Information Record"] = record
+			return true
 		}
-		put("File Name Length", "uint32", 0, 4)
 		record["File Name"] = text
 		record["File Name Raw Bytes"] = append([]byte(nil), data[4:]...)
 		record["Wire Field Ranges"].(map[string]any)["File Name"] = []any{start + 4, start + uint64(len(data))}
 		record["Wire Field Ranges"].(map[string]any)["File Name Raw Bytes"] = record["Wire Field Ranges"].(map[string]any)["File Name"]
 		body["File Name"] = text
-		body["Information Level Name"] = "SMB_QUERY_FILE_NAME_INFO"
+	case 0x0109:
+		// MS-CIFS 2.2.8.3.12. One entry whose name fills the data block.
+		if len(data) < 24 {
+			return false
+		}
+		next := binary.LittleEndian.Uint32(data[0:4])
+		n := int(binary.LittleEndian.Uint32(data[4:8]))
+		put("Next Entry Offset", "uint32", 0, 4)
+		put("Stream Name Length", "uint32", 4, 4)
+		put("Stream Size", "int64", 8, 8)
+		put("Stream Allocation Size", "int64", 16, 8)
+		body["Information Level Name"] = "SMB_QUERY_FILE_STREAM_INFO"
+		if next != 0 || n != len(data)-24 || n < 0 || n%2 != 0 {
+			body["Data Status"] = "opaque: stream name count does not fill this data block"
+			log.Debugf("cifs: SMB_QUERY_FILE_STREAM_INFO name left opaque; count %d next %d", n, next)
+			body["Information Record"] = record
+			return true
+		}
+		text, err := DecodeCIFSUTF16(data[24:])
+		if err != nil {
+			body["Data Status"] = "opaque: stream name count does not fill this data block"
+			log.Debugf("cifs: SMB_QUERY_FILE_STREAM_INFO name left opaque; UTF-16 bytes are not a complete name")
+			body["Information Record"] = record
+			return true
+		}
+		record["Stream Name"] = text
+		record["Stream Name Raw Bytes"] = append([]byte(nil), data[24:]...)
+		record["Wire Field Ranges"].(map[string]any)["Stream Name"] = []any{start + 24, start + uint64(len(data))}
+		record["Wire Field Ranges"].(map[string]any)["Stream Name Raw Bytes"] = record["Wire Field Ranges"].(map[string]any)["Stream Name"]
 	default:
 		return false
 	}

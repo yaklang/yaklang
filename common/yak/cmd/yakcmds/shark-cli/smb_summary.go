@@ -213,10 +213,14 @@ func smbQueryInfoSummary(e *pcaputil.ProtocolEvent) (string, bool) {
 			parts = append(parts, "fs="+name)
 		case "SecurityDescriptor":
 			revision, ok := smbSummaryInteger(fields["Revision"])
-			if !ok || fields["Security Body Status"] == nil {
+			if !ok || fields["Security Body Status"] == nil || fields["Identity Verified"] == true {
 				return "", false
 			}
-			parts = append(parts, "revision="+revision, "opaque SID/ACL")
+			if owner, ok := fields["Owner SID"].(string); ok && owner != "" {
+				parts = append(parts, "revision="+revision, "owner="+owner)
+			} else {
+				parts = append(parts, "revision="+revision, "opaque SID/ACL")
+			}
 		default:
 			return "", false
 		}

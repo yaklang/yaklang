@@ -385,7 +385,9 @@ func AnnotateCIFSTransaction2Response(fields map[string]any, setup, level uint16
 			return
 		}
 		if hasLevel && cifsApplyQueryRecord(body, ranges, level) {
-			body["Data Status"] = "decoded from the matched request information level"
+			if _, ok := body["Data Status"]; !ok {
+				body["Data Status"] = "decoded from the matched request information level"
+			}
 			return
 		}
 		body["Data Status"] = "opaque: matched information level is not a selected SMB_QUERY_FILE_ALL_INFO block"

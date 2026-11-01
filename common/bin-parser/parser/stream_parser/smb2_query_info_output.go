@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/yaklang/yaklang/common/bin-parser/parser/base"
+	"github.com/yaklang/yaklang/common/log"
 )
 
 // A response does not carry these selectors. Callers must establish them from
@@ -159,28 +160,191 @@ func smb2FsAttributeFields(wire []byte, info map[string]any) ([]tlsCertificateFi
 }
 
 func smb2SecurityDescriptorFields(wire []byte, info map[string]any) ([]tlsCertificateField, map[string]any, error) {
-	// MS-DTYP 2.4.6 self-relative header. Nonzero offsets must land inside this buffer.
-	// SID and ACL bytes stay one raw tail; this profile does not name their fields.
+	// MS-DTYP 2.4.6. Nonzero offsets are buffer offsets only when SE_SELF_RELATIVE
+	// is set. A SID or ACL that does not fit is not an identity.
 	if len(wire) < 20 {
 		return nil, nil, fmt.Errorf("SecurityDescriptor: truncated 20-byte header")
 	}
-	for _, at := range []int{4, 8, 12, 16} {
-		off := int(binary.LittleEndian.Uint32(wire[at : at+4]))
+	control := binary.LittleEndian.Uint16(wire[2:4])
+	offsets := []int{
+		int(binary.LittleEndian.Uint32(wire[4:8])),
+		int(binary.LittleEndian.Uint32(wire[8:12])),
+		int(binary.LittleEndian.Uint32(wire[12:16])),
+		int(binary.LittleEndian.Uint32(wire[16:20])),
+	}
+	for _, off := range offsets {
 		if off != 0 && (off < 20 || off >= len(wire)) {
 			return nil, nil, fmt.Errorf("SecurityDescriptor: offset leaves this buffer")
 		}
 	}
-	info["Security Body Status"] = "opaque: SID and ACL bytes are not selected"
+	info["Identity Verified"] = false
 	fields := []tlsCertificateField{
 		tlsCertificateLeaf("Revision", "uint8", 0, 1), tlsCertificateLeaf("Sbz1", "uint8", 1, 2),
 		tlsCertificateLeaf("Control", "uint16", 2, 4), tlsCertificateLeaf("Offset Owner", "uint32", 4, 8),
 		tlsCertificateLeaf("Offset Group", "uint32", 8, 12), tlsCertificateLeaf("Offset Sacl", "uint32", 12, 16),
 		tlsCertificateLeaf("Offset Dacl", "uint32", 16, 20),
 	}
-	if len(wire) > 20 {
-		fields = append(fields, tlsCertificateLeaf("Security Descriptor Body", "raw", 20, len(wire)))
+	if control&0x8000 == 0 {
+		info["Security Body Status"] = "opaque: SID and ACL bytes are not selected"
+		if offsets[0]|offsets[1]|offsets[2]|offsets[3] != 0 {
+			info["Security Body Status"] = "opaque: security descriptor offsets are not self-relative"
+			log.Debugf("smb2: security descriptor offsets left opaque; SE_SELF_RELATIVE is clear")
+		}
+		return fields, info, nil
+	}
+	type piece struct{ off, end int }
+	var used []piece
+	overlaps := func(off, end int) bool {
+		for _, prev := range used {
+			if off < prev.end && prev.off < end {
+				return true
+			}
+		}
+		return false
+	}
+	placeSID := func(name string, off int) {
+		if off == 0 {
+			return
+		}
+		text, n, reason := smb2SIDLiteral(wire[off:])
+		if reason != "" {
+			info[name+" SID Status"] = reason
+			log.Debugf("smb2: %s SID left opaque: %s", name, reason)
+			return
+		}
+		if overlaps(off, off+n) {
+			info[name+" SID Status"] = "opaque: security descriptor ranges overlap"
+			log.Debugf("smb2: %s SID left opaque; its bytes overlap another security descriptor field", name)
+			return
+		}
+		info[name+" SID"] = text
+		fields = append(fields,
+			tlsCertificateLeaf(name+" SID Revision", "uint8", off, off+1),
+			tlsCertificateLeaf(name+" SID Sub Authority Count", "uint8", off+1, off+2),
+			tlsCertificateLeaf(name+" SID Identifier Authority", "raw", off+2, off+8),
+		)
+		if n > 8 {
+			fields = append(fields, tlsCertificateLeaf(name+" SID Sub Authorities", "raw", off+8, off+n))
+		}
+		used = append(used, piece{off, off + n})
+	}
+	placeACL := func(name string, off int) {
+		if off == 0 {
+			return
+		}
+		aclFields, n, reason := smb2ACLFields(wire[off:], name)
+		if reason != "" {
+			info[name+" Status"] = reason
+			log.Debugf("smb2: %s left opaque: %s", name, reason)
+			return
+		}
+		if overlaps(off, off+n) {
+			info[name+" Status"] = "opaque: security descriptor ranges overlap"
+			log.Debugf("smb2: %s left opaque; its bytes overlap another security descriptor field", name)
+			return
+		}
+		for i := range aclFields {
+			aclFields[i].Start += off
+			aclFields[i].End += off
+		}
+		fields = append(fields, aclFields...)
+		if binary.LittleEndian.Uint16(wire[off+4:off+6]) == 0 {
+			info[name+" Status"] = "empty"
+		} else {
+			info[name+" Status"] = "decoded literal ACE bytes; identity not verified"
+		}
+		used = append(used, piece{off, off + n})
+	}
+	placeSID("Owner", offsets[0])
+	placeSID("Group", offsets[1])
+	placeACL("Sacl", offsets[2])
+	placeACL("Dacl", offsets[3])
+	failed := smb2OpaqueStatus(info["Owner SID Status"]) || smb2OpaqueStatus(info["Group SID Status"]) || smb2OpaqueStatus(info["Sacl Status"]) || smb2OpaqueStatus(info["Dacl Status"])
+	decoded := info["Owner SID"] != nil || info["Group SID"] != nil || info["Sacl Status"] != nil || info["Dacl Status"] != nil
+	switch {
+	case failed:
+		info["Security Body Status"] = "opaque: a SID or ACL does not fit in this buffer"
+	case decoded:
+		info["Security Body Status"] = "decoded literal SID and ACL; identity not verified"
+	default:
+		info["Security Body Status"] = "opaque: SID and ACL bytes are not selected"
 	}
 	return fields, info, nil
+}
+
+func smb2OpaqueStatus(value any) bool {
+	text, ok := value.(string)
+	return ok && len(text) >= 7 && text[:7] == "opaque:"
+}
+
+// MS-DTYP 2.4.2.2. Revision 1 and a sub-authority count that fits this buffer.
+// The returned text is the literal S-1 form, not a resolved account.
+func smb2SIDLiteral(wire []byte) (string, int, string) {
+	if len(wire) < 8 {
+		return "", 0, "opaque: SID sub-authority count leaves this buffer"
+	}
+	if wire[0] != 1 {
+		return "", 0, "opaque: SID revision is not 1"
+	}
+	n := int(wire[1])
+	if n > 15 {
+		return "", 0, "opaque: SID sub-authority count leaves this buffer"
+	}
+	need := 8 + 4*n
+	if len(wire) < need {
+		return "", 0, "opaque: SID sub-authority count leaves this buffer"
+	}
+	var authority uint64
+	for _, b := range wire[2:8] {
+		authority = authority<<8 | uint64(b)
+	}
+	text := fmt.Sprintf("S-1-%d", authority)
+	for i := 0; i < n; i++ {
+		text += fmt.Sprintf("-%d", binary.LittleEndian.Uint32(wire[8+4*i:12+4*i]))
+	}
+	return text, need, ""
+}
+
+// MS-DTYP 2.4.5. AclSize covers the 8-byte header and any ACE bytes that follow.
+// An ACE that does not fit is not published.
+func smb2ACLFields(wire []byte, name string) ([]tlsCertificateField, int, string) {
+	if len(wire) < 8 {
+		return nil, 0, "opaque: ACL header leaves this buffer"
+	}
+	size := int(binary.LittleEndian.Uint16(wire[2:4]))
+	aces := int(binary.LittleEndian.Uint16(wire[4:6]))
+	if size < 8 || size > len(wire) {
+		return nil, 0, "opaque: ACL size leaves this buffer"
+	}
+	fields := []tlsCertificateField{
+		tlsCertificateLeaf(name+" Revision", "uint8", 0, 1),
+		tlsCertificateLeaf(name+" Sbz1", "uint8", 1, 2),
+		tlsCertificateLeaf(name+" Size", "uint16", 2, 4),
+		tlsCertificateLeaf(name+" Ace Count", "uint16", 4, 6),
+		tlsCertificateLeaf(name+" Sbz2", "uint16", 6, 8),
+	}
+	at := 8
+	for i := 0; i < aces; i++ {
+		if at+4 > size {
+			return nil, 0, "opaque: ACL bytes do not cover the declared ACE count"
+		}
+		aceSize := int(binary.LittleEndian.Uint16(wire[at+2 : at+4]))
+		if aceSize < 4 || at+aceSize > size {
+			return nil, 0, "opaque: ACL bytes do not cover the declared ACE count"
+		}
+		prefix := fmt.Sprintf("%s ACE %d", name, i)
+		fields = append(fields,
+			tlsCertificateLeaf(prefix+" Type", "uint8", at, at+1),
+			tlsCertificateLeaf(prefix+" Flags", "uint8", at+1, at+2),
+			tlsCertificateLeaf(prefix+" Size", "uint16", at+2, at+4),
+			tlsCertificateLeaf(prefix+" Body", "raw", at+4, at+aceSize),
+		)
+		at += aceSize
+	}
+	if aces == 0 && size != 8 {
+		return nil, 0, "opaque: empty ACL size is not 8"
+	}
+	return fields, size, ""
 }
 
 // DecodeSMB2QueryInfoOutput decodes only a complete selected output buffer.

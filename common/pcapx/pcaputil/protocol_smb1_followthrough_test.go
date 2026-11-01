@@ -346,6 +346,8 @@ func TestSMB1RemainingTrans2InformationLevels(t *testing.T) {
 	overflowWords := smb1Words(uint16(2), uint16(6), uint16(0), uint16(2), uint16(56), uint16(0), uint16(6), uint16(60), uint16(0), byte(0), byte(0))
 	opaque := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 24, overflowWords, append([]byte{0, 0, 0, 0, 0}, overflow...)))
 	require.Contains(t, opaque.Session["Body"].(map[string]any)["Data Status"], "opaque")
+	require.Equal(t, uint32(4), opaque.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["File Name Length"])
+	require.NotContains(t, opaque.Session["Body"].(map[string]any)["Information Record"], "File Name")
 
 	record40 := make([]byte, 40)
 	binary.LittleEndian.PutUint64(record40[0:8], 9)
@@ -367,6 +369,156 @@ func TestSMB1RemainingTrans2InformationLevels(t *testing.T) {
 	wideWords := smb1Words(uint16(6), uint16(9), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(6), uint16(68), uint16(9), uint16(74), byte(1), byte(0), uint16(8))
 	wideEvent := smb1FeedOK(t, session, 0, smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 27, wideWords, wide))
 	require.NotContains(t, wideEvent.Session["Body"], "Information Record")
+
+	// MS-CIFS 2.2.8.3.11 and 2.2.8.3.12. A short counted tail keeps the header and does not publish a name.
+	altReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
+	altParams := []byte{0, 0, 0, 0x08, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
+	require.Nil(t, session.Feed(0, time.Unix(5, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 28, altReq, altParams)).Err)
+	altData := []byte{4, 0, 0, 0, 'a', 0, 'b', 0}
+	altWords := smb1Words(uint16(2), uint16(8), uint16(0), uint16(2), uint16(56), uint16(0), uint16(8), uint16(60), uint16(0), byte(0), byte(0))
+	alt := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 28, altWords, append([]byte{0, 0, 0, 0, 0}, altData...)))
+	require.Equal(t, "ab", alt.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["File Name"])
+	require.Equal(t, "SMB_QUERY_FILE_ALT_NAME_INFO", alt.Session["Body"].(map[string]any)["Information Level Name"])
+	require.Nil(t, session.Feed(0, time.Unix(6, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 29, altReq, altParams)).Err)
+	shortAlt := []byte{4, 0, 0, 0, 'a', 0}
+	shortAltWords := smb1Words(uint16(2), uint16(6), uint16(0), uint16(2), uint16(56), uint16(0), uint16(6), uint16(60), uint16(0), byte(0), byte(0))
+	shortAltEvent := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 29, shortAltWords, append([]byte{0, 0, 0, 0, 0}, shortAlt...)))
+	require.Contains(t, shortAltEvent.Session["Body"].(map[string]any)["Data Status"], "opaque")
+	require.NotContains(t, shortAltEvent.Session["Body"].(map[string]any)["Information Record"], "File Name")
+
+	streamReq := smb1Words(uint16(10), uint16(0), uint16(2), uint16(64), byte(0), byte(0), uint16(0), uint32(0), uint16(0), uint16(10), uint16(68), uint16(0), uint16(0), byte(1), byte(0), uint16(5))
+	streamParams := []byte{0, 0, 0, 0x09, 0x01, 0, 0, 0, 0, 'a', 0, 0, 0}
+	require.Nil(t, session.Feed(0, time.Unix(7, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 30, streamReq, streamParams)).Err)
+	streamName := []byte{':', 0, '$', 0, 'D', 0, 'A', 0, 'T', 0, 'A', 0}
+	streamData := append(make([]byte, 24), streamName...)
+	binary.LittleEndian.PutUint32(streamData[4:8], uint32(len(streamName)))
+	streamWords := smb1Words(uint16(2), uint16(uint16(len(streamData))), uint16(0), uint16(2), uint16(56), uint16(0), uint16(uint16(len(streamData))), uint16(60), uint16(0), byte(0), byte(0))
+	stream := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 30, streamWords, append([]byte{0, 0, 0, 0, 0}, streamData...)))
+	require.Equal(t, ":$DATA", stream.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["Stream Name"])
+	require.Nil(t, session.Feed(0, time.Unix(8, 0), smb1Command(0x32, 0x08, 0x8000, 2048, 1, 2048, 31, streamReq, streamParams)).Err)
+	shortStream := append([]byte(nil), streamData[:26]...)
+	binary.LittleEndian.PutUint32(shortStream[4:8], 12)
+	shortStreamWords := smb1Words(uint16(2), uint16(26), uint16(0), uint16(2), uint16(56), uint16(0), uint16(26), uint16(60), uint16(0), byte(0), byte(0))
+	shortStreamEvent := smb1FeedOK(t, session, 1, smb1Command(0x32, 0x80, 0x8000, 2048, 1, 2048, 31, shortStreamWords, append([]byte{0, 0, 0, 0, 0}, shortStream...)))
+	require.Contains(t, shortStreamEvent.Session["Body"].(map[string]any)["Data Status"], "opaque")
+	require.Equal(t, uint32(12), shortStreamEvent.Session["Body"].(map[string]any)["Information Record"].(map[string]any)["Stream Name Length"])
+	require.NotContains(t, shortStreamEvent.Session["Body"].(map[string]any)["Information Record"], "Stream Name")
+}
+
+func TestSMBSecurityDescriptorBodyAndDFSVersions(t *testing.T) {
+	// MS-DTYP 2.4.2.2, 2.4.5 and 2.4.6. Constructed. The 20-byte header case stays header-only.
+	header := make([]byte, 20)
+	header[0] = 1
+	state := &binSMB2{client: 0}
+	_, err := state.consumeFrom(0, smb2QueryRequest(21, 17, 7, 3, 0, nil), 64)
+	require.NoError(t, err)
+	info, err := state.consumeFrom(1, smb2QueryResponse(21, 17, 7, 0, header), 64)
+	require.NoError(t, err)
+	typed := info["Body"].(map[string]any)[info["Output Information Type"].(string)].(map[string]any)
+	require.Equal(t, byte(1), typed["Revision"])
+	require.Equal(t, false, typed["Identity Verified"])
+	require.Contains(t, typed["Security Body Status"], "opaque")
+	require.NotContains(t, typed, "Owner SID")
+
+	desc := make([]byte, 36)
+	desc[0] = 1
+	binary.LittleEndian.PutUint16(desc[2:4], 0x8000)
+	binary.LittleEndian.PutUint32(desc[4:8], 20)
+	binary.LittleEndian.PutUint32(desc[16:20], 28)
+	desc[20] = 1
+	desc[27] = 5
+	desc[28] = 2
+	binary.LittleEndian.PutUint16(desc[30:32], 8)
+	full := &binSMB2{client: 0}
+	_, err = full.consumeFrom(0, smb2QueryRequest(23, 17, 7, 3, 0, nil), 64)
+	require.NoError(t, err)
+	info, err = full.consumeFrom(1, smb2QueryResponse(23, 17, 7, 0, desc), 64)
+	require.NoError(t, err)
+	typed = info["Body"].(map[string]any)[info["Output Information Type"].(string)].(map[string]any)
+	require.Equal(t, "S-1-5", typed["Owner SID"])
+	require.Equal(t, false, typed["Identity Verified"])
+	require.Equal(t, "empty", typed["Dacl Status"])
+	require.Equal(t, uint16(0), typed["Dacl Ace Count"])
+	require.NotContains(t, typed["Security Body Status"], "verified identity")
+
+	truncated := make([]byte, 24)
+	truncated[0] = 1
+	binary.LittleEndian.PutUint16(truncated[2:4], 0x8000)
+	binary.LittleEndian.PutUint32(truncated[4:8], 20)
+	truncated[20] = 1
+	truncated[21] = 1
+	cut := &binSMB2{client: 0}
+	_, err = cut.consumeFrom(0, smb2QueryRequest(24, 17, 7, 3, 0, nil), 64)
+	require.NoError(t, err)
+	info, err = cut.consumeFrom(1, smb2QueryResponse(24, 17, 7, 0, truncated), 64)
+	require.NoError(t, err)
+	typed = info["Body"].(map[string]any)[info["Output Information Type"].(string)].(map[string]any)
+	require.NotContains(t, typed, "Owner SID")
+	require.Contains(t, typed["Owner SID Status"], "opaque")
+	require.Equal(t, false, typed["Identity Verified"])
+
+	for _, off := range []uint32{10, 40} {
+		bad := make([]byte, 28)
+		bad[0] = 1
+		binary.LittleEndian.PutUint16(bad[2:4], 0x8000)
+		binary.LittleEndian.PutUint32(bad[4:8], off)
+		miss := &binSMB2{client: 0}
+		_, err = miss.consumeFrom(0, smb2QueryRequest(25, 17, 7, 3, 0, nil), 64)
+		require.NoError(t, err)
+		opaque, err := miss.consumeFrom(1, smb2QueryResponse(25, 17, 7, 0, bad), 64)
+		require.NoError(t, err)
+		require.Contains(t, opaque["Output Content Status"], "opaque")
+		require.NotContains(t, opaque, "Output Information Type")
+	}
+
+	// MS-DFSC 2.2.5.2 and 2.2.5.4. Strings follow the fixed entries.
+	v2 := make([]byte, 8+22+6)
+	binary.LittleEndian.PutUint16(v2[2:4], 1)
+	binary.LittleEndian.PutUint16(v2[8:10], 2)
+	binary.LittleEndian.PutUint16(v2[10:12], 22)
+	binary.LittleEndian.PutUint16(v2[8+16:8+18], 22)
+	binary.LittleEndian.PutUint16(v2[8+18:8+20], 22)
+	binary.LittleEndian.PutUint16(v2[8+20:8+22], 22)
+	copy(v2[30:], []byte{'\\', 0, 's', 0, 0, 0})
+	referral, ok, err := smb2DecodeDFSReferralV2(v2, 4)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, `\s`, referral["Referrals"].([]map[string]any)[0]["DFS Path"])
+	shortV2 := v2[:8+21]
+	_, ok, err = smb2DecodeDFSReferralV2(shortV2, 4)
+	require.NoError(t, err)
+	require.False(t, ok)
+	unterminated := v2[:30]
+	_, ok, err = smb2DecodeDFSReferralV2(unterminated, 4)
+	require.NoError(t, err)
+	require.False(t, ok)
+
+	v4 := make([]byte, 8+34+6)
+	binary.LittleEndian.PutUint16(v4[2:4], 1)
+	binary.LittleEndian.PutUint16(v4[8:10], 4)
+	binary.LittleEndian.PutUint16(v4[10:12], 34)
+	binary.LittleEndian.PutUint16(v4[8+6:8+8], 0x0004)
+	binary.LittleEndian.PutUint16(v4[8+12:8+14], 34)
+	binary.LittleEndian.PutUint16(v4[8+14:8+16], 34)
+	binary.LittleEndian.PutUint16(v4[8+16:8+18], 34)
+	copy(v4[42:], []byte{'\\', 0, 't', 0, 0, 0})
+	referral, ok, err = smb2DecodeDFSReferralV4(v4, 4)
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Equal(t, `\t`, referral["Referrals"].([]map[string]any)[0]["Network Address"])
+	v4[8+6] = 0
+	_, ok, err = smb2DecodeDFSReferralV4(v4, 4)
+	require.NoError(t, err)
+	require.False(t, ok, "version 4 without TargetSetBoundary is not the selected layout")
+
+	unknown := make([]byte, 8+22)
+	binary.LittleEndian.PutUint16(unknown[2:4], 1)
+	binary.LittleEndian.PutUint16(unknown[8:10], 5)
+	binary.LittleEndian.PutUint16(unknown[10:12], 22)
+	body := map[string]any{}
+	require.NoError(t, smb2DecodeIOCTLOutput(body, smb2FSCTLDFSGetReferrals, unknown, 4, 4))
+	require.Contains(t, body["Control Payload Status"], "opaque")
+	require.NotContains(t, body, "DFS Referral")
 }
 
 func smbCount(events []*ProtocolEvent, name string) int {

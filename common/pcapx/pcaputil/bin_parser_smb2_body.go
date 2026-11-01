@@ -853,21 +853,13 @@ func smb2DecodeIOCTLOutput(body map[string]any, code uint32, raw []byte, base, m
 		body["Network Interfaces"] = entries
 		body["Control Payload Status"] = "decoded: FSCTL_QUERY_NETWORK_INTERFACE_INFO"
 	case smb2FSCTLDFSGetReferrals:
-		referral, ok, err := smb2DecodeDFSReferralV3(raw, max)
-		if err != nil {
-			return err
-		}
-		version := "3"
-		if !ok {
-			referral, ok, err = smb2DecodeDFSReferralV1(raw, max)
-			version = "1"
-		}
+		referral, version, ok, err := smb2SelectDFSReferral(raw, max)
 		if err != nil {
 			return err
 		}
 		if !ok {
-			body["Control Payload Status"] = "opaque: DFS referral version is not a selected v1 or v3 layout"
-			log.Debugf("smb2: FSCTL_DFS_GET_REFERRALS payload left opaque; v1 and v3 layouts were not present")
+			body["Control Payload Status"] = "opaque: DFS referral version is not a selected v1, v2, v3, or v4 layout"
+			log.Debugf("smb2: FSCTL_DFS_GET_REFERRALS payload left opaque; v1, v2, v3, and v4 layouts were not present")
 			return nil
 		}
 		smb2OffsetRanges(referral, base)
@@ -1037,6 +1029,117 @@ func smb2DecodeDFSReferralV1(raw []byte, max int) (map[string]any, bool, error) 
 		smb2Literal(entry, "Share Name", lo, hi, text)
 		entries[i] = entry
 		at += size
+	}
+	info["Referrals"] = entries
+	return info, true, nil
+}
+
+func smb2SelectDFSReferral(raw []byte, max int) (map[string]any, string, bool, error) {
+	for _, version := range []string{"3", "1", "2", "4"} {
+		var referral map[string]any
+		var ok bool
+		var err error
+		switch version {
+		case "3":
+			referral, ok, err = smb2DecodeDFSReferralV3(raw, max)
+		case "1":
+			referral, ok, err = smb2DecodeDFSReferralV1(raw, max)
+		case "2":
+			referral, ok, err = smb2DecodeDFSReferralV2(raw, max)
+		case "4":
+			referral, ok, err = smb2DecodeDFSReferralV4(raw, max)
+		}
+		if err != nil || ok {
+			return referral, version, ok, err
+		}
+	}
+	return nil, "", false, nil
+}
+
+// MS-DFSC 2.2.4 and 2.2.5.2. The fixed prefix is 22 bytes. Size is the distance
+// to the next entry. NUL-terminated strings follow the last entry.
+func smb2DecodeDFSReferralV2(raw []byte, max int) (map[string]any, bool, error) {
+	return smb2DecodeDFSReferralFixed(raw, max, 2, 22, false)
+}
+
+// MS-DFSC 2.2.5.4 uses the 2.2.5.3.1 layout: 34 bytes including ServiceSiteGuid.
+// NameListReferral stays opaque because its padding width is not fixed. The
+// first entry must set TargetSetBoundary.
+func smb2DecodeDFSReferralV4(raw []byte, max int) (map[string]any, bool, error) {
+	return smb2DecodeDFSReferralFixed(raw, max, 4, 34, true)
+}
+
+func smb2DecodeDFSReferralFixed(raw []byte, max int, version uint16, fixed int, v4 bool) (map[string]any, bool, error) {
+	if len(raw) < 8 {
+		return nil, false, nil
+	}
+	count := int(binary.LittleEndian.Uint16(raw[2:4]))
+	if count <= 0 || count > max {
+		if count > max && max > 0 {
+			return nil, false, protocolError(ErrResourceExceeded, "SMB2 DFS referral count exceeds collection budget")
+		}
+		return nil, false, nil
+	}
+	at := 8
+	sizes := make([]int, count)
+	for i := 0; i < count; i++ {
+		if len(raw)-at < fixed || binary.LittleEndian.Uint16(raw[at:at+2]) != version {
+			return nil, false, nil
+		}
+		size := int(binary.LittleEndian.Uint16(raw[at+2 : at+4]))
+		if size < fixed || at+size > len(raw) {
+			return nil, false, nil
+		}
+		flags := binary.LittleEndian.Uint16(raw[at+6 : at+8])
+		if v4 && (flags&0x0002 != 0 || i == 0 && flags&0x0004 == 0) {
+			return nil, false, nil
+		}
+		sizes[i] = size
+		at += size
+	}
+	last := at
+	info := map[string]any{}
+	smb2Literal(info, "Path Consumed", 0, 2, binary.LittleEndian.Uint16(raw[0:2]))
+	smb2Literal(info, "Number Of Referrals", 2, 4, uint16(count))
+	smb2Literal(info, "Referral Header Flags", 4, 8, binary.LittleEndian.Uint32(raw[4:8]))
+	entries := make([]map[string]any, count)
+	at = 8
+	for i := 0; i < count; i++ {
+		entry := map[string]any{}
+		smb2Literal(entry, "Version", at, at+2, version)
+		smb2Literal(entry, "Size", at+2, at+4, uint16(sizes[i]))
+		smb2Literal(entry, "Server Type", at+4, at+6, binary.LittleEndian.Uint16(raw[at+4:at+6]))
+		smb2Literal(entry, "Referral Entry Flags", at+6, at+8, binary.LittleEndian.Uint16(raw[at+6:at+8]))
+		pathAt, altAt, netAt := 16, 18, 20
+		if version == 2 {
+			smb2Literal(entry, "Proximity", at+8, at+12, binary.LittleEndian.Uint32(raw[at+8:at+12]))
+			smb2Literal(entry, "Time To Live", at+12, at+16, binary.LittleEndian.Uint32(raw[at+12:at+16]))
+		} else {
+			smb2Literal(entry, "Time To Live", at+8, at+12, binary.LittleEndian.Uint32(raw[at+8:at+12]))
+			pathAt, altAt, netAt = 12, 14, 16
+			smb2Literal(entry, "Service Site Guid", at+18, at+34, bytes.Clone(raw[at+18:at+34]))
+		}
+		names := []struct {
+			key string
+			at  int
+		}{{"DFS Path", pathAt}, {"DFS Alternate Path", altAt}, {"Network Address", netAt}}
+		for _, name := range names {
+			off := int(binary.LittleEndian.Uint16(raw[at+name.at : at+name.at+2]))
+			smb2Literal(entry, name.key+" Offset", at+name.at, at+name.at+2, uint16(off))
+			if off == 0 {
+				continue
+			}
+			if at+off < last || at+off > len(raw) {
+				return nil, false, nil
+			}
+			text, lo, hi, err := smb2UTF16Z(raw, at+off)
+			if err != nil {
+				return nil, false, nil
+			}
+			smb2Literal(entry, name.key, lo, hi, text)
+		}
+		entries[i] = entry
+		at += sizes[i]
 	}
 	info["Referrals"] = entries
 	return info, true, nil
