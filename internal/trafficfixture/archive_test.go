@@ -4,12 +4,99 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/sha256"
+	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/pcapgo"
 )
+
+func TestEnterpriseTrafficAnalysisBatchAliases(t *testing.T) {
+	root, err := RepositoryRoot()
+	if err != nil {
+		t.Fatal(err)
+	}
+	names, err := Names()
+	if err != nil {
+		t.Fatal(err)
+	}
+	const prefix = "testdata/enterprise-traffic-analysis/"
+	count := 0
+	for _, name := range names {
+		if !strings.HasPrefix(name, prefix) {
+			continue
+		}
+		count++
+		data, err := ReadFile(filepath.Join(root, filepath.FromSlash(name)))
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if len(data) == 0 {
+			t.Fatalf("%s: empty fixture", name)
+		}
+	}
+	if count != 23 {
+		t.Fatalf("enterprise fixture aliases=%d, want 23", count)
+	}
+	raw, err := ReadBatch("validation-enterprise-traffic-analysis-20261030", "validation/expected.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var answers FrozenExpectations
+	if err := json.Unmarshal(raw, &answers); err != nil {
+		t.Fatal(err)
+	}
+	if len(answers.Cases) != 10 {
+		t.Fatalf("enterprise capture answers=%d, want 10", len(answers.Cases))
+	}
+	for _, item := range answers.Cases {
+		t.Run(item.ID, func(t *testing.T) {
+			raw, err := ReadFile(filepath.Join(root, filepath.FromSlash(item.Input.OriginalPath)))
+			if err != nil {
+				t.Fatal(err)
+			}
+			// Capture record facts are independent of application-layer decoders.
+			var next func() ([]byte, gopacket.CaptureInfo, error)
+			var link string
+			if strings.HasSuffix(item.Input.File, ".pcapng") {
+				reader, err := pcapgo.NewNgReader(bytes.NewReader(raw), pcapgo.DefaultNgReaderOptions)
+				if err != nil {
+					t.Fatal(err)
+				}
+				next, link = reader.ReadPacketData, reader.LinkType().String()
+			} else {
+				reader, err := pcapgo.NewReader(bytes.NewReader(raw))
+				if err != nil {
+					t.Fatal(err)
+				}
+				next, link = reader.ReadPacketData, reader.LinkType().String()
+			}
+			packets := 0
+			for {
+				_, _, err := next()
+				if err == io.EOF {
+					break
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				packets++
+			}
+			if packets != item.Facts.PacketCount || link != item.Facts.LinkType {
+				t.Fatalf("capture facts=%d/%s, oracle=%d/%s", packets, link, item.Facts.PacketCount, item.Facts.LinkType)
+			}
+			if item.ExpectedStatus != "partial" || len(item.Missing) == 0 || len(item.Expectations) != 1 || item.Expectations[0].Kind != "source_manifest_constraints" || item.Expectations[0].Expected.PacketCount != packets {
+				t.Fatal("source manifest facts must retain their partial semantic scope")
+			}
+		})
+	}
+}
 
 func TestFrozenBatchIntegrity(t *testing.T) {
 	t.Run("standalone-inventory-workspace", workspaceStandaloneInventory)

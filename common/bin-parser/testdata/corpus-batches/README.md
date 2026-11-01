@@ -18,6 +18,22 @@ go run ./internal/trafficfixture/cmd/corpus verify
 
 # Versioned traffic corpus
 
+## Enterprise traffic analysis fixtures
+
+The six enterprise investigation scenarios are stored in
+`validation-enterprise-traffic-analysis-20261030.zip`. The batch contains 24
+members: 23 PCAP/PCAPNG, keylog, manifest and `TASKS.md` files aliased under
+`testdata/enterprise-traffic-analysis/`. Tests read them directly through
+`internal/trafficfixture.ReadFile`; filename-based consumers use
+`Materialize` into a test-owned temporary directory. Expanded copies are
+ignored by Git and do not shadow the indexed archive.
+
+The remaining member, `validation/expected.json`, binds all ten captures to
+their source manifest hashes, sizes and packet counts. Its partial oracle
+scope describes capture facts, without claiming application semantics or
+successful authentication. Original capture and scenario member bytes are
+unchanged.
+
 The current gate is **`required-tests-traffic-unified-v191.json`**. Chronological
 entries below retain their original batch context; an older entry saying
 “current” or “active” does not select an older inventory.
@@ -33,7 +49,10 @@ inventories and other identical content. `source-index.json` binds the frozen
 pre-consolidation member and alias contracts; logical files reconstruct to
 their original exact length and SHA256. Original compressed ZIP identities are
 **source provenance**, not a claim that the old compressed files still exist
-in this checkout. `trafficfixture.SourceArchive` exposes that distinction.
+in this checkout. `trafficfixture.SourceArchive` exposes that distinction. The
+enterprise traffic analysis batch described above is a separate direct ZIP, so
+the current index contains 289 logical batches, 24,849 members and 25,197
+aliases.
 
 Each logical member remains bounded to 25 MiB and each logical batch to128 MiB.
 The aggregate storage directory is separately bounded to256 MiB expanded,

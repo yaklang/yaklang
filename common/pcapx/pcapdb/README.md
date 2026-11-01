@@ -46,7 +46,9 @@ AI 的工具描述和 skill 中应重复这组最小约定。复杂细节按需�
 | 独立流量子库 | `sessions`、`streams`、`stream_chunks`、`session_packets`、`stream_chunk_packets` | 同上 |
 | 独立流量子库 | 协议字段的按需标量表达式索引，定义可通过 `ProtocolFieldIndexes` 查询 | [pcap_protocol_fields.go](pcap_protocol_fields.go) |
 
-业务模型组合 `gorm.Model`，主库和子库使用独立的 GORM 句柄。默认库目录为 `<YAKIT_HOME>/pcap-library/<DatasetID>/index.sqlite`，当前子库 schema version 为 **4**，当前实现的数据库类型为 **sqlite**。登记模型的 DatabaseType 字段并不表示已经实现 PostgreSQL/MySQL 后端。
+业务模型组合 `gorm.Model`，主库和子库使用独立的 GORM 句柄。默认库目录为 `<YAKIT_HOME>/pcap-library/<DatasetID>/index.sqlite`，当前子库 schema version 为 **5**，当前实现的数据库类型为 **sqlite**。登记模型的 DatabaseType 字段并不表示已经实现 PostgreSQL/MySQL 后端。
+
+包索引保存源/目标 MAC、VLAN 栈和 IP。`macs` 先按捕获域汇总源 MAC、源 IP 数和包数，`endpoint_bindings` 再展开源 MAC/IP 时间窗口；它们表示帧内共同观察到的源地址，不是路由/NAT 后的主机归属，也不替代协议或用户实体解析。
 
 原始包和文件封装都在子库内。导入成功后，删除来源文件不影响查询、完整 PCAP/PCAPNG 导出或从已存捕获重建分析。协议字段 JSON 是解析结果；需要核对原字节时读取 BLOB，不能将 JSON 重编码结果当成原始线缆数据。
 
@@ -117,7 +119,10 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | 方法 | 返回内容 |
 | --- | --- |
 | `db.Metadata()` | 完整登记元数据；工具应只挑所需摘要返回 |
-| `db.QueryPacketsPage(options...)` | 包摘要；含时间、捕获长度、原长度、链路类型、端点、transport、解码错误 |
+| `db.CaptureOverview(options...)` | 精确捕获概况：首末时间、协议/状态/传输层直方图、链路类型及 Section/Interface 数量；不返回消息行 |
+| `db.QueryPacketsPage(options...)` | 包摘要；含时间、捕获长度、原长度、链路类型、MAC、VLAN、IP、transport、解码错误 |
+| `db.QueryMACSummariesPage(options...)` | 按捕获域和 VLAN 汇总源 MAC、不同源 IP 数、包数及首末证据 |
+| `db.QueryEndpointBindingsPage(options...)` | 展开源 MAC/IP 时间窗口，含包数和首末包/时间；不代表 NAT 后归属 |
 | `db.QueryProtocolsPage(options...)` | 协议消息摘要；含 Protocol、FlowID、SessionID、StreamID、解析状态和 Completeness |
 | `db.QuerySessionsPage(options...)` | 网络会话摘要；含端点、捕获域、计数、Complete/HasGaps/Midstream/CloseReason |
 | `db.QueryStreamsPage(options...)` | 方向流摘要；含 SessionID、Direction、Kind、字节数和块数 |
@@ -128,6 +133,7 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | `db.ReadProtocolPage(messageID, options...)` | 协议消息 BLOB 的受限预览 |
 | `db.ReadStreamPage(streamID, options...)` | 逐块受限预览，以 chunk ID 翻页 |
 | `db.ProtocolDetailsPage(messageID, options...)` | 完整 Fields 与 Session JSON 树，超过预算报错 |
+| `db.HTTPBodyProfilePage(messageID, options...)` | HTTP/1 消息的非可逆正文画像：长度、完整性、编码/压缩/二进制特征、敏感类别及消息/wire body/decoded body SHA256；不返回正文 |
 | `db.DiscoverProtocolFields(options...)` | 字段路径/类型的受限采样，不返回字段值 |
 | `db.ProtocolFieldIndexes(options...)` | 已有路径索引定义；条目数受库级上限约束 |
 | `db.EnsureProtocolFieldIndexes(paths...)` | 给当前库按需建索引，与库级版本同义 |
@@ -166,20 +172,27 @@ Yak 模块名称为 `pcapdb`，正确拼写为 **`GetOrCreatePCAPDatabase`**。�
 | 选项 | 默认值/范围 | 应如何使用 |
 | --- | --- | --- |
 | `limit(n)` | 100，1..1000 | 摘要条数；字段发现时是候选消息数，不是字段数 |
-| `after(id)` | 0，非负整数 | 该操作对应 ID 的排他游标，后续查 `id > after` |
+| `after(id)` | 0，非负整数 | 该操作对应 ID 的排他游标；`macs` 与 `endpoint_bindings` 使用派生结果的稳定序号 |
 | `resultBytes(n)` | 65536，4096..1048576 | Page 接口紧凑 JSON 总字节预算 |
 | `previewBytes(n)` | 512，0..65536 | 二进制 Page 每条 BLOB 预览的原始字节数；0 只取元信息 |
 | `maxBytes(n)` | 262144，65536..1048576 | 原生 ReadStream 每页完整 chunk 原始字节预算 |
 | `queryContext(ctx)` | 继承句柄执行 context | 收紧单次查询截止时间；不是秒数，也不是输出选项 |
 | `transport(name)`、`protocol(name)` | 无 | 名称转为小写；协议名称以实际解析结果为准 |
-| `sourceIP / destinationIP(value)` | 无 | 端点精确匹配，无 CIDR/模糊匹配语义 |
+| `sourceIP / destinationIP(value)` | 无 | 端点精确匹配，无 CIDR/模糊匹配语义；`macs` / `endpoint_bindings` 只接受 sourceIP |
+| `sourceMAC(value)` | 无 | `macs` / `endpoint_bindings` 的源 MAC 精确匹配，导入时规范为小写冒号格式 |
 | `sourcePort / destinationPort(n)` | 无，0..65535 | 端口精确匹配 |
 | `flow(n)` | 无，非负整数 | 协议解析 flow ID，不是网络 session ID |
 | `session(id)`、`stream(id)` | 无，正整数 | 已保存的关联 ID |
 | `timeRange(startNS, endNS)` | 无 | 纳秒时间，半开区间 `[startNS, endNS)` |
+
+`CaptureOverview` 只接受 context 和输出预算；时间、协议、IP、端口及 session/stream 筛选不适用于整个捕获概况。
 | `field(path, value)` | 无 | Fields 中的类型明确的标量等值条件 |
 | `fieldExists(path)`、`fieldMissing(path)` | 无 | 区分存在、显式 null 和缺失 |
 | `withFields(true)` | false | 仅原生 QueryProtocols 投影完整 Fields/Session；摘要 Page 不接受 |
+
+协议摘要还包含 `TransactionID` 和 `ResponseTo`。对 HTTP 等已建立请求响应关联的协议，响应记录的 `ResponseTo` 是请求消息 ID，可直接用于配对；不要根据相邻行、时间接近或 TCP 流顺序猜测配对。
+
+`HTTPBodyProfilePage` 用于需要完整正文统计但不能回显正文的场景。单条存储消息上限 16 MiB。`MessageSHA256` 覆盖完整 HTTP/1 消息；`WireBodySHA256` 覆盖去除 HTTP transfer framing（如 chunked）后的 body；`DecodedBodySHA256` 覆盖按 `Content-Encoding` 解压后的 body。只有相应完整性成立时才返回哈希。`SensitiveIndicators` 是字段/值模式的候选标记，不等同于已确认敏感数据泄漏。
 
 各选项不是通用 SQL 语言。以下矩阵列出工具可以承诺的筛选语义；对于没有支持的组合，工具应拒绝输入或先做关联查询，不能静默丢弃。
 

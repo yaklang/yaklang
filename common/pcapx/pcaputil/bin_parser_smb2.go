@@ -47,6 +47,7 @@ type smb2Pending struct {
 	key          smb2PendingKey
 	name         string
 	path         string
+	target       string
 	fileID       string
 	related      bool
 	direction    int
@@ -263,7 +264,7 @@ func (s *binSMB2) reserveState(additionalPathBytes int64) error {
 	var chainBytes int64
 	seen := make(map[*smb2RequestChain]bool)
 	for _, pending := range s.pending {
-		pathBytes += int64(len(pending.path))
+		pathBytes += int64(len(pending.path) + len(pending.target))
 		if chain := pending.chain; chain != nil && !seen[chain] {
 			seen[chain] = true
 			chainBytes += int64(chain.size)*128 + 64
@@ -424,6 +425,7 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 		}
 		pending := smb2Pending{key: key, name: name, direction: dir, hasDirection: dir >= 0, chain: link.chain, ordinal: link.ordinal}
 		pending.path, _ = c["File Name"].(string)
+		pending.target, _ = c["Path"].(string)
 		pending.related, _ = c["Related File ID Ignored"].(bool)
 		if name == "QUERY_INFO" {
 			body := c["Body"].(map[string]any)
@@ -448,7 +450,7 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 				}
 			}
 		}
-		additional := int64(len(pending.path))
+		additional := int64(len(pending.path) + len(pending.target))
 		if link.chain != nil && link.ordinal == 0 {
 			additional += int64(link.chain.size)*128 + 64
 		}
@@ -501,6 +503,12 @@ func (s *binSMB2) associateCommand(c map[string]any, max, dir int, link smb2Comp
 			c["File Context"] = pending.path
 			c["File Context Status"] = "observed-open"
 		}
+	}
+	if pending.target != "" {
+		c["Request Path"] = pending.target
+	}
+	if pending.path != "" {
+		c["Request File Name"] = pending.path
 	}
 	status, _ := c["Status"].(uint32)
 	if status == 0x00000103 { // STATUS_PENDING: preserve until the async final response.

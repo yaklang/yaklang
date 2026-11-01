@@ -40,8 +40,9 @@ func dcerpcBindVersion(uuid []byte, ctx uint16, call uint32, major, minor uint16
 }
 
 type dcerpcBindContext struct {
-	uuid []byte
-	id   uint16
+	uuid         []byte
+	id           uint16
+	major, minor uint16
 }
 
 func dcerpcBindType(ptype byte, uuid []byte, ctx uint16, call uint32) []byte {
@@ -58,7 +59,12 @@ func dcerpcBindContexts(ptype byte, call uint32, contexts ...dcerpcBindContext) 
 		binary.LittleEndian.PutUint16(body[off:], context.id)
 		body[off+2] = 1
 		copy(body[off+4:off+20], context.uuid)
-		binary.LittleEndian.PutUint32(body[off+20:], 3)
+		major, minor := context.major, context.minor
+		if major == 0 && minor == 0 {
+			major = 3
+		}
+		binary.LittleEndian.PutUint16(body[off+20:], major)
+		binary.LittleEndian.PutUint16(body[off+22:], minor)
 		copy(body[off+24:off+40], dcerpcNDR)
 		binary.LittleEndian.PutUint32(body[off+40:], 2)
 	}
@@ -239,6 +245,42 @@ func TestProtocolSessionDCERPCBindEPMAndSRVSVC(t *testing.T) {
 	require.Equal(t, ErrNeedMore, cut.Err.Kind)
 }
 
+func TestProtocolSessionDCERPCSVCCTLVersionedOperations(t *testing.T) {
+	s, err := NewProtocolSession(DefaultParserBudget())
+	require.NoError(t, err)
+	t.Cleanup(func() { s.Close("FIN") })
+	ts := time.Unix(1, 0)
+
+	require.Nil(t, s.Feed(0, ts, dcerpcBindContexts(11, 11, dcerpcBindContext{uuid: dcerpcSVCCTL, id: 0, major: 2})).Err)
+	require.Nil(t, s.Feed(1, ts, dcerpcBindAck(11)).Err)
+	operations := map[uint16]string{
+		6:  "svcctl.RQueryServiceStatus",
+		12: "svcctl.RCreateServiceW",
+		15: "svcctl.ROpenSCManagerW",
+		16: "svcctl.ROpenServiceW",
+		19: "svcctl.RStartServiceW",
+		45: "svcctl.RCreateServiceWOW64W",
+	}
+	call := uint32(20)
+	for op, name := range operations {
+		r := s.Feed(0, ts, dcerpcRequest(call, 0, op, nil))
+		require.Nil(t, r.Err)
+		require.Equal(t, "svcctl", r.Events[0].Session["Interface"])
+		require.Equal(t, name, r.Events[0].Session["Packet Name"])
+		require.Equal(t, op, r.Events[0].Session["OpNum"])
+		require.Equal(t, fmt.Sprintf("DCE/RPC %s call %d", name, call), r.Events[0].Summary)
+		r = s.Feed(1, ts, dcerpcResponse(call, 0, nil))
+		require.Nil(t, r.Err)
+		require.Equal(t, name, r.Events[0].Session["Matched Request"])
+		call++
+	}
+
+	r := s.Feed(0, ts, dcerpcRequest(call, 0, 10, nil))
+	require.Nil(t, r.Err)
+	require.Equal(t, "svcctl.op_10", r.Events[0].Session["Packet Name"])
+	require.Equal(t, uint16(10), r.Events[0].Session["OpNum"])
+}
+
 func TestProtocolSessionDCERPCInterfaceAliasRequiresKnownVersion(t *testing.T) {
 	s, err := NewProtocolSession(DefaultParserBudget())
 	require.NoError(t, err)
@@ -258,6 +300,16 @@ func TestProtocolSessionDCERPCInterfaceAliasRequiresKnownVersion(t *testing.T) {
 	require.Equal(t, "unknown.op_3", r.Events[0].Session["Packet Name"])
 	require.Equal(t, "unknown", r.Events[0].Session["Interface"])
 	require.Equal(t, uint16(4), r.Events[0].Session["Interface Version Major"])
+
+	wrongVersion := dcerpcBindVersion(dcerpcSVCCTL, 1, 71, 1, 0)
+	r = s.Feed(0, ts, wrongVersion)
+	require.Nil(t, r.Err)
+	require.Equal(t, "unknown", r.Events[0].Session["Interface"])
+	require.Nil(t, s.Feed(1, ts, dcerpcBindAck(71)).Err)
+	r = s.Feed(0, ts, dcerpcRequest(72, 1, 15, nil))
+	require.Nil(t, r.Err)
+	require.Equal(t, "unknown.op_15", r.Events[0].Session["Packet Name"])
+	require.Equal(t, uint16(15), r.Events[0].Session["OpNum"])
 }
 
 func TestProtocolSessionDCERPCFailClosed(t *testing.T) {

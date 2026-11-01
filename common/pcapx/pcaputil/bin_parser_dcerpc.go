@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+
+	binparser "github.com/yaklang/yaklang/common/bin-parser/parser"
 )
 
 // binDCERPC is the M0 session state for connection-oriented DCE/RPC v5.
@@ -70,6 +72,8 @@ const (
 var (
 	dcerpcEPM    = []byte{0x08, 0x83, 0xaf, 0xe1, 0x1f, 0x5d, 0xc9, 0x11, 0x91, 0xa4, 0x08, 0x00, 0x2b, 0x14, 0xa0, 0xfa}
 	dcerpcSRVSVC = []byte{0xc8, 0x4f, 0x32, 0x4b, 0x70, 0x16, 0xd3, 0x01, 0x12, 0x78, 0x5a, 0x47, 0xbf, 0x6e, 0xe1, 0x88}
+	// [MS-SCMR] svcctl v2.0: 367abb81-9844-35f1-ad32-98f038001003.
+	dcerpcSVCCTL = []byte{0x81, 0xbb, 0x7a, 0x36, 0x44, 0x98, 0xf1, 0x35, 0xad, 0x32, 0x98, 0xf0, 0x38, 0x00, 0x10, 0x03}
 	dcerpcNDR    = []byte{0x04, 0x5d, 0x88, 0x8a, 0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00, 0x2b, 0x10, 0x48, 0x60}
 )
 
@@ -251,7 +255,17 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 		if err := d.reserveMemory(d.retainedBytes()); err != nil {
 			return nil, err
 		}
-		return dcerpcSecurityEnvelope(raw, info)
+		info, err := dcerpcSecurityEnvelope(raw, info)
+		if err != nil {
+			return info, err
+		}
+		authTrailer := raw[len(raw)-8-authLength:]
+		if authTrailer[0] == 10 {
+			if ntlm, ok := binparser.ParseNTLMSSPFields(authTrailer[8:]); ok {
+				info["NTLMSSP"] = ntlm
+			}
+		}
+		return info, nil
 	}
 	d.peerMessages[dir] = true
 	fragmentKey := dcerpcFragmentKey{direction: dir, callID: call}
@@ -329,6 +343,12 @@ func (d *binDCERPC) consumePDU(dir int, raw []byte, max int, pduID uint64) (map[
 		if err := d.consumeBindAck(call, "AlterContext", "AlterContextResp", dir, body, info, max); err != nil {
 			return nil, err
 		}
+	case 16:
+		if len(body) < 4 {
+			return nil, fmt.Errorf("dcerpc: truncated auth3")
+		}
+		info["Max Xmit Frag"] = binary.LittleEndian.Uint16(body[0:2])
+		info["Max Recv Frag"] = binary.LittleEndian.Uint16(body[2:4])
 	}
 	return info, nil
 }
@@ -524,6 +544,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	var accepted []dcerpcProposal
 	var rejected []uint16
+	var negotiated []uint16
 	for i, result := range results {
 		proposal := proposals[i]
 		views[i]["Proposed Context ID"] = proposal.id
@@ -547,6 +568,7 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 			}
 			info["Observed Bind Time Feature Bits"] = result.reason
 			info["Bind Time Feature Endpoint State Verified"] = false
+			negotiated = append(negotiated, proposal.id)
 		default:
 			return fmt.Errorf("dcerpc: invalid bind result %d", result.result)
 		}
@@ -584,6 +606,9 @@ func (d *binDCERPC) consumeBindAck(call uint32, expectedRequest, responseName st
 	}
 	if len(rejected) > 0 {
 		info["Rejected Context IDs"] = rejected
+	}
+	if len(negotiated) > 0 {
+		info["Negotiated Context IDs"] = negotiated
 	}
 	return nil
 }
@@ -702,7 +727,7 @@ func (d *binDCERPC) parseRequest(body []byte, flags byte, info map[string]any) e
 	}
 	if name, ok := d.ctx[ctx]; ok {
 		info["Interface"] = name
-		info["Packet Name"] = dcerpcOpName(name, op)
+		info["Packet Name"] = dcerpcVersionedOpName(name, d.ctxVersion[ctx], op)
 		if u := d.uuid[ctx]; len(u) != 0 {
 			info["Abstract Syntax"] = hex.EncodeToString(u)
 		}
@@ -881,6 +906,8 @@ func dcerpcPTypeName(p byte) string {
 		return "AlterContext"
 	case 15:
 		return "AlterContextResp"
+	case 16:
+		return "Auth3"
 	}
 	return fmt.Sprintf("PType %d", p)
 }
@@ -891,33 +918,74 @@ func dcerpcIfaceName(uuid []byte, major, minor uint16) string {
 		return "EPM"
 	case bytes.Equal(uuid, dcerpcSRVSVC) && major == 3 && minor == 0:
 		return "SRVSVC"
+	case bytes.Equal(uuid, dcerpcSVCCTL) && major == 2 && minor == 0:
+		return "svcctl"
 	default:
 		return "unknown"
 	}
 }
 
 func dcerpcOpName(iface string, op uint16) string {
+	version, ok := dcerpcInterfaceVersion(iface)
+	if !ok {
+		return fmt.Sprintf("%s.op_%d", iface, op)
+	}
+	return dcerpcVersionedOpName(iface, version, op)
+}
+
+func dcerpcInterfaceVersion(iface string) (uint32, bool) {
 	switch iface {
-	case "EPM":
+	case "EPM", "SRVSVC":
+		return 3 << 16, true
+	case "svcctl":
+		return 2 << 16, true
+	default:
+		return 0, false
+	}
+}
+
+func dcerpcVersionedOpName(iface string, version uint32, op uint16) string {
+	if version == 2<<16 && iface == "svcctl" {
+		// [MS-SCMR] 3.1.4 method order for svcctl v2.0. Unknown opnums,
+		// including gaps reserved from the wire, stay numeric.
 		switch op {
-		case 0:
-			return "EPM.ept_insert"
-		case 1:
-			return "EPM.ept_delete"
-		case 2:
-			return "EPM.ept_lookup"
-		case 3:
-			return "EPM.ept_map"
-		case 4:
-			return "EPM.ept_lookup_handle_free"
-		case 5:
-			return "EPM.ept_inq_object"
 		case 6:
-			return "EPM.ept_mgmt_delete"
+			return "svcctl.RQueryServiceStatus"
+		case 12:
+			return "svcctl.RCreateServiceW"
+		case 15:
+			return "svcctl.ROpenSCManagerW"
+		case 16:
+			return "svcctl.ROpenServiceW"
+		case 19:
+			return "svcctl.RStartServiceW"
+		case 45:
+			return "svcctl.RCreateServiceWOW64W"
 		}
-	case "SRVSVC":
-		if op == 15 {
-			return "SRVSVC.NetrShareEnum"
+	}
+	if version == 3<<16 {
+		switch iface {
+		case "EPM":
+			switch op {
+			case 0:
+				return "EPM.ept_insert"
+			case 1:
+				return "EPM.ept_delete"
+			case 2:
+				return "EPM.ept_lookup"
+			case 3:
+				return "EPM.ept_map"
+			case 4:
+				return "EPM.ept_lookup_handle_free"
+			case 5:
+				return "EPM.ept_inq_object"
+			case 6:
+				return "EPM.ept_mgmt_delete"
+			}
+		case "SRVSVC":
+			if op == 15 {
+				return "SRVSVC.NetrShareEnum"
+			}
 		}
 	}
 	return fmt.Sprintf("%s.op_%d", iface, op)

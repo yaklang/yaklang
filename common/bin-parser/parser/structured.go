@@ -52,6 +52,12 @@ func ParseStructured(data []byte, rule string, keys ...string) (map[string]any, 
 					return value, nil
 				}
 			}
+		case "application-layer.dcerpc":
+			if len(keys) == 1 && keys[0] == "DCERPC" {
+				if value, ok := captureDCERPCStructured(data); ok {
+					return map[string]any{"fields": value, "metadata": nil}, nil
+				}
+			}
 		}
 	}
 	if len(keys) == 1 && base.ParserRegistration("default") == defaultParserRegistration {

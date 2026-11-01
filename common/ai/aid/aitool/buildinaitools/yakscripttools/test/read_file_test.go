@@ -14,6 +14,7 @@ import (
 	"github.com/yaklang/yaklang/common/consts"
 	"github.com/yaklang/yaklang/common/schema"
 	_ "github.com/yaklang/yaklang/common/yak"
+	"github.com/yaklang/yaklang/internal/trafficfixture"
 	"gotest.tools/v3/assert"
 )
 
@@ -227,6 +228,36 @@ func TestReadFile_BinaryFileDetection(t *testing.T) {
 
 	assert.Assert(t, strings.Contains(stdout, "binary") || strings.Contains(stdout, "not a text file"),
 		"binary file should be detected and rejected with a helpful message")
+}
+
+// TestReadFile_PCAPRoutesToStructuredWorkflow ensures a raw PCAP read directs
+// the caller to the protocol-aware workflow instead of the legacy packet tool.
+// The previous hint caused HTTP questions to stop at Layer 4.
+func TestReadFile_PCAPRoutesToStructuredWorkflow(t *testing.T) {
+	tool := getReadFileTool(t)
+	root, err := trafficfixture.RepositoryRoot()
+	assert.NilError(t, err)
+	path, err := trafficfixture.Materialize(
+		filepath.Join(root, "testdata/enterprise-traffic-analysis/http-dga-c2/capture.pcapng"),
+		t.TempDir(),
+	)
+	assert.NilError(t, err)
+	_, err = os.Stat(path)
+	assert.NilError(t, err, "shared HTTP DGA capture should exist")
+
+	stdout, _ := execReadFileTool(t, tool, aitool.InvokeParams{"file": path})
+	t.Logf("stdout:\n%s", stdout)
+
+	assert.Assert(t, strings.Contains(stdout, "load_pcapfile"),
+		"PCAP guidance must start with load_pcapfile")
+	assert.Assert(t, strings.Contains(stdout, "query_pcapdb"),
+		"PCAP guidance must include query_pcapdb")
+	assert.Assert(t, strings.Contains(stdout, "pcapdb traffic analysis system"),
+		"PCAP guidance must identify the pcapdb workflow")
+	assert.Assert(t, strings.Contains(stdout, "manage_pcapdb"),
+		"PCAP guidance must mention dataset management")
+	assert.Assert(t, !strings.Contains(stdout, "analyze_pcap"),
+		"retired packet-level tools must not be recommended")
 }
 
 // TestReadFile_SourceFile_NumberedOutput verifies reading a real source file with lines mode

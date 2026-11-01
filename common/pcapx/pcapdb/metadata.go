@@ -6,7 +6,7 @@ import (
 	"errors"
 )
 
-const SchemaVersion = 4
+const SchemaVersion = 5
 
 // String alias keeps state values directly comparable in Yak scripts.
 type State = string
