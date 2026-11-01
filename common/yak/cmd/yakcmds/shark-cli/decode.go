@@ -477,6 +477,13 @@ func detail(raw *capturedPacket) (d packetDetail) {
 	if networkRefused || espIncomplete || mldObserved || igmpObserved || pimObserved || ospfObserved || gtpv2Observed || rsvpObserved || icmpv6Partial || icmpv4Partial {
 		return d
 	}
+	if hasCapturedZeroLengthIPv4(raw, row.TransportView) {
+		// A zero declared envelope cannot select a YAML child length. The
+		// compatibility view keeps native PDUs and literal, qualified headers.
+		qualified := quickDetail(raw)
+		qualified.unavailable = d.unavailable
+		return qualified
+	}
 	appendTransportObservation(&d, row)
 	rule := ""
 	data := raw.data
@@ -768,6 +775,9 @@ func quickDetail(raw *capturedPacket) packetDetail {
 		offset += len(l.LayerContents())
 		if l.LayerType() == gopacket.LayerTypePayload {
 			d.fields = append(d.fields, field{text: "Payload: " + formatFieldValue("Payload", l.LayerContents()), start: start, end: offset, hasRange: offset > start && offset <= len(raw.data)})
+			continue
+		}
+		if ip, ok := l.(*layers.IPv4); ok && appendZeroLengthIPv4Fields(&d, raw.data, ip, start) {
 			continue
 		}
 		d.fields = append(d.fields, field{text: l.LayerType().String(), branch: true, start: start, end: offset, hasRange: offset > start && offset <= len(raw.data)})
