@@ -118,7 +118,11 @@ caption另核验：当前握手包的protocol_stack止于TLS；`connection:`后�
 Sharon参考251431的verify_data为`<MISSING>`，明确记为非literal参考缺口，不转成十六进制值或算通过。
 330闭合：`4707a2c2f4ac942a075af0392cfbad8676d3c02f3c54522b015e6d3d80054b80`。
 
-7c证据不替代新main代码的完整大捕获结果；合并后需另行回放和归因。外部完整大捕获SHA仍为Weber
+7c证据不替代新main代码的完整大捕获结果。后续d1构建在8a文档等价检查点完成346的6次完整回放；
+347逐对象比较保留全部ID/raw/来源，非SMB事件/字段无变化，两个flow JSON逐字节相同。
+main原有SMB变化为176/2事件、165/2物理展示，仅保留差异，不展开SMB语义验收。
+347收据：`468a218dbb4ab109bf774e051c3b07c90ce1af3de5be44b60b24f7a34dddcdec`。
+外部完整大捕获SHA仍为Weber
 `ecbca543fbe011a85c8876420fcb2c244b9290ad653d13cd1a574158167073f4`和Sharon
 `aa4fcc81af216e2b788171c64271b43681974d9156aa9ddbdc1a7a25e730714c`。
 
@@ -137,10 +141,16 @@ CI342在读新CI产物前冻结：313158个精确ID/终态，313133 pass、25历
 最终提交CI仍以PR中的精确head_sha、实际checkout、完整artifact、所有必需checks/statuses为准；本文件不把旧700全绿、skipped或本地通过当成新提交全绿。
 原700的47个指定检查/安全检查、2状态和完整traffic已单独闭合，收据 `ca929999774423b05345ea0c43401bef1c72687c6c3b4aef1c500d40dd01df46`。
 
+后续8a的CI352已实际闭合：精确 `8a02294759c1ead373c60c60fb870c7649d92fa7` 的47个成功checks、2个成功statuses、4个选定成功workflow；自动draft skipped单列，不计成功。
+[完整流量专项](https://github.com/yaklang/yaklang/actions/runs/41277905022)实际checkout与head均8a，产物313158个ID/终态和预冻结342完全一致，313133pass/25历史optional skip，131084 required全pass/0skip。
+完整artifact SHA256 `14db27b82594a8a410c51951f76359cc6d6e762be50e88adff1bde2064773880` 同时与官方digest和上传日志一致。
+[Essential](https://github.com/yaklang/yaklang/actions/runs/41277858361)也已成功。
+闭合352：`cc1256031ca8a015a72e8894c0523ba7c7555d199e20a1a519399e53b92198ea`。该验收只属于8a，不替代后续CV或新功能的CI。
+
 ## 后续缺口
 
 - M2-43/N13：PHA请求offer/上下文唯一性/多轮关联、完整阶段合法性、缺握手资格、TLS/QUIC高级恢复；不能由本次Finished长度/epoch证明关闭。
-- 新M2-47/N15：真实CertificateVerify仍仅发表Type/Length/Authenticated，缺完整版本化正文、签名方案/长度、拥有签名字节及递进来源；独立来源已经能核验，优先补齐。
+- 当时新增M2-47/N15：CV曾仅发表Type/Length/Authenticated；后续e5/488已关闭完整版本化正文/方案/长度/拥有来源及实际页面的有限合同，见[CV证据与保留缺口](shark-m2-tls-certificate-verify-20261101.md)。没有由此验证产品签名或关闭N13。
 - N07–N11原HTTP方法不可观察性、新SYN政策、app-only QUIC及6 TCP/24 UDP fuzz分区继续开放。
 - M2-45/N14：IP碎片来源分类和有界重组；不能把全部Fragment列差异视为可恢复记录。
 - SMB M2-04/05/36按用户要求搁置；[独立任务书](shark-m2-smb-taskbook-20261101.md)的历史分母须在S01重验。

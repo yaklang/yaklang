@@ -4,8 +4,11 @@
 
 最新main又前进到 `238faf87f36e9eff5ec1ea0ff06e8c06d473214c`，已通过普通merge
 `49bb60b02655bb73c75be39ffae9c26a8836c582` 纳入M2；保留两边既有修改并确定性重建压缩规则。
-当前修正合并测试/干净构建为 `d1a6e62123ea8c6b6d3b43838c12beb86943ddaa`。
+当时修正合并测试/干净构建为 `d1a6e62123ea8c6b6d3b43838c12beb86943ddaa`；随后8a检查点已47checks/2statuses及313158精确traffic ID全绿，实际checkout和完整产物已核验。
 [本轮真实Finished、Windows、完整来源及最终CI门](shark-m2-tls-finished-20261101.md)。
+当前非SMB修复/干净构建为 `488147e9cd490f863edbca5720ff39a85d8cfcf1`，
+[CertificateVerify、实际Windows可见方案及原始来源](shark-m2-tls-certificate-verify-20261101.md)。
+继续同一M2阶段PR #5371；后续文档head的CI单独验收，不能沿用8a成功。
 后续同树/相同patch哈希只描述f99当时连接M1 squash的历史动作，不适用于新增main改动后的整棵树。
 
 后续状态更新：M1 #5353 已 squash 合并到 main `dba37562abddd57fc6386818dbd7953eb52d314c`，
@@ -25,7 +28,7 @@ M2 #5371 已自动改以 main 为基线，现以普通 merge
 
 M1 的293个提交重放成功。普通rebase省略了旧merge提交附带的15行历史说明，已原样恢复，
 并单列本次记录；与原761bd254相比只有一份里程碑说明变化，生产代码、测试、捕获ZIP与配置相同。
-用精确旧远端SHA的force-with-lease发布，不覆盖其他人的并发提交。M1没有合入main，仍走原PR审查。
+整理时曾用精确旧远端SHA的force-with-lease发布，不覆盖他人并发提交；“M1没有合入main、仍走原PR审查”为当时快照。现M1已合并，后续main同步均为普通merge，没有新增强推。
 
 ## 已归并的批次
 

@@ -7,7 +7,7 @@
 ## 当前基线
 
 - M2 阶段分支：`codex/shark-m2-protocol-correctness`，阶段 PR [#5371](https://github.com/yaklang/yaklang/pull/5371)。
-- 开工从 M2 远端最新提交建立独立工作区并记录精确 HEAD。main `238faf87f36e9eff5ec1ea0ff06e8c06d473214c` 已普通合入49bb，兼容测试/当前构建为 `d1a6e62123ea8c6b6d3b43838c12beb86943ddaa`；最终提交CI看阶段PR，不沿用旧结果。M1 #5353 已合并，后续保持唯一M2活动阶段。
+- 开工从 M2 远端最新提交建立独立工作区并记录精确 HEAD。main `238faf87f36e9eff5ec1ea0ff06e8c06d473214c` 已普通合入49bb；可复核全绿检查点为 `8a02294759c1ead373c60c60fb870c7649d92fa7`，实际47checks/2statuses、313133pass/25历史optional skip、131084 required全pass/0skip已逐项核验。[完整traffic](https://github.com/yaklang/yaklang/actions/runs/41277905022)与[Essential](https://github.com/yaklang/yaklang/actions/runs/41277858361)均成功，不计自动draft skipped。后续非SMB正文工作继续进入同一M2，最终head仍看阶段PR的独立CI，不沿用旧结果。M1 #5353 已合并，保持唯一M2活动阶段。
 - 历史SMB审计基准仍为 `a4df082e02cdc1aef427baff7a4fd70774fb4911`（M1 `a9b8df4f64364065765fc0f7f1df4ed9d68cf7dc`），当时47检查、2状态、312727 pass/25历史optional skip、131084 required全通过。旧107/121及1008分母须在S01重新复核，不能把main合并或TLS验证当SMB已验收。
 - 9 个分批 PR 已归入 M2。原 SMB 批次 #5380 的已有代码已保留；最终 fuzz 取消、重建回放和 Windows 的未关闭项仍然有效。
 - 在独立 worktree 或 clone 开发，使用临时 `codex/` 分支，交付目标为 M2。不得修改 M1、强制覆盖 M2 或在主线程正在测试时改动其源码目录。临时分支不是第三个阶段，合入后清理。

@@ -86,8 +86,17 @@ types, complete signature identifiers, CA names, or TLS 1.3 request context and
 extensions. Selecting a literal uses a separate complete handshake byte source;
 decrypted fields do not point into ciphertext. Missing negotiation leaves a
 qualified envelope, and an absent CA extension is distinct from an empty vector.
-Decoded request/update results remain visible ahead of coalesced TLS envelope
-summaries. Body decoding and record authentication do not certify complete
+CertificateVerify uses its complete version-qualified signature vector, with
+the observed two-byte algorithm, exact length and owned signature bytes. The
+detail tree progresses from header to body to context; selecting a signature
+uses the complete handshake encoding, never a guessed ciphertext range. TLS 1.2
+cleartext before CCS is distinct from authenticated TLS 1.3 plaintext. These
+literals do not verify the signature, certificate trust or exchange context.
+Legacy handshake-body decoding does not add legacy cipher decryption support.
+Decoded request, signature and update results remain visible ahead of coalesced
+TLS envelope summaries. KeyUpdate and decoded application identities retain
+priority; a later Finished cannot hide a complete signature scheme. Body
+decoding and record authentication do not certify complete
 handshake conformance, certificate trust, or post-handshake authentication.
 The table shows handshake names, alerts, SNI/ALPN, HTTP/2 stream IDs, request paths
 and gRPC message sizes when actually decoded. Missing keys, unavailable handshake
