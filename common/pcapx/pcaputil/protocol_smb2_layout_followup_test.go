@@ -404,3 +404,51 @@ func TestSMB2CachedDialectDoesNotReplaceCurrentNegotiate(t *testing.T) {
 	require.Equal(t, uint16(0x0210), third.Events[0].Session["Connection Dialect"])
 	require.Equal(t, uint16(0x0210), second.Events[0].Session["Dialect"])
 }
+
+func TestSMB2CapturedVLAN81QueryDoesNotSelectVLAN80Response(t *testing.T) {
+	// Sliced from The-Ultimate-PCAP.pcapng: QUERY_INFO class 7 on VLAN 81, its
+	// VLAN 80 response. The two VLAN IDs stay separate domains.
+	request := smb2LayoutFixture(t, "vlan81-query-info-request.bin")
+	response := smb2LayoutFixture(t, "vlan80-query-info-response.bin")
+	parsed, err := (&binSMB2{client: 0}).consume(request, 64)
+	require.NoError(t, err)
+	require.Equal(t, byte(1), parsed["Body"].(map[string]any)["Info Type"])
+	require.Equal(t, byte(7), parsed["Body"].(map[string]any)["File Info Class"])
+	wires := [][]byte{request, response, response}
+	domains := []int{1, 0, 1}
+	directions := []int{0, 1, 1}
+	var events []*ProtocolEvent
+	analyzer, err := NewPacketAnalyzer(WithOnProtocolMessage(func(event *ProtocolEvent) { events = append(events, event) }))
+	require.NoError(t, err)
+	defer analyzer.Close()
+	seq := [2][2]uint32{{1, 1}, {1, 1}}
+	for index, wire := range wires {
+		domain, direction := domains[index], directions[index]
+		src, dst := net.IPv4(192, 0, 2, 1), net.IPv4(192, 0, 2, 2)
+		sport, dport := layers.TCPPort(50000), layers.TCPPort(445)
+		if direction == 1 {
+			src, dst, sport, dport = dst, src, dport, sport
+		}
+		ethernet := &layers.Ethernet{SrcMAC: net.HardwareAddr{2, 0, 0, 0, 0, 1}, DstMAC: net.HardwareAddr{2, 0, 0, 0, 0, 2}, EthernetType: layers.EthernetTypeDot1Q}
+		ip := &layers.IPv4{Version: 4, IHL: 5, TTL: 64, Protocol: layers.IPProtocolTCP, SrcIP: src, DstIP: dst}
+		tcp := &layers.TCP{SrcPort: sport, DstPort: dport, Seq: seq[domain][direction], ACK: true, PSH: true, Window: 4096}
+		seq[domain][direction] += uint32(len(wire))
+		require.NoError(t, tcp.SetNetworkLayerForChecksum(ip))
+		buffer := gopacket.NewSerializeBuffer()
+		tag := &layers.Dot1Q{VLANIdentifier: uint16(80 + domain), Type: layers.EthernetTypeIPv4}
+		require.NoError(t, gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{FixLengths: true, ComputeChecksums: true}, ethernet, tag, ip, tcp, gopacket.Payload(wire)))
+		packet := buffer.Bytes()
+		require.NoError(t, analyzer.Feed(packet, gopacket.CaptureInfo{Timestamp: time.Unix(int64(100+index), 0), CaptureLength: len(packet), Length: len(packet), InterfaceIndex: 0}, layers.LinkTypeEthernet))
+	}
+	require.NoError(t, analyzer.Close())
+	require.Len(t, events, 3)
+	require.Equal(t, byte(7), events[0].Session["Body"].(map[string]any)["File Info Class"])
+	require.NotEqual(t, events[0].FlowID, events[1].FlowID)
+	require.Equal(t, "missing-or-ambiguous-request", events[1].Session["Association Status"])
+	require.NotContains(t, events[1].Session, "Request File Info Class")
+	require.NotContains(t, events[1].Session, "Output Information Type")
+	require.Equal(t, events[0].FlowID, events[2].FlowID)
+	require.Equal(t, "matched", events[2].Session["Association Status"])
+	require.Equal(t, byte(7), events[2].Session["Request File Info Class"])
+	require.Equal(t, "FileEaInformation", events[2].Session["Output Information Type"])
+}
