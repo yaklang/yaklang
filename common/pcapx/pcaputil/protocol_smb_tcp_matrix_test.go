@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/gopacket/gopacket/layers"
@@ -37,7 +38,7 @@ func smbTCPWrite(steps *[]tcpStep, seq *uint32, reverse bool, data []byte, cuts 
 	}
 }
 
-func smbTCPReplay(t *testing.T, port layers.TCPPort, steps []tcpStep, deferred bool, budget ...int) ([]*ProtocolEvent, BinParserStats, error) {
+func smbTCPReplay(t *testing.T, port layers.TCPPort, steps []tcpStep, deferred bool, workers int, budget ...int) ([]*ProtocolEvent, BinParserStats, error) {
 	t.Helper()
 	var opts []CaptureOption
 	if deferred {
@@ -46,12 +47,12 @@ func smbTCPReplay(t *testing.T, port layers.TCPPort, steps []tcpStep, deferred b
 	if len(budget) == 2 {
 		opts = append(opts, WithProtocolBudget(budget[0], budget[1]))
 	}
-	return binReplay(t, binTestPcap(t, steps, port, false, true), 1, opts...)
+	return binReplay(t, binTestPcap(t, steps, port, false, true), workers, opts...)
 }
 
-func smbTCPOK(t *testing.T, port layers.TCPPort, steps []tcpStep, deferred bool) []*ProtocolEvent {
+func smbTCPOK(t *testing.T, port layers.TCPPort, steps []tcpStep, deferred bool, workers int) []*ProtocolEvent {
 	t.Helper()
-	events, stats, err := smbTCPReplay(t, port, steps, deferred)
+	events, stats, err := smbTCPReplay(t, port, steps, deferred, workers)
 	require.NoError(t, err)
 	require.Zero(t, stats.BufferedBytes)
 	return events
@@ -84,6 +85,14 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 	req := smb2NegotiateReq(0x0311)
 	resp := smb2NegotiateResp(0x0311)
 	require.Greater(t, len(resp), len(req))
+	for _, workers := range []int{1, 3} {
+		t.Run(fmt.Sprintf("workers-%d", workers), func(t *testing.T) {
+			testSMB2TCPStateMatrix(t, req, resp, workers)
+		})
+	}
+}
+
+func testSMB2TCPStateMatrix(t *testing.T, req, resp []byte, workers int) {
 	for _, deferred := range []bool{false, true} {
 		t.Run(boolName("deferred", deferred), func(t *testing.T) {
 			t.Run("nbss-tcp-smb-boundaries", func(t *testing.T) {
@@ -98,7 +107,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&steps, &server, true, positive, 1, len(positive))
 				smbTCPWrite(&steps, &client, false, req, 3, 17, len(req))
 				smbTCPWrite(&steps, &server, true, resp)
-				events := smbTCPOK(t, 139, steps, deferred)
+				events := smbTCPOK(t, 139, steps, deferred, workers)
 				var nbss, request, answer *ProtocolEvent
 				for _, event := range events {
 					if event.Protocol == "nbss" && nbss == nil {
@@ -132,31 +141,31 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 			t.Run("reorder-retransmit-hole-truncation-overlap", func(t *testing.T) {
 				steps := smbTCPHandshake(100, 500)
 				steps = append(steps, tcpStep{seq: 120, data: string(req[20:])}, tcpStep{seq: 100, data: string(req[:20])})
-				events := smbTCPOK(t, 445, steps, deferred)
+				events := smbTCPOK(t, 445, steps, deferred, workers)
 				require.Equal(t, 1, smbCount(events, "NEGOTIATE"))
 
 				again := smbTCPHandshake(100, 500)
 				again = append(again, tcpStep{seq: 100, data: string(req)}, tcpStep{seq: 100, data: string(req)})
-				events = smbTCPOK(t, 445, again, deferred)
+				events = smbTCPOK(t, 445, again, deferred, workers)
 				require.Equal(t, 1, smbCount(events, "NEGOTIATE"))
 
 				hole := smbTCPHandshake(100, 500)
 				hole = append(hole, tcpStep{seq: 100, data: string(req[:8])}, tcpStep{seq: 120, data: string(req[8:])})
-				events, _, err := smbTCPReplay(t, 445, hole, deferred)
+				events, _, err := smbTCPReplay(t, 445, hole, deferred, workers)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "unfilled sequence gap")
 				require.Equal(t, 0, smbCount(events, "NEGOTIATE"))
 
 				short := smbTCPHandshake(100, 500)
 				short = append(short, tcpStep{seq: 100, data: string(req[:len(req)-1])}, tcpStep{seq: uint32(100 + len(req) - 1), fin: true})
-				events = smbTCPOK(t, 445, short, deferred)
+				events = smbTCPOK(t, 445, short, deferred, workers)
 				require.Equal(t, 0, smbCount(events, "NEGOTIATE"))
 				require.Equal(t, "incomplete", events[len(events)-1].Status)
 
 				conflict := bytes.Repeat([]byte{'X'}, 10)
 				overlap := smbTCPHandshake(100, 500)
 				overlap = append(overlap, tcpStep{seq: 110, data: string(conflict)}, tcpStep{seq: 100, data: string(req)})
-				events, _, err = smbTCPReplay(t, 445, overlap, deferred)
+				events, _, err = smbTCPReplay(t, 445, overlap, deferred, workers)
 				require.Error(t, err)
 				require.Contains(t, err.Error(), "conflict")
 				for _, event := range events {
@@ -168,7 +177,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 			})
 
 			t.Run("syn-fin-rst-generation", func(t *testing.T) {
-				alone, _, err := smbTCPReplay(t, 445, []tcpStep{{seq: 99, syn: true, data: string(req)}}, deferred)
+				alone, _, err := smbTCPReplay(t, 445, []tcpStep{{seq: 99, syn: true, data: string(req)}}, deferred, workers)
 				require.NoError(t, err)
 				require.Equal(t, 1, smbCount(alone, "NEGOTIATE"))
 				steps := smbTCPHandshake(100, 500)
@@ -176,7 +185,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&steps, &client, false, req)
 				steps = append(steps, tcpStep{seq: 999, syn: true})
 				smbTCPWrite(&steps, &server, true, resp)
-				events := smbTCPOK(t, 445, steps, deferred)
+				events := smbTCPOK(t, 445, steps, deferred, workers)
 				require.Equal(t, 2, smbCount(events, "NEGOTIATE"))
 				require.Equal(t, "NEGOTIATE", events[1].Session["Matched Request"])
 				require.Equal(t, events[0].FlowID, events[1].FlowID)
@@ -192,7 +201,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 					tcpStep{seq: 8001, data: string(req)},
 					tcpStep{seq: 9001 + uint32(len(resp)), reverse: true, data: string(resp)},
 				)
-				events = smbTCPOK(t, 445, closed, deferred)
+				events = smbTCPOK(t, 445, closed, deferred, workers)
 				require.Equal(t, 5, smbCount(events, "NEGOTIATE"))
 				require.Equal(t, "NEGOTIATE", events[1].Session["Matched Request"])
 				require.NotEqual(t, events[0].FlowID, events[2].FlowID)
@@ -206,7 +215,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&reset, &c, false, req)
 				smbTCPWrite(&reset, &s, true, resp)
 				reset = append(reset, tcpStep{seq: c, rst: true}, tcpStep{seq: c, data: string(req)})
-				events = smbTCPOK(t, 445, reset, deferred)
+				events = smbTCPOK(t, 445, reset, deferred, workers)
 				require.Equal(t, 2, smbCount(events, "NEGOTIATE"))
 			})
 
@@ -215,7 +224,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				client := uint32(100)
 				smbTCPWrite(&reused, &client, false, req)
 				smbTCPWrite(&reused, &client, false, req)
-				events := smbTCPOK(t, 445, reused, deferred)
+				events := smbTCPOK(t, 445, reused, deferred, workers)
 				decoded := 0
 				for _, event := range events {
 					if event.Status == "decoded" || event.Status == "deferred" {
@@ -231,7 +240,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&dup, &c, false, req)
 				smbTCPWrite(&dup, &s, true, resp)
 				smbTCPWrite(&dup, &s, true, resp)
-				events = smbTCPOK(t, 445, dup, deferred)
+				events = smbTCPOK(t, 445, dup, deferred, workers)
 				matched := 0
 				for _, event := range events {
 					if event.Session["Matched Request"] == "NEGOTIATE" {
@@ -254,7 +263,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&late, &s, true, late6)
 				smbTCPWrite(&late, &s, true, bad)
 				smbTCPWrite(&late, &s, true, late5)
-				events = smbTCPOK(t, 445, late, deferred)
+				events = smbTCPOK(t, 445, late, deferred, workers)
 				require.Equal(t, "READ", events[2].Session["Matched Request"])
 				require.Equal(t, true, events[3].Session["Unmatched"])
 				require.Equal(t, []byte("yes"), events[4].Session["Body"].(map[string]any)["Data"])
@@ -276,7 +285,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&async, &s, true, pending)
 				smbTCPWrite(&async, &s, true, wrong)
 				smbTCPWrite(&async, &s, true, final)
-				events = smbTCPOK(t, 445, async, deferred)
+				events = smbTCPOK(t, 445, async, deferred, workers)
 				require.Equal(t, true, events[1].Session["Operation Pending"])
 				require.Equal(t, uint64(0xfeed0001), events[1].Session["Async ID"])
 				require.Equal(t, true, events[2].Session["Unmatched"])
@@ -290,7 +299,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&cancelled, &c, false, smb2Read(8, 0x11, 1, fid, 4))
 				smbTCPWrite(&cancelled, &c, false, cancel)
 				smbTCPWrite(&cancelled, &s, true, smb2ReadResp(8, 0x11, 1, []byte("kept")))
-				events = smbTCPOK(t, 445, cancelled, deferred)
+				events = smbTCPOK(t, 445, cancelled, deferred, workers)
 				require.Equal(t, "CANCEL", events[1].Session["Packet Name"])
 				require.Equal(t, false, events[1].Session["Response Expected"])
 				require.Equal(t, uint64(8), events[1].Session["Cancellation Target Message ID"])
@@ -303,7 +312,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				refused := smbTCPHandshake(100, 500)
 				c = 100
 				smbTCPWrite(&refused, &c, false, reply)
-				events = smbTCPOK(t, 445, refused, deferred)
+				events = smbTCPOK(t, 445, refused, deferred, workers)
 				require.NotEqual(t, "decoded", events[0].Status)
 				require.NotEqual(t, "deferred", events[0].Status)
 				require.NotContains(t, events[0].Session, "Cancellation Target Message ID")
@@ -315,7 +324,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				smbTCPWrite(&ordered, &c, false, compoundReq)
 				smbTCPWrite(&ordered, &s, true, early)
 				smbTCPWrite(&ordered, &s, true, smb2CreateResp(10, 0x11, 1, fid))
-				events = smbTCPOK(t, 445, ordered, deferred)
+				events = smbTCPOK(t, 445, ordered, deferred, workers)
 				require.Equal(t, "missing-request-file-context", events[1].Session["File Context Status"])
 				require.NotContains(t, events[1].Session, "Inherited File ID")
 				require.NotContains(t, events[1].Session, "Request File ID")
@@ -325,7 +334,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				c, s = 100, 500
 				smbTCPWrite(&inherited, &c, false, compoundReq)
 				inherited = append(inherited, tcpStep{seq: s + uint32(split), reverse: true, data: string(compoundResp[split:])}, tcpStep{seq: s, reverse: true, data: string(compoundResp[:split])})
-				events = smbTCPOK(t, 445, inherited, deferred)
+				events = smbTCPOK(t, 445, inherited, deferred, workers)
 				second := events[1].Session["Commands"].([]map[string]any)[1]
 				require.Equal(t, true, second["Inherited File ID"])
 				require.GreaterOrEqual(t, len(events[1].SourceBytes.PacketRefs), 2)
@@ -340,7 +349,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				}
 				exact := smbTCPHandshake(100, 500)
 				exact = append(exact, tcpStep{seq: 100, data: string(req)})
-				events, stats, err := smbTCPReplay(t, 445, exact, deferred, len(req), len(req)+8192)
+				events, stats, err := smbTCPReplay(t, 445, exact, deferred, workers, len(req), len(req)+8192)
 				require.NoError(t, err)
 				require.Equal(t, 1, smbCount(events, "NEGOTIATE"))
 				require.Zero(t, stats.BufferedBytes)
@@ -362,7 +371,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 
 				short := smbTCPHandshake(100, 500)
 				short = append(short, tcpStep{seq: 100, data: string(req)})
-				events, _, err = smbTCPReplay(t, 445, short, deferred, len(req)-1, len(req)+8192)
+				events, _, err = smbTCPReplay(t, 445, short, deferred, workers, len(req)-1, len(req)+8192)
 				require.NoError(t, err)
 				require.Equal(t, 0, smbCount(events, "NEGOTIATE"))
 				require.Equal(t, "limited", events[0].Status)
@@ -371,7 +380,7 @@ func TestSMB2TCPStateMatrix(t *testing.T) {
 				c, s := uint32(100), uint32(500)
 				smbTCPWrite(&other, &c, false, req)
 				smbTCPWrite(&other, &s, true, resp)
-				events, stats, err = smbTCPReplay(t, 445, other, deferred, len(req), len(resp)+8192)
+				events, stats, err = smbTCPReplay(t, 445, other, deferred, workers, len(req), len(resp)+8192)
 				require.NoError(t, err)
 				require.Equal(t, req, events[0].Raw)
 				require.Equal(t, want, events[0].Status)
