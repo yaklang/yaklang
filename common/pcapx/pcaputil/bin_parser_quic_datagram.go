@@ -265,6 +265,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil && h.long {
 			e.Profile = quicNativeProfile(h.version)
 		}
+		if f.quic.retired {
+			// A replay between coalesced packets may exhaust the owner budget.
+			// Retain the remaining wire once; public Initial keys cannot reopen it.
+			err = protocolError(ErrResourceExceeded, "QUIC recovery exhausted the conversation budget")
+		}
 		if err != nil {
 			if _, typed := classifySessionError(err); typed == nil {
 				err = protocolError(ErrMalformedMessage, "invalid coalesced QUIC header: %v", err)
@@ -328,7 +333,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			v := el.Value.(*binUDPEntry)
 			// Closed-generation evidence may be inspected, but must not keep
 			// obsolete keys alive indefinitely through late packets.
-			if !f.quic.closed {
+			if !f.quic.closed && !f.quic.retired {
 				if base.Timestamp.After(v.touched) {
 					v.touched = base.Timestamp
 				}
@@ -384,14 +389,25 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err != nil && !recoverable {
 			break
 		}
+		if err == nil && h.space == quicSpaceHandshake && off < len(wire) && el != nil &&
+			!f.quic.retired && !f.quic.closed && len(f.quic.earlyPending) > 0 && f.quic.earlyAccepted() {
+			// An accepted early request can precede a response in the next
+			// coalesced packet. Restore it now, reserving every remaining wire
+			// observation before spending a slot on the earlier capture.
+			available := a.budget.MaxCollectionElements - len(events)
+			if available > 0 {
+				reserved := f.quic.remainingWireEvents(dir, wire[off:], available)
+				events = append(events, a.resumeEarlyQUIC(f, base, available-reserved)...)
+			}
+		}
 	}
 	if el == nil {
 		f.closeSession()
 	} else if f.quic.closed {
 		f.quic.earlyPending, f.quic.earlyPendingBytes = nil, 0
 	} else {
-		// Resume only after every wire packet in this datagram. Context and
-		// control streams must settle before replaying earlier application bytes.
+		// Also retry at the datagram boundary after late keys/control context,
+		// without allowing replay to authenticate this datagram's padding.
 		events = append(events, a.resumeEarlyQUIC(f, base, a.budget.MaxCollectionElements-len(events))...)
 	}
 	return events, true

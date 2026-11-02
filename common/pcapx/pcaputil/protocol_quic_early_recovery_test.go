@@ -382,6 +382,100 @@ func TestQUICEarlyRecoveredCloseDoesNotReplayFollowingStreams(t *testing.T) {
 	require.Nil(t, q.streams)
 }
 
+// These AES-128 fixtures include the actual observed receiver CID in both
+// coalesced packet headers; the CID-less conformance helper cannot route them.
+func earlyRecoveryCIDPacket(t *testing.T, key *quicTrafficKeys, handshake bool, pn uint32, cid, plain []byte) []byte {
+	t.Helper()
+	header := append([]byte{0x43}, cid...)
+	if handshake {
+		header = binary.BigEndian.AppendUint32([]byte{0xe3}, quicVersion1)
+		header = append(header, byte(len(cid)))
+		header = append(header, cid...)
+		header = append(header, 0)
+		header = append(header, quicPutVarint(uint64(4+len(plain)+16))...)
+	}
+	pnAt := len(header)
+	header = binary.BigEndian.AppendUint32(header, pn)
+	block, err := aes.NewCipher(key.key)
+	require.NoError(t, err)
+	packetCipher, err := cipher.NewGCM(block)
+	require.NoError(t, err)
+	wire := append(bytes.Clone(header), packetCipher.Seal(nil, quicNonce(key.iv, uint64(pn)), plain, header)...)
+	mask, err := quicHeaderMask(key, wire[pnAt+4:pnAt+20])
+	require.NoError(t, err)
+	bits := byte(0x1f)
+	if handshake {
+		bits = 0x0f
+	}
+	wire[0] ^= mask[0] & bits
+	for i := 0; i < 4; i++ {
+		wire[pnAt+i] ^= mask[1+i]
+	}
+	return wire
+}
+
+func TestQUICEarlyRecoveryPrecedesCoalescedResponseWithoutStealingWireBudget(t *testing.T) {
+	for _, mode := range []string{"associate", "wire-budget", "recovery-resource"} {
+		t.Run(mode, func(t *testing.T) {
+			a := earlyRecoveryParser(t)
+			a.budget.MaxCollectionElements = 3
+			if mode == "wire-budget" {
+				a.budget.MaxCollectionElements = 2
+			}
+			q, early, app, _ := earlyRecoveryFixture(t, quicVersion1, 0x1301, true, false)
+			f := earlyRecoveryOwner(a, q, CaptureDomain{})
+			request := earlyRecoveryStream([]byte("request"))
+			if mode == "recovery-resource" {
+				request = append([]byte{0x0f, 0}, quicPutVarint(1<<20)...)
+				request = append(request, 1, 'x')
+			}
+			first, ok := a.decodeQUICDatagram(earlyRecoveryBase(f, CaptureDomain{}, 1), quicConformancePacket(t, early, "0-RTT", 1, 0, request))
+			require.True(t, ok)
+			require.Len(t, first, 1)
+			share := append([]byte{0, 23, 0, 32}, bytes.Repeat([]byte{1}, 32)...)
+			server := tlsResumptionHello(false, nil, 0x1301, tlsResumptionExt{43, []byte{3, 4}}, tlsResumptionExt{51, share}, tlsResumptionExt{41, []byte{0, 0}})
+			require.NoError(t, q.feedCrypto(1, quicSpaceInitial, 0, quicTLSLevelMessage(2, server), map[string]any{}, 128))
+			cid := []byte("clientid")
+			q.cids[string(cid)] = 0
+			ee := quicTLSLevelMessage(8, []byte{0, 4, 0, 42, 0, 0})
+			crypto := append([]byte{6, 0}, quicPutVarint(uint64(len(ee)))...)
+			crypto = append(crypto, ee...)
+			hs := earlyRecoveryCIDPacket(t, q.keys.handshake[1], true, 1, cid, crypto)
+			response := earlyRecoveryCIDPacket(t, q.keys.app[1][0], false, 2, cid, earlyRecoveryStream([]byte("response")))
+			base := earlyRecoveryBase(f, CaptureDomain{}, 2)
+			base.Source, base.Destination = base.Destination, base.Source
+			events, ok := a.decodeQUICDatagram(base, append(hs, response...))
+			require.True(t, ok)
+			if mode == "wire-budget" {
+				require.Len(t, events, 2)
+				require.Equal(t, response, events[1].Raw, "both original wire packets retain their budget")
+				require.Len(t, q.earlyPending, 1)
+				later, ok := a.decodeQUICDatagram(earlyRecoveryBase(f, CaptureDomain{}, 3), epochQUICPacket(t, app, []byte("seedcid8"), 5, 0, 4))
+				require.True(t, ok)
+				require.Len(t, later, 2)
+				require.Empty(t, q.earlyPending)
+				return
+			}
+			require.Len(t, events, 3)
+			require.Equal(t, response, events[2].Raw)
+			if mode == "recovery-resource" {
+				require.True(t, q.retired)
+				require.Nil(t, q.keys)
+				require.Nil(t, q.streams)
+				require.Equal(t, ErrResourceExceeded, events[1].sessionError.Kind)
+				require.Equal(t, ErrResourceExceeded, events[2].sessionError.Kind)
+				require.NotEqual(t, true, events[2].Session["Authentication Verified"])
+			} else {
+				require.Equal(t, "decoded", events[1].Status)
+				require.Equal(t, "decoded", events[2].Status)
+				require.NotZero(t, events[1].ID)
+				require.Equal(t, events[1].ID, events[2].ResponseTo)
+				require.Equal(t, events[1].ID, events[2].TransactionID)
+			}
+		})
+	}
+}
+
 func TestTLSEarlyAcceptanceExtensionMustBeEmpty(t *testing.T) {
 	for n := 0; n <= 5; n++ {
 		t.Run(fmt.Sprintf("bytes%d", n), func(t *testing.T) {

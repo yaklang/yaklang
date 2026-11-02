@@ -96,6 +96,24 @@ type quicEarlyPending struct {
 	cost int64
 }
 
+// Count bounded wire envelopes without decrypting, delivering frames or
+// allocating state. An invalid tail still needs one diagnostic observation.
+func (q *binQUIC) remainingWireEvents(dir int, wire []byte, limit int) int {
+	count := 0
+	for len(wire) > 0 {
+		count++
+		if count >= limit {
+			return count
+		}
+		h, err := q.wireHeader(wire, dir)
+		if err != nil || h.size <= 0 || h.size > len(wire) {
+			return count
+		}
+		wire = wire[h.size:]
+	}
+	return count
+}
+
 func (q *binQUIC) retainEarly(e *ProtocolEvent, h quicHdr, raw []byte, off, max int, err error) error {
 	_, typed := classifySessionError(err)
 	if !q.native || q.provider == nil || q.retired || q.closed || e.Direction != 0 || h.typeName != "0-RTT" ||
