@@ -332,9 +332,13 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		if len(versions) < 3 || int(versions[0]) != len(versions)-1 || (len(versions)-1)%2 != 0 || !tlsContains16(versions[1:], version) {
 			return protocolError(ErrMalformedMessage, "TLS selected version was not offered")
 		}
-		if binary.BigEndian.Uint16(body) != 0x303 || !bytes.Equal(h.session, current.session) || h.compression[0] != 0 {
-			return protocolError(ErrMalformedMessage, "TLS 1.3 ServerHello legacy parameters")
-		}
+	}
+	// These two literal constraints are provable from ServerHello alone.
+	// Missing ClientHello only prevents checking its offered versions and
+	// compatibility session-ID echo; it cannot legalize a different legacy
+	// version or compression method (RFC 8446 4.1.3).
+	if version == 0x304 && (binary.BigEndian.Uint16(body) != 0x303 || h.compression[0] != 0 || current != nil && !bytes.Equal(h.session, current.session)) {
+		return protocolError(ErrMalformedMessage, "TLS 1.3 ServerHello legacy parameters")
 	}
 	if present {
 		if version != 0x304 || bytes.Equal(body[2:34], tlsRetryRandom[:]) {
