@@ -542,6 +542,21 @@ func (c *Compiler) dynamicMemberReadValue(contextInst ssa.Instruction, val ssa.V
 // value. GetObject()/GetKey() return the latest owner, which for a value
 // reused by a later assignment is the assignment target, not the object the
 // member was originally read from.
+// valueIsMemberRead reports whether val is itself a member read, i.e. its word
+// comes from indexing an object. A value only receives an owner pair when it is
+// written into a field (`obj.f = v`); that does not make the value a read of
+// that field, so `target` after `params.info.url = target` still loads its own
+// word.
+func valueIsMemberRead(val ssa.Value) bool {
+	switch val.(type) {
+	case *ssa.Call, *ssa.Make:
+		return false
+	case *ssa.ConstInst:
+		return false
+	}
+	return true
+}
+
 func (c *Compiler) firstOwnerObjectKey(val ssa.Value) (ssa.Value, ssa.Value) {
 	if val == nil {
 		return nil, nil
@@ -1147,6 +1162,14 @@ func (c *Compiler) shouldReadMemberValueDynamically(val ssa.Value, id int64) boo
 	if _, isConst := val.(*ssa.ConstInst); isConst {
 		return false
 	}
+	// A value produced by an instruction that computes a word is not a member
+	// read, even when the front end also recorded it as a field of some object.
+	// `params.info.url = target` adds an owner pair to the `target` value; a
+	// later read of `target` must load that word, not re-read the field (which
+	// is still empty at that point).
+	if !valueIsMemberRead(val) {
+		return false
+	}
 	if current := c.currentFunction(); current != nil && val.GetFunc() != nil && val.GetFunc() != current {
 		return false
 	}
@@ -1203,22 +1226,6 @@ func (c *Compiler) assignedSSAValue(contextInst ssa.Instruction, resultID int64)
 	}
 	assigned, _ := got.(ssa.Value)
 	return assigned
-}
-
-// hasPlainVariable reports whether val is bound to a non-member variable: it is
-// assigned to a name, not only to an object field. The front end can reuse one
-// SSA value for both (`target = target.Trim(...)` is also recorded as
-// `params.info.proxy.url = proxy`), and the plain assignment is the word to use.
-func hasPlainVariable(val ssa.Value) bool {
-	if val == nil {
-		return false
-	}
-	for _, variable := range val.GetAllVariables() {
-		if variable != nil && !variable.IsMemberCall() {
-			return true
-		}
-	}
-	return false
 }
 
 func (c *Compiler) hasAssignedMemberCallVariable(val ssa.Value) bool {
@@ -2058,14 +2065,6 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 		if obj.GetId() == owner.GetId() && c.resolveMemberKeyString(key) == keyStr {
 			return false
 		}
-	}
-	// A value assigned to a plain variable is that variable's word. The front
-	// end can also record the same value as a field of an unrelated object
-	// (`target = target.Trim(...)` is reused for `params.info.proxy.url`), and
-	// reading it back through that field would return the field's empty slot
-	// instead of the value the literal stores.
-	if hasPlainVariable(member) {
-		return false
 	}
 	if current := c.currentFunction(); current != nil && member.GetFunc() != nil && member.GetFunc() != current {
 		return false
