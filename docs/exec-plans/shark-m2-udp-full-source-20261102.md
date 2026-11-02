@@ -28,7 +28,7 @@ producer SHA256 `23665a15e59fb4d92d9ab59c8e3ae176510c7e8d36f468d821dae77068efcdf
 
 1264实际运行旧d853/新26f的SDK、flow、CLI共六次。1269独立复核这些不可变执行产物，
 零新增原生执行，并新跑完整TShark4.6.9双遍、空配置、不使用Decode As。12帧UDP端口、
-长度、checksum字面值和完整Data与独立线上源一致，零长度Data省略明确处理。原始IPv4
+长度、checksum字面值和完整Data与独立线上源一致，零长度Data省略明确处理。IPv4中的UDP
 checksum为零的意义是未提供，不把producer的`verified_or_absent=false`误报为校验失败。
 SDK和行只允许完整Raw、来源SHA和承载完整性变化，其余所有字段及完整flow导出相同。
 summary `9d21f22452143a8281db91023cce371ad96e75e4f6b5f3f0b123fcf230261743`。
