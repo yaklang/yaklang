@@ -23,6 +23,7 @@ type Protocol struct {
 	Name           string
 	Position, Size int
 	Fields         []Field
+	Diagnostics    []string
 }
 
 type Packet struct {
@@ -43,20 +44,21 @@ type Evidence struct {
 }
 
 type UDPObservation struct {
-	Number           uint64 `json:"frame"`
-	Interface        uint64 `json:"interface"`
-	Section          uint64 `json:"section"`
-	Encapsulation    string `json:"encapsulation"`
-	Stream           uint64 `json:"reference_stream"`
-	IPOffset         int    `json:"ip_offset"`
-	UDPOffset        int    `json:"udp_offset"`
-	Source           string `json:"source"`
-	Destination      string `json:"destination"`
-	SourcePort       uint16 `json:"source_port"`
-	DestinationPort  uint16 `json:"destination_port"`
-	Length           uint16 `json:"udp_length"`
-	ExtentConsistent bool   `json:"extent_consistent"`
-	CapturedSHA256   string `json:"captured_sha256"`
+	Number               uint64   `json:"frame"`
+	Interface            uint64   `json:"interface"`
+	Section              uint64   `json:"section"`
+	Encapsulation        string   `json:"encapsulation"`
+	Stream               uint64   `json:"reference_stream"`
+	IPOffset             int      `json:"ip_offset"`
+	UDPOffset            int      `json:"udp_offset"`
+	Source               string   `json:"source"`
+	Destination          string   `json:"destination"`
+	SourcePort           uint16   `json:"source_port"`
+	DestinationPort      uint16   `json:"destination_port"`
+	Length               uint16   `json:"udp_length"`
+	ExtentConsistent     bool     `json:"extent_consistent"`
+	CapturedSHA256       string   `json:"captured_sha256"`
+	ReferenceDiagnostics []string `json:"reference_diagnostics,omitempty"`
 }
 
 func attr(start xml.StartElement, name string) string {
@@ -104,10 +106,23 @@ func readProtocol(d *xml.Decoder, start xml.StartElement) (Protocol, error) {
 		case xml.StartElement:
 			depth++
 			fields++
-			if depth > 32 || fields > 10000 || t.Name.Local != "field" {
+			if depth > 32 || fields > 10000 {
 				return p, fmt.Errorf("unsupported PDML field tree")
 			}
 			name := attr(t, "name")
+			if t.Name.Local == "proto" && (name == "_ws.malformed" || name == "_ws.expert") {
+				// Reference diagnostics may be nested inside an invalid header
+				// field. Their children are not this transport's wire fields.
+				p.Diagnostics = append(p.Diagnostics, name)
+				if err := d.Skip(); err != nil {
+					return p, err
+				}
+				depth--
+				continue
+			}
+			if t.Name.Local != "field" {
+				return p, fmt.Errorf("unsupported PDML field tree")
+			}
 			if relevant(name) {
 				f := Field{Name: name, Value: attr(t, "value"), Show: attr(t, "show")}
 				if len(f.Value) > 128 || len(f.Show) > 128 {
@@ -289,6 +304,6 @@ func MatchDirectIPv4UDP(p Packet, e Evidence) (UDPObservation, error) {
 		Source: net.IP(b[at+12 : at+16]).String(), Destination: net.IP(b[at+16 : at+20]).String(),
 		SourcePort: binary.BigEndian.Uint16(b[u : u+2]), DestinationPort: binary.BigEndian.Uint16(b[u+2 : u+4]), Length: length,
 		ExtentConsistent: ipLength >= h+8 && ipLength <= len(b)-at && length >= 8 && int(length) <= ipLength-h,
-		CapturedSHA256:   hex.EncodeToString(hash[:])}
+		CapturedSHA256:   hex.EncodeToString(hash[:]), ReferenceDiagnostics: append([]string(nil), selected.Diagnostics...)}
 	return out, nil
 }

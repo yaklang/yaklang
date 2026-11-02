@@ -144,12 +144,24 @@ func TestUDPOracleReferenceMetadataIntegrity(t *testing.T) {
 		"bad-position":      strings.Replace(good, `pos="34"`, `pos="-1"`, 1),
 		"oversized-field":   strings.Replace(good, `value="01020304"`, `value="`+strings.Repeat("a", 129)+`"`, 1),
 		"duplicate-frame":   strings.Replace(good, `</pdml>`, strings.TrimSuffix(strings.TrimPrefix(good, `<pdml>`), `</pdml>`)+`</pdml>`, 1),
+		"nested-transport":  strings.Replace(good, `<field name="udp.checksum" pos="40" size="2" show="" value="0000"/>`, `<proto name="udp" pos="40" size="8"/>`, 1),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := trafficoracle.ReadPDML(strings.NewReader(text), func(trafficoracle.Packet) error { return nil }); err == nil {
 				t.Fatal("corrupt reference accepted")
 			}
 		})
+	}
+}
+
+func TestUDPOracleRetainsNestedReferenceDiagnostics(t *testing.T) {
+	e, text := udpOracleFixture()
+	needle := `<field name="udp.checksum" pos="40" size="2" show="" value="0000"/>`
+	text = strings.Replace(text, needle, strings.TrimSuffix(needle, `/>`)+`><proto name="_ws.malformed"><field name="udp.srcport" pos="34" size="2" value="dead"/></proto></field>`, 1)
+	p := udpOraclePacket(t, text)
+	o, err := trafficoracle.MatchDirectIPv4UDP(p, e)
+	if err != nil || o.Stream != 931 || len(o.ReferenceDiagnostics) != 1 || o.ReferenceDiagnostics[0] != "_ws.malformed" {
+		t.Fatalf("diagnostic discarded or used as header bytes: %+v %v", o, err)
 	}
 }
 
