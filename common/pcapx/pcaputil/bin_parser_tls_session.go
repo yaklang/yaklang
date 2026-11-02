@@ -110,6 +110,7 @@ type binTLS struct {
 	phaInitialFinished, phaGap             [2]bool
 	phaPeerPrefixComplete                  bool // current record only; no connection-wide ACK inference
 	phaEarlyResponses                      map[string]tlsPHAResponse
+	serverHandshakeStage                   uint8 // accepted initial TLS 1.3 server observations only
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
@@ -356,9 +357,16 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	// Hello/extension validation and Finished/KeyUpdate transitions commit
 	// together. A rejected message cannot retain half-applied peer state.
 	// Retained slices and metadata are immutable or replaced, never edited.
+	stage, err := t.observedServerHandshakeStage(dir, b[0], authenticated)
+	if err != nil {
+		return nil, err
+	}
 	trial := *t
 	m, err := trial.applyHandshakeMessage(dir, b, authenticated, limits...)
 	if err == nil {
+		if stage != 0 {
+			trial.serverHandshakeStage = stage
+		}
 		*t = trial
 	}
 	return m, err
