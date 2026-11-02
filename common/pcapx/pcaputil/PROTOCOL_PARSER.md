@@ -14,6 +14,8 @@ Go 的 `ObserveTLSServerHelloRecord(record, maxElements)` 提供无连接状态�
 复用原生 hello 语法，未支持扩展的内部内容仍 opaque。它不应用协商规则、不修改输入，
 也不证明对端、协商成立或认证成功。Shark 对具有完整自有来源的 legacy 参数拒绝记录，
 保留 `TLS`、具体错误和“协商未成立”的递进说明，不继承 TLS1.3 会话或应用身份。
+详情把声明版本、legacy version、cipher suite 和压缩值与协商状态区分；字面 legacy、cipher
+和压缩字段只定位到自有明文 record，错误说明不借用这些字节范围。
 
 ## 最小脚本
 

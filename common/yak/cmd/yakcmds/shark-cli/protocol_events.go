@@ -1079,10 +1079,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind
 		tlsRemainder := tlsStoppedStreamRemainder(e)
+		rejectedHello := rejectedTLSServerHelloDiagnostic(e)
 		if kind == "" {
 			kind = "message"
 		}
-		if !credibleTLSIdentity(e) && !tlsRemainder {
+		if rejectedHello {
+			kind += " · complete ServerHello declaration; negotiation not established"
+		}
+		if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
 			if strongTLSRecord(e) {
 				kind += " · TLS record framing; handshake not captured"
 			} else {
@@ -1105,11 +1109,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				label = "UDP carrier diagnostic"
 			}
 		}
-		if !credibleTLSIdentity(e) && !tlsRemainder {
+		if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
 			label = "TLS?"
 			if strongTLSRecord(e) {
 				label = "TLS · record framing only"
 			}
+		}
+		if rejectedHello {
+			label = "TLS ServerHello (rejected)"
 		}
 		unit := "PDU"
 		if tcpPayload {
@@ -1217,7 +1224,23 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
 		}
-		if !credibleTLSIdentity(e) && !tlsRemainder {
+		if rejectedHello {
+			observation, _ := pcaputil.ObserveTLSServerHelloRecord(e.Raw, 4096)
+			add("TLS ServerHello: complete observed declaration; rejected", false)
+			add("Negotiated TLS version: unavailable · ServerHello rejected", false)
+			add("Cleartext declaration: parsed; peer authentication not verified", false)
+			add("Rejected ServerHello declaration", true)
+			// These spans belong to this complete, owned cleartext record.
+			// The declared selected version remains an observation, not an
+			// admitted session value or a successful handshake-body alias.
+			out = append(out,
+				field{text: fmt.Sprintf("Declared selected version: %s (0x%04x) · not negotiated", tlsVersion(observation.SelectedVersion), observation.SelectedVersion), depth: 1},
+				field{text: fmt.Sprintf("Declared legacy version: 0x%04x · required 0x0303", observation.LegacyVersion), depth: 1, source: currentSource, start: 9, end: 11, hasRange: true},
+				field{text: fmt.Sprintf("Declared cipher suite: 0x%04x", observation.CipherSuite), depth: 1, source: currentSource, start: 44 + observation.SessionIDLength, end: 46 + observation.SessionIDLength, hasRange: true},
+				field{text: fmt.Sprintf("Declared compression: %d · required 0", observation.Compression), depth: 1, source: currentSource, start: 46 + observation.SessionIDLength, end: 47 + observation.SessionIDLength, hasRange: true},
+			)
+		}
+		if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
 			add("TLS session identity: unconfirmed · complete record header/body, handshake context not observed", false)
 			add("Negotiated TLS version: unavailable · record legacy version is not negotiation evidence", false)
 			add("Plaintext: unavailable · record authentication has not been verified", false)

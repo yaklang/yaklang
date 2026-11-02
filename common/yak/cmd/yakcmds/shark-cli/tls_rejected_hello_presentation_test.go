@@ -57,6 +57,45 @@ func TestTLSRejectedServerHelloKeepsObservedIdentity(t *testing.T) {
 	require.Equal(t, "TLS", view.protocol)
 	require.Contains(t, detailLines(view.fields), "TLS 1.3 ServerHello legacy parameters")
 	require.NotContains(t, detailLines(view.fields), "Negotiated Version: TLSv1.3")
+	require.NotContains(t, detailLines(view.fields), "handshake not captured")
+	require.NotContains(t, detailLines(view.fields), "TLS? candidate")
+}
+
+func TestTLSRejectedServerHelloDetailsKeepLiteralSource(t *testing.T) {
+	for _, name := range []string{"legacy-version", "compression"} {
+		t.Run(name, func(t *testing.T) {
+			e := rejectedServerHelloPresentation(t)
+			label, start, end, expected := "Declared legacy version:", 9, 11, []byte{3, 1}
+			if name == "compression" {
+				e.Raw[9], e.Raw[10], e.Raw[46] = 3, 3, 1
+				label, start, end, expected = "Declared compression:", 46, 47, []byte{1}
+			}
+			e.SourceBytes.SHA256 = fmt.Sprintf("%x", sha256.Sum256(e.Raw))
+			fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+			text := detailLines(fields)
+			require.NotContains(t, text, "handshake not captured")
+			require.NotContains(t, text, "TLS? candidate")
+			require.Contains(t, text, "Rejected ServerHello declaration")
+			require.Contains(t, text, "Declared selected version: TLSv1.3 (0x0304) · not negotiated")
+			found := false
+			for _, f := range fields {
+				if strings.HasPrefix(f.text, "Error:") {
+					require.False(t, f.hasRange, "diagnosis is not a wire field")
+				}
+				if !strings.HasPrefix(f.text, label) {
+					continue
+				}
+				found = true
+				require.True(t, f.hasRange)
+				require.Greater(t, f.source, 0)
+				require.Equal(t, start, f.start)
+				require.Equal(t, end, f.end)
+				require.Equal(t, e.Raw, sources[f.source-1].Data)
+				require.Equal(t, expected, sources[f.source-1].Data[f.start:f.end])
+			}
+			require.True(t, found)
+		})
+	}
 }
 
 func TestTLSRejectedServerHelloDoesNotGuessFromPrefixOrMetadata(t *testing.T) {

@@ -527,7 +527,8 @@ func detail(raw *capturedPacket) (d packetDetail) {
 			if resultErr == nil && value != nil {
 				wireStart := len(d.fields)
 				flattenFields(value, 0, &d.fields)
-				if summarize(raw).ProtocolScope == "connection-associated bytes" {
+				wireScope := summarize(raw).ProtocolScope
+				if wireScope == "connection-associated bytes" {
 					for i := wireStart; i < len(d.fields); i++ {
 						if d.fields[i].branch && applicationNodes[d.fields[i].text] != "" {
 							// Bytes inside an established stream are not a fresh PDU.
@@ -541,6 +542,10 @@ func detail(raw *capturedPacket) (d packetDetail) {
 				if d.protocol == "TLS?" || !hasObservedTLS(raw) {
 					for i := range d.fields {
 						if d.fields[i].branch && (d.fields[i].text == "TLS" || d.fields[i].text == "Transport Layer Security") {
+							if wireScope == "rejected TLS ServerHello" {
+								d.fields[i].text = "TLS record envelope · see rejected ServerHello PDU; negotiation not established"
+								continue
+							}
 							label := "TLS?"
 							if d.protocol == "TLS" {
 								label = "TLS"
