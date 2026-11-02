@@ -37,7 +37,7 @@ func TestOperatorPlanBoundedDispatchAdmission(t *testing.T) {
 	}
 	for _, mutated := range []string{
 		source + "\nthis.ProcessByType(\"Unexpected\")",
-		strings.Replace(source, "protocol == 9", "protocol != 9", 1),
+		strings.Replace(source, "header < 20", "header > 20", 1),
 		strings.Replace(source, "dccpDestination = nil", "dccpDestination = sideEffect()", 1),
 		strings.Replace(source, "var node", "sideEffect(); var node", 1),
 		strings.Replace(source, "node.SetMaxLength(l)", "node.SetMaxLength(l+1)", 1),
