@@ -295,6 +295,7 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		// A new valid ClientHello starts a fresh observation scope. The outer
 		// transaction discards this reset if renegotiation/HRR checks fail.
 		t.resumption.context = nil
+		t.initialPSKAuthentication = tlsPSKAuthenticationUnconstrained
 		return nil
 	}
 	version := binary.BigEndian.Uint16(body)
@@ -325,6 +326,7 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		}
 	}
 	selected, present := h.ext[41]
+	t.initialPSKAuthentication = tlsPSKAuthenticationUnconstrained
 	if version == 0x304 && current != nil {
 		versions := current.ext[43]
 		if len(versions) < 3 || int(versions[0]) != len(versions)-1 || (len(versions)-1)%2 != 0 || !tlsContains16(versions[1:], version) {
@@ -380,6 +382,13 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		m["PSK Selection"] = selection
 		ctx["PSK Selection"] = cloneSession(selection)
 		ctx["PSK Selected"] = true
+		t.initialPSKAuthentication = tlsPSKAuthenticationOrdinary
+		if _, present := h.ext[33]; present {
+			// RFC 8773 can combine a certificate with an external PSK. The
+			// observed flag prevents an ordinary-PSK inference; this is not
+			// validation of all companion extensions, binders or trust.
+			t.initialPSKAuthentication = tlsPSKAuthenticationCertificateExtension
+		}
 	} else if version == 0x304 && current != nil && !bytes.Equal(body[2:34], tlsRetryRandom[:]) {
 		ctx["PSK Selected"] = false
 	}

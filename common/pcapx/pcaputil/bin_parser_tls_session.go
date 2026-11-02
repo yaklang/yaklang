@@ -113,6 +113,7 @@ type binTLS struct {
 	serverHandshakeStage                   uint8 // accepted initial TLS 1.3 server observations only
 	clientHandshakeStage                   uint8 // accepted initial TLS 1.3 client observations only
 	clientCertificateEmpty                 bool  // private fact from an admitted initial client Certificate
+	initialPSKAuthentication               uint8 // complete ServerHello observation; never a public session hint
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
@@ -359,6 +360,9 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	// Hello/extension validation and Finished/KeyUpdate transitions commit
 	// together. A rejected message cannot retain half-applied peer state.
 	// Retained slices and metadata are immutable or replaced, never edited.
+	if err := t.checkInitialPSKAuthentication(dir, b[0], authenticated); err != nil {
+		return nil, err
+	}
 	stage, err := t.observedServerHandshakeStage(dir, b[0], authenticated)
 	if err != nil {
 		return nil, err
