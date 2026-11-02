@@ -1,5 +1,7 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+最新已核验全绿父基线为`220d52898ac06f9951f2d82e53aab46c559d21b8`，47约定检查/91实际执行/2statuses、314350原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41393130244)。后续469仅补物理TCP异常flags页面，[证据](shark-m2-tcp-invalid-flags-20261102.md)，其新最终head CI另验，不涉及SMB应用分析。S01–S06及107/121待复核缺口保持，开工固定远端最新M2。
+
 最新已独立全绿父基线为`3d2ac689d21b6831f34ff46c24e82557584ad6c4`，47约定检查/91实际执行/2statuses、314308原始ID及131084 required已闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41389720953)。随后976e仅增加UDP比较基础设施，[新范围](shark-m2-udp-oracle-layer-20261102.md)，其最终head CI另验，不替代SMB验收。S01–S06保持，107/121须重新核对；开工仍固定远端最新M2精确SHA。
 
 最新可复核父基线为`93c852275052dd252be662136a97f61d6c017f8a`，47约定检查/91实际执行/2statuses及314266精确traffic ID已全绿；[traffic](https://github.com/yaklang/yaklang/actions/runs/41381222731)。后续M2-65仅补非SMB option父头观察和内嵌文档，[实际证据](shark-m2-ipv4-option-observation-20261102.md)，新最终head另验CI。下文旧检查点保留为历史；承接人从开工时远端最新M2固定S01。SMB 107/121为待复核历史缺口，不能用上述非SMB验收替代S01，S01–S06范围不变。
