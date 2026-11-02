@@ -17,11 +17,14 @@ type ipv4IPIPExtentRefusedPacket struct{ gopacket.Packet }
 func (a *binParser) refuseIPv4IPIPExtent(p gopacket.Packet, evidence captureEvidence, ci gopacket.CaptureInfo) bool {
 	for _, layer := range p.Layers() {
 		ip, ok := layer.(*layers.IPv4)
-		if !ok || ip.Version != 4 || ip.FragOffset != 0 || ip.Flags&layers.IPv4MoreFragments != 0 || ip.Protocol != layers.IPProtocolIPv4 && ip.Protocol != layers.IPProtocolIPv6 {
+		if !ok {
 			continue
 		}
 		h := ip.LayerContents()
-		if len(h) < 20 || h[0]>>4 != 4 || int(h[0]&15)*4 != len(h) || binary.BigEndian.Uint16(h[2:4]) != 0 {
+		// Failed option decodes retain the bounded header bytes but leave the
+		// dependency's fixed fields at zero. They are observations, not defaults
+		// from which to select a different carrier or an inner identity.
+		if len(h) < 20 || h[0]>>4 != 4 || int(h[0]&15)*4 != len(h) || binary.BigEndian.Uint16(h[2:4]) != 0 || binary.BigEndian.Uint16(h[6:8])&0x3fff != 0 || h[9] != 4 && h[9] != 41 {
 			continue
 		}
 		names := make([]string, 0, len(evidence.networkPrefix)+8)
@@ -41,13 +44,20 @@ func (a *binParser) refuseIPv4IPIPExtent(p gopacket.Packet, evidence captureEvid
 		fields := map[string]any{
 			"Observed Header Layers": names, "Observed IP Version": uint8(4), "Observed Total Length": uint16(0), "Captured Header Bytes": len(h),
 			"Observed Fragment ID": binary.BigEndian.Uint16(h[4:6]), "Observed Fragment Offset": 0, "Observed More Fragments": false,
-			"Observed Next Protocol": uint8(ip.Protocol), "Fragment Offset Unit": "bytes", "Child Header Identity": "unconfirmed",
+			"Observed Next Protocol": h[9], "Fragment Offset Unit": "bytes", "Child Header Identity": "unconfirmed",
 			"Header Observation Scope":        "IPv4 fixed header; enclosing IP-in-IP extent unavailable",
 			"IP-in-IP Normalization Admitted": false, "Network Transport Admitted": false, "Fragment Reassembly Admitted": false,
 			"Captured Length Substitution": "not evidence of an enclosing IP-in-IP wire extent",
 		}
 		a.malformed.Add(1)
-		const reason = "IPv4 IP-in-IP parent Total Length is zero; carrier extent unavailable; inner identity not admitted"
+		reason := "IPv4 IP-in-IP parent Total Length is zero; carrier extent unavailable; inner identity not admitted"
+		if ip.Version != 4 {
+			if failure := p.ErrorLayer(); failure != nil {
+				fields["Parent Header Decode Complete"] = false
+				fields["Parent Header Decode Error"] = failure.Error().Error()
+				reason += "; " + failure.Error().Error()
+			}
+		}
 		a.emit(&ProtocolEvent{Timestamp: ci.Timestamp, Transport: "network", Protocol: "ip", Profile: "ipv4-carrier-extent-refusal", Domain: evidence.Ref.Domain,
 			Status: "malformed", Completeness: "headers", ExpertCode: "IPv4CarrierExtentUnavailable", Error: reason, Summary: reason,
 			Session: cloneSession(fields), semanticSession: cloneSession(fields), SourceBytes: networkObservationSource(evidence), CarrierLayers: append([]string(nil), evidence.carrierLayers...)})

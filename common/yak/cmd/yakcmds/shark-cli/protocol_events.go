@@ -1422,7 +1422,13 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				if len(wireRanges) > 0 {
 					depth = -1
 				}
-				walk("Other decoded fields", values, depth)
+				label := "Other decoded fields"
+				_, fragmentExtent := ipv4FragmentExtentRefusal(e)
+				_, carrierExtent := ipv4IPIPExtentRefusal(e)
+				if fragmentExtent || carrierExtent {
+					label = "Header observation context"
+				}
+				walk(label, values, depth)
 			}
 		}
 		state := e.Status
