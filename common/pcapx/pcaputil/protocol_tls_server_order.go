@@ -25,7 +25,7 @@ func (t *binTLS) observedServerHandshakeStage(dir int, kind byte, authenticated 
 		return 0, nil
 	}
 	if stage <= t.serverHandshakeStage {
-		return 0, protocolError(ErrMalformedMessage, "TLS 1.3 server handshake order repeats or precedes an accepted message")
+		return 0, protocolError(ErrMalformedMessage, "TLS 1.3 server handshake order: repeated or reversed message")
 	}
 	return stage, nil
 }
