@@ -393,6 +393,14 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if h["Hello Retry Request"] == true {
 			name = "Hello Retry Request"
 		}
+		if encrypted, _, _ := tlsEncryptedExtensionsDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); encrypted != nil {
+			for _, extension := range mapList(encrypted.Fields["Extensions"]) {
+				if number(extension["Type"]) == 16 {
+					name += " · ALPN=" + strconv.QuoteToASCII(string(bytesValue(extension["Protocol"])))
+				}
+			}
+			messageRank = max(messageRank, tlsHandshakeBodyRank)
+		}
 		if certificate, _, _ := tlsCertificateDetail(h, number(v["Negotiated Version"]), v["Authentication Verified"] == true); certificate != nil {
 			name += fmt.Sprintf(" · %d entries · context %d bytes · trust not evaluated", len(mapList(certificate.Fields["Certificate Entries"])), number(certificate.Fields["Context Length"]))
 			messageRank = max(messageRank, tlsHandshakeBodyRank)

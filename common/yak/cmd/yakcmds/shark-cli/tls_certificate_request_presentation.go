@@ -57,6 +57,9 @@ func tlsDetailedHandshakeRank(e *pcaputil.ProtocolEvent) int {
 	version, authenticated := number(v["Negotiated Version"]), v["Authentication Verified"] == true
 	rank := 0
 	for _, h := range mapList(v["Handshake Messages"]) {
+		if view, _, _ := tlsEncryptedExtensionsDetail(h, version, authenticated); view != nil {
+			rank = max(rank, tlsHandshakeBodyRank)
+		}
 		if tlsKeyUpdatePlaintext(h, authenticated && version == 0x304) != nil {
 			return tlsKeyUpdateRank
 		}

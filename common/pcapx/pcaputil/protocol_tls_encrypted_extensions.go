@@ -49,7 +49,7 @@ func (t *binTLS) admitEncryptedExtensions(dir int, body []byte, limits ...int) e
 		// never EE. Unknown extensions remain opaque rather than inventing
 		// a location rule for future registered extensions.
 		switch typ {
-		case 13, 21, 41, 43, 44, 45, 50, 51:
+		case 5, 13, 18, 21, 41, 43, 44, 45, 47, 48, 50, 51:
 			return protocolError(ErrMalformedMessage, fmt.Sprintf("TLS extension %d is not permitted in EncryptedExtensions", typ))
 		case 49:
 			return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")

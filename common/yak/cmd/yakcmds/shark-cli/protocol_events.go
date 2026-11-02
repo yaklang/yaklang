@@ -169,6 +169,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var dcerpcResultKnown bool
 	var dcerpcMessage bool
 	var authenticatedQUIC bool
+	var authenticatedQUICHandshake bool
 	var quicPayloadState string
 	quicCryptoSize := -1
 	var authenticatedTLS bool
@@ -511,6 +512,27 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 				if name == "Handshake Messages" || name == "TLS Handshakes" {
 					add(handshakeType(r["Type"]), true)
+					encryptedVersion, encryptedAuthenticated := tlsNegotiatedVersion, authenticatedTLS
+					if name == "TLS Handshakes" {
+						encryptedVersion, encryptedAuthenticated = 0x304, authenticatedQUICHandshake
+					}
+					encrypted, encryptedWire, encryptedName := tlsEncryptedExtensionsDetail(r, encryptedVersion, encryptedAuthenticated)
+					encryptedSource := 0
+					if encrypted != nil {
+						if fieldValueSourceCount < 256 && len(encryptedWire) <= (1<<20)-fieldValueBytes {
+							sources = append(sources, detailSource{Name: encryptedName, Data: bytes.Clone(encryptedWire)})
+							encryptedSource = len(sources)
+							fieldValueSourceCount++
+							fieldValueBytes += len(encryptedWire)
+						} else {
+							byteSourceLimited = true
+						}
+						if len(out) < 4096 {
+							out = append(out, field{text: "Handshake Type: Encrypted Extensions (8)", depth: depth + 2, source: encryptedSource, start: 0, end: 1, hasRange: encryptedSource > 0})
+						} else {
+							fieldViewLimited = true
+						}
+					}
 					certificateVersion, certificateAuthenticated := tlsNegotiatedVersion, authenticatedTLS
 					if name == "TLS Handshakes" && authenticatedQUIC && number(r["Certificate Version"]) == 0x304 {
 						certificateVersion, certificateAuthenticated = 0x304, true
@@ -611,6 +633,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 					}
 					sort.Strings(keys)
+					if encrypted != nil {
+						order := map[string]int{"Length": 0, "Encrypted Extensions": 1, "Authenticated": 2, "Encrypted Extensions Version": 3, "Encoded Encrypted Extensions": 4}
+						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
+					}
 					if certificate != nil {
 						order := map[string]int{"Length": 0, "Certificate Body": 1, "Certificates": 2, "Authenticated": 3, "Certificate Version": 4, "Certificate Body Status": 5, "Certificate Message SHA256": 6, "Encoded Certificate": 7, "Post Handshake Response": 8}
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
@@ -628,6 +654,20 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						sort.SliceStable(keys, func(i, j int) bool { return order[keys[i]] < order[keys[j]] })
 					}
 					for _, key := range keys {
+						if encrypted != nil && key == "Encrypted Extensions" {
+							rows, limited := tlsEncryptedExtensionsFields(encrypted, encryptedSource, depth+2, max(0, 4096-len(out)))
+							out = append(out, rows...)
+							fieldViewLimited = fieldViewLimited || limited
+							continue
+						}
+						if encrypted != nil && key == "Encoded Encrypted Extensions" {
+							if len(out) < 4096 {
+								out = append(out, field{text: "Encoded Encrypted Extensions: " + formatFieldValue(key, encryptedWire), depth: depth + 2, source: encryptedSource, start: 0, end: len(encryptedWire), hasRange: encryptedSource > 0})
+							} else {
+								fieldViewLimited = true
+							}
+							continue
+						}
 						if certificate != nil && key == "Certificate Body" {
 							rows, limited := tlsCertificateFields(certificate, certificateSource, depth+2, max(0, 4096-len(out)))
 							out = append(out, rows...)
@@ -676,6 +716,10 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 						}
 						before := len(out)
 						walk(key, r[key], depth+1)
+						if encrypted != nil && key == "Length" && encryptedSource > 0 && len(out) > before {
+							field := &out[len(out)-1]
+							field.source, field.start, field.end, field.hasRange = encryptedSource, 1, 4, true
+						}
 						if certificate != nil && key == "Length" && certificateSource > 0 && len(out) > before {
 							field := &out[len(out)-1]
 							field.source, field.start, field.end, field.hasRange = certificateSource, 1, 4, true
@@ -1029,6 +1073,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		tlsNegotiatedVersion = number(e.Session["Negotiated Version"])
 		tlsCipherSuite = number(e.Session["Cipher Suite"])
 		authenticatedQUIC = (e.Protocol == "quic" || e.Protocol == "http3" || e.Protocol == "doq") && e.Session["Authentication Verified"] == true
+		authenticatedQUICHandshake = authenticatedQUIC && e.Session["Native Carrier"] == true && e.Session["Packet Number Space"] == "handshake" && (e.Status == "decoded" || e.Status == "deferred")
 		quicPayloadState = quicPayloadDisposition(e.Session["Payload Delivery"])
 		http3FrameKind, http3StreamID = "", number(e.Session["HTTP3 Stream ID"])
 		http3HeaderSource, http3HeaderRanges = 0, nil

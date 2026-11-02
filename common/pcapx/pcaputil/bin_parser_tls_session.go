@@ -456,9 +456,19 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 		if err := t.admitEncryptedExtensions(dir, body, limits...); err != nil {
 			return nil, err
 		}
+		maxElements := 4096
+		if len(limits) > 0 {
+			maxElements = limits[0]
+		}
+		view, err := DecodeTLSEncryptedExtensions(b, t.version, maxElements)
+		if err != nil {
+			return nil, err
+		}
 		if err := t.extensions(body, false, limits...); err != nil {
 			return nil, err
 		}
+		m["Encrypted Extensions"], m["Encrypted Extensions Version"] = view.Fields, t.version
+		m["Encoded Encrypted Extensions"] = bytes.Clone(b)
 	case 15:
 		if t.version < 0x301 || t.version > 0x304 {
 			m["Certificate Verify Status"] = "negotiated version unavailable or unsupported; body uninterpreted"

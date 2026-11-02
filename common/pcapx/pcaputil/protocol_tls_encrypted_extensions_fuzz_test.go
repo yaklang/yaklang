@@ -37,7 +37,7 @@ func FuzzTLSEncryptedExtensionsAdmission(f *testing.F) {
 				count++
 				data := body[at : at+size]
 				at += size
-				if kind == 13 || kind == 21 || kind == 41 || kind == 43 || kind == 44 || kind == 45 || kind == 49 || kind == 50 || kind == 51 {
+				if kind == 5 || kind == 13 || kind == 18 || kind == 21 || kind == 41 || kind == 43 || kind == 44 || kind == 45 || kind == 47 || kind == 48 || kind == 49 || kind == 50 || kind == 51 {
 					valid = false
 					break
 				}

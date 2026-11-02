@@ -23,6 +23,15 @@ func tlsCertificateDisplayBindings() []displayFieldBinding {
 		{"tls.handshake.certificate", "certificate entry data", 0, true, nil, []string{"Certificate Entries", "*", "Certificate Data"}},
 	} {
 		spec := spec
+		var encryptedPath []string
+		switch spec.name {
+		case "tls.handshake.extensions_length":
+			encryptedPath = []string{"Extensions Length"}
+		case "tls.handshake.extension.type":
+			encryptedPath = []string{"Extensions", "*", "Type"}
+		case "tls.handshake.extension.len":
+			encryptedPath = []string{"Extensions", "*", "Length"}
+		}
 		kind := DisplayUnsigned
 		if spec.binary {
 			kind = DisplayString
@@ -36,7 +45,7 @@ func tlsCertificateDisplayBindings() []displayFieldBinding {
 				for _, choice := range []struct {
 					root string
 					path []string
-				}{{"Certificate Request", spec.request}, {"Certificate Body", spec.body}} {
+				}{{"Certificate Request", spec.request}, {"Certificate Body", spec.body}, {"Encrypted Extensions", encryptedPath}} {
 					if choice.path == nil {
 						continue
 					}
@@ -54,7 +63,7 @@ func tlsCertificateDisplayBindings() []displayFieldBinding {
 		})
 		binding.protocols = "|tls|quic|http3|doq|"
 		binding.descriptor.AllowEmpty = spec.binary
-		binding.descriptor.Description = "Literal in a complete version-qualified CertificateRequest or Certificate body. Byte strings use lossless hexadecimal; occurrence order is retained. Owned handshake bytes have no outer record/frame span. Offers, request association, certificate type, signature and trust are not verified."
+		binding.descriptor.Description = "Literal in a complete version-qualified CertificateRequest, Certificate or EncryptedExtensions body. Byte strings use lossless hexadecimal; occurrence order is retained. Owned handshake bytes have no outer record/frame span. This projection does not establish negotiation, request association, certificate type, signature or trust."
 		out = append(out, binding)
 	}
 	return out
