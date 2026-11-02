@@ -1,5 +1,11 @@
 # M2-79：QUIC 早期密钥、跨层包号与实际 Windows 展示
 
+2026-11-03 CI后续：c292专项316025原始ID/85新增/131084 required已逐项闭合，
+[实际运行](https://github.com/yaklang/yaklang/actions/runs/41524197531)、官方artifact 13180167186，
+17051141B/SHA256 `7665f5be7ae37488edc61052041ba0dda04a2e72b2a183f7367387046558c0e4`；
+外部闭合1536 SHA256 `084ba827f6d08b6f618d15219e716acab6fe0fffab76b05814d9b85b65062581`。
+整体Essential两根因失败，见[M2-80 CI尾部丢失和Java错误导入身份](shark-m2-ci-drain-and-imports-20261103.md)；专项成功不代表整个提交全绿，恢复缺口不变。
+
 运行代码和三个干净构建为 `e71481b05a80c009ae6bf70199617f077e7c6bf0`。
 本批仅验收已观察密码套件后的早期密钥加载，以及已接纳客户端 0-RTT/1-RTT 包号的顺序约束。
 **真实原始捕获仍有一个先于密钥加载的 0-RTT 未恢复，以及一个关联的 HTTP/3 上下文缺口**；
