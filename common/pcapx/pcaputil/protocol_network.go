@@ -287,6 +287,9 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		return nil, true
 	}
+	if a.refuseIPv4FragmentExtent(p, e, ci) {
+		return nil, true
+	}
 	if failure := p.ErrorLayer(); failure != nil {
 		var pptp *pptpHeaderError
 		if errors.As(failure.Error(), &pptp) {
