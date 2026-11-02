@@ -70,6 +70,7 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 		var seen [1024]uint64
 		count := 0
 		var psk, versions, modes []byte
+		var certificatePSK tlsCertificatePSKHelloExtensions
 		for q := p; q < len(body); {
 			if len(body)-q < 4 {
 				return bad()
@@ -85,6 +86,12 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 			}
 			seen[kind/64] |= bit
 			switch kind {
+			case 33:
+				certificatePSK.present = true
+			case 42:
+				certificatePSK.early = true
+			case 51:
+				certificatePSK.share = body[q : q+n]
 			case 41:
 				psk = body[q : q+n]
 			case 43:
@@ -94,6 +101,10 @@ func tlsHello(body []byte, client bool, limits ...int) (*tlsHelloView, error) {
 			}
 			count++
 			q += n
+		}
+		certificatePSK.psk, certificatePSK.versions, certificatePSK.modes = psk, versions, modes
+		if err := certificatePSK.check(client); err != nil {
+			return nil, err
 		}
 		if client && psk != nil {
 			if err := tlsPSKClientRequirements(versions, modes); err != nil {
@@ -139,7 +150,10 @@ func tlsHelloExtensionStructure(h *tlsHelloView, client bool) error {
 			return err
 		}
 	}
-	return nil
+	_, present := h.ext[33]
+	_, early := h.ext[42]
+	return (tlsCertificatePSKHelloExtensions{present: present, early: early,
+		psk: h.ext[41], share: h.ext[51], modes: h.ext[45], versions: h.ext[43]}).check(client)
 }
 
 func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) error {
@@ -147,6 +161,10 @@ func tlsHelloExtensionDataStructure(kind uint16, v []byte, client, last bool) er
 		return err
 	}
 	switch kind {
+	case 33:
+		if len(v) != 0 {
+			return protocolError(ErrMalformedMessage, "TLS certificate-with-external-PSK flag must be empty")
+		}
 	case 0:
 		if client {
 			_, err := tlsSNIName(v)

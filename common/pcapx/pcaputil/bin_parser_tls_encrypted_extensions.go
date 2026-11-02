@@ -86,11 +86,11 @@ func DecodeTLSEncryptedExtensions(encoded []byte, version uint16, maxElements in
 	return view, nil
 }
 
-// RFC 8446 section 4.2's registered-message table. New/unknown extensions are
-// opaque, not assigned a speculative location or payload grammar.
+// RFC 8446 section 4.2 and RFC 8773 section 5's known message locations.
+// New/unknown extensions are opaque, without a speculative location or grammar.
 func tlsForbiddenEncryptedExtension(kind uint16) bool {
 	switch kind {
-	case 5, 13, 18, 21, 41, 43, 44, 45, 47, 48, 49, 50, 51:
+	case 5, 13, 18, 21, 33, 41, 43, 44, 45, 47, 48, 49, 50, 51:
 		return true
 	}
 	return false

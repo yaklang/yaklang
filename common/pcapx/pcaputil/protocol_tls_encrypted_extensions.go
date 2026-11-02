@@ -45,11 +45,11 @@ func (t *binTLS) admitEncryptedExtensions(dir int, body []byte, limits ...int) e
 		value := rest[:n]
 		rest = rest[n:]
 		count++
-		// RFC 8446 4.2 places these known extensions in CH/SH/HRR/CR,
+		// RFC 8446 4.2 and RFC 8773 5 place these in CH/SH/HRR/CR,
 		// never EE. Unknown extensions remain opaque rather than inventing
 		// a location rule for future registered extensions.
 		switch typ {
-		case 5, 13, 18, 21, 41, 43, 44, 45, 47, 48, 50, 51:
+		case 5, 13, 18, 21, 33, 41, 43, 44, 45, 47, 48, 50, 51:
 			return protocolError(ErrMalformedMessage, fmt.Sprintf("TLS extension %d is not permitted in EncryptedExtensions", typ))
 		case 49:
 			return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")

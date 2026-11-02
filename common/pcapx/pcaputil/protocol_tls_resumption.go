@@ -314,6 +314,11 @@ func (t *binTLS) observeResumptionHello(dir int, typ byte, body []byte, h *tlsHe
 		if err != nil {
 			return err
 		}
+		if _, selected := h.ext[33]; selected {
+			if _, offered := current.ext[33]; !offered {
+				return protocolError(ErrMalformedMessage, "TLS certificate-with-external-PSK was not offered")
+			}
+		}
 	}
 	ctx := map[string]any{"Evidence Scope": "current connection hello observations", "Certificate Trust": "not-evaluated"}
 	if current != nil {
