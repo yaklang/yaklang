@@ -1545,6 +1545,12 @@ func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Val
 		if _, ok := source.(*ssa.Phi); ok && c.hasValueSlot(resultID) {
 			return c.loadSSAValue(resultID), nil
 		}
+		// A closure value stored as a field is a function pointer, not a field
+		// read. Materialize it through getValue; the dynamic member path would
+		// leave the slot unmaterialized.
+		if _, isFn := ssa.ToFunction(source); isFn {
+			return c.getValue(contextInst, source.GetId())
+		}
 		if dynamicMemberRead {
 			if memberSource := c.memberSourceForMemberSetDynamicRead(source); memberSource != nil {
 				return c.dynamicMemberReadValue(contextInst, memberSource, resultID)
@@ -1559,8 +1565,28 @@ func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Val
 			}
 			return c.dynamicMemberReadValue(contextInst, source, resultID)
 		}
+		// The value to store is the source's own word. The result slot is not
+		// materialized when the source is a closure parameter read from the
+		// enclosing frame, so compile the source instead of probing the slot.
+		if source.GetId() != resultID && c.canReadSourceDirectly(source) {
+			return c.getValue(contextInst, source.GetId())
+		}
 	}
 	return c.finishGetValue(contextInst, resultID)
+}
+
+// canReadSourceDirectly reports whether the source value's own word is the
+// word to store. Member reads and phis keep their dedicated lowering because
+// reading them back through the object is what makes updates visible.
+func (c *Compiler) canReadSourceDirectly(source ssa.Value) bool {
+	if source == nil {
+		return false
+	}
+	switch source.(type) {
+	case *ssa.Phi, *ssa.ParameterMember, *ssa.Undefined, *ssa.SideEffect:
+		return false
+	}
+	return true
 }
 
 func (c *Compiler) shouldReadInitialMemberValueForMemberSet(source ssa.Value) bool {

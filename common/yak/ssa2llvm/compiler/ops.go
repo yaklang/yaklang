@@ -246,7 +246,12 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	// 4. Lazy compile if Parameter (function argument / closure binding)
 	if param, ok := ssa.ToParameter(valObj); ok && param != nil {
 		if param.GetFunc() != nil && c.currentFunction() != nil && param.GetFunc() != c.currentFunction() {
-			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
+			// A parameter owned by another function has no word here. Cache the
+			// zero so callers that probe the slot (finishGetValue) still resolve
+			// a value instead of reporting it as unmaterialized.
+			val := llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false)
+			c.cacheValue(id, val)
+			return val, nil
 		}
 		var loadedOK bool
 		err := c.withEntryInsertPoint(fn, func() error {
