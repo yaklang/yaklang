@@ -1,5 +1,15 @@
 # M2-78：RFC8773 Hello 接纳与 Windows 拒绝记录展示
 
+后续独立CI闭合：最终 `776246d11c158ddbb82d9a4779305e9f60ec62ac` 的47约定检查名、
+91执行检查及2 statuses全成功；315940原始ID/动作与推送前清单相同，224新增和131084 required
+全pass/零required skip，自动draft skip排除。官方17138966B产物SHA256
+`67f796a403ffa1f1df14393d86a1b7bab8acd7b33407a94b63e08b2a3b4389da`、CRC、实际checkout和上传digest已核。
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41513137101)、
+[Essential](https://github.com/yaklang/yaklang/actions/runs/41513146083)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/41513154685)，闭合1494
+`3a24a9dae8a944616fedb5e592f6ea27693090415493e1f561182294785501dd`。
+以下“最终head须另验”为当时记录，不把776全绿扩大为后续QUIC代码的认证。
+
 本批有限验收为扩展33的空标志、CH/SH配套及提议关联、EE位置、原子接纳和拥有来源展示。
 运行代码为 `bb217cad07c32388a9c2caf6a10ece172036060c`；原生核心为
 `c4a2490b294d38e468ff6eb27dafd1cc2a3fc8ad`。父交付
