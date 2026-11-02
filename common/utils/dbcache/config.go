@@ -21,14 +21,16 @@ type config struct {
 	saveParallelism int
 	persistLimit    int
 	// saveByteBudget flushes the current batch once another item would exceed
-	// it. saveByteSize is func(T) int stored as any because config is not generic.
+	// it. saveByteSize and skipEviction are declared with the caller's own
+	// element type; the option closes over that type and erases it here, so the
+	// type assertion happens once, where the type is still known.
 	saveByteBudget int
-	saveByteSize   any
+	saveByteSize   func(any) int
 
 	// context
 	ctx context.Context
 
-	skipEviction any
+	skipEviction func(any) bool
 }
 
 type Option func(*config)
@@ -93,7 +95,20 @@ func WithSaveByteBudget[T any](budget int, sizeOf func(T) int) Option {
 			budget = 0
 		}
 		c.saveByteBudget = budget
-		c.saveByteSize = sizeOf
+		if sizeOf == nil {
+			c.saveByteSize = nil
+			return
+		}
+		// config is not generic, so the element type the caller declared is
+		// erased by one closure. A record of another type sizes as 1 byte,
+		// which keeps the row-count limit as the only batch boundary.
+		c.saveByteSize = func(item any) int {
+			value, ok := item.(T)
+			if !ok {
+				return 1
+			}
+			return sizeOf(value)
+		}
 	}
 }
 
@@ -114,7 +129,19 @@ func WithContext(ctx context.Context) Option {
 
 func WithSkipEviction[T any](skip func(T) bool) Option {
 	return func(c *config) {
-		c.skipEviction = skip
+		if skip == nil {
+			c.skipEviction = nil
+			return
+		}
+		// A value of another type is never skipped, which is the safe default:
+		// skipEviction only avoids extra work, it never drops a row.
+		c.skipEviction = func(item any) bool {
+			value, ok := item.(T)
+			if !ok {
+				return false
+			}
+			return skip(value)
+		}
 	}
 }
 

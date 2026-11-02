@@ -122,3 +122,54 @@ func TestOffsetPreloadLegacySchemaFallsBackPerVariable(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.Equal(t, int64(20), rows[0].EndOffset)
 }
+
+// Two compile projects can run in one process, and instruction ids are only
+// unique inside a program. A snapshot cached for one program must never answer
+// a lookup of another program that happens to reuse the same value id.
+func TestOffsetPreloadCacheIsProgramBound(t *testing.T) {
+	db := setupA2LoaderDB(t)
+	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
+	first, second := t.Name()+"-first", t.Name()+"-second"
+	invalidateOffsetCache(first)
+	invalidateOffsetCache(second)
+	t.Cleanup(func() {
+		invalidateOffsetCache(first)
+		invalidateOffsetCache(second)
+	})
+	require.NoError(t, db.Create(&IrOffset{ProgramName: first, ValueID: 7, VariableName: "x", FileHash: "a", EndOffset: 20}).Error)
+	require.NoError(t, db.Create(&IrOffset{ProgramName: second, ValueID: 7, VariableName: "x", FileHash: "b", EndOffset: 40}).Error)
+
+	require.NoError(t, PreloadOffsetsByValueIDs(db, first, []int64{7}))
+	gotFirst := GetOffsetByVariable("x", 7, first)
+	require.Len(t, gotFirst, 1)
+	require.Equal(t, int64(20), gotFirst[0].EndOffset)
+
+	// The second program has its own row and must read it, not the cached one.
+	gotSecond := GetOffsetByVariable("x", 7, second)
+	require.Len(t, gotSecond, 1)
+	require.Equal(t, int64(40), gotSecond[0].EndOffset)
+
+	// A write batch retires the snapshots of that program only.
+	require.NoError(t, SaveIrOffsetBatch(db, []*IrOffset{{
+		ProgramName: first, ValueID: 7, VariableName: "x", FileHash: "c", StartOffset: 50, EndOffset: 60,
+	}}))
+	require.Len(t, GetOffsetByVariable("x", 7, first), 2)
+	require.Len(t, GetOffsetByVariable("x", 7, second), 1)
+}
+
+// Deleting a program must not leave its snapshots readable if a later compile
+// reuses the name with fewer rows.
+func TestOffsetPreloadCacheSurvivesNoProgramRows(t *testing.T) {
+	db := setupA2LoaderDB(t)
+	require.NoError(t, db.AutoMigrate(&IrOffset{}).Error)
+	prog := t.Name()
+	invalidateOffsetCache(prog)
+	t.Cleanup(func() { invalidateOffsetCache(prog) })
+	require.NoError(t, db.Create(&IrOffset{ProgramName: prog, ValueID: 7, VariableName: "x", FileHash: "a", EndOffset: 20}).Error)
+	require.NoError(t, PreloadOffsetsByValueIDs(db, prog, []int64{7}))
+	require.Len(t, GetOffsetByVariable("x", 7, prog), 1)
+
+	require.NoError(t, db.Unscoped().Where("program_name = ?", prog).Delete(&IrOffset{}).Error)
+	forgetOffsetCacheProgram(prog)
+	require.Empty(t, GetOffsetByVariable("x", 7, prog), "a deleted program must not answer from a retired snapshot")
+}

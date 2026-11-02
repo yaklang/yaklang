@@ -250,7 +250,9 @@ func functionScopeRetainsCapture(prog *Program, fn *Function) bool {
 			return
 		}
 		for _, latest := range current.GetAllVariables() {
-			if latest == nil {
+			// GetAllVariables returns VersionedIF values: a typed-nil version
+			// does not compare equal to nil, and GetName below would panic.
+			if utils.IsNil(latest) {
 				continue
 			}
 			for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
@@ -355,7 +357,7 @@ func releaseUncapturedScopeValues(prog *Program, fn *Function, scope *ScopeInsta
 	})
 	released := 0
 	for _, latest := range scope.GetAllVariables() {
-		if latest == nil {
+		if utils.IsNil(latest) {
 			continue
 		}
 		name := latest.GetName()
@@ -571,11 +573,11 @@ func detachScope(scope ScopeIF) {
 		return
 	}
 	for _, latest := range current.GetAllVariables() {
-		if latest == nil {
+		if utils.IsNil(latest) {
 			continue
 		}
 		for _, versioned := range current.GetAllVariablesByName(latest.GetName(), true) {
-			if versioned == nil {
+			if utils.IsNil(versioned) {
 				continue
 			}
 			versioned.SetScope(nil)

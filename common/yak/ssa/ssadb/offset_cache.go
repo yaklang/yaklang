@@ -8,62 +8,71 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 )
 
-// offsetReadCacheCapacity bounds how many value-id snapshots a read-only
-// program keeps. Entries are immutable copies. Empty lookups are not stored,
-// so a miss during compilation cannot hide a later insert.
+// offsetReadCacheCapacity bounds how many value-id snapshots stay cached. Each
+// entry is an immutable copy of the rows for one (program, value) pair. Empty
+// lookups are not stored, so a miss during compilation cannot hide a later
+// insert.
 const offsetReadCacheCapacity = 4096
 
-type offsetProgramCache struct {
-	rows *utils.CacheExWithKey[int64, []*IrOffset]
+// offsetCacheKey binds a cached snapshot to one program and to one generation
+// of that program's offsets. Instruction ids are only unique inside a program,
+// so a key without the program would let two concurrent compile projects answer
+// each other's lookups. The generation bumps on every offset write batch, so a
+// stale snapshot becomes unreachable instead of having to be hunted down.
+type offsetCacheKey struct {
+	program    string
+	generation int64
+	valueID    int64
 }
 
 var (
 	initOffsetCacheOnce sync.Once
-	offsetCaches        *utils.CacheEx[*offsetProgramCache]
+	offsetCache         *utils.CacheExWithKey[offsetCacheKey, []*IrOffset]
+
+	offsetCacheGenerationMu sync.Mutex
+	offsetCacheGenerations  = make(map[string]int64)
 )
 
-func newOffsetCaches() *utils.CacheEx[*offsetProgramCache] {
-	parent := utils.NewCacheEx[*offsetProgramCache](utils.WithCacheTTL(ProgramCacheTTL))
-	parent.SetExpirationCallback(func(_ string, child *offsetProgramCache, _ utils.EvictionReason) {
-		if child != nil && child.rows != nil {
-			child.rows.Close()
-		}
-	})
-	return parent
-}
-
-func offsetCacheFor(programName string) *offsetProgramCache {
-	programName = strings.TrimSpace(programName)
-	if programName == "" {
-		return nil
-	}
+func offsetReadCache() *utils.CacheExWithKey[offsetCacheKey, []*IrOffset] {
 	initOffsetCacheOnce.Do(func() {
-		offsetCaches = newOffsetCaches()
-	})
-	if child, ok := offsetCaches.Get(programName); ok {
-		return child
-	}
-	programRowCacheMu.Lock()
-	defer programRowCacheMu.Unlock()
-	if child, ok := offsetCaches.Get(programName); ok {
-		return child
-	}
-	child := &offsetProgramCache{
-		rows: utils.NewCacheExWithKey[int64, []*IrOffset](
+		offsetCache = utils.NewCacheExWithKey[offsetCacheKey, []*IrOffset](
 			utils.WithCacheCapacity(offsetReadCacheCapacity),
 			utils.WithCacheTTL(irCacheTTL),
-		),
-	}
-	offsetCaches.Set(programName, child)
-	return child
+		)
+	})
+	return offsetCache
 }
 
+// offsetCacheGeneration returns the current offset generation of a program.
+func offsetCacheGeneration(program string) int64 {
+	offsetCacheGenerationMu.Lock()
+	defer offsetCacheGenerationMu.Unlock()
+	return offsetCacheGenerations[program]
+}
+
+// invalidateOffsetCache retires every snapshot of one program. Old keys stay
+// unreadable and leave through the cache TTL or capacity, so no key has to be
+// scanned. A program without a generation entry starts at zero.
 func invalidateOffsetCache(programName string) {
-	programName = strings.TrimSpace(programName)
-	if programName == "" || offsetCaches == nil {
+	program := strings.TrimSpace(programName)
+	if program == "" {
 		return
 	}
-	offsetCaches.Delete(programName)
+	offsetCacheGenerationMu.Lock()
+	offsetCacheGenerations[program]++
+	offsetCacheGenerationMu.Unlock()
+}
+
+// forgetOffsetCacheProgram drops the generation entry of a deleted program.
+func forgetOffsetCacheProgram(programName string) {
+	program := strings.TrimSpace(programName)
+	if program == "" {
+		return
+	}
+	invalidateOffsetCache(program)
+	offsetCacheGenerationMu.Lock()
+	delete(offsetCacheGenerations, program)
+	offsetCacheGenerationMu.Unlock()
 }
 
 // PreloadOffsetsByValueIDs loads every current binding for the requested values
@@ -74,17 +83,19 @@ func PreloadOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int64)
 	if db == nil {
 		db = GetDB()
 	}
-	rows, err := nativeGetOffsetsByValueIDs(db, programName, valueIDs)
+	program := strings.TrimSpace(programName)
+	rows, err := nativeGetOffsetsByValueIDs(db, program, valueIDs)
 	if err != nil {
 		return err
 	}
-	cache := offsetCacheFor(programName)
-	if cache == nil {
+	if program == "" {
 		return nil
 	}
+	cache := offsetReadCache()
+	generation := offsetCacheGeneration(program)
 	grouped := make(map[int64][]*IrOffset)
 	for _, row := range rows {
-		if row == nil {
+		if row == nil || row.ProgramName != program {
 			continue
 		}
 		grouped[row.ValueID] = append(grouped[row.ValueID], cloneOffset(row))
@@ -93,25 +104,22 @@ func PreloadOffsetsByValueIDs(db *gorm.DB, programName string, valueIDs []int64)
 		if len(bindings) == 0 {
 			continue
 		}
-		cache.rows.Set(valueID, bindings)
+		cache.Set(offsetCacheKey{program: program, generation: generation, valueID: valueID}, bindings)
 	}
 	return nil
 }
 
 func cachedOffsetsByVariable(programName, name string, valueID int64) ([]*IrOffset, bool) {
-	programName = strings.TrimSpace(programName)
-	if programName == "" || valueID <= 0 || offsetCaches == nil {
+	program := strings.TrimSpace(programName)
+	if program == "" || valueID <= 0 {
 		return nil, false
 	}
-	cache, ok := offsetCaches.Get(programName)
-	if !ok || cache == nil {
-		return nil, false
-	}
-	rows, ok := cache.rows.Get(valueID)
+	key := offsetCacheKey{program: program, generation: offsetCacheGeneration(program), valueID: valueID}
+	rows, ok := offsetReadCache().Get(key)
 	if !ok {
 		return nil, false
 	}
-	out := make([]*IrOffset, 0)
+	out := make([]*IrOffset, 0, len(rows))
 	for _, row := range rows {
 		if row != nil && row.VariableName == name {
 			out = append(out, cloneOffset(row))

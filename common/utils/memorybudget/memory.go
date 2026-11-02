@@ -44,6 +44,17 @@ func Usable() int64 {
 	return UsableFrom(Total())
 }
 
+// Available reports the memory the OS can hand to this process without
+// swapping, as the kernel reports it. It returns 0 when the platform does not
+// expose the metric; callers must treat 0 as unknown, not as exhaustion.
+func Available() int64 {
+	vm, err := mem.VirtualMemory()
+	if err != nil || vm == nil || vm.Available == 0 {
+		return 0
+	}
+	return int64(vm.Available)
+}
+
 func UsableFrom(total int64) int64 {
 	if total <= 0 {
 		return 0

@@ -47,21 +47,21 @@ func (b *astbuilder) dereferenceMember(value ssa.Value, isPointer bool) ssa.Valu
 }
 
 // memberRefParameterChecker builds the shared member-store Parameter tracing
-// used by both member-suffix paths. It reads through the member pointer so the
-// dereference done by the caller is visible here, and consumes any pending
-// RefParameter entry recorded for the member.
-func (b *astbuilder) memberRefParameterChecker(member *ssa.Value) func(target string) {
+// used by both member-suffix paths. Pass the value the caller reads the member
+// from (after its pointer dereference), and consume any pending RefParameter
+// entry recorded for that member.
+func (b *astbuilder) memberRefParameterChecker(member ssa.Value) func(target string) {
 	return func(target string) {
-		if member == nil || utils.IsNil(*member) {
+		if utils.IsNil(member) {
 			return
 		}
 		refParameterIndex := -1
-		if p, ok := ssa.ToParameter(*member); ok && !p.IsFreeValue {
+		if p, ok := ssa.ToParameter(member); ok && !p.IsFreeValue {
 			refParameterIndex = p.FormalParameterIndex
-		} else if p, ok := ssa.ToParameterMember(*member); ok {
+		} else if p, ok := ssa.ToParameterMember(member); ok {
 			refParameterIndex = p.FormalParameterIndex
 		}
-		if ref, ok := b.TakeRefParameter((*member).GetName()); ok {
+		if ref, ok := b.TakeRefParameter(member.GetName()); ok {
 			refParameterIndex = ref.Index
 		}
 		if refParameterIndex != -1 {
@@ -787,8 +787,6 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 				member = right
 			}
 
-			checkParameter := b.memberRefParameterChecker(&member)
-
 			if !utils.IsNil(member) {
 				if member.GetType() != nil && member.GetType().GetTypeKind() == ssa.PointerKind {
 					member = b.dereferenceMember(member, true)
@@ -797,7 +795,7 @@ func (b *astbuilder) buildPostfixSuffixLvalueFromPostfixSuffix(
 				right = b.ReadMemberCallValue(member, memberKey)
 				left = b.CreateMemberCallVariable(member, memberKey)
 				if left != nil {
-					checkParameter(left.GetName())
+					b.memberRefParameterChecker(member)(left.GetName())
 				}
 			}
 			_ = setReference
@@ -1345,7 +1343,6 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 			// TODO(c2ssa): the write-side suffix path calls this checker for
 			// every lvalue while this path gates on setReference — the drift is
 			// preserved as-is until a regression test pins the intended rule.
-			checkParameter := b.memberRefParameterChecker(&member)
 
 			if member != nil {
 				if member.GetType() != nil && member.GetType().GetTypeKind() == ssa.PointerKind {
@@ -1359,7 +1356,7 @@ func (b *astbuilder) buildPostfixSuffixLvalue(ast *cparser.PostfixSuffixLvalueCo
 				}
 
 				if setReference && left != nil {
-					checkParameter(left.GetName())
+					b.memberRefParameterChecker(member)(left.GetName())
 				}
 			}
 		}

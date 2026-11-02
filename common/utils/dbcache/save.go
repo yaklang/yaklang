@@ -229,12 +229,10 @@ func (s *Save[T]) processBuffer() {
 	currentSaveSize := s.config.saveSize
 	items := make([]T, 0, currentSaveSize)
 	byteBudget := s.config.saveByteBudget
-	var sizeOf func(T) int
-	if byteBudget > 0 {
-		sizeOf, _ = s.config.saveByteSize.(func(T) int)
-		if sizeOf == nil {
-			byteBudget = 0
-		}
+	sizeOf := s.config.saveByteSize
+	if byteBudget <= 0 || sizeOf == nil {
+		byteBudget = 0
+		sizeOf = nil
 	}
 	bytes := 0
 	for {
@@ -247,7 +245,7 @@ func (s *Save[T]) processBuffer() {
 			if sizeOf == nil {
 				return 1
 			}
-			n := sizeOf(item)
+			n := sizeOf(any(item))
 			if n < 1 {
 				return 1
 			}

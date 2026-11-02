@@ -33,6 +33,9 @@ func (m *blueprintMemberMap) Get(name string) ([]Value, bool) {
 }
 
 func (m *blueprintMemberMap) Have(name string) bool {
+	if utils.IsNil(m) {
+		return false
+	}
 	_, ok := m.Get(name)
 	return ok
 }

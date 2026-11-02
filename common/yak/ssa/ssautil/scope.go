@@ -626,7 +626,7 @@ func (scope *ScopedVersionedTable[T]) ChangeCapturedSideEffect(name string, ver 
 // of an outer variable runs before that parameter is installed, and the
 // initial registration sees no parent and drops the branch from the phi.
 func (v *ScopedVersionedTable[T]) RegisterCapturedVariable(ver VersionedIF[T]) {
-	if v == nil || ver == nil {
+	if utils.IsNil(v) || utils.IsNil(ver) {
 		return
 	}
 	v.tryRegisterCapturedVariable(ver.GetName(), ver)

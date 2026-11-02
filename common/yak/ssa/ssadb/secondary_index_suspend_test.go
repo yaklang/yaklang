@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
 )
 
 // Secondary indexes are what make a multi-gigabyte SQLite IR write random.
@@ -51,7 +52,7 @@ func TestSuspendSecondaryIndexesRestoresDefinitions(t *testing.T) {
 }
 
 func TestMemoryHeadroomForIndexSortReadsHost(t *testing.T) {
-	available, ok := availableMemoryBytes()
+	available, ok := ssautil.AvailableMemoryBytes()
 	if !ok {
 		require.False(t, memoryHeadroomForIndexSort(), "an unknown host must fall back to the file sorter")
 		return
