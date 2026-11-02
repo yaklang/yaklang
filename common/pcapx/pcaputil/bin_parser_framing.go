@@ -779,7 +779,14 @@ func (a *binParser) datagramFields(network gopacket.NetworkLayer, udp *layers.UD
 		}
 	}
 	if e.Raw == nil {
-		e.Raw = append([]byte(nil), wire[:min(len(wire), a.config.ProbeBytes)]...)
+		n := min(len(wire), a.config.ProbeBytes)
+		if carrierErr == nil && e.Status == "unrecognized" && len(wire) <= a.config.MaxMessageBytes {
+			// ProbeBytes limits recognition, not the identity of a complete,
+			// bounded UDP payload. Keep its owned bytes for source inspection
+			// without granting an application identity or Decode admission.
+			n, e.Completeness = len(wire), "datagram"
+		}
+		e.Raw = append([]byte(nil), wire[:n]...)
 	}
 	a.emit(e)
 }
