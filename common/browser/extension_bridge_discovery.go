@@ -1,9 +1,14 @@
 package browser
 
 import (
+	"encoding/json"
 	"errors"
+	"net"
 	"net/http"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -50,9 +55,49 @@ type extensionBridgeDiscoveryEnvelope struct {
 	EngineIdentityID string `json:"engineIdentityId"`
 	EngineInstanceID string `json:"engineInstanceId"`
 	Endpoint         string `json:"endpoint"`
+	FrontendID       string `json:"frontendId"`
+	FrontendName     string `json:"frontendName"`
+}
+
+func extensionBridgeFrontend() (string, string) {
+	edition := strings.ToLower(os.Getenv("YAKIT_EDITION"))
+	database := strings.ToLower(filepath.Base(os.Getenv("YAK_DEFAULT_PROJECT_DATABASE_NAME")))
+	switch {
+	case strings.Contains(edition, "memfit") || strings.Contains(database, "memfit"):
+		return "memfit", "Memfit AI"
+	case strings.Contains(edition, "irify") || strings.Contains(database, "irify"):
+		return "irify", "IRify"
+	case strings.Contains(edition, "ee") || strings.Contains(edition, "enterprise") || strings.Contains(database, "company"):
+		return "yakit-enterprise", "Yakit 企业版"
+	case strings.Contains(edition, "yakit") || strings.Contains(database, "yakit") || os.Getenv("YAKIT_HOME") != "":
+		return "yakit", "Yakit"
+	default:
+		return "yak", "独立 Yak 引擎"
+	}
 }
 
 func (s *ExtensionBridgeServer) handleDiscoveryWebSocket(writer http.ResponseWriter, request *http.Request) {
+	engineIdentityID, _ := s.manager.EngineIdentity()
+	frontendID, frontendName := extensionBridgeFrontend()
+	envelope := extensionBridgeDiscoveryEnvelope{
+		Type: "engine", ProtocolVersion: managedExtensionBridgeProtocolVersion,
+		EngineIdentityID: engineIdentityID, EngineInstanceID: s.engineInstanceID, Endpoint: s.URL(),
+		FrontendID: frontendID, FrontendName: frontendName,
+	}
+	// YTray reads the same public discovery hint before launching a browser.
+	// Browser clients still use the extension-origin WebSocket route below.
+	if !websocket.IsWebSocketUpgrade(request) {
+		host, _, err := net.SplitHostPort(request.Host)
+		if request.Method != http.MethodGet || request.Header.Get("Origin") != "" || err != nil ||
+			(host != "127.0.0.1" && host != "localhost" && host != "::1") {
+			http.Error(writer, "local discovery only", http.StatusForbidden)
+			return
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		writer.Header().Set("Cache-Control", "no-store")
+		_ = json.NewEncoder(writer).Encode(envelope)
+		return
+	}
 	upgrader := websocket.Upgrader{
 		HandshakeTimeout: 2 * time.Second,
 		CheckOrigin: func(r *http.Request) bool {
@@ -66,9 +111,5 @@ func (s *ExtensionBridgeServer) handleDiscoveryWebSocket(writer http.ResponseWri
 	}
 	defer connection.Close()
 	_ = connection.SetWriteDeadline(time.Now().Add(2 * time.Second))
-	engineIdentityID, _ := s.manager.EngineIdentity()
-	_ = connection.WriteJSON(extensionBridgeDiscoveryEnvelope{
-		Type: "engine", ProtocolVersion: managedExtensionBridgeProtocolVersion,
-		EngineIdentityID: engineIdentityID, EngineInstanceID: s.engineInstanceID, Endpoint: s.URL(),
-	})
+	_ = connection.WriteJSON(envelope)
 }

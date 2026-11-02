@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net"
@@ -14,6 +15,44 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/require"
 )
+
+func TestExtensionBridgeNativeFrontendDiscovery(t *testing.T) {
+	t.Setenv("YAKIT_EDITION", "memfit")
+	manager, err := NewExtensionBridgeManager(NewExtensionBridgeFileIdentityStore(filepath.Join(t.TempDir(), "identity.json")), nil)
+	require.NoError(t, err)
+	require.NoError(t, manager.Start(0))
+	t.Cleanup(func() { require.NoError(t, manager.Close()) })
+	endpoint := "http" + strings.TrimSuffix(strings.TrimPrefix(manager.Snapshot().URL, "ws"), extensionBridgePath) + extensionBridgeDiscoveryPath
+	response, err := http.Get(endpoint)
+	require.NoError(t, err)
+	defer response.Body.Close()
+	require.Equal(t, http.StatusOK, response.StatusCode)
+	var discovered extensionBridgeDiscoveryEnvelope
+	require.NoError(t, json.NewDecoder(response.Body).Decode(&discovered))
+	require.Equal(t, "memfit", discovered.FrontendID)
+	require.Equal(t, "Memfit AI", discovered.FrontendName)
+	require.Equal(t, manager.Snapshot().EngineInstanceID, discovered.EngineInstanceID)
+
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	require.NoError(t, err)
+	request.Header.Set("Origin", "https://example.test")
+	blocked, err := http.DefaultClient.Do(request)
+	require.NoError(t, err)
+	defer blocked.Body.Close()
+	require.Equal(t, http.StatusForbidden, blocked.StatusCode)
+}
+
+func TestExtensionBridgeFrontendFromProjectDatabase(t *testing.T) {
+	t.Setenv("YAKIT_EDITION", "")
+	t.Setenv("YAK_DEFAULT_PROJECT_DATABASE_NAME", "default-memfit.db")
+	id, name := extensionBridgeFrontend()
+	require.Equal(t, "memfit", id)
+	require.Equal(t, "Memfit AI", name)
+	t.Setenv("YAK_DEFAULT_PROJECT_DATABASE_NAME", "default-yakit.db")
+	id, name = extensionBridgeFrontend()
+	require.Equal(t, "yakit", id)
+	require.Equal(t, "Yakit", name)
+}
 
 func TestExtensionBridgeListenRetry(t *testing.T) {
 	for _, cause := range []error{syscall.EADDRINUSE, syscall.EACCES, syscall.EPERM} {
