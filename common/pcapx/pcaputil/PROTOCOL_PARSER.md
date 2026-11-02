@@ -8,6 +8,13 @@
 在支持的配置下认证解密。握手消息正文、记录认证、观察到的请求/响应关联及证书信任
 具有不同范围；完整握手验证和所有协议与 Wireshark 等价均不在这些能力声明之中。
 
+Go 的 `ObserveTLSServerHelloRecord(record, maxElements)` 提供无连接状态的字面观察：
+输入必须是一个完整明文 TLS record，且恰好包含一个完整 ServerHello 和完整外层扩展向量。
+返回 record/legacy/声明选择版本、cipher suite、压缩值、session ID 长度及扩展数；
+复用原生 hello 语法，未支持扩展的内部内容仍 opaque。它不应用协商规则、不修改输入，
+也不证明对端、协商成立或认证成功。Shark 对具有完整自有来源的 legacy 参数拒绝记录，
+保留 `TLS`、具体错误和“协商未成立”的递进说明，不继承 TLS1.3 会话或应用身份。
+
 ## 最小脚本
 
 ```javascript

@@ -46,6 +46,41 @@ func authenticatedTLSRecordDiagnostic(e *pcaputil.ProtocolEvent) bool {
 	return true
 }
 
+// The native parser rejected a complete cleartext ServerHello declaration.
+// Preserve the observed TLS layer without declaring a negotiated TLS version,
+// successful handshake, authenticated record, or sticky connection identity.
+func rejectedTLSServerHelloDiagnostic(e *pcaputil.ProtocolEvent) bool {
+	if e == nil || e.Protocol != "tls" || e.Transport != "tcp" || e.Profile != "tls" ||
+		e.ID == 0 || e.FlowID == 0 || e.TCPFlowID == 0 || e.Status != "malformed" ||
+		e.ExpertCode != string(pcaputil.ErrMalformedMessage) || e.Error != "MalformedMessage: TLS 1.3 ServerHello legacy parameters" {
+		return false
+	}
+	info := eventValues(e)
+	if info["Authentication Verified"] != false || info["Content Visibility"] != "cleartext" ||
+		number(info["Negotiated Version"]) != 0 || number(info["Record Type"]) != 22 ||
+		number(info["Record Version"]) != 0x303 || number(info["Record Length"]) != uint64(len(e.Raw)-5) || e.Length != len(e.Raw) {
+		return false
+	}
+	observation, err := pcaputil.ObserveTLSServerHelloRecord(e.Raw, 4096)
+	if err != nil || observation.RecordVersion != 0x303 || observation.SelectedVersion != 0x304 {
+		return false
+	}
+	switch observation.CipherSuite {
+	case 0x1301, 0x1302, 0x1303:
+	default:
+		return false
+	}
+	if e.SourceBytes.Kind != "reassembled" || len(e.SourceBytes.PacketRefs) == 0 || e.SourceBytes.SHA256 != fmt.Sprintf("%x", sha256.Sum256(e.Raw)) {
+		return false
+	}
+	for _, ref := range e.SourceBytes.PacketRefs {
+		if ref.Number == 0 || ref.Domain != e.Domain {
+			return false
+		}
+	}
+	return true
+}
+
 // A stopped decoder can retain a bounded prefix of several remaining records.
 // This is a stream extent, not a successfully framed or authenticated TLS PDU.
 func tlsStoppedStreamRemainder(e *pcaputil.ProtocolEvent) bool {
