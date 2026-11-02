@@ -245,7 +245,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 			return protocolError(ErrUnsupportedFeature, "QUIC traffic cipher unsupported")
 		}
 		secrets := map[string][]byte{}
-		for _, label := range []string{"CLIENT_HANDSHAKE_TRAFFIC_SECRET", "SERVER_HANDSHAKE_TRAFFIC_SECRET", "CLIENT_TRAFFIC_SECRET_0", "SERVER_TRAFFIC_SECRET_0"} {
+		for _, label := range []string{"CLIENT_HANDSHAKE_TRAFFIC_SECRET", "SERVER_HANDSHAKE_TRAFFIC_SECRET", "CLIENT_TRAFFIC_SECRET_0", "SERVER_TRAFFIC_SECRET_0", "CLIENT_EARLY_TRAFFIC_SECRET"} {
 			if v, ok := q.provider.LookupTLSSecret(label, q.tls.random); ok {
 				secrets[label] = v
 			}
@@ -256,7 +256,10 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		}
 		ring.initial = q.keys.initial
 		q.keys = ring
-		q.loadedKeys = len(secrets) == 4
+		// The optional early secret must neither be omitted nor make five
+		// provider entries look like incomplete regular keys. Replacing the
+		// ring again would discard already established application key epochs.
+		q.loadedKeys = ring.handshake[0] != nil && ring.handshake[1] != nil && ring.app[0][0] != nil && ring.app[1][0] != nil
 	}
 	return nil
 }

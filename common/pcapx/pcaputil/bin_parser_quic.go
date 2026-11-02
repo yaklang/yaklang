@@ -21,6 +21,7 @@ type binQUIC struct {
 	keyFirst        [2]uint64
 	keyLast         [2]uint64
 	keyFirstSet     [2]bool
+	earlyOrder      quicEarlyOrder
 	controlSeen     [2]bool
 	qpackSeen       [2][2]bool
 	h3Fault         *h3ConnectionFault
@@ -318,6 +319,10 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 			return q.rejectAuthenticatedQUICPacket(dir, h.space, pn, info, plain, err)
 		}
 	}
+	if err := q.checkEarlyPacketOrder(dir, h, pn); err != nil {
+		quicRetainUndeliveredPayload(info, plain)
+		return info, err
+	}
 	if quicSeen(q.space(dir, h.space), pn) {
 		info["Duplicate"] = true
 		info["Frames"] = frames // Retain authenticated wire evidence without delivering it twice.
@@ -373,6 +378,9 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	}
 	q.observePN(q.space(dir, h.space), pn, info)
 	info, err = q.finishFrames(dir, h.space, frames, info, max)
+	if err == nil || isRecoverableH3ObservationError(err) {
+		q.observeEarlyPacketOrder(dir, h, pn)
+	}
 	if err != nil && !isRecoverableH3ObservationError(err) {
 		if q.native {
 			quicRetainStoppedPayload(info, plain)
