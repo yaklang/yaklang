@@ -63,7 +63,7 @@ func appendCapturedIPv4FragmentExtentFields(d *packetDetail, raw *capturedPacket
 				field{depth: 1, text: fmt.Sprintf("Observed Header Length: %d bytes", len(h)), start: offset, end: offset + 1, hasRange: true},
 				field{depth: 1, text: "Observed Total Length: 0 · invalid fragment extent", start: offset + 2, end: offset + 4, hasRange: true},
 				field{depth: 1, text: fmt.Sprintf("Observed Fragment ID: %d", ip.Id), start: offset + 4, end: offset + 6, hasRange: true},
-				field{depth: 1, text: fmt.Sprintf("Observed Fragment Offset: %d · MF=%t", int(flags&0x1fff)*8, flags&0x2000 != 0), start: offset + 6, end: offset + 8, hasRange: true})
+				field{depth: 1, text: fmt.Sprintf("Observed Fragment Offset: %d bytes · MF=%t", int(flags&0x1fff)*8, flags&0x2000 != 0), start: offset + 6, end: offset + 8, hasRange: true})
 			return
 		}
 	}

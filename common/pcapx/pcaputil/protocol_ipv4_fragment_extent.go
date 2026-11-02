@@ -39,6 +39,7 @@ func (a *binParser) refuseIPv4FragmentExtent(p gopacket.Packet, evidence capture
 			"Observed Header Layers": names, "Observed IP Version": uint8(4), "Observed Total Length": uint16(0),
 			"Captured Header Bytes": len(h), "Observed Fragment ID": binary.BigEndian.Uint16(h[4:6]),
 			"Observed Fragment Offset": int(ip.FragOffset) * 8, "Observed More Fragments": ip.Flags&layers.IPv4MoreFragments != 0,
+			"Fragment Offset Unit":         "bytes",
 			"Header Observation Scope":     "IPv4 fixed header and fragment flags; datagram extent unavailable",
 			"Fragment Reassembly Admitted": false, "Child Header Identity": "unconfirmed", "Captured Length Substitution": "not evidence of a fragment wire extent",
 		}

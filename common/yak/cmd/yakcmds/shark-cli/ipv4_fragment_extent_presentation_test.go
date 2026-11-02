@@ -58,6 +58,7 @@ func TestIPv4FragmentExtentRefusalAgreesAcrossViews(t *testing.T) {
 			require.Equal(t, "IPv4", v.view.protocol)
 			text := detailLines(v.view.fields)
 			require.Contains(t, text, "Total Length is zero")
+			require.Contains(t, text, "Observed Fragment Offset: 0 bytes · MF=true")
 			require.NotContains(t, text, "YAML dissector")
 			require.NotContains(t, text, "DNS")
 			require.Empty(t, v.view.sources)
