@@ -94,6 +94,43 @@ func formatFieldValue(name string, value any) string {
 	return fmt.Sprintf("%d bytes · HEX % x |%s|%s", len(data), preview, ascii, suffix)
 }
 
+func formatNodeFieldValue(n *base.NodeValue) string {
+	// A raw bit result is full octets followed by a right-aligned partial
+	// octet, not a byte-aligned integer or a slice of captured wire bytes.
+	// Qualify it by its parser type and exact bit span, never by a field name.
+	data, raw := n.Value.([]byte)
+	if raw && n.Origin != nil && n.Origin.Cfg != nil && n.Origin.Cfg.GetString(base.CfgType) == "raw" {
+		span, ok := n.Origin.Cfg.GetItem(base.CfgNodeResult).([2]uint64)
+		if ok && span[1] > span[0] && span[1] <= 262144*8 {
+			width := span[1] - span[0]
+			if (span[0]%8 != 0 || width%8 != 0) && uint64(len(data)) == (width+7)/8 &&
+				(width%8 == 0 || data[len(data)-1]>>(width%8) == 0) {
+				var bits strings.Builder
+				for i := uint64(0); i < min(width, 128); i++ {
+					chunkWidth := min(uint64(8), width-i/8*8)
+					bits.WriteByte('0' + (data[i/8]>>(chunkWidth-1-i%8))&1)
+				}
+				if width > 128 {
+					return fmt.Sprintf("%d bits · BITS %s … (select for full bytes)", width, bits.String())
+				}
+				// Group from the low end so a 12-bit result {0x0f, 0x0e}
+				// becomes 0x0fe, rather than the misleading octets 0f 0e.
+				padded := strings.Repeat("0", int((4-width%4)%4)) + bits.String()
+				hex := make([]byte, len(padded)/4)
+				for i := range hex {
+					var nibble byte
+					for _, bit := range padded[i*4 : i*4+4] {
+						nibble = nibble<<1 | byte(bit-'0')
+					}
+					hex[i] = "0123456789abcdef"[nibble]
+				}
+				return fmt.Sprintf("%d bits · HEX %s · BITS %s", width, hex, bits.String())
+			}
+		}
+	}
+	return formatFieldValue(n.Name, n.Value)
+}
+
 func nodeField(n *base.NodeValue, text string, branch bool) field {
 	f := field{text: text, branch: branch}
 	// Parser positions are bit offsets, including packed fields. Highlight the

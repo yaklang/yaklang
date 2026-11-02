@@ -638,7 +638,7 @@ func flatFields(n *base.NodeValue, section, path string, out *[]field, initialDe
 			*out = append(*out, f)
 		}
 		if n.IsValue() {
-			value := formatFieldValue(n.Name, n.Value)
+			value := formatNodeFieldValue(n)
 			if address, ok := legacyAddressFieldValue(section, n.Name, n.Value); ok {
 				value = address
 			}
