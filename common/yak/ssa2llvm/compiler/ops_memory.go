@@ -593,6 +593,7 @@ func (c *Compiler) compileUndefined(inst *ssa.Undefined) error {
 		// "#<id>.k" member variable whose name part matches "k" in the loop
 		// condition scope) so m[k] uses the per-iteration field value.
 		if resolved := c.resolveUndefinedScopeValue(inst); resolved != nil {
+
 			val, err := c.getValue(inst, resolved.GetId())
 			if err == nil {
 				c.cacheValue(inst.GetId(), val)
@@ -1204,6 +1205,22 @@ func (c *Compiler) assignedSSAValue(contextInst ssa.Instruction, resultID int64)
 	return assigned
 }
 
+// hasPlainVariable reports whether val is bound to a non-member variable: it is
+// assigned to a name, not only to an object field. The front end can reuse one
+// SSA value for both (`target = target.Trim(...)` is also recorded as
+// `params.info.proxy.url = proxy`), and the plain assignment is the word to use.
+func hasPlainVariable(val ssa.Value) bool {
+	if val == nil {
+		return false
+	}
+	for _, variable := range val.GetAllVariables() {
+		if variable != nil && !variable.IsMemberCall() {
+			return true
+		}
+	}
+	return false
+}
+
 func (c *Compiler) hasAssignedMemberCallVariable(val ssa.Value) bool {
 	if val == nil {
 		return false
@@ -1640,7 +1657,45 @@ func (c *Compiler) memberDynamicReadReady(contextInst ssa.Instruction, member ss
 	if nameObj := c.memberObjectFromValueName(member); nameObj != nil && (obj == nil || nameObj.GetId() != obj.GetId()) {
 		obj = nameObj
 	}
-	return c.memberValueAvailableAt(fn, contextInst, obj) && c.memberValueAvailableAt(fn, contextInst, key)
+	if c.memberValueAvailableAt(fn, contextInst, obj) && c.memberValueAvailableAt(fn, contextInst, key) {
+		return true
+	}
+	// A phi edge is materialized at the end of its predecessor block, not in
+	// the phi's own block. When the edge value is defined in that predecessor
+	// (the `config, err = ssa.NewConfig()` unpack inside the branch), the read
+	// is available at the emit point even though the phi block is not
+	// dominated by the definition.
+	if c.function != nil && c.function.activeBlockID > 0 {
+		activeID := c.function.activeBlockID
+		return c.memberValueAvailableAtBlock(fn, activeID, obj) && c.memberValueAvailableAtBlock(fn, activeID, key)
+	}
+	return false
+}
+
+// memberValueAvailableAtBlock reports whether val is available at the end of
+// blockID. It is the block-positional form of memberValueAvailableAt.
+func (c *Compiler) memberValueAvailableAtBlock(fn *ssa.Function, blockID int64, val ssa.Value) bool {
+	if val == nil || blockID <= 0 {
+		return true
+	}
+	switch val.(type) {
+	case *ssa.ConstInst, *ssa.Parameter, *ssa.ParameterMember:
+		return true
+	}
+	if _, ok := ssa.ToExternLib(val); ok {
+		return true
+	}
+	inst, ok := val.(ssa.Instruction)
+	if !ok || inst == nil || inst.GetBlock() == nil {
+		return true
+	}
+	if inst.GetBlock().GetId() == blockID {
+		return true
+	}
+	if fn == nil {
+		return false
+	}
+	return c.blockDominates(fn, inst.GetBlock().GetId(), blockID)
 }
 
 func (c *Compiler) memberValueAvailableAt(fn *ssa.Function, contextInst ssa.Instruction, val ssa.Value) bool {
@@ -1923,7 +1978,13 @@ func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.
 		memberInst, memberIsInst := member.(ssa.Instruction)
 		if memberIsInst && memberInst.GetBlock() != nil && inst.GetBlock() != nil {
 			if memberInst.GetBlock().GetId() != inst.GetBlock().GetId() {
-				continue
+				// A value defined in a dominating block is already materialized
+				// when the literal is built, so it can be copied into the field.
+				// Only a definition in an unrelated block (a sibling branch or a
+				// later block) must be left to its own use site.
+				if fn := inst.GetFunc(); fn == nil || !c.blockDominates(fn, memberInst.GetBlock().GetId(), inst.GetBlock().GetId()) {
+					continue
+				}
 			}
 			if makeIndex >= 0 {
 				if idx := instructionIndex(memberInst.GetBlock(), memberInst.GetId()); idx > makeIndex {
@@ -1997,6 +2058,14 @@ func (c *Compiler) shouldReadMemberValueForInitialMakeMember(member ssa.Value, o
 		if obj.GetId() == owner.GetId() && c.resolveMemberKeyString(key) == keyStr {
 			return false
 		}
+	}
+	// A value assigned to a plain variable is that variable's word. The front
+	// end can also record the same value as a field of an unrelated object
+	// (`target = target.Trim(...)` is reused for `params.info.proxy.url`), and
+	// reading it back through that field would return the field's empty slot
+	// instead of the value the literal stores.
+	if hasPlainVariable(member) {
+		return false
 	}
 	if current := c.currentFunction(); current != nil && member.GetFunc() != nil && member.GetFunc() != current {
 		return false
