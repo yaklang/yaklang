@@ -1,5 +1,10 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+最新独立全绿检查点为`f85833d7e215c2dd10794093b145d4c042e80128`，47约定检查/91执行/2状态、
+315396原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41471189600)。
+后续e700仅补[非SMB普通PSK认证边界和实际Windows](shark-m2-tls-psk-authentication-20261103.md)，
+最终head CI须另验。S01–S06及历史107/121/字段分母不改，承接者固定开工时最新远端M2精确HEAD。
+
 最新独立全绿检查点为`dccafe51d65ccc4bba7256c0377665e7ea150668`，47约定检查/91执行/2状态、
 315277原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41459106990)。
 后续fbda仅补[非SMB客户端初始TLS认证观察与实际Windows](shark-m2-tls-client-order-20261102.md)，
