@@ -1392,15 +1392,15 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 					p.summary = "Response interrupted · record AEAD verified"
 				}
 			}
-			if p.protocol == "" && rejectedTLSServerHelloDiagnostic(e) {
+			if helloName := rejectedTLSHelloName(e); p.protocol == "" && helloName != "" {
 				for _, layer := range eventCarriers(e) {
 					p.addLayer(layer)
 				}
 				p.addLayer("TLS")
 				p.protocol, p.priority, p.status = "TLS", eventPriority(e), e.Status
-				p.visibility, p.scope = "cleartext", "rejected TLS ServerHello"
-				p.evidence = "complete ServerHello declaration; negotiation not established"
-				p.summary = "ServerHello rejected · negotiation not established"
+				p.visibility, p.scope = "cleartext", "rejected TLS "+helloName
+				p.evidence = "complete " + helloName + " declaration; negotiation not established"
+				p.summary = helloName + " rejected · negotiation not established"
 			}
 			if e.Protocol == "quic" && e.Admission == "unparsed-datagram-remainder" {
 				p.diagnostic = clipText(e.Summary, 256)

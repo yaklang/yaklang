@@ -17,6 +17,13 @@ Go 的 `ObserveTLSServerHelloRecord(record, maxElements)` 提供无连接状态�
 详情把声明版本、legacy version、cipher suite 和压缩值与协商状态区分；字面 legacy、cipher
 和压缩字段只定位到自有明文 record，错误说明不借用这些字节范围。
 
+Go 的 `ObserveTLSCertificatePSKHelloRecord(record, maxElements)` 仅观察含扩展 33 的
+单个完整明文 ClientHello/ServerHello 外层；先检查完整向量、重复项和集合上限，再复用
+原生 framing reader。它允许观察已被拒绝的扩展内容，返回的类型、长度和偏移均为 record
+字面值，不是扩展语义验收、外部 PSK 来源、binder 或协商证明。Shark 只为具有完整自有
+来源及对应原生 RFC8773 错误的记录展示“已观察但被拒绝”的 Hello；错误文字没有字节范围，
+扩展 type/length/data 只定位到自有 record。这种诊断不能建立连接粘性身份。
+
 ## 最小脚本
 
 ```javascript

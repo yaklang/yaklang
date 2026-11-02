@@ -81,6 +81,52 @@ func rejectedTLSServerHelloDiagnostic(e *pcaputil.ProtocolEvent) bool {
 	return true
 }
 
+// A complete, owned Hello envelope plus the native RFC 8773 refusal proves an
+// observed rejected Hello, never a successful body or sticky TLS negotiation.
+func rejectedTLSCertificatePSKHelloDiagnostic(e *pcaputil.ProtocolEvent) *pcaputil.TLSCertificatePSKHelloRecordObservation {
+	if e == nil || e.Protocol != "tls" || e.Transport != "tcp" || e.Profile != "tls" ||
+		e.ID == 0 || e.FlowID == 0 || e.TCPFlowID == 0 || e.Status != "malformed" || e.ExpertCode != string(pcaputil.ErrMalformedMessage) {
+		return nil
+	}
+	switch e.Error {
+	case "MalformedMessage: TLS certificate-with-external-PSK flag must be empty",
+		"MalformedMessage: TLS certificate-with-external-PSK hello companions",
+		"MalformedMessage: TLS certificate-with-external-PSK was not offered":
+	default:
+		return nil
+	}
+	info := eventValues(e)
+	if info["Authentication Verified"] != false || info["Content Visibility"] != "cleartext" ||
+		number(info["Negotiated Version"]) != 0 || number(info["Record Type"]) != 22 ||
+		number(info["Record Length"]) != uint64(len(e.Raw)-5) || e.Length != len(e.Raw) {
+		return nil
+	}
+	o, err := pcaputil.ObserveTLSCertificatePSKHelloRecord(e.Raw, 4096)
+	if err != nil || number(info["Record Version"]) != uint64(o.RecordVersion) ||
+		e.SourceBytes.Kind != "reassembled" || len(e.SourceBytes.PacketRefs) == 0 || e.SourceBytes.SHA256 != fmt.Sprintf("%x", sha256.Sum256(e.Raw)) {
+		return nil
+	}
+	for _, ref := range e.SourceBytes.PacketRefs {
+		if ref.Number == 0 || ref.Domain != e.Domain {
+			return nil
+		}
+	}
+	return o
+}
+
+func rejectedTLSHelloName(e *pcaputil.ProtocolEvent) string {
+	if rejectedTLSServerHelloDiagnostic(e) {
+		return "ServerHello"
+	}
+	if o := rejectedTLSCertificatePSKHelloDiagnostic(e); o != nil {
+		if o.HandshakeType == 1 {
+			return "ClientHello"
+		}
+		return "ServerHello"
+	}
+	return ""
+}
+
 // A stopped decoder can retain a bounded prefix of several remaining records.
 // This is a stream extent, not a successfully framed or authenticated TLS PDU.
 func tlsStoppedStreamRemainder(e *pcaputil.ProtocolEvent) bool {

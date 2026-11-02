@@ -542,8 +542,8 @@ func detail(raw *capturedPacket) (d packetDetail) {
 				if d.protocol == "TLS?" || !hasObservedTLS(raw) {
 					for i := range d.fields {
 						if d.fields[i].branch && (d.fields[i].text == "TLS" || d.fields[i].text == "Transport Layer Security") {
-							if wireScope == "rejected TLS ServerHello" {
-								d.fields[i].text = "TLS record envelope · see rejected ServerHello PDU; negotiation not established"
+							if wireScope == "rejected TLS ServerHello" || wireScope == "rejected TLS ClientHello" {
+								d.fields[i].text = "TLS record envelope · see rejected " + strings.TrimPrefix(wireScope, "rejected TLS ") + " PDU; negotiation not established"
 								continue
 							}
 							label := "TLS?"

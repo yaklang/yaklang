@@ -1079,12 +1079,15 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		http3HeaderSource, http3HeaderRanges = 0, nil
 		kind := e.SourceBytes.Kind
 		tlsRemainder := tlsStoppedStreamRemainder(e)
-		rejectedHello := rejectedTLSServerHelloDiagnostic(e)
+		rejectedLegacyHello := rejectedTLSServerHelloDiagnostic(e)
+		certificatePSKHello := rejectedTLSCertificatePSKHelloDiagnostic(e)
+		rejectedHelloName := rejectedTLSHelloName(e)
+		rejectedHello := rejectedHelloName != ""
 		if kind == "" {
 			kind = "message"
 		}
 		if rejectedHello {
-			kind += " · complete ServerHello declaration; negotiation not established"
+			kind += " · complete " + rejectedHelloName + " declaration; negotiation not established"
 		}
 		if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
 			if strongTLSRecord(e) {
@@ -1116,7 +1119,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 		}
 		if rejectedHello {
-			label = "TLS ServerHello (rejected)"
+			label = "TLS " + rejectedHelloName + " (rejected)"
 		}
 		unit := "PDU"
 		if tcpPayload {
@@ -1224,7 +1227,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 			}
 			add(fmt.Sprintf("%s bytes complete in frame #%d · %d contributing packet(s)", kind, e.SourceBytes.CompletedIn.Number, len(e.SourceBytes.PacketRefs)), false)
 		}
-		if rejectedHello {
+		if rejectedLegacyHello {
 			observation, _ := pcaputil.ObserveTLSServerHelloRecord(e.Raw, 4096)
 			add("TLS ServerHello: complete observed declaration; rejected", false)
 			add("Negotiated TLS version: unavailable · ServerHello rejected", false)
@@ -1238,6 +1241,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				field{text: fmt.Sprintf("Declared legacy version: 0x%04x · required 0x0303", observation.LegacyVersion), depth: 1, source: currentSource, start: 9, end: 11, hasRange: true},
 				field{text: fmt.Sprintf("Declared cipher suite: 0x%04x", observation.CipherSuite), depth: 1, source: currentSource, start: 44 + observation.SessionIDLength, end: 46 + observation.SessionIDLength, hasRange: true},
 				field{text: fmt.Sprintf("Declared compression: %d · required 0", observation.Compression), depth: 1, source: currentSource, start: 46 + observation.SessionIDLength, end: 47 + observation.SessionIDLength, hasRange: true},
+			)
+		}
+		if o := certificatePSKHello; o != nil {
+			add("TLS "+rejectedHelloName+": complete observed envelope; rejected", false)
+			add("Negotiated TLS version: unavailable · Hello rejected", false)
+			add("Cleartext envelope observed; extensions rejected; peer authentication not verified", false)
+			add("Rejected "+rejectedHelloName+" certificate/PSK declaration", true)
+			at := o.ExtensionOffset
+			out = append(out,
+				field{text: "Certificate/PSK extension type: tls_cert_with_extern_psk (33)", depth: 1, source: currentSource, start: at, end: at + 2, hasRange: true},
+				field{text: fmt.Sprintf("Certificate/PSK extension data length: %d · required 0", o.ExtensionDataLength), depth: 1, source: currentSource, start: at + 2, end: at + 4, hasRange: true},
+				field{text: fmt.Sprintf("Certificate/PSK extension data: %d bytes", o.ExtensionDataLength), depth: 1, source: currentSource, start: at + 4, end: at + 4 + o.ExtensionDataLength, hasRange: o.ExtensionDataLength > 0},
 			)
 		}
 		if !credibleTLSIdentity(e) && !tlsRemainder && !rejectedHello {
