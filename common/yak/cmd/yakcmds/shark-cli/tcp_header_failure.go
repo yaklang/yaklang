@@ -20,6 +20,7 @@ type tcpHeaderFailure struct {
 	network                         capturedNetworkHeader
 	start, end, available, required int
 	headerComplete                  bool
+	invalidFlags                    bool
 	legacyZeroLength                bool
 	status, reason                  string
 	fixed                           []byte
@@ -32,12 +33,24 @@ type tcpFailurePrefix struct {
 }
 
 func inspectTCPHeaderFailure(raw *capturedPacket, p gopacket.Packet) *tcpHeaderFailure {
-	if p == nil || p.ErrorLayer() == nil || !bytes.Equal(p.Data(), raw.data) {
+	if p == nil || !bytes.Equal(p.Data(), raw.data) {
 		return nil
+	}
+	if p.ErrorLayer() == nil {
+		// The dependency accepts syntactically complete SYN+FIN/RST headers,
+		// but the reassembler rejects them before touching a connection.
+		// Ordinary complete TCP headers keep the existing fast path.
+		tcp, ok := p.Layer(layers.LayerTypeTCP).(*layers.TCP)
+		if !ok || !tcp.SYN || !tcp.FIN && !tcp.RST {
+			return nil
+		}
 	}
 	b := literalTCPHeaderFailure(raw)
 	if b == nil {
 		return nil // A complete TCP header followed by a bad child stays intact.
+	}
+	if p.ErrorLayer() == nil && !b.invalidFlags {
+		return nil // Decoded metadata cannot substitute for the literal flag bits.
 	}
 	if raw.presentation.networkRefused || presentEvents(raw.protocolEvents()).networkRefused {
 		return nil // An unselected or invalid parent owns its own child boundary.
@@ -220,6 +233,11 @@ func literalTCPHeaderFailure(raw *capturedPacket) *tcpHeaderFailure {
 			}
 		}
 		option += size
+	}
+	if flags := wire[at+13]; flags&2 != 0 && flags&5 != 0 {
+		b.invalidFlags = true
+		b.status, b.reason = "malformed", "TCP SYN combined with FIN or RST"
+		return b
 	}
 	return nil // Do not turn an unrelated application decoder error into TCP failure.
 }
