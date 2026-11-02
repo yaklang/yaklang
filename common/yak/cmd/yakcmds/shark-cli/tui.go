@@ -286,9 +286,7 @@ func runTUI(ctx context.Context, s *captureSession, src *captureSource, cfg capt
 				stop()
 			}
 		}
-		if ui.rate.sample(time.Now(), s) {
-			ui.updateMix()
-		}
+		ui.refreshProtocolMix(time.Now(), s)
 		return screen.draw(ui.view(s, src, cfg), ui.width, ui.height)
 	}
 	if err := refresh(true); err != nil {

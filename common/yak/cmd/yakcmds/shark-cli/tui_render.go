@@ -215,6 +215,16 @@ type protocolShare struct {
 	count int
 }
 
+func (u *tui) refreshProtocolMix(now time.Time, s *captureSession) {
+	// The final batch can arrive before the next rate tick. Once the input
+	// channel is drained, EOF must show that final physical window immediately.
+	// Rechecking it also reflects late retained protocol observations without
+	// inventing new traffic samples. The window is bounded to 128 packets.
+	if u.rate.sample(now, s) || u.finished {
+		u.updateMix()
+	}
+}
+
 func (u *tui) updateMix() {
 	counts := map[string]int{}
 	u.mixTotal = min(128, u.ring.size)
