@@ -1,9 +1,12 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
-本批已独立全绿父基线为`4153bbd7b7fee2d3b2d9833801c96423858000a3`，47约定检查/91最新执行/2状态、
-315530原始ID与131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41485063054)。
-后续98fd只补[非SMB单侧ServerHello字面和一致Windows展示](shark-m2-tls-server-hello-observation-20261103.md)，
-新最终head CI须另验，当前交接基线以Page及PR精确SHA为准。S01–S06、107/121及字段分母不变；承接者固定开工时最新远端M2。
+当前已独立全绿交接基线为 `e31fc553c06c7e06fafa64ff42a112c46c3b55b6`，47约定检查/91执行/2statuses、
+315716原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41501019191)。
+后续bb217仅补[非SMB RFC8773配套/EE及拒绝Hello展示](shark-m2-tls-certificate-psk-20261103.md)，
+224新增、114小源、20参考和94实际Windows均为有限本地验收，最终说明head须另验315940及全部CI。
+当前78项68有限完成/10开放；SMB S01–S06、历史107/121和字段分母不变，承接者固定开工时最新远端M2。
+
+以下保留历史非SMB检查点；当前基线以上文及Page精确SHA为准。
 
 最新独立全绿检查点为`f85833d7e215c2dd10794093b145d4c042e80128`，47约定检查/91执行/2状态、
 315396原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41471189600)。
