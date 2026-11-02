@@ -176,6 +176,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var tlsNegotiatedVersion uint64
 	var tlsCipherSuite uint64
 	var http3FrameKind string
+	var http1StartLineKind string
 	var http3StreamID uint64
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
@@ -208,6 +209,18 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 		}
 		switch x := v.(type) {
 		case map[string]any:
+			if protocol == "http" {
+				previous := http1StartLineKind
+				defer func() { http1StartLineKind = previous }()
+				switch name {
+				case "HTTP Request", "HTTP Response":
+					http1StartLineKind = name
+				case "FirstLine":
+				default:
+					// A payload dictionary named FirstLine is not a start line.
+					http1StartLineKind = ""
+				}
+			}
 			if protocol == "quic" || protocol == "http3" || protocol == "doq" {
 				previous := quicCryptoSize
 				defer func() { quicCryptoSize = previous }()
@@ -317,6 +330,14 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 					return smbDetailFieldLess(keys[i], keys[j], wireRanges)
 				}
 				a, b := fieldPriority(keys[i]), fieldPriority(keys[j])
+				if protocol == "http" {
+					if rank, ok := http1MessageDetailPriority(name, http1StartLineKind, keys[i]); ok {
+						a = rank
+					}
+					if rank, ok := http1MessageDetailPriority(name, http1StartLineKind, keys[j]); ok {
+						b = rank
+					}
+				}
 				if (protocol == "quic" || protocol == "http3" || protocol == "doq") && x["Frame Type"] == "CRYPTO" {
 					if rank, ok := quicCryptoFramePriority[keys[i]]; ok {
 						a = rank
