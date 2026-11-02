@@ -111,6 +111,8 @@ type binTLS struct {
 	phaPeerPrefixComplete                  bool // current record only; no connection-wide ACK inference
 	phaEarlyResponses                      map[string]tlsPHAResponse
 	serverHandshakeStage                   uint8 // accepted initial TLS 1.3 server observations only
+	clientHandshakeStage                   uint8 // accepted initial TLS 1.3 client observations only
+	clientCertificateEmpty                 bool  // private fact from an admitted initial client Certificate
 }
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
@@ -361,11 +363,18 @@ func (t *binTLS) handshakeMessage(dir int, b []byte, authenticated bool, limits 
 	if err != nil {
 		return nil, err
 	}
+	clientStage, err := t.observedClientHandshakeStage(dir, b[0], authenticated)
+	if err != nil {
+		return nil, err
+	}
 	trial := *t
 	m, err := trial.applyHandshakeMessage(dir, b, authenticated, limits...)
 	if err == nil {
 		if stage != 0 {
 			trial.serverHandshakeStage = stage
+		}
+		if clientStage != 0 {
+			trial.clientHandshakeStage = clientStage
 		}
 		*t = trial
 	}
@@ -619,6 +628,9 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 				if association["Context Association"] == "matched observed CertificateRequest" {
 					m["Certificate Body Status"] = "body vectors decoded; observed request context matched; certificate type and trust not evaluated"
 				}
+			}
+			if authenticated && t.client >= 0 && dir == t.client && !t.app[dir] {
+				t.clientCertificateEmpty = len(view.Certificates) == 0
 			}
 		} else {
 			certs, err := tlsCertificates(body, false, limits...)
