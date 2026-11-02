@@ -1021,6 +1021,10 @@ func (p *packetPresentation) add(e *pcaputil.ProtocolEvent) {
 		p.addLayer("OSPFv3")
 		return
 	}
+	if names, ok := ipv4IPIPExtentRefusal(e); ok {
+		*p = packetPresentation{networkRefused: true, protocol: "IPv4", summary: safeText(e.Summary), status: "malformed", visibility: "invalid-carrier-extent", scope: "observed IPv4 parent header; IP-in-IP normalization not admitted", evidence: "literal zero Total Length; captured length cannot establish enclosing carrier extent", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
+		return
+	}
 	if names, ok := ipv4FragmentExtentRefusal(e); ok {
 		*p = packetPresentation{networkRefused: true, protocol: "IPv4", summary: safeText(e.Summary), status: "malformed", visibility: "invalid-fragment-extent", scope: "observed IPv4 fragment header; reassembly not admitted", evidence: "literal zero Total Length; captured length cannot establish fragment extent", nativeHeaders: append([]string(nil), names...), nativeDomain: e.Domain, priority: 1000}
 		return

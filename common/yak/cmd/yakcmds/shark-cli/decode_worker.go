@@ -363,7 +363,8 @@ func decodeStream(req streamDecodeRequest) (d packetDetail) {
 		d.unavailable = protocolDetailsUnavailable(req.Events)
 		for _, event := range req.Events {
 			_, extentRefused := ipv4FragmentExtentRefusal(event)
-			if _, _, refused := networkHeaderRefusalPresentation(event); refused || extentRefused {
+			_, carrierExtentRefused := ipv4IPIPExtentRefusal(event)
+			if _, _, refused := networkHeaderRefusalPresentation(event); refused || extentRefused || carrierExtentRefused {
 				// There is no captured frame in a stream-only request. Retain the
 				// exact diagnostic and its observed prefix identity, without child
 				// dissectors or fabricated physical network-header byte ranges.

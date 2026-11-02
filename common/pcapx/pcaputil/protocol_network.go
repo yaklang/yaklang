@@ -287,6 +287,12 @@ func (a *binParser) networkPacket(p gopacket.Packet) (gopacket.Packet, bool) {
 		}
 		return nil, true
 	}
+	if a.refuseIPv4IPIPExtent(p, e, ci) {
+		if p.ErrorLayer() != nil {
+			return &ipv4IPIPExtentRefusedPacket{p}, false
+		}
+		return nil, true
+	}
 	if a.refuseIPv4FragmentExtent(p, e, ci) {
 		return nil, true
 	}
