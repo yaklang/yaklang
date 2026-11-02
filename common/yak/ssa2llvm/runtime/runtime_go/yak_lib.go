@@ -113,6 +113,16 @@ func yak_runtime_make_object() int64 {
 	return int64(uintptr(newStdlibShadow(newRuntimeOrderedMap())))
 }
 
+// decodeMethodMemberCount unpacks the paramMemberCount word from
+// yak_runtime_make_callable. A negative word marks an object method and the
+// absolute value, minus one, is the parameter-member count.
+func decodeMethodMemberCount(encoded int64) (count int, implicitReceiver bool) {
+	if encoded < 0 {
+		return int(-encoded - 1), true
+	}
+	return int(encoded), false
+}
+
 //export yak_runtime_make_callable
 func yak_runtime_make_callable(fn uintptr, paramMemberCount int64, freeCount int64, freeValues unsafe.Pointer) int64 {
 	defer recoverRuntimePanic()
@@ -123,9 +133,11 @@ func yak_runtime_make_callable(fn uintptr, paramMemberCount int64, freeCount int
 	if freeCount > 0 && freeValues != nil {
 		captures = append(captures, unsafe.Slice((*uint64)(freeValues), int(freeCount))...)
 	}
+	memberCount, implicitReceiver := decodeMethodMemberCount(paramMemberCount)
 	return int64(uintptr(newRuntimeShadow(runtimeCallableClosure{
 		fn:               uint64(fn),
-		paramMemberCount: int(paramMemberCount),
+		paramMemberCount: memberCount,
+		implicitReceiver: implicitReceiver,
 		freeValues:       captures,
 	})))
 }

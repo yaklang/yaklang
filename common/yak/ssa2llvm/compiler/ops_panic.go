@@ -195,6 +195,73 @@ func (c *Compiler) panicValueFlags(inst *ssa.Panic) uint64 {
 	return 0
 }
 
+// snapshotCatchExceptions copies the live panic word into the catch
+// variables of this block. recover() still clears the live word; the catch
+// variable keeps the value it had on entry (`println(recover()); println(err)`
+// prints the panic twice).
+func (c *Compiler) snapshotCatchExceptions(blockID int64) error {
+	if c == nil || c.function == nil || blockID <= 0 {
+		return nil
+	}
+	ids := c.function.exceptionIDsByCatchBody[blockID]
+	if len(ids) == 0 {
+		return nil
+	}
+	panicVal, err := c.loadContextPanic(fmt.Sprintf("yak_catch_panic_%d", blockID))
+	if err != nil {
+		return err
+	}
+	panicVal = c.coerceToInt64(panicVal)
+	for _, id := range ids {
+		slot := c.ensureExceptionSlot(id)
+		if slot.IsNil() {
+			return fmt.Errorf("snapshotCatchExceptions: no slot for exception %d", id)
+		}
+		c.Builder.CreateStore(panicVal, slot)
+	}
+	return nil
+}
+
+func (c *Compiler) ensureExceptionSlot(id int64) llvm.Value {
+	if c == nil || c.function == nil || id <= 0 {
+		return llvm.Value{}
+	}
+	if c.function.exceptionSlots == nil {
+		c.function.exceptionSlots = make(map[int64]llvm.Value)
+	}
+	if slot, ok := c.function.exceptionSlots[id]; ok && !slot.IsNil() {
+		return slot
+	}
+	fn := c.function.current
+	if fn == nil || fn.EnterBlock <= 0 {
+		return llvm.Value{}
+	}
+	entryBB := c.entryBlockFor(fn)
+	if entryBB.IsNil() {
+		return llvm.Value{}
+	}
+	restoreBB := c.currentInsertBlock()
+	prevActive := c.function.activeBlockID
+	c.function.activeBlockID = fn.EnterBlock
+	if first := entryBB.FirstInstruction(); first.IsNil() {
+		c.Builder.SetInsertPointAtEnd(entryBB)
+	} else {
+		c.Builder.SetInsertPointBefore(first)
+	}
+	slot := buildAlloca(c.Builder, c.LLVMCtx.Int64Type(), fmt.Sprintf("yak_exc_slot_%d", id))
+	c.Builder.CreateStore(llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), slot)
+	c.function.exceptionSlots[id] = slot
+	if !restoreBB.IsNil() {
+		if c.blockHasTerminator(restoreBB) {
+			c.setInsertPointBeforeTerminator(restoreBB)
+		} else {
+			c.Builder.SetInsertPointAtEnd(restoreBB)
+		}
+	}
+	c.function.activeBlockID = prevActive
+	return slot
+}
+
 func (c *Compiler) compileRecover(inst *ssa.Recover) error {
 	if inst == nil {
 		return nil

@@ -1,18 +1,19 @@
 package ssa
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/yaklang/yaklang/common/utils"
 )
 
 // get field value
 func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Value {
 	res := checkCanMemberCallExist(object, key, wantFunction)
-	// normal member
-	// use name  peek value
-	if ret := b.PeekValueInThisFunction(res.name); ret != nil {
+	if ret := b.PeekValueInThisFunction(res.name); ret != nil && shouldReuseMemberScopeValue(object, key, ret) {
 		return ret
 	}
-	if !isStaticBlueprintMemberAccess(object, key) {
+	if !isStaticBlueprintMemberAccess(object, key) && !memberMutatedByNestedClosure(object, key) {
 		if members := GetMembersByKey(object, key); len(members) > 0 {
 			if wantFunction {
 				for _, member := range members {
@@ -32,6 +33,159 @@ func (b *FunctionBuilder) getFieldValue(object, key Value, wantFunction bool) Va
 	// default member
 	value := b.createDefaultMember(res, object, key, wantFunction)
 	return value
+}
+
+func shouldReuseMemberScopeValue(object, key, value Value) bool {
+	if utils.IsNil(value) {
+		return false
+	}
+	if !memberMutatedByNestedClosure(object, key) {
+		return true
+	}
+	// A literal cached when the object was built can be stale after a nested
+	// function mutates this exact field. Keep propagated side effects and
+	// computed values from the current scope; only bypass the old literal.
+	_, isLiteral := ToConstInst(value)
+	return !isLiteral
+}
+
+// memberMutatedByNestedClosure reports whether a nested function captures this
+// object and writes the requested member through a parameter member.
+func memberMutatedByNestedClosure(object, key Value) bool {
+	if utils.IsNil(object) || utils.IsNil(key) || !valueCapturedByClosure(object) {
+		return false
+	}
+	parent := object.GetFunc()
+	program := object.GetProgram()
+	if parent == nil || program == nil {
+		return false
+	}
+	keyName := GetKeyString(key)
+	if keyName == "" {
+		keyName = key.String()
+	}
+	if keyName == "" {
+		return false
+	}
+	wantSuffix := "." + keyName
+	mutated := false
+	program.EachFunction(func(fn *Function) {
+		if mutated || fn == nil || !isNestedInFunction(fn, parent) {
+			return
+		}
+		// The closure must be handed to a call whose body the front end cannot
+		// see (filesys.onFileStat); otherwise handleArgumentFunctionSideEffect
+		// already propagates the write.
+		if holder := fn.GetParent(); holder == nil || !closurePassedToOpaqueCall(holder, fn) {
+			return
+		}
+		for _, freeValueID := range fn.FreeValues {
+			parameterValue, ok := fn.GetValueById(freeValueID)
+			if !ok || parameterValue == nil {
+				continue
+			}
+			parameter, ok := ToParameter(parameterValue)
+			if !ok || parameter == nil || resolveCapturedObjectID(parameter) != object.GetId() {
+				continue
+			}
+			prefix := fmt.Sprintf("#%d", freeValueID)
+			for _, memberID := range fn.ParameterMembers {
+				member, ok := fn.GetValueById(memberID)
+				if !ok || member == nil {
+					continue
+				}
+				name := member.GetName()
+				if strings.HasPrefix(name, prefix) && strings.HasSuffix(name, wantSuffix) {
+					mutated = true
+					return
+				}
+			}
+		}
+	})
+	return mutated
+}
+
+// isNestedInFunction reports whether fn is nested anywhere below ancestor.
+func isNestedInFunction(fn, ancestor *Function) bool {
+	if fn == nil || ancestor == nil {
+		return false
+	}
+	for current := fn.GetParent(); current != nil; current = current.GetParent() {
+		if current.GetId() == ancestor.GetId() {
+			return true
+		}
+	}
+	return false
+}
+
+// resolveCapturedObjectID follows free-value defaults until it reaches the value
+// the innermost closure actually captured (for `params.file_count`, the outer
+// `params` object). A capture nested two levels deep defaults to the enclosing
+// function's free value, not to the object itself.
+func resolveCapturedObjectID(param *Parameter) int64 {
+	for depth := 0; param != nil && depth < 8; depth++ {
+		captured := param.GetDefault()
+		if captured == nil {
+			return 0
+		}
+		if next, ok := ToParameter(captured); ok && next != nil && next.IsFreeValue {
+			param = next
+			continue
+		}
+		return captured.GetId()
+	}
+	return 0
+}
+
+// closurePassedToOpaqueCall reports whether parent passes nested as a callback
+// argument to a call without an SSA function body. Such a call cannot have its
+// callback side effects propagated by handleArgumentFunctionSideEffect.
+func closurePassedToOpaqueCall(parent, nested *Function) bool {
+	if parent == nil || nested == nil {
+		return false
+	}
+	for _, blockID := range parent.Blocks {
+		blockValue, ok := parent.GetValueById(blockID)
+		if !ok {
+			continue
+		}
+		block, ok := ToBasicBlock(blockValue)
+		if !ok || block == nil {
+			continue
+		}
+		for _, instructionID := range block.Insts {
+			instruction, ok := parent.GetInstructionById(instructionID)
+			if !ok || instruction == nil {
+				continue
+			}
+			call, ok := ToCall(instruction)
+			if !ok || call == nil {
+				continue
+			}
+			passed := false
+			for _, argumentID := range call.Args {
+				argument, ok := parent.GetValueById(argumentID)
+				if !ok || argument == nil {
+					continue
+				}
+				if function, ok := ToFunction(argument); ok && function != nil && function.GetId() == nested.GetId() {
+					passed = true
+					break
+				}
+			}
+			if !passed {
+				continue
+			}
+			callee, ok := parent.GetValueById(call.Method)
+			if !ok || callee == nil {
+				return true
+			}
+			if _, hasSSAFunctionBody := ToFunction(callee); !hasSSAFunctionBody {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // isStaticBlueprintMemberAccess reports whether object/key denote a class static

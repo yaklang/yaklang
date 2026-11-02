@@ -1075,6 +1075,9 @@ func (c *Compiler) maybeEmitMemberSet(contextInst ssa.Instruction, val ssa.Value
 					return err
 				}
 				keyStr := c.resolveMemberKeyString(key)
+				if keyStr != "" && c.memberVariableSetEmitted(resultID, obj, keyStr) {
+					return c.emitAssignedMemberVariableSets(contextInst, val, resultID)
+				}
 				if keyStr != "" && !c.shouldSkipOutdatedMemberSet(val, keyStr) {
 					llvmVal, err := c.valueForMemberSet(contextInst, val, resultID, false)
 					if err != nil {
@@ -1524,6 +1527,12 @@ func (c *Compiler) valueForMemberSet(contextInst ssa.Instruction, source ssa.Val
 			}
 		}
 		if c.shouldReadInitialMemberValueForMemberSet(source) {
+			// The field was already stored from the value's own word. Reading it
+			// back and storing that result replaces the word: a bool 0 read back
+			// through the runtime becomes true.
+			if c.hasValueSlot(resultID) {
+				return c.loadSSAValue(resultID), nil
+			}
 			return c.dynamicMemberReadValue(contextInst, source, resultID)
 		}
 	}
@@ -1850,7 +1859,21 @@ func (c *Compiler) sameMemberTarget(val ssa.Value, obj ssa.Value, keyStr string)
 	if val == nil || obj == nil || keyStr == "" || !val.IsMember() || val.GetObject() == nil {
 		return false
 	}
-	return val.GetObject().GetId() == obj.GetId() && c.resolveMemberKeyString(val.GetKey()) == keyStr
+	return val.GetObject().GetId() == obj.GetId() && c.memberKeyText(val.GetKey()) == keyStr
+}
+
+// memberKeyText is the runtime key of a member, using the constant's own
+// text. ConstInst.GetName() is empty for string literal keys, so comparing
+// through GetName() treats the key as a different member and re-writes the
+// field with a value read back from it.
+func (c *Compiler) memberKeyText(key ssa.Value) string {
+	if key == nil {
+		return ""
+	}
+	if cinst, ok := ssa.ToConstInst(key); ok {
+		return strings.Trim(cinst.String(), "\"")
+	}
+	return strings.Trim(key.GetName(), "\"")
 }
 
 func (c *Compiler) emitInitialMakeMemberAssignments(inst *ssa.Make, objVal llvm.Value) error {

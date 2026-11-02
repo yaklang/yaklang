@@ -501,16 +501,21 @@ func TestRuntimeDropError_TupleAndSingle(t *testing.T) {
 }
 
 func TestRuntimeReadClosureFreeValue_ByRefSlot(t *testing.T) {
-	slot := uint64(42)
+	// The slot has to live on the heap. A uintptr to a stack variable is not
+	// a tracked pointer, and the shadow allocation in the first read can move
+	// the stack, leaving the stored address on the old copy (still 42).
+	slot := new(uint64)
+	*slot = 42
+	ptr := uint64(uintptr(unsafe.Pointer(slot)))
 	closure := runtimeCallableClosure{
 		fn:         123,
-		freeValues: []uint64{uint64(uintptr(unsafe.Pointer(&slot))), uint64(uintptr(unsafe.Pointer(&slot)))},
+		freeValues: []uint64{ptr, ptr},
 	}
 	raw := uint64(uintptr(newRuntimeShadow(closure)))
 	if got := yak_runtime_read_closure_free_value(raw, 1, 1); got != 42 {
 		t.Fatalf("read closure free value = %d, want 42", got)
 	}
-	slot = 99
+	*slot = 99
 	if got := yak_runtime_read_closure_free_value(raw, 0, 1); got != 99 {
 		t.Fatalf("read closure free value after update = %d, want 99", got)
 	}
