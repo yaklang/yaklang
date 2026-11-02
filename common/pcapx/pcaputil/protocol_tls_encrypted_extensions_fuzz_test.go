@@ -1,0 +1,69 @@
+package pcaputil
+
+import (
+	"bytes"
+	"encoding/binary"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
+
+func FuzzTLSEncryptedExtensionsAdmission(f *testing.F) {
+	for _, body := range [][]byte{eeScopeBody(), eeScopeBody(tlsResumptionExt{16, eeScopeALPN("h2")}), eeScopeBody(tlsResumptionExt{43, []byte{3, 3}}), eeScopeBody(tlsResumptionExt{0xaaaa, nil}, tlsResumptionExt{0xaaaa, nil}), eeScopeBody(tlsResumptionExt{0xaaaa, nil}, tlsResumptionExt{0xbbbb, nil}), {0, 1, 0}} {
+		f.Add(body, byte(1))
+	}
+	f.Fuzz(func(t *testing.T, input []byte, budget byte) {
+		body := bytes.Clone(input[:min(len(input), 4096)])
+		limit := int(budget%8) + 1
+		// Independent RFC envelope/placement oracle. Unknown extensions are
+		// opaque in this finite profile; it is not full extension negotiation.
+		valid := len(body) >= 2 && int(binary.BigEndian.Uint16(body)) == len(body)-2
+		count := 0
+		selected := ""
+		seen := map[uint16]bool{}
+		if valid {
+			for at := 2; at < len(body); {
+				if len(body)-at < 4 {
+					valid = false
+					break
+				}
+				kind, size := binary.BigEndian.Uint16(body[at:]), int(binary.BigEndian.Uint16(body[at+2:]))
+				at += 4
+				if size > len(body)-at || seen[kind] {
+					valid = false
+					break
+				}
+				seen[kind] = true
+				count++
+				data := body[at : at+size]
+				at += size
+				if kind == 13 || kind == 21 || kind == 41 || kind == 43 || kind == 44 || kind == 45 || kind == 49 || kind == 50 || kind == 51 {
+					valid = false
+					break
+				}
+				if kind == 16 {
+					if len(data) < 3 || int(binary.BigEndian.Uint16(data)) != len(data)-2 || int(data[2]) != len(data)-3 || data[2] == 0 || string(data[3:]) != "h2" {
+						valid = false
+						break
+					}
+					selected = string(data[3:])
+				}
+			}
+		}
+		valid = valid && count <= limit
+		state := newBinTLS()
+		state.client, state.version, state.suite = 0, 0x304, 0x1301
+		state.alpnOfferKnown, state.alpnOffer = true, eeScopeALPN("h2")
+		before := *state
+		_, err := state.handshakeMessage(1, reliabilityHS(8, body), true, limit)
+		if !valid {
+			require.Error(t, err)
+			require.Equal(t, before, *state)
+			return
+		}
+		require.NoError(t, err)
+		require.Equal(t, uint16(0x304), state.version)
+		require.Equal(t, selected, state.alpn)
+		require.Equal(t, before.alpnOffer, state.alpnOffer)
+	})
+}

@@ -98,6 +98,8 @@ type binTLS struct {
 	plaintext                              []byte
 	content                                byte
 	firstHello, retryCookie                []byte
+	alpnOffer                              []byte // immutable admitted ClientHello vector, retained after final ServerHello
+	alpnOfferKnown                         bool
 	retrySeen, retryClientSeen, finalHello bool
 	retrySuite, retryGroup                 uint16
 	resumption                             tlsResumptionState
@@ -112,7 +114,7 @@ type binTLS struct {
 
 func newBinTLS() *binTLS { return &binTLS{client: -1} }
 func (t *binTLS) storage() int64 {
-	return 2048 + t.extraStorage + t.resumption.storage() + t.requestContextStorage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie))
+	return 2048 + t.extraStorage + t.resumption.storage() + t.requestContextStorage() + int64(cap(t.handshake[0])+cap(t.handshake[1])+cap(t.firstHello)+cap(t.retryCookie)+cap(t.alpnOffer))
 }
 func tlsU24(b []byte) int { return int(b[0])<<16 | int(b[1])<<8 | int(b[2]) }
 func (f *binFlow) consumeTLS(dir int, e *ProtocolEvent) (map[string]any, error) {
@@ -450,6 +452,9 @@ func (t *binTLS) applyHandshakeMessage(dir int, b []byte, authenticated bool, li
 	case 8:
 		if !authenticated {
 			return nil, protocolError(ErrMalformedMessage, "cleartext TLS EncryptedExtensions")
+		}
+		if err := t.admitEncryptedExtensions(dir, body, limits...); err != nil {
+			return nil, err
 		}
 		if err := t.extensions(body, false, limits...); err != nil {
 			return nil, err

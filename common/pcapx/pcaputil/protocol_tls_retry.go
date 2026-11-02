@@ -309,6 +309,11 @@ func (t *binTLS) observeHello(dir int, typ byte, body []byte, limits ...int) (bo
 		// client's PHA offer as connection state across that release and KU.
 		t.phaOfferKnown = true
 		_, t.phaOffered = h.ext[49]
+		// EncryptedExtensions follows final ServerHello, which releases the
+		// complete retry body. Keep only the admitted ALPN offer needed to
+		// qualify the later server selection; absence is also known evidence.
+		t.alpnOfferKnown = true
+		t.alpnOffer = bytes.Clone(h.ext[16])
 		return false, nil
 	}
 	retry := bytes.Equal(body[2:34], tlsRetryRandom[:])
