@@ -1,5 +1,7 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+最新已独立全绿父基线为`3d2ac689d21b6831f34ff46c24e82557584ad6c4`，47约定检查/91实际执行/2statuses、314308原始ID及131084 required已闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41389720953)。随后976e仅增加UDP比较基础设施，[新范围](shark-m2-udp-oracle-layer-20261102.md)，其最终head CI另验，不替代SMB验收。S01–S06保持，107/121须重新核对；开工仍固定远端最新M2精确SHA。
+
 最新可复核父基线为`93c852275052dd252be662136a97f61d6c017f8a`，47约定检查/91实际执行/2statuses及314266精确traffic ID已全绿；[traffic](https://github.com/yaklang/yaklang/actions/runs/41381222731)。后续M2-65仅补非SMB option父头观察和内嵌文档，[实际证据](shark-m2-ipv4-option-observation-20261102.md)，新最终head另验CI。下文旧检查点保留为历史；承接人从开工时远端最新M2固定S01。SMB 107/121为待复核历史缺口，不能用上述非SMB验收替代S01，S01–S06范围不变。
 
 承接 Yak Shark M2 的 SMB 专项：补齐已定位的原生解析、类型化字段、连接状态和递进展示，使用真实捕获与 Wireshark 逐包验证。正确性优先。只补协议名称、端口提示或让报告数字相同，不能算完成。
