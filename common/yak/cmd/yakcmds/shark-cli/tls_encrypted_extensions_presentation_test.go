@@ -18,7 +18,7 @@ func encryptedExtensionsPresentation(t *testing.T) *pcaputil.ProtocolEvent {
 	view, err := pcaputil.DecodeTLSEncryptedExtensions(wire, 0x304, 1)
 	require.NoError(t, err)
 	return &pcaputil.ProtocolEvent{ID: 1, Protocol: "tls", Status: "decoded", Raw: append([]byte{23, 3, 3, 0, 38}, bytes.Repeat([]byte{0xa5}, 38)...), Session: map[string]any{
-		"Negotiated Version": uint16(0x304), "Authentication Verified": true,
+		"Negotiated Version": uint16(0x304), "Authentication Verified": true, "ALPN": "http/1.1",
 		"Handshake Messages": []map[string]any{{"Type": byte(8), "Length": 17, "Authenticated": true,
 			"Encrypted Extensions": view.Fields, "Encrypted Extensions Version": uint16(0x304), "Encoded Encrypted Extensions": wire}},
 	}}
@@ -70,6 +70,7 @@ func TestTLSEncryptedExtensionsProgressiveOwnedSourcesAndWorkers(t *testing.T) {
 			if protocol == "tls" {
 				row := presentEvents([]*pcaputil.ProtocolEvent{e}).apply(packetSummary{})
 				require.Contains(t, row.Info, "Encrypted Extensions · ALPN=\"http/1.1\"")
+				require.Equal(t, 1, strings.Count(row.Info, "ALPN="), "current selection must not be repeated as a context hint")
 				require.Equal(t, "TLSv1.3", row.Protocol)
 			}
 			after, err := json.Marshal(e)

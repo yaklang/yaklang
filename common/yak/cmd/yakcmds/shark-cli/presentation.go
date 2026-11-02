@@ -383,6 +383,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		return strings.Join(parts, " · ")
 	}
 	var parts []string
+	messageALPN := false
 	var handshakes []struct {
 		text string
 		rank int
@@ -397,6 +398,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 			for _, extension := range mapList(encrypted.Fields["Extensions"]) {
 				if number(extension["Type"]) == 16 {
 					name += " · ALPN=" + strconv.QuoteToASCII(string(bytesValue(extension["Protocol"])))
+					messageALPN = true
 				}
 			}
 			messageRank = max(messageRank, tlsHandshakeBodyRank)
@@ -483,7 +485,7 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 	if name := textValue(v["SNI"]); name != "" {
 		parts = append(parts, "SNI="+name)
 	}
-	if alpn := textValue(v["ALPN"]); alpn != "" {
+	if alpn := textValue(v["ALPN"]); alpn != "" && !messageALPN {
 		parts = append(parts, "ALPN="+alpn)
 	}
 	if e.Error != "" {
