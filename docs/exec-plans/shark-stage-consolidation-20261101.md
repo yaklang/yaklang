@@ -1,5 +1,9 @@
 # Shark 两阶段分支整理：2026-11-01
 
+2026-11-03同一M2继续[单侧ServerHello字面与一致Windows展示](shark-m2-tls-server-hello-observation-20261103.md)，
+运行98fd；77父项67有限完成/10未关闭，SMB仍跳过。main d705已包含、M1已合并，仍唯一M2 PR #5371。
+父4153已独立47/91/2、315530原始ID及官方产物全绿；本批最终说明head须独立315716及全部CI，不改写历史。
+
 2026-11-03同一M2继续[普通TLS1.3 PSK认证边界与实际Windows](shark-m2-tls-psk-authentication-20261103.md)，
 运行e700；76父项66有限完成/10未关闭，SMB仍跳过。main d705已包含、M1已合并，仍唯一M2 PR #5371。
 父f858已独立47/91/2和315396原始ID全绿；本批最终说明head须独立315530及全部CI，不改写历史。
