@@ -1,5 +1,11 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+最新已独立全绿基线为`912d8b6c8910039730e1f15e31f37a2f06dca3f3`，47约定检查/91执行/2状态、
+314824原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41409852472)。
+后续4c2e仅补[TLS EE资格、复用和实际Windows](shark-m2-tls-encrypted-extensions-20261102.md)，
+新最终head另验CI，不代替SMB验收。S01–S06、107/121须开工复核及阶段边界保持；从开工时远端
+最新M2固定精确HEAD。主线程继续跳过SMB语义分析。
+
 最新已核验全绿父基线为`220d52898ac06f9951f2d82e53aab46c559d21b8`，47约定检查/91实际执行/2statuses、314350原始ID及131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41393130244)。后续469仅补物理TCP异常flags页面，[证据](shark-m2-tcp-invalid-flags-20261102.md)，其新最终head CI另验，不涉及SMB应用分析。S01–S06及107/121待复核缺口保持，开工固定远端最新M2。
 
 最新已独立全绿父基线为`b603d21e02939b2fd874ecbbc93828c735008b31`，47约定检查/91实际执行/2statuses、314520原始ID及131084 required已闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41402609456)。运行ddd补位字段展示，后续83f4修复通用IPv4头分发，[新范围及Windows实抓](shark-m2-ipv4-header-dispatch-20261102.md)，新最终head CI另验，均不替代SMB验收。S01–S06保持，107/121须重新核对；开工仍固定远端最新M2精确SHA。
