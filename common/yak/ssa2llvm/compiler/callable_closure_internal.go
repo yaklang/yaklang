@@ -65,7 +65,8 @@ func (c *Compiler) freeValueCaptureMode(fn *ssa.Function, binding callframe.Free
 	}
 	// Per-iteration loop variables, function locals, and globals all get a
 	// private heap slot so mutable captures persist per closure.
-	return freeValueCaptureByRefFresh
+	mode := freeValueCaptureByRefFresh
+	return mode
 }
 
 // captureValueIsLocalPhi reports a per-iteration loop variable (`for i :=`).
@@ -333,7 +334,7 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 	makeFn, makeType := c.getOrInsertRuntimeMakeCallable()
 	closure := c.Builder.CreateCall(makeType, makeFn, []llvm.Value{
 		target,
-		llvm.ConstInt(i64, uint64(len(ssaFn.ParameterMembers)), false),
+		llvm.ConstInt(i64, uint64(encodedMethodMemberCount(ssaFn)), false),
 		llvm.ConstInt(i64, uint64(freeCount), false),
 		freeValuesPtr,
 	}, "yak_callable_closure")
@@ -343,6 +344,21 @@ func (c *Compiler) materializeCallableClosure(contextInst ssa.Instruction, ssaFn
 		c.Builder.CreateStore(c.coerceToInt64(closure), cell)
 	}
 	return closure, nil
+}
+
+// encodedMethodMemberCount is the paramMemberCount word passed to
+// yak_runtime_make_callable. A negative value marks an object method: the
+// runtime prepends the receiver so the implicit `this` parameter is the
+// instance, not the first user argument. -1 means no parameter members.
+func encodedMethodMemberCount(fn *ssa.Function) int64 {
+	count := int64(0)
+	if fn != nil {
+		count = int64(len(fn.ParameterMembers))
+	}
+	if fn != nil && fn.Type != nil && fn.Type.IsMethod {
+		return -(count + 1)
+	}
+	return count
 }
 
 func bindingNamesSelf(fn *ssa.Function, binding callframe.FreeValueBinding) bool {

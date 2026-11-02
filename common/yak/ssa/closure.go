@@ -844,12 +844,89 @@ func isParameterCalledInFunction(calleeFunc *Function, paramIndex int) bool {
 // 1. If an argument is a function with side effects
 // 2. If the corresponding parameter is actually called inside the callee
 // 3. If both conditions are met, create SideEffect instructions at the call site
+// splitMemberVerboseName splits `params.file_count` into its object name and
+// field. A side effect created for a captured object member already carries the
+// object variable and the field in its verbose name.
+func splitMemberVerboseName(se *FunctionSideEffect) (objName, field string) {
+	if se == nil || se.Variable == nil {
+		return "", ""
+	}
+	if idx := strings.LastIndex(se.VerboseName, "."); idx >= 0 && idx+1 < len(se.VerboseName) {
+		field = se.VerboseName[idx+1:]
+	}
+	objName = se.Variable.GetName()
+	return objName, field
+}
+
+func propagateOpaqueCallbackSideEffects(c *Call, builder *FunctionBuilder, currentScope ScopeIF) {
+	for _, argId := range c.Args {
+		argValue, ok := c.GetValueById(argId)
+		if !ok || utils.IsNil(argValue) {
+			continue
+		}
+		argFunc, isFunc := ToFunction(argValue)
+		if !isFunc || argFunc.Type == nil {
+			continue
+		}
+		// Only closures carry captures a Go callback can write through.
+		// A plain named function passed as a callback has no free values, so
+		// its side effects belong to its own call sites, not to this one.
+		if len(argFunc.FreeValues) == 0 {
+			continue
+		}
+		recoverBuilder := builder.SetCurrent(c)
+		for _, se := range argFunc.Type.SideEffects {
+			if se == nil || se.Kind != NormalSideEffect {
+				continue
+			}
+			modify, ok := c.GetValueById(se.Modify)
+			if !ok || utils.IsNil(modify) {
+				modify, ok = argFunc.GetValueById(se.Modify)
+				if !ok || utils.IsNil(modify) {
+					continue
+				}
+			}
+			varName := se.Name
+			if se.Variable != nil && se.Variable.GetName() != "" {
+				varName = se.Variable.GetName()
+			}
+			sideEffect := builder.EmitSideEffect(se.Name, c, modify)
+			if sideEffect == nil {
+				continue
+			}
+			sideEffect.SetVerboseName(se.VerboseName)
+			// Bind the write to the object's member, not to the object itself.
+			// An object-named side effect (`[params]`) makes later reads of any
+			// field resolve to this value, so `params.language` would read the
+			// count. A member variable keeps the write on its own field.
+			if objName, field := splitMemberVerboseName(se); objName != "" && field != "" {
+				if objVariable := ReadVariableFromScopeAndParent(currentScope, objName); objVariable != nil {
+					if objValue := objVariable.GetValue(); !utils.IsNil(objValue) {
+						key := builder.EmitConstInst(field)
+						if memberVariable := builder.CreateMemberCallVariable(objValue, key); memberVariable != nil {
+							builder.AssignVariable(memberVariable, sideEffect)
+							recoverBuilder()
+							continue
+						}
+					}
+				}
+			}
+			variable := builder.CreateVariableForce(varName)
+			if variable == nil {
+				recoverBuilder()
+				continue
+			}
+			if v := ReadVariableFromScopeAndParent(currentScope, se.Name); v != nil {
+				variable.SetCaptured(v)
+			}
+			builder.AssignVariable(variable, sideEffect)
+		}
+		recoverBuilder()
+	}
+}
+
 func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 	defer c.markPersistenceDirty()
-	if calleeFuncTyp == nil {
-		return
-	}
-
 	function := c.GetFunc()
 	if function == nil {
 		return
@@ -864,6 +941,14 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 		return
 	}
 
+	// A callee with no SSA type is an extern/yaklib function. When one of its
+	// arguments is a closure, the Go side may invoke it (`filesys.onFileStat`),
+	// so the closure's captured writes have to surface at this call site.
+	if calleeFuncTyp == nil {
+		propagateOpaqueCallbackSideEffects(c, builder, currentScope)
+		return
+	}
+
 	// Get the callee function (not just its type) to analyze parameter usage
 	method, ok := c.GetValueById(c.Method)
 	if !ok || utils.IsNil(method) {
@@ -871,7 +956,17 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 	}
 	calleeFunc, isCalleeFunc := ToFunction(method)
 	if !isCalleeFunc {
-		// Cannot analyze parameter usage without function implementation
+		// filesys.onFileStat(func...) has no SSA body, but the callback runs
+		// and its captured writes must reach the caller.
+		propagateOpaqueCallbackSideEffects(c, builder, currentScope)
+		return
+	}
+	if len(calleeFunc.Blocks) == 0 {
+		// A yaklib/Go-implemented callee has a type but no SSA body, so
+		// isParameterCalledInFunction cannot observe the indirect call. The Go
+		// side may still invoke the closure (filesys.onFileStat), so the
+		// captured writes have to surface at this call site.
+		propagateOpaqueCallbackSideEffects(c, builder, currentScope)
 		return
 	}
 
@@ -918,8 +1013,40 @@ func handleArgumentFunctionSideEffect(c *Call, calleeFuncTyp *FunctionType) {
 				}
 			}
 
-			// Create side effect at call site
-			variable := builder.CreateVariableForce(se.Name)
+			// The write targets a member of a captured free variable
+			// (`params.file_count` inside a callback that the holder received). The
+			// caller reads the member cell `#<objectID>.<field>`, so resolve the
+			// caller's object through the call binding and bind the effect there.
+			// Binding a plain variable named after the object would both miss that
+			// read and replace the object with the field's value, which makes every
+			// other field read return this one.
+			if se.MemberCallKind == FreeValueMemberCall {
+				if obj, ok := se.GetActualParam(c); ok && !utils.IsNil(obj) {
+					if key, keyOK := c.GetValueById(se.MemberCallKey); keyOK && key != nil {
+						if memberVariable := builder.CreateMemberCallVariable(obj, key); memberVariable != nil {
+							if sideEffect := builder.EmitSideEffect(se.Name, c, modify); sideEffect != nil {
+								builder.AssignVariable(memberVariable, sideEffect)
+								sideEffect.SetVerboseName(se.VerboseName)
+								if c.SideEffectValue == nil {
+									c.SideEffectValue = make(map[string]int64)
+								}
+								c.SideEffectValue[se.VerboseName] = sideEffect.GetId()
+								continue
+							}
+						}
+					}
+				}
+			}
+
+			// Create side effect at call site. A member write inside the closure
+			// (`m.n++`) is recorded under the field name (`#18.n`); the variable it
+			// updates in the caller is the captured object (`m`). Bind the side
+			// effect to that variable so a later read of `m.n` sees the update.
+			varName := se.Name
+			if se.Variable != nil && se.Variable.GetName() != "" {
+				varName = se.Variable.GetName()
+			}
+			variable := builder.CreateVariableForce(varName)
 			if variable == nil {
 				continue
 			}

@@ -12,6 +12,8 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 	}
 
 	c.function.exceptionValueIDs = nil
+	c.function.exceptionIDsByCatchBody = nil
+	c.function.exceptionSlots = nil
 	c.function.activeHandlerByBlock = nil
 	c.function.catchBodyByHandler = nil
 	c.function.catchTargetByBlock = nil
@@ -48,6 +50,7 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 	}
 
 	exceptionIDs := make(map[int64]struct{})
+	exceptionIDsByCatchBody := make(map[int64][]int64)
 	catchBodyByHandler := make(map[int64]int64)
 	catchTargetByBlock := make(map[int64]int64)
 
@@ -82,6 +85,9 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 			}
 			if catchInst.Exception > 0 {
 				exceptionIDs[catchInst.Exception] = struct{}{}
+				if catchInst.CatchBody > 0 {
+					exceptionIDsByCatchBody[catchInst.CatchBody] = append(exceptionIDsByCatchBody[catchInst.CatchBody], catchInst.Exception)
+				}
 			}
 		}
 		if firstCatchBody > 0 {
@@ -141,6 +147,7 @@ func (c *Compiler) prepareErrorHandling(fn *ssa.Function) error {
 	}
 
 	c.function.exceptionValueIDs = exceptionIDs
+	c.function.exceptionIDsByCatchBody = exceptionIDsByCatchBody
 	c.function.activeHandlerByBlock = activeHandlerByBlock
 	c.function.catchBodyByHandler = catchBodyByHandler
 	c.function.catchTargetByBlock = catchTargetByBlock

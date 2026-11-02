@@ -82,7 +82,13 @@ type functionCompileContext struct {
 	// dominant over every redirected load/store.
 	redirectedClosureAllocas map[int64]llvm.Value
 
-	exceptionValueIDs    map[int64]struct{}
+	exceptionValueIDs map[int64]struct{}
+	// exceptionIDsByCatchBody lists the catch-variable ids bound by each catch
+	// body block. Those variables are a snapshot of the panic word taken on
+	// entry, not a live alias of it.
+	exceptionIDsByCatchBody map[int64][]int64
+	// exceptionSlots holds the entry-block alloca for each catch variable.
+	exceptionSlots       map[int64]llvm.Value
 	activeHandlerByBlock map[int64]int64
 	catchBodyByHandler   map[int64]int64
 	catchTargetByBlock   map[int64]int64

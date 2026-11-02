@@ -71,7 +71,6 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 	if id == 0 {
 		return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 	}
-
 	// Exception values (try/catch `err`) are backed by the current function's panic slot.
 	// These values can be referenced in multiple blocks, so do not cache the load.
 	if c != nil && c.function != nil && c.function.exceptionValueIDs != nil {
@@ -125,6 +124,12 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 		}
 		_, isExternLib := ssa.ToExternLib(valObj)
 		if !isExternUndef && !isExternLib && !c.valueHasLocalDependency(fn, valObj) {
+			// A value owned by a closure the caller reads after the call (the
+			// `m.n++` result) is not a word in this function. The side effect the
+			// front end attached to the call carries it.
+			if recovered := c.sideEffectForForeignValue(contextInst, fn, id); !recovered.IsNil() {
+				return recovered, nil
+			}
 			return llvm.ConstInt(c.LLVMCtx.Int64Type(), 0, false), nil
 		}
 	}
@@ -179,6 +184,14 @@ func (c *Compiler) getValue(contextInst ssa.Instruction, id int64) (llvm.Value, 
 			return val, nil
 		}
 		return llvm.Value{}, fmt.Errorf("getValue: compileMemberCall succeeded but value %d not cached", id)
+	}
+
+	// A member read the front end folded to the literal written before a
+	// closure ran must observe the closure's update, which lives in the side
+	// effect the front end attached to the call (or, when the closure was
+	// handed to a Go function, in the closure's own cell).
+	if folded := c.closureMemberReadValue(contextInst, valObj, id); !folded.IsNil() {
+		return folded, nil
 	}
 
 	// 2. Check cache for non-dynamic values.
@@ -809,6 +822,32 @@ func (c *Compiler) storeFreeValueSideEffect(fn *ssa.Function, se *ssa.FunctionSi
 	return c.storeFreeValueSideEffectWord(fn, se, contextInst, llvm.Value{})
 }
 
+// sideEffectModifiesOwnMember reports a side effect that writes a member of
+// the captured value itself: the front end records `m["c"] = 7` as a side
+// effect on `m` whose Modify is the member value. The captured cell holds the
+// object, so it must keep that word.
+func (c *Compiler) sideEffectModifiesOwnMember(fn *ssa.Function, se *ssa.FunctionSideEffect, binding callframe.FreeValueBinding) bool {
+	if fn == nil || se == nil || binding.ValueID <= 0 || se.Modify <= 0 {
+		return false
+	}
+	modify, ok := fn.GetValueById(se.Modify)
+	if !ok || modify == nil || !modify.IsMember() {
+		return false
+	}
+	obj := modify.GetObject()
+	if obj == nil {
+		return false
+	}
+	if obj.GetId() == binding.ValueID {
+		return true
+	}
+	// The member's object may be a parameter alias of the captured value.
+	if obj.GetFunc() == fn && obj.GetName() != "" && binding.Variable != nil && obj.GetName() == binding.Variable.GetName() {
+		return true
+	}
+	return false
+}
+
 func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.FunctionSideEffect, contextInst ssa.Instruction, preset llvm.Value) error {
 	if fn == nil || se == nil || se.Modify <= 0 || c == nil || c.function == nil {
 		return nil
@@ -822,6 +861,14 @@ func (c *Compiler) storeFreeValueSideEffectWord(fn *ssa.Function, se *ssa.Functi
 			continue
 		}
 		if c.freeValueCaptureMode(fn, binding) == freeValueCaptureByValue {
+			continue
+		}
+		// A member write on the captured value itself (`m["c"] = 7`) is
+		// recorded against `m` with the member as Modify. The field write is
+		// emitted where the assignment happens; storing the member's word here
+		// would replace the captured object with the field value, and every
+		// later read of `m` (inside or after the closure) would see garbage.
+		if c.sideEffectModifiesOwnMember(fn, se, binding) {
 			continue
 		}
 		ptr, ok := c.function.freeValuePointers[binding.ValueID]

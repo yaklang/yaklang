@@ -382,6 +382,10 @@ func runtimeResolveStringMethod(s string, name string) (reflect.Value, bool) {
 type runtimeCallableClosure struct {
 	fn               uint64
 	paramMemberCount int
+	// implicitReceiver is set for a yak object method. The call site passes
+	// only the user arguments; the receiver is prepended here so the method's
+	// first parameter is that instance.
+	implicitReceiver bool
 	freeValues       []uint64
 }
 
@@ -1538,7 +1542,14 @@ func callRuntimeShadowMethod(objPtr unsafe.Pointer, methodName string, rawArgs [
 	if closure, ok := runtimeCallableClosureValue(method.Interface()); ok {
 		// A closure stored in an object field is not a Go function.
 		// callRuntimeValue cannot reflect it, so use the closure ABI directly.
-		return callRuntimeCallableClosure(closure, rawArgs, ellipsis)
+		// Object methods take the instance as an implicit first parameter.
+		args := rawArgs
+		if closure.implicitReceiver {
+			args = make([]uint64, 0, len(rawArgs)+1)
+			args = append(args, uint64(uintptr(objPtr)))
+			args = append(args, rawArgs...)
+		}
+		return callRuntimeCallableClosure(closure, args, ellipsis)
 	}
 
 	return callRuntimeValue(method, rawArgs, ellipsis)

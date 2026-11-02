@@ -21,6 +21,10 @@ type Compiler struct {
 	Mod     llvm.Module
 	Builder llvm.Builder
 
+	// sideEffectInProgress tracks the side effects currently being lowered so
+	// a re-entrant read through the cross-function hook cannot loop.
+	sideEffectInProgress map[int64]struct{}
+
 	// Values maps YakSSA Value IDs to LLVM Values.
 	// This is critical because YakSSA uses int64 IDs for all SSA values.
 	Values map[int64]llvm.Value
@@ -384,6 +388,11 @@ func (c *Compiler) CompileFunction(fn *ssa.Function) error {
 		}
 		if c.function != nil {
 			c.armDeferGuards(c.function.deferArmAtStart[blockID])
+		}
+		// Catch variables keep the panic value from entry. recover() clears the
+		// live word, and a later read of the catch variable must still see it.
+		if err := c.snapshotCatchExceptions(blockID); err != nil {
+			return err
 		}
 
 		// Then compile regular instructions
