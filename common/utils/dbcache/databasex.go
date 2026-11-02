@@ -142,7 +142,12 @@ func NewCache[T MemoryItem, D any](
 ) *Cache[T, D] {
 	cfg := NewConfig(opt...)
 	ctx, cancel := context.WithCancel(cfg.ctx)
-	skipEviction, _ := cfg.skipEviction.(func(T) bool)
+	// The option closed over the caller's element type, so the erased callback
+	// is adapted back to T here, once, instead of on every eviction check.
+	var skipEviction func(T) bool
+	if eraser := cfg.skipEviction; eraser != nil {
+		skipEviction = func(value T) bool { return eraser(value) }
+	}
 
 	cache := &Cache[T, D]{
 		cancel:           cancel,
@@ -215,7 +220,7 @@ func NewCache[T MemoryItem, D any](
 			}, nil
 		})
 
-		// Save stores *saveTask[D], so the caller's func(D) int has to
+		// Save stores *saveTask[D], so the caller's size function has to
 		// measure task.data. Dropping it here makes the row-count limit the
 		// only batch boundary.
 		saveOpts := []Option{
@@ -224,7 +229,7 @@ func NewCache[T MemoryItem, D any](
 			WithSaveTimeout(cfg.saveTimeout),
 			WithName(cfg.name),
 		}
-		if sizeOf, ok := cfg.saveByteSize.(func(D) int); ok && cfg.saveByteBudget > 0 && sizeOf != nil {
+		if sizeOf := cfg.saveByteSize; sizeOf != nil && cfg.saveByteBudget > 0 {
 			saveOpts = append(saveOpts, WithSaveByteBudget(cfg.saveByteBudget, func(task *saveTask[D]) int {
 				if task == nil {
 					return 1

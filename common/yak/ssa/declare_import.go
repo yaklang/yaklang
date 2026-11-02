@@ -193,26 +193,22 @@ func (p *Program) ImportTypeStaticAll(lib *Program, classname string) error {
 	blueprint.Build()
 	p.fixImportCallback = append(p.fixImportCallback, func() {
 		//fix
-		if blueprint.StaticMember != nil {
-			blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
-				if len(values) > 0 {
-					pkg.val[s] = values[len(values)-1]
-				}
-				return true
-			})
-		}
-		for s, function := range blueprint.StaticMethod {
-			pkg.val[s] = function
-		}
-	})
-	if blueprint.StaticMember != nil {
 		blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 			if len(values) > 0 {
 				pkg.val[s] = values[len(values)-1]
 			}
 			return true
 		})
-	}
+		for s, function := range blueprint.StaticMethod {
+			pkg.val[s] = function
+		}
+	})
+	blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
+		if len(values) > 0 {
+			pkg.val[s] = values[len(values)-1]
+		}
+		return true
+	})
 	for s, function := range blueprint.StaticMethod {
 		pkg.val[s] = function
 	}
@@ -225,28 +221,24 @@ func (p *Program) ImportTypeStaticMemberFromLib(lib *Program, clsName string, na
 	}
 	build := func(blueprint *Blueprint, name string) {
 		p.fixImportCallback = append(p.fixImportCallback, func() {
-			if blueprint.StaticMember != nil {
-				blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
-					if name == s && len(values) > 0 {
-						pkg.val[s] = values[len(values)-1]
-					}
-					return true
-				})
-			}
-			for s, function := range blueprint.StaticMethod {
-				if name == s {
-					pkg.val[s] = function
-				}
-			}
-		})
-		if blueprint.StaticMember != nil {
 			blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
 				if name == s && len(values) > 0 {
 					pkg.val[s] = values[len(values)-1]
 				}
 				return true
 			})
-		}
+			for s, function := range blueprint.StaticMethod {
+				if name == s {
+					pkg.val[s] = function
+				}
+			}
+		})
+		blueprint.StaticMember.ForEach(func(s string, values []Value) bool {
+			if name == s && len(values) > 0 {
+				pkg.val[s] = values[len(values)-1]
+			}
+			return true
+		})
 		for s, function := range blueprint.StaticMethod {
 			if name == s {
 				pkg.val[s] = function

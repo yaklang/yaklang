@@ -188,8 +188,11 @@ func SaveIrCodeBatch(db *gorm.DB, items []*IrCode) error {
 	if err := db.New().SaveInBatches(deduped, irCodeBatchChunk, "program_name", "code_id").Error; err != nil {
 		return fmt.Errorf("upsert IR snapshot: %w", err)
 	}
-	irCodeUpdateStatements.Add(int64((len(deduped) + irCodeBatchChunk - 1) / irCodeBatchChunk))
-	irCodeUpdateRows.Add(int64(len(deduped)))
+	for program, rows := range irCodeRowsByProgram(deduped) {
+		counter := irCodeWriteCounterFor(program)
+		counter.updateStatements.Add(int64((rows + irCodeBatchChunk - 1) / irCodeBatchChunk))
+		counter.updateRows.Add(int64(rows))
+	}
 	return nil
 }
 

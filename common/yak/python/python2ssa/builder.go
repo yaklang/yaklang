@@ -473,19 +473,19 @@ func (b *singleFileBuilder) ensureBlueprintConstructorSlot(blueprint *ssa.Bluepr
 		}
 	}
 	constructorSlot := b.newDynamicPlaceholder(blueprint.Name)
-	if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(blueprint.Name) {
+	if !blueprint.NormalMember.Have(blueprint.Name) {
 		blueprint.RegisterNormalMember(blueprint.Name, constructorSlot, false)
 	}
-	if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(blueprint.Name) {
+	if !blueprint.StaticMember.Have(blueprint.Name) {
 		blueprint.RegisterStaticMember(blueprint.Name, constructorSlot, false)
 	}
 	if strings.Contains(blueprint.Name, ".") {
 		simpleName := pythonBlueprintSimpleName(blueprint.Name)
 		if simpleName != "" {
-			if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(simpleName) {
+			if !blueprint.NormalMember.Have(simpleName) {
 				blueprint.RegisterNormalMember(simpleName, constructorSlot, false)
 			}
-			if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(simpleName) {
+			if !blueprint.StaticMember.Have(simpleName) {
 				blueprint.RegisterStaticMember(simpleName, constructorSlot, false)
 			}
 			b.syncBlueprintContainerMember(blueprint, simpleName, constructorSlot)
@@ -539,7 +539,7 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		if name == "" || fn == nil {
 			continue
 		}
-		if child.NormalMember == nil || !child.NormalMember.Have(name) {
+		if !child.NormalMember.Have(name) {
 			child.RegisterNormalMember(name, fn, false)
 		}
 	}
@@ -547,7 +547,7 @@ func (b *singleFileBuilder) preRegisterInheritedBlueprintMembers(child, parent *
 		if name == "" || fn == nil {
 			continue
 		}
-		if child.StaticMember == nil || !child.StaticMember.Have(name) {
+		if !child.StaticMember.Have(name) {
 			child.RegisterStaticMember(name, fn, false)
 		}
 	}
@@ -598,11 +598,11 @@ func (b *singleFileBuilder) preRegisterBlueprintMemberHints(blueprint *ssa.Bluep
 		}
 		value := b.newDynamicPlaceholder(blueprint.Name + "." + name)
 		if static {
-			if blueprint.StaticMember == nil || !blueprint.StaticMember.Have(name) {
+			if !blueprint.StaticMember.Have(name) {
 				blueprint.RegisterStaticMember(name, value, false)
 			}
 		} else {
-			if blueprint.NormalMember == nil || !blueprint.NormalMember.Have(name) {
+			if !blueprint.NormalMember.Have(name) {
 				blueprint.RegisterNormalMember(name, value, false)
 			}
 		}

@@ -320,7 +320,7 @@ func (c *ProgramCache) SaveToDatabase(cb ...func(int)) error {
 					persistStats.WriteOperations, persistStats.UniquePersisted, persistStats.Resident,
 					persistStats.Pending, persistStats.WriteOperations, persistStats.BatchCount, avgBatch,
 					persistStats.Resident, persistStats.Pending, persistStats.UnchangedSkipped, persistStats.ResidentReleased)
-				insertRows, updateRows, updateStatements := ssadb.IrCodeWriteBreakdown()
+				insertRows, updateRows, updateStatements := ssadb.IrCodeWriteBreakdown(progName)
 				log.Infof("[ssa-ir-code-writes] program=%s insert_rows=%d update_rows=%d update_statements=%d",
 					progName, insertRows, updateRows, updateStatements)
 			}

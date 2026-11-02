@@ -45,12 +45,24 @@ func TestSaveIrCodeBatchUpsertsInPlace(t *testing.T) {
 		item.String = "v1"
 	}
 
-	ResetIrCodeWriteBreakdown()
+	ResetIrCodeWriteBreakdown("batch-updates")
 	require.NoError(t, SaveIrCodeBatch(db, items))
-	_, updateRows, statements := IrCodeWriteBreakdown()
+	_, updateRows, statements := IrCodeWriteBreakdown("batch-updates")
 	require.LessOrEqual(t, statements, int64(rows/irCodeBatchChunk+8),
 		"an upsert must not issue one statement per row")
 	require.Greater(t, updateRows, int64(0))
+
+	// A second program's writes must not land in this program's breakdown: a
+	// backend can run several compile projects at once.
+	other := &IrCode{ProgramName: "batch-updates-other", CodeID: 1, String: "x"}
+	require.NoError(t, SaveIrCodeBatch(db, []*IrCode{other}))
+	insertRows, otherRows, otherStatements := IrCodeWriteBreakdown("batch-updates-other")
+	require.Zero(t, insertRows)
+	require.Equal(t, int64(1), otherRows)
+	require.Equal(t, int64(1), otherStatements)
+	_, unchangedRows, unchangedStatements := IrCodeWriteBreakdown("batch-updates")
+	require.Equal(t, updateRows, unchangedRows, "another program must not add rows to this breakdown")
+	require.Equal(t, statements, unchangedStatements, "another program must not add statements to this breakdown")
 
 	for _, item := range items {
 		got := nativeGetIrCodeItemById(db, "batch-updates", item.CodeID)
