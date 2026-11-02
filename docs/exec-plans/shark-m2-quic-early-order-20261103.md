@@ -1,5 +1,9 @@
 # M2-79：QUIC 早期密钥、跨层包号与实际 Windows 展示
 
+2026-11-03后续：d344已独立47约定检查/91执行/2statuses、316025精确traffic ID及官方产物全绿；Java/RAG官方产物另核8新及3原失败ID各一次pass，79有限合同已有完整精确SHA CI。
+随后[M2-81 有界早期恢复、同数据报关联和实际Windows](shark-m2-quic-early-recovery-20261103.md)有限修复原始先到0-RTT及同数据报响应关联；运行6941的最终新SHA仍须独立CI。
+R04和新R05继续开放；旧原始20/21/缺口记录保留为修复前证据，不改成历史全通过。
+
 2026-11-03 CI后续：c292专项316025原始ID/85新增/131084 required已逐项闭合，
 [实际运行](https://github.com/yaklang/yaklang/actions/runs/41524197531)、官方artifact 13180167186，
 17051141B/SHA256 `7665f5be7ae37488edc61052041ba0dda04a2e72b2a183f7367387046558c0e4`；

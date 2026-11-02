@@ -1,5 +1,10 @@
 # M2 协议正确性验收清单
 
+2026-11-03后续：[M2-81 有界早期恢复、同数据报关联和实际Windows](shark-m2-quic-early-recovery-20261103.md)，运行6941，50新增、290976最终完整pass/25历史skip、864定向、32642插桩。
+实抓原始21/21已打开、四HTTP3消息及两个响应关联与独立来源/新参考对上，33新native/11新参考/36实际Windows；六完整公共及原四域strict保持。
+当前81项71有限完成、7进行中/3SMB搁置、10未关闭；N09.R03有限关闭，R04保留，新增R05七个晚到请求关联缺口。
+非SMB四包18–36实施小时。d344已独立47约定检查/91执行/2statuses、316025精确traffic ID及官方产物全绿；Java/RAG官方产物另核8新及3原失败ID各一次pass；本批最终SHA须独立316075及全部CI，父成功不认证恢复代码。
+
 2026-11-03后续：[M2-80 CI尾部丢失和Java错误导入身份](shark-m2-ci-drain-and-imports-20261103.md)。新旧回归20轮220全pass；两个完整包5轮447唯一ID/442pass/5历史skip，0fail。
 c292专项316025原始ID、85新增和131084 required已逐项闭合，但两个Essential实际失败，整体不全绿。
 当前80项70有限完成、7进行中/3SMB搁置、10未关闭；非SMB四包17–34实施小时。
@@ -215,7 +220,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 进行中（8场景实际复验，有限范围已闭合） | 82fc六来源72+两个匹配新SYNACK后77场景重跑，七个严格通过；C1 TLS1.2保留exit4/8项策略差异，额外4TLS+3HTTP经双Python AEAD/peer/父子/response_to/Feed57审计均旧Flow2，未串入新3。真实callback与CompletedIn分开；原严格失败不抹去。字节范围及TLS页面另闭合37；密钥代际/缺开头/KeyUpdate等整体未完成 | 2–4 小时；新增边界另计，不以7/8代替全部高级恢复 |
 | M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（R01/R02有限关闭，R03/R04明确开放） | 79补已观察suite的早期密钥及跨层PN，21真实源AEAD、13变换目标/605字段、36 Windows及原四组contract/checker73全0；原始先到0-RTT仍1缺密钥/1 H3上下文，迟到SETTINGS重试仍缺。CID/epoch/STREAM/QPACK/0RTT全程序须独立验收。[79证据](shark-m2-quic-early-order-20261103.md) | 4–8 小时；执行等待及新问题另计 |
 | M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N17共13有限完成/4未关闭；N11原24组混层比较错误已逐位置核实，9066包未建立应用会话，不代表所有UDP会话完成。N08有限政策/来源及N14的63/64/65入口合同保持；原133项解释、6 TCP政策、N13完整阶段、N09缺握手及N14高级字段/恢复仍保留 | 当前4包粗估17–34 AI实施小时，不含CI/构建/回放等待及新问题 |
-| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | 776已47/91/2及315940原始ID独立全绿。c292专项316025/85新增/131084 required已核官方产物，但两个Essential实际失败；80已修复RAG尾部丢失和Java并发错误别名，新旧回归20轮及两完整包5轮通过。最终SHA独立全部CI和316025流量ID，平台父动作保持，不沿用draft skip | 30–90 分钟实施，执行等待另计 |
+| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | d344已47/91/2、316025精确traffic ID及官方产物全绿，8核心新增/3原失败ID也核官方实际pass；父失败保留。81运行6941最终完整290976pass/25历史skip，50新增、实抓21/21及四H3消息/两个关联、新参考/实际Windows已有限验收；最终SHA另验316075原始ID、50新pass、131084 required零skip及全部CI，不沿用draft skip | 30–90 分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
 | M2-14 | SMB1 status 格式与 NTSTATUS alias 正确 | 已完成（alias 合同） | `TestSMB1AliasContract*`：请求/响应四组合，NTSTATUS 仅响应且 bit 置位；raw Status 与请求格式偏好分开，保留范围 | 0 |
@@ -285,6 +290,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-78 | RFC8773错误Hello仍改变PSK模式及完整拒绝记录被显示为缺握手 | 已完成（有限标志/配套/EE及拥有展示合同，最终CI归11） | c4先验空标志、CH/SH配套、已知提议及EE位置，bb有界外层观察统一CH/SH列表/详情/规则树与自有范围；224新增、290841合并本地pass/25历史skip、74312/43399插桩。114小源、12不同真实ISN域profile/216引用、72坏CH ACK不粘TLS、20参考、94实际Windows、六完整公共及四QUIC严格门通过；8组合参考、完整RFC8773/HRR与P04开放。[证据](shark-m2-tls-certificate-psk-20261103.md) | 0 |
 | M2-79 | 原生漏早期密钥及0-RTT/1-RTT跨层PN顺序误接纳 | 已完成（N09.R02有限合同，最终CI归11） | e714按当前random/已观察suite加载可选早期secret，不反复覆盖应用epoch；私有生命周期PN界限先于duplicate，双方向、拒绝原子及v1/v2三套件通过。85新增、290926最终完整pass/25历史skip、21真实源AEAD、13变换目标/605字段、40568插桩、33新native/11新参考和36实际Windows；六完整公共及原四域strict保持。原始先到0-RTT与迟到SETTINGS恢复仍开放，未将导出相同算修好。[证据](shark-m2-quic-early-order-20261103.md) | 0 |
 | M2-80 | CI中RAG排队尾部丢失和并发Java显式导入错误本包身份 | 已完成（有限根因修复，最终CI归11） | 由输出方排空后取消内部管线；显式导入fallback只移除错误本包猜测。新增8 ID先红后绿，旧断言不变；20轮220全pass、两完整包5轮442pass/5历史skip；不改Shark解析/ZIP/工作流。[证据](shark-m2-ci-drain-and-imports-20261103.md) | 0 |
+| M2-81 | 先到0-RTT未恢复及同数据报内丢请求响应关联 | 已完成（N09.R03有限合同，最终CI归11） | 6941在当前owner/域内有界拥有密文/来源，观察完整接纳后新PDU重处理，原贡献15与上下文16分开；拒绝/坏tag/预算/关闭不交付，晚secret不重装epoch。握手后预留剩余wire预算并在响应前恢复请求。50新增、最终完整290976pass/25历史skip、864定向、32642插桩、21原包/四H3消息及两个响应关联、新参考/36实际Windows、六完整公共及原四域strict通过；R04及新R05保留。[证据](shark-m2-quic-early-recovery-20261103.md) | 0 |
 
 M2-56后续限定补充：17fe对已知服务端要求context为空、证书列表非空，保留客户端空列表、
 PHA context及无角色语法API；43新ID和34实际Windows状态通过，两个坏控制不再发布HTTP，

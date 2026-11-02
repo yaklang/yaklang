@@ -1,5 +1,10 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+2026-11-03最新独立全绿交接基线为 `d34493d93721134ef407530dca0ae7abeee8e64d`。d344已独立47约定检查/91执行/2statuses、316025精确traffic ID及官方产物全绿；Java/RAG官方产物另核8新及3原失败ID各一次pass；
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41531275106)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41531281689)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41531288802)。
+后续[M2-81 有界早期恢复、同数据报关联和实际Windows](shark-m2-quic-early-recovery-20261103.md)运行6941已有限本地验收，最终SHA CI另验；当前81项71有限完成/10开放、非SMB四包18–36实施小时。
+SMB S01–S06、历史107/121及字段分母不变；Page仅更新两个基线块，70块顺序/ID及68任务块不变（sequence26），不认证未完成的SMB。
+
 2026-11-03交接补充：主表80项70有限完成/10开放；SMB S01–S06原任务和分母不变。
 c292专项316025已绿，但RAG/Java两个Essential失败。[M2-80 CI尾部丢失和Java错误导入身份](shark-m2-ci-drain-and-imports-20261103.md)已有限本地验收，
 新最终SHA须独立全部CI；当前可独立整体全绿交接基线仍是下列776，不能把c292标为ready。

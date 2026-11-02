@@ -1,5 +1,11 @@
 # M2-80：修复最终 CI 暴露的结果丢失和错误类型身份
 
+2026-11-03最终CI已闭合：d344已独立47约定检查/91执行/2statuses、316025精确traffic ID及官方产物全绿；Java/RAG官方产物另核8新及3原失败ID各一次pass。
+说明提交为 `d34493d93721134ef407530dca0ae7abeee8e64d`，官方traffic artifact 13183195835，17012270B，
+SHA256 `1c41e297ef34c7ec58f2e2b571b31ad1476cce243735fb7e8be277b598cd8e33`；
+完整闭合1568 `56bb86155ddd44f80a2d648049284a3ecc0d764506aae4e4abca622a4cc6625c`，核心ID闭合1569 `ab14dd052b2f2bdbbd35d6308033d5b6cf55ce8e22fddd7cf6fe3f4e493bcc94`。
+随后[M2-81 有界早期恢复、同数据报关联和实际Windows](shark-m2-quic-early-recovery-20261103.md)的新恢复代码不由d344 CI认证；旧c292失败和先红证据均保留。
+
 本项是 M2-11 最终提交验收的前置修复，不是新的协议覆盖声明。父提交为
 `c292544105682dac07d90f2d08399c2e4f0aecd1`。该提交的流量专项已经通过，但整体 CI 未通过：
 
