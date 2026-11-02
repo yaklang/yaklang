@@ -1,5 +1,10 @@
 # M2-10 非 SMB 有限差异清单
 
+2026-11-02后续[M2-74完整未识别UDP来源](shark-m2-udp-full-source-20261102.md)：
+46新增、8119事件/4833长载荷与事前原始源一致，新实抓12帧及参考、实际Windows完整1200B通过。
+原四组QUIC contract/checker73不改均0差异，N09.R01来源有限关闭；N09高级语义整体仍开放。
+17包13有限完成/4开放、16–32实施小时保持，不把完整UDP拥有字节当QUIC身份或全部恢复。
+
 2026-11-02后续[M2-73观察到的服务端握手顺序](shark-m2-tls-server-order-20261102.md)：
 246新增/三套件子序列、48最终小回放、36帧新实抓、30条record来源、16组CR字面alias及44实际Windows状态通过。
 零长度context省略的raw strict差异、四个组合接口/VLAN参考失败和两组QUIC strict2664均保留。
@@ -68,7 +73,7 @@ N14复核到M1已有有界IP重组基础，纠正旧“未实现”描述；完�
 | M2-10.N06 | HTTP迟到/乱序请求后的响应恢复 | 有限完成（M2-39） | 真实163/167恢复两例旧6差异；HEAD/CONNECT/Expect100、预算、原贡献及callback因果门 | 0 |
 | M2-10.N07 | 永久缺客户端请求的HTTP响应边界 | 有限完成（M2-55的partial可观察性）；完整划分差异保留 | c0确认完整头的HTTP版本/状态码，拥有的未定界字节不伪造正文、方法或新消息；真实GET/HEAD/CONNECT、TLS缺失和54公开头独立来源/参考、1048后续观察、别名负控及35实际Windows状态通过。原WS169的6响应与产品1完整响应差异不豁免；不承诺缺信息时完整划分等价。[证据](shark-m2-http-orphan-observation-20261101.md) | 此有限合同0；信息不足的完整划分限制保留 |
 | M2-10.N08 | TLS1.2 C1新SYN未配SYNACK的历史恢复政策 | 有限完成；政策差异保留，非parser修复 | 857/859/861共40次实际运行、5784字面参考检查；独立94 AEAD/48 peer HTTP，当前184个TLS/HTTP来源全部加入旧代账本，多出7消息均Flow2/Feed57，错误新代密钥拒绝。RST发送方向前缀及匹配新SYN-ACK界限逐项核实，2页54 Windows状态保留正确旧代层级。原strict72仍exit4/8差异，不以此宣称真实端点RCV.NXT或参考消息数一致；[有限政策和证据](shark-m2-tls-old-generation-and-http-display-20261102.md) | 此有限合同0；参考政策差异保留 |
-| M2-10.N09 | QUIC app-only缺握手时的身份及来源资格 | 开放，覆盖与政策 | 两域组合各2664 strict差异；各2007准确UDP预览不等于QUIC语义。CID/epoch/STREAM/QPACK/0RTT须分开冻结真实源与拒绝门 | 3–6小时 |
+| M2-10.N09 | QUIC app-only缺握手时的身份及来源资格 | 开放；R01完整UDP来源有限关闭 | M2-74以原始完整载荷修复截断/缺映射，四域组合原strict73全部0；app-only域2004 opaque和3坏tag无借用ALPN/PN/HTTP3。原两组各2664失败保存，不改checker、不补标签。CID/epoch/STREAM/QPACK/0RTT及高级恢复仍须独立语义门。[有限证据](shark-m2-udp-full-source-20261102.md) | 3–6小时 |
 | M2-10.N10 | 6个fuzz TCP tuple分区/复用差异 | 开放，政策/代次证明 | 1039新完整回调仍44观察/8段544B、全部SHA及后续不接纳保持；1040独立遍历全原包补至74 tuple候选，旧52为见证集合，新增22含不完整/碎片/拒绝输入。1041新参考已取，完整代次/应用关联政策仍待证。67仅修315个异常SYN标志物理页面，不改流分区；[新范围](shark-m2-tcp-invalid-flags-20261102.md) | 3–6小时 |
 | M2-10.N11 | 原24组fuzz UDP tuple分区报告差异 | 有限完成（M2-66来源归因；非全部UDP会话验收） | 24组/9066原包各一个外层tuple和一个新参考stream；旧报告合并多层udp.stream，不能当应用会话合并。9018长度矛盾、48仅范围一致，全部当前SDK/CLI无应用连接。42新ID、43受影响pass、382630插桩、五次真实DNS域控制/拒绝及新PDML位置核对通过；原24计数/完整报告保留。[限定证据](shark-m2-udp-oracle-layer-20261102.md) | 本次原报告有限合同0；其他UDP应用会话不自动验收 |
 | M2-10.N12 | KeyUpdate record尾边界和换钥原子性 | 有限完成（M2-41；其他换钥消息仍开放） | 176/180独立源、39ca真实SDK三类误接受及HTTP泄漏；6bac同v02六源通过及12DTO拒绝，私有secret/IV/AEAD/seq及反向/预算测试、96752插桩fuzz。父阶段列表问题另列M2-42；后续9af/229实际60状态已关闭有限UI合同 | 0 |

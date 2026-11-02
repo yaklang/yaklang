@@ -1,5 +1,10 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+最新独立全绿基线为`97112f9af350c6bcf36a465fe46634276d161f78`，47约定检查/91执行/2状态、
+315231原始ID和131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41442647790)。
+后续26f仅修[非SMB完整UDP来源与Windows字节页](shark-m2-udp-full-source-20261102.md)，新最终head
+CI另验，main仍d705且已包含。S01–S06、历史107完整记录/121命令头和字段分母均须承接者开工独立复核。
+
 最新独立全绿检查点为`add08e5072baefceec69533821b25704de58ca1f`，47约定检查/91执行/2状态及
 314985原始ID/131084 required闭合；[traffic](https://github.com/yaklang/yaklang/actions/runs/41436592291)。
 后续d853仅补[非SMB服务端TLS观察顺序与Windows诊断](shark-m2-tls-server-order-20261102.md)，

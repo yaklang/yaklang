@@ -1,5 +1,10 @@
 # M2 协议正确性验收清单
 
+2026-11-02后续：M2-74/N09.R01补完整未识别UDP的拥有载荷，
+[46新增、8119原始来源/4833扩展、原QUIC四严格门和实际Windows](shark-m2-udp-full-source-20261102.md)。
+当前74项64有限完成、7进行中/3SMB搁置、10未关闭；非SMB四包仍16–32实施小时。
+97112已47/91/2和315231原始ID全绿；本批最终head另验315277及全部CI，N09整体仍开放。
+
 2026-11-02后续：M2-73补已知服务端初始TLS1.3消息重复/倒序拒绝，
 [246新增、新实抓36帧/独立源、新参考、六域控制和实际Windows](shark-m2-tls-server-order-20261102.md)。
 当前73项63有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，16–32实施小时。
@@ -108,7 +113,7 @@ M2最初从M1全绿提交 `39729081a3300381154d96cf1b4866f23976260b` 分出；
 代码量或测试数量估算完成度。M1 尚未合并时，M2 PR 以 M1 分支为基线，避免重复展示 M1。
 
 后续分支 `codex/shark-m2-smb-query-info-types` 从已全绿的 M2 `f9faae9f82c0dbe6a657bfaa94d7d6acdc845380` 开始。
-当前状态：**73 项，已完成 63，进行中 7，未开始 0，按用户要求搁置 3；剩余 10 项（含搁置）**。
+当前状态：**74 项，已完成 64，进行中 7，未开始 0，按用户要求搁置 3；剩余 10 项（含搁置）**。
 各项完成范围以表中有限合同及对应证据为准，不含进行中的 M2-11；不代表核心协议或整个 SMB profile 验收完成。
 随后已明确新增、关闭59的PHA offer/已观察context合同和60的认证后握手诊断身份/连接说明合同。
 原宽口径剩余10项保持；非SMB现17包中13有限完成、4开放，粗估16–32 AI实施小时，构建/CI/回放等待及新发现另计。
@@ -173,9 +178,9 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-06 | SMB Windows 递进页面和字段来源 | 已完成（四页有限合同） | dd63三页及60新QUERY_INFO body实际控制台页；中间重复InfoType只高亮174，不借70/278，完整物理/PDU字节、mouse/tabs/resize/CP936通过。未推广到全部Windows行为或高级typed内容 | 0 |
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 进行中 | 107/121和全部281来源门保持；60三种新构建完整回放、选定QI字段/Windows闭合；dd63→60的42223事件仅93个SMB2变化，其余42130和完整CLI/flow逐字节相同；M1→60全行账本保留，完整语义ID/字段/会话仍开放 | 1–3 小时 |
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 进行中（8场景实际复验，有限范围已闭合） | 82fc六来源72+两个匹配新SYNACK后77场景重跑，七个严格通过；C1 TLS1.2保留exit4/8项策略差异，额外4TLS+3HTTP经双Python AEAD/peer/父子/response_to/Feed57审计均旧Flow2，未串入新3。真实callback与CompletedIn分开；原严格失败不抹去。字节范围及TLS页面另闭合37；密钥代际/缺开头/KeyUpdate等整体未完成 | 2–4 小时；新增边界另计，不以7/8代替全部高级恢复 |
-| M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（四实际域组合已跑，缺握手整体仍开放） | 82fc接口/VLAN full/full两严格门通过，每域2022认证/3坏tag/6tail、4556来源检查；两个app-only严格73各2664差异原样保留。另核各2007个准确UDP预览（1332截64B/675完整短包），0借域身份，不等于完整QUIC解析。CID/epoch/STREAM/QPACK/0RTT仍需独立语义门 | 2–4 小时；执行等待及新问题另计 |
+| M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（N09.R01来源有限关闭，缺握手整体仍开放） | 26f完整UDP来源后重新四域组合，原contract/checker73未改、全部0严格差异；full/full每域2022认证/3坏tag/6tail，app-only域2004 opaque/3坏tag无借用身份。原两组2664失败保留并定位为长来源截断/缺映射，不补QUIC标签；CID/epoch/STREAM/QPACK/0RTT仍需独立语义门。[74证据](shark-m2-udp-full-source-20261102.md) | 2–4 小时；执行等待及新问题另计 |
 | M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N17共13有限完成/4未关闭；N11原24组混层比较错误已逐位置核实，9066包未建立应用会话，不代表所有UDP会话完成。N08有限政策/来源及N14的63/64/65入口合同保持；原133项解释、6 TCP政策、N13完整阶段、N09缺握手及N14高级字段/恢复仍保留 | 当前4包粗估16–32 AI实施小时，不含CI/构建/回放等待及新问题 |
-| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | 220最终47约定检查/91实际执行/2statuses及314350原始ID、官方产物已闭合，131084 required全pass/0skip。469的25新ID、完整六导出/315源资格及4725参考字段、40状态Windows已本地复核；新最终head独立314375原始ID和全部CI，25新增全pass，不沿用父成功或自动draft skip | 30–90 分钟实施，执行等待另计 |
+| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | 97112已47约定检查/91实际执行/2statuses及315231原始ID、官方产物/checkout闭合，131084 required全pass/0skip。26f的46新增、290178本地pass/25历史skip、完整大捕获源资格和22 Windows状态通过；新最终head独立315277原始ID和全部CI，不沿用父成功或自动draft skip | 30–90 分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
 | M2-14 | SMB1 status 格式与 NTSTATUS alias 正确 | 已完成（alias 合同） | `TestSMB1AliasContract*`：请求/响应四组合，NTSTATUS 仅响应且 bit 置位；raw Status 与请求格式偏好分开，保留范围 | 0 |
@@ -238,6 +243,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-71 | EE正文、字面alias、拥有来源及递进字段 | 已完成（有限字段/展示合同，最终CI归11） | a74/868解析完整向量和ALPN，保留opaque其他Data、UTF8/raw分离；53新ID及双插桩43036/41362。独立公共25B与本机21B AEAD/新参考一致，306855事件/379926行仅一个EE事件/一行有资格化变化，24原生控制及六最终完整回放保持；实际Windows精确高亮，完整P04仍开放。[证据](shark-m2-ee-fields-and-eof-statistics-20261102.md) | 0 |
 | M2-72 | 首个EOF协议统计停在旧采样窗口 | 已完成（N14.U04有限物理窗口合同，最终CI归11） | cf立即刷新最终128物理包、保留live间隔/计数和晚到观察；6新ID/1615最终CLI pass、2历史skip。完整新参考ESP78/IKEv2 50，实际Windows首EOF与搜索后均61%/39%；六完整导出逐字节不变。[证据](shark-m2-ee-fields-and-eof-statistics-20261102.md) | 0 |
 | M2-73 | 已知服务端TLS1.3握手消息重复/倒序仍被接纳 | 已完成（有限观察子序列合同，最终CI归11） | cd/d853仅比较认证后已接纳消息，不因缺前缀拒绝；状态/预算拒绝不推进，PHA及未知角色独立。246新增、290132完整pass/25历史skip、2617最终相关pass、33766插桩；48最终小回放、36帧新实抓/30来源、六完整公共导出、44实际Windows状态。组合接口/VLAN与QUIC strict差异保留，P04整体开放。[完整证据](shark-m2-tls-server-order-20261102.md) | 0 |
+| M2-74 | 完整未识别UDP仅保留64B probe导致来源和页面缺字节 | 已完成（N09.R01有限字节来源合同，最终CI归11） | b49/26f只在有效且未超消息预算的未知UDP拥有完整载荷，协议/拒绝和连接不提升；46新增、290178完整本地pass/25历史skip、71701插桩、新12帧/参考、8119源资格/4833扩展、六完整公共导出及22实际Windows状态通过。原四组QUIC checker全部0，N09高级语义仍开放。[完整证据](shark-m2-udp-full-source-20261102.md) | 0 |
 
 M2-56后续限定补充：17fe对已知服务端要求context为空、证书列表非空，保留客户端空列表、
 PHA context及无角色语法API；43新ID和34实际Windows状态通过，两个坏控制不再发布HTTP，
