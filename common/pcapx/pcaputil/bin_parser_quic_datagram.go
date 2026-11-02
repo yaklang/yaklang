@@ -301,6 +301,11 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		if err == nil {
 			e.Session, err = f.quic.consume(dir, raw, a.budget.MaxCollectionElements)
 		}
+		if bounded && !rejectedCID && el != nil {
+			if pendingError := f.quic.retainEarly(&e, h, raw, off, a.budget.MaxCollectionElements, err); pendingError != nil {
+				err = pendingError
+			}
+		}
 		f.quic.eventRefs = nil
 		if historical && e.Session["Authentication Verified"] != true {
 			return nil, false
@@ -309,7 +314,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			e.Session["Retired Destination CID"] = true
 			e.Session["CID Association"] = "authenticated late packet on retired CID"
 		}
-		if err == nil || isRecoverableH3ObservationError(err) {
+		if err == nil || isRecoverableH3ObservationError(err) || recoverableQUICEarlyError(err) || len(f.quic.earlyPending) > 0 {
 			if budgetError := f.reserveSession(f.quic.initialMemory()); budgetError != nil {
 				err = budgetError
 			}
@@ -331,56 +336,13 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 			}
 			e.FlowID = f.id
 		}
-		if e.Session != nil {
-			e.Session["Observation Scope"] = "UDP capture domain and observed CID"
-			e.Session["Datagram Offset"] = off
-			e.Session["Native Carrier"] = true
-			e.Session["ALPN"] = f.quic.alpn
-			// Duplicate/protected packets can return before finishFrames. Their
-			// connection context still includes an earlier observed HTTP3 fault.
-			f.quic.annotateH3ConnectionFault(e.Session)
-		}
-		if e.Session != nil {
-			var transaction uint64
-			multiple := false
-			frames, _ := e.Session["Frames"].([]map[string]any)
-			for _, fr := range frames {
-				if id, ok := fr["Request PDU ID"].(uint64); ok && id != 0 {
-					if transaction != 0 && transaction != id {
-						multiple = true
-					}
-					transaction = id
-				}
-			}
-			if !multiple && transaction != 0 {
-				e.TransactionID = transaction
-				if dir == 1 {
-					e.ResponseTo = transaction
-				}
-			}
-			if e.Session["Encrypted"] == true {
-				e.Completeness = "encrypted"
-				e.Session["Content Visibility"] = "encrypted"
-				e.Admission = "observed-CID-protected-payload"
-			}
-		}
-		if e.Session["HTTP3"] == true {
-			e.Protocol = "http3"
-			e.Profile = "http3-native"
-		}
-		if e.Session["DoQ"] == true {
-			e.Protocol = "doq"
-			e.Profile = "doq-native"
-			if d, ok := e.Session["DoQ Message"].(map[string]any); ok {
-				e.Session["DNS"] = d["DNS"]
-			}
-		}
+		a.projectNativeQUICSession(&e, f.quic, off)
 		// A failed AEAD or unavailable key does not invalidate the long-header
 		// length (RFC9000 12.2). Never scan ciphertext for a guessed boundary.
 		// Other failures, notably resource refusal, stop processing and retain
 		// the entire unprocessed remainder in one bounded diagnostic.
 		_, typed := classifySessionError(err)
-		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isRecoverableH3ObservationError(err))
+		recoverable := bounded && typed != nil && (typed.Kind == ErrAuthenticationFailed || typed.Kind == ErrEncrypted || rejectedCID && typed.Kind == ErrMalformedMessage || isRecoverableH3ObservationError(err) || recoverableQUICEarlyError(err))
 		if err != nil && !recoverable {
 			// Keep an existing single-packet error envelope. It cannot describe
 			// an aggregated remainder or a refused resource reservation.
@@ -408,22 +370,7 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 		default:
 			e.Admission = "unverified-QUIC-candidate"
 		}
-		// The authenticated session already parsed this header. Preserve the wire
-		// field view without executing a YAML operator for every ciphertext octet.
-		e.nativeQUICWire = err == nil
-		if bounded && size == h.size && e.Session != nil {
-			observed := h
-			if !h.long {
-				// The session resolves a short header's CID size from observed
-				// receiver context; the stateless outer header has no size byte.
-				observed.dcid, _ = e.Session["DCID"].([]byte)
-			}
-			e.Session["Wire Field Ranges"] = quicHeaderWireRanges(observed, raw)
-		}
-		// Query identity and passive context are private even on a refused
-		// native event; mutable public labels/caches cannot grant success.
-		e.semanticSession = cloneSession(e.Session)
-		a.finishProtocolDatagram(&e, raw, a.specs["application-layer.quic/QUIC"], err)
+		a.finishNativeQUICWire(&e, h, raw, err, bounded)
 		datagramAuthenticated = datagramAuthenticated || e.Admission == "authenticated-wire-and-observed-CID" && e.Session["Authentication Verified"] == true
 		lastLongBoundary = bounded && h.long && size == h.size && !rejectedCID
 		if e.Admission == "unparsed-datagram-remainder" {
@@ -440,6 +387,12 @@ func (a *binParser) decodeQUICDatagram(base *ProtocolEvent, wire []byte) ([]*Pro
 	}
 	if el == nil {
 		f.closeSession()
+	} else if f.quic.closed {
+		f.quic.earlyPending, f.quic.earlyPendingBytes = nil, 0
+	} else {
+		// Resume only after every wire packet in this datagram. Context and
+		// control streams must settle before replaying earlier application bytes.
+		events = append(events, a.resumeEarlyQUIC(f, base, a.budget.MaxCollectionElements-len(events))...)
 	}
 	return events, true
 }

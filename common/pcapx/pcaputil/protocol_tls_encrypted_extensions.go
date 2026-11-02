@@ -53,6 +53,10 @@ func (t *binTLS) admitEncryptedExtensions(dir int, body []byte, limits ...int) e
 			return protocolError(ErrMalformedMessage, fmt.Sprintf("TLS extension %d is not permitted in EncryptedExtensions", typ))
 		case 49:
 			return protocolError(ErrMalformedMessage, "TLS post_handshake_auth must be an empty ClientHello extension")
+		case 42:
+			if len(value) != 0 {
+				return protocolError(ErrMalformedMessage, "TLS EncryptedExtensions early_data must be empty")
+			}
 		case 16:
 			selected, err := tlsALPNName(value, true, limits...)
 			if err != nil {

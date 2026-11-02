@@ -175,6 +175,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		next = *q.tls
 	}
 	at := q.cryptoRead[dir][space]
+	nextEarly := q.earlyContext
 	var messages []map[string]any
 	for len(a.data)-at >= 4 {
 		if space == quicSpaceHandshake && next.app[dir] {
@@ -205,6 +206,9 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		if err := quicTLSTicketValues(m); err != nil {
 			return err
 		}
+		if err := nextEarly.observe(&next, b[0], b[4:n], max); err != nil {
+			return err
+		}
 		messages = append(messages, m)
 		at += n
 	}
@@ -220,6 +224,7 @@ func (q *binQUIC) feedCrypto(dir, space int, off uint64, data []byte, info map[s
 		*q.tls = next
 	}
 	q.cryptoRead[dir][space] = at
+	q.earlyContext = nextEarly
 	if len(messages) > 0 {
 		info["TLS Handshakes"] = messages
 	}

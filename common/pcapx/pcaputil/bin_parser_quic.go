@@ -11,50 +11,53 @@ import (
 // are parsed only after packet protection succeeds or through the explicitly
 // declared decrypted-stream API.
 type binQUIC struct {
-	version         uint32 // observed packet-protection version; zero is unbound
-	eventID         uint64
-	eventRefs       []PacketReference
-	keyPhase        [2]int
-	previousKeys    [2][]quicPriorKey
-	keyFloor        [2]uint64
-	keyFloorSet     [2]bool
-	keyFirst        [2]uint64
-	keyLast         [2]uint64
-	keyFirstSet     [2]bool
-	earlyOrder      quicEarlyOrder
-	controlSeen     [2]bool
-	qpackSeen       [2][2]bool
-	h3Fault         *h3ConnectionFault
-	native          bool
-	retired         bool // capture history, not an authenticated new connection
-	zeroCID         [2]bool
-	byteLimit       int
-	provider        TLSSecretProvider
-	tls             *binTLS
-	loadedKeys      bool
-	alpn            string
-	cids            map[string]int
-	cidSequences    [2]map[uint64]string
-	cidRetired      [2]map[uint64]string
-	cidRetiredBelow [2]uint64
-	cryptoData      [2][3]quicAssembler
-	cryptoRead      [2][3]int
-	decryptedSource string
-	dcid, scid      []byte
-	initialDCID     []byte
-	originalDCID    []byte
-	initialSCID     []byte
-	retrySCID       []byte
-	retrySeen       bool
-	retryTokenHash  [32]byte
-	retryTokenLen   int
-	spaces          [2][3]quicPNSpace
-	streams         map[uint64]*quicStream
-	crypto          [2][3][]quicRange
-	state           string
-	closed          bool
-	keys            *quicKeyring
-	qpack           qpackConn
+	version           uint32 // observed packet-protection version; zero is unbound
+	eventID           uint64
+	eventRefs         []PacketReference
+	keyPhase          [2]int
+	previousKeys      [2][]quicPriorKey
+	keyFloor          [2]uint64
+	keyFloorSet       [2]bool
+	keyFirst          [2]uint64
+	keyLast           [2]uint64
+	keyFirstSet       [2]bool
+	earlyOrder        quicEarlyOrder
+	earlyContext      quicEarlyContext
+	earlyPending      []*quicEarlyPending
+	earlyPendingBytes int64
+	controlSeen       [2]bool
+	qpackSeen         [2][2]bool
+	h3Fault           *h3ConnectionFault
+	native            bool
+	retired           bool // capture history, not an authenticated new connection
+	zeroCID           [2]bool
+	byteLimit         int
+	provider          TLSSecretProvider
+	tls               *binTLS
+	loadedKeys        bool
+	alpn              string
+	cids              map[string]int
+	cidSequences      [2]map[uint64]string
+	cidRetired        [2]map[uint64]string
+	cidRetiredBelow   [2]uint64
+	cryptoData        [2][3]quicAssembler
+	cryptoRead        [2][3]int
+	decryptedSource   string
+	dcid, scid        []byte
+	initialDCID       []byte
+	originalDCID      []byte
+	initialSCID       []byte
+	retrySCID         []byte
+	retrySeen         bool
+	retryTokenHash    [32]byte
+	retryTokenLen     int
+	spaces            [2][3]quicPNSpace
+	streams           map[uint64]*quicStream
+	crypto            [2][3][]quicRange
+	state             string
+	closed            bool
+	keys              *quicKeyring
+	qpack             qpackConn
 }
 
 type quicPNSpace struct {
@@ -256,6 +259,10 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if q.decryptedSource != "" {
 		return info, protocolError(ErrMalformedMessage, "invalid explicit decrypted QUIC frame input")
 	}
+	if q.native && q.provider != nil && h.typeName == "0-RTT" && q.earlyRejected() {
+		info["Encrypted"], info["Protected Payload"], info["Early Data Decision"] = true, true, "rejected"
+		return info, protocolError(ErrContextRequired, quicEarlyRejected)
+	}
 	candidate, oldInitial, candidateError := q.protectionCandidate(dir, h)
 	if candidateError != nil {
 		return info, candidateError
@@ -322,6 +329,11 @@ func (q *binQUIC) consume(dir int, raw []byte, max int) (map[string]any, error) 
 	if err := q.checkEarlyPacketOrder(dir, h, pn); err != nil {
 		quicRetainUndeliveredPayload(info, plain)
 		return info, err
+	}
+	if q.awaitEarlyApplication(h, frames) {
+		info["Early Data Decision"] = "awaiting observed server acceptance"
+		quicRetainUndeliveredPayload(info, plain)
+		return info, protocolError(ErrContextRequired, quicEarlyAwaiting)
 	}
 	if quicSeen(q.space(dir, h.space), pn) {
 		info["Duplicate"] = true
@@ -1332,6 +1344,7 @@ func quicValidateProtectedFrames(space int, frames []map[string]any) error {
 // (including slice capacities). STREAM admission requires application keys.
 func (q *binQUIC) initialMemory() int64 {
 	n := int64(4096)
+	n += q.earlyPendingBytes
 	if q.tls != nil {
 		n += q.tls.resumption.storage()
 	}

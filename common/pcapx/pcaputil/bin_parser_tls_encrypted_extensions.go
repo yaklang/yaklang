@@ -44,6 +44,9 @@ func DecodeTLSEncryptedExtensions(encoded []byte, version uint16, maxElements in
 		if tlsForbiddenEncryptedExtension(kind) {
 			return nil, protocolError(ErrMalformedMessage, "TLS forbidden EncryptedExtensions extension")
 		}
+		if kind == 42 && n != 0 {
+			return nil, protocolError(ErrMalformedMessage, "TLS EncryptedExtensions early_data must be empty")
+		}
 		if kind == 16 {
 			// Check the complete vector even when the collection budget is zero.
 			if _, err := tlsALPNName(encoded[at:at+n], true); err != nil {
