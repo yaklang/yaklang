@@ -53,6 +53,36 @@ func TestVerifyUserSatisfaction_PrefersSpeedModelAndPreservesContext(t *testing.
 			t.Errorf("missing verification context material %q", marker)
 		}
 	}
+	boundary := strings.LastIndex(receivedPrompt, "# Verification response boundary")
+	require.Greater(t, boundary, strings.Index(receivedPrompt, "pending-audit-marker"),
+		"the read-only response boundary must follow the task and its TODO data")
+	require.Contains(t, receivedPrompt[boundary:], `"verify-satisfaction"`)
 	require.Equal(t, 1, speedCalls)
 	require.Zero(t, otherCalls, "progress observation must not consume the main model when a speed model is configured")
+}
+
+func TestVerifyUserSatisfaction_RejectsBusinessActionAndRetriesOnSpeedModel(t *testing.T) {
+	var speedCalls int
+	react, err := NewTestReAct(
+		aicommon.WithDisableCreateDBRuntime(true),
+		aicommon.WithAITransactionAutoRetry(2),
+		aicommon.WithSpeedPriorityAICallback(func(cfg aicommon.AICallerConfigIf, req *aicommon.AIRequest) (*aicommon.AIResponse, error) {
+			speedCalls++
+			raw := `{"@action":"directly_call_tool","tool_name":"write_file","user_satisfied":true}`
+			if speedCalls > 1 {
+				raw = `{"@action":"verify-satisfaction","user_satisfied":false,"reasoning":"Observed work remains incomplete","evidence":[]}`
+			}
+			response := cfg.NewAIResponse()
+			response.EmitOutputStream(strings.NewReader(raw))
+			response.Close()
+			return response, nil
+		}),
+	)
+	require.NoError(t, err)
+	result, err := react.VerifyUserSatisfaction(context.Background(), "audit-goal", true, "sources-still-pending")
+	require.NoError(t, err)
+	require.Equal(t, 2, speedCalls, "a business action must be rejected, not accepted as a verification")
+	require.NotNil(t, result)
+	require.False(t, result.Satisfied)
+	require.Equal(t, "Observed work remains incomplete", result.Reasoning)
 }
