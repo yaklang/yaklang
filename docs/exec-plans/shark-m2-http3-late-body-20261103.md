@@ -1,5 +1,13 @@
 # M2-84：晚到 HTTP/3 方法的响应正文复验与实际 Windows 页面
 
+后续验收补记：最终说明提交 `4d52296c80414937a6eaa201925917630e2b5377` 已独立全绿：47约定检查名、91执行、两个statuses，
+316231原始Traffic ID/动作和131084 required零skip逐一闭合。正式产物13204145134/17156708B，SHA256
+`c1e7542da71bd4b1951c0ecb1c57d7461592d5e1f7ba9d0b59572d990db85c3b`，上传摘要/CRC/真实checkout均核对。
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41575000332)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41575004834)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/41575009443)；闭合1762 SHA256
+`c3462494f8ecaafdcc40181b26b448d76ee4a7e9ef8e5a0b0502202c4b64a928`。
+以下R07旧缺口已由[M2-85](shark-m2-http3-connect-tunnel-20261103.md)有限关闭，原失败证据仍保留；完整N09未关闭。
+
 本项有限关闭 N09.R06：响应先解码、请求方法后来才完整时，复验已经观察到的响应 DATA 和 FIN。
 原始响应事件、Decode、ResponseTo 和字节来源保持不可变；后来的当前视图增加明确的复验结论。
 这不认证对端交付、表示大小、完整 HTTP/3/QUIC 生命周期或全部 Wireshark 诊断等价。
