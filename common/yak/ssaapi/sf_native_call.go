@@ -741,14 +741,12 @@ func init() {
 			if fn == nil {
 				return false
 			}
-			if fn.GetName() == template2java.JAVA_TEMPLATE_SERVER_NAME ||
-				fn.GetVerboseName() == template2java.JAVA_TEMPLATE_SERVER_NAME {
-				return true
-			}
 			// A saved program can hand back a lazy function placeholder whose
 			// Params slice is not materialized yet. The generated callable is
 			// named "<class>_<method>_<hash>", so the marker still identifies
-			// the template service without forcing the body to load.
+			// the template service without forcing the body to load. The marker
+			// test also covers the exact name, which is the generated method
+			// itself when the body is materialized.
 			if strings.Contains(fn.GetName(), template2java.JAVA_TEMPLATE_SERVER_NAME) ||
 				strings.Contains(fn.GetVerboseName(), template2java.JAVA_TEMPLATE_SERVER_NAME) {
 				return true
