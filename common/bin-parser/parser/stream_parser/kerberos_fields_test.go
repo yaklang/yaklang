@@ -99,6 +99,52 @@ func TestFirstBatchT21(t *testing.T) {
 	})
 }
 
+func TestKerberosSemanticSummaryFacts(t *testing.T) {
+	t.Run("request", func(t *testing.T) {
+		wire := krbTestRequest(10, krbTestBody(), krbTestPA(2, krbTestEncrypted()))
+		facts, err := DecodeKerberosSummaryFacts(wire, false)
+		require.NoError(t, err)
+		require.Equal(t, "AS-REQ", facts["Message Name"])
+		require.Equal(t, "EXAMPLE", facts["Realm"])
+		require.Equal(t, "host/sample.example", facts["Client Principal"])
+		require.Equal(t, "host/sample.example", facts["Server Principal"])
+		require.Equal(t, []int64{23, -133, -128, 3}, facts["Requested Encryption Types"])
+		require.Equal(t, []int64{23}, facts["Observed Encryption Types"])
+		require.Equal(t, 1, facts["Ticket Count"])
+	})
+
+	t.Run("reply-ticket-stays-opaque", func(t *testing.T) {
+		wire := krbTestReply(11)
+		facts, err := DecodeKerberosSummaryFacts(wire, false)
+		require.NoError(t, err)
+		require.Equal(t, "AS-REP", facts["Message Name"])
+		require.Equal(t, "EXAMPLE", facts["Client Realm"])
+		require.Equal(t, "host/sample.example", facts["Client Principal"])
+		require.Equal(t, "EXAMPLE", facts["Ticket Realm"])
+		require.Equal(t, "host/sample.example", facts["Ticket Server"])
+		require.NotContains(t, facts, "Cipher Bytes")
+		require.NotContains(t, facts, "Plaintext")
+	})
+
+	t.Run("nested-pa-tgs-request-does-not-replace-outer-message", func(t *testing.T) {
+		wire := krbTestRequest(12, krbTestBody(), krbTestPA(1, krbTestAP(14)))
+		facts, err := DecodeKerberosSummaryFacts(wire, false)
+		require.NoError(t, err)
+		require.Equal(t, "TGS-REQ", facts["Message Name"])
+		require.Equal(t, "EXAMPLE", facts["Realm"])
+		require.Equal(t, "EXAMPLE", facts["Ticket Realm"])
+		require.Equal(t, "host/sample.example", facts["Ticket Server"])
+	})
+
+	t.Run("error", func(t *testing.T) {
+		wire := krbTestError(0, 52)
+		facts, err := DecodeKerberosSummaryFacts(wire, false)
+		require.NoError(t, err)
+		require.Equal(t, "KRB-ERROR", facts["Message Name"])
+		require.Equal(t, int64(52), facts["Error Code"])
+	})
+}
+
 func TestKerberosFieldsLayouts(t *testing.T) {
 	checksum := krbTestTLV(0x30, krbTestCtx(0, krbTestInt(-138)), krbTestCtx(1, krbTestTLV(4, []byte{1, 2})))
 	fastReq := krbTestTLV(0xa0, krbTestTLV(0x30, krbTestCtx(1, checksum), krbTestCtx(2, krbTestEncrypted())))

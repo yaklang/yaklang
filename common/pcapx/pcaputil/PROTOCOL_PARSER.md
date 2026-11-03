@@ -77,6 +77,11 @@ Windows 将 `yak` 换成对应的 `yak.exe` 路径。`-i` 支持网卡编号或�
 | `Metadata` | 与字段分开的解析附加信息 |
 | `Session` | 观察到的会话上下文快照，包含解压头或事务关联；不代表认证凭证或 TLS 已验证 |
 
+Kerberos、LDAP 和 SMB2 的 `Summary` 直接给出消息类型、主要操作/目标、
+关联状态和已知结果边界，不要求调用方先展开完整 `Fields`。摘要中的 principal、
+DN、路径、状态和错误码都是捕获观察；`decrypt=no`、`identity=unverified` 和
+`result=pending` 等标记不能解释为认证、执行或业务成功。
+
 回调返回后可以保留消息，原始字节和字段不借用重组池。每次捕获内的新协议回调默认
 串行执行，包括多个 TCP worker 与 UDP 投递，脚本可直接维护自己的计数或列表。
 同一 TCP 会话内保持消息顺序；跨会话不保证 ID、时间戳和完成顺序相同。

@@ -1348,7 +1348,7 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		case "postgresql":
 			e.Summary = fmt.Sprintf("PostgreSQL %v", e.Session["Message Name"])
 		case "ldap":
-			e.Summary = fmt.Sprintf("LDAP %v id %v", e.Session["Message Name"], e.Session["Message ID"])
+			e.Summary = ldapSessionSummary(e.Session, e.semanticFields)
 		case "redis":
 			e.Summary = fmt.Sprintf("Redis %v", e.Session["RESP Type"])
 		case "websocket":
@@ -1472,19 +1472,49 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 }
 
 func smb2SessionSummary(session map[string]any) string {
-	name := fmt.Sprint(session["Packet Name"])
-	summary := "SMB2 " + name
+	name := sanitizeSummaryText(fmt.Sprint(session["Packet Name"]), 48)
+	if session["Encrypted"] == true || name == "transform" {
+		summary := "SMB2 transform ciphertext=opaque decrypt=no"
+		if size, ok := summaryUnsigned(session["Original Size"]); ok {
+			summary += fmt.Sprintf(" len=%d", size)
+		}
+		return limitSummary(summary, protocolSummaryLimit)
+	}
+	role := "request"
+	if session["Response"] == true {
+		role = "response"
+	}
+	summary := "SMB2 " + name + " " + role
+	if count, ok := summaryUnsigned(session["Compound Count"]); ok && count > 1 {
+		summary += fmt.Sprintf(" compound=%d", count)
+	}
 	if target := smb2SummaryTarget(session); target != "" {
-		summary += " " + target
+		summary += " target=" + target
 	}
 	if value, ok := smb2SummaryQuantity(session); ok {
 		summary += " " + value
 	}
+	var tail string
 	if status, ok := session["Status"].(uint32); ok {
-		summary += fmt.Sprintf(" status=0x%08x", status)
+		tail += fmt.Sprintf(" status=0x%08x", status)
 	}
-	summary += fmt.Sprintf(" mid %v", session["Message ID"])
-	return limitSummary(summary, 240)
+	if session["Response"] == true {
+		if status, ok := session["Status"].(uint32); ok && status == 0x00000103 {
+			tail += " result=pending"
+		} else {
+			tail += " result=response-status-observed"
+		}
+	} else {
+		tail += " result=request-pending"
+	}
+	if session["Association Status"] == "matched" {
+		tail += " matched"
+	} else if session["Unmatched"] == true {
+		tail += " unmatched"
+	}
+	tail += fmt.Sprintf(" mid=%v", session["Message ID"])
+	summary = limitSummary(summary, protocolSummaryLimit-len([]rune(tail)))
+	return summary + tail
 }
 
 func smb2SummaryTarget(session map[string]any) string {

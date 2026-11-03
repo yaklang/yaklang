@@ -32,6 +32,8 @@ func (e *ProtocolEvent) summarizeProtocol() {
 			op = "reply"
 		}
 		e.Summary = fmt.Sprintf("ARP %s %s -> %s sender_mac=%v", op, e.Source, e.Destination, e.Session["Sender MAC"])
+	case "kerberos":
+		e.Summary = e.kerberosSummary()
 	case "wcf":
 		name, _ := e.Session["Record Name"].(string)
 		if name == "" {
