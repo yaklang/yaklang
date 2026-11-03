@@ -21,8 +21,7 @@ var SSAProjectTables = []any{
 	// source code
 	&IrSource{},
 	// type
-	&IrTypeID{},
-	&IrTypePayload{},
+	&IrType{},
 	// program
 	&IrProgram{},
 	&IrOffset{},
@@ -51,7 +50,7 @@ func init() {
 	schema.RegisterDatabaseSchema(schema.KEY_SCHEMA_SSA_DATABASE, SSAProjectTables...)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrSourceQuotedCode)
 	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrCodeIndex)
-	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrTypeDedupe)
+	schema.RegisterDatabasePatch(schema.KEY_SCHEMA_SSA_DATABASE, patchIrTypeIndexes)
 	// gorm.Open copies gorm.DefaultCallback exactly once and never re-reads
 	// it, so the timing callbacks have to be on the default before the SSA
 	// database opens. Importing ssadb is what triggers the open.
@@ -382,8 +381,7 @@ func deleteProgramCodeOnly(db *gorm.DB, program string) error {
 		deleteProgramRows(db, TableIrNamePool, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "program_name = ?", program),
 		deleteProgramRows(db, TableIrSources, "folder_path = ? AND file_name = ?", "/", program),
-		deleteProgramRows(db, TableIrTypeIDs, "program_name = ?", program),
-		deleteProgramRows(db, TableIrTypePayloads, "program_name = ?", program),
+		deleteProgramRows(db, TableIrTypes, "program_name = ?", program),
 		deleteProgramRows(db, TableIrOffsets, "program_name = ?", program),
 	)
 }
@@ -482,16 +480,16 @@ func pruneRedundantIRIndexes(db *gorm.DB) {
 	}
 }
 
-// patchIrTypeDedupe installs the two UNIQUE keys the type writes conflict on.
-func patchIrTypeDedupe(db *gorm.DB) {
+// patchIrTypeIndexes installs the UNIQUE key the type writes conflict on.
+func patchIrTypeIndexes(db *gorm.DB) {
 	if db == nil || db.Dialect() == nil {
 		return
 	}
 	if damenggorm.IsDM(db) {
-		// installDMIRIndexes creates these keys for the DM dialect.
+		// installDMIRIndexes creates this key for the DM dialect.
 		return
 	}
-	if err := ensureIrTypeDedupeIndexes(db); err != nil {
-		log.Warnf("[ir-type-dedupe] index patch: %v", err)
+	if err := ensureIrTypeIndexes(db); err != nil {
+		log.Warnf("[ir-type] index patch: %v", err)
 	}
 }

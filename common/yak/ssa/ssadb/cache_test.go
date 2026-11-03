@@ -16,8 +16,8 @@ func setupTestDB() *gorm.DB {
 	}
 
 	// 自动迁移表结构
-	db.AutoMigrate(&IrCode{}, &IrTypeID{}, &IrTypePayload{}, &IrProgram{})
-	if err := ensureIrTypeDedupeIndexes(db); err != nil {
+	db.AutoMigrate(&IrCode{}, &IrType{}, &IrProgram{})
+	if err := ensureIrTypeIndexes(db); err != nil {
 		panic(err)
 	}
 	return db

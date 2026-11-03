@@ -174,25 +174,25 @@ func TestDMIRTypeBatchReuseAndRollback(t *testing.T) {
 	other := &ssadb.IrType{ProgramName: name, TypeId: 2, Kind: 1, String: "untouched"}
 	require.NoError(t, ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{nil, row, other}))
 	require.Zero(t, row.ID, "natural-key SaveInBatches does not write generated identities back to caller structs")
-	var before, beforeOther ssadb.IrTypeID
+	var before, beforeOther ssadb.IrType
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 1).First(&before).Error)
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 2).First(&beforeOther).Error)
-	require.NotZero(t, before.PayloadID)
+	require.NotZero(t, before.ID)
 	row.Kind = 2
 	row.String = "updated"
 	require.NoError(t, ssadb.SaveIrTypeBatch(db, []*ssadb.IrType{row, nil}))
 	var count int64
-	require.NoError(t, db.Model(&ssadb.IrTypeID{}).Where("program_name=?", name).Count(&count).Error)
+	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name=?", name).Count(&count).Error)
 	require.EqualValues(t, 2, count)
 	require.Equal(t, "updated", ssadb.GetIrTypeItemById(db, name, 1).String)
 	require.Equal(t, "untouched", ssadb.GetIrTypeItemById(db, name, 2).String)
 	require.NotNil(t, ssadb.GetIrTypeItemById(db, name, 2))
-	var storedID, otherID ssadb.IrTypeID
+	var storedID, otherID ssadb.IrType
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 1).First(&storedID).Error)
 	require.NoError(t, db.Where("program_name=? AND type_id=?", name, 2).First(&otherID).Error)
-	require.Equal(t, beforeOther.PayloadID, otherID.PayloadID, "the untouched id keeps its payload")
+	require.Equal(t, beforeOther.ID, otherID.ID, "the untouched id keeps its row")
 
-	constraint := addDMIRFailureCheck(t, db, ssadb.TableIrTypePayloads, "kind", name)
+	constraint := addDMIRFailureCheck(t, db, ssadb.TableIrTypes, "kind", name)
 	items := make([]*ssadb.IrType, 0, 1002)
 	for id := uint64(1); id <= 1001; id++ {
 		items = append(items, &ssadb.IrType{ProgramName: name, TypeId: id, Kind: 1, String: "replacement"})
@@ -202,7 +202,7 @@ func TestDMIRTypeBatchReuseAndRollback(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, strings.ToUpper(err.Error()), strings.ToUpper(constraint), "the final distinct row must fail at the named CHECK")
 	require.Equal(t, "updated", ssadb.GetIrTypeItemById(db, name, 1).String, "failed type batch must preserve the previous snapshot")
-	require.NoError(t, db.Model(&ssadb.IrTypeID{}).Where("program_name=?", name).Count(&count).Error)
+	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name=?", name).Count(&count).Error)
 	require.EqualValues(t, 2, count, "earlier successful insert chunks must be rolled back")
 	cached, ok := ssadb.GetIrTypeCache(name).Get(1)
 	require.True(t, ok)

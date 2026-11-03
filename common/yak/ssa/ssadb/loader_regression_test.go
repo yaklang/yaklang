@@ -234,8 +234,8 @@ func TestSearchVariableConstType_A3_Equivalence(t *testing.T) {
 func setupNativeReadTestDB(t *testing.T) *gorm.DB {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrTypeID{}, &IrTypePayload{}).Error)
-	require.NoError(t, ensureIrTypeDedupeIndexes(db))
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}).Error)
+	require.NoError(t, ensureIrTypeIndexes(db))
 	return db
 }
 

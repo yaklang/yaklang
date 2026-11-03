@@ -8,13 +8,12 @@ import (
 
 func TestNewIRSchemaUsesCanonicalLookupIndexes(t *testing.T) {
 	db := setupA2LoaderDB(t)
-	require.NoError(t, db.AutoMigrate(&IrTypeID{}, &IrTypePayload{}, &IrOffset{}).Error)
+	require.NoError(t, db.AutoMigrate(&IrType{}, &IrOffset{}).Error)
 	patchIrCodeIndex(db)
-	require.NoError(t, ensureIrTypeDedupeIndexes(db))
+	require.NoError(t, ensureIrTypeIndexes(db))
 	for _, tc := range []struct{ table, index string }{
 		{TableIrCodes, "ux_ir_codes_program_code"},
-		{TableIrTypeIDs, "ux_ir_type_ids_program_type"},
-		{TableIrTypePayloads, "ux_ir_type_payloads_program_hash"},
+		{TableIrTypes, irTypeUniqueIndex},
 	} {
 		t.Run(tc.table, func(t *testing.T) {
 			require.True(t, hasNamedIndex(db, tc.table, tc.index))

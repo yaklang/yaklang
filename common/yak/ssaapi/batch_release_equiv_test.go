@@ -54,7 +54,7 @@ func compileReleaseFixture(t *testing.T, disableRelease bool) releaseFixtureResu
 
 	db := ssadb.GetDB()
 	counts := map[string]int64{}
-	for _, model := range []any{&ssadb.IrCode{}, &ssadb.IrOffset{}, &ssadb.IrIndex{}, &ssadb.IrTypeID{}, &ssadb.IrTypePayload{}, &ssadb.IrSource{}} {
+	for _, model := range []any{&ssadb.IrCode{}, &ssadb.IrOffset{}, &ssadb.IrIndex{}, &ssadb.IrType{}, &ssadb.IrSource{}} {
 		var n int64
 		require.NoError(t, db.Model(model).Where("program_name = ?", name).Count(&n).Error)
 		counts[fmt.Sprintf("%T", model)] = n
