@@ -71,12 +71,12 @@ func (s *SSABuilder) PreHandlerProject(fileSystem fi.FileSystem, ast ssa.FrontAS
 			return err
 		}
 	case ".jsp", ".jspx":
-		src := editor.GetSourceCode()
-		// The prepare stage already turned this page into Java and stored it
-		// back under the same path. Parsing it again as JSP would reject the
-		// generated compilation unit.
-		if strings.Contains(src, "void _JavaTemplateService(") {
-			ast, err := s.ParseAST(src, s.GetAntlrCache())
+		// The prepare stage turns a page into Java and registers its template
+		// ranges on the program. A registered page is already generated Java;
+		// parsing it again as JSP would reject the compilation unit. The state
+		// lives on the program, not in a marker searched in the text.
+		if prog.TryGetTemplate(path) != nil {
+			ast, err := s.ParseAST(editor.GetSourceCode(), s.GetAntlrCache())
 			if err != nil {
 				log.Debugf("parse prepared jsp %s error: %v", path, err)
 				return err

@@ -15,7 +15,6 @@ import (
 
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/diagnostics"
-	"github.com/yaklang/yaklang/common/utils/filesys"
 	"github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/ssa"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssareducer"
@@ -279,12 +278,10 @@ func (c *Config) parseProjectWithFSUnits(
 		if timings.TemplateErrors > 0 {
 			return nil, utils.Errorf("materialize-out %s: %d jsp files failed to convert", out, timings.TemplateErrors)
 		}
-		materializer := filesys.MaterializerOf(filesystem)
-		var paths, nbytes int64
-		var readErrors int64
-		if materializer != nil {
-			st := materializer.Stats()
-			paths, nbytes, readErrors = st.Paths, st.Loaded, st.Errors
+		var paths, nbytes, readErrors int64
+		if sources := c.preparedSources; sources != nil {
+			st := sources.Stats()
+			paths, nbytes, readErrors = st.Paths, st.MemoryHold+st.DiskHold, st.Errors
 		}
 		if readErrors > 0 {
 			return nil, utils.Errorf("materialize-out %s: %d source reads failed", out, readErrors)
