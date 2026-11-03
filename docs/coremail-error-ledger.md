@@ -150,7 +150,8 @@ PY
 4. 跑全量（32 核、22 GiB 软上限；启动前 `MemAvailable` 必须 ≥ 20 GiB）：
    ```sh
    export GOMAXPROCS=32 GOGC=100 GOMEMLIMIT=22GiB
-   export YAKIT_HOME="$RUN/yakit" TMPDIR="$RUN/tmp" YAK_SSA_SOURCE_CACHE=0
+   export YAKIT_HOME="$RUN/yakit" TMPDIR="$RUN/tmp"
+   # 准备出的源码超过内存预算时落 TMPDIR 下的私有临时目录，进程结束即删除。
    export GOCACHE=/mnt/data/cache/go-build GOTMPDIR="$RUN/tmp"
    awk '/MemAvailable/{print}' /proc/meminfo
    "$RUN/materialize" --debug "$RUN" /home/wlz/Target/coremail > "$RUN/stdout.log" 2>&1
