@@ -2,8 +2,10 @@
 
 日期：2026-11-03  
 分支：`codex/pa010-semantic-summaries`  
-基线：PR [#5371](https://github.com/yaklang/yaklang/pull/5371) 源分支
-`codex/shark-m2-protocol-correctness` / `4ccbc87927660735149efc779896c4328aad5556`
+初始基线：PR [#5371](https://github.com/yaklang/yaklang/pull/5371) 源分支
+`codex/shark-m2-protocol-correctness` / `4ccbc87927660735149efc779896c4328aad5556`。
+提 PR 前已普通合入最新源分支 `7335a24a63a3bcae35391c8590074a3fb29bd8bf`
+（merge `4fd97d8939`）。
 
 ## 有限合同
 
