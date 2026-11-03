@@ -1,5 +1,10 @@
 # M2-82：迟到 SETTINGS 的 QPACK 恢复与拥有字节展示
 
+2026-11-03最终说明提交1505ee1036a6b0d418da0676530c62a35540ca0c已独立全绿：47约定检查名/91执行/2statuses，316141精确ID、316116pass/25历史skip，131084 required全pass零skip。
+官方artifact 13195241277，17095254B，SHA256 `05bccd23143167290d2b3c0bd45683f4dda4b34ffc2b9fcd65e8d3aee38ead04`；checkout/upload/digest/CRC逐项闭合。
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41554533958)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41554539422)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41554544695)。
+闭合1678 SHA256 `3396fa4d27c6ed618f9a2a857346523f2e197b6f91c4937749473412c6b78712`。后续[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md)另验新SHA，父成功不认证新工作。
+
 本项有限关闭 N09.R04 的当前捕获连接恢复合同。SMB 不分析、不修复，N09 整体、R05、
 TCP 政策、TLS 高级阶段及 IP 字段/重组仍开放；不声明核心协议完备或与 Wireshark 全部等价。
 
