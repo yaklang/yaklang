@@ -253,9 +253,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if protocol == "http3" {
+				previousEncoder := http3RecoveredEncoder
+				defer func() { http3RecoveredEncoder = previousEncoder }()
+				http3RecoveredEncoder = false
 				if strings.HasPrefix(name, "QPACK Resumed Encoders[") {
-					previous, previousID := http3RecoveredEncoder, http3StreamID
-					defer func() { http3RecoveredEncoder, http3StreamID = previous, previousID }()
+					previousID := http3StreamID
+					defer func() { http3StreamID = previousID }()
 					http3RecoveredEncoder = x["Status"] == "decoded"
 					http3StreamID = number(x["HTTP3 Stream ID"])
 				}

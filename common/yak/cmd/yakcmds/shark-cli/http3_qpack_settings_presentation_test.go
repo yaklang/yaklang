@@ -76,3 +76,27 @@ func TestHTTP3RecoveredQPACKInstructionsPrecedeLargeProvenance(t *testing.T) {
 	require.GreaterOrEqual(t, index, 0)
 	require.Less(t, index, 30, "instruction semantics and bytes must precede the potentially truncated witness tree")
 }
+
+func TestHTTP3QPACKNestedWitnessCannotAuthorizeInstructionBytes(t *testing.T) {
+	for _, worker := range []bool{false, true} {
+		t.Run(fmt.Sprintf("worker%v", worker), func(t *testing.T) {
+			session := map[string]any{"Authentication Verified": true, "QPACK Resumed Encoders": []map[string]any{{"Status": "decoded", "HTTP3 Stream ID": uint64(7), "Instruction Bytes": []byte{0x3f, 0x21}, "Byte Source": map[string]any{"Instruction Bytes": []byte{9, 8, 7}}}}}
+			if worker {
+				wire, err := json.Marshal(session)
+				require.NoError(t, err)
+				decoder := json.NewDecoder(bytes.NewReader(wire))
+				decoder.UseNumber()
+				require.NoError(t, decoder.Decode(&session))
+			}
+			fields, sources := protocolEventDetail([]*pcaputil.ProtocolEvent{{Protocol: "http3", Status: "decoded", Session: session}})
+			ranged := 0
+			for _, field := range fields {
+				if strings.HasPrefix(field.text, "Instruction Bytes:") && field.hasRange {
+					ranged++
+					require.Equal(t, []byte{0x3f, 0x21}, sources[field.source-1].Data)
+				}
+			}
+			require.Equal(t, 1, ranged, "a same-named value inside a witness is context, not a decoded instruction")
+		})
+	}
+}
