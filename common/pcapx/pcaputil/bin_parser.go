@@ -1069,6 +1069,7 @@ type binFlow struct {
 	zookeeper         *binZooKeeper
 	clickhouse        *binClickHouse
 	stomp             *binSTOMP
+	wcf               *binWCF
 	rfb               *binRFB
 	diameter          *binDiameter
 	iec104            *binIEC104
@@ -1118,6 +1119,16 @@ func (f *binFlow) event(dir int, raw []byte, status, detail string) *BinParserEv
 		// field tree. Preserve its existing refusal before mutable public
 		// fields, protocol/status, or a caller-supplied rule can promote it.
 		e.nativeDiagnosticError = "protocol parser: event is incomplete, not an exact message"
+	}
+	if f.protocol == "wcf" && f.wcf != nil {
+		// Preserve observed MC-NMF context on refusal and truncation events.
+		// A complete record replaces this with consumeWCF's record snapshot.
+		e.Session = f.wcf.contextFields()
+		if len(raw) > 0 {
+			e.Session["Observed Record Type"] = uint64(raw[0])
+			e.Session["Observed Record Name"] = wcfRecordName(raw[0])
+		}
+		e.Profile, e.Completeness = "wcf-mc-nmf", "record"
 	}
 	if f.transportFlow != nil {
 		e.TCPFlowID = f.transportFlow.Index
@@ -1594,7 +1605,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					if len(wire) < 65608 && len(wire) < a.config.MaxMessageBytes && probeSMB1NegotiateExtendedResponse(wire, 65608).Verdict == ProbeNeedMore {
 						break
 					}
-					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
+					if len(wire) < a.budget.MaxFrameBytes && (needsMoreNBSSPrefix(wire, a.budget.MaxFrameBytes) || needsMoreTelnetPrefix(wire) || probeSLMPTCP(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes), false).Verdict == ProbeNeedMore || wrapperIncompletePrefix(wire, a.budget.MaxFrameBytes) || f.captureTCP && probeDNSTCP(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreS7Prefix(wire, a.budget.MaxFrameBytes) || probeWCF(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore || f.needsMoreSSHServerPreamble(dir, wire) || initialProtocolNeedMore(wire, a.budget.MaxFrameBytes).Verdict == ProbeNeedMore || needsMoreHTTPStartLine(wire) || f.needsMorePortProtocolPrefix(wire) || f.needsMoreBoundedText(wire) || f.needsMoreOpenWire(wire) || !f.captureTCP && probeRADIUSAccountingByte(wire, min(a.budget.MaxFrameBytes, a.config.MaxMessageBytes)).Verdict == ProbeNeedMore) {
 						break
 					}
 					f.stop(dir, wire, "unrecognized", "TCP application protocol not recognized")
@@ -1735,7 +1746,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 				} else {
 					result, err = f.consumeTLS(dir, e)
 				}
-			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || (f.protocol == "smb" && f.binding == nil && f.smb2 != nil) || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
+			} else if f.protocol == "iso8583" || f.protocol == "fins" || f.protocol == "mms" || f.protocol == "slmp" || f.protocol == "redis" || f.protocol == "syslog" || f.protocol == "snmp" || (f.protocol == "smb" && f.binding == nil && f.smb2 != nil) || f.protocol == "smb2" || f.protocol == "hart-ip" || f.protocol == "enip" || f.protocol == "doip" || f.protocol == "genisys" || f.protocol == "dlms-wrapper" || f.protocol == "dlms" || f.protocol == "c37118" || f.protocol == "roc-plus" || f.protocol == "atg" || f.memcached != nil || (e.Entry == "SSHIdentification" || e.Entry == "SSHPreIdentification") || f.protocol == "stratum" || f.protocol == "gearman" || f.protocol == "beanstalkd" || f.protocol == "scgi" || f.protocol == "msgpack-rpc" || f.protocol == "zookeeper" || f.protocol == "clickhouse" || f.protocol == "stomp" || f.protocol == "wcf" || f.protocol == "nats" || f.textInternet != nil || e.Entry == "MySQLPreparedFields" {
 				result = map[string]any{}
 			} else if e.Protocol == "rtsp" && rtspNativeControlWire(e.Raw, a.budget.MaxCollectionElements) {
 				result = map[string]any{}
@@ -1812,7 +1823,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
-				if (f.protocol == "stomp" || f.protocol == "nats") && e.Session != nil {
+				if (f.protocol == "stomp" || f.protocol == "nats" || f.protocol == "wcf") && e.Session != nil {
 					e.semanticFields = cloneSession(e.Session)
 					result = map[string]any{"fields": e.semanticFields}
 				}
@@ -2072,7 +2083,7 @@ func (f *binFlow) feed(dir int, data []byte, ts time.Time) {
 	// A valid request header can unblock an informational response before
 	// its body arrives (Expect: 100-continue). Retain this direction first.
 	f.replayHTTPAwaitingPeer(dir)
-	if detected && f.protocol != "" && !f.hasSession() {
+	if detected && f.protocol != "" && (!f.hasSession() || f.protocol == "wcf") {
 		other := &f.directions[1-dir]
 		if len(other.buffer) > 0 && !other.stopped {
 			f.feed(1-dir, nil, other.ts)

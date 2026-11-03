@@ -32,6 +32,25 @@ func (e *ProtocolEvent) summarizeProtocol() {
 			op = "reply"
 		}
 		e.Summary = fmt.Sprintf("ARP %s %s -> %s sender_mac=%v", op, e.Source, e.Destination, e.Session["Sender MAC"])
+	case "wcf":
+		name, _ := e.Session["Record Name"].(string)
+		if name == "" {
+			return
+		}
+		e.Summary = "WCF MC-NMF " + name
+		if kind, ok := e.Session["Envelope Kind"].(string); ok {
+			if length, ok := e.Session["Payload Length"].(uint64); ok {
+				e.Summary += fmt.Sprintf(" · %d-byte opaque %s body", length, kind)
+			}
+		} else if version, ok := e.Session["Version"].(string); ok {
+			e.Summary += " · v" + version
+		}
+		if mode, ok := e.Session["Mode Name"].(string); ok && mode != "" {
+			e.Summary += " · " + mode
+		}
+		if encoding, ok := e.Session["Encoding Name"].(string); ok && encoding != "" {
+			e.Summary += " · " + encoding
+		}
 	case "icmp", "icmpv6":
 		typ, ok := e.Session["Type"].(uint8)
 		code, codeOK := e.Session["Code"].(uint8)
