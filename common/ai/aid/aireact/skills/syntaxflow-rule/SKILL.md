@@ -39,16 +39,14 @@ description: >
 从用户样例/需求确认：sink 危险调用点（`exec`、`Query`、`Parse`、`Execute`...）、
 source 用户输入来源（`c.Query`、`r.URL.Query`、`FormValue`...）。先在纸上明确这两端再写规则。
 
-### 1.2 查 include 库结构（强制步骤）
+### 1.2 查 include 库结构（强制步骤，最多搜 2 次）
 
-**禁止凭记忆发明 `<include('...')>` 库名。** 用 `require_tool` 加载 `check_syntaxflow_syntax` 之外，
-库结构查询走文件系统：内置库源码位于引擎安装目录的 `buildin` 下（例如
-`<yakit-workdir>/.../golang/lib/golang-gin-context.sf`），用以下方式确认：
+**禁止凭记忆发明 `<include('...')>` 库名。** 用文件系统方式确认：`grep` 在工作目录/引擎安装目录
+搜索库名（如 `golang-gin-context`），命中后用 `read_file` 读该 `.sf` lib 确认导出的变量名
+（如 `$gin.Context`、`$context.Query`）。
 
-1. `grep`：在引擎/工作目录内搜索 `golang-gin-context` 等库名，定位 `.sf` lib 文件；
-2. `read_file`：读该 lib 文件，确认其中导出的变量名（如 `$sink.Context`、`$context.Query`）；
-3. 若确实找不到 lib 源码，改用你**已验证过**的最小原生语法（`.methodName(* #-> as $x)`），
-   不要猜测 include 内部结构。
+**搜索上限 2 次**：两轮没找到就不要再全盘搜索，直接改用最小原生语法
+（`.methodName(* #-> as $x)`）写规则，避免卡在找库上。
 
 常用库对照：Gin → `golang-gin-context`；Spring → `java-spring-mvc-param`；
 Go 标准库输入 → `golang-user-input`。
@@ -60,24 +58,37 @@ Go 标准库输入 → `golang-user-input`。
 
 ### 1.4 语法校验
 
-`require_tool` 加载 `check-syntaxflow-syntax`（scenario 工具，默认清单不展示），然后调用：
+`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），必须按下面**两个独立 action**
+调用。严禁把 `require_tool` 和 `directly_call_tool` 字段混在同一个 action 里。
 
+第一步，只加载 Schema（`require_tool_payload` 只能是字符串或字符串数组）：
+
+```json
+{"@action": "require_tool", "require_tool_payload": "check-syntaxflow-syntax", "human_readable_thought": "加载 SyntaxFlow 语法检查工具"}
 ```
-{ "path": "<你的 .sf 绝对路径>" }
+
+第二步，按上一步展示的 Schema 立即执行：
+
+```json
+{"@action": "directly_call_tool", "directly_call_tool_name": "check-syntaxflow-syntax", "directly_call_tool_params": {"path": "<你的 .sf 绝对路径>"}}
 ```
 
 返回 `passed=true` 表示语法通过；`passed=false` 时按 `errors` 逐行修复后重跑。
 
 ### 1.5 正例自检（有样例时必做）
 
-同一个工具，补上三个参数：
+同一个工具（Schema 已加载则直接复用，无需重复 require_tool），补上样例参数：
 
-```
+```json
 {
-  "path": "<.sf 绝对路径>",
-  "sample_code": "<用户提供的漏洞样例完整源码>",
-  "filename": "vuln.go",
-  "language": "golang"
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "check-syntaxflow-syntax",
+  "directly_call_tool_params": {
+    "path": "<.sf 绝对路径>",
+    "sample_code": "<用户提供的漏洞样例完整源码>",
+    "filename": "vuln.go",
+    "language": "golang"
+  }
 }
 ```
 

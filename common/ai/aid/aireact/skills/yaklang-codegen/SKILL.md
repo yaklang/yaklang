@@ -36,10 +36,15 @@ Python / Go / JS**：无 import、无类，标准库全局可用。
 
 ### 1.1 语法检查
 
-`require_tool` 加载 `check_yaklang_syntax`（scenario 工具，默认清单不展示）：
+`check_yaklang_syntax` 是 scenario 工具（默认清单不展示），按**两个独立 action** 调用，
+禁止把 `require_tool` 和 `directly_call_tool` 字段混在同一个 action 里：
 
 ```json
-{ "path": "<脚本绝对路径>" }
+{"@action": "require_tool", "require_tool_payload": "check_yaklang_syntax", "human_readable_thought": "加载 Yaklang 语法检查工具"}
+```
+
+```json
+{"@action": "directly_call_tool", "directly_call_tool_name": "check_yaklang_syntax", "directly_call_tool_params": {"path": "<脚本绝对路径>"}}
 ```
 
 **禁止**用 SyntaxFlow 的检查工具校验 Yaklang 代码。
@@ -49,8 +54,19 @@ Python / Go / JS**：无 import、无类，标准库全局可用。
 用 `bash` 工具执行脚本（Windows 会按环境选择 bash/PowerShell）：
 
 ```json
-{ "command": "yak <脚本绝对路径>", "timeout": 120, "accepted-exit-codes": "0" }
+{
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "bash",
+  "directly_call_tool_params": {
+    "command": "yak <脚本绝对路径>",
+    "timeout": 120,
+    "accepted-exit-codes": "0"
+  }
+}
 ```
+
+若 `yak` 不在 PATH：先用 `bash` 执行 `where yak` / `which yak` 定位，或使用当前引擎二进制的
+绝对路径替换命令中的 `yak`。
 
 - PoC/插件类必须让脚本内 `runSelfTest()` 通过 `if YAK_MAIN` 触发；直接运行即可。
 - 依赖外网/目标时，自测应使用 mock 数据，不要在自测里打真实目标。
