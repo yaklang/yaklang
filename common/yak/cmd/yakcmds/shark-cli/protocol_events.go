@@ -193,6 +193,7 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 	var http3RecoveredEncoder bool
 	var http3HeaderSource int
 	var http3HeaderRanges map[string][]int
+	var http3TunnelType bool
 	var fieldViewLimited bool
 	var byteSourceLimited bool
 	fieldValueBytes := 0
@@ -261,6 +262,12 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				}
 			}
 			if protocol == "http3" {
+				previousTunnel, previousStream := http3TunnelType, http3StreamID
+				defer func() { http3TunnelType, http3StreamID = previousTunnel, previousStream }()
+				http3TunnelType = strings.HasPrefix(name, "HTTP3 Tunnel Observations[") || strings.HasPrefix(name, "HTTP3 Resolved Tunnel Observations[") || name == "Tunnel Frame Check" || name == "HTTP3 Connection Error" && x["Error Name"] == "H3_FRAME_UNEXPECTED"
+				if http3TunnelType {
+					http3StreamID = number(x["Stream ID"])
+				}
 				previousEncoder := http3RecoveredEncoder
 				defer func() { http3RecoveredEncoder = previousEncoder }()
 				http3RecoveredEncoder = false
@@ -877,6 +884,16 @@ func protocolEventDetail(events []*pcaputil.ProtocolEvent, deduplicateSession ..
 				sourceName = "QUIC wire remainder · extracted octets"
 			}
 			if protocol == "http3" && authenticatedQUIC {
+				if name == "Frame Header Bytes" && http3TunnelType {
+					// Only the owned byte type (preserved by the worker descriptor)
+					// establishes octets. A Base64-looking text value is not proof.
+					// This is the observed type varint, not a physical-frame span or
+					// evidence that its following length/payload has been decoded.
+					if octets, ok := x.([]byte); ok && len(octets) > 0 && len(octets) <= 8 {
+						generated = octets
+						sourceName = fmt.Sprintf("HTTP/3 CONNECT frame type · stream %d · extracted bytes; frame offsets unavailable", http3StreamID)
+					}
+				}
 				if name == "Instruction Bytes" && http3RecoveredEncoder {
 					generated = bytesValue(x)
 					sourceName = fmt.Sprintf("HTTP/3 QPACK encoder · retained stream %d · SETTINGS is context", http3StreamID)

@@ -78,3 +78,78 @@ func TestHTTP3TunnelUnverifiedOrderIsNotDisplayedAsAConnectionError(t *testing.T
 		})
 	}
 }
+
+func TestHTTP3TunnelTypeOwnsItsExtractedByteSourceAcrossWorker(t *testing.T) {
+	for _, worker := range []bool{false, true} {
+		for _, group := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations", "HTTP3 Connection Error", "Tunnel Frame Check"} {
+			t.Run(fmt.Sprintf("worker%v/%s", worker, group), func(t *testing.T) {
+				fact := map[string]any{"Frame Type": "HEADERS", "Frame Type Value": uint64(1), "Stream ID": uint64(4), "Frame Header Bytes": []byte{0x40, 1}, "Error Name": "H3_FRAME_UNEXPECTED"}
+				var value any = fact
+				if strings.HasSuffix(group, "Observations") {
+					value = []map[string]any{fact}
+				}
+				e := &pcaputil.ProtocolEvent{ID: 1, Protocol: "http3", Transport: "udp", Status: "decoded", Raw: []byte("captured ciphertext"), Session: map[string]any{"Authentication Verified": true, group: value}}
+				events := []*pcaputil.ProtocolEvent{e}
+				if worker {
+					wire, err := marshalDecodeRequest(decodeRequest{Events: events})
+					require.NoError(t, err)
+					var request decodeRequest
+					d := json.NewDecoder(bytes.NewReader(wire))
+					d.UseNumber()
+					require.NoError(t, d.Decode(&request))
+					require.NoError(t, restoreWorkerByteFields(request.Events, request.ByteFields))
+					events = request.Events
+				}
+				fields, sources := protocolEventDetail(events)
+				found := false
+				for _, f := range fields {
+					if !strings.HasPrefix(f.text, "Frame Header Bytes:") {
+						continue
+					}
+					found = true
+					require.Contains(t, f.text, "2 bytes")
+					require.True(t, f.hasRange)
+					require.Greater(t, f.source, 1, "type octets are not a range in ciphertext")
+					require.Equal(t, 0, f.start)
+					require.Equal(t, 2, f.end)
+					s := sources[f.source-1]
+					require.Equal(t, []byte{0x40, 1}, s.Data)
+					require.Contains(t, s.Name, "CONNECT frame type")
+					require.Contains(t, s.Name, "frame offsets unavailable")
+					s.Data[0] = 0
+					require.Equal(t, []byte{0x40, 1}, fact["Frame Header Bytes"])
+				}
+				require.True(t, found)
+			})
+		}
+	}
+}
+
+func TestHTTP3TunnelByteSourceRequiresTypedBoundedAuthenticatedScope(t *testing.T) {
+	for _, name := range []string{"text", "oversized", "unauthenticated", "unrelated-map"} {
+		t.Run(name, func(t *testing.T) {
+			var header any = []byte{1}
+			authenticated, group := true, "HTTP3 Tunnel Observations"
+			switch name {
+			case "text":
+				header = "AQ=="
+			case "oversized":
+				header = bytes.Repeat([]byte{1}, 9)
+			case "unauthenticated":
+				authenticated = false
+			case "unrelated-map":
+				group = "Unknown Context"
+			}
+			e := &pcaputil.ProtocolEvent{Protocol: "http3", Raw: []byte("ciphertext"), Session: map[string]any{"Authentication Verified": authenticated, group: []map[string]any{{"Frame Header Bytes": header}}}}
+			fields, _ := protocolEventDetail([]*pcaputil.ProtocolEvent{e})
+			found := false
+			for _, f := range fields {
+				if strings.HasPrefix(f.text, "Frame Header Bytes:") {
+					found = true
+					require.False(t, f.hasRange)
+				}
+			}
+			require.True(t, found)
+		})
+	}
+}
