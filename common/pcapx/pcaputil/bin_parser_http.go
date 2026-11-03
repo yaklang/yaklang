@@ -242,6 +242,8 @@ func (f *binFlow) frameDirection(dir int, w []byte) (int, *binSpec, error) {
 			return f.frameClickHouse(dir, w)
 		case "stomp":
 			return f.frameSTOMP(dir, w)
+		case "wcf":
+			return f.frameWCF(dir, w)
 		case "dnp3":
 			return f.frameDNP3(w)
 		case "c37118":

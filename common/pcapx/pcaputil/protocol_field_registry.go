@@ -597,6 +597,44 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(m[spec.key])
 		}))
 	}
+	for _, f := range []struct {
+		name, label, key string
+		typ              DisplayFieldType
+		bits             int
+		origin           string
+	}{
+		{"wcf.record_type", "MC-NMF record type", "Record Type", DisplayUnsigned, 8, "pdu"},
+		{"wcf.record_name", "MC-NMF record name", "Record Name", DisplayString, 0, "context"},
+		{"wcf.major_version", "MC-NMF major version", "Major Version", DisplayUnsigned, 8, "pdu"},
+		{"wcf.minor_version", "MC-NMF minor version", "Minor Version", DisplayUnsigned, 8, "pdu"},
+		{"wcf.mode", "MC-NMF communication mode", "Mode", DisplayUnsigned, 8, "pdu"},
+		{"wcf.via", "MC-NMF Via URI", "Via", DisplayString, 0, "pdu"},
+		{"wcf.encoding", "MC-NMF envelope encoding", "Encoding", DisplayUnsigned, 8, "pdu"},
+		{"wcf.encoding_name", "MC-NMF envelope encoding name", "Encoding Name", DisplayString, 0, "context"},
+		{"wcf.envelope_kind", "MC-NMF envelope record kind", "Envelope Kind", DisplayString, 0, "context"},
+		{"wcf.envelope_sequence", "Observed MC-NMF envelope ordinal", "Envelope Sequence", DisplayUnsigned, 64, "derived"},
+		{"wcf.declared_length", "MC-NMF declared envelope length", "Declared Length", DisplayUnsigned, 64, "pdu"},
+		{"wcf.payload_length", "MC-NMF opaque envelope bytes", "Payload Length", DisplayUnsigned, 64, "pdu"},
+		{"wcf.payload_sha256", "MC-NMF opaque envelope SHA-256", "Envelope Body SHA256", DisplayString, 0, "derived"},
+		{"wcf.envelope_opaque", "MC-NMF envelope body decoded", "Envelope Body Opaque", DisplayBoolean, 0, "context"},
+		{"wcf.role", "MC-NMF observed role", "Role", DisplayString, 0, "context"},
+	} {
+		b := displayRoot("wcf", f.name, f.label, f.typ, f.bits, f.origin, f.key)
+		b.protocols = "|wcf|"
+		switch f.key {
+		case "Declared Length":
+			b.rangeKey = "Envelope Length"
+		case "Payload Length":
+			b.rangeKey = "Envelope Body"
+			b.custom = func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+				emit(e.Session["Payload Length"])
+			}
+			b.rangeFor = func(e *ProtocolEvent, _ int) *DisplayFieldRange {
+				return e.displayPDUFieldRange("Envelope Body")
+			}
+		}
+		out = append(out, b)
+	}
 	out = append(out, nativeNetworkDisplayBindings()...)
 	out = append(out, nativeMLDDisplayBindings()...)
 	out = append(out, nativeIGMPDisplayBindings()...)
@@ -1137,6 +1175,22 @@ func displayFieldEnums(name string) []DisplayFieldEnum {
 		return []DisplayFieldEnum{{250, "Subnegotiation"}, {251, "WILL"}, {252, "WONT"}, {253, "DO"}, {254, "DONT"}, {255, "Escaped IAC"}}
 	case "nbss.type":
 		return []DisplayFieldEnum{{129, "Session Request"}, {130, "Positive Session Response"}, {131, "Negative Session Response"}, {132, "Retarget Session Response"}, {133, "Session Keepalive"}}
+	case "wcf.record_type":
+		return []DisplayFieldEnum{
+			{0x00, "Version"},
+			{0x01, "Mode"},
+			{0x02, "Via"},
+			{0x03, "Known Encoding"},
+			{0x04, "Extensible Encoding"},
+			{0x05, "Unsized Envelope"},
+			{0x06, "Sized Envelope"},
+			{0x07, "End"},
+			{0x08, "Fault"},
+			{0x09, "Upgrade Request"},
+			{0x0a, "Upgrade Response"},
+			{0x0b, "Preamble Ack"},
+			{0x0c, "Preamble End"},
+		}
 	}
 	return nil
 }

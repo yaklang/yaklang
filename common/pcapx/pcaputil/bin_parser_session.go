@@ -223,6 +223,17 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 	} else if p.Verdict == ProbeNeedMore {
 		return
 	}
+	if p := probeWCF(wire, min(f.a.budget.MaxFrameBytes, f.a.config.MaxMessageBytes)); p.Verdict == ProbeAccept {
+		clientDir, clientKnown := f.tcpClientDir, f.tcpClientKnown
+		midstream := p.Version == "midstream"
+		if !midstream {
+			clientDir, clientKnown = dir, true
+		}
+		f.protocol, f.wcf = "wcf", newBinWCF(clientDir, clientKnown, midstream)
+		return
+	} else if p.Verdict == ProbeNeedMore {
+		return
+	}
 	// A long MySQL greeting can begin with 'P\x00\x00\x00\x0a', which
 	// resembles a tiny PostgreSQL Parse frame. Check the numeric version,
 	// salt/filler and protocol-41 capabilities before weak typed messages.
@@ -391,6 +402,13 @@ func (f *binFlow) detectDirection(dir int, wire []byte) {
 		f.protocol, f.clickhouse = "clickhouse", &binClickHouse{clientDir: clientDir}
 	case "stomp":
 		f.protocol, f.stomp = "stomp", &binSTOMP{clientDir: dir}
+	case "wcf":
+		clientDir, clientKnown := f.tcpClientDir, f.tcpClientKnown
+		midstream := p.Version == "midstream"
+		if !midstream {
+			clientDir, clientKnown = dir, true
+		}
+		f.protocol, f.wcf = "wcf", newBinWCF(clientDir, clientKnown, midstream)
 	case "socks5":
 		f.protocol, f.socks5 = "socks5", &binSOCKS5{client: dir, phase: socks5Greeting}
 	case "stratum":
@@ -1256,6 +1274,8 @@ func (f *binFlow) consumeSession(dir int, e *ProtocolEvent, result map[string]an
 		if err == nil {
 			e.Profile, e.Completeness = "stomp-bounded-frame", "message"
 		}
+	case "wcf":
+		err = f.consumeWCF(dir, e)
 	case "syslog":
 		framing := syslogStreamFraming(e.Raw)
 		e.Session, err = f.syslog.consume(e.Raw, framing, f.a.config.MaxMessageBytes, f.a.budget.MaxCollectionElements)
@@ -1579,6 +1599,7 @@ func (f *binFlow) closeSession() {
 		f.memcached = nil
 	}
 	f.iso8583 = nil
+	f.wcf = nil
 	f.stratum = nil
 	f.gearman = nil
 	f.beanstalk = nil
