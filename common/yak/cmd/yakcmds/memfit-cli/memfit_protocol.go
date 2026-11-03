@@ -46,6 +46,7 @@ type memfitStartConfig struct {
 	AgentTitle    string `json:"agent_title,omitempty"`
 	AgentDesc     string `json:"agent_description,omitempty"`
 	Focus         string `json:"focus,omitempty"`
+	DumpDir       string `json:"dump_dir,omitempty"`
 }
 
 type memfitInput struct {

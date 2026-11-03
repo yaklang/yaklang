@@ -137,6 +137,10 @@ func newMemfitCommand(profile memfitProfile) *cli.Command {
 				Name:  "debug",
 				Usage: "show worker diagnostic logs and detailed events",
 			},
+			cli.StringFlag{
+				Name:  "dump-dir",
+				Usage: "write complete AI calls, tool/system events, protocol frames, and worker logs to this directory",
+			},
 		},
 		Action: func(c *cli.Context) error {
 			return runMemfitCLI(c, profile)
@@ -172,6 +176,21 @@ func runMemfitCLI(c *cli.Context, profile memfitProfile) error {
 	if !stat.IsDir() {
 		return utils.Errorf("memfit workdir is not a directory: %s", absWorkdir)
 	}
+	dumpDir := strings.TrimSpace(c.String("dump-dir"))
+	if dumpDir != "" {
+		dumpDir, err = filepath.Abs(dumpDir)
+		if err != nil {
+			return utils.Wrap(err, "resolve memfit dump directory")
+		}
+		if err := os.MkdirAll(dumpDir, 0o700); err != nil {
+			return utils.Wrap(err, "create memfit dump directory")
+		}
+		if dirStat, statErr := os.Stat(dumpDir); statErr != nil {
+			return utils.Wrap(statErr, "stat memfit dump directory")
+		} else if !dirStat.IsDir() {
+			return utils.Errorf("memfit dump path is not a directory: %s", dumpDir)
+		}
+	}
 
 	config := memfitStartConfig{
 		AIType:        strings.TrimSpace(c.String("ai-type")),
@@ -189,6 +208,7 @@ func runMemfitCLI(c *cli.Context, profile memfitProfile) error {
 		AgentTitle:    profile.Title,
 		AgentDesc:     profile.Description,
 		Focus:         profile.Focus,
+		DumpDir:       dumpDir,
 	}
 	if err := validateMemfitStartConfig(config); err != nil {
 		return err
@@ -256,6 +276,14 @@ func runMemfitWorker(input io.Reader, output io.Writer) error {
 		_ = protocol.send("error", first.ID, memfitStatus{Message: err.Error()})
 		return err
 	}
+	trace, err := newMemfitTrace(config.DumpDir, config.APIKey)
+	if err != nil {
+		_ = protocol.send("error", first.ID, memfitStatus{Message: err.Error()})
+		return err
+	}
+	defer trace.Close()
+	trace.recordStartConfig(config)
+	trace.recordJSONL(memfitTraceLifecycleFile, "worker_started", map[string]any{"pid": os.Getpid()})
 
 	if config.Debug {
 		log.SetLevel(log.DebugLevel)
@@ -272,7 +300,7 @@ func runMemfitWorker(input io.Reader, output io.Writer) error {
 	}
 	defer cancel()
 
-	options, err := buildMemfitEngineOptions(ctx, config, protocol)
+	options, err := buildMemfitEngineOptions(ctx, config, protocol, trace)
 	if err != nil {
 		_ = protocol.send("error", first.ID, memfitStatus{Message: err.Error()})
 		return err
@@ -287,6 +315,9 @@ func runMemfitWorker(input io.Reader, output io.Writer) error {
 	if err := protocol.send("ready", first.ID, memfitStatus{Message: "worker ready"}); err != nil {
 		return err
 	}
+	trace.recordJSONL(memfitTraceLifecycleFile, "engine_ready", map[string]any{
+		"focus": config.Focus,
+	})
 
 	frames := make(chan []byte)
 	scanDone := make(chan error, 1)
@@ -429,6 +460,7 @@ func buildMemfitEngineOptions(
 	ctx context.Context,
 	config memfitStartConfig,
 	protocol *memfitProtocolWriter,
+	trace *memfitTrace,
 ) ([]aiengine.AIEngineConfigOption, error) {
 	options := []aiengine.AIEngineConfigOption{
 		aiengine.WithContext(ctx),
@@ -438,6 +470,7 @@ func buildMemfitEngineOptions(
 		aiengine.WithReviewPolicy(config.ReviewPolicy),
 		aiengine.WithAllowUserInteract(config.ReviewPolicy != "yolo"),
 		aiengine.WithOnEvent(func(_ aicommon.AIEngineOperator, event *schema.AiOutputEvent) {
+			trace.recordAIEvent(event)
 			forwardMemfitWorkerEvent(protocol, config.APIKey, event)
 		}),
 	}
@@ -454,6 +487,9 @@ func buildMemfitEngineOptions(
 		options = append(options, aiengine.WithExtOptions(
 			aicommon.WithAiToolManager(newCodingToolManager()),
 		))
+	}
+	if trace != nil {
+		options = append(options, aiengine.WithAICallTraceHook(trace.recordAICall))
 	}
 
 	if config.AIType != "" || config.APIKey != "" || config.Model != "" || config.BaseURL != "" {

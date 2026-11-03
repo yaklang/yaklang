@@ -238,6 +238,7 @@ type Config struct {
 	AiTransactionAutoRetry int64
 	aiRetryWaitFunc        func(context.Context, time.Duration) error
 	PromptHook             func(string) string
+	aiCallTraceHook        AICallTraceHook
 
 	/*
 		Prompt Manager
@@ -4512,6 +4513,9 @@ func convertConfigToOptions(i *Config, inheritHotPatch bool) []ConfigOption {
 	// Misc
 	if i.PromptHook != nil {
 		opts = append(opts, WithPromptHook(i.PromptHook))
+	}
+	if i.aiCallTraceHook != nil {
+		opts = append(opts, WithAICallTraceHook(i.aiCallTraceHook))
 	}
 	if i.Language != "" {
 		opts = append(opts, WithLanguage(i.Language))

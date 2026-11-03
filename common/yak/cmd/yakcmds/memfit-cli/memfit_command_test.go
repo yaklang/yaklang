@@ -25,6 +25,7 @@ func TestMemfitCommandContract(t *testing.T) {
 	require.Contains(t, flags, "base-url")
 	require.Contains(t, flags, "print")
 	require.Contains(t, flags, "plain")
+	require.Contains(t, flags, "dump-dir")
 
 	review, ok := flags["review"].(cli.StringFlag)
 	require.True(t, ok)

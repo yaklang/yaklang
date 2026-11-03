@@ -50,3 +50,25 @@ yak memfit-code
 The worker protocol is versioned and framed. The parent can only send start,
 input, interactive reply, review policy, cancel, and shutdown frames. The child
 returns presentation-safe events plus terminal turn status.
+
+## Diagnostic trace
+
+Pass `--dump-dir` explicitly to keep a complete local trace for troubleshooting:
+
+```bash
+yak memfit-code --dump-dir ./memfit-trace \
+  --workdir /path/to/repository --review yolo
+```
+
+The directory contains:
+
+- `ai-calls.jsonl`: complete normalized prompts, outputs, reasoning, model and
+  token usage, HTTP status, and errors for every top-level AI call;
+- `ai-events.jsonl`: every tool/system/stream event with task and call IDs;
+- `protocol.jsonl`: both directions of the parent/worker protocol;
+- `worker.log`: worker stdout/stderr diagnostics;
+- `lifecycle.jsonl`: start configuration and process lifecycle markers.
+
+The configured API key is redacted. The trace still contains source prompts,
+tool arguments, tool output, and model responses, so treat the directory as
+sensitive and never commit it.

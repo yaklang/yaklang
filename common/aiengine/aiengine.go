@@ -700,6 +700,9 @@ func buildReActOptions(ctx context.Context, config *AIEngineConfig, outputChan c
 	if config.UserUsageCallback != nil {
 		options = append(options, aicommon.WithUserUsageCallback(config.UserUsageCallback))
 	}
+	if config.AICallTraceHook != nil {
+		options = append(options, aicommon.WithAICallTraceHook(config.AICallTraceHook))
+	}
 
 	// 高级配置
 

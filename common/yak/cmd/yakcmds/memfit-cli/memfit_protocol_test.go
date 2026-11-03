@@ -27,6 +27,19 @@ func TestMemfitProtocolRoundTrip(t *testing.T) {
 	require.Equal(t, "第一行\nsecond", payload.Text)
 }
 
+func TestMemfitStartConfigRoundTripsDumpDir(t *testing.T) {
+	var output bytes.Buffer
+	require.NoError(t, newMemfitProtocolWriter(&output).send("start", "start-1", memfitStartConfig{
+		ReviewPolicy: "yolo",
+		DumpDir:      "/tmp/memfit-trace",
+	}))
+	envelope, err := decodeMemfitEnvelope(output.Bytes())
+	require.NoError(t, err)
+	config, err := decodeMemfitPayload[memfitStartConfig](envelope)
+	require.NoError(t, err)
+	require.Equal(t, "/tmp/memfit-trace", config.DumpDir)
+}
+
 func TestMemfitProtocolRejectsNoiseAndVersionMismatch(t *testing.T) {
 	_, err := decodeMemfitEnvelope([]byte("dependency wrote to stdout"))
 	require.ErrorIs(t, err, errMemfitNotProtocolFrame)
