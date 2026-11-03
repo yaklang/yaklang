@@ -93,8 +93,12 @@ Go 标准库输入 → `golang-user-input`。
 `directly_call_tool_params_group` 批量形式；参数类型必须与 Schema 一致——整数直接写数字
 （`"limit": 20`，不要写成 `"20"`），布尔用 `true`/`false`，不要加引号。
 
-> 同理，`grep` / `read_file` / `write_file` / `bash` 都在默认工具清单中可见，直接调用即可，
+> 同理，`grep` / `read_file` / `write_file` 都在默认工具清单中可见，直接调用即可，
 > 不要用 `require_tool` 加载它们。
+>
+> **本技能不需要 `bash`**：语法校验/正例自检由 `check-syntaxflow-syntax` 完成，
+> 库与语法由 `syntaxflowdoc_*` 查询。校验通过后直接交付，不要再用 `bash`
+> 探测安装目录或做额外验证（既低效又容易触发参数类型错误）。
 
 ### 1.5 正例自检（有样例时必做）
 
