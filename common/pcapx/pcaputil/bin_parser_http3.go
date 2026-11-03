@@ -392,6 +392,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if q.native {
 			hf["Byte Source"] = st.sources[dir].describe(sid, dir, start, end)
 			hf["Payload Byte Source"] = st.sources[dir].describe(sid, dir, payloadStart, end)
+			q.observeH3LateBody(st, dir, sid, hf)
 		}
 		frames = append(frames, hf)
 		h3.parsed[dir] += need

@@ -533,6 +533,34 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 	}))
 	for _, spec := range []struct {
 		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"http3.late_message.verdict", "Observation Verdict", DisplayString, 0},
+		{"http3.late_message.length_check", "Length Check", DisplayString, 0},
+		{"http3.late_message.request_method_class", "Request Method Class", DisplayString, 0},
+		{"http3.late_message.request_method", "Request Method", DisplayString, 0},
+		{"http3.late_message.observed_data_bytes", "Observed DATA Bytes", DisplayUnsigned, 64},
+		{"http3.late_message.header_pdu", "Header PDU ID", DisplayUnsigned, 64},
+		{"http3.late_message.observed_in_pdu", "Observed In PDU ID", DisplayUnsigned, 64},
+		{"http3.late_message.streamid", "Stream ID", DisplayUnsigned, 62},
+		{"http3.late_message.direction", "Direction", DisplayUnsigned, 1},
+		{"http3.late_message.coverage_complete", "Body Coverage Complete", DisplayBoolean, 0},
+	} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Later method check of retained response observations; no wire range or whole-message/peer-delivery certificate", spec.typ, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			displayHTTP3LateMessage(e, p, func(m map[string]any) { emit(m[spec.key]) })
+		}))
+	}
+	out = append(out, displayCustom("http3", "http3.late_message.fin_pdu", "Original FIN observation, independent of the later contiguous delivery or method PDU", DisplayUnsigned, 64, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		displayHTTP3LateMessage(e, p, func(m map[string]any) {
+			if f, ok := m["Observed FIN Source"].(map[string]any); ok && f["Available"] == true {
+				emit(f["PDU ID"])
+			}
+		})
+	}))
+	for _, spec := range []struct {
+		name, key string
 		bits      int
 	}{
 		{"http3.connection.error_code", "Error Code", 62},
@@ -799,6 +827,19 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 	}
 
 	return s
+}
+
+func displayHTTP3LateMessage(e *ProtocolEvent, p *displayProjection, visit func(map[string]any)) {
+	for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+		p.maps(e.Session[kind], func(link map[string]any) {
+			if link["Ambiguous"] == true {
+				return
+			}
+			if m, ok := link["Response Message Revalidation"].(map[string]any); ok {
+				visit(m)
+			}
+		})
+	}
 }
 
 func normalizeDisplayValue(value any, d DisplayFieldDescriptor) (any, bool) {

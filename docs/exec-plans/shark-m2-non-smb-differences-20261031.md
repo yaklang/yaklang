@@ -1,5 +1,12 @@
 # M2-10 非 SMB 有限差异清单
 
+2026-11-03后续：[M2-84 晚到方法的响应正文复验与实际Windows](shark-m2-http3-late-body-20261103.md)。
+当前84项74有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，18–36 AI实施小时。
+R06四个真实来源乱序目标有限关闭；新R07成功CONNECT后的HEADERS帧序列缺口已复现并保留，完整N09仍开放。
+0bb为代码/完整本地运行/实际构建同一SHA：291132pass/25历史skip、41新增；34791插桩，41小源执行/15新参考，
+新16消息/56头/32帧、旧21原包/13目标、72实际Windows、六完整公共及四strict域控制通过。
+e0fb已独立47/91/2及316190原始ID/官方产物全绿；本批最终说明head须另验316231原始ID/动作及全部CI。
+
 2026-11-03后续：[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md)。
 当前83项73有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，18–36 AI实施小时。
 N09.R05七个冻结真实来源变换有限关闭，新R06晚到HEAD方法的旧响应正文复验已复现并追加，完整N09仍开放。
@@ -35,7 +42,8 @@ N09新增的可验收子项（包含在既有开放N09内，不重复计算父�
 | N09.R03 先到0-RTT在获得当前连接密钥后的有界恢复 | 有限完成（M2-81，最终CI归11） | 当前owner/域与已观察接纳、私有原始密文/来源及预算；拒绝/晚secret/坏tag/DTO/retire/close/EOF与v1/v2三套件通过。实抓21/21、353 QUIC/276控制字面、四H3消息/两个响应关联、新参考及36实际Windows；原诊断保留，新PDU贡献完成15/上下文16分开。完整生命周期、R04/R05仍开放 |
 | N09.R04 迟到peer SETTINGS后的QPACK恢复 | 有限完成（M2-82，最终CI归11） | 当前owner/方向的既有后缀重试，不重放PN/STREAM；双方向/v1/v2三套件、接口/VLAN、分片/批事务、拒绝/资源和关闭/退休通过。frame18/PDU28的3fe11f在frame19/PDU29提供设置后恢复容量4096，来源仍18；新参考逐字段及最终Windows独立源高亮。原不可变诊断保留，完整跨连接remembered SETTINGS/全部QPACK生命周期仍归开放N09 |
 | N09.R05 晚到已解码请求的响应关联补充 | 有限完成（M2-83，最终CI归11） | 不可变原观察加有界当前视图；私有Flow/域/头观察号与字节源分开，七个冻结来源变换全部正确，64边/预算/歧义/淘汰显式；49新ID、21109插桩、36实际Windows、六完整公共回放。[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md) |
-| N09.R06 晚到方法未复验先前响应正文 | 已复现，未实施 | 仓库外overlay1696：HEAD非空正文原状态未保留错误，两个pass/两个fail action（含父）；保留正文手动checkBody会拒绝。需区分后来响应语义诊断与有效当前请求，补HEAD/CONNECT/FIN/缺包/复用、来源、实际页和逐包参考；非真实抓包证据 |
+| N09.R06 晚到方法未复验先前响应正文 | 有限完成（M2-84，最终CI归11） | 新实抓1708与独立1710来源；四个冻结乱序目标、88保护包比较/16消息/56头/32帧，区分原始DATA/FIN和后来方法、有效当前请求；41新ID、34791插桩、72实际Windows、六完整公共及四strict域通过。正文已观察合同不替代R07隧道帧序列或完整生命周期。[84证据](shark-m2-http3-late-body-20261103.md) |
+| N09.R07 成功CONNECT后的已知HEADERS/trailers帧序列 | 已复现，未实施 | 仓库外1748 authored overlay：普通GET trailers合法负例1pass，已知CONNECT与晚到CONNECT两个叶子失败，加父3fail；原stdout与源码/overlay哈希保留，不算实抓或通过分母。RFC9114 4.4要求connection H3_FRAME_UNEXPECTED，需补连接级原生错误、晚到发现、复用/域隔离、独立来源和Windows |
 
 2026-11-03后续[M2-78 RFC8773配套、EE位置及拒绝Hello展示](shark-m2-tls-certificate-psk-20261103.md)：
 224新增、114最终小源、12复用/接口/VLAN profile/216引用、72坏CH ACK无TLS粘性，94实际Windows通过。
@@ -130,7 +138,7 @@ N14复核到M1已有有界IP重组基础，纠正旧“未实现”描述；完�
 | M2-10.N06 | HTTP迟到/乱序请求后的响应恢复 | 有限完成（M2-39） | 真实163/167恢复两例旧6差异；HEAD/CONNECT/Expect100、预算、原贡献及callback因果门 | 0 |
 | M2-10.N07 | 永久缺客户端请求的HTTP响应边界 | 有限完成（M2-55的partial可观察性）；完整划分差异保留 | c0确认完整头的HTTP版本/状态码，拥有的未定界字节不伪造正文、方法或新消息；真实GET/HEAD/CONNECT、TLS缺失和54公开头独立来源/参考、1048后续观察、别名负控及35实际Windows状态通过。原WS169的6响应与产品1完整响应差异不豁免；不承诺缺信息时完整划分等价。[证据](shark-m2-http-orphan-observation-20261101.md) | 此有限合同0；信息不足的完整划分限制保留 |
 | M2-10.N08 | TLS1.2 C1新SYN未配SYNACK的历史恢复政策 | 有限完成；政策差异保留，非parser修复 | 857/859/861共40次实际运行、5784字面参考检查；独立94 AEAD/48 peer HTTP，当前184个TLS/HTTP来源全部加入旧代账本，多出7消息均Flow2/Feed57，错误新代密钥拒绝。RST发送方向前缀及匹配新SYN-ACK界限逐项核实，2页54 Windows状态保留正确旧代层级。原strict72仍exit4/8差异，不以此宣称真实端点RCV.NXT或参考消息数一致；[有限政策和证据](shark-m2-tls-old-generation-and-http-display-20261102.md) | 此有限合同0；参考政策差异保留 |
-| M2-10.N09 | QUIC app-only缺握手时的身份及来源资格 | 开放；R01–R05有限关闭，新增R06开放 | 83有限补晚到请求头关联、当前视图与原PDU/来源隔离；七变体、21109插桩及36实际Windows。R06 authored先到正文/晚HEAD复验两个pass/两个fail action已复现，未当真实抓包；完整CID/epoch/STREAM/QPACK/0RTT生命周期及remembered SETTINGS仍开放。[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md) | 5–10小时 |
+| M2-10.N09 | QUIC app-only缺握手时的身份及来源资格 | 开放；R01–R06有限关闭，新增R07开放 | 84补晚到HEAD/CONNECT的旧响应正文复验及原DATA/FIN与方法来源分账；四新实抓来源变换、41新ID、34791插桩、72实际Windows。R07 CONNECT隧道HEADERS两个失败叶子另保留；完整CID/epoch/STREAM/QPACK/0RTT生命周期及remembered SETTINGS仍开放。[84范围和证据](shark-m2-http3-late-body-20261103.md) | 5–10小时 |
 | M2-10.N10 | 6个fuzz TCP tuple分区/复用差异 | 开放，政策/代次证明 | 1039新完整回调仍44观察/8段544B、全部SHA及后续不接纳保持；1040独立遍历全原包补至74 tuple候选，旧52为见证集合，新增22含不完整/碎片/拒绝输入。1041新参考已取，完整代次/应用关联政策仍待证。67仅修315个异常SYN标志物理页面，不改流分区；[新范围](shark-m2-tcp-invalid-flags-20261102.md) | 3–6小时 |
 | M2-10.N11 | 原24组fuzz UDP tuple分区报告差异 | 有限完成（M2-66来源归因；非全部UDP会话验收） | 24组/9066原包各一个外层tuple和一个新参考stream；旧报告合并多层udp.stream，不能当应用会话合并。9018长度矛盾、48仅范围一致，全部当前SDK/CLI无应用连接。42新ID、43受影响pass、382630插桩、五次真实DNS域控制/拒绝及新PDML位置核对通过；原24计数/完整报告保留。[限定证据](shark-m2-udp-oracle-layer-20261102.md) | 本次原报告有限合同0；其他UDP应用会话不自动验收 |
 | M2-10.N12 | KeyUpdate record尾边界和换钥原子性 | 有限完成（M2-41；其他换钥消息仍开放） | 176/180独立源、39ca真实SDK三类误接受及HTTP泄漏；6bac同v02六源通过及12DTO拒绝，私有secret/IV/AEAD/seq及反向/预算测试、96752插桩fuzz。父阶段列表问题另列M2-42；后续9af/229实际60状态已关闭有限UI合同 | 0 |
