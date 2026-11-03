@@ -20,6 +20,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils/yakgit"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssagitworkdir"
+	"github.com/yaklang/yaklang/common/yak/ssautils"
 )
 
 var (
@@ -95,12 +96,7 @@ func getZipFile(codeSource *Config) (*filesys.ZipFS, error) {
 func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 	// use local
 	if c.GetCodeSourceLocalFile() != "" {
-		jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
-		if err != nil {
-			return nil, err
-		}
-		jarFS.SetRetainUnprovedSource(true)
-		return jarFS, nil
+		return ssautils.OpenJarFS(c.GetCodeSourceLocalFile(), c.GetCodeSourceJarRecursiveParse())
 	}
 	if c.GetCodeSourceURL() == "" {
 		return nil, utils.Errorf("url is empty ")
@@ -125,12 +121,7 @@ func getJarFS(c *Config) (*javaclassparser.JarFS, error) {
 		return nil, utils.Errorf("write temp file error: %v", err)
 	}
 	tmpFile.Close()
-	jarFS, err := javaclassparser.NewJarFSFromLocalWithOptions(tmpPath, c.GetCodeSourceJarRecursiveParse())
-	if err != nil {
-		return nil, err
-	}
-	jarFS.SetRetainUnprovedSource(true)
-	return jarFS, nil
+	return ssautils.OpenJarFS(tmpPath, c.GetCodeSourceJarRecursiveParse())
 }
 
 func gitFs(codeSource *Config) (fi.FileSystem, error) {

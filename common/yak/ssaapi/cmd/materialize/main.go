@@ -22,9 +22,10 @@ import (
 	"time"
 
 	"github.com/yaklang/yaklang/common/utils/filesys"
+	fi "github.com/yaklang/yaklang/common/utils/filesys/filesys_interface"
 	"github.com/yaklang/yaklang/common/yak/java/java2ssa"
 	"github.com/yaklang/yaklang/common/yak/ssa"
-	"github.com/yaklang/yaklang/common/yak/ssaapi"
+	"github.com/yaklang/yaklang/common/yak/ssautils"
 )
 
 type sourceCheck struct {
@@ -41,33 +42,33 @@ type sourceCheck struct {
 }
 
 type verification struct {
-	Files                 int                             `json:"files"`
-	Checked               int                             `json:"checked"`
-	UniqueChecks          int                             `json:"unique_checks"`
-	ReusedChecks          int                             `json:"reused_checks"`
-	MaterializationErrors int64                           `json:"materialization_errors"`
-	SyntaxFailures        int                             `json:"syntax_failures"`
-	StubMethods           int                             `json:"stub_methods"`
-	StubFiles             int                             `json:"stub_files"`
-	Suppressed            int                             `json:"suppressed"`
-	PrepareSeconds        float64                         `json:"prepare_seconds"`
-	VerifySeconds         float64                         `json:"verify_seconds"`
-	HeapAlloc             uint64                          `json:"heap_alloc_bytes"`
-	HeapInuse             uint64                          `json:"heap_inuse_bytes"`
-	SourceBytes           int64                           `json:"source_bytes"`
-	Preparation           ssaapi.SourcePreparationTimings `json:"preparation"`
-	JavaFiles             int                             `json:"java_files"`
-	FrontendFiles         int                             `json:"frontend_covered_files"`
-	FrontendCalls         int                             `json:"frontend_calls"`
-	FrontendFailures      int                             `json:"frontend_failures"`
-	DecompilerRefusals    int                             `json:"decompiler_refusals"`
-	EmptyUnits            int                             `json:"empty_units"`
-	ReadFailures          int                             `json:"read_failures"`
-	JavaWorkerSeconds     float64                         `json:"java_worker_seconds"`
-	CheckWorkerSeconds    float64                         `json:"check_worker_seconds"`
-	ReadWorkerSeconds     float64                         `json:"read_worker_seconds"`
-	ManifestWriteSeconds  float64                         `json:"manifest_write_seconds"`
-	Issues                []sourceCheck                   `json:"issues,omitempty"`
+	Files                 int              `json:"files"`
+	Checked               int              `json:"checked"`
+	UniqueChecks          int              `json:"unique_checks"`
+	ReusedChecks          int              `json:"reused_checks"`
+	MaterializationErrors int64            `json:"materialization_errors"`
+	SyntaxFailures        int              `json:"syntax_failures"`
+	StubMethods           int              `json:"stub_methods"`
+	StubFiles             int              `json:"stub_files"`
+	Suppressed            int              `json:"suppressed"`
+	PrepareSeconds        float64          `json:"prepare_seconds"`
+	VerifySeconds         float64          `json:"verify_seconds"`
+	HeapAlloc             uint64           `json:"heap_alloc_bytes"`
+	HeapInuse             uint64           `json:"heap_inuse_bytes"`
+	SourceBytes           int64            `json:"source_bytes"`
+	Preparation           ssautils.Timings `json:"preparation"`
+	JavaFiles             int              `json:"java_files"`
+	FrontendFiles         int              `json:"frontend_covered_files"`
+	FrontendCalls         int              `json:"frontend_calls"`
+	FrontendFailures      int              `json:"frontend_failures"`
+	DecompilerRefusals    int              `json:"decompiler_refusals"`
+	EmptyUnits            int              `json:"empty_units"`
+	ReadFailures          int              `json:"read_failures"`
+	JavaWorkerSeconds     float64          `json:"java_worker_seconds"`
+	CheckWorkerSeconds    float64          `json:"check_worker_seconds"`
+	ReadWorkerSeconds     float64          `json:"read_worker_seconds"`
+	ManifestWriteSeconds  float64          `json:"manifest_write_seconds"`
+	Issues                []sourceCheck    `json:"issues,omitempty"`
 }
 
 // A stubbed method body carries the marker as a quoted string literal, while a
@@ -127,7 +128,6 @@ func verifyTree(tree *filesys.VirtualFS, workers int, out string) (verification,
 }
 
 func verifyTreeWithVerifier(tree *filesys.VirtualFS, workers int, out string, verify func(string, []byte, *ssa.AntlrCache) sourceCheck) (verification, error) {
-	var result verification
 	var paths []string
 	if err := filesys.Recursive(".", filesys.WithFileSystem(tree), filesys.WithFileStat(func(path string, info fs.FileInfo) error {
 		if info != nil && !info.IsDir() {
@@ -135,8 +135,27 @@ func verifyTreeWithVerifier(tree *filesys.VirtualFS, workers int, out string, ve
 		}
 		return nil
 	})); err != nil {
-		return result, err
+		return verification{}, err
 	}
+	return verifyPaths(paths, tree.ReadFile, workers, out, verify)
+}
+
+// verifyPrepared verifies exactly the sources the prepare stage produced.
+// Walking the wrapped filesystem would also visit metadata files that are not
+// Java and would report them as empty units.
+func verifyPrepared(sources *ssautils.PreparedSources, fsys fi.FileSystem, workers int, out string) (verification, error) {
+	var paths []string
+	if err := sources.WalkEntries(func(name string, _ int64) error {
+		paths = append(paths, name)
+		return nil
+	}); err != nil {
+		return verification{}, err
+	}
+	return verifyPaths(paths, fsys.ReadFile, workers, out, verifySource)
+}
+
+func verifyPaths(paths []string, read func(string) ([]byte, error), workers int, out string, verify func(string, []byte, *ssa.AntlrCache) sourceCheck) (verification, error) {
+	var result verification
 	result.Files = len(paths)
 	manifest, err := os.Create(filepath.Join(out, "sources.jsonl"))
 	if err != nil {
@@ -168,7 +187,7 @@ func verifyTreeWithVerifier(tree *filesys.VirtualFS, workers int, out string, ve
 			defer cache.Clear()
 			for path := range jobs {
 				readStarted := time.Now()
-				src, err := tree.ReadFile(path)
+				src, err := read(path)
 				readSeconds := time.Since(readStarted).Seconds()
 				if err != nil {
 					checks <- sourceCheck{Path: path, Kind: "read_error", Error: err.Error(), ReadSeconds: readSeconds}
@@ -305,10 +324,11 @@ func run(root, out string) (int, error) {
 	fmt.Printf("pprof http://%s/debug/pprof/\n", ln.Addr())
 	fmt.Printf("gomaxprocs=%d gogc=%s gomemlimit=%s target=%s\n", runtime.GOMAXPROCS(0), os.Getenv("GOGC"), os.Getenv("GOMEMLIMIT"), root)
 	started := time.Now()
-	result, err := ssaapi.MaterializeLocalProject(root, runtime.GOMAXPROCS(0))
+	result, err := ssautils.MaterializeProject(root, runtime.GOMAXPROCS(0))
 	if err != nil {
 		return 1, err
 	}
+	defer result.Sources.Close()
 	prepared := time.Since(started)
 	// The function producing the tree has returned: none of its wrappers,
 	// archive ownership plans, parser tables or worker stacks need survive.
@@ -318,7 +338,7 @@ func run(root, out string) (int, error) {
 	runtime.ReadMemStats(&beforeVerify)
 	fmt.Printf("prepared files=%d bytes=%d elapsed=%s retained_heap_alloc=%d retained_heap_inuse=%d\n", result.Files, result.Bytes, prepared, beforeVerify.HeapAlloc, beforeVerify.HeapInuse)
 	verifyStarted := time.Now()
-	report, err := verifyTree(result.VirtualFS, runtime.GOMAXPROCS(0), out)
+	report, err := verifyPrepared(result.Sources, result.FS, runtime.GOMAXPROCS(0), out)
 	if err != nil {
 		return 1, err
 	}
@@ -339,8 +359,8 @@ func run(root, out string) (int, error) {
 	if err := os.WriteFile(filepath.Join(out, "verification.json"), append(raw, '\n'), 0644); err != nil {
 		return 1, err
 	}
-	fmt.Printf("finished files=%d checked=%d syntax_failures=%d stub_methods=%d suppressed=%d elapsed=%s heap_alloc=%d heap_inuse=%d virtualfs=%T\n", report.Files, report.Checked, report.SyntaxFailures, report.StubMethods, report.Suppressed, time.Since(started), report.HeapAlloc, report.HeapInuse, result.VirtualFS)
-	runtime.KeepAlive(result.VirtualFS)
+	fmt.Printf("finished files=%d checked=%d syntax_failures=%d stub_methods=%d suppressed=%d elapsed=%s heap_alloc=%d heap_inuse=%d sources=%T\n", report.Files, report.Checked, report.SyntaxFailures, report.StubMethods, report.Suppressed, time.Since(started), report.HeapAlloc, report.HeapInuse, result.FS)
+	runtime.KeepAlive(result.FS)
 	if report.SyntaxFailures > 0 || report.StubMethods > 0 || report.MaterializationErrors > 0 {
 		return 1, nil
 	}

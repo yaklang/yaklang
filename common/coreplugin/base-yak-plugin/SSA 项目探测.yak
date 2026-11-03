@@ -56,10 +56,10 @@ for _, lang := range langOrder {
 var scoreMap = map[string]int{}
 var markerMap = map[string]int{}
 var manifestMap = map[string]int{}
-// Java 归档只存在于 Java 项目里；扫描目录时必须单独记下来，否则 webapp 里成千上
-// 万个 .js 会把语言判成 js，Java builder 就永远不会展开 jar/war，里面的类全部
-// 不可见（coremail: class/java=0 jsp=701）。
-var hasJavaArchive = false
+// javaArchiveCount 只统计归档个数，暂不参与语言判定。归档存在不等于项目正文
+// 就是 Java：webapp 里可能有成千上万个 .js，把语言强行钉成 Java 会掩盖真正的
+// 工程组成。这里先收集事实，判定规则另行设计。
+var javaArchiveCount = 0
 for _, lang := range langOrder {
     scoreMap[lang] = 0
     markerMap[lang] = 0
@@ -454,12 +454,6 @@ func AutoParseLanguage() {
     if params.language != "" {
         return
     }
-    // jar/war/class 是 Java 独有的，出现即判定 Java：归档展开是 Java builder 才
-    // 有的能力，判成别的语言会让归档里的类完全消失。
-    if hasJavaArchive {
-        setLanguage("java")
-        return
-    }
     // total = extension score (file counts) + marker hits * markerWeight +
     // manifest hits * manifestWeight. Iterate in a fixed order so map-iteration
     // nondeterminism cannot flip ties.
@@ -498,8 +492,8 @@ func getZipinfo(basePath) {
                 params.file_count++
                 addLanguageScore(path)
                 ext = file.GetExt(path).Lower()
-                if ext == ".jar" || ext == ".war" || ext == ".class" {
-                    hasJavaArchive = true
+                if ext == ".jar" || ext == ".war" {
+                    javaArchiveCount = javaArchiveCount + 1
                 }
                 if params.language == "" && !shouldSkipPath(path) {
                     addFileMarkers(info.Name().Lower())
@@ -549,8 +543,8 @@ func getLocalInfo(localFile) {
                 params.file_count++
                 addLanguageScore(path)
                 ext = file.GetExt(path).Lower()
-                if ext == ".jar" || ext == ".war" || ext == ".class" {
-                    hasJavaArchive = true
+                if ext == ".jar" || ext == ".war" {
+                    javaArchiveCount = javaArchiveCount + 1
                 }
                 if params.language == "" && !shouldSkipPath(path) {
                     addFileMarkers(info.Name().Lower())

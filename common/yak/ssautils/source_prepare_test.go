@@ -1,4 +1,4 @@
-package ssaapi
+package ssautils
 
 import (
 	"os"
@@ -13,8 +13,8 @@ import (
 )
 
 // TestPrepareReleasesJSPRuntimeBeforePrehandler is the memory boundary: JSP
-// prediction state is scratch for generating the virtual filesystem. Once that
-// Java is stored, the shared DFA must be empty before prehandler starts.
+// prediction state is scratch for generating the source tree. Once that Java
+// is stored, the shared DFA must be empty before prehandler starts.
 func TestPrepareReleasesJSPRuntimeBeforePrehandler(t *testing.T) {
 	jspparser.ResetJSPRuntimeCaches()
 	lexer := jspparser.NewJSPLexer(antlr.NewInputStream(`<html><body>seed</body></html>`))
@@ -25,20 +25,23 @@ func TestPrepareReleasesJSPRuntimeBeforePrehandler(t *testing.T) {
 
 	vf := filesys.NewVirtualFs()
 	vf.AddFile("webapp/index.jsp", `<html><body>hello</body></html>`)
-	cfg, err := DefaultConfig(WithFileSystem(vf), WithProgramPath("."))
-	require.NoError(t, err)
-	cfg.resolveLanguageBuilder(vf)
-	cfg.prepareProjectSources(cfg.swapLanguageFs(vf), nil, nil)
+	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	require.True(t, ok)
+	wrapped := builder.WrapWithPreprocessedFS(vf, true)
+
+	sources := NewPreparedSources(0, "")
+	defer sources.Close()
+	sources.Prepare(wrapped, PrepareOptions{Root: ".", Concurrency: 2})
 
 	require.Zero(t, jspparser.JSPRuntimeDFAStates())
 }
 
 // TestPreparedSourceParsesWithJava2SSA is the source-stage contract: whatever
-// prepareProjectSources leaves behind for the compile must be Java that
-// java2ssa's ANTLR frontend accepts. It covers both halves of the preparation —
-// a class decompiled out of an archive and a JSP page turned into a servlet.
+// Prepare leaves behind for the compile must be Java that java2ssa's ANTLR
+// frontend accepts. It covers both halves — a class decompiled out of an
+// archive and a JSP page turned into a servlet.
 func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
-	jarBytes, err := os.ReadFile("test/ssatest/testfile/test.jar")
+	jarBytes, err := os.ReadFile("../ssaapi/test/ssatest/testfile/test.jar")
 	require.NoError(t, err)
 
 	vf := filesys.NewVirtualFs()
@@ -47,28 +50,23 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 	vf.AddFile("webapp/index.jsp", `<html><body>${fn:escapeXml(param.name)}</body></html>`)
 	vf.AddFile("webapp/legacy.jsp", `<%@ page pageEncoding="GBK" %><c:if test="${!empty param.uid}">uid</c:if>`)
 
-	cfg, err := DefaultConfig(WithFileSystem(vf), WithProgramPath("."))
-	require.NoError(t, err)
+	builder, ok := java2ssa.CreateBuilder().(*java2ssa.SSABuilder)
+	require.True(t, ok)
+	wrapped := builder.WrapWithPreprocessedFS(vf, true)
 
-	// The source stage runs before ScanProjectFiles, so the builder must be
-	// resolved here or the archive wrap never happens.
-	cfg.resolveLanguageBuilder(vf)
-	require.NotNil(t, cfg.LanguageBuilder)
-	require.Equal(t, "java", string(cfg.LanguageBuilder.GetLanguage()))
+	sources := NewPreparedSources(0, "")
+	defer sources.Close()
+	fsys := sources.Wrap(wrapped)
+	sources.Prepare(fsys, PrepareOptions{Root: ".", Concurrency: 4})
 
-	wrapped := cfg.swapLanguageFs(vf)
-	cfg.prepareProjectSources(wrapped, nil, nil)
-
-	materializer := filesys.MaterializerOf(wrapped)
-	require.NotNil(t, materializer, "prepare must run against the materialized filesystem")
-	stats := materializer.Stats()
+	stats := sources.Stats()
 	require.Greater(t, stats.Paths, int64(0), "prepare materialized nothing")
-	// Walk what the prepare stage actually stored. Both the decompiled class and
-	// the generated servlet must be parseable Java.
+	// Walk what the prepare stage actually served. Both the decompiled class
+	// and the generated servlet must be parseable Java.
 	var checkedJava, checkedJSP int
 	var failures []string
 	err = filesys.Recursive(".",
-		filesys.WithFileSystem(materializer.VirtualFS()),
+		filesys.WithFileSystem(fsys),
 		filesys.WithFileStat(func(path string, info os.FileInfo) error {
 			if info == nil || info.IsDir() {
 				return nil
@@ -77,7 +75,7 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 			if !strings.HasSuffix(lower, ".java") && !strings.HasSuffix(lower, ".jsp") {
 				return nil
 			}
-			src, err := materializer.VirtualFS().ReadFile(path)
+			src, err := fsys.ReadFile(path)
 			if err != nil {
 				failures = append(failures, path+": read: "+err.Error())
 				return nil
@@ -105,6 +103,33 @@ func TestPreparedSourceParsesWithJava2SSA(t *testing.T) {
 	require.Greater(t, checkedJava, 0, "the jar class must be decompiled into a .java source")
 	require.Greater(t, checkedJSP, 0, "the jsp pages must be converted")
 	require.Empty(t, failures, "prepared sources must parse with java2ssa")
-	t.Logf("prepared: %d java, %d jsp, materializer %s", checkedJava, checkedJSP,
-		filesys.FormatSourceMaterializerStats(stats))
+	t.Logf("prepared: %d java, %d jsp, %s", checkedJava, checkedJSP, filesys.FormatSpillFSStats(stats))
+}
+
+// TestPrepareMaterializeOutWritesUsableJava checks the tree mirror: classes
+// become .java files, pages become page.jsp.java and never collide.
+func TestPrepareMaterializeOutWritesUsableJava(t *testing.T) {
+	dir := t.TempDir()
+	vf := filesys.NewVirtualFs()
+	vf.AddFile("pkg/A.class", "class A {}")
+	vf.AddFile("web/index.jsp", `<html>${1}</html>`)
+
+	sources := NewPreparedSources(0, "")
+	defer sources.Close()
+	sources.SetMaterializeOut(dir)
+	// The publisher writes whatever the cache stores; this test seeds the two
+	// shapes directly because real class decompilation is covered above.
+	sources.spill.Put("pkg/A.class", []byte("class A {}"))
+	sources.spill.Put("web/index.jsp", []byte("class Index {}"))
+
+	javaBytes, err := os.ReadFile(dir + "/pkg/A.java")
+	require.NoError(t, err)
+	require.Equal(t, "class A {}", string(javaBytes))
+	jspBytes, err := os.ReadFile(dir + "/web/index.jsp.java")
+	require.NoError(t, err)
+	require.Equal(t, "class Index {}", string(jspBytes))
+
+	rel, err := treeRel("../../etc/passwd.java")
+	require.NoError(t, err)
+	require.NotContains(t, rel, "..", "treeRel must not escape the output root")
 }

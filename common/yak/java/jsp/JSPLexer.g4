@@ -216,12 +216,15 @@ fragment JSP_END_TAG
     : '%>'
     ;
 
+// '$' and '#' are ordinary static text unless the following '{' makes them
+// EL_EXPR_START ('${' / '#{'). ANTLR already prefers the longer match at the
+// same position, so no semantic predicate is needed here. Predicates disable
+// DFA edge caching and run again on every match, which is the wrong trade for
+// the hottest rule in a JSP page.
 fragment JSP_STATIC_CONTENT_CHAR
-    : ~[<\\$#]
+    : ~[<\\]
     | ESCAPED_DOLLAR
     | '\\'
-    | '$' { this.GetInputStream().LA(1) != '{' }?
-    | '#' { this.GetInputStream().LA(1) != '{' }?
     ;
 
 
