@@ -119,12 +119,14 @@ var (
 	//
 	// 关键词: scenario tool names, ssa, syntaxflow, code audit focus
 	scenarioToolNames = map[string]struct{}{
-		// ssatools 包 Go 内建 (ssa_tools.go / syntaxflow.go)
-		"ssa-project-info":        {},
-		"ssa-list-files":          {},
-		"ssa-read-file":           {},
-		"ssa-grep":                {},
-		"check-syntaxflow-syntax": {},
+		// ssatools 包 Go 内建 (ssa_tools.go / syntaxflow.go / syntaxflow_doc.go)
+		"ssa-project-info":                 {},
+		"ssa-list-files":                   {},
+		"ssa-read-file":                    {},
+		"ssa-grep":                         {},
+		"check-syntaxflow-syntax":          {},
+		"syntaxflowdoc_search":             {},
+		"syntaxflowdoc_builtin_lib_details": {},
 
 		// yakscriptforai/ssa/*.yak 脚本
 		"check_syntaxflow_syntax": {},

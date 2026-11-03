@@ -45,6 +45,11 @@ func CreateSSATools() ([]*aitool.Tool, error) {
 		log.Errorf("register check-syntaxflow-syntax tool: %v", err)
 	}
 
+	// 注册 SyntaxFlowDoc 查询工具（syntaxflowdoc_search / syntaxflowdoc_builtin_lib_details）
+	if err := registerSyntaxFlowDocTools(factory); err != nil {
+		log.Errorf("register syntaxflowdoc tools: %v", err)
+	}
+
 	return factory.Tools(), nil
 }
 
