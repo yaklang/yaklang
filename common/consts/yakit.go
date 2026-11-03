@@ -512,6 +512,16 @@ func doDBRiskPatch(db *gorm.DB) {
 	if err != nil {
 		log.Warnf("failed to add index on risks.ip: %v", err)
 	}
+
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_disposition ON risks(disposition);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.disposition: %v", err)
+	}
+
+	err = db.Exec(`CREATE INDEX IF NOT EXISTS main.idx_risks_duplicate_of_risk_id ON risks(duplicate_of_risk_id);`).Error
+	if err != nil {
+		log.Warnf("failed to add index on risks.duplicate_of_risk_id: %v", err)
+	}
 }
 
 func doAIEventPatch(db *gorm.DB) {

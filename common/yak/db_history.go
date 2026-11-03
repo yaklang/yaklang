@@ -20,6 +20,13 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 	options := func(opts []yaklib.DBHistoryOption) []yaklib.DBHistoryOption {
 		return append(append([]yaklib.DBHistoryOption{}, defaults...), opts...)
 	}
+	riskScopeOptions := func(opts []yaklib.DBHistoryOption) []yaklib.DBHistoryOption {
+		result := options(opts)
+		if runtime != nil && runtime.RiskSelectionScopeRequired {
+			result = append(result, yaklib.WithDBHistoryRiskSelectionScope(runtime.RiskSelectionAllowedIDs))
+		}
+		return result
+	}
 	exports["ListYakProjects"] = func(opts ...yaklib.DBHistoryOption) ([]*yaklib.YakProject, error) {
 		return yaklib.ListYakProjects(options(opts)...)
 	}
@@ -34,7 +41,10 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 	// the query so Save/NewRisk retain this invocation's Yakit client binding.
 	engine.SetVars(map[string]any{"risk": map[string]any{
 		"QueryRiskInDatabase": func(filter map[string]any, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDatabasePage, error) {
-			return yaklib.QueryRiskInDatabase(filter, options(opts)...)
+			return yaklib.QueryRiskInDatabase(filter, riskScopeOptions(opts)...)
+		},
+		"TriageRiskInDatabase": func(ids []int64, disposition string, duplicateOf int64, reason string, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDispositionResult, error) {
+			return yaklib.TriageRiskInDatabase(ids, disposition, duplicateOf, reason, riskScopeOptions(opts)...)
 		},
 	}})
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/yaklang/gorm"
 )
 
-// DBHistoryOption 是 ListYakProjects、QueryHTTPFlows、QueryHTTPFlowByID 和 QueryRiskInDatabase 的查询配置项，具体支持的选项以各函数说明为准。
+// DBHistoryOption 是 ListYakProjects、HTTP 查询、风险查询和风险处置函数共用的数据库绑定配置项，具体支持的选项以各函数说明为准。
 type DBHistoryOption func(*dbHistoryConfig)
 type dbHistoryConfig struct {
 	ctx                                              context.Context
@@ -17,12 +17,24 @@ type dbHistoryConfig struct {
 	projectID, keyword, url, methods, status, source string
 	limit, offset, packetLimit                       int
 	afterID, beforeID                                int64
+	riskSelectionScopeSet                            bool
+	riskSelectionAllowedIDs                          []int64
 }
 
 // WithDBHistoryRuntime 为 Go 调用方绑定上下文、项目库与项目登记库；这是运行时注入接口，不导出为 Yak 函数。
 // nil 数据库沿用引擎全局库；ctx 必须非 nil。
 func WithDBHistoryRuntime(ctx context.Context, project, profile *gorm.DB) DBHistoryOption {
 	return func(c *dbHistoryConfig) { c.ctx, c.projectDB, c.profileDB = ctx, project, profile }
+}
+
+// WithDBHistoryRiskSelectionScope constrains risk queries and disposition
+// changes to an explicit risk selection. This is a Go runtime option, not a
+// Yak db option.
+func WithDBHistoryRiskSelectionScope(ids []int64) DBHistoryOption {
+	return func(c *dbHistoryConfig) {
+		c.riskSelectionScopeSet = true
+		c.riskSelectionAllowedIDs = append([]int64(nil), ids...)
+	}
 }
 
 // dbHistoryProjectID 设置项目数据库标识（导出名为 db.projectID）。
