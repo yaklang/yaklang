@@ -33,6 +33,7 @@ var recommendedBuiltinSkills = []struct {
 	{name: "security-engineering"},
 	{name: "code-review"},
 	{name: "pentest-task-design"},
+	{name: "risk-review"},
 }
 
 var recommendedSkillsMu sync.Mutex
