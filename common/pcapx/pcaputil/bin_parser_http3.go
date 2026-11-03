@@ -19,6 +19,8 @@ type h3StreamState struct {
 	headers        [2]int
 	fieldFailure   [2]ProtocolErrorKind
 	framingFailure [2]bool
+	tunnelFailure  [2]bool
+	tunnelTypes    [2]*h3TunnelTypeObservation
 	body           [2]h3MessageBody
 	requestMethod  int
 	response       *h3ResponseObservation
@@ -43,6 +45,13 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 	h3 := st.h3
 	if dir != 0 && dir != 1 {
 		dir = 0
+	}
+	if q.native && h3.tunnelFailure[dir] {
+		fr["HTTP3"], info["HTTP3"] = true, true
+		fr["HTTP3 Stream State"] = "prior-H3_FRAME_UNEXPECTED; tunnel frame parsing quarantined"
+		q.annotateH3ConnectionFault(info)
+		st.sources[dir].prune(^uint64(0))
+		return &h3ConnectionObservationError{protocolError(ErrMalformedMessage, "HTTP3 prior H3_FRAME_UNEXPECTED on this stream")}
 	}
 	if q.native && h3.framingFailure[dir] {
 		fr["HTTP3"], info["HTTP3"] = true, true
@@ -233,6 +242,14 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			}
 			break
 		}
+		if q.native && !uni {
+			q.observeH3TunnelType(st, dir, sid, ft, buf[:n1])
+			if q.h3TunnelEstablished(st, sid) && st.h3.tunnelTypes[dir] != nil && !st.h3.tunnelTypes[dir].orderUnverified {
+				if err := q.rejectH3TunnelType(st, dir, sid, fr, info, frames); err != nil {
+					return err
+				}
+			}
+		}
 		ln, n2, err := quicVarint(buf[n1:])
 		if quicNeedMore(err) {
 			break
@@ -263,7 +280,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 			if h3.kind == "control" && h3.seenSettings && ft == 4 {
 				return protocolError(ErrMalformedMessage, "HTTP3 duplicate SETTINGS")
 			}
-			if !uni && ft == 0 && h3.headers[dir] != 1 {
+			if !uni && ft == 0 && h3.headers[dir] != 1 && !q.h3TunnelEstablished(st, sid) {
 				return protocolError(ErrMalformedMessage, "HTTP3 DATA outside message body")
 			}
 			if !uni && ft == 4 {
@@ -398,6 +415,9 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		h3.parsed[dir] += need
 		if q.native {
 			st.sources[dir].prune(uint64(h3.parsed[dir]))
+			if o := h3.tunnelTypes[dir]; o != nil && o.orderUnverified && uint64(h3.parsed[dir]) > o.offset {
+				h3.tunnelTypes[dir] = nil
+			}
 		}
 		buf = h3.buf[dir][h3.parsed[dir]:]
 		if fieldError != nil {

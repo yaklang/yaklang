@@ -607,6 +607,7 @@ func (q *binQUIC) applyFrames(dir, space int, frames []map[string]any, info map[
 					st.responseFIN = nil
 					if st.h3 != nil {
 						st.h3.response = nil
+						st.h3.tunnelTypes = [2]*h3TunnelTypeObservation{}
 						st.h3.blocked[dir] = false
 						st.h3.parsed[dir] = len(st.h3.buf[dir])
 					}
@@ -1355,6 +1356,9 @@ func (q *binQUIC) initialMemory() int64 {
 	}
 	if q.h3Fault != nil {
 		n += 128
+		if q.h3Fault.tunnel != nil {
+			n += q.h3Fault.tunnel.memory()
+		}
 	}
 	n += int64(cap(q.originalDCID) + cap(q.initialSCID) + cap(q.retrySCID))
 	for d := range q.cryptoData {
@@ -1369,6 +1373,11 @@ func (q *binQUIC) initialMemory() int64 {
 		}
 		if st.h3 != nil {
 			n += 384
+			for _, o := range st.h3.tunnelTypes {
+				if o != nil {
+					n += o.memory()
+				}
+			}
 			if st.h3.response != nil {
 				n += st.h3.response.memory()
 			}

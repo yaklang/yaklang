@@ -54,6 +54,7 @@ func (q *binQUIC) observeH3HeaderAssociation(st *quicStream, dir int, sid uint64
 		return
 	}
 	h3 := st.h3
+	q.recheckH3Tunnel(st, sid, info)
 	if dir == 0 && frame["Header Kind"] == "request" && h3.response == nil {
 		st.responseFIN = nil // a future response will already know this method
 	}
@@ -78,7 +79,7 @@ func (q *binQUIC) observeH3HeaderAssociation(st *quicStream, dir int, sid uint64
 		"Response Header References Complete": response.originsFull && response.refsFull,
 		"PDU Namespace":                       "header observation PDUs; byte-origin PDUs and packet references are listed separately",
 	}
-	link["Response Message Revalidation"] = q.revalidateH3LateResponse(st, sid, response, frame)
+	link["Response Message Revalidation"] = q.revalidateH3LateResponse(st, sid, response, frame, info)
 	links, _ := info["HTTP3 Late Associations"].([]map[string]any)
 	info["HTTP3 Late Associations"] = append(links, link)
 	// Existing response snapshots and their ResponseTo values are immutable.

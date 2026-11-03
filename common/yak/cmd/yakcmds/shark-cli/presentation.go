@@ -409,6 +409,20 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 				}
 			}
 		}
+		for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+			for i, row := range mapList(v[kind]) {
+				if i >= 2 {
+					break
+				}
+				if row["Ambiguous"] != true {
+					message := fmt.Sprintf("CONNECT %s · frame PDU #%d · observed PDU #%d", textValue(row["Error Name"]), number(row["Frame PDU ID"]), number(row["Observed In PDU ID"]))
+					if row["Observation Verdict"] == "order-unverified" {
+						message = fmt.Sprintf("CONNECT order unverified · frame PDU #%d · success context PDU #%d", number(row["Frame PDU ID"]), number(row["Observed In PDU ID"]))
+					}
+					parts = append([]string{message}, parts...)
+				}
+			}
+		}
 		return strings.Join(parts, " · ")
 	}
 	var parts []string

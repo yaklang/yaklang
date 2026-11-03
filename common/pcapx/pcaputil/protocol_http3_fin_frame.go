@@ -13,9 +13,13 @@ import (
 type h3ConnectionFault struct {
 	pdu, stream, offset, end uint64
 	direction                int
+	tunnel                   *h3TunnelTypeObservation
 }
 
 func (f *h3ConnectionFault) snapshot() map[string]any {
+	if f.tunnel != nil {
+		return f.tunnel.snapshot(f.pdu)
+	}
 	return map[string]any{
 		"Error Name": "H3_FRAME_ERROR", "Error Code": uint64(0x106), "Error Scope": "connection",
 		"First PDU ID": f.pdu, "Stream ID": f.stream, "Direction": uint64(f.direction),
@@ -45,7 +49,7 @@ func (q *binQUIC) annotateH3ConnectionFault(info map[string]any) {
 
 func (q *binQUIC) rejectH3FINFrame(st *quicStream, dir int, sid uint64, fr, info map[string]any, frames []map[string]any) error {
 	h3 := st.h3
-	current := &h3ConnectionFault{q.eventID, sid, uint64(h3.parsed[dir]), uint64(len(h3.buf[dir])), dir}
+	current := &h3ConnectionFault{pdu: q.eventID, stream: sid, offset: uint64(h3.parsed[dir]), end: uint64(len(h3.buf[dir])), direction: dir}
 	if q.h3Fault == nil {
 		q.h3Fault = current
 	}

@@ -597,6 +597,37 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 			emit(m[spec.key])
 		}))
 	}
+	for _, spec := range []struct {
+		name, key string
+		typ       DisplayFieldType
+		bits      int
+	}{
+		{"http3.tunnel.error_code", "Error Code", DisplayUnsigned, 62},
+		{"http3.tunnel.frame_type", "Frame Type Value", DisplayUnsigned, 62},
+		{"http3.tunnel.frame_pdu", "Frame PDU ID", DisplayUnsigned, 64},
+		{"http3.tunnel.observed_in_pdu", "Observed In PDU ID", DisplayUnsigned, 64},
+		{"http3.tunnel.streamid", "Stream ID", DisplayUnsigned, 62},
+		{"http3.tunnel.direction", "Direction", DisplayUnsigned, 1},
+		{"http3.tunnel.frame_offset", "Frame Offset", DisplayUnsigned, 62},
+		{"http3.tunnel.error_name", "Error Name", DisplayString, 0},
+		{"http3.tunnel.verdict", "Observation Verdict", DisplayString, 0},
+	} {
+		spec := spec
+		b := displayCustom("http3", spec.name, "Observed CONNECT frame-type violation and later context; not ciphertext offsets or inferred peer closure", spec.typ, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			if !e.nativeQUICObservation || e.semanticSession["Authentication Verified"] != true {
+				return
+			}
+			for _, kind := range []string{"HTTP3 Tunnel Observations", "HTTP3 Resolved Tunnel Observations"} {
+				p.maps(e.semanticSession[kind], func(m map[string]any) {
+					if m["Ambiguous"] != true {
+						emit(m[spec.key])
+					}
+				})
+			}
+		})
+		b.protocols = "|quic|http3|"
+		out = append(out, b)
+	}
 	out = append(out, nativeNetworkDisplayBindings()...)
 	out = append(out, nativeMLDDisplayBindings()...)
 	out = append(out, nativeIGMPDisplayBindings()...)
