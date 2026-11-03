@@ -20,6 +20,10 @@ const (
 	// verificationAutoTriggerHardPromptDelta 是 token 门的"硬阈值"上界,
 	// 设为软门的 2 倍, 单次超大 token 增量时立即 fire.
 	verificationAutoTriggerHardPromptDelta = 2 * verificationAutoTriggerMinPromptDelta
+
+	// Ordinary file reads can cross the soft token gate on every iteration.
+	// Give execution time to advance; a hard increase still bypasses this gate.
+	verificationAutoTriggerMinIterationDelta = 3
 )
 
 // verificationWatchdogMinInterval 是看门狗 timer 的最小兜底间隔, 防止在
@@ -442,7 +446,8 @@ func (r *ReActLoop) buildVerificationWatchdogPayload(task aicommon.AIStatefulTas
 //
 //  1. 末轮兜底: iter == maxIterations 必触发, 保证最终一定有一次 verify.
 //  2. 硬 token 门: token delta >= verificationAutoTriggerHardPromptDelta 立即 fire.
-//  3. 软 token 门: token delta >= verificationAutoTriggerMinPromptDelta 作为加速器.
+//  3. 软 token 门: 新增内容达到阈值，且执行已推进至少三轮.
+//  4. 压缩缩短上下文只重置 token 基线，不刷新看门狗时间或触发核验.
 //
 // 关键词: shouldTriggerAutomaticVerification 仅 token 门, 时间门归 watchdog,
 //
@@ -465,10 +470,25 @@ func (r *ReActLoop) shouldTriggerAutomaticVerification(current *VerificationRunt
 		// baseline 未建立, 等 token 门自然触发; 时间门由 watchdog 负责.
 		return false
 	}
+	if current.LoopPromptTokens > 0 && current.LoopPromptTokens < previous.LoopPromptTokens {
+		// Compression/retirement is not new evidence. Rebase only the token
+		// count, preserving the last real verification time for the watchdog.
+		rebased := *previous
+		rebased.LoopPromptTokens = current.LoopPromptTokens
+		r.actionHistoryMutex.Lock()
+		if r.verificationRuntimeSnapshot == previous {
+			r.verificationRuntimeSnapshot = &rebased
+		}
+		r.actionHistoryMutex.Unlock()
+		return false
+	}
 	// token 门 (硬门 + 软门)
 	tokenDelta := verificationPromptTokenDelta(previous, current)
 	if tokenDelta >= verificationAutoTriggerHardPromptDelta {
 		return true
+	}
+	if current.IterationIndex-previous.IterationIndex < verificationAutoTriggerMinIterationDelta {
+		return false
 	}
 	return tokenDelta >= verificationAutoTriggerMinPromptDelta
 }
@@ -479,7 +499,7 @@ func verificationPromptTokenDelta(previous *VerificationRuntimeSnapshot, current
 	}
 	delta := current.LoopPromptTokens - previous.LoopPromptTokens
 	if delta < 0 {
-		return -delta
+		return 0
 	}
 	return delta
 }

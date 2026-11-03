@@ -48,8 +48,10 @@ func (r *ReAct) VerifyUserSatisfaction(ctx context.Context, originalQuery string
 	verifyTTFB, verifyIdle := aicommon.ResolveAIStreamIdleThresholds(r.config)
 	var verificationTimedOut atomic.Bool
 
+	// Verification observes progress and evidence; it does not execute work or
+	// decide when the loop exits. Prefer the configured lightweight model.
 	transErr := aicommon.CallAITransaction(
-		r.config, verificationPrompt, r.config.CallAI,
+		r.config, verificationPrompt, r.config.CallSpeedPriorityAI,
 		func(rsp *aicommon.AIResponse) error {
 			// 每个 retry attempt 独立重置, 仅当"最后一次失败"时才作为
 			// 整体降级依据 (transErr != nil 时再读 verificationTimedOut).
