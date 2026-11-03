@@ -1,5 +1,12 @@
 # Yak Shark M2 SMB 协议正确性任务书
 
+2026-11-03主线程进展：最新独立全绿检查点为5255658f94dc032ee21bde5d1a62a3b1663d06cb，
+47个约定检查名、91执行检查、两个statuses及316075精确Traffic ID/动作和官方产物闭合。
+后续M2-82只修非SMB的当前连接QPACK恢复/字节源/页面，解析器7825、展示0510，本项最终CI待独立验证。
+82项72有限完成、7进行中/3SMB搁置；非SMB四包17–34实施小时。
+S01–S06及历史107完整记录/121命令头的重新核对要求保持；主线程没有重新分析SMB。
+承接人仍固定开工时远端M2实际HEAD，不能把这些非SMB证据当SMB验收。
+
 2026-11-03最新独立全绿交接基线为 `d34493d93721134ef407530dca0ae7abeee8e64d`。d344已独立47约定检查/91执行/2statuses、316025精确traffic ID及官方产物全绿；Java/RAG官方产物另核8新及3原失败ID各一次pass；
 [Traffic](https://github.com/yaklang/yaklang/actions/runs/41531275106)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41531281689)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41531288802)。
 后续[M2-81 有界早期恢复、同数据报关联和实际Windows](shark-m2-quic-early-recovery-20261103.md)运行6941已有限本地验收，最终SHA CI另验；当前81项71有限完成/10开放、非SMB四包18–36实施小时。

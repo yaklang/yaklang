@@ -1,5 +1,12 @@
 # M2-81：先到 0-RTT 的有界恢复、同数据报响应关联和实际 Windows
 
+最终说明提交5255658f94dc032ee21bde5d1a62a3b1663d06cb已独立全绿：47约定检查、91执行检查及两个statuses成功，
+316075原始ID/动作、50新pass、131084 required零skip和官方17008618B产物的checkout/upload/SHA/CRC均已核验。
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41542365029)、[Essential](https://github.com/yaklang/yaklang/actions/runs/41542370968)、[Diff](https://github.com/yaklang/yaklang/actions/runs/41542377065)。
+产物SHA256 `67348be4d8b107d62e2b8830c42daae3a73047619474a342f086af91ab762615`；闭合1607 `c841e8d2713b477bce262c8bb76539c4c7cc62c8077220bd77990b5bbd8845cf`。
+macOS首次未取得hosted runner的容量取消证据保留，重试41任务全成功，没有放宽断言/超时。
+后续[M2-82](shark-m2-qpack-late-settings-20261103.md)有限关闭R04，R05及完整N09仍开放；本报告以下为81当时冻结范围。
+
 本项有限关闭 N09.R03。运行/构建提交为 `6941e45db788a8b5192e9f3f6d4ef13765f2ddd2`，
 在唯一 M2 PR #5371 中继续；SMB 不分析、不修改。当前 81 个父项，71 个在明示有限合同完成，
 7 个进行中、3 个 SMB 搁置，共 10 个未关闭。非 SMB 17 包中 13 个有限完成、4 个开放。
