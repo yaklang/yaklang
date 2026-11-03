@@ -145,16 +145,6 @@ func (t *IrType) BeforeSave(tx *gorm.DB) error {
 	return nil
 }
 
-func (i *IrTypeID) BeforeSave(tx *gorm.DB) error {
-	sanitizeStructStringsForPG(i)
-	return nil
-}
-
-func (p *IrTypePayload) BeforeSave(tx *gorm.DB) error {
-	sanitizeStructStringsForPG(p)
-	return nil
-}
-
 func (i *IrNamePool) BeforeSave(tx *gorm.DB) error {
 	sanitizeStructStringsForPG(i)
 	return nil

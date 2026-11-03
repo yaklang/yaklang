@@ -19,8 +19,7 @@ func installDMIRIndexes(db *gorm.DB) error {
 		{"ux_ir_codes_program_code", TableIrCodes, "program_name,code_id", true},
 		{"ux_ir_offsets_program_value_file_range", TableIrOffsets, "program_name,value_id,file_hash,start_offset,end_offset,COALESCE(variable_name,'')", true},
 		{"idx_ir_codes_program_opcode", TableIrCodes, "program_name,opcode", false},
-		{"ux_ir_type_ids_program_type", TableIrTypeIDs, "program_name,type_id", true},
-		{"ux_ir_type_payloads_program_hash", TableIrTypePayloads, "program_name,type_hash", true},
+		{irTypeUniqueIndex, TableIrTypes, "program_name,type_id", true},
 		{"idx_ir_indices_program_value", TableIrIndices, "program_name,value_id", false},
 		{"idx_ir_name_pool_program_name_name", TableIrNamePool, "program_name,name", false},
 	} {

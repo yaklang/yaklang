@@ -9,6 +9,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssadb"
 	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
+	"go.uber.org/atomic"
 	"path/filepath"
 	"strings"
 	"sync"
@@ -259,14 +260,15 @@ func TestTypeStoreFlushFileDBKeepsIndexIntegrity(t *testing.T) {
 
 	db, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&ssadb.IrTypeID{}, &ssadb.IrTypePayload{}).Error)
-	require.NoError(t, ssadb.EnsureIrTypeDedupeIndexesForTest(db))
+	require.NoError(t, db.AutoMigrate(&ssadb.IrType{}).Error)
+	require.NoError(t, ssadb.EnsureIrTypeIndexesForTest(db))
 
 	store := &typeStore{
 		mode:        ProgramCacheDBWrite,
 		db:          db,
 		programName: "prog",
 		saveSize:    4096,
+		nextID:      atomic.NewInt64(0),
 		resident:    utils.NewSafeMapWithKey[int64, Type](),
 	}
 	longName := strings.Repeat("org.apache.hadoop.example.TypeName", 20)

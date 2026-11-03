@@ -47,7 +47,12 @@ func TestTypeStringsSharedInMemoryAndDatabase(t *testing.T) {
 			require.True(t, unsafe.StringData(a.GetFullTypeNames()[0]) == unsafe.StringData(c.GetFullTypeNames()[0]), "equal qualified names must share string backing storage")
 			a.AddFullTypeName("reuse.OnlyLeft")
 			require.Equal(t, []string{"reuse.QualifiedName"}, c.GetFullTypeNames())
-			require.NotEqual(t, a.GetId(), c.GetId(), "mutable types retain independent identities")
+			if mode == ProgramCacheDBWrite {
+				require.Equal(t, a.GetId(), c.GetId(), "database writes intern equal types into one id")
+			} else {
+				require.NotEqual(t, a.GetId(), c.GetId(), "memory-only programs keep independent type identities")
+			}
+			require.NotZero(t, a.GetId(), "remembering a type must assign its id")
 			b.Finish()
 		})
 	}

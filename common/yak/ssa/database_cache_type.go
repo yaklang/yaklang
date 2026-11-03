@@ -24,6 +24,11 @@ type typeStore struct {
 	resident    *utils.SafeMapWithKey[int64, Type]
 	flushMu     sync.Mutex
 	persisted   typeFingerprints
+	// interned maps a type content fingerprint to the id that already stores
+	// it. Equal types reuse one id, so a program keeps one row per distinct
+	// content instead of one row per created type object.
+	interned map[[sha256.Size]byte]int64
+	internMu sync.Mutex
 	// identity remembers the last persisted map-cache key. A matching key
 	// whose fingerprint is already stored skips snapshot and hashing.
 	identity map[int64]typePersistIdentity
@@ -58,22 +63,99 @@ func (s *typeStore) remember(typ Type) Type {
 	}
 	id := typ.GetId()
 	if id <= 0 {
-		if claimer, ok := typ.(interface {
-			claimIdIfUnset(int64) (int64, bool)
-		}); ok {
-			// Draw a candidate from the shared counter, then let the object
-			// itself decide the single winner.
-			id, _ = claimer.claimIdIfUnset(s.nextID.Inc())
-		} else {
-			id = s.nextID.Inc()
-			typ.SetId(id)
+		// Interning exists to stop duplicate database rows. A memory-only
+		// program stores no rows and keeps each object's identity.
+		if s.mode == ProgramCacheDBWrite && s.internTypeContent(typ) {
+			return typ
 		}
+		id = s.claimTypeID(typ)
 	}
 	// Imported/shared types may already own an ID. Reserve it before the
 	// next new allocation, otherwise a primitive can replace that resident.
 	setAtomicMaxIfGreater(s.nextID, id)
 	s.resident.Set(id, typ)
 	return typ
+}
+
+// internTypeContent reuses the id of an already stored type whose persisted
+// body is identical, and reports whether it did. Equal types would otherwise
+// write one row each: Hue stored 3.47M type ids for 106K distinct bodies, and
+// almost every duplicate was a primitive such as string or number.
+// typeIsInternable decides which type kinds may share an id.
+func (s *typeStore) internTypeContent(typ Type) bool {
+	if !typeIsInternable(typ) {
+		return false
+	}
+	fingerprint := snapshotTypePersistence(typ).fingerprint()
+
+	s.internMu.Lock()
+	defer s.internMu.Unlock()
+	if existing, ok := s.interned[fingerprint]; ok {
+		typ.SetId(existing)
+		s.adoptInternedType(existing, typ)
+		return true
+	}
+	id := s.claimTypeID(typ)
+	if s.interned == nil {
+		s.interned = make(map[[sha256.Size]byte]int64)
+	}
+	s.interned[fingerprint] = id
+	return false
+}
+
+// adoptInternedType keeps the canonical object resident and folds the
+// duplicate's type names into it, so a name learned through the second use is
+// still written for the shared id. The duplicate object is dropped: equal
+// fingerprints already guarantee an equal stored body.
+func (s *typeStore) adoptInternedType(id int64, duplicate Type) {
+	if existing, ok := s.resident.Get(id); ok && !utils.IsNil(existing) {
+		for _, name := range duplicate.GetFullTypeNames() {
+			existing.AddFullTypeName(name)
+		}
+		return
+	}
+	s.resident.Set(id, duplicate)
+}
+
+// claimTypeID assigns the next free id. A shared type may have been claimed
+// by another worker, in which case the object itself returns the winner's id.
+func (s *typeStore) claimTypeID(typ Type) int64 {
+	if claimer, ok := typ.(interface {
+		claimIdIfUnset(int64) (int64, bool)
+	}); ok {
+		// Draw a candidate from the shared counter, then let the object
+		// itself decide the single winner.
+		if id, _ := claimer.claimIdIfUnset(s.nextID.Inc()); id > 0 {
+			return id
+		}
+	}
+	id := s.nextID.Inc()
+	typ.SetId(id)
+	return id
+}
+
+// typeIsInternable reports whether two objects with one persisted body are
+// interchangeable for the whole run.
+//
+// Blueprints are excluded: their parents, interfaces and container arrive
+// after the first reference and differ per class. Struct, tuple and plain
+// object types are excluded too: the frontend grows them field by field, so
+// two declarations can start equal and diverge. Function types are fixed by
+// their parameter list, and slice/map wrappers are fixed at construction.
+func typeIsInternable(typ Type) bool {
+	switch t := typ.(type) {
+	case *Blueprint:
+		return false
+	case *FunctionType:
+		return true
+	case *ObjectType:
+		switch t.GetTypeKind() {
+		case SliceTypeKind, MapTypeKind:
+			return true
+		}
+	}
+	_, stable := typePersistIdentityOf(typ)
+	return stable
 }
 
 func (s *typeStore) get(id int64) (Type, bool) {

@@ -234,7 +234,7 @@ func TestFinalFlushAfterFinishEvictsDeferredTail(t *testing.T) {
 	require.NoError(t, prog.Cache.SaveToDatabase())
 	require.NotNil(t, ssadb.GetIrCodeItemById(ssadb.GetDB(), programName, second.GetId()))
 }
-func TestTypeStoreUsesDedupeSchemaFromSSADatabase(t *testing.T) {
+func TestTypeStoreUsesSingleTableSchemaFromSSADatabase(t *testing.T) {
 	db := ssadb.GetDB()
 	programName := uuid.NewString()
 	defer ssadb.DeleteProgram(db, programName)
@@ -243,27 +243,19 @@ func TestTypeStoreUsesDedupeSchemaFromSSADatabase(t *testing.T) {
 	prog := NewProgram(cfg, ProgramCacheDBWrite, Application, filesys.NewVirtualFs(), "", 1)
 	require.NotNil(t, prog.Cache.types.db)
 	typ := CreateStringType()
-	typ.AddFullTypeName("dedupe.integration")
+	typ.AddFullTypeName("single.integration")
 	prog.Cache.rememberType(typ)
 	require.NoError(t, prog.Cache.types.flush())
-	require.Equal(t, int64(1), countIrTypePayloadsForProgram(t, db, programName))
-	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, db, programName))
+	require.Equal(t, int64(1), countIrTypeRowsForProgram(t, db, programName))
 	loaded := ssadb.GetIrTypeItemById(db, programName, typ.GetId())
 	require.NotNil(t, loaded)
-	require.Contains(t, loaded.ExtraInformation, "dedupe.integration")
+	require.Contains(t, loaded.ExtraInformation, "single.integration")
 }
 
-func countIrTypePayloadsForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
+func countIrTypeRowsForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
 	t.Helper()
 	var count int64
-	require.NoError(t, db.Model(&ssadb.IrTypePayload{}).Where("program_name = ?", programName).Count(&count).Error)
-	return count
-}
-
-func countIrTypeIDsForProgram(t *testing.T, db *gorm.DB, programName string) int64 {
-	t.Helper()
-	var count int64
-	require.NoError(t, db.Model(&ssadb.IrTypeID{}).Where("program_name = ?", programName).Count(&count).Error)
+	require.NoError(t, db.Model(&ssadb.IrType{}).Where("program_name = ?", programName).Count(&count).Error)
 	return count
 }
 
@@ -282,20 +274,17 @@ func TestTypeFlushUpsertsExistingTypeIDs(t *testing.T) {
 	prog.Cache.rememberType(typ)
 	require.NoError(t, prog.Cache.types.flush())
 
-	var first ssadb.IrTypeID
+	var first ssadb.IrType
 	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&first).Error)
 	require.NoError(t, prog.Cache.types.flush())
-	var unchanged ssadb.IrTypeID
+	var unchanged ssadb.IrType
 	require.NoError(t, storeDB.Where("program_name = ? AND type_id = ?", programName, typ.GetId()).First(&unchanged).Error)
-	require.Equal(t, first.PayloadID, unchanged.PayloadID, "an unchanged type id must keep its payload")
-	require.Equal(t, int64(1), countIrTypeIDsForProgram(t, storeDB, programName))
+	require.Equal(t, first.ID, unchanged.ID, "an unchanged type id must keep its row")
+	require.Equal(t, int64(1), countIrTypeRowsForProgram(t, storeDB, programName))
 
 	typ.AddFullTypeName("java.lang.String")
 	require.NoError(t, prog.Cache.types.flush())
-	var count int64
-	require.NoError(t, storeDB.Model(&ssadb.IrTypeID{}).
-		Where("program_name = ? AND type_id = ?", programName, typ.GetId()).Count(&count).Error)
-	require.Equal(t, int64(1), count)
+	require.Equal(t, int64(1), countIrTypeRowsForProgram(t, storeDB, programName))
 
 	loaded := ssadb.GetIrTypeItemById(storeDB, programName, typ.GetId())
 	require.NotNil(t, loaded)

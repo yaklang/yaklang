@@ -22,8 +22,8 @@ import (
 func TestLargeBatchChunksPersistAllRows(t *testing.T) {
 	db, err := gorm.Open("sqlite3", ":memory:")
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrTypeID{}, &IrTypePayload{}, &IrIndex{}, &IrOffset{}).Error)
-	require.NoError(t, ensureIrTypeDedupeIndexes(db))
+	require.NoError(t, db.AutoMigrate(&IrCode{}, &IrType{}, &IrIndex{}, &IrOffset{}).Error)
+	require.NoError(t, ensureIrTypeIndexes(db))
 
 	const n = 2000
 	const chunk = 1000
@@ -72,7 +72,7 @@ func TestLargeBatchChunksPersistAllRows(t *testing.T) {
 		return int(c)
 	}
 	require.Equal(t, n, count(&IrCode{}, "ir_codes"))
-	require.Equal(t, n, count(&IrTypeID{}, "ir_type_ids"))
+	require.Equal(t, n, count(&IrType{}, TableIrTypes))
 	require.Equal(t, n, count(&IrIndex{}, "ir_indices_v1"))
 	require.Equal(t, n, count(&IrOffset{}, "ir_offsets"))
 }
@@ -144,8 +144,8 @@ func TestSaveIrTypeBatchLargeBatchesKeepsIndexIntegrity(t *testing.T) {
 	dbPath := filepath.Join(t.TempDir(), "irtype-integrity.db")
 	db, err := gorm.Open("sqlite3", dbPath)
 	require.NoError(t, err)
-	require.NoError(t, db.AutoMigrate(&IrTypeID{}, &IrTypePayload{}).Error)
-	require.NoError(t, ensureIrTypeDedupeIndexes(db))
+	require.NoError(t, db.AutoMigrate(&IrType{}).Error)
+	require.NoError(t, ensureIrTypeIndexes(db))
 
 	longJSON := `{"fullTypeName":["` + strings.Repeat("org.apache.hadoop.example.TypeName", 20) + `"],"name":"x"}`
 	for round := 0; round < 10; round++ {
@@ -177,7 +177,7 @@ func TestSaveIrTypeBatchLargeBatchesKeepsIndexIntegrity(t *testing.T) {
 	require.Equal(t, []string{"ok"}, result, "SQLite integrity_check must pass")
 
 	var count int64
-	require.NoError(t, db.Model(&IrTypeID{}).Where("program_name = ?", "prog").Count(&count).Error)
+	require.NoError(t, db.Model(&IrType{}).Where("program_name = ?", "prog").Count(&count).Error)
 	require.Equal(t, int64(20000), count)
 }
 

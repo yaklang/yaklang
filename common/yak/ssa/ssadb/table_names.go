@@ -7,6 +7,7 @@ const (
 	TableIrSources  = "ir_sources"
 	TableIrPrograms = "ir_programs"
 	TableIrOffsets  = "ir_offsets"
+	TableIrTypes    = "ir_types_v2"
 
 	TableAuditResults = "audit_results"
 	TableAuditNodes   = "audit_nodes"
