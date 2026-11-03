@@ -41,12 +41,16 @@ description: >
 
 ### 2.2 调用 `syntaxflow_rule_completion`（核心步骤）
 
-该工具在默认工具清单中可见，直接调用：
+该工具在默认工具清单中可见，直接执行，**不需要** require_tool：
 
 ```json
 {
-  "file_path": "<规则文件绝对路径>",
-  "write_output": true
+  "@action": "directly_call_tool",
+  "directly_call_tool_name": "syntaxflow_rule_completion",
+  "directly_call_tool_params": {
+    "file_path": "<规则文件绝对路径>",
+    "write_output": true
+  }
 }
 ```
 
@@ -64,10 +68,15 @@ description: >
 
 ### 2.4 语法校验（必做）
 
-`require_tool` 加载 `check-syntaxflow-syntax`（scenario 工具），传入 `written_path`：
+`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），按**两个独立 action** 调用，
+禁止把 `require_tool` 和 `directly_call_tool` 字段混在同一个 action 里：
 
 ```json
-{ "path": "<written_path>" }
+{"@action": "require_tool", "require_tool_payload": "check-syntaxflow-syntax", "human_readable_thought": "加载 SyntaxFlow 语法检查工具"}
+```
+
+```json
+{"@action": "directly_call_tool", "directly_call_tool_name": "check-syntaxflow-syntax", "directly_call_tool_params": {"path": "<written_path>"}}
 ```
 
 `passed=false` 时按 `errors` 修复——但注意：**只能修元数据部分**，如果错误出在规则体，
