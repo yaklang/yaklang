@@ -40,7 +40,7 @@ var allBuiltinSkills = []struct {
 	{"fuzztag", "skills/fuzztag/SKILL.md", []string{"fuzz.Strings", "笛卡尔积", "同步配对"}},
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 	{"syntaxflow-rule", "skills/syntaxflow-rule/SKILL.md", []string{"UNSAFE", "#->", "check-syntaxflow-syntax", "matched=true"}},
-	{"sf-rule-completion", "skills/sf-rule-completion/SKILL.md", []string{"syntaxflow_rule_completion", "rule_id", "risk 预设值"}},
+	{"sf-rule-completion", "skills/sf-rule-completion/SKILL.md", []string{"syntaxflow_rule_completion", "rule_id", "risk 预设值", "check-syntaxflow-syntax"}},
 	{"yaklang-codegen", "skills/yaklang-codegen/SKILL.md", []string{"YAK_MAIN", "poc.HTTPEx", "cli.check"}},
 }
 
