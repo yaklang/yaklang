@@ -41,7 +41,7 @@ var allBuiltinSkills = []struct {
 	{"fuzztag-reference", "skills/fuzztag-reference/SKILL.md", []string{"exec_fuzztag", "codecflow", "params", "别名"}},
 	{"syntaxflow-rule", "skills/syntaxflow-rule/SKILL.md", []string{"UNSAFE", "#->", "check-syntaxflow-syntax", "matched=true"}},
 	{"sf-rule-completion", "skills/sf-rule-completion/SKILL.md", []string{"syntaxflow_rule_completion", "rule_id", "risk 预设值", "check-syntaxflow-syntax"}},
-	{"yaklang-codegen", "skills/yaklang-codegen/SKILL.md", []string{"YAK_MAIN", "poc.HTTPEx", "cli.check"}},
+	{"yaklang-codegen", "skills/yaklang-codegen/SKILL.md", []string{"YAK_MAIN", "poc.HTTPEx", "cli.check", "check_yaklang_syntax"}},
 }
 
 // Keep the reference skill complete as the engine's tag registry evolves.
