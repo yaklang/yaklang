@@ -224,7 +224,7 @@ AnyDesk、DingTalk、DoH、DoQ、DoT、HTTP/3、IMAPS、SMTPS、T.38、WeChat/Mi
 | P2 | UDS | todo | 需核对别名/Fields 入口 |
 | P2 | VMware AFD | todo | 需核对别名/Fields 入口 |
 | P2 | Vault | todo | 需核对别名/Fields 入口 |
-| P2 | WCF | todo | 需核对别名/Fields 入口 |
+| P2 | WCF | partial | MC-NMF v1.0 `net.tcp` native framing；SOAP/Binary XML 正文保持 opaque |
 | P2 | WEP | todo | [partial / WEP](rules/wep.yaml) |
 | P2 | WINS | todo | 需核对别名/Fields 入口 |
 | P2 | WS-Discovery | todo | [partial / WSDiscovery](rules/application-layer/ws_discovery.yaml) |

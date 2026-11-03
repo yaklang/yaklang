@@ -621,7 +621,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	{Name: "WS-Man", Family: "service-tools", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
 	{Name: "WinRM HTTP", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
 	{Name: "PowerShell PSRP", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
-	{Name: "WCF", Family: "service-tools", Sources: src(srcPrivate), Status: stTodo, Priority: priP2},
+	{Name: "WCF", Family: "service-tools", Sources: src(srcPrivate), Status: stPartial, Priority: priP2, Notes: "Native MC-NMF v1.0 net.tcp record framing and opaque SOAP/Binary XML envelopes; no YAML object schema, SOAP semantics or singleton-sized body framing"},
 	{Name: ".NET Remoting", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
 	{Name: "Java serialization", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP0, Notes: "STREAM_MAGIC ACED v5 + TC type"},
 	{Name: "Hessian2", Family: "service-tools", Sources: src(srcPrivate), Status: stDone, Priority: priP1},
