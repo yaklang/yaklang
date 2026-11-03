@@ -293,6 +293,9 @@ func marshalExtraInformation(raw Instruction) map[string]any {
 		// params["member_call_obj"] = ret.GetObject()
 	case *Phi:
 		params["phi_edges"] = ret.Edge
+		if len(ret.LoopCarriedEdges) > 0 {
+			params["phi_loop_carried_edges"] = ret.LoopCarriedEdges
+		}
 		if ret.CFGEntryBasicBlock > 0 {
 			params["cfg_entry"] = ret.CFGEntryBasicBlock
 		}
@@ -447,6 +450,7 @@ func unmarshalExtraInformation(cache *ProgramCache, inst Instruction, ir *ssadb.
 		ret.MemberCallKey = utils.MapGetInt64(params, "member_call_key")
 	case *Phi:
 		ret.Edge = utils.MapGetInt64Slice(params, "phi_edges")
+		ret.LoopCarriedEdges = utils.MapGetInt64Slice(params, "phi_loop_carried_edges")
 		ret.CFGEntryBasicBlock = utils.MapGetInt64(params, "cfg_entry")
 	case *Return:
 		ret.Results = utils.MapGetInt64Slice(params, "return_results")

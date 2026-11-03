@@ -696,12 +696,6 @@ func (f *FunctionBuilder) EmitPhi(name string, vs Values) *Phi {
 	return p
 }
 
-func capturedMemberSideEffectVariable(base *Variable, verbose string) *Variable {
-	clone := *base
-	clone.verboseName = verbose
-	return &clone
-}
-
 func (f *FunctionBuilder) SetReturnSideEffects() {
 	defer f.Function.markPersistenceDirty()
 	SideEffectsReturn := make(map[*Variable]*FunctionSideEffect)
@@ -736,13 +730,6 @@ func (f *FunctionBuilder) SetReturnSideEffects() {
 			variable = value.GetLastVariable()
 		}
 
-		// Two member writes on one captured object share the object variable.
-		// Keying only by that variable keeps the last field and drops the
-		// earlier one (`params.file_count++` then `params.language = ...`).
-		if previous, ok := SideEffectsReturn[variable]; ok && previous != nil && previous.VerboseName != ser.VerboseName {
-			SideEffectsReturn[capturedMemberSideEffectVariable(variable, ser.VerboseName)] = ser
-			continue
-		}
 		SideEffectsReturn[variable] = ser
 	}
 	f.SideEffects = nil

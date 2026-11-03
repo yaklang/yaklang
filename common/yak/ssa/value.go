@@ -7,6 +7,7 @@ import (
 	"github.com/yaklang/yaklang/common/utils"
 	"github.com/yaklang/yaklang/common/utils/memedit"
 	"github.com/yaklang/yaklang/common/yak/ssa/ssautil"
+	"github.com/yaklang/yaklang/common/yak/ssaapi/ssaconfig"
 )
 
 func getAssignExternErrorPos(scope ScopeIF, variable *Variable) *memedit.Range {
@@ -146,17 +147,17 @@ func (b *FunctionBuilder) readValueEx(
 	local := GetFristLocalVariableFromScopeAndParent(scope, name)
 
 	if ret := ReadVariableFromScopeAndParent(scope, name); ret != nil {
-		// Prefer the local version only when it lives in a DEEPER scope than
-		// the one the read resolved to, i.e. it really shadows an outer
-		// variable. Two other cases must keep the resolved value:
-		//   - a plain reassignment (`ret = f()`) creates a second variable in
-		//     the SAME scope, so the newest assignment has to win;
-		//   - a loop condition read resolves to the spin phi of the condition
-		//     scope while the local copy sits in the enclosing header scope,
-		//     so preferring it would freeze the condition at the pre-loop value.
-		if local != nil && ret.GetCaptured() != nil && local.GetCaptured() != nil &&
-			ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() &&
-			variableScopeIsDeeper(local, ret) {
+		// Yak resolves a name to the newest assignment in the same scope and to
+		// the loop spin phi in a loop condition; the other front ends (Go, C,
+		// PHP, ...) keep the historical "first local wins" rule so their
+		// shadowing and pointer semantics stay unchanged.
+		preferLocal := true
+		if b.GetLanguage() == ssaconfig.Yak {
+			preferLocal = preferLocalVariable(ret, local)
+		}
+		if local != nil && preferLocal &&
+			ret.GetCaptured() != nil && local.GetCaptured() != nil &&
+			ret.GetCaptured().GetGlobalIndex() != local.GetCaptured().GetGlobalIndex() {
 			ret = local
 		}
 		if b.CurrentRange != nil {

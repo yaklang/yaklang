@@ -604,13 +604,27 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	// predecessor the loop-carried word and vice versa, so `target = r; break`
 	// reads the pre-loop value. Rotate the loop's own edge to the condition
 	// predecessor and keep the break edges in order after it.
-	edges = reorderLoopExitEdges(fn, blockID, preds, edges)
+	edgeOrder := loopExitEdgeOrder(fn, blockID, preds)
 
 	edgeByPred := make(map[int64]int64, len(preds))
+	loopCarriedPred := make(map[int64]bool, len(preds))
 	for i, predBlockID := range preds {
-		if i < len(edges) {
-			edgeByPred[predBlockID] = edges[i]
+		if i >= len(edgeOrder) {
+			break
 		}
+		edgeIdx := edgeOrder[i]
+		if edgeIdx < 0 || edgeIdx >= len(edges) {
+			continue
+		}
+		if inst.IsLoopCarriedEdge(edgeIdx) {
+			// "Unchanged in this iteration": the phi's slot keeps the value
+			// seeded at the loop entry (first iteration) or the previous
+			// iteration's merge. Storing the folded pre-loop word here would
+			// reset the variable on every pass.
+			loopCarriedPred[predBlockID] = true
+			continue
+		}
+		edgeByPred[predBlockID] = edges[edgeIdx]
 	}
 
 	phiBB, ok := c.Blocks[blockID]
@@ -619,6 +633,12 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	}
 
 	zero := llvm.ConstInt(c.inferPhiType(inst), 0, false)
+
+	if len(inst.LoopCarriedEdges) > 0 {
+		if err := c.seedLoopCarriedPhi(inst, fn, blockID, edges); err != nil {
+			return err
+		}
+	}
 
 	prevActive := int64(0)
 	if c.function != nil {
@@ -716,8 +736,11 @@ func (c *Compiler) resolvePhi(inst *ssa.Phi) error {
 	// Prefer SSA predecessor order (aligned with phi edges) over LLVM CFG discovery.
 	if len(preds) > 0 {
 		for i, predBlockID := range preds {
+			if loopCarriedPred[predBlockID] {
+				continue
+			}
 			edgeValID := edgeByPred[predBlockID]
-			if edgeValID == 0 && i < len(edges) {
+			if edgeValID == 0 && i < len(edges) && !inst.IsLoopCarriedEdge(i) {
 				edgeValID = edges[i]
 			}
 			emitPredStore(phiEdgeStoreBlock(fn, predBlockID, edgeValID), edgeValID)
@@ -821,14 +844,19 @@ func (c *Compiler) resolvePhiIncomingValue(contextInst *ssa.Phi, fn *ssa.Functio
 	return resolved, nil
 }
 
-// reorderLoopExitEdges aligns phi edges with CFG predecessors for a loop exit
-// block. The front end merges the break scopes first and the loop's own final
-// value last, but the CFG lists the loop condition block as the first
-// predecessor; without this rotation every break edge is read by the wrong
-// predecessor (a `target = r; break` after the loop sees the pre-loop value).
-func reorderLoopExitEdges(fn *ssa.Function, blockID int64, preds, edges []int64) []int64 {
-	if fn == nil || blockID <= 0 || len(preds) < 2 || len(edges) != len(preds) {
-		return edges
+// loopExitEdgeOrder maps each predecessor position to the phi edge index that
+// belongs to it. It is the identity except for a loop exit block: the front end
+// merges the break scopes first and the loop's own final value last, while the
+// CFG lists the loop condition block as the first predecessor. Without the
+// rotation every break edge is read by the wrong predecessor (a
+// `target = r; break` after the loop sees the pre-loop value).
+func loopExitEdgeOrder(fn *ssa.Function, blockID int64, preds []int64) []int {
+	order := make([]int, len(preds))
+	for i := range order {
+		order[i] = i
+	}
+	if fn == nil || blockID <= 0 || len(preds) < 2 {
+		return order
 	}
 	condBlockID := int64(0)
 	for _, loopID := range collectFunctionLoopIDs(fn) {
@@ -845,16 +873,167 @@ func reorderLoopExitEdges(fn *ssa.Function, blockID int64, preds, edges []int64)
 		}
 	}
 	if condBlockID <= 0 || preds[0] != condBlockID {
-		return edges
+		return order
 	}
-	out := make([]int64, len(edges))
-	copy(out, edges)
 	// The loop's own edge is the last one; it belongs to the first predecessor.
-	out[0] = edges[len(edges)-1]
-	for i := 1; i < len(edges); i++ {
-		out[i] = edges[i-1]
+	order[0] = len(preds) - 1
+	for i := 1; i < len(preds); i++ {
+		order[i] = i - 1
 	}
-	return out
+	return order
+}
+
+// seedLoopCarriedPhi writes the folded pre-loop value into a loop-carried phi's
+// slot at the loop entry. Edges marked as loop-carried then read that slot: the
+// pre-loop value on the first iteration and the previous iteration's merged
+// value afterwards.
+func (c *Compiler) seedLoopCarriedPhi(inst *ssa.Phi, fn *ssa.Function, blockID int64, edges []int64) error {
+	if inst == nil || fn == nil || len(edges) == 0 {
+		return nil
+	}
+	loop := c.enclosingLoopForBlock(fn, blockID)
+	if loop == nil {
+		return nil
+	}
+	seedID := int64(0)
+	for _, idx := range inst.LoopCarriedEdges {
+		if idx >= 0 && int(idx) < len(edges) && edges[idx] > 0 {
+			seedID = edges[idx]
+			break
+		}
+	}
+	if seedID <= 0 {
+		return nil
+	}
+	entryID := c.loopSeedBlockID(fn, loop)
+	entryBB, ok := c.Blocks[entryID]
+	if entryID <= 0 || !ok || entryBB.IsNil() {
+		return nil
+	}
+	c.setInsertPointBeforeTerminator(entryBB)
+	if c.function != nil {
+		c.function.activeBlockID = entryID
+	}
+	seed, err := c.resolvePhiIncomingValue(inst, fn, entryID, seedID)
+	if err != nil {
+		return err
+	}
+	c.setInsertPointBeforeTerminator(entryBB)
+	if c.function != nil {
+		c.function.activeBlockID = entryID
+	}
+	c.storeSSAValue(inst.GetId(), seed)
+	return nil
+}
+
+// enclosingLoopForBlock returns the innermost loop whose condition block
+// dominates blockID.
+func (c *Compiler) enclosingLoopForBlock(fn *ssa.Function, blockID int64) *ssa.Loop {
+	if fn == nil || blockID <= 0 {
+		return nil
+	}
+	var best *ssa.Loop
+	bestCond := int64(0)
+	for _, loopID := range collectFunctionLoopIDs(fn) {
+		loopVal, ok := fn.GetInstructionById(loopID)
+		if !ok {
+			continue
+		}
+		loop, ok := loopVal.(*ssa.Loop)
+		if !ok || loop == nil {
+			continue
+		}
+		cond := loop.GetBlock()
+		if cond == nil || !c.blockDominates(fn, cond.GetId(), blockID) {
+			continue
+		}
+		// Dominance alone is not enough: the condition block of an earlier
+		// loop also dominates every block after that loop. A block is inside
+		// the loop only when it can also reach the condition block again (the
+		// loop's own back edge).
+		if !c.blockCanReach(fn, blockID, cond.GetId()) {
+			continue
+		}
+		if best == nil || c.blockDominates(fn, bestCond, cond.GetId()) {
+			best, bestCond = loop, cond.GetId()
+		}
+	}
+	return best
+}
+
+// blockCanReach reports whether target is reachable from start following the
+// function's successor edges.
+func (c *Compiler) blockCanReach(fn *ssa.Function, start, target int64) bool {
+	if fn == nil || start <= 0 || target <= 0 {
+		return false
+	}
+	if start == target {
+		return true
+	}
+	seen := map[int64]bool{start: true}
+	queue := []int64{start}
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		blockVal, ok := fn.GetValueById(current)
+		if !ok {
+			continue
+		}
+		block, ok := ssa.ToBasicBlock(blockVal)
+		if !ok || block == nil {
+			continue
+		}
+		for _, succID := range block.Succs {
+			if succID == target {
+				return true
+			}
+			if !seen[succID] {
+				seen[succID] = true
+				queue = append(queue, succID)
+			}
+		}
+	}
+	return false
+}
+
+// loopSeedBlockID returns the block that runs exactly once before the loop's
+// first iteration. A phi edge may point at the pre-loop value from inside an
+// enclosing loop (`acc = []; for i { for j { acc = append(acc, ..) } }`), so the
+// seed has to be hoisted out of every enclosing loop, not just out of its own.
+func (c *Compiler) loopSeedBlockID(fn *ssa.Function, loop *ssa.Loop) int64 {
+	if loop == nil {
+		return 0
+	}
+	if loop.Init > 0 {
+		return loop.Init
+	}
+	var entry int64
+	for current := loop; current != nil; {
+		block := current.GetBlock()
+		if block == nil {
+			return 0
+		}
+		entry = 0
+		for _, predID := range block.Preds {
+			if !c.blockDominates(fn, block.GetId(), predID) {
+				entry = predID
+				break
+			}
+		}
+		if entry <= 0 {
+			return 0
+		}
+		outer := c.enclosingLoopForBlock(fn, entry)
+		if outer == nil || outer.GetId() == current.GetId() {
+			return entry
+		}
+		// The entry block is the loop pre-header of an inner loop, but it is
+		// re-executed on every pass of the enclosing loop. Hoist the seed out
+		// of the enclosing loop so the first iteration starts from the value
+		// that existed before either loop ran.
+		current = outer
+	}
+	return entry
 }
 
 func collectFunctionLoopIDs(fn *ssa.Function) []int64 {
