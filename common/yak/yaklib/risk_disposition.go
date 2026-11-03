@@ -61,16 +61,8 @@ func TriageRiskInDatabase(
 	if c.projectID != "" && c.projectID != "current" {
 		return nil, fmt.Errorf("risk disposition updates are limited to the current project database")
 	}
-	if c.riskSelectionScopeSet {
-		allowed := make(map[int64]struct{}, len(c.riskSelectionAllowedIDs))
-		for _, id := range c.riskSelectionAllowedIDs {
-			allowed[id] = struct{}{}
-		}
-		for _, id := range ids {
-			if _, ok := allowed[id]; !ok {
-				return nil, fmt.Errorf("risk %d is outside the attached risk selection", id)
-			}
-		}
+	if err := validateRiskSelectionScope(c, ids); err != nil {
+		return nil, err
 	}
 	db, closeDB, err := historyProjectDatabase(c)
 	if err != nil {

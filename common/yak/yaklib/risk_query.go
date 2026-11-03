@@ -116,22 +116,8 @@ func QueryRiskInDatabase(filter map[string]any, opts ...DBHistoryOption) (*RiskD
 			return nil, fmt.Errorf("risk IDs must be positive")
 		}
 	}
-	if c.riskSelectionScopeSet {
-		if c.projectID != "" && c.projectID != "current" {
-			return nil, fmt.Errorf("risk queries with an attached selection are limited to the current project database")
-		}
-		if len(c.riskSelectionAllowedIDs) == 0 {
-			return nil, fmt.Errorf("attached risk selection is empty or invalid")
-		}
-		allowed := make(map[int64]struct{}, len(c.riskSelectionAllowedIDs))
-		for _, id := range c.riskSelectionAllowedIDs {
-			allowed[id] = struct{}{}
-		}
-		for _, id := range f.IDs {
-			if _, ok := allowed[id]; !ok {
-				return nil, fmt.Errorf("risk %d is outside the attached risk selection", id)
-			}
-		}
+	if err := validateRiskSelectionScope(c, f.IDs); err != nil {
+		return nil, err
 	}
 	db, closeDB, err := historyProjectDatabase(c)
 	if err != nil {
@@ -217,4 +203,26 @@ func filterRiskDispositions(query *gorm.DB, raw string) (*gorm.DB, error) {
 		return query, nil
 	}
 	return query.Where("("+strings.Join(clauses, " OR ")+")", args...), nil
+}
+
+func validateRiskSelectionScope(c *dbHistoryConfig, ids []int64) error {
+	if c == nil || !c.riskSelectionScopeSet {
+		return nil
+	}
+	if c.projectID != "" && c.projectID != "current" {
+		return fmt.Errorf("risk operations with an attached selection are limited to the current project database")
+	}
+	if len(c.riskSelectionAllowedIDs) == 0 {
+		return fmt.Errorf("attached risk selection is empty or invalid")
+	}
+	allowed := make(map[int64]struct{}, len(c.riskSelectionAllowedIDs))
+	for _, id := range c.riskSelectionAllowedIDs {
+		allowed[id] = struct{}{}
+	}
+	for _, id := range ids {
+		if _, ok := allowed[id]; !ok {
+			return fmt.Errorf("risk %d is outside the attached risk selection", id)
+		}
+	}
+	return nil
 }

@@ -46,5 +46,8 @@ func bindDBHistoryToEngine(engine *antlr4yak.Engine, ctx context.Context, runtim
 		"TriageRiskInDatabase": func(ids []int64, disposition string, duplicateOf int64, reason string, opts ...yaklib.DBHistoryOption) (*yaklib.RiskDispositionResult, error) {
 			return yaklib.TriageRiskInDatabase(ids, disposition, duplicateOf, reason, riskScopeOptions(opts)...)
 		},
+		"GetRiskEvidenceInDatabase": func(ids []int64, packetLimit int, opts ...yaklib.DBHistoryOption) (*yaklib.RiskEvidenceResult, error) {
+			return yaklib.GetRiskEvidenceInDatabase(ids, packetLimit, riskScopeOptions(opts)...)
+		},
 	}})
 }

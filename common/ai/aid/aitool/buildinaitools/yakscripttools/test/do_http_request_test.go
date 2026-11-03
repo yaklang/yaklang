@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strconv"
 	"strings"
 	"testing"
@@ -366,6 +367,30 @@ func TestDoHTTPRequest_PacketMode(t *testing.T) {
 	assert.Assert(t, strings.Contains(stdout, flag), "packet mode response should contain flag")
 	assert.Assert(t, strings.Contains(stdout, "request packet"), "request should be printed in packet mode")
 	assert.Assert(t, strings.Contains(stdout, "X-Custom-Test"), "custom header should appear in request output")
+}
+
+func TestDoHTTPRequest_PacketFileMode(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/packet-file" || r.Header.Get("X-Replay-Source") != "risk-evidence" {
+			http.Error(w, "unexpected replay", http.StatusBadRequest)
+			return
+		}
+		_, _ = w.Write([]byte("packet-file-replay-ok"))
+	}))
+	defer server.Close()
+
+	requestPath := t.TempDir() + "/risk-request.http"
+	rawRequest := "GET /packet-file HTTP/1.1\r\nHost: " +
+		server.Listener.Addr().String() +
+		"\r\nX-Replay-Source: risk-evidence\r\n\r\n"
+	assert.NilError(t, os.WriteFile(requestPath, []byte(rawRequest), 0o600))
+
+	result := execHTTPToolResult(t, aitool.InvokeParams{
+		"packet-file": requestPath,
+		"timeout":     5,
+	})
+	assert.Equal(t, utils.InterfaceToInt(result["status_code"]), http.StatusOK)
+	assert.Equal(t, utils.InterfaceToBoolean(result["response_received"]), true)
 }
 
 func TestDoHTTPRequest_CustomHeaders(t *testing.T) {
