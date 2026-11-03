@@ -33,6 +33,7 @@ PCAP/PCAPNG 的应用层问题默认走本 Skill 的结构化链路。`read_file
 - 解析状态语义：decoded 表示结构化解析完成；incomplete 表示已识别但没观察到完整边界；malformed 表示已识别但报文非法；unrecognized 表示有界探测后仍无法归属协议，不能据此断言流量不存在；context-required 表示协议族已识别，但当前阶段不支持或缺少协商上下文。`unrecognized` 与 `context-required` 都计入 protocol_message_count，不存在独立的 `unsupported` 消息状态；“不支持”需要根据这两个状态和具体错误解释，不能虚构第三种计数。
 - 协议、请求路径、响应状态：先 query_type=protocols 取摘要，按实际 protocol 名筛选。协议消息可跨多个包。
 - HTTP 请求响应关联：protocols 摘要中的 response_to 直接指向请求消息 ID，transaction_id 表示同一事务。先配对消息，再用 details 获取字段；不要自行根据相邻行或时间猜测配对。
+- 已知多条彼此独立的消息 ID 且各条 details 参数已完整确定时，直接使用工具层的批量调用能力，在 `directly_call_tool_params_group` 中一次提交 2-8 个 query_pcapdb 调用；每项使用 `query_type=details`、各自的 `record_id` 和合理预算。批量调用属于工具层，不是 query_pcapdb 的 query_type；不要串行逐条等待，也不要引入专用批量详情接口。
 - HTTP Body 的哈希、完整性、Content-Encoding、压缩/二进制特征和敏感类别：使用 query_type=body_summary 和消息 record_id。它在 pcapdb 后端读取完整消息并返回非可逆摘要，不返回正文或正文前缀。不要先用 protocol_data 截断预览，也不要导出到 shell 自行算哈希。
 - 查具体字段：query_type=fields 发现真实 Path、Types 和 ExampleMessageID；再 details 核对示例值，最后 query_type=protocols 配合 field_path / field_op / field_type / field_value 返回命中的消息。fields 返回字段目录，不能代替消息命中列表。不要猜协议字段名；integer 值用十进制字符串，null 与 missing 分开。
 - IP、端口、捕获时间：query_type=packets。source/destination 有方向；不支持 CIDR 或任意文本 SQL。
@@ -42,7 +43,7 @@ PCAP/PCAPNG 的应用层问题默认走本 Skill 的结构化链路。`read_file
 
 已有 id 时优先使用 id；pcapfile 方式可能写入库或补做分析。保存 dataset_id，后续调用使用同一库。两个身份参数只能传一个，不依赖上一次调用的隐含默认库。
 
-切换 query_type 时重新选择参数，不能复制整套上次筛选条件。尤其是 details：只传身份、query_type、record_id 和预算，不携带 protocol、field_path 或时间/IP/会话筛选。例如 `{"id":"dataset-uuid","query_type":"details","record_id":1,"result_bytes":16384}`，其中库 ID 和消息 ID 必须替换为实际返回值。回到 protocols 搜索时再显式传 protocol 和 field 条件。
+切换 query_type 时重新选择参数，不能复制整套上次筛选条件。尤其是 details：只传身份、query_type、record_id 和预算，不携带 protocol、field_path 或时间/IP/会话筛选。例如 `{"id":"dataset-uuid","query_type":"details","record_id":1,"result_bytes":16384}`，其中库 ID 和消息 ID 必须替换为实际返回值。多条互不依赖的详情可分别构造后放进同一个工具批次，例如对 record_id 3 和 1 各提交一个 query_pcapdb 子调用；任一子调用的参数尚需等待另一条结果时，改用顺序调用。回到 protocols 搜索时再显式传 protocol 和 field 条件。
 
 ## 分页与完整性
 
