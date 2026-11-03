@@ -58,16 +58,9 @@ Go 标准库输入 → `golang-user-input`。
 
 ### 1.4 语法校验
 
-`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），必须按下面**两个独立 action**
-调用。严禁把 `require_tool` 和 `directly_call_tool` 字段混在同一个 action 里。
-
-第一步，只加载 Schema（`require_tool_payload` 只能是字符串或字符串数组）：
-
-```json
-{"@action": "require_tool", "require_tool_payload": "check-syntaxflow-syntax", "human_readable_thought": "加载 SyntaxFlow 语法检查工具"}
-```
-
-第二步，按上一步展示的 Schema 立即执行：
+`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），但它**可以直接调用**，参数本文已给出，
+不需要 `require_tool` 预加载 Schema。**不要使用 `require_tool`**（弱模型容易把 payload 传成对象导致
+`require_tool_payload must be a tool name or an array of tool names` 中断任务）。
 
 ```json
 {"@action": "directly_call_tool", "directly_call_tool_name": "check-syntaxflow-syntax", "directly_call_tool_params": {"path": "<你的 .sf 绝对路径>"}}
@@ -75,9 +68,12 @@ Go 标准库输入 → `golang-user-input`。
 
 返回 `passed=true` 表示语法通过；`passed=false` 时按 `errors` 逐行修复后重跑。
 
+> 同理，`grep` / `read_file` / `write_file` / `bash` 都在默认工具清单中可见，直接调用即可，
+> 不要用 `require_tool` 加载它们。
+
 ### 1.5 正例自检（有样例时必做）
 
-同一个工具（Schema 已加载则直接复用，无需重复 require_tool），补上样例参数：
+同一个工具，补上样例参数直接调用（无需预加载）：
 
 ```json
 {
