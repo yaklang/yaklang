@@ -192,8 +192,12 @@ func TestReAct_CompressContextOnPromptOverflow(t *testing.T) {
 						} else {
 							require.Contains(t, instructions, `"@action":"compress_context"`)
 						}
-						options := aispec.NewDefaultAIConfig(req.GetExtraSpecOpts()...)
-						require.Equal(t, "none", options.ThinkingLevel, "compression turns do not spend model thinking")
+						// Provider configuration is applied before per-request options.
+						// Automatic compression must preserve that configuration.
+						opts := []aispec.AIConfigOption{aispec.WithThinkingLevel("low")}
+						opts = append(opts, req.GetExtraSpecOpts()...)
+						options := aispec.NewDefaultAIConfig(opts...)
+						require.Equal(t, "low", options.ThinkingLevel, "compression turns inherit the configured thinking level")
 						if native {
 							var names []string
 							for _, tool := range options.Tools {
