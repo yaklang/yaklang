@@ -68,6 +68,10 @@ Go 标准库输入 → `golang-user-input`。
 
 返回 `passed=true` 表示语法通过；`passed=false` 时按 `errors` 逐行修复后重跑。
 
+**调用纪律**：优先使用上面这种单次 `directly_call_tool` 标量形式，不要用
+`directly_call_tool_params_group` 批量形式；参数类型必须与 Schema 一致——整数直接写数字
+（`"limit": 20`，不要写成 `"20"`），布尔用 `true`/`false`，不要加引号。
+
 > 同理，`grep` / `read_file` / `write_file` / `bash` 都在默认工具清单中可见，直接调用即可，
 > 不要用 `require_tool` 加载它们。
 

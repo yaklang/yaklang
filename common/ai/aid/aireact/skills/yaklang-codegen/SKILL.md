@@ -45,6 +45,10 @@ Python / Go / JS**：无 import、无类，标准库全局可用。
 
 **禁止**用 SyntaxFlow 的检查工具校验 Yaklang 代码。
 
+**调用纪律**：优先使用单次 `directly_call_tool` 标量形式，不要用
+`directly_call_tool_params_group` 批量形式；参数类型必须与 Schema 一致——整数直接写数字
+（如 `"timeout": 120`），不要写成字符串 `"120"`；`accepted-exit-codes` 按示例保持字符串。
+
 > `grep` / `read_file` / `write_file` / `bash` 都在默认工具清单中可见，直接调用即可，
 > 不要用 `require_tool` 加载它们。
 
