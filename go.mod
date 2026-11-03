@@ -105,7 +105,7 @@ require (
 	// Yaklang's maintained hard fork combines goja and goja_nodejs in one Go 1.22 module.
 	github.com/yaklang/goja v0.1.0
 	github.com/yaklang/gorm v1.9.18-0.20261027075104-00c777df9a43
-	github.com/yaklang/javajive v0.4.1-0.20260920160508-81f8ef556034
+	github.com/yaklang/javajive v0.7.1-0.20261103025322-66a7a6e68cc4
 	github.com/yaklang/pcap v1.0.7-0.20261013042911-fa4332334a4a
 	github.com/ysmood/gson v0.7.3
 	github.com/ysmood/leakless v0.9.0
