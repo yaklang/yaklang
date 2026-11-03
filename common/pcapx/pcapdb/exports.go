@@ -309,6 +309,7 @@ var Exports = map[string]any{
 	"withBatchSize":              WithBatchSize,
 	"withProtocols":              WithProtocols,
 	"withStreams":                WithStreams,
+	"withTLSKeyLog":              WithTLSKeyLog,
 	"withFieldIndex":             WithFieldIndex,
 	"onProgress":                 WithProgress,
 	"queryContext":               QueryContext,

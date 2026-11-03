@@ -17,13 +17,15 @@ PCAP/PCAPNG 的应用层问题默认走本 Skill 的结构化链路。`read_file
 
 | 工具 | 用途 |
 | --- | --- |
-| load_pcapfile | 导入或按完整内容去重复用捕获，返回 dataset_id、状态、计数和分析能力；默认分析协议及 session/stream |
+| load_pcapfile | 导入或按完整内容去重复用捕获，返回 dataset_id、状态、计数和分析能力；默认分析协议及 session/stream，可选授权 `tls_keylog_file` |
 | query_pcapdb | 传 id 查询已有库，或传 pcapfile 自动导入/复用；按 query_type 返回有界证据 |
 | manage_pcapdb | op=list/count/validate/export/delete；分页选库、登记计数、校验、导出和删除库 |
 
 导入和查询的业务结果在结构化 result 中。观察日志不代表成功；不要只看工具调用是否结束。
 
 用户只给已有库线索时先用 manage_pcapdb(op=list) 选库，取 items[].dataset_id。目录的数字 id/next_cursor 只用于列库分页；目录页 state=ready 不代表每个子库均 ready。count 只是登记数，需确认可用性时按 id 做 validate；deep=true 会读全部 BLOB，按任务需要选择。
+
+用户明确提供单独的 NSS keylog 文件时，在 load_pcapfile 或 query_pcapdb(pcapfile=...) 中传 `tls_keylog_file`，让授权解密结果进入持久化协议索引。不要把 keylog 内容读入回答、日志或命令行参数；已有 dataset_id 先看 metadata.tls_keylog_applied。若需要给无 keylog 的旧库补充解密，重新用原捕获和 `tls_keylog_file` 导入。keylog 只证明相关 TLS 记录可认证解密，不证明证书可信或应用身份已验证。
 
 导出使用 manage_pcapdb(op=export,id=实际库ID,output=明确目标路径)，不覆盖已有文件。仅在用户要求删除指定库时执行 op=delete；不能将清理库当作分析的默认收尾。删除保留源 PCAP/导出文件，busy 时先结束自己的读取再重试，不强制关闭别人的连接。检查 deleted、cleanup_pending 和 error，未完成的删除不能报告成功；同一 ID 可重试。
 
