@@ -1,5 +1,15 @@
 # M2-83：晚到 HTTP/3 请求的有界关联与递进展示
 
+2026-11-03补记：最终 `e0fb24890448e2c4610b7e7ab1690525066352d5` 已独立全部全绿，
+47约定检查名、91实际执行检查、两个statuses、316190精确Traffic ID/动作和官方产物逐项闭合；
+131084 required全pass/零required skip，自动draft skip不计成功。
+[Traffic](https://github.com/yaklang/yaklang/actions/runs/41563235938)、
+[Essential](https://github.com/yaklang/yaklang/actions/runs/41563240309)、
+[Diff](https://github.com/yaklang/yaklang/actions/runs/41563245187)。
+官方17138032字节产物SHA256 `e0ec347c849ffc0ac22f0268028ed2a4281cf131a3db4a91e98f989865c6849d`；
+闭合1718 SHA256 `b9c83c11c3790b0c1da3f3e81fdecd8b8c36abcd93a067deec524c97bd3750cc`。
+后续[M2-84 晚到方法正文复验](shark-m2-http3-late-body-20261103.md)使用新运行0bb，不能沿用本次成功。
+
 本项有限关闭 N09.R05 的七个已冻结真实来源变换：响应头先被完整解码，请求头后来完成。
 只认证当前捕获连接、域和 STREAM 的已验证头关联，不认证完整消息正文或对端交付。
 N09 整体仍开放；新发现的晚到方法正文复验列为 R06，不藏入本项完成范围。SMB 不分析、不修复。

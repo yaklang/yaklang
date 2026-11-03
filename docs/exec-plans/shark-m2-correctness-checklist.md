@@ -1,5 +1,12 @@
 # M2 协议正确性验收清单
 
+2026-11-03后续：[M2-84 晚到方法的响应正文复验与实际Windows](shark-m2-http3-late-body-20261103.md)。
+当前84项74有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，18–36 AI实施小时。
+R06四个真实来源乱序目标有限关闭；新R07成功CONNECT后的HEADERS帧序列缺口已复现并保留，完整N09仍开放。
+0bb为代码/完整本地运行/实际构建同一SHA：291132pass/25历史skip、41新增；34791插桩，41小源执行/15新参考，
+新16消息/56头/32帧、旧21原包/13目标、72实际Windows、六完整公共及四strict域控制通过。
+e0fb已独立47/91/2及316190原始ID/官方产物全绿；本批最终说明head须另验316231原始ID/动作及全部CI。
+
 2026-11-03后续：[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md)。
 当前83项73有限完成、7进行中/3SMB搁置、10未关闭；非SMB17包13有限完成/4开放，18–36 AI实施小时。
 N09.R05七个冻结真实来源变换有限关闭，新R06晚到HEAD方法的旧响应正文复验已复现并追加，完整N09仍开放。
@@ -232,9 +239,9 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-06 | SMB Windows 递进页面和字段来源 | 已完成（四页有限合同） | dd63三页及60新QUERY_INFO body实际控制台页；中间重复InfoType只高亮174，不借70/278，完整物理/PDU字节、mouse/tabs/resize/CP936通过。未推广到全部Windows行为或高级typed内容 | 0 |
 | M2-07 | 大捕获 SDK/CLI/flow 与隔离 Wireshark 逐包闭合 | 进行中 | 107/121和全部281来源门保持；60三种新构建完整回放、选定QI字段/Windows闭合；dd63→60的42223事件仅93个SMB2变化，其余42130和完整CLI/flow逐字节相同；M1→60全行账本保留，完整语义ID/字段/会话仍开放 | 1–3 小时 |
 | M2-08 | TLS 高级丢包乱序恢复与复用边界 | 进行中（8场景实际复验，有限范围已闭合） | 82fc六来源72+两个匹配新SYNACK后77场景重跑，七个严格通过；C1 TLS1.2保留exit4/8项策略差异，额外4TLS+3HTTP经双Python AEAD/peer/父子/response_to/Feed57审计均旧Flow2，未串入新3。真实callback与CompletedIn分开；原严格失败不抹去。字节范围及TLS页面另闭合37；密钥代际/缺开头/KeyUpdate等整体未完成 | 2–4 小时；新增边界另计，不以7/8代替全部高级恢复 |
-| M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（R01/R02/R03/R04有限关闭，R05开放） | 82补当前owner/方向的迟到SETTINGS重试、零容量与协议/预算区分、表项事务和同包其他STREAM、原始见证/独立高亮；当前R04通过，七个R05关联缺口仍在。最终33小源/11新参考、原21包/13目标/四H3消息及18 Windows通过；原四域strict全0。完整CID/epoch/STREAM/QPACK/0RTT与remembered SETTINGS仍待独立验收。[82证据](shark-m2-qpack-late-settings-20261103.md) | 4–8小时；等待和新问题另计 |
-| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N17共13有限完成/4未关闭；N11原24组混层比较错误已逐位置核实，9066包未建立应用会话，不代表所有UDP会话完成。N08有限政策/来源及N14的63/64/65入口合同保持；原133项解释、6 TCP政策、N13完整阶段、N09完整生命周期和新R06晚到方法正文及N14高级字段/恢复仍保留 | 当前4包粗估18–36 AI实施小时，不含CI/构建/回放等待及新问题 |
-| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | 1505已47/91/2、316141精确Traffic ID及官方产物闭合。本项f1fd完整291084pass/25历史skip，b625仅新增fuzz后合并291091pass/25历史skip、49新增；21109插桩、实际逐包/七关联/36 Windows及六完整公共回放通过有限合同。最终说明head须独立316190原始ID/动作、49新pass、131084 required零skip及全部CI；不沿用父成功或draft skip | 30–90分钟实施，执行等待另计 |
+| M2-09 | QUIC 与 HTTP/3 高级恢复边界 | 进行中（R01–R06有限关闭，R07开放） | 84补晚到方法的旧响应DATA/FIN复验、原始字节/观察号、合法当前请求隔离和递进展示；四个新实抓来源变换通过，41新ID/34791插桩、41小源/15新参考、新16消息/56头/32帧、72实际Windows和原四域strict全0。成功CONNECT后HEADERS的已知/晚到方法两个失败叶子已另列R07，完整CID/epoch/STREAM/QPACK/0RTT与remembered SETTINGS仍待独立验收。[84证据](shark-m2-http3-late-body-20261103.md) | 5–10小时；等待和新问题另计 |
+| M2-10 | 剩余协议、字段、会话及 fuzz 差异转为逐项验收 | 进行中 | 非SMB N01..N17共13有限完成/4未关闭；N11原24组混层比较错误已逐位置核实，9066包未建立应用会话，不代表所有UDP会话完成。N08有限政策/来源及N14的63/64/65入口合同保持；原133项解释、6 TCP政策、N13完整阶段、N09完整生命周期和新R07隧道帧序列及N14高级字段/恢复仍保留 | 当前4包粗估18–36 AI实施小时，不含CI/构建/回放等待及新问题 |
+| M2-11 | M2 交付的完整回归与精确 SHA CI | 进行中 | e0fb已47/91/2、316190精确Traffic ID及官方产物闭合。本项0bb一次完整291132pass/25历史skip、41新增；34791插桩、41小源/15新参考、72实际Windows和六完整公共回放通过有限合同。最终说明head须独立316231原始ID/动作、41新pass、131084 required零skip及全部CI；不沿用父成功或draft skip | 30–90分钟实施，执行等待另计 |
 | M2-12 | 缓存 dialect 不覆盖当前 NEGOTIATE 的 literal 值 | 已完成（有限合同） | `TestSMB2CurrentNegotiateDialectIsNotCachedContext`：0311→02ff/0210，当前 wire 与独立 Connection Dialect；不把 request offer 当选择 | 0 |
 | M2-13 | 显式旧 SMB binding 不被新原生路径绕过 | 已完成（有限合同） | `TestSMBExplicitLegacyBindingRetainsCanonicalFields`：完整 TREE_DISCONNECT，eager/deferred ×1/3 workers，原 Command/MID 和 JSON 保持 | 0 |
 | M2-14 | SMB1 status 格式与 NTSTATUS alias 正确 | 已完成（alias 合同） | `TestSMB1AliasContract*`：请求/响应四组合，NTSTATUS 仅响应且 bit 置位；raw Status 与请求格式偏好分开，保留范围 | 0 |
@@ -307,6 +314,7 @@ M2-02/03/22 的逐包证据来自 e7 构建；后续修改的完整交付仍须�
 | M2-81 | 先到0-RTT未恢复及同数据报内丢请求响应关联 | 已完成（N09.R03有限合同，最终CI归11） | 6941在当前owner/域内有界拥有密文/来源，观察完整接纳后新PDU重处理，原贡献15与上下文16分开；拒绝/坏tag/预算/关闭不交付，晚secret不重装epoch。握手后预留剩余wire预算并在响应前恢复请求。50新增、最终完整290976pass/25历史skip、864定向、32642插桩、21原包/四H3消息及两个响应关联、新参考/36实际Windows、六完整公共及原四域strict通过；R04及新R05保留。[证据](shark-m2-quic-early-recovery-20261103.md) | 0 |
 | M2-82 | 迟到SETTINGS的QPACK未恢复及原指令字节/展示资格 | 已完成（N09.R04当前连接有限合同，最终CI归11） | 4024/7825/0510区分未知与已知零、恢复已拥有后缀，事务性表项/资源传播、其他STREAM和原始见证裁剪；页面独立源并拒绝说明树同名字段借高亮。66新ID全pass；解析器完整291039pass/25历史skip、后续完整CLI1685pass/2历史skip，合并291042pass/25历史skip；71334插桩，33新小源/11新参考、21原包/13目标、四H3消息/两关联、18实际Windows及六完整公共/原四域strict通过。R05和完整N09仍开放。[范围与证据](shark-m2-qpack-late-settings-20261103.md) | 0 |
 | M2-83 | 晚到HTTP3请求无法补充已发布响应的关联及缓存/展示不一致 | 已完成（N09.R05头关联有限合同，最终CI归11） | f1fd原生私有关联观察、同Flow/域的有界历史视图及revision；不改原事件/ResponseTo/字节来源。b625只加fuzz，49新ID/合并291091pass与25历史skip；21109插桩、七真实来源变换、33新native/11新参考、21原包/13控制/四H3消息、36实际Windows和六完整公共通过。R06晚到HEAD正文复验新缺口明确保留，N09整体不关闭。[M2-83 晚到HTTP3请求的有界关联和实际Windows](shark-m2-http3-late-association-20261103.md) | 0 |
+| M2-84 | 晚到方法未复验先前HTTP3响应正文及DATA/FIN来源 | 已完成（N09.R06已观察正文有限合同，最终CI归11） | 0bb在原生同owner/域/STREAM中保留有界DATA与wire FIN见证，补HEAD/CONNECT/FIN/缺口复验，不改原响应/字节、不误伤合法请求；41新ID、一次完整291132pass/25历史skip、34791插桩。新实抓原样本/三控制88保护包比较、16消息/56头/32帧；总41小源/15参考、72实际Windows、六完整公共和四strict域通过。R07隧道HEADERS两个失败叶子保留，完整N09仍开放。[84范围与证据](shark-m2-http3-late-body-20261103.md) | 0 |
 
 M2-56后续限定补充：17fe对已知服务端要求context为空、证书列表非空，保留客户端空列表、
 PHA context及无角色语法API；43新ID和34实际Windows状态通过，两个坏控制不再发布HTTP，
