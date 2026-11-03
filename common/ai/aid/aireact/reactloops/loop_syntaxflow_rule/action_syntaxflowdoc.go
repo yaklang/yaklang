@@ -138,6 +138,7 @@ syntaxflowdoc_search(query="dataflow", category="native_call")`,
 			hits := sfdoc.SearchDocument(query, limit, category)
 			syntaxflowdocHandleSuccess(loop, op, "syntaxflowdoc_search", "syntaxflowdoc_search", syntaxflowdoc.FormatSearchHits(query, hits))
 		},
+		func(action *reactloops.LoopAction) { action.SourceToolName = "syntaxflowdoc_search" },
 	)
 }
 
@@ -305,5 +306,6 @@ syntaxflowdoc_builtin_lib_details(name=["golang-gin-context"])`,
 			}
 			syntaxflowdocHandleSuccess(loop, op, "syntaxflowdoc_builtin_lib_details", "syntaxflowdoc_builtin_lib_details", body)
 		},
+		func(action *reactloops.LoopAction) { action.SourceToolName = "syntaxflowdoc_builtin_lib_details" },
 	)
 }
