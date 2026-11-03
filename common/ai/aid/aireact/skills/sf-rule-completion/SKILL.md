@@ -68,12 +68,8 @@ description: >
 
 ### 2.4 语法校验（必做）
 
-`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），按**两个独立 action** 调用，
-禁止把 `require_tool` 和 `directly_call_tool` 字段混在同一个 action 里：
-
-```json
-{"@action": "require_tool", "require_tool_payload": "check-syntaxflow-syntax", "human_readable_thought": "加载 SyntaxFlow 语法检查工具"}
-```
+`check-syntaxflow-syntax` 是 scenario 工具（默认清单不展示），但**可以直接调用**，不需要
+`require_tool` 预加载。**不要使用 `require_tool`**（弱模型容易传错 payload 导致任务中断）：
 
 ```json
 {"@action": "directly_call_tool", "directly_call_tool_name": "check-syntaxflow-syntax", "directly_call_tool_params": {"path": "<written_path>"}}
