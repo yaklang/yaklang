@@ -27,7 +27,7 @@ description: >
 
 ```
 1) 识别 sink / source
-2) include 库处理（不搜索磁盘；优先最小原生语法）
+2) 用 syntaxflowdoc_search / syntaxflowdoc_builtin_lib_details 查库与语法
 3) 写规则到 .sf 文件
 4) 语法校验（check-syntaxflow-syntax）
 5) 有样例 → 正例自检（同一工具，加 sample_code+language）
@@ -39,20 +39,38 @@ description: >
 从用户样例/需求确认：sink 危险调用点（`exec`、`Query`、`Parse`、`Execute`...）、
 source 用户输入来源（`c.Query`、`r.URL.Query`、`FormValue`...）。先在纸上明确这两端再写规则。
 
-### 1.2 include 库处理（不要搜索磁盘）
+### 1.2 查 include 库与语法（使用全局文档工具）
 
-**内置 SyntaxFlow 库（如 `golang-gin-context`）是编译进引擎二进制的，磁盘上不存在对应
-`.sf` 文件**——不要在引擎安装目录或工作目录搜索 lib，浪费轮次且必然找不到。
+`syntaxflowdoc_search` 和 `syntaxflowdoc_builtin_lib_details` 是全局 scenario 工具（默认清单不展示，
+但可直接调用，参数见下），查询的是编译进引擎的 SyntaxFlowDoc 快照，**与专注模式看到的是同一份数据**。
+不要再去磁盘搜索 `.sf` 库文件（内置库不落盘）。
 
-通用模式下拿不到 lib 内部结构，因此：
+**先搜索**（确认真实存在的 native call / include 库名 / 语法关键字，禁止臆造）：
 
-- **优先不写 include**，直接用最小原生语法覆盖样例中的 sink：
-  `.Query(* #-> as $src);` / `.Exec(* #-> as $src);` / `$x.Params(* #-> as $p);`
-- 只有在用户明确提供库名、且你确定其导出变量时，才写 `<include('lib')> as $var`。
-- **禁止臆造 include 内部变量名**。
+```json
+{"@action": "directly_call_tool", "directly_call_tool_name": "syntaxflowdoc_search", "directly_call_tool_params": {"query": "gin", "category": "builtin_lib", "limit": 10}}
+```
 
-常用库对照（仅作参考，不保证当前安装可用）：Gin → `golang-gin-context`；
-Spring → `java-spring-mvc-param`；Go 标准库输入 → `golang-user-input`。
+`category` 可选：`native_call` / `operator` / `opcode` / `desc_key` / `builtin_lib` / `syntax`。
+
+**再查库详情**（拿到库名后确认语言与相对路径）：
+
+```json
+{"@action": "directly_call_tool", "directly_call_tool_name": "syntaxflowdoc_builtin_lib_details", "directly_call_tool_params": {"name": ["golang-gin-context"]}}
+```
+
+注意：库详情只返回库名/语言/路径/描述，**不含导出变量名**。需要变量名时：
+
+- 若引擎由源码构建（工作目录下有 yaklang 仓库），可 `read_file` 读取
+  `<repo>/common/syntaxflow/sfbuildin/buildin/<path>`（path 来自详情返回）确认变量；
+- 否则**不要猜**，直接改用最小原生语法（见下）。
+
+**找不到库时的兜底**：优先不写 include，用最小原生语法覆盖样例中的 sink：
+`.Query(* #-> as $src);` / `.Exec(* #-> as $src);` / `$x.Params(* #-> as $p);`。
+只有库名与导出变量都确认后才写 `<include('lib')> as $var`。
+
+常用库对照（仅作参考）：Gin → `golang-gin-context`；Spring → `java-spring-mvc-param`；
+Go 标准库输入 → `golang-user-input`。
 
 ### 1.3 写规则到 .sf 文件
 
@@ -181,6 +199,7 @@ SAFE
 |---|---|---|
 | 语法校验 | 你显式调用 `check-syntaxflow-syntax` | 写文件后系统自动 lint |
 | 正例自检 | 你显式传 `sample_code` 自检 | 语法通过后系统自动重检至 matched |
+| 文档/库检索 | `syntaxflowdoc_search` / `syntaxflowdoc_builtin_lib_details`（同一份内嵌快照） | `syntaxflowdoc_*` loop action（同数据） |
 | 规则样例 RAG 搜索 | 不可用（改用 grep 搜 .sf 样例） | 内置 Grep + 语义检索 |
 | 编辑器交付 | 写入普通文件 | 交付到前端「规则编写」编辑器 |
 
