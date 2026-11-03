@@ -27,7 +27,7 @@ description: >
 
 ```
 1) 识别 sink / source
-2) 查 include 库结构（必须，禁止臆造库名）
+2) include 库处理（不搜索磁盘；优先最小原生语法）
 3) 写规则到 .sf 文件
 4) 语法校验（check-syntaxflow-syntax）
 5) 有样例 → 正例自检（同一工具，加 sample_code+language）
@@ -39,17 +39,20 @@ description: >
 从用户样例/需求确认：sink 危险调用点（`exec`、`Query`、`Parse`、`Execute`...）、
 source 用户输入来源（`c.Query`、`r.URL.Query`、`FormValue`...）。先在纸上明确这两端再写规则。
 
-### 1.2 查 include 库结构（强制步骤，最多搜 2 次）
+### 1.2 include 库处理（不要搜索磁盘）
 
-**禁止凭记忆发明 `<include('...')>` 库名。** 用文件系统方式确认：`grep` 在工作目录/引擎安装目录
-搜索库名（如 `golang-gin-context`），命中后用 `read_file` 读该 `.sf` lib 确认导出的变量名
-（如 `$gin.Context`、`$context.Query`）。
+**内置 SyntaxFlow 库（如 `golang-gin-context`）是编译进引擎二进制的，磁盘上不存在对应
+`.sf` 文件**——不要在引擎安装目录或工作目录搜索 lib，浪费轮次且必然找不到。
 
-**搜索上限 2 次**：两轮没找到就不要再全盘搜索，直接改用最小原生语法
-（`.methodName(* #-> as $x)`）写规则，避免卡在找库上。
+通用模式下拿不到 lib 内部结构，因此：
 
-常用库对照：Gin → `golang-gin-context`；Spring → `java-spring-mvc-param`；
-Go 标准库输入 → `golang-user-input`。
+- **优先不写 include**，直接用最小原生语法覆盖样例中的 sink：
+  `.Query(* #-> as $src);` / `.Exec(* #-> as $src);` / `$x.Params(* #-> as $p);`
+- 只有在用户明确提供库名、且你确定其导出变量时，才写 `<include('lib')> as $var`。
+- **禁止臆造 include 内部变量名**。
+
+常用库对照（仅作参考，不保证当前安装可用）：Gin → `golang-gin-context`；
+Spring → `java-spring-mvc-param`；Go 标准库输入 → `golang-user-input`。
 
 ### 1.3 写规则到 .sf 文件
 
