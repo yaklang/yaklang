@@ -248,7 +248,7 @@ var ProtocolRoadmap = []RoadmapItem{
 	// --- 目录 / 认证 ---
 	{Name: "LDAP", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "P0 explicit LDAPv3 bind/unbind/search plus Modify/Add/Del/ModifyDN/Compare/Abandon/Extended fields (P0_SCOPE.md)"},
 	{Name: "LDAPS", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP1},
-	{Name: "CLDAP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP1},
+	{Name: "CLDAP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP1, Notes: "Native UDP/389 dispatch over ordered LDAPMessage datagrams; selected SearchRequest fields and explicit opaque response observations, no TCP state reuse"},
 	{Name: "Kerberos", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "APPLICATION tags AS/TGS/AP/ERROR + TCP record"},
 	{Name: "NTLM", Family: "auth", Sources: src(srcWireshark, srcColasoft), Status: stDone, Priority: priP0, Notes: "see NTLMSSP type 1/2/3"},
 	{Name: "NTLMSSP", Family: "auth", Sources: src(srcWireshark), Status: stDone, Priority: priP0, Notes: "type 1/2/3 fields + SMB2/SPNEGO hook"},

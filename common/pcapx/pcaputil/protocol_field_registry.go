@@ -635,6 +635,43 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		}
 		out = append(out, b)
 	}
+	for _, f := range []struct {
+		name, label, key string
+		typ              DisplayFieldType
+		bits             int
+		origin           string
+	}{
+		{"cldap.message_id", "CLDAP message ID", "Message ID", DisplayUnsigned, 64, "context"},
+		{"cldap.message_count", "CLDAP messages in this UDP datagram", "Message Count", DisplayUnsigned, 32, "derived"},
+		{"cldap.operation", "CLDAP protocol operation tag", "Operation", DisplayUnsigned, 8, "context"},
+		{"cldap.operation_name", "CLDAP protocol operation", "Message Name", DisplayString, 0, "context"},
+		{"cldap.base_object", "CLDAP SearchRequest base object", "Base Object", DisplayString, 0, "context"},
+		{"cldap.scope", "CLDAP SearchRequest scope", "Scope", DisplayUnsigned, 8, "context"},
+		{"cldap.filter_present_attribute", "CLDAP present-filter attribute", "Present Attribute", DisplayString, 0, "context"},
+		{"cldap.result_code", "Observed CLDAP SearchResultDone result code", "Result Code", DisplayUnsigned, 64, "context"},
+		{"cldap.response_opaque", "CLDAP response body remains opaque", "Response Body Opaque", DisplayBoolean, 0, "context"},
+	} {
+		b := displayRoot("cldap", f.name, f.label, f.typ, f.bits, f.origin, f.key)
+		b.protocols = "|cldap|"
+		if f.name == "cldap.base_object" {
+			b.descriptor.AllowEmpty = true
+		}
+		out = append(out, b)
+	}
+	b = displayCustom("cldap", "cldap.attribute", "CLDAP requested attributes", DisplayString, 0, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		switch attributes := e.Session["Requested Attributes"].(type) {
+		case []string:
+			for _, attribute := range attributes {
+				emit(attribute)
+			}
+		case []any:
+			for _, attribute := range attributes {
+				emit(attribute)
+			}
+		}
+	})
+	b.protocols = "|cldap|"
+	out = append(out, b)
 	out = append(out, nativeNetworkDisplayBindings()...)
 	out = append(out, nativeMLDDisplayBindings()...)
 	out = append(out, nativeIGMPDisplayBindings()...)
@@ -1175,6 +1212,15 @@ func displayFieldEnums(name string) []DisplayFieldEnum {
 		return []DisplayFieldEnum{{250, "Subnegotiation"}, {251, "WILL"}, {252, "WONT"}, {253, "DO"}, {254, "DONT"}, {255, "Escaped IAC"}}
 	case "nbss.type":
 		return []DisplayFieldEnum{{129, "Session Request"}, {130, "Positive Session Response"}, {131, "Negative Session Response"}, {132, "Retarget Session Response"}, {133, "Session Keepalive"}}
+	case "cldap.operation":
+		return []DisplayFieldEnum{
+			{0x63, "Search Request"},
+			{0x64, "Search Result Entry"},
+			{0x65, "Search Result Done"},
+			{0x73, "Search Result Reference"},
+		}
+	case "cldap.scope":
+		return []DisplayFieldEnum{{0, "Base Object"}, {1, "Single Level"}, {2, "Whole Subtree"}}
 	case "wcf.record_type":
 		return []DisplayFieldEnum{
 			{0x00, "Version"},
