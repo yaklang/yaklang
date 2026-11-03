@@ -48,10 +48,14 @@ source 用户输入来源（`c.Query`、`r.URL.Query`、`FormValue`...）。先�
 **先搜索**（确认真实存在的 native call / include 库名 / 语法关键字，禁止臆造）：
 
 ```json
-{"@action": "directly_call_tool", "directly_call_tool_name": "syntaxflowdoc_search", "directly_call_tool_params": {"query": "gin", "category": "builtin_lib", "limit": 10}}
+{"@action": "directly_call_tool", "directly_call_tool_name": "syntaxflowdoc_search", "directly_call_tool_params": {"query": "golang-gin-context", "category": "builtin_lib", "limit": 10}}
 ```
 
 `category` 可选：`native_call` / `operator` / `opcode` / `desc_key` / `builtin_lib` / `syntax`。
+
+**搜索技巧**：优先用**完整库名/符号名**（`golang-gin-context`、`QueryContext`），而不是
+`gin`、`sql` 这类短词——短词会匹配到大量描述文本，把目标挤到 limit 之外。先按框架推测库名，
+搜不到再放宽为短词并提高 `limit`（最大 64）。
 
 **再查库详情**（拿到库名后确认语言与相对路径）：
 
