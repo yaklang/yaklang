@@ -242,6 +242,12 @@ func FileContextProvider(filePath string, userPrompt ...string) ContextProvider 
 			content = string(contentBytes)
 		}
 
+		// Omit an empty complete file before metadata makes the snapshot nonempty.
+		// A truncated whitespace preview cannot establish that the full file is empty.
+		if !truncated && strings.TrimSpace(content) == "" {
+			return "", nil
+		}
+
 		// 5. 构建提示词
 		var result bytes.Buffer
 		result.WriteString(baseInfo)
@@ -269,6 +275,9 @@ func FileContentContextProvider(content string, userPrompt ...string) ContextPro
 	resource := &AttachedFileContentResourceData{}
 	_ = resource.Unmarshal(content)
 	return func(config AICallerConfigIf, emitter *Emitter, _ string) (string, error) {
+		if strings.TrimSpace(content) == "" {
+			return "", nil
+		}
 		rendered, err := resource.render(emitter)
 		if err != nil {
 			return "", err

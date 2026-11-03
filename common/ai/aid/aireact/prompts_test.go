@@ -450,7 +450,7 @@ func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 		t.Fatalf("First call context does not contain expected content. Got: %s", ctx1)
 	}
 
-	// Second call - should have diff
+	// Second call replaces the snapshot without replaying the previous content.
 	ctx2 := react.promptManager.DynamicContext()
 	if ctx2 == "" {
 		t.Fatal("Dynamic context should not be empty")
@@ -460,10 +460,10 @@ func TestPromptManager_WithTracedDynamicContextProvider(t *testing.T) {
 		t.Fatalf("Second call context does not contain expected content. Got: %s", ctx2)
 	}
 
-	// Second call should contain diff information
-	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
-		t.Fatalf("Second call should contain diff information. Got: %s", ctx2)
-	}
+	require.NotContains(t, ctx1, "CHANGES_DIFF")
+	require.NotContains(t, ctx2, "CHANGES_DIFF")
+	require.NotContains(t, ctx2, "Traced content call #1")
+	require.Equal(t, 1, strings.Count(ctx2, "Traced content call #2"))
 
 	t.Logf("First call context: %s", ctx1)
 	t.Logf("Second call context: %s", ctx2)
@@ -513,7 +513,7 @@ func TestPromptManager_WithTracedFileContext(t *testing.T) {
 		t.Fatalf("Failed to update temp file: %v", err)
 	}
 
-	// Second call - should detect changes and show diff
+	// Second call shows the updated file once, without the old version or a diff.
 	ctx2 := react.promptManager.DynamicContext()
 	if ctx2 == "" {
 		t.Fatal("Dynamic context should not be empty")
@@ -523,10 +523,16 @@ func TestPromptManager_WithTracedFileContext(t *testing.T) {
 		t.Fatalf("Second call should contain updated file content. Got: %s", ctx2)
 	}
 
-	// Second call should contain diff information
-	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
-		t.Fatalf("Second call should contain diff information. Got: %s", ctx2)
-	}
+	require.NotContains(t, ctx2, "CHANGES_DIFF")
+	require.NotContains(t, ctx2, initialContent)
+	require.Equal(t, 1, strings.Count(ctx2, updatedContent))
+
+	// An empty file removes the whole provider block, including its label.
+	require.NoError(t, os.WriteFile(tempFile.Name(), nil, 0644))
+	ctx3 := react.promptManager.DynamicContext()
+	require.NotContains(t, ctx3, "test_file")
+	require.NotContains(t, ctx3, updatedContent)
+	require.NotContains(t, ctx3, "CHANGES_DIFF")
 
 	t.Logf("First call context: %s", ctx1)
 	t.Logf("Second call context: %s", ctx2)
@@ -606,10 +612,11 @@ func TestPromptManager_WithMixedContextProviders(t *testing.T) {
 		t.Fatalf("Second call should contain content from both providers. Got: %s", ctx2)
 	}
 
-	// Second call should contain diff for traced provider but not for regular provider
-	if !utils.MatchAllOfSubString(ctx2, "CHANGES_DIFF") {
-		t.Fatalf("Second call should contain diff information for traced provider. Got: %s", ctx2)
-	}
+	// Both registration APIs render only the current snapshot.
+	require.NotContains(t, ctx2, "CHANGES_DIFF")
+	require.NotContains(t, ctx2, "Traced provider content #1")
+	require.Equal(t, 1, strings.Count(ctx2, "Regular provider content"))
+	require.Equal(t, 1, strings.Count(ctx2, "Traced provider content #2"))
 
 	// Check call counts
 	regularMutex.Lock()

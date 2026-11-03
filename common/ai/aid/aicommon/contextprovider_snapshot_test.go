@@ -2,6 +2,9 @@ package aicommon
 
 import (
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -42,4 +45,29 @@ func TestContextProviderSnapshot_EmptyChangeAndRecovery(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestContextProviderSnapshot_EmptyFileOmitsMetadata(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "context.txt")
+	for _, content := range []string{"", " \n\t"} {
+		require.NoError(t, os.WriteFile(path, []byte(content), 0600))
+		for name, provider := range map[string]ContextProvider{
+			"path":   FileContextProvider(path),
+			"inline": FileContentContextProvider(content),
+		} {
+			t.Run(name, func(t *testing.T) {
+				manager := NewContextProviderManager()
+				manager.RegisterTracedContent("file", provider)
+				require.Empty(t, manager.ExecuteWithNonce(nil, nil, "helper"))
+				require.Empty(t, manager.ExecuteMainLoopWithNonce(nil, nil, "main"))
+			})
+		}
+	}
+
+	// Preserve a truncated preview even if its first bytes are all whitespace:
+	// the unread portion may contain actual data.
+	require.NoError(t, os.WriteFile(path, []byte(strings.Repeat(" ", MaxFileContentSize)+"UNREAD_DATA"), 0600))
+	rendered, err := FileContextProvider(path)(nil, nil, "file")
+	require.NoError(t, err)
+	require.Contains(t, rendered, "File content truncated")
 }
