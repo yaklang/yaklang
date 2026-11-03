@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/yaklang/yaklang/common/utils/subprocess"
 	"github.com/yaklang/yaklang/common/utils"
+	"github.com/yaklang/yaklang/common/utils/subprocess"
 )
 
 type memfitProcessClient struct {
@@ -96,7 +96,7 @@ func startMemfitProcessClient(ctx context.Context, config memfitStartConfig) (*m
 						return utils.Errorf("memfit worker initialization failed: %s%s", status.Message, client.formattedLogTail())
 					}
 				case <-p.Done():
-					return utils.Errorf("memfit worker exited during initialization: %v%s", p.WaitError(), client.formattedLogTail())
+					return utils.Errorf("%s worker exited during initialization: %v%s", memfitDisplayName(config), p.WaitError(), client.formattedLogTail())
 				case <-ctx.Done():
 					return ctx.Err()
 				case <-timer.C:

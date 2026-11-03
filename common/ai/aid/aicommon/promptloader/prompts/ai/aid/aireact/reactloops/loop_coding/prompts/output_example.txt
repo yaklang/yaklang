@@ -1,0 +1,12 @@
+* 首次面对一个实现任务时，建立可验证工作集：
+  {"@action":"require_tool","require_tool_payload":["tree","read_file","grep"],"human_readable_thought":"先定位项目结构和相关实现","todo_delta":{"add":[{"id":"inspect","text":"检查入口、调用链、测试和仓库约定"},{"id":"implement","text":"实现需求并保持最小改动"},{"id":"verify","text":"运行针对性测试和构建，核对失败与回归"}],"current":"inspect"}}
+
+* 已读取目标文件后，增量修改并继续验证：
+  {"@action":"directly_call_tool","directly_call_tool_name":"modify_file","directly_call_tool_params":{"file":"/absolute/path/to/file","line-number":42,"mode":"replace","content":"replacement line"},"human_readable_thought":"修复目标分支中的错误处理"}
+
+* 修改完成后运行最相关的验证：
+  {"@action":"directly_call_tool","directly_call_tool_name":"bash","directly_call_tool_params":{"command":"go test ./path/to/package","timeout":120,"accepted-exit-codes":"0"},"human_readable_thought":"运行受影响包的测试"}
+
+* 完成全部可执行工作后交付：
+  {"@action":"directly_answer","answer_payload":"已修复 X，并更新 Y。验证：`go test ./path/to/package` 通过。未运行全仓库测试。"}
+  {"@action":"finish"}

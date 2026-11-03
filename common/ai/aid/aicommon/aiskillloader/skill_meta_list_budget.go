@@ -20,9 +20,14 @@ const skillInventoryHeader = "# Skill Inventory\nNames and brief descriptions on
 // renderSkillInventory snapshots a bounded directory without retaining mutable
 // metadata pointers, loaded state, or skill bodies.
 func renderSkillInventory(metas []*SkillMeta, tokenEstimator func(string) int) string {
+	return renderSkillInventoryWithNames(metas, nil, tokenEstimator)
+}
+
+func renderSkillInventoryWithNames(metas []*SkillMeta, names []string, tokenEstimator func(string) int) string {
+	metas = selectDefaultSkillMetas(metas, names)
 	skills := make([]*SkillMeta, 0, len(metas))
 	seen := make(map[string]bool, len(metas))
-	for _, meta := range sortSkillMetasByName(metas) {
+	for _, meta := range metas {
 		if meta == nil || meta.DisableModelInvocation {
 			continue
 		}
@@ -57,6 +62,31 @@ func renderSkillInventory(metas []*SkillMeta, tokenEstimator func(string) int) s
 		inventory.WriteString(line)
 	}
 	return strings.TrimSpace(inventory.String())
+}
+
+func selectDefaultSkillMetas(metas []*SkillMeta, names []string) []*SkillMeta {
+	if len(names) == 0 {
+		return sortSkillMetasByName(metas)
+	}
+	byName := make(map[string]*SkillMeta, len(metas))
+	for _, meta := range metas {
+		if meta != nil && meta.Name != "" {
+			byName[meta.Name] = meta
+		}
+	}
+	selected := make([]*SkillMeta, 0, len(names))
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		name = strings.TrimSpace(name)
+		if name == "" || seen[name] {
+			continue
+		}
+		if meta := byName[name]; meta != nil {
+			seen[name] = true
+			selected = append(selected, meta)
+		}
+	}
+	return selected
 }
 
 // MaxCatalogSkills 是意图识别写入「最相关 SKILL 目录」的最大条目数

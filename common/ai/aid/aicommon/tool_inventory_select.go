@@ -1,11 +1,15 @@
 package aicommon
 
-import "github.com/yaklang/yaklang/common/ai/aid/aitool"
+import (
+	"github.com/yaklang/yaklang/common/ai/aid/aitool"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
+)
 
 // ToolInventorySelectionInput 与 prompt Tool Inventory 段使用同一套筛选参数.
 type ToolInventorySelectionInput struct {
 	CandidateTools        []*aitool.Tool
 	ScenarioToolWhitelist []string
+	DisclosurePolicy      buildinaitools.ToolDisclosurePolicy
 }
 
 // ToolInventorySelection 是 prompt 构建 Tool Inventory 段的筛选结果.
@@ -31,9 +35,18 @@ func SelectToolInventoryTools(cfg *Config, input ToolInventorySelectionInput) To
 		return ToolInventorySelection{}
 	}
 
-	data := BuildToolInventoryData(
+	policy := input.DisclosurePolicy
+	if cfg != nil && cfg.GetAiToolManager() != nil {
+		managerPolicy := cfg.GetAiToolManager().GetDefaultToolDisclosure()
+		if len(managerPolicy.Names) > 0 || len(managerPolicy.Prefixes) > 0 || managerPolicy.Exclusive {
+			policy = managerPolicy
+		}
+	}
+
+	data := BuildToolInventoryDataWithPolicy(
 		input.CandidateTools,
 		resolveToolInventoryTopCount(cfg),
+		policy,
 		input.ScenarioToolWhitelist...,
 	)
 	if !data.ToolInventory {

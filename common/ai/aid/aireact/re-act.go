@@ -1194,30 +1194,39 @@ func classifySessionMCPMountFailure(err error) string {
 
 // cycle import issue
 
+// BuiltinToolManagerOptions returns the standard builtin catalog composition.
+// A fresh catalog slice avoids sharing the manager-owned backing array.
+func BuiltinToolManagerOptions() []buildinaitools.ToolManagerOption {
+	allTools := buildinaitools.GetAllTools()
+	aiChatFunc := func(prompt string) (io.Reader, error) {
+		response, err := ai.Chat(prompt)
+		if err != nil {
+			return nil, err
+		}
+		return strings.NewReader(response), nil
+	}
+	return []buildinaitools.ToolManagerOption{
+		buildinaitools.WithExtendTools(allTools, true),
+		buildinaitools.WithAIToolsSearcher(rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)),
+		buildinaitools.WithAiForgeSearcher(rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)),
+	}
+}
+
+// NewBuiltinToolManager composes the standard builtin catalog with
+// profile-specific manager options. The tool implementations are shared; the
+// profile only decides which existing tools are enabled by default.
+func NewBuiltinToolManager(extra ...buildinaitools.ToolManagerOption) *buildinaitools.AiToolManager {
+	options := BuiltinToolManagerOptions()
+	options = append(options, extra...)
+	manager := buildinaitools.NewToolManager(options...)
+	enabled, _ := manager.GetEnableTools()
+	log.Infof("composed AI tool manager with %d enabled tools", len(enabled))
+	return manager
+}
+
 func WithBuiltinTools() aicommon.ConfigOption {
 	return func(cfg *aicommon.Config) error {
-
-		// Get all builtin tools
-		allTools := buildinaitools.GetAllTools()
-
-		// Create a simple AI chat function for the searcher
-		aiChatFunc := func(prompt string) (io.Reader, error) {
-			response, err := ai.Chat(prompt)
-			if err != nil {
-				return nil, err
-			}
-			return strings.NewReader(response), nil
-		}
-
-		// Create keyword searcher
-		aiToolSearcher := rag_search_tool.NewComprehensiveSearcher[*aitool.Tool](rag_search_tool.AIToolVectorIndexName, aiChatFunc)
-		forgeSearcher := rag_search_tool.NewComprehensiveSearcher[*schema.AIForge](rag_search_tool.ForgeVectorIndexName, aiChatFunc)
-
-		log.Infof("Added %d builtin AI tools (search_capabilities is a built-in @action)", len(allTools))
-		return aicommon.WithAiToolManagerOptions(
-			buildinaitools.WithExtendTools(allTools, true),
-			buildinaitools.WithAIToolsSearcher(aiToolSearcher),
-			buildinaitools.WithAiForgeSearcher(forgeSearcher))(cfg)
+		return aicommon.WithAiToolManagerOptions(BuiltinToolManagerOptions()...)(cfg)
 	}
 }
 

@@ -12,6 +12,8 @@ import (
 
 	"github.com/yaklang/yaklang/common/ai/aid/aicommon"
 	"github.com/yaklang/yaklang/common/ai/aid/aireact"
+	"github.com/yaklang/yaklang/common/ai/aid/aireact/reactloops/loop_coding"
+	"github.com/yaklang/yaklang/common/ai/aid/aitool/buildinaitools"
 	"github.com/yaklang/yaklang/common/ai/aispec"
 	"github.com/yaklang/yaklang/common/aiengine"
 	"github.com/yaklang/yaklang/common/consts"
@@ -24,74 +26,122 @@ import (
 
 const memfitWorkerEnvironment = "YAK_MEMFIT_WORKER"
 
-var Command = &cli.Command{
-	Name:  "memfit",
-	Usage: "Run the local Memfit AI agent in an isolated worker process",
-	UsageText: "yak memfit [options] [prompt]\n\n" +
-		"Examples:\n" +
-		"  yak memfit \"你好？你是什么模型？\"\n" +
-		"  yak memfit --ai-type openai --api-key $OPENAI_API_KEY --model gpt-4.1\n" +
-		"  yak memfit --print \"summarize this directory\"",
-	Flags: []cli.Flag{
-		cli.StringFlag{
-			Name:  "ai-type",
-			Usage: "AI provider override; empty uses the configured Yaklang model",
-		},
-		cli.StringFlag{
-			Name:   "api-key",
-			Usage:  "AI API key override (prefer the YAK_AI_API_KEY environment variable)",
-			EnvVar: "YAK_AI_API_KEY",
-		},
-		cli.StringFlag{
-			Name:  "model",
-			Usage: "AI model override",
-		},
-		cli.StringFlag{
-			Name:  "base-url",
-			Usage: "AI API base URL override",
-		},
-		cli.StringFlag{
-			Name:  "workdir,C",
-			Usage: "agent working directory (default: current directory)",
-		},
-		cli.StringFlag{
-			Name:  "language,lang",
-			Value: "zh",
-			Usage: "response language preference",
-		},
-		cli.StringFlag{
-			Name:  "review",
-			Value: "yolo",
-			Usage: "tool review policy: yolo, ai, or manual (default: yolo)",
-		},
-		cli.IntFlag{
-			Name:  "max-iterations",
-			Value: 50,
-			Usage: "maximum ReAct iterations per task",
-		},
-		cli.IntFlag{
-			Name:  "timeout",
-			Value: 0,
-			Usage: "maximum worker lifetime in seconds (0 disables the limit)",
-		},
-		cli.StringFlag{
-			Name:  "session",
-			Usage: "persistent session ID (empty creates a new session)",
-		},
-		cli.BoolFlag{
-			Name:  "print,p",
-			Usage: "print one response and exit; also implied when output is not a terminal",
-		},
-		cli.BoolFlag{
-			Name:  "plain",
-			Usage: "disable ANSI styling and interactive TUI",
-		},
-		cli.BoolFlag{
-			Name:  "debug",
-			Usage: "show worker diagnostic logs and detailed events",
-		},
+type memfitProfile struct {
+	Name        string
+	Title       string
+	Description string
+	Usage       string
+	Examples    []string
+	Aliases     []string
+	Focus       string
+}
+
+var generalMemfitProfile = memfitProfile{
+	Name:        "memfit",
+	Title:       "memfit",
+	Description: "local isolated agent",
+	Usage:       "Run the local Memfit AI agent in an isolated worker process",
+	Examples: []string{
+		"yak memfit \"你好？你是什么模型？\"",
+		"yak memfit --ai-type openai --api-key $OPENAI_API_KEY --model gpt-4.1",
+		"yak memfit --print \"summarize this directory\"",
 	},
-	Action: runMemfitCLI,
+}
+
+var codingMemfitProfile = memfitProfile{
+	Name:        "memfit-code",
+	Title:       "memfit code",
+	Description: "coding-only isolated agent",
+	Usage:       "Run the coding-only Memfit agent in an isolated worker process",
+	Aliases:     []string{"code-agent"},
+	Focus:       loop_coding.LoopName,
+	Examples: []string{
+		"yak memfit-code \"修复当前仓库的失败测试\"",
+		"yak memfit-code --print \"实现这个功能并运行相关测试\"",
+		"yak memfit-code --workdir ./backend --review ai",
+	},
+}
+
+var Command = newMemfitCommand(generalMemfitProfile)
+
+// CodingCommand is a separate coding-only distribution. It shares the same
+// isolated process protocol and TUI as Memfit, but fixes the focus mode and
+// composes its default tool set from the shared builtin catalog.
+var CodingCommand = newMemfitCommand(codingMemfitProfile)
+
+func newMemfitCommand(profile memfitProfile) *cli.Command {
+	usageText := profile.Name + " [options] [prompt]\n\nExamples:\n"
+	for _, example := range profile.Examples {
+		usageText += "  " + example + "\n"
+	}
+	return &cli.Command{
+		Name:      profile.Name,
+		Usage:     profile.Usage,
+		UsageText: strings.TrimRight(usageText, "\n"),
+		Aliases:   append([]string(nil), profile.Aliases...),
+		Flags: []cli.Flag{
+			cli.StringFlag{
+				Name:  "ai-type",
+				Usage: "AI provider override; empty uses the configured Yaklang model",
+			},
+			cli.StringFlag{
+				Name:   "api-key",
+				Usage:  "AI API key override (prefer the YAK_AI_API_KEY environment variable)",
+				EnvVar: "YAK_AI_API_KEY",
+			},
+			cli.StringFlag{
+				Name:  "model",
+				Usage: "AI model override",
+			},
+			cli.StringFlag{
+				Name:  "base-url",
+				Usage: "AI API base URL override",
+			},
+			cli.StringFlag{
+				Name:  "workdir,C",
+				Usage: "agent working directory (default: current directory)",
+			},
+			cli.StringFlag{
+				Name:  "language,lang",
+				Value: "zh",
+				Usage: "response language preference",
+			},
+			cli.StringFlag{
+				Name:  "review",
+				Value: "yolo",
+				Usage: "tool review policy: yolo, ai, or manual",
+			},
+			cli.IntFlag{
+				Name:  "max-iterations",
+				Value: 50,
+				Usage: "maximum ReAct iterations per task",
+			},
+			cli.IntFlag{
+				Name:  "timeout",
+				Value: 0,
+				Usage: "maximum worker lifetime in seconds (0 disables the limit)",
+			},
+			cli.StringFlag{
+				Name:  "session",
+				Usage: "persistent session ID (empty creates a new session)",
+			},
+			cli.BoolFlag{
+				Name:  "print,p",
+				Usage: "print one response and exit; also implied when output is not a terminal",
+			},
+			cli.BoolFlag{
+				Name:  "plain",
+				Usage: "disable ANSI styling and interactive TUI",
+			},
+			cli.BoolFlag{
+				Name:  "debug",
+				Usage: "show worker diagnostic logs and detailed events",
+			},
+		},
+		Action: func(c *cli.Context) error {
+			return runMemfitCLI(c, profile)
+		},
+	}
 }
 
 // WorkerCommand is registered outside cliGroup so its Hidden bit is not
@@ -102,7 +152,7 @@ var WorkerCommand = &cli.Command{
 	Action: runMemfitWorkerCLI,
 }
 
-func runMemfitCLI(c *cli.Context) error {
+func runMemfitCLI(c *cli.Context, profile memfitProfile) error {
 	workdir := strings.TrimSpace(c.String("workdir"))
 	if workdir == "" {
 		var err error
@@ -135,6 +185,10 @@ func runMemfitCLI(c *cli.Context) error {
 		Timeout:       c.Int("timeout"),
 		SessionID:     strings.TrimSpace(c.String("session")),
 		Debug:         c.Bool("debug"),
+		AgentName:     profile.Name,
+		AgentTitle:    profile.Title,
+		AgentDesc:     profile.Description,
+		Focus:         profile.Focus,
 	}
 	if err := validateMemfitStartConfig(config); err != nil {
 		return err
@@ -150,7 +204,7 @@ func runMemfitCLI(c *cli.Context) error {
 		query = strings.TrimSpace(string(data))
 	}
 	if query == "" && !interactive {
-		return utils.Error("memfit prompt is required in print/plain mode")
+		return utils.Errorf("%s prompt is required in print/plain mode", memfitDisplayName(config))
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -393,6 +447,14 @@ func buildMemfitEngineOptions(
 	if config.Debug {
 		options = append(options, aiengine.WithDebugMode(true))
 	}
+	if config.Focus != "" {
+		options = append(options, aiengine.WithFocus(config.Focus))
+	}
+	if config.Focus == loop_coding.LoopName {
+		options = append(options, aiengine.WithExtOptions(
+			aicommon.WithAiToolManager(newCodingToolManager()),
+		))
+	}
 
 	if config.AIType != "" || config.APIKey != "" || config.Model != "" || config.BaseURL != "" {
 		aiType := config.AIType
@@ -415,6 +477,19 @@ func buildMemfitEngineOptions(
 		options = append(options, aiengine.WithAIConfig(aiType, aiOptions...))
 	}
 	return options, nil
+}
+
+// newCodingToolManager composes the shared builtin catalog into the coding
+// distribution's selected tool set. Tool implementations remain shared.
+func newCodingToolManager() *buildinaitools.AiToolManager {
+	return aireact.NewBuiltinToolManager(loop_coding.ToolManagerOptions()...)
+}
+
+func memfitDisplayName(config memfitStartConfig) string {
+	if title := strings.TrimSpace(config.AgentTitle); title != "" {
+		return title
+	}
+	return "memfit"
 }
 
 func configuredMemfitProviderType() string {

@@ -72,6 +72,15 @@ func WithManagerTokenEstimator(estimator func(string) int) ManagerOption {
 	}
 }
 
+// WithDefaultSkillInventory limits the fixed Available Skills directory to the
+// named skills, in the provided order. Other skills remain searchable and
+// loadable through the same loader; this option only shapes default disclosure.
+func WithDefaultSkillInventory(names ...string) ManagerOption {
+	return func(m *SkillsContextManager) {
+		m.skillInventoryNames = append([]string(nil), names...)
+	}
+}
+
 // SkillsContextManager 是技能加载与查看工具, 不是正文托管者。
 //
 // 改造后的职责边界:
@@ -94,6 +103,8 @@ type SkillsContextManager struct {
 	// skillInventory 是初始化时确定的有限目录，后续加载、翻页和来源变化不修改它。
 	// 只保存名称和简短描述的最终渲染文本，不托管技能正文或加载状态。
 	skillInventory string
+	// skillInventoryNames is an optional profile-level default disclosure list.
+	skillInventoryNames []string
 
 	// states 只记录已加载技能的轻量查看状态 (文件树 / 阅读窗口 / 翻页 offset)。
 	// 它不参与 prompt 拼装, 也不决定展示位置。
@@ -125,7 +136,7 @@ func NewSkillsContextManager(loader SkillLoader, opts ...ManagerOption) *SkillsC
 		opt(m)
 	}
 	if loader != nil {
-		m.skillInventory = renderSkillInventory(loader.AllSkillMetas(), m.tokenEstimator)
+		m.skillInventory = renderSkillInventoryWithNames(loader.AllSkillMetas(), m.skillInventoryNames, m.tokenEstimator)
 	}
 	m.initializeSkillSearchPersistence()
 	return m
@@ -137,6 +148,15 @@ func (m *SkillsContextManager) SkillInventory() string {
 		return ""
 	}
 	return m.skillInventory
+}
+
+// GetDefaultSkillNames returns the profile-level default disclosure allowlist.
+// An empty list means the ordinary full registry ordering.
+func (m *SkillsContextManager) GetDefaultSkillNames() []string {
+	if m == nil {
+		return nil
+	}
+	return append([]string(nil), m.skillInventoryNames...)
 }
 
 // LoadDefaultSkills 在绑定之后由初始化入口显式加载 metadata auto_load 技能。

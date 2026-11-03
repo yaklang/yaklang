@@ -6,9 +6,11 @@ import memfitcli "github.com/yaklang/yaklang/common/yak/cmd/yakcmds/memfit-cli"
 // worker, local client, protocol, and TUI live in their own package.
 var (
 	MemfitCommand       = memfitcli.Command
+	MemfitCodingCommand = memfitcli.CodingCommand
 	MemfitWorkerCommand = memfitcli.WorkerCommand
 )
 
 func init() {
 	AICommands = append(AICommands, MemfitCommand)
+	AICommands = append(AICommands, MemfitCodingCommand)
 }
