@@ -43,6 +43,11 @@ type ToolRuntimeConfig struct {
 	// RiskSaveHandler replaces the process-local SQLite write for a risk when
 	// the current AI runtime is bound to a platform-owned result sink.
 	RiskSaveHandler func(context.Context, *schema.Risk) error
+	// RiskSelectionScopeRequired limits risk queries and triage writes to the
+	// task's attached risk IDs. It is enabled only when the task carries a risk
+	// attachment.
+	RiskSelectionScopeRequired bool
+	RiskSelectionAllowedIDs    []int64
 	// EmitUIEvent emits structured metadata for a local UI surface. Tool callbacks
 	// must never place binary or base64 content in this channel.
 	EmitUIEvent func(schema.EventType, string, any) error

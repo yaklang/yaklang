@@ -10,6 +10,7 @@ const (
 	AttachedResourceTypeCode            = "code"
 	AttachedResourceTypeHTTPFlowID      = "http_flow_id"
 	AttachedResourceTypeKnowledgeBase   = "knowledge_base"
+	AttachedResourceTypeRisk            = "risk"
 	AttachedResourceTypeSelected        = "selected"
 	AttachedResourceTypeHTTPFuzzRequest = "http_fuzz_request"
 
@@ -25,6 +26,8 @@ const (
 	AttachedHTTPPacketInlineLimit       = 8 * 1024
 	AttachedDefaultResourceInlineLimit  = 8 * 1024
 	AttachedFilePreviewLimit            = 1024
+	AttachedRiskResourceMaxIDs          = 10000
+	AttachedRiskResourcePreviewIDs      = 80
 )
 
 // AttachedCodeSelection is the JSON payload for Type=selected, Key=content from Yak Runner code chips.

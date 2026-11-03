@@ -498,9 +498,13 @@ func (a *ToolCaller) invoke(
 	}
 	if statefulTask, ok := a.task.(AIStatefulTask); ok && statefulTask != nil {
 		runtimeCfg.CurrentTaskUserInput = statefulTask.GetOriginUserInput()
+		runtimeCfg.RiskSelectionScopeRequired, runtimeCfg.RiskSelectionAllowedIDs = AttachedRiskSelectionScope(statefulTask)
 	} else if a.invokeRuntime != nil {
 		if currentTask := a.invokeRuntime.GetCurrentTask(); currentTask != nil {
 			runtimeCfg.CurrentTaskUserInput = currentTask.GetOriginUserInput()
+			if statefulTask, ok := currentTask.(AIStatefulTask); ok {
+				runtimeCfg.RiskSelectionScopeRequired, runtimeCfg.RiskSelectionAllowedIDs = AttachedRiskSelectionScope(statefulTask)
+			}
 		}
 	}
 	runtimeCfg.Detach = a.Detach
