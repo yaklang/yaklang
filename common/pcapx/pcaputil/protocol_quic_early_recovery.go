@@ -267,6 +267,12 @@ func (a *binParser) projectNativeQUICSession(e *ProtocolEvent, q *binQUIC, off i
 		// Duplicate/protected packets can return before finishFrames. Their
 		// connection context still includes an earlier observed HTTP3 fault.
 		q.annotateH3ConnectionFault(e.Session)
+		if links, ok := e.Session["HTTP3 Late Associations"].([]map[string]any); ok {
+			for _, link := range links {
+				link["Flow ID"], link["Observed In PDU ID"] = e.FlowID, e.ID
+				link["Capture Domain"] = map[string]any{"Section": e.Domain.Section, "Interface": e.Domain.Interface, "Encapsulation": e.Domain.Encapsulation}
+			}
+		}
 	}
 	if e.Session != nil {
 		var transaction uint64
@@ -321,5 +327,10 @@ func (a *binParser) finishNativeQUICWire(e *ProtocolEvent, h quicHdr, raw []byte
 	// Query identity and passive context are private even on a refused
 	// native event; mutable public labels/caches cannot grant success.
 	e.semanticSession = cloneSession(e.Session)
+	if e.Protocol == "http3" {
+		e.nativeQUICApplication = 1
+	} else if e.Protocol == "doq" {
+		e.nativeQUICApplication = 2
+	}
 	a.finishProtocolDatagram(e, raw, a.specs["application-layer.quic/QUIC"], err)
 }

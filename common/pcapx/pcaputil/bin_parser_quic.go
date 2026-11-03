@@ -1361,6 +1361,9 @@ func (q *binQUIC) initialMemory() int64 {
 		n += 512
 		if st.h3 != nil {
 			n += 384
+			if st.h3.response != nil {
+				n += st.h3.response.memory()
+			}
 		}
 		if st.doq != nil {
 			n += 128

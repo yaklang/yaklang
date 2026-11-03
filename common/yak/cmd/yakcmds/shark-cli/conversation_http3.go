@@ -79,6 +79,24 @@ func http3ConversationEvent(e *pcaputil.ProtocolEvent) *pcaputil.ProtocolEvent {
 		}
 	}
 	m["HTTP3 Frames"], m["Headers"] = frames, copyHeaders(e.Session["Headers"])
+	for _, kind := range []string{"HTTP3 Late Associations", "HTTP3 Resolved Associations"} {
+		var links []map[string]any
+		for _, link := range mapList(e.Session[kind]) {
+			row := map[string]any{}
+			for _, key := range []string{"Stream ID", "Request PDU ID", "Request Headers PDU ID", "Response PDU ID", "Observed In PDU ID", "Flow ID", "Association Scope", "PDU Namespace", "Ambiguous"} {
+				if value, ok := link[key]; ok {
+					row[key] = value
+				}
+			}
+			links = append(links, row)
+		}
+		if len(links) > 0 {
+			m[kind] = links
+		}
+	}
+	if view, ok := e.Session["HTTP3 Association View"].(map[string]any); ok {
+		m["HTTP3 Association View"] = copyConformance(view)
+	}
 	if len(groups) == 0 && len(mapList(m["Headers"])) > 0 {
 		groups = append(groups, map[string]any{"Stream ID": number(e.Session["HTTP3 Stream ID"]), "Headers": m["Headers"]})
 	}

@@ -58,6 +58,7 @@ type ProtocolEvent struct {
 	semanticMetadata                   any
 	ownedRuleEnvelope, hasRuleMetadata bool
 	nativeQUICObservation              bool
+	nativeQUICApplication              uint8 // 1: HTTP3, 2: DoQ; retained even in metadata-only rows
 	nativeQUICWire                     bool
 	nativeQUICWireBytes                []byte // immutable accepted envelope; expand byte leaves only on query
 	nativeDoIPObservation              bool
@@ -2206,8 +2207,11 @@ type ProtocolInspector struct {
 
 type protocolHistoryEntry struct {
 	BinParserEvent
-	retainedCost  int
-	packetIndexed bool
+	retainedCost            int
+	packetIndexed           bool
+	http3Associations       []map[string]any
+	http3ContextSequence    uint64
+	http3AssociationLimited bool
 }
 
 // BinParserInspector is retained for source compatibility. Use ProtocolInspector.
@@ -2229,6 +2233,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 		v.received++
 		v.evicted++
 		v.identities.observe(e, v.received)
+		v.observeHTTP3Associations(e)
 		v.mu.Unlock()
 		return
 	}
@@ -2267,6 +2272,7 @@ func (v *BinParserInspector) OnEvent(e *BinParserEvent) {
 	v.count++
 	v.bytes += row.retainedCost
 	v.index(&row)
+	v.observeHTTP3Associations(&row.BinParserEvent)
 }
 
 // Rows returns metadata only, oldest first, optionally filtered by protocol and
@@ -2328,6 +2334,7 @@ func (v *BinParserInspector) Details(id uint64) (*BinParserEvent, error) {
 		copyEvent.nativeQUICWireBytes = append([]byte(nil), e.nativeQUICWireBytes...)
 		copyEvent.Session = cloneSession(e.Session)
 		copyEvent.Raw = append([]byte(nil), e.Raw...)
+		entries[0].materializeHTTP3Associations(&copyEvent)
 		row = &copyEvent
 	}
 	v.mu.Unlock()

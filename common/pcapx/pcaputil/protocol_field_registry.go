@@ -513,6 +513,28 @@ func buildDisplayFieldBindings() []displayFieldBinding {
 		name, key string
 		bits      int
 	}{
+		{"http3.late_association.request_pdu", "Request PDU ID", 64},
+		{"http3.late_association.request_headers_pdu", "Request Headers PDU ID", 64},
+		{"http3.late_association.response_pdu", "Response PDU ID", 64},
+		{"http3.late_association.streamid", "Stream ID", 62},
+	} {
+		spec := spec
+		out = append(out, displayCustom("http3", spec.name, "Later association of validated header observations; not a literal wire field or whole-message verdict", DisplayUnsigned, spec.bits, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+			p.maps(e.Session["HTTP3 Late Associations"], func(link map[string]any) { emit(link[spec.key]) })
+			p.maps(e.Session["HTTP3 Resolved Associations"], func(link map[string]any) { emit(link[spec.key]) })
+		}))
+	}
+	out = append(out, displayCustom("http3", "pdu.resolved_response_to", "Request relation learned later in the retained capture view; original pdu.response_to is unchanged", DisplayUnsigned, 64, "context", func(e *ProtocolEvent, emit func(any), p *displayProjection) {
+		p.maps(e.Session["HTTP3 Resolved Associations"], func(link map[string]any) {
+			if link["Ambiguous"] != true {
+				emit(link["Request PDU ID"])
+			}
+		})
+	}))
+	for _, spec := range []struct {
+		name, key string
+		bits      int
+	}{
 		{"http3.connection.error_code", "Error Code", 62},
 		{"http3.connection.error_pdu", "First PDU ID", 64},
 		{"http3.connection.error_streamid", "Stream ID", 62},
@@ -628,6 +650,19 @@ func (e *ProtocolEvent) DisplayFieldValues() DisplayFieldSnapshot {
 		owned.ID, owned.FlowID, owned.Length, owned.Domain = n.id, n.flow, n.length, n.domain
 		owned.Source, owned.Destination, owned.SourceBytes = n.source, n.destination, cloneNativeNetworkSource(n.bytes)
 		owned.Session = e.semanticSession
+		e = &owned
+	}
+	if e.nativeQUICObservation {
+		// Decode and field queries share the captured private context. Public
+		// aliases and Session maps must not invent or retarget HTTP3/DoQ facts.
+		owned := *e
+		owned.Protocol, owned.Session = "quic", e.semanticSession
+		if e.nativeQUICApplication == 1 || owned.Session["HTTP3"] == true {
+			owned.Protocol = "http3"
+		}
+		if e.nativeQUICApplication == 2 || owned.Session["DoQ"] == true {
+			owned.Protocol = "doq"
+		}
 		e = &owned
 	}
 	if e.nativeSSHObservation || e.nativeIMAPObservation || e.nativeDCERPCObservation || e.nativeTLSObservation || e.nativeESPObservation {

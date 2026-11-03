@@ -21,6 +21,7 @@ type h3StreamState struct {
 	framingFailure [2]bool
 	body           [2]h3MessageBody
 	requestMethod  int
+	response       *h3ResponseObservation
 
 	kind                  string
 	seenType              bool
@@ -404,6 +405,7 @@ func (q *binQUIC) feedHTTP3(dir int, sid, off uint64, data []byte, fin bool, max
 		if len(frames) >= max {
 			return protocolError(ErrResourceExceeded, "HTTP/3 frame budget exceeded")
 		}
+		q.observeH3HeaderAssociation(st, dir, sid, hf, info)
 	}
 	if q.native && fin && h3.parsed[dir] != len(h3.buf[dir]) {
 		return q.rejectH3FINFrame(st, dir, sid, fr, info, frames)

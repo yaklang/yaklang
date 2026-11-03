@@ -372,6 +372,22 @@ func secureTransportSummary(e *pcaputil.ProtocolEvent) string {
 		if dns, ok := v["DoQ Message"].(map[string]any); ok {
 			parts = append(parts, "DNS="+textValue(dns["QNAME"]))
 		}
+		for i, link := range mapList(v["HTTP3 Late Associations"]) {
+			if i >= 2 {
+				break
+			}
+			parts = append(parts, fmt.Sprintf("late association: stream=%d response PDU #%d", number(link["Stream ID"]), number(link["Response PDU ID"])))
+		}
+		for i, link := range mapList(v["HTTP3 Resolved Associations"]) {
+			if i >= 2 {
+				break
+			}
+			if link["Ambiguous"] == true {
+				parts = append(parts, fmt.Sprintf("ambiguous request association: stream=%d", number(link["Stream ID"])))
+			} else {
+				parts = append(parts, fmt.Sprintf("later request PDU #%d: stream=%d", number(link["Request PDU ID"]), number(link["Stream ID"])))
+			}
+		}
 		if v["Authentication Verified"] == true {
 			parts = append(parts, "packet AEAD verified")
 		} else if v["Encrypted"] == true {
