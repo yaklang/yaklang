@@ -851,10 +851,20 @@ func splitMemberVerboseName(se *FunctionSideEffect) (objName, field string) {
 	if se == nil || se.Variable == nil {
 		return "", ""
 	}
-	if idx := strings.LastIndex(se.VerboseName, "."); idx >= 0 && idx+1 < len(se.VerboseName) {
-		field = se.VerboseName[idx+1:]
-	}
 	objName = se.Variable.GetName()
+	// Only `obj.field` names qualify. An already-materialized member such as
+	// `#242.lang` is not an object name: binding it again would create the
+	// double member `#242.lang.lang`.
+	if objName == "" || strings.ContainsAny(objName, ".#") {
+		return "", ""
+	}
+	if !strings.HasPrefix(se.VerboseName, objName+".") {
+		return "", ""
+	}
+	field = strings.TrimPrefix(se.VerboseName, objName+".")
+	if field == "" || strings.Contains(field, ".") {
+		return "", ""
+	}
 	return objName, field
 }
 

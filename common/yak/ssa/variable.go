@@ -230,20 +230,32 @@ func GetFristLocalVariableFromScope(scope ScopeIF, name string) *Variable {
 	return findVariableFromScope(scope, name, true, true)
 }
 
-// variableScopeIsDeeper reports whether a was created in a scope nested inside
-// b's scope. Only such a variable shadows the one b belongs to.
-func variableScopeIsDeeper(a, b *Variable) bool {
-	if a == nil || b == nil {
+// preferLocalVariable reports whether the first local variable found for a name
+// must override the version the scope lookup returned.
+//
+// Two cases keep the looked-up value even though the local version differs:
+//   - a plain reassignment (`ret = f()`) adds a second variable in the SAME
+//     scope, so the newest assignment has to win;
+//   - a loop condition resolves to the spin phi of the condition scope while
+//     the local copy sits in the enclosing header scope, so preferring the copy
+//     would freeze the condition at the pre-loop value.
+func preferLocalVariable(ret, local *Variable) bool {
+	if ret == nil || local == nil {
 		return false
 	}
-	scopeA, scopeB := a.GetScope(), b.GetScope()
-	if utils.IsNil(scopeA) || utils.IsNil(scopeB) {
+	scopeRet, scopeLocal := ret.GetScope(), local.GetScope()
+	if utils.IsNil(scopeRet) || utils.IsNil(scopeLocal) {
 		return false
 	}
-	if scopeA.Compare(scopeB) {
+	if scopeRet.Compare(scopeLocal) || scopeLocal.Compare(scopeRet) {
 		return false
 	}
-	return scopeA.IsSameOrSubScope(scopeB)
+	if v := ret.GetValue(); v != nil {
+		if _, isPhi := ToPhi(v); isPhi {
+			return false
+		}
+	}
+	return true
 }
 
 func GetFristLocalVariableFromScopeAndParent(scope ScopeIF, name string) *Variable {

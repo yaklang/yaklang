@@ -723,8 +723,41 @@ type Phi struct {
 	CFGEntryBasicBlock int64
 
 	Edge []int64 // value  // edge[i] from phi.Block.Preds[i]
+	// LoopCarriedEdges lists Edge indexes that mean "unchanged in this
+	// iteration". The loop spin handler folds such an edge to the loop's
+	// pre-loop value so the merge stays a single phi, but the exact iteration
+	// semantics are the phi's own previous value. Consumers that need exact
+	// values (code generation) read the phi itself on those edges instead.
+	LoopCarriedEdges []int64
 	//	what instruction create this control-flow merge?
 	// branch *Instruction // loop or if :
+}
+
+// MarkLoopCarriedEdge records that Edge[index] stands for the phi's previous
+// iteration value, not for the pre-loop value stored in that slot.
+func (p *Phi) MarkLoopCarriedEdge(index int) {
+	if p == nil || index < 0 {
+		return
+	}
+	for _, existing := range p.LoopCarriedEdges {
+		if existing == int64(index) {
+			return
+		}
+	}
+	p.LoopCarriedEdges = append(p.LoopCarriedEdges, int64(index))
+}
+
+// IsLoopCarriedEdge reports whether Edge[index] is a folded "unchanged" edge.
+func (p *Phi) IsLoopCarriedEdge(index int) bool {
+	if p == nil || index < 0 {
+		return false
+	}
+	for _, existing := range p.LoopCarriedEdges {
+		if existing == int64(index) {
+			return true
+		}
+	}
+	return false
 }
 
 func (p *Phi) IsPhi() bool {

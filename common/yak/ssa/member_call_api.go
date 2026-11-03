@@ -174,15 +174,8 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 		if ok && modify != nil {
 			if ref := modify.GetReference(); ref != nil {
 				objectt = ref
-			} else if modify.IsMember() && modify.GetObject() != nil {
-				objectt = modify.GetObject()
 			}
 		}
-	}
-
-	res := checkCanMemberCallExist(objectt, key, wantFunction)
-	if ret := b.PeekValueInThisFunction(res.name); ret != nil && shouldReuseMemberScopeValue(objectt, key, ret) {
-		return ret
 	}
 
 	// Phi value: read member from each edge and merge as Phi.
@@ -199,9 +192,10 @@ func (b *FunctionBuilder) readMemberCallValueExWithVisited(object, key Value, wa
 		defer visited.pop(vk, inOverflow)
 
 		res := checkCanMemberCallExist(objectt, key, wantFunction)
-		if ret := b.PeekValueInThisFunction(res.name); ret != nil && shouldReuseMemberScopeValue(objectt, key, ret) {
+		if ret := b.PeekValueInThisFunction(res.name); ret != nil {
 			return ret
 		}
+
 		edgeValues := make(Values, 0, len(phi.Edge))
 		for _, edgeID := range phi.Edge {
 			edgeValue, ok := objectt.GetValueById(edgeID)
